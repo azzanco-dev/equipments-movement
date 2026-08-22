@@ -195,9 +195,7 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
 
   if (!log) return null;
 
-  const isEntry = log.movement_type === 'entry';
-  console.log(linkedLog)
-  
+  const isEntry = log.movement_type === 'entry';  
   let durationMs = 0;
 
   if (linkedLog) {
