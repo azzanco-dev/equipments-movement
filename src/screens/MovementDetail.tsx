@@ -18,8 +18,12 @@ import {
   StickyNote,
   Link2,
   ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Maximize2,
 } from 'lucide-react';
-import type { EntryExitLog, Company, Project } from '@/lib/types';
+import type { EntryExitLog, Company, Project, EntryExitPhoto } from '@/lib/types';
 
 interface MovementDetailProps {
   movementId: string;
@@ -74,6 +78,10 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
   const [linkedCompany, setLinkedCompany] = useState<Company | null>(null);
   const [linkedProject, setLinkedProject] = useState<Project | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [photoCarouselIndex, setPhotoCarouselIndex] = useState(0);
+  const [fullImageOpen, setFullImageOpen] = useState(false);
+  const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [linkedError, setLinkedError] = useState<string | null>(null);
@@ -89,6 +97,10 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
     setLinkedCompany(null);
     setLinkedProject(null);
     setPhotoUrl(null);
+    setPhotoUrls([]);
+    setPhotoCarouselIndex(0);
+    setFullImageOpen(false);
+    setFullImageSrc(null);
     setLinkedError(null);
     setError(null);
     setLoading(true);
@@ -128,8 +140,27 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
         setProject(proj as Project | null);
       }
 
-      // Fetch photo signed URL
-      if (logData.photo_url) {
+      // Fetch photo signed URLs — prefer new entry_exit_photos table,
+      // fall back to legacy photo_url if no new photo rows exist.
+      const { data: photoRows, error: photoErr } = await supabase
+        .from('entry_exit_photos')
+        .select('*')
+        .eq('entry_exit_log_id', movementId)
+        .order('sort_order', { ascending: true });
+
+      if (photoErr) {
+        console.error(photoErr);
+      } else if (photoRows && photoRows.length > 0) {
+        const signedUrls = await Promise.all(
+          (photoRows as EntryExitPhoto[]).map(async (p) => {
+            const { data: signed } = await supabase.storage
+              .from('log-photos')
+              .createSignedUrl(p.file_path, 3600);
+            return signed?.signedUrl ?? null;
+          })
+        );
+        setPhotoUrls(signedUrls.filter((u): u is string => u !== null));
+      } else if (logData.photo_url) {
         const { data: signed } = await supabase.storage
           .from('log-photos')
           .createSignedUrl(logData.photo_url, 3600);
@@ -332,18 +363,63 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
           </div>
         )}
 
-        {/* Photo */}
+        {/* Photos */}
         <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
           <div className="flex items-center gap-2 mb-2">
             <Camera size={16} className="text-muted" />
             <p className="text-xs text-muted">{t('photo')}</p>
           </div>
-          {photoUrl ? (
-            <img
-              src={photoUrl}
-              alt={t('photo')}
-              className="rounded-lg max-h-80 object-cover"
-            />
+          {photoUrls.length > 0 ? (
+            <div className="relative rounded-lg overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--border)', height: '320px' }}>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <img
+                  src={photoUrls[photoCarouselIndex]}
+                  alt={`Photo ${photoCarouselIndex + 1}`}
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => { setFullImageSrc(photoUrls[photoCarouselIndex]); setFullImageOpen(true); }}
+                className="absolute top-1 end-1 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
+              >
+                <Maximize2 size={16} />
+              </button>
+              {photoUrls.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setPhotoCarouselIndex((prev) => (prev - 1 + photoUrls.length) % photoUrls.length)}
+                    className="absolute start-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPhotoCarouselIndex((prev) => (prev + 1) % photoUrls.length)}
+                    className="absolute end-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+                  <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-white bg-black/50 rounded-full px-2 py-0.5">
+                    {photoCarouselIndex + 1} / {photoUrls.length}
+                  </span>
+                </>
+              )}
+            </div>
+          ) : photoUrl ? (
+            <div className="relative rounded-lg overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--border)', height: '320px' }}>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <img src={photoUrl} alt={t('photo')} className="max-h-full max-w-full object-contain" />
+              </div>
+              <button
+                type="button"
+                onClick={() => { setFullImageSrc(photoUrl); setFullImageOpen(true); }}
+                className="absolute top-1 end-1 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
+              >
+                <Maximize2 size={16} />
+              </button>
+            </div>
           ) : (
             <p className="text-sm text-muted italic">{t('noPhoto')}</p>
           )}
@@ -429,6 +505,27 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
           ) : (
             <p className="text-sm text-muted italic">—</p>
           )}
+        </div>
+      )}
+
+      {/* Full image modal */}
+      {fullImageOpen && fullImageSrc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setFullImageOpen(false)}
+        >
+          <button
+            onClick={() => setFullImageOpen(false)}
+            className="absolute top-4 end-4 rounded-full p-2 bg-white/10 hover:bg-white/20 text-white transition-colors"
+          >
+            <X size={24} />
+          </button>
+          <img
+            src={fullImageSrc}
+            alt={t('photo')}
+            className="max-h-[90vh] max-w-[90vw] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>

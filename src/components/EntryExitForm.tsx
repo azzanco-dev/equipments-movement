@@ -6,13 +6,15 @@ import { Modal } from '@/components/Modal';
 import { Alert } from '@/components/Alert';
 import { QRScanner } from '@/components/QRScanner';
 import { Spinner } from '@/components/Spinner';
-import { QrCode, Search, Upload, AlertTriangle, CheckCircle, Clock, MapPin, Building2, FileText } from 'lucide-react';
+import { QrCode, Search, Upload, AlertTriangle, CheckCircle, Clock, MapPin, Building2, FileText, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
 import type { Equipment, MovementType, LastMovement, Company, Project } from '@/lib/types';
 import { Select } from '@/components/Select';
 import { sanitizeSearchTerm } from '@/lib/search';
 
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const FRONTEND_MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+const MAX_PHOTOS = 3;
 
 interface EntryExitFormProps {
   open: boolean;
@@ -49,7 +51,9 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
   const [validationError, setValidationError] = useState<string | null>(null);
   const [driverName, setDriverName] = useState('');
   const [notes, setNotes] = useState('');
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+  const [carouselIndex, setCarouselIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -70,7 +74,9 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     setValidationError(null);
     setDriverName('');
     setNotes('');
-    setPhotoFile(null);
+    setPhotoFiles([]);
+    setPhotoPreviews([]);
+    setCarouselIndex(0);
     setSaveError(null);
     setSelectedCompanyId('');
     setSelectedProjectId('');
@@ -180,6 +186,38 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     handleSelectEquipment(data as Equipment);
   };
 
+  const handleAddPhoto = (file: File | null) => {
+    if (!file) return;
+    if (photoFiles.length >= MAX_PHOTOS) return;
+    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+      setSaveError(t('invalidPhotoType'));
+      return;
+    }
+    if (file.size > FRONTEND_MAX_PHOTO_BYTES) {
+      setSaveError(t('photoTooLargeMulti'));
+      return;
+    }
+    setSaveError(null);
+    const preview = URL.createObjectURL(file);
+    setPhotoFiles((prev) => [...prev, file]);
+    setPhotoPreviews((prev) => [...prev, preview]);
+    setCarouselIndex(photoFiles.length);
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    URL.revokeObjectURL(photoPreviews[index]);
+    setPhotoFiles((prev) => prev.filter((_, i) => i !== index));
+    setPhotoPreviews((prev) => prev.filter((_, i) => i !== index));
+    setCarouselIndex((prev) => Math.max(0, Math.min(prev, photoFiles.length - 2)));
+  };
+
+  useEffect(() => {
+    return () => {
+      photoPreviews.forEach((url) => URL.revokeObjectURL(url));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSave = async () => {
     if (!selected || !user) return;
     if (validationError) return;
@@ -188,30 +226,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     setSaveError(null);
 
     try {
-      let photoUrl: string | null = null;
-
-      // Upload photo if provided
-      if (photoFile) {
-        if (!ALLOWED_PHOTO_TYPES.includes(photoFile.type)) {
-          setSaveError(t('invalidPhotoType'));
-          setSaving(false);
-          return;
-        }
-        if (photoFile.size > MAX_PHOTO_BYTES) {
-          setSaveError(t('photoTooLarge'));
-          setSaving(false);
-          return;
-        }
-        const safeName = photoFile.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
-        const fileName = `${user.id}/${Date.now()}-${safeName}`;
-        const { error: uploadError } = await supabase.storage
-          .from('log-photos')
-          .upload(fileName, photoFile);
-
-        if (uploadError) throw uploadError;
-        photoUrl = fileName;
-      }
-
       const payload: Record<string, unknown> = {
         equipment_id: selected.id,
         supervisor_id: user.id,
@@ -219,7 +233,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
         registration_method: 'qr' in window && scanOpen ? 'qr' : 'manual',
         driver_name: driverName || null,
         notes: notes || null,
-        photo_url: photoUrl,
       };
 
       // ENTRY: client supplies company, project, and contractor code.
@@ -236,18 +249,57 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
         payload.recorded_at = new Date(recordedAt).toISOString();
       }
 
-      const { error } = await supabase.from('entry_exit_logs').insert(payload);
+      const { data: insertedLog, error: insertError } = await supabase
+        .from('entry_exit_logs')
+        .insert(payload)
+        .select('id')
+        .single();
 
-      if (error) throw error;
+      if (insertError) throw insertError;
+      if (!insertedLog) throw new Error('insert failed');
+
+      // Upload photos and create entry_exit_photos rows
+      if (photoFiles.length > 0) {
+        const uploadResults = await Promise.allSettled(
+          photoFiles.map(async (file, index) => {
+            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
+            const fileName = `${user.id}/${Date.now()}-${index}-${safeName}`;
+            const { error: uploadError } = await supabase.storage
+              .from('log-photos')
+              .upload(fileName, file);
+
+            if (uploadError) throw uploadError;
+
+            const { error: dbError } = await supabase
+              .from('entry_exit_photos')
+              .insert({
+                entry_exit_log_id: insertedLog.id,
+                file_path: fileName,
+                uploaded_by: user.id,
+                sort_order: index,
+              });
+
+            if (dbError) throw dbError;
+          })
+        );
+
+        const failedCount = uploadResults.filter((r) => r.status === 'rejected').length;
+        if (failedCount > 0) {
+          console.error(`${failedCount} photo(s) failed to upload`);
+          if (failedCount === photoFiles.length) {
+            setSaveError(t('photoUploadFailed'));
+            setSaving(false);
+            return;
+          }
+          setSaveError(t('photoUploadFailed'));
+        }
+      }
 
       onSaved();
       onClose();
       reset();
     } catch (err) {
       console.error(err);
-      // The most likely cause of a DB rejection here is a stale frontend state:
-      // another user recorded a movement between our check and our submit.
-      // Refresh the latest movement state and show a clean message.
       setSaveError(t('movementStateChanged'));
       checkLastMovement(selected);
     } finally {
@@ -551,33 +603,67 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
 
               <div>
                 <label className="label">{t('photo')}</label>
-                <label className="flex items-center justify-center gap-2 rounded-lg border border-dashed p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" style={{ borderColor: 'var(--border)' }}>
-                  <Upload size={18} className="text-muted" />
-                  <span className="text-sm text-muted">
-                    {photoFile ? photoFile.name : t('uploadPhoto')}
-                  </span>
-                  <input
-                    type="file"
-                    accept={ALLOWED_PHOTO_TYPES.join(',')}
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] ?? null;
-                      if (!file) { setPhotoFile(null); return; }
-                      if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
-                        setPhotoFile(null);
-                        setSaveError(t('invalidPhotoType'));
-                        return;
-                      }
-                      if (file.size > MAX_PHOTO_BYTES) {
-                        setPhotoFile(null);
-                        setSaveError(t('photoTooLarge'));
-                        return;
-                      }
-                      setSaveError(null);
-                      setPhotoFile(file);
-                    }}
-                  />
-                </label>
+                {photoFiles.length > 0 && (
+                  <div className="mb-3">
+                    <div className="relative rounded-lg overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--border)', height: '240px' }}>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <img
+                          src={photoPreviews[carouselIndex]}
+                          alt={`Photo ${carouselIndex + 1}`}
+                          className="max-h-full max-w-full object-contain"
+                        />
+                      </div>
+                      {photoFiles.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setCarouselIndex((prev) => (prev - 1 + photoFiles.length) % photoFiles.length)}
+                            className="absolute start-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
+                          >
+                            <ChevronLeft size={20} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCarouselIndex((prev) => (prev + 1) % photoFiles.length)}
+                            className="absolute end-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
+                          >
+                            <ChevronRight size={20} />
+                          </button>
+                          <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-white bg-black/50 rounded-full px-2 py-0.5">
+                            {carouselIndex + 1} / {photoFiles.length}
+                          </span>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePhoto(carouselIndex)}
+                        className="absolute top-1 end-1 rounded-full p-1 bg-black/40 hover:bg-red-600 text-white transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-muted mb-2">
+                  {t('photosCount').replace('{count}', String(photoFiles.length)).replace('{max}', String(MAX_PHOTOS))}
+                </p>
+                {photoFiles.length < MAX_PHOTOS ? (
+                  <label className="flex items-center justify-center gap-2 rounded-lg border border-dashed p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" style={{ borderColor: 'var(--border)' }}>
+                    <Camera size={18} className="text-muted" />
+                    <span className="text-sm text-muted">{t('addPhoto')}</span>
+                    <input
+                      type="file"
+                      accept={ALLOWED_PHOTO_TYPES.join(',')}
+                      className="hidden"
+                      onChange={(e) => {
+                        handleAddPhoto(e.target.files?.[0] ?? null);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                ) : (
+                  <p className="text-xs text-muted text-center py-2">{t('maxPhotosReached')}</p>
+                )}
               </div>
             </div>
 

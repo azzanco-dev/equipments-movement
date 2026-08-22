@@ -116,6 +116,15 @@ export interface CompanyProject {
   created_at: string;
 }
 
+export interface EntryExitPhoto {
+  id: string;
+  entry_exit_log_id: string;
+  file_path: string;
+  uploaded_by: string;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface LastMovement {
   movement_type: MovementType;
   recorded_at: string;
