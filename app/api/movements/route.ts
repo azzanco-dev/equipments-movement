@@ -4,13 +4,14 @@ import { NextResponse } from 'next/server';
 export const runtime = 'nodejs';
 
 const MAX_PHOTOS = 3;
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
-const ALLOWED_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic']);
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const ALLOWED_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 function movementErrorCode(message: string): string {
   if (message.includes('movement time cannot be in the future')) return 'future_time';
   if (message.includes('company_id is required')) return 'company_required';
   if (message.includes('project_id is required')) return 'project_required';
+  if (message.includes('driver_id is required') || message.includes('invalid driver_id')) return 'driver_required';
   if (message.includes('no prior entry') || message.includes('not inside the gate')) return 'no_prior_entry';
   if (message.includes('sequence would be invalid')) return 'invalid_sequence';
   return 'movement_save_failed';
@@ -65,6 +66,7 @@ export async function POST(request: Request) {
       notes: value('notes'),
     };
     if (movementType === 'entry') {
+      payload.driver_id = value('driver_id');
       payload.company_id = value('company_id');
       payload.project_id = value('project_id');
       payload.contractor_equipment_code = value('contractor_equipment_code');
@@ -79,14 +81,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: movementErrorCode(insertError.message) }, { status: 409 });
     }
 
+    let photoFailures = 0;
     for (const [index, file] of photos.entries()) {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) || `photo-${index}`;
-      const filePath = `${authData.user.id}/${crypto.randomUUID()}-${index}-${safeName}`;
+      const filePath = `${authData.user.id}/${insertedLog.id}/${crypto.randomUUID()}-${index}-${safeName}`;
       const { error: uploadError } = await supabase.storage.from('log-photos').upload(filePath, file, {
         contentType: file.type,
         upsert: false,
       });
-      if (uploadError) return NextResponse.json({ id: insertedLog.id, error: 'photo_upload_failed' }, { status: 502 });
+      if (uploadError) {
+        photoFailures += 1;
+        continue;
+      }
       const { error: photoError } = await supabase.from('entry_exit_photos').insert({
         entry_exit_log_id: insertedLog.id,
         file_path: filePath,
@@ -95,11 +101,11 @@ export async function POST(request: Request) {
       });
       if (photoError) {
         await supabase.storage.from('log-photos').remove([filePath]);
-        return NextResponse.json({ id: insertedLog.id, error: 'photo_upload_failed' }, { status: 502 });
+        photoFailures += 1;
       }
     }
 
-    return NextResponse.json({ id: insertedLog.id }, { status: 201 });
+    return NextResponse.json({ id: insertedLog.id, photoFailures }, { status: 201 });
   } catch (error) {
     console.error('Create movement failed', error);
     return NextResponse.json({ error: 'movement_save_failed' }, { status: 500 });

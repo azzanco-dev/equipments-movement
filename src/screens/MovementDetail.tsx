@@ -5,6 +5,7 @@ import type { TranslationKey } from '@/i18n/translations';
 import { InlineSpinner } from '@/components/Spinner';
 import { PageHeader } from '@/components/PageHeader';
 import { Alert } from '@/components/Alert';
+import { useAuth } from '@/auth/AuthContext';
 import {
   ArrowLeft,
   LogIn,
@@ -23,6 +24,8 @@ import {
   ChevronRight,
   X,
   Maximize2,
+  Trash2,
+  Upload,
 } from 'lucide-react';
 import type { EntryExitLog, Company, Project, EntryExitPhoto } from '@/lib/types';
 
@@ -72,6 +75,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
 
 export function MovementDetail({ movementId, onBack, onNavigateMovement }: MovementDetailProps) {
   const { t } = useI18n();
+  const { user, profile } = useAuth();
   const [log, setLog] = useState<EntryExitLog | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [project, setProject] = useState<Project | null>(null);
@@ -79,13 +83,16 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
   const [linkedCompany, setLinkedCompany] = useState<Company | null>(null);
   const [linkedProject, setLinkedProject] = useState<Project | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
+  const [photoItems, setPhotoItems] = useState<(EntryExitPhoto & { url: string })[]>([]);
   const [photoCarouselIndex, setPhotoCarouselIndex] = useState(0);
   const [fullImageOpen, setFullImageOpen] = useState(false);
   const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [linkedError, setLinkedError] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoActionError, setPhotoActionError] = useState<string | null>(null);
+  const photoUrls = photoItems.map((item) => item.url);
 
   const fetchData = useCallback(async () => {
     // Reset all movement-specific state so stale values from a previous
@@ -98,7 +105,7 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
     setLinkedCompany(null);
     setLinkedProject(null);
     setPhotoUrl(null);
-    setPhotoUrls([]);
+    setPhotoItems([]);
     setPhotoCarouselIndex(0);
     setFullImageOpen(false);
     setFullImageSrc(null);
@@ -109,7 +116,7 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
     try {
       const { data, error: fetchError } = await supabase
         .from('entry_exit_logs')
-        .select('*, equipment:equipment(*), supervisor:profiles(*)')
+        .select('*, equipment:equipment(*), supervisor:profiles(*), driver:drivers(*)')
         .eq('id', movementId)
         .maybeSingle();
 
@@ -152,15 +159,15 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
       if (photoErr) {
         console.error(photoErr);
       } else if (photoRows && photoRows.length > 0) {
-        const signedUrls = await Promise.all(
+        const signedItems = await Promise.all(
           (photoRows as EntryExitPhoto[]).map(async (p) => {
             const { data: signed } = await supabase.storage
               .from('log-photos')
               .createSignedUrl(p.file_path, 3600);
-            return signed?.signedUrl ?? null;
+            return signed?.signedUrl ? { ...p, url: signed.signedUrl } : null;
           })
         );
-        setPhotoUrls(signedUrls.filter((u): u is string => u !== null));
+        setPhotoItems(signedItems.filter((item): item is EntryExitPhoto & { url: string } => item !== null));
       } else if (logData.photo_url) {
         const { data: signed } = await supabase.storage
           .from('log-photos')
@@ -237,6 +244,32 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const addPhotos = async (files: FileList | null) => {
+    if (!files?.length || photoItems.length >= 3) return;
+    const selected = Array.from(files);
+    if (selected.length > 3 - photoItems.length || selected.some((file) => file.size > 10 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) {
+      setPhotoActionError(t('invalidPhotosForMovement'));
+      return;
+    }
+    setPhotoBusy(true); setPhotoActionError(null);
+    const { data } = await supabase.auth.getSession();
+    const form = new FormData(); selected.forEach((file) => form.append('photos', file));
+    const response = await fetch(`/api/movements/${movementId}/photos`, { method: 'POST', headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}` }, body: form });
+    setPhotoBusy(false);
+    if (!response.ok) { setPhotoActionError(t('photoUploadFailed')); return; }
+    await fetchData();
+  };
+
+  const deletePhoto = async (photoId: string) => {
+    if (!confirm(t('confirmDeletePhoto'))) return;
+    setPhotoBusy(true); setPhotoActionError(null);
+    const { data } = await supabase.auth.getSession();
+    const response = await fetch(`/api/movements/${movementId}/photos`, { method: 'DELETE', headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId }) });
+    setPhotoBusy(false);
+    if (!response.ok) { setPhotoActionError(t('photoDeleteFailed')); return; }
+    setPhotoCarouselIndex(0); await fetchData();
+  };
 
   if (loading) return <InlineSpinner label={t('loading')} />;
 
@@ -332,7 +365,7 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
           <InfoRow
             icon={<User size={16} />}
             label={t('driverName')}
-            value={log.driver_name}
+            value={log.driver?.full_name ?? log.driver_name}
           />
           <InfoRow
             icon={<User size={16} />}
@@ -349,11 +382,11 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
             label={t('createdAt')}
             value={log.created_at ? formatDateTime(log.created_at) : '—'}
           />
-          {/* <InfoRow
+          <InfoRow
             icon={<Clock size={16} />}
             label={t('registrationMethod')}
             value={log.registration_method === 'qr' ? t('qr') : t('manual')}
-          /> */}
+          />
         </div>
 
         {/* Notes */}
@@ -375,6 +408,7 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
             <Camera size={16} className="text-muted" />
             <p className="text-xs text-muted">{t('photo')}</p>
           </div>
+          {photoActionError && <div className="mb-3"><Alert type="error">{photoActionError}</Alert></div>}
           {photoUrls.length > 0 ? (
             <div className="relative rounded-lg overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--border)', height: '320px' }}>
               <div className="absolute inset-0 flex items-center justify-center">
@@ -391,6 +425,9 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
               >
                 <Maximize2 size={16} />
               </button>
+              {(photoItems[photoCarouselIndex]?.uploaded_by === user?.id || profile?.role === 'admin') && (
+                <button type="button" disabled={photoBusy} onClick={() => deletePhoto(photoItems[photoCarouselIndex].id)} className="absolute top-1 start-1 rounded-full bg-red-600/80 p-1.5 text-white hover:bg-red-700"><Trash2 size={16} /></button>
+              )}
               {photoUrls.length > 1 && (
                 <>
                   <button
@@ -428,6 +465,12 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
             </div>
           ) : (
             <p className="text-sm text-muted italic">{t('noPhoto')}</p>
+          )}
+          {photoItems.length < 3 && (
+            <label className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-sm hover:bg-gray-100 dark:hover:bg-gray-800" style={{ borderColor: 'var(--border)' }}>
+              <Upload size={16} />{photoBusy ? t('loading') : t('addPhoto')}
+              <input type="file" multiple accept="image/jpeg,image/png,image/webp" className="hidden" disabled={photoBusy} onChange={(event) => { addPhotos(event.target.files); event.target.value = ''; }} />
+            </label>
           )}
         </div>
       </div>

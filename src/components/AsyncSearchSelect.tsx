@@ -1,0 +1,121 @@
+import { useEffect, useRef, useState } from 'react';
+import { Check, ChevronDown, Loader2, Search, X } from 'lucide-react';
+import { useI18n } from '@/i18n/I18nContext';
+import type { SelectOption } from '@/components/Select';
+
+interface AsyncSearchSelectProps {
+  value: string;
+  selectedOption?: SelectOption | null;
+  onChange: (value: string, option: SelectOption | null) => void;
+  loadOptions: (query: string) => Promise<SelectOption[]>;
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
+}
+
+export function AsyncSearchSelect({
+  value,
+  selectedOption,
+  onChange,
+  loadOptions,
+  placeholder = '—',
+  className = '',
+  disabled = false,
+}: AsyncSearchSelectProps) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [options, setOptions] = useState<SelectOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const requestRef = useRef(0);
+
+  useEffect(() => {
+    const close = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        setOpen(false);
+        setQuery('');
+      }
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    inputRef.current?.focus();
+    const requestId = ++requestRef.current;
+    const timer = window.setTimeout(async () => {
+      setLoading(true);
+      try {
+        const next = await loadOptions(query.trim());
+        if (requestId === requestRef.current) setOptions(next.slice(0, 20));
+      } finally {
+        if (requestId === requestRef.current) setLoading(false);
+      }
+    }, query ? 300 : 0);
+    return () => window.clearTimeout(timer);
+  }, [open, query, loadOptions]);
+
+  return (
+    <div ref={ref} className={`relative ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+        className="flex w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-black disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-white"
+        style={{ borderColor: 'var(--border)' }}
+      >
+        <span className={selectedOption ? '' : 'text-gray-400'}>{selectedOption?.label ?? placeholder}</span>
+        <span className="flex items-center gap-1">
+          {value && (
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label={t('clear')}
+              onClick={(event) => { event.stopPropagation(); onChange('', null); }}
+              onKeyDown={(event) => { if (event.key === 'Enter') onChange('', null); }}
+              className="rounded p-0.5 hover:bg-gray-100 dark:hover:bg-gray-800"
+            >
+              <X size={14} />
+            </span>
+          )}
+          <ChevronDown size={16} className={`text-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 w-full min-w-[260px] overflow-hidden rounded-lg border shadow-lg" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+          <div className="relative border-b" style={{ borderColor: 'var(--border)' }}>
+            <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted" />
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('searchInList')}
+              className="w-full bg-transparent py-2 ps-9 pe-3 text-sm outline-none"
+            />
+          </div>
+          <div className="max-h-60 overflow-y-auto">
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 px-3 py-5 text-sm text-muted"><Loader2 size={16} className="animate-spin" />{t('loading')}</div>
+            ) : options.length === 0 ? (
+              <div className="px-3 py-5 text-center text-sm text-muted">{t('noResults')}</div>
+            ) : options.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => { onChange(option.value, option); setOpen(false); setQuery(''); }}
+                className={`flex w-full items-center justify-between gap-2 px-3.5 py-2 text-start text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${option.value === value ? 'font-semibold' : ''}`}
+              >
+                <span>{option.label}</span>
+                {option.value === value && <Check size={14} />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -7,14 +7,15 @@ import { Alert } from '@/components/Alert';
 import { QRScanner } from '@/components/QRScanner';
 import { Spinner } from '@/components/Spinner';
 import { QrCode, Search, AlertTriangle, CheckCircle, Clock, MapPin, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
-import type { Equipment, MovementType, LastMovement, Company, Project } from '@/lib/types';
-import { Select } from '@/components/Select';
+import type { Equipment, MovementType, LastMovement } from '@/lib/types';
 import { DatePicker } from '@/components/DatePicker';
 import { TimePicker } from '@/components/TimePicker';
+import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 import { sanitizeSearchTerm } from '@/lib/search';
+import type { SelectOption } from '@/components/Select';
 
-const FRONTEND_MAX_PHOTO_BYTES = 5 * 1024 * 1024;
-const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+const FRONTEND_MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_PHOTOS = 3;
 
 interface EntryExitFormProps {
@@ -54,17 +55,20 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
   const [lastMovement, setLastMovement] = useState<LastMovement | null>(null);
   const [loadingMovement, setLoadingMovement] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [driverName, setDriverName] = useState('');
+  const [driverId, setDriverId] = useState('');
+  const [selectedDriver, setSelectedDriver] = useState<SelectOption | null>(null);
   const [notes, setNotes] = useState('');
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [saveWarning, setSaveWarning] = useState<string | null>(null);
+  const [movementSaved, setMovementSaved] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [selectedCompany, setSelectedCompany] = useState<SelectOption | null>(null);
+  const [selectedProject, setSelectedProject] = useState<SelectOption | null>(null);
   const [contractorCode, setContractorCode] = useState('');
   const [recordedAt, setRecordedAt] = useState('');
   const [registrationMethod, setRegistrationMethod] = useState<'manual' | 'qr'>('manual');
@@ -93,14 +97,19 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     setLastMovement(null);
     setLoadingMovement(false);
     setValidationError(null);
-    setDriverName('');
+    setDriverId('');
+    setSelectedDriver(null);
     setNotes('');
     setPhotoFiles([]);
     setPhotoPreviews([]);
     setCarouselIndex(0);
     setSaveError(null);
+    setSaveWarning(null);
+    setMovementSaved(false);
     setSelectedCompanyId('');
     setSelectedProjectId('');
+    setSelectedCompany(null);
+    setSelectedProject(null);
     setContractorCode('');
     setRecordedAt('');
     setRegistrationMethod('manual');
@@ -113,12 +122,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
       reset();
     }
   }, [open, reset]);
-
-  useEffect(() => {
-    if (!open) return;
-    supabase.from('companies').select('*').order('name_ar').then(({ data }) => setCompanies((data as Company[]) ?? []));
-    supabase.from('projects').select('*').order('name_ar').then(({ data }) => setProjects((data as Project[]) ?? []));
-  }, [open]);
 
   // Search equipment
   useEffect(() => {
@@ -137,14 +140,14 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
       query.or(`code.ilike.%${term}%,type.ilike.%${term}%`);
     }
 
-    query.limit(50).then(({ data, error }) => {
+    const timer = window.setTimeout(() => query.limit(20).then(({ data, error }) => {
       if (!active) return;
       if (error) console.error(error);
       setEquipment((data as Equipment[]) ?? []);
       setLoadingEquipment(false);
-    });
+    }), search ? 300 : 0);
 
-    return () => { active = false; };
+    return () => { active = false; window.clearTimeout(timer); };
   }, [open, step, search]);
 
   // Check last movement when equipment is selected
@@ -165,6 +168,10 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
 
     const last = (data as LastMovement[])[0] ?? null;
     setLastMovement(last);
+    if (!isEntry && last?.driver_id) {
+      setDriverId(last.driver_id);
+      setSelectedDriver({ value: last.driver_id, label: last.driver_name ?? '—' });
+    }
 
     // Validation logic
     if (isEntry) {
@@ -185,6 +192,37 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
 
     return last;
   }, [isEntry, t]);
+
+  const loadDrivers = useCallback(async (query: string): Promise<SelectOption[]> => {
+    let request = supabase.from('drivers')
+      .select('id,full_name,id_number,mobile_number')
+      .order('full_name')
+      .limit(20);
+    const term = sanitizeSearchTerm(query);
+    if (term) request = request.or(`full_name.ilike.%${term}%,id_number.ilike.%${term}%,mobile_number.ilike.%${term}%`);
+    const { data, error } = await request;
+    if (error) return [];
+    return (data ?? []).map((driver) => ({
+      value: driver.id,
+      label: `${driver.full_name} — ${driver.id_number} — ${driver.mobile_number}`,
+    }));
+  }, []);
+
+  const loadCompanies = useCallback(async (query: string): Promise<SelectOption[]> => {
+    let request = supabase.from('companies').select('id,name_ar,name_en').order('name_ar').limit(20);
+    const term = sanitizeSearchTerm(query);
+    if (term) request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`);
+    const { data } = await request;
+    return (data ?? []).map((company) => ({ value: company.id, label: `${company.name_ar} — ${company.name_en}` }));
+  }, []);
+
+  const loadProjects = useCallback(async (query: string): Promise<SelectOption[]> => {
+    let request = supabase.from('projects').select('id,name_ar,name_en').order('name_ar').limit(20);
+    const term = sanitizeSearchTerm(query);
+    if (term) request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`);
+    const { data } = await request;
+    return (data ?? []).map((project) => ({ value: project.id, label: `${project.name_ar} — ${project.name_en}` }));
+  }, []);
 
   const handleSelectEquipment = (eq: Equipment) => {
     setSelected(eq);
@@ -253,6 +291,18 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
   const handleSave = async () => {
     if (!selected || !user) return;
     if (validationError) return;
+    if (isEntry && !driverId) {
+      setSaveError(t('driverRequired'));
+      return;
+    }
+    if (isEntry && !selectedCompanyId) {
+      setSaveError(t('companyRequiredForEntry'));
+      return;
+    }
+    if (isEntry && !selectedProjectId) {
+      setSaveError(t('projectRequiredForEntry'));
+      return;
+    }
     if (!recordedAt.trim()) {
       setSaveError(`${t('actualMovementTime')}: ${t('required')}`);
       return;
@@ -275,9 +325,9 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
       form.set('equipment_id', selected.id);
       form.set('movement_type', movementType);
       form.set('registration_method', registrationMethod);
-      if (driverName) form.set('driver_name', driverName);
       if (notes) form.set('notes', notes);
       if (isEntry) {
+        form.set('driver_id', driverId);
         if (selectedCompanyId) form.set('company_id', selectedCompanyId);
         if (selectedProjectId) form.set('project_id', selectedProjectId);
         if (contractorCode.trim()) form.set('contractor_equipment_code', contractorCode.trim());
@@ -294,10 +344,16 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
         const result = await response.json();
         throw new Error(result.error ?? 'movement_save_failed');
       }
+      const result = await response.json() as { id: string; photoFailures?: number };
 
       onSaved();
-      onClose();
-      reset();
+      if (result.photoFailures) {
+        setMovementSaved(true);
+        setSaveWarning(t('movementSavedPhotosFailed'));
+      } else {
+        onClose();
+        reset();
+      }
     } catch (err) {
       console.error(err);
       const code = err instanceof Error ? err.message : 'movement_save_failed';
@@ -305,6 +361,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
         future_time: t('movementTimeCannotBeFuture'),
         company_required: t('companyRequiredForEntry'),
         project_required: t('projectRequiredForEntry'),
+        driver_required: t('driverRequired'),
         no_prior_entry: t('noPriorEntryAtSelectedTime'),
         invalid_sequence: isEntry ? t('entrySequenceConflict') : t('exitSequenceConflict'),
         invalid_photos: t('invalidPhotoType'),
@@ -483,34 +540,40 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
             )}
 
             {/* Form fields */}
+            {!isEntry && lastMovement && !validationError && (
+              <div className="rounded-lg border p-4 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
+                <p className="mb-2 font-medium">{t('latestEntryBrief')}</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <span><span className="text-muted">{t('entryDateTime')}:</span> {formatDateTime(lastMovement.recorded_at)}</span>
+                  <span><span className="text-muted">{t('driverName')}:</span> {lastMovement.driver_name ?? '—'}</span>
+                  <span><span className="text-muted">{t('contractorEquipmentCode')}:</span> {lastMovement.contractor_equipment_code ?? '—'}</span>
+                  <span className="text-muted">{t('exitInheritsEntry')}</span>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4">
               {isEntry ? (
                 <>
                   <div>
                     <label className="label">{t('company')} *</label>
-                    <Select
+                    <AsyncSearchSelect
                       value={selectedCompanyId}
-                      onChange={setSelectedCompanyId}
+                      selectedOption={selectedCompany}
+                      onChange={(value, option) => { setSelectedCompanyId(value); setSelectedCompany(option); }}
                       placeholder="—"
-                      searchable
-                      options={[
-                        { value: '', label: '—' },
-                        ...companies.map((c) => ({ value: c.id, label: `${c.name_ar} — ${c.name_en}` })),
-                      ]}
+                      loadOptions={loadCompanies}
                     />
                   </div>
 
                   <div>
                     <label className="label">{t('project')} *</label>
-                    <Select
+                    <AsyncSearchSelect
                       value={selectedProjectId}
-                      onChange={setSelectedProjectId}
+                      selectedOption={selectedProject}
+                      onChange={(value, option) => { setSelectedProjectId(value); setSelectedProject(option); }}
                       placeholder="—"
-                      searchable
-                      options={[
-                        { value: '', label: '—' },
-                        ...projects.map((p) => ({ value: p.id, label: `${p.name_ar} — ${p.name_en}` })),
-                      ]}
+                      loadOptions={loadProjects}
                     />
                   </div>
 
@@ -528,13 +591,18 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
               ) : null}
 
               <div>
-                <label className="label">{t('driverName')}</label>
-                <input
-                  type="text"
-                  className="input"
-                  value={driverName}
-                  onChange={(e) => setDriverName(e.target.value)}
-                />
+                <label className="label">{t('driverName')} {isEntry && '*'}</label>
+                {isEntry ? (
+                  <AsyncSearchSelect
+                    value={driverId}
+                    selectedOption={selectedDriver}
+                    onChange={(value, option) => { setDriverId(value); setSelectedDriver(option); }}
+                    loadOptions={loadDrivers}
+                    placeholder={t('selectDriver')}
+                  />
+                ) : (
+                  <div className="input bg-gray-50 dark:bg-gray-900/30">{selectedDriver?.label ?? t('driverInheritedFromEntry')}</div>
+                )}
               </div>
 
               <div>
@@ -639,19 +707,14 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
             </div>
 
             {saveError && <Alert type="error">{saveError}</Alert>}
+            {saveWarning && <Alert type="warning">{saveWarning}</Alert>}
 
             {/* Actions */}
             <div className="flex gap-3 pt-2">
               <button onClick={onClose} className="btn-outline flex-1">
                 {t('cancel')}
               </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !!validationError || loadingMovement}
-                className="btn-primary flex-1"
-              >
-                {saving ? t('saving') : t('save')}
-              </button>
+              {!movementSaved && <button onClick={handleSave} disabled={saving || !!validationError || loadingMovement} className="btn-primary flex-1">{saving ? t('saving') : t('save')}</button>}
             </div>
           </div>
         )}

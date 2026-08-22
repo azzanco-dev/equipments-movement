@@ -14,11 +14,13 @@ import { AdminProjects } from '@/screens/AdminProjects';
 import { AdminCompanies } from '@/screens/AdminCompanies';
 import { AdminLessors } from '@/screens/AdminLessors';
 import { AdminUsers } from '@/screens/AdminUsers';
+import { AdminDrivers } from '@/screens/AdminDrivers';
+import { DriverDetail } from '@/screens/DriverDetail';
 import { MovementDetail } from '@/screens/MovementDetail';
 import type { Equipment } from '@/lib/types';
-import { LayoutDashboard, FileText, Truck, FolderKanban, Building2, Users, Briefcase } from 'lucide-react';
+import { LayoutDashboard, FileText, Truck, FolderKanban, Building2, Users, Briefcase, Contact } from 'lucide-react';
 
-const ADMIN_PAGES = new Set(['dashboard', 'logs', 'equipment', 'projects', 'companies', 'lessors', 'users']);
+const ADMIN_PAGES = new Set(['dashboard', 'logs', 'equipment', 'projects', 'companies', 'lessors', 'drivers', 'users']);
 
 function AppContent() {
   const { profile, loading } = useAuth();
@@ -28,6 +30,7 @@ function AppContent() {
   const segments = pathname.split('/').filter(Boolean);
   const movementId = segments[0] === 'movements' ? segments[1] : null;
   const equipmentId = segments[0] === 'equipment' ? segments[1] : null;
+  const driverId = segments[0] === 'drivers' ? segments[1] : null;
   const page = ADMIN_PAGES.has(segments[0] ?? '') ? segments[0] : 'dashboard';
 
   if (loading) return <FullPageSpinner />;
@@ -55,6 +58,7 @@ function AppContent() {
     { key: 'projects', label: t('projects'), icon: <FolderKanban size={18} /> },
     { key: 'companies', label: t('companies'), icon: <Briefcase size={18} /> },
     { key: 'lessors', label: t('lessors'), icon: <Building2 size={18} /> },
+    { key: 'drivers', label: t('drivers'), icon: <Contact size={18} /> },
     { key: 'users', label: t('users'), icon: <Users size={18} /> },
   ];
 
@@ -74,6 +78,8 @@ function AppContent() {
           }}
           onSelectMovement={openMovement}
         />
+      ) : driverId ? (
+        <DriverDetail driverId={driverId} onBack={() => router.push('/drivers')} />
       ) : (
         <>
           {(page === 'dashboard' || page === 'logs') && <AdminDashboard onSelectMovement={openMovement} />}
@@ -81,6 +87,7 @@ function AppContent() {
           {page === 'projects' && <AdminProjects />}
           {page === 'companies' && <AdminCompanies />}
           {page === 'lessors' && <AdminLessors />}
+          {page === 'drivers' && <AdminDrivers onSelectDriver={(id) => router.push(`/drivers/${id}`)} />}
           {page === 'users' && <AdminUsers />}
         </>
       )}

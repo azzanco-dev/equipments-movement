@@ -6,6 +6,18 @@ export type RegistrationType = 'private_transport' | 'public_transport' | 'heavy
 export type MovementType = 'entry' | 'exit';
 export type RegistrationMethod = 'qr' | 'manual';
 
+export interface Driver {
+  id: string;
+  full_name: string;
+  id_number: string;
+  mobile_number: string;
+  nationality: string;
+  employment_type: string;
+  job_title: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Profile {
   id: string;
   full_name: string;
@@ -67,6 +79,7 @@ export interface EntryExitLog {
   movement_type: MovementType;
   registration_method: RegistrationMethod;
   driver_name: string | null;
+  driver_id: string | null;
   odometer_reading: number | null;
   notes: string | null;
   photo_url: string | null;
@@ -79,6 +92,7 @@ export interface EntryExitLog {
   supervisor?: Profile;
   company?: Company | null;
   project?: Project | null;
+  driver?: Driver | null;
 }
 
 export interface EquipmentVisit {
@@ -133,4 +147,6 @@ export interface LastMovement {
   company_id: string | null;
   project_id: string | null;
   contractor_equipment_code: string | null;
+  driver_id: string | null;
+  driver_name: string | null;
 }
