@@ -311,8 +311,13 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
           <InfoRow
             icon={<Truck size={16} />}
-            label={t('equipmentCodeLabel')}
+            label={t('equipmentNameLabel')}
             value={log.equipment ? `${log.equipment.code} — ${log.equipment.type}` : '—'}
+          />
+          <InfoRow
+            icon={<FileText size={16} />}
+            label={t('contractorEquipmentCode')}
+            value={log.contractor_equipment_code}
           />
           <InfoRow
             icon={<Building2 size={16} />}
@@ -323,11 +328,6 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
             icon={<MapPin size={16} />}
             label={t('project')}
             value={project ? `${project.name_ar} — ${project.name_en}` : '—'}
-          />
-          <InfoRow
-            icon={<FileText size={16} />}
-            label={t('contractorEquipmentCode')}
-            value={log.contractor_equipment_code}
           />
           <InfoRow
             icon={<User size={16} />}
@@ -346,9 +346,14 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
           />
           <InfoRow
             icon={<Clock size={16} />}
+            label={t('createdAt')}
+            value={log.created_at ? formatDateTime(log.created_at) : '—'}
+          />
+          {/* <InfoRow
+            icon={<Clock size={16} />}
             label={t('registrationMethod')}
             value={log.registration_method === 'qr' ? t('qr') : t('manual')}
-          />
+          /> */}
         </div>
 
         {/* Notes */}

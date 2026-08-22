@@ -74,6 +74,7 @@ export interface EntryExitLog {
   project_id: string | null;
   contractor_equipment_code: string | null;
   recorded_at: string;
+  created_at: string;
   equipment?: Equipment;
   supervisor?: Profile;
   company?: Company | null;

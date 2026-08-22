@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useI18n } from '@/i18n/I18nContext';
 import { Alert } from '@/components/Alert';
@@ -17,17 +17,26 @@ export function QRScanner({ open, onClose, onScan }: QRScannerProps) {
   const [error, setError] = useState<string | null>(null);
   const lastScanRef = useRef<{ text: string; time: number }>({ text: '', time: 0 });
 
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current.clear();
+      } catch { /* ignore */ }
+      scannerRef.current = null;
+    }
+    setScanning(false);
+  }, []);
+
   useEffect(() => {
     return () => { stopScanner(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [stopScanner]);
 
   useEffect(() => {
     if (!open) {
       stopScanner();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, stopScanner]);
 
   async function startScanner() {
     setError(null);
@@ -50,17 +59,6 @@ export function QRScanner({ open, onClose, onScan }: QRScannerProps) {
       setError(t('error'));
       setScanning(false);
     }
-  }
-
-  async function stopScanner() {
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop();
-        scannerRef.current.clear();
-      } catch { /* ignore */ }
-      scannerRef.current = null;
-    }
-    setScanning(false);
   }
 
   if (!open) return null;

@@ -16,10 +16,14 @@ export function Alert({ type, children }: AlertProps) {
 
   return (
     <div
-      className="flex items-start gap-2.5 rounded-lg border p-3.5 text-sm animate-fade-in"
+      className={`flex items-start gap-2.5 rounded-lg border p-3.5 text-sm font-medium animate-fade-in ${
+        type === 'error'
+          ? 'border-red-500 bg-red-50 text-red-800 shadow-sm dark:border-red-700 dark:bg-red-950/40 dark:text-red-200'
+          : ''
+      }`}
       style={{
-        borderColor: type === 'error' ? 'var(--fg)' : 'var(--border)',
-        background: type === 'error' ? 'var(--surface)' : 'var(--surface)',
+        borderColor: type === 'error' ? undefined : 'var(--border)',
+        background: type === 'error' ? undefined : 'var(--surface)',
       }}
     >
       <span className="mt-0.5 shrink-0">{icons[type]}</span>

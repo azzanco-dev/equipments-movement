@@ -6,6 +6,7 @@ interface DatePickerProps {
   onChange: (value: string) => void;
   className?: string;
   placeholder?: string;
+  max?: string;
 }
 
 const MONTH_NAMES_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
@@ -37,7 +38,7 @@ function formatDateDisplay(s: string): string {
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-export function DatePicker({ value, onChange, className = '', placeholder = '—' }: DatePickerProps) {
+export function DatePicker({ value, onChange, className = '', placeholder = '—', max }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => parseISODate(value) ?? new Date());
   const ref = useRef<HTMLDivElement>(null);
@@ -78,6 +79,7 @@ export function DatePicker({ value, onChange, className = '', placeholder = '—
   }, [year, month]);
 
   const selectedDate = parseISODate(value);
+  const maxDate = max ? parseISODate(max) : null;
 
   function prevMonth() {
     setViewDate(new Date(year, month - 1, 1));
@@ -86,6 +88,7 @@ export function DatePicker({ value, onChange, className = '', placeholder = '—
     setViewDate(new Date(year, month + 1, 1));
   }
   function selectDay(d: Date) {
+    if (maxDate && d > maxDate) return;
     onChange(toISODate(d));
     setOpen(false);
   }
@@ -147,13 +150,17 @@ export function DatePicker({ value, onChange, className = '', placeholder = '—
               if (!d) return <div key={i} className="h-9" />;
               const isSelected = selectedDate && toISODate(d) === toISODate(selectedDate);
               const isToday = toISODate(d) === toISODate(today);
+              const isDisabled = Boolean(maxDate && d > maxDate);
               return (
                 <button
                   key={i}
                   type="button"
                   onClick={() => selectDay(d)}
+                  disabled={isDisabled}
                   className={`h-9 w-9 mx-auto rounded-md text-sm transition-colors flex items-center justify-center ${
-                    isSelected
+                    isDisabled
+                      ? 'text-gray-300 dark:text-gray-700 cursor-not-allowed'
+                      : isSelected
                       ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 font-medium'
                       : isToday
                         ? 'bg-gray-100 dark:bg-gray-800 font-medium'

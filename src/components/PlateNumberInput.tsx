@@ -7,11 +7,29 @@ interface PlateNumberInputProps {
 }
 
 interface PlateParts {
-  arabicLetters: string;
-  arabicNumbers: string;
   englishLetters: string;
   englishNumbers: string;
 }
+
+const ENGLISH_TO_ARABIC_LETTER: Record<string, string> = {
+  A: 'ا',
+  B: 'ب',
+  J: 'ح',
+  D: 'د',
+  R: 'ر',
+  S: 'س',
+  X: 'ص',
+  T: 'ط',
+  E: 'ع',
+  G: 'ق',
+  K: 'ك',
+  L: 'ل',
+  Z: 'م',
+  N: 'ن',
+  H: 'هـ',
+  U: 'و',
+  V: 'ى',
+};
 
 function parsePlate(value: string): PlateParts {
   const normalized = normalizePlateNumber(value);
@@ -19,25 +37,35 @@ function parsePlate(value: string): PlateParts {
   const numbers = normalized.match(/[0-9]+/)?.[0] ?? '';
 
   return {
-    arabicLetters: '',
-    arabicNumbers: '',
     englishLetters: letters,
     englishNumbers: numbers,
   };
 }
 
 function getNormalizedValue(parts: PlateParts): string {
-  const letters = parts.englishLetters || parts.arabicLetters;
-  const numbers = parts.englishNumbers || parts.arabicNumbers;
-  return normalizePlateNumber(`${letters} ${numbers}`);
+  return normalizePlateNumber(`${parts.englishLetters} ${parts.englishNumbers}`);
 }
 
 function cleanLetters(value: string): string {
-  return value.replace(/[^ء-يA-Za-z]/g, '').slice(0, 3);
+  return value
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '')
+    .split('')
+    .filter((letter) => letter in ENGLISH_TO_ARABIC_LETTER)
+    .join('')
+    .slice(0, 3);
 }
 
 function cleanNumbers(value: string): string {
-  return value.replace(/[^0-9٠-٩]/g, '').slice(0, 4);
+  return value.replace(/[^0-9]/g, '').slice(0, 4);
+}
+
+function toArabicLetters(value: string): string {
+  return value
+    .split('')
+    .reverse()
+    .map((letter) => ENGLISH_TO_ARABIC_LETTER[letter])
+    .join(' ');
 }
 
 export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
@@ -56,6 +84,9 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
   }
 
   const cellClass = 'w-full bg-transparent text-center text-2xl font-medium outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600';
+  const derivedCellClass = 'w-full text-center text-2xl font-medium';
+  const arabicLetters = toArabicLetters(parts.englishLetters);
+  const arabicNumbers = parts.englishNumbers;
 
   return (
     <div className="space-y-2">
@@ -76,34 +107,30 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
 
           <div className="grid flex-1 grid-cols-2 grid-rows-2">
             <div className="flex items-center justify-center border-b-[3px] border-e-[3px] p-3" style={{ borderColor: 'var(--fg)' }}>
-              <input
+              <div
                 aria-label="Arabic plate letters"
                 dir="rtl"
-                value={parts.arabicLetters}
-                onChange={(e) => updatePart('arabicLetters', cleanLetters(e.target.value))}
-                placeholder="أ ب ج"
-                className={cellClass}
-                inputMode="text"
-              />
+                className={`${derivedCellClass} ${arabicLetters ? '' : 'text-gray-300 dark:text-gray-600'}`}
+              >
+                {arabicLetters || 'ا ب ح'}
+              </div>
             </div>
             <div className="flex items-center justify-center border-b-[3px] p-3" style={{ borderColor: 'var(--fg)' }}>
-              <input
+              <div
                 aria-label="Arabic plate numbers"
                 dir="ltr"
-                value={parts.arabicNumbers}
-                onChange={(e) => updatePart('arabicNumbers', cleanNumbers(e.target.value))}
-                placeholder="٠ ٠ ٠ ٠"
-                className={cellClass}
-                inputMode="numeric"
-              />
+                className={`${derivedCellClass} ${arabicNumbers ? '' : 'text-gray-300 dark:text-gray-600'}`}
+              >
+                {arabicNumbers || '0 0 0 0'}
+              </div>
             </div>
             <div className="flex items-center justify-center border-e-[3px] p-3" style={{ borderColor: 'var(--fg)' }}>
               <input
                 aria-label="English plate letters"
                 dir="ltr"
                 value={parts.englishLetters}
-                onChange={(e) => updatePart('englishLetters', cleanLetters(e.target.value).toUpperCase())}
-                placeholder="A B C"
+                onChange={(e) => updatePart('englishLetters', cleanLetters(e.target.value))}
+                placeholder="A B J"
                 className={cellClass}
                 inputMode="text"
               />

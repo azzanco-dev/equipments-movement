@@ -1,9 +1,8 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { AuthProvider, useAuth } from '@/auth/AuthContext';
-import { I18nProvider, useI18n } from '@/i18n/I18nContext';
-import { ThemeProvider } from '@/theme/ThemeContext';
+import { useAuth } from '@/auth/AuthContext';
+import { useI18n } from '@/i18n/I18nContext';
 import { FullPageSpinner } from '@/components/Spinner';
 import { Layout } from '@/components/Layout';
 import { AuthScreen } from '@/screens/AuthScreen';
@@ -90,11 +89,5 @@ function AppContent() {
 }
 
 export default function App() {
-  return (
-    <ThemeProvider>
-      <I18nProvider>
-        <AuthProvider><AppContent /></AuthProvider>
-      </I18nProvider>
-    </ThemeProvider>
-  );
+  return <AppContent />;
 }

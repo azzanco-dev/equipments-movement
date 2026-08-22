@@ -80,6 +80,25 @@ body {
   }
 }
 
+/* iOS Safari zooms the page when a focused form control is smaller than 16px. */
+@media (max-width: 767px) {
+  input:not([type]),
+  input[type='text'],
+  input[type='email'],
+  input[type='password'],
+  input[type='number'],
+  input[type='search'],
+  input[type='tel'],
+  input[type='url'],
+  input[type='date'],
+  input[type='time'],
+  input[type='datetime-local'],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 @layer components {
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;

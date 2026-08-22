@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/i18n/I18nContext';
 import { useAuth } from '@/auth/AuthContext';
@@ -6,9 +6,11 @@ import { Modal } from '@/components/Modal';
 import { Alert } from '@/components/Alert';
 import { QRScanner } from '@/components/QRScanner';
 import { Spinner } from '@/components/Spinner';
-import { QrCode, Search, AlertTriangle, CheckCircle, Clock, MapPin, Building2, FileText, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
+import { QrCode, Search, AlertTriangle, CheckCircle, Clock, MapPin, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
 import type { Equipment, MovementType, LastMovement, Company, Project } from '@/lib/types';
 import { Select } from '@/components/Select';
+import { DatePicker } from '@/components/DatePicker';
+import { TimePicker } from '@/components/TimePicker';
 import { sanitizeSearchTerm } from '@/lib/search';
 
 const FRONTEND_MAX_PHOTO_BYTES = 5 * 1024 * 1024;
@@ -34,10 +36,14 @@ function formatDateTime(iso: string): string {
   });
 }
 
+function toLocalDateTimeInput(date: Date): string {
+  const localTime = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localTime.toISOString().slice(0, 16);
+}
+
 export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExitFormProps) {
   const { t } = useI18n();
-  const { user, profile } = useAuth();
-  const isAdmin = profile?.role === 'admin';
+  const { user } = useAuth();
 
   const [step, setStep] = useState<'select' | 'details'>('select');
   const [scanOpen, setScanOpen] = useState(false);
@@ -64,6 +70,21 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
   const [registrationMethod, setRegistrationMethod] = useState<'manual' | 'qr'>('manual');
 
   const isEntry = movementType === 'entry';
+  const currentLocalDateTime = toLocalDateTimeInput(new Date());
+  const movementDate = recordedAt.slice(0, 10);
+  const movementTime = recordedAt.slice(11, 16);
+
+  const updateMovementDate = (date: string) => {
+    if (!date) {
+      setRecordedAt('');
+      return;
+    }
+    setRecordedAt(`${date}T${movementTime || currentLocalDateTime.slice(11, 16)}`);
+  };
+
+  const updateMovementTime = (time: string) => {
+    setRecordedAt(`${movementDate || currentLocalDateTime.slice(0, 10)}T${time}`);
+  };
 
   const reset = useCallback(() => {
     setStep('select');
@@ -86,7 +107,11 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
   }, []);
 
   useEffect(() => {
-    if (!open) reset();
+    if (open) {
+      setRecordedAt(toLocalDateTimeInput(new Date()));
+    } else {
+      reset();
+    }
   }, [open, reset]);
 
   useEffect(() => {
@@ -188,21 +213,26 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     handleSelectEquipment(data as Equipment);
   };
 
-  const handleAddPhoto = (file: File | null) => {
-    if (!file) return;
-    if (photoFiles.length >= MAX_PHOTOS) return;
-    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+  const handleAddPhotos = (files: FileList | null) => {
+    if (!files?.length) return;
+
+    const remainingSlots = MAX_PHOTOS - photoFiles.length;
+    if (remainingSlots <= 0) return;
+
+    const selectedFiles = Array.from(files).slice(0, remainingSlots);
+    if (selectedFiles.some((file) => !ALLOWED_PHOTO_TYPES.includes(file.type))) {
       setSaveError(t('invalidPhotoType'));
       return;
     }
-    if (file.size > FRONTEND_MAX_PHOTO_BYTES) {
+    if (selectedFiles.some((file) => file.size > FRONTEND_MAX_PHOTO_BYTES)) {
       setSaveError(t('photoTooLargeMulti'));
       return;
     }
+
     setSaveError(null);
-    const preview = URL.createObjectURL(file);
-    setPhotoFiles((prev) => [...prev, file]);
-    setPhotoPreviews((prev) => [...prev, preview]);
+    const previews = selectedFiles.map((file) => URL.createObjectURL(file));
+    setPhotoFiles((prev) => [...prev, ...selectedFiles]);
+    setPhotoPreviews((prev) => [...prev, ...previews]);
     setCarouselIndex(photoFiles.length);
   };
 
@@ -223,6 +253,15 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
   const handleSave = async () => {
     if (!selected || !user) return;
     if (validationError) return;
+    if (!recordedAt.trim()) {
+      setSaveError(`${t('actualMovementTime')}: ${t('required')}`);
+      return;
+    }
+    const actualMovementDate = new Date(recordedAt);
+    if (isNaN(actualMovementDate.getTime()) || actualMovementDate.getTime() > Date.now()) {
+      setSaveError(t('movementTimeCannotBeFuture'));
+      return;
+    }
 
     setSaving(true);
     setSaveError(null);
@@ -243,7 +282,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
         if (selectedProjectId) form.set('project_id', selectedProjectId);
         if (contractorCode.trim()) form.set('contractor_equipment_code', contractorCode.trim());
       }
-      if (isAdmin && recordedAt.trim()) form.set('recorded_at', new Date(recordedAt).toISOString());
+      form.set('recorded_at', actualMovementDate.toISOString());
       photoFiles.forEach((file) => form.append('photos', file));
 
       const response = await fetch('/api/movements', {
@@ -251,30 +290,35 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
         headers: { Authorization: `Bearer ${accessToken}` },
         body: form,
       });
-      if (!response.ok) throw new Error((await response.json()).error ?? 'Movement save failed');
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error ?? 'movement_save_failed');
+      }
 
       onSaved();
       onClose();
       reset();
     } catch (err) {
       console.error(err);
-      setSaveError(t('movementStateChanged'));
+      const code = err instanceof Error ? err.message : 'movement_save_failed';
+      const messages: Record<string, string> = {
+        future_time: t('movementTimeCannotBeFuture'),
+        company_required: t('companyRequiredForEntry'),
+        project_required: t('projectRequiredForEntry'),
+        no_prior_entry: t('noPriorEntryAtSelectedTime'),
+        invalid_sequence: isEntry ? t('entrySequenceConflict') : t('exitSequenceConflict'),
+        invalid_photos: t('invalidPhotoType'),
+        invalid_movement_payload: t('movementSaveFailed'),
+        photo_upload_failed: t('photoUploadFailed'),
+        unauthorized: t('authError'),
+        movement_save_failed: t('movementSaveFailed'),
+      };
+      setSaveError(messages[code] ?? t('movementSaveFailed'));
       checkLastMovement(selected);
     } finally {
       setSaving(false);
     }
   };
-
-  // Resolve company/project names for the exit brief
-  const lastEntryCompany = useMemo(() => {
-    if (!lastMovement?.company_id) return null;
-    return companies.find((c) => c.id === lastMovement.company_id) ?? null;
-  }, [lastMovement, companies]);
-
-  const lastEntryProject = useMemo(() => {
-    if (!lastMovement?.project_id) return null;
-    return projects.find((p) => p.id === lastMovement.project_id) ?? null;
-  }, [lastMovement, projects]);
 
   // Current status derived from last movement
   const currentStatus: 'inside' | 'outside' | 'none' = !lastMovement
@@ -438,41 +482,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
               </Alert>
             )}
 
-            {/* EXIT: read-only latest entry brief (only when exit is valid) */}
-            {!isEntry && !validationError && lastMovement && (
-              <div className="rounded-lg border p-4 space-y-2" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
-                <p className="text-sm font-medium">{t('latestEntryBrief')}</p>
-                <div className="space-y-1.5 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Building2 size={14} className="text-muted" />
-                    <span className="text-muted">{t('company')}:</span>
-                    <span className="font-medium">
-                      {lastEntryCompany ? `${lastEntryCompany.name_ar} — ${lastEntryCompany.name_en}` : '—'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <MapPin size={14} className="text-muted" />
-                    <span className="text-muted">{t('project')}:</span>
-                    <span className="font-medium">
-                      {lastEntryProject ? `${lastEntryProject.name_ar} — ${lastEntryProject.name_en}` : '—'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <FileText size={14} className="text-muted" />
-                    <span className="text-muted">{t('contractorEquipmentCode')}:</span>
-                    <span className="font-medium" dir="ltr">
-                      {lastMovement.contractor_equipment_code || '—'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock size={14} className="text-muted" />
-                    <span className="text-muted">{t('entryDateTime')}:</span>
-                    <span className="font-medium">{formatDateTime(lastMovement.recorded_at)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Form fields */}
             <div className="space-y-4">
               {isEntry ? (
@@ -516,14 +525,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
                     />
                   </div>
                 </>
-              ) : (
-                <Alert type="info">
-                  <div className="flex items-start gap-2">
-                    <CheckCircle size={16} className="mt-0.5 shrink-0" />
-                    <span>{t('exitInheritsEntry')}</span>
-                  </div>
-                </Alert>
-              )}
+              ) : null}
 
               <div>
                 <label className="label">{t('driverName')}</label>
@@ -535,19 +537,29 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
                 />
               </div>
 
-              {/* Admin-only: custom recorded_at */}
-              {isAdmin && (
-                <div>
-                  <label className="label">{t('dateTimeLabel')}</label>
-                  <input
-                    type="datetime-local"
-                    className="input"
-                    value={recordedAt}
-                    onChange={(e) => setRecordedAt(e.target.value)}
-                    dir="ltr"
-                  />
+              <div>
+                <label className="label">{t('actualMovementTime')}</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-xs text-muted">{t('date')}</label>
+                    <DatePicker
+                      value={movementDate}
+                      onChange={updateMovementDate}
+                      max={currentLocalDateTime.slice(0, 10)}
+                      placeholder={t('date')}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <label className="mb-1 block text-xs text-muted">{t('time')}</label>
+                    <TimePicker
+                      value={movementTime}
+                      max={movementDate === currentLocalDateTime.slice(0, 10) ? currentLocalDateTime.slice(11, 16) : undefined}
+                      onChange={updateMovementTime}
+                      placeholder={t('time')}
+                    />
+                  </div>
                 </div>
-              )}
+              </div>
 
               <div>
                 <label className="label">{t('notes')}</label>
@@ -612,9 +624,10 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
                     <input
                       type="file"
                       accept={ALLOWED_PHOTO_TYPES.join(',')}
+                      multiple
                       className="hidden"
                       onChange={(e) => {
-                        handleAddPhoto(e.target.files?.[0] ?? null);
+                        handleAddPhotos(e.target.files);
                         e.target.value = '';
                       }}
                     />

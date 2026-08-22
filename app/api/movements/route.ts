@@ -7,6 +7,15 @@ const MAX_PHOTOS = 3;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic']);
 
+function movementErrorCode(message: string): string {
+  if (message.includes('movement time cannot be in the future')) return 'future_time';
+  if (message.includes('company_id is required')) return 'company_required';
+  if (message.includes('project_id is required')) return 'project_required';
+  if (message.includes('no prior entry') || message.includes('not inside the gate')) return 'no_prior_entry';
+  if (message.includes('sequence would be invalid')) return 'invalid_sequence';
+  return 'movement_save_failed';
+}
+
 function authenticatedClient(accessToken: string) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -20,7 +29,7 @@ function authenticatedClient(accessToken: string) {
 export async function POST(request: Request) {
   const authorization = request.headers.get('authorization');
   if (!authorization?.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
   try {
@@ -28,19 +37,19 @@ export async function POST(request: Request) {
     const supabase = authenticatedClient(accessToken);
     const { data: authData, error: authError } = await supabase.auth.getUser(accessToken);
     if (authError || !authData.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
 
     const form = await request.formData();
     const movementType = form.get('movement_type');
     const equipmentId = form.get('equipment_id');
     if ((movementType !== 'entry' && movementType !== 'exit') || typeof equipmentId !== 'string' || !equipmentId) {
-      return NextResponse.json({ error: 'Invalid movement payload' }, { status: 400 });
+      return NextResponse.json({ error: 'invalid_movement_payload' }, { status: 400 });
     }
 
     const photos = form.getAll('photos').filter((value): value is File => value instanceof File);
     if (photos.length > MAX_PHOTOS || photos.some((file) => file.size > MAX_PHOTO_BYTES || !ALLOWED_PHOTO_TYPES.has(file.type))) {
-      return NextResponse.json({ error: 'Invalid photos' }, { status: 400 });
+      return NextResponse.json({ error: 'invalid_photos' }, { status: 400 });
     }
 
     const value = (name: string) => {
@@ -65,7 +74,10 @@ export async function POST(request: Request) {
 
     const { data: insertedLog, error: insertError } = await supabase
       .from('entry_exit_logs').insert(payload).select('id').single();
-    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 409 });
+    if (insertError) {
+      console.error('Movement insert failed', insertError);
+      return NextResponse.json({ error: movementErrorCode(insertError.message) }, { status: 409 });
+    }
 
     for (const [index, file] of photos.entries()) {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) || `photo-${index}`;
@@ -74,7 +86,7 @@ export async function POST(request: Request) {
         contentType: file.type,
         upsert: false,
       });
-      if (uploadError) return NextResponse.json({ id: insertedLog.id, error: uploadError.message }, { status: 502 });
+      if (uploadError) return NextResponse.json({ id: insertedLog.id, error: 'photo_upload_failed' }, { status: 502 });
       const { error: photoError } = await supabase.from('entry_exit_photos').insert({
         entry_exit_log_id: insertedLog.id,
         file_path: filePath,
@@ -83,13 +95,13 @@ export async function POST(request: Request) {
       });
       if (photoError) {
         await supabase.storage.from('log-photos').remove([filePath]);
-        return NextResponse.json({ id: insertedLog.id, error: photoError.message }, { status: 502 });
+        return NextResponse.json({ id: insertedLog.id, error: 'photo_upload_failed' }, { status: 502 });
       }
     }
 
     return NextResponse.json({ id: insertedLog.id }, { status: 201 });
   } catch (error) {
     console.error('Create movement failed', error);
-    return NextResponse.json({ error: 'Unable to create movement' }, { status: 500 });
+    return NextResponse.json({ error: 'movement_save_failed' }, { status: 500 });
   }
 }

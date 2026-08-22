@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/lib/types';
@@ -19,6 +19,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const currentUserIdRef = useRef<string | null>(null);
 
   const fetchProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase
@@ -34,30 +35,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    let active = true;
+
+    const applySession = async (session: Session | null) => {
+      const nextProfile = session?.user ? await fetchProfile(session.user.id) : null;
+      if (!active) return;
+      currentUserIdRef.current = session?.user.id ?? null;
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id).then((p) => setProfile(p));
-      }
+      setProfile(nextProfile);
       setLoading(false);
-    });
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => applySession(session));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        (async () => {
-          const p = await fetchProfile(session.user.id);
-          setProfile(p);
-        })();
-      } else {
-        setProfile(null);
+      if (session?.user.id === currentUserIdRef.current) {
+        // Token refreshes and tab focus events can repeat the same session.
+        // Keep the user/profile references stable so screens do not refetch.
+        setSession(session);
+        return;
       }
-      setLoading(false);
+      void applySession(session);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, [fetchProfile]);
 
   const signIn = useCallback(async (email: string, password: string) => {

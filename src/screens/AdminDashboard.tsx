@@ -129,7 +129,7 @@ export function AdminDashboard({ onSelectMovement }: { onSelectMovement?: (id: s
     supabase.from('profiles').select('*').order('full_name').then(({ data }) => {
       setSupervisors((data as Profile[]) ?? []);
     });
-  }, []);
+  }, [fetchStats]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
   useEffect(() => { fetchVisits(); }, [fetchVisits]);
