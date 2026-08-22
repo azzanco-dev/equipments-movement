@@ -54,7 +54,7 @@ export function Select({ value, onChange, options, placeholder, className = '', 
         type="button"
         onClick={() => setOpen(!open)}
         className={`w-full flex items-center justify-between gap-2 rounded-lg border bg-transparent outline-none transition-colors focus:border-black dark:focus:border-white ${
-          compact ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-2.5 text-sm'
+          compact ? 'h-[34px] px-3 py-0 text-sm' : 'px-3.5 py-2.5 text-sm'
         }`}
         style={{ borderColor: 'var(--border)' }}
       >
