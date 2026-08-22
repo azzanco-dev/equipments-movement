@@ -42,8 +42,8 @@ export function Layout({ children, activePage, onNavigate, navItems }: LayoutPro
               className="flex items-center gap-2 cursor-pointer"
               onClick={() => onNavigate('dashboard')}
             >
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-black dark:bg-white">
-                <span className="text-white dark:text-black font-bold text-lg">E</span>
+              <div className="brand-mark flex h-9 w-9 items-center justify-center rounded-lg">
+                <span className="font-bold text-lg">E</span>
               </div>
               <div className="hidden sm:block">
                 <h1 className="text-sm font-bold leading-tight">{t('appName')}</h1>
@@ -85,7 +85,7 @@ export function Layout({ children, activePage, onNavigate, navItems }: LayoutPro
                 onClick={() => onNavigate(item.key)}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                   activePage === item.key
-                    ? 'bg-black text-white dark:bg-white dark:text-black'
+                    ? 'nav-active'
                     : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-fg'
                 }`}
               >
@@ -113,7 +113,7 @@ export function Layout({ children, activePage, onNavigate, navItems }: LayoutPro
                     }}
                     className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                       activePage === item.key
-                        ? 'bg-black text-white dark:bg-white dark:text-black'
+                        ? 'nav-active'
                         : 'hover:bg-gray-100 dark:hover:bg-gray-800'
                     }`}
                   >

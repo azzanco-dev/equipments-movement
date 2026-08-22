@@ -166,7 +166,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
           onClick={() => setTab('logs')}
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
             tab === 'logs'
-              ? 'border-black dark:border-white text-fg'
+              ? 'border-[var(--primary)] text-[var(--primary)]'
               : 'border-transparent text-muted hover:text-fg'
           }`}
         >
@@ -176,7 +176,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
           onClick={() => setTab('reports')}
           className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
             tab === 'reports'
-              ? 'border-black dark:border-white text-fg'
+              ? 'border-[var(--primary)] text-[var(--primary)]'
               : 'border-transparent text-muted hover:text-fg'
           }`}
         >
@@ -221,7 +221,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                         <td className="px-4 py-3 font-semibold">{log.equipment?.code ?? '—'}</td>
                         <td className="px-4 py-3 text-muted">{log.equipment?.type ?? '—'}</td>
                         <td className="px-4 py-3">
-                          <span className="badge border" style={{ borderColor: 'var(--border)' }}>
+                          <span className={`badge border ${log.movement_type === 'entry' ? 'status-entry' : 'status-exit'}`}>
                             {log.movement_type === 'entry' ? t('entry') : t('exit')}
                           </span>
                         </td>

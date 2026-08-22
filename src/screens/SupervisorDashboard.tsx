@@ -69,8 +69,8 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
           className="flex flex-col items-center justify-center gap-2 rounded-xl border p-6 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           style={{ borderColor: 'var(--border)' }}
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-black dark:bg-white">
-            <LogIn size={24} className="text-white dark:text-black" />
+          <div className="status-entry flex h-12 w-12 items-center justify-center rounded-full border">
+            <LogIn size={24} />
           </div>
           <span className="font-bold text-lg">{t('registerEntry')}</span>
         </button>
@@ -80,7 +80,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
           className="flex flex-col items-center justify-center gap-2 rounded-xl border p-6 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           style={{ borderColor: 'var(--border)' }}
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-black dark:border-white">
+          <div className="status-exit flex h-12 w-12 items-center justify-center rounded-full border">
             <LogOut size={24} />
           </div>
           <span className="font-bold text-lg">{t('registerExit')}</span>
@@ -152,7 +152,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
                       <td className="px-4 py-3 font-semibold">{log.contractor_equipment_code ?? '—'}</td>
                       <td className="px-4 py-3 text-muted">{log.equipment?.code ?? '—'}</td>
                       <td className="px-4 py-3">
-                        <span className="badge border" style={{ borderColor: 'var(--border)' }}>
+                        <span className={`badge border ${log.movement_type === 'entry' ? 'status-entry' : 'status-exit'}`}>
                           {log.movement_type === 'entry' ? t('entry') : t('exit')}
                         </span>
                       </td>
