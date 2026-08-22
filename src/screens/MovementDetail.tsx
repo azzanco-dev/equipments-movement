@@ -205,9 +205,11 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
     if (linkedLog.movement_type === 'entry') {
       console.log('pre is entry')
       durationMs = new Date(linkedLog.recorded_at).getTime() - new Date(log.recorded_at).getTime();
+      console.log('entry', durationMs)
     } else if (linkedLog.movement_type === 'exit') {
       console.log('pre is exit')
       durationMs = new Date(log.recorded_at).getTime() - new Date(linkedLog.recorded_at).getTime();
+      console.log('exit', durationMs)
     }
   }
 
