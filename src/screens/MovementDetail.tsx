@@ -197,9 +197,16 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
 
   const isEntry = log.movement_type === 'entry';
   console.log(linkedLog)
-  const durationMs = linkedLog
-    ? new Date(linkedLog.recorded_at).getTime() - new Date(log.recorded_at).getTime()
-    : 0;
+  
+  let durationMs = 0;
+
+  if (linkedLog) {
+    if (linkedLog.movementType === 'entry') {
+      durationMs = new Date(linkedLog.recorded_at).getTime() - new Date(log.recorded_at).getTime();
+    } else if (linkedLog.movementType === 'exit') {
+      durationMs = new Date(log.recorded_at).getTime() - new Date(linkedLog.recorded_at).getTime();
+    }
+  }
 
   return (
     <div className="space-y-6">
