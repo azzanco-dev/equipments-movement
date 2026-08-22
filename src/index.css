@@ -58,15 +58,15 @@ body {
   --surface: #f9fafb;
   --surface-hover: #f3f4f6;
   --overlay: rgba(0, 0, 0, 0.5);
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
+  --primary: #0a0a0a;
+  --primary-hover: #262626;
   --primary-contrast: #ffffff;
   --success: #15803d;
   --success-soft: #ecfdf3;
   --warning: #b45309;
   --warning-soft: #fff7ed;
   --danger: #dc2626;
-  --ring: #2563eb;
+  --ring: #0a0a0a;
 }
 
 .dark {
@@ -77,15 +77,15 @@ body {
   --surface: #1c1c1c;
   --surface-hover: #292929;
   --overlay: rgba(255, 255, 255, 0.1);
-  --primary: #60a5fa;
-  --primary-hover: #3b82f6;
-  --primary-contrast: #08111f;
+  --primary: #f5f5f5;
+  --primary-hover: #d4d4d4;
+  --primary-contrast: #0a0a0a;
   --success: #4ade80;
   --success-soft: #13271b;
   --warning: #fbbf24;
   --warning-soft: #2b2112;
   --danger: #f87171;
-  --ring: #60a5fa;
+  --ring: #f5f5f5;
 }
 
 @layer base {
