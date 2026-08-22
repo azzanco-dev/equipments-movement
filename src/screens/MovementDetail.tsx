@@ -76,10 +76,22 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [linkedError, setLinkedError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    // Reset all movement-specific state so stale values from a previous
+    // movement cannot bleed into the next one (especially when navigating
+    // directly between linked ENTRY and EXIT records).
+    setLog(null);
+    setCompany(null);
+    setProject(null);
+    setLinkedLog(null);
+    setLinkedCompany(null);
+    setLinkedProject(null);
+    setPhotoUrl(null);
+    setLinkedError(null);
     setError(null);
+    setLoading(true);
 
     try {
       const { data, error: fetchError } = await supabase
@@ -124,49 +136,63 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
         if (signed?.signedUrl) setPhotoUrl(signed.signedUrl);
       }
 
-      // Find linked movement
+      // Find linked movement using the same deterministic (recorded_at, id)
+      // ordering as the database trigger, so ties on recorded_at are broken
+      // by id consistently.
       if (logData.movement_type === 'entry') {
-        // Find the next EXIT after this entry
-        const { data: exitData } = await supabase
+        // Next EXIT: (recorded_at > entry) OR (recorded_at = entry AND id > entry.id)
+        const { data: exitData, error: linkErr } = await supabase
           .from('entry_exit_logs')
           .select('*, supervisor:profiles(*)')
           .eq('equipment_id', logData.equipment_id)
           .eq('movement_type', 'exit')
-          .gt('recorded_at', logData.recorded_at)
+          .or(`recorded_at.gt.${logData.recorded_at},and(recorded_at.eq.${logData.recorded_at},id.gt.${logData.id})`)
           .order('recorded_at', { ascending: true })
+          .order('id', { ascending: true })
           .limit(1)
           .maybeSingle();
-        setLinkedLog(exitData as EntryExitLog | null);
+
+        if (linkErr) {
+          setLinkedError(t('movementLoadError'));
+        } else {
+          setLinkedLog(exitData as EntryExitLog | null);
+        }
       } else {
-        // Find the preceding ENTRY before this exit
-        const { data: entryData } = await supabase
+        // Preceding ENTRY: (recorded_at < exit) OR (recorded_at = exit AND id < exit.id)
+        const { data: entryData, error: linkErr } = await supabase
           .from('entry_exit_logs')
           .select('*, supervisor:profiles(*)')
           .eq('equipment_id', logData.equipment_id)
           .eq('movement_type', 'entry')
-          .lt('recorded_at', logData.recorded_at)
+          .or(`recorded_at.lt.${logData.recorded_at},and(recorded_at.eq.${logData.recorded_at},id.lt.${logData.id})`)
           .order('recorded_at', { ascending: false })
+          .order('id', { ascending: false })
           .limit(1)
           .maybeSingle();
-        const entryLog = entryData as EntryExitLog | null;
-        setLinkedLog(entryLog);
 
-        // Fetch linked entry's company/project
-        if (entryLog?.company_id) {
-          const { data: comp } = await supabase
-            .from('companies')
-            .select('*')
-            .eq('id', entryLog.company_id)
-            .maybeSingle();
-          setLinkedCompany(comp as Company | null);
-        }
-        if (entryLog?.project_id) {
-          const { data: proj } = await supabase
-            .from('projects')
-            .select('*')
-            .eq('id', entryLog.project_id)
-            .maybeSingle();
-          setLinkedProject(proj as Project | null);
+        if (linkErr) {
+          setLinkedError(t('movementLoadError'));
+        } else {
+          const entryLog = entryData as EntryExitLog | null;
+          setLinkedLog(entryLog);
+
+          // Fetch linked entry's company/project
+          if (entryLog?.company_id) {
+            const { data: comp } = await supabase
+              .from('companies')
+              .select('*')
+              .eq('id', entryLog.company_id)
+              .maybeSingle();
+            setLinkedCompany(comp as Company | null);
+          }
+          if (entryLog?.project_id) {
+            const { data: proj } = await supabase
+              .from('projects')
+              .select('*')
+              .eq('id', entryLog.project_id)
+              .maybeSingle();
+            setLinkedProject(proj as Project | null);
+          }
         }
       }
     } catch {
@@ -330,7 +356,9 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
           <h3 className="text-sm font-bold text-muted uppercase tracking-wide mb-3 flex items-center gap-2">
             <Link2 size={16} /> {t('linkedExit')}
           </h3>
-          {linkedLog ? (
+          {linkedError ? (
+            <Alert type="error">{linkedError}</Alert>
+          ) : linkedLog ? (
             <div className="space-y-2">
               <InfoRow
                 icon={<Clock size={16} />}
@@ -360,7 +388,9 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
           <h3 className="text-sm font-bold text-muted uppercase tracking-wide mb-3 flex items-center gap-2">
             <Link2 size={16} /> {t('linkedEntry')}
           </h3>
-          {linkedLog ? (
+          {linkedError ? (
+            <Alert type="error">{linkedError}</Alert>
+          ) : linkedLog ? (
             <div className="space-y-2">
               <InfoRow
                 icon={<Clock size={16} />}
