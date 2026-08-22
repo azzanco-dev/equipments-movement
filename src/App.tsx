@@ -1,4 +1,6 @@
-import { useState } from 'react';
+'use client';
+
+import { usePathname, useRouter } from 'next/navigation';
 import { AuthProvider, useAuth } from '@/auth/AuthContext';
 import { I18nProvider, useI18n } from '@/i18n/I18nContext';
 import { ThemeProvider } from '@/theme/ThemeContext';
@@ -17,33 +19,36 @@ import { MovementDetail } from '@/screens/MovementDetail';
 import type { Equipment } from '@/lib/types';
 import { LayoutDashboard, FileText, Truck, FolderKanban, Building2, Users, Briefcase } from 'lucide-react';
 
+const ADMIN_PAGES = new Set(['dashboard', 'logs', 'equipment', 'projects', 'companies', 'lessors', 'users']);
+
 function AppContent() {
   const { profile, loading } = useAuth();
   const { t } = useI18n();
-  const [adminPage, setAdminPage] = useState('dashboard');
-  const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null);
-  const [selectedMovementId, setSelectedMovementId] = useState<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const segments = pathname.split('/').filter(Boolean);
+  const movementId = segments[0] === 'movements' ? segments[1] : null;
+  const equipmentId = segments[0] === 'equipment' ? segments[1] : null;
+  const page = ADMIN_PAGES.has(segments[0] ?? '') ? segments[0] : 'dashboard';
 
   if (loading) return <FullPageSpinner />;
   if (!profile) return <AuthScreen />;
 
+  const openMovement = (id: string) => router.push(`/movements/${id}`);
+  const backToDashboard = () => router.push('/dashboard');
+
   if (profile.role === 'supervisor') {
     return (
-      <Layout activePage="dashboard" onNavigate={() => {}} navItems={[]}>
-        {selectedMovementId ? (
-          <MovementDetail
-            movementId={selectedMovementId}
-            onBack={() => setSelectedMovementId(null)}
-            onNavigateMovement={setSelectedMovementId}
-          />
+      <Layout activePage="dashboard" onNavigate={backToDashboard} navItems={[]}>
+        {movementId ? (
+          <MovementDetail movementId={movementId} onBack={backToDashboard} onNavigateMovement={openMovement} />
         ) : (
-          <SupervisorDashboard onSelectMovement={setSelectedMovementId} />
+          <SupervisorDashboard onSelectMovement={openMovement} />
         )}
       </Layout>
     );
   }
 
-  // Admin
   const navItems = [
     { key: 'dashboard', label: t('dashboard'), icon: <LayoutDashboard size={18} /> },
     { key: 'logs', label: t('logs'), icon: <FileText size={18} /> },
@@ -54,47 +59,30 @@ function AppContent() {
     { key: 'users', label: t('users'), icon: <Users size={18} /> },
   ];
 
-  function handleNavigate(page: string) {
-    setSelectedEquipmentId(null);
-    setSelectedMovementId(null);
-    setAdminPage(page);
-  }
+  const navigate = (target: string) => router.push(`/${target}`);
 
   return (
-    <Layout activePage={adminPage} onNavigate={handleNavigate} navItems={navItems}>
-      {selectedMovementId ? (
-        <MovementDetail
-          movementId={selectedMovementId}
-          onBack={() => setSelectedMovementId(null)}
-          onNavigateMovement={setSelectedMovementId}
+    <Layout activePage={page} onNavigate={navigate} navItems={navItems}>
+      {movementId ? (
+        <MovementDetail movementId={movementId} onBack={() => router.back()} onNavigateMovement={openMovement} />
+      ) : equipmentId ? (
+        <EquipmentDetail
+          equipmentId={equipmentId}
+          onBack={() => router.push('/equipment')}
+          onEdit={(equipment: Equipment) => {
+            router.push('/equipment');
+            setTimeout(() => window.dispatchEvent(new CustomEvent('edit-equipment', { detail: equipment })), 0);
+          }}
+          onSelectMovement={openMovement}
         />
       ) : (
         <>
-          {adminPage === 'dashboard' && <AdminDashboard onSelectMovement={setSelectedMovementId} />}
-          {adminPage === 'logs' && <AdminDashboard onSelectMovement={setSelectedMovementId} />}
-          {adminPage === 'equipment' && (
-            selectedEquipmentId ? (
-              <EquipmentDetail
-                equipmentId={selectedEquipmentId}
-                onBack={() => setSelectedEquipmentId(null)}
-                onEdit={(eq: Equipment) => {
-                  setSelectedEquipmentId(null);
-                  // Defer to next tick so detail unmounts first
-                  setTimeout(() => {
-                    const event = new CustomEvent('edit-equipment', { detail: eq });
-                    window.dispatchEvent(event);
-                  }, 0);
-                }}
-                onSelectMovement={setSelectedMovementId}
-              />
-            ) : (
-              <AdminEquipment onSelectEquipment={setSelectedEquipmentId} />
-            )
-          )}
-          {adminPage === 'projects' && <AdminProjects />}
-          {adminPage === 'companies' && <AdminCompanies />}
-          {adminPage === 'lessors' && <AdminLessors />}
-          {adminPage === 'users' && <AdminUsers />}
+          {(page === 'dashboard' || page === 'logs') && <AdminDashboard onSelectMovement={openMovement} />}
+          {page === 'equipment' && <AdminEquipment onSelectEquipment={(id) => router.push(`/equipment/${id}`)} />}
+          {page === 'projects' && <AdminProjects />}
+          {page === 'companies' && <AdminCompanies />}
+          {page === 'lessors' && <AdminLessors />}
+          {page === 'users' && <AdminUsers />}
         </>
       )}
     </Layout>
@@ -105,9 +93,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <I18nProvider>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
+        <AuthProvider><AppContent /></AuthProvider>
       </I18nProvider>
     </ThemeProvider>
   );

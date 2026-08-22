@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/i18n/I18nContext';
+import type { TranslationKey } from '@/i18n/translations';
 import { InlineSpinner } from '@/components/Spinner';
 import { PageHeader } from '@/components/PageHeader';
 import { Alert } from '@/components/Alert';
@@ -43,7 +44,7 @@ function formatDateTime(iso: string): string {
   });
 }
 
-function formatDuration(ms: number, t: (k: string) => string): string {
+function formatDuration(ms: number, t: (k: TranslationKey) => string): string {
   if (ms < 0) ms = 0;
   const totalMinutes = Math.floor(ms / 60000);
   const days = Math.floor(totalMinutes / 1440);

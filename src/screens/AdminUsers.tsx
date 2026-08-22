@@ -42,7 +42,7 @@ export function AdminUsers() {
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-user`,
         {
           method: 'POST',
           headers: {

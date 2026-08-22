@@ -273,8 +273,6 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
 
   const statusLabel = (s: OperationalStatus) => s === 'operational' ? t('operational') : s === 'maintenance' ? t('maintenance') : t('stopped');
   const ownLabel = (s: OwnershipStatus) => s === 'alazani' ? t('ownershipAlazani') : s === 'takween' ? t('ownershipTakween') : s === 'third_party_f' ? t('ownershipThirdPartyF') : s === 'third_party_partnership_b' ? t('ownershipThirdPartyPartnershipB') : t('ownershipExternalSupplier');
-  const regLabel = (s: string) => s === 'private_transport' ? t('privateTransport') : s === 'public_transport' ? t('publicTransport') : s === 'heavy_equipment' ? t('heavyEquipment') : '—';
-
   const filteredEquipment = equipment.filter((eq) => {
     if (filterOperational && eq.operational_status !== filterOperational) return false;
     if (filterOwnership && eq.ownership_status !== filterOwnership) return false;

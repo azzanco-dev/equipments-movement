@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/i18n/I18nContext';
 import { InlineSpinner } from '@/components/Spinner';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
-import { ArrowLeft, Edit2, Power, QrCode, Printer, Calendar, User, Truck, Building2, Wrench, FileText } from 'lucide-react';
+import { ArrowLeft, Edit2, Power, Printer, Calendar, Truck, Building2, Wrench, FileText } from 'lucide-react';
 import type { Equipment, EntryExitLog, OperationalStatus, OwnershipStatus } from '@/lib/types';
 import { PageHeader } from '@/components/PageHeader';
 

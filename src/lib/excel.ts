@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import type { TranslationKey } from '@/i18n/translations';
 import type { EntryExitLog, EquipmentVisit, OperationalStatus, OwnershipStatus, RegistrationType } from '@/lib/types';
 
 export interface CompanyImportRow {
@@ -69,7 +70,7 @@ function parseDate(value: unknown): string | null {
   return null;
 }
 
-export function parseEquipmentExcel(data: ArrayBuffer, t: (key: string) => string): EquipmentImportRow[] {
+export function parseEquipmentExcel(data: ArrayBuffer, t: (key: TranslationKey) => string): EquipmentImportRow[] {
   const wb = XLSX.read(data, { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const json: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
@@ -121,7 +122,7 @@ export function parseEquipmentExcel(data: ArrayBuffer, t: (key: string) => strin
 
     const yearRaw = get('manufacture_year');
     const year = yearRaw ? parseInt(yearRaw, 10) : null;
-    if (yearRaw && (isNaN(year) || year < 1900 || year > 2100)) errors.push(t('manufactureYear'));
+    if (year !== null && (isNaN(year) || year < 1900 || year > 2100)) errors.push(t('manufactureYear'));
 
     return {
       code,
@@ -145,7 +146,7 @@ export function parseEquipmentExcel(data: ArrayBuffer, t: (key: string) => strin
   });
 }
 
-export function downloadEquipmentTemplate(t: (key: string) => string) {
+export function downloadEquipmentTemplate(t: (key: TranslationKey) => string) {
   const sample = [{
     [t('equipmentCode')]: 'A001',
     [t('equipmentType')]: 'Crane 50 Ton',
@@ -174,7 +175,7 @@ export function downloadEquipmentTemplate(t: (key: string) => string) {
   XLSX.writeFile(wb, 'equipment-template.xlsx');
 }
 
-export function exportLogsToExcel(logs: EntryExitLog[], fileName: string, t: (key: string) => string) {
+export function exportLogsToExcel(logs: EntryExitLog[], fileName: string, t: (key: TranslationKey) => string) {
   const data = logs.map((log) => ({
     [t('equipmentCodeLabel')]: log.equipment?.code ?? '',
     [t('equipmentType')]: log.equipment?.type ?? '',
@@ -194,7 +195,7 @@ export function exportLogsToExcel(logs: EntryExitLog[], fileName: string, t: (ke
   XLSX.writeFile(wb, `${fileName}.xlsx`);
 }
 
-export function exportVisitsToExcel(visits: EquipmentVisit[], fileName: string, t: (key: string) => string) {
+export function exportVisitsToExcel(visits: EquipmentVisit[], fileName: string, t: (key: TranslationKey) => string) {
   const data = visits.map((v) => ({
     [t('equipmentCodeLabel')]: v.equipment_code,
     [t('equipmentType')]: v.equipment_type,
@@ -207,9 +208,9 @@ export function exportVisitsToExcel(visits: EquipmentVisit[], fileName: string, 
     [t('exitTime')]: v.exit_recorded_at ? new Date(v.exit_recorded_at).toLocaleString() : '',
     [t('exitBy')]: v.exit_supervisor_name ?? '',
     [t('odometerReading')]: v.odometer_reading ?? '',
-    [t('exit_odometer' as string)]: v.exit_odometer ?? '',
+    ['Exit odometer']: v.exit_odometer ?? '',
     [t('notes')]: v.notes ?? '',
-    [t('exit_notes' as string)]: v.exit_notes ?? '',
+    ['Exit notes']: v.exit_notes ?? '',
   }));
 
   const ws = XLSX.utils.json_to_sheet(data);
@@ -220,7 +221,7 @@ export function exportVisitsToExcel(visits: EquipmentVisit[], fileName: string, 
 
 // ============ COMPANIES ============
 
-export function parseCompaniesExcel(data: ArrayBuffer, t: (key: string) => string): CompanyImportRow[] {
+export function parseCompaniesExcel(data: ArrayBuffer, t: (key: TranslationKey) => string): CompanyImportRow[] {
   const wb = XLSX.read(data, { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const json: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
@@ -254,7 +255,7 @@ export function parseCompaniesExcel(data: ArrayBuffer, t: (key: string) => strin
   });
 }
 
-export function downloadCompanyTemplate(t: (key: string) => string) {
+export function downloadCompanyTemplate(t: (key: TranslationKey) => string) {
   const sample = [{
     [t('companyNameAr')]: 'شركة المقاولات الحديثة',
     [t('companyNameEn')]: 'Modern Contracting Co.',
@@ -268,7 +269,7 @@ export function downloadCompanyTemplate(t: (key: string) => string) {
 
 // ============ PROJECTS ============
 
-export function parseProjectsExcel(data: ArrayBuffer, t: (key: string) => string): ProjectImportRow[] {
+export function parseProjectsExcel(data: ArrayBuffer, t: (key: TranslationKey) => string): ProjectImportRow[] {
   const wb = XLSX.read(data, { type: 'array' });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const json: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
@@ -302,7 +303,7 @@ export function parseProjectsExcel(data: ArrayBuffer, t: (key: string) => string
   });
 }
 
-export function downloadProjectTemplate(t: (key: string) => string) {
+export function downloadProjectTemplate(t: (key: TranslationKey) => string) {
   const sample = [{
     [t('projectNameAr')]: 'مشروع الألفا',
     [t('projectNameEn')]: 'Project Alpha',

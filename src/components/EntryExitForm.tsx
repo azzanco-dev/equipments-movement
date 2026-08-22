@@ -6,12 +6,11 @@ import { Modal } from '@/components/Modal';
 import { Alert } from '@/components/Alert';
 import { QRScanner } from '@/components/QRScanner';
 import { Spinner } from '@/components/Spinner';
-import { QrCode, Search, Upload, AlertTriangle, CheckCircle, Clock, MapPin, Building2, FileText, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
+import { QrCode, Search, AlertTriangle, CheckCircle, Clock, MapPin, Building2, FileText, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
 import type { Equipment, MovementType, LastMovement, Company, Project } from '@/lib/types';
 import { Select } from '@/components/Select';
 import { sanitizeSearchTerm } from '@/lib/search';
 
-const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const FRONTEND_MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
 const MAX_PHOTOS = 3;
@@ -62,6 +61,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [contractorCode, setContractorCode] = useState('');
   const [recordedAt, setRecordedAt] = useState('');
+  const [registrationMethod, setRegistrationMethod] = useState<'manual' | 'qr'>('manual');
 
   const isEntry = movementType === 'entry';
 
@@ -82,6 +82,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     setSelectedProjectId('');
     setContractorCode('');
     setRecordedAt('');
+    setRegistrationMethod('manual');
   }, []);
 
   useEffect(() => {
@@ -183,6 +184,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
       return;
     }
 
+    setRegistrationMethod('qr');
     handleSelectEquipment(data as Equipment);
   };
 
@@ -226,74 +228,30 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     setSaveError(null);
 
     try {
-      const payload: Record<string, unknown> = {
-        equipment_id: selected.id,
-        supervisor_id: user.id,
-        movement_type: movementType,
-        registration_method: 'qr' in window && scanOpen ? 'qr' : 'manual',
-        driver_name: driverName || null,
-        notes: notes || null,
-      };
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) throw new Error('Missing session');
 
-      // ENTRY: client supplies company, project, and contractor code.
-      // EXIT: the database trigger inherits these from the latest entry, so the
-      // client must not send them.
+      const form = new FormData();
+      form.set('equipment_id', selected.id);
+      form.set('movement_type', movementType);
+      form.set('registration_method', registrationMethod);
+      if (driverName) form.set('driver_name', driverName);
+      if (notes) form.set('notes', notes);
       if (isEntry) {
-        payload.company_id = selectedCompanyId || null;
-        payload.project_id = selectedProjectId || null;
-        payload.contractor_equipment_code = contractorCode.trim() || null;
+        if (selectedCompanyId) form.set('company_id', selectedCompanyId);
+        if (selectedProjectId) form.set('project_id', selectedProjectId);
+        if (contractorCode.trim()) form.set('contractor_equipment_code', contractorCode.trim());
       }
+      if (isAdmin && recordedAt.trim()) form.set('recorded_at', new Date(recordedAt).toISOString());
+      photoFiles.forEach((file) => form.append('photos', file));
 
-      // Admins may supply a custom recorded_at; non-admins get now() from the trigger.
-      if (isAdmin && recordedAt.trim()) {
-        payload.recorded_at = new Date(recordedAt).toISOString();
-      }
-
-      const { data: insertedLog, error: insertError } = await supabase
-        .from('entry_exit_logs')
-        .insert(payload)
-        .select('id')
-        .single();
-
-      if (insertError) throw insertError;
-      if (!insertedLog) throw new Error('insert failed');
-
-      // Upload photos and create entry_exit_photos rows
-      if (photoFiles.length > 0) {
-        const uploadResults = await Promise.allSettled(
-          photoFiles.map(async (file, index) => {
-            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
-            const fileName = `${user.id}/${Date.now()}-${index}-${safeName}`;
-            const { error: uploadError } = await supabase.storage
-              .from('log-photos')
-              .upload(fileName, file);
-
-            if (uploadError) throw uploadError;
-
-            const { error: dbError } = await supabase
-              .from('entry_exit_photos')
-              .insert({
-                entry_exit_log_id: insertedLog.id,
-                file_path: fileName,
-                uploaded_by: user.id,
-                sort_order: index,
-              });
-
-            if (dbError) throw dbError;
-          })
-        );
-
-        const failedCount = uploadResults.filter((r) => r.status === 'rejected').length;
-        if (failedCount > 0) {
-          console.error(`${failedCount} photo(s) failed to upload`);
-          if (failedCount === photoFiles.length) {
-            setSaveError(t('photoUploadFailed'));
-            setSaving(false);
-            return;
-          }
-          setSaveError(t('photoUploadFailed'));
-        }
-      }
+      const response = await fetch('/api/movements', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: form,
+      });
+      if (!response.ok) throw new Error((await response.json()).error ?? 'Movement save failed');
 
       onSaved();
       onClose();
@@ -386,7 +344,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
                       </div>
                       <div className="text-end">
                         <span className="badge border" style={{ borderColor: 'var(--border)' }}>
-                          {eq.ownership_status === 'owned' ? t('owned') : t('rented')}
+                          {eq.ownership_status === 'alazani' ? t('owned') : t('rented')}
                         </span>
                       </div>
                     </div>
