@@ -202,8 +202,8 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
-                      <th className="table-header text-start px-4 py-3">{t('equipmentCodeLabel')}</th>
-                      <th className="table-header text-start px-4 py-3">{t('equipmentType')}</th>
+                      <th className="table-header text-start px-4 py-3">{t('contractorEquipmentCode')}</th>
+                      <th className="table-header text-start px-4 py-3">{t('equipmentNameLabel')}</th>
                       <th className="table-header text-start px-4 py-3">{t('movementType')}</th>
                       <th className="table-header text-start px-4 py-3">{t('driverName')}</th>
                       <th className="table-header text-start px-4 py-3">{t('supervisorName')}</th>
@@ -218,8 +218,8 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                         style={{ borderColor: 'var(--border)' }}
                         onClick={onSelectMovement ? () => onSelectMovement(log.id) : undefined}
                       >
-                        <td className="px-4 py-3 font-semibold">{log.equipment?.code ?? '—'}</td>
-                        <td className="px-4 py-3 text-muted">{log.equipment?.type ?? '—'}</td>
+                        <td className="px-4 py-3 font-semibold" dir="ltr">{log.contractor_equipment_code ?? '—'}</td>
+                        <td className="px-4 py-3" dir="ltr">{log.equipment ? `${log.equipment.code} ${log.equipment.type}` : '—'}</td>
                         <td className="px-4 py-3">
                           <span className={`badge border ${log.movement_type === 'entry' ? 'status-entry' : 'status-exit'}`}>
                             {log.movement_type === 'entry' ? t('entry') : t('exit')}
@@ -282,8 +282,8 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
-                      <th className="table-header text-start px-4 py-3">{t('equipmentCodeLabel')}</th>
-                      <th className="table-header text-start px-4 py-3">{t('equipmentType')}</th>
+                      <th className="table-header text-start px-4 py-3">{t('contractorEquipmentCode')}</th>
+                      <th className="table-header text-start px-4 py-3">{t('equipmentNameLabel')}</th>
                       <th className="table-header text-start px-4 py-3">{t('driverName')}</th>
                       <th className="table-header text-start px-4 py-3">{t('entryTime')}</th>
                       <th className="table-header text-start px-4 py-3">{t('entryBy')}</th>
@@ -294,8 +294,8 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                   <tbody>
                     {visits.map((v) => (
                       <tr key={v.entry_log_id} className="border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
-                        <td className="px-4 py-3 font-semibold">{v.equipment_code}</td>
-                        <td className="px-4 py-3 text-muted">{v.equipment_type}</td>
+                        <td className="px-4 py-3 font-semibold" dir="ltr">{v.contractor_equipment_code ?? '—'}</td>
+                        <td className="px-4 py-3" dir="ltr">{v.equipment_code} {v.equipment_type}</td>
                         <td className="px-4 py-3">{v.driver_name ?? '—'}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(v.entry_recorded_at)}</td>
                         <td className="px-4 py-3">{v.entry_supervisor_name ?? '—'}</td>

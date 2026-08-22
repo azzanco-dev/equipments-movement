@@ -177,8 +177,8 @@ export function downloadEquipmentTemplate(t: (key: TranslationKey) => string) {
 
 export function exportLogsToExcel(logs: EntryExitLog[], fileName: string, t: (key: TranslationKey) => string) {
   const data = logs.map((log) => ({
-    [t('equipmentCodeLabel')]: log.equipment?.code ?? '',
-    [t('equipmentType')]: log.equipment?.type ?? '',
+    [t('contractorEquipmentCode')]: log.contractor_equipment_code ?? '',
+    [t('equipmentNameLabel')]: log.equipment ? `${log.equipment.code} ${log.equipment.type}` : '',
     [t('plateNumber')]: log.equipment?.plate_number ?? '',
     [t('movementType')]: log.movement_type === 'entry' ? t('entry') : t('exit'),
     [t('driverName')]: log.driver_name ?? '',
@@ -196,8 +196,8 @@ export function exportLogsToExcel(logs: EntryExitLog[], fileName: string, t: (ke
 
 export function exportVisitsToExcel(visits: EquipmentVisit[], fileName: string, t: (key: TranslationKey) => string) {
   const data = visits.map((v) => ({
-    [t('equipmentCodeLabel')]: v.equipment_code,
-    [t('equipmentType')]: v.equipment_type,
+    [t('contractorEquipmentCode')]: v.contractor_equipment_code ?? '',
+    [t('equipmentNameLabel')]: `${v.equipment_code} ${v.equipment_type}`,
     [t('plateNumber')]: v.plate_number ?? '',
     [t('project')]: v.project_name_ar ?? '',
     [t('company')]: v.company_name_ar ?? '',

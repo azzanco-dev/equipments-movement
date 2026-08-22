@@ -99,6 +99,7 @@ export interface EquipmentVisit {
   equipment_id: string;
   equipment_code: string;
   equipment_type: string;
+  contractor_equipment_code: string | null;
   plate_number: string | null;
   project_id: string | null;
   project_name_ar: string | null;
