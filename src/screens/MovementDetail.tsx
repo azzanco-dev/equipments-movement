@@ -200,11 +200,14 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
   let durationMs = 0;
 
   if (linkedLog) {
+    console.log('yes')
     if (linkedLog.movement_type === 'entry') {
       durationMs = new Date(linkedLog.recorded_at).getTime() - new Date(log.recorded_at).getTime();
     } else if (linkedLog.movement_type === 'exit') {
       durationMs = new Date(log.recorded_at).getTime() - new Date(linkedLog.recorded_at).getTime();
     }
+  } else {
+    console.log('no')
   }
 
   return (
