@@ -10,7 +10,7 @@ import type { EntryExitLog, MovementType } from '@/lib/types';
 import { Select } from '@/components/Select';
 import { PageHeader } from '@/components/PageHeader';
 
-export function SupervisorDashboard() {
+export function SupervisorDashboard({ onSelectMovement }: { onSelectMovement: (id: string) => void }) {
   const { t } = useI18n();
   const { user } = useAuth();
   const [formOpen, setFormOpen] = useState(false);
@@ -152,7 +152,12 @@ export function SupervisorDashboard() {
                 </thead>
                 <tbody>
                   {logs.map((log) => (
-                    <tr key={log.id} className="border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
+                    <tr
+                      key={log.id}
+                      className="border-b last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                      style={{ borderColor: 'var(--border)' }}
+                      onClick={() => onSelectMovement(log.id)}
+                    >
                       <td className="px-4 py-3 font-semibold">{log.equipment?.code ?? '—'}</td>
                       <td className="px-4 py-3 text-muted">{log.equipment?.type ?? '—'}</td>
                       <td className="px-4 py-3">

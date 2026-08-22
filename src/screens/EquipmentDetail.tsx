@@ -11,9 +11,10 @@ interface EquipmentDetailProps {
   equipmentId: string;
   onBack: () => void;
   onEdit: (eq: Equipment) => void;
+  onSelectMovement?: (id: string) => void;
 }
 
-export function EquipmentDetail({ equipmentId, onBack, onEdit }: EquipmentDetailProps) {
+export function EquipmentDetail({ equipmentId, onBack, onEdit, onSelectMovement }: EquipmentDetailProps) {
   const { t } = useI18n();
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [logs, setLogs] = useState<EntryExitLog[]>([]);
@@ -140,7 +141,12 @@ export function EquipmentDetail({ equipmentId, onBack, onEdit }: EquipmentDetail
                 </thead>
                 <tbody>
                   {logs.map((log) => (
-                    <tr key={log.id} className="border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
+                    <tr
+                      key={log.id}
+                      className={`border-b last:border-0 ${onSelectMovement ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors' : ''}`}
+                      style={{ borderColor: 'var(--border)' }}
+                      onClick={onSelectMovement ? () => onSelectMovement(log.id) : undefined}
+                    >
                       <td className="px-4 py-3">
                         <span className="badge border" style={{ borderColor: 'var(--border)' }}>
                           {log.movement_type === 'entry' ? t('entry') : t('exit')}

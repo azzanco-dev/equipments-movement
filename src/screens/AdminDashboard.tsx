@@ -9,7 +9,7 @@ import type { EntryExitLog, EquipmentVisit, Profile, Equipment } from '@/lib/typ
 import { Select } from '@/components/Select';
 import { PageHeader } from '@/components/PageHeader';
 
-export function AdminDashboard() {
+export function AdminDashboard({ onSelectMovement }: { onSelectMovement?: (id: string) => void }) {
   const { t } = useI18n();
   const [tab, setTab] = useState<'logs' | 'reports'>('logs');
 
@@ -273,7 +273,12 @@ export function AdminDashboard() {
                   </thead>
                   <tbody>
                     {logs.map((log) => (
-                      <tr key={log.id} className="border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
+                      <tr
+                        key={log.id}
+                        className={`border-b last:border-0 ${onSelectMovement ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors' : ''}`}
+                        style={{ borderColor: 'var(--border)' }}
+                        onClick={onSelectMovement ? () => onSelectMovement(log.id) : undefined}
+                      >
                         <td className="px-4 py-3 font-semibold">{log.equipment?.code ?? '—'}</td>
                         <td className="px-4 py-3 text-muted">{log.equipment?.type ?? '—'}</td>
                         <td className="px-4 py-3">

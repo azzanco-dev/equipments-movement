@@ -99,6 +99,23 @@ export const translations = {
     noProjectsAvailable: 'لا توجد مشاريع متاحة',
     companyProjectError: 'الشركة والمشروع غير مرتبطين. يرجى اختيار مشروع مرتبط بالشركة.',
 
+    // Movement details
+    movementDetails: 'تفاصيل الحركة',
+    movementDetailsDesc: 'بيانات حركة الدخول أو الخروج',
+    movementNotFound: 'لم يتم العثور على الحركة',
+    movementLoadError: 'تعذر تحميل بيانات الحركة',
+    linkedEntry: 'الدخول المرتبط',
+    linkedExit: 'الخروج المرتبط',
+    notExitedYet: 'لم يتم تسجيل خروج بعد',
+    durationOnSite: 'مدة البقاء في الموقع',
+    viewDetails: 'عرض التفاصيل',
+    noPhoto: 'لا توجد صورة',
+    movementDate: 'تاريخ ووقت الحركة',
+    days: 'يوم',
+    hours: 'ساعة',
+    minutes: 'دقيقة',
+    backToMovements: 'رجوع للحركات',
+
     // Admin dashboard
     todayEntries: 'دخوليات اليوم',
     todayExits: 'خروجيات اليوم',
@@ -382,6 +399,23 @@ export const translations = {
     selectProject: 'Select Project',
     noProjectsAvailable: 'No projects available',
     companyProjectError: 'The company and project are not linked. Please select a project linked to this company.',
+
+    // Movement details
+    movementDetails: 'Movement Details',
+    movementDetailsDesc: 'Details of an entry or exit movement',
+    movementNotFound: 'Movement not found',
+    movementLoadError: 'Could not load the movement details',
+    linkedEntry: 'Linked Entry',
+    linkedExit: 'Linked Exit',
+    notExitedYet: 'No exit recorded yet',
+    durationOnSite: 'Time on site',
+    viewDetails: 'View Details',
+    noPhoto: 'No photo',
+    movementDate: 'Movement Date / Time',
+    days: 'days',
+    hours: 'hours',
+    minutes: 'minutes',
+    backToMovements: 'Back to Movements',
 
     todayEntries: "Today's Entries",
     todayExits: "Today's Exits",

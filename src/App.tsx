@@ -13,6 +13,7 @@ import { AdminProjects } from '@/screens/AdminProjects';
 import { AdminCompanies } from '@/screens/AdminCompanies';
 import { AdminLessors } from '@/screens/AdminLessors';
 import { AdminUsers } from '@/screens/AdminUsers';
+import { MovementDetail } from '@/screens/MovementDetail';
 import type { Equipment } from '@/lib/types';
 import { LayoutDashboard, FileText, Truck, FolderKanban, Building2, Users, Briefcase } from 'lucide-react';
 
@@ -21,6 +22,7 @@ function AppContent() {
   const { t } = useI18n();
   const [adminPage, setAdminPage] = useState('dashboard');
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string | null>(null);
+  const [selectedMovementId, setSelectedMovementId] = useState<string | null>(null);
 
   if (loading) return <FullPageSpinner />;
   if (!profile) return <AuthScreen />;
@@ -28,7 +30,15 @@ function AppContent() {
   if (profile.role === 'supervisor') {
     return (
       <Layout activePage="dashboard" onNavigate={() => {}} navItems={[]}>
-        <SupervisorDashboard />
+        {selectedMovementId ? (
+          <MovementDetail
+            movementId={selectedMovementId}
+            onBack={() => setSelectedMovementId(null)}
+            onNavigateMovement={setSelectedMovementId}
+          />
+        ) : (
+          <SupervisorDashboard onSelectMovement={setSelectedMovementId} />
+        )}
       </Layout>
     );
   }
@@ -46,35 +56,47 @@ function AppContent() {
 
   function handleNavigate(page: string) {
     setSelectedEquipmentId(null);
+    setSelectedMovementId(null);
     setAdminPage(page);
   }
 
   return (
     <Layout activePage={adminPage} onNavigate={handleNavigate} navItems={navItems}>
-      {adminPage === 'dashboard' && <AdminDashboard />}
-      {adminPage === 'logs' && <AdminDashboard />}
-      {adminPage === 'equipment' && (
-        selectedEquipmentId ? (
-          <EquipmentDetail
-            equipmentId={selectedEquipmentId}
-            onBack={() => setSelectedEquipmentId(null)}
-            onEdit={(eq: Equipment) => {
-              setSelectedEquipmentId(null);
-              // Defer to next tick so detail unmounts first
-              setTimeout(() => {
-                const event = new CustomEvent('edit-equipment', { detail: eq });
-                window.dispatchEvent(event);
-              }, 0);
-            }}
-          />
-        ) : (
-          <AdminEquipment onSelectEquipment={setSelectedEquipmentId} />
-        )
+      {selectedMovementId ? (
+        <MovementDetail
+          movementId={selectedMovementId}
+          onBack={() => setSelectedMovementId(null)}
+          onNavigateMovement={setSelectedMovementId}
+        />
+      ) : (
+        <>
+          {adminPage === 'dashboard' && <AdminDashboard onSelectMovement={setSelectedMovementId} />}
+          {adminPage === 'logs' && <AdminDashboard onSelectMovement={setSelectedMovementId} />}
+          {adminPage === 'equipment' && (
+            selectedEquipmentId ? (
+              <EquipmentDetail
+                equipmentId={selectedEquipmentId}
+                onBack={() => setSelectedEquipmentId(null)}
+                onEdit={(eq: Equipment) => {
+                  setSelectedEquipmentId(null);
+                  // Defer to next tick so detail unmounts first
+                  setTimeout(() => {
+                    const event = new CustomEvent('edit-equipment', { detail: eq });
+                    window.dispatchEvent(event);
+                  }, 0);
+                }}
+                onSelectMovement={setSelectedMovementId}
+              />
+            ) : (
+              <AdminEquipment onSelectEquipment={setSelectedEquipmentId} />
+            )
+          )}
+          {adminPage === 'projects' && <AdminProjects />}
+          {adminPage === 'companies' && <AdminCompanies />}
+          {adminPage === 'lessors' && <AdminLessors />}
+          {adminPage === 'users' && <AdminUsers />}
+        </>
       )}
-      {adminPage === 'projects' && <AdminProjects />}
-      {adminPage === 'companies' && <AdminCompanies />}
-      {adminPage === 'lessors' && <AdminLessors />}
-      {adminPage === 'users' && <AdminUsers />}
     </Layout>
   );
 }

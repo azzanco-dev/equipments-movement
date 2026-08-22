@@ -13,7 +13,6 @@ import { sanitizeSearchTerm } from '@/lib/search';
 
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
-const MAX_ODOMETER = 10000000;
 
 interface EntryExitFormProps {
   open: boolean;
@@ -49,7 +48,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
   const [loadingMovement, setLoadingMovement] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [driverName, setDriverName] = useState('');
-  const [odometer, setOdometer] = useState('');
   const [notes, setNotes] = useState('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -71,7 +69,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     setLoadingMovement(false);
     setValidationError(null);
     setDriverName('');
-    setOdometer('');
     setNotes('');
     setPhotoFile(null);
     setSaveError(null);
@@ -187,16 +184,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     if (!selected || !user) return;
     if (validationError) return;
 
-    let odometerValue: number | null = null;
-    if (odometer.trim()) {
-      const parsed = parseFloat(odometer);
-      if (!Number.isFinite(parsed) || parsed < 0 || parsed >= MAX_ODOMETER) {
-        setSaveError(t('saveFailed'));
-        return;
-      }
-      odometerValue = parsed;
-    }
-
     setSaving(true);
     setSaveError(null);
 
@@ -231,7 +218,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
         movement_type: movementType,
         registration_method: 'qr' in window && scanOpen ? 'qr' : 'manual',
         driver_name: driverName || null,
-        odometer_reading: odometerValue,
         notes: notes || null,
         photo_url: photoUrl,
       };
@@ -536,20 +522,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
                   className="input"
                   value={driverName}
                   onChange={(e) => setDriverName(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="label">{t('odometerReading')}</label>
-                <input
-                  type="number"
-                  className="input"
-                  value={odometer}
-                  min={0}
-                  max={MAX_ODOMETER - 1}
-                  step="any"
-                  onChange={(e) => setOdometer(e.target.value)}
-                  dir="ltr"
                 />
               </div>
 
