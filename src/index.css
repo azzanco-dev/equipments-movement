@@ -1,0 +1,160 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Thmanyah Sans Font — loaded from jsDelivr CDN */
+@font-face {
+  font-family: 'Thmanyah';
+  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+0020-007F, U+00A0-00FF, U+0100-024F, U+0250-02AF;
+}
+@font-face {
+  font-family: 'Thmanyah';
+  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+0020-007F, U+00A0-00FF, U+0100-024F, U+0250-02AF;
+}
+@font-face {
+  font-family: 'Thmanyah';
+  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+0020-007F, U+00A0-00FF, U+0100-024F, U+0250-02AF;
+}
+
+/* Fallback fonts loaded from Google Fonts via index.html */
+:root {
+  --font-primary: 'Thmanyah', 'Tajawal', 'Inter', system-ui, sans-serif;
+  --font-latin: 'Inter', system-ui, sans-serif;
+}
+
+* {
+  font-family: var(--font-primary);
+}
+
+/* Latin text inside RTL context gets Inter for better readability */
+[dir="ltr"] {
+  font-family: var(--font-latin);
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Theme variables — Black & White only */
+:root {
+  --bg: #ffffff;
+  --fg: #0a0a0a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --surface: #f9fafb;
+  --surface-hover: #f3f4f6;
+  --overlay: rgba(0, 0, 0, 0.5);
+  --ring: #0a0a0a;
+}
+
+.dark {
+  --bg: #0a0a0a;
+  --fg: #f5f5f5;
+  --muted: #9ca3af;
+  --border: #2a2a2a;
+  --surface: #161616;
+  --surface-hover: #222222;
+  --overlay: rgba(255, 255, 255, 0.1);
+  --ring: #f5f5f5;
+}
+
+@layer base {
+  body {
+    background-color: var(--bg);
+    color: var(--fg);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary {
+    @apply btn bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200;
+  }
+  .btn-outline {
+    @apply btn border border-current text-current hover:bg-gray-100 dark:hover:bg-gray-800;
+  }
+  .btn-ghost {
+    @apply btn hover:bg-gray-100 dark:hover:bg-gray-800;
+  }
+  .input {
+    @apply w-full rounded-lg border bg-transparent px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-black dark:focus:border-white placeholder:text-gray-400;
+    border-color: var(--border);
+  }
+  .label {
+    @apply block text-sm font-medium mb-1.5;
+  }
+  .card {
+    @apply rounded-xl border p-5;
+    border-color: var(--border);
+    background-color: var(--surface);
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .table-header {
+    @apply text-xs font-semibold uppercase tracking-wide;
+    color: var(--muted);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* RTL/LTR helpers */
+[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.animate-slide-in {
+  animation: slideIn 0.25s ease-out;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin 1.5s linear infinite;
+}

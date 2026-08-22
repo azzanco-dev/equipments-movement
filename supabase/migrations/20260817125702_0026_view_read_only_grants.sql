@@ -1,0 +1,1 @@
+REVOKE INSERT, UPDATE, DELETE ON public.equipment_visits FROM authenticated;
