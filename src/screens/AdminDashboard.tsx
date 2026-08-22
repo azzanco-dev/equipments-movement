@@ -3,14 +3,16 @@ import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/i18n/I18nContext';
 import { InlineSpinner } from '@/components/Spinner';
 import { exportLogsToExcel, exportVisitsToExcel } from '@/lib/excel';
-import { LogIn, LogOut, Truck, AlertCircle, Download, Filter, Calendar } from 'lucide-react';
+import { LogIn, LogOut, Truck, AlertCircle, Download, Calendar } from 'lucide-react';
 import { DatePicker } from '@/components/DatePicker';
-import type { EntryExitLog, EquipmentVisit, Profile } from '@/lib/types';
-import { Select } from '@/components/Select';
+import type { EntryExitLog, EquipmentVisit } from '@/lib/types';
 import { PageHeader } from '@/components/PageHeader';
-import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 import { sanitizeSearchTerm } from '@/lib/search';
-import type { SelectOption } from '@/components/Select';
+import { DataListToolbar } from '@/components/data-list/DataListToolbar';
+import { DataListPagination } from '@/components/data-list/DataListPagination';
+import { useDataListState } from '@/components/data-list/useDataListState';
+import { movementsListConfig } from '@/lib/listConfigs';
+import { applyListFilters } from '@/lib/applyListFilters';
 
 export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelectMovement?: (id: string) => void; onCreateMovement?: (type: 'entry' | 'exit') => void }) {
   const { t } = useI18n();
@@ -23,12 +25,8 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
   // Logs
   const [logs, setLogs] = useState<EntryExitLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
-  const [filterEquipment, setFilterEquipment] = useState('');
-  const [filterSupervisor, setFilterSupervisor] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'entry' | 'exit'>('all');
-  const [filterDate, setFilterDate] = useState('');
-  const [selectedEquipment, setSelectedEquipment] = useState<SelectOption | null>(null);
-  const [supervisors, setSupervisors] = useState<Profile[]>([]);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const list = useDataListState(movementsListConfig);
 
   // Reports
   const [visits, setVisits] = useState<EquipmentVisit[]>([]);
@@ -79,28 +77,25 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
 
   const fetchLogs = useCallback(async () => {
     setLoadingLogs(true);
+    const term = sanitizeSearchTerm(list.search);
+    let equipmentIds: string[] = [];
+    if (term) {
+      const { data: equipmentMatches } = await supabase.from('equipment').select('id').or(`code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`).limit(100);
+      equipmentIds = (equipmentMatches ?? []).map((item) => item.id);
+    }
     let query = supabase
       .from('entry_exit_logs')
-      .select('*, equipment(*), supervisor:profiles(*)')
-      .order('recorded_at', { ascending: false })
-      .limit(200);
-
-    if (filterType !== 'all') query = query.eq('movement_type', filterType);
-    if (filterEquipment) query = query.eq('equipment_id', filterEquipment);
-    if (filterSupervisor) query = query.eq('supervisor_id', filterSupervisor);
-    if (filterDate) {
-      const start = new Date(filterDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(filterDate);
-      end.setHours(23, 59, 59, 999);
-      query = query.gte('recorded_at', start.toISOString()).lte('recorded_at', end.toISOString());
-    }
-
-    const { data, error } = await query;
+      .select('id,equipment_id,supervisor_id,movement_type,registration_method,driver_name,driver_id,notes,photo_url,company_id,project_id,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),supervisor:profiles(id,full_name,role,created_at)', { count: 'exact' })
+      .order(list.sort, { ascending: list.direction === 'asc' })
+      .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
+    if (term) query = query.or(`driver_name.ilike.%${term}%,contractor_equipment_code.ilike.%${term}%${equipmentIds.length ? `,equipment_id.in.(${equipmentIds.join(',')})` : ''}`);
+    query = applyListFilters(query, list.filters, new Set(movementsListConfig.filterFields.map((field) => field.key)));
+    const { data, error, count } = await query;
     if (error) console.error(error);
-    setLogs((data as EntryExitLog[]) ?? []);
+    setLogs((data as unknown as EntryExitLog[]) ?? []);
+    setLogsTotal(count ?? 0);
     setLoadingLogs(false);
-  }, [filterType, filterEquipment, filterSupervisor, filterDate]);
+  }, [list.direction, list.filters, list.page, list.pageSize, list.search, list.sort]);
 
   const fetchVisits = useCallback(async () => {
     setLoadingVisits(true);
@@ -126,18 +121,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
   // Initial load
   useEffect(() => {
     fetchStats();
-    supabase.from('profiles').select('*').order('full_name').then(({ data }) => {
-      setSupervisors((data as Profile[]) ?? []);
-    });
   }, [fetchStats]);
-
-  const loadEquipment = useCallback(async (search: string): Promise<SelectOption[]> => {
-    let query = supabase.from('equipment').select('id,code,type,plate_number').eq('is_active', true).order('code').limit(20);
-    const term = sanitizeSearchTerm(search);
-    if (term) query = query.or(`code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`);
-    const { data } = await query;
-    return (data ?? []).map((item) => ({ value: item.id, label: `${item.code} — ${item.type}${item.plate_number ? ` — ${item.plate_number}` : ''}` }));
-  }, []);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
   useEffect(() => { fetchVisits(); }, [fetchVisits]);
@@ -203,56 +187,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
       {/* Logs tab */}
       {tab === 'logs' && (
         <div className="space-y-4">
-          {/* Filters */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 text-sm text-muted">
-              <Filter size={16} />
-            </div>
-            <AsyncSearchSelect
-              className="w-auto min-w-[140px]"
-              value={filterEquipment}
-              selectedOption={selectedEquipment}
-              onChange={(value, option) => { setFilterEquipment(value); setSelectedEquipment(option); }}
-              placeholder={t('allEquipment')}
-              loadOptions={loadEquipment}
-            />
-            <Select
-              className="w-auto min-w-[140px]"
-              value={filterSupervisor}
-              onChange={setFilterSupervisor}
-              placeholder={t('allSupervisors')}
-              searchable
-
-              options={[
-                { value: '', label: t('allSupervisors') },
-                ...supervisors.map((s) => ({ value: s.id, label: s.full_name })),
-              ]}
-            />
-            <Select
-              className="w-auto min-w-[100px]"
-              value={filterType}
-              onChange={(v) => setFilterType(v as 'all' | 'entry' | 'exit')}
-              options={[
-                { value: 'all', label: t('allTypes') },
-                { value: 'entry', label: t('entry') },
-                { value: 'exit', label: t('exit') },
-              ]}
-            />
-            <DatePicker
-              className="w-auto"
-              value={filterDate}
-              onChange={setFilterDate}
-              placeholder={t('date')}
-            />
-            <button
-              onClick={() => exportLogsToExcel(logs, `logs-${new Date().toISOString().slice(0, 10)}`, t as (k: string) => string)}
-              className="btn-outline"
-              disabled={logs.length === 0}
-            >
-              <Download size={16} />
-              {t('exportExcel')}
-            </button>
-          </div>
+          <DataListToolbar config={movementsListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} actions={<button onClick={() => exportLogsToExcel(logs, `logs-${new Date().toISOString().slice(0, 10)}`, t as (k: string) => string)} className="btn-outline" disabled={logs.length === 0}><Download size={16} />{t('exportExcel')}</button>} />
 
           {/* Table */}
           {loadingLogs ? (
@@ -300,6 +235,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
               </div>
             </div>
           )}
+          <DataListPagination page={list.page} pageSize={list.pageSize} total={logsTotal} onPage={list.setPage} />
         </div>
       )}
 

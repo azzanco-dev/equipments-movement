@@ -8,6 +8,12 @@ import { PageHeader } from '@/components/PageHeader';
 import { Plus, Edit2, Trash2, Upload, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import type { Project } from '@/lib/types';
 import { parseProjectsExcel, downloadProjectTemplate, type ProjectImportRow } from '@/lib/excel';
+import { DataListToolbar } from '@/components/data-list/DataListToolbar';
+import { DataListPagination } from '@/components/data-list/DataListPagination';
+import { useDataListState } from '@/components/data-list/useDataListState';
+import { projectsListConfig } from '@/lib/listConfigs';
+import { applyListFilters } from '@/lib/applyListFilters';
+import { sanitizeSearchTerm } from '@/lib/search';
 
 export function AdminProjects() {
   const { t } = useI18n();
@@ -19,6 +25,8 @@ export function AdminProjects() {
   const [nameEn, setNameEn] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
+  const list = useDataListState(projectsListConfig);
 
   // Import state
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -32,11 +40,15 @@ export function AdminProjects() {
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('projects').select('*').order('name_ar');
+    let query = supabase.from('projects').select('id,name_ar,name_en,created_at', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
+    const term = sanitizeSearchTerm(list.search); if (term) query = query.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`);
+    query = applyListFilters(query, list.filters, new Set(projectsListConfig.filterFields.map((field) => field.key)));
+    const { data, error, count } = await query;
     if (error) console.error(error);
     setProjects((data as Project[]) ?? []);
+    setTotal(count ?? 0);
     setLoading(false);
-  }, []);
+  }, [list.direction, list.filters, list.page, list.pageSize, list.search, list.sort]);
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
@@ -173,6 +185,7 @@ export function AdminProjects() {
           </>
         }
       />
+      <DataListToolbar config={projectsListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} />
 
       {loading ? (
         <InlineSpinner label={t('loading')} />
@@ -207,6 +220,7 @@ export function AdminProjects() {
           </div>
         </div>
       )}
+      <DataListPagination page={list.page} pageSize={list.pageSize} total={total} onPage={list.setPage} />
 
       {/* Add/Edit Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? t('editProject') : t('addProject')} size="sm">

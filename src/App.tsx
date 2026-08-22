@@ -85,6 +85,7 @@ function AppContent() {
             setTimeout(() => window.dispatchEvent(new CustomEvent('edit-equipment', { detail: equipment })), 0);
           }}
           onSelectMovement={openMovement}
+          onViewAllMovements={(code) => router.push(`/logs?q=${encodeURIComponent(code)}`)}
         />
       ) : driverId ? (
         <DriverDetail driverId={driverId} onBack={() => router.push('/drivers')} />

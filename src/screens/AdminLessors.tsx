@@ -7,6 +7,12 @@ import { InlineSpinner } from '@/components/Spinner';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import type { Lessor } from '@/lib/types';
 import { PageHeader } from '@/components/PageHeader';
+import { DataListToolbar } from '@/components/data-list/DataListToolbar';
+import { DataListPagination } from '@/components/data-list/DataListPagination';
+import { useDataListState } from '@/components/data-list/useDataListState';
+import { lessorsListConfig } from '@/lib/listConfigs';
+import { applyListFilters } from '@/lib/applyListFilters';
+import { sanitizeSearchTerm } from '@/lib/search';
 
 export function AdminLessors() {
   const { t } = useI18n();
@@ -19,14 +25,20 @@ export function AdminLessors() {
   const [contactNumber, setContactNumber] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
+  const list = useDataListState(lessorsListConfig);
 
   const fetchLessors = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('lessors').select('*').order('name');
+    let query = supabase.from('lessors').select('id,name,contact_person,contact_number,created_at', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
+    const term = sanitizeSearchTerm(list.search); if (term) query = query.or(`name.ilike.%${term}%,contact_person.ilike.%${term}%,contact_number.ilike.%${term}%`);
+    query = applyListFilters(query, list.filters, new Set(lessorsListConfig.filterFields.map((field) => field.key)));
+    const { data, error, count } = await query;
     if (error) console.error(error);
     setLessors((data as Lessor[]) ?? []);
+    setTotal(count ?? 0);
     setLoading(false);
-  }, []);
+  }, [list.direction, list.filters, list.page, list.pageSize, list.search, list.sort]);
 
   useEffect(() => { fetchLessors(); }, [fetchLessors]);
 
@@ -59,9 +71,7 @@ export function AdminLessors() {
   return (
     <div className="space-y-4">
       <PageHeader title={t('lessors')} description={t('lessorsDesc')} />
-      <div className="flex justify-end">
-        <button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addLessor')}</button>
-      </div>
+      <DataListToolbar config={lessorsListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} actions={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addLessor')}</button>} />
       {loading ? (
         <InlineSpinner label={t('loading')} />
       ) : lessors.length === 0 ? (
@@ -93,6 +103,7 @@ export function AdminLessors() {
           </div>
         </div>
       )}
+      <DataListPagination page={list.page} pageSize={list.pageSize} total={total} onPage={list.setPage} />
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? t('editLessor') : t('addLessor')} size="sm">
         {formError && <div className="mb-4"><Alert type="error">{formError}</Alert></div>}
         <div className="space-y-4">

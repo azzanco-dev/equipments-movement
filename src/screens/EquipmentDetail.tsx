@@ -12,9 +12,10 @@ interface EquipmentDetailProps {
   onBack: () => void;
   onEdit: (eq: Equipment) => void;
   onSelectMovement?: (id: string) => void;
+  onViewAllMovements?: (equipmentCode: string) => void;
 }
 
-export function EquipmentDetail({ equipmentId, onBack, onEdit, onSelectMovement }: EquipmentDetailProps) {
+export function EquipmentDetail({ equipmentId, onBack, onEdit, onSelectMovement, onViewAllMovements }: EquipmentDetailProps) {
   const { t } = useI18n();
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [logs, setLogs] = useState<EntryExitLog[]>([]);
@@ -34,7 +35,7 @@ export function EquipmentDetail({ equipmentId, onBack, onEdit, onSelectMovement 
       .select('*, supervisor:profiles(*)')
       .eq('equipment_id', equipmentId)
       .order('recorded_at', { ascending: false })
-      .limit(50);
+      .limit(10);
     setLogs((logData as EntryExitLog[]) ?? []);
     setLoading(false);
   }, [equipmentId]);
@@ -123,7 +124,7 @@ export function EquipmentDetail({ equipmentId, onBack, onEdit, onSelectMovement 
 
       {/* Movement history */}
       <div>
-        <h3 className="text-lg font-bold mb-3 flex items-center gap-2"><FileText size={18} /> {t('movementHistory')}</h3>
+        <div className="mb-3 flex items-center justify-between"><h3 className="flex items-center gap-2 text-lg font-bold"><FileText size={18} /> {t('movementHistory')}</h3>{onViewAllMovements && <button className="btn-outline text-sm" onClick={() => onViewAllMovements(equipment.code)}>عرض الكل</button>}</div>
         {logs.length === 0 ? (
           <div className="card text-center py-12"><p className="text-muted">{t('noMovements')}</p></div>
         ) : (

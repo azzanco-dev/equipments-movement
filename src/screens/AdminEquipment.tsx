@@ -5,7 +5,7 @@ import { Modal } from '@/components/Modal';
 import { Alert } from '@/components/Alert';
 import { InlineSpinner } from '@/components/Spinner';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
-import { Plus, Edit2, Power, QrCode, Printer, Search, Upload, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, XCircle, ChevronRight, ChevronUp, ChevronDown, ChevronLeft, Filter } from 'lucide-react';
+import { Plus, Edit2, Power, QrCode, Printer, Upload, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, XCircle, ChevronRight } from 'lucide-react';
 import type { Equipment, Project, Lessor, OperationalStatus, OwnershipStatus, RegistrationType } from '@/lib/types';
 import { parseEquipmentExcel, downloadEquipmentTemplate, type EquipmentImportRow } from '@/lib/excel';
 import { Select } from '@/components/Select';
@@ -13,6 +13,11 @@ import { PageHeader } from '@/components/PageHeader';
 import { DatePicker } from '@/components/DatePicker';
 import { PlateNumberInput } from '@/components/PlateNumberInput';
 import { sanitizeSearchTerm } from '@/lib/search';
+import { DataListToolbar } from '@/components/data-list/DataListToolbar';
+import { DataListPagination } from '@/components/data-list/DataListPagination';
+import { useDataListState } from '@/components/data-list/useDataListState';
+import { equipmentListConfig } from '@/lib/listConfigs';
+import { applyListFilters } from '@/lib/applyListFilters';
 
 function genQrValue(): string {
   return `EQ-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -35,14 +40,8 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
   const [projects, setProjects] = useState<Project[]>([]);
   const [lessors, setLessors] = useState<Lessor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [sortKey, setSortKey] = useState<'code' | 'type' | 'plate_number' | 'operational_status' | 'ownership_status' | 'is_active'>('code');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const [filterOperational, setFilterOperational] = useState('');
-  const [filterOwnership, setFilterOwnership] = useState('');
-  const [filterActive, setFilterActive] = useState('');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const list = useDataListState(equipmentListConfig);
+  const [total, setTotal] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Equipment | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -60,17 +59,18 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
 
   const fetchEquipment = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('equipment').select('*').order('code');
-    const term = sanitizeSearchTerm(search);
+    let query = supabase.from('equipment').select('id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,created_at,updated_at', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
+    const term = sanitizeSearchTerm(list.search);
     if (term) {
       query = query.or(`code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`);
     }
-    const { data, error } = await query;
+    query = applyListFilters(query, list.filters, new Set(equipmentListConfig.filterFields.map((field) => field.key)));
+    const { data, error, count } = await query;
     if (error) console.error(error);
     setEquipment((data as Equipment[]) ?? []);
-    setPage(1);
+    setTotal(count ?? 0);
     setLoading(false);
-  }, [search]);
+  }, [list.direction, list.filters, list.page, list.pageSize, list.search, list.sort]);
 
   useEffect(() => {
     supabase.from('projects').select('*').order('name_ar').then(({ data }) => setProjects((data as Project[]) ?? []));
@@ -273,138 +273,45 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
 
   const statusLabel = (s: OperationalStatus) => s === 'operational' ? t('operational') : s === 'maintenance' ? t('maintenance') : t('stopped');
   const ownLabel = (s: OwnershipStatus) => s === 'alazani' ? t('ownershipAlazani') : s === 'takween' ? t('ownershipTakween') : s === 'third_party_f' ? t('ownershipThirdPartyF') : s === 'third_party_partnership_b' ? t('ownershipThirdPartyPartnershipB') : t('ownershipExternalSupplier');
-  const filteredEquipment = equipment.filter((eq) => {
-    if (filterOperational && eq.operational_status !== filterOperational) return false;
-    if (filterOwnership && eq.ownership_status !== filterOwnership) return false;
-    if (filterActive === 'active' && !eq.is_active) return false;
-    if (filterActive === 'inactive' && eq.is_active) return false;
-    return true;
-  });
-
-  const sortedEquipment = [...filteredEquipment].sort((a, b) => {
-    const aVal = a[sortKey] ?? '';
-    const bVal = b[sortKey] ?? '';
-    const aStr = typeof aVal === 'boolean' ? String(aVal) : String(aVal);
-    const bStr = typeof bVal === 'boolean' ? String(bVal) : String(bVal);
-    const cmp = aStr.localeCompare(bStr, undefined, { numeric: true });
-    return sortDir === 'asc' ? cmp : -cmp;
-  });
-
-  const totalPages = Math.max(1, Math.ceil(sortedEquipment.length / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const pagedEquipment = sortedEquipment.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-  function toggleSort(key: typeof sortKey) {
-    if (sortKey === key) {
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
-  }
-
-  function SortIcon({ column }: { column: typeof sortKey }) {
-    if (sortKey !== column) return <ChevronUp size={12} className="opacity-30" />;
-    return sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />;
-  }
 
   return (
     <div className="space-y-4">
       <PageHeader title={t('equipmentList')} description={t('equipmentDesc')} />
-      <div className="flex flex-col sm:flex-row gap-3 items-end">
-        <div className="flex-1 relative">
-          <Search size={18} className="absolute top-1/2 -translate-y-1/2 start-3 text-muted" />
-          <input className="input ps-10" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        <button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addEquipment')}</button>
-        <button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-outline"><Upload size={18} /> {t('importExcel')}</button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1.5 text-sm text-muted"><Filter size={16} /></div>
-        <Select
-          value={filterOperational}
-          onChange={setFilterOperational}
-          placeholder={t('operationalStatus')}
-          options={[
-            { value: '', label: t('operationalStatus') },
-            { value: 'operational', label: t('operational') },
-            { value: 'maintenance', label: t('maintenance') },
-            { value: 'stopped', label: t('stopped') },
-          ]}
-          className="w-auto min-w-[140px]"
-        />
-        <Select
-          value={filterOwnership}
-          onChange={setFilterOwnership}
-          placeholder={t('ownershipStatus')}
-          options={[
-            { value: '', label: t('ownershipStatus') },
-            { value: 'alazani', label: t('ownershipAlazani') },
-            { value: 'takween', label: t('ownershipTakween') },
-            { value: 'third_party_f', label: t('ownershipThirdPartyF') },
-            { value: 'third_party_partnership_b', label: t('ownershipThirdPartyPartnershipB') },
-            { value: 'external_supplier', label: t('ownershipExternalSupplier') },
-          ]}
-          className="w-auto min-w-[140px]"
-        />
-        <Select
-          value={filterActive}
-          onChange={setFilterActive}
-          placeholder={t('isActive')}
-          options={[
-            { value: '', label: t('isActive') },
-            { value: 'active', label: t('active') },
-            { value: 'inactive', label: t('inactive') },
-          ]}
-          className="w-auto min-w-[120px]"
-        />
-        {(filterOperational || filterOwnership || filterActive) && (
-          <button
-            onClick={() => { setFilterOperational(''); setFilterOwnership(''); setFilterActive(''); }}
-            className="text-xs text-muted hover:text-fg transition-colors"
-          >
-            {t('close')}
-          </button>
-        )}
-      </div>
+      <DataListToolbar config={equipmentListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} actions={<><button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addEquipment')}</button><button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-outline"><Upload size={18} /> {t('importExcel')}</button></>} />
 
       {loading ? (
         <InlineSpinner label={t('loading')} />
       ) : equipment.length === 0 ? (
         <div className="card text-center py-12"><p className="text-muted">{t('noEquipment')}</p></div>
-      ) : sortedEquipment.length === 0 ? (
-        <div className="card text-center py-12"><p className="text-muted">{t('noResults')}</p></div>
       ) : (
         <div className="card p-0 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
-                  <th className="table-header text-start px-4 py-3 cursor-pointer select-none hover:text-fg transition-colors" onClick={() => toggleSort('code')}>
-                    <span className="inline-flex items-center gap-1">{t('equipmentCode')} <SortIcon column="code" /></span>
+                  <th className="table-header text-start px-4 py-3">
+                    <span>{t('equipmentCode')}</span>
                   </th>
-                  <th className="table-header text-start px-4 py-3 cursor-pointer select-none hover:text-fg transition-colors" onClick={() => toggleSort('type')}>
-                    <span className="inline-flex items-center gap-1">{t('equipmentType')} <SortIcon column="type" /></span>
+                  <th className="table-header text-start px-4 py-3">
+                    <span>{t('equipmentType')}</span>
                   </th>
-                  <th className="table-header text-start px-4 py-3 cursor-pointer select-none hover:text-fg transition-colors" onClick={() => toggleSort('plate_number')}>
-                    <span className="inline-flex items-center gap-1">{t('plateNumber')} <SortIcon column="plate_number" /></span>
+                  <th className="table-header text-start px-4 py-3">
+                    <span>{t('plateNumber')}</span>
                   </th>
-                  <th className="table-header text-start px-4 py-3 cursor-pointer select-none hover:text-fg transition-colors" onClick={() => toggleSort('operational_status')}>
-                    <span className="inline-flex items-center gap-1">{t('operationalStatus')} <SortIcon column="operational_status" /></span>
+                  <th className="table-header text-start px-4 py-3">
+                    <span>{t('operationalStatus')}</span>
                   </th>
-                  <th className="table-header text-start px-4 py-3 cursor-pointer select-none hover:text-fg transition-colors" onClick={() => toggleSort('ownership_status')}>
-                    <span className="inline-flex items-center gap-1">{t('ownershipStatus')} <SortIcon column="ownership_status" /></span>
+                  <th className="table-header text-start px-4 py-3">
+                    <span>{t('ownershipStatus')}</span>
                   </th>
-                  <th className="table-header text-start px-4 py-3 cursor-pointer select-none hover:text-fg transition-colors" onClick={() => toggleSort('is_active')}>
-                    <span className="inline-flex items-center gap-1">{t('isActive')} <SortIcon column="is_active" /></span>
+                  <th className="table-header text-start px-4 py-3">
+                    <span>{t('isActive')}</span>
                   </th>
                   <th className="table-header text-start px-4 py-3">{t('actions')}</th>
                 </tr>
               </thead>
               <tbody>
-                {pagedEquipment.map((eq) => (
+                {equipment.map((eq) => (
                   <tr
                     key={eq.id}
                     className="border-b last:border-0 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50"
@@ -430,61 +337,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
               </tbody>
             </table>
           </div>
-          {/* Pagination */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t" style={{ borderColor: 'var(--border)' }}>
-            <div className="flex items-center gap-2 text-sm text-muted">
-              <span>{t('showing')} {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, sortedEquipment.length)} {t('of')} {sortedEquipment.length}</span>
-              <span className="text-muted">|</span>
-              <select
-                value={pageSize}
-                onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-                className="bg-transparent text-sm outline-none cursor-pointer"
-                style={{ color: 'var(--fg)' }}
-              >
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPage(currentPage - 1)}
-                disabled={currentPage <= 1}
-                className="btn-ghost p-1.5 disabled:opacity-30"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                .map((p, idx, arr) => {
-                  const prev = arr[idx - 1];
-                  const showEllipsis = prev && p - prev > 1;
-                  return (
-                    <span key={p} className="inline-flex items-center">
-                      {showEllipsis && <span className="px-1 text-muted">…</span>}
-                      <button
-                        onClick={() => setPage(p)}
-                        className={`min-w-[32px] rounded-md px-2 py-1.5 text-sm transition-colors ${
-                          p === currentPage
-                            ? 'bg-black text-white dark:bg-white dark:text-black font-medium'
-                            : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    </span>
-                  );
-                })}
-              <button
-                onClick={() => setPage(currentPage + 1)}
-                disabled={currentPage >= totalPages}
-                className="btn-ghost p-1.5 disabled:opacity-30"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
+          <div className="border-t px-4 py-3" style={{ borderColor: 'var(--border)' }}><DataListPagination page={list.page} pageSize={list.pageSize} total={total} onPage={list.setPage} /></div>
         </div>
       )}
 
