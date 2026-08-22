@@ -199,15 +199,16 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
 
   let durationMs = 0;
 
+  console.log('linkedLog:', linkedLog);
+console.log('movement_type:', linkedLog?.movement_type);
+console.log('recorded_at log:', log.recorded_at);
+console.log('recorded_at linkedLog:', linkedLog?.recorded_at);
   if (linkedLog) {
-    console.log('yes')
     if (linkedLog.movement_type === 'entry') {
       durationMs = new Date(linkedLog.recorded_at).getTime() - new Date(log.recorded_at).getTime();
     } else if (linkedLog.movement_type === 'exit') {
       durationMs = new Date(log.recorded_at).getTime() - new Date(linkedLog.recorded_at).getTime();
     }
-  } else {
-    console.log('no')
   }
 
   return (
