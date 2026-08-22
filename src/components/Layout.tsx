@@ -4,6 +4,7 @@ import { Sun, Moon, Languages, LogOut, Menu, X } from 'lucide-react';
 import { useTheme } from '@/theme/ThemeContext';
 import { useAuth } from '@/auth/AuthContext';
 import { useState } from 'react';
+import { Modal } from '@/components/Modal';
 
 interface LayoutProps {
   children: ReactNode;
@@ -17,6 +18,8 @@ export function Layout({ children, activePage, onNavigate, navItems }: LayoutPro
   const { theme, toggleTheme } = useTheme();
   const { profile, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const isAdmin = profile?.role === 'admin';
 
@@ -62,7 +65,7 @@ export function Layout({ children, activePage, onNavigate, navItems }: LayoutPro
               <p className="text-xs font-medium">{profile?.full_name}</p>
               <p className="text-xs text-muted">{isAdmin ? t('admin') : t('supervisor')}</p>
             </div>
-            <button onClick={signOut} className="btn-ghost p-2" title={t('signOut')}>
+            <button onClick={() => setLogoutOpen(true)} className="btn-ghost p-2" title={t('signOut')}>
               <LogOut size={18} />
             </button>
           </div>
@@ -128,6 +131,15 @@ export function Layout({ children, activePage, onNavigate, navItems }: LayoutPro
           {children}
         </main>
       </div>
+      <Modal open={logoutOpen} onClose={() => !loggingOut && setLogoutOpen(false)} title={t('confirmSignOut')} size="sm">
+        <div className="space-y-5">
+          <p className="text-sm text-muted">{t('confirmSignOutMessage')}</p>
+          <div className="flex gap-3">
+            <button className="btn-outline flex-1" disabled={loggingOut} onClick={() => setLogoutOpen(false)}>{t('cancel')}</button>
+            <button className="btn-primary flex-1" disabled={loggingOut} onClick={async () => { setLoggingOut(true); await signOut(); }}>{loggingOut ? t('loading') : t('signOut')}</button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
