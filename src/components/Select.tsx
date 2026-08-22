@@ -17,7 +17,7 @@ interface SelectProps {
   searchable?: boolean;
 }
 
-export function Select({ value, onChange, options, placeholder, className = '', compact = false, searchable = false }: SelectProps) {
+export function Select({ value, onChange, options, placeholder, className = '', searchable = false }: SelectProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -54,7 +54,7 @@ export function Select({ value, onChange, options, placeholder, className = '', 
         type="button"
         onClick={() => setOpen(!open)}
         className={`w-full flex items-center justify-between gap-2 rounded-lg border bg-transparent outline-none transition-colors focus:border-black dark:focus:border-white ${
-          compact ? 'h-[34px] px-3 py-0 text-sm' : 'px-3.5 py-2.5 text-sm'
+          'h-[34px] px-3 py-0 text-sm'
         }`}
         style={{ borderColor: 'var(--border)' }}
       >

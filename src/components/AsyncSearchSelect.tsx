@@ -68,7 +68,7 @@ export function AsyncSearchSelect({
         type="button"
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
-        className="flex w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3.5 py-2.5 text-sm outline-none transition-colors focus:border-black disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-white"
+        className="flex h-[34px] w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors focus:border-black disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-white"
         style={{ borderColor: 'var(--border)' }}
       >
         <span className={selectedOption ? '' : 'text-gray-400'}>{selectedOption?.label ?? placeholder}</span>
