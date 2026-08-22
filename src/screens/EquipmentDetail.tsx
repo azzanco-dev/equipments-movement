@@ -135,7 +135,6 @@ export function EquipmentDetail({ equipmentId, onBack, onEdit, onSelectMovement 
                     <th className="table-header text-start px-4 py-3">{t('movementType')}</th>
                     <th className="table-header text-start px-4 py-3">{t('supervisorName')}</th>
                     <th className="table-header text-start px-4 py-3">{t('driverName')}</th>
-                    <th className="table-header text-start px-4 py-3">{t('registrationMethod')}</th>
                     <th className="table-header text-start px-4 py-3">{t('recordedAt')}</th>
                   </tr>
                 </thead>
@@ -154,7 +153,6 @@ export function EquipmentDetail({ equipmentId, onBack, onEdit, onSelectMovement 
                       </td>
                       <td className="px-4 py-3 text-muted">{log.supervisor?.full_name ?? '—'}</td>
                       <td className="px-4 py-3">{log.driver_name ?? '—'}</td>
-                      <td className="px-4 py-3 text-muted">{log.registration_method === 'qr' ? t('qr') : t('manual')}</td>
                       <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDateTime(log.recorded_at)}</td>
                     </tr>
                   ))}

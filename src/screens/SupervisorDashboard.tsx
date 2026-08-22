@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/i18n/I18nContext';
 import { useAuth } from '@/auth/AuthContext';
-import { EntryExitForm } from '@/components/EntryExitForm';
 import { InlineSpinner } from '@/components/Spinner';
 import { LogIn, LogOut, Filter } from 'lucide-react';
 import { DatePicker } from '@/components/DatePicker';
@@ -10,11 +9,9 @@ import type { EntryExitLog, MovementType } from '@/lib/types';
 import { Select } from '@/components/Select';
 import { PageHeader } from '@/components/PageHeader';
 
-export function SupervisorDashboard({ onSelectMovement }: { onSelectMovement: (id: string) => void }) {
+export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { onSelectMovement: (id: string) => void; onCreateMovement: (type: MovementType) => void }) {
   const { t } = useI18n();
   const { user } = useAuth();
-  const [formOpen, setFormOpen] = useState(false);
-  const [formType, setFormType] = useState<MovementType>('entry');
   const [logs, setLogs] = useState<EntryExitLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<'all' | MovementType>('all');
@@ -52,11 +49,6 @@ export function SupervisorDashboard({ onSelectMovement }: { onSelectMovement: (i
     fetchLogs();
   }, [fetchLogs]);
 
-  const openForm = (type: MovementType) => {
-    setFormType(type);
-    setFormOpen(true);
-  };
-
   const formatDate = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleString(undefined, {
@@ -73,7 +65,7 @@ export function SupervisorDashboard({ onSelectMovement }: { onSelectMovement: (i
       {/* Action buttons */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <button
-          onClick={() => openForm('entry')}
+          onClick={() => onCreateMovement('entry')}
           className="flex flex-col items-center justify-center gap-2 rounded-xl border p-6 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           style={{ borderColor: 'var(--border)' }}
         >
@@ -84,7 +76,7 @@ export function SupervisorDashboard({ onSelectMovement }: { onSelectMovement: (i
         </button>
 
         <button
-          onClick={() => openForm('exit')}
+          onClick={() => onCreateMovement('exit')}
           className="flex flex-col items-center justify-center gap-2 rounded-xl border p-6 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
           style={{ borderColor: 'var(--border)' }}
         >
@@ -175,12 +167,6 @@ export function SupervisorDashboard({ onSelectMovement }: { onSelectMovement: (i
         )}
       </div>
 
-      <EntryExitForm
-        open={formOpen}
-        onClose={() => setFormOpen(false)}
-        movementType={formType}
-        onSaved={fetchLogs}
-      />
     </div>
   );
 }

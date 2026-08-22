@@ -11,6 +11,8 @@ interface AsyncSearchSelectProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  createLabel?: string;
+  onCreate?: (query: string) => void;
 }
 
 export function AsyncSearchSelect({
@@ -21,6 +23,8 @@ export function AsyncSearchSelect({
   placeholder = '—',
   className = '',
   disabled = false,
+  createLabel,
+  onCreate,
 }: AsyncSearchSelectProps) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -114,6 +118,7 @@ export function AsyncSearchSelect({
               </button>
             ))}
           </div>
+          {onCreate && query.trim() && <button type="button" className="w-full border-t px-3.5 py-2 text-start text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-800" style={{ borderColor: 'var(--border)' }} onClick={() => { onCreate(query.trim()); setOpen(false); }}>{createLabel ?? `+ ${query.trim()}`}</button>}
         </div>
       )}
     </div>

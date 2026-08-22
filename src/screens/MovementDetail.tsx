@@ -382,11 +382,6 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
             label={t('createdAt')}
             value={log.created_at ? formatDateTime(log.created_at) : '—'}
           />
-          <InfoRow
-            icon={<Clock size={16} />}
-            label={t('registrationMethod')}
-            value={log.registration_method === 'qr' ? t('qr') : t('manual')}
-          />
         </div>
 
         {/* Notes */}

@@ -7,9 +7,10 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  inline?: boolean;
 }
 
-export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
+export function Modal({ open, onClose, title, children, size = 'md', inline = false }: ModalProps) {
   if (!open) return null;
 
   const sizeClass = {
@@ -18,6 +19,11 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
   }[size];
+
+  if (inline) return <section className={`mx-auto w-full ${sizeClass} space-y-4`}>
+    <div className="flex items-center justify-between"><h1 className="text-2xl font-bold">{title}</h1><button onClick={onClose} className="btn-ghost p-1.5 rounded-lg"><X size={20} /></button></div>
+    <div className="card">{children}</div>
+  </section>;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" style={{ background: 'var(--overlay)' }}>

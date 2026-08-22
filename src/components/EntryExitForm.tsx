@@ -7,7 +7,7 @@ import { Alert } from '@/components/Alert';
 import { QRScanner } from '@/components/QRScanner';
 import { Spinner } from '@/components/Spinner';
 import { QrCode, Search, AlertTriangle, CheckCircle, Clock, MapPin, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
-import type { Equipment, MovementType, LastMovement } from '@/lib/types';
+import type { Driver, Equipment, Lessor, MovementType, LastMovement } from '@/lib/types';
 import { DatePicker } from '@/components/DatePicker';
 import { TimePicker } from '@/components/TimePicker';
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
@@ -23,6 +23,8 @@ interface EntryExitFormProps {
   onClose: () => void;
   movementType: MovementType;
   onSaved: () => void;
+  pageMode?: boolean;
+  onViewMovement?: (id: string) => void;
 }
 
 function formatDateTime(iso: string): string {
@@ -42,7 +44,7 @@ function toLocalDateTimeInput(date: Date): string {
   return localTime.toISOString().slice(0, 16);
 }
 
-export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExitFormProps) {
+export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode = false, onViewMovement }: EntryExitFormProps) {
   const { t } = useI18n();
   const { user } = useAuth();
 
@@ -65,13 +67,16 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveWarning, setSaveWarning] = useState<string | null>(null);
   const [movementSaved, setMovementSaved] = useState(false);
+  const [savedMovementId, setSavedMovementId] = useState('');
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [selectedCompany, setSelectedCompany] = useState<SelectOption | null>(null);
   const [selectedProject, setSelectedProject] = useState<SelectOption | null>(null);
   const [contractorCode, setContractorCode] = useState('');
   const [recordedAt, setRecordedAt] = useState('');
-  const [registrationMethod, setRegistrationMethod] = useState<'manual' | 'qr'>('manual');
+  const [quickDriver, setQuickDriver] = useState({ open: false, fullName: '', mobile: '' });
+  const [quickEquipment, setQuickEquipment] = useState({ open: false, plate: '', ownerName: '', ownerMobile: '' });
+  const [quickSaving, setQuickSaving] = useState(false);
 
   const isEntry = movementType === 'entry';
   const currentLocalDateTime = toLocalDateTimeInput(new Date());
@@ -106,13 +111,15 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     setSaveError(null);
     setSaveWarning(null);
     setMovementSaved(false);
+    setSavedMovementId('');
     setSelectedCompanyId('');
     setSelectedProjectId('');
     setSelectedCompany(null);
     setSelectedProject(null);
     setContractorCode('');
     setRecordedAt('');
-    setRegistrationMethod('manual');
+    setQuickDriver({ open: false, fullName: '', mobile: '' });
+    setQuickEquipment({ open: false, plate: '', ownerName: '', ownerMobile: '' });
   }, []);
 
   useEffect(() => {
@@ -131,7 +138,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
 
     const query = supabase
       .from('equipment')
-      .select('*, project:projects(*), lessor:lessors(*)')
+      .select('id,code,type,plate_number,ownership_status,qr_value,is_active')
       .eq('is_active', true)
       .order('code');
 
@@ -143,7 +150,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     const timer = window.setTimeout(() => query.limit(20).then(({ data, error }) => {
       if (!active) return;
       if (error) console.error(error);
-      setEquipment((data as Equipment[]) ?? []);
+      setEquipment((data as unknown as Equipment[]) ?? []);
       setLoadingEquipment(false);
     }), search ? 300 : 0);
 
@@ -233,11 +240,39 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     checkLastMovement(eq);
   };
 
+  const createQuickDriver = async () => {
+    if (!quickDriver.fullName.trim() || !/^\+?\d{7,15}$/.test(quickDriver.mobile)) { setSaveError('أدخل اسم السائق ورقم جوال صحيح.'); return; }
+    setQuickSaving(true); setSaveError(null);
+    const { data, error } = await supabase.rpc('quick_create_driver', { p_full_name: quickDriver.fullName.trim(), p_mobile_number: quickDriver.mobile.trim() });
+    setQuickSaving(false);
+    if (error || !data) { setSaveError(t('saveFailed')); return; }
+    const driver = data as Driver;
+    setDriverId(driver.id); setSelectedDriver({ value: driver.id, label: `${driver.full_name} — ${driver.mobile_number}` });
+    setQuickDriver({ open: false, fullName: '', mobile: '' });
+  };
+
+  const createQuickEquipment = async () => {
+    if (!quickEquipment.plate.trim()) { setSaveError('رقم اللوحة مطلوب.'); return; }
+    setQuickSaving(true); setSaveError(null);
+    let lessorId: string | null = null;
+    if (quickEquipment.ownerName || quickEquipment.ownerMobile) {
+      if (!quickEquipment.ownerName.trim() || !quickEquipment.ownerMobile.trim()) { setQuickSaving(false); setSaveError('اسم المالك ورقم جواله مطلوبان معًا.'); return; }
+      const lessorResult = await supabase.rpc('quick_create_lessor', { p_name: quickEquipment.ownerName.trim(), p_mobile_number: quickEquipment.ownerMobile.trim() });
+      if (lessorResult.error || !lessorResult.data) { setQuickSaving(false); setSaveError(t('saveFailed')); return; }
+      lessorId = (lessorResult.data as Lessor).id;
+    }
+    const { data, error } = await supabase.rpc('quick_create_equipment', { p_plate_number: quickEquipment.plate.trim(), p_lessor_id: lessorId });
+    setQuickSaving(false);
+    if (error || !data) { setSaveError(t('saveFailed')); return; }
+    setQuickEquipment({ open: false, plate: '', ownerName: '', ownerMobile: '' });
+    handleSelectEquipment(data as Equipment);
+  };
+
   const handleQRScan = async (decoded: string) => {
     setScanOpen(false);
     const { data, error } = await supabase
       .from('equipment')
-      .select('*, project:projects(*), lessor:lessors(*)')
+      .select('id,code,type,plate_number,ownership_status,qr_value,is_active')
       .eq('qr_value', decoded)
       .eq('is_active', true)
       .maybeSingle();
@@ -247,8 +282,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
       return;
     }
 
-    setRegistrationMethod('qr');
-    handleSelectEquipment(data as Equipment);
+    handleSelectEquipment(data as unknown as Equipment);
   };
 
   const handleAddPhotos = (files: FileList | null) => {
@@ -324,7 +358,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
       const form = new FormData();
       form.set('equipment_id', selected.id);
       form.set('movement_type', movementType);
-      form.set('registration_method', registrationMethod);
+      form.set('registration_method', 'manual');
       if (notes) form.set('notes', notes);
       if (isEntry) {
         form.set('driver_id', driverId);
@@ -347,10 +381,11 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
       const result = await response.json() as { id: string; photoFailures?: number };
 
       onSaved();
+      setSavedMovementId(result.id);
+      setMovementSaved(true);
       if (result.photoFailures) {
-        setMovementSaved(true);
         setSaveWarning(t('movementSavedPhotosFailed'));
-      } else {
+      } else if (!pageMode) {
         onClose();
         reset();
       }
@@ -391,6 +426,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
         onClose={onClose}
         title={isEntry ? t('registerEntry') : t('registerExit')}
         size="lg"
+        inline={pageMode}
       >
         {step === 'select' && (
           <div className="space-y-4">
@@ -427,7 +463,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
             {loadingEquipment ? (
               <div className="flex justify-center py-8"><Spinner size={24} /></div>
             ) : equipment.length === 0 ? (
-              <p className="text-center text-sm text-muted py-8">{t('noEquipmentFound')}</p>
+              <div className="space-y-3 py-4 text-center"><p className="text-sm text-muted">{t('noEquipmentFound')}</p><button className="btn-outline" onClick={() => setQuickEquipment((value) => ({ ...value, open: true, plate: search }))}>+ إضافة معدة جديدة</button></div>
             ) : (
               <div className="max-h-80 overflow-y-auto space-y-2">
                 {equipment.map((eq) => (
@@ -453,6 +489,13 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
                 ))}
               </div>
             )}
+            {quickEquipment.open && <div className="rounded-lg border p-4 text-start space-y-3" style={{ borderColor: 'var(--border)' }}>
+              <p className="font-semibold">إضافة معدة سريعة</p>
+              <div><label className="label">{t('plateNumber')} *</label><input className="input" value={quickEquipment.plate} onChange={(event) => setQuickEquipment({ ...quickEquipment, plate: event.target.value })} /></div>
+              <p className="text-xs text-muted">بيانات المالك/المؤجر اختيارية، وتُنشئ سجلًا حقيقيًا عند إدخالها.</p>
+              <div className="grid gap-3 sm:grid-cols-2"><div><label className="label">اسم المالك/المؤجر</label><input className="input" value={quickEquipment.ownerName} onChange={(event) => setQuickEquipment({ ...quickEquipment, ownerName: event.target.value })} /></div><div><label className="label">{t('mobileNumber')}</label><input className="input" dir="ltr" value={quickEquipment.ownerMobile} onChange={(event) => setQuickEquipment({ ...quickEquipment, ownerMobile: event.target.value })} /></div></div>
+              <div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setQuickEquipment({ open: false, plate: '', ownerName: '', ownerMobile: '' })}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={quickSaving} onClick={createQuickEquipment}>{quickSaving ? t('saving') : t('save')}</button></div>
+            </div>}
           </div>
         )}
 
@@ -599,11 +642,14 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
                     onChange={(value, option) => { setDriverId(value); setSelectedDriver(option); }}
                     loadOptions={loadDrivers}
                     placeholder={t('selectDriver')}
+                    createLabel="+ إضافة سائق جديد"
+                    onCreate={(query) => setQuickDriver({ open: true, fullName: query, mobile: '' })}
                   />
                 ) : (
                   <div className="input bg-gray-50 dark:bg-gray-900/30">{selectedDriver?.label ?? t('driverInheritedFromEntry')}</div>
                 )}
               </div>
+              {isEntry && quickDriver.open && <div className="rounded-lg border p-4 space-y-3" style={{ borderColor: 'var(--border)' }}><p className="font-semibold">إضافة سائق سريع</p><div className="grid gap-3 sm:grid-cols-2"><div><label className="label">{t('fullName')} *</label><input className="input" value={quickDriver.fullName} onChange={(event) => setQuickDriver({ ...quickDriver, fullName: event.target.value })} /></div><div><label className="label">{t('mobileNumber')} *</label><input className="input" dir="ltr" value={quickDriver.mobile} onChange={(event) => setQuickDriver({ ...quickDriver, mobile: event.target.value.replace(/[^\d+]/g, '') })} /></div></div><div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setQuickDriver({ open: false, fullName: '', mobile: '' })}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={quickSaving} onClick={createQuickDriver}>{quickSaving ? t('saving') : t('save')}</button></div></div>}
 
               <div>
                 <label className="label">{t('actualMovementTime')}</label>
@@ -708,13 +754,17 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
 
             {saveError && <Alert type="error">{saveError}</Alert>}
             {saveWarning && <Alert type="warning">{saveWarning}</Alert>}
+            {movementSaved && <Alert type="success">تم حفظ الحركة بنجاح.</Alert>}
 
             {/* Actions */}
             <div className="flex gap-3 pt-2">
               <button onClick={onClose} className="btn-outline flex-1">
                 {t('cancel')}
               </button>
-              {!movementSaved && <button onClick={handleSave} disabled={saving || !!validationError || loadingMovement} className="btn-primary flex-1">{saving ? t('saving') : t('save')}</button>}
+              {!movementSaved ? <button onClick={handleSave} disabled={saving || !!validationError || loadingMovement} className="btn-primary flex-1">{saving ? t('saving') : t('save')}</button> : <>
+                {onViewMovement && <button className="btn-primary flex-1" onClick={() => onViewMovement(savedMovementId)}>عرض الحركة</button>}
+                <button className="btn-outline flex-1" onClick={reset}>تسجيل حركة أخرى</button>
+              </>}
             </div>
           </div>
         )}

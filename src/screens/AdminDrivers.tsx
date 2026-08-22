@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, Edit2, Eye, Plus, Search, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Edit2, Eye, FileSpreadsheet, Plus, Search, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { sanitizeSearchTerm } from '@/lib/search';
 import { useI18n } from '@/i18n/I18nContext';
@@ -9,11 +9,10 @@ import { Modal } from '@/components/Modal';
 import { PageHeader } from '@/components/PageHeader';
 import { Select } from '@/components/Select';
 import type { Driver } from '@/lib/types';
+import { DriverExcelImport } from '@/components/DriverExcelImport';
+import { DRIVER_EMPLOYMENT_TYPES, DRIVER_NATIONALITIES } from '@/lib/driverExcel';
 
 const PAGE_SIZE = 20;
-export const DRIVER_NATIONALITIES = ['اليمن', 'مصر', 'باكستان', 'الهند', 'نيبال', 'بنجلاديش', 'السودان'] as const;
-export const DRIVER_EMPLOYMENT_TYPES = ['العزاني', 'تكوين', 'البناء', 'البدراني', 'امدادات العربة', 'نقدي'] as const;
-
 const EMPTY_FORM = { full_name: '', id_number: '', mobile_number: '', nationality: '', employment_type: '', job_title: '' };
 
 export function AdminDrivers({ onSelectDriver }: { onSelectDriver: (id: string) => void }) {
@@ -32,6 +31,7 @@ export function AdminDrivers({ onSelectDriver }: { onSelectDriver: (id: string) 
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => { setDebouncedSearch(search.trim()); setPage(0); }, 300);
@@ -60,16 +60,16 @@ export function AdminDrivers({ onSelectDriver }: { onSelectDriver: (id: string) 
   const openCreate = () => { setEditing(null); setForm(EMPTY_FORM); setError(null); setModalOpen(true); };
   const openEdit = (driver: Driver) => {
     setEditing(driver);
-    setForm({ full_name: driver.full_name, id_number: driver.id_number, mobile_number: driver.mobile_number, nationality: driver.nationality, employment_type: driver.employment_type, job_title: driver.job_title ?? '' });
+    setForm({ full_name: driver.full_name, id_number: driver.id_number ?? '', mobile_number: driver.mobile_number ?? '', nationality: driver.nationality ?? '', employment_type: driver.employment_type ?? '', job_title: driver.job_title ?? '' });
     setError(null); setModalOpen(true);
   };
 
   const save = async () => {
-    if (!form.full_name.trim() || !/^\d{5,20}$/.test(form.id_number) || !/^\+?\d{7,15}$/.test(form.mobile_number) || !form.nationality || !form.employment_type) {
+    if (!form.full_name.trim() || (form.id_number && !/^\d{5,20}$/.test(form.id_number)) || (form.mobile_number && !/^\+?\d{7,15}$/.test(form.mobile_number))) {
       setError(t('driverValidationError')); return;
     }
     setSaving(true); setError(null);
-    const payload = { ...form, full_name: form.full_name.trim(), id_number: form.id_number.trim(), mobile_number: form.mobile_number.trim(), job_title: form.job_title.trim() || null };
+    const payload = { ...form, full_name: form.full_name.trim(), id_number: form.id_number.trim() || null, mobile_number: form.mobile_number.trim() || null, nationality: form.nationality || null, employment_type: form.employment_type || null, job_title: form.job_title.trim() || null };
     const result = editing
       ? await supabase.from('drivers').update(payload).eq('id', editing.id)
       : await supabase.from('drivers').insert(payload);
@@ -93,6 +93,7 @@ export function AdminDrivers({ onSelectDriver }: { onSelectDriver: (id: string) 
         <Select className="min-w-[140px]" value={nationality} onChange={(value) => { setNationality(value); setPage(0); }} options={[{ value: '', label: t('allNationalities') }, ...DRIVER_NATIONALITIES.map((value) => ({ value, label: value }))]} />
         <Select className="min-w-[150px]" value={employmentType} onChange={(value) => { setEmploymentType(value); setPage(0); }} options={[{ value: '', label: t('allEmploymentTypes') }, ...DRIVER_EMPLOYMENT_TYPES.map((value) => ({ value, label: value }))]} />
         <Select className="min-w-[130px]" value={sort} onChange={(value) => setSort(value as 'full_name' | 'created_at')} options={[{ value: 'full_name', label: t('sortByName') }, { value: 'created_at', label: t('sortByNewest') }]} />
+        <button className="btn-outline" onClick={() => setImportOpen(true)}><FileSpreadsheet size={17} />استيراد Excel</button>
         <button className="btn-primary" onClick={openCreate}><Plus size={17} />{t('addDriver')}</button>
       </div>
 
@@ -100,7 +101,7 @@ export function AdminDrivers({ onSelectDriver }: { onSelectDriver: (id: string) 
         <div className="card overflow-hidden p-0"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b" style={{ borderColor: 'var(--border)' }}>
           <th className="table-header px-4 py-3 text-start">{t('fullName')}</th><th className="table-header px-4 py-3 text-start">{t('idNumber')}</th><th className="table-header px-4 py-3 text-start">{t('mobileNumber')}</th><th className="table-header px-4 py-3 text-start">{t('nationality')}</th><th className="table-header px-4 py-3 text-start">{t('employmentType')}</th><th className="table-header px-4 py-3 text-start">{t('actions')}</th>
         </tr></thead><tbody>{drivers.map((driver) => <tr key={driver.id} className="border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
-          <td className="px-4 py-3 font-semibold">{driver.full_name}</td><td className="px-4 py-3" dir="ltr">{driver.id_number}</td><td className="px-4 py-3" dir="ltr">{driver.mobile_number}</td><td className="px-4 py-3">{driver.nationality}</td><td className="px-4 py-3">{driver.employment_type}</td><td className="px-4 py-3"><div className="flex gap-1"><button className="btn-ghost p-1.5" onClick={() => onSelectDriver(driver.id)}><Eye size={16} /></button><button className="btn-ghost p-1.5" onClick={() => openEdit(driver)}><Edit2 size={16} /></button><button className="btn-ghost p-1.5" onClick={() => remove(driver)}><Trash2 size={16} /></button></div></td>
+          <td className="px-4 py-3 font-semibold">{driver.full_name}</td><td className="px-4 py-3" dir="ltr">{driver.id_number ?? '—'}</td><td className="px-4 py-3" dir="ltr">{driver.mobile_number ?? '—'}</td><td className="px-4 py-3">{driver.nationality ?? '—'}</td><td className="px-4 py-3">{driver.employment_type ?? '—'}</td><td className="px-4 py-3"><div className="flex gap-1"><button className="btn-ghost p-1.5" onClick={() => onSelectDriver(driver.id)}><Eye size={16} /></button><button className="btn-ghost p-1.5" onClick={() => openEdit(driver)}><Edit2 size={16} /></button><button className="btn-ghost p-1.5" onClick={() => remove(driver)}><Trash2 size={16} /></button></div></td>
         </tr>)}</tbody></table></div></div>
       )}
       <div className="flex items-center justify-between text-sm"><span className="text-muted">{total} {t('drivers')}</span><div className="flex gap-2"><button className="btn-outline px-3" disabled={page === 0} onClick={() => setPage((value) => value - 1)}><ChevronRight size={16} /></button><span className="px-2 py-2">{page + 1}</span><button className="btn-outline px-3" disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => setPage((value) => value + 1)}><ChevronLeft size={16} /></button></div></div>
@@ -108,12 +109,13 @@ export function AdminDrivers({ onSelectDriver }: { onSelectDriver: (id: string) 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? t('editDriver') : t('addDriver')} size="md">
         <div className="space-y-4">{error && <Alert type="error">{error}</Alert>}
           <div><label className="label">{t('fullName')} *</label><input className="input" value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} /></div>
-          <div className="grid grid-cols-2 gap-3"><div><label className="label">{t('idNumber')} *</label><input className="input" dir="ltr" value={form.id_number} onChange={(event) => setForm({ ...form, id_number: event.target.value.replace(/\D/g, '') })} /></div><div><label className="label">{t('mobileNumber')} *</label><input className="input" dir="ltr" value={form.mobile_number} onChange={(event) => setForm({ ...form, mobile_number: event.target.value.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '') })} /></div></div>
-          <div className="grid grid-cols-2 gap-3"><div><label className="label">{t('nationality')} *</label><Select value={form.nationality} onChange={(value) => setForm({ ...form, nationality: value })} options={DRIVER_NATIONALITIES.map((value) => ({ value, label: value }))} /></div><div><label className="label">{t('employmentType')} *</label><Select value={form.employment_type} onChange={(value) => setForm({ ...form, employment_type: value })} options={DRIVER_EMPLOYMENT_TYPES.map((value) => ({ value, label: value }))} /></div></div>
+          <div className="grid grid-cols-2 gap-3"><div><label className="label">{t('idNumber')}</label><input className="input" dir="ltr" value={form.id_number} onChange={(event) => setForm({ ...form, id_number: event.target.value.replace(/\D/g, '') })} /></div><div><label className="label">{t('mobileNumber')}</label><input className="input" dir="ltr" value={form.mobile_number} onChange={(event) => setForm({ ...form, mobile_number: event.target.value.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '') })} /></div></div>
+          <div className="grid grid-cols-2 gap-3"><div><label className="label">{t('nationality')}</label><Select value={form.nationality} onChange={(value) => setForm({ ...form, nationality: value })} options={[{ value: '', label: '—' }, ...DRIVER_NATIONALITIES.map((value) => ({ value, label: value }))]} /></div><div><label className="label">{t('employmentType')}</label><Select value={form.employment_type} onChange={(value) => setForm({ ...form, employment_type: value })} options={[{ value: '', label: '—' }, ...DRIVER_EMPLOYMENT_TYPES.map((value) => ({ value, label: value }))]} /></div></div>
           <div><label className="label">{t('jobTitle')}</label><input className="input" value={form.job_title} onChange={(event) => setForm({ ...form, job_title: event.target.value })} /></div>
           <div className="flex gap-3 pt-2"><button className="btn-outline flex-1" onClick={() => setModalOpen(false)}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={saving} onClick={save}>{saving ? t('saving') : t('save')}</button></div>
         </div>
       </Modal>
+      <DriverExcelImport open={importOpen} onClose={() => setImportOpen(false)} onImported={fetchDrivers} />
     </div>
   );
 }

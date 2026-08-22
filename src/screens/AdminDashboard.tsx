@@ -5,11 +5,14 @@ import { InlineSpinner } from '@/components/Spinner';
 import { exportLogsToExcel, exportVisitsToExcel } from '@/lib/excel';
 import { LogIn, LogOut, Truck, AlertCircle, Download, Filter, Calendar } from 'lucide-react';
 import { DatePicker } from '@/components/DatePicker';
-import type { EntryExitLog, EquipmentVisit, Profile, Equipment } from '@/lib/types';
+import type { EntryExitLog, EquipmentVisit, Profile } from '@/lib/types';
 import { Select } from '@/components/Select';
 import { PageHeader } from '@/components/PageHeader';
+import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
+import { sanitizeSearchTerm } from '@/lib/search';
+import type { SelectOption } from '@/components/Select';
 
-export function AdminDashboard({ onSelectMovement }: { onSelectMovement?: (id: string) => void }) {
+export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelectMovement?: (id: string) => void; onCreateMovement?: (type: 'entry' | 'exit') => void }) {
   const { t } = useI18n();
   const [tab, setTab] = useState<'logs' | 'reports'>('logs');
 
@@ -24,7 +27,7 @@ export function AdminDashboard({ onSelectMovement }: { onSelectMovement?: (id: s
   const [filterSupervisor, setFilterSupervisor] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'entry' | 'exit'>('all');
   const [filterDate, setFilterDate] = useState('');
-  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
+  const [selectedEquipment, setSelectedEquipment] = useState<SelectOption | null>(null);
   const [supervisors, setSupervisors] = useState<Profile[]>([]);
 
   // Reports
@@ -123,13 +126,18 @@ export function AdminDashboard({ onSelectMovement }: { onSelectMovement?: (id: s
   // Initial load
   useEffect(() => {
     fetchStats();
-    supabase.from('equipment').select('*').eq('is_active', true).order('code').then(({ data }) => {
-      setEquipmentList((data as Equipment[]) ?? []);
-    });
     supabase.from('profiles').select('*').order('full_name').then(({ data }) => {
       setSupervisors((data as Profile[]) ?? []);
     });
   }, [fetchStats]);
+
+  const loadEquipment = useCallback(async (search: string): Promise<SelectOption[]> => {
+    let query = supabase.from('equipment').select('id,code,type,plate_number').eq('is_active', true).order('code').limit(20);
+    const term = sanitizeSearchTerm(search);
+    if (term) query = query.or(`code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`);
+    const { data } = await query;
+    return (data ?? []).map((item) => ({ value: item.id, label: `${item.code} — ${item.type}${item.plate_number ? ` — ${item.plate_number}` : ''}` }));
+  }, []);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
   useEffect(() => { fetchVisits(); }, [fetchVisits]);
@@ -149,6 +157,7 @@ export function AdminDashboard({ onSelectMovement }: { onSelectMovement?: (id: s
     <div className="space-y-6">
       {/* Header */}
       <PageHeader title={t('dashboard')} description={t('dashboardDesc')} />
+      {onCreateMovement && <div className="flex flex-wrap gap-2"><button className="btn-primary" onClick={() => onCreateMovement('entry')}><LogIn size={17} />{t('registerEntry')}</button><button className="btn-outline" onClick={() => onCreateMovement('exit')}><LogOut size={17} />{t('registerExit')}</button></div>}
 
       {/* Stats */}
       {loadingStats ? (
@@ -199,17 +208,13 @@ export function AdminDashboard({ onSelectMovement }: { onSelectMovement?: (id: s
             <div className="flex items-center gap-2 text-sm text-muted">
               <Filter size={16} />
             </div>
-            <Select
+            <AsyncSearchSelect
               className="w-auto min-w-[140px]"
               value={filterEquipment}
-              onChange={setFilterEquipment}
+              selectedOption={selectedEquipment}
+              onChange={(value, option) => { setFilterEquipment(value); setSelectedEquipment(option); }}
               placeholder={t('allEquipment')}
-              searchable
-
-              options={[
-                { value: '', label: t('allEquipment') },
-                ...equipmentList.map((eq) => ({ value: eq.id, label: `${eq.code} — ${eq.type}` })),
-              ]}
+              loadOptions={loadEquipment}
             />
             <Select
               className="w-auto min-w-[140px]"
@@ -267,7 +272,6 @@ export function AdminDashboard({ onSelectMovement }: { onSelectMovement?: (id: s
                       <th className="table-header text-start px-4 py-3">{t('movementType')}</th>
                       <th className="table-header text-start px-4 py-3">{t('driverName')}</th>
                       <th className="table-header text-start px-4 py-3">{t('supervisorName')}</th>
-                      <th className="table-header text-start px-4 py-3">{t('registrationMethod')}</th>
                       <th className="table-header text-start px-4 py-3">{t('recordedAt')}</th>
                     </tr>
                   </thead>
@@ -288,7 +292,6 @@ export function AdminDashboard({ onSelectMovement }: { onSelectMovement?: (id: s
                         </td>
                         <td className="px-4 py-3">{log.driver_name ?? '—'}</td>
                         <td className="px-4 py-3">{log.supervisor?.full_name ?? '—'}</td>
-                        <td className="px-4 py-3 text-muted">{log.registration_method === 'qr' ? t('qr') : t('manual')}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(log.recorded_at)}</td>
                       </tr>
                     ))}

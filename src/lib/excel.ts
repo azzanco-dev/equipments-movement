@@ -183,7 +183,6 @@ export function exportLogsToExcel(logs: EntryExitLog[], fileName: string, t: (ke
     [t('movementType')]: log.movement_type === 'entry' ? t('entry') : t('exit'),
     [t('driverName')]: log.driver_name ?? '',
     [t('odometerReading')]: log.odometer_reading ?? '',
-    [t('registrationMethod')]: log.registration_method === 'qr' ? t('qr') : t('manual'),
     [t('notes')]: log.notes ?? '',
     [t('supervisorName')]: log.supervisor?.full_name ?? '',
     [t('recordedAt')]: new Date(log.recorded_at).toLocaleString(),

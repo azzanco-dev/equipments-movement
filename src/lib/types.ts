@@ -9,10 +9,10 @@ export type RegistrationMethod = 'qr' | 'manual';
 export interface Driver {
   id: string;
   full_name: string;
-  id_number: string;
-  mobile_number: string;
-  nationality: string;
-  employment_type: string;
+  id_number: string | null;
+  mobile_number: string | null;
+  nationality: string | null;
+  employment_type: string | null;
   job_title: string | null;
   created_at: string;
   updated_at: string;
