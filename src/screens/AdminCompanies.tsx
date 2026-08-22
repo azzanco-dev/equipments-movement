@@ -5,8 +5,8 @@ import { Modal } from '@/components/Modal';
 import { Alert } from '@/components/Alert';
 import { InlineSpinner } from '@/components/Spinner';
 import { PageHeader } from '@/components/PageHeader';
-import { Plus, Edit2, Trash2, Upload, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
-import type { Company } from '@/lib/types';
+import { Plus, Edit2, Trash2, Upload, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, XCircle, FolderTree, X, Plus as PlusIcon } from 'lucide-react';
+import type { Company, Project, CompanyProject } from '@/lib/types';
 import { parseCompaniesExcel, downloadCompanyTemplate, type CompanyImportRow } from '@/lib/excel';
 
 export function AdminCompanies() {
@@ -29,6 +29,15 @@ export function AdminCompanies() {
   const [importResult, setImportResult] = useState<{ success: number; fail: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+
+  // Manage projects state
+  const [projectsModalOpen, setProjectsModalOpen] = useState(false);
+  const [projectsModalCompany, setProjectsModalCompany] = useState<Company | null>(null);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [companyLinks, setCompanyLinks] = useState<CompanyProject[]>([]);
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [addProjectId, setAddProjectId] = useState('');
 
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
@@ -68,6 +77,56 @@ export function AdminCompanies() {
     const { error } = await supabase.from('companies').delete().eq('id', c.id);
     if (error) console.error(error);
     fetchCompanies();
+  }
+
+  async function openManageProjects(c: Company) {
+    setProjectsModalCompany(c);
+    setProjectsModalOpen(true);
+    setLinkError(null);
+    setAddProjectId('');
+    setLinkLoading(true);
+    const [projRes, linkRes] = await Promise.all([
+      supabase.from('projects').select('*').order('name_ar'),
+      supabase.from('company_projects').select('*').eq('company_id', c.id),
+    ]);
+    setAllProjects((projRes.data as Project[]) ?? []);
+    setCompanyLinks((linkRes.data as CompanyProject[]) ?? []);
+    setLinkLoading(false);
+  }
+
+  async function addProjectLink() {
+    if (!projectsModalCompany || !addProjectId) return;
+    setLinkError(null);
+    const { error } = await supabase
+      .from('company_projects')
+      .insert({ company_id: projectsModalCompany.id, project_id: addProjectId });
+    if (error) {
+      console.error(error);
+      setLinkError(t('saveFailed'));
+      return;
+    }
+    setAddProjectId('');
+    const { data } = await supabase
+      .from('company_projects')
+      .select('*')
+      .eq('company_id', projectsModalCompany.id);
+    setCompanyLinks((data as CompanyProject[]) ?? []);
+  }
+
+  async function removeProjectLink(linkId: string) {
+    if (!projectsModalCompany) return;
+    setLinkError(null);
+    const { error } = await supabase.from('company_projects').delete().eq('id', linkId);
+    if (error) {
+      console.error(error);
+      setLinkError(t('saveFailed'));
+      return;
+    }
+    const { data } = await supabase
+      .from('company_projects')
+      .select('*')
+      .eq('company_id', projectsModalCompany.id);
+    setCompanyLinks((data as CompanyProject[]) ?? []);
   }
 
   async function handleFileSelect(file: File) {
@@ -197,6 +256,7 @@ export function AdminCompanies() {
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
                         <button onClick={() => openEdit(c)} className="btn-ghost p-1.5"><Edit2 size={16} /></button>
+                        <button onClick={() => openManageProjects(c)} className="btn-ghost p-1.5" title={t('manageProjects')}><FolderTree size={16} /></button>
                         <button onClick={() => handleDelete(c)} className="btn-ghost p-1.5"><Trash2 size={16} /></button>
                       </div>
                     </td>
@@ -329,6 +389,85 @@ export function AdminCompanies() {
         ) : (
           <div className="flex flex-col items-center gap-4 py-8">
             <button onClick={() => { resetImport(); setImportModalOpen(false); }} className="btn-primary">{t('close')}</button>
+          </div>
+        )}
+      </Modal>
+
+      {/* Manage Projects Modal */}
+      <Modal
+        open={projectsModalOpen}
+        onClose={() => setProjectsModalOpen(false)}
+        title={`${t('manageProjects')} — ${projectsModalCompany?.name_ar ?? ''}`}
+        size="md"
+      >
+        {linkError && <div className="mb-4"><Alert type="error">{linkError}</Alert></div>}
+
+        {linkLoading ? (
+          <InlineSpinner label={t('loading')} />
+        ) : (
+          <div className="space-y-4">
+            {/* Linked projects list */}
+            <div>
+              <p className="label mb-2">{t('linkedProjects')}</p>
+              {companyLinks.length === 0 ? (
+                <p className="text-sm text-muted py-2">{t('noLinkedProjects')}</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {companyLinks.map((link) => {
+                    const proj = allProjects.find((p) => p.id === link.project_id);
+                    return (
+                      <div
+                        key={link.id}
+                        className="flex items-center justify-between rounded-lg border px-3 py-2"
+                        style={{ borderColor: 'var(--border)' }}
+                      >
+                        <span className="text-sm font-medium">
+                          {proj ? `${proj.name_ar} — ${proj.name_en}` : link.project_id}
+                        </span>
+                        <button
+                          onClick={() => removeProjectLink(link.id)}
+                          className="btn-ghost p-1 text-red-600 dark:text-red-400"
+                          title={t('removeProjectLink')}
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Add project link */}
+            <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+              <p className="label mb-2">{t('addProjectLink')}</p>
+              <div className="flex gap-2">
+                <select
+                  className="input flex-1"
+                  value={addProjectId}
+                  onChange={(e) => setAddProjectId(e.target.value)}
+                >
+                  <option value="">—</option>
+                  {allProjects
+                    .filter((p) => !companyLinks.some((l) => l.project_id === p.id))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name_ar} — {p.name_en}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  onClick={addProjectLink}
+                  disabled={!addProjectId}
+                  className="btn-primary px-3"
+                >
+                  <PlusIcon size={16} />
+                </button>
+              </div>
+              {allProjects.filter((p) => !companyLinks.some((l) => l.project_id === p.id)).length === 0 && (
+                <p className="text-xs text-muted mt-1.5">{t('noProjectsAvailable')}</p>
+              )}
+            </div>
           </div>
         )}
       </Modal>

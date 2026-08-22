@@ -109,6 +109,13 @@ export interface EquipmentVisit {
   exit_registration_method: RegistrationMethod | null;
 }
 
+export interface CompanyProject {
+  id: string;
+  company_id: string;
+  project_id: string;
+  created_at: string;
+}
+
 export interface LastMovement {
   movement_type: MovementType;
   recorded_at: string;
