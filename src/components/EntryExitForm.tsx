@@ -6,8 +6,8 @@ import { Modal } from '@/components/Modal';
 import { Alert } from '@/components/Alert';
 import { QRScanner } from '@/components/QRScanner';
 import { Spinner } from '@/components/Spinner';
-import { QrCode, Search, Upload, AlertTriangle, CheckCircle, Clock, MapPin, Building2, FileText, ChevronDown } from 'lucide-react';
-import type { Equipment, MovementType, LastMovement, Company, Project, CompanyProject } from '@/lib/types';
+import { QrCode, Search, Upload, AlertTriangle, CheckCircle, Clock, MapPin, Building2, FileText } from 'lucide-react';
+import type { Equipment, MovementType, LastMovement, Company, Project } from '@/lib/types';
 import { Select } from '@/components/Select';
 import { sanitizeSearchTerm } from '@/lib/search';
 
@@ -56,7 +56,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
   const [saveError, setSaveError] = useState<string | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [companyProjects, setCompanyProjects] = useState<CompanyProject[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [contractorCode, setContractorCode] = useState('');
@@ -80,7 +79,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     setSelectedProjectId('');
     setContractorCode('');
     setRecordedAt('');
-    setCompanyProjects([]);
   }, []);
 
   useEffect(() => {
@@ -91,7 +89,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     if (!open) return;
     supabase.from('companies').select('*').order('name_ar').then(({ data }) => setCompanies((data as Company[]) ?? []));
     supabase.from('projects').select('*').order('name_ar').then(({ data }) => setProjects((data as Project[]) ?? []));
-    supabase.from('company_projects').select('*').then(({ data }) => setCompanyProjects((data as CompanyProject[]) ?? []));
   }, [open]);
 
   // Search equipment
@@ -282,16 +279,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
     if (!lastMovement?.project_id) return null;
     return projects.find((p) => p.id === lastMovement.project_id) ?? null;
   }, [lastMovement, projects]);
-
-  const availableProjectsForCompany = useMemo(() => {
-    if (!selectedCompanyId) return [];
-    const linkedIds = new Set(
-      companyProjects
-        .filter((cp) => cp.company_id === selectedCompanyId)
-        .map((cp) => cp.project_id)
-    );
-    return projects.filter((p) => linkedIds.has(p.id));
-  }, [selectedCompanyId, companyProjects, projects]);
 
   // Current status derived from last movement
   const currentStatus: 'inside' | 'outside' | 'none' = !lastMovement
@@ -498,10 +485,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
                     <label className="label">{t('company')} *</label>
                     <Select
                       value={selectedCompanyId}
-                      onChange={(v) => {
-                        setSelectedCompanyId(v);
-                        setSelectedProjectId('');
-                      }}
+                      onChange={setSelectedCompanyId}
                       placeholder="—"
                       searchable
                       options={[
@@ -513,32 +497,16 @@ export function EntryExitForm({ open, onClose, movementType, onSaved }: EntryExi
 
                   <div>
                     <label className="label">{t('project')} *</label>
-                    {selectedCompanyId ? (
-                      availableProjectsForCompany.length > 0 ? (
-                        <Select
-                          value={selectedProjectId}
-                          onChange={setSelectedProjectId}
-                          placeholder="—"
-                          searchable
-                          options={[
-                            { value: '', label: '—' },
-                            ...availableProjectsForCompany.map((p) => ({ value: p.id, label: `${p.name_ar} — ${p.name_en}` })),
-                          ]}
-                        />
-                      ) : (
-                        <p className="text-sm text-muted py-2">{t('noLinkedProjects')}</p>
-                      )
-                    ) : (
-                      <button
-                        type="button"
-                        disabled
-                        className="w-full flex items-center justify-between gap-2 rounded-lg border bg-gray-50 dark:bg-gray-900 px-3.5 py-2.5 text-sm text-gray-400 cursor-not-allowed"
-                        style={{ borderColor: 'var(--border)' }}
-                      >
-                        <span>—</span>
-                        <ChevronDown size={16} className="shrink-0 text-muted" />
-                      </button>
-                    )}
+                    <Select
+                      value={selectedProjectId}
+                      onChange={setSelectedProjectId}
+                      placeholder="—"
+                      searchable
+                      options={[
+                        { value: '', label: '—' },
+                        ...projects.map((p) => ({ value: p.id, label: `${p.name_ar} — ${p.name_en}` })),
+                      ]}
+                    />
                   </div>
 
                   <div>
