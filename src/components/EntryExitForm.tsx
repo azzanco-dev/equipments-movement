@@ -383,6 +383,10 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
       onSaved();
       setSavedMovementId(result.id);
       setMovementSaved(true);
+      if (pageMode && onViewMovement) {
+        onViewMovement(result.id);
+        return;
+      }
       if (result.photoFailures) {
         setSaveWarning(t('movementSavedPhotosFailed'));
       } else if (!pageMode) {
