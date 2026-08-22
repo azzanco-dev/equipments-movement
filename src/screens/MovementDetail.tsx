@@ -199,6 +199,7 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
   let durationMs = 0;
 
   if (linkedLog) {
+    console.log('linked')
     if (linkedLog.movementType === 'entry') {
       console.log('pre is entry')
       durationMs = new Date(linkedLog.recorded_at).getTime() - new Date(log.recorded_at).getTime();
