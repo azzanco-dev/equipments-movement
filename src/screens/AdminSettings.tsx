@@ -104,7 +104,7 @@ export function AdminSettings() {
 
   const loadOpeningCandidates = useCallback(async (query: string): Promise<SelectOption[]> => {
     const { data } = await supabase.rpc('search_workshop_opening_candidates', { p_search: sanitizeSearchTerm(query) || null });
-    return (data ?? []).map((item: { id: string; code: string; type: string; plate_number: string | null }) => ({ value: item.id, label: `${item.code} — ${item.type}${item.plate_number ? ` — ${item.plate_number}` : ''}` }));
+    return (data ?? []).map((item: { id: string; code: string; type: string; plate_number: string | null }) => ({ value: item.id, label: `${item.code} — ${item.type}` }));
   }, []);
 
   async function addOpeningBalance() {
