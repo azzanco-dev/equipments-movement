@@ -21,7 +21,11 @@ export function Layout({ children, activePage, onNavigate, navItems }: LayoutPro
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const isAdmin = profile?.role === 'admin';
+  const roleLabel = profile?.role === 'admin'
+    ? t('admin')
+    : profile?.role === 'workshop'
+      ? t('workshopOfficer')
+      : t('supervisor');
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)', color: 'var(--fg)' }}>
@@ -63,7 +67,7 @@ export function Layout({ children, activePage, onNavigate, navItems }: LayoutPro
             <div className="mx-1 h-6 w-px" style={{ background: 'var(--border)' }} />
             <div className="hidden sm:block text-right">
               <p className="text-xs font-medium">{profile?.full_name}</p>
-              <p className="text-xs text-muted">{isAdmin ? t('admin') : t('supervisor')}</p>
+              <p className="text-xs text-muted">{roleLabel}</p>
             </div>
             <button onClick={() => setLogoutOpen(true)} className="btn-ghost p-2" title={t('signOut')}>
               <LogOut size={18} />
