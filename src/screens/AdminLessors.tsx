@@ -107,9 +107,9 @@ export function AdminLessors() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? t('editLessor') : t('addLessor')} size="sm">
         {formError && <div className="mb-4"><Alert type="error">{formError}</Alert></div>}
         <div className="space-y-4">
-          <div><label className="label">{t('lessorName')} *</label><input className="input" value={name} onChange={(e) => setName(e.target.value)} /></div>
-          <div><label className="label">{t('contactPerson')}</label><input className="input" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} /></div>
-          <div><label className="label">{t('contactNumber')}</label><input className="input" value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} /></div>
+          <div><label className="label">{t('lessorName')} *</label><input className="input" placeholder={t('lessorNamePlaceholder')} value={name} onChange={(e) => setName(e.target.value)} /></div>
+          <div><label className="label">{t('contactPerson')}</label><input className="input" placeholder={t('contactPersonPlaceholder')} value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} /></div>
+          <div><label className="label">{t('contactNumber')}</label><input className="input" dir="ltr" placeholder={t('contactNumberPlaceholder')} value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} /></div>
         </div>
         <div className="flex gap-3 pt-4">
           <button onClick={() => setModalOpen(false)} className="btn-outline flex-1">{t('cancel')}</button>

@@ -226,8 +226,8 @@ export function AdminProjects() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? t('editProject') : t('addProject')} size="sm">
         {formError && <div className="mb-4"><Alert type="error">{formError}</Alert></div>}
         <div className="space-y-4">
-          <div><label className="label">{t('projectNameAr')} *</label><input className="input" value={nameAr} onChange={(e) => setNameAr(e.target.value)} dir="rtl" /></div>
-          <div><label className="label">{t('projectNameEn')} *</label><input className="input" value={nameEn} onChange={(e) => setNameEn(e.target.value)} dir="ltr" /></div>
+          <div><label className="label">{t('projectNameAr')} *</label><input className="input" placeholder={t('projectNameArPlaceholder')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} dir="rtl" /></div>
+          <div><label className="label">{t('projectNameEn')} *</label><input className="input" placeholder={t('projectNameEnPlaceholder')} value={nameEn} onChange={(e) => setNameEn(e.target.value)} dir="ltr" /></div>
         </div>
         <div className="flex gap-3 pt-4">
           <button onClick={() => setModalOpen(false)} className="btn-outline flex-1">{t('cancel')}</button>

@@ -495,9 +495,9 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
             )}
             {quickEquipment.open && <div className="rounded-lg border p-4 text-start space-y-3" style={{ borderColor: 'var(--border)' }}>
               <p className="font-semibold">إضافة معدة سريعة</p>
-              <div><label className="label">{t('plateNumber')} *</label><input className="input" value={quickEquipment.plate} onChange={(event) => setQuickEquipment({ ...quickEquipment, plate: event.target.value })} /></div>
+              <div><label className="label">{t('plateNumber')} *</label><input className="input" placeholder={t('plateNumberPlaceholder')} value={quickEquipment.plate} onChange={(event) => setQuickEquipment({ ...quickEquipment, plate: event.target.value })} /></div>
               <p className="text-xs text-muted">بيانات المالك/المؤجر اختيارية، وتُنشئ سجلًا حقيقيًا عند إدخالها.</p>
-              <div className="grid gap-3 sm:grid-cols-2"><div><label className="label">اسم المالك/المؤجر</label><input className="input" value={quickEquipment.ownerName} onChange={(event) => setQuickEquipment({ ...quickEquipment, ownerName: event.target.value })} /></div><div><label className="label">{t('mobileNumber')}</label><input className="input" dir="ltr" value={quickEquipment.ownerMobile} onChange={(event) => setQuickEquipment({ ...quickEquipment, ownerMobile: event.target.value })} /></div></div>
+              <div className="grid gap-3 sm:grid-cols-2"><div><label className="label">اسم المالك/المؤجر</label><input className="input" placeholder={t('ownerNamePlaceholder')} value={quickEquipment.ownerName} onChange={(event) => setQuickEquipment({ ...quickEquipment, ownerName: event.target.value })} /></div><div><label className="label">{t('mobileNumber')}</label><input className="input" dir="ltr" placeholder={t('mobileNumberPlaceholder')} value={quickEquipment.ownerMobile} onChange={(event) => setQuickEquipment({ ...quickEquipment, ownerMobile: event.target.value })} /></div></div>
               <div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setQuickEquipment({ open: false, plate: '', ownerName: '', ownerMobile: '' })}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={quickSaving} onClick={createQuickEquipment}>{quickSaving ? t('saving') : t('save')}</button></div>
             </div>}
           </div>
@@ -608,7 +608,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                       value={selectedCompanyId}
                       selectedOption={selectedCompany}
                       onChange={(value, option) => { setSelectedCompanyId(value); setSelectedCompany(option); }}
-                      placeholder="—"
+                      placeholder={t('selectCompany')}
                       loadOptions={loadCompanies}
                     />
                   </div>
@@ -619,7 +619,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                       value={selectedProjectId}
                       selectedOption={selectedProject}
                       onChange={(value, option) => { setSelectedProjectId(value); setSelectedProject(option); }}
-                      placeholder="—"
+                      placeholder={t('selectProject')}
                       loadOptions={loadProjects}
                     />
                   </div>
@@ -630,6 +630,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                       type="text"
                       className="input"
                       value={contractorCode}
+                      placeholder={t('contractorCodePlaceholder')}
                       onChange={(e) => setContractorCode(e.target.value)}
                       dir="ltr"
                     />
@@ -653,7 +654,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                   <div className="input bg-gray-50 dark:bg-gray-900/30">{selectedDriver?.label ?? t('driverInheritedFromEntry')}</div>
                 )}
               </div>
-              {isEntry && quickDriver.open && <div className="rounded-lg border p-4 space-y-3" style={{ borderColor: 'var(--border)' }}><p className="font-semibold">إضافة سائق سريع</p><div className="grid gap-3 sm:grid-cols-2"><div><label className="label">{t('fullName')} *</label><input className="input" value={quickDriver.fullName} onChange={(event) => setQuickDriver({ ...quickDriver, fullName: event.target.value })} /></div><div><label className="label">{t('mobileNumber')} *</label><input className="input" dir="ltr" value={quickDriver.mobile} onChange={(event) => setQuickDriver({ ...quickDriver, mobile: event.target.value.replace(/[^\d+]/g, '') })} /></div></div><div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setQuickDriver({ open: false, fullName: '', mobile: '' })}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={quickSaving} onClick={createQuickDriver}>{quickSaving ? t('saving') : t('save')}</button></div></div>}
+              {isEntry && quickDriver.open && <div className="rounded-lg border p-4 space-y-3" style={{ borderColor: 'var(--border)' }}><p className="font-semibold">إضافة سائق سريع</p><div className="grid gap-3 sm:grid-cols-2"><div><label className="label">{t('fullName')} *</label><input className="input" placeholder={t('fullNamePlaceholder')} value={quickDriver.fullName} onChange={(event) => setQuickDriver({ ...quickDriver, fullName: event.target.value })} /></div><div><label className="label">{t('mobileNumber')} *</label><input className="input" dir="ltr" placeholder={t('mobileNumberPlaceholder')} value={quickDriver.mobile} onChange={(event) => setQuickDriver({ ...quickDriver, mobile: event.target.value.replace(/[^\d+]/g, '') })} /></div></div><div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setQuickDriver({ open: false, fullName: '', mobile: '' })}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={quickSaving} onClick={createQuickDriver}>{quickSaving ? t('saving') : t('save')}</button></div></div>}
 
               <div>
                 <label className="label">{t('actualMovementTime')}</label>
@@ -684,6 +685,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                 <textarea
                   className="input min-h-20 resize-none"
                   value={notes}
+                  placeholder={t('notesPlaceholder')}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
                 />

@@ -138,9 +138,9 @@ export function AdminUsers() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={t('addUser')} size="sm">
         {formError && <div className="mb-4"><Alert type="error">{formError}</Alert></div>}
         <div className="space-y-4">
-          <div><label className="label">{t('fullName')} *</label><input className="input" value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
-          <div><label className="label">{t('email')} *</label><input className="input" type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-          <div><label className="label">{t('password')} *</label><input className="input" type="password" dir="ltr" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+          <div><label className="label">{t('fullName')} *</label><input className="input" placeholder={t('fullNamePlaceholder')} value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
+          <div><label className="label">{t('email')} *</label><input className="input" type="email" dir="ltr" placeholder={t('emailPlaceholder')} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+          <div><label className="label">{t('password')} *</label><input className="input" type="password" dir="ltr" placeholder={t('passwordPlaceholder')} value={password} onChange={(e) => setPassword(e.target.value)} /></div>
           <div>
             <label className="label">{t('role')}</label>
             <Select

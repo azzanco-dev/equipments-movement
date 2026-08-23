@@ -286,8 +286,8 @@ export function AdminCompanies() {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? t('editCompany') : t('addCompany')} size="sm">
         {formError && <div className="mb-4"><Alert type="error">{formError}</Alert></div>}
         <div className="space-y-4">
-          <div><label className="label">{t('companyNameAr')} *</label><input className="input" value={nameAr} onChange={(e) => setNameAr(e.target.value)} /></div>
-          <div><label className="label">{t('companyNameEn')} *</label><input className="input" value={nameEn} onChange={(e) => setNameEn(e.target.value)} /></div>
+          <div><label className="label">{t('companyNameAr')} *</label><input className="input" dir="rtl" placeholder={t('companyNameArPlaceholder')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} /></div>
+          <div><label className="label">{t('companyNameEn')} *</label><input className="input" dir="ltr" placeholder={t('companyNameEnPlaceholder')} value={nameEn} onChange={(e) => setNameEn(e.target.value)} /></div>
         </div>
         <div className="flex gap-3 pt-4">
           <button onClick={() => setModalOpen(false)} className="btn-outline flex-1">{t('cancel')}</button>

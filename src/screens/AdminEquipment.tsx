@@ -350,8 +350,8 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? t('editEquipment') : t('addEquipment')} size="lg">
         {formError && <div className="mb-4"><Alert type="error">{formError}</Alert></div>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label className="label">{t('equipmentCode')} *</label><input className="input" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></div>
-          <div><label className="label">{t('equipmentType')} *</label><input className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} /></div>
+          <div><label className="label">{t('equipmentCode')} *</label><input className="input" dir="ltr" placeholder={t('equipmentCodePlaceholder')} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></div>
+          <div><label className="label">{t('equipmentType')} *</label><input className="input" placeholder={t('equipmentTypePlaceholder')} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} /></div>
           <div className="sm:col-span-2">
             <label className="label">{t('plateNumber')}</label>
             <PlateNumberInput
@@ -359,10 +359,10 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
               onChange={(value) => setForm({ ...form, plate_number: value })}
             />
           </div>
-          <div><label className="label">{t('manufactureYear')}</label><input className="input" type="number" value={form.manufacture_year} onChange={(e) => setForm({ ...form, manufacture_year: e.target.value })} /></div>
-          <div><label className="label">{t('brand')}</label><input className="input" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} /></div>
-          <div><label className="label">{t('model')}</label><input className="input" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} /></div>
-          <div><label className="label">{t('chassisNumber')}</label><input className="input" value={form.chassis_number} onChange={(e) => setForm({ ...form, chassis_number: e.target.value })} /></div>
+          <div><label className="label">{t('manufactureYear')}</label><input className="input" type="number" placeholder={t('manufactureYearPlaceholder')} value={form.manufacture_year} onChange={(e) => setForm({ ...form, manufacture_year: e.target.value })} /></div>
+          <div><label className="label">{t('brand')}</label><input className="input" placeholder={t('brandPlaceholder')} value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} /></div>
+          <div><label className="label">{t('model')}</label><input className="input" placeholder={t('modelPlaceholder')} value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} /></div>
+          <div><label className="label">{t('chassisNumber')}</label><input className="input" dir="ltr" placeholder={t('chassisNumberPlaceholder')} value={form.chassis_number} onChange={(e) => setForm({ ...form, chassis_number: e.target.value })} /></div>
           <div>
             <label className="label">{t('operationalStatus')}</label>
             <Select
@@ -434,7 +434,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
           <div><label className="label">{t('lastMaintenanceDate')}</label><DatePicker value={form.last_maintenance_date} onChange={(v) => setForm({ ...form, last_maintenance_date: v })} /></div>
           <div><label className="label">{t('registrationExpiry')}</label><DatePicker value={form.registration_expiry} onChange={(v) => setForm({ ...form, registration_expiry: v })} /></div>
           <div><label className="label">{t('insuranceExpiry')}</label><DatePicker value={form.insurance_expiry} onChange={(v) => setForm({ ...form, insurance_expiry: v })} /></div>
-          <div><label className="label">{t('qrValue')} *</label><input className="input" value={form.qr_value} onChange={(e) => setForm({ ...form, qr_value: e.target.value })} /></div>
+          <div><label className="label">{t('qrValue')} *</label><input className="input" dir="ltr" placeholder={t('qrValuePlaceholder')} value={form.qr_value} onChange={(e) => setForm({ ...form, qr_value: e.target.value })} /></div>
         </div>
         <div className="flex gap-3 pt-4">
           <button onClick={() => setModalOpen(false)} className="btn-outline flex-1">{t('cancel')}</button>

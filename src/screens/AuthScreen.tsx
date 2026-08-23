@@ -63,6 +63,7 @@ export function AuthScreen() {
                   className="input"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  placeholder={t('emailPlaceholder')}
                   required
                   dir="ltr"
                 />
@@ -74,6 +75,7 @@ export function AuthScreen() {
                   className="input"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  placeholder={t('passwordPlaceholder')}
                   required
                   dir="ltr"
                 />
