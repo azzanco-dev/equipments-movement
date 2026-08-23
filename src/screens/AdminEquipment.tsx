@@ -55,7 +55,13 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
   const [importResult, setImportResult] = useState<{ success: number; fail: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const listTopRef = useRef<HTMLDivElement>(null);
   const [dragOver, setDragOver] = useState(false);
+
+  const changePage = (nextPage: number) => {
+    list.setPage(nextPage);
+    window.requestAnimationFrame(() => listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
 
   const fetchEquipment = useCallback(async () => {
     setLoading(true);
@@ -275,7 +281,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
   const ownLabel = (s: OwnershipStatus) => s === 'alazani' ? t('ownershipAlazani') : s === 'takween' ? t('ownershipTakween') : s === 'third_party_f' ? t('ownershipThirdPartyF') : s === 'third_party_partnership_b' ? t('ownershipThirdPartyPartnershipB') : t('ownershipExternalSupplier');
 
   return (
-    <div className="space-y-4">
+    <div ref={listTopRef} className="space-y-4 scroll-mt-20">
       <PageHeader title={t('equipmentList')} description={t('equipmentDesc')} />
       <DataListToolbar config={equipmentListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} actions={<><button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addEquipment')}</button><button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-outline"><Upload size={18} /> {t('importExcel')}</button></>} />
 
@@ -337,7 +343,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
               </tbody>
             </table>
           </div>
-          <div className="border-t px-4 py-3" style={{ borderColor: 'var(--border)' }}><DataListPagination page={list.page} pageSize={list.pageSize} total={total} onPage={list.setPage} /></div>
+          <div className="border-t px-4 py-3" style={{ borderColor: 'var(--border)' }}><DataListPagination page={list.page} pageSize={list.pageSize} total={total} onPage={changePage} /></div>
         </div>
       )}
 
