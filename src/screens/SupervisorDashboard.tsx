@@ -17,6 +17,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<'all' | MovementType>('all');
   const [filterDate, setFilterDate] = useState('');
+  const workshopMode = profile?.role === 'workshop';
 
   const fetchLogs = useCallback(async () => {
     if (!user) return;
@@ -128,10 +129,10 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
               <table className="compact-table w-full text-sm">
                 <thead>
                   <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
-                    <th className="table-header text-start px-4 py-3">{t('contractorEquipmentCode')}</th>
+                    <th className="table-header text-start px-4 py-3">{workshopMode ? t('equipmentCodeLabel') : t('contractorEquipmentCode')}</th>
                     <th className="table-header text-start px-4 py-3">{t('equipmentNameLabel')}</th>
                     <th className="table-header text-start px-4 py-3">{t('movementType')}</th>
-                    <th className="table-header text-start px-4 py-3">{t('driverName')}</th>
+                    {!workshopMode && <th className="table-header text-start px-4 py-3">{t('driverName')}</th>}
                     <th className="table-header text-start px-4 py-3">{t('recordedAt')}</th>
                   </tr>
                 </thead>
@@ -143,14 +144,14 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
                       style={{ borderColor: 'var(--border)' }}
                       onClick={() => onSelectMovement(log.id)}
                     >
-                      <td className="px-4 py-3 font-semibold">{log.contractor_equipment_code ?? '—'}</td>
-                      <td className="px-4 py-3 text-muted">{log.equipment?.code ?? '—'}</td>
+                      <td className="px-4 py-3 font-semibold">{workshopMode ? (log.equipment?.code ?? '—') : (log.contractor_equipment_code ?? '—')}</td>
+                      <td className="px-4 py-3 text-muted">{workshopMode ? (log.equipment?.type ?? '—') : (log.equipment?.code ?? '—')}</td>
                       <td className="px-4 py-3">
                         <span className={`badge border ${log.movement_type === 'entry' ? 'status-entry' : 'status-exit'}`}>
                           {log.movement_type === 'entry' ? t('entry') : t('exit')}
                         </span>
                       </td>
-                      <td className="px-4 py-3">{log.driver_name ?? '—'}</td>
+                      {!workshopMode && <td className="px-4 py-3">{log.driver_name ?? '—'}</td>}
                       <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(log.recorded_at)}</td>
                     </tr>
                   ))}

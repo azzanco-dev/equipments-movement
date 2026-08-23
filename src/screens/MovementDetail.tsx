@@ -405,11 +405,13 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
               />
             </>
           )}
-          <InfoRow
-            icon={<User size={16} />}
-            label={t('supervisorName')}
-            value={log.supervisor?.full_name}
-          />
+          {profile?.role === 'admin' && (
+            <InfoRow
+              icon={<User size={16} />}
+              label={t('supervisorName')}
+              value={log.supervisor?.full_name}
+            />
+          )}
           <InfoRow
             icon={<Clock size={16} />}
             label={t('movementDate')}

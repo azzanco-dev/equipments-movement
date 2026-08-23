@@ -14,6 +14,7 @@ import { useDataListState } from '@/components/data-list/useDataListState';
 import { movementsListConfig, visitsListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
 import { formatDate } from '@/lib/dateFormat';
+import { Modal } from '@/components/Modal';
 
 async function loadLatestDriverNames(entryIds: string[]) {
   if (!entryIds.length) return new Map<string, string>();
@@ -50,6 +51,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
   const [visits, setVisits] = useState<EquipmentVisit[]>([]);
   const [loadingVisits, setLoadingVisits] = useState(true);
   const [visitsTotal, setVisitsTotal] = useState(0);
+  const [selectedVisit, setSelectedVisit] = useState<EquipmentVisit | null>(null);
   const visitList = useDataListState(visitsListConfig, 'visit_');
 
   const setTab = (nextTab: 'logs' | 'reports') => {
@@ -110,7 +112,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
     }
     let query = supabase
       .from('entry_exit_logs')
-      .select('id,equipment_id,supervisor_id,movement_type,registration_method,driver_name,driver_id,notes,photo_url,company_id,project_id,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),supervisor:profiles(id,full_name,role,created_at)', { count: 'exact' })
+      .select('id,equipment_id,supervisor_id,movement_type,registration_method,driver_name,driver_id,notes,photo_url,company_id,project_id,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number)', { count: 'exact' })
       .order(list.sort, { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
     if (term) query = query.or(`driver_name.ilike.%${term}%,contractor_equipment_code.ilike.%${term}%${equipmentIds.length ? `,equipment_id.in.(${equipmentIds.join(',')})` : ''}`);
@@ -223,7 +225,6 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                       <th className="table-header text-start px-4 py-3">{t('equipmentNameLabel')}</th>
                       <th className="table-header text-start px-4 py-3">{t('movementType')}</th>
                       <th className="table-header text-start px-4 py-3">{t('driverName')}</th>
-                      <th className="table-header text-start px-4 py-3">{t('supervisorName')}</th>
                       <th className="table-header text-start px-4 py-3">{t('recordedAt')}</th>
                     </tr>
                   </thead>
@@ -243,7 +244,6 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                           </span>
                         </td>
                         <td className="px-4 py-3">{log.current_driver_name ?? log.driver_name ?? '—'}</td>
-                        <td className="px-4 py-3">{log.supervisor?.full_name ?? '—'}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(log.recorded_at)}</td>
                       </tr>
                     ))}
@@ -271,30 +271,33 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
           ) : (
             <div className="card p-0 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="compact-table min-w-[1100px] w-full text-sm">
+                <table className="compact-table min-w-[800px] w-full text-sm">
                   <thead>
                     <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
                       <th className="table-header text-start px-4 py-3">{t('contractorEquipmentCode')}</th>
                       <th className="table-header text-start px-4 py-3">{t('equipmentNameLabel')}</th>
                       <th className="table-header text-start px-4 py-3">{t('driverName')}</th>
                       <th className="table-header text-start px-4 py-3">{t('entryTime')}</th>
-                      <th className="table-header text-start px-4 py-3">{t('entryBy')}</th>
                       <th className="table-header text-start px-4 py-3">{t('exitTime')}</th>
-                      <th className="table-header text-start px-4 py-3">{t('exitBy')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {visits.map((v) => (
-                      <tr key={v.entry_log_id} className="border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
+                      <tr
+                        key={v.entry_log_id}
+                        className="border-b last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                        style={{ borderColor: 'var(--border)' }}
+                        onClick={() => setSelectedVisit(v)}
+                        tabIndex={0}
+                        onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setSelectedVisit(v); }}
+                      >
                         <td className="px-4 py-3 font-semibold">{v.contractor_equipment_code ?? '—'}</td>
                         <td className="px-4 py-3">{v.equipment_code} {v.equipment_type}</td>
                         <td className="px-4 py-3">{v.last_driver_name ?? v.driver_name ?? '—'}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(v.entry_recorded_at)}</td>
-                        <td className="px-4 py-3">{v.entry_supervisor_name ?? '—'}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">
                           {v.exit_recorded_at ? formatDate(v.exit_recorded_at) : '—'}
                         </td>
-                        <td className="px-4 py-3">{v.exit_supervisor_name ?? '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -305,6 +308,32 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
           <DataListPagination page={visitList.page} pageSize={visitList.pageSize} total={visitsTotal} onPage={visitList.setPage} />
         </div>
       )}
+      <Modal open={selectedVisit !== null} onClose={() => setSelectedVisit(null)} title={t('visitDetails')} size="lg">
+        {selectedVisit && (
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+            {[
+              [t('equipmentCodeLabel'), selectedVisit.equipment_code],
+              [t('equipmentNameLabel'), selectedVisit.equipment_type],
+              [t('plateNumber'), selectedVisit.plate_number],
+              [t('contractorEquipmentCode'), selectedVisit.contractor_equipment_code],
+              [t('company'), [selectedVisit.company_name_ar, selectedVisit.company_name_en].filter(Boolean).join(' — ')],
+              [t('project'), [selectedVisit.project_name_ar, selectedVisit.project_name_en].filter(Boolean).join(' — ')],
+              [t('driverName'), selectedVisit.last_driver_name ?? selectedVisit.driver_name],
+              [t('entryTime'), formatDate(selectedVisit.entry_recorded_at)],
+              [t('entryBy'), selectedVisit.entry_supervisor_name],
+              [t('exitTime'), selectedVisit.exit_recorded_at ? formatDate(selectedVisit.exit_recorded_at) : null],
+              [t('exitBy'), selectedVisit.exit_supervisor_name],
+              [t('entryNotes'), selectedVisit.notes],
+              [t('exitNotes'), selectedVisit.exit_notes],
+            ].map(([label, value]) => (
+              <div key={label} className="min-w-0 border-b pb-3" style={{ borderColor: 'var(--border)' }}>
+                <p className="text-xs text-muted">{label}</p>
+                <p className="mt-1 font-medium break-words">{value || '—'}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
