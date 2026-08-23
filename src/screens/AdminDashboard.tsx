@@ -13,7 +13,7 @@ import { DataListPagination } from '@/components/data-list/DataListPagination';
 import { useDataListState } from '@/components/data-list/useDataListState';
 import { movementsListConfig, visitsListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
-import { formatDateTime } from '@/lib/dateFormat';
+import { formatDate } from '@/lib/dateFormat';
 
 async function loadLatestDriverNames(entryIds: string[]) {
   if (!entryIds.length) return new Map<string, string>();
@@ -146,8 +146,6 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
 
   useEffect(() => { if (tab === 'logs') fetchLogs(); }, [fetchLogs, tab]);
   useEffect(() => { if (tab === 'reports') fetchVisits(); }, [fetchVisits, tab]);
-
-  const formatDate = formatDateTime;
 
   const statCards = [
     { label: t('todayEntries'), value: stats.todayEntries, icon: <LogIn size={20} /> },

@@ -13,7 +13,7 @@ import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 import { sanitizeSearchTerm } from '@/lib/search';
 import type { SelectOption } from '@/components/Select';
 import { PlateNumberInput } from '@/components/PlateNumberInput';
-import { formatDateTime } from '@/lib/dateFormat';
+import { formatDate } from '@/lib/dateFormat';
 
 const FRONTEND_MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -559,7 +559,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                   <div className="flex items-center gap-2 text-xs text-muted">
                     <Clock size={14} />
                     <span>
-                      {t('lastMovement')}: {lastMovement.movement_type === 'entry' ? t('entry') : t('exit')} — {formatDateTime(lastMovement.recorded_at)}
+                      {t('lastMovement')}: {lastMovement.movement_type === 'entry' ? t('entry') : t('exit')} — {formatDate(lastMovement.recorded_at)}
                     </span>
                   </div>
                 )}
@@ -591,7 +591,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
               <div className="rounded-lg border p-4 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
                 <p className="mb-2 font-medium">{t('latestEntryBrief')}</p>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <span><span className="text-muted">{t('entryDateTime')}:</span> {formatDateTime(lastMovement.recorded_at)}</span>
+                  <span><span className="text-muted">{t('entryDateTime')}:</span> {formatDate(lastMovement.recorded_at)}</span>
                   <span><span className="text-muted">{t('driverName')}:</span> {lastMovement.driver_name ?? '—'}</span>
                   <span><span className="text-muted">{t('contractorEquipmentCode')}:</span> {lastMovement.contractor_equipment_code ?? '—'}</span>
                   <span className="text-muted">{t('exitInheritsEntry')}</span>

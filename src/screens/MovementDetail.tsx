@@ -32,7 +32,7 @@ import type { EntryExitLog, Company, Project, EntryExitPhoto, MovementDriverChan
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 import type { SelectOption } from '@/components/Select';
 import { sanitizeSearchTerm } from '@/lib/search';
-import { formatDateTime } from '@/lib/dateFormat';
+import { formatDate, formatDateTime } from '@/lib/dateFormat';
 
 interface MovementDetailProps {
   movementId: string;
@@ -408,7 +408,7 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
           <InfoRow
             icon={<Clock size={16} />}
             label={t('movementDate')}
-            value={formatDateTime(log.recorded_at)}
+            value={formatDate(log.recorded_at)}
           />
           <InfoRow
             icon={<Clock size={16} />}
@@ -532,7 +532,7 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
               <InfoRow
                 icon={<Clock size={16} />}
                 label={t('movementDate')}
-                value={formatDateTime(linkedLog.recorded_at)}
+                value={formatDate(linkedLog.recorded_at)}
               />
               <div className="flex items-center gap-3 py-2">
                 <Clock size={16} className="text-muted shrink-0" />
@@ -564,7 +564,7 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
               <InfoRow
                 icon={<Clock size={16} />}
                 label={t('movementDate')}
-                value={formatDateTime(linkedLog.recorded_at)}
+                value={formatDate(linkedLog.recorded_at)}
               />
               <InfoRow
                 icon={<Building2 size={16} />}

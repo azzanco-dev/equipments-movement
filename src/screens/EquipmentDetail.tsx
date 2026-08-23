@@ -7,7 +7,7 @@ import { ArrowLeft, Edit2, Power, Printer, Calendar, Truck, Building2, Wrench, F
 import type { Equipment, EntryExitLog, OperationalStatus, OwnershipStatus } from '@/lib/types';
 import { PageHeader } from '@/components/PageHeader';
 import { isOwnedEquipment, usesExternalSupplier } from '@/lib/equipmentOwnership';
-import { formatDate, formatDateTime } from '@/lib/dateFormat';
+import { formatDate } from '@/lib/dateFormat';
 
 interface EquipmentDetailProps {
   equipmentId: string;
@@ -154,7 +154,7 @@ export function EquipmentDetail({ equipmentId, onBack, onEdit, onSelectMovement,
                       </td>
                       <td className="px-4 py-3 text-muted">{log.supervisor?.full_name ?? '—'}</td>
                       <td className="px-4 py-3">{log.driver_name ?? '—'}</td>
-                      <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDateTime(log.recorded_at)}</td>
+                      <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(log.recorded_at)}</td>
                     </tr>
                   ))}
                 </tbody>
