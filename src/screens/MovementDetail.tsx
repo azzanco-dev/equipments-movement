@@ -320,6 +320,7 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
   if (!log) return null;
 
   const isEntry = log.movement_type === 'entry';
+  const isWorkshopMovement = log.movement_context === 'workshop';
 
   let durationMs = 0;
 
@@ -380,26 +381,30 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
             label={t('equipmentNameLabel')}
             value={log.equipment ? `${log.equipment.code} — ${log.equipment.type}` : '—'}
           />
-          <InfoRow
-            icon={<FileText size={16} />}
-            label={t('contractorEquipmentCode')}
-            value={log.contractor_equipment_code}
-          />
-          <InfoRow
-            icon={<Building2 size={16} />}
-            label={t('company')}
-            value={company ? `${company.name_ar} — ${company.name_en}` : '—'}
-          />
-          <InfoRow
-            icon={<MapPin size={16} />}
-            label={t('project')}
-            value={project ? `${project.name_ar} — ${project.name_en}` : '—'}
-          />
-          <InfoRow
-            icon={<User size={16} />}
-            label={t('driverName')}
-            value={log.driver?.full_name ?? log.driver_name}
-          />
+          {!isWorkshopMovement && (
+            <>
+              <InfoRow
+                icon={<FileText size={16} />}
+                label={t('contractorEquipmentCode')}
+                value={log.contractor_equipment_code}
+              />
+              <InfoRow
+                icon={<Building2 size={16} />}
+                label={t('company')}
+                value={company ? `${company.name_ar} — ${company.name_en}` : '—'}
+              />
+              <InfoRow
+                icon={<MapPin size={16} />}
+                label={t('project')}
+                value={project ? `${project.name_ar} — ${project.name_en}` : '—'}
+              />
+              <InfoRow
+                icon={<User size={16} />}
+                label={t('driverName')}
+                value={log.driver?.full_name ?? log.driver_name}
+              />
+            </>
+          )}
           <InfoRow
             icon={<User size={16} />}
             label={t('supervisorName')}
@@ -410,11 +415,13 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
             label={t('movementDate')}
             value={formatDate(log.recorded_at)}
           />
-          <InfoRow
-            icon={<Clock size={16} />}
-            label={t('createdAt')}
-            value={log.created_at ? formatDateTime(log.created_at) : '—'}
-          />
+          {profile?.role === 'admin' && (
+            <InfoRow
+              icon={<Clock size={16} />}
+              label={t('createdAt')}
+              value={log.created_at ? formatDateTime(log.created_at) : '—'}
+            />
+          )}
         </div>
 
         {/* Notes */}
@@ -566,21 +573,25 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
                 label={t('movementDate')}
                 value={formatDate(linkedLog.recorded_at)}
               />
-              <InfoRow
-                icon={<Building2 size={16} />}
-                label={t('company')}
-                value={linkedCompany ? `${linkedCompany.name_ar} — ${linkedCompany.name_en}` : '—'}
-              />
-              <InfoRow
-                icon={<MapPin size={16} />}
-                label={t('project')}
-                value={linkedProject ? `${linkedProject.name_ar} — ${linkedProject.name_en}` : '—'}
-              />
-              <InfoRow
-                icon={<FileText size={16} />}
-                label={t('contractorEquipmentCode')}
-                value={linkedLog.contractor_equipment_code}
-              />
+              {!isWorkshopMovement && (
+                <>
+                  <InfoRow
+                    icon={<Building2 size={16} />}
+                    label={t('company')}
+                    value={linkedCompany ? `${linkedCompany.name_ar} — ${linkedCompany.name_en}` : '—'}
+                  />
+                  <InfoRow
+                    icon={<MapPin size={16} />}
+                    label={t('project')}
+                    value={linkedProject ? `${linkedProject.name_ar} — ${linkedProject.name_en}` : '—'}
+                  />
+                  <InfoRow
+                    icon={<FileText size={16} />}
+                    label={t('contractorEquipmentCode')}
+                    value={linkedLog.contractor_equipment_code}
+                  />
+                </>
+              )}
               <div className="flex items-center gap-3 py-2">
                 <Clock size={16} className="text-muted shrink-0" />
                 <div>
