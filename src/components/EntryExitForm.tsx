@@ -9,7 +9,6 @@ import { Spinner } from '@/components/Spinner';
 import { QrCode, Search, AlertTriangle, CheckCircle, Clock, MapPin, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
 import type { Driver, Equipment, Lessor, MovementType, LastMovement } from '@/lib/types';
 import { DatePicker } from '@/components/DatePicker';
-import { TimePicker } from '@/components/TimePicker';
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 import { sanitizeSearchTerm } from '@/lib/search';
 import type { SelectOption } from '@/components/Select';
@@ -81,18 +80,13 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
   const isEntry = movementType === 'entry';
   const currentLocalDateTime = toLocalDateTimeInput(new Date());
   const movementDate = recordedAt.slice(0, 10);
-  const movementTime = recordedAt.slice(11, 16);
 
   const updateMovementDate = (date: string) => {
     if (!date) {
       setRecordedAt('');
       return;
     }
-    setRecordedAt(`${date}T${movementTime || currentLocalDateTime.slice(11, 16)}`);
-  };
-
-  const updateMovementTime = (time: string) => {
-    setRecordedAt(`${movementDate || currentLocalDateTime.slice(0, 10)}T${time}`);
+    setRecordedAt(`${date}T${currentLocalDateTime.slice(11, 16)}`);
   };
 
   const reset = useCallback(() => {
@@ -341,7 +335,8 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
       setSaveError(`${t('actualMovementTime')}: ${t('required')}`);
       return;
     }
-    const actualMovementDate = new Date(recordedAt);
+    const saveTime = toLocalDateTimeInput(new Date()).slice(11, 16);
+    const actualMovementDate = new Date(`${movementDate}T${saveTime}`);
     if (isNaN(actualMovementDate.getTime()) || actualMovementDate.getTime() > Date.now()) {
       setSaveError(t('movementTimeCannotBeFuture'));
       return;
@@ -658,25 +653,13 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
 
               <div>
                 <label className="label">{t('actualMovementTime')}</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="min-w-0">
-                    <label className="mb-1 block text-xs text-muted">{t('date')}</label>
-                    <DatePicker
-                      value={movementDate}
-                      onChange={updateMovementDate}
-                      max={currentLocalDateTime.slice(0, 10)}
-                      placeholder={t('date')}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <label className="mb-1 block text-xs text-muted">{t('time')}</label>
-                    <TimePicker
-                      value={movementTime}
-                      max={movementDate === currentLocalDateTime.slice(0, 10) ? currentLocalDateTime.slice(11, 16) : undefined}
-                      onChange={updateMovementTime}
-                      placeholder={t('time')}
-                    />
-                  </div>
+                <div className="max-w-sm">
+                  <DatePicker
+                    value={movementDate}
+                    onChange={updateMovementDate}
+                    max={currentLocalDateTime.slice(0, 10)}
+                    placeholder={t('date')}
+                  />
                 </div>
               </div>
 

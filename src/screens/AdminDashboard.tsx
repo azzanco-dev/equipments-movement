@@ -129,9 +129,6 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
   const formatDate = (iso: string) => new Date(iso).toLocaleString(undefined, {
     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
   });
-  const formatDateOnly = (iso: string) => new Date(iso).toLocaleDateString(undefined, {
-    year: 'numeric', month: 'short', day: 'numeric',
-  });
 
   const statCards = [
     { label: t('todayEntries'), value: stats.todayEntries, icon: <LogIn size={20} /> },
@@ -300,7 +297,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                         <td className="px-4 py-3 font-semibold">{v.contractor_equipment_code ?? '—'}</td>
                         <td className="px-4 py-3">{v.equipment_code} {v.equipment_type}</td>
                         <td className="px-4 py-3">{v.driver_name ?? '—'}</td>
-                        <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDateOnly(v.entry_recorded_at)}</td>
+                        <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(v.entry_recorded_at)}</td>
                         <td className="px-4 py-3">{v.entry_supervisor_name ?? '—'}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">
                           {v.exit_recorded_at ? formatDate(v.exit_recorded_at) : '—'}
