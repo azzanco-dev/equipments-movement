@@ -9,12 +9,20 @@ import { Plus, Trash2 } from 'lucide-react';
 import type { Profile, UserRole } from '@/lib/types';
 import { Select } from '@/components/Select';
 import { PageHeader } from '@/components/PageHeader';
+import { DataListToolbar } from '@/components/data-list/DataListToolbar';
+import { DataListPagination } from '@/components/data-list/DataListPagination';
+import { useDataListState } from '@/components/data-list/useDataListState';
+import { usersListConfig } from '@/lib/listConfigs';
+import { applyListFilters } from '@/lib/applyListFilters';
+import { sanitizeSearchTerm } from '@/lib/search';
 
 export function AdminUsers() {
   const { t } = useI18n();
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const list = useDataListState(usersListConfig);
   const [modalOpen, setModalOpen] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,11 +33,16 @@ export function AdminUsers() {
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
+    let query = supabase.from('profiles').select('id,full_name,role,created_at', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
+    const term = sanitizeSearchTerm(list.search);
+    if (term) query = query.ilike('full_name', `%${term}%`);
+    query = applyListFilters(query, list.filters, new Set(usersListConfig.filterFields.map((field) => field.key)));
+    const { data, error, count } = await query;
     if (error) console.error(error);
     setUsers((data as Profile[]) ?? []);
+    setTotal(count ?? 0);
     setLoading(false);
-  }, []);
+  }, [list.direction, list.filters, list.page, list.pageSize, list.search, list.sort]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
@@ -87,9 +100,7 @@ export function AdminUsers() {
   return (
     <div className="space-y-4">
       <PageHeader title={t('users')} description={t('usersDesc')} />
-      <div className="flex justify-end">
-        <button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addUser')}</button>
-      </div>
+      <DataListToolbar config={usersListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} actions={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addUser')}</button>} />
       {loading ? (
         <InlineSpinner label={t('loading')} />
       ) : users.length === 0 ? (
@@ -135,6 +146,7 @@ export function AdminUsers() {
           </div>
         </div>
       )}
+      <DataListPagination page={list.page} pageSize={list.pageSize} total={total} onPage={list.setPage} />
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={t('addUser')} size="sm">
         {formError && <div className="mb-4"><Alert type="error">{formError}</Alert></div>}
         <div className="space-y-4">

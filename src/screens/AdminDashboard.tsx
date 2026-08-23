@@ -1,22 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/i18n/I18nContext';
 import { InlineSpinner } from '@/components/Spinner';
 import { exportLogsToExcel, exportVisitsToExcel } from '@/lib/excel';
-import { LogIn, LogOut, Truck, AlertCircle, Download, Calendar } from 'lucide-react';
-import { DatePicker } from '@/components/DatePicker';
+import { LogIn, LogOut, Truck, AlertCircle, Download } from 'lucide-react';
 import type { EntryExitLog, EquipmentVisit } from '@/lib/types';
 import { PageHeader } from '@/components/PageHeader';
 import { sanitizeSearchTerm } from '@/lib/search';
 import { DataListToolbar } from '@/components/data-list/DataListToolbar';
 import { DataListPagination } from '@/components/data-list/DataListPagination';
 import { useDataListState } from '@/components/data-list/useDataListState';
-import { movementsListConfig } from '@/lib/listConfigs';
+import { movementsListConfig, visitsListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
 
 export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelectMovement?: (id: string) => void; onCreateMovement?: (type: 'entry' | 'exit') => void }) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<'logs' | 'reports'>('logs');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tab = searchParams.get('tab') === 'reports' ? 'reports' : 'logs';
 
   // Stats
   const [stats, setStats] = useState({ todayEntries: 0, todayExits: 0, activeEquipment: 0, outsideEquipment: 0 });
@@ -31,8 +34,15 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
   // Reports
   const [visits, setVisits] = useState<EquipmentVisit[]>([]);
   const [loadingVisits, setLoadingVisits] = useState(true);
-  const [visitDateFrom, setVisitDateFrom] = useState('');
-  const [visitDateTo, setVisitDateTo] = useState('');
+  const [visitsTotal, setVisitsTotal] = useState(0);
+  const visitList = useDataListState(visitsListConfig, 'visit_');
+
+  const setTab = (nextTab: 'logs' | 'reports') => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (nextTab === 'reports') next.set('tab', 'reports'); else next.delete('tab');
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true);
@@ -43,21 +53,21 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
     // Today's entries
     const { count: todayEntries } = await supabase
       .from('entry_exit_logs')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('movement_type', 'entry')
       .gte('recorded_at', todayStr);
 
     // Today's exits
     const { count: todayExits } = await supabase
       .from('entry_exit_logs')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('movement_type', 'exit')
       .gte('recorded_at', todayStr);
 
     // Active equipment count
     const { count: activeCount } = await supabase
       .from('equipment')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('is_active', true);
 
     // Equipment currently outside site (last movement was exit)
@@ -99,32 +109,24 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
 
   const fetchVisits = useCallback(async () => {
     setLoadingVisits(true);
-    let query = supabase.from('equipment_visits').select('*').order('entry_recorded_at', { ascending: false }).limit(200);
-
-    if (visitDateFrom) {
-      const d = new Date(visitDateFrom);
-      d.setHours(0, 0, 0, 0);
-      query = query.gte('entry_recorded_at', d.toISOString());
-    }
-    if (visitDateTo) {
-      const d = new Date(visitDateTo);
-      d.setHours(23, 59, 59, 999);
-      query = query.lte('entry_recorded_at', d.toISOString());
-    }
-
-    const { data, error } = await query;
+    let query = supabase.from('equipment_visits').select('equipment_id,equipment_code,equipment_type,contractor_equipment_code,plate_number,project_id,project_name_ar,project_name_en,company_name_ar,company_name_en,entry_log_id,entry_recorded_at,entry_supervisor_id,entry_supervisor_name,driver_name,odometer_reading,notes,exit_log_id,exit_recorded_at,exit_supervisor_id,exit_supervisor_name,exit_odometer,exit_notes', { count: 'exact' }).order(visitList.sort, { ascending: visitList.direction === 'asc' }).range((visitList.page - 1) * visitList.pageSize, visitList.page * visitList.pageSize - 1);
+    const term = sanitizeSearchTerm(visitList.search);
+    if (term) query = query.or(`equipment_code.ilike.%${term}%,equipment_type.ilike.%${term}%,driver_name.ilike.%${term}%,contractor_equipment_code.ilike.%${term}%`);
+    query = applyListFilters(query, visitList.filters, new Set(visitsListConfig.filterFields.map((field) => field.key)));
+    const { data, error, count } = await query;
     if (error) console.error(error);
-    setVisits((data as EquipmentVisit[]) ?? []);
+    setVisits((data as unknown as EquipmentVisit[]) ?? []);
+    setVisitsTotal(count ?? 0);
     setLoadingVisits(false);
-  }, [visitDateFrom, visitDateTo]);
+  }, [visitList.direction, visitList.filters, visitList.page, visitList.pageSize, visitList.search, visitList.sort]);
 
   // Initial load
   useEffect(() => {
     fetchStats();
   }, [fetchStats]);
 
-  useEffect(() => { fetchLogs(); }, [fetchLogs]);
-  useEffect(() => { fetchVisits(); }, [fetchVisits]);
+  useEffect(() => { if (tab === 'logs') fetchLogs(); }, [fetchLogs, tab]);
+  useEffect(() => { if (tab === 'reports') fetchVisits(); }, [fetchVisits, tab]);
 
   const formatDate = (iso: string) => new Date(iso).toLocaleString(undefined, {
     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -242,32 +244,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
       {/* Reports tab */}
       {tab === 'reports' && (
         <div className="space-y-4">
-          {/* Date filters */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 text-sm text-muted">
-              <Calendar size={16} />
-            </div>
-            <DatePicker
-              className="w-auto"
-              value={visitDateFrom}
-              onChange={setVisitDateFrom}
-              placeholder={t('from')}
-            />
-            <DatePicker
-              className="w-auto"
-              value={visitDateTo}
-              onChange={setVisitDateTo}
-              placeholder={t('to')}
-            />
-            <button
-              onClick={() => exportVisitsToExcel(visits, `visits-${new Date().toISOString().slice(0, 10)}`, t as (k: string) => string)}
-              className="btn-outline"
-              disabled={visits.length === 0}
-            >
-              <Download size={16} />
-              {t('exportExcel')}
-            </button>
-          </div>
+          <DataListToolbar config={visitsListConfig} search={visitList.searchInput} onSearch={visitList.setSearchInput} sort={visitList.sort} direction={visitList.direction} onSort={visitList.setSort} pageSize={visitList.pageSize} onPageSize={visitList.setPageSize} filters={visitList.filters} onFilters={visitList.setFilters} actions={<button onClick={() => exportVisitsToExcel(visits, `visits-${new Date().toISOString().slice(0, 10)}`, t as (k: string) => string)} className="btn-outline" disabled={visits.length === 0}><Download size={16} />{t('exportExcel')}</button>} />
 
           {/* Visits table */}
           {loadingVisits ? (
@@ -310,6 +287,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
               </div>
             </div>
           )}
+          <DataListPagination page={visitList.page} pageSize={visitList.pageSize} total={visitsTotal} onPage={visitList.setPage} />
         </div>
       )}
     </div>
