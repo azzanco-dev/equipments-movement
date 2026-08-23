@@ -13,6 +13,7 @@ import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 import { sanitizeSearchTerm } from '@/lib/search';
 import type { SelectOption } from '@/components/Select';
 import { PlateNumberInput } from '@/components/PlateNumberInput';
+import { formatDateTime } from '@/lib/dateFormat';
 
 const FRONTEND_MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -25,18 +26,6 @@ interface EntryExitFormProps {
   onSaved: () => void;
   pageMode?: boolean;
   onViewMovement?: (id: string) => void;
-}
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 function toLocalDateTimeInput(date: Date): string {

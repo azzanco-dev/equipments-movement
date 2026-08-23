@@ -13,6 +13,7 @@ import { DataListPagination } from '@/components/data-list/DataListPagination';
 import { useDataListState } from '@/components/data-list/useDataListState';
 import { movementsListConfig, visitsListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
+import { formatDateTime } from '@/lib/dateFormat';
 
 export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelectMovement?: (id: string) => void; onCreateMovement?: (type: 'entry' | 'exit') => void }) {
   const { t } = useI18n();
@@ -128,9 +129,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
   useEffect(() => { if (tab === 'logs') fetchLogs(); }, [fetchLogs, tab]);
   useEffect(() => { if (tab === 'reports') fetchVisits(); }, [fetchVisits, tab]);
 
-  const formatDate = (iso: string) => new Date(iso).toLocaleString(undefined, {
-    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
+  const formatDate = formatDateTime;
 
   const statCards = [
     { label: t('todayEntries'), value: stats.todayEntries, icon: <LogIn size={20} /> },

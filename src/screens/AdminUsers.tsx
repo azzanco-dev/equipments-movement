@@ -16,6 +16,7 @@ import { usersListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
 import { sanitizeSearchTerm } from '@/lib/search';
 import { PasswordInput } from '@/components/PasswordInput';
+import { formatDate } from '@/lib/dateFormat';
 
 export function AdminUsers() {
   const { t } = useI18n();
@@ -137,7 +138,7 @@ export function AdminUsers() {
                         />
                       )}
                     </td>
-                    <td className="px-4 py-3 text-muted whitespace-nowrap">{new Date(u.created_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(u.created_at)}</td>
                     <td className="px-4 py-3">
                       {u.id !== currentUser?.id && <button onClick={() => handleDelete(u)} className="btn-ghost p-1.5"><Trash2 size={16} /></button>}
                     </td>

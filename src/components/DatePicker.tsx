@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { formatDate } from '@/lib/dateFormat';
 
 interface DatePickerProps {
   value: string;
@@ -34,8 +35,7 @@ function parseISODate(s: string): Date | null {
 function formatDateDisplay(s: string): string {
   const d = parseISODate(s);
   if (!d) return '';
-  const months = isRTL() ? MONTH_NAMES_AR : MONTH_NAMES_EN;
-  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+  return formatDate(s);
 }
 
 export function DatePicker({ value, onChange, className = '', placeholder = '—', max }: DatePickerProps) {

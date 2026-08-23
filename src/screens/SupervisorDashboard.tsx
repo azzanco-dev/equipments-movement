@@ -8,6 +8,7 @@ import { DatePicker } from '@/components/DatePicker';
 import type { EntryExitLog, MovementType } from '@/lib/types';
 import { Select } from '@/components/Select';
 import { PageHeader } from '@/components/PageHeader';
+import { formatDateTime } from '@/lib/dateFormat';
 
 export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { onSelectMovement: (id: string) => void; onCreateMovement: (type: MovementType) => void }) {
   const { t } = useI18n();
@@ -50,13 +51,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
     fetchLogs();
   }, [fetchLogs]);
 
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleString(undefined, {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-    });
-  };
+  const formatDate = formatDateTime;
 
   return (
     <div className="space-y-6">

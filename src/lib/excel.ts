@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import type { TranslationKey } from '@/i18n/translations';
 import type { EntryExitLog, EquipmentVisit, OperationalStatus, OwnershipStatus, RegistrationType } from '@/lib/types';
+import { formatDateTime } from '@/lib/dateFormat';
 
 export interface CompanyImportRow {
   name_ar: string;
@@ -185,7 +186,7 @@ export function exportLogsToExcel(logs: EntryExitLog[], fileName: string, t: (ke
     [t('odometerReading')]: log.odometer_reading ?? '',
     [t('notes')]: log.notes ?? '',
     [t('supervisorName')]: log.supervisor?.full_name ?? '',
-    [t('recordedAt')]: new Date(log.recorded_at).toLocaleString(),
+    [t('recordedAt')]: formatDateTime(log.recorded_at),
   }));
 
   const ws = XLSX.utils.json_to_sheet(data);
@@ -203,9 +204,9 @@ export function exportVisitsToExcel(visits: EquipmentVisit[], fileName: string, 
     [t('company')]: v.company_name_ar ?? '',
     [t('driverName')]: v.driver_name ?? '',
     [t('exitDriver')]: v.exit_driver_name ?? '',
-    [t('entryTime')]: v.entry_recorded_at ? new Date(v.entry_recorded_at).toLocaleString() : '',
+    [t('entryTime')]: v.entry_recorded_at ? formatDateTime(v.entry_recorded_at) : '',
     [t('entryBy')]: v.entry_supervisor_name ?? '',
-    [t('exitTime')]: v.exit_recorded_at ? new Date(v.exit_recorded_at).toLocaleString() : '',
+    [t('exitTime')]: v.exit_recorded_at ? formatDateTime(v.exit_recorded_at) : '',
     [t('exitBy')]: v.exit_supervisor_name ?? '',
     [t('odometerReading')]: v.odometer_reading ?? '',
     ['Exit odometer']: v.exit_odometer ?? '',

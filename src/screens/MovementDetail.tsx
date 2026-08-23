@@ -32,23 +32,12 @@ import type { EntryExitLog, Company, Project, EntryExitPhoto, MovementDriverChan
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 import type { SelectOption } from '@/components/Select';
 import { sanitizeSearchTerm } from '@/lib/search';
+import { formatDateTime } from '@/lib/dateFormat';
 
 interface MovementDetailProps {
   movementId: string;
   onBack: () => void;
   onNavigateMovement: (id: string) => void;
-}
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 function formatDuration(ms: number, t: (k: TranslationKey) => string): string {

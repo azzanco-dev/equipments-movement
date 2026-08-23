@@ -7,6 +7,7 @@ import { ArrowLeft, Edit2, Power, Printer, Calendar, Truck, Building2, Wrench, F
 import type { Equipment, EntryExitLog, OperationalStatus, OwnershipStatus } from '@/lib/types';
 import { PageHeader } from '@/components/PageHeader';
 import { isOwnedEquipment, usesExternalSupplier } from '@/lib/equipmentOwnership';
+import { formatDate, formatDateTime } from '@/lib/dateFormat';
 
 interface EquipmentDetailProps {
   equipmentId: string;
@@ -46,9 +47,6 @@ export function EquipmentDetail({ equipmentId, onBack, onEdit, onSelectMovement,
   const statusLabel = (s: OperationalStatus) => s === 'operational' ? t('operational') : s === 'maintenance' ? t('maintenance') : t('stopped');
   const ownLabel = (s: OwnershipStatus) => s === 'alazani' ? t('ownershipAlazani') : s === 'takween' ? t('ownershipTakween') : s === 'third_party_f' ? t('ownershipThirdPartyF') : s === 'third_party_partnership_b' ? t('ownershipThirdPartyPartnershipB') : t('ownershipExternalSupplier');
   const regLabel = (s: string | null) => s === 'private_transport' ? t('privateTransport') : s === 'public_transport' ? t('publicTransport') : s === 'heavy_equipment' ? t('heavyEquipment') : '—';
-
-  const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-  const formatDateTime = (iso: string) => new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   async function toggleActive(eq: Equipment) {
     const { error } = await supabase.from('equipment').update({ is_active: !eq.is_active }).eq('id', eq.id);
