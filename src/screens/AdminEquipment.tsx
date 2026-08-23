@@ -66,7 +66,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
 
   const fetchEquipment = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('equipment').select('id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,created_at,updated_at', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
+    let query = supabase.from('equipment').select('id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,created_at,updated_at,lessor:lessors(name)', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
     const term = sanitizeSearchTerm(list.search);
     if (term) {
       query = query.or(`code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`);
@@ -74,7 +74,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
     query = applyListFilters(query, list.filters, new Set(equipmentListConfig.filterFields.map((field) => field.key)));
     const { data, error, count } = await query;
     if (error) console.error(error);
-    setEquipment((data as Equipment[]) ?? []);
+    setEquipment((data as unknown as Equipment[]) ?? []);
     setTotal(count ?? 0);
     setLoading(false);
   }, [list.direction, list.filters, list.page, list.pageSize, list.search, list.sort]);
@@ -346,7 +346,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                     <td className="px-4 py-3 text-muted">{eq.type}</td>
                     <td className="px-4 py-3 text-muted">{eq.plate_number ?? '—'}</td>
                     <td className="px-4 py-3 text-muted">{statusLabel(eq.operational_status)}</td>
-                    <td className="px-4 py-3 text-muted">{ownLabel(eq.ownership_status)}</td>
+                    <td className="px-4 py-3 text-muted">{usesExternalSupplier(eq.ownership_status) && eq.lessor?.name ? `${ownLabel(eq.ownership_status)} - ${eq.lessor.name}` : ownLabel(eq.ownership_status)}</td>
                     <td className="px-4 py-3">{eq.is_active ? t('active') : t('inactive')}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
