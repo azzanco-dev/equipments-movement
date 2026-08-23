@@ -218,8 +218,8 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                         style={{ borderColor: 'var(--border)' }}
                         onClick={onSelectMovement ? () => onSelectMovement(log.id) : undefined}
                       >
-                        <td className="px-4 py-3 font-semibold" dir="ltr">{log.contractor_equipment_code ?? '—'}</td>
-                        <td className="px-4 py-3" dir="ltr">{log.equipment ? `${log.equipment.code} ${log.equipment.type}` : '—'}</td>
+                        <td className="px-4 py-3 font-semibold">{log.contractor_equipment_code ?? '—'}</td>
+                        <td className="px-4 py-3">{log.equipment ? `${log.equipment.code} ${log.equipment.type}` : '—'}</td>
                         <td className="px-4 py-3">
                           <span className={`badge border ${log.movement_type === 'entry' ? 'status-entry' : 'status-exit'}`}>
                             {log.movement_type === 'entry' ? t('entry') : t('exit')}
@@ -294,8 +294,8 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                   <tbody>
                     {visits.map((v) => (
                       <tr key={v.entry_log_id} className="border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
-                        <td className="px-4 py-3 font-semibold" dir="ltr">{v.contractor_equipment_code ?? '—'}</td>
-                        <td className="px-4 py-3" dir="ltr">{v.equipment_code} {v.equipment_type}</td>
+                        <td className="px-4 py-3 font-semibold">{v.contractor_equipment_code ?? '—'}</td>
+                        <td className="px-4 py-3">{v.equipment_code} {v.equipment_type}</td>
                         <td className="px-4 py-3">{v.driver_name ?? '—'}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(v.entry_recorded_at)}</td>
                         <td className="px-4 py-3">{v.entry_supervisor_name ?? '—'}</td>
