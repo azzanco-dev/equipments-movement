@@ -150,6 +150,7 @@ export interface EntryExitPhoto {
 
 export interface LastMovement {
   movement_type: MovementType;
+  movement_context: 'site' | 'workshop';
   recorded_at: string;
   supervisor_id: string;
   company_id: string | null;

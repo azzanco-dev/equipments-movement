@@ -540,7 +540,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                   {currentStatus === 'inside' ? (
                     <>
                       <CheckCircle size={16} className="text-green-600 dark:text-green-400" />
-                      <span>{t('currentStatus')}: {t('insideSite')}</span>
+                      <span>{t('currentStatus')}: {t(lastMovement?.movement_context === 'workshop' ? 'insideWorkshop' : 'insideSite')}</span>
                     </>
                   ) : currentStatus === 'outside' ? (
                     <>
