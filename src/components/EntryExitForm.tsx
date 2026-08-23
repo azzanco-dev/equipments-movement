@@ -247,11 +247,14 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
 
   const createQuickEquipment = async () => {
     if (!quickEquipment.plate.trim()) { setSaveError('رقم اللوحة مطلوب.'); return; }
-    if (!quickEquipment.ownerName.trim() || !quickEquipment.ownerMobile.trim()) { setSaveError(t('lessorRequiredForOwnership')); return; }
     setQuickSaving(true); setSaveError(null);
-    const lessorResult = await supabase.rpc('quick_create_lessor', { p_name: quickEquipment.ownerName.trim(), p_mobile_number: quickEquipment.ownerMobile.trim() });
-    if (lessorResult.error || !lessorResult.data) { setQuickSaving(false); setSaveError(t('saveFailed')); return; }
-    const lessorId = (lessorResult.data as Lessor).id;
+    let lessorId: string | null = null;
+    if (quickEquipment.ownerName || quickEquipment.ownerMobile) {
+      if (!quickEquipment.ownerName.trim() || !quickEquipment.ownerMobile.trim()) { setQuickSaving(false); setSaveError(t('externalSupplierPairRequired')); return; }
+      const lessorResult = await supabase.rpc('quick_create_lessor', { p_name: quickEquipment.ownerName.trim(), p_mobile_number: quickEquipment.ownerMobile.trim() });
+      if (lessorResult.error || !lessorResult.data) { setQuickSaving(false); setSaveError(t('saveFailed')); return; }
+      lessorId = (lessorResult.data as Lessor).id;
+    }
     const { data, error } = await supabase.rpc('quick_create_equipment', { p_plate_number: quickEquipment.plate.trim(), p_lessor_id: lessorId });
     setQuickSaving(false);
     if (error || !data) { setSaveError(t('saveFailed')); return; }
@@ -488,8 +491,8 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
             {quickEquipment.open && <div className="rounded-lg border p-4 text-start space-y-3" style={{ borderColor: 'var(--border)' }}>
               <p className="font-semibold">إضافة معدة سريعة</p>
               <div><label className="label">{t('plateNumber')} *</label><input className="input" placeholder={t('plateNumberPlaceholder')} value={quickEquipment.plate} onChange={(event) => setQuickEquipment({ ...quickEquipment, plate: event.target.value })} /></div>
-              <p className="text-xs text-muted">المعدة المضافة برقم اللوحة تُسجل كمورد خارجي، لذلك بيانات المؤجّر مطلوبة.</p>
-              <div className="grid gap-3 sm:grid-cols-2"><div><label className="label">{t('lessor')} *</label><input className="input" placeholder={t('lessorNamePlaceholder')} value={quickEquipment.ownerName} onChange={(event) => setQuickEquipment({ ...quickEquipment, ownerName: event.target.value })} /></div><div><label className="label">{t('mobileNumber')} *</label><input className="input" dir="ltr" placeholder={t('mobileNumberPlaceholder')} value={quickEquipment.ownerMobile} onChange={(event) => setQuickEquipment({ ...quickEquipment, ownerMobile: event.target.value })} /></div></div>
+              <p className="text-xs text-muted">{t('externalSupplierOptionalHelp')}</p>
+              <div className="grid gap-3 sm:grid-cols-2"><div><label className="label">{t('externalSupplier')}</label><input className="input" placeholder={t('lessorNamePlaceholder')} value={quickEquipment.ownerName} onChange={(event) => setQuickEquipment({ ...quickEquipment, ownerName: event.target.value })} /></div><div><label className="label">{t('mobileNumber')}</label><input className="input" dir="ltr" placeholder={t('mobileNumberPlaceholder')} value={quickEquipment.ownerMobile} onChange={(event) => setQuickEquipment({ ...quickEquipment, ownerMobile: event.target.value })} /></div></div>
               <div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setQuickEquipment({ open: false, plate: '', ownerName: '', ownerMobile: '' })}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={quickSaving} onClick={createQuickEquipment}>{quickSaving ? t('saving') : t('save')}</button></div>
             </div>}
           </div>

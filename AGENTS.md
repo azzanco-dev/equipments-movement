@@ -57,9 +57,9 @@
 
 ## Equipment ownership
 
-- `ownership_status` is presented as “Ownership Classification”: Al-Azani, Takween, third-party F, third-party B, or external supplier.
+- `ownership_status` is presented as “Owner”: Al-Azani, Takween, third-party F, third-party B, or Other Owner (`external_supplier`).
 - Ownership state is derived, not independently edited: Al-Azani is owned; every other classification is rented.
-- A lessor is required for third-party F, third-party B, and external-supplier equipment. Al-Azani and Takween do not use a lessor selection.
+- The external supplier selector appears only for Other Owner and is optional. Every other owner choice clears `lessor_id`.
 - Equipment code prefixes suggest classification in the UI: `A` → Al-Azani, `TK` → Takween, `F` → third-party F, `B` → third-party B, otherwise external supplier. Database fields remain the source of truth.
 
 ## Unified list architecture

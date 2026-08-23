@@ -1,13 +1,7 @@
 import type { OwnershipStatus } from '@/lib/types';
 
-const LESSOR_REQUIRED = new Set<OwnershipStatus>([
-  'third_party_f',
-  'third_party_partnership_b',
-  'external_supplier',
-]);
-
-export function requiresLessor(status: OwnershipStatus): boolean {
-  return LESSOR_REQUIRED.has(status);
+export function usesExternalSupplier(status: OwnershipStatus): boolean {
+  return status === 'external_supplier';
 }
 
 export function isOwnedEquipment(status: OwnershipStatus): boolean {

@@ -18,7 +18,7 @@ import { DataListPagination } from '@/components/data-list/DataListPagination';
 import { useDataListState } from '@/components/data-list/useDataListState';
 import { equipmentListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
-import { inferOwnershipFromCode, isOwnedEquipment, requiresLessor } from '@/lib/equipmentOwnership';
+import { inferOwnershipFromCode, usesExternalSupplier } from '@/lib/equipmentOwnership';
 
 function genQrValue(): string {
   return `EQ-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -118,16 +118,12 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
   }
 
   async function handleSave() {
-    if (requiresLessor(form.ownership_status) && !form.lessor_id) {
-      setFormError(t('lessorRequiredForOwnership'));
-      return;
-    }
     setSaving(true); setFormError(null);
     try {
       const payload = {
         code: form.code, type: form.type, plate_number: form.plate_number || null,
         operational_status: form.operational_status, ownership_status: form.ownership_status,
-        project_id: form.project_id || null, lessor_id: requiresLessor(form.ownership_status) ? form.lessor_id : null,
+        project_id: form.project_id || null, lessor_id: usesExternalSupplier(form.ownership_status) ? (form.lessor_id || null) : null,
         brand: form.brand || null, model: form.model || null,
         manufacture_year: form.manufacture_year ? parseInt(form.manufacture_year) : null,
         chassis_number: form.chassis_number || null,
@@ -195,11 +191,8 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
         if (row.project_name && !projectMap.has(row.project_name.toLowerCase())) {
           row._errors.push(t('projectNotFound'));
         }
-        if (row.lessor_name && !lessorMap.has(row.lessor_name.toLowerCase())) {
+        if (usesExternalSupplier(row.ownership_status) && row.lessor_name && !lessorMap.has(row.lessor_name.toLowerCase())) {
           row._errors.push(t('lessorNotFound'));
-        }
-        if (requiresLessor(row.ownership_status) && !row.lessor_name) {
-          row._errors.push(t('lessorRequiredForOwnership'));
         }
       }
 
@@ -243,7 +236,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
       operational_status: r.operational_status,
       ownership_status: r.ownership_status,
       project_id: r.project_name ? (projectMap.get(r.project_name.toLowerCase()) ?? null) : null,
-      lessor_id: r.lessor_name ? (lessorMap.get(r.lessor_name.toLowerCase()) ?? null) : null,
+      lessor_id: usesExternalSupplier(r.ownership_status) && r.lessor_name ? (lessorMap.get(r.lessor_name.toLowerCase()) ?? null) : null,
       brand: r.brand,
       model: r.model,
       manufacture_year: r.manufacture_year,
@@ -287,15 +280,13 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
 
   const statusLabel = (s: OperationalStatus) => s === 'operational' ? t('operational') : s === 'maintenance' ? t('maintenance') : t('stopped');
   const ownLabel = (s: OwnershipStatus) => s === 'alazani' ? t('ownershipAlazani') : s === 'takween' ? t('ownershipTakween') : s === 'third_party_f' ? t('ownershipThirdPartyF') : s === 'third_party_partnership_b' ? t('ownershipThirdPartyPartnershipB') : t('ownershipExternalSupplier');
-  const ownershipStateLabel = (s: OwnershipStatus) => isOwnedEquipment(s) ? t('owned') : t('rented');
-
   function updateCode(code: string) {
     const inferred = inferOwnershipFromCode(code);
     setForm((current) => inferred ? {
       ...current,
       code,
       ownership_status: inferred,
-      lessor_id: requiresLessor(inferred) ? current.lessor_id : '',
+      lessor_id: usesExternalSupplier(inferred) ? current.lessor_id : '',
     } : { ...current, code });
   }
 
@@ -303,7 +294,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
     setForm((current) => ({
       ...current,
       ownership_status: status,
-      lessor_id: requiresLessor(status) ? current.lessor_id : '',
+      lessor_id: usesExternalSupplier(status) ? current.lessor_id : '',
     }));
   }
 
@@ -417,10 +408,6 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
             />
           </div>
           <div>
-            <label className="label">{t('ownershipState')}</label>
-            <div className="input flex items-center bg-gray-50 dark:bg-gray-900/30">{ownershipStateLabel(form.ownership_status)}</div>
-          </div>
-          <div>
             <label className="label">{t('registrationType')}</label>
             <Select
               value={form.registration_type}
@@ -448,8 +435,8 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
               ]}
             />
           </div>
-          {requiresLessor(form.ownership_status) && <div>
-            <label className="label">{t('lessor')} *</label>
+          {usesExternalSupplier(form.ownership_status) && <div>
+            <label className="label">{t('externalSupplier')}</label>
             <Select
               value={form.lessor_id}
               onChange={(v) => setForm({ ...form, lessor_id: v })}

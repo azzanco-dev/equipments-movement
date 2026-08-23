@@ -6,7 +6,7 @@ import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { ArrowLeft, Edit2, Power, Printer, Calendar, Truck, Building2, Wrench, FileText } from 'lucide-react';
 import type { Equipment, EntryExitLog, OperationalStatus, OwnershipStatus } from '@/lib/types';
 import { PageHeader } from '@/components/PageHeader';
-import { isOwnedEquipment, requiresLessor } from '@/lib/equipmentOwnership';
+import { isOwnedEquipment, usesExternalSupplier } from '@/lib/equipmentOwnership';
 
 interface EquipmentDetailProps {
   equipmentId: string;
@@ -115,7 +115,7 @@ export function EquipmentDetail({ equipmentId, onBack, onEdit, onSelectMovement,
               <InfoItem label={t('chassisNumber')} value={equipment.chassis_number} />
               <InfoItem label={t('registrationType')} value={regLabel(equipment.registration_type)} />
               <InfoItem label={t('project')} value={equipment.project ? `${equipment.project.name_ar} — ${equipment.project.name_en}` : undefined} />
-              {requiresLessor(equipment.ownership_status) && <InfoItem label={t('lessor')} value={equipment.lessor?.name ?? t('missingLessor')} />}
+              {usesExternalSupplier(equipment.ownership_status) && <InfoItem label={t('externalSupplier')} value={equipment.lessor?.name} />}
               <InfoItem icon={<Calendar size={16} />} label={t('lastMaintenanceDate')} value={equipment.last_maintenance_date ? formatDate(equipment.last_maintenance_date) : null} />
               <InfoItem icon={<Calendar size={16} />} label={t('registrationExpiry')} value={equipment.registration_expiry ? formatDate(equipment.registration_expiry) : null} />
               <InfoItem icon={<Calendar size={16} />} label={t('insuranceExpiry')} value={equipment.insurance_expiry ? formatDate(equipment.insurance_expiry) : null} />
