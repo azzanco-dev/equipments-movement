@@ -6,6 +6,7 @@ import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { ArrowLeft, Edit2, Power, Printer, Calendar, Truck, Building2, Wrench, FileText } from 'lucide-react';
 import type { Equipment, EntryExitLog, OperationalStatus, OwnershipStatus } from '@/lib/types';
 import { PageHeader } from '@/components/PageHeader';
+import { isOwnedEquipment, requiresLessor } from '@/lib/equipmentOwnership';
 
 interface EquipmentDetailProps {
   equipmentId: string;
@@ -107,13 +108,14 @@ export function EquipmentDetail({ equipmentId, onBack, onEdit, onSelectMovement,
               <InfoItem icon={<Truck size={16} />} label={t('plateNumber')} value={equipment.plate_number} />
               <InfoItem icon={<Wrench size={16} />} label={t('operationalStatus')} value={statusLabel(equipment.operational_status)} />
               <InfoItem icon={<Building2 size={16} />} label={t('ownershipStatus')} value={ownLabel(equipment.ownership_status)} />
+              <InfoItem label={t('ownershipState')} value={isOwnedEquipment(equipment.ownership_status) ? t('owned') : t('rented')} />
               <InfoItem label={t('brand')} value={equipment.brand} />
               <InfoItem label={t('model')} value={equipment.model} />
               <InfoItem label={t('manufactureYear')} value={equipment.manufacture_year?.toString()} />
               <InfoItem label={t('chassisNumber')} value={equipment.chassis_number} />
               <InfoItem label={t('registrationType')} value={regLabel(equipment.registration_type)} />
               <InfoItem label={t('project')} value={equipment.project ? `${equipment.project.name_ar} — ${equipment.project.name_en}` : undefined} />
-              <InfoItem label={t('lessor')} value={equipment.lessor?.name} />
+              {requiresLessor(equipment.ownership_status) && <InfoItem label={t('lessor')} value={equipment.lessor?.name ?? t('missingLessor')} />}
               <InfoItem icon={<Calendar size={16} />} label={t('lastMaintenanceDate')} value={equipment.last_maintenance_date ? formatDate(equipment.last_maintenance_date) : null} />
               <InfoItem icon={<Calendar size={16} />} label={t('registrationExpiry')} value={equipment.registration_expiry ? formatDate(equipment.registration_expiry) : null} />
               <InfoItem icon={<Calendar size={16} />} label={t('insuranceExpiry')} value={equipment.insurance_expiry ? formatDate(equipment.insurance_expiry) : null} />

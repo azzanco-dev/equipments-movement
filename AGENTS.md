@@ -32,7 +32,7 @@
 - Reject `ENTRY → ENTRY`, `EXIT → EXIT`, and `EXIT` without a preceding valid `ENTRY`.
 - Ordering is deterministic by `(recorded_at, id)`, including historical insertion and identical timestamps.
 - Preserve per-equipment concurrency protection; do not replace database locking with frontend state.
-- ENTRY requires equipment, independent company and project selections, driver, and actual movement time. `company_projects` remains for future use and must not restrict current ENTRY creation.
+- ENTRY requires equipment, independent company and project selections, driver, and an actual movement date. The UI selects the date only and applies the current local time internally when saving. `company_projects` remains for future use and must not restrict current ENTRY creation.
 - EXIT inherits company, project, contractor equipment code, and driver context from the corresponding latest valid ENTRY; inherited values are not manually editable.
 - Store `driver_id` plus the `driver_name` snapshot. Legacy rows with only `driver_name` must keep displaying correctly.
 - `registration_method`, `odometer_reading`, and legacy `photo_url` remain in the database for compatibility, but registration method and odometer are not part of the current movement UI.
@@ -54,6 +54,13 @@
 - Nationality and employment type values are controlled by database checks; update frontend lists and database constraints together.
 - Quick Create creates real relational records and auto-selects them. Keep its database functions narrowly scoped; it must not grant supervisors unrestricted master-data CRUD.
 - Duplicate checks use driver mobile/ID, equipment plate number, and lessor name/mobile as appropriate.
+
+## Equipment ownership
+
+- `ownership_status` is presented as “Ownership Classification”: Al-Azani, Takween, third-party F, third-party B, or external supplier.
+- Ownership state is derived, not independently edited: Al-Azani is owned; every other classification is rented.
+- A lessor is required for third-party F, third-party B, and external-supplier equipment. Al-Azani and Takween do not use a lessor selection.
+- Equipment code prefixes suggest classification in the UI: `A` → Al-Azani, `TK` → Takween, `F` → third-party F, `B` → third-party B, otherwise external supplier. Database fields remain the source of truth.
 
 ## Unified list architecture
 

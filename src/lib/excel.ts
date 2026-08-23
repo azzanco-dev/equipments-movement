@@ -46,7 +46,7 @@ const OWN_STATUS_MAP: Record<string, OwnershipStatus> = {
   'alazani': 'alazani', 'عزاني': 'alazani', 'العزاني': 'alazani', 'عبدالله العزاني': 'alazani',
   'takween': 'takween', 'تكوين': 'takween',
   'third_party_f': 'third_party_f', 'مملوكة للغير f': 'third_party_f', 'غير f': 'third_party_f',
-  'third_party_partnership_b': 'third_party_partnership_b', 'مملوكة للغير شراكة b': 'third_party_partnership_b', 'شراكة b': 'third_party_partnership_b',
+  'third_party_partnership_b': 'third_party_partnership_b', 'مملوكة للغير b': 'third_party_partnership_b', 'مملوكة للغير شراكة b': 'third_party_partnership_b', 'شراكة b': 'third_party_partnership_b',
   'external_supplier': 'external_supplier', 'مورد خارجي': 'external_supplier', 'مورد': 'external_supplier',
 };
 

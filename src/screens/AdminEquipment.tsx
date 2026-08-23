@@ -18,6 +18,7 @@ import { DataListPagination } from '@/components/data-list/DataListPagination';
 import { useDataListState } from '@/components/data-list/useDataListState';
 import { equipmentListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
+import { inferOwnershipFromCode, isOwnedEquipment, requiresLessor } from '@/lib/equipmentOwnership';
 
 function genQrValue(): string {
   return `EQ-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -65,7 +66,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
 
   const fetchEquipment = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('equipment').select('id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,created_at,updated_at', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
+    let query = supabase.from('equipment').select('id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,created_at,updated_at,lessor:lessors(id,name,contact_person,contact_number,created_at)', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
     const term = sanitizeSearchTerm(list.search);
     if (term) {
       query = query.or(`code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`);
@@ -73,7 +74,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
     query = applyListFilters(query, list.filters, new Set(equipmentListConfig.filterFields.map((field) => field.key)));
     const { data, error, count } = await query;
     if (error) console.error(error);
-    setEquipment((data as Equipment[]) ?? []);
+    setEquipment((data as unknown as Equipment[]) ?? []);
     setTotal(count ?? 0);
     setLoading(false);
   }, [list.direction, list.filters, list.page, list.pageSize, list.search, list.sort]);
@@ -117,12 +118,16 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
   }
 
   async function handleSave() {
+    if (requiresLessor(form.ownership_status) && !form.lessor_id) {
+      setFormError(t('lessorRequiredForOwnership'));
+      return;
+    }
     setSaving(true); setFormError(null);
     try {
       const payload = {
         code: form.code, type: form.type, plate_number: form.plate_number || null,
         operational_status: form.operational_status, ownership_status: form.ownership_status,
-        project_id: form.project_id || null, lessor_id: form.lessor_id || null,
+        project_id: form.project_id || null, lessor_id: requiresLessor(form.ownership_status) ? form.lessor_id : null,
         brand: form.brand || null, model: form.model || null,
         manufacture_year: form.manufacture_year ? parseInt(form.manufacture_year) : null,
         chassis_number: form.chassis_number || null,
@@ -192,6 +197,9 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
         }
         if (row.lessor_name && !lessorMap.has(row.lessor_name.toLowerCase())) {
           row._errors.push(t('lessorNotFound'));
+        }
+        if (requiresLessor(row.ownership_status) && !row.lessor_name) {
+          row._errors.push(t('lessorRequiredForOwnership'));
         }
       }
 
@@ -279,6 +287,25 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
 
   const statusLabel = (s: OperationalStatus) => s === 'operational' ? t('operational') : s === 'maintenance' ? t('maintenance') : t('stopped');
   const ownLabel = (s: OwnershipStatus) => s === 'alazani' ? t('ownershipAlazani') : s === 'takween' ? t('ownershipTakween') : s === 'third_party_f' ? t('ownershipThirdPartyF') : s === 'third_party_partnership_b' ? t('ownershipThirdPartyPartnershipB') : t('ownershipExternalSupplier');
+  const ownershipStateLabel = (s: OwnershipStatus) => isOwnedEquipment(s) ? t('owned') : t('rented');
+
+  function updateCode(code: string) {
+    const inferred = inferOwnershipFromCode(code);
+    setForm((current) => inferred ? {
+      ...current,
+      code,
+      ownership_status: inferred,
+      lessor_id: requiresLessor(inferred) ? current.lessor_id : '',
+    } : { ...current, code });
+  }
+
+  function updateOwnership(status: OwnershipStatus) {
+    setForm((current) => ({
+      ...current,
+      ownership_status: status,
+      lessor_id: requiresLessor(status) ? current.lessor_id : '',
+    }));
+  }
 
   return (
     <div ref={listTopRef} className="space-y-4 scroll-mt-20">
@@ -310,6 +337,8 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                   <th className="table-header text-start px-4 py-3">
                     <span>{t('ownershipStatus')}</span>
                   </th>
+                  <th className="table-header text-start px-4 py-3">{t('ownershipState')}</th>
+                  <th className="table-header text-start px-4 py-3">{t('lessor')}</th>
                   <th className="table-header text-start px-4 py-3">
                     <span>{t('isActive')}</span>
                   </th>
@@ -329,6 +358,8 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                     <td className="px-4 py-3 text-muted">{eq.plate_number ?? '—'}</td>
                     <td className="px-4 py-3 text-muted">{statusLabel(eq.operational_status)}</td>
                     <td className="px-4 py-3 text-muted">{ownLabel(eq.ownership_status)}</td>
+                    <td className="px-4 py-3 text-muted">{ownershipStateLabel(eq.ownership_status)}</td>
+                    <td className={`px-4 py-3 ${requiresLessor(eq.ownership_status) && !eq.lessor ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted'}`}>{requiresLessor(eq.ownership_status) ? (eq.lessor?.name ?? t('missingLessor')) : '—'}</td>
                     <td className="px-4 py-3">{eq.is_active ? t('active') : t('inactive')}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -350,7 +381,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? t('editEquipment') : t('addEquipment')} size="lg">
         {formError && <div className="mb-4"><Alert type="error">{formError}</Alert></div>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label className="label">{t('equipmentCode')} *</label><input className="input" dir="ltr" placeholder={t('equipmentCodePlaceholder')} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} /></div>
+          <div><label className="label">{t('equipmentCode')} *</label><input className="input" dir="ltr" placeholder={t('equipmentCodePlaceholder')} value={form.code} onChange={(e) => updateCode(e.target.value)} /></div>
           <div><label className="label">{t('equipmentType')} *</label><input className="input" placeholder={t('equipmentTypePlaceholder')} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} /></div>
           <div className="sm:col-span-2">
             <label className="label">{t('plateNumber')}</label>
@@ -379,7 +410,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
             <label className="label">{t('ownershipStatus')}</label>
             <Select
               value={form.ownership_status}
-              onChange={(v) => setForm({ ...form, ownership_status: v as OwnershipStatus })}
+              onChange={(v) => updateOwnership(v as OwnershipStatus)}
               options={[
                 { value: 'alazani', label: t('ownershipAlazani') },
                 { value: 'takween', label: t('ownershipTakween') },
@@ -388,6 +419,10 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                 { value: 'external_supplier', label: t('ownershipExternalSupplier') },
               ]}
             />
+          </div>
+          <div>
+            <label className="label">{t('ownershipState')}</label>
+            <div className="input flex items-center bg-gray-50 dark:bg-gray-900/30">{ownershipStateLabel(form.ownership_status)}</div>
           </div>
           <div>
             <label className="label">{t('registrationType')}</label>
@@ -417,8 +452,8 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
               ]}
             />
           </div>
-          <div>
-            <label className="label">{t('lessor')}</label>
+          {requiresLessor(form.ownership_status) && <div>
+            <label className="label">{t('lessor')} *</label>
             <Select
               value={form.lessor_id}
               onChange={(v) => setForm({ ...form, lessor_id: v })}
@@ -430,7 +465,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                 ...lessors.map((l) => ({ value: l.id, label: l.name })),
               ]}
             />
-          </div>
+          </div>}
           <div><label className="label">{t('lastMaintenanceDate')}</label><DatePicker value={form.last_maintenance_date} onChange={(v) => setForm({ ...form, last_maintenance_date: v })} /></div>
           <div><label className="label">{t('registrationExpiry')}</label><DatePicker value={form.registration_expiry} onChange={(v) => setForm({ ...form, registration_expiry: v })} /></div>
           <div><label className="label">{t('insuranceExpiry')}</label><DatePicker value={form.insurance_expiry} onChange={(v) => setForm({ ...form, insurance_expiry: v })} /></div>
