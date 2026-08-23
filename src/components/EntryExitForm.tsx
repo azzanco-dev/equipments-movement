@@ -653,7 +653,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
 
               <div>
                 <label className="label">{t('actualMovementTime')}</label>
-                <div className="max-w-sm">
+                <div className="max-w">
                   <DatePicker
                     value={movementDate}
                     onChange={updateMovementDate}
@@ -666,7 +666,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
               <div>
                 <label className="label">{t('notes')}</label>
                 <textarea
-                  className="input min-h-20 resize-none"
+                  className="input min-h-20 resize-none p-2"
                   value={notes}
                   placeholder={t('notesPlaceholder')}
                   onChange={(e) => setNotes(e.target.value)}
