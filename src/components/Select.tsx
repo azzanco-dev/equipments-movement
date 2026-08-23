@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Search } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nContext';
 
@@ -22,11 +23,29 @@ export function Select({ value, onChange, options, placeholder, className = '', 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, width: 0, maxHeight: 240 });
+
+  const updateMenuPosition = useCallback(() => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    const gap = 4;
+    const availableBelow = window.innerHeight - rect.bottom - gap;
+    const availableAbove = rect.top - gap;
+    const openAbove = availableBelow < 180 && availableAbove > availableBelow;
+    const maxHeight = Math.max(100, Math.min(240, openAbove ? availableAbove : availableBelow));
+    setMenuPosition({
+      top: openAbove ? rect.top - gap : rect.bottom + gap,
+      left: rect.left,
+      width: rect.width,
+      maxHeight,
+    });
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (ref.current && !ref.current.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node)) {
         setOpen(false);
         setQuery('');
       }
@@ -34,6 +53,17 @@ export function Select({ value, onChange, options, placeholder, className = '', 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
 
   useEffect(() => {
     if (open && searchable && searchRef.current) {
@@ -52,7 +82,7 @@ export function Select({ value, onChange, options, placeholder, className = '', 
     <div ref={ref} className={`relative ${className}`}>
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => { if (!open) updateMenuPosition(); setOpen(!open); }}
         className={`w-full flex items-center justify-between gap-2 rounded-lg border bg-transparent outline-none transition-colors focus:border-black dark:focus:border-white ${
           'h-8 px-3 py-0 text-sm'
         }`}
@@ -65,10 +95,20 @@ export function Select({ value, onChange, options, placeholder, className = '', 
         />
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
-          className="absolute z-50 mt-1 w-full rounded-lg border shadow-lg animate-fade-in"
-          style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}
+          ref={menuRef}
+          className="fixed z-[100] rounded-lg border shadow-lg animate-fade-in"
+          dir={document.documentElement.dir || 'rtl'}
+          style={{
+            background: 'var(--bg)',
+            borderColor: 'var(--border)',
+            left: menuPosition.left,
+            width: menuPosition.width,
+            ...(menuPosition.top < (ref.current?.getBoundingClientRect().top ?? 0)
+              ? { bottom: window.innerHeight - menuPosition.top }
+              : { top: menuPosition.top }),
+          }}
         >
           {searchable && (
             <div className="relative border-b" style={{ borderColor: 'var(--border)' }}>
@@ -83,7 +123,7 @@ export function Select({ value, onChange, options, placeholder, className = '', 
               />
             </div>
           )}
-          <div className="max-h-60 overflow-auto">
+          <div className="overflow-auto" style={{ maxHeight: menuPosition.maxHeight }}>
             {filtered.length === 0 ? (
               <div className="px-3.5 py-2 text-sm text-muted">—</div>
             ) : (
@@ -108,7 +148,8 @@ export function Select({ value, onChange, options, placeholder, className = '', 
               ))
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
