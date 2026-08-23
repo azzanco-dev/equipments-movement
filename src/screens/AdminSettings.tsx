@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
-import { Download, Edit2, Plus, Trash2, Upload } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Edit2, List, Plus, Trash2, Upload } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/i18n/I18nContext';
 import { PageHeader } from '@/components/PageHeader';
@@ -14,8 +15,12 @@ const PAGE_SIZE = 20;
 
 export function AdminSettings() {
   const { t } = useI18n();
+  const router = useRouter();
+  const pathname = usePathname();
+  const showEquipmentTypes = pathname === '/settings/equipment-types';
   const [rows, setRows] = useState<EquipmentTypeRow[]>([]);
   const [total, setTotal] = useState(0);
+  const [typesCount, setTypesCount] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -36,7 +41,11 @@ export function AdminSettings() {
     setLoading(false);
   }, [page, search]);
 
-  useEffect(() => { fetchRows(); }, [fetchRows]);
+  useEffect(() => {
+    supabase.from('equipment_types').select('id', { count: 'exact', head: true }).then(({ count }) => setTypesCount(count ?? 0));
+  }, []);
+
+  useEffect(() => { if (showEquipmentTypes) fetchRows(); }, [fetchRows, showEquipmentTypes]);
 
   const openCreate = () => { setEditing(null); setName(''); setError(null); setModalOpen(true); };
   const openEdit = (row: EquipmentTypeRow) => { setEditing(row); setName(row.name); setError(null); setModalOpen(true); };
@@ -85,8 +94,24 @@ export function AdminSettings() {
     }
   }
 
-  return <div className="space-y-4">
+  if (!showEquipmentTypes) return <div className="space-y-4">
     <PageHeader title={t('settings')} description={t('settingsDesc')} />
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <button type="button" onClick={() => router.push('/settings/equipment-types')} className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-gray-100 dark:hover:bg-gray-800">
+        <div className="mb-4 flex w-full items-start justify-between gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg border" style={{ borderColor: 'var(--border)' }}><List size={18} /></span>
+          <ChevronRight size={18} className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip" />
+        </div>
+        <h2 className="font-semibold">{t('equipmentTypes')}</h2>
+        <p className="mt-1 text-sm text-muted">{t('equipmentTypesDesc')}</p>
+        <p className="mt-auto pt-4 text-xs text-muted">{typesCount === null ? t('loading') : t('itemsCount').replace('{count}', String(typesCount))}</p>
+      </button>
+    </div>
+  </div>;
+
+  return <div className="space-y-4">
+    <button className="btn-ghost" onClick={() => router.push('/settings')}><ChevronLeft size={16} className="rtl-flip" />{t('backToSettings')}</button>
+    <PageHeader title={t('equipmentTypes')} description={t('equipmentTypesDesc')} />
     {error && <Alert type="error">{error}</Alert>}
     <div className="card space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
