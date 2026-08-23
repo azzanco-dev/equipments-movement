@@ -66,7 +66,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
 
   const fetchEquipment = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('equipment').select('id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,created_at,updated_at,lessor:lessors(id,name,contact_person,contact_number,created_at)', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
+    let query = supabase.from('equipment').select('id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,created_at,updated_at', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
     const term = sanitizeSearchTerm(list.search);
     if (term) {
       query = query.or(`code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`);
@@ -74,7 +74,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
     query = applyListFilters(query, list.filters, new Set(equipmentListConfig.filterFields.map((field) => field.key)));
     const { data, error, count } = await query;
     if (error) console.error(error);
-    setEquipment((data as unknown as Equipment[]) ?? []);
+    setEquipment((data as Equipment[]) ?? []);
     setTotal(count ?? 0);
     setLoading(false);
   }, [list.direction, list.filters, list.page, list.pageSize, list.search, list.sort]);
@@ -337,8 +337,6 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                   <th className="table-header text-start px-4 py-3">
                     <span>{t('ownershipStatus')}</span>
                   </th>
-                  <th className="table-header text-start px-4 py-3">{t('ownershipState')}</th>
-                  <th className="table-header text-start px-4 py-3">{t('lessor')}</th>
                   <th className="table-header text-start px-4 py-3">
                     <span>{t('isActive')}</span>
                   </th>
@@ -358,8 +356,6 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                     <td className="px-4 py-3 text-muted">{eq.plate_number ?? '—'}</td>
                     <td className="px-4 py-3 text-muted">{statusLabel(eq.operational_status)}</td>
                     <td className="px-4 py-3 text-muted">{ownLabel(eq.ownership_status)}</td>
-                    <td className="px-4 py-3 text-muted">{ownershipStateLabel(eq.ownership_status)}</td>
-                    <td className={`px-4 py-3 ${requiresLessor(eq.ownership_status) && !eq.lessor ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted'}`}>{requiresLessor(eq.ownership_status) ? (eq.lessor?.name ?? t('missingLessor')) : '—'}</td>
                     <td className="px-4 py-3">{eq.is_active ? t('active') : t('inactive')}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
