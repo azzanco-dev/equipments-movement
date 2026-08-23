@@ -84,7 +84,7 @@
 ## UI conventions
 
 - Arabic/RTL first, responsive, mobile-friendly, shadcn-style, neutral black/white foundation with restrained functional colors. No gradients.
-- Shared inputs, selects, date/time controls, and standard buttons are 34 px high. Large textareas, image areas, plate UI, and primary scanning areas may remain larger when functionally necessary.
+- Shared inputs, selects, date/time controls, and standard buttons are 32 px high. Standard button text is 13 px at weight 400. Large textareas, image areas, plate UI, and primary scanning areas may remain larger when functionally necessary.
 - Primary actions and active navigation are monochrome: black in light mode and white in dark mode.
 - Use green for ENTRY/success and amber for EXIT/warnings; use red only for errors/destructive actions.
 - Dark theme uses the slightly lifted neutral palette defined in `src/index.css`; keep text contrast accessible.

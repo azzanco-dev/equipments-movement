@@ -68,7 +68,7 @@ export function TimePicker({ value, onChange, className = '', placeholder = '—
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className="flex h-[34px] w-full items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-0 text-sm outline-none transition-colors hover:bg-gray-100 focus:ring-2 focus:ring-gray-200 dark:hover:bg-gray-800 dark:focus:ring-gray-700"
+        className="flex h-8 w-full items-center justify-between gap-2 rounded-md border bg-transparent px-3 py-0 text-sm outline-none transition-colors hover:bg-gray-100 focus:ring-2 focus:ring-gray-200 dark:hover:bg-gray-800 dark:focus:ring-gray-700"
         style={{ borderColor: 'var(--border)' }}
       >
         <span className="flex items-center gap-2">
