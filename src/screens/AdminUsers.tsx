@@ -123,7 +123,7 @@ export function AdminUsers() {
                     <td className="px-4 py-3 font-semibold">{u.full_name}{u.id === currentUser?.id ? ' (You)' : ''}</td>
                     <td className="px-4 py-3">
                       {u.id === currentUser?.id ? (
-                        <span className="text-muted">{u.role === 'admin' ? t('admin') : u.role === 'workshop' ? t('workshopOfficer') : t('supervisor')}</span>
+                        <span className="text-muted">{u.role === 'admin' ? t('admin') : u.role === 'workshop' ? t('workshopOfficer') : u.role === 'workshop_manager' ? t('workshopManager') : t('supervisor')}</span>
                       ) : (
                         <Select
                           compact
@@ -133,6 +133,7 @@ export function AdminUsers() {
                           options={[
                             { value: 'supervisor', label: t('supervisor') },
                             { value: 'workshop', label: t('workshopOfficer') },
+                            { value: 'workshop_manager', label: t('workshopManager') },
                             { value: 'admin', label: t('admin') },
                           ]}
                         />
@@ -164,6 +165,7 @@ export function AdminUsers() {
               options={[
                 { value: 'supervisor', label: t('supervisor') },
                 { value: 'workshop', label: t('workshopOfficer') },
+                { value: 'workshop_manager', label: t('workshopManager') },
                 { value: 'admin', label: t('admin') },
               ]}
             />

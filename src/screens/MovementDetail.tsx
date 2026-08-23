@@ -381,6 +381,13 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
             label={t('equipmentNameLabel')}
             value={log.equipment ? `${log.equipment.code} — ${log.equipment.type}` : '—'}
           />
+          {isWorkshopMovement && isEntry && (
+            <InfoRow
+              icon={<FileText size={16} />}
+              label={t('workshopPurpose')}
+              value={log.workshop_purpose === 'maintenance' ? t('maintenancePurpose') : log.workshop_purpose === 'parking' ? t('parkingPurpose') : t('pendingClassification')}
+            />
+          )}
           {!isWorkshopMovement && (
             <>
               <InfoRow

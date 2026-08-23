@@ -9,6 +9,7 @@ import type { EntryExitLog, MovementType } from '@/lib/types';
 import { Select } from '@/components/Select';
 import { PageHeader } from '@/components/PageHeader';
 import { formatDate } from '@/lib/dateFormat';
+import { Alert } from '@/components/Alert';
 
 export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { onSelectMovement: (id: string) => void; onCreateMovement: (type: MovementType) => void }) {
   const { t } = useI18n();
@@ -17,7 +18,10 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<'all' | MovementType>('all');
   const [filterDate, setFilterDate] = useState('');
-  const workshopMode = profile?.role === 'workshop';
+  const [classificationBusy, setClassificationBusy] = useState<string | null>(null);
+  const [classificationError, setClassificationError] = useState<string | null>(null);
+  const workshopManagerMode = profile?.role === 'workshop_manager';
+  const workshopMode = profile?.role === 'workshop' || workshopManagerMode;
 
   const fetchLogs = useCallback(async () => {
     if (!user) return;
@@ -26,10 +30,11 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
     let query = supabase
       .from('entry_exit_logs')
       .select('*, equipment(*)')
-      .eq('supervisor_id', user.id)
-      .eq('movement_context', profile?.role === 'workshop' ? 'workshop' : 'site')
+      .eq('movement_context', workshopMode ? 'workshop' : 'site')
       .order('recorded_at', { ascending: false })
       .limit(100);
+
+    if (!workshopManagerMode) query = query.eq('supervisor_id', user.id);
 
     if (filterType !== 'all') {
       query = query.eq('movement_type', filterType);
@@ -46,7 +51,16 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
     if (error) console.error(error);
     setLogs((data as EntryExitLog[]) ?? []);
     setLoading(false);
-  }, [user, profile?.role, filterType, filterDate]);
+  }, [user, workshopMode, workshopManagerMode, filterType, filterDate]);
+
+  const classifyEntry = async (logId: string, purpose: string) => {
+    setClassificationBusy(logId);
+    setClassificationError(null);
+    const { error } = await supabase.rpc('classify_workshop_entry', { p_entry_log_id: logId, p_purpose: purpose });
+    setClassificationBusy(null);
+    if (error) { setClassificationError(t('workshopClassificationFailed')); return; }
+    await fetchLogs();
+  };
 
   useEffect(() => {
     fetchLogs();
@@ -55,7 +69,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
   return (
     <div className="space-y-6">
       {/* Header */}
-      <PageHeader title={t('dashboard')} description={t('supervisorDashboardDesc')} />
+      <PageHeader title={t('dashboard')} description={workshopManagerMode ? t('workshopManagerDashboardDesc') : t('supervisorDashboardDesc')} />
 
       {/* Action buttons */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
@@ -115,7 +129,8 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
 
       {/* Recent logs */}
       <div>
-        <h2 className="text-lg font-bold mb-3">{t('recentLogs')}</h2>
+        <h2 className="text-lg font-bold mb-3">{workshopManagerMode ? t('recentWorkshopLogs') : t('recentLogs')}</h2>
+        {classificationError && <div className="mb-3"><Alert type="error">{classificationError}</Alert></div>}
 
         {loading ? (
           <InlineSpinner label={t('loading')} />
@@ -132,6 +147,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
                     <th className="table-header text-start px-4 py-3">{workshopMode ? t('equipmentCodeLabel') : t('contractorEquipmentCode')}</th>
                     <th className="table-header text-start px-4 py-3">{t('equipmentNameLabel')}</th>
                     <th className="table-header text-start px-4 py-3">{t('movementType')}</th>
+                    {workshopManagerMode && <th className="table-header text-start px-4 py-3">{t('workshopPurpose')}</th>}
                     {!workshopMode && <th className="table-header text-start px-4 py-3">{t('driverName')}</th>}
                     <th className="table-header text-start px-4 py-3">{t('recordedAt')}</th>
                   </tr>
@@ -151,6 +167,23 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
                           {log.movement_type === 'entry' ? t('entry') : t('exit')}
                         </span>
                       </td>
+                      {workshopManagerMode && (
+                        <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+                          {log.movement_type === 'entry' ? (
+                            <Select
+                              compact
+                              className={`min-w-[130px] ${classificationBusy === log.id ? 'pointer-events-none opacity-60' : ''}`}
+                              value={log.workshop_purpose ?? ''}
+                              onChange={(value) => classifyEntry(log.id, value)}
+                              options={[
+                                ...(log.workshop_purpose ? [] : [{ value: '', label: t('pendingClassification') }]),
+                                { value: 'maintenance', label: t('maintenancePurpose') },
+                                { value: 'parking', label: t('parkingPurpose') },
+                              ]}
+                            />
+                          ) : '—'}
+                        </td>
+                      )}
                       {!workshopMode && <td className="px-4 py-3">{log.driver_name ?? '—'}</td>}
                       <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(log.recorded_at)}</td>
                     </tr>

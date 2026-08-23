@@ -68,7 +68,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
   const [quickSaving, setQuickSaving] = useState(false);
 
   const isEntry = movementType === 'entry';
-  const workshopMode = profile?.role === 'workshop';
+  const workshopMode = profile?.role === 'workshop' || profile?.role === 'workshop_manager';
   const currentLocalDateTime = toLocalDateTimeInput(new Date());
   const movementDate = recordedAt.slice(0, 10);
 

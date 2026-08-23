@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'supervisor' | 'workshop';
+export type UserRole = 'admin' | 'supervisor' | 'workshop' | 'workshop_manager';
 
 export type OperationalStatus = 'operational' | 'maintenance' | 'stopped';
 export type OwnershipStatus = 'alazani' | 'takween' | 'third_party_f' | 'third_party_partnership_b' | 'external_supplier';
@@ -80,6 +80,7 @@ export interface EntryExitLog {
   supervisor_id: string;
   movement_type: MovementType;
   movement_context?: 'site' | 'workshop';
+  workshop_purpose?: 'maintenance' | 'parking' | null;
   current_driver_name?: string | null;
   registration_method: RegistrationMethod;
   driver_name: string | null;

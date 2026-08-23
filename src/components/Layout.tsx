@@ -25,6 +25,8 @@ export function Layout({ children, activePage, onNavigate, navItems }: LayoutPro
     ? t('admin')
     : profile?.role === 'workshop'
       ? t('workshopOfficer')
+      : profile?.role === 'workshop_manager'
+        ? t('workshopManager')
       : t('supervisor');
 
   return (
