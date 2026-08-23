@@ -6,7 +6,7 @@ import { Alert } from '@/components/Alert';
 import { InlineSpinner } from '@/components/Spinner';
 import { PageHeader } from '@/components/PageHeader';
 import { Plus, Edit2, Trash2, Upload, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, XCircle, FolderTree, X, Plus as PlusIcon } from 'lucide-react';
-import type { Company, Project, CompanyProject } from '@/lib/types';
+import type { Company, CompanyProject } from '@/lib/types';
 import { parseCompaniesExcel, downloadCompanyTemplate, type CompanyImportRow } from '@/lib/excel';
 import { DataListToolbar } from '@/components/data-list/DataListToolbar';
 import { DataListPagination } from '@/components/data-list/DataListPagination';
@@ -14,6 +14,12 @@ import { useDataListState } from '@/components/data-list/useDataListState';
 import { companiesListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
 import { sanitizeSearchTerm } from '@/lib/search';
+import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
+import type { SelectOption } from '@/components/Select';
+
+type CompanyProjectWithProject = CompanyProject & {
+  project?: { id: string; name_ar: string; name_en: string } | null;
+};
 
 export function AdminCompanies() {
   const { t } = useI18n();
@@ -41,11 +47,11 @@ export function AdminCompanies() {
   // Manage projects state
   const [projectsModalOpen, setProjectsModalOpen] = useState(false);
   const [projectsModalCompany, setProjectsModalCompany] = useState<Company | null>(null);
-  const [allProjects, setAllProjects] = useState<Project[]>([]);
-  const [companyLinks, setCompanyLinks] = useState<CompanyProject[]>([]);
+  const [companyLinks, setCompanyLinks] = useState<CompanyProjectWithProject[]>([]);
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [addProjectId, setAddProjectId] = useState('');
+  const [addProjectOption, setAddProjectOption] = useState<SelectOption | null>(null);
 
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
@@ -96,15 +102,25 @@ export function AdminCompanies() {
     setProjectsModalOpen(true);
     setLinkError(null);
     setAddProjectId('');
+    setAddProjectOption(null);
     setLinkLoading(true);
-    const [projRes, linkRes] = await Promise.all([
-      supabase.from('projects').select('*').order('name_ar'),
-      supabase.from('company_projects').select('*').eq('company_id', c.id),
-    ]);
-    setAllProjects((projRes.data as Project[]) ?? []);
-    setCompanyLinks((linkRes.data as CompanyProject[]) ?? []);
+    const { data } = await supabase
+      .from('company_projects')
+      .select('id,company_id,project_id,created_at,project:projects(id,name_ar,name_en)')
+      .eq('company_id', c.id);
+    setCompanyLinks((data as unknown as CompanyProjectWithProject[]) ?? []);
     setLinkLoading(false);
   }
+
+  const loadAvailableProjects = useCallback(async (query: string) => {
+    let request = supabase.from('projects').select('id,name_ar,name_en').order('name_ar').limit(20);
+    const linkedIds = companyLinks.map((link) => link.project_id);
+    if (linkedIds.length) request = request.not('id', 'in', `(${linkedIds.join(',')})`);
+    const term = sanitizeSearchTerm(query);
+    if (term) request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`);
+    const { data } = await request;
+    return (data ?? []).map((project) => ({ value: project.id, label: `${project.name_ar} — ${project.name_en}` }));
+  }, [companyLinks]);
 
   async function addProjectLink() {
     if (!projectsModalCompany || !addProjectId) return;
@@ -118,11 +134,12 @@ export function AdminCompanies() {
       return;
     }
     setAddProjectId('');
+    setAddProjectOption(null);
     const { data } = await supabase
       .from('company_projects')
-      .select('*')
+      .select('id,company_id,project_id,created_at,project:projects(id,name_ar,name_en)')
       .eq('company_id', projectsModalCompany.id);
-    setCompanyLinks((data as CompanyProject[]) ?? []);
+    setCompanyLinks((data as unknown as CompanyProjectWithProject[]) ?? []);
   }
 
   async function removeProjectLink(linkId: string) {
@@ -136,9 +153,9 @@ export function AdminCompanies() {
     }
     const { data } = await supabase
       .from('company_projects')
-      .select('*')
+      .select('id,company_id,project_id,created_at,project:projects(id,name_ar,name_en)')
       .eq('company_id', projectsModalCompany.id);
-    setCompanyLinks((data as CompanyProject[]) ?? []);
+    setCompanyLinks((data as unknown as CompanyProjectWithProject[]) ?? []);
   }
 
   async function handleFileSelect(file: File) {
@@ -428,7 +445,6 @@ export function AdminCompanies() {
               ) : (
                 <div className="space-y-1.5">
                   {companyLinks.map((link) => {
-                    const proj = allProjects.find((p) => p.id === link.project_id);
                     return (
                       <div
                         key={link.id}
@@ -436,7 +452,7 @@ export function AdminCompanies() {
                         style={{ borderColor: 'var(--border)' }}
                       >
                         <span className="text-sm font-medium">
-                          {proj ? `${proj.name_ar} — ${proj.name_en}` : link.project_id}
+                          {link.project ? `${link.project.name_ar} — ${link.project.name_en}` : link.project_id}
                         </span>
                         <button
                           onClick={() => removeProjectLink(link.id)}
@@ -456,20 +472,14 @@ export function AdminCompanies() {
             <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
               <p className="label mb-2">{t('addProjectLink')}</p>
               <div className="flex gap-2">
-                <select
-                  className="input flex-1"
+                <AsyncSearchSelect
+                  className="flex-1"
                   value={addProjectId}
-                  onChange={(e) => setAddProjectId(e.target.value)}
-                >
-                  <option value="">—</option>
-                  {allProjects
-                    .filter((p) => !companyLinks.some((l) => l.project_id === p.id))
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name_ar} — {p.name_en}
-                      </option>
-                    ))}
-                </select>
+                  selectedOption={addProjectOption}
+                  onChange={(value, option) => { setAddProjectId(value); setAddProjectOption(option); }}
+                  loadOptions={loadAvailableProjects}
+                  placeholder="—"
+                />
                 <button
                   onClick={addProjectLink}
                   disabled={!addProjectId}
@@ -478,9 +488,6 @@ export function AdminCompanies() {
                   <PlusIcon size={16} />
                 </button>
               </div>
-              {allProjects.filter((p) => !companyLinks.some((l) => l.project_id === p.id)).length === 0 && (
-                <p className="text-xs text-muted mt-1.5">{t('noProjectsAvailable')}</p>
-              )}
             </div>
           </div>
         )}

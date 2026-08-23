@@ -6,9 +6,9 @@ import { Alert } from '@/components/Alert';
 import { InlineSpinner } from '@/components/Spinner';
 import { QRCodeDisplay } from '@/components/QRCodeDisplay';
 import { Plus, Edit2, Power, QrCode, Printer, Upload, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, XCircle, ChevronRight } from 'lucide-react';
-import type { Equipment, Project, Lessor, OperationalStatus, OwnershipStatus, RegistrationType } from '@/lib/types';
+import type { Equipment, OperationalStatus, OwnershipStatus, RegistrationType } from '@/lib/types';
 import { parseEquipmentExcel, downloadEquipmentTemplate, type EquipmentImportRow } from '@/lib/excel';
-import { Select } from '@/components/Select';
+import { Select, type SelectOption } from '@/components/Select';
 import { PageHeader } from '@/components/PageHeader';
 import { DatePicker } from '@/components/DatePicker';
 import { PlateNumberInput } from '@/components/PlateNumberInput';
@@ -39,14 +39,16 @@ interface AdminEquipmentProps {
 export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) {
   const { t } = useI18n();
   const [equipment, setEquipment] = useState<Equipment[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [lessors, setLessors] = useState<Lessor[]>([]);
+  const [importProjectMap, setImportProjectMap] = useState<Map<string, string>>(new Map());
+  const [importLessorMap, setImportLessorMap] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const list = useDataListState(equipmentListConfig);
   const [total, setTotal] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Equipment | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [selectedProjectOption, setSelectedProjectOption] = useState<SelectOption | null>(null);
+  const [selectedLessorOption, setSelectedLessorOption] = useState<SelectOption | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [qrModal, setQrModal] = useState<Equipment | null>(null);
@@ -67,7 +69,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
 
   const fetchEquipment = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('equipment').select('id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,created_at,updated_at,lessor:lessors(name)', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
+    let query = supabase.from('equipment').select('id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,created_at,updated_at,project:projects(id,name_ar,name_en),lessor:lessors(id,name)', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
     const term = sanitizeSearchTerm(list.search);
     if (term) {
       query = query.or(`code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`);
@@ -80,11 +82,6 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
     setLoading(false);
   }, [list.direction, list.filters, list.page, list.pageSize, list.search, list.sort]);
 
-  useEffect(() => {
-    supabase.from('projects').select('*').order('name_ar').then(({ data }) => setProjects((data as Project[]) ?? []));
-    supabase.from('lessors').select('*').order('name').then(({ data }) => setLessors((data as Lessor[]) ?? []));
-  }, []);
-
   useEffect(() => { fetchEquipment(); }, [fetchEquipment]);
 
   const loadEquipmentTypes = useCallback(async (query: string) => {
@@ -93,6 +90,22 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
     if (term) request = request.ilike('name', `%${term}%`);
     const { data } = await request;
     return (data ?? []).map((item) => ({ value: item.name, label: item.name }));
+  }, []);
+
+  const loadProjects = useCallback(async (query: string) => {
+    let request = supabase.from('projects').select('id,name_ar,name_en').order('name_ar').limit(20);
+    const term = sanitizeSearchTerm(query);
+    if (term) request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`);
+    const { data } = await request;
+    return (data ?? []).map((project) => ({ value: project.id, label: `${project.name_ar} — ${project.name_en}` }));
+  }, []);
+
+  const loadLessors = useCallback(async (query: string) => {
+    let request = supabase.from('lessors').select('id,name').order('name').limit(20);
+    const term = sanitizeSearchTerm(query);
+    if (term) request = request.ilike('name', `%${term}%`);
+    const { data } = await request;
+    return (data ?? []).map((lessor) => ({ value: lessor.id, label: lessor.name }));
   }, []);
 
   useEffect(() => {
@@ -107,6 +120,8 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
   function openAdd() {
     setEditing(null);
     setForm({ ...emptyForm, qr_value: genQrValue() });
+    setSelectedProjectOption(null);
+    setSelectedLessorOption(null);
     setFormError(null);
     setModalOpen(true);
   }
@@ -122,6 +137,8 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
       qr_value: eq.qr_value, last_maintenance_date: eq.last_maintenance_date ?? '',
       registration_expiry: eq.registration_expiry ?? '', insurance_expiry: eq.insurance_expiry ?? '',
     });
+    setSelectedProjectOption(eq.project ? { value: eq.project.id, label: `${eq.project.name_ar} — ${eq.project.name_en}` } : null);
+    setSelectedLessorOption(eq.lessor ? { value: eq.lessor.id, label: eq.lessor.name } : null);
     setFormError(null);
     setModalOpen(true);
   }
@@ -203,8 +220,18 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
         seenCodes.add(lc);
       }
 
-      const projectMap = new Map(projects.flatMap((p) => [[p.name_ar.toLowerCase(), p.id], [p.name_en.toLowerCase(), p.id]]));
-      const lessorMap = new Map(lessors.map((l) => [l.name.toLowerCase(), l.id]));
+      const projectNames = [...new Set(rows.map((row) => row.project_name).filter(Boolean))];
+      const lessorNames = [...new Set(rows.map((row) => row.lessor_name).filter(Boolean))];
+      const [projectsAr, projectsEn, lessorRows] = await Promise.all([
+        projectNames.length ? supabase.from('projects').select('id,name_ar,name_en').in('name_ar', projectNames) : Promise.resolve({ data: [] }),
+        projectNames.length ? supabase.from('projects').select('id,name_ar,name_en').in('name_en', projectNames) : Promise.resolve({ data: [] }),
+        lessorNames.length ? supabase.from('lessors').select('id,name').in('name', lessorNames) : Promise.resolve({ data: [] }),
+      ]);
+      const matchedProjects = [...(projectsAr.data ?? []), ...(projectsEn.data ?? [])];
+      const projectMap = new Map(matchedProjects.flatMap((p) => [[p.name_ar.toLowerCase(), p.id], [p.name_en.toLowerCase(), p.id]]));
+      const lessorMap = new Map((lessorRows.data ?? []).map((l) => [l.name.toLowerCase(), l.id]));
+      setImportProjectMap(projectMap);
+      setImportLessorMap(lessorMap);
       for (const row of rows) {
         if (row.project_name && !projectMap.has(row.project_name.toLowerCase())) {
           row._errors.push(t('projectNotFound'));
@@ -243,9 +270,6 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
     setImporting(true);
     setImportError(null);
 
-    const projectMap = new Map(projects.flatMap((p) => [[p.name_ar.toLowerCase(), p.id], [p.name_en.toLowerCase(), p.id]]));
-    const lessorMap = new Map(lessors.map((l) => [l.name.toLowerCase(), l.id]));
-
     const rowsToImport = importData.filter((r) => selectedRows.has(r._rowNumber) && r._errors.length === 0);
     const payload = rowsToImport.map((r) => ({
       code: r.code,
@@ -253,8 +277,8 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
       plate_number: r.plate_number,
       operational_status: r.operational_status,
       ownership_status: r.ownership_status,
-      project_id: r.project_name ? (projectMap.get(r.project_name.toLowerCase()) ?? null) : null,
-      lessor_id: usesExternalSupplier(r.ownership_status) && r.lessor_name ? (lessorMap.get(r.lessor_name.toLowerCase()) ?? null) : null,
+      project_id: r.project_name ? (importProjectMap.get(r.project_name.toLowerCase()) ?? null) : null,
+      lessor_id: usesExternalSupplier(r.ownership_status) && r.lessor_name ? (importLessorMap.get(r.lessor_name.toLowerCase()) ?? null) : null,
       brand: r.brand,
       model: r.model,
       manufacture_year: r.manufacture_year,
@@ -293,6 +317,8 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
     setSelectedRows(new Set());
     setImportError(null);
     setImportResult(null);
+    setImportProjectMap(new Map());
+    setImportLessorMap(new Map());
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -300,6 +326,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
   const ownLabel = (s: OwnershipStatus) => s === 'alazani' ? t('ownershipAlazani') : s === 'takween' ? t('ownershipTakween') : s === 'third_party_f' ? t('ownershipThirdPartyF') : s === 'third_party_partnership_b' ? t('ownershipThirdPartyPartnershipB') : t('ownershipExternalSupplier');
   function updateCode(code: string) {
     const inferred = inferOwnershipFromCode(code);
+    if (inferred && !usesExternalSupplier(inferred)) setSelectedLessorOption(null);
     setForm((current) => inferred ? {
       ...current,
       code,
@@ -309,6 +336,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
   }
 
   function updateOwnership(status: OwnershipStatus) {
+    if (!usesExternalSupplier(status)) setSelectedLessorOption(null);
     setForm((current) => ({
       ...current,
       ownership_status: status,
@@ -441,30 +469,22 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
           </div>
           <div>
             <label className="label">{t('project')}</label>
-            <Select
+            <AsyncSearchSelect
               value={form.project_id}
-              onChange={(v) => setForm({ ...form, project_id: v })}
+              selectedOption={selectedProjectOption}
+              onChange={(value, option) => { setForm({ ...form, project_id: value }); setSelectedProjectOption(option); }}
+              loadOptions={loadProjects}
               placeholder="—"
-              searchable
-
-              options={[
-                { value: '', label: '—' },
-                ...projects.map((p) => ({ value: p.id, label: `${p.name_ar} — ${p.name_en}` })),
-              ]}
             />
           </div>
           {usesExternalSupplier(form.ownership_status) && <div>
             <label className="label">{t('externalSupplier')}</label>
-            <Select
+            <AsyncSearchSelect
               value={form.lessor_id}
-              onChange={(v) => setForm({ ...form, lessor_id: v })}
+              selectedOption={selectedLessorOption}
+              onChange={(value, option) => { setForm({ ...form, lessor_id: value }); setSelectedLessorOption(option); }}
+              loadOptions={loadLessors}
               placeholder="—"
-              searchable
-
-              options={[
-                { value: '', label: '—' },
-                ...lessors.map((l) => ({ value: l.id, label: l.name })),
-              ]}
             />
           </div>}
           <div><label className="label">{t('lastMaintenanceDate')}</label><DatePicker value={form.last_maintenance_date} onChange={(v) => setForm({ ...form, last_maintenance_date: v })} /></div>
