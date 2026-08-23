@@ -19,6 +19,7 @@ import { useDataListState } from '@/components/data-list/useDataListState';
 import { equipmentListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
 import { inferOwnershipFromCode, usesExternalSupplier } from '@/lib/equipmentOwnership';
+import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 
 function genQrValue(): string {
   return `EQ-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -85,6 +86,14 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
   }, []);
 
   useEffect(() => { fetchEquipment(); }, [fetchEquipment]);
+
+  const loadEquipmentTypes = useCallback(async (query: string) => {
+    let request = supabase.from('equipment_types').select('name').order('name').limit(20);
+    const term = sanitizeSearchTerm(query);
+    if (term) request = request.ilike('name', `%${term}%`);
+    const { data } = await request;
+    return (data ?? []).map((item) => ({ value: item.name, label: item.name }));
+  }, []);
 
   useEffect(() => {
     function handleEditEvent(e: Event) {
@@ -174,6 +183,15 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
     try {
       const buf = await file.arrayBuffer();
       const rows = parseEquipmentExcel(buf, t);
+
+      const importedTypes = [...new Set(rows.map((row) => row.type).filter(Boolean))];
+      const { data: knownTypeRows } = importedTypes.length
+        ? await supabase.from('equipment_types').select('name').in('name', importedTypes)
+        : { data: [] };
+      const knownTypes = new Set((knownTypeRows ?? []).map((row) => row.name.toLowerCase()));
+      for (const row of rows) {
+        if (row.type && !knownTypes.has(row.type.toLowerCase())) row._errors.push(t('equipmentTypeNotFound'));
+      }
 
       const existingCodes = new Set(equipment.map((e) => e.code.toLowerCase()));
       const seenCodes = new Set<string>();
@@ -369,7 +387,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
         {formError && <div className="mb-4"><Alert type="error">{formError}</Alert></div>}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className="label">{t('equipmentCode')} *</label><input className="input" dir="ltr" placeholder={t('equipmentCodePlaceholder')} value={form.code} onChange={(e) => updateCode(e.target.value)} /></div>
-          <div><label className="label">{t('equipmentType')} *</label><input className="input" placeholder={t('equipmentTypePlaceholder')} value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} /></div>
+          <div><label className="label">{t('equipmentType')} *</label><AsyncSearchSelect value={form.type} selectedOption={form.type ? { value: form.type, label: form.type } : null} onChange={(value) => setForm({ ...form, type: value })} loadOptions={loadEquipmentTypes} placeholder={t('selectEquipmentType')} /></div>
           <div className="sm:col-span-2">
             <label className="label">{t('plateNumber')}</label>
             <PlateNumberInput

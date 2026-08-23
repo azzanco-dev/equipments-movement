@@ -18,10 +18,11 @@ import { AdminDrivers } from '@/screens/AdminDrivers';
 import { DriverDetail } from '@/screens/DriverDetail';
 import { MovementDetail } from '@/screens/MovementDetail';
 import { MovementCreate } from '@/screens/MovementCreate';
+import { AdminSettings } from '@/screens/AdminSettings';
 import type { Equipment } from '@/lib/types';
-import { LayoutDashboard, FileText, Truck, FolderKanban, Building2, Users, Briefcase, Contact } from 'lucide-react';
+import { LayoutDashboard, FileText, Truck, FolderKanban, Building2, Users, Briefcase, Contact, Settings } from 'lucide-react';
 
-const ADMIN_PAGES = new Set(['dashboard', 'logs', 'equipment', 'projects', 'companies', 'lessors', 'drivers', 'users']);
+const ADMIN_PAGES = new Set(['dashboard', 'logs', 'equipment', 'projects', 'companies', 'lessors', 'drivers', 'users', 'settings']);
 
 function AppContent() {
   const { profile, loading } = useAuth();
@@ -66,6 +67,7 @@ function AppContent() {
     { key: 'lessors', label: t('lessors'), icon: <Building2 size={18} /> },
     { key: 'drivers', label: t('drivers'), icon: <Contact size={18} /> },
     { key: 'users', label: t('users'), icon: <Users size={18} /> },
+    { key: 'settings', label: t('settings'), icon: <Settings size={18} /> },
   ];
 
   const navigate = (target: string) => router.push(`/${target}`);
@@ -98,6 +100,7 @@ function AppContent() {
           {page === 'lessors' && <AdminLessors />}
           {page === 'drivers' && <AdminDrivers onSelectDriver={(id) => router.push(`/drivers/${id}`)} />}
           {page === 'users' && <AdminUsers />}
+          {page === 'settings' && <AdminSettings />}
         </>
       )}
     </Layout>

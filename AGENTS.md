@@ -62,6 +62,13 @@
 - The external supplier selector appears only for Other Owner and is optional. Every other owner choice clears `lessor_id`.
 - Equipment code prefixes suggest classification in the UI: `A` → Al-Azani, `TK` → Takween, `F` → third-party F, `B` → third-party B, otherwise external supplier. Database fields remain the source of truth.
 
+## Equipment types
+
+- Equipment types are controlled by the `equipment_types` master table and managed by admins under Settings.
+- The master record has one user-facing field, `name`; existing `equipment.type` remains the stored value and is protected by a foreign key to that master list.
+- Equipment forms use server-side searchable type selection limited to 20 results. Equipment Excel imports must reference an existing type.
+- Settings supports manual type management and Excel import with one equipment-type name column. Types referenced by equipment cannot be deleted.
+
 ## Unified list architecture
 
 - Major lists use the shared system in `src/components/data-list` and module configs in `src/lib/listConfigs.ts`.
