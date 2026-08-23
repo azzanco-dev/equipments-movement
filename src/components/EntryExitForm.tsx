@@ -7,11 +7,12 @@ import { Alert } from '@/components/Alert';
 import { QRScanner } from '@/components/QRScanner';
 import { Spinner } from '@/components/Spinner';
 import { QrCode, Search, AlertTriangle, CheckCircle, Clock, MapPin, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
-import type { Driver, Equipment, Lessor, MovementType, LastMovement } from '@/lib/types';
+import type { Driver, Equipment, MovementType, LastMovement } from '@/lib/types';
 import { DatePicker } from '@/components/DatePicker';
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 import { sanitizeSearchTerm } from '@/lib/search';
 import type { SelectOption } from '@/components/Select';
+import { PlateNumberInput } from '@/components/PlateNumberInput';
 
 const FRONTEND_MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -45,7 +46,7 @@ function toLocalDateTimeInput(date: Date): string {
 
 export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode = false, onViewMovement }: EntryExitFormProps) {
   const { t } = useI18n();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const [step, setStep] = useState<'select' | 'details'>('select');
   const [scanOpen, setScanOpen] = useState(false);
@@ -74,10 +75,11 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
   const [contractorCode, setContractorCode] = useState('');
   const [recordedAt, setRecordedAt] = useState('');
   const [quickDriver, setQuickDriver] = useState({ open: false, fullName: '', mobile: '' });
-  const [quickEquipment, setQuickEquipment] = useState({ open: false, plate: '', ownerName: '', ownerMobile: '' });
+  const [quickEquipment, setQuickEquipment] = useState({ open: false, plate: '', code: '', type: '', numberingStatus: 'numbered' as 'numbered' | 'unnumbered' });
   const [quickSaving, setQuickSaving] = useState(false);
 
   const isEntry = movementType === 'entry';
+  const workshopMode = profile?.role === 'workshop';
   const currentLocalDateTime = toLocalDateTimeInput(new Date());
   const movementDate = recordedAt.slice(0, 10);
 
@@ -113,7 +115,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     setContractorCode('');
     setRecordedAt('');
     setQuickDriver({ open: false, fullName: '', mobile: '' });
-    setQuickEquipment({ open: false, plate: '', ownerName: '', ownerMobile: '' });
+    setQuickEquipment({ open: false, plate: '', code: '', type: '', numberingStatus: 'numbered' });
   }, []);
 
   useEffect(() => {
@@ -130,26 +132,25 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     let active = true;
     setLoadingEquipment(true);
 
-    const query = supabase
-      .from('equipment')
-      .select('id,code,type,plate_number,ownership_status,qr_value,is_active')
-      .eq('is_active', true)
-      .order('code');
-
     const term = sanitizeSearchTerm(search);
-    if (term) {
-      query.or(`code.ilike.%${term}%,type.ilike.%${term}%`);
-    }
-
-    const timer = window.setTimeout(() => query.limit(20).then(({ data, error }) => {
+    const timer = window.setTimeout(async () => {
+      let result;
+      if (workshopMode) {
+        result = await supabase.rpc('search_workshop_equipment', { p_movement_type: movementType, p_search: term || null });
+      } else {
+        let query = supabase.from('equipment').select('id,code,type,plate_number,ownership_status,qr_value,is_active,master_data_complete,numbering_status').eq('is_active', true).order('code');
+        if (term) query = query.or(`code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`);
+        result = await query.limit(20);
+      }
+      const { data, error } = result;
       if (!active) return;
       if (error) console.error(error);
       setEquipment((data as unknown as Equipment[]) ?? []);
       setLoadingEquipment(false);
-    }), search ? 300 : 0);
+    }, search ? 300 : 0);
 
     return () => { active = false; window.clearTimeout(timer); };
-  }, [open, step, search]);
+  }, [open, step, search, workshopMode, movementType]);
 
   // Check last movement when equipment is selected
   const checkLastMovement = useCallback(async (eq: Equipment): Promise<LastMovement | null> => {
@@ -157,7 +158,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     setValidationError(null);
 
     const { data, error } = await supabase
-      .rpc('get_last_movement', { p_equipment_id: eq.id });
+      .rpc('get_last_movement', { p_equipment_id: eq.id, p_movement_context: workshopMode ? 'workshop' : 'site' });
 
     setLoadingMovement(false);
 
@@ -192,7 +193,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     }
 
     return last;
-  }, [isEntry, t]);
+  }, [isEntry, t, workshopMode]);
 
   const loadDrivers = useCallback(async (query: string): Promise<SelectOption[]> => {
     let request = supabase.from('drivers')
@@ -225,6 +226,14 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     return (data ?? []).map((project) => ({ value: project.id, label: `${project.name_ar} — ${project.name_en}` }));
   }, []);
 
+  const loadEquipmentTypes = useCallback(async (query: string): Promise<SelectOption[]> => {
+    let request = supabase.from('equipment_types').select('name').order('name').limit(20);
+    const term = sanitizeSearchTerm(query);
+    if (term) request = request.ilike('name', `%${term}%`);
+    const { data } = await request;
+    return (data ?? []).map((item) => ({ value: item.name, label: item.name }));
+  }, []);
+
   const handleSelectEquipment = (eq: Equipment) => {
     setSelected(eq);
     setSaveError(null);
@@ -247,18 +256,15 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
 
   const createQuickEquipment = async () => {
     if (!quickEquipment.plate.trim()) { setSaveError('رقم اللوحة مطلوب.'); return; }
+    if (workshopMode && quickEquipment.numberingStatus === 'numbered' && !quickEquipment.code.trim()) { setSaveError('رقم المعدة مطلوب.'); return; }
+    if (!workshopMode && !quickEquipment.type) { setSaveError('نوع المعدة مطلوب.'); return; }
     setQuickSaving(true); setSaveError(null);
-    let lessorId: string | null = null;
-    if (quickEquipment.ownerName || quickEquipment.ownerMobile) {
-      if (!quickEquipment.ownerName.trim() || !quickEquipment.ownerMobile.trim()) { setQuickSaving(false); setSaveError(t('externalSupplierPairRequired')); return; }
-      const lessorResult = await supabase.rpc('quick_create_lessor', { p_name: quickEquipment.ownerName.trim(), p_mobile_number: quickEquipment.ownerMobile.trim() });
-      if (lessorResult.error || !lessorResult.data) { setQuickSaving(false); setSaveError(t('saveFailed')); return; }
-      lessorId = (lessorResult.data as Lessor).id;
-    }
-    const { data, error } = await supabase.rpc('quick_create_equipment', { p_plate_number: quickEquipment.plate.trim(), p_lessor_id: lessorId });
+    const { data, error } = workshopMode
+      ? await supabase.rpc('quick_create_workshop_equipment', { p_numbering_status: quickEquipment.numberingStatus, p_code: quickEquipment.code.trim(), p_plate_number: quickEquipment.plate.trim() })
+      : await supabase.rpc('quick_create_foreman_equipment', { p_plate_number: quickEquipment.plate.trim(), p_type: quickEquipment.type });
     setQuickSaving(false);
     if (error || !data) { setSaveError(t('saveFailed')); return; }
-    setQuickEquipment({ open: false, plate: '', ownerName: '', ownerMobile: '' });
+    setQuickEquipment({ open: false, plate: '', code: '', type: '', numberingStatus: 'numbered' });
     handleSelectEquipment(data as Equipment);
   };
 
@@ -319,15 +325,19 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
   const handleSave = async () => {
     if (!selected || !user) return;
     if (validationError) return;
-    if (isEntry && !driverId) {
+    if (workshopMode && photoFiles.length === 0) {
+      setSaveError('الصورة مطلوبة لحركة الورشة.');
+      return;
+    }
+    if (!workshopMode && isEntry && !driverId) {
       setSaveError(t('driverRequired'));
       return;
     }
-    if (isEntry && !selectedCompanyId) {
+    if (!workshopMode && isEntry && !selectedCompanyId) {
       setSaveError(t('companyRequiredForEntry'));
       return;
     }
-    if (isEntry && !selectedProjectId) {
+    if (!workshopMode && isEntry && !selectedProjectId) {
       setSaveError(t('projectRequiredForEntry'));
       return;
     }
@@ -353,9 +363,10 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
       const form = new FormData();
       form.set('equipment_id', selected.id);
       form.set('movement_type', movementType);
+      form.set('movement_context', workshopMode ? 'workshop' : 'site');
       form.set('registration_method', 'manual');
       if (notes) form.set('notes', notes);
-      if (isEntry) {
+      if (!workshopMode && isEntry) {
         form.set('driver_id', driverId);
         if (selectedCompanyId) form.set('company_id', selectedCompanyId);
         if (selectedProjectId) form.set('project_id', selectedProjectId);
@@ -399,6 +410,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
         no_prior_entry: t('noPriorEntryAtSelectedTime'),
         invalid_sequence: isEntry ? t('entrySequenceConflict') : t('exitSequenceConflict'),
         invalid_photos: t('invalidPhotoType'),
+        photo_required: t('workshopPhotoRequired'),
         invalid_movement_payload: t('movementSaveFailed'),
         photo_upload_failed: t('photoUploadFailed'),
         unauthorized: t('authError'),
@@ -462,7 +474,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
             {loadingEquipment ? (
               <div className="flex justify-center py-8"><Spinner size={24} /></div>
             ) : equipment.length === 0 ? (
-              <div className="space-y-3 py-4 text-center"><p className="text-sm text-muted">{t('noEquipmentFound')}</p><button className="btn-outline" onClick={() => setQuickEquipment((value) => ({ ...value, open: true, plate: search }))}>+ إضافة معدة جديدة</button></div>
+              <div className="space-y-3 py-4 text-center"><p className="text-sm text-muted">{t('noEquipmentFound')}</p>{isEntry && <button className="btn-outline" onClick={() => setQuickEquipment((value) => ({ ...value, open: true, plate: search }))}>+ إضافة معدة جديدة</button>}</div>
             ) : (
               <div className="max-h-80 overflow-y-auto space-y-2">
                 {equipment.map((eq) => (
@@ -490,10 +502,14 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
             )}
             {quickEquipment.open && <div className="rounded-lg border p-4 text-start space-y-3" style={{ borderColor: 'var(--border)' }}>
               <p className="font-semibold">إضافة معدة سريعة</p>
-              <div><label className="label">{t('plateNumber')} *</label><input className="input" placeholder={t('plateNumberPlaceholder')} value={quickEquipment.plate} onChange={(event) => setQuickEquipment({ ...quickEquipment, plate: event.target.value })} /></div>
-              <p className="text-xs text-muted">{t('externalSupplierOptionalHelp')}</p>
-              <div className="grid gap-3 sm:grid-cols-2"><div><label className="label">{t('externalSupplier')}</label><input className="input" placeholder={t('lessorNamePlaceholder')} value={quickEquipment.ownerName} onChange={(event) => setQuickEquipment({ ...quickEquipment, ownerName: event.target.value })} /></div><div><label className="label">{t('mobileNumber')}</label><input className="input" dir="ltr" placeholder={t('mobileNumberPlaceholder')} value={quickEquipment.ownerMobile} onChange={(event) => setQuickEquipment({ ...quickEquipment, ownerMobile: event.target.value })} /></div></div>
-              <div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setQuickEquipment({ open: false, plate: '', ownerName: '', ownerMobile: '' })}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={quickSaving} onClick={createQuickEquipment}>{quickSaving ? t('saving') : t('save')}</button></div>
+              {workshopMode && <div className="flex gap-4 rounded-lg border p-3" style={{ borderColor: 'var(--border)' }}>
+                <label className="flex items-center gap-2 text-sm"><input type="radio" checked={quickEquipment.numberingStatus === 'numbered'} onChange={() => setQuickEquipment({ ...quickEquipment, numberingStatus: 'numbered' })} /> مرقمة</label>
+                <label className="flex items-center gap-2 text-sm"><input type="radio" checked={quickEquipment.numberingStatus === 'unnumbered'} onChange={() => setQuickEquipment({ ...quickEquipment, numberingStatus: 'unnumbered', code: '' })} /> بدون رقم</label>
+              </div>}
+              {workshopMode && quickEquipment.numberingStatus === 'numbered' && <div><label className="label">{t('equipmentCode')} *</label><input className="input" dir="ltr" placeholder={t('equipmentCodePlaceholder')} value={quickEquipment.code} onChange={(event) => setQuickEquipment({ ...quickEquipment, code: event.target.value })} /></div>}
+              <div><label className="label">{t('plateNumber')} *</label><PlateNumberInput value={quickEquipment.plate} onChange={(value) => setQuickEquipment({ ...quickEquipment, plate: value })} /></div>
+              {!workshopMode && <div><label className="label">{t('equipmentType')} *</label><AsyncSearchSelect value={quickEquipment.type} selectedOption={quickEquipment.type ? { value: quickEquipment.type, label: quickEquipment.type } : null} onChange={(value) => setQuickEquipment({ ...quickEquipment, type: value })} loadOptions={loadEquipmentTypes} placeholder={t('selectEquipmentType')} /></div>}
+              <div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setQuickEquipment({ open: false, plate: '', code: '', type: '', numberingStatus: 'numbered' })}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={quickSaving} onClick={createQuickEquipment}>{quickSaving ? t('saving') : t('save')}</button></div>
             </div>}
           </div>
         )}
@@ -582,7 +598,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
             )}
 
             {/* Form fields */}
-            {!isEntry && lastMovement && !validationError && (
+            {!workshopMode && !isEntry && lastMovement && !validationError && (
               <div className="rounded-lg border p-4 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
                 <p className="mb-2 font-medium">{t('latestEntryBrief')}</p>
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -595,7 +611,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
             )}
 
             <div className="space-y-4">
-              {isEntry ? (
+              {!workshopMode && isEntry ? (
                 <>
                   <div>
                     <label className="label">{t('company')} *</label>
@@ -633,7 +649,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                 </>
               ) : null}
 
-              <div>
+              {!workshopMode && <div>
                 <label className="label">{t('driverName')} {isEntry && '*'}</label>
                 {isEntry ? (
                   <AsyncSearchSelect
@@ -648,10 +664,10 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                 ) : (
                   <div className="input bg-gray-50 dark:bg-gray-900/30">{selectedDriver?.label ?? t('driverInheritedFromEntry')}</div>
                 )}
-              </div>
-              {isEntry && quickDriver.open && <div className="rounded-lg border p-4 space-y-3" style={{ borderColor: 'var(--border)' }}><p className="font-semibold">إضافة سائق سريع</p><div className="grid gap-3 sm:grid-cols-2"><div><label className="label">{t('fullName')} *</label><input className="input" placeholder={t('fullNamePlaceholder')} value={quickDriver.fullName} onChange={(event) => setQuickDriver({ ...quickDriver, fullName: event.target.value })} /></div><div><label className="label">{t('mobileNumber')} *</label><input className="input" dir="ltr" placeholder={t('mobileNumberPlaceholder')} value={quickDriver.mobile} onChange={(event) => setQuickDriver({ ...quickDriver, mobile: event.target.value.replace(/[^\d+]/g, '') })} /></div></div><div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setQuickDriver({ open: false, fullName: '', mobile: '' })}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={quickSaving} onClick={createQuickDriver}>{quickSaving ? t('saving') : t('save')}</button></div></div>}
+              </div>}
+              {!workshopMode && isEntry && quickDriver.open && <div className="rounded-lg border p-4 space-y-3" style={{ borderColor: 'var(--border)' }}><p className="font-semibold">إضافة سائق سريع</p><div className="grid gap-3 sm:grid-cols-2"><div><label className="label">{t('fullName')} *</label><input className="input" placeholder={t('fullNamePlaceholder')} value={quickDriver.fullName} onChange={(event) => setQuickDriver({ ...quickDriver, fullName: event.target.value })} /></div><div><label className="label">{t('mobileNumber')} *</label><input className="input" dir="ltr" placeholder={t('mobileNumberPlaceholder')} value={quickDriver.mobile} onChange={(event) => setQuickDriver({ ...quickDriver, mobile: event.target.value.replace(/[^\d+]/g, '') })} /></div></div><div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setQuickDriver({ open: false, fullName: '', mobile: '' })}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={quickSaving} onClick={createQuickDriver}>{quickSaving ? t('saving') : t('save')}</button></div></div>}
 
-              <div>
+              {!workshopMode && <div>
                 <label className="label">{t('actualMovementTime')}</label>
                 <div className="max-w">
                   <DatePicker
@@ -661,9 +677,9 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                     placeholder={t('date')}
                   />
                 </div>
-              </div>
+              </div>}
 
-              <div>
+              {!workshopMode && <div>
                 <label className="label">{t('notes')}</label>
                 <textarea
                   className="input min-h-20 resize-none p-2"
@@ -672,10 +688,10 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
                 />
-              </div>
+              </div>}
 
               <div>
-                <label className="label">{t('photo')}</label>
+                <label className="label">{t('photo')}{workshopMode ? ' *' : ''}</label>
                 {photoFiles.length > 0 && (
                   <div className="mb-3">
                     <div className="relative rounded-lg overflow-hidden" style={{ background: 'var(--surface)', border: '1px solid var(--border)', height: '240px' }}>

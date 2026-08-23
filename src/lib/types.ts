@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'supervisor';
+export type UserRole = 'admin' | 'supervisor' | 'workshop';
 
 export type OperationalStatus = 'operational' | 'maintenance' | 'stopped';
 export type OwnershipStatus = 'alazani' | 'takween' | 'third_party_f' | 'third_party_partnership_b' | 'external_supplier';
@@ -66,6 +66,8 @@ export interface Equipment {
   registration_expiry: string | null;
   insurance_expiry: string | null;
   is_active: boolean;
+  master_data_complete?: boolean;
+  numbering_status?: 'numbered' | 'unnumbered';
   created_at: string;
   updated_at: string;
   project?: Project | null;
@@ -77,6 +79,7 @@ export interface EntryExitLog {
   equipment_id: string;
   supervisor_id: string;
   movement_type: MovementType;
+  movement_context?: 'site' | 'workshop';
   registration_method: RegistrationMethod;
   driver_name: string | null;
   driver_id: string | null;
@@ -123,6 +126,8 @@ export interface EquipmentVisit {
   exit_notes: string | null;
   exit_photo_url: string | null;
   exit_registration_method: RegistrationMethod | null;
+  exit_driver_name?: string | null;
+  movement_context?: 'site' | 'workshop';
 }
 
 export interface CompanyProject {
@@ -150,4 +155,17 @@ export interface LastMovement {
   contractor_equipment_code: string | null;
   driver_id: string | null;
   driver_name: string | null;
+}
+
+export interface MovementDriverChange {
+  id: string;
+  entry_log_id: string;
+  previous_driver_id: string;
+  previous_driver_name: string;
+  new_driver_id: string;
+  new_driver_name: string;
+  changed_by: string;
+  changed_at: string;
+  note: string | null;
+  changer?: Profile | null;
 }

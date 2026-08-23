@@ -69,7 +69,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
 
   const fetchEquipment = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('equipment').select('id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,created_at,updated_at,project:projects(id,name_ar,name_en),lessor:lessors(id,name)', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
+    let query = supabase.from('equipment').select('id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,master_data_complete,numbering_status,created_at,updated_at,project:projects(id,name_ar,name_en),lessor:lessors(id,name)', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
     const term = sanitizeSearchTerm(list.search);
     if (term) {
       query = query.or(`code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`);
@@ -158,6 +158,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
         last_maintenance_date: form.last_maintenance_date || null,
         registration_expiry: form.registration_expiry || null,
         insurance_expiry: form.insurance_expiry || null,
+        master_data_complete: true,
       };
       if (editing) {
         const { error } = await supabase.from('equipment').update(payload).eq('id', editing.id);
@@ -388,11 +389,11 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                     style={{ borderColor: 'var(--border)' }}
                     onClick={() => onSelectEquipment?.(eq.id)}
                   >
-                    <td className="px-4 py-3 font-semibold">{eq.code}</td>
+                    <td className="px-4 py-3 font-semibold"><div className="flex items-center gap-2"><span>{eq.code}</span>{eq.master_data_complete === false && <span className="badge border border-amber-300 text-amber-700 dark:text-amber-300">{t('incompleteData')}</span>}</div></td>
                     <td className="px-4 py-3 text-muted">{eq.type}</td>
                     <td className="px-4 py-3 text-muted">{eq.plate_number ?? '—'}</td>
                     <td className="px-4 py-3 text-muted">{statusLabel(eq.operational_status)}</td>
-                    <td className="px-4 py-3 text-muted">{usesExternalSupplier(eq.ownership_status) && eq.lessor?.name ? `${ownLabel(eq.ownership_status)} - ${eq.lessor.name}` : ownLabel(eq.ownership_status)}</td>
+                    <td className="px-4 py-3 text-muted">{eq.master_data_complete === false ? t('incompleteData') : usesExternalSupplier(eq.ownership_status) && eq.lessor?.name ? `${ownLabel(eq.ownership_status)} - ${eq.lessor.name}` : ownLabel(eq.ownership_status)}</td>
                     <td className="px-4 py-3">{eq.is_active ? t('active') : t('inactive')}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>

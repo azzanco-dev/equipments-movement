@@ -11,7 +11,7 @@ import { PageHeader } from '@/components/PageHeader';
 
 export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { onSelectMovement: (id: string) => void; onCreateMovement: (type: MovementType) => void }) {
   const { t } = useI18n();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [logs, setLogs] = useState<EntryExitLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<'all' | MovementType>('all');
@@ -25,6 +25,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
       .from('entry_exit_logs')
       .select('*, equipment(*)')
       .eq('supervisor_id', user.id)
+      .eq('movement_context', profile?.role === 'workshop' ? 'workshop' : 'site')
       .order('recorded_at', { ascending: false })
       .limit(100);
 
@@ -43,7 +44,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
     if (error) console.error(error);
     setLogs((data as EntryExitLog[]) ?? []);
     setLoading(false);
-  }, [user, filterType, filterDate]);
+  }, [user, profile?.role, filterType, filterDate]);
 
   useEffect(() => {
     fetchLogs();

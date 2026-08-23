@@ -121,7 +121,7 @@ export function AdminUsers() {
                     <td className="px-4 py-3 font-semibold">{u.full_name}{u.id === currentUser?.id ? ' (You)' : ''}</td>
                     <td className="px-4 py-3">
                       {u.id === currentUser?.id ? (
-                        <span className="text-muted">{u.role === 'admin' ? t('admin') : t('supervisor')}</span>
+                        <span className="text-muted">{u.role === 'admin' ? t('admin') : u.role === 'workshop' ? t('workshopOfficer') : t('supervisor')}</span>
                       ) : (
                         <Select
                           compact
@@ -130,6 +130,7 @@ export function AdminUsers() {
                           onChange={(v) => handleRoleChange(u, v as UserRole)}
                           options={[
                             { value: 'supervisor', label: t('supervisor') },
+                            { value: 'workshop', label: t('workshopOfficer') },
                             { value: 'admin', label: t('admin') },
                           ]}
                         />
@@ -160,6 +161,7 @@ export function AdminUsers() {
               onChange={(v) => setRole(v as UserRole)}
               options={[
                 { value: 'supervisor', label: t('supervisor') },
+                { value: 'workshop', label: t('workshopOfficer') },
                 { value: 'admin', label: t('admin') },
               ]}
             />

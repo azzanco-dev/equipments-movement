@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
-import { ChevronLeft, ChevronRight, Download, Edit2, List, Plus, Trash2, Upload } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Edit2, List, Plus, Trash2, Upload, Warehouse } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useI18n } from '@/i18n/I18nContext';
 import { PageHeader } from '@/components/PageHeader';
@@ -9,6 +9,9 @@ import { Modal } from '@/components/Modal';
 import { Alert } from '@/components/Alert';
 import { InlineSpinner } from '@/components/Spinner';
 import { DataListPagination } from '@/components/data-list/DataListPagination';
+import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
+import type { SelectOption } from '@/components/Select';
+import { sanitizeSearchTerm } from '@/lib/search';
 
 type EquipmentTypeRow = { id: string; name: string };
 const PAGE_SIZE = 20;
@@ -18,6 +21,7 @@ export function AdminSettings() {
   const router = useRouter();
   const pathname = usePathname();
   const showEquipmentTypes = pathname === '/settings/equipment-types';
+  const showWorkshopOpening = pathname === '/settings/workshop-opening-balance';
   const [rows, setRows] = useState<EquipmentTypeRow[]>([]);
   const [total, setTotal] = useState(0);
   const [typesCount, setTypesCount] = useState<number | null>(null);
@@ -30,6 +34,10 @@ export function AdminSettings() {
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [openingEquipmentId, setOpeningEquipmentId] = useState('');
+  const [openingEquipment, setOpeningEquipment] = useState<SelectOption | null>(null);
+  const [openingSaving, setOpeningSaving] = useState(false);
+  const [openingMessage, setOpeningMessage] = useState<string | null>(null);
 
   const fetchRows = useCallback(async () => {
     setLoading(true);
@@ -94,6 +102,27 @@ export function AdminSettings() {
     }
   }
 
+  const loadOpeningCandidates = useCallback(async (query: string): Promise<SelectOption[]> => {
+    const { data } = await supabase.rpc('search_workshop_opening_candidates', { p_search: sanitizeSearchTerm(query) || null });
+    return (data ?? []).map((item: { id: string; code: string; type: string; plate_number: string | null }) => ({ value: item.id, label: `${item.code} — ${item.type}${item.plate_number ? ` — ${item.plate_number}` : ''}` }));
+  }, []);
+
+  async function addOpeningBalance() {
+    if (!openingEquipmentId) return;
+    setOpeningSaving(true); setOpeningMessage(null);
+    const { error: openingError } = await supabase.rpc('add_workshop_opening_balance', { p_equipment_id: openingEquipmentId });
+    setOpeningSaving(false);
+    if (openingError) { setOpeningMessage(t('workshopOpeningFailed')); return; }
+    setOpeningEquipmentId(''); setOpeningEquipment(null); setOpeningMessage(t('workshopOpeningSaved'));
+  }
+
+  if (showWorkshopOpening) return <div className="space-y-4">
+    <button className="btn-ghost" onClick={() => router.push('/settings')}><ChevronLeft size={16} className="rtl-flip" />{t('backToSettings')}</button>
+    <PageHeader title={t('workshopOpeningBalance')} description={t('workshopOpeningBalanceDesc')} />
+    {openingMessage && <Alert type={openingMessage === t('workshopOpeningSaved') ? 'success' : 'error'}>{openingMessage}</Alert>}
+    <div className="card max-w-2xl space-y-4"><div><label className="label">{t('equipment')} *</label><AsyncSearchSelect value={openingEquipmentId} selectedOption={openingEquipment} onChange={(value, option) => { setOpeningEquipmentId(value); setOpeningEquipment(option); setOpeningMessage(null); }} loadOptions={loadOpeningCandidates} placeholder={t('selectEquipment')} /></div><button className="btn-primary" disabled={!openingEquipmentId || openingSaving} onClick={addOpeningBalance}>{openingSaving ? t('saving') : t('markInsideWorkshop')}</button></div>
+  </div>;
+
   if (!showEquipmentTypes) return <div className="space-y-4">
     <PageHeader title={t('settings')} description={t('settingsDesc')} />
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -105,6 +134,10 @@ export function AdminSettings() {
         <h2 className="font-semibold">{t('equipmentTypes')}</h2>
         <p className="mt-1 text-sm text-muted">{t('equipmentTypesDesc')}</p>
         <p className="mt-auto pt-4 text-xs text-muted">{typesCount === null ? t('loading') : t('itemsCount').replace('{count}', String(typesCount))}</p>
+      </button>
+      <button type="button" onClick={() => router.push('/settings/workshop-opening-balance')} className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-gray-100 dark:hover:bg-gray-800">
+        <div className="mb-4 flex w-full items-start justify-between gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg border" style={{ borderColor: 'var(--border)' }}><Warehouse size={18} /></span><ChevronRight size={18} className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip" /></div>
+        <h2 className="font-semibold">{t('workshopOpeningBalance')}</h2><p className="mt-1 text-sm text-muted">{t('workshopOpeningBalanceDesc')}</p>
       </button>
     </div>
   </div>;

@@ -19,7 +19,7 @@
 
 ## Authorization and database integrity
 
-- Roles are `admin` and `supervisor`; preserve the existing permission model.
+- Roles are `admin`, `supervisor`, and the limited `workshop` role; preserve the reviewed permission model for each movement context.
 - Critical rules must be enforced in PostgreSQL/RLS, not only in React or API validation.
 - Do not weaken `entry_exit_logs`, `entry_exit_photos`, Storage, drivers, or master-data RLS.
 - Do not expose raw PostgreSQL or Supabase errors to users. Map known errors to safe, understandable UI messages.
@@ -28,13 +28,14 @@
 
 ## Movement invariants
 
-- Valid sequence per equipment is strictly `ENTRY → EXIT → ENTRY → EXIT`.
+- Valid sequence per equipment and movement context (`site` or `workshop`) is strictly `ENTRY → EXIT → ENTRY → EXIT`.
 - Reject `ENTRY → ENTRY`, `EXIT → EXIT`, and `EXIT` without a preceding valid `ENTRY`.
 - Ordering is deterministic by `(recorded_at, id)`, including historical insertion and identical timestamps.
 - Preserve per-equipment concurrency protection; do not replace database locking with frontend state.
-- ENTRY requires equipment, independent company and project selections, driver, and an actual movement date. The UI selects the date only and applies the current local time internally when saving. `company_projects` remains for future use and must not restrict current ENTRY creation.
-- EXIT inherits company, project, contractor equipment code, and driver context from the corresponding latest valid ENTRY; inherited values are not manually editable.
+- Site ENTRY requires equipment, independent company and project selections, driver, and an actual movement date. The UI selects the date only and applies the current local time internally when saving. `company_projects` remains for future use and must not restrict current ENTRY creation. Workshop ENTRY/EXIT uses the limited workshop form and requires equipment plus at least one selected photo; it does not require company, project, or driver.
+- EXIT inherits company, project, and contractor equipment code from the corresponding latest valid ENTRY. Site EXIT uses the latest current driver after any auditable driver changes made during the open visit.
 - Store `driver_id` plus the `driver_name` snapshot. Legacy rows with only `driver_name` must keep displaying correctly.
+- Keep the original entry driver immutable. Driver changes during an open site visit are append-only records; multiple changes are supported and closed visits reject further changes.
 - `registration_method`, `odometer_reading`, and legacy `photo_url` remain in the database for compatibility, but registration method and odometer are not part of the current movement UI.
 - After movement creation succeeds, navigate to `/movements/:id`. A movement must never be submitted twice because a later photo upload failed.
 
@@ -61,6 +62,7 @@
 - Ownership state is derived, not independently edited: Al-Azani is owned; every other classification is rented.
 - The external supplier selector appears only for Other Owner and is optional. Every other owner choice clears `lessor_id`.
 - Equipment code prefixes suggest classification in the UI: `A` → Al-Azani, `TK` → Takween, `F` → third-party F, `B` → third-party B, otherwise external supplier. Database fields remain the source of truth.
+- Quick-created equipment may be marked `master_data_complete = false` until an admin reviews it. Generated internal codes are short (`U001`, `U002`, ...), unique, and database-generated.
 
 ## Equipment types
 

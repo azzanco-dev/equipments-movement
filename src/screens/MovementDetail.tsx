@@ -26,8 +26,12 @@ import {
   Maximize2,
   Trash2,
   Upload,
+  RefreshCw,
 } from 'lucide-react';
-import type { EntryExitLog, Company, Project, EntryExitPhoto } from '@/lib/types';
+import type { EntryExitLog, Company, Project, EntryExitPhoto, MovementDriverChange } from '@/lib/types';
+import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
+import type { SelectOption } from '@/components/Select';
+import { sanitizeSearchTerm } from '@/lib/search';
 
 interface MovementDetailProps {
   movementId: string;
@@ -92,6 +96,14 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
   const [linkedError, setLinkedError] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoActionError, setPhotoActionError] = useState<string | null>(null);
+  const [driverChanges, setDriverChanges] = useState<MovementDriverChange[]>([]);
+  const [driverEntryId, setDriverEntryId] = useState<string | null>(null);
+  const [driverChangeOpen, setDriverChangeOpen] = useState(false);
+  const [newDriverId, setNewDriverId] = useState('');
+  const [newDriverOption, setNewDriverOption] = useState<SelectOption | null>(null);
+  const [driverChangeNote, setDriverChangeNote] = useState('');
+  const [driverChangeBusy, setDriverChangeBusy] = useState(false);
+  const [driverChangeError, setDriverChangeError] = useState<string | null>(null);
   const photoUrls = photoItems.map((item) => item.url);
 
   const fetchData = useCallback(async () => {
@@ -110,6 +122,8 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
     setFullImageOpen(false);
     setFullImageSrc(null);
     setLinkedError(null);
+    setDriverChanges([]);
+    setDriverEntryId(null);
     setError(null);
     setLoading(true);
 
@@ -129,6 +143,14 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
 
       const logData = data as EntryExitLog;
       setLog(logData);
+
+      const loadDriverChanges = async (entryId: string) => {
+        const { data: changes } = await supabase.from('movement_driver_changes')
+          .select('id,entry_log_id,previous_driver_id,previous_driver_name,new_driver_id,new_driver_name,changed_by,changed_at,note,changer:profiles!movement_driver_changes_changed_by_fkey(id,full_name,role,created_at)')
+          .eq('entry_log_id', entryId).order('changed_at').order('id');
+        setDriverEntryId(entryId);
+        setDriverChanges((changes as unknown as MovementDriverChange[]) ?? []);
+      };
 
       // Fetch company and project names
       if (logData.company_id) {
@@ -179,11 +201,13 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
       // ordering as the database trigger, so ties on recorded_at are broken
       // by id consistently.
       if (logData.movement_type === 'entry') {
+        await loadDriverChanges(logData.id);
         // Next EXIT: (recorded_at > entry) OR (recorded_at = entry AND id > entry.id)
         const { data: exitData, error: linkErr } = await supabase
           .from('entry_exit_logs')
           .select('*, supervisor:profiles(*)')
           .eq('equipment_id', logData.equipment_id)
+          .eq('movement_context', logData.movement_context ?? 'site')
           .eq('movement_type', 'exit')
           .or(`recorded_at.gt.${logData.recorded_at},and(recorded_at.eq.${logData.recorded_at},id.gt.${logData.id})`)
           .order('recorded_at', { ascending: true })
@@ -202,6 +226,7 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
           .from('entry_exit_logs')
           .select('*, supervisor:profiles(*)')
           .eq('equipment_id', logData.equipment_id)
+          .eq('movement_context', logData.movement_context ?? 'site')
           .eq('movement_type', 'entry')
           .or(`recorded_at.lt.${logData.recorded_at},and(recorded_at.eq.${logData.recorded_at},id.lt.${logData.id})`)
           .order('recorded_at', { ascending: false })
@@ -214,6 +239,7 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
         } else {
           const entryLog = entryData as EntryExitLog | null;
           setLinkedLog(entryLog);
+          if (entryLog) await loadDriverChanges(entryLog.id);
 
           // Fetch linked entry's company/project
           if (entryLog?.company_id) {
@@ -240,6 +266,24 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
       setLoading(false);
     }
   }, [movementId, t]);
+
+  const loadDrivers = useCallback(async (query: string): Promise<SelectOption[]> => {
+    let request = supabase.from('drivers').select('id,full_name,mobile_number').order('full_name').limit(20);
+    const term = sanitizeSearchTerm(query);
+    if (term) request = request.or(`full_name.ilike.%${term}%,mobile_number.ilike.%${term}%`);
+    const { data } = await request;
+    return (data ?? []).map((driver) => ({ value: driver.id, label: `${driver.full_name}${driver.mobile_number ? ` — ${driver.mobile_number}` : ''}` }));
+  }, []);
+
+  const changeDriver = async () => {
+    if (!driverEntryId || !newDriverId) return;
+    setDriverChangeBusy(true); setDriverChangeError(null);
+    const { error: changeError } = await supabase.rpc('change_active_movement_driver', { p_entry_log_id: driverEntryId, p_new_driver_id: newDriverId, p_note: driverChangeNote.trim() || null });
+    setDriverChangeBusy(false);
+    if (changeError) { setDriverChangeError(t('driverChangeFailed')); return; }
+    setDriverChangeOpen(false); setNewDriverId(''); setNewDriverOption(null); setDriverChangeNote('');
+    await fetchData();
+  };
 
   useEffect(() => {
     fetchData();
@@ -469,6 +513,22 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
           )}
         </div>
       </div>
+
+      {driverEntryId && log.movement_context !== 'workshop' && (
+        <div className="card space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div><h3 className="font-bold">{t('driverChangeHistory')}</h3><p className="text-xs text-muted">{t('currentDriver')}: {driverChanges.at(-1)?.new_driver_name ?? (isEntry ? log.driver_name : linkedLog?.driver_name) ?? '—'}</p></div>
+            {isEntry && !linkedLog && profile?.role !== 'workshop' && <button className="btn-outline" onClick={() => setDriverChangeOpen((value) => !value)}><RefreshCw size={16} />{t('changeDriver')}</button>}
+          </div>
+          {driverChangeOpen && <div className="rounded-lg border p-4 space-y-3" style={{ borderColor: 'var(--border)' }}>
+            <div><label className="label">{t('newDriver')} *</label><AsyncSearchSelect value={newDriverId} selectedOption={newDriverOption} onChange={(value, option) => { setNewDriverId(value); setNewDriverOption(option); }} loadOptions={loadDrivers} placeholder={t('selectDriver')} /></div>
+            <div><label className="label">{t('notes')}</label><input className="input" value={driverChangeNote} onChange={(event) => setDriverChangeNote(event.target.value)} placeholder={t('notesPlaceholder')} /></div>
+            {driverChangeError && <Alert type="error">{driverChangeError}</Alert>}
+            <div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setDriverChangeOpen(false)}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={!newDriverId || driverChangeBusy} onClick={changeDriver}>{driverChangeBusy ? t('saving') : t('save')}</button></div>
+          </div>}
+          {driverChanges.length === 0 ? <p className="text-sm text-muted">{t('noDriverChanges')}</p> : <div className="space-y-2">{driverChanges.map((change) => <div key={change.id} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: 'var(--border)' }}><p><span className="font-medium">{change.previous_driver_name}</span> ← <span className="font-medium">{change.new_driver_name}</span></p><p className="text-xs text-muted">{formatDateTime(change.changed_at)}{change.changer?.full_name ? ` — ${change.changer.full_name}` : ''}</p>{change.note && <p className="mt-1 text-xs">{change.note}</p>}</div>)}</div>}
+        </div>
+      )}
 
       {/* Linked movement section */}
       {isEntry ? (

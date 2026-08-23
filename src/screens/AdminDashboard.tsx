@@ -109,9 +109,9 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
 
   const fetchVisits = useCallback(async () => {
     setLoadingVisits(true);
-    let query = supabase.from('equipment_visits').select('equipment_id,equipment_code,equipment_type,contractor_equipment_code,plate_number,project_id,project_name_ar,project_name_en,company_name_ar,company_name_en,entry_log_id,entry_recorded_at,entry_supervisor_id,entry_supervisor_name,driver_name,odometer_reading,notes,exit_log_id,exit_recorded_at,exit_supervisor_id,exit_supervisor_name,exit_odometer,exit_notes', { count: 'exact' }).order(visitList.sort, { ascending: visitList.direction === 'asc' }).range((visitList.page - 1) * visitList.pageSize, visitList.page * visitList.pageSize - 1);
+    let query = supabase.from('equipment_visits').select('equipment_id,equipment_code,equipment_type,contractor_equipment_code,plate_number,project_id,project_name_ar,project_name_en,company_name_ar,company_name_en,entry_log_id,entry_recorded_at,entry_supervisor_id,entry_supervisor_name,driver_name,odometer_reading,notes,exit_log_id,exit_recorded_at,exit_supervisor_id,exit_supervisor_name,exit_driver_name,exit_odometer,exit_notes,movement_context', { count: 'exact' }).order(visitList.sort, { ascending: visitList.direction === 'asc' }).range((visitList.page - 1) * visitList.pageSize, visitList.page * visitList.pageSize - 1);
     const term = sanitizeSearchTerm(visitList.search);
-    if (term) query = query.or(`equipment_code.ilike.%${term}%,equipment_type.ilike.%${term}%,driver_name.ilike.%${term}%,contractor_equipment_code.ilike.%${term}%`);
+    if (term) query = query.or(`equipment_code.ilike.%${term}%,equipment_type.ilike.%${term}%,driver_name.ilike.%${term}%,exit_driver_name.ilike.%${term}%,contractor_equipment_code.ilike.%${term}%`);
     query = applyListFilters(query, visitList.filters, new Set(visitsListConfig.filterFields.map((field) => field.key)));
     const { data, error, count } = await query;
     if (error) console.error(error);
@@ -207,7 +207,8 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                       <th className="table-header text-start px-4 py-3">{t('contractorEquipmentCode')}</th>
                       <th className="table-header text-start px-4 py-3">{t('equipmentNameLabel')}</th>
                       <th className="table-header text-start px-4 py-3">{t('movementType')}</th>
-                      <th className="table-header text-start px-4 py-3">{t('driverName')}</th>
+                      <th className="table-header text-start px-4 py-3">{t('entryDriver')}</th>
+                      <th className="table-header text-start px-4 py-3">{t('exitDriver')}</th>
                       <th className="table-header text-start px-4 py-3">{t('supervisorName')}</th>
                       <th className="table-header text-start px-4 py-3">{t('recordedAt')}</th>
                     </tr>
@@ -274,6 +275,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                         <td className="px-4 py-3 font-semibold">{v.contractor_equipment_code ?? '—'}</td>
                         <td className="px-4 py-3">{v.equipment_code} {v.equipment_type}</td>
                         <td className="px-4 py-3">{v.driver_name ?? '—'}</td>
+                        <td className="px-4 py-3">{v.exit_driver_name ?? '—'}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(v.entry_recorded_at)}</td>
                         <td className="px-4 py-3">{v.entry_supervisor_name ?? '—'}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">

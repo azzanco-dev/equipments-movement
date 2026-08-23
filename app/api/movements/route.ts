@@ -43,14 +43,23 @@ export async function POST(request: Request) {
 
     const form = await request.formData();
     const movementType = form.get('movement_type');
+    const movementContext = form.get('movement_context') === 'workshop' ? 'workshop' : 'site';
     const equipmentId = form.get('equipment_id');
     if ((movementType !== 'entry' && movementType !== 'exit') || typeof equipmentId !== 'string' || !equipmentId) {
       return NextResponse.json({ error: 'invalid_movement_payload' }, { status: 400 });
     }
 
     const photos = form.getAll('photos').filter((value): value is File => value instanceof File);
+    if (movementContext === 'workshop' && photos.length === 0) {
+      return NextResponse.json({ error: 'photo_required' }, { status: 400 });
+    }
     if (photos.length > MAX_PHOTOS || photos.some((file) => file.size > MAX_PHOTO_BYTES || !ALLOWED_PHOTO_TYPES.has(file.type))) {
       return NextResponse.json({ error: 'invalid_photos' }, { status: 400 });
+    }
+
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', authData.user.id).maybeSingle();
+    if (!profile || (movementContext === 'workshop' ? !['admin', 'workshop'].includes(profile.role) : !['admin', 'supervisor'].includes(profile.role))) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 403 });
     }
 
     const value = (name: string) => {
@@ -61,6 +70,7 @@ export async function POST(request: Request) {
       equipment_id: equipmentId,
       supervisor_id: authData.user.id,
       movement_type: movementType,
+      movement_context: movementContext,
       registration_method: value('registration_method') === 'qr' ? 'qr' : 'manual',
       driver_name: value('driver_name'),
       notes: value('notes'),
