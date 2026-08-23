@@ -397,6 +397,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
         project_required: t('projectRequiredForEntry'),
         driver_required: t('driverRequired'),
         no_prior_entry: t('noPriorEntryAtSelectedTime'),
+        workshop_exit_owner: t('workshopExitOwner'),
         invalid_sequence: isEntry ? t('entrySequenceConflict') : t('exitSequenceConflict'),
         invalid_photos: t('invalidPhotoType'),
         photo_required: t('workshopPhotoRequired'),

@@ -13,6 +13,7 @@ function movementErrorCode(message: string): string {
   if (message.includes('project_id is required')) return 'project_required';
   if (message.includes('driver_id is required') || message.includes('invalid driver_id')) return 'driver_required';
   if (message.includes('no prior entry') || message.includes('not inside the gate')) return 'no_prior_entry';
+  if (message.includes('workshop exit must be registered by entry user')) return 'workshop_exit_owner';
   if (message.includes('sequence would be invalid')) return 'invalid_sequence';
   return 'movement_save_failed';
 }
