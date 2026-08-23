@@ -2,14 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Thmanyah Sans Font — loaded from jsDelivr CDN */
+/* Thmanyah Sans for Arabic, Manrope for Latin text. */
+@font-face {
+  font-family: 'Manrope';
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Manrope';
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-500-normal.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Manrope';
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-600-normal.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Manrope';
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-700-normal.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @font-face {
   font-family: 'Thmanyah';
   src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+0020-007F, U+00A0-00FF, U+0100-024F, U+0250-02AF;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 @font-face {
   font-family: 'Thmanyah';
@@ -17,7 +46,7 @@
   font-weight: 500;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+0020-007F, U+00A0-00FF, U+0100-024F, U+0250-02AF;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 @font-face {
   font-family: 'Thmanyah';
@@ -25,13 +54,12 @@
   font-weight: 700;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF, U+0020-007F, U+00A0-00FF, U+0100-024F, U+0250-02AF;
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
-/* Fallback fonts loaded from Google Fonts via index.html */
 :root {
-  --font-primary: 'Thmanyah', 'Tajawal', 'Inter', system-ui, sans-serif;
-  --font-latin: 'Inter', system-ui, sans-serif;
+  --font-primary: 'Thmanyah', 'Manrope', 'Tajawal', system-ui, sans-serif;
+  --font-latin: 'Manrope', 'Segoe UI', system-ui, sans-serif;
 }
 
 * {
@@ -40,6 +68,10 @@
 
 /* Latin text inside RTL context gets Inter for better readability */
 [dir="ltr"] {
+  font-family: var(--font-latin);
+}
+
+html[lang="en"] body {
   font-family: var(--font-latin);
 }
 
@@ -155,6 +187,10 @@ body {
   .table-header {
     @apply text-xs font-semibold uppercase tracking-wide;
     color: var(--muted);
+  }
+  .compact-table th,
+  .compact-table td {
+    @apply px-3 py-2.5;
   }
 }
 

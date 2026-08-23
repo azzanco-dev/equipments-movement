@@ -30,7 +30,7 @@ export function Layout({ children, activePage, onNavigate, navItems }: LayoutPro
         className="sticky top-0 z-40 border-b"
         style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}
       >
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+        <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
             <button
               className="lg:hidden btn-ghost p-2"
@@ -72,7 +72,7 @@ export function Layout({ children, activePage, onNavigate, navItems }: LayoutPro
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-7xl">
+      <div className="mx-auto flex max-w-[1600px]">
         {/* Sidebar — desktop */}
         <aside
           className="hidden lg:flex w-60 shrink-0 flex-col border-e p-4 sticky top-16 h-[calc(100vh-4rem)]"

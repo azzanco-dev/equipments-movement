@@ -5,8 +5,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Thmanyah', 'Tajawal', 'Inter', 'system-ui', 'sans-serif'],
-        latin: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Thmanyah', 'Manrope', 'Tajawal', 'system-ui', 'sans-serif'],
+        latin: ['Manrope', 'Segoe UI', 'system-ui', 'sans-serif'],
       },
       colors: {
         bg: 'var(--bg)',

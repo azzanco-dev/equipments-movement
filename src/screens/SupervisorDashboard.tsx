@@ -131,7 +131,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
         ) : (
           <div className="card p-0 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="compact-table w-full text-sm">
                 <thead>
                   <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
                     <th className="table-header text-start px-4 py-3">{t('contractorEquipmentCode')}</th>
