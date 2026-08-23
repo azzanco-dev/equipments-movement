@@ -112,7 +112,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
     }
     let query = supabase
       .from('entry_exit_logs')
-      .select('id,equipment_id,supervisor_id,movement_type,registration_method,driver_name,driver_id,notes,photo_url,company_id,project_id,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number)', { count: 'exact' })
+      .select('id,equipment_id,supervisor_id,movement_type,movement_context,registration_method,driver_name,driver_id,notes,photo_url,company_id,project_id,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),project:projects(id,name_ar,name_en)', { count: 'exact' })
       .order(list.sort, { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
     if (term) query = query.or(`driver_name.ilike.%${term}%,contractor_equipment_code.ilike.%${term}%${equipmentIds.length ? `,equipment_id.in.(${equipmentIds.join(',')})` : ''}`);
@@ -223,6 +223,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                     <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
                       <th className="table-header text-start px-4 py-3">{t('contractorEquipmentCode')}</th>
                       <th className="table-header text-start px-4 py-3">{t('equipmentNameLabel')}</th>
+                      <th className="table-header text-start px-4 py-3">{t('location')}</th>
                       <th className="table-header text-start px-4 py-3">{t('movementType')}</th>
                       <th className="table-header text-start px-4 py-3">{t('driverName')}</th>
                       <th className="table-header text-start px-4 py-3">{t('recordedAt')}</th>
@@ -238,6 +239,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                       >
                         <td className="px-4 py-3 font-semibold">{log.contractor_equipment_code ?? '—'}</td>
                         <td className="px-4 py-3">{log.equipment ? `${log.equipment.code} ${log.equipment.type}` : '—'}</td>
+                        <td className="px-4 py-3">{log.movement_context === 'workshop' ? t('workshopLocation') : log.project ? `${log.project.name_ar} — ${log.project.name_en}` : '—'}</td>
                         <td className="px-4 py-3">
                           <span className={`badge border ${log.movement_type === 'entry' ? 'status-entry' : 'status-exit'}`}>
                             {log.movement_type === 'entry' ? t('entry') : t('exit')}
@@ -276,6 +278,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                     <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
                       <th className="table-header text-start px-4 py-3">{t('contractorEquipmentCode')}</th>
                       <th className="table-header text-start px-4 py-3">{t('equipmentNameLabel')}</th>
+                      <th className="table-header text-start px-4 py-3">{t('location')}</th>
                       <th className="table-header text-start px-4 py-3">{t('driverName')}</th>
                       <th className="table-header text-start px-4 py-3">{t('entryTime')}</th>
                       <th className="table-header text-start px-4 py-3">{t('exitTime')}</th>
@@ -293,6 +296,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                       >
                         <td className="px-4 py-3 font-semibold">{v.contractor_equipment_code ?? '—'}</td>
                         <td className="px-4 py-3">{v.equipment_code} {v.equipment_type}</td>
+                        <td className="px-4 py-3">{v.movement_context === 'workshop' ? t('workshopLocation') : [v.project_name_ar, v.project_name_en].filter(Boolean).join(' — ') || '—'}</td>
                         <td className="px-4 py-3">{v.last_driver_name ?? v.driver_name ?? '—'}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(v.entry_recorded_at)}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">
