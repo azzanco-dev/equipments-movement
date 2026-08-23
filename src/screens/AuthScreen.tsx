@@ -3,6 +3,7 @@ import { useAuth } from '@/auth/AuthContext';
 import { useI18n } from '@/i18n/I18nContext';
 import { useTheme } from '@/theme/ThemeContext';
 import { Sun, Moon, Languages, AlertCircle } from 'lucide-react';
+import { PasswordInput } from '@/components/PasswordInput';
 
 export function AuthScreen() {
   const { t, toggleLanguage, lang } = useI18n();
@@ -70,9 +71,7 @@ export function AuthScreen() {
               </div>
               <div>
                 <label className="label">{t('password')}</label>
-                <input
-                  type="password"
-                  className="input"
+                <PasswordInput
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={t('passwordPlaceholder')}

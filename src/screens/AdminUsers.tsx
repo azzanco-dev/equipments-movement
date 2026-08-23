@@ -15,6 +15,7 @@ import { useDataListState } from '@/components/data-list/useDataListState';
 import { usersListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
 import { sanitizeSearchTerm } from '@/lib/search';
+import { PasswordInput } from '@/components/PasswordInput';
 
 export function AdminUsers() {
   const { t } = useI18n();
@@ -153,7 +154,7 @@ export function AdminUsers() {
         <div className="space-y-4">
           <div><label className="label">{t('fullName')} *</label><input className="input" placeholder={t('fullNamePlaceholder')} value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
           <div><label className="label">{t('email')} *</label><input className="input" type="email" dir="ltr" placeholder={t('emailPlaceholder')} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-          <div><label className="label">{t('password')} *</label><input className="input" type="password" dir="ltr" placeholder={t('passwordPlaceholder')} value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+          <div><label className="label">{t('password')} *</label><PasswordInput dir="ltr" placeholder={t('passwordPlaceholder')} value={password} onChange={(e) => setPassword(e.target.value)} /></div>
           <div>
             <label className="label">{t('role')}</label>
             <Select
