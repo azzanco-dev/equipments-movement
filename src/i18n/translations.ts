@@ -51,7 +51,7 @@ export const translations = {
     workshopManager: 'مدير الورشة',
     workshopPurpose: 'نوع دخول الورشة',
     maintenancePurpose: 'صيانة',
-    parkingPurpose: 'Parking',
+    parkingPurpose: 'موقف',
     pendingClassification: 'غير محدد',
     workshopClassificationFailed: 'تعذر تحديث نوع دخول الورشة.',
     driverChangeHistory: 'سجل تغييرات السائق',
