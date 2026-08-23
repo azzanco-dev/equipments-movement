@@ -545,7 +545,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                   ) : currentStatus === 'outside' ? (
                     <>
                       <MapPin size={16} className="text-amber-600 dark:text-amber-400" />
-                      <span>{t('currentStatus')}: {t('outsideSite')}</span>
+                      <span>{t('currentStatus')}: {t(lastMovement?.movement_context === 'workshop' ? 'outsideWorkshop' : 'outsideSite')}</span>
                     </>
                   ) : (
                     <>
