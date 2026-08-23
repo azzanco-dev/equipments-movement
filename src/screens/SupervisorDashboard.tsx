@@ -29,7 +29,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
 
     let query = supabase
       .from('entry_exit_logs')
-      .select('*, equipment(*)')
+      .select('*, equipment(*), supervisor:profiles(id,full_name,role,created_at)')
       .eq('movement_context', workshopMode ? 'workshop' : 'site')
       .order('recorded_at', { ascending: false })
       .limit(100);
@@ -147,6 +147,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
                     <th className="table-header text-start px-4 py-3">{workshopMode ? t('equipmentCodeLabel') : t('contractorEquipmentCode')}</th>
                     <th className="table-header text-start px-4 py-3">{t('equipmentNameLabel')}</th>
                     <th className="table-header text-start px-4 py-3">{t('movementType')}</th>
+                    {workshopManagerMode && <th className="table-header text-start px-4 py-3">{t('supervisorName')}</th>}
                     {workshopManagerMode && <th className="table-header text-start px-4 py-3">{t('workshopPurpose')}</th>}
                     {!workshopMode && <th className="table-header text-start px-4 py-3">{t('driverName')}</th>}
                     <th className="table-header text-start px-4 py-3">{t('recordedAt')}</th>
@@ -167,6 +168,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
                           {log.movement_type === 'entry' ? t('entry') : t('exit')}
                         </span>
                       </td>
+                      {workshopManagerMode && <td className="px-4 py-3">{log.supervisor?.full_name ?? '—'}</td>}
                       {workshopManagerMode && (
                         <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
                           {log.movement_type === 'entry' ? (
