@@ -21,9 +21,10 @@ export function formatDate(value: string | Date): string {
   return `${String(parts.day).padStart(2, '0')}/${String(parts.month).padStart(2, '0')}/${parts.year}`;
 }
 
-export function formatDateTime(value: string | Date): string {
+export function formatDateTime(value: string | Date, isolate = true): string {
   const parts = dateParts(value);
   if (!parts) return typeof value === 'string' ? value : '';
   const time = parts.date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  return `${formatDate(parts.date)} ${time}`;
+  const formatted = `${formatDate(parts.date)} ${time}`;
+  return isolate ? `\u2066${formatted}\u2069` : formatted;
 }

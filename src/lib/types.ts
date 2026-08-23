@@ -80,6 +80,7 @@ export interface EntryExitLog {
   supervisor_id: string;
   movement_type: MovementType;
   movement_context?: 'site' | 'workshop';
+  current_driver_name?: string | null;
   registration_method: RegistrationMethod;
   driver_name: string | null;
   driver_id: string | null;
@@ -128,6 +129,7 @@ export interface EquipmentVisit {
   exit_registration_method: RegistrationMethod | null;
   exit_driver_name?: string | null;
   movement_context?: 'site' | 'workshop';
+  last_driver_name?: string | null;
 }
 
 export interface CompanyProject {

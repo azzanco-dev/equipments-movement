@@ -15,6 +15,20 @@ import { movementsListConfig, visitsListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
 import { formatDateTime } from '@/lib/dateFormat';
 
+async function loadLatestDriverNames(entryIds: string[]) {
+  if (!entryIds.length) return new Map<string, string>();
+  const { data } = await supabase.from('movement_driver_changes')
+    .select('entry_log_id,new_driver_name,changed_at,id')
+    .in('entry_log_id', entryIds)
+    .order('changed_at', { ascending: false })
+    .order('id', { ascending: false });
+  const latest = new Map<string, string>();
+  for (const change of data ?? []) {
+    if (!latest.has(change.entry_log_id)) latest.set(change.entry_log_id, change.new_driver_name);
+  }
+  return latest;
+}
+
 export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelectMovement?: (id: string) => void; onCreateMovement?: (type: 'entry' | 'exit') => void }) {
   const { t } = useI18n();
   const router = useRouter();
@@ -103,7 +117,9 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
     query = applyListFilters(query, list.filters, new Set(movementsListConfig.filterFields.map((field) => field.key)));
     const { data, error, count } = await query;
     if (error) console.error(error);
-    setLogs((data as unknown as EntryExitLog[]) ?? []);
+    const rows = (data as unknown as EntryExitLog[]) ?? [];
+    const latestDrivers = await loadLatestDriverNames(rows.filter((row) => row.movement_type === 'entry').map((row) => row.id));
+    setLogs(rows.map((row) => ({ ...row, current_driver_name: row.movement_type === 'entry' ? (latestDrivers.get(row.id) ?? row.driver_name) : row.driver_name })));
     setLogsTotal(count ?? 0);
     setLoadingLogs(false);
   }, [list.direction, list.filters, list.page, list.pageSize, list.search, list.sort]);
@@ -116,7 +132,9 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
     query = applyListFilters(query, visitList.filters, new Set(visitsListConfig.filterFields.map((field) => field.key)));
     const { data, error, count } = await query;
     if (error) console.error(error);
-    setVisits((data as unknown as EquipmentVisit[]) ?? []);
+    const rows = (data as unknown as EquipmentVisit[]) ?? [];
+    const latestDrivers = await loadLatestDriverNames(rows.map((row) => row.entry_log_id));
+    setVisits(rows.map((row) => ({ ...row, last_driver_name: row.exit_driver_name ?? latestDrivers.get(row.entry_log_id) ?? row.driver_name })));
     setVisitsTotal(count ?? 0);
     setLoadingVisits(false);
   }, [visitList.direction, visitList.filters, visitList.page, visitList.pageSize, visitList.search, visitList.sort]);
@@ -206,8 +224,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                       <th className="table-header text-start px-4 py-3">{t('contractorEquipmentCode')}</th>
                       <th className="table-header text-start px-4 py-3">{t('equipmentNameLabel')}</th>
                       <th className="table-header text-start px-4 py-3">{t('movementType')}</th>
-                      <th className="table-header text-start px-4 py-3">{t('entryDriver')}</th>
-                      <th className="table-header text-start px-4 py-3">{t('exitDriver')}</th>
+                      <th className="table-header text-start px-4 py-3">{t('driverName')}</th>
                       <th className="table-header text-start px-4 py-3">{t('supervisorName')}</th>
                       <th className="table-header text-start px-4 py-3">{t('recordedAt')}</th>
                     </tr>
@@ -227,7 +244,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                             {log.movement_type === 'entry' ? t('entry') : t('exit')}
                           </span>
                         </td>
-                        <td className="px-4 py-3">{log.driver_name ?? '—'}</td>
+                        <td className="px-4 py-3">{log.current_driver_name ?? log.driver_name ?? '—'}</td>
                         <td className="px-4 py-3">{log.supervisor?.full_name ?? '—'}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(log.recorded_at)}</td>
                       </tr>
@@ -273,8 +290,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                       <tr key={v.entry_log_id} className="border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
                         <td className="px-4 py-3 font-semibold">{v.contractor_equipment_code ?? '—'}</td>
                         <td className="px-4 py-3">{v.equipment_code} {v.equipment_type}</td>
-                        <td className="px-4 py-3">{v.driver_name ?? '—'}</td>
-                        <td className="px-4 py-3">{v.exit_driver_name ?? '—'}</td>
+                        <td className="px-4 py-3">{v.last_driver_name ?? v.driver_name ?? '—'}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(v.entry_recorded_at)}</td>
                         <td className="px-4 py-3">{v.entry_supervisor_name ?? '—'}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">
