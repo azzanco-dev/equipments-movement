@@ -483,7 +483,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
             {loadingEquipment ? (
               <div className="flex justify-center py-8"><Spinner size={24} /></div>
             ) : equipment.length === 0 ? (
-              <div className="space-y-3 py-4 text-center"><p className="text-sm text-muted">{t('noEquipmentFound')}</p>{isEntry && <button className="btn-outline" onClick={() => setQuickEquipment((value) => ({ ...value, open: true, plate: search }))}>+ إضافة معدة جديدة</button>}</div>
+              <div className="py-4 text-center"><p className="text-sm text-muted">{t('noEquipmentFound')}</p></div>
             ) : (
               <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
                 {equipment.map((eq) => (
@@ -501,6 +501,15 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                   </button>
                 ))}
               </div>
+            )}
+            {isEntry && (
+              <button
+                type="button"
+                className="btn-outline w-full"
+                onClick={() => setQuickEquipment((value) => ({ ...value, open: true, plate: search }))}
+              >
+                + {t('addEquipment')}
+              </button>
             )}
             {quickEquipment.open && <div className="rounded-lg border p-4 text-start space-y-3" style={{ borderColor: 'var(--border)' }}>
               <p className="font-semibold">إضافة معدة سريعة</p>
