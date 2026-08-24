@@ -65,6 +65,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
   const [quickDriver, setQuickDriver] = useState({ open: false, fullName: '', mobile: '' });
   const [quickEquipment, setQuickEquipment] = useState({ open: false, plate: '', code: '', type: '', lessorId: '', numberingStatus: 'numbered' as 'numbered' | 'unnumbered' });
   const [selectedQuickLessor, setSelectedQuickLessor] = useState<SelectOption | null>(null);
+  const [quickLessor, setQuickLessor] = useState({ open: false, name: '', error: '' });
   const [quickSaving, setQuickSaving] = useState(false);
 
   const isEntry = movementType === 'entry';
@@ -107,6 +108,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     setQuickDriver({ open: false, fullName: '', mobile: '' });
     setQuickEquipment({ open: false, plate: '', code: '', type: '', lessorId: '', numberingStatus: 'numbered' });
     setSelectedQuickLessor(null);
+    setQuickLessor({ open: false, name: '', error: '' });
   }, []);
 
   useEffect(() => {
@@ -238,21 +240,25 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     return (data ?? []).map((lessor) => ({ value: lessor.id, label: lessor.name }));
   }, []);
 
-  const createQuickLessor = async (name: string) => {
-    const trimmedName = name.trim();
-    if (!trimmedName) return;
+  const createQuickLessor = async () => {
+    const trimmedName = quickLessor.name.trim();
+    if (!trimmedName) {
+      setQuickLessor((current) => ({ ...current, error: t('lessorNameRequired') }));
+      return;
+    }
     setQuickSaving(true);
-    setSaveError(null);
+    setQuickLessor((current) => ({ ...current, error: '' }));
     const { data, error } = await supabase.rpc('quick_create_lessor_by_name', { p_name: trimmedName });
     setQuickSaving(false);
     if (error || !data) {
-      setSaveError(t('saveFailed'));
+      setQuickLessor((current) => ({ ...current, error: t('saveFailed') }));
       return;
     }
     const lessor = data as { id: string; name: string };
     const option = { value: lessor.id, label: lessor.name };
     setQuickEquipment((current) => ({ ...current, lessorId: lessor.id }));
     setSelectedQuickLessor(option);
+    setQuickLessor({ open: false, name: '', error: '' });
   };
 
   const handleSelectEquipment = (eq: Equipment) => {
@@ -531,8 +537,9 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                     onChange={(value, option) => { setQuickEquipment({ ...quickEquipment, lessorId: value }); setSelectedQuickLessor(option); }}
                     loadOptions={loadLessors}
                     placeholder={t('selectLessor')}
-                    createLabel={t('addLessorByName')}
-                    onCreate={createQuickLessor}
+                    createLabel={`${t('addNewSupplier')} +`}
+                    onCreate={(query) => setQuickLessor({ open: true, name: query, error: '' })}
+                    alwaysShowCreate
                     disabled={quickSaving}
                   />
                 </div>
@@ -802,6 +809,31 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={quickLessor.open}
+        onClose={() => setQuickLessor({ open: false, name: '', error: '' })}
+        title={t('addNewSupplier')}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="label">{t('lessorName')} *</label>
+            <input
+              className="input"
+              value={quickLessor.name}
+              placeholder={t('lessorNamePlaceholder')}
+              onChange={(event) => setQuickLessor({ ...quickLessor, name: event.target.value, error: '' })}
+              autoFocus
+            />
+          </div>
+          {quickLessor.error && <Alert type="error">{quickLessor.error}</Alert>}
+          <div className="flex gap-2">
+            <button className="btn-outline flex-1" onClick={() => setQuickLessor({ open: false, name: '', error: '' })}>{t('cancel')}</button>
+            <button className="btn-primary flex-1" disabled={quickSaving || !quickLessor.name.trim()} onClick={createQuickLessor}>{quickSaving ? t('saving') : t('save')}</button>
+          </div>
+        </div>
       </Modal>
 
     </>
