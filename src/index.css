@@ -77,6 +77,7 @@ html[lang="en"] body {
 
 body {
   margin: 0;
+  min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -166,7 +167,7 @@ body {
     @apply btn hover:bg-gray-100 dark:hover:bg-gray-800;
   }
   .input {
-    @apply h-8 w-full rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors placeholder:text-gray-400;
+    @apply h-8 w-full rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors placeholder:text-gray-400 placeholder:text-[13px];
     border-color: var(--border);
   }
   .input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 16%, transparent); }
@@ -192,6 +193,11 @@ body {
   .compact-table td {
     @apply px-3 py-2.5;
   }
+}
+
+input::placeholder,
+textarea::placeholder {
+  font-size: 13px !important;
 }
 
 /* Custom scrollbar */

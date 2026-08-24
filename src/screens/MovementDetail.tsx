@@ -33,6 +33,7 @@ import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 import type { SelectOption } from '@/components/Select';
 import { sanitizeSearchTerm } from '@/lib/search';
 import { formatDate, formatDateTime } from '@/lib/dateFormat';
+import { localizedName } from '@/lib/localizedName';
 
 interface MovementDetailProps {
   movementId: string;
@@ -67,7 +68,7 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
 }
 
 export function MovementDetail({ movementId, onBack, onNavigateMovement }: MovementDetailProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { user, profile } = useAuth();
   const [log, setLog] = useState<EntryExitLog | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
@@ -398,12 +399,12 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
               <InfoRow
                 icon={<Building2 size={16} />}
                 label={t('company')}
-                value={company ? `${company.name_ar} — ${company.name_en}` : '—'}
+                value={company ? localizedName(lang, company.name_ar, company.name_en) : '—'}
               />
               <InfoRow
                 icon={<MapPin size={16} />}
                 label={t('project')}
-                value={project ? `${project.name_ar} — ${project.name_en}` : '—'}
+                value={project ? localizedName(lang, project.name_ar, project.name_en) : '—'}
               />
               <InfoRow
                 icon={<User size={16} />}
@@ -587,12 +588,12 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
                   <InfoRow
                     icon={<Building2 size={16} />}
                     label={t('company')}
-                    value={linkedCompany ? `${linkedCompany.name_ar} — ${linkedCompany.name_en}` : '—'}
+                    value={linkedCompany ? localizedName(lang, linkedCompany.name_ar, linkedCompany.name_en) : '—'}
                   />
                   <InfoRow
                     icon={<MapPin size={16} />}
                     label={t('project')}
-                    value={linkedProject ? `${linkedProject.name_ar} — ${linkedProject.name_en}` : '—'}
+                    value={linkedProject ? localizedName(lang, linkedProject.name_ar, linkedProject.name_en) : '—'}
                   />
                   <InfoRow
                     icon={<FileText size={16} />}

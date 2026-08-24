@@ -1,9 +1,9 @@
 import { type ReactNode } from 'react';
 import { useI18n } from '@/i18n/I18nContext';
-import { Sun, Moon, Languages, LogOut, Menu, X } from 'lucide-react';
+import { Sun, Moon, Languages, LogOut, Menu, X, CircleUserRound } from 'lucide-react';
 import { useTheme } from '@/theme/ThemeContext';
 import { useAuth } from '@/auth/AuthContext';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal } from '@/components/Modal';
 
 interface LayoutProps {
@@ -20,6 +20,16 @@ export function Layout({ children, activePage, onNavigate, navItems }: LayoutPro
   const [mobileOpen, setMobileOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const close = (event: MouseEvent) => {
+      if (!userMenuRef.current?.contains(event.target as Node)) setUserMenuOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
 
   const roleLabel = profile?.role === 'admin'
     ? t('admin')
@@ -58,7 +68,7 @@ export function Layout({ children, activePage, onNavigate, navItems }: LayoutPro
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="hidden items-center gap-1.5 sm:flex">
             <button onClick={toggleLanguage} className="btn-ghost p-2" title={t('toggleLanguage')}>
               <Languages size={18} />
               <span className="hidden sm:inline text-xs font-medium">{lang === 'ar' ? 'EN' : 'ع'}</span>
@@ -74,6 +84,40 @@ export function Layout({ children, activePage, onNavigate, navItems }: LayoutPro
             <button onClick={() => setLogoutOpen(true)} className="btn-ghost p-2" title={t('signOut')}>
               <LogOut size={18} />
             </button>
+          </div>
+
+          <div ref={userMenuRef} className="relative sm:hidden">
+            <button
+              type="button"
+              className="btn-ghost h-9 w-9 rounded-full p-0"
+              onClick={() => setUserMenuOpen((value) => !value)}
+              aria-label={t('userMenu')}
+              aria-expanded={userMenuOpen}
+            >
+              <CircleUserRound size={25} />
+            </button>
+            {userMenuOpen && (
+              <div className="absolute end-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border shadow-xl" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+                <div className="border-b px-4 py-3" style={{ borderColor: 'var(--border)' }}>
+                  <p className="text-sm font-semibold">{profile?.full_name ?? '—'}</p>
+                  <p className="mt-0.5 text-xs text-muted">{roleLabel}</p>
+                </div>
+                <div className="p-1.5">
+                  <button className="btn-ghost w-full justify-start" onClick={() => { toggleTheme(); setUserMenuOpen(false); }}>
+                    {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+                    {theme === 'dark' ? t('lightMode') : t('darkMode')}
+                  </button>
+                  <button className="btn-ghost w-full justify-start" onClick={() => { toggleLanguage(); setUserMenuOpen(false); }}>
+                    <Languages size={17} />
+                    {t('language')}: {lang === 'ar' ? 'English' : 'العربية'}
+                  </button>
+                  <button className="btn-ghost w-full justify-start text-red-600 dark:text-red-400" onClick={() => { setUserMenuOpen(false); setLogoutOpen(true); }}>
+                    <LogOut size={17} />
+                    {t('signOut')}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </header>

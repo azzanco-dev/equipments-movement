@@ -15,6 +15,7 @@ import { movementsListConfig, visitsListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
 import { formatDate } from '@/lib/dateFormat';
 import { Modal } from '@/components/Modal';
+import { localizedName } from '@/lib/localizedName';
 
 async function loadLatestDriverNames(entryIds: string[]) {
   if (!entryIds.length) return new Map<string, string>();
@@ -31,7 +32,7 @@ async function loadLatestDriverNames(entryIds: string[]) {
 }
 
 export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelectMovement?: (id: string) => void; onCreateMovement?: (type: 'entry' | 'exit') => void }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -239,7 +240,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                       >
                         <td className="px-4 py-3 font-semibold">{log.contractor_equipment_code ?? '—'}</td>
                         <td className="px-4 py-3">{log.equipment ? `${log.equipment.code} ${log.equipment.type}` : '—'}</td>
-                        <td className="px-4 py-3">{log.movement_context === 'workshop' ? t('workshopLocation') : log.project ? `${log.project.name_ar} — ${log.project.name_en}` : '—'}</td>
+                        <td className="px-4 py-3">{log.movement_context === 'workshop' ? t('workshopLocation') : log.project ? localizedName(lang, log.project.name_ar, log.project.name_en) : '—'}</td>
                         <td className="px-4 py-3">
                           <span className={`badge border ${log.movement_type === 'entry' ? 'status-entry' : 'status-exit'}`}>
                             {log.movement_type === 'entry' ? t('entry') : t('exit')}
@@ -296,7 +297,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                       >
                         <td className="px-4 py-3 font-semibold">{v.contractor_equipment_code ?? '—'}</td>
                         <td className="px-4 py-3">{v.equipment_code} {v.equipment_type}</td>
-                        <td className="px-4 py-3">{v.movement_context === 'workshop' ? t('workshopLocation') : [v.project_name_ar, v.project_name_en].filter(Boolean).join(' — ') || '—'}</td>
+                        <td className="px-4 py-3">{v.movement_context === 'workshop' ? t('workshopLocation') : localizedName(lang, v.project_name_ar, v.project_name_en)}</td>
                         <td className="px-4 py-3">{v.last_driver_name ?? v.driver_name ?? '—'}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(v.entry_recorded_at)}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">
@@ -320,8 +321,8 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
               [t('equipmentNameLabel'), selectedVisit.equipment_type],
               [t('plateNumber'), selectedVisit.plate_number],
               [t('contractorEquipmentCode'), selectedVisit.contractor_equipment_code],
-              [t('company'), [selectedVisit.company_name_ar, selectedVisit.company_name_en].filter(Boolean).join(' — ')],
-              [t('project'), [selectedVisit.project_name_ar, selectedVisit.project_name_en].filter(Boolean).join(' — ')],
+              [t('company'), localizedName(lang, selectedVisit.company_name_ar, selectedVisit.company_name_en)],
+              [t('project'), localizedName(lang, selectedVisit.project_name_ar, selectedVisit.project_name_en)],
               [t('driverName'), selectedVisit.last_driver_name ?? selectedVisit.driver_name],
               [t('entryTime'), formatDate(selectedVisit.entry_recorded_at)],
               [t('entryBy'), selectedVisit.entry_supervisor_name],

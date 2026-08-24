@@ -16,13 +16,14 @@ import { applyListFilters } from '@/lib/applyListFilters';
 import { sanitizeSearchTerm } from '@/lib/search';
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 import type { SelectOption } from '@/components/Select';
+import { localizedName } from '@/lib/localizedName';
 
 type CompanyProjectWithProject = CompanyProject & {
   project?: { id: string; name_ar: string; name_en: string } | null;
 };
 
 export function AdminCompanies() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -119,8 +120,8 @@ export function AdminCompanies() {
     const term = sanitizeSearchTerm(query);
     if (term) request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`);
     const { data } = await request;
-    return (data ?? []).map((project) => ({ value: project.id, label: `${project.name_ar} — ${project.name_en}` }));
-  }, [companyLinks]);
+    return (data ?? []).map((project) => ({ value: project.id, label: localizedName(lang, project.name_ar, project.name_en) }));
+  }, [companyLinks, lang]);
 
   async function addProjectLink() {
     if (!projectsModalCompany || !addProjectId) return;
@@ -273,16 +274,14 @@ export function AdminCompanies() {
             <table className="compact-table w-full text-sm">
               <thead>
                 <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
-                  <th className="table-header text-start px-4 py-3">{t('companyNameAr')}</th>
-                  <th className="table-header text-start px-4 py-3">{t('companyNameEn')}</th>
+                  <th className="table-header text-start px-4 py-3">{t('company')}</th>
                   <th className="table-header text-start px-4 py-3">{t('actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {companies.map((c) => (
                   <tr key={c.id} className="border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
-                    <td className="px-4 py-3 font-semibold">{c.name_ar}</td>
-                    <td className="px-4 py-3 text-muted">{c.name_en}</td>
+                    <td className="px-4 py-3 font-semibold">{localizedName(lang, c.name_ar, c.name_en)}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
                         <button onClick={() => openEdit(c)} className="btn-ghost p-1.5"><Edit2 size={16} /></button>
@@ -428,7 +427,7 @@ export function AdminCompanies() {
       <Modal
         open={projectsModalOpen}
         onClose={() => setProjectsModalOpen(false)}
-        title={`${t('manageProjects')} — ${projectsModalCompany?.name_ar ?? ''}`}
+        title={`${t('manageProjects')} — ${projectsModalCompany ? localizedName(lang, projectsModalCompany.name_ar, projectsModalCompany.name_en) : ''}`}
         size="md"
       >
         {linkError && <div className="mb-4"><Alert type="error">{linkError}</Alert></div>}
@@ -452,7 +451,7 @@ export function AdminCompanies() {
                         style={{ borderColor: 'var(--border)' }}
                       >
                         <span className="text-sm font-medium">
-                          {link.project ? `${link.project.name_ar} — ${link.project.name_en}` : link.project_id}
+                          {link.project ? localizedName(lang, link.project.name_ar, link.project.name_en) : link.project_id}
                         </span>
                         <button
                           onClick={() => removeProjectLink(link.id)}

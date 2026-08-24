@@ -66,12 +66,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchProfile]);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       return { error: error.message };
     }
+    const nextProfile = await fetchProfile(data.user.id);
+    currentUserIdRef.current = data.user.id;
+    setSession(data.session);
+    setUser(data.user);
+    setProfile(nextProfile);
+    setLoading(false);
     return { error: null };
-  }, []);
+  }, [fetchProfile]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();

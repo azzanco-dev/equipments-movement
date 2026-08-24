@@ -8,6 +8,7 @@ import type { Equipment, EntryExitLog, OperationalStatus, OwnershipStatus } from
 import { PageHeader } from '@/components/PageHeader';
 import { isOwnedEquipment, usesExternalSupplier } from '@/lib/equipmentOwnership';
 import { formatDate } from '@/lib/dateFormat';
+import { localizedName } from '@/lib/localizedName';
 
 interface EquipmentDetailProps {
   equipmentId: string;
@@ -18,7 +19,7 @@ interface EquipmentDetailProps {
 }
 
 export function EquipmentDetail({ equipmentId, onBack, onEdit, onSelectMovement, onViewAllMovements }: EquipmentDetailProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [logs, setLogs] = useState<EntryExitLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,7 +113,7 @@ export function EquipmentDetail({ equipmentId, onBack, onEdit, onSelectMovement,
               <InfoItem label={t('manufactureYear')} value={equipment.manufacture_year?.toString()} />
               <InfoItem label={t('chassisNumber')} value={equipment.chassis_number} />
               <InfoItem label={t('registrationType')} value={regLabel(equipment.registration_type)} />
-              <InfoItem label={t('project')} value={equipment.project ? `${equipment.project.name_ar} — ${equipment.project.name_en}` : undefined} />
+              <InfoItem label={t('project')} value={equipment.project ? localizedName(lang, equipment.project.name_ar, equipment.project.name_en) : undefined} />
               {usesExternalSupplier(equipment.ownership_status) && <InfoItem label={t('externalSupplier')} value={equipment.lessor?.name} />}
               <InfoItem icon={<Calendar size={16} />} label={t('lastMaintenanceDate')} value={equipment.last_maintenance_date ? formatDate(equipment.last_maintenance_date) : null} />
               <InfoItem icon={<Calendar size={16} />} label={t('registrationExpiry')} value={equipment.registration_expiry ? formatDate(equipment.registration_expiry) : null} />
@@ -124,7 +125,7 @@ export function EquipmentDetail({ equipmentId, onBack, onEdit, onSelectMovement,
 
       {/* Movement history */}
       <div>
-        <div className="mb-3 flex items-center justify-between"><h3 className="flex items-center gap-2 text-lg font-bold"><FileText size={18} /> {t('movementHistory')}</h3>{onViewAllMovements && <button className="btn-outline text-sm" onClick={() => onViewAllMovements(equipment.code)}>عرض الكل</button>}</div>
+        <div className="mb-3 flex items-center justify-between"><h3 className="flex items-center gap-2 text-lg font-bold"><FileText size={18} /> {t('movementHistory')}</h3>{onViewAllMovements && <button className="btn-outline text-sm" onClick={() => onViewAllMovements(equipment.code)}>{t('viewAll')}</button>}</div>
         {logs.length === 0 ? (
           <div className="card text-center py-12"><p className="text-muted">{t('noMovements')}</p></div>
         ) : (

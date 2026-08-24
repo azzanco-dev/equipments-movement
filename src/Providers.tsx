@@ -9,7 +9,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider>
       <I18nProvider>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider><div id="app-shell">{children}</div></AuthProvider>
       </I18nProvider>
     </ThemeProvider>
   );

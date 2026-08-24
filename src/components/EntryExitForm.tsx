@@ -4,7 +4,7 @@ import { useI18n } from '@/i18n/I18nContext';
 import { useAuth } from '@/auth/AuthContext';
 import { Modal } from '@/components/Modal';
 import { Alert } from '@/components/Alert';
-import { Spinner } from '@/components/Spinner';
+import { Skeleton } from '@/components/Spinner';
 import { Search, AlertTriangle, CheckCircle, Clock, MapPin, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
 import type { Driver, Equipment, MovementType, LastMovement } from '@/lib/types';
 import { DatePicker } from '@/components/DatePicker';
@@ -13,6 +13,7 @@ import { sanitizeSearchTerm } from '@/lib/search';
 import { Select, type SelectOption } from '@/components/Select';
 import { PlateNumberInput } from '@/components/PlateNumberInput';
 import { formatDate } from '@/lib/dateFormat';
+import { localizedName } from '@/lib/localizedName';
 
 const FRONTEND_MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -33,7 +34,7 @@ function toLocalDateTimeInput(date: Date): string {
 }
 
 export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode = false, onViewMovement }: EntryExitFormProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { user, profile } = useAuth();
 
   const [step, setStep] = useState<'select' | 'details'>('select');
@@ -213,16 +214,16 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     const term = sanitizeSearchTerm(query);
     if (term) request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`);
     const { data } = await request;
-    return (data ?? []).map((company) => ({ value: company.id, label: `${company.name_ar} — ${company.name_en}` }));
-  }, []);
+    return (data ?? []).map((company) => ({ value: company.id, label: localizedName(lang, company.name_ar, company.name_en) }));
+  }, [lang]);
 
   const loadProjects = useCallback(async (query: string): Promise<SelectOption[]> => {
     let request = supabase.from('projects').select('id,name_ar,name_en').order('name_ar').limit(20);
     const term = sanitizeSearchTerm(query);
     if (term) request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`);
     const { data } = await request;
-    return (data ?? []).map((project) => ({ value: project.id, label: `${project.name_ar} — ${project.name_en}` }));
-  }, []);
+    return (data ?? []).map((project) => ({ value: project.id, label: localizedName(lang, project.name_ar, project.name_en) }));
+  }, [lang]);
 
   const loadEquipmentTypes = useCallback(async (query: string): Promise<SelectOption[]> => {
     let request = supabase.from('equipment_types').select('name').order('name').limit(20);
@@ -271,7 +272,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
   };
 
   const createQuickDriver = async () => {
-    if (!quickDriver.fullName.trim() || !/^\+?\d{7,15}$/.test(quickDriver.mobile)) { setSaveError('أدخل اسم السائق ورقم جوال صحيح.'); return; }
+    if (!quickDriver.fullName.trim() || !/^\+?\d{7,15}$/.test(quickDriver.mobile)) { setSaveError(t('invalidQuickDriver')); return; }
     setQuickSaving(true); setSaveError(null);
     const { data, error } = await supabase.rpc('quick_create_driver', { p_full_name: quickDriver.fullName.trim(), p_mobile_number: quickDriver.mobile.trim() });
     setQuickSaving(false);
@@ -282,9 +283,9 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
   };
 
   const createQuickEquipment = async () => {
-    if (!quickEquipment.plate.trim()) { setSaveError('رقم اللوحة مطلوب.'); return; }
-    if (workshopMode && quickEquipment.numberingStatus === 'numbered' && !quickEquipment.code.trim()) { setSaveError('رقم المعدة مطلوب.'); return; }
-    if (!workshopMode && !quickEquipment.type) { setSaveError('نوع المعدة مطلوب.'); return; }
+    if (!quickEquipment.plate.trim()) { setSaveError(t('plateRequired')); return; }
+    if (workshopMode && quickEquipment.numberingStatus === 'numbered' && !quickEquipment.code.trim()) { setSaveError(t('equipmentCodeRequired')); return; }
+    if (!workshopMode && !quickEquipment.type) { setSaveError(t('equipmentTypeRequired')); return; }
     if (!workshopMode && !quickEquipment.lessorId) { setSaveError(t('lessorRequired')); return; }
     setQuickSaving(true); setSaveError(null);
     const { data, error } = workshopMode
@@ -338,7 +339,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     if (!selected || !user) return;
     if (validationError) return;
     if (workshopMode && photoFiles.length === 0) {
-      setSaveError('الصورة مطلوبة لحركة الورشة.');
+      setSaveError(t('workshopPhotoRequired'));
       return;
     }
     if (!workshopMode && isEntry && !driverId) {
@@ -487,7 +488,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
 
             {/* Equipment list */}
             {loadingEquipment ? (
-              <div className="flex justify-center py-8"><Spinner size={24} /></div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2"><Skeleton className="h-20" /><Skeleton className="h-20" /><Skeleton className="h-20" /><Skeleton className="h-20" /></div>
             ) : (
               <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
                 {equipment.length === 0 && (
@@ -522,8 +523,8 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
             {quickEquipment.open && <div className="rounded-lg border p-4 text-start space-y-3" style={{ borderColor: 'var(--border)' }}>
               <p className="font-semibold">{t('quickEquipmentAdd')}</p>
               {workshopMode && <div className="flex gap-4 rounded-lg border p-3" style={{ borderColor: 'var(--border)' }}>
-                <label className="flex items-center gap-2 text-sm"><input type="radio" checked={quickEquipment.numberingStatus === 'numbered'} onChange={() => setQuickEquipment({ ...quickEquipment, numberingStatus: 'numbered' })} /> مرقمة</label>
-                <label className="flex items-center gap-2 text-sm"><input type="radio" checked={quickEquipment.numberingStatus === 'unnumbered'} onChange={() => setQuickEquipment({ ...quickEquipment, numberingStatus: 'unnumbered', code: '' })} /> بدون رقم</label>
+                <label className="flex items-center gap-2 text-sm"><input type="radio" checked={quickEquipment.numberingStatus === 'numbered'} onChange={() => setQuickEquipment({ ...quickEquipment, numberingStatus: 'numbered' })} /> {t('numbered')}</label>
+                <label className="flex items-center gap-2 text-sm"><input type="radio" checked={quickEquipment.numberingStatus === 'unnumbered'} onChange={() => setQuickEquipment({ ...quickEquipment, numberingStatus: 'unnumbered', code: '' })} /> {t('unnumbered')}</label>
               </div>}
               {workshopMode && quickEquipment.numberingStatus === 'numbered' && <div><label className="label">{t('equipmentCode')} *</label><input className="input" dir="ltr" placeholder={t('equipmentCodePlaceholder')} value={quickEquipment.code} onChange={(event) => setQuickEquipment({ ...quickEquipment, code: event.target.value })} /></div>}
               <div><label className="label">{t('plateNumber')} *</label><PlateNumberInput value={quickEquipment.plate} onChange={(value) => setQuickEquipment({ ...quickEquipment, plate: value })} /></div>
@@ -564,14 +565,12 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
               </div>
               <p className="text-sm text-muted">{selected.type}</p>
               {selected.plate_number && <p className="text-sm text-muted">{t('plateNumber')}: {selected.plate_number}</p>}
-              {selected.project && <p className="text-sm text-muted">{t('project')}: {selected.project.name_ar} — {selected.project.name_en}</p>}
+              {selected.project && <p className="text-sm text-muted">{t('project')}: {localizedName(lang, selected.project.name_ar, selected.project.name_en)}</p>}
             </div>
 
             {/* Latest movement brief card */}
             {loadingMovement ? (
-              <div className="flex items-center justify-center py-4">
-                <Spinner size={20} />
-              </div>
+              <div className="space-y-2 py-2"><Skeleton className="h-14" /><Skeleton className="h-8 w-2/3" /></div>
             ) : (
               <div
                 className="rounded-lg border p-4 space-y-2"
@@ -795,7 +794,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
 
             {saveError && <Alert type="error">{saveError}</Alert>}
             {saveWarning && <Alert type="warning">{saveWarning}</Alert>}
-            {movementSaved && <Alert type="success">تم حفظ الحركة بنجاح.</Alert>}
+            {movementSaved && <Alert type="success">{t('movementSavedSuccess')}</Alert>}
 
             {/* Actions */}
             <div className="flex gap-3 pt-2">
@@ -803,8 +802,8 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                 {t('cancel')}
               </button>
               {!movementSaved ? <button onClick={handleSave} disabled={saving || !!validationError || loadingMovement} className="btn-primary flex-1">{saving ? t('saving') : t('save')}</button> : <>
-                {onViewMovement && <button className="btn-primary flex-1" onClick={() => onViewMovement(savedMovementId)}>عرض الحركة</button>}
-                <button className="btn-outline flex-1" onClick={reset}>تسجيل حركة أخرى</button>
+                {onViewMovement && <button className="btn-primary flex-1" onClick={() => onViewMovement(savedMovementId)}>{t('viewMovement')}</button>}
+                <button className="btn-outline flex-1" onClick={reset}>{t('registerAnotherMovement')}</button>
               </>}
             </div>
           </div>

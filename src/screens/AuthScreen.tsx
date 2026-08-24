@@ -26,7 +26,7 @@ export function AuthScreen() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)', color: 'var(--fg)' }}>
+    <div className="flex h-[100dvh] flex-col overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--fg)' }}>
       {/* Top controls */}
       <div className="absolute top-4 end-4 flex items-center gap-1.5 z-10">
         <button onClick={toggleLanguage} className="btn-ghost p-2" title={t('toggleLanguage')}>
@@ -38,10 +38,10 @@ export function AuthScreen() {
         </button>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-4">
+      <div className="flex min-h-0 flex-1 items-center justify-center p-4">
         <div className="w-full max-w-md">
           {/* Logo */}
-          <div className="flex flex-col items-center mb-8">
+          <div className="mb-5 flex flex-col items-center sm:mb-8">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-black dark:bg-white mb-4">
               <span className="text-white dark:text-black font-bold text-2xl">E</span>
             </div>

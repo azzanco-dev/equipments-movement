@@ -14,9 +14,10 @@ import { useDataListState } from '@/components/data-list/useDataListState';
 import { projectsListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
 import { sanitizeSearchTerm } from '@/lib/search';
+import { localizedName } from '@/lib/localizedName';
 
 export function AdminProjects() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -197,16 +198,14 @@ export function AdminProjects() {
             <table className="compact-table w-full text-sm">
               <thead>
                 <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
-                  <th className="table-header text-start px-4 py-3">{t('projectNameAr')}</th>
-                  <th className="table-header text-start px-4 py-3">{t('projectNameEn')}</th>
+                  <th className="table-header text-start px-4 py-3">{t('project')}</th>
                   <th className="table-header text-start px-4 py-3">{t('actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {projects.map((p) => (
                   <tr key={p.id} className="border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
-                    <td className="px-4 py-3 font-semibold">{p.name_ar}</td>
-                    <td className="px-4 py-3 text-muted">{p.name_en}</td>
+                    <td className="px-4 py-3 font-semibold">{localizedName(lang, p.name_ar, p.name_en)}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
                         <button onClick={() => openEdit(p)} className="btn-ghost p-1.5"><Edit2 size={16} /></button>

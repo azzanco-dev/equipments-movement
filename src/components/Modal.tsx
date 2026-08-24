@@ -1,4 +1,5 @@
-import { type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -10,7 +11,44 @@ interface ModalProps {
   inline?: boolean;
 }
 
+let modalDepth = 0;
+let bodyOverflowBeforeModal = '';
+
 export function Modal({ open, onClose, title, children, size = 'md', inline = false }: ModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    if (!open || inline) return;
+    const appShell = document.getElementById('app-shell');
+    const previousFocus = document.activeElement as HTMLElement | null;
+    if (modalDepth === 0) {
+      bodyOverflowBeforeModal = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      appShell?.setAttribute('inert', '');
+      appShell?.setAttribute('aria-hidden', 'true');
+    }
+    modalDepth += 1;
+    const modalLevel = modalDepth;
+    window.setTimeout(() => dialogRef.current?.querySelector<HTMLElement>('input, button, select, textarea, [tabindex]:not([tabindex="-1"])')?.focus(), 0);
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && modalDepth === modalLevel) onCloseRef.current();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      modalDepth = Math.max(0, modalDepth - 1);
+      if (modalDepth === 0) {
+        document.body.style.overflow = bodyOverflowBeforeModal;
+        appShell?.removeAttribute('inert');
+        appShell?.removeAttribute('aria-hidden');
+      }
+      previousFocus?.focus();
+    };
+  }, [inline, open]);
+
   if (!open) return null;
 
   const sizeClass = {
@@ -25,13 +63,17 @@ export function Modal({ open, onClose, title, children, size = 'md', inline = fa
     <div className="card">{children}</div>
   </section>;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in" style={{ background: 'var(--overlay)' }}>
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm" style={{ background: 'var(--overlay)' }}>
       <div
         className="absolute inset-0"
         onClick={onClose}
       />
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className={`relative w-full ${sizeClass} max-h-[90vh] overflow-y-auto rounded-2xl border shadow-2xl`}
         style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}
       >
@@ -46,6 +88,7 @@ export function Modal({ open, onClose, title, children, size = 'md', inline = fa
         </div>
         <div className="p-6">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

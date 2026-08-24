@@ -20,6 +20,7 @@ import { equipmentListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
 import { inferOwnershipFromCode, usesExternalSupplier } from '@/lib/equipmentOwnership';
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
+import { localizedName } from '@/lib/localizedName';
 
 function genQrValue(): string {
   return `EQ-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -37,7 +38,7 @@ interface AdminEquipmentProps {
 }
 
 export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [importProjectMap, setImportProjectMap] = useState<Map<string, string>>(new Map());
   const [importLessorMap, setImportLessorMap] = useState<Map<string, string>>(new Map());
@@ -97,8 +98,8 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
     const term = sanitizeSearchTerm(query);
     if (term) request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`);
     const { data } = await request;
-    return (data ?? []).map((project) => ({ value: project.id, label: `${project.name_ar} — ${project.name_en}` }));
-  }, []);
+    return (data ?? []).map((project) => ({ value: project.id, label: localizedName(lang, project.name_ar, project.name_en) }));
+  }, [lang]);
 
   const loadLessors = useCallback(async (query: string) => {
     let request = supabase.from('lessors').select('id,name').order('name').limit(20);
@@ -106,15 +107,6 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
     if (term) request = request.ilike('name', `%${term}%`);
     const { data } = await request;
     return (data ?? []).map((lessor) => ({ value: lessor.id, label: lessor.name }));
-  }, []);
-
-  useEffect(() => {
-    function handleEditEvent(e: Event) {
-      const eq = (e as CustomEvent).detail as Equipment;
-      openEdit(eq);
-    }
-    window.addEventListener('edit-equipment', handleEditEvent);
-    return () => window.removeEventListener('edit-equipment', handleEditEvent);
   }, []);
 
   function openAdd() {
@@ -137,11 +129,22 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
       qr_value: eq.qr_value, last_maintenance_date: eq.last_maintenance_date ?? '',
       registration_expiry: eq.registration_expiry ?? '', insurance_expiry: eq.insurance_expiry ?? '',
     });
-    setSelectedProjectOption(eq.project ? { value: eq.project.id, label: `${eq.project.name_ar} — ${eq.project.name_en}` } : null);
+    setSelectedProjectOption(eq.project ? { value: eq.project.id, label: localizedName(lang, eq.project.name_ar, eq.project.name_en) } : null);
     setSelectedLessorOption(eq.lessor ? { value: eq.lessor.id, label: eq.lessor.name } : null);
     setFormError(null);
     setModalOpen(true);
   }
+
+  useEffect(() => {
+    function handleEditEvent(e: Event) {
+      const eq = (e as CustomEvent).detail as Equipment;
+      openEdit(eq);
+    }
+    window.addEventListener('edit-equipment', handleEditEvent);
+    return () => window.removeEventListener('edit-equipment', handleEditEvent);
+    // The handler only needs to refresh its localized project label when language changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
 
   async function handleSave() {
     setSaving(true); setFormError(null);

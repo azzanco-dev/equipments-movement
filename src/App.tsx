@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect } from 'react';
 import { useAuth } from '@/auth/AuthContext';
 import { useI18n } from '@/i18n/I18nContext';
 import { FullPageSpinner } from '@/components/Spinner';
@@ -37,6 +38,10 @@ function AppContent() {
   const equipmentId = segments[0] === 'equipment' ? segments[1] : null;
   const driverId = segments[0] === 'drivers' ? segments[1] : null;
   const page = ADMIN_PAGES.has(segments[0] ?? '') ? segments[0] : 'dashboard';
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [pathname]);
 
   if (loading) return <FullPageSpinner />;
   if (!profile) return <AuthScreen />;
