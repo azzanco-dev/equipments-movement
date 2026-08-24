@@ -4,14 +4,13 @@ import { useI18n } from '@/i18n/I18nContext';
 import { useAuth } from '@/auth/AuthContext';
 import { Modal } from '@/components/Modal';
 import { Alert } from '@/components/Alert';
-import { QRScanner } from '@/components/QRScanner';
 import { Spinner } from '@/components/Spinner';
-import { QrCode, Search, AlertTriangle, CheckCircle, Clock, MapPin, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
+import { Search, AlertTriangle, CheckCircle, Clock, MapPin, ChevronLeft, ChevronRight, X, Camera } from 'lucide-react';
 import type { Driver, Equipment, MovementType, LastMovement } from '@/lib/types';
 import { DatePicker } from '@/components/DatePicker';
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 import { sanitizeSearchTerm } from '@/lib/search';
-import type { SelectOption } from '@/components/Select';
+import { Select, type SelectOption } from '@/components/Select';
 import { PlateNumberInput } from '@/components/PlateNumberInput';
 import { formatDate } from '@/lib/dateFormat';
 
@@ -38,8 +37,8 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
   const { user, profile } = useAuth();
 
   const [step, setStep] = useState<'select' | 'details'>('select');
-  const [scanOpen, setScanOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [ownerFilter, setOwnerFilter] = useState('');
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [selected, setSelected] = useState<Equipment | null>(null);
   const [loadingEquipment, setLoadingEquipment] = useState(false);
@@ -83,6 +82,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
   const reset = useCallback(() => {
     setStep('select');
     setSearch('');
+    setOwnerFilter('');
     setSelected(null);
     setLastMovement(null);
     setLoadingMovement(false);
@@ -125,9 +125,14 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     const timer = window.setTimeout(async () => {
       let result;
       if (workshopMode) {
-        result = await supabase.rpc('search_workshop_equipment', { p_movement_type: movementType, p_search: term || null });
+        result = await supabase.rpc('search_workshop_equipment', {
+          p_movement_type: movementType,
+          p_search: term || null,
+          p_ownership_status: ownerFilter || null,
+        });
       } else {
-        let query = supabase.from('equipment').select('id,code,type,plate_number,ownership_status,qr_value,is_active,master_data_complete,numbering_status').eq('is_active', true).order('code');
+        let query = supabase.from('equipment').select('id,code,type,plate_number,ownership_status,is_active,master_data_complete,numbering_status').eq('is_active', true).order('code');
+        if (ownerFilter) query = query.eq('ownership_status', ownerFilter);
         if (term) query = query.or(`code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`);
         result = await query.limit(20);
       }
@@ -139,7 +144,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     }, search ? 300 : 0);
 
     return () => { active = false; window.clearTimeout(timer); };
-  }, [open, step, search, workshopMode, movementType]);
+  }, [open, step, search, ownerFilter, workshopMode, movementType]);
 
   // Check last movement when equipment is selected
   const checkLastMovement = useCallback(async (eq: Equipment): Promise<LastMovement | null> => {
@@ -255,23 +260,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     if (error || !data) { setSaveError(t('saveFailed')); return; }
     setQuickEquipment({ open: false, plate: '', code: '', type: '', numberingStatus: 'numbered' });
     handleSelectEquipment(data as Equipment);
-  };
-
-  const handleQRScan = async (decoded: string) => {
-    setScanOpen(false);
-    const { data, error } = await supabase
-      .from('equipment')
-      .select('id,code,type,plate_number,ownership_status,qr_value,is_active')
-      .eq('qr_value', decoded)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if (error || !data) {
-      setSaveError(t('noEquipmentFound'));
-      return;
-    }
-
-    handleSelectEquipment(data as unknown as Equipment);
   };
 
   const handleAddPhotos = (files: FileList | null) => {
@@ -431,20 +419,22 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
       >
         {step === 'select' && (
           <div className="space-y-4">
-            {/* QR Scan button */}
-            <button
-              onClick={() => setScanOpen(true)}
-              className="btn-primary w-full py-3.5"
-            >
-              <QrCode size={20} />
-              {t('scanQR')}
-            </button>
-
-            {/* Divider */}
-            <div className="flex items-center gap-3">
-              <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
-              <span className="text-xs text-muted">{t('manualSelect')}</span>
-              <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
+            {/* Owner filter */}
+            <div>
+              <label className="label">{t('selectOwner')}</label>
+              <Select
+                value={ownerFilter}
+                onChange={setOwnerFilter}
+                placeholder={t('allOwners')}
+                options={[
+                  { value: '', label: t('allOwners') },
+                  { value: 'alazani', label: t('ownershipAlazani') },
+                  { value: 'takween', label: t('ownershipTakween') },
+                  { value: 'third_party_f', label: t('ownershipThirdPartyF') },
+                  { value: 'third_party_partnership_b', label: t('ownershipThirdPartyPartnershipB') },
+                  { value: 'external_supplier', label: t('ownershipExternalSupplier') },
+                ]}
+              />
             </div>
 
             {/* Search */}
@@ -466,7 +456,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
             ) : equipment.length === 0 ? (
               <div className="space-y-3 py-4 text-center"><p className="text-sm text-muted">{t('noEquipmentFound')}</p>{isEntry && <button className="btn-outline" onClick={() => setQuickEquipment((value) => ({ ...value, open: true, plate: search }))}>+ إضافة معدة جديدة</button>}</div>
             ) : (
-              <div className="max-h-80 overflow-y-auto space-y-2">
+              <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
                 {equipment.map((eq) => (
                   <button
                     key={eq.id}
@@ -474,17 +464,10 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                     className="w-full text-start rounded-lg border p-3 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     style={{ borderColor: 'var(--border)' }}
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold text-sm">{eq.code}</p>
-                        <p className="text-xs text-muted">{eq.type}</p>
-                        {eq.plate_number && <p className="text-xs text-muted">{t('plateNumber')}: {eq.plate_number}</p>}
-                      </div>
-                      <div className="text-end">
-                        <span className="badge border" style={{ borderColor: 'var(--border)' }}>
-                          {eq.ownership_status === 'alazani' ? t('owned') : t('rented')}
-                        </span>
-                      </div>
+                    <div>
+                      <p className="font-semibold text-sm">{eq.code}</p>
+                      <p className="text-xs text-muted">{eq.type}</p>
+                      {eq.plate_number && <p className="text-xs text-muted">{t('plateNumber')}: {eq.plate_number}</p>}
                     </div>
                   </button>
                 ))}
@@ -765,11 +748,6 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
         )}
       </Modal>
 
-      <QRScanner
-        open={scanOpen}
-        onClose={() => setScanOpen(false)}
-        onScan={handleQRScan}
-      />
     </>
   );
 }
