@@ -100,6 +100,8 @@ export function AsyncSearchSelect({
     return () => window.clearTimeout(timer);
   }, [open, query, loadOptions]);
 
+  const showCreateAction = Boolean(onCreate && (alwaysShowCreate || query.trim()));
+
   return (
     <div ref={ref} className={`relative ${className}`}>
       <button
@@ -130,7 +132,7 @@ export function AsyncSearchSelect({
       {open && createPortal(
         <div
           ref={menuRef}
-          className="fixed z-[100] overflow-hidden rounded-lg border shadow-lg"
+          className="fixed z-[100] flex flex-col overflow-hidden rounded-lg border shadow-lg"
           dir={document.documentElement.dir || 'rtl'}
           style={{
             background: 'var(--bg)',
@@ -143,7 +145,7 @@ export function AsyncSearchSelect({
               : { top: menuPosition.top }),
           }}
         >
-          <div className="relative border-b" style={{ borderColor: 'var(--border)' }}>
+          <div className="relative shrink-0 border-b" style={{ borderColor: 'var(--border)' }}>
             <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted" />
             <input
               ref={inputRef}
@@ -153,7 +155,7 @@ export function AsyncSearchSelect({
               className="w-full bg-transparent py-2 ps-9 pe-3 text-sm outline-none"
             />
           </div>
-          <div className="overflow-y-auto" style={{ maxHeight: Math.max(72, menuPosition.maxHeight - 82) }}>
+          <div className="min-h-0 flex-1 overflow-y-auto" style={{ maxHeight: Math.max(32, menuPosition.maxHeight - (showCreateAction ? 82 : 42)) }}>
             {loading ? (
               <div className="flex items-center justify-center gap-2 px-3 py-5 text-sm text-muted"><Loader2 size={16} className="animate-spin" />{t('loading')}</div>
             ) : options.length === 0 ? (
@@ -170,7 +172,7 @@ export function AsyncSearchSelect({
               </button>
             ))}
           </div>
-          {onCreate && (alwaysShowCreate || query.trim()) && <button type="button" className="w-full border-t px-3.5 py-2 text-start text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-800" style={{ borderColor: 'var(--border)' }} onClick={() => { onCreate(query.trim()); setOpen(false); }}>{createLabel ?? `+ ${query.trim()}`}</button>}
+          {showCreateAction && onCreate && <button type="button" className="w-full shrink-0 border-t px-3.5 py-2 text-start text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-800" style={{ borderColor: 'var(--border)' }} onClick={() => { onCreate(query.trim()); setOpen(false); }}>{createLabel ?? `+ ${query.trim()}`}</button>}
         </div>,
         document.body,
       )}
