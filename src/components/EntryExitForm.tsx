@@ -686,8 +686,9 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                     onChange={(value, option) => { setDriverId(value); setSelectedDriver(option); }}
                     loadOptions={loadDrivers}
                     placeholder={t('selectDriver')}
-                    createLabel="+ إضافة سائق جديد"
+                    createLabel={`${t('addNewDriver')} +`}
                     onCreate={(query) => setQuickDriver({ open: true, fullName: query, mobile: '' })}
+                    alwaysShowCreate
                   />
                 ) : (
                   <div className="input bg-gray-50 dark:bg-gray-900/30">{selectedDriver?.label ?? t('driverInheritedFromEntry')}</div>
