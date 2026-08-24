@@ -63,7 +63,8 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
   const [contractorCode, setContractorCode] = useState('');
   const [recordedAt, setRecordedAt] = useState('');
   const [quickDriver, setQuickDriver] = useState({ open: false, fullName: '', mobile: '' });
-  const [quickEquipment, setQuickEquipment] = useState({ open: false, plate: '', code: '', type: '', numberingStatus: 'numbered' as 'numbered' | 'unnumbered' });
+  const [quickEquipment, setQuickEquipment] = useState({ open: false, plate: '', code: '', type: '', lessorId: '', numberingStatus: 'numbered' as 'numbered' | 'unnumbered' });
+  const [selectedQuickLessor, setSelectedQuickLessor] = useState<SelectOption | null>(null);
   const [quickSaving, setQuickSaving] = useState(false);
 
   const isEntry = movementType === 'entry';
@@ -104,7 +105,8 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     setContractorCode('');
     setRecordedAt('');
     setQuickDriver({ open: false, fullName: '', mobile: '' });
-    setQuickEquipment({ open: false, plate: '', code: '', type: '', numberingStatus: 'numbered' });
+    setQuickEquipment({ open: false, plate: '', code: '', type: '', lessorId: '', numberingStatus: 'numbered' });
+    setSelectedQuickLessor(null);
   }, []);
 
   useEffect(() => {
@@ -228,6 +230,31 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     return (data ?? []).map((item) => ({ value: item.name, label: item.name }));
   }, []);
 
+  const loadLessors = useCallback(async (query: string): Promise<SelectOption[]> => {
+    let request = supabase.from('lessors').select('id,name').order('name').limit(20);
+    const term = sanitizeSearchTerm(query);
+    if (term) request = request.ilike('name', `%${term}%`);
+    const { data } = await request;
+    return (data ?? []).map((lessor) => ({ value: lessor.id, label: lessor.name }));
+  }, []);
+
+  const createQuickLessor = async (name: string) => {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+    setQuickSaving(true);
+    setSaveError(null);
+    const { data, error } = await supabase.rpc('quick_create_lessor_by_name', { p_name: trimmedName });
+    setQuickSaving(false);
+    if (error || !data) {
+      setSaveError(t('saveFailed'));
+      return;
+    }
+    const lessor = data as { id: string; name: string };
+    const option = { value: lessor.id, label: lessor.name };
+    setQuickEquipment((current) => ({ ...current, lessorId: lessor.id }));
+    setSelectedQuickLessor(option);
+  };
+
   const handleSelectEquipment = (eq: Equipment) => {
     setSelected(eq);
     setSaveError(null);
@@ -252,13 +279,15 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
     if (!quickEquipment.plate.trim()) { setSaveError('رقم اللوحة مطلوب.'); return; }
     if (workshopMode && quickEquipment.numberingStatus === 'numbered' && !quickEquipment.code.trim()) { setSaveError('رقم المعدة مطلوب.'); return; }
     if (!workshopMode && !quickEquipment.type) { setSaveError('نوع المعدة مطلوب.'); return; }
+    if (!workshopMode && !quickEquipment.lessorId) { setSaveError(t('lessorRequired')); return; }
     setQuickSaving(true); setSaveError(null);
     const { data, error } = workshopMode
       ? await supabase.rpc('quick_create_workshop_equipment', { p_numbering_status: quickEquipment.numberingStatus, p_code: quickEquipment.code.trim(), p_plate_number: quickEquipment.plate.trim() })
-      : await supabase.rpc('quick_create_foreman_equipment', { p_plate_number: quickEquipment.plate.trim(), p_type: quickEquipment.type });
+      : await supabase.rpc('quick_create_foreman_equipment', { p_plate_number: quickEquipment.plate.trim(), p_type: quickEquipment.type, p_lessor_id: quickEquipment.lessorId });
     setQuickSaving(false);
     if (error || !data) { setSaveError(t('saveFailed')); return; }
-    setQuickEquipment({ open: false, plate: '', code: '', type: '', numberingStatus: 'numbered' });
+    setQuickEquipment({ open: false, plate: '', code: '', type: '', lessorId: '', numberingStatus: 'numbered' });
+    setSelectedQuickLessor(null);
     handleSelectEquipment(data as Equipment);
   };
 
@@ -481,8 +510,23 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
               </div>}
               {workshopMode && quickEquipment.numberingStatus === 'numbered' && <div><label className="label">{t('equipmentCode')} *</label><input className="input" dir="ltr" placeholder={t('equipmentCodePlaceholder')} value={quickEquipment.code} onChange={(event) => setQuickEquipment({ ...quickEquipment, code: event.target.value })} /></div>}
               <div><label className="label">{t('plateNumber')} *</label><PlateNumberInput value={quickEquipment.plate} onChange={(value) => setQuickEquipment({ ...quickEquipment, plate: value })} /></div>
-              {!workshopMode && <div><label className="label">{t('equipmentType')} *</label><AsyncSearchSelect value={quickEquipment.type} selectedOption={quickEquipment.type ? { value: quickEquipment.type, label: quickEquipment.type } : null} onChange={(value) => setQuickEquipment({ ...quickEquipment, type: value })} loadOptions={loadEquipmentTypes} placeholder={t('selectEquipmentType')} /></div>}
-              <div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setQuickEquipment({ open: false, plate: '', code: '', type: '', numberingStatus: 'numbered' })}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={quickSaving} onClick={createQuickEquipment}>{quickSaving ? t('saving') : t('save')}</button></div>
+              {!workshopMode && <>
+                <div><label className="label">{t('equipmentType')} *</label><AsyncSearchSelect value={quickEquipment.type} selectedOption={quickEquipment.type ? { value: quickEquipment.type, label: quickEquipment.type } : null} onChange={(value) => setQuickEquipment({ ...quickEquipment, type: value })} loadOptions={loadEquipmentTypes} placeholder={t('selectEquipmentType')} /></div>
+                <div>
+                  <label className="label">{t('externalSupplier')} *</label>
+                  <AsyncSearchSelect
+                    value={quickEquipment.lessorId}
+                    selectedOption={selectedQuickLessor}
+                    onChange={(value, option) => { setQuickEquipment({ ...quickEquipment, lessorId: value }); setSelectedQuickLessor(option); }}
+                    loadOptions={loadLessors}
+                    placeholder={t('selectLessor')}
+                    createLabel={t('addLessorByName')}
+                    onCreate={createQuickLessor}
+                    disabled={quickSaving}
+                  />
+                </div>
+              </>}
+              <div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => { setQuickEquipment({ open: false, plate: '', code: '', type: '', lessorId: '', numberingStatus: 'numbered' }); setSelectedQuickLessor(null); }}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={quickSaving} onClick={createQuickEquipment}>{quickSaving ? t('saving') : t('save')}</button></div>
             </div>}
           </div>
         )}
