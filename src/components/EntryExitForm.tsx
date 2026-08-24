@@ -482,10 +482,11 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
             {/* Equipment list */}
             {loadingEquipment ? (
               <div className="flex justify-center py-8"><Spinner size={24} /></div>
-            ) : equipment.length === 0 ? (
-              <div className="py-4 text-center"><p className="text-sm text-muted">{t('noEquipmentFound')}</p></div>
             ) : (
               <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
+                {equipment.length === 0 && (
+                  <p className="col-span-full py-4 text-center text-sm text-muted">{t('noEquipmentFound')}</p>
+                )}
                 {equipment.map((eq) => (
                   <button
                     key={eq.id}
@@ -500,16 +501,17 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                     </div>
                   </button>
                 ))}
+                {isEntry && (
+                  <button
+                    type="button"
+                    className="w-full rounded-lg border px-3 py-2 text-start text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                    style={{ borderColor: 'var(--border)' }}
+                    onClick={() => setQuickEquipment((value) => ({ ...value, open: true, plate: search }))}
+                  >
+                    {t('addEquipment')} +
+                  </button>
+                )}
               </div>
-            )}
-            {isEntry && (
-              <button
-                type="button"
-                className="btn-outline w-full"
-                onClick={() => setQuickEquipment((value) => ({ ...value, open: true, plate: search }))}
-              >
-                + {t('addEquipment')}
-              </button>
             )}
             {quickEquipment.open && <div className="rounded-lg border p-4 text-start space-y-3" style={{ borderColor: 'var(--border)' }}>
               <p className="font-semibold">إضافة معدة سريعة</p>
