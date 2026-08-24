@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Loader2, Search, X } from 'lucide-react';
 import { useI18n } from '@/i18n/I18nContext';
 import type { SelectOption } from '@/components/Select';
@@ -32,12 +33,36 @@ export function AsyncSearchSelect({
   const [options, setOptions] = useState<SelectOption[]>([]);
   const [loading, setLoading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef(0);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, width: 260, maxHeight: 240, openAbove: false });
+
+  const updateMenuPosition = useCallback(() => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    const gap = 4;
+    const viewportPadding = 8;
+    const availableBelow = window.innerHeight - rect.bottom - gap - viewportPadding;
+    const availableAbove = rect.top - gap - viewportPadding;
+    const openAbove = availableBelow < 220 && availableAbove > availableBelow;
+    const availableHeight = openAbove ? availableAbove : availableBelow;
+    const width = Math.min(Math.max(rect.width, 260), window.innerWidth - viewportPadding * 2);
+    const isRtl = (document.documentElement.dir || 'rtl') === 'rtl';
+    const preferredLeft = isRtl ? rect.right - width : rect.left;
+    const left = Math.min(Math.max(viewportPadding, preferredLeft), window.innerWidth - width - viewportPadding);
+    setMenuPosition({
+      top: openAbove ? rect.top - gap : rect.bottom + gap,
+      left,
+      width,
+      maxHeight: Math.max(120, Math.min(300, availableHeight)),
+      openAbove,
+    });
+  }, []);
 
   useEffect(() => {
     const close = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) {
+      if (ref.current && !ref.current.contains(event.target as Node) && !menuRef.current?.contains(event.target as Node)) {
         setOpen(false);
         setQuery('');
       }
@@ -45,6 +70,17 @@ export function AsyncSearchSelect({
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updateMenuPosition();
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
 
   useEffect(() => {
     if (!open) return;
@@ -67,7 +103,7 @@ export function AsyncSearchSelect({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => { if (!open) updateMenuPosition(); setOpen((current) => !current); }}
         className="flex h-8 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors focus:border-black disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-white"
         style={{ borderColor: 'var(--border)' }}
       >
@@ -89,8 +125,22 @@ export function AsyncSearchSelect({
         </span>
       </button>
 
-      {open && (
-        <div className="absolute z-50 mt-1 w-full min-w-[260px] overflow-hidden rounded-lg border shadow-lg" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[100] overflow-hidden rounded-lg border shadow-lg"
+          dir={document.documentElement.dir || 'rtl'}
+          style={{
+            background: 'var(--bg)',
+            borderColor: 'var(--border)',
+            left: menuPosition.left,
+            width: menuPosition.width,
+            maxHeight: menuPosition.maxHeight,
+            ...(menuPosition.openAbove
+              ? { bottom: window.innerHeight - menuPosition.top }
+              : { top: menuPosition.top }),
+          }}
+        >
           <div className="relative border-b" style={{ borderColor: 'var(--border)' }}>
             <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted" />
             <input
@@ -101,7 +151,7 @@ export function AsyncSearchSelect({
               className="w-full bg-transparent py-2 ps-9 pe-3 text-sm outline-none"
             />
           </div>
-          <div className="max-h-60 overflow-y-auto">
+          <div className="overflow-y-auto" style={{ maxHeight: Math.max(72, menuPosition.maxHeight - 82) }}>
             {loading ? (
               <div className="flex items-center justify-center gap-2 px-3 py-5 text-sm text-muted"><Loader2 size={16} className="animate-spin" />{t('loading')}</div>
             ) : options.length === 0 ? (
@@ -119,7 +169,8 @@ export function AsyncSearchSelect({
             ))}
           </div>
           {onCreate && query.trim() && <button type="button" className="w-full border-t px-3.5 py-2 text-start text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-800" style={{ borderColor: 'var(--border)' }} onClick={() => { onCreate(query.trim()); setOpen(false); }}>{createLabel ?? `+ ${query.trim()}`}</button>}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
