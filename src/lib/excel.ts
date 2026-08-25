@@ -39,26 +39,32 @@ export interface EquipmentImportRow {
 
 const OP_STATUS_MAP: Record<string, OperationalStatus> = {
   'operational': 'operational', 'تعمل': 'operational',
-  'maintenance': 'maintenance', 'تحت الصيانة': 'maintenance', 'صيانة': 'maintenance',
+  'maintenance': 'maintenance', 'تحت_الصيانة': 'maintenance', 'صيانة': 'maintenance',
   'stopped': 'stopped', 'متوقفة': 'stopped', 'متوقف': 'stopped',
 };
 
 const OWN_STATUS_MAP: Record<string, OwnershipStatus> = {
-  'alazani': 'alazani', 'عزاني': 'alazani', 'العزاني': 'alazani', 'عبدالله العزاني': 'alazani',
+  'alazani': 'alazani', 'al_azani': 'alazani', 'al_azzani': 'alazani', 'alazni': 'alazani',
+  'عزاني': 'alazani', 'العزاني': 'alazani', 'عبدالله_العزاني': 'alazani',
   'takween': 'takween', 'تكوين': 'takween',
-  'third_party_f': 'third_party_f', 'مملوكة للغير f': 'third_party_f', 'غير f': 'third_party_f',
-  'third_party_partnership_b': 'third_party_partnership_b', 'مملوكة للغير b': 'third_party_partnership_b', 'مملوكة للغير شراكة b': 'third_party_partnership_b', 'شراكة b': 'third_party_partnership_b',
-  'external_supplier': 'external_supplier', 'مورد خارجي': 'external_supplier', 'مورد': 'external_supplier',
+  'third_party_f': 'third_party_f', 'مملوكة_للغير_f': 'third_party_f', 'غير_f': 'third_party_f',
+  'third_party_partnership_b': 'third_party_partnership_b', 'مملوكة_للغير_b': 'third_party_partnership_b', 'مملوكة_للغير_شراكة_b': 'third_party_partnership_b', 'شراكة_b': 'third_party_partnership_b',
+  'external_supplier': 'external_supplier', 'مورد_خارجي': 'external_supplier', 'مورّد_خارجي': 'external_supplier', 'مالك_آخر': 'external_supplier', 'مورد': 'external_supplier',
 };
 
 const REG_TYPE_MAP: Record<string, RegistrationType> = {
-  'private_transport': 'private_transport', 'نقل خاص': 'private_transport',
-  'public_transport': 'public_transport', 'نقل عام': 'public_transport',
-  'heavy_equipment': 'heavy_equipment', 'معدات ثقيلة': 'heavy_equipment',
+  'private_transport': 'private_transport', 'نقل_خاص': 'private_transport',
+  'public_transport': 'public_transport', 'نقل_عام': 'public_transport',
+  'heavy_equipment': 'heavy_equipment', 'معدات_ثقيلة': 'heavy_equipment',
 };
 
 function normalizeKey(key: string): string {
-  return key.toString().trim().toLowerCase().replace(/\s+/g, '_');
+  return key
+    .toString()
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '_');
 }
 
 function parseDate(value: unknown): string | null {
@@ -109,15 +115,15 @@ export function parseEquipmentExcel(data: ArrayBuffer, t: (key: TranslationKey) 
     const type = get('type');
     if (!type) errors.push(t('equipmentType'));
 
-    const opRaw = get('operational_status').toLowerCase();
+    const opRaw = normalizeKey(get('operational_status'));
     const opStatus = OP_STATUS_MAP[opRaw] ?? (opRaw === '' ? 'operational' : undefined);
     if (!opStatus) errors.push(t('operationalStatus'));
 
-    const ownRaw = get('ownership_status').toLowerCase();
+    const ownRaw = normalizeKey(get('ownership_status'));
     const ownStatus = OWN_STATUS_MAP[ownRaw] ?? (ownRaw === '' ? 'alazani' : undefined);
     if (!ownStatus) errors.push(t('ownershipStatus'));
 
-    const regRaw = get('registration_type').toLowerCase();
+    const regRaw = normalizeKey(get('registration_type'));
     const regType = regRaw ? (REG_TYPE_MAP[regRaw] ?? null) : null;
     if (regRaw && !regType) errors.push(t('registrationType'));
 
