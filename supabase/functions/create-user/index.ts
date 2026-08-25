@@ -63,6 +63,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    if (!/^\S+@\S+\.\S+$/.test(String(email).trim())) {
+      return new Response(JSON.stringify({ error: "Invalid email", code: "invalid_email" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (String(password).length < 8) {
+      return new Response(JSON.stringify({ error: "Weak password", code: "weak_password" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (!["admin", "supervisor", "workshop", "workshop_manager"].includes(role)) {
       return new Response(
         JSON.stringify({ error: "Invalid role" }),
@@ -82,7 +94,12 @@ Deno.serve(async (req: Request) => {
 
     if (createError) {
       console.error("createUser failed", createError);
-      return new Response(JSON.stringify({ error: "Could not create the user" }), {
+      const code = createError.code === "email_exists" || createError.message.toLowerCase().includes("already")
+        ? "email_exists"
+        : createError.code === "email_address_invalid" ? "invalid_email"
+        : createError.code === "weak_password" ? "weak_password"
+        : "create_failed";
+      return new Response(JSON.stringify({ error: "Could not create the user", code }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

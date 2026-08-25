@@ -99,7 +99,11 @@ export function AdminUsers() {
   }
 
   async function handleSave() {
-    setSaving(true); setFormError(null);
+    setFormError(null);
+    if (!fullName.trim() || !email.trim() || !password) { setFormError(t('userFieldsRequired')); return; }
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) { setFormError(t('invalidUserEmail')); return; }
+    if (password.length < 8) { setFormError(t('passwordMinLength')); return; }
+    setSaving(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
@@ -122,10 +126,18 @@ export function AdminUsers() {
       );
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Failed to create user');
+      if (!response.ok) {
+        if (result.code === 'email_exists') throw new Error('email_exists');
+        if (result.code === 'invalid_email') throw new Error('invalid_email');
+        if (result.code === 'weak_password') throw new Error('weak_password');
+        throw new Error('create_failed');
+      }
 
       setModalOpen(false); fetchUsers();
-    } catch (err) { console.error(err); setFormError(t('userCreateError')); }
+    } catch (err) {
+      const code = err instanceof Error ? err.message : '';
+      setFormError(code === 'email_exists' ? t('userEmailExists') : code === 'invalid_email' ? t('invalidUserEmail') : code === 'weak_password' ? t('passwordMinLength') : t('userCreateError'));
+    }
     finally { setSaving(false); }
   }
 
