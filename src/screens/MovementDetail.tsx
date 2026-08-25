@@ -413,7 +413,7 @@ export function MovementDetail({ movementId, onBack, onNavigateMovement }: Movem
               />
             </>
           )}
-          {(profile?.role === 'admin' || (profile?.role === 'workshop_manager' && isWorkshopMovement)) && (
+          {(profile?.role === 'admin' || (['workshop_manager', 'assistant_workshop_manager'].includes(profile?.role ?? '') && isWorkshopMovement)) && (
             <InfoRow
               icon={<User size={16} />}
               label={t('supervisorName')}

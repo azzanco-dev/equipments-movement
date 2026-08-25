@@ -70,7 +70,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
   const [quickSaving, setQuickSaving] = useState(false);
 
   const isEntry = movementType === 'entry';
-  const workshopMode = profile?.role === 'workshop' || profile?.role === 'workshop_manager';
+  const workshopMode = profile?.role === 'workshop' || profile?.role === 'assistant_workshop_manager' || profile?.role === 'workshop_manager';
   const currentLocalDateTime = toLocalDateTimeInput(new Date());
   const movementDate = recordedAt.slice(0, 10);
 
@@ -119,6 +119,14 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
       reset();
     }
   }, [open, reset]);
+
+  useEffect(() => {
+    if (!open || profile?.role !== 'supervisor' || !profile.project_id) return;
+    setSelectedProjectId(profile.project_id);
+    supabase.from('projects').select('id,name_ar,name_en').eq('id', profile.project_id).maybeSingle().then(({ data }) => {
+      if (data) setSelectedProject({ value: data.id, label: localizedName(lang, data.name_ar, data.name_en) });
+    });
+  }, [lang, open, profile?.project_id, profile?.role]);
 
   // Search equipment
   useEffect(() => {
@@ -666,6 +674,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                       onChange={(value, option) => { setSelectedProjectId(value); setSelectedProject(option); }}
                       placeholder={t('selectProject')}
                       loadOptions={loadProjects}
+                      disabled={profile?.role === 'supervisor'}
                     />
                   </div>
 

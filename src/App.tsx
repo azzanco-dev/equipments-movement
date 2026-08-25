@@ -52,7 +52,7 @@ function AppContent() {
   const openMovement = (id: string) => router.push(`/movements/${id}`);
   const backToDashboard = () => router.push('/dashboard');
 
-  if (profile.role === 'supervisor' || profile.role === 'workshop' || profile.role === 'workshop_manager') {
+  if (profile.role === 'supervisor' || profile.role === 'workshop' || profile.role === 'assistant_workshop_manager' || profile.role === 'workshop_manager') {
     return (
       <><Layout activePage="dashboard" onNavigate={backToDashboard} navItems={[]}>
         {isMovementCreate ? (

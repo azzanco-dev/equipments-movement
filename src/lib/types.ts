@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'supervisor' | 'workshop' | 'workshop_manager';
+export type UserRole = 'admin' | 'supervisor' | 'workshop' | 'assistant_workshop_manager' | 'workshop_manager';
 
 export type OperationalStatus = 'operational' | 'maintenance' | 'stopped';
 export type OwnershipStatus = 'alazani' | 'takween' | 'third_party_f' | 'third_party_partnership_b' | 'external_supplier';
@@ -22,6 +22,7 @@ export interface Profile {
   id: string;
   full_name: string;
   role: UserRole;
+  project_id: string | null;
   must_change_password: boolean;
   created_at: string;
 }

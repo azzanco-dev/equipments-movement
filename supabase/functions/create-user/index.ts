@@ -54,7 +54,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Parse request body
-    const { email, password, full_name, role } = await req.json();
+    const { email, password, full_name, role, project_id } = await req.json();
 
     if (!email || !password || !full_name || !role) {
       return new Response(
@@ -75,11 +75,17 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    if (!["admin", "supervisor", "workshop", "workshop_manager"].includes(role)) {
+    if (!["admin", "supervisor", "workshop", "assistant_workshop_manager", "workshop_manager"].includes(role)) {
       return new Response(
         JSON.stringify({ error: "Invalid role" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    if (role === "supervisor" && !project_id) {
+      return new Response(JSON.stringify({ error: "A project is required for foremen", code: "project_required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // Use service role client to create the new user
@@ -89,7 +95,7 @@ Deno.serve(async (req: Request) => {
       email,
       password,
       email_confirm: true,
-      user_metadata: { full_name, role, admin_created: true },
+      user_metadata: { full_name, role, project_id: role === "supervisor" ? project_id : null, admin_created: true },
     });
 
     if (createError) {

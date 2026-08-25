@@ -20,7 +20,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
   const [filterDate, setFilterDate] = useState('');
   const [classificationBusy, setClassificationBusy] = useState<string | null>(null);
   const [classificationError, setClassificationError] = useState<string | null>(null);
-  const workshopManagerMode = profile?.role === 'workshop_manager';
+  const workshopManagerMode = profile?.role === 'workshop_manager' || profile?.role === 'assistant_workshop_manager';
   const workshopMode = profile?.role === 'workshop' || workshopManagerMode;
 
   const fetchLogs = useCallback(async () => {
