@@ -32,6 +32,8 @@ export function AdminUsers() {
   const [role, setRole] = useState<UserRole>('supervisor');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<Profile | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -49,6 +51,52 @@ export function AdminUsers() {
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   function openAdd() { setEmail(''); setPassword(''); setFullName(''); setRole('supervisor'); setFormError(null); setModalOpen(true); }
+
+  async function openDetails(profile: Profile) {
+    setEditingUser(profile);
+    setDetailsLoading(true);
+    setFormError(null);
+    setPassword('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/manage-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ action: 'get', user_id: profile.id }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error('load failed');
+      setEditingUser(result.user as Profile);
+      setFullName(result.user.full_name);
+      setEmail(result.user.email);
+    } catch {
+      setFormError(t('userUpdateError'));
+    } finally {
+      setDetailsLoading(false);
+    }
+  }
+
+  async function handleUpdate() {
+    if (!editingUser) return;
+    setSaving(true); setFormError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/manage-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ action: 'update', user_id: editingUser.id, full_name: fullName.trim(), email: email.trim(), password }),
+      });
+      if (!response.ok) throw new Error('update failed');
+      setEditingUser(null);
+      await fetchUsers();
+    } catch {
+      setFormError(t('userUpdateError'));
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleSave() {
     setSaving(true); setFormError(null);
@@ -119,9 +167,9 @@ export function AdminUsers() {
               </tr></thead>
               <tbody>
                 {users.map((u) => (
-                  <tr key={u.id} className="border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
+                  <tr key={u.id} className="cursor-pointer border-b last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/60" style={{ borderColor: 'var(--border)' }} onClick={() => openDetails(u)} tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') openDetails(u); }}>
                     <td className="px-4 py-3 font-semibold">{u.full_name}{u.id === currentUser?.id ? ' (You)' : ''}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
                       {u.id === currentUser?.id ? (
                         <span className="text-muted">{u.role === 'admin' ? t('admin') : u.role === 'workshop' ? t('workshopOfficer') : u.role === 'workshop_manager' ? t('workshopManager') : t('supervisor')}</span>
                       ) : (
@@ -140,7 +188,7 @@ export function AdminUsers() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(u.created_at)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
                       {u.id !== currentUser?.id && <button onClick={() => handleDelete(u)} className="btn-ghost p-1.5"><Trash2 size={16} /></button>}
                     </td>
                   </tr>
@@ -175,6 +223,19 @@ export function AdminUsers() {
           <button onClick={() => setModalOpen(false)} className="btn-outline flex-1">{t('cancel')}</button>
           <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">{saving ? t('saving') : t('save')}</button>
         </div>
+      </Modal>
+      <Modal open={Boolean(editingUser)} onClose={() => setEditingUser(null)} title={t('userDetails')} size="sm">
+        {formError && <div className="mb-4"><Alert type="error">{formError}</Alert></div>}
+        {detailsLoading ? <InlineSpinner label={t('loading')} /> : <div className="space-y-4">
+          <div><label className="label">{t('fullName')} *</label><input className="input" value={fullName} onChange={(event) => setFullName(event.target.value)} /></div>
+          <div><label className="label">{t('email')} *</label><input className="input" type="email" dir="ltr" value={email} onChange={(event) => setEmail(event.target.value)} /></div>
+          <div><label className="label">{t('temporaryPassword')}</label><PasswordInput dir="ltr" value={password} onChange={(event) => setPassword(event.target.value)} /><p className="mt-1 text-xs text-muted">{t('temporaryPasswordHelp')}</p></div>
+          {editingUser?.must_change_password && <Alert type="warning">{t('mustChangePassword')}</Alert>}
+          <div className="flex gap-3 pt-2">
+            <button onClick={() => setEditingUser(null)} className="btn-outline flex-1">{t('cancel')}</button>
+            <button onClick={handleUpdate} disabled={saving} className="btn-primary flex-1">{saving ? t('saving') : t('save')}</button>
+          </div>
+        </div>}
       </Modal>
     </div>
   );

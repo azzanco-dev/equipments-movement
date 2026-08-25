@@ -22,6 +22,7 @@ import { MovementCreate } from '@/screens/MovementCreate';
 import { AdminSettings } from '@/screens/AdminSettings';
 import type { Equipment } from '@/lib/types';
 import { LayoutDashboard, FileText, Truck, FolderKanban, Building2, Users, Briefcase, Contact, Settings } from 'lucide-react';
+import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog';
 
 const ADMIN_PAGES = new Set(['dashboard', 'logs', 'equipment', 'projects', 'companies', 'lessors', 'drivers', 'users', 'settings']);
 
@@ -46,12 +47,14 @@ function AppContent() {
   if (loading) return <FullPageSpinner />;
   if (!profile) return <AuthScreen />;
 
+  const passwordDialog = <FirstLoginPasswordDialog />;
+
   const openMovement = (id: string) => router.push(`/movements/${id}`);
   const backToDashboard = () => router.push('/dashboard');
 
   if (profile.role === 'supervisor' || profile.role === 'workshop' || profile.role === 'workshop_manager') {
     return (
-      <Layout activePage="dashboard" onNavigate={backToDashboard} navItems={[]}>
+      <><Layout activePage="dashboard" onNavigate={backToDashboard} navItems={[]}>
         {isMovementCreate ? (
           <MovementCreate movementType={movementType} onClose={backToDashboard} onViewMovement={openMovement} />
         ) : movementId ? (
@@ -59,7 +62,7 @@ function AppContent() {
         ) : (
           <SupervisorDashboard onSelectMovement={openMovement} onCreateMovement={(type) => router.push(`/movements/new?type=${type}`)} />
         )}
-      </Layout>
+      </Layout>{passwordDialog}</>
     );
   }
 
@@ -78,7 +81,7 @@ function AppContent() {
   const navigate = (target: string) => router.push(`/${target}`);
 
   return (
-    <Layout activePage={page} onNavigate={navigate} navItems={navItems}>
+    <><Layout activePage={page} onNavigate={navigate} navItems={navItems}>
       {isMovementCreate ? (
         <MovementCreate movementType={movementType} onClose={() => router.push('/logs')} onViewMovement={openMovement} />
       ) : movementId ? (
@@ -108,7 +111,7 @@ function AppContent() {
           {page === 'settings' && <AdminSettings />}
         </>
       )}
-    </Layout>
+    </Layout>{passwordDialog}</>
   );
 }
 

@@ -22,6 +22,7 @@ export interface Profile {
   id: string;
   full_name: string;
   role: UserRole;
+  must_change_password: boolean;
   created_at: string;
 }
 

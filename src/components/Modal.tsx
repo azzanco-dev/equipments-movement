@@ -9,12 +9,13 @@ interface ModalProps {
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   inline?: boolean;
+  dismissible?: boolean;
 }
 
 let modalDepth = 0;
 let bodyOverflowBeforeModal = '';
 
-export function Modal({ open, onClose, title, children, size = 'md', inline = false }: ModalProps) {
+export function Modal({ open, onClose, title, children, size = 'md', inline = false, dismissible = true }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -34,7 +35,7 @@ export function Modal({ open, onClose, title, children, size = 'md', inline = fa
     window.setTimeout(() => dialogRef.current?.querySelector<HTMLElement>('input, button, select, textarea, [tabindex]:not([tabindex="-1"])')?.focus(), 0);
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && modalDepth === modalLevel) onCloseRef.current();
+      if (dismissible && event.key === 'Escape' && modalDepth === modalLevel) onCloseRef.current();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => {
@@ -47,7 +48,7 @@ export function Modal({ open, onClose, title, children, size = 'md', inline = fa
       }
       previousFocus?.focus();
     };
-  }, [inline, open]);
+  }, [dismissible, inline, open]);
 
   if (!open) return null;
 
@@ -67,7 +68,7 @@ export function Modal({ open, onClose, title, children, size = 'md', inline = fa
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm" style={{ background: 'var(--overlay)' }}>
       <div
         className="absolute inset-0"
-        onClick={onClose}
+        onClick={dismissible ? onClose : undefined}
       />
       <div
         ref={dialogRef}
@@ -82,9 +83,9 @@ export function Modal({ open, onClose, title, children, size = 'md', inline = fa
           style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}
         >
           <h2 className="text-lg font-bold">{title}</h2>
-          <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">
+          {dismissible && <button onClick={onClose} className="btn-ghost p-1.5 rounded-lg">
             <X size={20} />
-          </button>
+          </button>}
         </div>
         <div className="p-6">{children}</div>
       </div>
