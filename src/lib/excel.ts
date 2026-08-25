@@ -46,7 +46,11 @@ const OP_STATUS_MAP: Record<string, OperationalStatus> = {
 const OWN_STATUS_MAP: Record<string, OwnershipStatus> = {
   'alazani': 'alazani', 'al_azani': 'alazani', 'al_azzani': 'alazani', 'alazni': 'alazani',
   'عزاني': 'alazani', 'العزاني': 'alazani', 'عبدالله_العزاني': 'alazani',
+  'شركة_عبدالله_العزاني_للمقاولات': 'alazani',
+  'abdullah_al_azani_contracting_co.': 'alazani',
   'takween': 'takween', 'تكوين': 'takween',
+  'شركة_تكوين_المعدات_للمقاولات': 'takween',
+  'takween_equipment_contracting_co.': 'takween',
   'third_party_f': 'third_party_f', 'مملوكة_للغير_f': 'third_party_f', 'غير_f': 'third_party_f',
   'third_party_partnership_b': 'third_party_partnership_b', 'مملوكة_للغير_b': 'third_party_partnership_b', 'مملوكة_للغير_شراكة_b': 'third_party_partnership_b', 'شراكة_b': 'third_party_partnership_b',
   'external_supplier': 'external_supplier', 'مورد_خارجي': 'external_supplier', 'مورّد_خارجي': 'external_supplier', 'مالك_آخر': 'external_supplier', 'مورد': 'external_supplier',
