@@ -430,8 +430,8 @@ export const translations = {
     passwordMinLength: 'يجب ألا تقل كلمة المرور عن 8 أحرف.',
     passwordsDoNotMatch: 'كلمتا المرور غير متطابقتين.',
     changePasswordError: 'تعذر تغيير كلمة المرور. حاول مرة أخرى.',
-    assignedProject: 'المشروع المسؤول عنه',
-    foremanProjectRequired: 'يجب تحديد مشروع للفورمين.',
+    assignedProject: 'المشاريع المسؤول عنها',
+    foremanProjectRequired: 'يجب تحديد مشروع واحد على الأقل للفورمين.',
 
     // Common
     loading: 'جاري التحميل...',
@@ -912,8 +912,8 @@ export const translations = {
     passwordMinLength: 'Password must be at least 8 characters.',
     passwordsDoNotMatch: 'Passwords do not match.',
     changePasswordError: 'Could not change the password. Please try again.',
-    assignedProject: 'Assigned Project',
-    foremanProjectRequired: 'Select a project for the foreman.',
+    assignedProject: 'Assigned Projects',
+    foremanProjectRequired: 'Select at least one project for the foreman.',
 
     loading: 'Loading...',
     saving: 'Saving...',

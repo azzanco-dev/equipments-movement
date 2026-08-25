@@ -47,12 +47,13 @@ Deno.serve(async (req: Request) => {
     if (!userId) return json({ error: "User is required" }, 400);
 
     if (body.action === "get") {
-      const [{ data: authData, error: authError }, { data: profile, error: profileError }] = await Promise.all([
+      const [{ data: authData, error: authError }, { data: profile, error: profileError }, { data: assignments, error: assignmentsError }] = await Promise.all([
         adminClient.auth.admin.getUserById(userId),
-        adminClient.from("profiles").select("id,full_name,role,project_id,created_at,must_change_password,project:projects(name_ar,name_en)").eq("id", userId).maybeSingle(),
+        adminClient.from("profiles").select("id,full_name,role,created_at,must_change_password").eq("id", userId).maybeSingle(),
+        adminClient.from("profile_projects").select("project:projects(id,name_ar,name_en)").eq("profile_id", userId),
       ]);
-      if (authError || profileError || !authData.user || !profile) return json({ error: "User not found" }, 404);
-      return json({ user: { ...profile, email: authData.user.email ?? "" } });
+      if (authError || profileError || assignmentsError || !authData.user || !profile) return json({ error: "User not found" }, 404);
+      return json({ user: { ...profile, email: authData.user.email ?? "", assigned_projects: (assignments ?? []).flatMap((item) => item.project ? [item.project] : []) } });
     }
 
     if (body.action === "update") {
@@ -60,21 +61,27 @@ Deno.serve(async (req: Request) => {
       const email = String(body.email ?? "").trim();
       const password = String(body.password ?? "");
       const role = String(body.role ?? "");
-      const projectId = body.project_id ? String(body.project_id) : null;
+      const projectIds = Array.isArray(body.project_ids) ? [...new Set(body.project_ids.map(String))] : [];
       if (!fullName || !email) return json({ error: "Name and email are required" }, 400);
       if (password && password.length < 8) return json({ error: "Password must be at least 8 characters" }, 400);
       if (!["admin", "supervisor", "workshop", "assistant_workshop_manager", "workshop_manager"].includes(role)) return json({ error: "Invalid role" }, 400);
-      if (role === "supervisor" && !projectId) return json({ error: "A project is required for foremen" }, 400);
+      if (role === "supervisor" && projectIds.length === 0) return json({ error: "A project is required for foremen" }, 400);
 
       const authAttributes: { email: string; password?: string; email_confirm: boolean } = { email, email_confirm: true };
       if (password) authAttributes.password = password;
       const { error: authError } = await adminClient.auth.admin.updateUserById(userId, authAttributes);
       if (authError) return json({ error: "Could not update login details" }, 400);
 
-      const profileUpdate: { full_name: string; role: string; project_id: string | null; must_change_password?: boolean } = { full_name: fullName, role, project_id: role === "supervisor" ? projectId : null };
+      const profileUpdate: { full_name: string; role: string; project_id: null; must_change_password?: boolean } = { full_name: fullName, role, project_id: null };
       if (password) profileUpdate.must_change_password = true;
       const { error: profileError } = await adminClient.from("profiles").update(profileUpdate).eq("id", userId);
       if (profileError) return json({ error: "Could not update profile" }, 500);
+      const { error: clearAssignmentsError } = await adminClient.from("profile_projects").delete().eq("profile_id", userId);
+      if (clearAssignmentsError) return json({ error: "Could not update project assignments" }, 500);
+      if (role === "supervisor") {
+        const { error: assignmentError } = await adminClient.from("profile_projects").insert(projectIds.map((project_id) => ({ profile_id: userId, project_id })));
+        if (assignmentError) return json({ error: "Could not update project assignments" }, 400);
+      }
       return json({ success: true });
     }
 

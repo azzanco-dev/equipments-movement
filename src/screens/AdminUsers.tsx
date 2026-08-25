@@ -5,7 +5,7 @@ import { useAuth } from '@/auth/AuthContext';
 import { Modal } from '@/components/Modal';
 import { Alert } from '@/components/Alert';
 import { InlineSpinner } from '@/components/Spinner';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, X } from 'lucide-react';
 import type { Profile, UserRole } from '@/lib/types';
 import { Select } from '@/components/Select';
 import { PageHeader } from '@/components/PageHeader';
@@ -33,8 +33,7 @@ export function AdminUsers() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<UserRole>('supervisor');
-  const [projectId, setProjectId] = useState('');
-  const [selectedProject, setSelectedProject] = useState<SelectOption | null>(null);
+  const [assignedProjects, setAssignedProjects] = useState<SelectOption[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
@@ -55,7 +54,7 @@ export function AdminUsers() {
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
-  function openAdd() { setEmail(''); setPassword(''); setFullName(''); setRole('supervisor'); setProjectId(''); setSelectedProject(null); setFormError(null); setModalOpen(true); }
+  function openAdd() { setEmail(''); setPassword(''); setFullName(''); setRole('supervisor'); setAssignedProjects([]); setFormError(null); setModalOpen(true); }
 
   const loadProjects = useCallback(async (search: string): Promise<SelectOption[]> => {
     let query = supabase.from('projects').select('id,name_ar,name_en').order(lang === 'ar' ? 'name_ar' : 'name_en').limit(20);
@@ -93,8 +92,7 @@ export function AdminUsers() {
       setFullName(result.user.full_name);
       setEmail(result.user.email);
       setRole(result.user.role);
-      setProjectId(result.user.project_id ?? '');
-      setSelectedProject(result.user.project ? { value: result.user.project_id, label: localizedName(lang, result.user.project.name_ar, result.user.project.name_en) } : null);
+      setAssignedProjects((result.user.assigned_projects ?? []).map((project: { id: string; name_ar: string; name_en: string }) => ({ value: project.id, label: localizedName(lang, project.name_ar, project.name_en) })));
     } catch {
       setFormError(t('userUpdateError'));
     } finally {
@@ -104,7 +102,7 @@ export function AdminUsers() {
 
   async function handleUpdate() {
     if (!editingUser) return;
-    if (role === 'supervisor' && !projectId) { setFormError(t('foremanProjectRequired')); return; }
+    if (role === 'supervisor' && !assignedProjects.length) { setFormError(t('foremanProjectRequired')); return; }
     setSaving(true); setFormError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -112,7 +110,7 @@ export function AdminUsers() {
       const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/manage-user`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ action: 'update', user_id: editingUser.id, full_name: fullName.trim(), email: email.trim(), password, role, project_id: role === 'supervisor' ? projectId : null }),
+        body: JSON.stringify({ action: 'update', user_id: editingUser.id, full_name: fullName.trim(), email: email.trim(), password, role, project_ids: role === 'supervisor' ? assignedProjects.map((project) => project.value) : [] }),
       });
       if (!response.ok) throw new Error('update failed');
       setEditingUser(null);
@@ -127,7 +125,7 @@ export function AdminUsers() {
   async function handleSave() {
     setFormError(null);
     if (!fullName.trim() || !email.trim() || !password) { setFormError(t('userFieldsRequired')); return; }
-    if (role === 'supervisor' && !projectId) { setFormError(t('foremanProjectRequired')); return; }
+    if (role === 'supervisor' && !assignedProjects.length) { setFormError(t('foremanProjectRequired')); return; }
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) { setFormError(t('invalidUserEmail')); return; }
     if (password.length < 8) { setFormError(t('passwordMinLength')); return; }
     setSaving(true);
@@ -148,7 +146,7 @@ export function AdminUsers() {
             password,
             full_name: fullName.trim(),
             role,
-            project_id: role === 'supervisor' ? projectId : null,
+            project_ids: role === 'supervisor' ? assignedProjects.map((project) => project.value) : [],
           }),
         }
       );
@@ -226,7 +224,7 @@ export function AdminUsers() {
               options={roleOptions}
             />
           </div>
-          {role === 'supervisor' && <div><label className="label">{t('assignedProject')} *</label><AsyncSearchSelect value={projectId} selectedOption={selectedProject} onChange={(value, option) => { setProjectId(value); setSelectedProject(option); }} loadOptions={loadProjects} /></div>}
+          {role === 'supervisor' && <ProjectAssignments projects={assignedProjects} setProjects={setAssignedProjects} loadProjects={loadProjects} label={t('assignedProject')} />}
         </div>
         <div className="flex gap-3 pt-4">
           <button onClick={() => setModalOpen(false)} className="btn-outline flex-1">{t('cancel')}</button>
@@ -238,8 +236,8 @@ export function AdminUsers() {
         {detailsLoading ? <InlineSpinner label={t('loading')} /> : <div className="space-y-4">
           <div><label className="label">{t('fullName')} *</label><input className="input" value={fullName} onChange={(event) => setFullName(event.target.value)} /></div>
           <div><label className="label">{t('email')} *</label><input className="input" type="email" dir="ltr" value={email} onChange={(event) => setEmail(event.target.value)} /></div>
-          <div><label className="label">{t('role')}</label><Select value={role} onChange={(value) => { setRole(value as UserRole); if (value !== 'supervisor') { setProjectId(''); setSelectedProject(null); } }} options={roleOptions} /></div>
-          {role === 'supervisor' && <div><label className="label">{t('assignedProject')} *</label><AsyncSearchSelect value={projectId} selectedOption={selectedProject} onChange={(value, option) => { setProjectId(value); setSelectedProject(option); }} loadOptions={loadProjects} /></div>}
+          <div><label className="label">{t('role')}</label><Select value={role} onChange={(value) => { setRole(value as UserRole); if (value !== 'supervisor') setAssignedProjects([]); }} options={roleOptions} /></div>
+          {role === 'supervisor' && <ProjectAssignments projects={assignedProjects} setProjects={setAssignedProjects} loadProjects={loadProjects} label={t('assignedProject')} />}
           <div><label className="label">{t('temporaryPassword')}</label><PasswordInput dir="ltr" value={password} onChange={(event) => setPassword(event.target.value)} /><p className="mt-1 text-xs text-muted">{t('temporaryPasswordHelp')}</p></div>
           {editingUser?.must_change_password && <Alert type="warning">{t('mustChangePassword')}</Alert>}
           <div className="flex gap-3 pt-2">
@@ -250,4 +248,12 @@ export function AdminUsers() {
       </Modal>
     </div>
   );
+}
+
+function ProjectAssignments({ projects, setProjects, loadProjects, label }: { projects: SelectOption[]; setProjects: (projects: SelectOption[]) => void; loadProjects: (query: string) => Promise<SelectOption[]>; label: string }) {
+  return <div className="space-y-2">
+    <label className="label">{label} *</label>
+    <AsyncSearchSelect value="" selectedOption={null} onChange={(_, option) => { if (option && !projects.some((project) => project.value === option.value)) setProjects([...projects, option]); }} loadOptions={loadProjects} />
+    {projects.length > 0 && <div className="flex flex-wrap gap-2">{projects.map((project) => <span key={project.value} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs" style={{ borderColor: 'var(--border)' }}>{project.label}<button type="button" className="text-muted hover:text-red-600" onClick={() => setProjects(projects.filter((item) => item.value !== project.value))}><X size={13} /></button></span>)}</div>}
+  </div>;
 }

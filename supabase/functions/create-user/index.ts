@@ -54,7 +54,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Parse request body
-    const { email, password, full_name, role, project_id } = await req.json();
+    const { email, password, full_name, role, project_ids } = await req.json();
 
     if (!email || !password || !full_name || !role) {
       return new Response(
@@ -82,7 +82,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (role === "supervisor" && !project_id) {
+    if (role === "supervisor" && (!Array.isArray(project_ids) || project_ids.length === 0)) {
       return new Response(JSON.stringify({ error: "A project is required for foremen", code: "project_required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -95,7 +95,7 @@ Deno.serve(async (req: Request) => {
       email,
       password,
       email_confirm: true,
-      user_metadata: { full_name, role, project_id: role === "supervisor" ? project_id : null, admin_created: true },
+      user_metadata: { full_name, role, admin_created: true },
     });
 
     if (createError) {
@@ -109,6 +109,18 @@ Deno.serve(async (req: Request) => {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    if (role === "supervisor") {
+      const uniqueProjectIds = [...new Set(project_ids.map(String))];
+      const { error: assignmentError } = await adminClient.from("profile_projects").insert(uniqueProjectIds.map((project_id) => ({ profile_id: authData.user.id, project_id })));
+      if (assignmentError) {
+        console.error("project assignment failed", assignmentError);
+        await adminClient.auth.admin.deleteUser(authData.user.id);
+        return new Response(JSON.stringify({ error: "Could not assign projects", code: "invalid_projects" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     return new Response(
