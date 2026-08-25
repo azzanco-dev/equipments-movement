@@ -8,6 +8,7 @@ import { Plus, Edit2, Trash2 } from 'lucide-react';
 import type { Lessor } from '@/lib/types';
 import { PageHeader } from '@/components/PageHeader';
 import { DataListToolbar } from '@/components/data-list/DataListToolbar';
+import { DataListActions } from '@/components/data-list/DataListActions';
 import { DataListPagination } from '@/components/data-list/DataListPagination';
 import { useDataListState } from '@/components/data-list/useDataListState';
 import { lessorsListConfig } from '@/lib/listConfigs';
@@ -70,8 +71,8 @@ export function AdminLessors() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t('lessors')} description={t('lessorsDesc')} />
-      <DataListToolbar config={lessorsListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} primaryAction={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addLessor')}</button>} />
+      <PageHeader title={t('lessors')} description={t('lessorsDesc')} actions={<DataListActions primaryAction={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addLessor')}</button>} />} />
+      <DataListToolbar config={lessorsListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} />
       {loading ? (
         <InlineSpinner label={t('loading')} />
       ) : lessors.length === 0 ? (

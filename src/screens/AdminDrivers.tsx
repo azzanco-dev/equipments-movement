@@ -12,6 +12,7 @@ import type { Driver } from '@/lib/types';
 import { DriverExcelImport } from '@/components/DriverExcelImport';
 import { DRIVER_EMPLOYMENT_TYPES, DRIVER_NATIONALITIES } from '@/lib/driverExcel';
 import { DataListToolbar } from '@/components/data-list/DataListToolbar';
+import { DataListActions } from '@/components/data-list/DataListActions';
 import { DataListPagination } from '@/components/data-list/DataListPagination';
 import { useDataListState } from '@/components/data-list/useDataListState';
 import { useRowSelection } from '@/components/data-list/useRowSelection';
@@ -86,9 +87,9 @@ export function AdminDrivers({ onSelectDriver }: { onSelectDriver: (id: string) 
 
   return (
     <div className="space-y-4">
-      <PageHeader title={t('drivers')} description={t('driversDesc')} />
+      <PageHeader title={t('drivers')} description={t('driversDesc')} actions={<DataListActions menuActions={<button className="btn-ghost" onClick={() => setImportOpen(true)}><FileSpreadsheet size={15} />{t('importExcel')}</button>} primaryAction={<button className="btn-primary" onClick={openCreate}><Plus size={15} />{t('addDriver')}</button>} />} />
       {error && !modalOpen && <Alert type="error">{error}</Alert>}
-      <DataListToolbar compact config={driversListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} selectedCount={selection.selected.size} bulkActions={<button className="btn-outline h-8 px-3 py-0 text-[13px]" onClick={removeSelected}><Trash2 size={15} />{t('delete')}</button>} menuActions={<button className="btn-ghost" onClick={() => setImportOpen(true)}><FileSpreadsheet size={15} />{t('importExcel')}</button>} primaryAction={<button className="btn-primary h-8 px-3 py-0 text-[13px]" onClick={openCreate}><Plus size={15} />{t('addDriver')}</button>} />
+      <DataListToolbar compact config={driversListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} selectedCount={selection.selected.size} bulkActions={<button className="btn-outline h-8 px-3 py-0 text-[13px]" onClick={removeSelected}><Trash2 size={15} />{t('delete')}</button>} />
 
       {loading ? <InlineSpinner label={t('loading')} /> : drivers.length === 0 ? <div className="card py-12 text-center text-muted">{t('noDrivers')}</div> : (
         <div className="card overflow-hidden p-0"><div className="overflow-x-auto"><table className="compact-table w-full text-sm"><thead><tr className="border-b" style={{ borderColor: 'var(--border)' }}>

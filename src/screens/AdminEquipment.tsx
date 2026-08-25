@@ -14,6 +14,7 @@ import { DatePicker } from '@/components/DatePicker';
 import { PlateNumberInput } from '@/components/PlateNumberInput';
 import { sanitizeSearchTerm } from '@/lib/search';
 import { DataListToolbar } from '@/components/data-list/DataListToolbar';
+import { DataListActions } from '@/components/data-list/DataListActions';
 import { DataListPagination } from '@/components/data-list/DataListPagination';
 import { useDataListState } from '@/components/data-list/useDataListState';
 import { equipmentListConfig } from '@/lib/listConfigs';
@@ -364,8 +365,8 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
 
   return (
     <div ref={listTopRef} className="space-y-4 scroll-mt-20">
-      <PageHeader title={t('equipmentList')} description={t('equipmentDesc')} />
-      <DataListToolbar config={equipmentListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} menuActions={<button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-ghost"><Upload size={16} /> {t('importExcel')}</button>} primaryAction={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addEquipment')}</button>} />
+      <PageHeader title={t('equipmentList')} description={t('equipmentDesc')} actions={<DataListActions menuActions={<button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-ghost"><Upload size={16} /> {t('importExcel')}</button>} primaryAction={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addEquipment')}</button>} />} />
+      <DataListToolbar config={equipmentListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} />
 
       {loading ? (
         <InlineSpinner label={t('loading')} />

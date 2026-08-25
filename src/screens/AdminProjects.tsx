@@ -9,6 +9,7 @@ import { Plus, Edit2, Trash2, Upload, FileSpreadsheet, Download, CheckCircle2, A
 import type { Project } from '@/lib/types';
 import { parseProjectsExcel, downloadProjectTemplate, type ProjectImportRow } from '@/lib/excel';
 import { DataListToolbar } from '@/components/data-list/DataListToolbar';
+import { DataListActions } from '@/components/data-list/DataListActions';
 import { DataListPagination } from '@/components/data-list/DataListPagination';
 import { useDataListState } from '@/components/data-list/useDataListState';
 import { projectsListConfig } from '@/lib/listConfigs';
@@ -179,8 +180,9 @@ export function AdminProjects() {
       <PageHeader
         title={t('projects')}
         description={t('projectsDesc')}
+        actions={<DataListActions menuActions={<button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-ghost"><Upload size={16} /> {t('importExcel')}</button>} primaryAction={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addProject')}</button>} />}
       />
-      <DataListToolbar config={projectsListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} menuActions={<button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-ghost"><Upload size={16} /> {t('importExcel')}</button>} primaryAction={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addProject')}</button>} />
+      <DataListToolbar config={projectsListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} />
 
       {loading ? (
         <InlineSpinner label={t('loading')} />

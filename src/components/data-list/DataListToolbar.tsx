@@ -22,10 +22,10 @@ export function DataListToolbar({ config, search, onSearch, sort, direction, onS
   const toggle = (target: 'filters' | 'sort' | 'actions') => { if (target === 'filters') setDraftFilters(filters); setOpen((current) => current === target ? null : target); };
   return <div className="space-y-3" ref={toolbarRef}>
     <div className="flex flex-wrap items-center gap-2">
-      <div className="relative min-w-[220px] flex-1"><Search size={compact ? 14 : 16} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted" /><input className={`input ps-9 ${compact ? 'h-8 py-1 text-sm' : ''}`} value={search} onChange={(event) => onSearch(event.target.value)} placeholder={config.searchPlaceholder} /></div>
+      <div className="relative min-w-[220px] w-full sm:w-[360px] lg:w-[460px]"><Search size={compact ? 14 : 16} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted" /><input className={`input ps-9 ${compact ? 'h-8 py-1 text-sm' : ''}`} value={search} onChange={(event) => onSearch(event.target.value)} placeholder={config.searchPlaceholder} /></div>
       <div className="relative">
         <button className="btn-outline" onClick={() => toggle('filters')}><Filter size={15} />{t('filters')}{filters.length > 0 && <span className="rounded bg-gray-100 px-1.5 text-xs dark:bg-gray-700">{filters.length}</span>}<ChevronDown size={14} /></button>
-        {open === 'filters' && <div className="absolute end-0 top-[calc(100%+8px)] z-40 w-[min(680px,calc(100vw-24px))] rounded-xl border p-4 shadow-xl" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+        {open === 'filters' && <div className="absolute end-0 top-[calc(100%+6px)] z-40 w-[min(560px,calc(100vw-24px))] rounded-lg border p-3 shadow-xl" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
           <div className="mb-3 flex items-center justify-between"><span className="text-sm font-semibold">{t('filterResults')}</span><button className="btn-ghost p-1" onClick={() => setOpen(null)}><X size={15} /></button></div>
           <FilterBuilder fields={config.filterFields} filters={draftFilters} onChange={setDraftFilters} compact />
           <div className="mt-4 flex justify-end gap-2 border-t pt-3" style={{ borderColor: 'var(--border)' }}><button className="btn-ghost" onClick={() => setDraftFilters([])}>{t('clear')}</button><button className="btn-primary" onClick={() => { onFilters(draftFilters); setOpen(null); }}>{t('applyFilters')}</button></div>
