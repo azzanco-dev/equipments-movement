@@ -370,7 +370,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
+      let accessToken = sessionData.session?.access_token;
       if (!accessToken) throw new Error('Missing session');
 
       const form = new FormData();
@@ -388,11 +388,18 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
       form.set('recorded_at', actualMovementDate.toISOString());
       photoFiles.forEach((file) => form.append('photos', file));
 
-      const response = await fetch('/api/movements', {
+      const submitMovement = (token: string) => fetch('/api/movements', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { Authorization: `Bearer ${token}` },
         body: form,
       });
+      let response = await submitMovement(accessToken);
+      if (response.status === 401) {
+        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+        accessToken = refreshed.session?.access_token;
+        if (refreshError || !accessToken) throw new Error('unauthorized');
+        response = await submitMovement(accessToken);
+      }
       if (!response.ok) {
         const result = await response.json();
         throw new Error(result.error ?? 'movement_save_failed');
@@ -428,6 +435,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
         invalid_movement_payload: t('movementSaveFailed'),
         photo_upload_failed: t('photoUploadFailed'),
         unauthorized: t('authError'),
+        access_denied: t('accessDenied'),
         movement_save_failed: t('movementSaveFailed'),
       };
       setSaveError(messages[code] ?? t('movementSaveFailed'));

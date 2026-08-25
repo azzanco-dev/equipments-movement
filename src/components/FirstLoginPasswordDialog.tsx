@@ -4,6 +4,7 @@ import { PasswordInput } from '@/components/PasswordInput';
 import { Alert } from '@/components/Alert';
 import { useAuth } from '@/auth/AuthContext';
 import { useI18n } from '@/i18n/I18nContext';
+import { supabase } from '@/lib/supabase';
 
 export function FirstLoginPasswordDialog() {
   const { profile, session, refreshProfile } = useAuth();
@@ -29,6 +30,10 @@ export function FirstLoginPasswordDialog() {
         body: JSON.stringify({ action: 'change_own_password', password }),
       });
       if (!response.ok) throw new Error('change failed');
+      const email = session.user.email;
+      if (!email) throw new Error('missing email');
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) throw signInError;
       await refreshProfile();
       setPassword('');
       setConfirmation('');

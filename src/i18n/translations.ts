@@ -89,6 +89,7 @@ export const translations = {
     emailExists: 'هذا البريد مسجّل مسبقاً',
     signUpDisabled: 'إنشاء الحسابات متاح للأدمن فقط. تواصل مع الأدمن لإنشاء حساب.',
     authError: 'حدث خطأ أثناء المصادقة',
+    accessDenied: 'ليست لديك صلاحية لتسجيل هذه الحركة.',
 
     // Nav
     dashboard: 'الرئيسية',
@@ -583,6 +584,7 @@ export const translations = {
     emailExists: 'This email is already registered',
     signUpDisabled: 'Account creation is admin-only. Contact an admin to create an account.',
     authError: 'Authentication error',
+    accessDenied: 'You do not have permission to register this movement.',
 
     dashboard: 'Dashboard',
     logs: 'Logs',

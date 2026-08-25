@@ -60,7 +60,7 @@ export async function POST(request: Request) {
 
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', authData.user.id).maybeSingle();
     if (!profile || (movementContext === 'workshop' ? !['admin', 'workshop', 'assistant_workshop_manager', 'workshop_manager'].includes(profile.role) : !['admin', 'supervisor'].includes(profile.role))) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 403 });
+      return NextResponse.json({ error: 'access_denied' }, { status: 403 });
     }
 
     const value = (name: string) => {
