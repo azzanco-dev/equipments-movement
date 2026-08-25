@@ -85,17 +85,32 @@ export function AdminSettings() {
   async function importExcel(file?: File) {
     if (!file) return;
     setImporting(true); setError(null);
+    let fileParsed = false;
     try {
       const book = XLSX.read(await file.arrayBuffer(), { type: 'array' });
       const sheet = book.Sheets[book.SheetNames[0]];
       const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
-      const names = [...new Set(data.map((row) => String(Object.values(row)[0] ?? '').trim()).filter(Boolean))];
-      if (!names.length) throw new Error('empty');
-      const { error: insertError } = await supabase.from('equipment_types').upsert(names.map((item) => ({ name: item })), { onConflict: 'name', ignoreDuplicates: true });
-      if (insertError) throw insertError;
+      const importedNames = data.map((row) => String(Object.values(row)[0] ?? '').trim()).filter(Boolean);
+      if (!importedNames.length) throw new Error('empty');
+      fileParsed = true;
+
+      const uniqueNames = new Map<string, string>();
+      importedNames.forEach((item) => uniqueNames.set(item.toLocaleLowerCase(), item));
+
+      const { data: existingRows, error: existingError } = await supabase.from('equipment_types').select('name');
+      if (existingError) throw existingError;
+      const existingNames = new Set((existingRows ?? []).map((row) => row.name.trim().toLocaleLowerCase()));
+      const namesToInsert = [...uniqueNames.entries()]
+        .filter(([normalizedName]) => !existingNames.has(normalizedName))
+        .map(([, item]) => ({ name: item }));
+
+      if (namesToInsert.length) {
+        const { error: insertError } = await supabase.from('equipment_types').insert(namesToInsert);
+        if (insertError) throw insertError;
+      }
       setPage(1); await fetchRows();
     } catch {
-      setError(t('invalidEquipmentTypesFile'));
+      setError(t(fileParsed ? 'saveFailed' : 'invalidEquipmentTypesFile'));
     } finally {
       setImporting(false);
       if (fileRef.current) fileRef.current.value = '';
