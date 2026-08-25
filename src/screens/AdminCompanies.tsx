@@ -255,14 +255,8 @@ export function AdminCompanies() {
       <PageHeader
         title={t('companies')}
         description={t('companiesDesc')}
-        actions={
-          <>
-            <button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addCompany')}</button>
-            <button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-outline"><Upload size={18} /> {t('importExcel')}</button>
-          </>
-        }
       />
-      <DataListToolbar config={companiesListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} />
+      <DataListToolbar config={companiesListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} menuActions={<button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-ghost"><Upload size={16} /> {t('importExcel')}</button>} primaryAction={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addCompany')}</button>} />
 
       {loading ? (
         <InlineSpinner label={t('loading')} />

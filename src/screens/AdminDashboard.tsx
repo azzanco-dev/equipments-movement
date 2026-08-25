@@ -207,7 +207,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
       {/* Logs tab */}
       {tab === 'logs' && (
         <div className="space-y-4">
-          <DataListToolbar config={movementsListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} actions={<button onClick={() => exportLogsToExcel(logs, `logs-${new Date().toISOString().slice(0, 10)}`, t as (k: string) => string)} className="btn-outline" disabled={logs.length === 0}><Download size={16} />{t('exportExcel')}</button>} />
+          <DataListToolbar config={movementsListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} menuActions={<button onClick={() => exportLogsToExcel(logs, `logs-${new Date().toISOString().slice(0, 10)}`, t as (k: string) => string)} className="btn-ghost" disabled={logs.length === 0}><Download size={16} />{t('exportExcel')}</button>} />
 
           {/* Table */}
           {loadingLogs ? (
@@ -262,7 +262,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
       {/* Reports tab */}
       {tab === 'reports' && (
         <div className="space-y-4">
-          <DataListToolbar config={visitsListConfig} search={visitList.searchInput} onSearch={visitList.setSearchInput} sort={visitList.sort} direction={visitList.direction} onSort={visitList.setSort} pageSize={visitList.pageSize} onPageSize={visitList.setPageSize} filters={visitList.filters} onFilters={visitList.setFilters} actions={<button onClick={() => exportVisitsToExcel(visits, `visits-${new Date().toISOString().slice(0, 10)}`, t as (k: string) => string)} className="btn-outline" disabled={visits.length === 0}><Download size={16} />{t('exportExcel')}</button>} />
+          <DataListToolbar config={visitsListConfig} search={visitList.searchInput} onSearch={visitList.setSearchInput} sort={visitList.sort} direction={visitList.direction} onSort={visitList.setSort} pageSize={visitList.pageSize} onPageSize={visitList.setPageSize} filters={visitList.filters} onFilters={visitList.setFilters} menuActions={<button onClick={() => exportVisitsToExcel(visits, `visits-${new Date().toISOString().slice(0, 10)}`, t as (k: string) => string)} className="btn-ghost" disabled={visits.length === 0}><Download size={16} />{t('exportExcel')}</button>} />
 
           {/* Visits table */}
           {loadingVisits ? (

@@ -178,7 +178,7 @@ export function AdminUsers() {
   return (
     <div className="space-y-4">
       <PageHeader title={t('users')} description={t('usersDesc')} />
-      <DataListToolbar config={usersListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} actions={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addUser')}</button>} />
+      <DataListToolbar config={usersListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} primaryAction={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addUser')}</button>} />
       {loading ? (
         <InlineSpinner label={t('loading')} />
       ) : users.length === 0 ? (

@@ -179,14 +179,8 @@ export function AdminProjects() {
       <PageHeader
         title={t('projects')}
         description={t('projectsDesc')}
-        actions={
-          <>
-            <button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addProject')}</button>
-            <button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-outline"><Upload size={18} /> {t('importExcel')}</button>
-          </>
-        }
       />
-      <DataListToolbar config={projectsListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} />
+      <DataListToolbar config={projectsListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} menuActions={<button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-ghost"><Upload size={16} /> {t('importExcel')}</button>} primaryAction={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addProject')}</button>} />
 
       {loading ? (
         <InlineSpinner label={t('loading')} />

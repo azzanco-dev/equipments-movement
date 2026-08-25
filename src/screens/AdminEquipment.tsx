@@ -365,7 +365,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
   return (
     <div ref={listTopRef} className="space-y-4 scroll-mt-20">
       <PageHeader title={t('equipmentList')} description={t('equipmentDesc')} />
-      <DataListToolbar config={equipmentListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} actions={<><button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addEquipment')}</button><button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-outline"><Upload size={18} /> {t('importExcel')}</button></>} />
+      <DataListToolbar config={equipmentListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} menuActions={<button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-ghost"><Upload size={16} /> {t('importExcel')}</button>} primaryAction={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addEquipment')}</button>} />
 
       {loading ? (
         <InlineSpinner label={t('loading')} />
