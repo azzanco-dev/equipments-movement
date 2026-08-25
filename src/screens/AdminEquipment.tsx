@@ -205,16 +205,19 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
       const buf = await file.arrayBuffer();
       const rows = parseEquipmentExcel(buf, t);
 
-      const importedTypes = [...new Set(rows.map((row) => row.type).filter(Boolean))];
-      const { data: knownTypeRows } = importedTypes.length
-        ? await supabase.from('equipment_types').select('name').in('name', importedTypes)
-        : { data: [] };
+      const { data: knownTypeRows, error: knownTypesError } = await supabase.from('equipment_types').select('name');
+      if (knownTypesError) throw knownTypesError;
       const knownTypes = new Set((knownTypeRows ?? []).map((row) => row.name.toLowerCase()));
       for (const row of rows) {
         if (row.type && !knownTypes.has(row.type.toLowerCase())) row._errors.push(t('equipmentTypeNotFound'));
       }
 
-      const existingCodes = new Set(equipment.map((e) => e.code.toLowerCase()));
+      const importedCodes = [...new Set(rows.map((row) => row.code).filter(Boolean))];
+      const codeChunks = Array.from({ length: Math.ceil(importedCodes.length / 100) }, (_, index) => importedCodes.slice(index * 100, index * 100 + 100));
+      const existingCodeResults = await Promise.all(codeChunks.map((codes) => supabase.from('equipment').select('code').in('code', codes)));
+      const existingCodeError = existingCodeResults.find((result) => result.error)?.error;
+      if (existingCodeError) throw existingCodeError;
+      const existingCodes = new Set(existingCodeResults.flatMap((result) => result.data ?? []).map((row) => row.code.toLowerCase()));
       const seenCodes = new Set<string>();
       for (const row of rows) {
         const lc = row.code.toLowerCase();
@@ -298,14 +301,25 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
       let successCount = 0;
       let failCount = 0;
       const batchSize = 50;
-      for (let i = 0; i < payload.length; i += batchSize) {
-        const batch = payload.slice(i, i + batchSize);
+
+      const insertBatch = async (batch: typeof payload): Promise<void> => {
+        if (!batch.length) return;
         const { error } = await supabase.from('equipment').insert(batch);
-        if (error) {
-          failCount += batch.length;
-        } else {
+        if (!error) {
           successCount += batch.length;
+          return;
         }
+        if (batch.length === 1) {
+          failCount += 1;
+          return;
+        }
+        const middle = Math.ceil(batch.length / 2);
+        await insertBatch(batch.slice(0, middle));
+        await insertBatch(batch.slice(middle));
+      };
+
+      for (let i = 0; i < payload.length; i += batchSize) {
+        await insertBatch(payload.slice(i, i + batchSize));
       }
       setImportResult({ success: successCount, fail: failCount });
       if (successCount > 0) fetchEquipment();
