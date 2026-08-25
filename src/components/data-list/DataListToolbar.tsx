@@ -18,11 +18,12 @@ export function DataListToolbar({ config, search, onSearch, sort, direction, onS
   const [draftFilters, setDraftFilters] = useState(filters);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const currentSort = config.sortableFields.find((field) => field.key === sort);
-  useEffect(() => { const close = (event: MouseEvent) => { if (!toolbarRef.current?.contains(event.target as Node)) setOpen(null); }; document.addEventListener('mousedown', close); return () => document.removeEventListener('mousedown', close); }, []);
+  useEffect(() => { const close = (event: MouseEvent) => { const target = event.target as Element; if (target.closest?.('[data-select-portal="true"]')) return; if (!toolbarRef.current?.contains(target)) setOpen(null); }; document.addEventListener('mousedown', close); return () => document.removeEventListener('mousedown', close); }, []);
   const toggle = (target: 'filters' | 'sort' | 'actions') => { if (target === 'filters') setDraftFilters(filters); setOpen((current) => current === target ? null : target); };
   return <div className="space-y-3" ref={toolbarRef}>
     <div className="flex flex-wrap items-center gap-2">
       <div className="relative min-w-[220px] w-full sm:w-[360px] lg:w-[460px]"><Search size={compact ? 14 : 16} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted" /><input className={`input ps-9 ${compact ? 'h-8 py-1 text-sm' : ''}`} value={search} onChange={(event) => onSearch(event.target.value)} placeholder={config.searchPlaceholder} /></div>
+      <div className="flex items-center gap-2 sm:ms-auto">
       <div className="relative">
         <button className="btn-outline" onClick={() => toggle('filters')}><Filter size={15} />{t('filters')}{filters.length > 0 && <span className="rounded bg-gray-100 px-1.5 text-xs dark:bg-gray-700">{filters.length}</span>}<ChevronDown size={14} /></button>
         {open === 'filters' && <div className="absolute end-0 top-[calc(100%+6px)] z-40 w-[min(560px,calc(100vw-24px))] rounded-lg border p-3 shadow-xl" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
@@ -39,6 +40,7 @@ export function DataListToolbar({ config, search, onSearch, sort, direction, onS
         </div>}
       </div>
       <Select compact className="w-[78px]" value={String(pageSize)} onChange={(value) => onPageSize(Number(value))} options={(config.pageSizeOptions ?? PAGE_SIZE_OPTIONS).map((value) => ({ value: String(value), label: String(value) }))} />
+      </div>
       {menuActions && <div className="relative"><button className="btn-outline px-2.5" onClick={() => toggle('actions')} aria-label={t('moreActions')}><MoreHorizontal size={18} /></button>{open === 'actions' && <div className="absolute end-0 top-[calc(100%+8px)] z-40 min-w-[190px] space-y-1 rounded-xl border p-2 shadow-xl [&>button]:w-full [&>button]:justify-start" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }} onClick={() => setOpen(null)}>{menuActions}</div>}</div>}
       {actions}{primaryAction}
     </div>

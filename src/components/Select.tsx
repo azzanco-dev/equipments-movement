@@ -98,6 +98,7 @@ export function Select({ value, onChange, options, placeholder, className = '', 
       {open && createPortal(
         <div
           ref={menuRef}
+          data-select-portal="true"
           className="fixed z-[100] rounded-lg border shadow-lg animate-fade-in"
           dir={document.documentElement.dir || 'rtl'}
           style={{
