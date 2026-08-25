@@ -103,12 +103,12 @@ body {
 }
 
 .dark {
-  --bg: #121212;
+  --bg: #1a1a1a;
   --fg: #f5f5f5;
-  --muted: #9ca3af;
-  --border: #343434;
-  --surface: #1c1c1c;
-  --surface-hover: #292929;
+  --muted: #a8adb7;
+  --border: #424242;
+  --surface: #242424;
+  --surface-hover: #303030;
   --overlay: rgba(255, 255, 255, 0.1);
   --primary: #f5f5f5;
   --primary-hover: #d4d4d4;
