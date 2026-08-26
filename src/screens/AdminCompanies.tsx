@@ -18,6 +18,7 @@ import { sanitizeSearchTerm } from '@/lib/search';
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 import type { SelectOption } from '@/components/Select';
 import { localizedName } from '@/lib/localizedName';
+import { RelativeTime } from '@/components/RelativeTime';
 
 type CompanyProjectWithProject = CompanyProject & {
   project?: { id: string; name_ar: string; name_en: string } | null;
@@ -272,6 +273,7 @@ export function AdminCompanies() {
                 <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
                   <th className="table-header text-start px-4 py-3">{t('company')}</th>
                   <th className="table-header text-start px-4 py-3">{t('actions')}</th>
+                  <th className="table-header text-start px-4 py-3">{t('createdAt')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -285,6 +287,7 @@ export function AdminCompanies() {
                         <button onClick={() => handleDelete(c)} className="btn-ghost p-1.5"><Trash2 size={16} /></button>
                       </div>
                     </td>
+                    <td className="px-4 py-3"><RelativeTime value={c.created_at} /></td>
                   </tr>
                 ))}
               </tbody>

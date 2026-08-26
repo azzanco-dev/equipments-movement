@@ -17,7 +17,7 @@ import { usersListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
 import { sanitizeSearchTerm } from '@/lib/search';
 import { PasswordInput } from '@/components/PasswordInput';
-import { formatDate } from '@/lib/dateFormat';
+import { RelativeTime } from '@/components/RelativeTime';
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 import type { SelectOption } from '@/components/Select';
 import { localizedName } from '@/lib/localizedName';
@@ -191,18 +191,18 @@ export function AdminUsers() {
               <thead><tr className="border-b" style={{ borderColor: 'var(--border)' }}>
                 <th className="table-header text-start px-4 py-3">{t('fullName')}</th>
                 <th className="table-header text-start px-4 py-3">{t('role')}</th>
-                <th className="table-header text-start px-4 py-3">{t('createdAt')}</th>
                 <th className="table-header text-start px-4 py-3">{t('actions')}</th>
+                <th className="table-header text-start px-4 py-3">{t('createdAt')}</th>
               </tr></thead>
               <tbody>
                 {users.map((u) => (
                   <tr key={u.id} className="cursor-pointer border-b last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/60" style={{ borderColor: 'var(--border)' }} onClick={() => openDetails(u)} tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') openDetails(u); }}>
                     <td className="px-4 py-3 font-semibold">{u.full_name}{u.id === currentUser?.id ? ' (You)' : ''}</td>
                     <td className="px-4 py-3 text-muted">{roleLabel(u.role)}</td>
-                    <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(u.created_at)}</td>
                     <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
                       {u.id !== currentUser?.id && <button onClick={() => handleDelete(u)} className="btn-ghost p-1.5"><Trash2 size={16} /></button>}
                     </td>
+                    <td className="px-4 py-3"><RelativeTime value={u.created_at} /></td>
                   </tr>
                 ))}
               </tbody>

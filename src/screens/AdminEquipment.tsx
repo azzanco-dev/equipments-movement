@@ -22,6 +22,7 @@ import { applyListFilters } from '@/lib/applyListFilters';
 import { inferOwnershipFromCode, usesExternalSupplier } from '@/lib/equipmentOwnership';
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
 import { localizedName } from '@/lib/localizedName';
+import { RelativeTime } from '@/components/RelativeTime';
 
 function genQrValue(): string {
   return `EQ-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
@@ -397,6 +398,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                     <span>{t('isActive')}</span>
                   </th>
                   <th className="table-header text-start px-4 py-3">{t('actions')}</th>
+                  <th className="table-header text-start px-4 py-3">{t('createdAt')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -421,6 +423,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                         <ChevronRight size={16} className="text-muted ms-1" />
                       </div>
                     </td>
+                    <td className="px-4 py-3"><RelativeTime value={eq.created_at} /></td>
                   </tr>
                 ))}
               </tbody>

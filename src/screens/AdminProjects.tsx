@@ -16,6 +16,7 @@ import { projectsListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
 import { sanitizeSearchTerm } from '@/lib/search';
 import { localizedName } from '@/lib/localizedName';
+import { RelativeTime } from '@/components/RelativeTime';
 
 export function AdminProjects() {
   const { t, lang } = useI18n();
@@ -196,6 +197,7 @@ export function AdminProjects() {
                 <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
                   <th className="table-header text-start px-4 py-3">{t('project')}</th>
                   <th className="table-header text-start px-4 py-3">{t('actions')}</th>
+                  <th className="table-header text-start px-4 py-3">{t('createdAt')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -208,6 +210,7 @@ export function AdminProjects() {
                         <button onClick={() => handleDelete(p)} className="btn-ghost p-1.5"><Trash2 size={16} /></button>
                       </div>
                     </td>
+                    <td className="px-4 py-3"><RelativeTime value={p.created_at} /></td>
                   </tr>
                 ))}
               </tbody>

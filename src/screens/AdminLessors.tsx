@@ -14,6 +14,7 @@ import { useDataListState } from '@/components/data-list/useDataListState';
 import { lessorsListConfig } from '@/lib/listConfigs';
 import { applyListFilters } from '@/lib/applyListFilters';
 import { sanitizeSearchTerm } from '@/lib/search';
+import { RelativeTime } from '@/components/RelativeTime';
 
 export function AdminLessors() {
   const { t } = useI18n();
@@ -86,6 +87,7 @@ export function AdminLessors() {
                 <th className="table-header text-start px-4 py-3">{t('contactPerson')}</th>
                 <th className="table-header text-start px-4 py-3">{t('contactNumber')}</th>
                 <th className="table-header text-start px-4 py-3">{t('actions')}</th>
+                <th className="table-header text-start px-4 py-3">{t('createdAt')}</th>
               </tr></thead>
               <tbody>
                 {lessors.map((l) => (
@@ -97,6 +99,7 @@ export function AdminLessors() {
                       <button onClick={() => openEdit(l)} className="btn-ghost p-1.5"><Edit2 size={16} /></button>
                       <button onClick={() => handleDelete(l)} className="btn-ghost p-1.5"><Trash2 size={16} /></button>
                     </div></td>
+                    <td className="px-4 py-3"><RelativeTime value={l.created_at} /></td>
                   </tr>
                 ))}
               </tbody>
