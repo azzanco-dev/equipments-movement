@@ -710,7 +710,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
               </div>}
               {!workshopMode && isEntry && quickDriver.open && <div className="rounded-lg border p-4 space-y-3" style={{ borderColor: 'var(--border)' }}><p className="font-semibold">{t('quickDriverAdd')}</p><div className="grid gap-3 sm:grid-cols-2"><div><label className="label">{t('fullName')} *</label><input className="input" placeholder={t('fullNamePlaceholder')} value={quickDriver.fullName} onChange={(event) => setQuickDriver({ ...quickDriver, fullName: event.target.value })} /></div><div><label className="label">{t('mobileNumber')} *</label><input className="input" dir="ltr" placeholder={t('mobileNumberPlaceholder')} value={quickDriver.mobile} onChange={(event) => setQuickDriver({ ...quickDriver, mobile: event.target.value.replace(/[^\d+]/g, '') })} /></div></div><div className="flex gap-2"><button className="btn-outline flex-1" onClick={() => setQuickDriver({ open: false, fullName: '', mobile: '' })}>{t('cancel')}</button><button className="btn-primary flex-1" disabled={quickSaving} onClick={createQuickDriver}>{quickSaving ? t('saving') : t('save')}</button></div></div>}
 
-              {!workshopMode && <div>
+              <div>
                 <label className="label">{t('actualMovementTime')}</label>
                 <div className="max-w">
                   <DatePicker
@@ -720,9 +720,9 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                     placeholder={t('date')}
                   />
                 </div>
-              </div>}
+              </div>
 
-              {!workshopMode && <div>
+              <div>
                 <label className="label">{t('notes')}</label>
                 <textarea
                   className="input min-h-20 resize-none p-2"
@@ -731,7 +731,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
                 />
-              </div>}
+              </div>
 
               <div>
                 <label className="label">{t('photo')}{workshopMode ? ' *' : ''}</label>
