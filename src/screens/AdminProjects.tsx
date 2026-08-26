@@ -197,7 +197,7 @@ export function AdminProjects() {
                 <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
                   <th className="table-header text-start px-4 py-3">{t('project')}</th>
                   <th className="table-header text-start px-4 py-3">{t('actions')}</th>
-                  <th className="table-header text-start px-4 py-3">{t('createdAt')}</th>
+                  <th className="table-header px-4 py-3" aria-label={t('createdAt')} />
                 </tr>
               </thead>
               <tbody>

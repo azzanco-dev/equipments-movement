@@ -39,7 +39,7 @@ export function RelativeTime({ value }: { value: string | Date }) {
       dateTime={date.toISOString()}
       title={fullDateTime}
       aria-label={fullDateTime}
-      className="cursor-help whitespace-nowrap text-[11px] text-muted"
+      className="whitespace-nowrap text-[11px] text-muted"
     >
       {amount} {unit}
     </time>

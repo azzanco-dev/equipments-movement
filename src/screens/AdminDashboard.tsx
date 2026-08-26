@@ -16,6 +16,7 @@ import { applyListFilters } from '@/lib/applyListFilters';
 import { formatDate } from '@/lib/dateFormat';
 import { Modal } from '@/components/Modal';
 import { localizedName } from '@/lib/localizedName';
+import { RelativeTime } from '@/components/RelativeTime';
 
 async function loadLatestDriverNames(entryIds: string[]) {
   if (!entryIds.length) return new Map<string, string>();
@@ -228,6 +229,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                       <th className="table-header text-start px-4 py-3">{t('movementType')}</th>
                       <th className="table-header text-start px-4 py-3">{t('driverName')}</th>
                       <th className="table-header text-start px-4 py-3">{t('recordedAt')}</th>
+                      <th className="table-header px-4 py-3" aria-label={t('createdAt')} />
                     </tr>
                   </thead>
                   <tbody>
@@ -248,6 +250,7 @@ export function AdminDashboard({ onSelectMovement, onCreateMovement }: { onSelec
                         </td>
                         <td className="px-4 py-3">{log.current_driver_name ?? log.driver_name ?? '—'}</td>
                         <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(log.recorded_at)}</td>
+                        <td className="px-4 py-3"><RelativeTime value={log.created_at} /></td>
                       </tr>
                     ))}
                   </tbody>

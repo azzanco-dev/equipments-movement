@@ -10,6 +10,7 @@ import { Select } from '@/components/Select';
 import { PageHeader } from '@/components/PageHeader';
 import { formatDate } from '@/lib/dateFormat';
 import { Alert } from '@/components/Alert';
+import { RelativeTime } from '@/components/RelativeTime';
 
 export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { onSelectMovement: (id: string) => void; onCreateMovement: (type: MovementType) => void }) {
   const { t } = useI18n();
@@ -151,6 +152,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
                     {workshopManagerMode && <th className="table-header text-start px-4 py-3">{t('workshopPurpose')}</th>}
                     {!workshopMode && <th className="table-header text-start px-4 py-3">{t('driverName')}</th>}
                     <th className="table-header text-start px-4 py-3">{t('recordedAt')}</th>
+                    <th className="table-header px-4 py-3" aria-label={t('createdAt')} />
                   </tr>
                 </thead>
                 <tbody>
@@ -188,6 +190,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
                       )}
                       {!workshopMode && <td className="px-4 py-3">{log.driver_name ?? '—'}</td>}
                       <td className="px-4 py-3 text-muted whitespace-nowrap">{formatDate(log.recorded_at)}</td>
+                      <td className="px-4 py-3"><RelativeTime value={log.created_at} /></td>
                     </tr>
                   ))}
                 </tbody>

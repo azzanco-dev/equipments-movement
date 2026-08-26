@@ -398,7 +398,7 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                     <span>{t('isActive')}</span>
                   </th>
                   <th className="table-header text-start px-4 py-3">{t('actions')}</th>
-                  <th className="table-header text-start px-4 py-3">{t('createdAt')}</th>
+                  <th className="table-header px-4 py-3" aria-label={t('createdAt')} />
                 </tr>
               </thead>
               <tbody>
