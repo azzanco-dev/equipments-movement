@@ -486,6 +486,7 @@ export function EntryExitForm({ open, onClose, movementType, onSaved, pageMode =
               <Search size={18} className="absolute top-1/2 -translate-y-1/2 start-3 text-muted" />
               <input
                 type="text"
+                style={{ direction: 'ltr' }}
                 className="input ps-10"
                 placeholder={t('searchingEquipment')}
                 value={search}

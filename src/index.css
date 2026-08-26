@@ -163,6 +163,9 @@ body {
   .btn-outline {
     @apply btn border border-current text-current hover:bg-gray-100 dark:hover:bg-gray-800;
   }
+  .dark .btn-outline {
+    border-color: #424242;
+  }
   .btn-ghost {
     @apply btn hover:bg-gray-100 dark:hover:bg-gray-800;
   }
