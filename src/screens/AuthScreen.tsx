@@ -4,8 +4,10 @@ import { useI18n } from '@/i18n/I18nContext';
 import { useTheme } from '@/theme/ThemeContext';
 import { Sun, Moon, Languages, AlertCircle } from 'lucide-react';
 import { PasswordInput } from '@/components/PasswordInput';
+import { useRouter } from 'next/navigation';
 
 export function AuthScreen() {
+  const router = useRouter();
   const { t, toggleLanguage, lang } = useI18n();
   const { theme, toggleTheme } = useTheme();
   const { signIn } = useAuth();
@@ -20,7 +22,11 @@ export function AuthScreen() {
     setLoading(true);
 
     const { error } = await signIn(email, password);
-    if (error) setError(t(error));
+    if (error) {
+      setError(t(error));
+    } else {
+      router.replace('/dashboard');
+    }
 
     setLoading(false);
   };
