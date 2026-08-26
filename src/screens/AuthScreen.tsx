@@ -20,7 +20,7 @@ export function AuthScreen() {
     setLoading(true);
 
     const { error } = await signIn(email, password);
-    if (error) setError(error);
+    if (error) setError(t(error));
 
     setLoading(false);
   };

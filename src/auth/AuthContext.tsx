@@ -9,8 +9,22 @@ interface AuthContextValue {
   profile: Profile | null;
   loading: boolean;
   refreshProfile: () => Promise<void>;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: SignInError | null }>;
   signOut: () => Promise<void>;
+}
+
+export type SignInError =
+  | 'invalidCredentials'
+  | 'emailNotConfirmed'
+  | 'tooManySignInAttempts'
+  | 'authConnectionError'
+  | 'authError';
+
+function mapSignInError(error: { code?: string; status?: number }): SignInError {
+  if (error.code === 'email_not_confirmed') return 'emailNotConfirmed';
+  if (error.status === 429 || error.code === 'over_request_rate_limit') return 'tooManySignInAttempts';
+  if (error.code === 'invalid_credentials' || error.status === 400) return 'invalidCredentials';
+  return 'authError';
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -66,18 +80,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchProfile]);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      return { error: error.message };
+  const signIn = useCallback(async (
+    email: string,
+    password: string,
+  ): Promise<{ error: SignInError | null }> => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { error: mapSignInError(error) };
+
+      const nextProfile = await fetchProfile(data.user.id);
+      currentUserIdRef.current = data.user.id;
+      setSession(data.session);
+      setUser(data.user);
+      setProfile(nextProfile);
+      setLoading(false);
+      return { error: null };
+    } catch {
+      return { error: 'authConnectionError' };
     }
-    const nextProfile = await fetchProfile(data.user.id);
-    currentUserIdRef.current = data.user.id;
-    setSession(data.session);
-    setUser(data.user);
-    setProfile(nextProfile);
-    setLoading(false);
-    return { error: null };
   }, [fetchProfile]);
 
   const signOut = useCallback(async () => {
