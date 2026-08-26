@@ -52,7 +52,7 @@ export const translations = {
     workshopManager: 'مدير الورشة',
     workshopPurpose: 'نوع دخول الورشة',
     maintenancePurpose: 'صيانة',
-    parkingPurpose: 'موقف',
+    parkingPurpose: 'وقوف',
     pendingClassification: 'غير محدد',
     workshopClassificationFailed: 'تعذر تحديث نوع دخول الورشة.',
     driverChangeHistory: 'سجل تغييرات السائق',
