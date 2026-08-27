@@ -461,6 +461,11 @@ export const translations = {
     changePasswordError: 'تعذر تغيير كلمة المرور. حاول مرة أخرى.',
     assignedProject: 'المشاريع المسؤول عنها',
     foremanProjectRequired: 'يجب تحديد مشروع واحد على الأقل للفورمين.',
+    assignedCompanies: 'الشركات المسؤول عنها',
+    assignedCompaniesHelp:
+      'تُحفظ الشركات للفورمين دون تطبيق فلترة تشغيلية حالياً.',
+    selectCompanies: 'اختر شركة أو أكثر',
+    you: 'أنت',
 
     // Common
     loading: 'جاري التحميل...',
@@ -985,6 +990,11 @@ export const translations = {
     changePasswordError: 'Could not change the password. Please try again.',
     assignedProject: 'Assigned Projects',
     foremanProjectRequired: 'Select at least one project for the foreman.',
+    assignedCompanies: 'Assigned Companies',
+    assignedCompaniesHelp:
+      'Company assignments are stored for foremen without operational filtering for now.',
+    selectCompanies: 'Select one or more companies',
+    you: 'You',
 
     loading: 'Loading...',
     saving: 'Saving...',

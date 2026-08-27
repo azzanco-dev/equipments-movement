@@ -79,8 +79,8 @@ Deno.serve(async (req: Request) => {
           .eq('id', userId)
           .maybeSingle(),
         adminClient
-          .from('profile_projects')
-          .select('project:projects(id,name_ar,name_en)')
+          .from('profile_companies')
+          .select('company:companies(id,name_ar,name_en)')
           .eq('profile_id', userId),
       ])
       if (
@@ -95,8 +95,8 @@ Deno.serve(async (req: Request) => {
         user: {
           ...profile,
           email: authData.user.email ?? '',
-          assigned_projects: (assignments ?? []).flatMap((item) =>
-            item.project ? [item.project] : [],
+          assigned_companies: (assignments ?? []).flatMap((item) =>
+            item.company ? [item.company] : [],
           ),
         },
       })
@@ -107,8 +107,8 @@ Deno.serve(async (req: Request) => {
       const email = String(body.email ?? '').trim()
       const password = String(body.password ?? '')
       const role = String(body.role ?? '')
-      const projectIds = Array.isArray(body.project_ids)
-        ? [...new Set(body.project_ids.map(String))]
+      const companyIds = Array.isArray(body.company_ids)
+        ? [...new Set(body.company_ids.map(String))]
         : []
       if (!fullName || !email)
         return json({ error: 'Name and email are required' }, 400)
@@ -124,9 +124,6 @@ Deno.serve(async (req: Request) => {
         ].includes(role)
       )
         return json({ error: 'Invalid role' }, 400)
-      if (role === 'supervisor' && projectIds.length === 0)
-        return json({ error: 'A project is required for foremen' }, 400)
-
       const authAttributes: {
         email: string
         password?: string
@@ -153,22 +150,22 @@ Deno.serve(async (req: Request) => {
         .eq('id', userId)
       if (profileError) return json({ error: 'Could not update profile' }, 500)
       const { error: clearAssignmentsError } = await adminClient
-        .from('profile_projects')
+        .from('profile_companies')
         .delete()
         .eq('profile_id', userId)
       if (clearAssignmentsError)
-        return json({ error: 'Could not update project assignments' }, 500)
-      if (role === 'supervisor') {
+        return json({ error: 'Could not update company assignments' }, 500)
+      if (role === 'supervisor' && companyIds.length > 0) {
         const { error: assignmentError } = await adminClient
-          .from('profile_projects')
+          .from('profile_companies')
           .insert(
-            projectIds.map((project_id) => ({
+            companyIds.map((company_id) => ({
               profile_id: userId,
-              project_id,
+              company_id,
             })),
           )
         if (assignmentError)
-          return json({ error: 'Could not update project assignments' }, 400)
+          return json({ error: 'Could not update company assignments' }, 400)
       }
       return json({ success: true })
     }

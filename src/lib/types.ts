@@ -32,9 +32,11 @@ export interface Driver {
 export interface Profile {
   id: string
   full_name: string
+  email?: string
   role: UserRole
   project_id: string | null
   assigned_projects?: Array<{ id: string; name_ar: string; name_en: string }>
+  assigned_companies?: Array<{ id: string; name_ar: string; name_en: string }>
   must_change_password: boolean
   created_at: string
 }

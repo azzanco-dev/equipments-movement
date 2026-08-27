@@ -15,6 +15,7 @@ import { AdminProjects } from '@/screens/AdminProjects'
 import { AdminCompanies } from '@/screens/AdminCompanies'
 import { AdminLessors } from '@/screens/AdminLessors'
 import { AdminUsers } from '@/screens/AdminUsers'
+import { UserDetail } from '@/screens/UserDetail'
 import { AdminDrivers } from '@/screens/AdminDrivers'
 import { DriverDetail } from '@/screens/DriverDetail'
 import { MovementDetail } from '@/screens/MovementDetail'
@@ -58,6 +59,7 @@ function AppContent() {
   const movementType = searchParams.get('type') === 'exit' ? 'exit' : 'entry'
   const equipmentId = segments[0] === 'equipment' ? segments[1] : null
   const driverId = segments[0] === 'drivers' ? segments[1] : null
+  const userId = segments[0] === 'users' ? segments[1] : null
   const page = ADMIN_PAGES.has(segments[0] ?? '') ? segments[0] : 'dashboard'
 
   useEffect(() => {
@@ -168,6 +170,8 @@ function AppContent() {
             driverId={driverId}
             onBack={() => router.push('/drivers')}
           />
+        ) : userId ? (
+          <UserDetail userId={userId} onBack={() => router.push('/users')} />
         ) : (
           <>
             {(page === 'dashboard' || page === 'logs') && (
@@ -191,7 +195,9 @@ function AppContent() {
                 onSelectDriver={(id) => router.push(`/drivers/${id}`)}
               />
             )}
-            {page === 'users' && <AdminUsers />}
+            {page === 'users' && (
+              <AdminUsers onSelectUser={(id) => router.push(`/users/${id}`)} />
+            )}
             {page === 'settings' && <AdminSettings />}
           </>
         )}

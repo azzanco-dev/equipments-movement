@@ -58,7 +58,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Parse request body
-    const { email, password, full_name, role, project_ids } = await req.json()
+    const { email, password, full_name, role } = await req.json()
 
     if (!email || !password || !full_name || !role) {
       return new Response(
@@ -107,22 +107,6 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    if (
-      role === 'supervisor' &&
-      (!Array.isArray(project_ids) || project_ids.length === 0)
-    ) {
-      return new Response(
-        JSON.stringify({
-          error: 'A project is required for foremen',
-          code: 'project_required',
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
-      )
-    }
-
     // Use service role client to create the new user
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
 
@@ -152,32 +136,6 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         },
       )
-    }
-
-    if (role === 'supervisor') {
-      const uniqueProjectIds = [...new Set(project_ids.map(String))]
-      const { error: assignmentError } = await adminClient
-        .from('profile_projects')
-        .insert(
-          uniqueProjectIds.map((project_id) => ({
-            profile_id: authData.user.id,
-            project_id,
-          })),
-        )
-      if (assignmentError) {
-        console.error('project assignment failed', assignmentError)
-        await adminClient.auth.admin.deleteUser(authData.user.id)
-        return new Response(
-          JSON.stringify({
-            error: 'Could not assign projects',
-            code: 'invalid_projects',
-          }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          },
-        )
-      }
     }
 
     return new Response(
