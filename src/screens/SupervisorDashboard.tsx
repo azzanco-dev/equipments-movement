@@ -32,7 +32,7 @@ export function SupervisorDashboard({ onSelectMovement, onCreateMovement }: { on
       .from('entry_exit_logs')
       .select('*, equipment(*), supervisor:profiles(id,full_name,role,created_at)')
       .eq('movement_context', workshopMode ? 'workshop' : 'site')
-      .order('recorded_at', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(100);
 
     if (!workshopManagerMode) query = query.eq('supervisor_id', user.id);
