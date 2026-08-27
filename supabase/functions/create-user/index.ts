@@ -1,140 +1,200 @@
-import { createClient } from "npm:@supabase/supabase-js@2.57.4";
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers':
+    'Content-Type, Authorization, X-Client-Info, Apikey',
+}
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 200, headers: corsHeaders })
   }
 
   try {
     // Verify the caller is authenticated and is an admin
-    const authHeader = req.headers.get("Authorization");
+    const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
     // Create client with user's token to check their role
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
-    });
+    })
 
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    const {
+      data: { user },
+      error: userError,
+    } = await userClient.auth.getUser()
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     // Check if caller is admin
     const { data: profile, error: profileError } = await userClient
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
 
-    if (profileError || !profile || profile.role !== "admin") {
-      return new Response(JSON.stringify({ error: "Forbidden — admin only" }), {
+    if (profileError || !profile || profile.role !== 'admin') {
+      return new Response(JSON.stringify({ error: 'Forbidden — admin only' }), {
         status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
 
     // Parse request body
-    const { email, password, full_name, role, project_ids } = await req.json();
+    const { email, password, full_name, role, project_ids } = await req.json()
 
     if (!email || !password || !full_name || !role) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: email, password, full_name, role" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        JSON.stringify({
+          error: 'Missing required fields: email, password, full_name, role',
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
     }
 
     if (!/^\S+@\S+\.\S+$/.test(String(email).trim())) {
-      return new Response(JSON.stringify({ error: "Invalid email", code: "invalid_email" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ error: 'Invalid email', code: 'invalid_email' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
     }
 
     if (String(password).length < 8) {
-      return new Response(JSON.stringify({ error: "Weak password", code: "weak_password" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!["admin", "supervisor", "workshop", "assistant_workshop_manager", "workshop_manager"].includes(role)) {
       return new Response(
-        JSON.stringify({ error: "Invalid role" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        JSON.stringify({ error: 'Weak password', code: 'weak_password' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
     }
 
-    if (role === "supervisor" && (!Array.isArray(project_ids) || project_ids.length === 0)) {
-      return new Response(JSON.stringify({ error: "A project is required for foremen", code: "project_required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (
+      ![
+        'admin',
+        'supervisor',
+        'workshop',
+        'assistant_workshop_manager',
+        'workshop_manager',
+      ].includes(role)
+    ) {
+      return new Response(JSON.stringify({ error: 'Invalid role' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (
+      role === 'supervisor' &&
+      (!Array.isArray(project_ids) || project_ids.length === 0)
+    ) {
+      return new Response(
+        JSON.stringify({
+          error: 'A project is required for foremen',
+          code: 'project_required',
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
     }
 
     // Use service role client to create the new user
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const adminClient = createClient(supabaseUrl, serviceRoleKey)
 
-    const { data: authData, error: createError } = await adminClient.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name, role, admin_created: true },
-    });
+    const { data: authData, error: createError } =
+      await adminClient.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name, role, admin_created: true },
+      })
 
     if (createError) {
-      console.error("createUser failed", createError);
-      const code = createError.code === "email_exists" || createError.message.toLowerCase().includes("already")
-        ? "email_exists"
-        : createError.code === "email_address_invalid" ? "invalid_email"
-        : createError.code === "weak_password" ? "weak_password"
-        : "create_failed";
-      return new Response(JSON.stringify({ error: "Could not create the user", code }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      console.error('createUser failed', createError)
+      const code =
+        createError.code === 'email_exists' ||
+        createError.message.toLowerCase().includes('already')
+          ? 'email_exists'
+          : createError.code === 'email_address_invalid'
+            ? 'invalid_email'
+            : createError.code === 'weak_password'
+              ? 'weak_password'
+              : 'create_failed'
+      return new Response(
+        JSON.stringify({ error: 'Could not create the user', code }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
     }
 
-    if (role === "supervisor") {
-      const uniqueProjectIds = [...new Set(project_ids.map(String))];
-      const { error: assignmentError } = await adminClient.from("profile_projects").insert(uniqueProjectIds.map((project_id) => ({ profile_id: authData.user.id, project_id })));
+    if (role === 'supervisor') {
+      const uniqueProjectIds = [...new Set(project_ids.map(String))]
+      const { error: assignmentError } = await adminClient
+        .from('profile_projects')
+        .insert(
+          uniqueProjectIds.map((project_id) => ({
+            profile_id: authData.user.id,
+            project_id,
+          })),
+        )
       if (assignmentError) {
-        console.error("project assignment failed", assignmentError);
-        await adminClient.auth.admin.deleteUser(authData.user.id);
-        return new Response(JSON.stringify({ error: "Could not assign projects", code: "invalid_projects" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        console.error('project assignment failed', assignmentError)
+        await adminClient.auth.admin.deleteUser(authData.user.id)
+        return new Response(
+          JSON.stringify({
+            error: 'Could not assign projects',
+            code: 'invalid_projects',
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
       }
     }
 
     return new Response(
       JSON.stringify({
-        message: "User created successfully",
+        message: 'User created successfully',
         user: { id: authData.user.id, email: authData.user.email },
       }),
-      { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+      {
+        status: 201,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    )
   } catch (err) {
-    console.error("create-user failed", err);
-    return new Response(
-      JSON.stringify({ error: "Unexpected error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    console.error('create-user failed', err)
+    return new Response(JSON.stringify({ error: 'Unexpected error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
   }
-});
+})

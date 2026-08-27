@@ -1,16 +1,23 @@
-import { useState, type InputHTMLAttributes } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
-import { useI18n } from '@/i18n/I18nContext';
+import { useState, type InputHTMLAttributes } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
+import { useI18n } from '@/i18n/I18nContext'
 
-type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>;
+type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>
 
-export function PasswordInput({ className = '', ...props }: PasswordInputProps) {
-  const { t } = useI18n();
-  const [visible, setVisible] = useState(false);
+export function PasswordInput({
+  className = '',
+  ...props
+}: PasswordInputProps) {
+  const { t } = useI18n()
+  const [visible, setVisible] = useState(false)
 
   return (
     <div className="relative">
-      <input {...props} type={visible ? 'text' : 'password'} className={`input pr-10 ${className}`} />
+      <input
+        {...props}
+        type={visible ? 'text' : 'password'}
+        className={`input pr-10 ${className}`}
+      />
       <button
         type="button"
         onClick={() => setVisible((value) => !value)}
@@ -21,5 +28,5 @@ export function PasswordInput({ className = '', ...props }: PasswordInputProps) 
         {visible ? <EyeOff size={16} /> : <Eye size={16} />}
       </button>
     </div>
-  );
+  )
 }

@@ -1,0 +1,11 @@
+.next
+node_modules
+dist
+coverage
+public
+supabase/migrations
+package-lock.json
+next-env.d.ts
+AGENTS.md
+README.md
+.bolt

@@ -1,23 +1,23 @@
-import { useEffect, useRef } from 'react';
-import QRCode from 'qrcode';
+import { useEffect, useRef } from 'react'
+import QRCode from 'qrcode'
 
 interface QRCodeDisplayProps {
-  value: string;
-  size?: number;
+  value: string
+  size?: number
 }
 
 export function QRCodeDisplay({ value, size = 200 }: QRCodeDisplayProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current) return
     QRCode.toCanvas(canvasRef.current, value, {
       width: size,
       margin: 2,
       color: { dark: '#000000', light: '#ffffff' },
       errorCorrectionLevel: 'M',
-    }).catch((err) => console.error('QR generation error:', err));
-  }, [value, size]);
+    }).catch((err) => console.error('QR generation error:', err))
+  }, [value, size])
 
-  return <canvas ref={canvasRef} width={size} height={size} />;
+  return <canvas ref={canvasRef} width={size} height={size} />
 }

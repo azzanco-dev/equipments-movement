@@ -1,255 +1,349 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
-import { useI18n } from '@/i18n/I18nContext';
-import { Modal } from '@/components/Modal';
-import { Alert } from '@/components/Alert';
-import { InlineSpinner } from '@/components/Spinner';
-import { PageHeader } from '@/components/PageHeader';
-import { Plus, Edit2, Trash2, Upload, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, XCircle, FolderTree, X, Plus as PlusIcon } from 'lucide-react';
-import type { Company, CompanyProject } from '@/lib/types';
-import { parseCompaniesExcel, downloadCompanyTemplate, type CompanyImportRow } from '@/lib/excel';
-import { DataListToolbar } from '@/components/data-list/DataListToolbar';
-import { DataListActions } from '@/components/data-list/DataListActions';
-import { DataListPagination } from '@/components/data-list/DataListPagination';
-import { useDataListState } from '@/components/data-list/useDataListState';
-import { companiesListConfig } from '@/lib/listConfigs';
-import { applyListFilters } from '@/lib/applyListFilters';
-import { sanitizeSearchTerm } from '@/lib/search';
-import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
-import type { SelectOption } from '@/components/Select';
-import { localizedName } from '@/lib/localizedName';
-import { RelativeTime } from '@/components/RelativeTime';
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useI18n } from '@/i18n/I18nContext'
+import { Modal } from '@/components/Modal'
+import { Alert } from '@/components/Alert'
+import { InlineSpinner } from '@/components/Spinner'
+import { PageHeader } from '@/components/PageHeader'
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Upload,
+  FileSpreadsheet,
+  Download,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  FolderTree,
+  X,
+  Plus as PlusIcon,
+} from 'lucide-react'
+import type { Company, CompanyProject } from '@/lib/types'
+import {
+  parseCompaniesExcel,
+  downloadCompanyTemplate,
+  type CompanyImportRow,
+} from '@/lib/excel'
+import { DataListToolbar } from '@/components/data-list/DataListToolbar'
+import { DataListActions } from '@/components/data-list/DataListActions'
+import { DataListPagination } from '@/components/data-list/DataListPagination'
+import { useDataListState } from '@/components/data-list/useDataListState'
+import { companiesListConfig } from '@/lib/listConfigs'
+import { applyListFilters } from '@/lib/applyListFilters'
+import { sanitizeSearchTerm } from '@/lib/search'
+import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
+import type { SelectOption } from '@/components/Select'
+import { localizedName } from '@/lib/localizedName'
+import { RelativeTime } from '@/components/RelativeTime'
 
 type CompanyProjectWithProject = CompanyProject & {
-  project?: { id: string; name_ar: string; name_en: string } | null;
-};
+  project?: { id: string; name_ar: string; name_en: string } | null
+}
 
 export function AdminCompanies() {
-  const { t, lang } = useI18n();
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Company | null>(null);
-  const [nameAr, setNameAr] = useState('');
-  const [nameEn, setNameEn] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [total, setTotal] = useState(0);
-  const list = useDataListState(companiesListConfig);
+  const { t, lang } = useI18n()
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [loading, setLoading] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<Company | null>(null)
+  const [nameAr, setNameAr] = useState('')
+  const [nameEn, setNameEn] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [total, setTotal] = useState(0)
+  const list = useDataListState(companiesListConfig)
 
   // Import state
-  const [importModalOpen, setImportModalOpen] = useState(false);
-  const [importData, setImportData] = useState<CompanyImportRow[]>([]);
-  const [importError, setImportError] = useState<string | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-  const [importResult, setImportResult] = useState<{ success: number; fail: number } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false)
+  const [importData, setImportData] = useState<CompanyImportRow[]>([])
+  const [importError, setImportError] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
+  const [importResult, setImportResult] = useState<{
+    success: number
+    fail: number
+  } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [dragOver, setDragOver] = useState(false)
 
   // Manage projects state
-  const [projectsModalOpen, setProjectsModalOpen] = useState(false);
-  const [projectsModalCompany, setProjectsModalCompany] = useState<Company | null>(null);
-  const [companyLinks, setCompanyLinks] = useState<CompanyProjectWithProject[]>([]);
-  const [linkLoading, setLinkLoading] = useState(false);
-  const [linkError, setLinkError] = useState<string | null>(null);
-  const [addProjectId, setAddProjectId] = useState('');
-  const [addProjectOption, setAddProjectOption] = useState<SelectOption | null>(null);
+  const [projectsModalOpen, setProjectsModalOpen] = useState(false)
+  const [projectsModalCompany, setProjectsModalCompany] =
+    useState<Company | null>(null)
+  const [companyLinks, setCompanyLinks] = useState<CompanyProjectWithProject[]>(
+    [],
+  )
+  const [linkLoading, setLinkLoading] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
+  const [addProjectId, setAddProjectId] = useState('')
+  const [addProjectOption, setAddProjectOption] = useState<SelectOption | null>(
+    null,
+  )
 
   const fetchCompanies = useCallback(async () => {
-    setLoading(true);
-    let query = supabase.from('companies').select('id,name_ar,name_en,created_at', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
-    const term = sanitizeSearchTerm(list.search); if (term) query = query.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`);
-    query = applyListFilters(query, list.filters, new Set(companiesListConfig.filterFields.map((field) => field.key)));
-    const { data, error, count } = await query;
-    if (error) console.error(error);
-    setCompanies((data as Company[]) ?? []);
-    setTotal(count ?? 0);
-    setLoading(false);
-  }, [list.direction, list.filters, list.page, list.pageSize, list.search, list.sort]);
+    setLoading(true)
+    let query = supabase
+      .from('companies')
+      .select('id,name_ar,name_en,created_at', { count: 'exact' })
+      .order(list.sort, { ascending: list.direction === 'asc' })
+      .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
+    const term = sanitizeSearchTerm(list.search)
+    if (term)
+      query = query.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+    query = applyListFilters(
+      query,
+      list.filters,
+      new Set(companiesListConfig.filterFields.map((field) => field.key)),
+    )
+    const { data, error, count } = await query
+    if (error) console.error(error)
+    setCompanies((data as Company[]) ?? [])
+    setTotal(count ?? 0)
+    setLoading(false)
+  }, [
+    list.direction,
+    list.filters,
+    list.page,
+    list.pageSize,
+    list.search,
+    list.sort,
+  ])
 
-  useEffect(() => { fetchCompanies(); }, [fetchCompanies]);
+  useEffect(() => {
+    fetchCompanies()
+  }, [fetchCompanies])
 
   function openAdd() {
-    setEditing(null); setNameAr(''); setNameEn(''); setFormError(null); setModalOpen(true);
+    setEditing(null)
+    setNameAr('')
+    setNameEn('')
+    setFormError(null)
+    setModalOpen(true)
   }
   function openEdit(c: Company) {
-    setEditing(c); setNameAr(c.name_ar); setNameEn(c.name_en); setFormError(null); setModalOpen(true);
+    setEditing(c)
+    setNameAr(c.name_ar)
+    setNameEn(c.name_en)
+    setFormError(null)
+    setModalOpen(true)
   }
 
   async function handleSave() {
-    setSaving(true); setFormError(null);
+    setSaving(true)
+    setFormError(null)
     try {
-      const payload = { name_ar: nameAr, name_en: nameEn };
+      const payload = { name_ar: nameAr, name_en: nameEn }
       if (editing) {
-        const { error } = await supabase.from('companies').update(payload).eq('id', editing.id);
-        if (error) throw error;
+        const { error } = await supabase
+          .from('companies')
+          .update(payload)
+          .eq('id', editing.id)
+        if (error) throw error
       } else {
-        const { error } = await supabase.from('companies').insert(payload);
-        if (error) throw error;
+        const { error } = await supabase.from('companies').insert(payload)
+        if (error) throw error
       }
-      setModalOpen(false); fetchCompanies();
-    } catch (err) { console.error(err); setFormError(t('saveFailed')); }
-    finally { setSaving(false); }
+      setModalOpen(false)
+      fetchCompanies()
+    } catch (err) {
+      console.error(err)
+      setFormError(t('saveFailed'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleDelete(c: Company) {
-    if (!confirm(t('confirmDelete'))) return;
-    const { error } = await supabase.from('companies').delete().eq('id', c.id);
-    if (error) console.error(error);
-    fetchCompanies();
+    if (!confirm(t('confirmDelete'))) return
+    const { error } = await supabase.from('companies').delete().eq('id', c.id)
+    if (error) console.error(error)
+    fetchCompanies()
   }
 
   async function openManageProjects(c: Company) {
-    setProjectsModalCompany(c);
-    setProjectsModalOpen(true);
-    setLinkError(null);
-    setAddProjectId('');
-    setAddProjectOption(null);
-    setLinkLoading(true);
+    setProjectsModalCompany(c)
+    setProjectsModalOpen(true)
+    setLinkError(null)
+    setAddProjectId('')
+    setAddProjectOption(null)
+    setLinkLoading(true)
     const { data } = await supabase
       .from('company_projects')
-      .select('id,company_id,project_id,created_at,project:projects(id,name_ar,name_en)')
-      .eq('company_id', c.id);
-    setCompanyLinks((data as unknown as CompanyProjectWithProject[]) ?? []);
-    setLinkLoading(false);
+      .select(
+        'id,company_id,project_id,created_at,project:projects(id,name_ar,name_en)',
+      )
+      .eq('company_id', c.id)
+    setCompanyLinks((data as unknown as CompanyProjectWithProject[]) ?? [])
+    setLinkLoading(false)
   }
 
-  const loadAvailableProjects = useCallback(async (query: string) => {
-    let request = supabase.from('projects').select('id,name_ar,name_en').order('name_ar').limit(20);
-    const linkedIds = companyLinks.map((link) => link.project_id);
-    if (linkedIds.length) request = request.not('id', 'in', `(${linkedIds.join(',')})`);
-    const term = sanitizeSearchTerm(query);
-    if (term) request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`);
-    const { data } = await request;
-    return (data ?? []).map((project) => ({ value: project.id, label: localizedName(lang, project.name_ar, project.name_en) }));
-  }, [companyLinks, lang]);
+  const loadAvailableProjects = useCallback(
+    async (query: string) => {
+      let request = supabase
+        .from('projects')
+        .select('id,name_ar,name_en')
+        .order('name_ar')
+        .limit(20)
+      const linkedIds = companyLinks.map((link) => link.project_id)
+      if (linkedIds.length)
+        request = request.not('id', 'in', `(${linkedIds.join(',')})`)
+      const term = sanitizeSearchTerm(query)
+      if (term)
+        request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+      const { data } = await request
+      return (data ?? []).map((project) => ({
+        value: project.id,
+        label: localizedName(lang, project.name_ar, project.name_en),
+      }))
+    },
+    [companyLinks, lang],
+  )
 
   async function addProjectLink() {
-    if (!projectsModalCompany || !addProjectId) return;
-    setLinkError(null);
+    if (!projectsModalCompany || !addProjectId) return
+    setLinkError(null)
     const { error } = await supabase
       .from('company_projects')
-      .insert({ company_id: projectsModalCompany.id, project_id: addProjectId });
+      .insert({ company_id: projectsModalCompany.id, project_id: addProjectId })
     if (error) {
-      console.error(error);
-      setLinkError(t('saveFailed'));
-      return;
+      console.error(error)
+      setLinkError(t('saveFailed'))
+      return
     }
-    setAddProjectId('');
-    setAddProjectOption(null);
+    setAddProjectId('')
+    setAddProjectOption(null)
     const { data } = await supabase
       .from('company_projects')
-      .select('id,company_id,project_id,created_at,project:projects(id,name_ar,name_en)')
-      .eq('company_id', projectsModalCompany.id);
-    setCompanyLinks((data as unknown as CompanyProjectWithProject[]) ?? []);
+      .select(
+        'id,company_id,project_id,created_at,project:projects(id,name_ar,name_en)',
+      )
+      .eq('company_id', projectsModalCompany.id)
+    setCompanyLinks((data as unknown as CompanyProjectWithProject[]) ?? [])
   }
 
   async function removeProjectLink(linkId: string) {
-    if (!projectsModalCompany) return;
-    setLinkError(null);
-    const { error } = await supabase.from('company_projects').delete().eq('id', linkId);
+    if (!projectsModalCompany) return
+    setLinkError(null)
+    const { error } = await supabase
+      .from('company_projects')
+      .delete()
+      .eq('id', linkId)
     if (error) {
-      console.error(error);
-      setLinkError(t('saveFailed'));
-      return;
+      console.error(error)
+      setLinkError(t('saveFailed'))
+      return
     }
     const { data } = await supabase
       .from('company_projects')
-      .select('id,company_id,project_id,created_at,project:projects(id,name_ar,name_en)')
-      .eq('company_id', projectsModalCompany.id);
-    setCompanyLinks((data as unknown as CompanyProjectWithProject[]) ?? []);
+      .select(
+        'id,company_id,project_id,created_at,project:projects(id,name_ar,name_en)',
+      )
+      .eq('company_id', projectsModalCompany.id)
+    setCompanyLinks((data as unknown as CompanyProjectWithProject[]) ?? [])
   }
 
   async function handleFileSelect(file: File) {
-    setImportError(null);
-    setImportResult(null);
+    setImportError(null)
+    setImportResult(null)
     if (!file.name.match(/\.(xlsx|xls)$/i)) {
-      setImportError(t('invalidFile'));
-      return;
+      setImportError(t('invalidFile'))
+      return
     }
     try {
-      const buf = await file.arrayBuffer();
-      const rows = parseCompaniesExcel(buf, t);
+      const buf = await file.arrayBuffer()
+      const rows = parseCompaniesExcel(buf, t)
 
-      const existingAr = new Set(companies.map((c) => c.name_ar.toLowerCase()));
-      const existingEn = new Set(companies.map((c) => c.name_en.toLowerCase()));
-      const seenAr = new Set<string>();
-      const seenEn = new Set<string>();
+      const existingAr = new Set(companies.map((c) => c.name_ar.toLowerCase()))
+      const existingEn = new Set(companies.map((c) => c.name_en.toLowerCase()))
+      const seenAr = new Set<string>()
+      const seenEn = new Set<string>()
       for (const row of rows) {
-        if (row.name_ar && (existingAr.has(row.name_ar.toLowerCase()) || seenAr.has(row.name_ar.toLowerCase()))) {
-          row._errors.push(t('duplicateCompany'));
+        if (
+          row.name_ar &&
+          (existingAr.has(row.name_ar.toLowerCase()) ||
+            seenAr.has(row.name_ar.toLowerCase()))
+        ) {
+          row._errors.push(t('duplicateCompany'))
         }
-        if (row.name_en && (existingEn.has(row.name_en.toLowerCase()) || seenEn.has(row.name_en.toLowerCase()))) {
-          row._errors.push(t('duplicateCompany'));
+        if (
+          row.name_en &&
+          (existingEn.has(row.name_en.toLowerCase()) ||
+            seenEn.has(row.name_en.toLowerCase()))
+        ) {
+          row._errors.push(t('duplicateCompany'))
         }
-        if (row.name_ar) seenAr.add(row.name_ar.toLowerCase());
-        if (row.name_en) seenEn.add(row.name_en.toLowerCase());
+        if (row.name_ar) seenAr.add(row.name_ar.toLowerCase())
+        if (row.name_en) seenEn.add(row.name_en.toLowerCase())
       }
 
-      setImportData(rows);
-      const validIndices = new Set(rows.filter((r) => r._errors.length === 0).map((r) => r._rowNumber));
-      setSelectedRows(validIndices);
+      setImportData(rows)
+      const validIndices = new Set(
+        rows.filter((r) => r._errors.length === 0).map((r) => r._rowNumber),
+      )
+      setSelectedRows(validIndices)
     } catch {
-      setImportError(t('invalidFile'));
+      setImportError(t('invalidFile'))
     }
   }
 
   function toggleRow(rowNum: number) {
-    const next = new Set(selectedRows);
-    if (next.has(rowNum)) next.delete(rowNum);
-    else next.add(rowNum);
-    setSelectedRows(next);
+    const next = new Set(selectedRows)
+    if (next.has(rowNum)) next.delete(rowNum)
+    else next.add(rowNum)
+    setSelectedRows(next)
   }
 
   function toggleAllValid() {
-    const validRows = importData.filter((r) => r._errors.length === 0);
-    const allSelected = validRows.every((r) => selectedRows.has(r._rowNumber));
+    const validRows = importData.filter((r) => r._errors.length === 0)
+    const allSelected = validRows.every((r) => selectedRows.has(r._rowNumber))
     if (allSelected) {
-      setSelectedRows(new Set());
+      setSelectedRows(new Set())
     } else {
-      setSelectedRows(new Set(validRows.map((r) => r._rowNumber)));
+      setSelectedRows(new Set(validRows.map((r) => r._rowNumber)))
     }
   }
 
   async function handleImport() {
-    setImporting(true);
-    setImportError(null);
+    setImporting(true)
+    setImportError(null)
 
-    const rowsToImport = importData.filter((r) => selectedRows.has(r._rowNumber) && r._errors.length === 0);
+    const rowsToImport = importData.filter(
+      (r) => selectedRows.has(r._rowNumber) && r._errors.length === 0,
+    )
     const payload = rowsToImport.map((r) => ({
       name_ar: r.name_ar,
       name_en: r.name_en,
-    }));
+    }))
 
     try {
-      let successCount = 0;
-      let failCount = 0;
-      const batchSize = 50;
+      let successCount = 0
+      let failCount = 0
+      const batchSize = 50
       for (let i = 0; i < payload.length; i += batchSize) {
-        const batch = payload.slice(i, i + batchSize);
-        const { error } = await supabase.from('companies').insert(batch);
+        const batch = payload.slice(i, i + batchSize)
+        const { error } = await supabase.from('companies').insert(batch)
         if (error) {
-          failCount += batch.length;
+          failCount += batch.length
         } else {
-          successCount += batch.length;
+          successCount += batch.length
         }
       }
-      setImportResult({ success: successCount, fail: failCount });
-      if (successCount > 0) fetchCompanies();
+      setImportResult({ success: successCount, fail: failCount })
+      if (successCount > 0) fetchCompanies()
     } catch {
-      setImportError(t('importError'));
+      setImportError(t('importError'))
     } finally {
-      setImporting(false);
+      setImporting(false)
     }
   }
 
   function resetImport() {
-    setImportData([]);
-    setSelectedRows(new Set());
-    setImportError(null);
-    setImportResult(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    setImportData([])
+    setSelectedRows(new Set())
+    setImportError(null)
+    setImportResult(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   return (
@@ -257,37 +351,103 @@ export function AdminCompanies() {
       <PageHeader
         title={t('companies')}
         description={t('companiesDesc')}
-        actions={<DataListActions menuActions={<button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-ghost"><Upload size={16} /> {t('importExcel')}</button>} primaryAction={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addCompany')}</button>} />}
+        actions={
+          <DataListActions
+            menuActions={
+              <button
+                onClick={() => {
+                  resetImport()
+                  setImportModalOpen(true)
+                }}
+                className="btn-ghost"
+              >
+                <Upload size={16} /> {t('importExcel')}
+              </button>
+            }
+            primaryAction={
+              <button onClick={openAdd} className="btn-primary">
+                <Plus size={18} /> {t('addCompany')}
+              </button>
+            }
+          />
+        }
       />
-      <DataListToolbar config={companiesListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} />
+      <DataListToolbar
+        config={companiesListConfig}
+        search={list.searchInput}
+        onSearch={list.setSearchInput}
+        sort={list.sort}
+        direction={list.direction}
+        onSort={list.setSort}
+        pageSize={list.pageSize}
+        onPageSize={list.setPageSize}
+        filters={list.filters}
+        onFilters={list.setFilters}
+      />
 
       {loading ? (
         <InlineSpinner label={t('loading')} />
       ) : companies.length === 0 ? (
-        <div className="card text-center py-12"><p className="text-muted">{t('noCompanies')}</p></div>
+        <div className="card text-center py-12">
+          <p className="text-muted">{t('noCompanies')}</p>
+        </div>
       ) : (
         <div className="card p-0 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="compact-table w-full text-sm">
               <thead>
-                <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
-                  <th className="table-header text-start px-4 py-3">{t('company')}</th>
-                  <th className="table-header text-start px-4 py-3">{t('actions')}</th>
-                  <th className="table-header px-4 py-3" aria-label={t('createdAt')} />
+                <tr
+                  className="border-b"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  <th className="table-header text-start px-4 py-3">
+                    {t('company')}
+                  </th>
+                  <th className="table-header text-start px-4 py-3">
+                    {t('actions')}
+                  </th>
+                  <th
+                    className="table-header px-4 py-3"
+                    aria-label={t('createdAt')}
+                  />
                 </tr>
               </thead>
               <tbody>
                 {companies.map((c) => (
-                  <tr key={c.id} className="border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
-                    <td className="px-4 py-3 font-semibold">{localizedName(lang, c.name_ar, c.name_en)}</td>
+                  <tr
+                    key={c.id}
+                    className="border-b last:border-0"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <td className="px-4 py-3 font-semibold">
+                      {localizedName(lang, c.name_ar, c.name_en)}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
-                        <button onClick={() => openEdit(c)} className="btn-ghost p-1.5"><Edit2 size={16} /></button>
-                        <button onClick={() => openManageProjects(c)} className="btn-ghost p-1.5" title={t('manageProjects')}><FolderTree size={16} /></button>
-                        <button onClick={() => handleDelete(c)} className="btn-ghost p-1.5"><Trash2 size={16} /></button>
+                        <button
+                          onClick={() => openEdit(c)}
+                          className="btn-ghost p-1.5"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => openManageProjects(c)}
+                          className="btn-ghost p-1.5"
+                          title={t('manageProjects')}
+                        >
+                          <FolderTree size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(c)}
+                          className="btn-ghost p-1.5"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </td>
-                    <td className="px-4 py-3"><RelativeTime value={c.created_at} /></td>
+                    <td className="px-4 py-3">
+                      <RelativeTime value={c.created_at} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -295,30 +455,87 @@ export function AdminCompanies() {
           </div>
         </div>
       )}
-      <DataListPagination page={list.page} pageSize={list.pageSize} total={total} onPage={list.setPage} />
+      <DataListPagination
+        page={list.page}
+        pageSize={list.pageSize}
+        total={total}
+        onPage={list.setPage}
+      />
 
       {/* Add/Edit Modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? t('editCompany') : t('addCompany')} size="sm">
-        {formError && <div className="mb-4"><Alert type="error">{formError}</Alert></div>}
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editing ? t('editCompany') : t('addCompany')}
+        size="sm"
+      >
+        {formError && (
+          <div className="mb-4">
+            <Alert type="error">{formError}</Alert>
+          </div>
+        )}
         <div className="space-y-4">
-          <div><label className="label">{t('companyNameAr')} *</label><input className="input" dir="rtl" placeholder={t('companyNameArPlaceholder')} value={nameAr} onChange={(e) => setNameAr(e.target.value)} /></div>
-          <div><label className="label">{t('companyNameEn')} *</label><input className="input" dir="ltr" placeholder={t('companyNameEnPlaceholder')} value={nameEn} onChange={(e) => setNameEn(e.target.value)} /></div>
+          <div>
+            <label className="label">{t('companyNameAr')} *</label>
+            <input
+              className="input"
+              dir="rtl"
+              placeholder={t('companyNameArPlaceholder')}
+              value={nameAr}
+              onChange={(e) => setNameAr(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">{t('companyNameEn')} *</label>
+            <input
+              className="input"
+              dir="ltr"
+              placeholder={t('companyNameEnPlaceholder')}
+              value={nameEn}
+              onChange={(e) => setNameEn(e.target.value)}
+            />
+          </div>
         </div>
         <div className="flex gap-3 pt-4">
-          <button onClick={() => setModalOpen(false)} className="btn-outline flex-1">{t('cancel')}</button>
-          <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">{saving ? t('saving') : t('save')}</button>
+          <button
+            onClick={() => setModalOpen(false)}
+            className="btn-outline flex-1"
+          >
+            {t('cancel')}
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="btn-primary flex-1"
+          >
+            {saving ? t('saving') : t('save')}
+          </button>
         </div>
       </Modal>
 
       {/* Import Modal */}
-      <Modal open={importModalOpen} onClose={() => setImportModalOpen(false)} title={t('importCompanies')} size="xl">
-        {importError && <div className="mb-4"><Alert type="error">{importError}</Alert></div>}
+      <Modal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        title={t('importCompanies')}
+        size="xl"
+      >
+        {importError && (
+          <div className="mb-4">
+            <Alert type="error">{importError}</Alert>
+          </div>
+        )}
         {importResult && (
           <div className="mb-4">
             <Alert type={importResult.fail > 0 ? 'warning' : 'success'}>
               {importResult.fail > 0
-                ? t('importPartialSuccess').replace('{success}', String(importResult.success)).replace('{fail}', String(importResult.fail))
-                : t('importSuccess').replace('{count}', String(importResult.success))}
+                ? t('importPartialSuccess')
+                    .replace('{success}', String(importResult.success))
+                    .replace('{fail}', String(importResult.fail))
+                : t('importSuccess').replace(
+                    '{count}',
+                    String(importResult.success),
+                  )}
             </Alert>
           </div>
         )}
@@ -326,14 +543,27 @@ export function AdminCompanies() {
         {importData.length === 0 && !importResult ? (
           <div className="space-y-4">
             <div className="flex justify-end">
-              <button onClick={() => downloadCompanyTemplate(t)} className="btn-ghost text-sm"><Download size={16} /> {t('downloadTemplate')}</button>
+              <button
+                onClick={() => downloadCompanyTemplate(t)}
+                className="btn-ghost text-sm"
+              >
+                <Download size={16} /> {t('downloadTemplate')}
+              </button>
             </div>
             <div
               className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors ${dragOver ? 'border-primary bg-primary/5' : 'border-border'}`}
               onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragOver(true)
+              }}
               onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFileSelect(f); }}
+              onDrop={(e) => {
+                e.preventDefault()
+                setDragOver(false)
+                const f = e.dataTransfer.files[0]
+                if (f) handleFileSelect(f)
+              }}
             >
               <FileSpreadsheet size={48} className="mx-auto text-muted mb-4" />
               <p className="text-muted">{t('dragDropFile')}</p>
@@ -342,7 +572,10 @@ export function AdminCompanies() {
                 type="file"
                 accept=".xlsx,.xls"
                 className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) handleFileSelect(f)
+                }}
               />
             </div>
           </div>
@@ -350,32 +583,66 @@ export function AdminCompanies() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3 justify-between">
               <div className="flex gap-4 text-sm">
-                <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400"><CheckCircle2 size={16} /> {t('validRows')}: {importData.filter((r) => r._errors.length === 0).length}</span>
-                <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400"><AlertTriangle size={16} /> {t('errorRows')}: {importData.filter((r) => r._errors.length > 0).length}</span>
+                <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
+                  <CheckCircle2 size={16} /> {t('validRows')}:{' '}
+                  {importData.filter((r) => r._errors.length === 0).length}
+                </span>
+                <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                  <AlertTriangle size={16} /> {t('errorRows')}:{' '}
+                  {importData.filter((r) => r._errors.length > 0).length}
+                </span>
               </div>
               <div className="flex gap-2">
-                <button onClick={toggleAllValid} className="btn-ghost text-sm">{selectedRows.size === importData.filter((r) => r._errors.length === 0).length ? t('deselectAll') : t('selectAll')}</button>
-                <button onClick={() => downloadCompanyTemplate(t)} className="btn-ghost text-sm"><Download size={16} /> {t('downloadTemplate')}</button>
+                <button onClick={toggleAllValid} className="btn-ghost text-sm">
+                  {selectedRows.size ===
+                  importData.filter((r) => r._errors.length === 0).length
+                    ? t('deselectAll')
+                    : t('selectAll')}
+                </button>
+                <button
+                  onClick={() => downloadCompanyTemplate(t)}
+                  className="btn-ghost text-sm"
+                >
+                  <Download size={16} /> {t('downloadTemplate')}
+                </button>
               </div>
             </div>
 
-            <div className="max-h-[400px] overflow-auto rounded-lg border" style={{ borderColor: 'var(--border)' }}>
+            <div
+              className="max-h-[400px] overflow-auto rounded-lg border"
+              style={{ borderColor: 'var(--border)' }}
+            >
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-surface">
-                  <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
+                  <tr
+                    className="border-b"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
                     <th className="px-3 py-2 w-8"></th>
-                    <th className="table-header text-start px-3 py-2">{t('row')}</th>
-                    <th className="table-header text-start px-3 py-2">{t('companyNameAr')}</th>
-                    <th className="table-header text-start px-3 py-2">{t('companyNameEn')}</th>
-                    <th className="table-header text-start px-3 py-2">{t('rowErrors')}</th>
+                    <th className="table-header text-start px-3 py-2">
+                      {t('row')}
+                    </th>
+                    <th className="table-header text-start px-3 py-2">
+                      {t('companyNameAr')}
+                    </th>
+                    <th className="table-header text-start px-3 py-2">
+                      {t('companyNameEn')}
+                    </th>
+                    <th className="table-header text-start px-3 py-2">
+                      {t('rowErrors')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {importData.map((row) => {
-                    const hasErrors = row._errors.length > 0;
-                    const isSelected = selectedRows.has(row._rowNumber);
+                    const hasErrors = row._errors.length > 0
+                    const isSelected = selectedRows.has(row._rowNumber)
                     return (
-                      <tr key={row._rowNumber} className={`border-b last:border-0 ${hasErrors ? 'bg-red-50 dark:bg-red-950/20' : ''}`} style={{ borderColor: 'var(--border)' }}>
+                      <tr
+                        key={row._rowNumber}
+                        className={`border-b last:border-0 ${hasErrors ? 'bg-red-50 dark:bg-red-950/20' : ''}`}
+                        style={{ borderColor: 'var(--border)' }}
+                      >
                         <td className="px-3 py-2 text-center">
                           <input
                             type="checkbox"
@@ -385,39 +652,67 @@ export function AdminCompanies() {
                             className="rounded"
                           />
                         </td>
-                        <td className="px-3 py-2 text-muted">{row._rowNumber}</td>
-                        <td className="px-3 py-2 font-semibold">{row.name_ar || '—'}</td>
-                        <td className="px-3 py-2 text-muted">{row.name_en || '—'}</td>
+                        <td className="px-3 py-2 text-muted">
+                          {row._rowNumber}
+                        </td>
+                        <td className="px-3 py-2 font-semibold">
+                          {row.name_ar || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-muted">
+                          {row.name_en || '—'}
+                        </td>
                         <td className="px-3 py-2">
                           {hasErrors ? (
                             <div className="flex flex-wrap gap-1">
                               {row._errors.map((err, i) => (
-                                <span key={i} className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                                <span
+                                  key={i}
+                                  className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400"
+                                >
                                   <XCircle size={12} /> {err}
                                 </span>
                               ))}
                             </div>
                           ) : (
-                            <CheckCircle2 size={16} className="text-green-600 dark:text-green-400" />
+                            <CheckCircle2
+                              size={16}
+                              className="text-green-600 dark:text-green-400"
+                            />
                           )}
                         </td>
                       </tr>
-                    );
+                    )
                   })}
                 </tbody>
               </table>
             </div>
 
             <div className="flex gap-3 pt-2">
-              <button onClick={resetImport} className="btn-outline flex-1">{t('cancel')}</button>
-              <button onClick={handleImport} disabled={importing || selectedRows.size === 0} className="btn-primary flex-1">
-                {importing ? t('importing') : `${t('importSelected')} (${selectedRows.size})`}
+              <button onClick={resetImport} className="btn-outline flex-1">
+                {t('cancel')}
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={importing || selectedRows.size === 0}
+                className="btn-primary flex-1"
+              >
+                {importing
+                  ? t('importing')
+                  : `${t('importSelected')} (${selectedRows.size})`}
               </button>
             </div>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4 py-8">
-            <button onClick={() => { resetImport(); setImportModalOpen(false); }} className="btn-primary">{t('close')}</button>
+            <button
+              onClick={() => {
+                resetImport()
+                setImportModalOpen(false)
+              }}
+              className="btn-primary"
+            >
+              {t('close')}
+            </button>
           </div>
         )}
       </Modal>
@@ -429,7 +724,11 @@ export function AdminCompanies() {
         title={`${t('manageProjects')} — ${projectsModalCompany ? localizedName(lang, projectsModalCompany.name_ar, projectsModalCompany.name_en) : ''}`}
         size="md"
       >
-        {linkError && <div className="mb-4"><Alert type="error">{linkError}</Alert></div>}
+        {linkError && (
+          <div className="mb-4">
+            <Alert type="error">{linkError}</Alert>
+          </div>
+        )}
 
         {linkLoading ? (
           <InlineSpinner label={t('loading')} />
@@ -439,7 +738,9 @@ export function AdminCompanies() {
             <div>
               <p className="label mb-2">{t('linkedProjects')}</p>
               {companyLinks.length === 0 ? (
-                <p className="text-sm text-muted py-2">{t('noLinkedProjects')}</p>
+                <p className="text-sm text-muted py-2">
+                  {t('noLinkedProjects')}
+                </p>
               ) : (
                 <div className="space-y-1.5">
                   {companyLinks.map((link) => {
@@ -450,7 +751,13 @@ export function AdminCompanies() {
                         style={{ borderColor: 'var(--border)' }}
                       >
                         <span className="text-sm font-medium">
-                          {link.project ? localizedName(lang, link.project.name_ar, link.project.name_en) : link.project_id}
+                          {link.project
+                            ? localizedName(
+                                lang,
+                                link.project.name_ar,
+                                link.project.name_en,
+                              )
+                            : link.project_id}
                         </span>
                         <button
                           onClick={() => removeProjectLink(link.id)}
@@ -460,21 +767,27 @@ export function AdminCompanies() {
                           <X size={16} />
                         </button>
                       </div>
-                    );
+                    )
                   })}
                 </div>
               )}
             </div>
 
             {/* Add project link */}
-            <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+            <div
+              className="pt-2 border-t"
+              style={{ borderColor: 'var(--border)' }}
+            >
               <p className="label mb-2">{t('addProjectLink')}</p>
               <div className="flex gap-2">
                 <AsyncSearchSelect
                   className="flex-1"
                   value={addProjectId}
                   selectedOption={addProjectOption}
-                  onChange={(value, option) => { setAddProjectId(value); setAddProjectOption(option); }}
+                  onChange={(value, option) => {
+                    setAddProjectId(value)
+                    setAddProjectOption(option)
+                  }}
                   loadOptions={loadAvailableProjects}
                   placeholder="—"
                 />
@@ -491,5 +804,5 @@ export function AdminCompanies() {
         )}
       </Modal>
     </div>
-  );
+  )
 }

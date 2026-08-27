@@ -1,6 +1,6 @@
-export type Language = 'ar' | 'en';
+export type Language = 'ar' | 'en'
 
-export type TranslationKey = keyof typeof translations.ar;
+export type TranslationKey = keyof typeof translations.ar
 
 export const translations = {
   ar: {
@@ -74,7 +74,8 @@ export const translations = {
     viewMovement: 'عرض الحركة',
     registerAnotherMovement: 'تسجيل حركة أخرى',
     workshopOpeningBalance: 'الرصيد الافتتاحي للورشة',
-    workshopOpeningBalanceDesc: 'تحديد المعدات الموجودة داخل الورشة قبل بدء التسجيل بالنظام.',
+    workshopOpeningBalanceDesc:
+      'تحديد المعدات الموجودة داخل الورشة قبل بدء التسجيل بالنظام.',
     markInsideWorkshop: 'تسجيل المعدة داخل الورشة',
     workshopOpeningSaved: 'تم تسجيل المعدة ضمن الرصيد الافتتاحي.',
     workshopOpeningFailed: 'تعذر تسجيل المعدة أو توجد لها حركة ورشة سابقة.',
@@ -87,10 +88,13 @@ export const translations = {
     noAccount: 'ليس لديك حساب؟ أنشئ حساباً',
     invalidCredentials: 'بيانات الدخول غير صحيحة',
     emailNotConfirmed: 'يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول.',
-    tooManySignInAttempts: 'تم إجراء محاولات كثيرة. انتظر قليلاً ثم حاول مرة أخرى.',
-    authConnectionError: 'تعذر الاتصال بخدمة تسجيل الدخول. تحقق من اتصالك وحاول مرة أخرى.',
+    tooManySignInAttempts:
+      'تم إجراء محاولات كثيرة. انتظر قليلاً ثم حاول مرة أخرى.',
+    authConnectionError:
+      'تعذر الاتصال بخدمة تسجيل الدخول. تحقق من اتصالك وحاول مرة أخرى.',
     emailExists: 'هذا البريد مسجّل مسبقاً',
-    signUpDisabled: 'إنشاء الحسابات متاح للأدمن فقط. تواصل مع الأدمن لإنشاء حساب.',
+    signUpDisabled:
+      'إنشاء الحسابات متاح للأدمن فقط. تواصل مع الأدمن لإنشاء حساب.',
     authError: 'حدث خطأ أثناء المصادقة',
     accessDenied: 'ليست لديك صلاحية لتسجيل هذه الحركة.',
 
@@ -115,7 +119,8 @@ export const translations = {
     noDrivers: 'لا يوجد سائقون',
     searchDrivers: 'البحث بالاسم أو الهوية أو الجوال',
     driversLoadError: 'تعذر تحميل السائقين',
-    driverValidationError: 'تحقق من الاسم ورقم الهوية والجوال والقوائم المطلوبة.',
+    driverValidationError:
+      'تحقق من الاسم ورقم الهوية والجوال والقوائم المطلوبة.',
     driverIdExists: 'رقم الهوية مستخدم لسائق آخر.',
     driverDeleteBlocked: 'لا يمكن حذف السائق لأنه مرتبط بحركات معدات.',
     idNumber: 'رقم الهوية',
@@ -141,7 +146,8 @@ export const translations = {
     settings: 'الإعدادات',
     settingsDesc: 'إدارة القوائم والإعدادات المستخدمة في النظام',
     equipmentTypes: 'أنواع المعدات',
-    equipmentTypesDesc: 'إدارة قائمة الأنواع المستخدمة عند إضافة وتعديل المعدات',
+    equipmentTypesDesc:
+      'إدارة قائمة الأنواع المستخدمة عند إضافة وتعديل المعدات',
     itemsCount: '{count} عنصر',
     backToSettings: 'العودة إلى الإعدادات',
     equipmentTypeName: 'اسم النوع',
@@ -154,7 +160,8 @@ export const translations = {
     duplicateEquipmentType: 'نوع المعدة موجود مسبقًا.',
     confirmDeleteEquipmentType: 'هل تريد حذف نوع المعدة؟',
     equipmentTypeInUse: 'لا يمكن حذف النوع لأنه مرتبط بمعدات.',
-    invalidEquipmentTypesFile: 'تعذر استيراد الملف. استخدم ملف Excel بعمود واحد لأسماء الأنواع.',
+    invalidEquipmentTypesFile:
+      'تعذر استيراد الملف. استخدم ملف Excel بعمود واحد لأسماء الأنواع.',
 
     // Supervisor dashboard
     registerEntry: 'تسجيل دخولية',
@@ -196,7 +203,8 @@ export const translations = {
     cannotRegisterExit: 'لا يمكن تسجيل خروج — آخر حركة للمعده كانت خروج',
     lastMovement: 'آخر حركة',
     contractorEquipmentCode: 'ترقيم الشركة',
-    exitInheritsEntry: 'سيتم وراثة الشركة والمشروع وكود المقاول من آخر دخول للمعدة',
+    exitInheritsEntry:
+      'سيتم وراثة الشركة والمشروع وكود المقاول من آخر دخول للمعدة',
     confirmProceed: 'هل تريد المتابعة؟',
     noPreviousMovement: 'لا توجد حركة سابقة',
     currentStatus: 'الحالة الحالية',
@@ -208,19 +216,25 @@ export const translations = {
     exitAllowed: 'يمكن تسجيل الخروج',
     entryBlockedMsg: 'لا يمكن تسجيل دخول جديد لأن آخر حركة للمعدة كانت دخول.',
     exitBlockedMsg: 'لا يمكن تسجيل خروج لأن المعدة ليست داخل موقع حاليًا.',
-    workshopExitOwner: 'يمكن تسجيل خروج المعدة فقط بواسطة المستخدم الذي سجل دخولها.',
+    workshopExitOwner:
+      'يمكن تسجيل خروج المعدة فقط بواسطة المستخدم الذي سجل دخولها.',
     exitNoPreviousMsg: 'لا يمكن تسجيل خروج لأنه لا توجد حركة سابقة للمعدة.',
     latestEntryBrief: 'بيانات آخر دخول',
     entryDateTime: 'تاريخ الدخول',
-    movementStateChanged: 'تغيرت حالة المعدة بين الفحص والإرسال. يرجى المحاولة مرة أخرى.',
+    movementStateChanged:
+      'تغيرت حالة المعدة بين الفحص والإرسال. يرجى المحاولة مرة أخرى.',
     dateTimeLabel: 'التاريخ والوقت',
     actualMovementTime: 'تاريخ الحركة الفعلي',
-    movementTimeCannotBeFuture: 'تاريخ الحركة الفعلي لا يمكن أن يكون في المستقبل',
+    movementTimeCannotBeFuture:
+      'تاريخ الحركة الفعلي لا يمكن أن يكون في المستقبل',
     companyRequiredForEntry: 'يجب تحديد الشركة قبل تسجيل الدخول.',
     projectRequiredForEntry: 'يجب تحديد المشروع قبل تسجيل الدخول.',
-    noPriorEntryAtSelectedTime: 'لا توجد دخولية سابقة للمعدة قبل الوقت المحدد. اختر وقتًا بعد الدخولية الفعلية.',
-    entrySequenceConflict: 'لا يمكن تسجيل الدخول في هذا الوقت؛ توجد دخولية أخرى بدون خروج يفصل بينهما.',
-    exitSequenceConflict: 'لا يمكن تسجيل الخروج في هذا الوقت؛ توجد خروجية أخرى أو لا توجد دخولية سابقة مناسبة.',
+    noPriorEntryAtSelectedTime:
+      'لا توجد دخولية سابقة للمعدة قبل الوقت المحدد. اختر وقتًا بعد الدخولية الفعلية.',
+    entrySequenceConflict:
+      'لا يمكن تسجيل الدخول في هذا الوقت؛ توجد دخولية أخرى بدون خروج يفصل بينهما.',
+    exitSequenceConflict:
+      'لا يمكن تسجيل الخروج في هذا الوقت؛ توجد خروجية أخرى أو لا توجد دخولية سابقة مناسبة.',
     movementSaveFailed: 'تعذر حفظ الحركة. تحقق من البيانات وحاول مرة أخرى.',
     manageProjects: 'إدارة المشاريع',
     linkedProjects: 'المشاريع المرتبطة',
@@ -229,7 +243,8 @@ export const translations = {
     removeProjectLink: 'إزالة',
     selectProject: 'اختر مشروع',
     noProjectsAvailable: 'لا توجد مشاريع متاحة',
-    companyProjectError: 'الشركة والمشروع غير مرتبطين. يرجى اختيار مشروع مرتبط بالشركة.',
+    companyProjectError:
+      'الشركة والمشروع غير مرتبطين. يرجى اختيار مشروع مرتبط بالشركة.',
 
     // Movement details
     movementDetails: 'تفاصيل الحركة',
@@ -252,8 +267,10 @@ export const translations = {
     removePhoto: 'إزالة',
     photoTooLargeMulti: 'حجم الصورة يجب ألا يتجاوز 10 ميجابايت.',
     photoUploadFailed: 'فشل رفع بعض الصور. يمكنك المحاولة مرة أخرى.',
-    movementSavedPhotosFailed: 'تم حفظ الحركة بنجاح، لكن تعذر رفع بعض الصور. أغلق النموذج وأضف الصور من تفاصيل الحركة دون إعادة تسجيل الحركة.',
-    invalidPhotosForMovement: 'اختر صور JPEG أو PNG أو WEBP فقط، بحد 10 ميجابايت للصورة وبحد إجمالي 3 صور.',
+    movementSavedPhotosFailed:
+      'تم حفظ الحركة بنجاح، لكن تعذر رفع بعض الصور. أغلق النموذج وأضف الصور من تفاصيل الحركة دون إعادة تسجيل الحركة.',
+    invalidPhotosForMovement:
+      'اختر صور JPEG أو PNG أو WEBP فقط، بحد 10 ميجابايت للصورة وبحد إجمالي 3 صور.',
     confirmDeletePhoto: 'هل تريد حذف هذه الصورة؟',
     photoDeleteFailed: 'تعذر حذف الصورة.',
     maxPhotosReached: 'تم الوصول للحد الأقصى (3 صور).',
@@ -317,8 +334,10 @@ export const translations = {
     addNewSupplier: 'إضافة مورّد جديد',
     lessorNameRequired: 'اسم المورّد مطلوب.',
     lessorRequired: 'اختر المورّد أو أضف اسمه أولًا.',
-    externalSupplierOptionalHelp: 'المعدة المضافة برقم اللوحة تُسجل كمالك آخر، ويمكن إضافة مورّد خارجي اختياريًا.',
-    externalSupplierPairRequired: 'أدخل اسم المورّد ورقم جواله معًا، أو اترك الحقلين فارغين.',
+    externalSupplierOptionalHelp:
+      'المعدة المضافة برقم اللوحة تُسجل كمالك آخر، ويمكن إضافة مورّد خارجي اختياريًا.',
+    externalSupplierPairRequired:
+      'أدخل اسم المورّد ورقم جواله معًا، أو اترك الحقلين فارغين.',
     operational: 'تعمل',
     maintenance: 'تحت الصيانة',
     stopped: 'متوقفة',
@@ -364,8 +383,10 @@ export const translations = {
     status: 'الحالة',
     processing: 'جارٍ المعالجة…',
     importValidRows: 'استيراد {count} صف صالح',
-    driverFileReadFailed: 'تعذر قراءة الملف. تأكد من استخدام قالب Excel الصحيح.',
-    driverImportFailed: 'تعذر استيراد الصفوف الصالحة. راجع التكرارات وحاول مجددًا.',
+    driverFileReadFailed:
+      'تعذر قراءة الملف. تأكد من استخدام قالب Excel الصحيح.',
+    driverImportFailed:
+      'تعذر استيراد الصفوف الصالحة. راجع التكرارات وحاول مجددًا.',
     errorRows: 'صفوف بها أخطاء',
     rowErrors: 'أخطاء',
     row: 'صف',
@@ -431,7 +452,8 @@ export const translations = {
     temporaryPasswordHelp: 'اتركها فارغة إذا لم ترغب في تغيير كلمة المرور.',
     mustChangePassword: 'يجب تغيير كلمة المرور',
     firstLoginPasswordTitle: 'تغيير كلمة المرور',
-    firstLoginPasswordDescription: 'هذه أول مرة تسجل فيها الدخول. أنشئ كلمة مرور جديدة للمتابعة.',
+    firstLoginPasswordDescription:
+      'هذه أول مرة تسجل فيها الدخول. أنشئ كلمة مرور جديدة للمتابعة.',
     newPassword: 'كلمة المرور الجديدة',
     confirmPassword: 'تأكيد كلمة المرور',
     passwordMinLength: 'يجب ألا تقل كلمة المرور عن 8 أحرف.',
@@ -444,7 +466,8 @@ export const translations = {
     loading: 'جاري التحميل...',
     saving: 'جاري الحفظ...',
     error: 'خطأ',
-    saveFailed: 'تعذر حفظ البيانات. يرجى التحقق من المدخلات والمحاولة مرة أخرى.',
+    saveFailed:
+      'تعذر حفظ البيانات. يرجى التحقق من المدخلات والمحاولة مرة أخرى.',
     invalidPhotoType: 'نوع الصورة غير مدعوم. استخدم JPEG أو PNG أو WebP.',
     photoTooLarge: 'حجم الصورة كبير جداً. الحد الأقصى 10 ميجابايت.',
     success: 'تم بنجاح',
@@ -499,7 +522,8 @@ export const translations = {
     lessorsDesc: 'إدارة المورّدين وبيانات التواصل الخاصة بهم',
     usersDesc: 'إدارة المستخدمين وأدوارهم في النظام',
     supervisorDashboardDesc: 'تسجيل دخول وخروج المعدات وعرض آخر سجلاتك',
-    workshopManagerDashboardDesc: 'تسجيل حركات الورشة ومراجعة وتصنيف دخوليات جميع المسؤولين',
+    workshopManagerDashboardDesc:
+      'تسجيل حركات الورشة ومراجعة وتصنيف دخوليات جميع المسؤولين',
     equipmentDetailDesc: 'بيانات المعدة الكاملة وسجل الحركات',
     searchInList: 'ابحث في القائمة...',
   },
@@ -559,10 +583,12 @@ export const translations = {
     newDriver: 'New driver',
     previousDriver: 'Previous driver',
     noDriverChanges: 'The driver was not changed during this visit.',
-    driverChangeFailed: 'Could not change the driver. Confirm the visit is still open.',
+    driverChangeFailed:
+      'Could not change the driver. Confirm the visit is still open.',
     entryDriver: 'Entry driver',
     exitDriver: 'Exit driver',
-    workshopPhotoRequired: 'At least one photo is required for a workshop movement.',
+    workshopPhotoRequired:
+      'At least one photo is required for a workshop movement.',
     invalidQuickDriver: 'Enter the driver name and a valid mobile number.',
     plateRequired: 'Plate number is required.',
     equipmentCodeRequired: 'Equipment number is required.',
@@ -572,10 +598,13 @@ export const translations = {
     viewMovement: 'View movement',
     registerAnotherMovement: 'Register another movement',
     workshopOpeningBalance: 'Workshop opening balance',
-    workshopOpeningBalanceDesc: 'Mark equipment already inside the workshop before live tracking starts.',
+    workshopOpeningBalanceDesc:
+      'Mark equipment already inside the workshop before live tracking starts.',
     markInsideWorkshop: 'Mark inside workshop',
-    workshopOpeningSaved: 'Equipment was added to the workshop opening balance.',
-    workshopOpeningFailed: 'Could not add the equipment, or it already has a workshop movement.',
+    workshopOpeningSaved:
+      'Equipment was added to the workshop opening balance.',
+    workshopOpeningFailed:
+      'Could not add the equipment, or it already has a workshop movement.',
     incompleteData: 'Incomplete data',
     signInButton: 'Sign In',
     signUpButton: 'Sign Up',
@@ -585,10 +614,13 @@ export const translations = {
     noAccount: "Don't have an account? Sign up",
     invalidCredentials: 'Invalid credentials',
     emailNotConfirmed: 'Please confirm your email address before signing in.',
-    tooManySignInAttempts: 'Too many attempts. Please wait a moment and try again.',
-    authConnectionError: 'Could not connect to the sign-in service. Check your connection and try again.',
+    tooManySignInAttempts:
+      'Too many attempts. Please wait a moment and try again.',
+    authConnectionError:
+      'Could not connect to the sign-in service. Check your connection and try again.',
     emailExists: 'This email is already registered',
-    signUpDisabled: 'Account creation is admin-only. Contact an admin to create an account.',
+    signUpDisabled:
+      'Account creation is admin-only. Contact an admin to create an account.',
     authError: 'Authentication error',
     accessDenied: 'You do not have permission to register this movement.',
 
@@ -612,9 +644,11 @@ export const translations = {
     noDrivers: 'No drivers found',
     searchDrivers: 'Search by name, ID, or mobile',
     driversLoadError: 'Unable to load drivers',
-    driverValidationError: 'Check the name, ID number, mobile number, and required lists.',
+    driverValidationError:
+      'Check the name, ID number, mobile number, and required lists.',
     driverIdExists: 'This ID number is already used by another driver.',
-    driverDeleteBlocked: 'This driver cannot be deleted because they are linked to movements.',
+    driverDeleteBlocked:
+      'This driver cannot be deleted because they are linked to movements.',
     idNumber: 'ID Number',
     mobileNumber: 'Mobile Number',
     nationality: 'Nationality',
@@ -638,7 +672,8 @@ export const translations = {
     settings: 'Settings',
     settingsDesc: 'Manage system lists and settings',
     equipmentTypes: 'Equipment Types',
-    equipmentTypesDesc: 'Manage the type list used when creating and editing equipment',
+    equipmentTypesDesc:
+      'Manage the type list used when creating and editing equipment',
     itemsCount: '{count} items',
     backToSettings: 'Back to Settings',
     equipmentTypeName: 'Type Name',
@@ -650,8 +685,10 @@ export const translations = {
     selectEquipmentType: 'Select equipment type',
     duplicateEquipmentType: 'This equipment type already exists.',
     confirmDeleteEquipmentType: 'Delete this equipment type?',
-    equipmentTypeInUse: 'This type cannot be deleted because equipment uses it.',
-    invalidEquipmentTypesFile: 'The file could not be imported. Use an Excel file with one equipment-type name column.',
+    equipmentTypeInUse:
+      'This type cannot be deleted because equipment uses it.',
+    invalidEquipmentTypesFile:
+      'The file could not be imported. Use an Excel file with one equipment-type name column.',
 
     registerEntry: 'Register Entry',
     registerExit: 'Register Exit',
@@ -690,7 +727,8 @@ export const translations = {
     cannotRegisterExit: 'Cannot register exit — last movement was an exit',
     lastMovement: 'Last movement',
     contractorEquipmentCode: 'Company number',
-    exitInheritsEntry: 'Company, project and contractor code are inherited from the equipment\'s last entry',
+    exitInheritsEntry:
+      "Company, project and contractor code are inherited from the equipment's last entry",
     confirmProceed: 'Do you want to proceed?',
     noPreviousMovement: 'No previous movement',
     currentStatus: 'Current status',
@@ -700,22 +738,32 @@ export const translations = {
     outsideWorkshop: 'Outside workshop',
     entryAllowed: 'Entry is allowed',
     exitAllowed: 'Exit is allowed',
-    entryBlockedMsg: 'Cannot register a new entry because the equipment\'s last movement was an entry.',
-    exitBlockedMsg: 'Cannot register an exit because the equipment is not currently on site.',
-    workshopExitOwner: 'Only the user who registered the equipment entry can register its exit.',
-    exitNoPreviousMsg: 'Cannot register an exit because the equipment has no previous movement.',
+    entryBlockedMsg:
+      "Cannot register a new entry because the equipment's last movement was an entry.",
+    exitBlockedMsg:
+      'Cannot register an exit because the equipment is not currently on site.',
+    workshopExitOwner:
+      'Only the user who registered the equipment entry can register its exit.',
+    exitNoPreviousMsg:
+      'Cannot register an exit because the equipment has no previous movement.',
     latestEntryBrief: 'Latest entry details',
     entryDateTime: 'Entry date',
-    movementStateChanged: 'The equipment state changed between checking and submitting. Please try again.',
+    movementStateChanged:
+      'The equipment state changed between checking and submitting. Please try again.',
     dateTimeLabel: 'Date & Time',
     actualMovementTime: 'Actual Movement Date',
-    movementTimeCannotBeFuture: 'The actual movement date cannot be in the future',
+    movementTimeCannotBeFuture:
+      'The actual movement date cannot be in the future',
     companyRequiredForEntry: 'Select a company before registering the entry.',
     projectRequiredForEntry: 'Select a project before registering the entry.',
-    noPriorEntryAtSelectedTime: 'No prior entry exists before the selected time. Choose a time after the actual entry.',
-    entrySequenceConflict: 'Entry cannot be recorded at this time; another entry exists without an exit between them.',
-    exitSequenceConflict: 'Exit cannot be recorded at this time; another exit exists or there is no suitable prior entry.',
-    movementSaveFailed: 'The movement could not be saved. Check the details and try again.',
+    noPriorEntryAtSelectedTime:
+      'No prior entry exists before the selected time. Choose a time after the actual entry.',
+    entrySequenceConflict:
+      'Entry cannot be recorded at this time; another entry exists without an exit between them.',
+    exitSequenceConflict:
+      'Exit cannot be recorded at this time; another exit exists or there is no suitable prior entry.',
+    movementSaveFailed:
+      'The movement could not be saved. Check the details and try again.',
     manageProjects: 'Manage Projects',
     linkedProjects: 'Linked Projects',
     noLinkedProjects: 'No projects linked to this company.',
@@ -723,7 +771,8 @@ export const translations = {
     removeProjectLink: 'Remove',
     selectProject: 'Select Project',
     noProjectsAvailable: 'No projects available',
-    companyProjectError: 'The company and project are not linked. Please select a project linked to this company.',
+    companyProjectError:
+      'The company and project are not linked. Please select a project linked to this company.',
 
     // Movement details
     movementDetails: 'Movement Details',
@@ -746,8 +795,10 @@ export const translations = {
     removePhoto: 'Remove',
     photoTooLargeMulti: 'Image size must not exceed 10 MB.',
     photoUploadFailed: 'Some photos failed to upload. You can try again.',
-    movementSavedPhotosFailed: 'The movement was saved, but some photos failed. Close this form and add them from Movement Details without resubmitting the movement.',
-    invalidPhotosForMovement: 'Choose JPEG, PNG, or WEBP images only, up to 10 MB each and 3 photos total.',
+    movementSavedPhotosFailed:
+      'The movement was saved, but some photos failed. Close this form and add them from Movement Details without resubmitting the movement.',
+    invalidPhotosForMovement:
+      'Choose JPEG, PNG, or WEBP images only, up to 10 MB each and 3 photos total.',
     confirmDeletePhoto: 'Delete this photo?',
     photoDeleteFailed: 'Unable to delete the photo.',
     maxPhotosReached: 'Maximum reached (3 photos).',
@@ -809,8 +860,10 @@ export const translations = {
     addNewSupplier: 'Add New Supplier',
     lessorNameRequired: 'Supplier name is required.',
     lessorRequired: 'Select a lessor or add their name first.',
-    externalSupplierOptionalHelp: 'Equipment added by plate is saved under Other Owner; adding an external supplier is optional.',
-    externalSupplierPairRequired: 'Enter both the supplier name and mobile number, or leave both fields empty.',
+    externalSupplierOptionalHelp:
+      'Equipment added by plate is saved under Other Owner; adding an external supplier is optional.',
+    externalSupplierPairRequired:
+      'Enter both the supplier name and mobile number, or leave both fields empty.',
     operational: 'Operational',
     maintenance: 'Maintenance',
     stopped: 'Stopped',
@@ -849,15 +902,18 @@ export const translations = {
     validRows: 'Valid Rows',
     importDriversExcel: 'Import Drivers from Excel',
     uploadExcel: 'Upload Excel',
-    uploadForPreview: 'Upload the file to preview and validate it before import',
+    uploadForPreview:
+      'Upload the file to preview and validate it before import',
     valid: 'Valid',
     invalid: 'Invalid',
     duplicateSuspected: 'Duplicate or suspected',
     status: 'Status',
     processing: 'Processing…',
     importValidRows: 'Import {count} valid rows',
-    driverFileReadFailed: 'Could not read the file. Make sure you are using the correct Excel template.',
-    driverImportFailed: 'Could not import the valid rows. Review duplicates and try again.',
+    driverFileReadFailed:
+      'Could not read the file. Make sure you are using the correct Excel template.',
+    driverImportFailed:
+      'Could not import the valid rows. Review duplicates and try again.',
     errorRows: 'Rows with Errors',
     rowErrors: 'Errors',
     row: 'Row',
@@ -920,7 +976,8 @@ export const translations = {
     temporaryPasswordHelp: 'Leave blank to keep the current password.',
     mustChangePassword: 'Password change required',
     firstLoginPasswordTitle: 'Change Password',
-    firstLoginPasswordDescription: 'This is your first sign-in. Create a new password to continue.',
+    firstLoginPasswordDescription:
+      'This is your first sign-in. Create a new password to continue.',
     newPassword: 'New Password',
     confirmPassword: 'Confirm Password',
     passwordMinLength: 'Password must be at least 8 characters.',
@@ -979,35 +1036,39 @@ export const translations = {
     english: 'English',
 
     // Page descriptions
-    dashboardDesc: 'Overview of today\'s entries/exits and equipment status',
-    logsDesc: 'Full log of equipment entry and exit movements with filters and export',
+    dashboardDesc: "Overview of today's entries/exits and equipment status",
+    logsDesc:
+      'Full log of equipment entry and exit movements with filters and export',
     equipmentDesc: 'Manage equipment: add, edit, import, and track status',
     projectsDesc: 'Manage projects and their associated companies',
     lessorsDesc: 'Manage lessors and their contact information',
     usersDesc: 'Manage system users and their roles',
-    supervisorDashboardDesc: 'Register equipment entries and exits, and view your recent logs',
-    workshopManagerDashboardDesc: 'Register workshop movements and review and classify all officers’ entries',
+    supervisorDashboardDesc:
+      'Register equipment entries and exits, and view your recent logs',
+    workshopManagerDashboardDesc:
+      'Register workshop movements and review and classify all officers’ entries',
     equipmentDetailDesc: 'Full equipment details and movement history',
     searchInList: 'Search in list...',
   },
-} as const;
+} as const
 
 export function getLanguage(): Language {
   if (typeof localStorage !== 'undefined') {
-    const stored = localStorage.getItem('lang');
-    if (stored === 'ar' || stored === 'en') return stored;
+    const stored = localStorage.getItem('lang')
+    if (stored === 'ar' || stored === 'en') return stored
   }
-  if (typeof navigator !== 'undefined') return navigator.language.toLowerCase().startsWith('ar') ? 'ar' : 'en';
-  return 'ar';
+  if (typeof navigator !== 'undefined')
+    return navigator.language.toLowerCase().startsWith('ar') ? 'ar' : 'en'
+  return 'ar'
 }
 
 export function setLanguage(lang: Language) {
-  localStorage.setItem('lang', lang);
-  applyLanguage(lang);
+  localStorage.setItem('lang', lang)
+  applyLanguage(lang)
 }
 
 export function applyLanguage(lang: Language) {
-  const html = document.documentElement;
-  html.lang = lang;
-  html.dir = lang === 'ar' ? 'rtl' : 'ltr';
+  const html = document.documentElement
+  html.lang = lang
+  html.dir = lang === 'ar' ? 'rtl' : 'ltr'
 }

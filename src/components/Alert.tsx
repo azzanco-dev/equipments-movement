@@ -1,9 +1,9 @@
-import { type ReactNode } from 'react';
-import { AlertCircle, CheckCircle, Info, AlertTriangle } from 'lucide-react';
+import { type ReactNode } from 'react'
+import { AlertCircle, CheckCircle, Info, AlertTriangle } from 'lucide-react'
 
 interface AlertProps {
-  type: 'error' | 'success' | 'info' | 'warning';
-  children: ReactNode;
+  type: 'error' | 'success' | 'info' | 'warning'
+  children: ReactNode
 }
 
 export function Alert({ type, children }: AlertProps) {
@@ -12,7 +12,7 @@ export function Alert({ type, children }: AlertProps) {
     success: <CheckCircle size={18} />,
     info: <Info size={18} />,
     warning: <AlertTriangle size={18} />,
-  };
+  }
 
   return (
     <div
@@ -29,5 +29,5 @@ export function Alert({ type, children }: AlertProps) {
       <span className="mt-0.5 shrink-0">{icons[type]}</span>
       <div className="flex-1">{children}</div>
     </div>
-  );
+  )
 }

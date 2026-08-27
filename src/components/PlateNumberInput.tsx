@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react';
-import { normalizePlateNumber } from '@/lib/plate';
+import { useEffect, useState } from 'react'
+import { normalizePlateNumber } from '@/lib/plate'
 
 interface PlateNumberInputProps {
-  value: string;
-  onChange: (value: string) => void;
+  value: string
+  onChange: (value: string) => void
 }
 
 interface PlateParts {
-  englishLetters: string;
-  englishNumbers: string;
+  englishLetters: string
+  englishNumbers: string
 }
 
 const ENGLISH_TO_ARABIC_LETTER: Record<string, string> = {
@@ -29,21 +29,21 @@ const ENGLISH_TO_ARABIC_LETTER: Record<string, string> = {
   H: 'هـ',
   U: 'و',
   V: 'ى',
-};
+}
 
 function parsePlate(value: string): PlateParts {
-  const normalized = normalizePlateNumber(value);
-  const letters = normalized.match(/[A-Z]+/)?.[0] ?? '';
-  const numbers = normalized.match(/[0-9]+/)?.[0] ?? '';
+  const normalized = normalizePlateNumber(value)
+  const letters = normalized.match(/[A-Z]+/)?.[0] ?? ''
+  const numbers = normalized.match(/[0-9]+/)?.[0] ?? ''
 
   return {
     englishLetters: letters,
     englishNumbers: numbers,
-  };
+  }
 }
 
 function getNormalizedValue(parts: PlateParts): string {
-  return normalizePlateNumber(`${parts.englishLetters} ${parts.englishNumbers}`);
+  return normalizePlateNumber(`${parts.englishLetters} ${parts.englishNumbers}`)
 }
 
 function cleanLetters(value: string): string {
@@ -53,11 +53,11 @@ function cleanLetters(value: string): string {
     .split('')
     .filter((letter) => letter in ENGLISH_TO_ARABIC_LETTER)
     .join('')
-    .slice(0, 3);
+    .slice(0, 3)
 }
 
 function cleanNumbers(value: string): string {
-  return value.replace(/[^0-9]/g, '').slice(0, 4);
+  return value.replace(/[^0-9]/g, '').slice(0, 4)
 }
 
 function toArabicLetters(value: string): string {
@@ -65,28 +65,29 @@ function toArabicLetters(value: string): string {
     .split('')
     .reverse()
     .map((letter) => ENGLISH_TO_ARABIC_LETTER[letter])
-    .join(' ');
+    .join(' ')
 }
 
 export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
-  const [parts, setParts] = useState<PlateParts>(() => parsePlate(value));
+  const [parts, setParts] = useState<PlateParts>(() => parsePlate(value))
 
   useEffect(() => {
     if (normalizePlateNumber(value) !== getNormalizedValue(parts)) {
-      setParts(parsePlate(value));
+      setParts(parsePlate(value))
     }
-  }, [value, parts]);
+  }, [value, parts])
 
   function updatePart(key: keyof PlateParts, nextValue: string) {
-    const nextParts = { ...parts, [key]: nextValue };
-    setParts(nextParts);
-    onChange(getNormalizedValue(nextParts));
+    const nextParts = { ...parts, [key]: nextValue }
+    setParts(nextParts)
+    onChange(getNormalizedValue(nextParts))
   }
 
-  const cellClass = 'w-full bg-transparent text-center text-2xl font-medium outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600';
-  const derivedCellClass = 'w-full text-center text-2xl font-medium';
-  const arabicLetters = toArabicLetters(parts.englishLetters);
-  const arabicNumbers = parts.englishNumbers;
+  const cellClass =
+    'w-full bg-transparent text-center text-2xl font-medium outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600'
+  const derivedCellClass = 'w-full text-center text-2xl font-medium'
+  const arabicLetters = toArabicLetters(parts.englishLetters)
+  const arabicNumbers = parts.englishNumbers
 
   return (
     <div className="space-y-2">
@@ -101,12 +102,17 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
           >
             <div className="text-[30px] leading-none">♛</div>
             <div className="text-[11px] font-bold">السعودية</div>
-            <div className="text-xs leading-4 tracking-[0.3em]">K<br />S<br />A</div>
+            <div className="text-xs leading-4 tracking-[0.3em]">
+              K<br />S<br />A
+            </div>
             <div className="h-3 w-3 rounded-full bg-black" />
           </div>
 
           <div className="grid flex-1 grid-cols-2 grid-rows-2">
-            <div className="flex items-center justify-center border-b-[3px] border-e-[3px] p-3" style={{ borderColor: 'var(--fg)' }}>
+            <div
+              className="flex items-center justify-center border-b-[3px] border-e-[3px] p-3"
+              style={{ borderColor: 'var(--fg)' }}
+            >
               <div
                 aria-label="Arabic plate letters"
                 dir="rtl"
@@ -115,7 +121,10 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
                 {arabicLetters || 'ا ب ح'}
               </div>
             </div>
-            <div className="flex items-center justify-center border-b-[3px] p-3" style={{ borderColor: 'var(--fg)' }}>
+            <div
+              className="flex items-center justify-center border-b-[3px] p-3"
+              style={{ borderColor: 'var(--fg)' }}
+            >
               <div
                 aria-label="Arabic plate numbers"
                 dir="ltr"
@@ -124,12 +133,17 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
                 {arabicNumbers || '0 0 0 0'}
               </div>
             </div>
-            <div className="flex items-center justify-center border-e-[3px] p-3" style={{ borderColor: 'var(--fg)' }}>
+            <div
+              className="flex items-center justify-center border-e-[3px] p-3"
+              style={{ borderColor: 'var(--fg)' }}
+            >
               <input
                 aria-label="English plate letters"
                 dir="ltr"
                 value={parts.englishLetters}
-                onChange={(e) => updatePart('englishLetters', cleanLetters(e.target.value))}
+                onChange={(e) =>
+                  updatePart('englishLetters', cleanLetters(e.target.value))
+                }
                 placeholder="A B J"
                 className={cellClass}
                 inputMode="text"
@@ -140,7 +154,9 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
                 aria-label="English plate numbers"
                 dir="ltr"
                 value={parts.englishNumbers}
-                onChange={(e) => updatePart('englishNumbers', cleanNumbers(e.target.value))}
+                onChange={(e) =>
+                  updatePart('englishNumbers', cleanNumbers(e.target.value))
+                }
                 placeholder="0 0 0 0"
                 className={cellClass}
                 inputMode="numeric"
@@ -151,5 +167,5 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
       </div>
       <p className="text-xs text-muted">أدخل رقم اللوحة بنفس ترتيب لوحتك</p>
     </div>
-  );
+  )
 }

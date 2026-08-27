@@ -5,28 +5,32 @@
 /* Thmanyah Sans for Arabic, Manrope for Latin text. */
 @font-face {
   font-family: 'Manrope';
-  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-400-normal.woff2') format('woff2');
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-400-normal.woff2')
+    format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Manrope';
-  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-500-normal.woff2') format('woff2');
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-500-normal.woff2')
+    format('woff2');
   font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Manrope';
-  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-600-normal.woff2') format('woff2');
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-600-normal.woff2')
+    format('woff2');
   font-weight: 600;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Manrope';
-  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-700-normal.woff2') format('woff2');
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-700-normal.woff2')
+    format('woff2');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -34,27 +38,33 @@
 
 @font-face {
   font-family: 'Thmanyah';
-  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Regular.woff2') format('woff2');
+  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Regular.woff2')
+    format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+  unicode-range:
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 @font-face {
   font-family: 'Thmanyah';
-  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Medium.woff2') format('woff2');
+  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Medium.woff2')
+    format('woff2');
   font-weight: 500;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+  unicode-range:
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 @font-face {
   font-family: 'Thmanyah';
-  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Bold.woff2') format('woff2');
+  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Bold.woff2')
+    format('woff2');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+  unicode-range:
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
 :root {
@@ -67,11 +77,11 @@
 }
 
 /* Latin text inside RTL context gets Inter for better readability */
-[dir="ltr"] {
+[dir='ltr'] {
   font-family: var(--font-latin);
 }
 
-html[lang="en"] body {
+html[lang='en'] body {
   font-family: var(--font-latin);
 }
 
@@ -125,7 +135,9 @@ body {
   body {
     background-color: var(--bg);
     color: var(--fg);
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
   }
 }
 
@@ -173,7 +185,10 @@ body {
     @apply h-8 w-full rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors placeholder:text-gray-400 placeholder:text-[13px];
     border-color: var(--border);
   }
-  .input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 16%, transparent); }
+  .input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 16%, transparent);
+  }
   .label {
     @apply block text-sm font-medium mb-1.5;
   }
@@ -185,9 +200,21 @@ body {
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
   }
-  .brand-mark, .nav-active { background-color: var(--primary); color: var(--primary-contrast); }
-  .status-entry { color: var(--success); background-color: var(--success-soft); border-color: color-mix(in srgb, var(--success) 30%, transparent); }
-  .status-exit { color: var(--warning); background-color: var(--warning-soft); border-color: color-mix(in srgb, var(--warning) 30%, transparent); }
+  .brand-mark,
+  .nav-active {
+    background-color: var(--primary);
+    color: var(--primary-contrast);
+  }
+  .status-entry {
+    color: var(--success);
+    background-color: var(--success-soft);
+    border-color: color-mix(in srgb, var(--success) 30%, transparent);
+  }
+  .status-exit {
+    color: var(--warning);
+    background-color: var(--warning-soft);
+    border-color: color-mix(in srgb, var(--warning) 30%, transparent);
+  }
   .table-header {
     @apply text-xs font-semibold uppercase tracking-wide;
     color: var(--muted);
@@ -220,29 +247,43 @@ textarea::placeholder {
 }
 
 /* RTL/LTR helpers */
-[dir="rtl"] .rtl-flip {
+[dir='rtl'] .rtl-flip {
   transform: scaleX(-1);
 }
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(100%); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 .animate-slide-in {
   animation: slideIn 0.25s ease-out;
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .animate-spin-slow {
   animation: spin 1.5s linear infinite;

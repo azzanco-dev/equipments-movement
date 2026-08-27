@@ -1,293 +1,489 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
-import { useI18n } from '@/i18n/I18nContext';
-import { Modal } from '@/components/Modal';
-import { Alert } from '@/components/Alert';
-import { InlineSpinner } from '@/components/Spinner';
-import { QRCodeDisplay } from '@/components/QRCodeDisplay';
-import { Plus, Edit2, Power, QrCode, Printer, Upload, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, XCircle, ChevronRight } from 'lucide-react';
-import type { Equipment, OperationalStatus, OwnershipStatus, RegistrationType } from '@/lib/types';
-import { parseEquipmentExcel, downloadEquipmentTemplate, type EquipmentImportRow } from '@/lib/excel';
-import { Select, type SelectOption } from '@/components/Select';
-import { PageHeader } from '@/components/PageHeader';
-import { DatePicker } from '@/components/DatePicker';
-import { PlateNumberInput } from '@/components/PlateNumberInput';
-import { sanitizeSearchTerm } from '@/lib/search';
-import { DataListToolbar } from '@/components/data-list/DataListToolbar';
-import { DataListActions } from '@/components/data-list/DataListActions';
-import { DataListPagination } from '@/components/data-list/DataListPagination';
-import { useDataListState } from '@/components/data-list/useDataListState';
-import { equipmentListConfig } from '@/lib/listConfigs';
-import { applyListFilters } from '@/lib/applyListFilters';
-import { inferOwnershipFromCode, usesExternalSupplier } from '@/lib/equipmentOwnership';
-import { AsyncSearchSelect } from '@/components/AsyncSearchSelect';
-import { localizedName } from '@/lib/localizedName';
-import { RelativeTime } from '@/components/RelativeTime';
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { supabase } from '@/lib/supabase'
+import { useI18n } from '@/i18n/I18nContext'
+import { Modal } from '@/components/Modal'
+import { Alert } from '@/components/Alert'
+import { InlineSpinner } from '@/components/Spinner'
+import { QRCodeDisplay } from '@/components/QRCodeDisplay'
+import {
+  Plus,
+  Edit2,
+  Power,
+  QrCode,
+  Printer,
+  Upload,
+  FileSpreadsheet,
+  Download,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  ChevronRight,
+} from 'lucide-react'
+import type {
+  Equipment,
+  OperationalStatus,
+  OwnershipStatus,
+  RegistrationType,
+} from '@/lib/types'
+import {
+  parseEquipmentExcel,
+  downloadEquipmentTemplate,
+  type EquipmentImportRow,
+} from '@/lib/excel'
+import { Select, type SelectOption } from '@/components/Select'
+import { PageHeader } from '@/components/PageHeader'
+import { DatePicker } from '@/components/DatePicker'
+import { PlateNumberInput } from '@/components/PlateNumberInput'
+import { sanitizeSearchTerm } from '@/lib/search'
+import { DataListToolbar } from '@/components/data-list/DataListToolbar'
+import { DataListActions } from '@/components/data-list/DataListActions'
+import { DataListPagination } from '@/components/data-list/DataListPagination'
+import { useDataListState } from '@/components/data-list/useDataListState'
+import { equipmentListConfig } from '@/lib/listConfigs'
+import { applyListFilters } from '@/lib/applyListFilters'
+import {
+  inferOwnershipFromCode,
+  usesExternalSupplier,
+} from '@/lib/equipmentOwnership'
+import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
+import { localizedName } from '@/lib/localizedName'
+import { RelativeTime } from '@/components/RelativeTime'
 
 function genQrValue(): string {
-  return `EQ-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  return `EQ-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
 }
 
 const emptyForm = {
-  code: '', type: '', plate_number: '', operational_status: 'operational' as OperationalStatus,
-  ownership_status: 'alazani' as OwnershipStatus, project_id: '', lessor_id: '',
-  brand: '', model: '', manufacture_year: '', chassis_number: '', registration_type: '' as string,
-  qr_value: '', last_maintenance_date: '', registration_expiry: '', insurance_expiry: '',
-};
-
-interface AdminEquipmentProps {
-  onSelectEquipment?: (id: string) => void;
+  code: '',
+  type: '',
+  plate_number: '',
+  operational_status: 'operational' as OperationalStatus,
+  ownership_status: 'alazani' as OwnershipStatus,
+  project_id: '',
+  lessor_id: '',
+  brand: '',
+  model: '',
+  manufacture_year: '',
+  chassis_number: '',
+  registration_type: '' as string,
+  qr_value: '',
+  last_maintenance_date: '',
+  registration_expiry: '',
+  insurance_expiry: '',
 }
 
-export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) {
-  const { t, lang } = useI18n();
-  const [equipment, setEquipment] = useState<Equipment[]>([]);
-  const [importProjectMap, setImportProjectMap] = useState<Map<string, string>>(new Map());
-  const [importLessorMap, setImportLessorMap] = useState<Map<string, string>>(new Map());
-  const [loading, setLoading] = useState(true);
-  const list = useDataListState(equipmentListConfig);
-  const [total, setTotal] = useState(0);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Equipment | null>(null);
-  const [form, setForm] = useState(emptyForm);
-  const [selectedProjectOption, setSelectedProjectOption] = useState<SelectOption | null>(null);
-  const [selectedLessorOption, setSelectedLessorOption] = useState<SelectOption | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [qrModal, setQrModal] = useState<Equipment | null>(null);
-  const [importModalOpen, setImportModalOpen] = useState(false);
-  const [importData, setImportData] = useState<EquipmentImportRow[]>([]);
-  const [importError, setImportError] = useState<string | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-  const [importResult, setImportResult] = useState<{ success: number; fail: number } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const listTopRef = useRef<HTMLDivElement>(null);
-  const [dragOver, setDragOver] = useState(false);
+interface AdminEquipmentProps {
+  onSelectEquipment?: (id: string) => void
+}
+
+export function AdminEquipment({
+  onSelectEquipment,
+}: AdminEquipmentProps = {}) {
+  const { t, lang } = useI18n()
+  const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [importProjectMap, setImportProjectMap] = useState<Map<string, string>>(
+    new Map(),
+  )
+  const [importLessorMap, setImportLessorMap] = useState<Map<string, string>>(
+    new Map(),
+  )
+  const [loading, setLoading] = useState(true)
+  const list = useDataListState(equipmentListConfig)
+  const [total, setTotal] = useState(0)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<Equipment | null>(null)
+  const [form, setForm] = useState(emptyForm)
+  const [selectedProjectOption, setSelectedProjectOption] =
+    useState<SelectOption | null>(null)
+  const [selectedLessorOption, setSelectedLessorOption] =
+    useState<SelectOption | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [qrModal, setQrModal] = useState<Equipment | null>(null)
+  const [importModalOpen, setImportModalOpen] = useState(false)
+  const [importData, setImportData] = useState<EquipmentImportRow[]>([])
+  const [importError, setImportError] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set())
+  const [importResult, setImportResult] = useState<{
+    success: number
+    fail: number
+  } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const listTopRef = useRef<HTMLDivElement>(null)
+  const [dragOver, setDragOver] = useState(false)
 
   const changePage = (nextPage: number) => {
-    list.setPage(nextPage);
-    window.requestAnimationFrame(() => listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  };
+    list.setPage(nextPage)
+    window.requestAnimationFrame(() =>
+      listTopRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      }),
+    )
+  }
 
   const fetchEquipment = useCallback(async () => {
-    setLoading(true);
-    let query = supabase.from('equipment').select('id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,master_data_complete,numbering_status,created_at,updated_at,project:projects(id,name_ar,name_en),lessor:lessors(id,name)', { count: 'exact' }).order(list.sort, { ascending: list.direction === 'asc' }).range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1);
-    const term = sanitizeSearchTerm(list.search);
+    setLoading(true)
+    let query = supabase
+      .from('equipment')
+      .select(
+        'id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,master_data_complete,numbering_status,created_at,updated_at,project:projects(id,name_ar,name_en),lessor:lessors(id,name)',
+        { count: 'exact' },
+      )
+      .order(list.sort, { ascending: list.direction === 'asc' })
+      .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
+    const term = sanitizeSearchTerm(list.search)
     if (term) {
-      query = query.or(`code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`);
+      query = query.or(
+        `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`,
+      )
     }
-    query = applyListFilters(query, list.filters, new Set(equipmentListConfig.filterFields.map((field) => field.key)));
-    const { data, error, count } = await query;
-    if (error) console.error(error);
-    setEquipment((data as unknown as Equipment[]) ?? []);
-    setTotal(count ?? 0);
-    setLoading(false);
-  }, [list.direction, list.filters, list.page, list.pageSize, list.search, list.sort]);
+    query = applyListFilters(
+      query,
+      list.filters,
+      new Set(equipmentListConfig.filterFields.map((field) => field.key)),
+    )
+    const { data, error, count } = await query
+    if (error) console.error(error)
+    setEquipment((data as unknown as Equipment[]) ?? [])
+    setTotal(count ?? 0)
+    setLoading(false)
+  }, [
+    list.direction,
+    list.filters,
+    list.page,
+    list.pageSize,
+    list.search,
+    list.sort,
+  ])
 
-  useEffect(() => { fetchEquipment(); }, [fetchEquipment]);
+  useEffect(() => {
+    fetchEquipment()
+  }, [fetchEquipment])
 
   const loadEquipmentTypes = useCallback(async (query: string) => {
-    let request = supabase.from('equipment_types').select('name').order('name').limit(20);
-    const term = sanitizeSearchTerm(query);
-    if (term) request = request.ilike('name', `%${term}%`);
-    const { data } = await request;
-    return (data ?? []).map((item) => ({ value: item.name, label: item.name }));
-  }, []);
+    let request = supabase
+      .from('equipment_types')
+      .select('name')
+      .order('name')
+      .limit(20)
+    const term = sanitizeSearchTerm(query)
+    if (term) request = request.ilike('name', `%${term}%`)
+    const { data } = await request
+    return (data ?? []).map((item) => ({ value: item.name, label: item.name }))
+  }, [])
 
-  const loadProjects = useCallback(async (query: string) => {
-    let request = supabase.from('projects').select('id,name_ar,name_en').order('name_ar').limit(20);
-    const term = sanitizeSearchTerm(query);
-    if (term) request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`);
-    const { data } = await request;
-    return (data ?? []).map((project) => ({ value: project.id, label: localizedName(lang, project.name_ar, project.name_en) }));
-  }, [lang]);
+  const loadProjects = useCallback(
+    async (query: string) => {
+      let request = supabase
+        .from('projects')
+        .select('id,name_ar,name_en')
+        .order('name_ar')
+        .limit(20)
+      const term = sanitizeSearchTerm(query)
+      if (term)
+        request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+      const { data } = await request
+      return (data ?? []).map((project) => ({
+        value: project.id,
+        label: localizedName(lang, project.name_ar, project.name_en),
+      }))
+    },
+    [lang],
+  )
 
   const loadLessors = useCallback(async (query: string) => {
-    let request = supabase.from('lessors').select('id,name').order('name').limit(20);
-    const term = sanitizeSearchTerm(query);
-    if (term) request = request.ilike('name', `%${term}%`);
-    const { data } = await request;
-    return (data ?? []).map((lessor) => ({ value: lessor.id, label: lessor.name }));
-  }, []);
+    let request = supabase
+      .from('lessors')
+      .select('id,name')
+      .order('name')
+      .limit(20)
+    const term = sanitizeSearchTerm(query)
+    if (term) request = request.ilike('name', `%${term}%`)
+    const { data } = await request
+    return (data ?? []).map((lessor) => ({
+      value: lessor.id,
+      label: lessor.name,
+    }))
+  }, [])
 
   function openAdd() {
-    setEditing(null);
-    setForm({ ...emptyForm, qr_value: genQrValue() });
-    setSelectedProjectOption(null);
-    setSelectedLessorOption(null);
-    setFormError(null);
-    setModalOpen(true);
+    setEditing(null)
+    setForm({ ...emptyForm, qr_value: genQrValue() })
+    setSelectedProjectOption(null)
+    setSelectedLessorOption(null)
+    setFormError(null)
+    setModalOpen(true)
   }
 
   function openEdit(eq: Equipment) {
-    setEditing(eq);
+    setEditing(eq)
     setForm({
-      code: eq.code, type: eq.type, plate_number: eq.plate_number ?? '',
-      operational_status: eq.operational_status, ownership_status: eq.ownership_status,
-      project_id: eq.project_id ?? '', lessor_id: eq.lessor_id ?? '',
-      brand: eq.brand ?? '', model: eq.model ?? '', manufacture_year: eq.manufacture_year?.toString() ?? '',
-      chassis_number: eq.chassis_number ?? '', registration_type: eq.registration_type ?? '',
-      qr_value: eq.qr_value, last_maintenance_date: eq.last_maintenance_date ?? '',
-      registration_expiry: eq.registration_expiry ?? '', insurance_expiry: eq.insurance_expiry ?? '',
-    });
-    setSelectedProjectOption(eq.project ? { value: eq.project.id, label: localizedName(lang, eq.project.name_ar, eq.project.name_en) } : null);
-    setSelectedLessorOption(eq.lessor ? { value: eq.lessor.id, label: eq.lessor.name } : null);
-    setFormError(null);
-    setModalOpen(true);
+      code: eq.code,
+      type: eq.type,
+      plate_number: eq.plate_number ?? '',
+      operational_status: eq.operational_status,
+      ownership_status: eq.ownership_status,
+      project_id: eq.project_id ?? '',
+      lessor_id: eq.lessor_id ?? '',
+      brand: eq.brand ?? '',
+      model: eq.model ?? '',
+      manufacture_year: eq.manufacture_year?.toString() ?? '',
+      chassis_number: eq.chassis_number ?? '',
+      registration_type: eq.registration_type ?? '',
+      qr_value: eq.qr_value,
+      last_maintenance_date: eq.last_maintenance_date ?? '',
+      registration_expiry: eq.registration_expiry ?? '',
+      insurance_expiry: eq.insurance_expiry ?? '',
+    })
+    setSelectedProjectOption(
+      eq.project
+        ? {
+            value: eq.project.id,
+            label: localizedName(lang, eq.project.name_ar, eq.project.name_en),
+          }
+        : null,
+    )
+    setSelectedLessorOption(
+      eq.lessor ? { value: eq.lessor.id, label: eq.lessor.name } : null,
+    )
+    setFormError(null)
+    setModalOpen(true)
   }
 
   useEffect(() => {
     function handleEditEvent(e: Event) {
-      const eq = (e as CustomEvent).detail as Equipment;
-      openEdit(eq);
+      const eq = (e as CustomEvent).detail as Equipment
+      openEdit(eq)
     }
-    window.addEventListener('edit-equipment', handleEditEvent);
-    return () => window.removeEventListener('edit-equipment', handleEditEvent);
+    window.addEventListener('edit-equipment', handleEditEvent)
+    return () => window.removeEventListener('edit-equipment', handleEditEvent)
     // The handler only needs to refresh its localized project label when language changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang]);
+  }, [lang])
 
   async function handleSave() {
-    setSaving(true); setFormError(null);
+    setSaving(true)
+    setFormError(null)
     try {
       const payload = {
-        code: form.code, type: form.type, plate_number: form.plate_number || null,
-        operational_status: form.operational_status, ownership_status: form.ownership_status,
-        project_id: form.project_id || null, lessor_id: usesExternalSupplier(form.ownership_status) ? (form.lessor_id || null) : null,
-        brand: form.brand || null, model: form.model || null,
-        manufacture_year: form.manufacture_year ? parseInt(form.manufacture_year) : null,
+        code: form.code,
+        type: form.type,
+        plate_number: form.plate_number || null,
+        operational_status: form.operational_status,
+        ownership_status: form.ownership_status,
+        project_id: form.project_id || null,
+        lessor_id: usesExternalSupplier(form.ownership_status)
+          ? form.lessor_id || null
+          : null,
+        brand: form.brand || null,
+        model: form.model || null,
+        manufacture_year: form.manufacture_year
+          ? parseInt(form.manufacture_year)
+          : null,
         chassis_number: form.chassis_number || null,
-        registration_type: (form.registration_type || null) as RegistrationType | null,
+        registration_type: (form.registration_type ||
+          null) as RegistrationType | null,
         qr_value: form.qr_value,
         last_maintenance_date: form.last_maintenance_date || null,
         registration_expiry: form.registration_expiry || null,
         insurance_expiry: form.insurance_expiry || null,
         master_data_complete: true,
-      };
-      if (editing) {
-        const { error } = await supabase.from('equipment').update(payload).eq('id', editing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('equipment').insert(payload);
-        if (error) throw error;
       }
-      setModalOpen(false);
-      fetchEquipment();
+      if (editing) {
+        const { error } = await supabase
+          .from('equipment')
+          .update(payload)
+          .eq('id', editing.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('equipment').insert(payload)
+        if (error) throw error
+      }
+      setModalOpen(false)
+      fetchEquipment()
     } catch (err) {
-      console.error(err);
-      setFormError(t('saveFailed'));
+      console.error(err)
+      setFormError(t('saveFailed'))
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
   }
 
   async function toggleActive(eq: Equipment) {
-    const { error } = await supabase.from('equipment').update({ is_active: !eq.is_active }).eq('id', eq.id);
-    if (error) console.error(error);
-    fetchEquipment();
+    const { error } = await supabase
+      .from('equipment')
+      .update({ is_active: !eq.is_active })
+      .eq('id', eq.id)
+    if (error) console.error(error)
+    fetchEquipment()
   }
 
   function printQR(eq: Equipment) {
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`<html><head><title>QR - ${eq.code}</title></head><body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif"><h2>${eq.code}</h2><p>${eq.type}</p><img src="https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(eq.qr_value)}" alt="QR" style="width:256px;height:256px"/><p style="margin-top:8px;font-size:12px;color:#666">${eq.qr_value}</p></body></html>`);
-    win.document.close();
-    win.print();
+    const win = window.open('', '_blank')
+    if (!win) return
+    win.document.write(
+      `<html><head><title>QR - ${eq.code}</title></head><body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif"><h2>${eq.code}</h2><p>${eq.type}</p><img src="https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(eq.qr_value)}" alt="QR" style="width:256px;height:256px"/><p style="margin-top:8px;font-size:12px;color:#666">${eq.qr_value}</p></body></html>`,
+    )
+    win.document.close()
+    win.print()
   }
 
   async function handleFileSelect(file: File) {
-    setImportError(null);
-    setImportResult(null);
+    setImportError(null)
+    setImportResult(null)
     if (!file.name.match(/\.(xlsx|xls)$/i)) {
-      setImportError(t('invalidFile'));
-      return;
+      setImportError(t('invalidFile'))
+      return
     }
     try {
-      const buf = await file.arrayBuffer();
-      const rows = parseEquipmentExcel(buf, t);
+      const buf = await file.arrayBuffer()
+      const rows = parseEquipmentExcel(buf, t)
 
-      const { data: knownTypeRows, error: knownTypesError } = await supabase.from('equipment_types').select('name');
-      if (knownTypesError) throw knownTypesError;
-      const knownTypes = new Set((knownTypeRows ?? []).map((row) => row.name.toLowerCase()));
+      const { data: knownTypeRows, error: knownTypesError } = await supabase
+        .from('equipment_types')
+        .select('name')
+      if (knownTypesError) throw knownTypesError
+      const knownTypes = new Set(
+        (knownTypeRows ?? []).map((row) => row.name.toLowerCase()),
+      )
       for (const row of rows) {
-        if (row.type && !knownTypes.has(row.type.toLowerCase())) row._errors.push(t('equipmentTypeNotFound'));
+        if (row.type && !knownTypes.has(row.type.toLowerCase()))
+          row._errors.push(t('equipmentTypeNotFound'))
       }
 
-      const importedCodes = [...new Set(rows.map((row) => row.code).filter(Boolean))];
-      const codeChunks = Array.from({ length: Math.ceil(importedCodes.length / 100) }, (_, index) => importedCodes.slice(index * 100, index * 100 + 100));
-      const existingCodeResults = await Promise.all(codeChunks.map((codes) => supabase.from('equipment').select('code').in('code', codes)));
-      const existingCodeError = existingCodeResults.find((result) => result.error)?.error;
-      if (existingCodeError) throw existingCodeError;
-      const existingCodes = new Set(existingCodeResults.flatMap((result) => result.data ?? []).map((row) => row.code.toLowerCase()));
-      const seenCodes = new Set<string>();
+      const importedCodes = [
+        ...new Set(rows.map((row) => row.code).filter(Boolean)),
+      ]
+      const codeChunks = Array.from(
+        { length: Math.ceil(importedCodes.length / 100) },
+        (_, index) => importedCodes.slice(index * 100, index * 100 + 100),
+      )
+      const existingCodeResults = await Promise.all(
+        codeChunks.map((codes) =>
+          supabase.from('equipment').select('code').in('code', codes),
+        ),
+      )
+      const existingCodeError = existingCodeResults.find(
+        (result) => result.error,
+      )?.error
+      if (existingCodeError) throw existingCodeError
+      const existingCodes = new Set(
+        existingCodeResults
+          .flatMap((result) => result.data ?? [])
+          .map((row) => row.code.toLowerCase()),
+      )
+      const seenCodes = new Set<string>()
       for (const row of rows) {
-        const lc = row.code.toLowerCase();
+        const lc = row.code.toLowerCase()
         if (existingCodes.has(lc) || seenCodes.has(lc)) {
-          row._errors.push(t('duplicateCode'));
+          row._errors.push(t('duplicateCode'))
         }
-        seenCodes.add(lc);
+        seenCodes.add(lc)
       }
 
-      const projectNames = [...new Set(rows.map((row) => row.project_name).filter(Boolean))];
-      const lessorNames = [...new Set(rows.map((row) => row.lessor_name).filter(Boolean))];
+      const projectNames = [
+        ...new Set(rows.map((row) => row.project_name).filter(Boolean)),
+      ]
+      const lessorNames = [
+        ...new Set(rows.map((row) => row.lessor_name).filter(Boolean)),
+      ]
       const [projectsAr, projectsEn, lessorRows] = await Promise.all([
-        projectNames.length ? supabase.from('projects').select('id,name_ar,name_en').in('name_ar', projectNames) : Promise.resolve({ data: [] }),
-        projectNames.length ? supabase.from('projects').select('id,name_ar,name_en').in('name_en', projectNames) : Promise.resolve({ data: [] }),
-        lessorNames.length ? supabase.from('lessors').select('id,name').in('name', lessorNames) : Promise.resolve({ data: [] }),
-      ]);
-      const matchedProjects = [...(projectsAr.data ?? []), ...(projectsEn.data ?? [])];
-      const projectMap = new Map(matchedProjects.flatMap((p) => [[p.name_ar.toLowerCase(), p.id], [p.name_en.toLowerCase(), p.id]]));
-      const lessorMap = new Map((lessorRows.data ?? []).map((l) => [l.name.toLowerCase(), l.id]));
-      setImportProjectMap(projectMap);
-      setImportLessorMap(lessorMap);
+        projectNames.length
+          ? supabase
+              .from('projects')
+              .select('id,name_ar,name_en')
+              .in('name_ar', projectNames)
+          : Promise.resolve({ data: [] }),
+        projectNames.length
+          ? supabase
+              .from('projects')
+              .select('id,name_ar,name_en')
+              .in('name_en', projectNames)
+          : Promise.resolve({ data: [] }),
+        lessorNames.length
+          ? supabase.from('lessors').select('id,name').in('name', lessorNames)
+          : Promise.resolve({ data: [] }),
+      ])
+      const matchedProjects = [
+        ...(projectsAr.data ?? []),
+        ...(projectsEn.data ?? []),
+      ]
+      const projectMap = new Map(
+        matchedProjects.flatMap((p) => [
+          [p.name_ar.toLowerCase(), p.id],
+          [p.name_en.toLowerCase(), p.id],
+        ]),
+      )
+      const lessorMap = new Map(
+        (lessorRows.data ?? []).map((l) => [l.name.toLowerCase(), l.id]),
+      )
+      setImportProjectMap(projectMap)
+      setImportLessorMap(lessorMap)
       for (const row of rows) {
-        if (row.project_name && !projectMap.has(row.project_name.toLowerCase())) {
-          row._errors.push(t('projectNotFound'));
+        if (
+          row.project_name &&
+          !projectMap.has(row.project_name.toLowerCase())
+        ) {
+          row._errors.push(t('projectNotFound'))
         }
-        if (usesExternalSupplier(row.ownership_status) && row.lessor_name && !lessorMap.has(row.lessor_name.toLowerCase())) {
-          row._errors.push(t('lessorNotFound'));
+        if (
+          usesExternalSupplier(row.ownership_status) &&
+          row.lessor_name &&
+          !lessorMap.has(row.lessor_name.toLowerCase())
+        ) {
+          row._errors.push(t('lessorNotFound'))
         }
       }
 
-      setImportData(rows);
-      const validIndices = new Set(rows.filter((r) => r._errors.length === 0).map((r) => r._rowNumber));
-      setSelectedRows(validIndices);
+      setImportData(rows)
+      const validIndices = new Set(
+        rows.filter((r) => r._errors.length === 0).map((r) => r._rowNumber),
+      )
+      setSelectedRows(validIndices)
     } catch {
-      setImportError(t('invalidFile'));
+      setImportError(t('invalidFile'))
     }
   }
 
   function toggleRow(rowNum: number) {
-    const next = new Set(selectedRows);
-    if (next.has(rowNum)) next.delete(rowNum);
-    else next.add(rowNum);
-    setSelectedRows(next);
+    const next = new Set(selectedRows)
+    if (next.has(rowNum)) next.delete(rowNum)
+    else next.add(rowNum)
+    setSelectedRows(next)
   }
 
   function toggleAllValid() {
-    const validRows = importData.filter((r) => r._errors.length === 0);
-    const allSelected = validRows.every((r) => selectedRows.has(r._rowNumber));
+    const validRows = importData.filter((r) => r._errors.length === 0)
+    const allSelected = validRows.every((r) => selectedRows.has(r._rowNumber))
     if (allSelected) {
-      setSelectedRows(new Set());
+      setSelectedRows(new Set())
     } else {
-      setSelectedRows(new Set(validRows.map((r) => r._rowNumber)));
+      setSelectedRows(new Set(validRows.map((r) => r._rowNumber)))
     }
   }
 
   async function handleImport() {
-    setImporting(true);
-    setImportError(null);
+    setImporting(true)
+    setImportError(null)
 
-    const rowsToImport = importData.filter((r) => selectedRows.has(r._rowNumber) && r._errors.length === 0);
+    const rowsToImport = importData.filter(
+      (r) => selectedRows.has(r._rowNumber) && r._errors.length === 0,
+    )
     const payload = rowsToImport.map((r) => ({
       code: r.code,
       type: r.type,
       plate_number: r.plate_number,
       operational_status: r.operational_status,
       ownership_status: r.ownership_status,
-      project_id: r.project_name ? (importProjectMap.get(r.project_name.toLowerCase()) ?? null) : null,
-      lessor_id: usesExternalSupplier(r.ownership_status) && r.lessor_name ? (importLessorMap.get(r.lessor_name.toLowerCase()) ?? null) : null,
+      project_id: r.project_name
+        ? (importProjectMap.get(r.project_name.toLowerCase()) ?? null)
+        : null,
+      lessor_id:
+        usesExternalSupplier(r.ownership_status) && r.lessor_name
+          ? (importLessorMap.get(r.lessor_name.toLowerCase()) ?? null)
+          : null,
       brand: r.brand,
       model: r.model,
       manufacture_year: r.manufacture_year,
@@ -297,88 +493,146 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
       last_maintenance_date: r.last_maintenance_date,
       registration_expiry: r.registration_expiry,
       insurance_expiry: r.insurance_expiry,
-    }));
+    }))
 
     try {
-      let successCount = 0;
-      let failCount = 0;
-      const batchSize = 50;
+      let successCount = 0
+      let failCount = 0
+      const batchSize = 50
 
       const insertBatch = async (batch: typeof payload): Promise<void> => {
-        if (!batch.length) return;
-        const { error } = await supabase.from('equipment').insert(batch);
+        if (!batch.length) return
+        const { error } = await supabase.from('equipment').insert(batch)
         if (!error) {
-          successCount += batch.length;
-          return;
+          successCount += batch.length
+          return
         }
         if (batch.length === 1) {
-          failCount += 1;
-          return;
+          failCount += 1
+          return
         }
-        const middle = Math.ceil(batch.length / 2);
-        await insertBatch(batch.slice(0, middle));
-        await insertBatch(batch.slice(middle));
-      };
+        const middle = Math.ceil(batch.length / 2)
+        await insertBatch(batch.slice(0, middle))
+        await insertBatch(batch.slice(middle))
+      }
 
       for (let i = 0; i < payload.length; i += batchSize) {
-        await insertBatch(payload.slice(i, i + batchSize));
+        await insertBatch(payload.slice(i, i + batchSize))
       }
-      setImportResult({ success: successCount, fail: failCount });
-      if (successCount > 0) fetchEquipment();
+      setImportResult({ success: successCount, fail: failCount })
+      if (successCount > 0) fetchEquipment()
     } catch {
-      setImportError(t('importError'));
+      setImportError(t('importError'))
     } finally {
-      setImporting(false);
+      setImporting(false)
     }
   }
 
   function resetImport() {
-    setImportData([]);
-    setSelectedRows(new Set());
-    setImportError(null);
-    setImportResult(null);
-    setImportProjectMap(new Map());
-    setImportLessorMap(new Map());
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    setImportData([])
+    setSelectedRows(new Set())
+    setImportError(null)
+    setImportResult(null)
+    setImportProjectMap(new Map())
+    setImportLessorMap(new Map())
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const statusLabel = (s: OperationalStatus) => s === 'operational' ? t('operational') : s === 'maintenance' ? t('maintenance') : t('stopped');
-  const ownLabel = (s: OwnershipStatus) => s === 'alazani' ? t('ownershipAlazani') : s === 'takween' ? t('ownershipTakween') : s === 'third_party_f' ? t('ownershipThirdPartyF') : s === 'third_party_partnership_b' ? t('ownershipThirdPartyPartnershipB') : t('ownershipExternalSupplier');
+  const statusLabel = (s: OperationalStatus) =>
+    s === 'operational'
+      ? t('operational')
+      : s === 'maintenance'
+        ? t('maintenance')
+        : t('stopped')
+  const ownLabel = (s: OwnershipStatus) =>
+    s === 'alazani'
+      ? t('ownershipAlazani')
+      : s === 'takween'
+        ? t('ownershipTakween')
+        : s === 'third_party_f'
+          ? t('ownershipThirdPartyF')
+          : s === 'third_party_partnership_b'
+            ? t('ownershipThirdPartyPartnershipB')
+            : t('ownershipExternalSupplier')
   function updateCode(code: string) {
-    const inferred = inferOwnershipFromCode(code);
-    if (inferred && !usesExternalSupplier(inferred)) setSelectedLessorOption(null);
-    setForm((current) => inferred ? {
-      ...current,
-      code,
-      ownership_status: inferred,
-      lessor_id: usesExternalSupplier(inferred) ? current.lessor_id : '',
-    } : { ...current, code });
+    const inferred = inferOwnershipFromCode(code)
+    if (inferred && !usesExternalSupplier(inferred))
+      setSelectedLessorOption(null)
+    setForm((current) =>
+      inferred
+        ? {
+            ...current,
+            code,
+            ownership_status: inferred,
+            lessor_id: usesExternalSupplier(inferred) ? current.lessor_id : '',
+          }
+        : { ...current, code },
+    )
   }
 
   function updateOwnership(status: OwnershipStatus) {
-    if (!usesExternalSupplier(status)) setSelectedLessorOption(null);
+    if (!usesExternalSupplier(status)) setSelectedLessorOption(null)
     setForm((current) => ({
       ...current,
       ownership_status: status,
       lessor_id: usesExternalSupplier(status) ? current.lessor_id : '',
-    }));
+    }))
   }
 
   return (
     <div ref={listTopRef} className="space-y-4 scroll-mt-20">
-      <PageHeader title={t('equipmentList')} description={t('equipmentDesc')} actions={<DataListActions menuActions={<button onClick={() => { resetImport(); setImportModalOpen(true); }} className="btn-ghost"><Upload size={16} /> {t('importExcel')}</button>} primaryAction={<button onClick={openAdd} className="btn-primary"><Plus size={18} /> {t('addEquipment')}</button>} />} />
-      <DataListToolbar config={equipmentListConfig} search={list.searchInput} onSearch={list.setSearchInput} sort={list.sort} direction={list.direction} onSort={list.setSort} pageSize={list.pageSize} onPageSize={list.setPageSize} filters={list.filters} onFilters={list.setFilters} />
+      <PageHeader
+        title={t('equipmentList')}
+        description={t('equipmentDesc')}
+        actions={
+          <DataListActions
+            menuActions={
+              <button
+                onClick={() => {
+                  resetImport()
+                  setImportModalOpen(true)
+                }}
+                className="btn-ghost"
+              >
+                <Upload size={16} /> {t('importExcel')}
+              </button>
+            }
+            primaryAction={
+              <button onClick={openAdd} className="btn-primary">
+                <Plus size={18} /> {t('addEquipment')}
+              </button>
+            }
+          />
+        }
+      />
+      <DataListToolbar
+        config={equipmentListConfig}
+        search={list.searchInput}
+        onSearch={list.setSearchInput}
+        sort={list.sort}
+        direction={list.direction}
+        onSort={list.setSort}
+        pageSize={list.pageSize}
+        onPageSize={list.setPageSize}
+        filters={list.filters}
+        onFilters={list.setFilters}
+      />
 
       {loading ? (
         <InlineSpinner label={t('loading')} />
       ) : equipment.length === 0 ? (
-        <div className="card text-center py-12"><p className="text-muted">{t('noEquipment')}</p></div>
+        <div className="card text-center py-12">
+          <p className="text-muted">{t('noEquipment')}</p>
+        </div>
       ) : (
         <div className="card p-0 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="compact-table w-full text-sm">
               <thead>
-                <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
+                <tr
+                  className="border-b"
+                  style={{ borderColor: 'var(--border)' }}
+                >
                   <th className="table-header text-start px-4 py-3">
                     <span>{t('equipmentCode')}</span>
                   </th>
@@ -397,8 +651,13 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                   <th className="table-header text-start px-4 py-3">
                     <span>{t('isActive')}</span>
                   </th>
-                  <th className="table-header text-start px-4 py-3">{t('actions')}</th>
-                  <th className="table-header px-4 py-3" aria-label={t('createdAt')} />
+                  <th className="table-header text-start px-4 py-3">
+                    {t('actions')}
+                  </th>
+                  <th
+                    className="table-header px-4 py-3"
+                    aria-label={t('createdAt')}
+                  />
                 </tr>
               </thead>
               <tbody>
@@ -409,35 +668,116 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                     style={{ borderColor: 'var(--border)' }}
                     onClick={() => onSelectEquipment?.(eq.id)}
                   >
-                    <td className="px-4 py-3 font-semibold"><div className="flex items-center gap-2"><span>{eq.code}</span>{eq.master_data_complete === false && <span className="badge border border-amber-300 text-amber-700 dark:text-amber-300">{t('incompleteData')}</span>}</div></td>
+                    <td className="px-4 py-3 font-semibold">
+                      <div className="flex items-center gap-2">
+                        <span>{eq.code}</span>
+                        {eq.master_data_complete === false && (
+                          <span className="badge border border-amber-300 text-amber-700 dark:text-amber-300">
+                            {t('incompleteData')}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-muted">{eq.type}</td>
-                    <td className="px-4 py-3 text-muted">{eq.plate_number ?? '—'}</td>
-                    <td className="px-4 py-3 text-muted">{statusLabel(eq.operational_status)}</td>
-                    <td className="px-4 py-3 text-muted">{eq.master_data_complete === false ? t('incompleteData') : usesExternalSupplier(eq.ownership_status) && eq.lessor?.name ? `${ownLabel(eq.ownership_status)} - ${eq.lessor.name}` : ownLabel(eq.ownership_status)}</td>
-                    <td className="px-4 py-3">{eq.is_active ? t('active') : t('inactive')}</td>
+                    <td className="px-4 py-3 text-muted">
+                      {eq.plate_number ?? '—'}
+                    </td>
+                    <td className="px-4 py-3 text-muted">
+                      {statusLabel(eq.operational_status)}
+                    </td>
+                    <td className="px-4 py-3 text-muted">
+                      {eq.master_data_complete === false
+                        ? t('incompleteData')
+                        : usesExternalSupplier(eq.ownership_status) &&
+                            eq.lessor?.name
+                          ? `${ownLabel(eq.ownership_status)} - ${eq.lessor.name}`
+                          : ownLabel(eq.ownership_status)}
+                    </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => openEdit(eq)} className="btn-ghost p-1.5"><Edit2 size={16} /></button>
-                        <button onClick={() => setQrModal(eq)} className="btn-ghost p-1.5"><QrCode size={16} /></button>
-                        <button onClick={() => toggleActive(eq)} className="btn-ghost p-1.5"><Power size={16} /></button>
+                      {eq.is_active ? t('active') : t('inactive')}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div
+                        className="flex items-center gap-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() => openEdit(eq)}
+                          className="btn-ghost p-1.5"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => setQrModal(eq)}
+                          className="btn-ghost p-1.5"
+                        >
+                          <QrCode size={16} />
+                        </button>
+                        <button
+                          onClick={() => toggleActive(eq)}
+                          className="btn-ghost p-1.5"
+                        >
+                          <Power size={16} />
+                        </button>
                         <ChevronRight size={16} className="text-muted ms-1" />
                       </div>
                     </td>
-                    <td className="px-4 py-3"><RelativeTime value={eq.created_at} /></td>
+                    <td className="px-4 py-3">
+                      <RelativeTime value={eq.created_at} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="border-t px-4 py-3" style={{ borderColor: 'var(--border)' }}><DataListPagination page={list.page} pageSize={list.pageSize} total={total} onPage={changePage} /></div>
+          <div
+            className="border-t px-4 py-3"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            <DataListPagination
+              page={list.page}
+              pageSize={list.pageSize}
+              total={total}
+              onPage={changePage}
+            />
+          </div>
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? t('editEquipment') : t('addEquipment')} size="lg">
-        {formError && <div className="mb-4"><Alert type="error">{formError}</Alert></div>}
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editing ? t('editEquipment') : t('addEquipment')}
+        size="lg"
+      >
+        {formError && (
+          <div className="mb-4">
+            <Alert type="error">{formError}</Alert>
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div><label className="label">{t('equipmentCode')} *</label><input className="input" dir="ltr" placeholder={t('equipmentCodePlaceholder')} value={form.code} onChange={(e) => updateCode(e.target.value)} /></div>
-          <div><label className="label">{t('equipmentType')} *</label><AsyncSearchSelect value={form.type} selectedOption={form.type ? { value: form.type, label: form.type } : null} onChange={(value) => setForm({ ...form, type: value })} loadOptions={loadEquipmentTypes} placeholder={t('selectEquipmentType')} /></div>
+          <div>
+            <label className="label">{t('equipmentCode')} *</label>
+            <input
+              className="input"
+              dir="ltr"
+              placeholder={t('equipmentCodePlaceholder')}
+              value={form.code}
+              onChange={(e) => updateCode(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="label">{t('equipmentType')} *</label>
+            <AsyncSearchSelect
+              value={form.type}
+              selectedOption={
+                form.type ? { value: form.type, label: form.type } : null
+              }
+              onChange={(value) => setForm({ ...form, type: value })}
+              loadOptions={loadEquipmentTypes}
+              placeholder={t('selectEquipmentType')}
+            />
+          </div>
           <div className="sm:col-span-2">
             <label className="label">{t('plateNumber')}</label>
             <PlateNumberInput
@@ -445,15 +785,55 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
               onChange={(value) => setForm({ ...form, plate_number: value })}
             />
           </div>
-          <div><label className="label">{t('manufactureYear')}</label><input className="input" type="number" placeholder={t('manufactureYearPlaceholder')} value={form.manufacture_year} onChange={(e) => setForm({ ...form, manufacture_year: e.target.value })} /></div>
-          <div><label className="label">{t('brand')}</label><input className="input" placeholder={t('brandPlaceholder')} value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} /></div>
-          <div><label className="label">{t('model')}</label><input className="input" placeholder={t('modelPlaceholder')} value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} /></div>
-          <div><label className="label">{t('chassisNumber')}</label><input className="input" dir="ltr" placeholder={t('chassisNumberPlaceholder')} value={form.chassis_number} onChange={(e) => setForm({ ...form, chassis_number: e.target.value })} /></div>
+          <div>
+            <label className="label">{t('manufactureYear')}</label>
+            <input
+              className="input"
+              type="number"
+              placeholder={t('manufactureYearPlaceholder')}
+              value={form.manufacture_year}
+              onChange={(e) =>
+                setForm({ ...form, manufacture_year: e.target.value })
+              }
+            />
+          </div>
+          <div>
+            <label className="label">{t('brand')}</label>
+            <input
+              className="input"
+              placeholder={t('brandPlaceholder')}
+              value={form.brand}
+              onChange={(e) => setForm({ ...form, brand: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">{t('model')}</label>
+            <input
+              className="input"
+              placeholder={t('modelPlaceholder')}
+              value={form.model}
+              onChange={(e) => setForm({ ...form, model: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="label">{t('chassisNumber')}</label>
+            <input
+              className="input"
+              dir="ltr"
+              placeholder={t('chassisNumberPlaceholder')}
+              value={form.chassis_number}
+              onChange={(e) =>
+                setForm({ ...form, chassis_number: e.target.value })
+              }
+            />
+          </div>
           <div>
             <label className="label">{t('operationalStatus')}</label>
             <Select
               value={form.operational_status}
-              onChange={(v) => setForm({ ...form, operational_status: v as OperationalStatus })}
+              onChange={(v) =>
+                setForm({ ...form, operational_status: v as OperationalStatus })
+              }
               options={[
                 { value: 'operational', label: t('operational') },
                 { value: 'maintenance', label: t('maintenance') },
@@ -470,8 +850,14 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                 { value: 'alazani', label: t('ownershipAlazani') },
                 { value: 'takween', label: t('ownershipTakween') },
                 { value: 'third_party_f', label: t('ownershipThirdPartyF') },
-                { value: 'third_party_partnership_b', label: t('ownershipThirdPartyPartnershipB') },
-                { value: 'external_supplier', label: t('ownershipExternalSupplier') },
+                {
+                  value: 'third_party_partnership_b',
+                  label: t('ownershipThirdPartyPartnershipB'),
+                },
+                {
+                  value: 'external_supplier',
+                  label: t('ownershipExternalSupplier'),
+                },
               ]}
             />
           </div>
@@ -494,52 +880,121 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
             <AsyncSearchSelect
               value={form.project_id}
               selectedOption={selectedProjectOption}
-              onChange={(value, option) => { setForm({ ...form, project_id: value }); setSelectedProjectOption(option); }}
+              onChange={(value, option) => {
+                setForm({ ...form, project_id: value })
+                setSelectedProjectOption(option)
+              }}
               loadOptions={loadProjects}
               placeholder="—"
             />
           </div>
-          {usesExternalSupplier(form.ownership_status) && <div>
-            <label className="label">{t('externalSupplier')}</label>
-            <AsyncSearchSelect
-              value={form.lessor_id}
-              selectedOption={selectedLessorOption}
-              onChange={(value, option) => { setForm({ ...form, lessor_id: value }); setSelectedLessorOption(option); }}
-              loadOptions={loadLessors}
-              placeholder="—"
+          {usesExternalSupplier(form.ownership_status) && (
+            <div>
+              <label className="label">{t('externalSupplier')}</label>
+              <AsyncSearchSelect
+                value={form.lessor_id}
+                selectedOption={selectedLessorOption}
+                onChange={(value, option) => {
+                  setForm({ ...form, lessor_id: value })
+                  setSelectedLessorOption(option)
+                }}
+                loadOptions={loadLessors}
+                placeholder="—"
+              />
+            </div>
+          )}
+          <div>
+            <label className="label">{t('lastMaintenanceDate')}</label>
+            <DatePicker
+              value={form.last_maintenance_date}
+              onChange={(v) => setForm({ ...form, last_maintenance_date: v })}
             />
-          </div>}
-          <div><label className="label">{t('lastMaintenanceDate')}</label><DatePicker value={form.last_maintenance_date} onChange={(v) => setForm({ ...form, last_maintenance_date: v })} /></div>
-          <div><label className="label">{t('registrationExpiry')}</label><DatePicker value={form.registration_expiry} onChange={(v) => setForm({ ...form, registration_expiry: v })} /></div>
-          <div><label className="label">{t('insuranceExpiry')}</label><DatePicker value={form.insurance_expiry} onChange={(v) => setForm({ ...form, insurance_expiry: v })} /></div>
-          <div><label className="label">{t('qrValue')} *</label><input className="input" dir="ltr" placeholder={t('qrValuePlaceholder')} value={form.qr_value} onChange={(e) => setForm({ ...form, qr_value: e.target.value })} /></div>
+          </div>
+          <div>
+            <label className="label">{t('registrationExpiry')}</label>
+            <DatePicker
+              value={form.registration_expiry}
+              onChange={(v) => setForm({ ...form, registration_expiry: v })}
+            />
+          </div>
+          <div>
+            <label className="label">{t('insuranceExpiry')}</label>
+            <DatePicker
+              value={form.insurance_expiry}
+              onChange={(v) => setForm({ ...form, insurance_expiry: v })}
+            />
+          </div>
+          <div>
+            <label className="label">{t('qrValue')} *</label>
+            <input
+              className="input"
+              dir="ltr"
+              placeholder={t('qrValuePlaceholder')}
+              value={form.qr_value}
+              onChange={(e) => setForm({ ...form, qr_value: e.target.value })}
+            />
+          </div>
         </div>
         <div className="flex gap-3 pt-4">
-          <button onClick={() => setModalOpen(false)} className="btn-outline flex-1">{t('cancel')}</button>
-          <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">{saving ? t('saving') : t('save')}</button>
+          <button
+            onClick={() => setModalOpen(false)}
+            className="btn-outline flex-1"
+          >
+            {t('cancel')}
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="btn-primary flex-1"
+          >
+            {saving ? t('saving') : t('save')}
+          </button>
         </div>
       </Modal>
 
-      <Modal open={!!qrModal} onClose={() => setQrModal(null)} title={t('qrValue')} size="sm">
+      <Modal
+        open={!!qrModal}
+        onClose={() => setQrModal(null)}
+        title={t('qrValue')}
+        size="sm"
+      >
         {qrModal && (
           <div className="flex flex-col items-center gap-4 py-4">
             <p className="font-bold text-lg">{qrModal.code}</p>
             <p className="text-sm text-muted">{qrModal.type}</p>
             <QRCodeDisplay value={qrModal.qr_value} size={200} />
-            <p className="text-xs text-muted break-all text-center">{qrModal.qr_value}</p>
-            <button onClick={() => printQR(qrModal)} className="btn-outline"><Printer size={16} /> {t('printQR')}</button>
+            <p className="text-xs text-muted break-all text-center">
+              {qrModal.qr_value}
+            </p>
+            <button onClick={() => printQR(qrModal)} className="btn-outline">
+              <Printer size={16} /> {t('printQR')}
+            </button>
           </div>
         )}
       </Modal>
 
-      <Modal open={importModalOpen} onClose={() => setImportModalOpen(false)} title={t('importEquipment')} size="xl">
-        {importError && <div className="mb-4"><Alert type="error">{importError}</Alert></div>}
+      <Modal
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        title={t('importEquipment')}
+        size="xl"
+      >
+        {importError && (
+          <div className="mb-4">
+            <Alert type="error">{importError}</Alert>
+          </div>
+        )}
         {importResult && (
           <div className="mb-4">
             <Alert type={importResult.fail > 0 ? 'warning' : 'success'}>
               {importResult.fail > 0
-                ? t('importPartialSuccess').replace('{success}', String(importResult.success)).replace('{fail}', String(importResult.fail))
-                : t('importSuccess').replace('{count}', String(importResult.success))}
+                ? t('importPartialSuccess')
+                    .replace('{success}', String(importResult.success))
+                    .replace('{fail}', String(importResult.fail))
+                : t('importSuccess').replace(
+                    '{count}',
+                    String(importResult.success),
+                  )}
             </Alert>
           </div>
         )}
@@ -547,14 +1002,27 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
         {importData.length === 0 && !importResult ? (
           <div className="space-y-4">
             <div className="flex justify-end">
-              <button onClick={() => downloadEquipmentTemplate(t)} className="btn-ghost text-sm"><Download size={16} /> {t('downloadTemplate')}</button>
+              <button
+                onClick={() => downloadEquipmentTemplate(t)}
+                className="btn-ghost text-sm"
+              >
+                <Download size={16} /> {t('downloadTemplate')}
+              </button>
             </div>
             <div
               className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors ${dragOver ? 'border-primary bg-primary/5' : 'border-border'}`}
               onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragOver(true)
+              }}
               onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFileSelect(f); }}
+              onDrop={(e) => {
+                e.preventDefault()
+                setDragOver(false)
+                const f = e.dataTransfer.files[0]
+                if (f) handleFileSelect(f)
+              }}
             >
               <FileSpreadsheet size={48} className="mx-auto text-muted mb-4" />
               <p className="text-muted">{t('dragDropFile')}</p>
@@ -563,7 +1031,10 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                 type="file"
                 accept=".xlsx,.xls"
                 className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) handleFileSelect(f)
+                }}
               />
             </div>
           </div>
@@ -571,35 +1042,75 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3 justify-between">
               <div className="flex gap-4 text-sm">
-                <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400"><CheckCircle2 size={16} /> {t('validRows')}: {importData.filter((r) => r._errors.length === 0).length}</span>
-                <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400"><AlertTriangle size={16} /> {t('errorRows')}: {importData.filter((r) => r._errors.length > 0).length}</span>
+                <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
+                  <CheckCircle2 size={16} /> {t('validRows')}:{' '}
+                  {importData.filter((r) => r._errors.length === 0).length}
+                </span>
+                <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                  <AlertTriangle size={16} /> {t('errorRows')}:{' '}
+                  {importData.filter((r) => r._errors.length > 0).length}
+                </span>
               </div>
               <div className="flex gap-2">
-                <button onClick={toggleAllValid} className="btn-ghost text-sm">{selectedRows.size === importData.filter((r) => r._errors.length === 0).length ? t('deselectAll') : t('selectAll')}</button>
-                <button onClick={() => downloadEquipmentTemplate(t)} className="btn-ghost text-sm"><Download size={16} /> {t('downloadTemplate')}</button>
+                <button onClick={toggleAllValid} className="btn-ghost text-sm">
+                  {selectedRows.size ===
+                  importData.filter((r) => r._errors.length === 0).length
+                    ? t('deselectAll')
+                    : t('selectAll')}
+                </button>
+                <button
+                  onClick={() => downloadEquipmentTemplate(t)}
+                  className="btn-ghost text-sm"
+                >
+                  <Download size={16} /> {t('downloadTemplate')}
+                </button>
               </div>
             </div>
 
-            <div className="max-h-[400px] overflow-auto rounded-lg border" style={{ borderColor: 'var(--border)' }}>
+            <div
+              className="max-h-[400px] overflow-auto rounded-lg border"
+              style={{ borderColor: 'var(--border)' }}
+            >
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-surface">
-                  <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
+                  <tr
+                    className="border-b"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
                     <th className="px-3 py-2 w-8"></th>
-                    <th className="table-header text-start px-3 py-2">{t('row')}</th>
-                    <th className="table-header text-start px-3 py-2">{t('equipmentCode')}</th>
-                    <th className="table-header text-start px-3 py-2">{t('equipmentType')}</th>
-                    <th className="table-header text-start px-3 py-2">{t('plateNumber')}</th>
-                    <th className="table-header text-start px-3 py-2">{t('operationalStatus')}</th>
-                    <th className="table-header text-start px-3 py-2">{t('ownershipStatus')}</th>
-                    <th className="table-header text-start px-3 py-2">{t('rowErrors')}</th>
+                    <th className="table-header text-start px-3 py-2">
+                      {t('row')}
+                    </th>
+                    <th className="table-header text-start px-3 py-2">
+                      {t('equipmentCode')}
+                    </th>
+                    <th className="table-header text-start px-3 py-2">
+                      {t('equipmentType')}
+                    </th>
+                    <th className="table-header text-start px-3 py-2">
+                      {t('plateNumber')}
+                    </th>
+                    <th className="table-header text-start px-3 py-2">
+                      {t('operationalStatus')}
+                    </th>
+                    <th className="table-header text-start px-3 py-2">
+                      {t('ownershipStatus')}
+                    </th>
+                    <th className="table-header text-start px-3 py-2">
+                      {t('rowErrors')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {importData.map((row) => {
-                    const hasErrors = row._errors.length > 0;
-                    const isSelected = selectedRows.has(row._rowNumber);
+                    const hasErrors = row._errors.length > 0
+                    const isSelected = selectedRows.has(row._rowNumber)
                     return (
-                      <tr key={row._rowNumber} className={`border-b last:border-0 ${hasErrors ? 'bg-red-50 dark:bg-red-950/20' : ''}`} style={{ borderColor: 'var(--border)' }}>
+                      <tr
+                        key={row._rowNumber}
+                        className={`border-b last:border-0 ${hasErrors ? 'bg-red-50 dark:bg-red-950/20' : ''}`}
+                        style={{ borderColor: 'var(--border)' }}
+                      >
                         <td className="px-3 py-2 text-center">
                           <input
                             type="checkbox"
@@ -609,45 +1120,79 @@ export function AdminEquipment({ onSelectEquipment }: AdminEquipmentProps = {}) 
                             className="rounded"
                           />
                         </td>
-                        <td className="px-3 py-2 text-muted">{row._rowNumber}</td>
-                        <td className="px-3 py-2 font-semibold">{row.code || '—'}</td>
-                        <td className="px-3 py-2 text-muted">{row.type || '—'}</td>
-                        <td className="px-3 py-2 text-muted">{row.plate_number ?? '—'}</td>
-                        <td className="px-3 py-2 text-muted">{row.operational_status}</td>
-                        <td className="px-3 py-2 text-muted">{row.ownership_status}</td>
+                        <td className="px-3 py-2 text-muted">
+                          {row._rowNumber}
+                        </td>
+                        <td className="px-3 py-2 font-semibold">
+                          {row.code || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-muted">
+                          {row.type || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-muted">
+                          {row.plate_number ?? '—'}
+                        </td>
+                        <td className="px-3 py-2 text-muted">
+                          {row.operational_status}
+                        </td>
+                        <td className="px-3 py-2 text-muted">
+                          {row.ownership_status}
+                        </td>
                         <td className="px-3 py-2">
                           {hasErrors ? (
                             <div className="flex flex-wrap gap-1">
                               {row._errors.map((err, i) => (
-                                <span key={i} className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                                <span
+                                  key={i}
+                                  className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400"
+                                >
                                   <XCircle size={12} /> {err}
                                 </span>
                               ))}
                             </div>
                           ) : (
-                            <CheckCircle2 size={16} className="text-green-600 dark:text-green-400" />
+                            <CheckCircle2
+                              size={16}
+                              className="text-green-600 dark:text-green-400"
+                            />
                           )}
                         </td>
                       </tr>
-                    );
+                    )
                   })}
                 </tbody>
               </table>
             </div>
 
             <div className="flex gap-3 pt-2">
-              <button onClick={resetImport} className="btn-outline flex-1">{t('cancel')}</button>
-              <button onClick={handleImport} disabled={importing || selectedRows.size === 0} className="btn-primary flex-1">
-                {importing ? t('importing') : `${t('importSelected')} (${selectedRows.size})`}
+              <button onClick={resetImport} className="btn-outline flex-1">
+                {t('cancel')}
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={importing || selectedRows.size === 0}
+                className="btn-primary flex-1"
+              >
+                {importing
+                  ? t('importing')
+                  : `${t('importSelected')} (${selectedRows.size})`}
               </button>
             </div>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4 py-8">
-            <button onClick={() => { resetImport(); setImportModalOpen(false); }} className="btn-primary">{t('close')}</button>
+            <button
+              onClick={() => {
+                resetImport()
+                setImportModalOpen(false)
+              }}
+              className="btn-primary"
+            >
+              {t('close')}
+            </button>
           </div>
         )}
       </Modal>
     </div>
-  );
+  )
 }

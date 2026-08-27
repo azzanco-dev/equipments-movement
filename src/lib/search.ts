@@ -9,5 +9,5 @@ export function sanitizeSearchTerm(raw: string): string {
     .replace(/[,.()"\\:*%_]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 80);
+    .slice(0, 80)
 }

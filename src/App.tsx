@@ -1,73 +1,122 @@
-'use client';
+'use client'
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
-import { useAuth } from '@/auth/AuthContext';
-import { useI18n } from '@/i18n/I18nContext';
-import { FullPageSpinner } from '@/components/Spinner';
-import { Layout } from '@/components/Layout';
-import { AuthScreen } from '@/screens/AuthScreen';
-import { SupervisorDashboard } from '@/screens/SupervisorDashboard';
-import { AdminDashboard } from '@/screens/AdminDashboard';
-import { AdminEquipment } from '@/screens/AdminEquipment';
-import { EquipmentDetail } from '@/screens/EquipmentDetail';
-import { AdminProjects } from '@/screens/AdminProjects';
-import { AdminCompanies } from '@/screens/AdminCompanies';
-import { AdminLessors } from '@/screens/AdminLessors';
-import { AdminUsers } from '@/screens/AdminUsers';
-import { AdminDrivers } from '@/screens/AdminDrivers';
-import { DriverDetail } from '@/screens/DriverDetail';
-import { MovementDetail } from '@/screens/MovementDetail';
-import { MovementCreate } from '@/screens/MovementCreate';
-import { AdminSettings } from '@/screens/AdminSettings';
-import type { Equipment } from '@/lib/types';
-import { LayoutDashboard, FileText, Truck, FolderKanban, Building2, Users, Briefcase, Contact, Settings } from 'lucide-react';
-import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useEffect } from 'react'
+import { useAuth } from '@/auth/AuthContext'
+import { useI18n } from '@/i18n/I18nContext'
+import { FullPageSpinner } from '@/components/Spinner'
+import { Layout } from '@/components/Layout'
+import { AuthScreen } from '@/screens/AuthScreen'
+import { SupervisorDashboard } from '@/screens/SupervisorDashboard'
+import { AdminDashboard } from '@/screens/AdminDashboard'
+import { AdminEquipment } from '@/screens/AdminEquipment'
+import { EquipmentDetail } from '@/screens/EquipmentDetail'
+import { AdminProjects } from '@/screens/AdminProjects'
+import { AdminCompanies } from '@/screens/AdminCompanies'
+import { AdminLessors } from '@/screens/AdminLessors'
+import { AdminUsers } from '@/screens/AdminUsers'
+import { AdminDrivers } from '@/screens/AdminDrivers'
+import { DriverDetail } from '@/screens/DriverDetail'
+import { MovementDetail } from '@/screens/MovementDetail'
+import { MovementCreate } from '@/screens/MovementCreate'
+import { AdminSettings } from '@/screens/AdminSettings'
+import type { Equipment } from '@/lib/types'
+import {
+  LayoutDashboard,
+  FileText,
+  Truck,
+  FolderKanban,
+  Building2,
+  Users,
+  Briefcase,
+  Contact,
+  Settings,
+} from 'lucide-react'
+import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog'
 
-const ADMIN_PAGES = new Set(['dashboard', 'logs', 'equipment', 'projects', 'companies', 'lessors', 'drivers', 'users', 'settings']);
+const ADMIN_PAGES = new Set([
+  'dashboard',
+  'logs',
+  'equipment',
+  'projects',
+  'companies',
+  'lessors',
+  'drivers',
+  'users',
+  'settings',
+])
 
 function AppContent() {
-  const { profile, loading } = useAuth();
-  const { t } = useI18n();
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const segments = pathname.split('/').filter(Boolean);
-  const movementId = segments[0] === 'movements' ? segments[1] : null;
-  const isMovementCreate = segments[0] === 'movements' && segments[1] === 'new';
-  const movementType = searchParams.get('type') === 'exit' ? 'exit' : 'entry';
-  const equipmentId = segments[0] === 'equipment' ? segments[1] : null;
-  const driverId = segments[0] === 'drivers' ? segments[1] : null;
-  const page = ADMIN_PAGES.has(segments[0] ?? '') ? segments[0] : 'dashboard';
+  const { profile, loading } = useAuth()
+  const { t } = useI18n()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const segments = pathname.split('/').filter(Boolean)
+  const movementId = segments[0] === 'movements' ? segments[1] : null
+  const isMovementCreate = segments[0] === 'movements' && segments[1] === 'new'
+  const movementType = searchParams.get('type') === 'exit' ? 'exit' : 'entry'
+  const equipmentId = segments[0] === 'equipment' ? segments[1] : null
+  const driverId = segments[0] === 'drivers' ? segments[1] : null
+  const page = ADMIN_PAGES.has(segments[0] ?? '') ? segments[0] : 'dashboard'
 
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [pathname]);
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+  }, [pathname])
 
-  if (loading) return <FullPageSpinner />;
-  if (!profile) return <AuthScreen />;
+  if (loading) return <FullPageSpinner />
+  if (!profile) return <AuthScreen />
 
-  const passwordDialog = <FirstLoginPasswordDialog />;
+  const passwordDialog = <FirstLoginPasswordDialog />
 
-  const openMovement = (id: string) => router.push(`/movements/${id}`);
-  const backToDashboard = () => router.push('/dashboard');
+  const openMovement = (id: string) => router.push(`/movements/${id}`)
+  const backToDashboard = () => router.push('/dashboard')
 
-  if (profile.role === 'supervisor' || profile.role === 'workshop' || profile.role === 'assistant_workshop_manager' || profile.role === 'workshop_manager') {
+  if (
+    profile.role === 'supervisor' ||
+    profile.role === 'workshop' ||
+    profile.role === 'assistant_workshop_manager' ||
+    profile.role === 'workshop_manager'
+  ) {
     return (
-      <><Layout activePage="dashboard" onNavigate={backToDashboard} navItems={[]}>
-        {isMovementCreate ? (
-          <MovementCreate movementType={movementType} onClose={backToDashboard} onViewMovement={openMovement} />
-        ) : movementId ? (
-          <MovementDetail movementId={movementId} onBack={backToDashboard} onNavigateMovement={openMovement} />
-        ) : (
-          <SupervisorDashboard onSelectMovement={openMovement} onCreateMovement={(type) => router.push(`/movements/new?type=${type}`)} />
-        )}
-      </Layout>{passwordDialog}</>
-    );
+      <>
+        <Layout
+          activePage="dashboard"
+          onNavigate={backToDashboard}
+          navItems={[]}
+        >
+          {isMovementCreate ? (
+            <MovementCreate
+              movementType={movementType}
+              onClose={backToDashboard}
+              onViewMovement={openMovement}
+            />
+          ) : movementId ? (
+            <MovementDetail
+              movementId={movementId}
+              onBack={backToDashboard}
+              onNavigateMovement={openMovement}
+            />
+          ) : (
+            <SupervisorDashboard
+              onSelectMovement={openMovement}
+              onCreateMovement={(type) =>
+                router.push(`/movements/new?type=${type}`)
+              }
+            />
+          )}
+        </Layout>
+        {passwordDialog}
+      </>
+    )
   }
 
   const navItems = [
-    { key: 'dashboard', label: t('dashboard'), icon: <LayoutDashboard size={18} /> },
+    {
+      key: 'dashboard',
+      label: t('dashboard'),
+      icon: <LayoutDashboard size={18} />,
+    },
     { key: 'logs', label: t('logs'), icon: <FileText size={18} /> },
     { key: 'equipment', label: t('equipment'), icon: <Truck size={18} /> },
     { key: 'projects', label: t('projects'), icon: <FolderKanban size={18} /> },
@@ -76,45 +125,82 @@ function AppContent() {
     { key: 'drivers', label: t('drivers'), icon: <Contact size={18} /> },
     { key: 'users', label: t('users'), icon: <Users size={18} /> },
     { key: 'settings', label: t('settings'), icon: <Settings size={18} /> },
-  ];
+  ]
 
-  const navigate = (target: string) => router.push(`/${target}`);
+  const navigate = (target: string) => router.push(`/${target}`)
 
   return (
-    <><Layout activePage={page} onNavigate={navigate} navItems={navItems}>
-      {isMovementCreate ? (
-        <MovementCreate movementType={movementType} onClose={() => router.push('/logs')} onViewMovement={openMovement} />
-      ) : movementId ? (
-        <MovementDetail movementId={movementId} onBack={() => router.back()} onNavigateMovement={openMovement} />
-      ) : equipmentId ? (
-        <EquipmentDetail
-          equipmentId={equipmentId}
-          onBack={() => router.push('/equipment')}
-          onEdit={(equipment: Equipment) => {
-            router.push('/equipment');
-            setTimeout(() => window.dispatchEvent(new CustomEvent('edit-equipment', { detail: equipment })), 0);
-          }}
-          onSelectMovement={openMovement}
-          onViewAllMovements={(code) => router.push(`/logs?q=${encodeURIComponent(code)}`)}
-        />
-      ) : driverId ? (
-        <DriverDetail driverId={driverId} onBack={() => router.push('/drivers')} />
-      ) : (
-        <>
-          {(page === 'dashboard' || page === 'logs') && <AdminDashboard onSelectMovement={openMovement} onCreateMovement={(type) => router.push(`/movements/new?type=${type}`)} />}
-          {page === 'equipment' && <AdminEquipment onSelectEquipment={(id) => router.push(`/equipment/${id}`)} />}
-          {page === 'projects' && <AdminProjects />}
-          {page === 'companies' && <AdminCompanies />}
-          {page === 'lessors' && <AdminLessors />}
-          {page === 'drivers' && <AdminDrivers onSelectDriver={(id) => router.push(`/drivers/${id}`)} />}
-          {page === 'users' && <AdminUsers />}
-          {page === 'settings' && <AdminSettings />}
-        </>
-      )}
-    </Layout>{passwordDialog}</>
-  );
+    <>
+      <Layout activePage={page} onNavigate={navigate} navItems={navItems}>
+        {isMovementCreate ? (
+          <MovementCreate
+            movementType={movementType}
+            onClose={() => router.push('/logs')}
+            onViewMovement={openMovement}
+          />
+        ) : movementId ? (
+          <MovementDetail
+            movementId={movementId}
+            onBack={() => router.back()}
+            onNavigateMovement={openMovement}
+          />
+        ) : equipmentId ? (
+          <EquipmentDetail
+            equipmentId={equipmentId}
+            onBack={() => router.push('/equipment')}
+            onEdit={(equipment: Equipment) => {
+              router.push('/equipment')
+              setTimeout(
+                () =>
+                  window.dispatchEvent(
+                    new CustomEvent('edit-equipment', { detail: equipment }),
+                  ),
+                0,
+              )
+            }}
+            onSelectMovement={openMovement}
+            onViewAllMovements={(code) =>
+              router.push(`/logs?q=${encodeURIComponent(code)}`)
+            }
+          />
+        ) : driverId ? (
+          <DriverDetail
+            driverId={driverId}
+            onBack={() => router.push('/drivers')}
+          />
+        ) : (
+          <>
+            {(page === 'dashboard' || page === 'logs') && (
+              <AdminDashboard
+                onSelectMovement={openMovement}
+                onCreateMovement={(type) =>
+                  router.push(`/movements/new?type=${type}`)
+                }
+              />
+            )}
+            {page === 'equipment' && (
+              <AdminEquipment
+                onSelectEquipment={(id) => router.push(`/equipment/${id}`)}
+              />
+            )}
+            {page === 'projects' && <AdminProjects />}
+            {page === 'companies' && <AdminCompanies />}
+            {page === 'lessors' && <AdminLessors />}
+            {page === 'drivers' && (
+              <AdminDrivers
+                onSelectDriver={(id) => router.push(`/drivers/${id}`)}
+              />
+            )}
+            {page === 'users' && <AdminUsers />}
+            {page === 'settings' && <AdminSettings />}
+          </>
+        )}
+      </Layout>
+      {passwordDialog}
+    </>
+  )
 }
 
 export default function App() {
-  return <AppContent />;
+  return <AppContent />
 }
