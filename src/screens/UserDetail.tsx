@@ -216,16 +216,27 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
         {t('back')}
       </button>
       <div>
-        <h1 className="text-xl font-bold tracking-tight">{t('userDetails')}</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-xl font-bold tracking-tight">
+            {t('userDetails')}
+          </h1>
+          {hasUnsavedChanges && (
+            <span className="badge border border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-200">
+              {t('unsavedData')}
+            </span>
+          )}
+          {user?.must_change_password && (
+            <span className="badge border border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-200">
+              {t('mustChangePassword')}
+            </span>
+          )}
+        </div>
         {user && (
           <p className="mt-0.5 text-[13px] text-muted">{user.full_name}</p>
         )}
       </div>
       <div className="card space-y-4">
         {error && <Alert type="error">{error}</Alert>}
-        {hasUnsavedChanges && (
-          <Alert type="warning">{t('unsavedChanges')}</Alert>
-        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label">{t('fullName')} *</label>
@@ -284,9 +295,6 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
               {t('assignedCompaniesHelp')}
             </p>
           </div>
-        )}
-        {user?.must_change_password && (
-          <Alert type="warning">{t('mustChangePassword')}</Alert>
         )}
         <div className="flex justify-end gap-3 pt-2">
           <button type="button" onClick={handleBack} className="btn-outline">
