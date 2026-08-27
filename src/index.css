@@ -184,6 +184,9 @@ body {
   .input {
     @apply h-8 w-full rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors placeholder:text-gray-400 placeholder:text-[13px];
     border-color: var(--border);
+    line-height: 1.5rem;
+    padding-top: 0;
+    padding-bottom: 2px;
   }
   .input:focus {
     border-color: var(--primary);

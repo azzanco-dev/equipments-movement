@@ -3,6 +3,7 @@
 ## Product and communication
 
 - This is an Arabic-first equipment gate movement system. Reply to the product owner in Arabic unless they ask for another language.
+- For all newly added Arabic UI copy, do not use alif with hamza or madda. Normalize `أ`, `إ`, and `آ` to plain `ا`. Existing Arabic copy will be normalized separately later; do not rewrite it as part of unrelated changes.
 - Current scope is the operational foundation: equipment, drivers, companies, projects, lessors/owners, users, entry/exit movements, visit reports, and movement photos.
 - Do not introduce workshop, contracts/POs, timesheets, sales, purchasing, accounting, notifications, charts, or other future modules unless explicitly requested.
 - Preserve existing behavior and make incremental changes. Do not rebuild working features merely to match a preferred architecture.
