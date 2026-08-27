@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { Alert } from '@/components/Alert'
 import { AsyncMultiSelect } from '@/components/AsyncMultiSelect'
@@ -16,6 +16,22 @@ interface UserDetailProps {
   onBack: () => void
 }
 
+function formSnapshot(
+  fullName: string,
+  email: string,
+  password: string,
+  role: UserRole,
+  companies: SelectOption[],
+) {
+  return JSON.stringify({
+    fullName,
+    email,
+    password,
+    role,
+    companyIds: companies.map((company) => company.value).sort(),
+  })
+}
+
 export function UserDetail({ userId, onBack }: UserDetailProps) {
   const { t, lang } = useI18n()
   const [user, setUser] = useState<Profile | null>(null)
@@ -27,6 +43,14 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<UserRole>('supervisor')
   const [companies, setCompanies] = useState<SelectOption[]>([])
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
+
+  const currentSnapshot = useMemo(
+    () => formSnapshot(fullName, email, password, role, companies),
+    [companies, email, fullName, password, role],
+  )
+  const hasUnsavedChanges =
+    savedSnapshot !== null && currentSnapshot !== savedSnapshot
 
   const roleOptions = [
     { value: 'supervisor', label: t('supervisor') },
@@ -73,11 +97,21 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
         setFullName(loadedUser.full_name)
         setEmail(loadedUser.email ?? '')
         setRole(loadedUser.role)
-        setCompanies(
-          (loadedUser.assigned_companies ?? []).map((company) => ({
+        const assignedCompanies = (loadedUser.assigned_companies ?? []).map(
+          (company) => ({
             value: company.id,
             label: localizedName(lang, company.name_ar, company.name_en),
-          })),
+          }),
+        )
+        setCompanies(assignedCompanies)
+        setSavedSnapshot(
+          formSnapshot(
+            loadedUser.full_name,
+            loadedUser.email ?? '',
+            '',
+            loadedUser.role,
+            assignedCompanies,
+          ),
         )
       } catch {
         if (active) setError(t('userUpdateError'))
@@ -90,6 +124,15 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       active = false
     }
   }, [callManageUser, lang, t, userId])
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+    }
+    window.addEventListener('beforeunload', warnBeforeUnload)
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload)
+  }, [hasUnsavedChanges])
 
   const loadCompanies = useCallback(
     async (search: string): Promise<SelectOption[]> => {
@@ -126,17 +169,27 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     }
     setSaving(true)
     try {
+      const nextFullName = fullName.trim()
+      const nextEmail = email.trim()
       await callManageUser({
         action: 'update',
         user_id: userId,
-        full_name: fullName.trim(),
-        email: email.trim(),
+        full_name: nextFullName,
+        email: nextEmail,
         password,
         role,
         company_ids:
           role === 'supervisor' ? companies.map((item) => item.value) : [],
       })
+      setFullName(nextFullName)
+      setEmail(nextEmail)
       setPassword('')
+      setUser((current) =>
+        current ? { ...current, full_name: nextFullName } : current,
+      )
+      setSavedSnapshot(
+        formSnapshot(nextFullName, nextEmail, '', role, companies),
+      )
       setError(null)
     } catch {
       setError(t('userUpdateError'))
@@ -145,11 +198,20 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     }
   }
 
+  function handleBack() {
+    if (hasUnsavedChanges && !confirm(t('unsavedChanges'))) return
+    onBack()
+  }
+
   if (loading) return <InlineSpinner label={t('loading')} />
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <button type="button" onClick={onBack} className="btn-ghost gap-1 px-1">
+      <button
+        type="button"
+        onClick={handleBack}
+        className="btn-ghost gap-1 px-1"
+      >
         <ArrowRight size={16} className={lang === 'en' ? 'rotate-180' : ''} />
         {t('back')}
       </button>
@@ -161,6 +223,9 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       </div>
       <div className="card space-y-4">
         {error && <Alert type="error">{error}</Alert>}
+        {hasUnsavedChanges && (
+          <Alert type="warning">{t('unsavedChanges')}</Alert>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label">{t('fullName')} *</label>
@@ -224,7 +289,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           <Alert type="warning">{t('mustChangePassword')}</Alert>
         )}
         <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onBack} className="btn-outline">
+          <button type="button" onClick={handleBack} className="btn-outline">
             {t('cancel')}
           </button>
           <button
