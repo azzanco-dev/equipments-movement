@@ -84,34 +84,41 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
   }
 
   const cellClass =
-    'w-full bg-transparent text-center text-2xl font-medium outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600'
-  const derivedCellClass = 'w-full text-center text-2xl font-medium'
+    'w-full bg-transparent text-center !text-xl font-medium leading-none outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600'
+  const derivedCellClass = 'w-full text-center text-xl font-medium leading-none'
   const arabicLetters = toArabicLetters(parts.englishLetters)
   const arabicNumbers = parts.englishNumbers
 
   return (
     <div className="space-y-2">
       <div
-        className="overflow-hidden rounded-2xl border-[3px]"
-        style={{ borderColor: 'var(--fg)', background: 'var(--bg)' }}
+        className="overflow-hidden rounded-xl border-2"
+        style={{
+          borderColor: 'color-mix(in srgb, var(--fg) 68%, transparent)',
+          background: 'var(--bg)',
+        }}
       >
-        <div className="flex min-h-[150px]">
+        <div className="flex min-h-[96px]">
           <div
-            className="flex w-[68px] shrink-0 flex-col items-center justify-center gap-1 border-e-[3px] bg-white px-2 text-center text-black"
-            style={{ borderColor: 'var(--fg)' }}
+            className="flex w-14 shrink-0 flex-col items-center justify-center gap-0.5 border-e-2 bg-white px-1.5 text-center text-black"
+            style={{
+              borderColor: 'color-mix(in srgb, var(--fg) 68%, transparent)',
+            }}
           >
-            <div className="text-[30px] leading-none">♛</div>
-            <div className="text-[11px] font-bold">السعودية</div>
-            <div className="text-xs leading-4 tracking-[0.3em]">
+            <div className="text-2xl leading-none">♛</div>
+            <div className="text-[10px] font-bold">السعودية</div>
+            <div className="text-[10px] leading-3 tracking-[0.25em]">
               K<br />S<br />A
             </div>
-            <div className="h-3 w-3 rounded-full bg-black" />
+            <div className="h-2.5 w-2.5 rounded-full bg-black" />
           </div>
 
           <div className="grid flex-1 grid-cols-2 grid-rows-2">
             <div
-              className="flex items-center justify-center border-b-[3px] border-e-[3px] p-3"
-              style={{ borderColor: 'var(--fg)' }}
+              className="flex items-center justify-center border-b-2 border-e-2 p-2"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--fg) 68%, transparent)',
+              }}
             >
               <div
                 aria-label="Arabic plate letters"
@@ -122,8 +129,10 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
               </div>
             </div>
             <div
-              className="flex items-center justify-center border-b-[3px] p-3"
-              style={{ borderColor: 'var(--fg)' }}
+              className="flex items-center justify-center border-b-2 p-2"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--fg) 68%, transparent)',
+              }}
             >
               <div
                 aria-label="Arabic plate numbers"
@@ -134,8 +143,10 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
               </div>
             </div>
             <div
-              className="flex items-center justify-center border-e-[3px] p-3"
-              style={{ borderColor: 'var(--fg)' }}
+              className="flex items-center justify-center border-e-2 p-2"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--fg) 68%, transparent)',
+              }}
             >
               <input
                 aria-label="English plate letters"
@@ -149,7 +160,7 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
                 inputMode="text"
               />
             </div>
-            <div className="flex items-center justify-center p-3">
+            <div className="flex items-center justify-center p-2">
               <input
                 aria-label="English plate numbers"
                 dir="ltr"

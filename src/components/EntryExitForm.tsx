@@ -700,10 +700,10 @@ export function EntryExitForm({
             {/* Equipment list */}
             {loadingEquipment ? (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Skeleton className="h-20" />
-                <Skeleton className="h-20" />
-                <Skeleton className="h-20" />
-                <Skeleton className="h-20" />
+                <Skeleton className="h-16" />
+                <Skeleton className="h-16" />
+                <Skeleton className="h-16" />
+                <Skeleton className="h-16" />
               </div>
             ) : (
               <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
@@ -716,14 +716,17 @@ export function EntryExitForm({
                   <button
                     key={eq.id}
                     onClick={() => handleSelectEquipment(eq)}
-                    className="w-full text-start rounded-lg border p-3 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    style={{ borderColor: 'var(--border)' }}
+                    className="w-full rounded-lg border px-3 py-2 text-start transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                    style={{
+                      borderColor:
+                        'color-mix(in srgb, var(--border) 72%, transparent)',
+                    }}
                   >
-                    <div>
-                      <p className="font-semibold text-sm">{eq.code}</p>
-                      <p className="text-xs text-muted">{eq.type}</p>
+                    <div className="space-y-0.5 text-[13px] leading-4">
+                      <p className="font-medium">{eq.code}</p>
+                      <p className="text-muted">{eq.type}</p>
                       {eq.plate_number && (
-                        <p className="text-xs text-muted">
+                        <p className="text-muted">
                           {t('plateNumber')}: {eq.plate_number}
                         </p>
                       )}
@@ -750,8 +753,11 @@ export function EntryExitForm({
             )}
             {quickEquipment.open && (
               <div
-                className="rounded-lg border p-4 text-start space-y-3"
-                style={{ borderColor: 'var(--border)' }}
+                className="space-y-2.5 rounded-lg border p-3 text-start"
+                style={{
+                  borderColor:
+                    'color-mix(in srgb, var(--border) 72%, transparent)',
+                }}
               >
                 <p className="font-semibold">{t('quickEquipmentAdd')}</p>
                 {workshopMode && (
