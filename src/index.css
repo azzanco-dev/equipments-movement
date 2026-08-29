@@ -46,6 +46,18 @@
   unicode-range:
     U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
+
+/* Noto Sans Arabic has conventional dotted final yeh forms in native inputs. */
+@font-face {
+  font-family: 'NotoArabicInput';
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-arabic@5.2.5/files/noto-sans-arabic-arabic-400-normal.woff2')
+    format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
 @font-face {
   font-family: 'Thmanyah';
   src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Medium.woff2')
@@ -184,9 +196,9 @@ body {
   .input {
     @apply h-8 w-full rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors placeholder:text-gray-400 placeholder:text-[13px];
     border-color: var(--border);
-    line-height: 1.5rem;
-    padding-top: 0;
-    padding-bottom: 2px;
+    font-family:
+      'NotoArabicInput', 'Manrope', 'Segoe UI', Tahoma, system-ui, sans-serif;
+    line-height: 1.25rem;
   }
   .input:focus {
     border-color: var(--primary);
