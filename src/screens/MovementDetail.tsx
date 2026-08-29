@@ -365,18 +365,20 @@ export function MovementDetail({
     setPhotoActionError(null)
     const { data } = await supabase.auth.getSession()
     const accessToken = data.session?.access_token
-    let failed = !accessToken
+    let failureMessage: string | null = accessToken
+      ? null
+      : t('photo_authorization_failed')
     if (accessToken) {
       for (const file of selected) {
-        if (!(await uploadMovementPhoto(movementId, file, accessToken))) {
-          failed = true
-          break
+        const result = await uploadMovementPhoto(movementId, file, accessToken)
+        if (!result.success && !failureMessage) {
+          failureMessage = t(result.error ?? 'photoUploadFailed')
         }
       }
     }
     setPhotoBusy(false)
-    if (failed) {
-      setPhotoActionError(t('photoUploadFailed'))
+    if (failureMessage) {
+      setPhotoActionError(failureMessage)
       await fetchData()
       return
     }

@@ -268,6 +268,12 @@ export const translations = {
     removePhoto: 'إزالة',
     photoTooLargeMulti: 'حجم الصورة يجب ألا يتجاوز 10 ميجابايت.',
     photoUploadFailed: 'فشل رفع بعض الصور. يمكنك المحاولة مرة أخرى.',
+    photo_authorization_failed:
+      'تعذر تجهيز رفع الصورة. سجل الدخول مجددا ثم حاول مرة اخرى.',
+    photo_transfer_failed:
+      'تعذر اكمال رفع الصورة. تحقق من الشبكة ثم حاول مرة اخرى.',
+    photo_link_failed:
+      'تم رفع الصورة لكن تعذر ربطها بالحركة. حاول مجددا من صفحة التفاصيل.',
     movementSavedPhotosFailed:
       'تم حفظ الحركة بنجاح، لكن تعذر رفع بعض الصور. أغلق النموذج وأضف الصور من تفاصيل الحركة دون إعادة تسجيل الحركة.',
     invalidPhotosForMovement:
@@ -833,6 +839,12 @@ export const translations = {
     removePhoto: 'Remove',
     photoTooLargeMulti: 'Image size must not exceed 10 MB.',
     photoUploadFailed: 'Some photos failed to upload. You can try again.',
+    photo_authorization_failed:
+      'Could not authorize the photo upload. Sign in again and retry.',
+    photo_transfer_failed:
+      'The photo upload could not finish. Check the network and retry.',
+    photo_link_failed:
+      'The photo uploaded but could not be linked. Retry from movement details.',
     movementSavedPhotosFailed:
       'The movement was saved, but some photos failed. Close this form and add them from Movement Details without resubmitting the movement.',
     invalidPhotosForMovement:

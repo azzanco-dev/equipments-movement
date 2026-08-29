@@ -641,16 +641,26 @@ export function EntryExitForm({
       setSavedMovementId(result.id)
       setMovementSaved(true)
       let photoFailures = 0
+      let photoFailureMessage: string | null = null
       for (const file of photoFiles) {
-        const uploaded = await uploadMovementPhoto(result.id, file, accessToken)
-        if (!uploaded) photoFailures += 1
+        const uploadResult = await uploadMovementPhoto(
+          result.id,
+          file,
+          accessToken,
+        )
+        if (!uploadResult.success) {
+          photoFailures += 1
+          if (uploadResult.error && !photoFailureMessage) {
+            photoFailureMessage = t(uploadResult.error)
+          }
+        }
       }
       if (pageMode && onViewMovement) {
         onViewMovement(result.id)
         return
       }
       if (photoFailures) {
-        setSaveWarning(t('movementSavedPhotosFailed'))
+        setSaveWarning(photoFailureMessage ?? t('movementSavedPhotosFailed'))
       } else if (!pageMode) {
         onClose()
         reset()
