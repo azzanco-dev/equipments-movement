@@ -78,9 +78,12 @@ export function Layout({
               className="flex items-center gap-2 cursor-pointer"
               onClick={() => onNavigate('dashboard')}
             >
-              <div className="brand-mark flex h-9 w-9 items-center justify-center rounded-lg">
-                <span className="font-bold text-lg">E</span>
-              </div>
+              <img
+                src="/azzanco-logo.png"
+                alt=""
+                aria-hidden="true"
+                className="h-9 w-9 shrink-0 rounded-lg object-contain"
+              />
               <div className="hidden sm:block">
                 <h1 className="text-sm font-bold leading-tight">
                   {t('appName')}
