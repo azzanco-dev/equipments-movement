@@ -57,7 +57,6 @@ export function MovementImport() {
     if (row.mode === 'entry' || row.mode === 'both') {
       if (!row.company_id) errors.push('company_not_found')
       if (!row.project_id) errors.push('project_not_found')
-      if (!row.driver_id) errors.push('driver_not_found')
       if (!row.entry_date) errors.push('entry_date_required')
     }
     if ((row.mode === 'exit' || row.mode === 'both') && !row.exit_date)
