@@ -3,8 +3,13 @@ import '@/index.css'
 import { Providers } from '@/Providers'
 
 export const metadata: Metadata = {
-  title: 'Equipment Movement',
+  title: 'حركة المعدات | Equipments movement',
   description: 'Equipment entry and exit management',
+  icons: {
+    icon: '/azzanco-logo.png',
+    shortcut: '/azzanco-logo.png',
+    apple: '/azzanco-logo.png',
+  },
 }
 
 export default function RootLayout({
