@@ -61,11 +61,12 @@ export function AuthScreen() {
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="mb-5 flex flex-col items-center sm:mb-8">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-black dark:bg-white mb-4">
-              <span className="text-white dark:text-black font-bold text-2xl">
-                E
-              </span>
-            </div>
+            <img
+              src="/azzanco-logo.png"
+              alt=""
+              aria-hidden="true"
+              className="mb-4 h-14 w-14 rounded-2xl object-contain"
+            />
             <h1 className="text-xl font-bold">{t('appName')}</h1>
             <p className="text-sm text-muted mt-1">{t('appSubtitle')}</p>
           </div>
