@@ -40,6 +40,7 @@ import type { SelectOption } from '@/components/Select'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
+import { uploadMovementPhoto } from '@/lib/movementPhotoUpload'
 
 interface MovementDetailProps {
   movementId: string
@@ -363,16 +364,20 @@ export function MovementDetail({
     setPhotoBusy(true)
     setPhotoActionError(null)
     const { data } = await supabase.auth.getSession()
-    const form = new FormData()
-    selected.forEach((file) => form.append('photos', file))
-    const response = await fetch(`/api/movements/${movementId}/photos`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${data.session?.access_token ?? ''}` },
-      body: form,
-    })
+    const accessToken = data.session?.access_token
+    let failed = !accessToken
+    if (accessToken) {
+      for (const file of selected) {
+        if (!(await uploadMovementPhoto(movementId, file, accessToken))) {
+          failed = true
+          break
+        }
+      }
+    }
     setPhotoBusy(false)
-    if (!response.ok) {
+    if (failed) {
       setPhotoActionError(t('photoUploadFailed'))
+      await fetchData()
       return
     }
     await fetchData()

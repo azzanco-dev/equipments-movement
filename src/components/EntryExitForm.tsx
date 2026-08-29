@@ -24,6 +24,7 @@ import { Select, type SelectOption } from '@/components/Select'
 import { PlateNumberInput } from '@/components/PlateNumberInput'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
+import { uploadMovementPhoto } from '@/lib/movementPhotoUpload'
 
 const FRONTEND_MAX_PHOTO_BYTES = 10 * 1024 * 1024
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -594,27 +595,31 @@ export function EntryExitForm({
       let accessToken = sessionData.session?.access_token
       if (!accessToken) throw new Error('Missing session')
 
-      const form = new FormData()
-      form.set('equipment_id', selected.id)
-      form.set('movement_type', movementType)
-      form.set('movement_context', workshopMode ? 'workshop' : 'site')
-      form.set('registration_method', 'manual')
-      if (notes) form.set('notes', notes)
-      if (!workshopMode && isEntry) {
-        form.set('driver_id', driverId)
-        if (selectedCompanyId) form.set('company_id', selectedCompanyId)
-        if (selectedProjectId) form.set('project_id', selectedProjectId)
-        if (contractorCode.trim())
-          form.set('contractor_equipment_code', contractorCode.trim())
+      const payload: Record<string, string | number> = {
+        equipment_id: selected.id,
+        movement_type: movementType,
+        movement_context: workshopMode ? 'workshop' : 'site',
+        registration_method: 'manual',
+        recorded_at: actualMovementDate.toISOString(),
+        photo_count: photoFiles.length,
       }
-      form.set('recorded_at', actualMovementDate.toISOString())
-      photoFiles.forEach((file) => form.append('photos', file))
+      if (notes) payload.notes = notes
+      if (!workshopMode && isEntry) {
+        payload.driver_id = driverId
+        if (selectedCompanyId) payload.company_id = selectedCompanyId
+        if (selectedProjectId) payload.project_id = selectedProjectId
+        if (contractorCode.trim())
+          payload.contractor_equipment_code = contractorCode.trim()
+      }
 
       const submitMovement = (token: string) =>
         fetch('/api/movements', {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: form,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
         })
       let response = await submitMovement(accessToken)
       if (response.status === 401) {
@@ -630,17 +635,21 @@ export function EntryExitForm({
       }
       const result = (await response.json()) as {
         id: string
-        photoFailures?: number
       }
 
       onSaved()
       setSavedMovementId(result.id)
       setMovementSaved(true)
+      let photoFailures = 0
+      for (const file of photoFiles) {
+        const uploaded = await uploadMovementPhoto(result.id, file, accessToken)
+        if (!uploaded) photoFailures += 1
+      }
       if (pageMode && onViewMovement) {
         onViewMovement(result.id)
         return
       }
-      if (result.photoFailures) {
+      if (photoFailures) {
         setSaveWarning(t('movementSavedPhotosFailed'))
       } else if (!pageMode) {
         onClose()

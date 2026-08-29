@@ -53,29 +53,56 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
     }
 
-    const form = await request.formData()
-    const movementType = form.get('movement_type')
+    const contentType = request.headers.get('content-type') ?? ''
+    let photos: File[] = []
+    let values: Record<string, unknown> = {}
+    if (contentType.includes('application/json')) {
+      values = (await request.json()) as Record<string, unknown>
+    } else {
+      const form = await request.formData()
+      photos = form
+        .getAll('photos')
+        .filter((value): value is File => value instanceof File)
+      for (const key of [
+        'equipment_id',
+        'movement_type',
+        'movement_context',
+        'registration_method',
+        'driver_id',
+        'driver_name',
+        'company_id',
+        'project_id',
+        'contractor_equipment_code',
+        'notes',
+        'recorded_at',
+      ]) {
+        values[key] = form.get(key)
+      }
+    }
+    const value = (name: string) => {
+      const item = values[name]
+      return typeof item === 'string' && item.trim() ? item.trim() : null
+    }
+    const movementType = value('movement_type')
     const movementContext =
-      form.get('movement_context') === 'workshop' ? 'workshop' : 'site'
-    const equipmentId = form.get('equipment_id')
-    if (
-      (movementType !== 'entry' && movementType !== 'exit') ||
-      typeof equipmentId !== 'string' ||
-      !equipmentId
-    ) {
+      value('movement_context') === 'workshop' ? 'workshop' : 'site'
+    const equipmentId = value('equipment_id')
+    if ((movementType !== 'entry' && movementType !== 'exit') || !equipmentId) {
       return NextResponse.json(
         { error: 'invalid_movement_payload' },
         { status: 400 },
       )
     }
 
-    const photos = form
-      .getAll('photos')
-      .filter((value): value is File => value instanceof File)
-    if (movementContext === 'workshop' && photos.length === 0) {
+    const intendedPhotoCount = photos.length || Number(values.photo_count ?? 0)
+    if (
+      movementContext === 'workshop' &&
+      (!Number.isInteger(intendedPhotoCount) || intendedPhotoCount < 1)
+    ) {
       return NextResponse.json({ error: 'photo_required' }, { status: 400 })
     }
     if (
+      intendedPhotoCount > MAX_PHOTOS ||
       photos.length > MAX_PHOTOS ||
       photos.some(
         (file) =>
@@ -104,10 +131,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'access_denied' }, { status: 403 })
     }
 
-    const value = (name: string) => {
-      const item = form.get(name)
-      return typeof item === 'string' && item.trim() ? item.trim() : null
-    }
     const payload: Record<string, unknown> = {
       equipment_id: equipmentId,
       supervisor_id: authData.user.id,

@@ -46,6 +46,85 @@ export async function POST(
     .from('entry_exit_photos')
     .select('*', { count: 'exact', head: true })
     .eq('entry_exit_log_id', id)
+
+  if (
+    (request.headers.get('content-type') ?? '').includes('application/json')
+  ) {
+    const body = (await request.json().catch(() => null)) as {
+      action?: string
+      fileName?: string
+      contentType?: string
+      size?: number
+      filePath?: string
+    } | null
+    if (body?.action === 'authorize_upload') {
+      if (
+        (count ?? 0) >= MAX_PHOTOS ||
+        !body.fileName ||
+        !body.contentType ||
+        !body.size ||
+        body.size > MAX_PHOTO_BYTES ||
+        !ALLOWED_PHOTO_TYPES.has(body.contentType)
+      ) {
+        return NextResponse.json({ error: 'invalid_photos' }, { status: 400 })
+      }
+      const safeName =
+        body.fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) || 'photo'
+      const path = `${auth.user.id}/${id}/${crypto.randomUUID()}-${safeName}`
+      const { data: signed, error: signedError } = await auth.supabase.storage
+        .from('log-photos')
+        .createSignedUploadUrl(path)
+      if (signedError || !signed?.token) {
+        return NextResponse.json(
+          { error: 'photo_upload_failed' },
+          { status: 502 },
+        )
+      }
+      return NextResponse.json({ path, token: signed.token }, { status: 201 })
+    }
+
+    if (body?.action === 'complete_upload') {
+      const expectedPrefix = `${auth.user.id}/${id}/`
+      if (
+        !body.filePath?.startsWith(expectedPrefix) ||
+        body.filePath.slice(expectedPrefix.length).includes('/')
+      ) {
+        return NextResponse.json({ error: 'invalid_photo' }, { status: 400 })
+      }
+      const { data: existing } = await auth.supabase
+        .from('entry_exit_photos')
+        .select('id')
+        .eq('entry_exit_log_id', id)
+        .eq('file_path', body.filePath)
+        .maybeSingle()
+      if (existing) {
+        return NextResponse.json({ created: 1 }, { status: 200 })
+      }
+      const { error: insertError } = await auth.supabase
+        .from('entry_exit_photos')
+        .insert({
+          entry_exit_log_id: id,
+          file_path: body.filePath,
+          uploaded_by: auth.user.id,
+          sort_order: count ?? 0,
+        })
+      if (insertError) {
+        await auth.supabase.storage.from('log-photos').remove([body.filePath])
+        return NextResponse.json(
+          {
+            error: insertError.message.includes('maximum 3')
+              ? 'max_photos'
+              : 'photo_upload_failed',
+          },
+          { status: 409 },
+        )
+      }
+      return NextResponse.json({ created: 1 }, { status: 201 })
+    }
+
+    return NextResponse.json({ error: 'invalid_photo' }, { status: 400 })
+  }
+
   const form = await request.formData()
   const files = form
     .getAll('photos')
