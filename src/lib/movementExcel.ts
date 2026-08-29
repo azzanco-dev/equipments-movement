@@ -117,7 +117,9 @@ export async function parseMovementWorkbook(
 ): Promise<ParsedMovementImportRow[]> {
   const workbook = XLSX.read(await file.arrayBuffer(), {
     type: 'array',
-    cellDates: true,
+    // Keep Excel dates as serial numbers. Converting them to JavaScript Date
+    // objects applies the device timezone and can shift the calendar day.
+    cellDates: false,
   })
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
   if (!sheet) throw new Error('missing_sheet')
