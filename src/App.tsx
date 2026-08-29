@@ -21,6 +21,7 @@ import { DriverDetail } from '@/screens/DriverDetail'
 import { MovementDetail } from '@/screens/MovementDetail'
 import { MovementCreate } from '@/screens/MovementCreate'
 import { AdminSettings } from '@/screens/AdminSettings'
+import { MovementImport } from '@/screens/MovementImport'
 import type { Equipment } from '@/lib/types'
 import {
   LayoutDashboard,
@@ -32,6 +33,7 @@ import {
   Briefcase,
   Contact,
   Settings,
+  FileUp,
 } from 'lucide-react'
 import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog'
 
@@ -44,6 +46,7 @@ const ADMIN_PAGES = new Set([
   'lessors',
   'drivers',
   'users',
+  'movement-import',
   'settings',
 ])
 
@@ -126,6 +129,11 @@ function AppContent() {
     { key: 'lessors', label: t('lessors'), icon: <Building2 size={18} /> },
     { key: 'drivers', label: t('drivers'), icon: <Contact size={18} /> },
     { key: 'users', label: t('users'), icon: <Users size={18} /> },
+    {
+      key: 'movement-import',
+      label: t('movementImport'),
+      icon: <FileUp size={18} />,
+    },
     { key: 'settings', label: t('settings'), icon: <Settings size={18} /> },
   ]
 
@@ -198,6 +206,7 @@ function AppContent() {
             {page === 'users' && (
               <AdminUsers onSelectUser={(id) => router.push(`/users/${id}`)} />
             )}
+            {page === 'movement-import' && <MovementImport />}
             {page === 'settings' && <AdminSettings />}
           </>
         )}
