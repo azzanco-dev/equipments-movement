@@ -86,9 +86,13 @@ function text(value: unknown) {
   return String(value ?? '').trim()
 }
 
+function localDateString(value: Date) {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+}
+
 function excelDate(value: unknown): string {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10)
+    return localDateString(value)
   }
   if (typeof value === 'number') {
     const parsed = XLSX.SSF.parse_date_code(value)
@@ -105,9 +109,7 @@ function excelDate(value: unknown): string {
   if (local)
     return `${local[3]}-${local[2].padStart(2, '0')}-${local[1].padStart(2, '0')}`
   const parsed = new Date(raw)
-  return Number.isNaN(parsed.getTime())
-    ? raw
-    : parsed.toISOString().slice(0, 10)
+  return Number.isNaN(parsed.getTime()) ? raw : localDateString(parsed)
 }
 
 export async function parseMovementWorkbook(
