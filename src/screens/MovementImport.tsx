@@ -36,6 +36,61 @@ interface ImportResult {
   error?: string
 }
 
+function ImportProjectSelect({
+  companyId,
+  value,
+  label,
+  placeholder,
+  disabled,
+  lang,
+  onChange,
+}: {
+  companyId: string | null
+  value: string | null
+  label: string
+  placeholder: string
+  disabled: boolean
+  lang: 'ar' | 'en'
+  onChange: (value: string, option: SelectOption | null) => void
+}) {
+  const loadOptions = useCallback(
+    async (search: string): Promise<SelectOption[]> => {
+      let query = companyId
+        ? supabase
+            .from('projects')
+            .select('id,name_ar,name_en,company_projects!inner(company_id)')
+            .eq('company_projects.company_id', companyId)
+            .order(lang === 'ar' ? 'name_ar' : 'name_en')
+            .limit(20)
+        : supabase
+            .from('projects')
+            .select('id,name_ar,name_en')
+            .order(lang === 'ar' ? 'name_ar' : 'name_en')
+            .limit(20)
+      const term = sanitizeSearchTerm(search)
+      if (term)
+        query = query.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+      const { data } = await query
+      return (data ?? []).map((item) => ({
+        value: item.id,
+        label: localizedName(lang, item.name_ar, item.name_en),
+      }))
+    },
+    [companyId, lang],
+  )
+
+  return (
+    <AsyncSearchSelect
+      value={value ?? ''}
+      selectedOption={value ? { value, label } : null}
+      onChange={onChange}
+      loadOptions={loadOptions}
+      disabled={disabled}
+      placeholder={placeholder}
+    />
+  )
+}
+
 export function MovementImport() {
   const { t, lang } = useI18n()
   const [rows, setRows] = useState<MovementImportRow[]>([])
@@ -54,12 +109,6 @@ export function MovementImport() {
   const rowErrors = useCallback((row: MovementImportRow) => {
     const errors: string[] = []
     if (!row.equipment_id) errors.push('equipment_not_found')
-    if (
-      row.supervisor_name &&
-      row.supervisor_name.trim().toLowerCase() !==
-        row.supervisor_label?.trim().toLowerCase()
-    )
-      errors.push('supervisor_not_found')
     if (row.mode === 'entry' || row.mode === 'both') {
       if (!row.company_id) errors.push('company_not_found')
       if (!row.project_id) errors.push('project_not_found')
@@ -119,25 +168,6 @@ export function MovementImport() {
     async (search: string): Promise<SelectOption[]> => {
       let query = supabase
         .from('companies')
-        .select('id,name_ar,name_en')
-        .order(lang === 'ar' ? 'name_ar' : 'name_en')
-        .limit(20)
-      const term = sanitizeSearchTerm(search)
-      if (term)
-        query = query.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
-      const { data } = await query
-      return (data ?? []).map((item) => ({
-        value: item.id,
-        label: localizedName(lang, item.name_ar, item.name_en),
-      }))
-    },
-    [lang],
-  )
-
-  const loadProjects = useCallback(
-    async (search: string): Promise<SelectOption[]> => {
-      let query = supabase
-        .from('projects')
         .select('id,name_ar,name_en')
         .order(lang === 'ar' ? 'name_ar' : 'name_en')
         .limit(20)
@@ -432,6 +462,8 @@ export function MovementImport() {
                               updateRow(index, {
                                 company_id: value || null,
                                 company_label: option?.label ?? null,
+                                project_id: null,
+                                project_label: null,
                               })
                             }
                             loadOptions={loadCompanies}
@@ -440,24 +472,17 @@ export function MovementImport() {
                           />
                         </td>
                         <td className="p-2">
-                          <AsyncSearchSelect
-                            value={row.project_id ?? ''}
-                            selectedOption={
-                              row.project_id
-                                ? {
-                                    value: row.project_id,
-                                    label:
-                                      row.project_label ?? row.project_name,
-                                  }
-                                : null
-                            }
+                          <ImportProjectSelect
+                            companyId={row.company_id}
+                            value={row.project_id}
+                            label={row.project_label ?? row.project_name}
                             onChange={(value, option) =>
                               updateRow(index, {
                                 project_id: value || null,
                                 project_label: option?.label ?? null,
                               })
                             }
-                            loadOptions={loadProjects}
+                            lang={lang}
                             disabled={row.mode === 'exit'}
                             placeholder={row.project_name || t('selectProject')}
                           />
