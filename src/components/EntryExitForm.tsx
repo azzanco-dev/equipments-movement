@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { useAuth } from '@/auth/AuthContext'
@@ -94,6 +94,8 @@ export function EntryExitForm({
   const [quickEquipment, setQuickEquipment] = useState({
     open: false,
     plate: '',
+    chassis: '',
+    identifierType: 'plate' as 'plate' | 'chassis',
     code: '',
     type: '',
     lessorId: '',
@@ -107,6 +109,8 @@ export function EntryExitForm({
     error: '',
   })
   const [quickSaving, setQuickSaving] = useState(false)
+  const equipmentListRef = useRef<HTMLDivElement>(null)
+  const quickEquipmentRef = useRef<HTMLDivElement>(null)
 
   const isEntry = movementType === 'entry'
   const workshopMode =
@@ -152,6 +156,8 @@ export function EntryExitForm({
     setQuickEquipment({
       open: false,
       plate: '',
+      chassis: '',
+      identifierType: 'plate',
       code: '',
       type: '',
       lessorId: '',
@@ -168,6 +174,17 @@ export function EntryExitForm({
       reset()
     }
   }, [open, reset])
+
+  useEffect(() => {
+    if (!quickEquipment.open) return
+    const frame = window.requestAnimationFrame(() => {
+      quickEquipmentRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [quickEquipment.open])
 
   // Search equipment
   useEffect(() => {
@@ -189,14 +206,14 @@ export function EntryExitForm({
           let query = supabase
             .from('equipment')
             .select(
-              'id,code,type,plate_number,ownership_status,is_active,master_data_complete,numbering_status',
+              'id,code,type,plate_number,chassis_number,ownership_status,is_active,master_data_complete,numbering_status',
             )
             .eq('is_active', true)
             .order('code')
           if (ownerFilter) query = query.eq('ownership_status', ownerFilter)
           if (term)
             query = query.or(
-              `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`,
+              `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%,chassis_number.ilike.%${term}%`,
             )
           result = await query.limit(20)
         }
@@ -426,8 +443,21 @@ export function EntryExitForm({
   }
 
   const createQuickEquipment = async () => {
-    if (!quickEquipment.plate.trim()) {
+    if (
+      (!workshopMode &&
+        quickEquipment.identifierType === 'plate' &&
+        !quickEquipment.plate.trim()) ||
+      (workshopMode && !quickEquipment.plate.trim())
+    ) {
       setSaveError(t('plateRequired'))
+      return
+    }
+    if (
+      !workshopMode &&
+      !quickEquipment.chassis.trim() &&
+      quickEquipment.identifierType === 'chassis'
+    ) {
+      setSaveError(t('chassisNumberRequired'))
       return
     }
     if (
@@ -455,7 +485,11 @@ export function EntryExitForm({
           p_plate_number: quickEquipment.plate.trim(),
         })
       : await supabase.rpc('quick_create_foreman_equipment', {
-          p_plate_number: quickEquipment.plate.trim(),
+          p_plate_number:
+            quickEquipment.identifierType === 'plate'
+              ? quickEquipment.plate.trim()
+              : null,
+          p_chassis_number: quickEquipment.chassis.trim() || null,
           p_type: quickEquipment.type,
           p_lessor_id: quickEquipment.lessorId,
         })
@@ -467,6 +501,8 @@ export function EntryExitForm({
     setQuickEquipment({
       open: false,
       plate: '',
+      chassis: '',
+      identifierType: 'plate',
       code: '',
       type: '',
       lessorId: '',
@@ -661,7 +697,10 @@ export function EntryExitForm({
               <label className="label">{t('selectOwner')}</label>
               <Select
                 value={ownerFilter}
-                onChange={setOwnerFilter}
+                onChange={(value) => {
+                  equipmentListRef.current?.scrollTo({ top: 0 })
+                  setOwnerFilter(value)
+                }}
                 placeholder={t('allOwners')}
                 options={[
                   { value: '', label: t('allOwners') },
@@ -706,7 +745,10 @@ export function EntryExitForm({
                 <Skeleton className="h-16" />
               </div>
             ) : (
-              <div className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2">
+              <div
+                ref={equipmentListRef}
+                className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2"
+              >
                 {equipment.length === 0 && (
                   <p className="col-span-full py-4 text-center text-sm text-muted">
                     {t('noEquipmentFound')}
@@ -728,6 +770,11 @@ export function EntryExitForm({
                       {eq.plate_number && (
                         <p className="text-muted">
                           {t('plateNumber')}: {eq.plate_number}
+                        </p>
+                      )}
+                      {!eq.plate_number && eq.chassis_number && (
+                        <p className="text-muted">
+                          {t('chassisNumber')}: {eq.chassis_number}
                         </p>
                       )}
                     </div>
@@ -753,6 +800,7 @@ export function EntryExitForm({
             )}
             {quickEquipment.open && (
               <div
+                ref={quickEquipmentRef}
                 className="space-y-2.5 rounded-lg border p-3 text-start"
                 style={{
                   borderColor:
@@ -760,6 +808,36 @@ export function EntryExitForm({
                 }}
               >
                 <p className="font-semibold">{t('quickEquipmentAdd')}</p>
+                {!workshopMode && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['plate', 'chassis'] as const).map((type) => (
+                      <label
+                        key={type}
+                        className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-sm ${quickEquipment.identifierType === type ? 'bg-gray-100 dark:bg-gray-800' : ''}`}
+                        style={{ borderColor: 'var(--border)' }}
+                      >
+                        <span>
+                          {t(
+                            type === 'plate' ? 'plateNumber' : 'chassisNumber',
+                          )}
+                        </span>
+                        <input
+                          type="radio"
+                          name="quick-equipment-identifier"
+                          checked={quickEquipment.identifierType === type}
+                          onChange={() =>
+                            setQuickEquipment({
+                              ...quickEquipment,
+                              identifierType: type,
+                              plate:
+                                type === 'chassis' ? '' : quickEquipment.plate,
+                            })
+                          }
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
                 {workshopMode && (
                   <div
                     className="flex gap-4 rounded-lg border p-3"
@@ -814,17 +892,38 @@ export function EntryExitForm({
                       />
                     </div>
                   )}
-                <div>
-                  <label className="label">{t('plateNumber')} *</label>
-                  <PlateNumberInput
-                    value={quickEquipment.plate}
-                    onChange={(value) =>
-                      setQuickEquipment({ ...quickEquipment, plate: value })
-                    }
-                  />
-                </div>
+                {(workshopMode ||
+                  quickEquipment.identifierType === 'plate') && (
+                  <div>
+                    <label className="label">{t('plateNumber')} *</label>
+                    <PlateNumberInput
+                      value={quickEquipment.plate}
+                      onChange={(value) =>
+                        setQuickEquipment({ ...quickEquipment, plate: value })
+                      }
+                    />
+                  </div>
+                )}
                 {!workshopMode && (
                   <>
+                    <div>
+                      <label className="label">
+                        {t('chassisNumber')}{' '}
+                        {quickEquipment.identifierType === 'chassis' ? '*' : ''}
+                      </label>
+                      <input
+                        className="input"
+                        dir="ltr"
+                        placeholder={t('chassisNumberPlaceholder')}
+                        value={quickEquipment.chassis}
+                        onChange={(event) =>
+                          setQuickEquipment({
+                            ...quickEquipment,
+                            chassis: event.target.value,
+                          })
+                        }
+                      />
+                    </div>
                     <div>
                       <label className="label">{t('equipmentType')} *</label>
                       <AsyncSearchSelect
@@ -875,6 +974,8 @@ export function EntryExitForm({
                       setQuickEquipment({
                         open: false,
                         plate: '',
+                        chassis: '',
+                        identifierType: 'plate',
                         code: '',
                         type: '',
                         lessorId: '',
