@@ -809,7 +809,7 @@ export function EntryExitForm({
                 {isEntry && (
                   <button
                     type="button"
-                    className="w-full rounded-lg border px-3 py-2 text-start text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                    className="w-full rounded-lg border px-3 py-4 text-start text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
                     style={{ borderColor: 'var(--border)' }}
                     onClick={() =>
                       setQuickEquipment((value) => ({

@@ -456,15 +456,15 @@ export function AdminDashboard({
                             : undefined
                         }
                       >
-                        <td className="px-4 py-3 font-semibold">
+                        <td className="px-4 py-3 font-semibold text-xs">
                           {log.contractor_equipment_code ?? '—'}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-[13px]">
                           {log.equipment
                             ? `${log.equipment.code} ${log.equipment.type}`
                             : '—'}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-[13px]">
                           {log.movement_context === 'workshop'
                             ? t('workshopLocation')
                             : log.project
@@ -475,7 +475,7 @@ export function AdminDashboard({
                                 )
                               : '—'}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-[13px]">
                           <span
                             className={`badge border ${log.movement_type === 'entry' ? 'status-entry' : 'status-exit'}`}
                           >
@@ -484,13 +484,13 @@ export function AdminDashboard({
                               : t('exit')}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-[13px]">
                           {log.current_driver_name ?? log.driver_name ?? '—'}
                         </td>
-                        <td className="px-4 py-3 text-muted whitespace-nowrap">
+                        <td className="px-4 py-3 text-[12px] text-muted whitespace-nowrap">
                           {formatDate(log.recorded_at)}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-[13px]">
                           <RelativeTime value={log.created_at} />
                         </td>
                       </tr>
@@ -590,13 +590,13 @@ export function AdminDashboard({
                             setSelectedVisit(v)
                         }}
                       >
-                        <td className="px-4 py-3 font-semibold">
+                        <td className="px-4 py-3 text-[13px] font-semibold">
                           {v.contractor_equipment_code ?? '—'}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-[13px]">
                           {v.equipment_code} {v.equipment_type}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-[13px]">
                           {v.movement_context === 'workshop'
                             ? t('workshopLocation')
                             : localizedName(
@@ -605,13 +605,13 @@ export function AdminDashboard({
                                 v.project_name_en,
                               )}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-[13px]">
                           {v.last_driver_name ?? v.driver_name ?? '—'}
                         </td>
-                        <td className="px-4 py-3 text-muted whitespace-nowrap">
+                        <td className="px-4 py-3 text-[12px] text-muted whitespace-nowrap">
                           {formatDate(v.entry_recorded_at)}
                         </td>
-                        <td className="px-4 py-3 text-muted whitespace-nowrap">
+                        <td className="px-4 py-3 text-[12px] text-muted whitespace-nowrap">
                           {v.exit_recorded_at
                             ? formatDate(v.exit_recorded_at)
                             : '—'}
