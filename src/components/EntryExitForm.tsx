@@ -24,7 +24,7 @@ import { Select, type SelectOption } from '@/components/Select'
 import { PlateNumberInput } from '@/components/PlateNumberInput'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
-import { uploadMovementPhoto } from '@/lib/movementPhotoUpload'
+import { uploadMovementPhotos } from '@/lib/movementPhotoUpload'
 
 const FRONTEND_MAX_PHOTO_BYTES = 10 * 1024 * 1024
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -595,13 +595,18 @@ export function EntryExitForm({
       let accessToken = sessionData.session?.access_token
       if (!accessToken) throw new Error('Missing session')
 
-      const payload: Record<string, string | number> = {
+      const payload: Record<string, unknown> = {
         equipment_id: selected.id,
         movement_type: movementType,
         movement_context: workshopMode ? 'workshop' : 'site',
         registration_method: 'manual',
         recorded_at: actualMovementDate.toISOString(),
         photo_count: photoFiles.length,
+        photo_files: photoFiles.map((file) => ({
+          fileName: file.name,
+          contentType: file.type,
+          size: file.size,
+        })),
       }
       if (notes) payload.notes = notes
       if (!workshopMode && isEntry) {
@@ -635,6 +640,7 @@ export function EntryExitForm({
       }
       const result = (await response.json()) as {
         id: string
+        photoUploads?: Array<{ path: string; token: string }>
       }
 
       onSaved()
@@ -642,12 +648,13 @@ export function EntryExitForm({
       setMovementSaved(true)
       let photoFailures = 0
       let photoFailureMessage: string | null = null
-      for (const file of photoFiles) {
-        const uploadResult = await uploadMovementPhoto(
-          result.id,
-          file,
-          accessToken,
-        )
+      const uploadResults = await uploadMovementPhotos(
+        result.id,
+        photoFiles,
+        accessToken,
+        result.photoUploads,
+      )
+      for (const uploadResult of uploadResults) {
         if (!uploadResult.success) {
           photoFailures += 1
           if (uploadResult.error && !photoFailureMessage) {

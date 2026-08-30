@@ -40,7 +40,7 @@ import type { SelectOption } from '@/components/Select'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
-import { uploadMovementPhoto } from '@/lib/movementPhotoUpload'
+import { uploadMovementPhotos } from '@/lib/movementPhotoUpload'
 
 interface MovementDetailProps {
   movementId: string
@@ -369,8 +369,12 @@ export function MovementDetail({
       ? null
       : t('photo_authorization_failed')
     if (accessToken) {
-      for (const file of selected) {
-        const result = await uploadMovementPhoto(movementId, file, accessToken)
+      const uploadResults = await uploadMovementPhotos(
+        movementId,
+        selected,
+        accessToken,
+      )
+      for (const result of uploadResults) {
         if (!result.success && !failureMessage) {
           failureMessage = t(result.error ?? 'photoUploadFailed')
         }

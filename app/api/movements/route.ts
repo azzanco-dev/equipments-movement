@@ -7,6 +7,12 @@ const MAX_PHOTOS = 3
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024
 const ALLOWED_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
+interface PhotoDescriptor {
+  fileName: string
+  contentType: string
+  size: number
+}
+
 function movementErrorCode(message: string): string {
   if (message.includes('movement time cannot be in the future'))
     return 'future_time'
@@ -94,7 +100,20 @@ export async function POST(request: Request) {
       )
     }
 
-    const intendedPhotoCount = photos.length || Number(values.photo_count ?? 0)
+    const photoDescriptors = Array.isArray(values.photo_files)
+      ? values.photo_files.filter(
+          (item): item is PhotoDescriptor =>
+            typeof item === 'object' &&
+            item !== null &&
+            typeof (item as PhotoDescriptor).fileName === 'string' &&
+            typeof (item as PhotoDescriptor).contentType === 'string' &&
+            typeof (item as PhotoDescriptor).size === 'number',
+        )
+      : []
+    const intendedPhotoCount =
+      photos.length ||
+      photoDescriptors.length ||
+      Number(values.photo_count ?? 0)
     if (
       movementContext === 'workshop' &&
       (!Number.isInteger(intendedPhotoCount) || intendedPhotoCount < 1)
@@ -104,9 +123,15 @@ export async function POST(request: Request) {
     if (
       intendedPhotoCount > MAX_PHOTOS ||
       photos.length > MAX_PHOTOS ||
+      photoDescriptors.length > MAX_PHOTOS ||
       photos.some(
         (file) =>
           file.size > MAX_PHOTO_BYTES || !ALLOWED_PHOTO_TYPES.has(file.type),
+      ) ||
+      photoDescriptors.some(
+        (file) =>
+          file.size > MAX_PHOTO_BYTES ||
+          !ALLOWED_PHOTO_TYPES.has(file.contentType),
       )
     ) {
       return NextResponse.json({ error: 'invalid_photos' }, { status: 400 })
@@ -163,6 +188,18 @@ export async function POST(request: Request) {
       )
     }
 
+    const photoUploads: Array<{ path: string; token: string }> = []
+    for (const file of photoDescriptors) {
+      const safeName =
+        file.fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) || 'photo'
+      const path = `${authData.user.id}/${insertedLog.id}/${crypto.randomUUID()}-${safeName}`
+      const { data: signed, error: signedError } = await supabase.storage
+        .from('log-photos')
+        .createSignedUploadUrl(path)
+      if (signedError || !signed?.token) break
+      photoUploads.push({ path, token: signed.token })
+    }
+
     let photoFailures = 0
     for (const [index, file] of photos.entries()) {
       const safeName =
@@ -194,7 +231,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { id: insertedLog.id, photoFailures },
+      { id: insertedLog.id, photoFailures, photoUploads },
       { status: 201 },
     )
   } catch (error) {

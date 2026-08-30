@@ -16,7 +16,6 @@ export interface MovementPhotoUploadResult {
 
 const TUS_CHUNK_BYTES = 6 * 1024 * 1024
 const MAX_STANDARD_UPLOAD_BYTES = 6 * 1024 * 1024
-const MAX_TRANSFER_ATTEMPTS = 2
 const COMPLETE_RETRY_DELAYS = [0, 750, 1500]
 
 function wait(delay: number) {
@@ -75,11 +74,11 @@ async function uploadDirectly(
   if (error) throw error
 }
 
-async function authorizeUpload(
+async function authorizeUploads(
   movementId: string,
-  file: File,
+  files: File[],
   accessToken: string,
-): Promise<UploadAuthorization | null> {
+): Promise<UploadAuthorization[] | null> {
   try {
     const response = await fetch(`/api/movements/${movementId}/photos`, {
       method: 'POST',
@@ -88,22 +87,27 @@ async function authorizeUpload(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        action: 'authorize_upload',
-        fileName: file.name,
-        contentType: file.type,
-        size: file.size,
+        action: 'authorize_uploads',
+        files: files.map((file) => ({
+          fileName: file.name,
+          contentType: file.type,
+          size: file.size,
+        })),
       }),
     })
     if (!response.ok) return null
-    return (await response.json()) as UploadAuthorization
+    const result = (await response.json()) as {
+      uploads?: UploadAuthorization[]
+    }
+    return result.uploads?.length === files.length ? result.uploads : null
   } catch {
     return null
   }
 }
 
-async function completeUpload(
+async function completeUploads(
   movementId: string,
-  path: string,
+  paths: string[],
   accessToken: string,
 ): Promise<boolean> {
   for (const delay of COMPLETE_RETRY_DELAYS) {
@@ -116,8 +120,8 @@ async function completeUpload(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'complete_upload',
-          filePath: path,
+          action: 'complete_uploads',
+          filePaths: paths,
         }),
       })
       if (response.ok) return true
@@ -129,42 +133,64 @@ async function completeUpload(
   return false
 }
 
-export async function uploadMovementPhoto(
+export async function uploadMovementPhotos(
   movementId: string,
-  file: File,
+  files: File[],
   accessToken: string,
-): Promise<MovementPhotoUploadResult> {
-  let authorization: UploadAuthorization | null = null
-  for (let attempt = 0; attempt < MAX_TRANSFER_ATTEMPTS; attempt += 1) {
-    authorization = await authorizeUpload(movementId, file, accessToken)
-    if (!authorization) {
-      return { success: false, error: 'photo_authorization_failed' }
-    }
+  authorizedUploads?: UploadAuthorization[],
+): Promise<MovementPhotoUploadResult[]> {
+  if (!files.length) return []
+  const authorizations =
+    authorizedUploads?.length === files.length
+      ? authorizedUploads
+      : await authorizeUploads(movementId, files, accessToken)
+  if (!authorizations) {
+    return files.map(() => ({
+      success: false,
+      error: 'photo_authorization_failed',
+    }))
+  }
 
+  const transferred: Array<{
+    index: number
+    authorization: UploadAuthorization
+  }> = []
+  const results: MovementPhotoUploadResult[] = files.map(() => ({
+    success: false,
+    error: 'photo_transfer_failed',
+  }))
+
+  for (const [index, file] of files.entries()) {
+    const authorization = authorizations[index]
     try {
       if (file.size <= MAX_STANDARD_UPLOAD_BYTES) {
         await uploadDirectly(file, authorization)
       } else {
         await uploadResumably(file, authorization, accessToken)
       }
-      break
+      transferred.push({ index, authorization })
     } catch (error) {
       console.error(
         'Photo transfer failed',
         error instanceof Error ? error.message : 'unknown_error',
       )
       await supabase.storage.from('log-photos').remove([authorization.path])
-      authorization = null
     }
   }
 
-  if (!authorization)
-    return { success: false, error: 'photo_transfer_failed' }
+  if (!transferred.length) return results
 
-  if (await completeUpload(movementId, authorization.path, accessToken)) {
-    return { success: true }
+  const transferredPaths = transferred.map(
+    ({ authorization }) => authorization.path,
+  )
+  if (await completeUploads(movementId, transferredPaths, accessToken)) {
+    for (const { index } of transferred) results[index] = { success: true }
+    return results
   }
 
-  await supabase.storage.from('log-photos').remove([authorization.path])
-  return { success: false, error: 'photo_link_failed' }
+  await supabase.storage.from('log-photos').remove(transferredPaths)
+  for (const { index } of transferred) {
+    results[index] = { success: false, error: 'photo_link_failed' }
+  }
+  return results
 }

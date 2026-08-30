@@ -56,7 +56,103 @@ export async function POST(
       contentType?: string
       size?: number
       filePath?: string
+      files?: Array<{
+        fileName?: string
+        contentType?: string
+        size?: number
+      }>
+      filePaths?: string[]
     } | null
+    if (body?.action === 'authorize_uploads') {
+      const files = body.files ?? []
+      const available = MAX_PHOTOS - (count ?? 0)
+      if (
+        !files.length ||
+        files.length > available ||
+        files.some(
+          (file) =>
+            !file.fileName ||
+            !file.contentType ||
+            !file.size ||
+            file.size > MAX_PHOTO_BYTES ||
+            !ALLOWED_PHOTO_TYPES.has(file.contentType),
+        )
+      ) {
+        return NextResponse.json({ error: 'invalid_photos' }, { status: 400 })
+      }
+
+      const uploads = []
+      for (const file of files) {
+        const safeName =
+          file.fileName!.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) ||
+          'photo'
+        const path = `${auth.user.id}/${id}/${crypto.randomUUID()}-${safeName}`
+        const { data: signed, error: signedError } =
+          await auth.supabase.storage
+            .from('log-photos')
+            .createSignedUploadUrl(path)
+        if (signedError || !signed?.token) {
+          return NextResponse.json(
+            { error: 'photo_upload_failed' },
+            { status: 502 },
+          )
+        }
+        uploads.push({ path, token: signed.token })
+      }
+      return NextResponse.json({ uploads }, { status: 201 })
+    }
+
+    if (body?.action === 'complete_uploads') {
+      const expectedPrefix = `${auth.user.id}/${id}/`
+      const filePaths = [...new Set(body.filePaths ?? [])]
+      const available = MAX_PHOTOS - (count ?? 0)
+      if (
+        !filePaths.length ||
+        filePaths.length > available ||
+        filePaths.some(
+          (path) =>
+            !path.startsWith(expectedPrefix) ||
+            path.slice(expectedPrefix.length).includes('/'),
+        )
+      ) {
+        return NextResponse.json({ error: 'invalid_photos' }, { status: 400 })
+      }
+
+      const { data: existing } = await auth.supabase
+        .from('entry_exit_photos')
+        .select('file_path')
+        .eq('entry_exit_log_id', id)
+        .in('file_path', filePaths)
+      const existingPaths = new Set(
+        (existing ?? []).map((photo) => photo.file_path),
+      )
+      const newPaths = filePaths.filter((path) => !existingPaths.has(path))
+      if (newPaths.length) {
+        const { error: insertError } = await auth.supabase
+          .from('entry_exit_photos')
+          .insert(
+            newPaths.map((filePath, index) => ({
+              entry_exit_log_id: id,
+              file_path: filePath,
+              uploaded_by: auth.user.id,
+              sort_order: (count ?? 0) + index,
+            })),
+          )
+        if (insertError) {
+          await auth.supabase.storage.from('log-photos').remove(newPaths)
+          return NextResponse.json(
+            {
+              error: insertError.message.includes('maximum 3')
+                ? 'max_photos'
+                : 'photo_upload_failed',
+            },
+            { status: 409 },
+          )
+        }
+      }
+      return NextResponse.json({ created: newPaths.length }, { status: 201 })
+    }
+
     if (body?.action === 'authorize_upload') {
       if (
         (count ?? 0) >= MAX_PHOTOS ||
