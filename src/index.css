@@ -303,3 +303,7 @@ textarea::placeholder {
 .animate-spin-slow {
   animation: spin 1.5s linear infinite;
 }
+
+.btn-outline {
+  border-color: #e5e7eb;
+}
