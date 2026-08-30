@@ -51,10 +51,12 @@ export function AsyncSearchSelect({
     if (!rect) return
     const gap = 4
     const viewportPadding = 8
-    const availableBelow =
-      window.innerHeight - rect.bottom - gap - viewportPadding
-    const availableAbove = rect.top - gap - viewportPadding
-    const openAbove = availableBelow < 220 && availableAbove > availableBelow
+    const availableBelow = Math.max(
+      0,
+      window.innerHeight - rect.bottom - gap - viewportPadding,
+    )
+    const availableAbove = Math.max(0, rect.top - gap - viewportPadding)
+    const openAbove = availableAbove > availableBelow
     const availableHeight = openAbove ? availableAbove : availableBelow
     const width = Math.min(
       Math.max(rect.width, 260),
@@ -70,7 +72,7 @@ export function AsyncSearchSelect({
       top: openAbove ? rect.top - gap : rect.bottom + gap,
       left,
       width,
-      maxHeight: Math.max(120, Math.min(300, availableHeight)),
+      maxHeight: Math.max(0, availableHeight),
       openAbove,
     })
   }, [])
@@ -198,13 +200,7 @@ export function AsyncSearchSelect({
               />
             </div>
             <div
-              className="min-h-0 flex-1 overflow-y-auto"
-              style={{
-                maxHeight: Math.max(
-                  32,
-                  menuPosition.maxHeight - (showCreateAction ? 82 : 42),
-                ),
-              }}
+              className="min-h-0 flex-1 overscroll-contain overflow-y-auto"
             >
               {loading ? (
                 <div className="flex items-center justify-center gap-2 px-3 py-5 text-sm text-muted">
