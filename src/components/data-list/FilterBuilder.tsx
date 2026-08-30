@@ -2,6 +2,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { Select } from '@/components/Select'
 import type { FilterField, FilterOperator, ListFilter } from './types'
 import { useI18n } from '@/i18n/I18nContext'
+import { createClientId } from '@/lib/clientId'
 
 export function FilterBuilder({
   fields,
@@ -53,7 +54,7 @@ export function FilterBuilder({
       onChange([
         ...filters,
         {
-          id: crypto.randomUUID(),
+          id: createClientId(),
           field: field.key,
           operator: field.operators[0],
           value: '',
