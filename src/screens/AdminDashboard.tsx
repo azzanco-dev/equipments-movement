@@ -424,6 +424,9 @@ export function AdminDashboard({
                         {t('contractorEquipmentCode')}
                       </th>
                       <th className="table-header text-start px-4 py-3">
+                        {t('equipmentCodeLabel')}
+                      </th>
+                      <th className="table-header text-start px-4 py-3">
                         {t('equipmentNameLabel')}
                       </th>
                       <th className="table-header text-start px-4 py-3">
@@ -460,9 +463,10 @@ export function AdminDashboard({
                           {log.contractor_equipment_code ?? '—'}
                         </td>
                         <td className="px-4 py-3 text-[13px]">
-                          {log.equipment
-                            ? `${log.equipment.code} ${log.equipment.type}`
-                            : '—'}
+                          {log.equipment?.code ?? '—'}
+                        </td>
+                        <td className="px-4 py-3 text-[13px]">
+                          {log.equipment?.type ?? '—'}
                         </td>
                         <td className="px-4 py-3 text-[13px]">
                           {log.movement_context === 'workshop'
@@ -561,6 +565,9 @@ export function AdminDashboard({
                         {t('contractorEquipmentCode')}
                       </th>
                       <th className="table-header text-start px-4 py-3">
+                        {t('equipmentCodeLabel')}
+                      </th>
+                      <th className="table-header text-start px-4 py-3">
                         {t('equipmentNameLabel')}
                       </th>
                       <th className="table-header text-start px-4 py-3">
@@ -594,7 +601,10 @@ export function AdminDashboard({
                           {v.contractor_equipment_code ?? '—'}
                         </td>
                         <td className="px-4 py-3 text-[13px]">
-                          {v.equipment_code} {v.equipment_type}
+                          {v.equipment_code}
+                        </td>
+                        <td className="px-4 py-3 text-[13px]">
+                          {v.equipment_type}
                         </td>
                         <td className="px-4 py-3 text-[13px]">
                           {v.movement_context === 'workshop'

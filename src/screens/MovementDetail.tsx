@@ -27,6 +27,7 @@ import {
   Trash2,
   Upload,
   RefreshCw,
+  Pencil,
 } from 'lucide-react'
 import type {
   EntryExitLog,
@@ -120,6 +121,18 @@ export function MovementDetail({
   const [driverChangeError, setDriverChangeError] = useState<string | null>(
     null,
   )
+  const [editOpen, setEditOpen] = useState(false)
+  const [editBusy, setEditBusy] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [editEquipment, setEditEquipment] = useState<SelectOption | null>(null)
+  const [editSupervisor, setEditSupervisor] = useState<SelectOption | null>(
+    null,
+  )
+  const [editCompany, setEditCompany] = useState<SelectOption | null>(null)
+  const [editProject, setEditProject] = useState<SelectOption | null>(null)
+  const [editDriver, setEditDriver] = useState<SelectOption | null>(null)
+  const [editRecordedAt, setEditRecordedAt] = useState('')
+  const [editContractorCode, setEditContractorCode] = useState('')
   const photoUrls = photoItems.map((item) => item.url)
 
   const fetchData = useCallback(async () => {
@@ -319,6 +332,162 @@ export function MovementDetail({
     [],
   )
 
+  const loadEquipment = useCallback(async (query: string) => {
+    const term = sanitizeSearchTerm(query)
+    let request = supabase
+      .from('equipment')
+      .select('id,code,type')
+      .order('code')
+      .limit(20)
+    if (term) request = request.or(`code.ilike.%${term}%,type.ilike.%${term}%`)
+    const { data } = await request
+    return (data ?? []).map((item) => ({
+      value: item.id,
+      label: `${item.code} — ${item.type}`,
+    }))
+  }, [])
+
+  const loadSupervisors = useCallback(async (query: string) => {
+    const term = sanitizeSearchTerm(query)
+    let request = supabase
+      .from('profiles')
+      .select('id,full_name')
+      .in('role', ['admin', 'supervisor'])
+      .order('full_name')
+      .limit(20)
+    if (term) request = request.ilike('full_name', `%${term}%`)
+    const { data } = await request
+    return (data ?? []).map((item) => ({
+      value: item.id,
+      label: item.full_name,
+    }))
+  }, [])
+
+  const loadCompanies = useCallback(
+    async (query: string) => {
+      const term = sanitizeSearchTerm(query)
+      let request = supabase
+        .from('companies')
+        .select('id,name_ar,name_en')
+        .order('name_ar')
+        .limit(20)
+      if (term)
+        request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+      const { data } = await request
+      return (data ?? []).map((item) => ({
+        value: item.id,
+        label: localizedName(lang, item.name_ar, item.name_en),
+      }))
+    },
+    [lang],
+  )
+
+  const loadProjects = useCallback(
+    async (query: string) => {
+      const term = sanitizeSearchTerm(query)
+      let request = supabase
+        .from('projects')
+        .select('id,name_ar,name_en')
+        .order('name_ar')
+        .limit(20)
+      if (term)
+        request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+      const { data } = await request
+      return (data ?? []).map((item) => ({
+        value: item.id,
+        label: localizedName(lang, item.name_ar, item.name_en),
+      }))
+    },
+    [lang],
+  )
+
+  const openEdit = () => {
+    if (!log) return
+    setEditEquipment(
+      log.equipment
+        ? {
+            value: log.equipment.id,
+            label: `${log.equipment.code} — ${log.equipment.type}`,
+          }
+        : null,
+    )
+    setEditSupervisor(
+      log.supervisor
+        ? { value: log.supervisor.id, label: log.supervisor.full_name }
+        : null,
+    )
+    setEditCompany(
+      company
+        ? {
+            value: company.id,
+            label: localizedName(lang, company.name_ar, company.name_en),
+          }
+        : null,
+    )
+    setEditProject(
+      project
+        ? {
+            value: project.id,
+            label: localizedName(lang, project.name_ar, project.name_en),
+          }
+        : null,
+    )
+    setEditDriver(null)
+    const date = new Date(log.recorded_at)
+    setEditRecordedAt(
+      new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+        .toISOString()
+        .slice(0, 16),
+    )
+    setEditContractorCode(log.contractor_equipment_code ?? '')
+    setEditError(null)
+    setEditOpen(true)
+  }
+
+  const saveEdit = async () => {
+    if (
+      !log ||
+      !editEquipment ||
+      !editSupervisor ||
+      !editRecordedAt ||
+      (!isWorkshopMovement && (!editCompany || !editProject))
+    )
+      return
+    setEditBusy(true)
+    setEditError(null)
+    const { data } = await supabase.auth.getSession()
+    const response = await fetch(`/api/movements/${log.id}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${data.session?.access_token ?? ''}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        equipment_id: editEquipment.value,
+        supervisor_id: editSupervisor.value,
+        recorded_at: new Date(editRecordedAt).toISOString(),
+        company_id: editCompany?.value ?? null,
+        project_id: editProject?.value ?? null,
+        contractor_equipment_code: editContractorCode.trim() || null,
+        driver_id: log.driver_id ? null : (editDriver?.value ?? null),
+      }),
+    })
+    setEditBusy(false)
+    if (!response.ok) {
+      const result = (await response.json().catch(() => null)) as {
+        error?: string
+      } | null
+      setEditError(
+        result?.error === 'invalid_sequence'
+          ? t('movementEditSequenceError')
+          : t('movementEditFailed'),
+      )
+      return
+    }
+    setEditOpen(false)
+    await fetchData()
+  }
+
   const changeDriver = async () => {
     if (!driverEntryId || !newDriverId) return
     setDriverChangeBusy(true)
@@ -455,6 +624,119 @@ export function MovementDetail({
         title={t('movementDetails')}
         description={t('movementDetailsDesc')}
       />
+
+      {profile?.role === 'admin' && (
+        <div className="flex justify-end">
+          <button type="button" className="btn-outline" onClick={openEdit}>
+            <Pencil size={16} /> {t('editMovement')}
+          </button>
+        </div>
+      )}
+
+      {editOpen && profile?.role === 'admin' && (
+        <div className="card space-y-4">
+          <h3 className="font-bold">{t('editMovement')}</h3>
+          {editError && <Alert type="error">{editError}</Alert>}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="space-y-1 text-sm">
+              <span>{t('equipmentNameLabel')}</span>
+              <AsyncSearchSelect
+                value={editEquipment?.value ?? ''}
+                selectedOption={editEquipment}
+                onChange={(_, option) => setEditEquipment(option)}
+                loadOptions={loadEquipment}
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span>{t('supervisorName')}</span>
+              <AsyncSearchSelect
+                value={editSupervisor?.value ?? ''}
+                selectedOption={editSupervisor}
+                onChange={(_, option) => setEditSupervisor(option)}
+                loadOptions={loadSupervisors}
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span>{t('movementDate')}</span>
+              <input
+                type="datetime-local"
+                value={editRecordedAt}
+                max={new Date().toISOString().slice(0, 16)}
+                onChange={(event) => setEditRecordedAt(event.target.value)}
+                className="h-8 w-full rounded-lg border bg-transparent px-3 text-base sm:text-sm"
+                style={{ borderColor: 'var(--border)' }}
+              />
+            </label>
+            {!isWorkshopMovement && (
+              <label className="space-y-1 text-sm">
+                <span>{t('contractorEquipmentCode')}</span>
+                <input
+                  value={editContractorCode}
+                  onChange={(event) =>
+                    setEditContractorCode(event.target.value)
+                  }
+                  className="h-8 w-full rounded-lg border bg-transparent px-3 text-base sm:text-sm"
+                  style={{ borderColor: 'var(--border)' }}
+                />
+              </label>
+            )}
+            {!isWorkshopMovement && (
+              <label className="space-y-1 text-sm">
+                <span>{t('company')}</span>
+                <AsyncSearchSelect
+                  value={editCompany?.value ?? ''}
+                  selectedOption={editCompany}
+                  onChange={(_, option) => setEditCompany(option)}
+                  loadOptions={loadCompanies}
+                />
+              </label>
+            )}
+            {!isWorkshopMovement && (
+              <label className="space-y-1 text-sm">
+                <span>{t('project')}</span>
+                <AsyncSearchSelect
+                  value={editProject?.value ?? ''}
+                  selectedOption={editProject}
+                  onChange={(_, option) => setEditProject(option)}
+                  loadOptions={loadProjects}
+                />
+              </label>
+            )}
+            {!isWorkshopMovement && !log.driver_id && (
+              <label className="space-y-1 text-sm">
+                <span>{t('driverName')}</span>
+                <AsyncSearchSelect
+                  value={editDriver?.value ?? ''}
+                  selectedOption={editDriver}
+                  onChange={(_, option) => setEditDriver(option)}
+                  loadOptions={loadDrivers}
+                />
+              </label>
+            )}
+          </div>
+          {!isWorkshopMovement && log.driver_id && (
+            <p className="text-xs text-muted">{t('existingDriverEditHint')}</p>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={editBusy}
+              onClick={saveEdit}
+            >
+              {editBusy ? t('loading') : t('saveChanges')}
+            </button>
+            <button
+              type="button"
+              className="btn-outline"
+              disabled={editBusy}
+              onClick={() => setEditOpen(false)}
+            >
+              {t('cancel')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Movement type banner */}
       <div

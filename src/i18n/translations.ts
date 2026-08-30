@@ -250,6 +250,13 @@ export const translations = {
     // Movement details
     movementDetails: 'تفاصيل الحركة',
     movementDetailsDesc: 'بيانات حركة الدخول أو الخروج',
+    editMovement: 'تعديل الحركة',
+    movementEditFailed:
+      'تعذر حفظ تعديلات الحركة. تحقق من البيانات وحاول مرة اخرى.',
+    movementEditSequenceError:
+      'لا يمكن حفظ التعديل لانه يجعل تسلسل حركات المعدة غير صحيح.',
+    existingDriverEditHint:
+      'السائق الموجود لا يعدل من هنا. استخدم ميزة تغيير السائق للحفاظ على سجل التغييرات.',
     movementNotFound: 'لم يتم العثور على الحركة',
     movementLoadError: 'تعذر تحميل بيانات الحركة',
     linkedEntry: 'الدخول المرتبط',
@@ -821,6 +828,13 @@ export const translations = {
     // Movement details
     movementDetails: 'Movement Details',
     movementDetailsDesc: 'Details of an entry or exit movement',
+    editMovement: 'Edit movement',
+    movementEditFailed:
+      'Could not save the movement changes. Check the data and try again.',
+    movementEditSequenceError:
+      'This change would make the equipment movement sequence invalid.',
+    existingDriverEditHint:
+      'An existing driver cannot be edited here. Use Change Driver to preserve the audit history.',
     movementNotFound: 'Movement not found',
     movementLoadError: 'Could not load the movement details',
     linkedEntry: 'Linked Entry',
