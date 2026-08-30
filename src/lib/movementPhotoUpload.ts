@@ -15,6 +15,13 @@ export interface MovementPhotoUploadResult {
 }
 
 const TUS_CHUNK_BYTES = 6 * 1024 * 1024
+const MAX_STANDARD_UPLOAD_BYTES = 6 * 1024 * 1024
+const MAX_TRANSFER_ATTEMPTS = 2
+const COMPLETE_RETRY_DELAYS = [0, 750, 1500]
+
+function wait(delay: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, delay))
+}
 
 function resumableUploadEndpoint() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -55,51 +62,108 @@ function uploadResumably(
   })
 }
 
+async function uploadDirectly(
+  file: File,
+  authorization: UploadAuthorization,
+): Promise<void> {
+  const { error } = await supabase.storage
+    .from('log-photos')
+    .uploadToSignedUrl(authorization.path, authorization.token, file, {
+      contentType: file.type,
+      upsert: false,
+    })
+  if (error) throw error
+}
+
+async function authorizeUpload(
+  movementId: string,
+  file: File,
+  accessToken: string,
+): Promise<UploadAuthorization | null> {
+  try {
+    const response = await fetch(`/api/movements/${movementId}/photos`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'authorize_upload',
+        fileName: file.name,
+        contentType: file.type,
+        size: file.size,
+      }),
+    })
+    if (!response.ok) return null
+    return (await response.json()) as UploadAuthorization
+  } catch {
+    return null
+  }
+}
+
+async function completeUpload(
+  movementId: string,
+  path: string,
+  accessToken: string,
+): Promise<boolean> {
+  for (const delay of COMPLETE_RETRY_DELAYS) {
+    if (delay) await wait(delay)
+    try {
+      const response = await fetch(`/api/movements/${movementId}/photos`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'complete_upload',
+          filePath: path,
+        }),
+      })
+      if (response.ok) return true
+      if (response.status < 500) return false
+    } catch {
+      // Retry transient network failures. Completion is idempotent server-side.
+    }
+  }
+  return false
+}
+
 export async function uploadMovementPhoto(
   movementId: string,
   file: File,
   accessToken: string,
 ): Promise<MovementPhotoUploadResult> {
-  const authorizeResponse = await fetch(`/api/movements/${movementId}/photos`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      action: 'authorize_upload',
-      fileName: file.name,
-      contentType: file.type,
-      size: file.size,
-    }),
-  })
-  if (!authorizeResponse.ok) {
-    return { success: false, error: 'photo_authorization_failed' }
+  let authorization: UploadAuthorization | null = null
+  for (let attempt = 0; attempt < MAX_TRANSFER_ATTEMPTS; attempt += 1) {
+    authorization = await authorizeUpload(movementId, file, accessToken)
+    if (!authorization) {
+      return { success: false, error: 'photo_authorization_failed' }
+    }
+
+    try {
+      if (file.size <= MAX_STANDARD_UPLOAD_BYTES) {
+        await uploadDirectly(file, authorization)
+      } else {
+        await uploadResumably(file, authorization, accessToken)
+      }
+      break
+    } catch (error) {
+      console.error(
+        'Photo transfer failed',
+        error instanceof Error ? error.message : 'unknown_error',
+      )
+      await supabase.storage.from('log-photos').remove([authorization.path])
+      authorization = null
+    }
   }
 
-  const authorization = (await authorizeResponse.json()) as UploadAuthorization
-  try {
-    await uploadResumably(file, authorization, accessToken)
-  } catch (error) {
-    console.error(
-      'Resumable photo upload failed',
-      error instanceof Error ? error.message : 'unknown_error',
-    )
+  if (!authorization)
     return { success: false, error: 'photo_transfer_failed' }
-  }
 
-  const completeResponse = await fetch(`/api/movements/${movementId}/photos`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      action: 'complete_upload',
-      filePath: authorization.path,
-    }),
-  })
-  if (completeResponse.ok) return { success: true }
+  if (await completeUpload(movementId, authorization.path, accessToken)) {
+    return { success: true }
+  }
 
   await supabase.storage.from('log-photos').remove([authorization.path])
   return { success: false, error: 'photo_link_failed' }
