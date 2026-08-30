@@ -181,8 +181,8 @@ export interface LastMovement {
 export interface MovementDriverChange {
   id: string
   entry_log_id: string
-  previous_driver_id: string
-  previous_driver_name: string
+  previous_driver_id: string | null
+  previous_driver_name: string | null
   new_driver_id: string
   new_driver_name: string
   changed_by: string
