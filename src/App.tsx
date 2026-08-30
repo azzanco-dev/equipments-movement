@@ -1,27 +1,13 @@
 'use client'
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { useEffect } from 'react'
 import { useAuth } from '@/auth/AuthContext'
 import { useI18n } from '@/i18n/I18nContext'
 import { FullPageSpinner } from '@/components/Spinner'
 import { Layout } from '@/components/Layout'
 import { AuthScreen } from '@/screens/AuthScreen'
-import { SupervisorDashboard } from '@/screens/SupervisorDashboard'
-import { AdminDashboard } from '@/screens/AdminDashboard'
-import { AdminEquipment } from '@/screens/AdminEquipment'
-import { EquipmentDetail } from '@/screens/EquipmentDetail'
-import { AdminProjects } from '@/screens/AdminProjects'
-import { AdminCompanies } from '@/screens/AdminCompanies'
-import { AdminLessors } from '@/screens/AdminLessors'
-import { AdminUsers } from '@/screens/AdminUsers'
-import { UserDetail } from '@/screens/UserDetail'
-import { AdminDrivers } from '@/screens/AdminDrivers'
-import { DriverDetail } from '@/screens/DriverDetail'
-import { MovementDetail } from '@/screens/MovementDetail'
-import { MovementCreate } from '@/screens/MovementCreate'
-import { AdminSettings } from '@/screens/AdminSettings'
-import { MovementImport } from '@/screens/MovementImport'
 import type { Equipment } from '@/lib/types'
 import {
   LayoutDashboard,
@@ -36,6 +22,88 @@ import {
   FileUp,
 } from 'lucide-react'
 import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog'
+
+const screenLoading = () => <FullPageSpinner />
+
+const SupervisorDashboard = dynamic(
+  () =>
+    import('@/screens/SupervisorDashboard').then(
+      (module) => module.SupervisorDashboard,
+    ),
+  { loading: screenLoading },
+)
+const AdminDashboard = dynamic(
+  () =>
+    import('@/screens/AdminDashboard').then(
+      (module) => module.AdminDashboard,
+    ),
+  { loading: screenLoading },
+)
+const AdminEquipment = dynamic(
+  () =>
+    import('@/screens/AdminEquipment').then(
+      (module) => module.AdminEquipment,
+    ),
+  { loading: screenLoading },
+)
+const EquipmentDetail = dynamic(
+  () =>
+    import('@/screens/EquipmentDetail').then(
+      (module) => module.EquipmentDetail,
+    ),
+  { loading: screenLoading },
+)
+const AdminProjects = dynamic(
+  () =>
+    import('@/screens/AdminProjects').then((module) => module.AdminProjects),
+  { loading: screenLoading },
+)
+const AdminCompanies = dynamic(
+  () =>
+    import('@/screens/AdminCompanies').then((module) => module.AdminCompanies),
+  { loading: screenLoading },
+)
+const AdminLessors = dynamic(
+  () =>
+    import('@/screens/AdminLessors').then((module) => module.AdminLessors),
+  { loading: screenLoading },
+)
+const AdminUsers = dynamic(
+  () => import('@/screens/AdminUsers').then((module) => module.AdminUsers),
+  { loading: screenLoading },
+)
+const UserDetail = dynamic(
+  () => import('@/screens/UserDetail').then((module) => module.UserDetail),
+  { loading: screenLoading },
+)
+const AdminDrivers = dynamic(
+  () => import('@/screens/AdminDrivers').then((module) => module.AdminDrivers),
+  { loading: screenLoading },
+)
+const DriverDetail = dynamic(
+  () => import('@/screens/DriverDetail').then((module) => module.DriverDetail),
+  { loading: screenLoading },
+)
+const MovementDetail = dynamic(
+  () =>
+    import('@/screens/MovementDetail').then((module) => module.MovementDetail),
+  { loading: screenLoading },
+)
+const MovementCreate = dynamic(
+  () =>
+    import('@/screens/MovementCreate').then((module) => module.MovementCreate),
+  { loading: screenLoading },
+)
+const AdminSettings = dynamic(
+  () =>
+    import('@/screens/AdminSettings').then((module) => module.AdminSettings),
+  { loading: screenLoading },
+)
+const MovementImport = dynamic(
+  () =>
+    import('@/screens/MovementImport').then((module) => module.MovementImport),
+  { loading: screenLoading },
+)
 
 const ADMIN_PAGES = new Set([
   'dashboard',
