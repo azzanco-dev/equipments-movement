@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
@@ -60,6 +60,20 @@ export function AdminDashboard({
   const [logs, setLogs] = useState<EntryExitLog[]>([])
   const [loadingLogs, setLoadingLogs] = useState(true)
   const [logsTotal, setLogsTotal] = useState(0)
+  const [supervisorOptions, setSupervisorOptions] = useState<
+    Array<{ value: string; label: string }>
+  >([])
+  const movementConfig = useMemo(
+    () => ({
+      ...movementsListConfig,
+      filterFields: movementsListConfig.filterFields.map((field) =>
+        field.key === 'supervisor_id'
+          ? { ...field, options: supervisorOptions }
+          : field,
+      ),
+    }),
+    [supervisorOptions],
+  )
   const list = useDataListState(movementsListConfig)
 
   // Reports
@@ -235,6 +249,31 @@ export function AdminDashboard({
   }, [fetchStats])
 
   useEffect(() => {
+    let active = true
+    const loadSupervisors = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id,full_name')
+        .order('full_name')
+      if (!active) return
+      if (error) {
+        console.error(error)
+        return
+      }
+      setSupervisorOptions(
+        (data ?? []).map((profile) => ({
+          value: profile.id,
+          label: profile.full_name,
+        })),
+      )
+    }
+    void loadSupervisors()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
     if (tab === 'logs') fetchLogs()
   }, [fetchLogs, tab])
   useEffect(() => {
@@ -337,7 +376,7 @@ export function AdminDashboard({
       {tab === 'logs' && (
         <div className="space-y-4">
           <DataListToolbar
-            config={movementsListConfig}
+            config={movementConfig}
             search={list.searchInput}
             onSearch={list.setSearchInput}
             sort={list.sort}

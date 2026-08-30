@@ -170,6 +170,13 @@ export const movementsListConfig: DataListConfig = {
         { value: 'exit', label: 'خروج' },
       ],
     },
+    {
+      key: 'supervisor_id',
+      label: 'المشرف',
+      type: 'select',
+      operators: ['eq', 'neq', 'in', 'not_in'],
+      options: [],
+    },
     { key: 'driver_name', label: 'السائق', type: 'text', operators: textOps },
     {
       key: 'recorded_at',
