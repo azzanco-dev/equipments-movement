@@ -7,7 +7,14 @@ import {
   Search,
   X,
 } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
+import { createPortal } from 'react-dom'
 import { Select } from '@/components/Select'
 import { FilterBuilder } from './FilterBuilder'
 import {
@@ -58,7 +65,39 @@ export function DataListToolbar({
   const [open, setOpen] = useState<'filters' | 'sort' | 'actions' | null>(null)
   const [draftFilters, setDraftFilters] = useState(filters)
   const toolbarRef = useRef<HTMLDivElement>(null)
+  const filterTriggerRef = useRef<HTMLButtonElement>(null)
+  const [filterPosition, setFilterPosition] = useState({
+    top: 0,
+    left: 12,
+    width: 320,
+    maxHeight: 320,
+    openAbove: false,
+  })
   const currentSort = config.sortableFields.find((field) => field.key === sort)
+  const updateFilterPosition = useCallback(() => {
+    const rect = filterTriggerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const gap = 6
+    const padding = 12
+    const availableBelow = Math.max(
+      0,
+      window.innerHeight - rect.bottom - gap - padding,
+    )
+    const availableAbove = Math.max(0, rect.top - gap - padding)
+    const openAbove = availableBelow < 240 && availableAbove > availableBelow
+    const width = Math.min(560, window.innerWidth - padding * 2)
+    const left = Math.min(
+      Math.max(padding, rect.right - width),
+      window.innerWidth - width - padding,
+    )
+    setFilterPosition({
+      top: openAbove ? rect.top - gap : rect.bottom + gap,
+      left,
+      width,
+      maxHeight: openAbove ? availableAbove : availableBelow,
+      openAbove,
+    })
+  }, [])
   useEffect(() => {
     const close = (event: MouseEvent) => {
       const target = event.target as Element
@@ -73,8 +112,21 @@ export function DataListToolbar({
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [])
+  useEffect(() => {
+    if (open !== 'filters') return
+    updateFilterPosition()
+    window.addEventListener('resize', updateFilterPosition)
+    window.addEventListener('scroll', updateFilterPosition, true)
+    return () => {
+      window.removeEventListener('resize', updateFilterPosition)
+      window.removeEventListener('scroll', updateFilterPosition, true)
+    }
+  }, [open, updateFilterPosition])
   const toggle = (target: 'filters' | 'sort' | 'actions') => {
-    if (target === 'filters') setDraftFilters(filters)
+    if (target === 'filters') {
+      setDraftFilters(filters)
+      updateFilterPosition()
+    }
     setOpen((current) => (current === target ? null : target))
   }
   return (
@@ -95,6 +147,7 @@ export function DataListToolbar({
         <div className="flex items-center gap-2 sm:ms-auto">
           <div className="relative">
             <button
+              ref={filterTriggerRef}
               data-list-trigger="true"
               className="btn-outline"
               onClick={() => toggle('filters')}
@@ -108,54 +161,65 @@ export function DataListToolbar({
               )}
               <ChevronDown size={14} />
             </button>
-            {open === 'filters' && (
-              <div
-                data-list-popover="true"
-                className="absolute end-0 top-[calc(100%+6px)] z-40 w-[min(560px,calc(100vw-24px))] rounded-lg border p-3 shadow-xl"
-                style={{
-                  background: 'var(--bg)',
-                  borderColor: 'var(--border)',
-                }}
-              >
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-sm font-semibold">
-                    {t('filterResults')}
-                  </span>
-                  <button
-                    className="btn-ghost p-1"
-                    onClick={() => setOpen(null)}
-                  >
-                    <X size={15} />
-                  </button>
-                </div>
-                <FilterBuilder
-                  fields={config.filterFields}
-                  filters={draftFilters}
-                  onChange={setDraftFilters}
-                  compact
-                />
+            {open === 'filters' &&
+              createPortal(
                 <div
-                  className="mt-4 flex justify-end gap-2 border-t pt-3"
-                  style={{ borderColor: 'var(--border)' }}
+                  data-list-popover="true"
+                  className="fixed z-[100] flex flex-col rounded-lg border p-3 shadow-xl"
+                  dir={document.documentElement.dir || 'rtl'}
+                  style={{
+                    background: 'var(--bg)',
+                    borderColor: 'var(--border)',
+                    left: filterPosition.left,
+                    width: filterPosition.width,
+                    maxHeight: filterPosition.maxHeight,
+                    ...(filterPosition.openAbove
+                      ? { bottom: window.innerHeight - filterPosition.top }
+                      : { top: filterPosition.top }),
+                  }}
                 >
-                  <button
-                    className="btn-ghost"
-                    onClick={() => setDraftFilters([])}
+                  <div className="mb-3 flex shrink-0 items-center justify-between">
+                    <span className="text-sm font-semibold">
+                      {t('filterResults')}
+                    </span>
+                    <button
+                      className="btn-ghost p-1"
+                      onClick={() => setOpen(null)}
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                  <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto">
+                    <FilterBuilder
+                      fields={config.filterFields}
+                      filters={draftFilters}
+                      onChange={setDraftFilters}
+                      compact
+                    />
+                  </div>
+                  <div
+                    className="mt-3 flex shrink-0 justify-end gap-2 border-t pt-3"
+                    style={{ borderColor: 'var(--border)' }}
                   >
-                    {t('clear')}
-                  </button>
-                  <button
-                    className="btn-primary"
-                    onClick={() => {
-                      onFilters(draftFilters)
-                      setOpen(null)
-                    }}
-                  >
-                    {t('applyFilters')}
-                  </button>
-                </div>
-              </div>
-            )}
+                    <button
+                      className="btn-ghost"
+                      onClick={() => setDraftFilters([])}
+                    >
+                      {t('clear')}
+                    </button>
+                    <button
+                      className="btn-primary"
+                      onClick={() => {
+                        onFilters(draftFilters)
+                        setOpen(null)
+                      }}
+                    >
+                      {t('applyFilters')}
+                    </button>
+                  </div>
+                </div>,
+                document.body,
+              )}
           </div>
           <div className="relative">
             <button
