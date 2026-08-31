@@ -29,6 +29,26 @@ import { uploadMovementPhotos } from '@/lib/movementPhotoUpload'
 const FRONTEND_MAX_PHOTO_BYTES = 10 * 1024 * 1024
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_PHOTOS = 3
+const PHOTO_UPLOAD_TIMEOUT_MS = 60_000
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(
+      () => reject(new Error('photo_upload_timeout')),
+      timeoutMs,
+    )
+    promise.then(
+      (value) => {
+        window.clearTimeout(timeout)
+        resolve(value)
+      },
+      (error) => {
+        window.clearTimeout(timeout)
+        reject(error)
+      },
+    )
+  })
+}
 
 interface EntryExitFormProps {
   open: boolean
@@ -75,6 +95,7 @@ export function EntryExitForm({
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
   const [carouselIndex, setCarouselIndex] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [uploadingPhotos, setUploadingPhotos] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveWarning, setSaveWarning] = useState<string | null>(null)
   const [movementSaved, setMovementSaved] = useState(false)
@@ -148,6 +169,7 @@ export function EntryExitForm({
     setCarouselIndex(0)
     setSaveError(null)
     setSaveWarning(null)
+    setUploadingPhotos(false)
     setMovementSaved(false)
     setSavedMovementId('')
     setSelectedCompanyId('')
@@ -661,19 +683,31 @@ export function EntryExitForm({
       setSavedMovementId(result.id)
       let photoFailures = 0
       let photoFailureMessage: string | null = null
-      const uploadResults = await uploadMovementPhotos(
-        result.id,
-        photoFiles,
-        accessToken,
-        result.photoUploads,
-      )
-      for (const uploadResult of uploadResults) {
-        if (!uploadResult.success) {
-          photoFailures += 1
-          if (uploadResult.error && !photoFailureMessage) {
-            photoFailureMessage = t(uploadResult.error)
+      setUploadingPhotos(photoFiles.length > 0)
+      try {
+        const uploadResults = await withTimeout(
+          uploadMovementPhotos(
+            result.id,
+            photoFiles,
+            accessToken,
+            result.photoUploads,
+          ),
+          PHOTO_UPLOAD_TIMEOUT_MS,
+        )
+        for (const uploadResult of uploadResults) {
+          if (!uploadResult.success) {
+            photoFailures += 1
+            if (uploadResult.error && !photoFailureMessage) {
+              photoFailureMessage = t(uploadResult.error)
+            }
           }
         }
+      } catch (uploadError) {
+        console.error('Photo upload did not finish', uploadError)
+        photoFailures = photoFiles.length
+        photoFailureMessage = t('movementSavedPhotosFailed')
+      } finally {
+        setUploadingPhotos(false)
       }
       if (photoFailures) {
         setSaveWarning(photoFailureMessage ?? t('movementSavedPhotosFailed'))
@@ -1482,7 +1516,11 @@ export function EntryExitForm({
                     disabled={saving || !!validationError || loadingMovement}
                     className="btn-primary flex-1"
                   >
-                    {saving ? t('saving') : t('save')}
+                    {uploadingPhotos
+                      ? t('uploadingPhotos')
+                      : saving
+                        ? t('saving')
+                        : t('save')}
                   </button>
                 </div>
               ) : (

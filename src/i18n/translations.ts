@@ -499,6 +499,7 @@ export const translations = {
     // Common
     loading: 'جاري التحميل...',
     saving: 'جاري الحفظ...',
+    uploadingPhotos: 'جاري رفع الصور...',
     error: 'خطأ',
     saveFailed:
       'تعذر حفظ البيانات. يرجى التحقق من المدخلات والمحاولة مرة أخرى.',
@@ -1087,6 +1088,7 @@ export const translations = {
 
     loading: 'Loading...',
     saving: 'Saving...',
+    uploadingPhotos: 'Uploading photos...',
     error: 'Error',
     saveFailed: 'Could not save. Please check your entries and try again.',
     invalidPhotoType: 'Unsupported image type. Use JPEG, PNG or WebP.',
