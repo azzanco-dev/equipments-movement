@@ -9,6 +9,7 @@ import { Modal } from '@/components/Modal'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { formatDateTime } from '@/lib/dateFormat'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { Select } from '@/components/Select'
 
 type AuditAction = 'create' | 'update' | 'delete'
 
@@ -125,29 +126,29 @@ export function MovementActivity() {
             placeholder={t('searchActivity')}
           />
         </label>
-        <select
-          className="input sm:w-40"
+        <Select
+          className="sm:w-40"
           value={action}
-          onChange={(event) =>
-            replaceParams({ action: event.target.value, page: '' })
-          }
-        >
-          <option value="">{t('allActions')}</option>
-          <option value="create">{t('activityCreated')}</option>
-          <option value="update">{t('activityUpdated')}</option>
-          <option value="delete">{t('activityDeleted')}</option>
-        </select>
-        <select
-          className="input sm:w-40"
+          onChange={(value) => replaceParams({ action: value, page: '' })}
+          placeholder={t('allActions')}
+          options={[
+            { value: '', label: t('allActions') },
+            { value: 'create', label: t('activityCreated') },
+            { value: 'update', label: t('activityUpdated') },
+            { value: 'delete', label: t('activityDeleted') },
+          ]}
+        />
+        <Select
+          className="sm:w-40"
           value={context}
-          onChange={(event) =>
-            replaceParams({ context: event.target.value, page: '' })
-          }
-        >
-          <option value="">{t('allLocations')}</option>
-          <option value="site">{t('location')}</option>
-          <option value="workshop">{t('workshopLocation')}</option>
-        </select>
+          onChange={(value) => replaceParams({ context: value, page: '' })}
+          placeholder={t('allLocations')}
+          options={[
+            { value: '', label: t('allLocations') },
+            { value: 'site', label: t('location') },
+            { value: 'workshop', label: t('workshopLocation') },
+          ]}
+        />
       </div>
 
       {loading ? (
