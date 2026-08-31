@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { InlineSpinner } from '@/components/Spinner'
 import { exportLogsToExcel, exportVisitsToExcel } from '@/lib/excel'
 import { LogIn, LogOut, Truck, AlertCircle, Download } from 'lucide-react'
-import type { EntryExitLog, EquipmentVisit } from '@/lib/types'
+import type { EntryExitLog, Equipment, EquipmentVisit } from '@/lib/types'
 import { PageHeader } from '@/components/PageHeader'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
@@ -34,6 +34,19 @@ async function loadLatestDriverNames(entryIds: string[]) {
   return latest
 }
 
+type SummaryKey =
+  'today_entries' | 'today_exits' | 'active_equipment' | 'outside_equipment'
+
+interface EquipmentSummaryRow extends Pick<
+  Equipment,
+  'id' | 'code' | 'type' | 'plate_number' | 'operational_status' | 'is_active'
+> {
+  movement_type: 'entry' | 'exit' | null
+  movement_context: 'site' | 'workshop' | null
+  last_movement_at: string | null
+  last_movement_id: string | null
+}
+
 export function AdminDashboard({
   onSelectMovement,
   onCreateMovement,
@@ -46,6 +59,17 @@ export function AdminDashboard({
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const tab = searchParams.get('tab') === 'reports' ? 'reports' : 'logs'
+  const requestedSummary = searchParams.get('summary')
+  const selectedSummary: SummaryKey | null = [
+    'today_entries',
+    'today_exits',
+    'active_equipment',
+    'outside_equipment',
+  ].includes(requestedSummary ?? '')
+    ? (requestedSummary as SummaryKey)
+    : null
+  const summaryPage = Math.max(1, Number(searchParams.get('summary_page')) || 1)
+  const summaryRef = useRef<HTMLDivElement>(null)
 
   // Stats
   const [stats, setStats] = useState({
@@ -55,6 +79,12 @@ export function AdminDashboard({
     outsideEquipment: 0,
   })
   const [loadingStats, setLoadingStats] = useState(true)
+  const [summaryLogs, setSummaryLogs] = useState<EntryExitLog[]>([])
+  const [summaryEquipment, setSummaryEquipment] = useState<
+    EquipmentSummaryRow[]
+  >([])
+  const [summaryTotal, setSummaryTotal] = useState(0)
+  const [loadingSummary, setLoadingSummary] = useState(false)
 
   // Logs
   const [logs, setLogs] = useState<EntryExitLog[]>([])
@@ -91,6 +121,31 @@ export function AdminDashboard({
     else next.delete('tab')
     const query = next.toString()
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+  }
+
+  const setSummary = (summary: SummaryKey) => {
+    const next = new URLSearchParams(searchParams.toString())
+    if (selectedSummary === summary) {
+      next.delete('summary')
+      next.delete('summary_page')
+    } else {
+      next.set('summary', summary)
+      next.delete('summary_page')
+    }
+    const query = next.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    if (selectedSummary !== summary)
+      window.setTimeout(
+        () => summaryRef.current?.scrollIntoView({ behavior: 'smooth' }),
+        50,
+      )
+  }
+
+  const setSummaryPage = (page: number) => {
+    const next = new URLSearchParams(searchParams.toString())
+    if (page <= 1) next.delete('summary_page')
+    else next.set('summary_page', String(page))
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false })
   }
 
   const fetchStats = useCallback(async () => {
@@ -136,6 +191,71 @@ export function AdminDashboard({
     })
     setLoadingStats(false)
   }, [])
+
+  useEffect(() => {
+    if (!selectedSummary) {
+      setSummaryLogs([])
+      setSummaryEquipment([])
+      setSummaryTotal(0)
+      return
+    }
+    let active = true
+    const load = async () => {
+      setLoadingSummary(true)
+      const from = (summaryPage - 1) * 20
+      const to = from + 19
+      if (
+        selectedSummary === 'today_entries' ||
+        selectedSummary === 'today_exits'
+      ) {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const { data, count, error } = await supabase
+          .from('entry_exit_logs')
+          .select(
+            'id,equipment_id,supervisor_id,movement_type,movement_context,registration_method,driver_name,driver_id,notes,photo_url,company_id,project_id,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),project:projects(id,name_ar,name_en)',
+            { count: 'exact' },
+          )
+          .eq(
+            'movement_type',
+            selectedSummary === 'today_entries' ? 'entry' : 'exit',
+          )
+          .gte('recorded_at', today.toISOString())
+          .order('recorded_at', { ascending: false })
+          .order('id', { ascending: false })
+          .range(from, to)
+        if (error) console.error(error)
+        if (!active) return
+        setSummaryLogs((data as unknown as EntryExitLog[]) ?? [])
+        setSummaryEquipment([])
+        setSummaryTotal(count ?? 0)
+      } else {
+        let query = supabase
+          .from('equipment_current_state')
+          .select(
+            'id,code,type,plate_number,operational_status,is_active,movement_type,movement_context,last_movement_at,last_movement_id',
+            { count: 'exact' },
+          )
+          .order('code')
+          .range(from, to)
+        query =
+          selectedSummary === 'active_equipment'
+            ? query.eq('is_active', true)
+            : query.eq('movement_type', 'exit')
+        const { data, count, error } = await query
+        if (error) console.error(error)
+        if (!active) return
+        setSummaryEquipment((data as EquipmentSummaryRow[] | null) ?? [])
+        setSummaryLogs([])
+        setSummaryTotal(count ?? 0)
+      }
+      setLoadingSummary(false)
+    }
+    void load()
+    return () => {
+      active = false
+    }
+  }, [selectedSummary, summaryPage])
 
   const fetchLogs = useCallback(async () => {
     setLoadingLogs(true)
@@ -282,21 +402,25 @@ export function AdminDashboard({
 
   const statCards = [
     {
+      key: 'today_entries' as const,
       label: t('todayEntries'),
       value: stats.todayEntries,
       icon: <LogIn size={20} />,
     },
     {
+      key: 'today_exits' as const,
       label: t('todayExits'),
       value: stats.todayExits,
       icon: <LogOut size={20} />,
     },
     {
+      key: 'active_equipment' as const,
       label: t('activeEquipment'),
       value: stats.activeEquipment,
       icon: <Truck size={20} />,
     },
     {
+      key: 'outside_equipment' as const,
       label: t('equipmentOutside'),
       value: stats.outsideEquipment,
       icon: <AlertCircle size={20} />,
@@ -332,7 +456,15 @@ export function AdminDashboard({
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {statCards.map((stat) => (
-            <div key={stat.label} className="card">
+            <button
+              key={stat.key}
+              type="button"
+              aria-pressed={selectedSummary === stat.key}
+              onClick={() => setSummary(stat.key)}
+              className={`card text-start transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50 ${
+                selectedSummary === stat.key ? 'ring-2 ring-current' : ''
+              }`}
+            >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-muted font-medium">
                   {stat.label}
@@ -340,8 +472,128 @@ export function AdminDashboard({
                 <span className="text-muted">{stat.icon}</span>
               </div>
               <p className="text-2xl font-bold">{stat.value}</p>
-            </div>
+            </button>
           ))}
+        </div>
+      )}
+
+      {selectedSummary && (
+        <div ref={summaryRef} className="space-y-3 scroll-mt-20">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold">
+              {statCards.find((item) => item.key === selectedSummary)?.label}
+            </h2>
+            <button
+              className="btn-ghost"
+              onClick={() => setSummary(selectedSummary)}
+            >
+              {t('close')}
+            </button>
+          </div>
+          {loadingSummary ? (
+            <InlineSpinner label={t('loading')} />
+          ) : summaryLogs.length === 0 && summaryEquipment.length === 0 ? (
+            <div className="card py-10 text-center text-sm text-muted">
+              {t('noResults')}
+            </div>
+          ) : (
+            <div className="card overflow-hidden p-0">
+              <div className="overflow-x-auto">
+                <table className="compact-table w-full text-sm">
+                  <thead>
+                    <tr
+                      className="border-b"
+                      style={{ borderColor: 'var(--border)' }}
+                    >
+                      <th className="table-header px-4 py-3 text-start">
+                        {t('equipmentCodeLabel')}
+                      </th>
+                      <th className="table-header px-4 py-3 text-start">
+                        {t('equipmentNameLabel')}
+                      </th>
+                      <th className="table-header px-4 py-3 text-start">
+                        {t('plateNumber')}
+                      </th>
+                      <th className="table-header px-4 py-3 text-start">
+                        {summaryLogs.length
+                          ? t('movementType')
+                          : t('currentStatus')}
+                      </th>
+                      <th className="table-header px-4 py-3 text-start">
+                        {t('recordedAt')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summaryLogs.map((log) => (
+                      <tr
+                        key={log.id}
+                        className="cursor-pointer border-b last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                        style={{ borderColor: 'var(--border)' }}
+                        onClick={() => onSelectMovement?.(log.id)}
+                      >
+                        <td className="px-4 py-3 font-medium">
+                          {log.equipment?.code ?? '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          {log.equipment?.type ?? '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          {log.equipment?.plate_number ?? '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`badge border ${log.movement_type === 'entry' ? 'status-entry' : 'status-exit'}`}
+                          >
+                            {log.movement_type === 'entry'
+                              ? t('entry')
+                              : t('exit')}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted">
+                          {formatDate(log.recorded_at)}
+                        </td>
+                      </tr>
+                    ))}
+                    {summaryEquipment.map((equipment) => (
+                      <tr
+                        key={equipment.id}
+                        className="cursor-pointer border-b last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                        style={{ borderColor: 'var(--border)' }}
+                        onClick={() =>
+                          router.push(`/equipment/${equipment.id}`)
+                        }
+                      >
+                        <td className="px-4 py-3 font-medium">
+                          {equipment.code}
+                        </td>
+                        <td className="px-4 py-3">{equipment.type}</td>
+                        <td className="px-4 py-3">
+                          {equipment.plate_number ?? '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          {selectedSummary === 'outside_equipment'
+                            ? t('equipmentOutside')
+                            : t(equipment.operational_status)}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-muted">
+                          {equipment.last_movement_at
+                            ? formatDate(equipment.last_movement_at)
+                            : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          <DataListPagination
+            page={summaryPage}
+            pageSize={20}
+            total={summaryTotal}
+            onPage={setSummaryPage}
+          />
         </div>
       )}
 
