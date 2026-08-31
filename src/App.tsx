@@ -149,6 +149,38 @@ function AppContent() {
   const openMovement = (id: string) => router.push(`/movements/${id}`)
   const backToDashboard = () => router.push('/dashboard')
 
+  if (profile.role === 'monitor') {
+    const monitorPage = page === 'logs' ? 'logs' : 'dashboard'
+    const monitorNavItems = [
+      {
+        key: 'dashboard',
+        label: t('dashboard'),
+        icon: <LayoutDashboard size={18} />,
+      },
+      { key: 'logs', label: t('logs'), icon: <FileText size={18} /> },
+    ]
+    return (
+      <>
+        <Layout
+          activePage={monitorPage}
+          onNavigate={(target) => router.push(`/${target}`)}
+          navItems={monitorNavItems}
+        >
+          {movementId && movementId !== 'new' ? (
+            <MovementDetail
+              movementId={movementId}
+              onBack={() => router.back()}
+              onNavigateMovement={openMovement}
+            />
+          ) : (
+            <AdminDashboard onSelectMovement={openMovement} />
+          )}
+        </Layout>
+        {passwordDialog}
+      </>
+    )
+  }
+
   if (
     profile.role === 'supervisor' ||
     profile.role === 'workshop' ||

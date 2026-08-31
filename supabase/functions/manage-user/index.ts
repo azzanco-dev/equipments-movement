@@ -121,6 +121,7 @@ Deno.serve(async (req: Request) => {
           'workshop',
           'assistant_workshop_manager',
           'workshop_manager',
+          'monitor',
         ].includes(role)
       )
         return json({ error: 'Invalid role' }, 400)

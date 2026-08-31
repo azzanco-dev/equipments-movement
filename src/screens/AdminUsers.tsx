@@ -81,7 +81,9 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
           ? t('assistantWorkshopManager')
           : value === 'workshop_manager'
             ? t('workshopManager')
-            : t('supervisor')
+            : value === 'monitor'
+              ? t('monitoring')
+              : t('supervisor')
   const roleOptions = [
     { value: 'supervisor', label: t('supervisor') },
     { value: 'workshop', label: t('workshopOfficer') },
@@ -90,6 +92,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
       label: t('assistantWorkshopManager'),
     },
     { value: 'workshop_manager', label: t('workshopManager') },
+    { value: 'monitor', label: t('monitoring') },
     { value: 'admin', label: t('admin') },
   ]
 

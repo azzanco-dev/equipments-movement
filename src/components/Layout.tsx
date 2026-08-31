@@ -57,7 +57,9 @@ export function Layout({
           ? t('assistantWorkshopManager')
           : profile?.role === 'workshop_manager'
             ? t('workshopManager')
-            : t('supervisor')
+            : profile?.role === 'monitor'
+              ? t('monitoring')
+              : t('supervisor')
 
   return (
     <div
@@ -66,7 +68,11 @@ export function Layout({
     >
       {/* Top bar */}
       {pendingPage && (
-        <div className="fixed inset-x-0 top-0 z-[70] h-0.5 overflow-hidden" role="status" aria-label={t('loading')}>
+        <div
+          className="fixed inset-x-0 top-0 z-[70] h-0.5 overflow-hidden"
+          role="status"
+          aria-label={t('loading')}
+        >
           <div className="h-full w-1/3 animate-nav-progress bg-[var(--primary)]" />
         </div>
       )}

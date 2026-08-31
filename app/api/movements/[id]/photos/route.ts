@@ -23,7 +23,13 @@ async function authenticate(request: Request) {
   const token = header.slice(7)
   const supabase = clientFor(token)
   const { data, error } = await supabase.auth.getUser(token)
-  return error || !data.user ? null : { supabase, user: data.user }
+  if (error || !data.user) return null
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', data.user.id)
+    .maybeSingle()
+  return profile ? { supabase, user: data.user, role: profile.role } : null
 }
 
 export async function POST(
@@ -33,6 +39,8 @@ export async function POST(
   const auth = await authenticate(request)
   if (!auth)
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  if (auth.role === 'monitor')
+    return NextResponse.json({ error: 'access_denied' }, { status: 403 })
   const { id } = await context.params
   const { data: movement } = await auth.supabase
     .from('entry_exit_logs')
@@ -84,13 +92,11 @@ export async function POST(
       const uploads = []
       for (const file of files) {
         const safeName =
-          file.fileName!.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) ||
-          'photo'
+          file.fileName!.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) || 'photo'
         const path = `${auth.user.id}/${id}/${crypto.randomUUID()}-${safeName}`
-        const { data: signed, error: signedError } =
-          await auth.supabase.storage
-            .from('log-photos')
-            .createSignedUploadUrl(path)
+        const { data: signed, error: signedError } = await auth.supabase.storage
+          .from('log-photos')
+          .createSignedUploadUrl(path)
         if (signedError || !signed?.token) {
           return NextResponse.json(
             { error: 'photo_upload_failed' },
@@ -281,6 +287,8 @@ export async function DELETE(
   const auth = await authenticate(request)
   if (!auth)
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  if (auth.role === 'monitor')
+    return NextResponse.json({ error: 'access_denied' }, { status: 403 })
   const { id } = await context.params
   const body = (await request.json().catch(() => null)) as {
     photoId?: string

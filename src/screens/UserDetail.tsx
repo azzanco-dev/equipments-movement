@@ -60,6 +60,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       label: t('assistantWorkshopManager'),
     },
     { value: 'workshop_manager', label: t('workshopManager') },
+    { value: 'monitor', label: t('monitoring') },
     { value: 'admin', label: t('admin') },
   ]
 

@@ -4,6 +4,7 @@ export type UserRole =
   | 'workshop'
   | 'assistant_workshop_manager'
   | 'workshop_manager'
+  | 'monitor'
 
 export type OperationalStatus = 'operational' | 'maintenance' | 'stopped'
 export type OwnershipStatus =

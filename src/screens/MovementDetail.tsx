@@ -826,6 +826,7 @@ export function MovementDetail({
             </>
           )}
           {(profile?.role === 'admin' ||
+            profile?.role === 'monitor' ||
             (['workshop_manager', 'assistant_workshop_manager'].includes(
               profile?.role ?? '',
             ) &&
@@ -906,17 +907,20 @@ export function MovementDetail({
               >
                 <Maximize2 size={16} />
               </button>
-              {(photoItems[photoCarouselIndex]?.uploaded_by === user?.id ||
-                profile?.role === 'admin') && (
-                <button
-                  type="button"
-                  disabled={photoBusy}
-                  onClick={() => deletePhoto(photoItems[photoCarouselIndex].id)}
-                  className="absolute top-1 start-1 rounded-full bg-red-600/80 p-1.5 text-white hover:bg-red-700"
-                >
-                  <Trash2 size={16} />
-                </button>
-              )}
+              {profile?.role !== 'monitor' &&
+                (photoItems[photoCarouselIndex]?.uploaded_by === user?.id ||
+                  profile?.role === 'admin') && (
+                  <button
+                    type="button"
+                    disabled={photoBusy}
+                    onClick={() =>
+                      deletePhoto(photoItems[photoCarouselIndex].id)
+                    }
+                    className="absolute top-1 start-1 rounded-full bg-red-600/80 p-1.5 text-white hover:bg-red-700"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               {photoUrls.length > 1 && (
                 <>
                   <button
@@ -978,7 +982,7 @@ export function MovementDetail({
           ) : (
             <p className="text-sm text-muted italic">{t('noPhoto')}</p>
           )}
-          {photoItems.length < 3 && (
+          {profile?.role !== 'monitor' && photoItems.length < 3 && (
             <label
               className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
               style={{ borderColor: 'var(--border)' }}
@@ -1013,15 +1017,18 @@ export function MovementDetail({
                   '—'}
               </p>
             </div>
-            {isEntry && !linkedLog && profile?.role !== 'workshop' && (
-              <button
-                className="btn-outline"
-                onClick={() => setDriverChangeOpen((value) => !value)}
-              >
-                <RefreshCw size={16} />
-                {t('changeDriver')}
-              </button>
-            )}
+            {isEntry &&
+              !linkedLog &&
+              profile?.role !== 'workshop' &&
+              profile?.role !== 'monitor' && (
+                <button
+                  className="btn-outline"
+                  onClick={() => setDriverChangeOpen((value) => !value)}
+                >
+                  <RefreshCw size={16} />
+                  {t('changeDriver')}
+                </button>
+              )}
           </div>
           {driverChangeOpen && (
             <div

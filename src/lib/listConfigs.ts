@@ -209,6 +209,7 @@ export const usersListConfig: DataListConfig = {
         { value: 'workshop', label: 'مسؤول حركة الورشة' },
         { value: 'assistant_workshop_manager', label: 'مساعد مدير الورشة' },
         { value: 'workshop_manager', label: 'مدير الورشة' },
+        { value: 'monitor', label: 'متابعة' },
       ],
     },
   ],
