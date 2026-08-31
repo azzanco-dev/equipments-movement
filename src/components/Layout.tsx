@@ -65,7 +65,7 @@ export function Layout({
       style={{ background: 'var(--bg)', color: 'var(--fg)' }}
     >
       {/* Top bar */}
-      {pendingPage && (pendingPage === 'dashboard' || pendingPage === 'logs') && (
+      {pendingPage && (
         <div className="fixed inset-x-0 top-0 z-[70] h-0.5 overflow-hidden" role="status" aria-label={t('loading')}>
           <div className="h-full w-1/3 animate-nav-progress bg-[var(--primary)]" />
         </div>
@@ -220,7 +220,7 @@ export function Layout({
                 disabled={Boolean(pendingPage) || activePage === item.key}
                 onClick={() => {
                   if (pendingPage || activePage === item.key) return
-                  if (item.key === 'dashboard' || item.key === 'logs') setPendingPage(item.key)
+                  setPendingPage(item.key)
                   onNavigate(item.key)
                 }}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
@@ -252,7 +252,7 @@ export function Layout({
                     key={item.key}
                     onClick={() => {
                       if (pendingPage || activePage === item.key) return
-                      if (item.key === 'dashboard' || item.key === 'logs') setPendingPage(item.key)
+                      setPendingPage(item.key)
                       onNavigate(item.key)
                       setMobileOpen(false)
                     }}
