@@ -154,31 +154,57 @@ export function AdminDashboard({
     today.setHours(0, 0, 0, 0)
     const todayStr = today.toISOString()
 
-    // Today's entries
-    const { count: todayEntries } = await supabase
-      .from('entry_exit_logs')
-      .select('id', { count: 'exact', head: true })
-      .eq('movement_type', 'entry')
-      .gte('recorded_at', todayStr)
+    const [
+      { count: todayEntries },
+      { count: todayExits },
+      { count: activeCount },
+      { count: outsideCount },
+    ] = await Promise.all([
+      supabase
+        .from('entry_exit_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('movement_type', 'entry')
+        .gte('recorded_at', todayStr),
+      supabase
+        .from('entry_exit_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('movement_type', 'exit')
+        .gte('recorded_at', todayStr),
+      supabase
+        .from('equipment')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true),
+      supabase
+        .from('equipment_current_state')
+        .select('id', { count: 'exact', head: true })
+        .or('movement_type.eq.exit,movement_type.is.null'),
+    ])
 
-    // Today's exits
-    const { count: todayExits } = await supabase
-      .from('entry_exit_logs')
-      .select('id', { count: 'exact', head: true })
-      .eq('movement_type', 'exit')
-      .gte('recorded_at', todayStr)
+    // // Today's entries
+    // const { count: todayEntries } = await supabase
+    //   .from('entry_exit_logs')
+    //   .select('id', { count: 'exact', head: true })
+    //   .eq('movement_type', 'entry')
+    //   .gte('recorded_at', todayStr)
 
-    // Active equipment count
-    const { count: activeCount } = await supabase
-      .from('equipment')
-      .select('id', { count: 'exact', head: true })
-      .eq('is_active', true)
+    // // Today's exits
+    // const { count: todayExits } = await supabase
+    //   .from('entry_exit_logs')
+    //   .select('id', { count: 'exact', head: true })
+    //   .eq('movement_type', 'exit')
+    //   .gte('recorded_at', todayStr)
 
-    // Outside means the last movement is EXIT, or no movement exists yet.
-    const { count: outsideCount } = await supabase
-      .from('equipment_current_state')
-      .select('id', { count: 'exact', head: true })
-      .or('movement_type.eq.exit,movement_type.is.null')
+    // // Active equipment count
+    // const { count: activeCount } = await supabase
+    //   .from('equipment')
+    //   .select('id', { count: 'exact', head: true })
+    //   .eq('is_active', true)
+
+    // // Outside means the last movement is EXIT, or no movement exists yet.
+    // const { count: outsideCount } = await supabase
+    //   .from('equipment_current_state')
+    //   .select('id', { count: 'exact', head: true })
+    //   .or('movement_type.eq.exit,movement_type.is.null')
 
     setStats({
       todayEntries: todayEntries ?? 0,
