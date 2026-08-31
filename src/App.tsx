@@ -123,7 +123,7 @@ const ADMIN_PAGES = new Set([
 ])
 
 function AppContent() {
-  const { profile, loading } = useAuth()
+  const { profile, session, loading, profileLoadError, retryProfile } = useAuth()
   const { t } = useI18n()
   const router = useRouter()
   const pathname = usePathname()
@@ -142,6 +142,17 @@ function AppContent() {
   }, [pathname])
 
   if (loading) return <FullPageSpinner />
+  if (session && profileLoadError)
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center p-4">
+        <div className="card w-full max-w-md space-y-4 text-center">
+          <p>{t('profileLoadError')}</p>
+          <button className="btn-primary mx-auto" onClick={retryProfile}>
+            {t('retry')}
+          </button>
+        </div>
+      </div>
+    )
   if (!profile) return <AuthScreen />
 
   const passwordDialog = <FirstLoginPasswordDialog />

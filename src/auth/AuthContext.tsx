@@ -16,6 +16,8 @@ interface AuthContextValue {
   user: User | null
   profile: Profile | null
   loading: boolean
+  profileLoadError: boolean
+  retryProfile: () => Promise<void>
   refreshProfile: () => Promise<void>
   signIn: (
     email: string,
@@ -50,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [profileLoadError, setProfileLoadError] = useState(false)
   const currentUserIdRef = useRef<string | null>(null)
 
   const fetchProfile = useCallback(async (userId: string) => {
@@ -59,8 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('id', userId)
       .maybeSingle()
     if (error) {
-      console.error('Error fetching profile:', error)
-      return null
+      console.error('Error fetching profile:', error.code)
+      throw error
     }
     return data as Profile | null
   }, [])
@@ -69,14 +72,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true
 
     const applySession = async (session: Session | null) => {
-      const nextProfile = session?.user
-        ? await fetchProfile(session.user.id)
-        : null
+      let nextProfile: Profile | null = null
+      try {
+        nextProfile = session?.user ? await fetchProfile(session.user.id) : null
+      } catch {
+        if (!active) return
+        currentUserIdRef.current = session?.user.id ?? null
+        setSession(session)
+        setUser(session?.user ?? null)
+        setProfileLoadError(Boolean(session))
+        setLoading(false)
+        return
+      }
       if (!active) return
       currentUserIdRef.current = session?.user.id ?? null
       setSession(session)
       setUser(session?.user ?? null)
       setProfile(nextProfile)
+      setProfileLoadError(false)
       setLoading(false)
     }
 
@@ -119,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(data.session)
         setUser(data.user)
         setProfile(nextProfile)
+        setProfileLoadError(false)
         setLoading(false)
         return { error: null }
       } catch {
@@ -135,8 +149,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = useCallback(async () => {
     if (!user) return
-    setProfile(await fetchProfile(user.id))
+    try {
+      setProfile(await fetchProfile(user.id))
+      setProfileLoadError(false)
+    } catch {
+      setProfileLoadError(true)
+    }
   }, [fetchProfile, user])
+
+  const retryProfile = useCallback(async () => {
+    if (!user) return
+    setLoading(true)
+    await refreshProfile()
+    setLoading(false)
+  }, [refreshProfile, user])
 
   return (
     <AuthContext.Provider
@@ -145,6 +171,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         profile,
         loading,
+        profileLoadError,
+        retryProfile,
         signIn,
         signOut,
         refreshProfile,

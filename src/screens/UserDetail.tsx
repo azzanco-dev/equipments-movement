@@ -9,6 +9,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import { localizedName } from '@/lib/localizedName'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
+import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
 import type { Profile, UserRole } from '@/lib/types'
 
 interface UserDetailProps {
@@ -64,26 +65,24 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     { value: 'admin', label: t('admin') },
   ]
 
-  const callManageUser = useCallback(async (body: Record<string, unknown>) => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-    if (!session) throw new Error('Not authenticated')
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/manage-user`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(body),
-      },
-    )
-    const result = await response.json()
-    if (!response.ok) throw new Error('request failed')
-    return result
-  }, [])
+  const callManageUser = useCallback(
+    (body: Record<string, unknown>) =>
+      callEdgeFunction<{ user: Profile }>('manage-user', body),
+    [],
+  )
+
+  const errorMessage = useCallback(
+    (cause: unknown) => {
+      if (!(cause instanceof EdgeFunctionError)) return t('userUpdateError')
+      if (cause.code === 'network') return t('networkConnectionError')
+      if (cause.code === 'sessionExpired') return t('sessionExpiredError')
+      if (cause.code === 'forbidden') return t('userPermissionError')
+      if (cause.code === 'notFound') return t('userNotFound')
+      if (cause.code === 'server') return t('serverTemporaryError')
+      return t('userUpdateError')
+    },
+    [t],
+  )
 
   useEffect(() => {
     let active = true
@@ -114,8 +113,8 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             assignedCompanies,
           ),
         )
-      } catch {
-        if (active) setError(t('userUpdateError'))
+      } catch (cause) {
+        if (active) setError(errorMessage(cause))
       } finally {
         if (active) setLoading(false)
       }
@@ -124,7 +123,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     return () => {
       active = false
     }
-  }, [callManageUser, lang, t, userId])
+  }, [callManageUser, errorMessage, lang, userId])
 
   useEffect(() => {
     if (!hasUnsavedChanges) return
@@ -203,8 +202,8 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
         formSnapshot(nextFullName, nextEmail, '', role, companies),
       )
       setError(null)
-    } catch {
-      setError(t('userUpdateError'))
+    } catch (cause) {
+      setError(errorMessage(cause))
     } finally {
       setSaving(false)
     }

@@ -4,6 +4,7 @@ import { PasswordInput } from '@/components/PasswordInput'
 import { Alert } from '@/components/Alert'
 import { useAuth } from '@/auth/AuthContext'
 import { useI18n } from '@/i18n/I18nContext'
+import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
 import { supabase } from '@/lib/supabase'
 
 export function FirstLoginPasswordDialog() {
@@ -30,18 +31,10 @@ export function FirstLoginPasswordDialog() {
 
     setSaving(true)
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/manage-user`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ action: 'change_own_password', password }),
-        },
-      )
-      if (!response.ok) throw new Error('change failed')
+      await callEdgeFunction('manage-user', {
+        action: 'change_own_password',
+        password,
+      })
       const email = session.user.email
       if (!email) throw new Error('missing email')
       const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -52,8 +45,17 @@ export function FirstLoginPasswordDialog() {
       await refreshProfile()
       setPassword('')
       setConfirmation('')
-    } catch {
-      setError(t('changePasswordError'))
+    } catch (cause) {
+      setError(
+        cause instanceof EdgeFunctionError && cause.code === 'network'
+          ? t('networkConnectionError')
+          : cause instanceof EdgeFunctionError &&
+              cause.code === 'sessionExpired'
+            ? t('sessionExpiredError')
+            : cause instanceof EdgeFunctionError && cause.code === 'server'
+              ? t('serverTemporaryError')
+              : t('changePasswordError'),
+      )
     } finally {
       setSaving(false)
     }

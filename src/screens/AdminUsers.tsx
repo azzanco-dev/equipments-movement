@@ -17,6 +17,7 @@ import { applyListFilters } from '@/lib/applyListFilters'
 import { usersListConfig } from '@/lib/listConfigs'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
+import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
 import type { Profile, UserRole } from '@/lib/types'
 
 interface AdminUsersProps {
@@ -121,37 +122,20 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     }
     setSaving(true)
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      if (!session) throw new Error('Not authenticated')
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-user`,
+      const result = await callEdgeFunction<{ user: { id: string } }>(
+        'create-user',
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            email: email.trim(),
-            password,
-            full_name: fullName.trim(),
-            role,
-          }),
+          email: email.trim(),
+          password,
+          full_name: fullName.trim(),
+          role,
         },
       )
-      const result = await response.json()
-      if (!response.ok) {
-        if (result.code === 'email_exists') throw new Error('email_exists')
-        if (result.code === 'invalid_email') throw new Error('invalid_email')
-        if (result.code === 'weak_password') throw new Error('weak_password')
-        throw new Error('create_failed')
-      }
       setModalOpen(false)
       onSelectUser(result.user.id)
     } catch (error) {
-      const code = error instanceof Error ? error.message : ''
+      const code =
+        error instanceof EdgeFunctionError ? error.serverCode : undefined
       setFormError(
         code === 'email_exists'
           ? t('userEmailExists')
@@ -159,7 +143,19 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
             ? t('invalidUserEmail')
             : code === 'weak_password'
               ? t('passwordMinLength')
-              : t('userCreateError'),
+              : error instanceof EdgeFunctionError &&
+                  error.code === 'network'
+                ? t('networkConnectionError')
+                : error instanceof EdgeFunctionError &&
+                    error.code === 'sessionExpired'
+                  ? t('sessionExpiredError')
+                  : error instanceof EdgeFunctionError &&
+                      error.code === 'forbidden'
+                    ? t('userPermissionError')
+                    : error instanceof EdgeFunctionError &&
+                        error.code === 'server'
+                      ? t('serverTemporaryError')
+                      : t('userCreateError'),
       )
     } finally {
       setSaving(false)
