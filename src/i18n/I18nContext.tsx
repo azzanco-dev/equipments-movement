@@ -26,11 +26,15 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue | null>(null)
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Language>(() => getLanguage())
+  // The layout is rendered in Arabic on the server, so the first client render
+  // must use the same language. Restore the browser preference after hydration.
+  const [lang, setLangState] = useState<Language>('ar')
 
   useEffect(() => {
-    applyLanguage(lang)
-  }, [lang])
+    const initialLanguage = getLanguage()
+    applyLanguage(initialLanguage)
+    setLangState(initialLanguage)
+  }, [])
 
   const setLang = useCallback((l: Language) => {
     setLangState(l)

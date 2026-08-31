@@ -32,23 +32,30 @@ function getInitialTheme(): Theme {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => getInitialTheme())
+  // Keep the server and the first client render identical. Browser preferences
+  // are applied after hydration because they are unavailable to the server.
+  const [theme, setThemeState] = useState<Theme>('light')
 
   useEffect(() => {
+    const initialTheme = getInitialTheme()
     const root = document.documentElement
-    if (theme === 'dark') {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
-    localStorage.setItem('theme', theme)
-  }, [theme])
+    root.classList.toggle('dark', initialTheme === 'dark')
+    setThemeState(initialTheme)
+  }, [])
 
-  const setTheme = useCallback((t: Theme) => setThemeState(t), [])
-  const toggleTheme = useCallback(
-    () => setThemeState((p) => (p === 'dark' ? 'light' : 'dark')),
-    [],
-  )
+  const setTheme = useCallback((nextTheme: Theme) => {
+    document.documentElement.classList.toggle('dark', nextTheme === 'dark')
+    localStorage.setItem('theme', nextTheme)
+    setThemeState(nextTheme)
+  }, [])
+  const toggleTheme = useCallback(() => {
+    setThemeState((previousTheme) => {
+      const nextTheme = previousTheme === 'dark' ? 'light' : 'dark'
+      document.documentElement.classList.toggle('dark', nextTheme === 'dark')
+      localStorage.setItem('theme', nextTheme)
+      return nextTheme
+    })
+  }, [])
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
