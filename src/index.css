@@ -79,9 +79,28 @@
     U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
+/* Thmanyah Serif Display is reserved for headings. */
+@font-face {
+  font-family: 'Thmanyah Serif Display';
+  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-serif-display/woff2/thmanyah-serif-display-Medium.woff2')
+    format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Thmanyah Serif Display';
+  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-serif-display/woff2/thmanyah-serif-display-Bold.woff2')
+    format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --font-primary: 'Thmanyah', 'Manrope', 'Tajawal', system-ui, sans-serif;
   --font-latin: 'Manrope', 'Segoe UI', system-ui, sans-serif;
+  --font-heading: 'Thmanyah Serif Display', 'Thmanyah', 'Manrope', serif;
 }
 
 * {
@@ -95,6 +114,15 @@
 
 html[lang='en'] body {
   font-family: var(--font-latin);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
 }
 
 body {
