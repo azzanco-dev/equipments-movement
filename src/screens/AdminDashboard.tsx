@@ -174,20 +174,17 @@ export function AdminDashboard({
       .select('id', { count: 'exact', head: true })
       .eq('is_active', true)
 
-    // Equipment currently outside site (last movement was exit)
-    const { data: lastMovements } = await supabase.rpc(
-      'get_all_equipment_last_movement',
-    )
-    const outsideCount =
-      (lastMovements as { movement_type: string }[] | null)?.filter(
-        (m) => m.movement_type === 'exit',
-      ).length ?? 0
+    // Outside means the last movement is EXIT, or no movement exists yet.
+    const { count: outsideCount } = await supabase
+      .from('equipment_current_state')
+      .select('id', { count: 'exact', head: true })
+      .or('movement_type.eq.exit,movement_type.is.null')
 
     setStats({
       todayEntries: todayEntries ?? 0,
       todayExits: todayExits ?? 0,
       activeEquipment: activeCount ?? 0,
-      outsideEquipment: outsideCount,
+      outsideEquipment: outsideCount ?? 0,
     })
     setLoadingStats(false)
   }, [])
@@ -241,7 +238,7 @@ export function AdminDashboard({
         query =
           selectedSummary === 'active_equipment'
             ? query.eq('is_active', true)
-            : query.eq('movement_type', 'exit')
+            : query.or('movement_type.eq.exit,movement_type.is.null')
         const { data, count, error } = await query
         if (error) console.error(error)
         if (!active) return
@@ -462,7 +459,9 @@ export function AdminDashboard({
               aria-pressed={selectedSummary === stat.key}
               onClick={() => setSummary(stat.key)}
               className={`card text-start transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/50 ${
-                selectedSummary === stat.key ? 'ring-2 ring-current' : ''
+                selectedSummary === stat.key
+                  ? 'bg-gray-50 dark:bg-gray-800/50 border-gray-400 dark:border-gray-500'
+                  : ''
               }`}
             >
               <div className="flex items-center justify-between mb-2">
