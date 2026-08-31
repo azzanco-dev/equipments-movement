@@ -153,6 +153,17 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     [lang],
   )
 
+  const loadAllCompanies = useCallback(async (): Promise<SelectOption[]> => {
+    const { data } = await supabase
+      .from('companies')
+      .select('id,name_ar,name_en')
+      .order(lang === 'ar' ? 'name_ar' : 'name_en')
+    return (data ?? []).map((company) => ({
+      value: company.id,
+      label: localizedName(lang, company.name_ar, company.name_en),
+    }))
+  }, [lang])
+
   async function handleSave() {
     setError(null)
     if (!fullName.trim() || !email.trim()) {
@@ -289,6 +300,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
               value={companies}
               onChange={setCompanies}
               loadOptions={loadCompanies}
+              loadAllOptions={loadAllCompanies}
               placeholder={t('selectCompanies')}
             />
             <p className="mt-1 text-xs text-muted">

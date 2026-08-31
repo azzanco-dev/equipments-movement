@@ -10,6 +10,7 @@ interface AsyncMultiSelectProps {
   loadOptions: (query: string) => Promise<SelectOption[]>
   placeholder?: string
   disabled?: boolean
+  loadAllOptions?: () => Promise<SelectOption[]>
 }
 
 export function AsyncMultiSelect({
@@ -18,12 +19,14 @@ export function AsyncMultiSelect({
   loadOptions,
   placeholder = '—',
   disabled = false,
+  loadAllOptions,
 }: AsyncMultiSelectProps) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [options, setOptions] = useState<SelectOption[]>([])
   const [loading, setLoading] = useState(false)
+  const [selectingAll, setSelectingAll] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -101,6 +104,17 @@ export function AsyncMultiSelect({
         ? value.filter((item) => item.value !== option.value)
         : [...value, option],
     )
+  }
+
+  const selectAll = async () => {
+    if (!loadAllOptions) return
+    setSelectingAll(true)
+    try {
+      const all = await loadAllOptions()
+      onChange(all)
+    } finally {
+      setSelectingAll(false)
+    }
   }
 
   return (
@@ -221,6 +235,29 @@ export function AsyncMultiSelect({
                 })
               )}
             </div>
+            {loadAllOptions && (
+              <div
+                className="flex items-center gap-2 border-t p-2"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <button
+                  type="button"
+                  className="btn-ghost flex-1 justify-center text-xs"
+                  disabled={selectingAll}
+                  onClick={() => void selectAll()}
+                >
+                  {selectingAll ? t('loading') : t('selectAll')}
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost flex-1 justify-center text-xs"
+                  disabled={selectingAll || value.length === 0}
+                  onClick={() => onChange([])}
+                >
+                  {t('deselectAll')}
+                </button>
+              </div>
+            )}
           </div>,
           document.body,
         )}

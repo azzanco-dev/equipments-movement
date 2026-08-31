@@ -34,6 +34,7 @@ export function Layout({
   const [logoutOpen, setLogoutOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [pendingPage, setPendingPage] = useState<string | null>(null)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -44,6 +45,8 @@ export function Layout({
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [])
+
+  useEffect(() => setPendingPage(null), [activePage])
 
   const roleLabel =
     profile?.role === 'admin'
@@ -62,6 +65,11 @@ export function Layout({
       style={{ background: 'var(--bg)', color: 'var(--fg)' }}
     >
       {/* Top bar */}
+      {pendingPage && (pendingPage === 'dashboard' || pendingPage === 'logs') && (
+        <div className="fixed inset-x-0 top-0 z-[70] h-0.5 overflow-hidden" role="status" aria-label={t('loading')}>
+          <div className="h-full w-1/3 animate-nav-progress bg-[var(--primary)]" />
+        </div>
+      )}
       <header
         className="sticky top-0 z-40 border-b"
         style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}
@@ -76,7 +84,11 @@ export function Layout({
             </button>
             <button
               className="flex items-center gap-2 cursor-pointer"
-              onClick={() => onNavigate('dashboard')}
+              onClick={() => {
+                if (pendingPage || activePage === 'dashboard') return
+                setPendingPage('dashboard')
+                onNavigate('dashboard')
+              }}
             >
               <img
                 src="/azzanco-logo.png"
@@ -205,8 +217,13 @@ export function Layout({
             {navItems.map((item) => (
               <button
                 key={item.key}
-                onClick={() => onNavigate(item.key)}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                disabled={Boolean(pendingPage) || activePage === item.key}
+                onClick={() => {
+                  if (pendingPage || activePage === item.key) return
+                  if (item.key === 'dashboard' || item.key === 'logs') setPendingPage(item.key)
+                  onNavigate(item.key)
+                }}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
                   activePage === item.key
                     ? 'nav-active'
                     : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-fg'
@@ -234,10 +251,12 @@ export function Layout({
                   <button
                     key={item.key}
                     onClick={() => {
+                      if (pendingPage || activePage === item.key) return
+                      if (item.key === 'dashboard' || item.key === 'logs') setPendingPage(item.key)
                       onNavigate(item.key)
                       setMobileOpen(false)
                     }}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
                       activePage === item.key
                         ? 'nav-active'
                         : 'hover:bg-gray-100 dark:hover:bg-gray-800'
