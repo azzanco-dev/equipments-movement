@@ -922,7 +922,7 @@ export const translations = {
     allSupervisors: 'All Supervisors',
     exportExcel: 'Export Excel',
     visitReports: 'Visit Reports',
-    location: 'Location',
+    location: 'Site',
     workshopLocation: 'Workshop',
     visitDetails: 'Visit Details',
     entryNotes: 'Entry Notes',
