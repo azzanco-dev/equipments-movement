@@ -5,10 +5,12 @@ export function MovementCreate({
   movementType,
   onClose,
   onViewMovement,
+  onGoHome,
 }: {
   movementType: MovementType
   onClose: () => void
   onViewMovement: (id: string) => void
+  onGoHome: () => void
 }) {
   return (
     <EntryExitForm
@@ -18,6 +20,7 @@ export function MovementCreate({
       onClose={onClose}
       onSaved={() => undefined}
       onViewMovement={onViewMovement}
+      onGoHome={onGoHome}
     />
   )
 }

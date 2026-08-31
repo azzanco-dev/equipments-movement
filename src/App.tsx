@@ -199,6 +199,7 @@ function AppContent() {
               movementType={movementType}
               onClose={backToDashboard}
               onViewMovement={openMovement}
+              onGoHome={backToDashboard}
             />
           ) : movementId ? (
             <MovementDetail
@@ -252,6 +253,7 @@ function AppContent() {
             movementType={movementType}
             onClose={() => router.push('/logs')}
             onViewMovement={openMovement}
+            onGoHome={backToDashboard}
           />
         ) : movementId ? (
           <MovementDetail

@@ -37,6 +37,7 @@ interface EntryExitFormProps {
   onSaved: () => void
   pageMode?: boolean
   onViewMovement?: (id: string) => void
+  onGoHome?: () => void
 }
 
 function toLocalDateTimeInput(date: Date): string {
@@ -51,6 +52,7 @@ export function EntryExitForm({
   onSaved,
   pageMode = false,
   onViewMovement,
+  onGoHome,
 }: EntryExitFormProps) {
   const { t, lang } = useI18n()
   const { user, profile } = useAuth()
@@ -112,6 +114,7 @@ export function EntryExitForm({
   const [quickSaving, setQuickSaving] = useState(false)
   const equipmentListRef = useRef<HTMLDivElement>(null)
   const quickEquipmentRef = useRef<HTMLDivElement>(null)
+  const successRef = useRef<HTMLDivElement>(null)
 
   const isEntry = movementType === 'entry'
   const workshopMode =
@@ -186,6 +189,17 @@ export function EntryExitForm({
     })
     return () => window.cancelAnimationFrame(frame)
   }, [quickEquipment.open])
+
+  useEffect(() => {
+    if (!movementSaved) return
+    const frame = window.requestAnimationFrame(() => {
+      successRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'end',
+      })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [movementSaved])
 
   // Search equipment
   useEffect(() => {
@@ -645,7 +659,6 @@ export function EntryExitForm({
 
       onSaved()
       setSavedMovementId(result.id)
-      setMovementSaved(true)
       let photoFailures = 0
       let photoFailureMessage: string | null = null
       const uploadResults = await uploadMovementPhotos(
@@ -662,13 +675,11 @@ export function EntryExitForm({
           }
         }
       }
-      if (pageMode && onViewMovement) {
-        onViewMovement(result.id)
-        return
-      }
       if (photoFailures) {
         setSaveWarning(photoFailureMessage ?? t('movementSavedPhotosFailed'))
-      } else if (!pageMode) {
+      }
+      setMovementSaved(true)
+      if (!photoFailures && !pageMode) {
         onClose()
         reset()
       }
@@ -1453,39 +1464,55 @@ export function EntryExitForm({
               </div>
             </div>
 
-            {saveError && <Alert type="error">{saveError}</Alert>}
-            {saveWarning && <Alert type="warning">{saveWarning}</Alert>}
-            {movementSaved && (
-              <Alert type="success">{t('movementSavedSuccess')}</Alert>
-            )}
+            <div ref={successRef} className="space-y-3">
+              {saveError && <Alert type="error">{saveError}</Alert>}
+              {saveWarning && <Alert type="warning">{saveWarning}</Alert>}
+              {movementSaved && (
+                <Alert type="success">{t('movementSavedSuccess')}</Alert>
+              )}
 
-            {/* Actions */}
-            <div className="flex gap-3 pt-2">
-              <button onClick={onClose} className="btn-outline flex-1">
-                {t('cancel')}
-              </button>
+              {/* Actions */}
               {!movementSaved ? (
-                <button
-                  onClick={handleSave}
-                  disabled={saving || !!validationError || loadingMovement}
-                  className="btn-primary flex-1"
-                >
-                  {saving ? t('saving') : t('save')}
-                </button>
+                <div className="flex gap-3 pt-2">
+                  <button onClick={onClose} className="btn-outline flex-1">
+                    {t('cancel')}
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || !!validationError || loadingMovement}
+                    className="btn-primary flex-1"
+                  >
+                    {saving ? t('saving') : t('save')}
+                  </button>
+                </div>
               ) : (
-                <>
+                <div className="grid grid-cols-2 gap-3 pt-2">
                   {onViewMovement && (
                     <button
-                      className="btn-primary flex-1"
+                      className="btn-primary"
                       onClick={() => onViewMovement(savedMovementId)}
                     >
                       {t('viewMovement')}
                     </button>
                   )}
-                  <button className="btn-outline flex-1" onClick={reset}>
+                  <button
+                    className="btn-outline"
+                    onClick={() => {
+                      reset()
+                      window.scrollTo({ top: 0, behavior: 'smooth' })
+                    }}
+                  >
                     {t('registerAnotherMovement')}
                   </button>
-                </>
+                  {onGoHome && (
+                    <button
+                      className="btn-outline col-span-2"
+                      onClick={onGoHome}
+                    >
+                      {t('dashboard')}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
