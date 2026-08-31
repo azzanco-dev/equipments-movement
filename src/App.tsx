@@ -20,6 +20,7 @@ import {
   Contact,
   Settings,
   FileUp,
+  History,
 } from 'lucide-react'
 import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog'
 
@@ -34,16 +35,12 @@ const SupervisorDashboard = dynamic(
 )
 const AdminDashboard = dynamic(
   () =>
-    import('@/screens/AdminDashboard').then(
-      (module) => module.AdminDashboard,
-    ),
+    import('@/screens/AdminDashboard').then((module) => module.AdminDashboard),
   { loading: screenLoading },
 )
 const AdminEquipment = dynamic(
   () =>
-    import('@/screens/AdminEquipment').then(
-      (module) => module.AdminEquipment,
-    ),
+    import('@/screens/AdminEquipment').then((module) => module.AdminEquipment),
   { loading: screenLoading },
 )
 const EquipmentDetail = dynamic(
@@ -64,8 +61,7 @@ const AdminCompanies = dynamic(
   { loading: screenLoading },
 )
 const AdminLessors = dynamic(
-  () =>
-    import('@/screens/AdminLessors').then((module) => module.AdminLessors),
+  () => import('@/screens/AdminLessors').then((module) => module.AdminLessors),
   { loading: screenLoading },
 )
 const AdminUsers = dynamic(
@@ -104,6 +100,13 @@ const MovementImport = dynamic(
     import('@/screens/MovementImport').then((module) => module.MovementImport),
   { loading: screenLoading },
 )
+const MovementActivity = dynamic(
+  () =>
+    import('@/screens/MovementActivity').then(
+      (module) => module.MovementActivity,
+    ),
+  { loading: screenLoading },
+)
 
 const ADMIN_PAGES = new Set([
   'dashboard',
@@ -115,6 +118,7 @@ const ADMIN_PAGES = new Set([
   'drivers',
   'users',
   'movement-import',
+  'activity',
   'settings',
 ])
 
@@ -197,6 +201,7 @@ function AppContent() {
     { key: 'lessors', label: t('lessors'), icon: <Building2 size={18} /> },
     { key: 'drivers', label: t('drivers'), icon: <Contact size={18} /> },
     { key: 'users', label: t('users'), icon: <Users size={18} /> },
+    { key: 'activity', label: t('activityLog'), icon: <History size={18} /> },
     {
       key: 'movement-import',
       label: t('movementImport'),
@@ -275,6 +280,7 @@ function AppContent() {
               <AdminUsers onSelectUser={(id) => router.push(`/users/${id}`)} />
             )}
             {page === 'movement-import' && <MovementImport />}
+            {page === 'activity' && <MovementActivity />}
             {page === 'settings' && <AdminSettings />}
           </>
         )}
