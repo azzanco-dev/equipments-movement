@@ -58,6 +58,7 @@ const emptyForm = {
   code: '',
   type: '',
   plate_number: '',
+  numbering_status: 'numbered' as 'numbered' | 'unnumbered',
   operational_status: 'operational' as OperationalStatus,
   ownership_status: 'alazani' as OwnershipStatus,
   project_id: '',
@@ -225,6 +226,7 @@ export function AdminEquipment({
       code: eq.code,
       type: eq.type,
       plate_number: eq.plate_number ?? '',
+      numbering_status: eq.numbering_status ?? 'numbered',
       operational_status: eq.operational_status,
       ownership_status: eq.ownership_status,
       project_id: eq.project_id ?? '',
@@ -266,13 +268,21 @@ export function AdminEquipment({
   }, [lang])
 
   async function handleSave() {
+    if (form.numbering_status === 'numbered' && !form.plate_number) {
+      setFormError(t('plateRequired'))
+      return
+    }
     setSaving(true)
     setFormError(null)
     try {
       const payload = {
         code: form.code,
         type: form.type,
-        plate_number: form.plate_number || null,
+        plate_number:
+          form.numbering_status === 'numbered'
+            ? form.plate_number || null
+            : null,
+        numbering_status: form.numbering_status,
         operational_status: form.operational_status,
         ownership_status: form.ownership_status,
         project_id: form.project_id || null,
@@ -789,12 +799,50 @@ export function AdminEquipment({
             />
           </div>
           <div className="sm:col-span-2">
-            <label className="label">{t('plateNumber')}</label>
-            <PlateNumberInput
-              value={form.plate_number}
-              onChange={(value) => setForm({ ...form, plate_number: value })}
-            />
+            <label className="label">
+              {t('equipmentIdentificationType')} *
+            </label>
+            <div
+              className="flex gap-4 rounded-lg border p-3"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="equipment-identification-type"
+                  checked={form.numbering_status === 'numbered'}
+                  onChange={() =>
+                    setForm({ ...form, numbering_status: 'numbered' })
+                  }
+                />
+                {t('vehiclePlate')}
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="equipment-identification-type"
+                  checked={form.numbering_status === 'unnumbered'}
+                  onChange={() =>
+                    setForm({
+                      ...form,
+                      numbering_status: 'unnumbered',
+                      plate_number: '',
+                    })
+                  }
+                />
+                {t('customsCard')}
+              </label>
+            </div>
           </div>
+          {form.numbering_status === 'numbered' && (
+            <div className="sm:col-span-2">
+              <label className="label">{t('plateNumber')} *</label>
+              <PlateNumberInput
+                value={form.plate_number}
+                onChange={(value) => setForm({ ...form, plate_number: value })}
+              />
+            </div>
+          )}
           <div>
             <label className="label">{t('manufactureYear')}</label>
             <input
