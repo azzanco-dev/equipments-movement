@@ -699,7 +699,7 @@ export function AdminEquipment({
                       </div>
                     </td>
                     <td className="px-4 py-3 text-muted">{eq.type}</td>
-                    <td className="px-4 py-3 text-muted">
+                    <td className={`px-4 py-3 text-muted ${lang === 'ar' ? 'text-right' : 'text-left'}`} dir="ltr">
                       {eq.plate_number ?? '—'}
                     </td>
                     <td className="px-4 py-3 text-muted">

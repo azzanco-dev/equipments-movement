@@ -160,7 +160,7 @@ export function MovementDetail({
       const { data, error: fetchError } = await supabase
         .from('entry_exit_logs')
         .select(
-          '*, equipment:equipment(*), supervisor:profiles(*), driver:drivers(*)',
+          '*, equipment:equipment(*, lessor:lessors(name)), supervisor:profiles(*), driver:drivers(*)',
         )
         .eq('id', movementId)
         .maybeSingle()
@@ -798,7 +798,7 @@ export function MovementDetail({
               <InfoRow
                 icon={<FileText size={16} />}
                 label={t('contractorEquipmentCode')}
-                value={log.contractor_equipment_code}
+                value={log.contractor_equipment_code + ' - ' + (log.equipment?.lessor?.name || '')}
               />
               <InfoRow
                 icon={<Building2 size={16} />}
