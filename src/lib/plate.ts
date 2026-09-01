@@ -9,6 +9,7 @@ const ARABIC_LETTER_MAP: Record<string, string> = {
   ر: 'R',
   س: 'S',
   ص: 'X',
+  ف: 'F',
   ط: 'T',
   ع: 'E',
   ق: 'G',
@@ -48,7 +49,13 @@ export function convertArabicPlateText(value: string): string {
 
 export function normalizePlateNumber(value: string): string {
   const converted = convertArabicPlateText(value).toUpperCase()
-  const letters = converted.match(/[A-Z]/g)?.join('') ?? ''
+  const hasArabicLetters = /[ء-ي]/.test(value)
+  const hasEnglishLetters = /[A-Za-z]/.test(value)
+  const letterParts = converted.match(/[A-Z]/g) ?? []
+  const letters = (
+    hasArabicLetters && !hasEnglishLetters ? letterParts.reverse() : letterParts
+  ).join('')
   const numbers = converted.match(/[0-9]/g)?.join('') ?? ''
-  return [letters, numbers].filter(Boolean).join(' ')
+  if (letters && numbers) return `${numbers}-${letters}`
+  return numbers || letters
 }

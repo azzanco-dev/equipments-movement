@@ -397,6 +397,29 @@ export const translations = {
     // Import equipment
     importExcel: 'استيراد من Excel',
     importEquipment: 'استيراد معدات',
+    updateEquipmentExcel: 'تحديث المعدات عبر Excel',
+    exportEquipmentForUpdate: 'تصدير ملف التحديث',
+    uploadEquipmentUpdate: 'رفع ملف التحديث',
+    equipmentUpdateInstructions:
+      'تعديل بيانات المعدات: عدل القيم في ورقة Equipment ثم ارفع الملف للمعاينة.',
+    equipmentUpdateInstructionIds:
+      'لا تعدل عمودي record_id و record_version، فهما للمطابقة ومنع تعارض التحديثات.',
+    equipmentUpdateInstructionPlate:
+      'صيغة اللوحة المعتمدة 8888-FSA، ويتم توحيد الصيغ المقبولة تلقائيا.',
+    equipmentUpdateInstructionPreview:
+      'لن يتم حفظ اي تغيير حتى تراجع الفروقات وتعتمدها.',
+    invalidRecordId: 'معرف السجل غير صالح.',
+    invalidRecordVersion: 'نسخة السجل غير صالحة.',
+    recordChangedSinceExport: 'تم تعديل السجل بعد تصدير الملف.',
+    recordNotFound: 'السجل غير موجود.',
+    readyToUpdate: 'جاهز للتحديث',
+    unchangedRows: 'بدون تغيير',
+    conflictRows: 'متعارضة',
+    changedFields: 'الحقول المتغيرة',
+    applyEquipmentUpdates: 'اعتماد التحديثات',
+    equipmentUpdateSuccess: 'تم تحديث {count} معدة بنجاح.',
+    equipmentUpdatePartial: 'تم تحديث {success} وتعذر تحديث {fail}.',
+    exportFailed: 'تعذر تصدير الملف.',
     downloadTemplate: 'تحميل قالب Excel',
     selectFile: 'اختر ملف',
     dragDropFile: 'اسحب ملف Excel هنا أو اضغط للاختيار',
@@ -482,7 +505,8 @@ export const translations = {
     userPermissionError: 'ليس لديك صلاحية لتنفيذ هذا الاجراء',
     userNotFound: 'المستخدم غير موجود او تم حذفه',
     serverTemporaryError: 'حدث خطا مؤقت في الخادم. حاول مرة اخرى',
-    profileLoadError: 'تعذر تحميل بيانات حسابك. تحقق من الانترنت ثم حاول مرة اخرى',
+    profileLoadError:
+      'تعذر تحميل بيانات حسابك. تحقق من الانترنت ثم حاول مرة اخرى',
     retry: 'اعادة المحاولة',
     temporaryPassword: 'كلمة مرور مؤقتة جديدة',
     temporaryPasswordHelp: 'اتركها فارغة إذا لم ترغب في تغيير كلمة المرور.',
@@ -996,6 +1020,30 @@ export const translations = {
     // Import equipment
     importExcel: 'Import from Excel',
     importEquipment: 'Import Equipment',
+    updateEquipmentExcel: 'Update Equipment via Excel',
+    exportEquipmentForUpdate: 'Export Update Workbook',
+    uploadEquipmentUpdate: 'Upload Update Workbook',
+    equipmentUpdateInstructions:
+      'Edit equipment values in the Equipment sheet, then upload the workbook for preview.',
+    equipmentUpdateInstructionIds:
+      'Do not edit record_id or record_version; they match records and prevent update conflicts.',
+    equipmentUpdateInstructionPlate:
+      'The standard plate format is 8888-FSA; accepted input formats are normalized automatically.',
+    equipmentUpdateInstructionPreview:
+      'Nothing is saved until you review and approve the changes.',
+    invalidRecordId: 'Invalid record ID.',
+    invalidRecordVersion: 'Invalid record version.',
+    recordChangedSinceExport:
+      'This record changed after the workbook was exported.',
+    recordNotFound: 'Record not found.',
+    readyToUpdate: 'Ready to update',
+    unchangedRows: 'Unchanged',
+    conflictRows: 'Conflicts',
+    changedFields: 'Changed fields',
+    applyEquipmentUpdates: 'Apply updates',
+    equipmentUpdateSuccess: '{count} equipment records updated successfully.',
+    equipmentUpdatePartial: '{success} updated and {fail} failed.',
+    exportFailed: 'The workbook could not be exported.',
     downloadTemplate: 'Download Excel Template',
     selectFile: 'Select File',
     dragDropFile: 'Drag & drop Excel file here or click to browse',
@@ -1074,12 +1122,14 @@ export const translations = {
     userFieldsRequired: 'Name, email, and password are required.',
     userDetails: 'User Details',
     userUpdateError: 'Could not update user details',
-    networkConnectionError: 'Could not connect. Check your internet connection and try again.',
+    networkConnectionError:
+      'Could not connect. Check your internet connection and try again.',
     sessionExpiredError: 'Your session has expired. Sign in again.',
     userPermissionError: 'You do not have permission to perform this action.',
     userNotFound: 'The user was not found or has been deleted.',
     serverTemporaryError: 'A temporary server error occurred. Try again.',
-    profileLoadError: 'Could not load your account. Check your connection and try again.',
+    profileLoadError:
+      'Could not load your account. Check your connection and try again.',
     retry: 'Retry',
     temporaryPassword: 'New Temporary Password',
     temporaryPasswordHelp: 'Leave blank to keep the current password.',

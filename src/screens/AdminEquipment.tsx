@@ -48,6 +48,7 @@ import {
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import { localizedName } from '@/lib/localizedName'
 import { RelativeTime } from '@/components/RelativeTime'
+import { EquipmentExcelUpdate } from '@/components/EquipmentExcelUpdate'
 
 function genQrValue(): string {
   return `EQ-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
@@ -101,6 +102,7 @@ export function AdminEquipment({
   const [formError, setFormError] = useState<string | null>(null)
   const [qrModal, setQrModal] = useState<Equipment | null>(null)
   const [importModalOpen, setImportModalOpen] = useState(false)
+  const [updateExcelOpen, setUpdateExcelOpen] = useState(false)
   const [importData, setImportData] = useState<EquipmentImportRow[]>([])
   const [importError, setImportError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
@@ -128,7 +130,7 @@ export function AdminEquipment({
     let query = supabase
       .from('equipment')
       .select(
-        'id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,master_data_complete,numbering_status,created_at,updated_at,project:projects(id,name_ar,name_en),lessor:lessors(id,name)',
+        'id,code,type,plate_number,plate_digits,plate_letters_en,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,master_data_complete,numbering_status,created_at,updated_at,project:projects(id,name_ar,name_en),lessor:lessors(id,name)',
         { count: 'exact' },
       )
       .order(list.sort, { ascending: list.direction === 'asc' })
@@ -587,15 +589,23 @@ export function AdminEquipment({
         actions={
           <DataListActions
             menuActions={
-              <button
-                onClick={() => {
-                  resetImport()
-                  setImportModalOpen(true)
-                }}
-                className="btn-ghost"
-              >
-                <Upload size={16} /> {t('importExcel')}
-              </button>
+              <>
+                <button
+                  onClick={() => setUpdateExcelOpen(true)}
+                  className="btn-ghost"
+                >
+                  <FileSpreadsheet size={16} /> {t('updateEquipmentExcel')}
+                </button>
+                <button
+                  onClick={() => {
+                    resetImport()
+                    setImportModalOpen(true)
+                  }}
+                  className="btn-ghost"
+                >
+                  <Upload size={16} /> {t('importExcel')}
+                </button>
+              </>
             }
             primaryAction={
               <button onClick={openAdd} className="btn-primary">
@@ -1193,6 +1203,11 @@ export function AdminEquipment({
           </div>
         )}
       </Modal>
+      <EquipmentExcelUpdate
+        open={updateExcelOpen}
+        onClose={() => setUpdateExcelOpen(false)}
+        onUpdated={fetchEquipment}
+      />
     </div>
   )
 }

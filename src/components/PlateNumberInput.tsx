@@ -19,6 +19,7 @@ const ENGLISH_TO_ARABIC_LETTER: Record<string, string> = {
   R: 'ر',
   S: 'س',
   X: 'ص',
+  F: 'ف',
   T: 'ط',
   E: 'ع',
   G: 'ق',
@@ -58,6 +59,18 @@ function cleanLetters(value: string): string {
 
 function cleanNumbers(value: string): string {
   return value.replace(/[^0-9]/g, '').slice(0, 4)
+}
+
+function arabicLetters(value: string): string {
+  return value
+    .split('')
+    .map((letter) => ENGLISH_TO_ARABIC_LETTER[letter] ?? '')
+    .reverse()
+    .join(' ')
+}
+
+function arabicNumbers(value: string): string {
+  return value.replace(/[0-9]/g, (digit) => '٠١٢٣٤٥٦٧٨٩'[Number(digit)])
 }
 
 export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
@@ -109,35 +122,45 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
                 borderColor: 'color-mix(in srgb, var(--fg) 68%, transparent)',
               }}
             >
-              <input
-                aria-label="English plate letters"
-                dir="ltr"
-                value={parts.englishLetters}
-                onChange={(e) =>
-                  updatePart('englishLetters', cleanLetters(e.target.value))
-                }
-                placeholder="A B J"
-                className={cellClass}
-                inputMode="text"
-              />
+              <div className="w-full space-y-1 text-center">
+                <div className="min-h-5 text-lg" dir="rtl">
+                  {arabicLetters(parts.englishLetters) || 'ا س ف'}
+                </div>
+                <input
+                  aria-label="English plate letters"
+                  dir="ltr"
+                  value={parts.englishLetters}
+                  onChange={(e) =>
+                    updatePart('englishLetters', cleanLetters(e.target.value))
+                  }
+                  placeholder="F S A"
+                  className={cellClass}
+                  inputMode="text"
+                />
+              </div>
             </div>
             <div className="flex items-center justify-center p-2">
-              <input
-                aria-label="English plate numbers"
-                dir="ltr"
-                value={parts.englishNumbers}
-                onChange={(e) =>
-                  updatePart('englishNumbers', cleanNumbers(e.target.value))
-                }
-                placeholder="0 0 0 0"
-                className={cellClass}
-                inputMode="numeric"
-              />
+              <div className="w-full space-y-1 text-center">
+                <div className="min-h-5 text-lg" dir="ltr">
+                  {arabicNumbers(parts.englishNumbers) || '٨٨٨٨'}
+                </div>
+                <input
+                  aria-label="English plate numbers"
+                  dir="ltr"
+                  value={parts.englishNumbers}
+                  onChange={(e) =>
+                    updatePart('englishNumbers', cleanNumbers(e.target.value))
+                  }
+                  placeholder="8888"
+                  className={cellClass}
+                  inputMode="numeric"
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
-      <p className="text-xs text-muted">أدخل رقم اللوحة بنفس ترتيب لوحتك</p>
+      <p className="text-xs text-muted">الصيغة المعتمدة: 8888-FSA</p>
     </div>
   )
 }

@@ -8,6 +8,7 @@ import type {
   RegistrationType,
 } from '@/lib/types'
 import { formatDate } from '@/lib/dateFormat'
+import { normalizePlateNumber } from '@/lib/plate'
 
 export interface CompanyImportRow {
   name_ar: string
@@ -180,10 +181,17 @@ export function parseEquipmentExcel(
     if (year !== null && (isNaN(year) || year < 1900 || year > 2100))
       errors.push(t('manufactureYear'))
 
+    const rawPlateNumber = get('plate_number')
+    const plateNumber = rawPlateNumber
+      ? normalizePlateNumber(rawPlateNumber)
+      : null
+    if (plateNumber && !/^[0-9]{1,4}-[A-Z]{1,3}$/.test(plateNumber))
+      errors.push(t('plateNumber'))
+
     return {
       code,
       type,
-      plate_number: get('plate_number') || null,
+      plate_number: plateNumber,
       operational_status: opStatus ?? 'operational',
       ownership_status: ownStatus ?? 'alazani',
       brand: get('brand') || null,
@@ -209,7 +217,7 @@ export function downloadEquipmentTemplate(t: (key: TranslationKey) => string) {
     {
       [t('equipmentCode')]: 'A001',
       [t('equipmentType')]: 'Crane 50 Ton',
-      [t('plateNumber')]: '1234 ABC',
+      [t('plateNumber')]: '1234-ABC',
       [t('operationalStatus')]: t('operational'),
       [t('ownershipStatus')]: t('ownershipAlazani'),
       [t('brand')]: 'XCMG',

@@ -69,6 +69,8 @@ export interface Equipment {
   code: string
   type: string
   plate_number: string | null
+  plate_digits?: string | null
+  plate_letters_en?: string | null
   operational_status: OperationalStatus
   ownership_status: OwnershipStatus
   project_id: string | null
