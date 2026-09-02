@@ -700,7 +700,7 @@ export function AdminEquipment({
                     </td>
                     <td className="px-4 py-3 text-muted">{eq.type}</td>
                     <td className={`px-4 py-3 text-muted ${lang === 'ar' ? 'text-right' : 'text-left'}`} dir="ltr">
-                      {eq.plate_number ?? '—'}
+                      {eq.plate_number || eq.chassis_number || '—'}
                     </td>
                     <td className="px-4 py-3 text-muted">
                       {statusLabel(eq.operational_status)}
