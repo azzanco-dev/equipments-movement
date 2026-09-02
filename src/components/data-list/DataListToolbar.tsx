@@ -132,7 +132,7 @@ export function DataListToolbar({
             className="absolute start-3 top-1/2 -translate-y-1/2 text-muted"
           />
           <input
-            className={`input ps-9 ${compact ? 'h-8 py-1 text-sm' : ''}`}
+            className={`input ps-9 ${compact ? 'h-8 py-1 text-sm' : ''} ${config.id === 'equipment' && lang === 'ar' && !search ? 'text-center' : ''}`}
             dir={
               config.id === 'equipment'
                 ? lang === 'ar' && !search
