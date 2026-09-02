@@ -7,13 +7,7 @@ import {
   Search,
   X,
 } from 'lucide-react'
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Select } from '@/components/Select'
 import { FilterBuilder } from './FilterBuilder'
@@ -61,7 +55,7 @@ export function DataListToolbar({
   primaryAction,
   compact = false,
 }: ToolbarProps) {
-  const { t } = useI18n()
+  const { lang, t } = useI18n()
   const [open, setOpen] = useState<'filters' | 'sort' | 'actions' | null>(null)
   const [draftFilters, setDraftFilters] = useState(filters)
   const toolbarRef = useRef<HTMLDivElement>(null)
@@ -139,6 +133,13 @@ export function DataListToolbar({
           />
           <input
             className={`input ps-9 ${compact ? 'h-8 py-1 text-sm' : ''}`}
+            dir={
+              config.id === 'equipment'
+                ? lang === 'ar' && !search
+                  ? 'rtl'
+                  : 'ltr'
+                : undefined
+            }
             value={search}
             onChange={(event) => onSearch(event.target.value)}
             placeholder={config.searchPlaceholder}
