@@ -798,7 +798,7 @@ export function EntryExitForm({
               />
               <input
                 type="text"
-                style={{ direction: 'ltr' }}
+                dir={lang === 'ar' && !search ? 'rtl' : 'ltr'}
                 className="input ps-10"
                 placeholder={t('searchingEquipment')}
                 value={search}
