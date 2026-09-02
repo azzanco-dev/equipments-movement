@@ -55,7 +55,7 @@ export function DataListToolbar({
   primaryAction,
   compact = false,
 }: ToolbarProps) {
-  const { lang, t } = useI18n()
+  const { t } = useI18n()
   const [open, setOpen] = useState<'filters' | 'sort' | 'actions' | null>(null)
   const [draftFilters, setDraftFilters] = useState(filters)
   const toolbarRef = useRef<HTMLDivElement>(null)
@@ -129,17 +129,11 @@ export function DataListToolbar({
         <div className="relative min-w-[220px] w-full sm:w-[360px] lg:w-[460px]">
           <Search
             size={compact ? 14 : 16}
-            className="absolute start-3 top-1/2 -translate-y-1/2 text-muted"
+            className={`absolute top-1/2 -translate-y-1/2 text-muted ${config.id === 'equipment' ? 'left-3' : 'start-3'}`}
           />
           <input
-            className={`input ps-9 ${compact ? 'h-8 py-1 text-sm' : ''} ${config.id === 'equipment' && lang === 'ar' && !search ? 'text-center' : ''}`}
-            dir={
-              config.id === 'equipment'
-                ? lang === 'ar' && !search
-                  ? 'rtl'
-                  : 'ltr'
-                : undefined
-            }
+            className={`input ps-9 ${compact ? 'h-8 py-1 text-sm' : ''} ${config.id === 'equipment' ? 'text-left' : ''}`}
+            dir={config.id === 'equipment' ? 'ltr' : undefined}
             value={search}
             onChange={(event) => onSearch(event.target.value)}
             placeholder={config.searchPlaceholder}
