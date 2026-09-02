@@ -297,7 +297,7 @@ export function AdminDashboard({
     let query = supabase
       .from('entry_exit_logs')
       .select(
-        'id,equipment_id,supervisor_id,movement_type,movement_context,registration_method,driver_name,driver_id,notes,photo_url,company_id,project_id,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),project:projects(id,name_ar,name_en)',
+        'id,equipment_id,supervisor_id,movement_type,movement_context,workshop_purpose,registration_method,driver_name,driver_id,notes,photo_url,company_id,project_id,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),project:projects(id,name_ar,name_en)',
         { count: 'exact' },
       )
       .order(list.sort, { ascending: list.direction === 'asc' })
@@ -746,15 +746,25 @@ export function AdminDashboard({
                           {log.equipment?.type ?? '—'}
                         </td>
                         <td className="px-4 py-3 text-[13px]">
-                          {log.movement_context === 'workshop'
-                            ? t('workshopLocation')
-                            : log.project
-                              ? localizedName(
-                                  lang,
-                                  log.project.name_ar,
-                                  log.project.name_en,
-                                )
-                              : '—'}
+                          <div>
+                            {log.movement_context === 'workshop'
+                              ? t('workshopLocation')
+                              : log.project
+                                ? localizedName(
+                                    lang,
+                                    log.project.name_ar,
+                                    log.project.name_en,
+                                  )
+                                : '—'}
+                          </div>
+                          {log.movement_context === 'workshop' &&
+                            log.workshop_purpose && (
+                              <div className="mt-0.5 text-[11px] text-muted">
+                                {log.workshop_purpose === 'maintenance'
+                                  ? t('maintenancePurpose')
+                                  : t('parkingPurpose')}
+                              </div>
+                            )}
                         </td>
                         <td className="px-4 py-3 text-[13px]">
                           <span
