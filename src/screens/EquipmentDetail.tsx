@@ -120,7 +120,7 @@ export function EquipmentDetail({
     return (
       <div className="space-y-4">
         <button onClick={onBack} className="btn-ghost">
-          <ArrowLeft size={18} /> {t('backToEquipment')}
+          <ArrowLeft size={18} className="rtl-flip" /> {t('backToEquipment')}
         </button>
         <div className="card text-center py-12">
           <p className="text-muted">{t('noEquipment')}</p>
@@ -132,7 +132,7 @@ export function EquipmentDetail({
     <div className="space-y-6">
       {/* Back button */}
       <button onClick={onBack} className="btn-ghost">
-        <ArrowLeft size={18} /> {t('backToEquipment')}
+        <ArrowLeft size={18} className="rtl-flip" /> {t('backToEquipment')}
       </button>
 
       <PageHeader

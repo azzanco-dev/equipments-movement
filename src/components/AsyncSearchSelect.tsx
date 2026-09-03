@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Loader2, Search, X } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import type { SelectOption } from '@/components/Select'
+import { prepareFloatingMenu } from '@/lib/floatingMenu'
 
 interface AsyncSearchSelectProps {
   value: string
@@ -72,7 +73,7 @@ export function AsyncSearchSelect({
       top: openAbove ? rect.top - gap : rect.bottom + gap,
       left,
       width,
-      maxHeight: Math.max(0, availableHeight),
+      maxHeight: Math.min(240, Math.max(96, availableHeight)),
       openAbove,
     })
   }, [])
@@ -132,7 +133,7 @@ export function AsyncSearchSelect({
         type="button"
         disabled={disabled}
         onClick={() => {
-          if (!open) updateMenuPosition()
+          if (!open) prepareFloatingMenu(ref.current, updateMenuPosition, 240)
           setOpen((current) => !current)
         }}
         className="flex h-8 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors focus:border-black disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-white"
@@ -199,9 +200,7 @@ export function AsyncSearchSelect({
                 className="w-full bg-transparent py-2 ps-9 pe-3 text-sm outline-none"
               />
             </div>
-            <div
-              className="min-h-0 flex-1 overscroll-contain overflow-y-auto"
-            >
+            <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto">
               {loading ? (
                 <div className="flex items-center justify-center gap-2 px-3 py-5 text-sm text-muted">
                   <Loader2 size={16} className="animate-spin" />

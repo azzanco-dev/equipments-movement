@@ -1147,6 +1147,25 @@ export function EntryExitForm({
                                 : t('pendingClassification')}
                           </>
                         )}
+                        {lastMovement?.movement_context === 'site' && (
+                          <>
+                            {(lastMovement.project_name_ar ||
+                              lastMovement.project_name_en) && (
+                              <>
+                                {' '}
+                                —{' '}
+                                {localizedName(
+                                  lang,
+                                  lastMovement.project_name_ar,
+                                  lastMovement.project_name_en,
+                                )}
+                              </>
+                            )}
+                            {lastMovement.supervisor_name && (
+                              <> — {lastMovement.supervisor_name}</>
+                            )}
+                          </>
+                        )}
                       </span>
                     </>
                   ) : currentStatus === 'outside' ? (
@@ -1439,7 +1458,7 @@ export function EntryExitForm({
                             }
                             className="absolute start-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
                           >
-                            <ChevronLeft size={20} />
+                            <ChevronLeft size={20} className="rtl-flip" />
                           </button>
                           <button
                             type="button"
@@ -1450,7 +1469,7 @@ export function EntryExitForm({
                             }
                             className="absolute end-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
                           >
-                            <ChevronRight size={20} />
+                            <ChevronRight size={20} className="rtl-flip" />
                           </button>
                           <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-white bg-black/50 rounded-full px-2 py-0.5">
                             {carouselIndex + 1} / {photoFiles.length}

@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { useAuth } from '@/auth/AuthContext'
 import { InlineSpinner } from '@/components/Spinner'
-import { LogIn, LogOut, Filter } from 'lucide-react'
+import { LogIn, LogOut, Filter, Search } from 'lucide-react'
 import { DatePicker } from '@/components/DatePicker'
 import type { EntryExitLog, MovementType } from '@/lib/types'
 import { Select } from '@/components/Select'
@@ -11,6 +11,23 @@ import { PageHeader } from '@/components/PageHeader'
 import { formatDate } from '@/lib/dateFormat'
 import { Alert } from '@/components/Alert'
 import { RelativeTime } from '@/components/RelativeTime'
+import { sanitizeSearchTerm } from '@/lib/search'
+
+async function loadLatestDriverNames(entryIds: string[]) {
+  if (!entryIds.length) return new Map<string, string>()
+  const { data } = await supabase
+    .from('movement_driver_changes')
+    .select('entry_log_id,new_driver_name,changed_at,id')
+    .in('entry_log_id', entryIds)
+    .order('changed_at', { ascending: false })
+    .order('id', { ascending: false })
+  const latest = new Map<string, string>()
+  for (const change of data ?? []) {
+    if (!latest.has(change.entry_log_id))
+      latest.set(change.entry_log_id, change.new_driver_name)
+  }
+  return latest
+}
 
 export function SupervisorDashboard({
   onSelectMovement,
@@ -25,6 +42,8 @@ export function SupervisorDashboard({
   const [loading, setLoading] = useState(true)
   const [filterType, setFilterType] = useState<'all' | MovementType>('all')
   const [filterDate, setFilterDate] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
   const [classificationBusy, setClassificationBusy] = useState<string | null>(
     null,
   )
@@ -40,6 +59,35 @@ export function SupervisorDashboard({
     if (!user) return
     setLoading(true)
 
+    const term = sanitizeSearchTerm(search)
+    let equipmentIds: string[] = []
+    let companyIds: string[] = []
+    let projectIds: string[] = []
+    if (term) {
+      const [equipmentResult, companyResult, projectResult] = await Promise.all(
+        [
+          supabase
+            .from('equipment')
+            .select('id')
+            .or(`code.ilike.%${term}%,plate_number.ilike.%${term}%`)
+            .limit(100),
+          supabase
+            .from('companies')
+            .select('id')
+            .or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+            .limit(100),
+          supabase
+            .from('projects')
+            .select('id')
+            .or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+            .limit(100),
+        ],
+      )
+      equipmentIds = (equipmentResult.data ?? []).map((item) => item.id)
+      companyIds = (companyResult.data ?? []).map((item) => item.id)
+      projectIds = (projectResult.data ?? []).map((item) => item.id)
+    }
+
     let query = supabase
       .from('entry_exit_logs')
       .select(
@@ -49,7 +97,18 @@ export function SupervisorDashboard({
       .order('created_at', { ascending: false })
       .limit(100)
 
-    if (!workshopManagerMode) query = query.eq('supervisor_id', user.id)
+    if (term) {
+      const filters = [`contractor_equipment_code.ilike.%${term}%`]
+      if (equipmentIds.length)
+        filters.push(`equipment_id.in.(${equipmentIds.join(',')})`)
+      if (companyIds.length)
+        filters.push(`company_id.in.(${companyIds.join(',')})`)
+      if (projectIds.length)
+        filters.push(`project_id.in.(${projectIds.join(',')})`)
+      query = query.or(filters.join(','))
+    }
+
+    if (!workshopMode) query = query.eq('supervisor_id', user.id)
 
     if (filterType !== 'all') {
       query = query.eq('movement_type', filterType)
@@ -66,9 +125,21 @@ export function SupervisorDashboard({
 
     const { data, error } = await query
     if (error) console.error(error)
-    setLogs((data as EntryExitLog[]) ?? [])
+    const rows = (data as EntryExitLog[]) ?? []
+    const latestDrivers = await loadLatestDriverNames(
+      rows.filter((row) => row.movement_type === 'entry').map((row) => row.id),
+    )
+    setLogs(
+      rows.map((row) => ({
+        ...row,
+        current_driver_name:
+          row.movement_type === 'entry'
+            ? (latestDrivers.get(row.id) ?? row.driver_name)
+            : row.driver_name,
+      })),
+    )
     setLoading(false)
-  }, [user, workshopMode, workshopManagerMode, filterType, filterDate])
+  }, [user, workshopMode, filterType, filterDate, search])
 
   const classifyEntry = async (logId: string, purpose: string) => {
     setClassificationBusy(logId)
@@ -88,6 +159,11 @@ export function SupervisorDashboard({
   useEffect(() => {
     fetchLogs()
   }, [fetchLogs])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearch(searchInput.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [searchInput])
 
   return (
     <div className="space-y-6">
@@ -128,6 +204,18 @@ export function SupervisorDashboard({
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full sm:w-[360px]">
+          <Search
+            size={15}
+            className="absolute start-3 top-1/2 -translate-y-1/2 text-muted"
+          />
+          <input
+            className="input ps-9"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder={t('searchMovementRecords')}
+          />
+        </div>
         <div className="flex items-center gap-2 text-sm text-muted">
           <Filter size={16} />
         </div>
@@ -197,12 +285,12 @@ export function SupervisorDashboard({
                     <th className="table-header text-start px-4 py-3">
                       {t('movementType')}
                     </th>
-                    {workshopManagerMode && (
+                    {workshopMode && (
                       <th className="table-header text-start px-4 py-3">
                         {t('supervisorName')}
                       </th>
                     )}
-                    {workshopManagerMode && (
+                    {workshopMode && (
                       <th className="table-header text-start px-4 py-3">
                         {t('workshopPurpose')}
                       </th>
@@ -248,48 +336,60 @@ export function SupervisorDashboard({
                             : t('exit')}
                         </span>
                       </td>
-                      {workshopManagerMode && (
+                      {workshopMode && (
                         <td className="px-4 py-3">
                           {log.supervisor?.full_name ?? '—'}
                         </td>
                       )}
-                      {workshopManagerMode && (
+                      {workshopMode && (
                         <td
                           className="px-4 py-3"
                           onClick={(event) => event.stopPropagation()}
                         >
                           {log.movement_type === 'entry' ? (
-                            <Select
-                              compact
-                              className={`min-w-[130px] ${classificationBusy === log.id ? 'pointer-events-none opacity-60' : ''}`}
-                              value={log.workshop_purpose ?? ''}
-                              onChange={(value) => classifyEntry(log.id, value)}
-                              options={[
-                                ...(log.workshop_purpose
-                                  ? []
-                                  : [
-                                      {
-                                        value: '',
-                                        label: t('pendingClassification'),
-                                      },
-                                    ]),
-                                {
-                                  value: 'maintenance',
-                                  label: t('maintenancePurpose'),
-                                },
-                                {
-                                  value: 'parking',
-                                  label: t('parkingPurpose'),
-                                },
-                              ]}
-                            />
+                            workshopManagerMode ? (
+                              <Select
+                                compact
+                                className={`min-w-[130px] ${classificationBusy === log.id ? 'pointer-events-none opacity-60' : ''}`}
+                                value={log.workshop_purpose ?? ''}
+                                onChange={(value) =>
+                                  classifyEntry(log.id, value)
+                                }
+                                options={[
+                                  ...(log.workshop_purpose
+                                    ? []
+                                    : [
+                                        {
+                                          value: '',
+                                          label: t('pendingClassification'),
+                                        },
+                                      ]),
+                                  {
+                                    value: 'maintenance',
+                                    label: t('maintenancePurpose'),
+                                  },
+                                  {
+                                    value: 'parking',
+                                    label: t('parkingPurpose'),
+                                  },
+                                ]}
+                              />
+                            ) : log.workshop_purpose === 'maintenance' ? (
+                              t('maintenancePurpose')
+                            ) : log.workshop_purpose === 'parking' ? (
+                              t('parkingPurpose')
+                            ) : (
+                              t('pendingClassification')
+                            )
                           ) : (
                             '—'
                           )}
                         </td>
                       )}
                       {!workshopMode && (
-                        <td className="px-4 py-3">{log.driver_name ?? '—'}</td>
+                        <td className="px-4 py-3">
+                          {log.current_driver_name ?? log.driver_name ?? '—'}
+                        </td>
                       )}
                       <td className="px-4 py-3 text-muted whitespace-nowrap">
                         {formatDate(log.recorded_at)}

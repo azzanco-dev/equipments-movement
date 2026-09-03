@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Loader2, Search, X } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import type { SelectOption } from '@/components/Select'
+import { prepareFloatingMenu } from '@/lib/floatingMenu'
 
 interface AsyncMultiSelectProps {
   value: SelectOption[]
@@ -31,12 +32,26 @@ export function AsyncMultiSelect({
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const requestRef = useRef(0)
-  const [position, setPosition] = useState({ top: 0, left: 0, width: 260 })
+  const [position, setPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 260,
+    maxHeight: 240,
+    openAbove: false,
+  })
 
   const updatePosition = useCallback(() => {
     const rect = rootRef.current?.getBoundingClientRect()
     if (!rect) return
     const padding = 8
+    const gap = 4
+    const availableBelow = Math.max(
+      0,
+      window.innerHeight - rect.bottom - gap - padding,
+    )
+    const availableAbove = Math.max(0, rect.top - gap - padding)
+    const openAbove = availableAbove > availableBelow
+    const availableHeight = openAbove ? availableAbove : availableBelow
     const width = Math.min(
       Math.max(rect.width, 260),
       window.innerWidth - padding * 2,
@@ -44,12 +59,14 @@ export function AsyncMultiSelect({
     const rtl = (document.documentElement.dir || 'rtl') === 'rtl'
     const preferredLeft = rtl ? rect.right - width : rect.left
     setPosition({
-      top: rect.bottom + 4,
+      top: openAbove ? rect.top - gap : rect.bottom + gap,
       left: Math.min(
         Math.max(padding, preferredLeft),
         window.innerWidth - width - padding,
       ),
       width,
+      maxHeight: Math.min(240, Math.max(96, availableHeight)),
+      openAbove,
     })
   }, [])
 
@@ -127,7 +144,7 @@ export function AsyncMultiSelect({
         tabIndex={disabled ? -1 : 0}
         onClick={() => {
           if (disabled) return
-          if (!open) updatePosition()
+          if (!open) prepareFloatingMenu(rootRef.current, updatePosition, 240)
           setOpen(true)
         }}
         onKeyDown={(event) => {
@@ -178,14 +195,17 @@ export function AsyncMultiSelect({
             ref={menuRef}
             role="listbox"
             aria-multiselectable="true"
-            className="fixed z-[100] overflow-hidden rounded-lg border shadow-lg"
+            className="fixed z-[100] flex flex-col overflow-hidden rounded-lg border shadow-lg"
             dir={document.documentElement.dir || 'rtl'}
             style={{
-              top: position.top,
               left: position.left,
               width: position.width,
+              maxHeight: position.maxHeight,
               background: 'var(--bg)',
               borderColor: 'var(--border)',
+              ...(position.openAbove
+                ? { bottom: window.innerHeight - position.top }
+                : { top: position.top }),
             }}
           >
             <div
@@ -204,7 +224,7 @@ export function AsyncMultiSelect({
                 className="w-full bg-transparent py-2 ps-9 pe-3 text-sm outline-none"
               />
             </div>
-            <div className="max-h-60 overflow-y-auto py-1">
+            <div className="min-h-0 flex-1 overflow-y-auto py-1">
               {loading ? (
                 <div className="flex items-center justify-center gap-2 px-3 py-5 text-sm text-muted">
                   <Loader2 size={16} className="animate-spin" />

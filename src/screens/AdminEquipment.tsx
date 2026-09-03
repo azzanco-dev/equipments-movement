@@ -699,7 +699,10 @@ export function AdminEquipment({
                       </div>
                     </td>
                     <td className="px-4 py-3 text-muted">{eq.type}</td>
-                    <td className={`px-4 py-3 text-muted ${lang === 'ar' ? 'text-right' : 'text-left'}`} dir="ltr">
+                    <td
+                      className={`px-4 py-3 text-muted ${lang === 'ar' ? 'text-right' : 'text-left'}`}
+                      dir="ltr"
+                    >
                       {eq.plate_number || eq.chassis_number || '—'}
                     </td>
                     <td className="px-4 py-3 text-muted">
@@ -739,7 +742,10 @@ export function AdminEquipment({
                         >
                           <Power size={16} />
                         </button>
-                        <ChevronRight size={16} className="text-muted ms-1" />
+                        <ChevronRight
+                          size={16}
+                          className="rtl-flip text-muted ms-1"
+                        />
                       </div>
                     </td>
                     <td className="px-4 py-3">

@@ -198,6 +198,8 @@ export const translations = {
     manualSelect: 'اختيار يدوي',
     scanQRCode: 'امسح رمز QR',
     searchingEquipment: 'ابحث عن المعدة بالكود أو النوع...',
+    searchMovementRecords:
+      'ابحث بكود المعدة او ترقيم الشركة او اللوحة او الشركة او الموقع',
     noEquipmentFound: 'لا توجد معدات مطابقة',
     selectedEquipment: 'المعدة المحددة',
     driverName: 'اسم السائق / المشغّل',
@@ -799,6 +801,8 @@ export const translations = {
     addEquipmentType: 'Add Equipment Type',
     editEquipmentType: 'Edit Equipment Type',
     searchEquipmentTypes: 'Search equipment types',
+    searchMovementRecords:
+      'Search by equipment code, company number, plate, company, or site',
     equipmentTypeRequired: 'Equipment type name is required.',
     equipmentTypeNotFound: 'The equipment type does not exist in Settings.',
     selectEquipmentType: 'Select equipment type',

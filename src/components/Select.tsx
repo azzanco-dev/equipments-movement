@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Check, Search } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
+import { prepareFloatingMenu } from '@/lib/floatingMenu'
 
 export interface SelectOption {
   value: string
@@ -37,15 +38,20 @@ export function Select({
     left: 0,
     width: 0,
     maxHeight: 240,
+    openAbove: false,
   })
 
   const updateMenuPosition = useCallback(() => {
     const rect = ref.current?.getBoundingClientRect()
     if (!rect) return
     const gap = 4
-    const availableBelow = window.innerHeight - rect.bottom - gap
-    const availableAbove = rect.top - gap
-    const openAbove = availableBelow < 180 && availableAbove > availableBelow
+    const viewportPadding = 8
+    const availableBelow = Math.max(
+      0,
+      window.innerHeight - rect.bottom - gap - viewportPadding,
+    )
+    const availableAbove = Math.max(0, rect.top - gap - viewportPadding)
+    const openAbove = availableAbove > availableBelow
     const maxHeight = Math.max(
       100,
       Math.min(240, openAbove ? availableAbove : availableBelow),
@@ -55,6 +61,7 @@ export function Select({
       left: rect.left,
       width: rect.width,
       maxHeight,
+      openAbove,
     })
   }, [])
 
@@ -105,7 +112,7 @@ export function Select({
       <button
         type="button"
         onClick={() => {
-          if (!open) updateMenuPosition()
+          if (!open) prepareFloatingMenu(ref.current, updateMenuPosition, 240)
           setOpen(!open)
         }}
         className={`w-full flex items-center justify-between gap-2 rounded-lg border bg-transparent outline-none transition-colors focus:border-black dark:focus:border-white ${'h-8 px-3 py-0 text-sm'}`}
@@ -130,8 +137,7 @@ export function Select({
               borderColor: 'var(--border)',
               left: menuPosition.left,
               width: menuPosition.width,
-              ...(menuPosition.top <
-              (ref.current?.getBoundingClientRect().top ?? 0)
+              ...(menuPosition.openAbove
                 ? { bottom: window.innerHeight - menuPosition.top }
                 : { top: menuPosition.top }),
             }}

@@ -586,7 +586,7 @@ export function MovementDetail({
     return (
       <div className="space-y-4">
         <button onClick={onBack} className="btn-ghost">
-          <ArrowLeft size={18} /> {t('backToMovements')}
+          <ArrowLeft size={18} className="rtl-flip" /> {t('backToMovements')}
         </button>
         <Alert type="error">{error}</Alert>
       </div>
@@ -617,7 +617,7 @@ export function MovementDetail({
   return (
     <div className="space-y-6">
       <button onClick={onBack} className="btn-ghost">
-        <ArrowLeft size={18} /> {t('backToMovements')}
+        <ArrowLeft size={18} className="rtl-flip" /> {t('backToMovements')}
       </button>
 
       <PageHeader
@@ -798,7 +798,11 @@ export function MovementDetail({
               <InfoRow
                 icon={<FileText size={16} />}
                 label={t('contractorEquipmentCode')}
-                value={log.contractor_equipment_code + ' - ' + (log.equipment?.lessor?.name || '')}
+                value={
+                  log.contractor_equipment_code +
+                  ' - ' +
+                  (log.equipment?.lessor?.name || '')
+                }
               />
               <InfoRow
                 icon={<Building2 size={16} />}
@@ -821,7 +825,13 @@ export function MovementDetail({
               <InfoRow
                 icon={<User size={16} />}
                 label={t('driverName')}
-                value={log.driver?.full_name ?? log.driver_name}
+                value={
+                  (isEntry
+                    ? driverChanges.at(-1)?.new_driver_name
+                    : undefined) ??
+                  log.driver?.full_name ??
+                  log.driver_name
+                }
               />
             </>
           )}
@@ -933,7 +943,7 @@ export function MovementDetail({
                     }
                     className="absolute start-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
                   >
-                    <ChevronLeft size={20} />
+                    <ChevronLeft size={20} className="rtl-flip" />
                   </button>
                   <button
                     type="button"
@@ -944,7 +954,7 @@ export function MovementDetail({
                     }
                     className="absolute end-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
                   >
-                    <ChevronRight size={20} />
+                    <ChevronRight size={20} className="rtl-flip" />
                   </button>
                   <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-white bg-black/50 rounded-full px-2 py-0.5">
                     {photoCarouselIndex + 1} / {photoUrls.length}

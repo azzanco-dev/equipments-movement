@@ -175,7 +175,7 @@ export function DatePicker({
               onClick={rtl ? nextMonth : prevMonth}
               className="inline-flex items-center justify-center rounded-md p-1 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft size={16} className="rtl-flip" />
             </button>
             <span className="text-sm font-medium">
               {monthNames[month]} {year}
@@ -185,7 +185,7 @@ export function DatePicker({
               onClick={rtl ? prevMonth : nextMonth}
               className="inline-flex items-center justify-center rounded-md p-1 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
-              <ChevronRight size={16} />
+              <ChevronRight size={16} className="rtl-flip" />
             </button>
           </div>
 

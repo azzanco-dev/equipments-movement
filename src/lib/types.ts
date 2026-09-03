@@ -174,8 +174,11 @@ export interface LastMovement {
   workshop_purpose: 'maintenance' | 'parking' | null
   recorded_at: string
   supervisor_id: string
+  supervisor_name: string | null
   company_id: string | null
   project_id: string | null
+  project_name_ar: string | null
+  project_name_en: string | null
   contractor_equipment_code: string | null
   driver_id: string | null
   driver_name: string | null

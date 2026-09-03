@@ -46,7 +46,7 @@ export function DriverDetail({
     return (
       <div className="space-y-4">
         <button className="btn-ghost" onClick={onBack}>
-          <ArrowLeft size={18} />
+          <ArrowLeft size={18} className="rtl-flip" />
           {t('back')}
         </button>
         <Alert type="error">{error}</Alert>
@@ -67,7 +67,7 @@ export function DriverDetail({
   return (
     <div className="space-y-5">
       <button className="btn-ghost" onClick={onBack}>
-        <ArrowLeft size={18} />
+        <ArrowLeft size={18} className="rtl-flip" />
         {t('backToDrivers')}
       </button>
       <PageHeader title={driver.full_name} description={t('driverDetails')} />
