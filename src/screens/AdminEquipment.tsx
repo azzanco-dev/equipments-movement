@@ -1187,7 +1187,7 @@ export function AdminEquipment({
                         <td className="px-3 py-2 text-muted">
                           {row.type || '—'}
                         </td>
-                        <td className="px-3 py-2 text-muted">
+                        <td className="px-3 py-2 text-muted text-right">
                           {row.plate_number ?? '—'}
                         </td>
                         <td className="px-3 py-2 text-muted">
