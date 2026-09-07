@@ -42,6 +42,7 @@ import { sanitizeSearchTerm } from '@/lib/search'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import { uploadMovementPhotos } from '@/lib/movementPhotoUpload'
+import { useListRequest } from '@/components/data-list/useListRequest'
 
 interface MovementDetailProps {
   movementId: string
@@ -135,7 +136,9 @@ export function MovementDetail({
   const [editContractorCode, setEditContractorCode] = useState('')
   const photoUrls = photoItems.map((item) => item.url)
 
+  const startRequest = useListRequest()
   const fetchData = useCallback(async () => {
+    const signal = startRequest()
     // Reset all movement-specific state so stale values from a previous
     // movement cannot bleed into the next one (especially when navigating
     // directly between linked ENTRY and EXIT records).
@@ -160,11 +163,13 @@ export function MovementDetail({
       const { data, error: fetchError } = await supabase
         .from('entry_exit_logs')
         .select(
-          '*, equipment:equipment(*, lessor:lessors(name)), supervisor:profiles(*), driver:drivers(*)',
+          '*, equipment:equipment(*, lessor:lessors(name)), supervisor:profiles(*), driver:drivers(*), company:companies(id,name_ar,name_en,created_at), project:projects(id,name_ar,name_en,created_at)',
         )
         .eq('id', movementId)
+        .abortSignal(signal)
         .maybeSingle()
 
+      if (signal.aborted) return
       if (fetchError) throw fetchError
       if (!data) {
         setError(t('movementNotFound'))
@@ -174,6 +179,8 @@ export function MovementDetail({
 
       const logData = data as EntryExitLog
       setLog(logData)
+      setCompany(logData.company ?? null)
+      setProject(logData.project ?? null)
 
       const loadDriverChanges = async (entryId: string) => {
         const { data: changes } = await supabase
@@ -184,132 +191,122 @@ export function MovementDetail({
           .eq('entry_log_id', entryId)
           .order('changed_at')
           .order('id')
+          .abortSignal(signal)
+        if (signal.aborted) return
         setDriverEntryId(entryId)
         setDriverChanges((changes as unknown as MovementDriverChange[]) ?? [])
       }
 
-      // Fetch company and project names
-      if (logData.company_id) {
-        const { data: comp } = await supabase
-          .from('companies')
-          .select('*')
-          .eq('id', logData.company_id)
-          .maybeSingle()
-        setCompany(comp as Company | null)
-      }
-      if (logData.project_id) {
-        const { data: proj } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('id', logData.project_id)
-          .maybeSingle()
-        setProject(proj as Project | null)
-      }
+      await Promise.all([
+        (async () => {
+          // Fetch photo signed URLs — prefer new entry_exit_photos table,
+          // fall back to legacy photo_url if no new photo rows exist.
+          const { data: photoRows, error: photoErr } = await supabase
+            .from('entry_exit_photos')
+            .select('*')
+            .eq('entry_exit_log_id', movementId)
+            .order('sort_order', { ascending: true })
+            .abortSignal(signal)
 
-      // Fetch photo signed URLs — prefer new entry_exit_photos table,
-      // fall back to legacy photo_url if no new photo rows exist.
-      const { data: photoRows, error: photoErr } = await supabase
-        .from('entry_exit_photos')
-        .select('*')
-        .eq('entry_exit_log_id', movementId)
-        .order('sort_order', { ascending: true })
-
-      if (photoErr) {
-        console.error(photoErr)
-      } else if (photoRows && photoRows.length > 0) {
-        const signedItems = await Promise.all(
-          (photoRows as EntryExitPhoto[]).map(async (p) => {
+          if (signal.aborted) return
+          if (photoErr) {
+            console.error(photoErr)
+          } else if (photoRows && photoRows.length > 0) {
             const { data: signed } = await supabase.storage
               .from('log-photos')
-              .createSignedUrl(p.file_path, 3600)
-            return signed?.signedUrl ? { ...p, url: signed.signedUrl } : null
-          }),
-        )
-        setPhotoItems(
-          signedItems.filter(
-            (item): item is EntryExitPhoto & { url: string } => item !== null,
-          ),
-        )
-      } else if (logData.photo_url) {
-        const { data: signed } = await supabase.storage
-          .from('log-photos')
-          .createSignedUrl(logData.photo_url, 3600)
-        if (signed?.signedUrl) setPhotoUrl(signed.signedUrl)
-      }
-
-      // Find linked movement using the same deterministic (recorded_at, id)
-      // ordering as the database trigger, so ties on recorded_at are broken
-      // by id consistently.
-      if (logData.movement_type === 'entry') {
-        await loadDriverChanges(logData.id)
-        // Next EXIT: (recorded_at > entry) OR (recorded_at = entry AND id > entry.id)
-        const { data: exitData, error: linkErr } = await supabase
-          .from('entry_exit_logs')
-          .select('*, supervisor:profiles(*)')
-          .eq('equipment_id', logData.equipment_id)
-          .eq('movement_context', logData.movement_context ?? 'site')
-          .eq('movement_type', 'exit')
-          .or(
-            `recorded_at.gt.${logData.recorded_at},and(recorded_at.eq.${logData.recorded_at},id.gt.${logData.id})`,
-          )
-          .order('recorded_at', { ascending: true })
-          .order('id', { ascending: true })
-          .limit(1)
-          .maybeSingle()
-
-        if (linkErr) {
-          setLinkedError(t('movementLoadError'))
-        } else {
-          setLinkedLog(exitData as EntryExitLog | null)
-        }
-      } else {
-        // Preceding ENTRY: (recorded_at < exit) OR (recorded_at = exit AND id < exit.id)
-        const { data: entryData, error: linkErr } = await supabase
-          .from('entry_exit_logs')
-          .select('*, supervisor:profiles(*)')
-          .eq('equipment_id', logData.equipment_id)
-          .eq('movement_context', logData.movement_context ?? 'site')
-          .eq('movement_type', 'entry')
-          .or(
-            `recorded_at.lt.${logData.recorded_at},and(recorded_at.eq.${logData.recorded_at},id.lt.${logData.id})`,
-          )
-          .order('recorded_at', { ascending: false })
-          .order('id', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        if (linkErr) {
-          setLinkedError(t('movementLoadError'))
-        } else {
-          const entryLog = entryData as EntryExitLog | null
-          setLinkedLog(entryLog)
-          if (entryLog) await loadDriverChanges(entryLog.id)
-
-          // Fetch linked entry's company/project
-          if (entryLog?.company_id) {
-            const { data: comp } = await supabase
-              .from('companies')
-              .select('*')
-              .eq('id', entryLog.company_id)
-              .maybeSingle()
-            setLinkedCompany(comp as Company | null)
+              .createSignedUrls(
+                photoRows.map((photo) => photo.file_path),
+                3600,
+              )
+            if (signal.aborted) return
+            const signedByPath = new Map(
+              (signed ?? []).map((item) => [item.path, item.signedUrl]),
+            )
+            const signedItems = (photoRows as EntryExitPhoto[]).map((photo) => {
+              const url = signedByPath.get(photo.file_path)
+              return url ? { ...photo, url } : null
+            })
+            setPhotoItems(
+              signedItems.filter(
+                (item): item is EntryExitPhoto & { url: string } =>
+                  item !== null,
+              ),
+            )
+          } else if (logData.photo_url) {
+            const { data: signed } = await supabase.storage
+              .from('log-photos')
+              .createSignedUrl(logData.photo_url, 3600)
+            if (signal.aborted) return
+            if (signed?.signedUrl) setPhotoUrl(signed.signedUrl)
           }
-          if (entryLog?.project_id) {
-            const { data: proj } = await supabase
-              .from('projects')
-              .select('*')
-              .eq('id', entryLog.project_id)
+        })(),
+        (async () => {
+          // Find linked movement using the same deterministic (recorded_at, id)
+          // ordering as the database trigger, so ties on recorded_at are broken
+          // by id consistently.
+          if (logData.movement_type === 'entry') {
+            await loadDriverChanges(logData.id)
+            if (signal.aborted) return
+            // Next EXIT: (recorded_at > entry) OR (recorded_at = entry AND id > entry.id)
+            const { data: exitData, error: linkErr } = await supabase
+              .from('entry_exit_logs')
+              .select('*, supervisor:profiles(*)')
+              .eq('equipment_id', logData.equipment_id)
+              .eq('movement_context', logData.movement_context ?? 'site')
+              .eq('movement_type', 'exit')
+              .or(
+                `recorded_at.gt.${logData.recorded_at},and(recorded_at.eq.${logData.recorded_at},id.gt.${logData.id})`,
+              )
+              .order('recorded_at', { ascending: true })
+              .order('id', { ascending: true })
+              .limit(1)
+              .abortSignal(signal)
               .maybeSingle()
-            setLinkedProject(proj as Project | null)
+
+            if (signal.aborted) return
+            if (linkErr) {
+              setLinkedError(t('movementLoadError'))
+            } else {
+              setLinkedLog(exitData as EntryExitLog | null)
+            }
+          } else {
+            // Preceding ENTRY: (recorded_at < exit) OR (recorded_at = exit AND id < exit.id)
+            const { data: entryData, error: linkErr } = await supabase
+              .from('entry_exit_logs')
+              .select(
+                '*, supervisor:profiles(*), company:companies(id,name_ar,name_en,created_at), project:projects(id,name_ar,name_en,created_at)',
+              )
+              .eq('equipment_id', logData.equipment_id)
+              .eq('movement_context', logData.movement_context ?? 'site')
+              .eq('movement_type', 'entry')
+              .or(
+                `recorded_at.lt.${logData.recorded_at},and(recorded_at.eq.${logData.recorded_at},id.lt.${logData.id})`,
+              )
+              .order('recorded_at', { ascending: false })
+              .order('id', { ascending: false })
+              .limit(1)
+              .abortSignal(signal)
+              .maybeSingle()
+
+            if (signal.aborted) return
+            if (linkErr) {
+              setLinkedError(t('movementLoadError'))
+            } else {
+              const entryLog = entryData as EntryExitLog | null
+              setLinkedLog(entryLog)
+              setLinkedCompany(entryLog?.company ?? null)
+              setLinkedProject(entryLog?.project ?? null)
+              if (entryLog) await loadDriverChanges(entryLog.id)
+            }
           }
-        }
-      }
+        })(),
+      ])
     } catch {
-      setError(t('movementLoadError'))
+      if (!signal.aborted) setError(t('movementLoadError'))
     } finally {
-      setLoading(false)
+      if (!signal.aborted) setLoading(false)
     }
-  }, [movementId, t])
+  }, [movementId, t, startRequest])
 
   const loadDrivers = useCallback(
     async (query: string): Promise<SelectOption[]> => {

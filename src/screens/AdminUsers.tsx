@@ -6,6 +6,7 @@ import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { useDataListState } from '@/components/data-list/useDataListState'
+import { useListRequest } from '@/components/data-list/useListRequest'
 import { Modal } from '@/components/Modal'
 import { PageHeader } from '@/components/PageHeader'
 import { PasswordInput } from '@/components/PasswordInput'
@@ -39,7 +40,9 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
+  const startListRequest = useListRequest()
   const fetchUsers = useCallback(async () => {
+    const signal = startListRequest()
     setLoading(true)
     let query = supabase
       .from('profiles')
@@ -47,6 +50,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
         count: 'exact',
       })
       .order(list.sort, { ascending: list.direction === 'asc' })
+      .order('id', { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
     const term = sanitizeSearchTerm(list.search)
     if (term) query = query.ilike('full_name', `%${term}%`)
@@ -55,13 +59,15 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
       list.filters,
       new Set(usersListConfig.filterFields.map((field) => field.key)),
     )
-    const { data, error, count } = await query
+    const { data, error, count } = await query.abortSignal(signal)
+    if (signal.aborted) return
     if (error) console.error(error)
     setUsers((data as Profile[]) ?? [])
     setTotal(count ?? 0)
     setLoading(false)
   }, [
     list.direction,
+    startListRequest,
     list.filters,
     list.page,
     list.pageSize,
@@ -143,8 +149,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
             ? t('invalidUserEmail')
             : code === 'weak_password'
               ? t('passwordMinLength')
-              : error instanceof EdgeFunctionError &&
-                  error.code === 'network'
+              : error instanceof EdgeFunctionError && error.code === 'network'
                 ? t('networkConnectionError')
                 : error instanceof EdgeFunctionError &&
                     error.code === 'sessionExpired'

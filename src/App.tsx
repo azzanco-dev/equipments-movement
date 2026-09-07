@@ -8,7 +8,6 @@ import { useI18n } from '@/i18n/I18nContext'
 import { FullPageSpinner } from '@/components/Spinner'
 import { Layout } from '@/components/Layout'
 import { AuthScreen } from '@/screens/AuthScreen'
-import type { Equipment } from '@/lib/types'
 import {
   LayoutDashboard,
   FileText,
@@ -123,7 +122,8 @@ const ADMIN_PAGES = new Set([
 ])
 
 function AppContent() {
-  const { profile, session, loading, profileLoadError, retryProfile } = useAuth()
+  const { profile, session, loading, profileLoadError, retryProfile } =
+    useAuth()
   const { t } = useI18n()
   const router = useRouter()
   const pathname = usePathname()
@@ -276,16 +276,9 @@ function AppContent() {
           <EquipmentDetail
             equipmentId={equipmentId}
             onBack={() => router.push('/equipment')}
-            onEdit={(equipment: Equipment) => {
-              router.push('/equipment')
-              setTimeout(
-                () =>
-                  window.dispatchEvent(
-                    new CustomEvent('edit-equipment', { detail: equipment }),
-                  ),
-                0,
-              )
-            }}
+            onEdit={(equipment) =>
+              router.push(`/equipment?edit=${encodeURIComponent(equipment.id)}`)
+            }
             onSelectMovement={openMovement}
             onViewAllMovements={(code) =>
               router.push(`/logs?q=${encodeURIComponent(code)}`)

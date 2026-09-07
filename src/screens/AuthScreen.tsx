@@ -33,7 +33,7 @@ export function AuthScreen() {
 
   return (
     <div
-      className="flex h-[100dvh] flex-col overflow-hidden"
+      className="flex min-h-[100dvh] flex-col"
       style={{ background: 'var(--bg)', color: 'var(--fg)' }}
     >
       {/* Top controls */}
@@ -57,7 +57,7 @@ export function AuthScreen() {
         </button>
       </div>
 
-      <div className="flex min-h-0 flex-1 items-center justify-center p-4">
+      <div className="flex flex-1 items-center justify-center px-4 py-20">
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="mb-5 flex flex-col items-center sm:mb-8">
@@ -80,8 +80,12 @@ export function AuthScreen() {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="label">{t('email')}</label>
+                <label htmlFor="login-email" className="label">
+                  {t('email')}
+                </label>
                 <input
+                  id="login-email"
+                  autoComplete="username"
                   type="email"
                   className="input"
                   value={email}
@@ -92,8 +96,12 @@ export function AuthScreen() {
                 />
               </div>
               <div>
-                <label className="label">{t('password')}</label>
+                <label htmlFor="login-password" className="label">
+                  {t('password')}
+                </label>
                 <PasswordInput
+                  id="login-password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={t('passwordPlaceholder')}
@@ -104,6 +112,7 @@ export function AuthScreen() {
 
               {error && (
                 <div
+                  role="alert"
                   className="flex items-start gap-2.5 rounded-lg border p-3 text-sm"
                   style={{ borderColor: 'var(--fg)' }}
                 >

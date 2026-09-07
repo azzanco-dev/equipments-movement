@@ -23,6 +23,7 @@ export function DataListPagination({
         <button
           className="btn-outline px-3"
           disabled={page <= 1}
+          aria-label={t('previousPage')}
           onClick={() => onPage(page - 1)}
         >
           {dir === 'rtl' ? (
@@ -37,6 +38,7 @@ export function DataListPagination({
         <button
           className="btn-outline px-3"
           disabled={page >= pages}
+          aria-label={t('nextPage')}
           onClick={() => onPage(page + 1)}
         >
           {dir === 'rtl' ? (

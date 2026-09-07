@@ -12,8 +12,14 @@ import { formatDate } from '@/lib/dateFormat'
 import { Alert } from '@/components/Alert'
 import { RelativeTime } from '@/components/RelativeTime'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { useListRequest } from '@/components/data-list/useListRequest'
+import { useDataListState } from '@/components/data-list/useDataListState'
+import { DataListPagination } from '@/components/data-list/DataListPagination'
+import { PAGE_SIZE_OPTIONS } from '@/components/data-list/types'
+import { movementsListConfig } from '@/lib/listConfigs'
+import { useSearchParams } from 'next/navigation'
 
-async function loadLatestDriverNames(entryIds: string[]) {
+async function loadLatestDriverNames(entryIds: string[], signal: AbortSignal) {
   if (!entryIds.length) return new Map<string, string>()
   const { data } = await supabase
     .from('movement_driver_changes')
@@ -21,6 +27,7 @@ async function loadLatestDriverNames(entryIds: string[]) {
     .in('entry_log_id', entryIds)
     .order('changed_at', { ascending: false })
     .order('id', { ascending: false })
+    .abortSignal(signal)
   const latest = new Map<string, string>()
   for (const change of data ?? []) {
     if (!latest.has(change.entry_log_id))
@@ -40,10 +47,31 @@ export function SupervisorDashboard({
   const { user, profile } = useAuth()
   const [logs, setLogs] = useState<EntryExitLog[]>([])
   const [loading, setLoading] = useState(true)
-  const [filterType, setFilterType] = useState<'all' | MovementType>('all')
-  const [filterDate, setFilterDate] = useState('')
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
+  const list = useDataListState(movementsListConfig)
+  const { search, searchInput, setSearchInput } = list
+  const params = useSearchParams()
+  const requestedType = params.get('movement_type')
+  const filterType =
+    requestedType === 'entry' || requestedType === 'exit'
+      ? requestedType
+      : 'all'
+  const requestedDate = params.get('movement_date') ?? ''
+  const filterDate =
+    /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) &&
+    Number.isFinite(Date.parse(`${requestedDate}T00:00:00`))
+      ? requestedDate
+      : ''
+  const [total, setTotal] = useState(0)
+  const [loadError, setLoadError] = useState(false)
+  const changeFilters = (values: Record<string, string>) => {
+    const url = new URL(window.location.href)
+    for (const [key, value] of Object.entries(values)) {
+      if (value && value !== 'all') url.searchParams.set(key, value)
+      else url.searchParams.delete(key)
+    }
+    url.searchParams.delete('page')
+    window.history.replaceState(null, '', `${url.pathname}${url.search}`)
+  }
   const [classificationBusy, setClassificationBusy] = useState<string | null>(
     null,
   )
@@ -55,9 +83,12 @@ export function SupervisorDashboard({
     profile?.role === 'assistant_workshop_manager'
   const workshopMode = profile?.role === 'workshop' || workshopManagerMode
 
+  const startListRequest = useListRequest()
   const fetchLogs = useCallback(async () => {
     if (!user) return
+    const signal = startListRequest()
     setLoading(true)
+    setLoadError(false)
 
     const term = sanitizeSearchTerm(search)
     let equipmentIds: string[] = []
@@ -70,19 +101,23 @@ export function SupervisorDashboard({
             .from('equipment')
             .select('id')
             .or(`code.ilike.%${term}%,plate_number.ilike.%${term}%`)
+            .abortSignal(signal)
             .limit(100),
           supabase
             .from('companies')
             .select('id')
             .or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+            .abortSignal(signal)
             .limit(100),
           supabase
             .from('projects')
             .select('id')
             .or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+            .abortSignal(signal)
             .limit(100),
         ],
       )
+      if (signal.aborted) return
       equipmentIds = (equipmentResult.data ?? []).map((item) => item.id)
       companyIds = (companyResult.data ?? []).map((item) => item.id)
       projectIds = (projectResult.data ?? []).map((item) => item.id)
@@ -91,11 +126,13 @@ export function SupervisorDashboard({
     let query = supabase
       .from('entry_exit_logs')
       .select(
-        '*, equipment(*), supervisor:profiles(id,full_name,role,created_at)',
+        'id,equipment_id,supervisor_id,movement_type,movement_context,workshop_purpose,driver_name,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type),supervisor:profiles(id,full_name)',
+        { count: 'exact' },
       )
       .eq('movement_context', workshopMode ? 'workshop' : 'site')
       .order('created_at', { ascending: false })
-      .limit(100)
+      .order('id', { ascending: false })
+      .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
 
     if (term) {
       const filters = [`contractor_equipment_code.ilike.%${term}%`]
@@ -123,12 +160,16 @@ export function SupervisorDashboard({
         .lte('recorded_at', end.toISOString())
     }
 
-    const { data, error } = await query
-    if (error) console.error(error)
-    const rows = (data as EntryExitLog[]) ?? []
+    const { data, error, count } = await query.abortSignal(signal)
+    if (signal.aborted) return
+    if (error) setLoadError(true)
+    const rows = (data as unknown as EntryExitLog[]) ?? []
     const latestDrivers = await loadLatestDriverNames(
       rows.filter((row) => row.movement_type === 'entry').map((row) => row.id),
+      signal,
     )
+    if (signal.aborted) return
+    setTotal(count ?? 0)
     setLogs(
       rows.map((row) => ({
         ...row,
@@ -139,7 +180,16 @@ export function SupervisorDashboard({
       })),
     )
     setLoading(false)
-  }, [user, workshopMode, filterType, filterDate, search])
+  }, [
+    user,
+    workshopMode,
+    filterType,
+    filterDate,
+    search,
+    startListRequest,
+    list.page,
+    list.pageSize,
+  ])
 
   const classifyEntry = async (logId: string, purpose: string) => {
     setClassificationBusy(logId)
@@ -159,11 +209,6 @@ export function SupervisorDashboard({
   useEffect(() => {
     fetchLogs()
   }, [fetchLogs])
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setSearch(searchInput.trim()), 300)
-    return () => window.clearTimeout(timer)
-  }, [searchInput])
 
   return (
     <div className="space-y-6">
@@ -222,7 +267,7 @@ export function SupervisorDashboard({
         <Select
           className="w-auto min-w-[100px]"
           value={filterType}
-          onChange={(v) => setFilterType(v as 'all' | MovementType)}
+          onChange={(value) => changeFilters({ movement_type: value })}
           options={[
             { value: 'all', label: t('allTypes') },
             { value: 'entry', label: t('entry') },
@@ -232,14 +277,13 @@ export function SupervisorDashboard({
         <DatePicker
           className="w-auto"
           value={filterDate}
-          onChange={setFilterDate}
+          onChange={(value) => changeFilters({ movement_date: value })}
           placeholder={t('date')}
         />
         {(filterType !== 'all' || filterDate) && (
           <button
             onClick={() => {
-              setFilterType('all')
-              setFilterDate('')
+              changeFilters({ movement_type: '', movement_date: '' })
             }}
             className="text-xs text-muted hover:text-fg"
           >
@@ -261,6 +305,13 @@ export function SupervisorDashboard({
 
         {loading ? (
           <InlineSpinner label={t('loading')} />
+        ) : loadError ? (
+          <Alert type="error">
+            <span>{t('movementLoadError')}</span>{' '}
+            <button className="btn-outline" onClick={fetchLogs}>
+              {t('retry')}
+            </button>
+          </Alert>
         ) : logs.length === 0 ? (
           <div className="card text-center py-12">
             <p className="text-muted">{t('noLogs')}</p>
@@ -402,6 +453,28 @@ export function SupervisorDashboard({
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+        {!loading && !loadError && (
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm text-muted">
+              <span>{t('rowsPerPage')}</span>
+              <Select
+                className="w-24"
+                value={String(list.pageSize)}
+                onChange={(value) => list.setPageSize(Number(value))}
+                options={PAGE_SIZE_OPTIONS.map((value) => ({
+                  value: String(value),
+                  label: String(value),
+                }))}
+              />
+            </div>
+            <DataListPagination
+              page={list.page}
+              pageSize={list.pageSize}
+              total={total}
+              onPage={list.setPage}
+            />
           </div>
         )}
       </div>

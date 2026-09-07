@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import * as XLSX from 'xlsx'
 import {
   ChevronLeft,
   ChevronRight,
@@ -22,6 +21,7 @@ import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/components/Select'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { useListRequest } from '@/components/data-list/useListRequest'
 
 type EquipmentTypeRow = { id: string; name: string }
 const PAGE_SIZE = 20
@@ -37,6 +37,7 @@ export function AdminSettings() {
   const [typesCount, setTypesCount] = useState<number | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<EquipmentTypeRow | null>(null)
@@ -51,7 +52,17 @@ export function AdminSettings() {
   const [openingSaving, setOpeningSaving] = useState(false)
   const [openingMessage, setOpeningMessage] = useState<string | null>(null)
 
+  const startRequest = useListRequest()
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearch(searchInput.trim())
+      setPage(1)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [searchInput])
+
   const fetchRows = useCallback(async () => {
+    const signal = startRequest()
     setLoading(true)
     let query = supabase
       .from('equipment_types')
@@ -59,11 +70,12 @@ export function AdminSettings() {
       .order('name')
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
     if (search.trim()) query = query.ilike('name', `%${search.trim()}%`)
-    const { data, count } = await query
+    const { data, count } = await query.abortSignal(signal)
+    if (signal.aborted) return
     setRows((data as EquipmentTypeRow[]) ?? [])
     setTotal(count ?? 0)
     setLoading(false)
-  }, [page, search])
+  }, [page, search, startRequest])
 
   useEffect(() => {
     supabase
@@ -122,7 +134,8 @@ export function AdminSettings() {
     await fetchRows()
   }
 
-  function downloadTemplate() {
+  async function downloadTemplate() {
+    const XLSX = await import('xlsx')
     const sheet = XLSX.utils.json_to_sheet([
       { [t('equipmentTypeName')]: 'حفار' },
     ])
@@ -137,6 +150,7 @@ export function AdminSettings() {
     setError(null)
     let fileParsed = false
     try {
+      const XLSX = await import('xlsx')
       const book = XLSX.read(await file.arrayBuffer(), { type: 'array' })
       const sheet = book.Sheets[book.SheetNames[0]]
       const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
@@ -357,10 +371,9 @@ export function AdminSettings() {
         </div>
         <input
           className="input max-w-md"
-          value={search}
+          value={searchInput}
           onChange={(event) => {
-            setSearch(event.target.value)
-            setPage(1)
+            setSearchInput(event.target.value)
           }}
           placeholder={t('searchEquipmentTypes')}
         />

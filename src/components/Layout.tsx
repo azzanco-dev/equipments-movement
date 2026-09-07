@@ -13,6 +13,7 @@ import { useTheme } from '@/theme/ThemeContext'
 import { useAuth } from '@/auth/AuthContext'
 import { useEffect, useRef, useState } from 'react'
 import { Modal } from '@/components/Modal'
+import { usePathname } from 'next/navigation'
 
 interface LayoutProps {
   children: ReactNode
@@ -30,6 +31,9 @@ export function Layout({
   const { t, toggleLanguage, lang } = useI18n()
   const { theme, toggleTheme } = useTheme()
   const { profile, signOut } = useAuth()
+  const pathname = usePathname()
+  const isCurrentPage = (page: string) =>
+    pathname === `/${page}` || (page === 'dashboard' && pathname === '/')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [logoutOpen, setLogoutOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -46,7 +50,22 @@ export function Layout({
     return () => document.removeEventListener('mousedown', close)
   }, [])
 
-  useEffect(() => setPendingPage(null), [activePage])
+  useEffect(() => {
+    setPendingPage(null)
+    setMobileOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    if (!mobileOpen && !userMenuOpen) return
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileOpen(false)
+        setUserMenuOpen(false)
+      }
+    }
+    document.addEventListener('keydown', close)
+    return () => document.removeEventListener('keydown', close)
+  }, [mobileOpen, userMenuOpen])
 
   const roleLabel =
     profile?.role === 'admin'
@@ -64,7 +83,7 @@ export function Layout({
   return (
     <div
       className="min-h-screen"
-      style={{ background: 'var(--bg)', color: 'var(--fg)' }}
+      style={{ background: 'var(--surface)', color: 'var(--fg)' }}
     >
       {/* Top bar */}
       {pendingPage && (
@@ -82,16 +101,20 @@ export function Layout({
       >
         <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
-            <button
-              className="lg:hidden btn-ghost p-2"
-              onClick={() => setMobileOpen(!mobileOpen)}
-            >
-              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
+            {navItems.length > 0 && (
+              <button
+                className="lg:hidden btn-ghost p-2"
+                aria-label={t('navigationMenu')}
+                aria-expanded={mobileOpen}
+                onClick={() => setMobileOpen(!mobileOpen)}
+              >
+                {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
+            )}
             <button
               className="flex items-center gap-2 cursor-pointer"
               onClick={() => {
-                if (pendingPage || activePage === 'dashboard') return
+                if (isCurrentPage('dashboard')) return
                 setPendingPage('dashboard')
                 onNavigate('dashboard')
               }}
@@ -215,49 +238,54 @@ export function Layout({
 
       <div className="mx-auto flex max-w-[1600px]">
         {/* Sidebar — desktop */}
-        <aside
-          className="hidden lg:flex w-60 shrink-0 flex-col border-e p-4 sticky top-16 h-[calc(100vh-4rem)]"
-          style={{ borderColor: 'var(--border)' }}
-        >
-          <nav className="flex flex-col gap-1">
-            {navItems.map((item) => (
-              <button
-                key={item.key}
-                disabled={Boolean(pendingPage) || activePage === item.key}
-                onClick={() => {
-                  if (pendingPage || activePage === item.key) return
-                  setPendingPage(item.key)
-                  onNavigate(item.key)
-                }}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
-                  activePage === item.key
-                    ? 'nav-active'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-fg'
-                }`}
-              >
-                {item.icon}
-                {item.label}
-              </button>
-            ))}
-          </nav>
-        </aside>
+        {navItems.length > 0 && (
+          <aside
+            className="hidden lg:flex w-60 shrink-0 flex-col border-e p-4 sticky top-16 h-[calc(100dvh-4rem)] overflow-y-auto"
+            style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}
+          >
+            <nav className="flex flex-col gap-1">
+              {navItems.map((item) => (
+                <button
+                  key={item.key}
+                  aria-current={activePage === item.key ? 'page' : undefined}
+                  onClick={() => {
+                    if (isCurrentPage(item.key)) return
+                    setPendingPage(item.key)
+                    onNavigate(item.key)
+                  }}
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
+                    activePage === item.key
+                      ? 'nav-active'
+                      : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-fg'
+                  }`}
+                >
+                  {item.icon}
+                  {item.label}
+                </button>
+              ))}
+            </nav>
+          </aside>
+        )}
 
         {/* Sidebar — mobile drawer */}
         {mobileOpen && (
           <div
             className="lg:hidden fixed inset-0 z-30 animate-fade-in"
             style={{ background: 'var(--overlay)' }}
+            onClick={() => setMobileOpen(false)}
           >
             <div
               className="absolute inset-y-0 start-0 w-64 border-e p-4 pt-20 overflow-y-auto"
               style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}
+              onClick={(event) => event.stopPropagation()}
             >
               <nav className="flex flex-col gap-1">
                 {navItems.map((item) => (
                   <button
                     key={item.key}
                     onClick={() => {
-                      if (pendingPage || activePage === item.key) return
+                      setMobileOpen(false)
+                      if (isCurrentPage(item.key)) return
                       setPendingPage(item.key)
                       onNavigate(item.key)
                       setMobileOpen(false)

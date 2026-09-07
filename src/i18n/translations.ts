@@ -513,6 +513,14 @@ export const translations = {
     profileLoadError:
       'تعذر تحميل بيانات حسابك. تحقق من الانترنت ثم حاول مرة اخرى',
     retry: 'اعادة المحاولة',
+    optionsLoadError: 'تعذر تحميل الخيارات. حاول مرة اخرى.',
+    navigationMenu: 'قائمة التنقل',
+    rowsPerPage: 'عدد الصفوف في الصفحة',
+    previousPage: 'الصفحة السابقة',
+    nextPage: 'الصفحة التالية',
+    printQrError:
+      'تعذر فتح معاينة الطباعة. تحقق من السماح بالنوافذ المنبثقة وحاول مرة اخرى.',
+    equipmentLoadError: 'تعذر تحميل بيانات المعدة. حاول مرة اخرى.',
     temporaryPassword: 'كلمة مرور مؤقتة جديدة',
     temporaryPasswordHelp: 'اتركها فارغة إذا لم ترغب في تغيير كلمة المرور.',
     mustChangePassword: 'يجب تغيير كلمة المرور',
@@ -1141,6 +1149,14 @@ export const translations = {
     profileLoadError:
       'Could not load your account. Check your connection and try again.',
     retry: 'Retry',
+    optionsLoadError: 'Could not load options. Please try again.',
+    navigationMenu: 'Navigation menu',
+    rowsPerPage: 'Rows per page',
+    previousPage: 'Previous page',
+    nextPage: 'Next page',
+    printQrError:
+      'Could not open the print preview. Allow popups and try again.',
+    equipmentLoadError: 'Could not load the equipment. Please try again.',
     temporaryPassword: 'New Temporary Password',
     temporaryPasswordHelp: 'Leave blank to keep the current password.',
     mustChangePassword: 'Password change required',

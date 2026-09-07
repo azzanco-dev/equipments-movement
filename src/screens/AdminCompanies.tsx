@@ -29,6 +29,7 @@ import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { useDataListState } from '@/components/data-list/useDataListState'
+import { useListRequest } from '@/components/data-list/useListRequest'
 import { companiesListConfig } from '@/lib/listConfigs'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { sanitizeSearchTerm } from '@/lib/search'
@@ -81,12 +82,15 @@ export function AdminCompanies() {
     null,
   )
 
+  const startListRequest = useListRequest()
   const fetchCompanies = useCallback(async () => {
+    const signal = startListRequest()
     setLoading(true)
     let query = supabase
       .from('companies')
       .select('id,name_ar,name_en,created_at', { count: 'exact' })
       .order(list.sort, { ascending: list.direction === 'asc' })
+      .order('id', { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
     const term = sanitizeSearchTerm(list.search)
     if (term)
@@ -96,13 +100,15 @@ export function AdminCompanies() {
       list.filters,
       new Set(companiesListConfig.filterFields.map((field) => field.key)),
     )
-    const { data, error, count } = await query
+    const { data, error, count } = await query.abortSignal(signal)
+    if (signal.aborted) return
     if (error) console.error(error)
     setCompanies((data as Company[]) ?? [])
     setTotal(count ?? 0)
     setLoading(false)
   }, [
     list.direction,
+    startListRequest,
     list.filters,
     list.page,
     list.pageSize,

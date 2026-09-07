@@ -27,6 +27,8 @@ export function AsyncMultiSelect({
   const [query, setQuery] = useState('')
   const [options, setOptions] = useState<SelectOption[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+  const [retry, setRetry] = useState(0)
   const [selectingAll, setSelectingAll] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -99,20 +101,30 @@ export function AsyncMultiSelect({
   useEffect(() => {
     if (!open) return
     const requestId = ++requestRef.current
+    setLoading(true)
+    setLoadError(false)
     const timer = window.setTimeout(
       async () => {
         setLoading(true)
         try {
           const next = await loadOptions(query.trim())
           if (requestId === requestRef.current) setOptions(next.slice(0, 20))
+        } catch {
+          if (requestId === requestRef.current) {
+            setOptions([])
+            setLoadError(true)
+          }
         } finally {
           if (requestId === requestRef.current) setLoading(false)
         }
       },
       query ? 300 : 0,
     )
-    return () => window.clearTimeout(timer)
-  }, [loadOptions, open, query])
+    return () => {
+      window.clearTimeout(timer)
+      requestRef.current = requestId + 1
+    }
+  }, [open, query, loadOptions, retry])
 
   const toggle = (option: SelectOption) => {
     const selected = value.some((item) => item.value === option.value)
@@ -193,6 +205,16 @@ export function AsyncMultiSelect({
         createPortal(
           <div
             ref={menuRef}
+            data-select-portal="true"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.stopPropagation()
+                setOpen(false)
+                rootRef.current
+                  ?.querySelector<HTMLElement>('button, [role="combobox"]')
+                  ?.focus()
+              }
+            }}
             role="listbox"
             aria-multiselectable="true"
             className="fixed z-[100] flex flex-col overflow-hidden rounded-lg border shadow-lg"
@@ -229,6 +251,20 @@ export function AsyncMultiSelect({
                 <div className="flex items-center justify-center gap-2 px-3 py-5 text-sm text-muted">
                   <Loader2 size={16} className="animate-spin" />
                   {t('loading')}
+                </div>
+              ) : loadError ? (
+                <div
+                  role="alert"
+                  className="space-y-2 px-3 py-4 text-center text-sm text-muted"
+                >
+                  <p>{t('optionsLoadError')}</p>
+                  <button
+                    type="button"
+                    className="btn-outline"
+                    onClick={() => setRetry((value) => value + 1)}
+                  >
+                    {t('retry')}
+                  </button>
                 </div>
               ) : options.length === 0 ? (
                 <div className="px-3 py-5 text-center text-sm text-muted">

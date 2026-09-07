@@ -3,7 +3,6 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { InlineSpinner } from '@/components/Spinner'
-import { exportLogsToExcel, exportVisitsToExcel } from '@/lib/excel'
 import { LogIn, LogOut, Truck, AlertCircle, Download } from 'lucide-react'
 import type { EntryExitLog, Equipment, EquipmentVisit } from '@/lib/types'
 import { PageHeader } from '@/components/PageHeader'
@@ -11,6 +10,7 @@ import { sanitizeSearchTerm } from '@/lib/search'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { useDataListState } from '@/components/data-list/useDataListState'
+import { useListRequest } from '@/components/data-list/useListRequest'
 import { movementsListConfig, visitsListConfig } from '@/lib/listConfigs'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
@@ -18,7 +18,7 @@ import { Modal } from '@/components/Modal'
 import { localizedName } from '@/lib/localizedName'
 import { RelativeTime } from '@/components/RelativeTime'
 
-async function loadLatestDriverNames(entryIds: string[]) {
+async function loadLatestDriverNames(entryIds: string[], signal: AbortSignal) {
   if (!entryIds.length) return new Map<string, string>()
   const { data } = await supabase
     .from('movement_driver_changes')
@@ -26,6 +26,7 @@ async function loadLatestDriverNames(entryIds: string[]) {
     .in('entry_log_id', entryIds)
     .order('changed_at', { ascending: false })
     .order('id', { ascending: false })
+    .abortSignal(signal)
   const latest = new Map<string, string>()
   for (const change of data ?? []) {
     if (!latest.has(change.entry_log_id))
@@ -280,7 +281,10 @@ export function AdminDashboard({
     }
   }, [selectedSummary, summaryPage])
 
+  const startLogsRequest = useListRequest()
+  const startVisitsRequest = useListRequest()
   const fetchLogs = useCallback(async () => {
+    const signal = startLogsRequest()
     setLoadingLogs(true)
     const term = sanitizeSearchTerm(list.search)
     let equipmentIds: string[] = []
@@ -292,6 +296,8 @@ export function AdminDashboard({
           `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`,
         )
         .limit(100)
+        .abortSignal(signal)
+      if (signal.aborted) return
       equipmentIds = (equipmentMatches ?? []).map((item) => item.id)
     }
     let query = supabase
@@ -301,6 +307,7 @@ export function AdminDashboard({
         { count: 'exact' },
       )
       .order(list.sort, { ascending: list.direction === 'asc' })
+      .order('id', { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
     if (term)
       query = query.or(
@@ -311,12 +318,15 @@ export function AdminDashboard({
       list.filters,
       new Set(movementsListConfig.filterFields.map((field) => field.key)),
     )
-    const { data, error, count } = await query
+    const { data, error, count } = await query.abortSignal(signal)
+    if (signal.aborted) return
     if (error) console.error(error)
     const rows = (data as unknown as EntryExitLog[]) ?? []
     const latestDrivers = await loadLatestDriverNames(
       rows.filter((row) => row.movement_type === 'entry').map((row) => row.id),
+      signal,
     )
+    if (signal.aborted) return
     setLogs(
       rows.map((row) => ({
         ...row,
@@ -330,6 +340,7 @@ export function AdminDashboard({
     setLoadingLogs(false)
   }, [
     list.direction,
+    startLogsRequest,
     list.filters,
     list.page,
     list.pageSize,
@@ -338,6 +349,7 @@ export function AdminDashboard({
   ])
 
   const fetchVisits = useCallback(async () => {
+    const signal = startVisitsRequest()
     setLoadingVisits(true)
     let query = supabase
       .from('equipment_visits')
@@ -346,6 +358,7 @@ export function AdminDashboard({
         { count: 'exact' },
       )
       .order(visitList.sort, { ascending: visitList.direction === 'asc' })
+      .order('entry_log_id', { ascending: visitList.direction === 'asc' })
       .range(
         (visitList.page - 1) * visitList.pageSize,
         visitList.page * visitList.pageSize - 1,
@@ -360,12 +373,15 @@ export function AdminDashboard({
       visitList.filters,
       new Set(visitsListConfig.filterFields.map((field) => field.key)),
     )
-    const { data, error, count } = await query
+    const { data, error, count } = await query.abortSignal(signal)
+    if (signal.aborted) return
     if (error) console.error(error)
     const rows = (data as unknown as EquipmentVisit[]) ?? []
     const latestDrivers = await loadLatestDriverNames(
       rows.map((row) => row.entry_log_id),
+      signal,
     )
+    if (signal.aborted) return
     setVisits(
       rows.map((row) => ({
         ...row,
@@ -379,6 +395,7 @@ export function AdminDashboard({
     setLoadingVisits(false)
   }, [
     visitList.direction,
+    startVisitsRequest,
     visitList.filters,
     visitList.page,
     visitList.pageSize,
@@ -665,13 +682,14 @@ export function AdminDashboard({
             onFilters={list.setFilters}
             menuActions={
               <button
-                onClick={() =>
+                onClick={async () => {
+                  const { exportLogsToExcel } = await import('@/lib/excel')
                   exportLogsToExcel(
                     logs,
                     `logs-${new Date().toISOString().slice(0, 10)}`,
                     t as (k: string) => string,
                   )
-                }
+                }}
                 className="btn-ghost"
                 disabled={logs.length === 0}
               >
@@ -816,13 +834,14 @@ export function AdminDashboard({
             onFilters={visitList.setFilters}
             menuActions={
               <button
-                onClick={() =>
+                onClick={async () => {
+                  const { exportVisitsToExcel } = await import('@/lib/excel')
                   exportVisitsToExcel(
                     visits,
                     `visits-${new Date().toISOString().slice(0, 10)}`,
                     t as (k: string) => string,
                   )
-                }
+                }}
                 className="btn-ghost"
                 disabled={visits.length === 0}
               >

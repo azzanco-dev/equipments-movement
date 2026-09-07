@@ -39,6 +39,7 @@ import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { useDataListState } from '@/components/data-list/useDataListState'
+import { useListRequest } from '@/components/data-list/useListRequest'
 import { equipmentListConfig } from '@/lib/listConfigs'
 import { applyListFilters } from '@/lib/applyListFilters'
 import {
@@ -49,6 +50,8 @@ import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import { localizedName } from '@/lib/localizedName'
 import { RelativeTime } from '@/components/RelativeTime'
 import { EquipmentExcelUpdate } from '@/components/EquipmentExcelUpdate'
+import { printEquipmentQr } from '@/lib/printEquipmentQr'
+import { useSearchParams } from 'next/navigation'
 
 function genQrValue(): string {
   return `EQ-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
@@ -82,6 +85,8 @@ export function AdminEquipment({
   onSelectEquipment,
 }: AdminEquipmentProps = {}) {
   const { t, lang } = useI18n()
+  const editId = useSearchParams().get('edit')
+  const [pageError, setPageError] = useState<string | null>(null)
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [importProjectMap, setImportProjectMap] = useState<Map<string, string>>(
     new Map(),
@@ -126,8 +131,11 @@ export function AdminEquipment({
     )
   }
 
+  const startListRequest = useListRequest()
   const fetchEquipment = useCallback(async () => {
+    const signal = startListRequest()
     setLoading(true)
+    setPageError(null)
     let query = supabase
       .from('equipment')
       .select(
@@ -135,6 +143,7 @@ export function AdminEquipment({
         { count: 'exact' },
       )
       .order(list.sort, { ascending: list.direction === 'asc' })
+      .order('id', { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
     const term = sanitizeSearchTerm(list.search)
     if (term) {
@@ -147,13 +156,16 @@ export function AdminEquipment({
       list.filters,
       new Set(equipmentListConfig.filterFields.map((field) => field.key)),
     )
-    const { data, error, count } = await query
-    if (error) console.error(error)
+    const { data, error, count } = await query.abortSignal(signal)
+    if (signal.aborted) return
+    if (error) setPageError(t('equipmentLoadError'))
     setEquipment((data as unknown as Equipment[]) ?? [])
     setTotal(count ?? 0)
     setLoading(false)
   }, [
     list.direction,
+    startListRequest,
+    t,
     list.filters,
     list.page,
     list.pageSize,
@@ -220,52 +232,70 @@ export function AdminEquipment({
     setModalOpen(true)
   }
 
-  function openEdit(eq: Equipment) {
-    setEditing(eq)
-    setForm({
-      code: eq.code,
-      type: eq.type,
-      plate_number: eq.plate_number ?? '',
-      numbering_status: eq.numbering_status ?? 'numbered',
-      operational_status: eq.operational_status,
-      ownership_status: eq.ownership_status,
-      project_id: eq.project_id ?? '',
-      lessor_id: eq.lessor_id ?? '',
-      brand: eq.brand ?? '',
-      model: eq.model ?? '',
-      manufacture_year: eq.manufacture_year?.toString() ?? '',
-      chassis_number: eq.chassis_number ?? '',
-      registration_type: eq.registration_type ?? '',
-      qr_value: eq.qr_value,
-      last_maintenance_date: eq.last_maintenance_date ?? '',
-      registration_expiry: eq.registration_expiry ?? '',
-      insurance_expiry: eq.insurance_expiry ?? '',
-    })
-    setSelectedProjectOption(
-      eq.project
-        ? {
-            value: eq.project.id,
-            label: localizedName(lang, eq.project.name_ar, eq.project.name_en),
-          }
-        : null,
-    )
-    setSelectedLessorOption(
-      eq.lessor ? { value: eq.lessor.id, label: eq.lessor.name } : null,
-    )
-    setFormError(null)
-    setModalOpen(true)
-  }
+  const openEdit = useCallback(
+    (eq: Equipment) => {
+      setEditing(eq)
+      setForm({
+        code: eq.code,
+        type: eq.type,
+        plate_number: eq.plate_number ?? '',
+        numbering_status: eq.numbering_status ?? 'numbered',
+        operational_status: eq.operational_status,
+        ownership_status: eq.ownership_status,
+        project_id: eq.project_id ?? '',
+        lessor_id: eq.lessor_id ?? '',
+        brand: eq.brand ?? '',
+        model: eq.model ?? '',
+        manufacture_year: eq.manufacture_year?.toString() ?? '',
+        chassis_number: eq.chassis_number ?? '',
+        registration_type: eq.registration_type ?? '',
+        qr_value: eq.qr_value,
+        last_maintenance_date: eq.last_maintenance_date ?? '',
+        registration_expiry: eq.registration_expiry ?? '',
+        insurance_expiry: eq.insurance_expiry ?? '',
+      })
+      setSelectedProjectOption(
+        eq.project
+          ? {
+              value: eq.project.id,
+              label: localizedName(
+                lang,
+                eq.project.name_ar,
+                eq.project.name_en,
+              ),
+            }
+          : null,
+      )
+      setSelectedLessorOption(
+        eq.lessor ? { value: eq.lessor.id, label: eq.lessor.name } : null,
+      )
+      setFormError(null)
+      setModalOpen(true)
+    },
+    [lang],
+  )
 
   useEffect(() => {
-    function handleEditEvent(e: Event) {
-      const eq = (e as CustomEvent).detail as Equipment
-      openEdit(eq)
-    }
-    window.addEventListener('edit-equipment', handleEditEvent)
-    return () => window.removeEventListener('edit-equipment', handleEditEvent)
-    // The handler only needs to refresh its localized project label when language changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lang])
+    if (!editId) return
+    const controller = new AbortController()
+    void (async () => {
+      const { data, error } = await supabase
+        .from('equipment')
+        .select(
+          '*,project:projects(id,name_ar,name_en),lessor:lessors(id,name)',
+        )
+        .eq('id', editId)
+        .abortSignal(controller.signal)
+        .maybeSingle()
+      if (controller.signal.aborted) return
+      if (error || !data) setPageError(t('equipmentLoadError'))
+      else openEdit(data as Equipment)
+      const url = new URL(window.location.href)
+      url.searchParams.delete('edit')
+      window.history.replaceState(null, '', `${url.pathname}${url.search}`)
+    })()
+    return () => controller.abort()
+  }, [editId, openEdit, t])
 
   async function handleSave() {
     if (form.numbering_status === 'numbered' && !form.plate_number) {
@@ -333,13 +363,8 @@ export function AdminEquipment({
   }
 
   function printQR(eq: Equipment) {
-    const win = window.open('', '_blank')
-    if (!win) return
-    win.document.write(
-      `<html><head><title>QR - ${eq.code}</title></head><body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif"><h2>${eq.code}</h2><p>${eq.type}</p><img src="https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(eq.qr_value)}" alt="QR" style="width:256px;height:256px"/><p style="margin-top:8px;font-size:12px;color:#666">${eq.qr_value}</p></body></html>`,
-    )
-    win.document.close()
-    win.print()
+    setPageError(null)
+    void printEquipmentQr(eq, () => setPageError(t('printQrError')))
   }
 
   async function handleFileSelect(file: File) {
@@ -593,6 +618,7 @@ export function AdminEquipment({
 
   return (
     <div ref={listTopRef} className="space-y-4 scroll-mt-20">
+      {pageError && <Alert type="error">{pageError}</Alert>}
       <PageHeader
         title={t('equipmentList')}
         description={t('equipmentDesc')}
@@ -1024,6 +1050,7 @@ export function AdminEquipment({
       >
         {qrModal && (
           <div className="flex flex-col items-center gap-4 py-4">
+            {pageError && <Alert type="error">{pageError}</Alert>}
             <p className="font-bold text-lg">{qrModal.code}</p>
             <p className="text-sm text-muted">{qrModal.type}</p>
             <QRCodeDisplay value={qrModal.qr_value} size={200} />

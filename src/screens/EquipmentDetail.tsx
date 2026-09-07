@@ -27,6 +27,9 @@ import {
 } from '@/lib/equipmentOwnership'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
+import { printEquipmentQr } from '@/lib/printEquipmentQr'
+import { Alert } from '@/components/Alert'
+import { useListRequest } from '@/components/data-list/useListRequest'
 
 interface EquipmentDetailProps {
   equipmentId: string
@@ -47,25 +50,36 @@ export function EquipmentDetail({
   const [equipment, setEquipment] = useState<Equipment | null>(null)
   const [logs, setLogs] = useState<EntryExitLog[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const startRequest = useListRequest()
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const { data: eqData } = await supabase
-      .from('equipment')
-      .select('*, project:projects(*), lessor:lessors(*)')
-      .eq('id', equipmentId)
-      .maybeSingle()
-    setEquipment(eqData as Equipment | null)
-
-    const { data: logData } = await supabase
-      .from('entry_exit_logs')
-      .select('*, supervisor:profiles(*)')
-      .eq('equipment_id', equipmentId)
-      .order('recorded_at', { ascending: false })
-      .limit(10)
-    setLogs((logData as EntryExitLog[]) ?? [])
+    setError(null)
+    const signal = startRequest()
+    const [equipmentResult, logsResult] = await Promise.all([
+      supabase
+        .from('equipment')
+        .select('*, project:projects(*), lessor:lessors(*)')
+        .eq('id', equipmentId)
+        .abortSignal(signal)
+        .maybeSingle(),
+      supabase
+        .from('entry_exit_logs')
+        .select('*, supervisor:profiles(*)')
+        .eq('equipment_id', equipmentId)
+        .order('recorded_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(10)
+        .abortSignal(signal),
+    ])
+    if (signal.aborted) return
+    if (equipmentResult.error || logsResult.error)
+      setError(t('equipmentLoadError'))
+    setEquipment(equipmentResult.data as Equipment | null)
+    setLogs((logsResult.data as EntryExitLog[]) ?? [])
     setLoading(false)
-  }, [equipmentId])
+  }, [equipmentId, startRequest, t])
 
   useEffect(() => {
     fetchData()
@@ -106,13 +120,8 @@ export function EquipmentDetail({
   }
 
   function printQR(eq: Equipment) {
-    const win = window.open('', '_blank')
-    if (!win) return
-    win.document.write(
-      `<html><head><title>QR - ${eq.code}</title></head><body style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif"><h2>${eq.code}</h2><p>${eq.type}</p><img src="https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(eq.qr_value)}" alt="QR" style="width:256px;height:256px"/><p style="margin-top:8px;font-size:12px;color:#666">${eq.qr_value}</p></body></html>`,
-    )
-    win.document.close()
-    win.print()
+    setError(null)
+    void printEquipmentQr(eq, () => setError(t('printQrError')))
   }
 
   if (loading) return <InlineSpinner label={t('loading')} />
@@ -123,13 +132,19 @@ export function EquipmentDetail({
           <ArrowLeft size={18} className="rtl-flip" /> {t('backToEquipment')}
         </button>
         <div className="card text-center py-12">
-          <p className="text-muted">{t('noEquipment')}</p>
+          <p className="text-muted">{error ?? t('noEquipment')}</p>
+          {error && (
+            <button className="btn-outline mt-3" onClick={fetchData}>
+              {t('retry')}
+            </button>
+          )}
         </div>
       </div>
     )
 
   return (
     <div className="space-y-6">
+      {error && <Alert type="error">{error}</Alert>}
       {/* Back button */}
       <button onClick={onBack} className="btn-ghost">
         <ArrowLeft size={18} className="rtl-flip" /> {t('backToEquipment')}

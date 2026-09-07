@@ -1,4 +1,3 @@
-import * as tus from 'tus-js-client'
 import { supabase } from '@/lib/supabase'
 
 interface UploadAuthorization {
@@ -32,11 +31,12 @@ function resumableUploadEndpoint() {
     : `${url.origin}/storage/v1/upload/resumable`
 }
 
-function uploadResumably(
+async function uploadResumably(
   file: File,
   authorization: UploadAuthorization,
   accessToken: string,
 ): Promise<void> {
+  const tus = await import('tus-js-client')
   return new Promise((resolve, reject) => {
     const upload = new tus.Upload(file, {
       endpoint: resumableUploadEndpoint(),

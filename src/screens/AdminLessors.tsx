@@ -11,6 +11,7 @@ import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { useDataListState } from '@/components/data-list/useDataListState'
+import { useListRequest } from '@/components/data-list/useListRequest'
 import { lessorsListConfig } from '@/lib/listConfigs'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { sanitizeSearchTerm } from '@/lib/search'
@@ -30,7 +31,9 @@ export function AdminLessors() {
   const [total, setTotal] = useState(0)
   const list = useDataListState(lessorsListConfig)
 
+  const startListRequest = useListRequest()
   const fetchLessors = useCallback(async () => {
+    const signal = startListRequest()
     setLoading(true)
     let query = supabase
       .from('lessors')
@@ -38,6 +41,7 @@ export function AdminLessors() {
         count: 'exact',
       })
       .order(list.sort, { ascending: list.direction === 'asc' })
+      .order('id', { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
     const term = sanitizeSearchTerm(list.search)
     if (term)
@@ -49,13 +53,15 @@ export function AdminLessors() {
       list.filters,
       new Set(lessorsListConfig.filterFields.map((field) => field.key)),
     )
-    const { data, error, count } = await query
+    const { data, error, count } = await query.abortSignal(signal)
+    if (signal.aborted) return
     if (error) console.error(error)
     setLessors((data as Lessor[]) ?? [])
     setTotal(count ?? 0)
     setLoading(false)
   }, [
     list.direction,
+    startListRequest,
     list.filters,
     list.page,
     list.pageSize,

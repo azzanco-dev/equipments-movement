@@ -70,47 +70,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true
+    let revision = 0
+    let deferred: ReturnType<typeof setTimeout> | undefined
 
-    const applySession = async (session: Session | null) => {
-      let nextProfile: Profile | null = null
-      try {
-        nextProfile = session?.user ? await fetchProfile(session.user.id) : null
-      } catch {
-        if (!active) return
-        currentUserIdRef.current = session?.user.id ?? null
+    const applySession = (session: Session | null) => {
+      const userId = session?.user.id ?? null
+      if (userId === currentUserIdRef.current && userId) {
         setSession(session)
-        setUser(session?.user ?? null)
-        setProfileLoadError(Boolean(session))
-        setLoading(false)
         return
       }
-      if (!active) return
-      currentUserIdRef.current = session?.user.id ?? null
+      const request = ++revision
+      clearTimeout(deferred)
+      currentUserIdRef.current = userId
       setSession(session)
       setUser(session?.user ?? null)
-      setProfile(nextProfile)
+      setProfile(null)
       setProfileLoadError(false)
-      setLoading(false)
+      setLoading(Boolean(session))
+      if (!userId) return
+      // Supabase queries must start after the auth callback releases its lock.
+      deferred = setTimeout(async () => {
+        try {
+          const nextProfile = await fetchProfile(userId)
+          if (!active || request !== revision) return
+          setProfile(nextProfile)
+          setProfileLoadError(!nextProfile)
+        } catch {
+          if (!active || request !== revision) return
+          setProfileLoadError(true)
+        } finally {
+          if (active && request === revision) setLoading(false)
+        }
+      }, 0)
     }
-
-    supabase.auth
-      .getSession()
-      .then(({ data: { session } }) => applySession(session))
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user.id === currentUserIdRef.current) {
-        // Token refreshes and tab focus events can repeat the same session.
-        // Keep the user/profile references stable so screens do not refetch.
-        setSession(session)
-        return
-      }
-      void applySession(session)
+      // INITIAL_SESSION initializes the provider without a duplicate getSession.
+      if (active) applySession(session)
     })
 
     return () => {
       active = false
+      currentUserIdRef.current = null
+      clearTimeout(deferred)
       subscription.unsubscribe()
     }
   }, [fetchProfile])
@@ -121,25 +125,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password: string,
     ): Promise<{ error: SignInError | null }> => {
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
         if (error) return { error: mapSignInError(error) }
 
-        const nextProfile = await fetchProfile(data.user.id)
-        currentUserIdRef.current = data.user.id
-        setSession(data.session)
-        setUser(data.user)
-        setProfile(nextProfile)
-        setProfileLoadError(false)
-        setLoading(false)
         return { error: null }
       } catch {
         return { error: 'authConnectionError' }
       }
     },
-    [fetchProfile],
+    [],
   )
 
   const signOut = useCallback(async () => {
@@ -150,10 +147,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = useCallback(async () => {
     if (!user) return
     try {
-      setProfile(await fetchProfile(user.id))
-      setProfileLoadError(false)
+      const nextProfile = await fetchProfile(user.id)
+      if (currentUserIdRef.current !== user.id) return
+      setProfile(nextProfile)
+      setProfileLoadError(!nextProfile)
     } catch {
-      setProfileLoadError(true)
+      if (currentUserIdRef.current === user.id) setProfileLoadError(true)
     }
   }, [fetchProfile, user])
 

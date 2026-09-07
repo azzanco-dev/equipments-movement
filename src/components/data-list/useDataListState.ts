@@ -1,17 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
 import type { DataListConfig, ListFilter } from './types'
 
 const validSizes = new Set([20, 50, 100, 200, 350, 500])
 
 export function useDataListState(config: DataListConfig, prefix = '') {
-  const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
   const key = useCallback((name: string) => `${prefix}${name}`, [prefix])
   const [searchInput, setSearchInput] = useState(params.get(key('q')) ?? '')
+  const pendingSearch = useRef(false)
   const search = params.get(key('q')) ?? ''
-  const page = Math.max(1, Number(params.get(key('page'))) || 1)
+  const requestedPage = Number(params.get(key('page')))
+  const page =
+    Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
   const requestedSize = Number(params.get(key('size'))) || 20
   const pageSize = validSizes.has(requestedSize) ? requestedSize : 20
   const requestedSort = params.get(key('sort')) ?? config.defaultSort
@@ -26,22 +28,28 @@ export function useDataListState(config: DataListConfig, prefix = '') {
       : params.get(key('dir')) === 'asc'
         ? 'asc'
         : (config.defaultDirection ?? 'asc')
+  const serializedFilters = params.get(key('filters')) ?? '[]'
   const filters = useMemo<ListFilter[]>(() => {
     try {
-      const value = JSON.parse(
-        params.get(key('filters')) ?? '[]',
-      ) as ListFilter[]
-      return value.filter((filter) =>
-        config.filterFields.some(
-          (field) =>
-            field.key === filter.field &&
-            field.operators.includes(filter.operator),
-        ),
+      const value = JSON.parse(serializedFilters) as ListFilter[]
+      if (!Array.isArray(value)) return []
+      return value.filter(
+        (filter) =>
+          filter &&
+          typeof filter.id === 'string' &&
+          typeof filter.value === 'string' &&
+          (filter.valueTo === undefined ||
+            typeof filter.valueTo === 'string') &&
+          config.filterFields.some(
+            (field) =>
+              field.key === filter.field &&
+              field.operators.includes(filter.operator),
+          ),
       )
     } catch {
       return []
     }
-  }, [params, config.filterFields, key])
+  }, [serializedFilters, config.filterFields])
 
   const update = useCallback(
     (values: Record<string, string | number | null>) => {
@@ -51,22 +59,38 @@ export function useDataListState(config: DataListConfig, prefix = '') {
           ? next.delete(key)
           : next.set(key, String(value)),
       )
-      router.replace(`${pathname}?${next.toString()}`, { scroll: false })
+      const query = next.toString()
+      if (query !== params.toString())
+        window.history.replaceState(
+          null,
+          '',
+          query ? `${pathname}?${query}` : pathname,
+        )
     },
-    [params, pathname, router],
+    [params, pathname],
   )
 
   useEffect(() => {
+    pendingSearch.current = false
+    setSearchInput(search)
+  }, [search, pathname])
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
-      if (searchInput !== search)
+      if (pendingSearch.current && searchInput.trim() !== search) {
+        pendingSearch.current = false
         update({ [key('q')]: searchInput.trim(), [key('page')]: 1 })
+      }
     }, 300)
     return () => window.clearTimeout(timer)
   }, [searchInput, search, update, key])
 
   return {
     searchInput,
-    setSearchInput,
+    setSearchInput: (value: string) => {
+      pendingSearch.current = true
+      setSearchInput(value)
+    },
     search,
     page,
     pageSize,
@@ -84,8 +108,16 @@ export function useDataListState(config: DataListConfig, prefix = '') {
         [key('page')]: 1,
       }),
     clear: () => {
+      pendingSearch.current = false
       setSearchInput('')
-      router.replace(pathname, { scroll: false })
+      update(
+        Object.fromEntries(
+          ['q', 'page', 'size', 'sort', 'dir', 'filters'].map((name) => [
+            key(name),
+            null,
+          ]),
+        ),
+      )
     },
   }
 }

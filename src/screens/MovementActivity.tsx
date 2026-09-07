@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { Eye, Search } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
@@ -31,13 +31,20 @@ const PAGE_SIZE = 20
 
 export function MovementActivity() {
   const { t } = useI18n()
-  const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
-  const page = Math.max(1, Number(params.get('page')) || 1)
+  const requestedPage = Number(params.get('page'))
+  const page =
+    Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
   const search = params.get('q') ?? ''
-  const action = params.get('action') ?? ''
-  const context = params.get('context') ?? ''
+  const action = ['create', 'update', 'delete'].includes(
+    params.get('action') ?? '',
+  )
+    ? params.get('action')!
+    : ''
+  const context = ['site', 'workshop'].includes(params.get('context') ?? '')
+    ? params.get('context')!
+    : ''
   const [rows, setRows] = useState<MovementAuditRow[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -50,12 +57,13 @@ export function MovementActivity() {
         if (value) next.set(key, value)
         else next.delete(key)
       })
-      router.replace(`${pathname}?${next.toString()}`, { scroll: false })
+      window.history.replaceState(null, '', `${pathname}?${next.toString()}`)
     },
-    [params, pathname, router],
+    [params, pathname],
   )
 
   useEffect(() => {
+    const controller = new AbortController()
     const timeout = window.setTimeout(() => {
       const load = async () => {
         setLoading(true)
@@ -75,7 +83,10 @@ export function MovementActivity() {
           )
         if (action) query = query.eq('action', action)
         if (context) query = query.eq('movement_context', context)
-        const { data, count, error } = await query
+        const { data, count, error } = await query.abortSignal(
+          controller.signal,
+        )
+        if (controller.signal.aborted) return
         if (error) console.error('Movement activity load failed', error)
         setRows((data as MovementAuditRow[] | null) ?? [])
         setTotal(count ?? 0)
@@ -83,7 +94,10 @@ export function MovementActivity() {
       }
       void load()
     }, 250)
-    return () => window.clearTimeout(timeout)
+    return () => {
+      window.clearTimeout(timeout)
+      controller.abort()
+    }
   }, [action, context, page, search])
 
   const fieldLabels = useMemo<Record<string, string>>(
