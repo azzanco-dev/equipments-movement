@@ -294,6 +294,8 @@ export const translations = {
     addPhoto: 'إضافة صورة',
     removePhoto: 'إزالة',
     photoTooLargeMulti: 'حجم الصورة يجب ألا يتجاوز 10 ميجابايت.',
+    photoCompressionFailed:
+      'تعذر ضغط الصور. اختر الصور مجددا او حاول مرة اخرى.',
     photoUploadFailed: 'فشل رفع بعض الصور. يمكنك المحاولة مرة أخرى.',
     photo_authorization_failed:
       'تعذر تجهيز رفع الصورة. سجل الدخول مجددا ثم حاول مرة اخرى.',
@@ -932,6 +934,8 @@ export const translations = {
     addPhoto: 'Add Photo',
     removePhoto: 'Remove',
     photoTooLargeMulti: 'Image size must not exceed 10 MB.',
+    photoCompressionFailed:
+      'The photos could not be compressed. Select them again or retry.',
     photoUploadFailed: 'Some photos failed to upload. You can try again.',
     photo_authorization_failed:
       'Could not authorize the photo upload. Sign in again and retry.',

@@ -25,6 +25,7 @@ import { PlateNumberInput } from '@/components/PlateNumberInput'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import { uploadMovementPhotos } from '@/lib/movementPhotoUpload'
+import { prepareMovementPhotos } from '@/lib/movementPhotoCompression'
 
 const FRONTEND_MAX_PHOTO_BYTES = 10 * 1024 * 1024
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -627,6 +628,7 @@ export function EntryExitForm({
     setSaveError(null)
 
     try {
+      const preparedPhotoFiles = await prepareMovementPhotos(photoFiles)
       const { data: sessionData } = await supabase.auth.getSession()
       let accessToken = sessionData.session?.access_token
       if (!accessToken) throw new Error('Missing session')
@@ -637,8 +639,8 @@ export function EntryExitForm({
         movement_context: workshopMode ? 'workshop' : 'site',
         registration_method: 'manual',
         recorded_at: actualMovementDate.toISOString(),
-        photo_count: photoFiles.length,
-        photo_files: photoFiles.map((file) => ({
+        photo_count: preparedPhotoFiles.length,
+        photo_files: preparedPhotoFiles.map((file) => ({
           fileName: file.name,
           contentType: file.type,
           size: file.size,
@@ -683,12 +685,12 @@ export function EntryExitForm({
       setSavedMovementId(result.id)
       let photoFailures = 0
       let photoFailureMessage: string | null = null
-      setUploadingPhotos(photoFiles.length > 0)
+      setUploadingPhotos(preparedPhotoFiles.length > 0)
       try {
         const uploadResults = await withTimeout(
           uploadMovementPhotos(
             result.id,
-            photoFiles,
+            preparedPhotoFiles,
             accessToken,
             result.photoUploads,
           ),
@@ -704,7 +706,7 @@ export function EntryExitForm({
         }
       } catch (uploadError) {
         console.error('Photo upload did not finish', uploadError)
-        photoFailures = photoFiles.length
+        photoFailures = preparedPhotoFiles.length
         photoFailureMessage = t('movementSavedPhotosFailed')
       } finally {
         setUploadingPhotos(false)
@@ -732,6 +734,8 @@ export function EntryExitForm({
           : t('exitSequenceConflict'),
         invalid_photos: t('invalidPhotoType'),
         photo_required: t('workshopPhotoRequired'),
+        photo_decode_failed: t('photoCompressionFailed'),
+        photo_compression_failed: t('photoCompressionFailed'),
         invalid_movement_payload: t('movementSaveFailed'),
         photo_upload_failed: t('photoUploadFailed'),
         unauthorized: t('authError'),
