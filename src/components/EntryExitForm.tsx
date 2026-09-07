@@ -24,7 +24,7 @@ import { Select, type SelectOption } from '@/components/Select'
 import { PlateNumberInput } from '@/components/PlateNumberInput'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
-import { uploadMovementPhotos } from '@/lib/movementPhotoUpload'
+import { uploadMovementPhotosDirectly } from '@/lib/movementPhotoUpload'
 import { prepareMovementPhotos } from '@/lib/movementPhotoCompression'
 
 const FRONTEND_MAX_PHOTO_BYTES = 10 * 1024 * 1024
@@ -137,6 +137,11 @@ export function EntryExitForm({
   const equipmentListRef = useRef<HTMLDivElement>(null)
   const quickEquipmentRef = useRef<HTMLDivElement>(null)
   const successRef = useRef<HTMLDivElement>(null)
+  const photoPreparationIdRef = useRef(0)
+  const photoPreparationSourceRef = useRef<File[]>([])
+  const photoPreparationPromiseRef = useRef<Promise<File[]>>(
+    Promise.resolve([]),
+  )
 
   const isEntry = movementType === 'entry'
   const workshopMode =
@@ -166,6 +171,9 @@ export function EntryExitForm({
     setSelectedDriver(null)
     setNotes('')
     setPhotoFiles([])
+    photoPreparationIdRef.current += 1
+    photoPreparationSourceRef.current = []
+    photoPreparationPromiseRef.current = Promise.resolve([])
     setPhotoPreviews([])
     setCarouselIndex(0)
     setSaveError(null)
@@ -550,6 +558,22 @@ export function EntryExitForm({
     handleSelectEquipment(data as Equipment)
   }
 
+  const preparePhotoSelection = (files: File[]) => {
+    const preparationId = photoPreparationIdRef.current + 1
+    photoPreparationIdRef.current = preparationId
+    photoPreparationSourceRef.current = files
+    const preparation = prepareMovementPhotos(files)
+    photoPreparationPromiseRef.current = preparation
+    void preparation.catch((error) => {
+      if (photoPreparationIdRef.current !== preparationId) return
+      console.error(
+        'Photo preparation failed',
+        error instanceof Error ? error.message : 'unknown_error',
+      )
+      setSaveError(t('photoCompressionFailed'))
+    })
+  }
+
   const handleAddPhotos = (files: FileList | null) => {
     if (!files?.length) return
 
@@ -570,14 +594,18 @@ export function EntryExitForm({
 
     setSaveError(null)
     const previews = selectedFiles.map((file) => URL.createObjectURL(file))
-    setPhotoFiles((prev) => [...prev, ...selectedFiles])
+    const nextFiles = [...photoFiles, ...selectedFiles]
+    setPhotoFiles(nextFiles)
+    preparePhotoSelection(nextFiles)
     setPhotoPreviews((prev) => [...prev, ...previews])
     setCarouselIndex(photoFiles.length)
   }
 
   const handleRemovePhoto = (index: number) => {
     URL.revokeObjectURL(photoPreviews[index])
-    setPhotoFiles((prev) => prev.filter((_, i) => i !== index))
+    const nextFiles = photoFiles.filter((_, i) => i !== index)
+    setPhotoFiles(nextFiles)
+    preparePhotoSelection(nextFiles)
     setPhotoPreviews((prev) => prev.filter((_, i) => i !== index))
     setCarouselIndex((prev) =>
       Math.max(0, Math.min(prev, photoFiles.length - 2)),
@@ -628,7 +656,10 @@ export function EntryExitForm({
     setSaveError(null)
 
     try {
-      const preparedPhotoFiles = await prepareMovementPhotos(photoFiles)
+      const preparedPhotoFiles =
+        photoPreparationSourceRef.current === photoFiles
+          ? await photoPreparationPromiseRef.current
+          : await prepareMovementPhotos(photoFiles)
       const { data: sessionData } = await supabase.auth.getSession()
       let accessToken = sessionData.session?.access_token
       if (!accessToken) throw new Error('Missing session')
@@ -640,11 +671,6 @@ export function EntryExitForm({
         registration_method: 'manual',
         recorded_at: actualMovementDate.toISOString(),
         photo_count: preparedPhotoFiles.length,
-        photo_files: preparedPhotoFiles.map((file) => ({
-          fileName: file.name,
-          contentType: file.type,
-          size: file.size,
-        })),
       }
       if (notes) payload.notes = notes
       if (!workshopMode && isEntry) {
@@ -676,10 +702,7 @@ export function EntryExitForm({
         const result = await response.json()
         throw new Error(result.error ?? 'movement_save_failed')
       }
-      const result = (await response.json()) as {
-        id: string
-        photoUploads?: Array<{ path: string; token: string }>
-      }
+      const result = (await response.json()) as { id: string }
 
       onSaved()
       setSavedMovementId(result.id)
@@ -688,11 +711,10 @@ export function EntryExitForm({
       setUploadingPhotos(preparedPhotoFiles.length > 0)
       try {
         const uploadResults = await withTimeout(
-          uploadMovementPhotos(
+          uploadMovementPhotosDirectly(
             result.id,
             preparedPhotoFiles,
-            accessToken,
-            result.photoUploads,
+            user.id,
           ),
           PHOTO_UPLOAD_TIMEOUT_MS,
         )

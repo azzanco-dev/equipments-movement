@@ -13,6 +13,79 @@ export interface MovementPhotoUploadResult {
   error?: MovementPhotoUploadError
 }
 
+function safeFileName(name: string, fallback: string) {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) || fallback
+}
+
+export async function uploadMovementPhotosDirectly(
+  movementId: string,
+  files: File[],
+  userId: string,
+  sortOrderOffset = 0,
+): Promise<MovementPhotoUploadResult[]> {
+  if (!files.length) return []
+
+  const results: MovementPhotoUploadResult[] = files.map(() => ({
+    success: false,
+    error: 'photo_transfer_failed',
+  }))
+  const transferred = await Promise.all(
+    files.map(async (file, index) => {
+      const fileName = safeFileName(file.name, `photo-${index}.jpg`)
+      const path = `${userId}/${movementId}/${crypto.randomUUID()}-${fileName}`
+      try {
+        const { error } = await supabase.storage.from('log-photos').upload(
+          path,
+          file,
+          {
+            contentType: file.type,
+            upsert: false,
+          },
+        )
+        if (error) {
+          console.error('Photo transfer failed', error.message)
+          return null
+        }
+        return { index, path }
+      } catch (error) {
+        console.error(
+          'Photo transfer failed',
+          error instanceof Error ? error.message : 'unknown_error',
+        )
+        return null
+      }
+    }),
+  )
+  const completedTransfers = transferred.filter(
+    (item): item is { index: number; path: string } => item !== null,
+  )
+  if (!completedTransfers.length) return results
+
+  const { error: linkError } = await supabase.from('entry_exit_photos').insert(
+    completedTransfers.map(({ index, path }) => ({
+      entry_exit_log_id: movementId,
+      file_path: path,
+      uploaded_by: userId,
+      sort_order: sortOrderOffset + index,
+    })),
+  )
+  if (linkError) {
+    console.error('Photo link failed', linkError.message)
+    await supabase.storage
+      .from('log-photos')
+      .remove(completedTransfers.map(({ path }) => path))
+    for (const { index } of completedTransfers) {
+      results[index] = { success: false, error: 'photo_link_failed' }
+    }
+    return results
+  }
+
+  for (const { index } of completedTransfers) {
+    results[index] = { success: true }
+  }
+  return results
+}
+
 const TUS_CHUNK_BYTES = 6 * 1024 * 1024
 const MAX_STANDARD_UPLOAD_BYTES = 6 * 1024 * 1024
 const COMPLETE_RETRY_DELAYS = [0, 750, 1500]

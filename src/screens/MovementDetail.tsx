@@ -41,7 +41,8 @@ import type { SelectOption } from '@/components/Select'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
-import { uploadMovementPhotos } from '@/lib/movementPhotoUpload'
+import { uploadMovementPhotosDirectly } from '@/lib/movementPhotoUpload'
+import { prepareMovementPhotos } from '@/lib/movementPhotoCompression'
 import { useListRequest } from '@/components/data-list/useListRequest'
 
 interface MovementDetailProps {
@@ -529,24 +530,33 @@ export function MovementDetail({
     }
     setPhotoBusy(true)
     setPhotoActionError(null)
-    const { data } = await supabase.auth.getSession()
-    const accessToken = data.session?.access_token
-    let failureMessage: string | null = accessToken
+    let failureMessage: string | null = user
       ? null
       : t('photo_authorization_failed')
-    if (accessToken) {
-      const uploadResults = await uploadMovementPhotos(
-        movementId,
-        selected,
-        accessToken,
-      )
-      for (const result of uploadResults) {
-        if (!result.success && !failureMessage) {
-          failureMessage = t(result.error ?? 'photoUploadFailed')
+    try {
+      if (user) {
+        const prepared = await prepareMovementPhotos(selected)
+        const uploadResults = await uploadMovementPhotosDirectly(
+          movementId,
+          prepared,
+          user.id,
+          photoItems.length,
+        )
+        for (const result of uploadResults) {
+          if (!result.success && !failureMessage) {
+            failureMessage = t(result.error ?? 'photoUploadFailed')
+          }
         }
       }
+    } catch (uploadError) {
+      console.error(
+        'Photo preparation or upload failed',
+        uploadError instanceof Error ? uploadError.message : 'unknown_error',
+      )
+      failureMessage = t('photoCompressionFailed')
+    } finally {
+      setPhotoBusy(false)
     }
-    setPhotoBusy(false)
     if (failureMessage) {
       setPhotoActionError(failureMessage)
       await fetchData()

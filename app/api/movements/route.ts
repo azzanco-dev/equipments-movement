@@ -53,9 +53,10 @@ export async function POST(request: Request) {
   try {
     const accessToken = authorization.slice(7)
     const supabase = authenticatedClient(accessToken)
-    const { data: authData, error: authError } =
-      await supabase.auth.getUser(accessToken)
-    if (authError || !authData.user) {
+    const { data: claimsData, error: authError } =
+      await supabase.auth.getClaims(accessToken)
+    const userId = claimsData?.claims.sub
+    if (authError || !userId) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
     }
 
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
-      .eq('id', authData.user.id)
+      .eq('id', userId)
       .maybeSingle()
     if (
       !profile ||
@@ -158,7 +159,7 @@ export async function POST(request: Request) {
 
     const payload: Record<string, unknown> = {
       equipment_id: equipmentId,
-      supervisor_id: authData.user.id,
+      supervisor_id: userId,
       movement_type: movementType,
       movement_context: movementContext,
       registration_method:
@@ -192,7 +193,7 @@ export async function POST(request: Request) {
     for (const file of photoDescriptors) {
       const safeName =
         file.fileName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) || 'photo'
-      const path = `${authData.user.id}/${insertedLog.id}/${crypto.randomUUID()}-${safeName}`
+      const path = `${userId}/${insertedLog.id}/${crypto.randomUUID()}-${safeName}`
       const { data: signed, error: signedError } = await supabase.storage
         .from('log-photos')
         .createSignedUploadUrl(path)
@@ -205,7 +206,7 @@ export async function POST(request: Request) {
       const safeName =
         file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80) ||
         `photo-${index}`
-      const filePath = `${authData.user.id}/${insertedLog.id}/${crypto.randomUUID()}-${index}-${safeName}`
+      const filePath = `${userId}/${insertedLog.id}/${crypto.randomUUID()}-${index}-${safeName}`
       const { error: uploadError } = await supabase.storage
         .from('log-photos')
         .upload(filePath, file, {
@@ -221,7 +222,7 @@ export async function POST(request: Request) {
         .insert({
           entry_exit_log_id: insertedLog.id,
           file_path: filePath,
-          uploaded_by: authData.user.id,
+          uploaded_by: userId,
           sort_order: index,
         })
       if (photoError) {
