@@ -330,7 +330,7 @@ export function AdminDrivers({
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <RelativeTime value={driver.created_at} />
+                      <RelativeTime value={driver.updated_at} />
                     </td>
                   </tr>
                 ))}
