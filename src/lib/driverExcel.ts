@@ -21,6 +21,7 @@ export const DRIVER_EMPLOYMENT_TYPES = [
 export type DriverImportRow = {
   rowNumber: number
   full_name: string
+  name_en: string | null
   id_number: string | null
   mobile_number: string | null
   nationality: string | null
@@ -32,6 +33,7 @@ export type DriverImportRow = {
 
 type DriverColumn =
   | 'full_name'
+  | 'name_en'
   | 'id_number'
   | 'mobile_number'
   | 'nationality'
@@ -84,6 +86,7 @@ export async function parseDriverWorkbook(
     return {
       rowNumber: index + 2,
       full_name,
+      name_en: value('name_en') || null,
       id_number,
       mobile_number,
       nationality,
@@ -99,6 +102,7 @@ export function downloadDriverTemplate() {
   const sheet = XLSX.utils.json_to_sheet([
     {
       full_name: 'محمد أحمد',
+      name_en: 'Mohammed Ahmed',
       id_number: '1234567890',
       mobile_number: '0500000000',
       nationality: 'اليمن',

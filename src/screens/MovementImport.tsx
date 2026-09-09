@@ -150,18 +150,18 @@ export function MovementImport() {
     async (search: string): Promise<SelectOption[]> => {
       let query = supabase
         .from('drivers')
-        .select('id,full_name,mobile_number')
+        .select('id,full_name,name_en,mobile_number')
         .order('full_name')
         .limit(20)
       const term = sanitizeSearchTerm(search)
       if (term)
         query = query.or(
-          `full_name.ilike.%${term}%,mobile_number.ilike.%${term}%`,
+          `full_name.ilike.%${term}%,name_en.ilike.%${term}%,mobile_number.ilike.%${term}%`,
         )
       const { data } = await query
       return (data ?? []).map((item) => ({
         value: item.id,
-        label: `${item.full_name}${item.mobile_number ? ` · ${item.mobile_number}` : ''}`,
+        label: `${item.full_name}${item.name_en ? ` · ${item.name_en}` : ''}${item.mobile_number ? ` · ${item.mobile_number}` : ''}`,
       }))
     },
     [],

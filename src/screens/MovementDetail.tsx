@@ -313,18 +313,18 @@ export function MovementDetail({
     async (query: string): Promise<SelectOption[]> => {
       let request = supabase
         .from('drivers')
-        .select('id,full_name,mobile_number')
+        .select('id,full_name,name_en,mobile_number')
         .order('full_name')
         .limit(20)
       const term = sanitizeSearchTerm(query)
       if (term)
         request = request.or(
-          `full_name.ilike.%${term}%,mobile_number.ilike.%${term}%`,
+          `full_name.ilike.%${term}%,name_en.ilike.%${term}%,mobile_number.ilike.%${term}%`,
         )
       const { data } = await request
       return (data ?? []).map((driver) => ({
         value: driver.id,
-        label: `${driver.full_name}${driver.mobile_number ? ` — ${driver.mobile_number}` : ''}`,
+        label: `${driver.full_name}${driver.name_en ? ` — ${driver.name_en}` : ''}${driver.mobile_number ? ` — ${driver.mobile_number}` : ''}`,
       }))
     },
     [],

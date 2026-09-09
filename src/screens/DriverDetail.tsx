@@ -30,7 +30,7 @@ export function DriverDetail({
     const { data, error: fetchError } = await supabase
       .from('drivers')
       .select(
-        'id,full_name,id_number,mobile_number,nationality,employment_type,job_title,created_at,updated_at',
+        'id,full_name,name_en,id_number,mobile_number,nationality,employment_type,job_title,created_at,updated_at',
       )
       .eq('id', driverId)
       .maybeSingle()
@@ -54,6 +54,7 @@ export function DriverDetail({
     )
   const items = [
     [<User key="u" size={17} />, t('fullName'), driver.full_name],
+    [<User key="ue" size={17} />, t('driverNameEn'), driver.name_en ?? '—'],
     [<CreditCard key="i" size={17} />, t('idNumber'), driver.id_number],
     [<Phone key="p" size={17} />, t('mobileNumber'), driver.mobile_number],
     [<Flag key="f" size={17} />, t('nationality'), driver.nationality],

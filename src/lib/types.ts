@@ -21,6 +21,7 @@ export type RegistrationMethod = 'qr' | 'manual'
 export interface Driver {
   id: string
   full_name: string
+  name_en: string | null
   id_number: string | null
   mobile_number: string | null
   nationality: string | null

@@ -33,8 +33,8 @@ const select = (values: readonly string[]) =>
 
 export const driversListConfig: DataListConfig = {
   id: 'drivers',
-  searchPlaceholder: 'البحث بالاسم أو الهوية أو الجوال',
-  searchFields: ['full_name', 'id_number', 'mobile_number'],
+  searchPlaceholder: 'البحث بالاسم او الهوية او الجوال',
+  searchFields: ['full_name', 'name_en', 'id_number', 'mobile_number'],
   defaultSort: 'full_name',
   filterFields: [
     {
@@ -60,6 +60,7 @@ export const driversListConfig: DataListConfig = {
   ],
   sortableFields: [
     { key: 'full_name', label: 'الاسم' },
+    { key: 'name_en', label: 'الاسم بالانجليزي' },
     { key: 'created_at', label: 'تاريخ الإنشاء' },
   ],
 }

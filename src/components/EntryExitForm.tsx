@@ -333,19 +333,19 @@ export function EntryExitForm({
     async (query: string): Promise<SelectOption[]> => {
       let request = supabase
         .from('drivers')
-        .select('id,full_name,id_number,mobile_number')
+        .select('id,full_name,name_en,id_number,mobile_number')
         .order('full_name')
         .limit(20)
       const term = sanitizeSearchTerm(query)
       if (term)
         request = request.or(
-          `full_name.ilike.%${term}%,id_number.ilike.%${term}%,mobile_number.ilike.%${term}%`,
+          `full_name.ilike.%${term}%,name_en.ilike.%${term}%,id_number.ilike.%${term}%,mobile_number.ilike.%${term}%`,
         )
       const { data, error } = await request
       if (error) return []
       return (data ?? []).map((driver) => ({
         value: driver.id,
-        label: `${driver.full_name} — ${driver.id_number} — ${driver.mobile_number}`,
+        label: `${driver.full_name}${driver.name_en ? ` — ${driver.name_en}` : ''} — ${driver.id_number} — ${driver.mobile_number}`,
       }))
     },
     [],
@@ -711,11 +711,7 @@ export function EntryExitForm({
       setUploadingPhotos(preparedPhotoFiles.length > 0)
       try {
         const uploadResults = await withTimeout(
-          uploadMovementPhotosDirectly(
-            result.id,
-            preparedPhotoFiles,
-            user.id,
-          ),
+          uploadMovementPhotosDirectly(result.id, preparedPhotoFiles, user.id),
           PHOTO_UPLOAD_TIMEOUT_MS,
         )
         for (const uploadResult of uploadResults) {

@@ -76,6 +76,7 @@ export function DriverExcelImport({
     setError('')
     const payload = valid.map((row) => ({
       full_name: row.full_name,
+      name_en: row.name_en,
       id_number: row.id_number,
       mobile_number: row.mobile_number,
       nationality: row.nationality,
@@ -168,6 +169,7 @@ export function DriverExcelImport({
                   <tr>
                     <th className="table-header p-2">{t('row')}</th>
                     <th className="table-header p-2">{t('fullName')}</th>
+                    <th className="table-header p-2">{t('driverNameEn')}</th>
                     <th className="table-header p-2">{t('idNumber')}</th>
                     <th className="table-header p-2">{t('mobileNumber')}</th>
                     <th className="table-header p-2">{t('status')}</th>
@@ -182,6 +184,9 @@ export function DriverExcelImport({
                     >
                       <td className="p-2">{row.rowNumber}</td>
                       <td className="p-2">{row.full_name || '—'}</td>
+                      <td className="p-2" dir="ltr">
+                        {row.name_en || '—'}
+                      </td>
                       <td className="p-2" dir="ltr">
                         {row.id_number || '—'}
                       </td>

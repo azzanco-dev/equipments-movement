@@ -26,6 +26,7 @@ import { RelativeTime } from '@/components/RelativeTime'
 
 const EMPTY_FORM = {
   full_name: '',
+  name_en: '',
   id_number: '',
   mobile_number: '',
   nationality: '',
@@ -58,7 +59,7 @@ export function AdminDrivers({
     let query = supabase
       .from('drivers')
       .select(
-        'id,full_name,id_number,mobile_number,nationality,employment_type,job_title,created_at,updated_at',
+        'id,full_name,name_en,id_number,mobile_number,nationality,employment_type,job_title,created_at,updated_at',
         { count: 'exact' },
       )
       .order(list.sort, { ascending: list.direction === 'asc' })
@@ -67,7 +68,7 @@ export function AdminDrivers({
     const term = sanitizeSearchTerm(list.search)
     if (term)
       query = query.or(
-        `full_name.ilike.%${term}%,id_number.ilike.%${term}%,mobile_number.ilike.%${term}%`,
+        `full_name.ilike.%${term}%,name_en.ilike.%${term}%,id_number.ilike.%${term}%,mobile_number.ilike.%${term}%`,
       )
     query = applyListFilters(
       query,
@@ -105,6 +106,7 @@ export function AdminDrivers({
     setEditing(driver)
     setForm({
       full_name: driver.full_name,
+      name_en: driver.name_en ?? '',
       id_number: driver.id_number ?? '',
       mobile_number: driver.mobile_number ?? '',
       nationality: driver.nationality ?? '',
@@ -129,6 +131,7 @@ export function AdminDrivers({
     const payload = {
       ...form,
       full_name: form.full_name.trim(),
+      name_en: form.name_en.trim() || null,
       id_number: form.id_number.trim() || null,
       mobile_number: form.mobile_number.trim() || null,
       nationality: form.nationality || null,
@@ -251,6 +254,9 @@ export function AdminDrivers({
                     {t('fullName')}
                   </th>
                   <th className="table-header px-4 py-3 text-start">
+                    {t('driverNameEn')}
+                  </th>
+                  <th className="table-header px-4 py-3 text-start">
                     {t('idNumber')}
                   </th>
                   <th className="table-header px-4 py-3 text-start">
@@ -287,6 +293,9 @@ export function AdminDrivers({
                     </td>
                     <td className="px-4 py-3 font-semibold">
                       {driver.full_name}
+                    </td>
+                    <td className="px-4 py-3" dir="ltr">
+                      {driver.name_en ?? '—'}
                     </td>
                     <td className="px-4 py-3" dir="ltr">
                       {driver.id_number ?? '—'}
@@ -353,6 +362,19 @@ export function AdminDrivers({
               value={form.full_name}
               onChange={(event) =>
                 setForm({ ...form, full_name: event.target.value })
+              }
+            />
+          </div>
+          <div>
+            <label className="label">{t('driverNameEn')}</label>
+            <input
+              className="input"
+              dir="ltr"
+              maxLength={150}
+              placeholder={t('driverNameEnPlaceholder')}
+              value={form.name_en}
+              onChange={(event) =>
+                setForm({ ...form, name_en: event.target.value })
               }
             />
           </div>
