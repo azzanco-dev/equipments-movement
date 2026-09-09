@@ -778,7 +778,7 @@ export function AdminEquipment({
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <RelativeTime value={eq.created_at} />
+                      <RelativeTime value={eq.updated_at} />
                     </td>
                   </tr>
                 ))}
