@@ -298,7 +298,10 @@ export function AdminEquipment({
   }, [editId, openEdit, t])
 
   async function handleSave() {
-    if (form.numbering_status === 'numbered' && !form.plate_number) {
+    if (
+      form.numbering_status === 'numbered' &&
+      !/[0-9]/.test(form.plate_number)
+    ) {
       setFormError(t('plateRequired'))
       return
     }

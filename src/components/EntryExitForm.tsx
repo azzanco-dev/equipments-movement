@@ -492,8 +492,8 @@ export function EntryExitForm({
     if (
       (!workshopMode &&
         quickEquipment.identifierType === 'plate' &&
-        !quickEquipment.plate.trim()) ||
-      (workshopMode && !quickEquipment.plate.trim())
+        !/[0-9]/.test(quickEquipment.plate)) ||
+      (workshopMode && !/[0-9]/.test(quickEquipment.plate))
     ) {
       setSaveError(t('plateRequired'))
       return

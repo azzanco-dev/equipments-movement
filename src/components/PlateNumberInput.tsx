@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { normalizePlateNumber } from '@/lib/plate'
+import { useI18n } from '@/i18n/I18nContext'
 
 interface PlateNumberInputProps {
   value: string
@@ -74,6 +75,7 @@ function arabicNumbers(value: string): string {
 }
 
 export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
+  const { t } = useI18n()
   const [parts, setParts] = useState<PlateParts>(() => parsePlate(value))
 
   useEffect(() => {
@@ -160,7 +162,7 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
           </div>
         </div>
       </div>
-      <p className="text-xs text-muted">الصيغة المعتمدة: 8888-FSA</p>
+      <p className="text-xs text-muted">{t('plateInputHint')}</p>
     </div>
   )
 }

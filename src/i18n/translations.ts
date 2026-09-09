@@ -412,7 +412,8 @@ export const translations = {
     equipmentUpdateInstructionIds:
       'لا تعدل عمودي record_id و record_version، فهما للمطابقة ومنع تعارض التحديثات.',
     equipmentUpdateInstructionPlate:
-      'صيغة اللوحة المعتمدة 8888-FSA، ويتم توحيد الصيغ المقبولة تلقائيا.',
+      'ارقام اللوحة مطلوبة، والاحرف اختيارية، ويتم توحيد الصيغ المقبولة تلقائيا.',
+    plateInputHint: 'الارقام مطلوبة، والاحرف اختيارية',
     equipmentUpdateInstructionPreview:
       'لن يتم حفظ اي تغيير حتى تراجع الفروقات وتعتمدها.',
     invalidRecordId: 'معرف السجل غير صالح.',
@@ -1050,7 +1051,8 @@ export const translations = {
     equipmentUpdateInstructionIds:
       'Do not edit record_id or record_version; they match records and prevent update conflicts.',
     equipmentUpdateInstructionPlate:
-      'The standard plate format is 8888-FSA; accepted input formats are normalized automatically.',
+      'Plate digits are required, letters are optional, and accepted formats are normalized automatically.',
+    plateInputHint: 'Digits are required; letters are optional',
     equipmentUpdateInstructionPreview:
       'Nothing is saved until you review and approve the changes.',
     invalidRecordId: 'Invalid record ID.',

@@ -185,7 +185,7 @@ export function parseEquipmentExcel(
     const plateNumber = rawPlateNumber
       ? normalizePlateNumber(rawPlateNumber)
       : null
-    if (plateNumber && !/^[0-9]{1,4}-[A-Z]{1,3}$/.test(plateNumber))
+    if (plateNumber && !/^[0-9]{1,4}(?:-[A-Z]{1,3})?$/.test(plateNumber))
       errors.push(t('plateNumber'))
 
     return {
