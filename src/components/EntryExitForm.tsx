@@ -757,6 +757,7 @@ export function EntryExitForm({
 
       onSaved()
       setSavedMovementId(result.id)
+      onViewMovement?.(result.id)
       pendingPhotoBatchRef.current = null
       const photoFailures = result.photoFailures ?? 0
       if (photoFailures) {
