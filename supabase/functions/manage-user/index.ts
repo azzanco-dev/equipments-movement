@@ -141,9 +141,8 @@ Deno.serve(async (req: Request) => {
       const profileUpdate: {
         full_name: string
         role: string
-        project_id: null
         must_change_password?: boolean
-      } = { full_name: fullName, role, project_id: null }
+      } = { full_name: fullName, role }
       if (password) profileUpdate.must_change_password = true
       const { error: profileError } = await adminClient
         .from('profiles')

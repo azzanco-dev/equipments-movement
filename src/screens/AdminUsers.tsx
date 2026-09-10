@@ -46,7 +46,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     setLoading(true)
     let query = supabase
       .from('profiles')
-      .select('id,full_name,role,project_id,must_change_password,created_at', {
+      .select('id,full_name,role,must_change_password,created_at', {
         count: 'exact',
       })
       .order(list.sort, { ascending: list.direction === 'asc' })
