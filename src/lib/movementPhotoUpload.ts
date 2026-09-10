@@ -5,6 +5,11 @@ interface UploadAuthorization {
   token: string
 }
 
+export interface PendingMovementPhotoBatch {
+  batchId: string
+  paths: string[]
+}
+
 export type MovementPhotoUploadError =
   'photo_authorization_failed' | 'photo_transfer_failed' | 'photo_link_failed'
 
@@ -34,14 +39,12 @@ export async function uploadMovementPhotosDirectly(
       const fileName = safeFileName(file.name, `photo-${index}.jpg`)
       const path = `${userId}/${movementId}/${crypto.randomUUID()}-${fileName}`
       try {
-        const { error } = await supabase.storage.from('log-photos').upload(
-          path,
-          file,
-          {
+        const { error } = await supabase.storage
+          .from('log-photos')
+          .upload(path, file, {
             contentType: file.type,
             upsert: false,
-          },
-        )
+          })
         if (error) {
           console.error('Photo transfer failed', error.message)
           return null
@@ -108,6 +111,7 @@ async function uploadResumably(
   file: File,
   authorization: UploadAuthorization,
   accessToken: string,
+  onProgress?: (progress: number) => void,
 ): Promise<void> {
   const tus = await import('tus-js-client')
   return new Promise((resolve, reject) => {
@@ -127,11 +131,78 @@ async function uploadResumably(
         contentType: file.type,
         cacheControl: '3600',
       },
+      onProgress: (uploadedBytes, totalBytes) =>
+        onProgress?.(
+          totalBytes > 0 ? Math.round((uploadedBytes / totalBytes) * 100) : 0,
+        ),
       onError: (error) => reject(error),
-      onSuccess: () => resolve(),
+      onSuccess: () => {
+        onProgress?.(100)
+        resolve()
+      },
     })
     upload.start()
   })
+}
+
+export async function discardPendingMovementPhotoBatch(
+  batchId: string,
+  accessToken: string,
+) {
+  await fetch('/api/movements/photo-uploads', {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ batchId }),
+  }).catch(() => undefined)
+}
+
+export async function uploadPendingMovementPhotos(
+  files: File[],
+  accessToken: string,
+  onProgress: (index: number, progress: number) => void,
+): Promise<PendingMovementPhotoBatch> {
+  const response = await fetch('/api/movements/photo-uploads', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      files: files.map((file) => ({
+        fileName: file.name,
+        contentType: file.type,
+        size: file.size,
+      })),
+    }),
+  })
+  if (!response.ok) throw new Error('photo_authorization_failed')
+  const result = (await response.json()) as {
+    batchId?: string
+    uploads?: UploadAuthorization[]
+  }
+  if (!result.batchId || result.uploads?.length !== files.length)
+    throw new Error('photo_authorization_failed')
+
+  try {
+    await Promise.all(
+      files.map((file, index) =>
+        uploadResumably(file, result.uploads![index], accessToken, (progress) =>
+          onProgress(index, progress),
+        ),
+      ),
+    )
+  } catch (error) {
+    await discardPendingMovementPhotoBatch(result.batchId, accessToken)
+    throw error
+  }
+
+  return {
+    batchId: result.batchId,
+    paths: result.uploads.map((upload) => upload.path),
+  }
 }
 
 async function uploadDirectly(

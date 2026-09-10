@@ -101,6 +101,24 @@ export async function POST(request: Request) {
       )
     }
 
+    const uploadBatchId = value('upload_batch_id')
+    const { data: pendingBatch, error: pendingBatchError } = uploadBatchId
+      ? await supabase
+          .from('pending_movement_photo_batches')
+          .select('id,file_paths,expected_files,expires_at')
+          .eq('id', uploadBatchId)
+          .eq('uploaded_by', userId)
+          .maybeSingle()
+      : { data: null, error: null }
+    if (
+      pendingBatchError ||
+      (uploadBatchId &&
+        (!pendingBatch ||
+          new Date(pendingBatch.expires_at).getTime() <= Date.now()))
+    ) {
+      return NextResponse.json({ error: 'invalid_photos' }, { status: 400 })
+    }
+
     const photoDescriptors = Array.isArray(values.photo_files)
       ? values.photo_files.filter(
           (item): item is PhotoDescriptor =>
@@ -114,6 +132,7 @@ export async function POST(request: Request) {
     const intendedPhotoCount =
       photos.length ||
       photoDescriptors.length ||
+      pendingBatch?.file_paths.length ||
       Number(values.photo_count ?? 0)
     if (
       movementContext === 'workshop' &&
@@ -136,6 +155,35 @@ export async function POST(request: Request) {
       )
     ) {
       return NextResponse.json({ error: 'invalid_photos' }, { status: 400 })
+    }
+
+    if (pendingBatch) {
+      const expectedPrefix = `${userId}/${pendingBatch.id}/`
+      if (
+        pendingBatch.file_paths.some(
+          (path: string) =>
+            !path.startsWith(expectedPrefix) ||
+            path.slice(expectedPrefix.length).includes('/'),
+        )
+      ) {
+        return NextResponse.json({ error: 'invalid_photos' }, { status: 400 })
+      }
+      const { data: storedObjects, error: listError } = await supabase.storage
+        .from('log-photos')
+        .list(`${userId}/${pendingBatch.id}`, { limit: MAX_PHOTOS + 1 })
+      const storedNames = new Set(
+        (storedObjects ?? []).map((item) => item.name),
+      )
+      const allFilesExist = pendingBatch.file_paths.every((path: string) => {
+        const name = path.slice(expectedPrefix.length)
+        return storedNames.has(name)
+      })
+      if (listError || !allFilesExist) {
+        return NextResponse.json(
+          { error: 'photos_not_uploaded' },
+          { status: 409 },
+        )
+      }
     }
 
     const { data: profile } = await supabase
@@ -186,6 +234,41 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: movementErrorCode(insertError.message) },
         { status: 409 },
+      )
+    }
+
+    if (pendingBatch) {
+      const { error: photoError } = await supabase
+        .from('entry_exit_photos')
+        .insert(
+          pendingBatch.file_paths.map((filePath: string, index: number) => ({
+            entry_exit_log_id: insertedLog.id,
+            file_path: filePath,
+            uploaded_by: userId,
+            sort_order: index,
+          })),
+        )
+      if (photoError) {
+        console.error('Pending movement photos link failed', photoError.message)
+        await supabase.storage
+          .from('log-photos')
+          .remove(pendingBatch.file_paths)
+        await supabase
+          .from('pending_movement_photo_batches')
+          .delete()
+          .eq('id', pendingBatch.id)
+        return NextResponse.json(
+          { id: insertedLog.id, photoFailures: pendingBatch.file_paths.length },
+          { status: 201 },
+        )
+      }
+      await supabase
+        .from('pending_movement_photo_batches')
+        .delete()
+        .eq('id', pendingBatch.id)
+      return NextResponse.json(
+        { id: insertedLog.id, photoFailures: 0 },
+        { status: 201 },
       )
     }
 
