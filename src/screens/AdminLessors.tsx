@@ -37,7 +37,7 @@ export function AdminLessors() {
     setLoading(true)
     let query = supabase
       .from('lessors')
-      .select('id,name,contact_person,contact_number,created_at', {
+      .select('id,name,contact_person,contact_number,created_at,updated_at', {
         count: 'exact',
       })
       .order(list.sort, { ascending: list.direction === 'asc' })
@@ -217,7 +217,7 @@ export function AdminLessors() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <RelativeTime value={l.created_at} />
+                      <RelativeTime value={l.updated_at} />
                     </td>
                   </tr>
                 ))}

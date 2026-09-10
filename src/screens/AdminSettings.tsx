@@ -22,11 +22,18 @@ import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/components/Select'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { useListRequest } from '@/components/data-list/useListRequest'
+import { RelativeTime } from '@/components/RelativeTime'
 
-type EquipmentTypeRow = { id: string; name: string; equipment_count: number }
+type EquipmentTypeRow = {
+  id: string
+  name: string
+  equipment_count: number
+  updated_at: string
+}
 type EquipmentTypeQueryRow = {
   id: string
   name: string
+  updated_at: string
   equipment: Array<{ count: number }>
 }
 const PAGE_SIZE = 20
@@ -71,8 +78,9 @@ export function AdminSettings() {
     setLoading(true)
     let query = supabase
       .from('equipment_types')
-      .select('id,name,equipment(count)', { count: 'exact' })
-      .order('name')
+      .select('id,name,updated_at,equipment(count)', { count: 'exact' })
+      .order('updated_at', { ascending: false })
+      .order('id', { ascending: false })
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
     if (search.trim()) query = query.ilike('name', `%${search.trim()}%`)
     const { data, count } = await query.abortSignal(signal)
@@ -82,6 +90,7 @@ export function AdminSettings() {
         id: row.id,
         name: row.name,
         equipment_count: row.equipment[0]?.count ?? 0,
+        updated_at: row.updated_at,
       })),
     )
     setTotal(count ?? 0)
@@ -411,6 +420,10 @@ export function AdminSettings() {
                   <th className="table-header px-3 py-2 text-start">
                     {t('actions')}
                   </th>
+                  <th
+                    className="table-header px-3 py-2"
+                    aria-label={t('updatedAt')}
+                  />
                 </tr>
               </thead>
               <tbody>
@@ -437,6 +450,9 @@ export function AdminSettings() {
                           <Trash2 size={15} />
                         </button>
                       </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <RelativeTime value={row.updated_at} />
                     </td>
                   </tr>
                 ))}

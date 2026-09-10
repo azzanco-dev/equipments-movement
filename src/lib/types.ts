@@ -46,6 +46,7 @@ export interface Company {
   name_ar: string
   name_en: string
   created_at: string
+  updated_at: string
 }
 
 export interface Project {
@@ -53,6 +54,7 @@ export interface Project {
   name_ar: string
   name_en: string
   created_at: string
+  updated_at: string
 }
 
 export interface Lessor {
@@ -61,6 +63,7 @@ export interface Lessor {
   contact_person: string | null
   contact_number: string | null
   created_at: string
+  updated_at: string
 }
 
 export interface Equipment {

@@ -35,7 +35,8 @@ export const driversListConfig: DataListConfig = {
   id: 'drivers',
   searchPlaceholder: 'البحث بالاسم او الهوية او الجوال',
   searchFields: ['full_name', 'name_en', 'id_number', 'mobile_number'],
-  defaultSort: 'full_name',
+  defaultSort: 'updated_at',
+  defaultDirection: 'desc',
   filterFields: [
     {
       key: 'nationality',
@@ -62,13 +63,15 @@ export const driversListConfig: DataListConfig = {
     { key: 'full_name', label: 'الاسم' },
     { key: 'name_en', label: 'الاسم بالانجليزي' },
     { key: 'created_at', label: 'تاريخ الإنشاء' },
+    { key: 'updated_at', label: 'تاريخ التعديل' },
   ],
 }
 export const equipmentListConfig: DataListConfig = {
   id: 'equipment',
   searchPlaceholder: 'البحث بالكود أو اللوحة أو النوع',
   searchFields: ['code', 'plate_number', 'type'],
-  defaultSort: 'code',
+  defaultSort: 'updated_at',
+  defaultDirection: 'desc',
   filterFields: [
     {
       key: 'operational_status',
@@ -108,13 +111,15 @@ export const equipmentListConfig: DataListConfig = {
     'operational_status',
     'ownership_status',
     'created_at',
+    'updated_at',
   ].map((key) => ({ key, label: key })),
 }
 export const companiesListConfig: DataListConfig = {
   id: 'companies',
   searchPlaceholder: 'البحث باسم الشركة',
   searchFields: ['name_ar', 'name_en'],
-  defaultSort: 'name_ar',
+  defaultSort: 'updated_at',
+  defaultDirection: 'desc',
   filterFields: [
     { key: 'name_ar', label: 'الاسم العربي', type: 'text', operators: textOps },
     {
@@ -128,6 +133,7 @@ export const companiesListConfig: DataListConfig = {
     { key: 'name_ar', label: 'الاسم العربي' },
     { key: 'name_en', label: 'الاسم الإنجليزي' },
     { key: 'created_at', label: 'تاريخ الإنشاء' },
+    { key: 'updated_at', label: 'تاريخ التعديل' },
   ],
 }
 export const projectsListConfig: DataListConfig = {
@@ -139,7 +145,8 @@ export const lessorsListConfig: DataListConfig = {
   id: 'lessors',
   searchPlaceholder: 'البحث بالاسم أو جهة الاتصال أو الجوال',
   searchFields: ['name', 'contact_person', 'contact_number'],
-  defaultSort: 'name',
+  defaultSort: 'updated_at',
+  defaultDirection: 'desc',
   filterFields: [
     { key: 'name', label: 'الاسم', type: 'text', operators: textOps },
     {
@@ -152,6 +159,7 @@ export const lessorsListConfig: DataListConfig = {
   sortableFields: [
     { key: 'name', label: 'الاسم' },
     { key: 'created_at', label: 'تاريخ الإنشاء' },
+    { key: 'updated_at', label: 'تاريخ التعديل' },
   ],
 }
 export const movementsListConfig: DataListConfig = {

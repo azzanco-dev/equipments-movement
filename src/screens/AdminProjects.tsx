@@ -65,7 +65,7 @@ export function AdminProjects() {
     setLoading(true)
     let query = supabase
       .from('projects')
-      .select('id,name_ar,name_en,created_at', { count: 'exact' })
+      .select('id,name_ar,name_en,created_at,updated_at', { count: 'exact' })
       .order(list.sort, { ascending: list.direction === 'asc' })
       .order('id', { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
@@ -340,7 +340,7 @@ export function AdminProjects() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <RelativeTime value={p.created_at} />
+                      <RelativeTime value={p.updated_at} />
                     </td>
                   </tr>
                 ))}
