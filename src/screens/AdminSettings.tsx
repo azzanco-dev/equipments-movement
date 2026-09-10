@@ -382,6 +382,7 @@ export function AdminSettings() {
         </div>
         <input
           className="input max-w-md"
+          dir="ltr"
           value={searchInput}
           onChange={(event) => {
             setSearchInput(event.target.value)
