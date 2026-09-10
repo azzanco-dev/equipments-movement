@@ -23,7 +23,12 @@ import type { SelectOption } from '@/components/Select'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { useListRequest } from '@/components/data-list/useListRequest'
 
-type EquipmentTypeRow = { id: string; name: string }
+type EquipmentTypeRow = { id: string; name: string; equipment_count: number }
+type EquipmentTypeQueryRow = {
+  id: string
+  name: string
+  equipment: Array<{ count: number }>
+}
 const PAGE_SIZE = 20
 
 export function AdminSettings() {
@@ -66,13 +71,19 @@ export function AdminSettings() {
     setLoading(true)
     let query = supabase
       .from('equipment_types')
-      .select('id,name', { count: 'exact' })
+      .select('id,name,equipment(count)', { count: 'exact' })
       .order('name')
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
     if (search.trim()) query = query.ilike('name', `%${search.trim()}%`)
     const { data, count } = await query.abortSignal(signal)
     if (signal.aborted) return
-    setRows((data as EquipmentTypeRow[]) ?? [])
+    setRows(
+      ((data as EquipmentTypeQueryRow[] | null) ?? []).map((row) => ({
+        id: row.id,
+        name: row.name,
+        equipment_count: row.equipment[0]?.count ?? 0,
+      })),
+    )
     setTotal(count ?? 0)
     setLoading(false)
   }, [page, search, startRequest])
@@ -394,6 +405,9 @@ export function AdminSettings() {
                     {t('equipmentTypeName')}
                   </th>
                   <th className="table-header px-3 py-2 text-start">
+                    {t('linkedEquipmentCount')}
+                  </th>
+                  <th className="table-header px-3 py-2 text-start">
                     {t('actions')}
                   </th>
                 </tr>
@@ -406,6 +420,7 @@ export function AdminSettings() {
                     style={{ borderColor: 'var(--border)' }}
                   >
                     <td className="px-3 py-2 font-medium">{row.name}</td>
+                    <td className="px-3 py-2">{row.equipment_count}</td>
                     <td className="px-3 py-2">
                       <div className="flex gap-1">
                         <button
