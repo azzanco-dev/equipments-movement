@@ -25,6 +25,13 @@ import {
   downloadCompanyTemplate,
   type CompanyImportRow,
 } from '@/lib/excel'
+import {
+  COMPANY_EXPORT_COLUMNS,
+  companyExportColumnLabels,
+  exportCompaniesToExcel,
+  type CompanyExportColumn,
+  type CompanyExportRow,
+} from '@/lib/companyExport'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
@@ -67,6 +74,12 @@ export function AdminCompanies() {
   } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [exportColumns, setExportColumns] = useState<Set<CompanyExportColumn>>(
+    () => new Set(['name_ar', 'name_en', 'linked_projects']),
+  )
 
   // Manage projects state
   const [projectsModalOpen, setProjectsModalOpen] = useState(false)
@@ -352,6 +365,75 @@ export function AdminCompanies() {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  function toggleExportColumn(column: CompanyExportColumn) {
+    setExportColumns((current) => {
+      const next = new Set(current)
+      if (next.has(column)) next.delete(column)
+      else next.add(column)
+      return next
+    })
+  }
+
+  async function handleExport() {
+    const selectedColumns = COMPANY_EXPORT_COLUMNS.filter((column) =>
+      exportColumns.has(column),
+    )
+    if (!selectedColumns.length) return
+    setExporting(true)
+    setExportError(null)
+    try {
+      const allCompanies: Company[] = []
+      for (let from = 0; ; from += 500) {
+        const { data, error } = await supabase
+          .from('companies')
+          .select('id,name_ar,name_en,created_at,updated_at')
+          .order('name_ar')
+          .order('id')
+          .range(from, from + 499)
+        if (error) throw error
+        const batch = (data as Company[]) ?? []
+        allCompanies.push(...batch)
+        if (batch.length < 500) break
+      }
+
+      const projectsByCompany = new Map<
+        string,
+        Array<{ name_ar: string; name_en: string }>
+      >()
+      for (let from = 0; ; from += 500) {
+        const { data, error } = await supabase
+          .from('company_projects')
+          .select('company_id,project:projects(name_ar,name_en)')
+          .order('company_id')
+          .range(from, from + 499)
+        if (error) throw error
+        const batch = (data ?? []) as unknown as Array<{
+          company_id: string
+          project: { name_ar: string; name_en: string } | null
+        }>
+        for (const link of batch) {
+          if (!link.project) continue
+          const projects = projectsByCompany.get(link.company_id) ?? []
+          projects.push(link.project)
+          projectsByCompany.set(link.company_id, projects)
+        }
+        if (batch.length < 500) break
+      }
+
+      const rows: CompanyExportRow[] = allCompanies.map((company) => ({
+        ...company,
+        projects: projectsByCompany.get(company.id) ?? [],
+      }))
+      exportCompaniesToExcel(rows, selectedColumns, t, lang)
+      setExportModalOpen(false)
+    } catch (error) {
+      console.error(error)
+      setExportError(t('exportFailed'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -360,6 +442,16 @@ export function AdminCompanies() {
         actions={
           <DataListActions
             menuActions={
+              <>
+                <button
+                  onClick={() => {
+                    setExportError(null)
+                    setExportModalOpen(true)
+                  }}
+                  className="btn-ghost"
+                >
+                  <Download size={16} /> {t('exportExcel')}
+                </button>
               <button
                 onClick={() => {
                   resetImport()
@@ -369,6 +461,7 @@ export function AdminCompanies() {
               >
                 <Upload size={16} /> {t('importExcel')}
               </button>
+              </>
             }
             primaryAction={
               <button onClick={openAdd} className="btn-primary">
@@ -467,6 +560,51 @@ export function AdminCompanies() {
         total={total}
         onPage={list.setPage}
       />
+
+      <Modal
+        open={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        title={t('exportCompanies')}
+        size="sm"
+      >
+        <div className="space-y-4">
+          {exportError && <Alert type="error">{exportError}</Alert>}
+          <p className="text-sm text-muted">{t('companyExportHelp')}</p>
+          <div className="space-y-2">
+            {COMPANY_EXPORT_COLUMNS.map((column) => (
+              <label
+                key={column}
+                className="flex items-center gap-3 rounded-lg border px-3 py-2 text-sm cursor-pointer"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <input
+                  type="checkbox"
+                  checked={exportColumns.has(column)}
+                  onChange={() => toggleExportColumn(column)}
+                  className="rounded"
+                />
+                {t(companyExportColumnLabels[column])}
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              onClick={() => setExportModalOpen(false)}
+              className="btn-outline flex-1"
+            >
+              {t('cancel')}
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={exporting || exportColumns.size === 0}
+              className="btn-primary flex-1"
+            >
+              <Download size={16} />{' '}
+              {exporting ? t('processing') : t('exportExcel')}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Add/Edit Modal */}
       <Modal

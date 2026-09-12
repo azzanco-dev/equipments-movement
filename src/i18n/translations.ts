@@ -488,6 +488,11 @@ export const translations = {
     editCompany: 'تعديل شركة',
     noCompanies: 'لا توجد شركات',
     importCompanies: 'استيراد شركات',
+    exportCompanies: 'تصدير الشركات',
+    companyExportHelp:
+      'اختر الاعمدة والعلاقات المطلوبة. سيشمل الملف كل الشركات المتاحة لك.',
+    linkedProjectsCount: 'عدد المشاريع المرتبطة',
+    companyExportGeneratedAt: 'تاريخ التصدير',
     duplicateCompany: 'اسم الشركة مكرر',
     importProjects: 'استيراد مشاريع',
     projectCompanyNotFound: 'الشركة غير موجودة',
@@ -1137,6 +1142,11 @@ export const translations = {
     editCompany: 'Edit Company',
     noCompanies: 'No companies',
     importCompanies: 'Import Companies',
+    exportCompanies: 'Export Companies',
+    companyExportHelp:
+      'Choose the columns and relationships to include. The workbook includes all companies available to you.',
+    linkedProjectsCount: 'Linked Projects Count',
+    companyExportGeneratedAt: 'Exported At',
     duplicateCompany: 'Duplicate company name',
     importProjects: 'Import Projects',
     projectCompanyNotFound: 'Company not found',
