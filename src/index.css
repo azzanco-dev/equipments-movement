@@ -2,40 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Thmanyah Sans for Arabic, Manrope for Latin text. */
-@font-face {
-  font-family: 'Manrope';
-  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-400-normal.woff2')
-    format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Manrope';
-  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-500-normal.woff2')
-    format('woff2');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Manrope';
-  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-600-normal.woff2')
-    format('woff2');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Manrope';
-  src: url('https://cdn.jsdelivr.net/npm/@fontsource/manrope@5.2.5/files/manrope-latin-700-normal.woff2')
-    format('woff2');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
+/* Thmanyah Sans remains the Arabic interface font. */
 @font-face {
   font-family: 'Thmanyah';
   src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Regular.woff2')
@@ -98,22 +65,13 @@
 }
 
 :root {
-  --font-primary: 'Thmanyah', 'Manrope', 'Tajawal', system-ui, sans-serif;
-  --font-latin: 'Manrope', 'Segoe UI', system-ui, sans-serif;
-  --font-heading: 'Thmanyah Serif Display', 'Thmanyah', 'Manrope', serif;
+  --font-primary: 'Thmanyah', 'Tajawal', 'Segoe UI', Tahoma, system-ui, sans-serif;
+  --font-latin: 'Roboto', 'Segoe UI', Arial, system-ui, sans-serif;
+  --font-heading: 'Thmanyah Serif Display', 'Thmanyah', 'Segoe UI', serif;
 }
 
 * {
   font-family: var(--font-primary);
-}
-
-/* Latin text inside RTL context gets Inter for better readability */
-[dir='ltr'] {
-  font-family: var(--font-latin);
-}
-
-html[lang='en'] body {
-  font-family: var(--font-latin);
 }
 
 h1,
@@ -123,6 +81,11 @@ h4,
 h5,
 h6 {
   font-family: var(--font-heading);
+}
+
+html[lang='en'],
+html[lang='en'] * {
+  font-family: var(--font-latin);
 }
 
 body {
@@ -225,8 +188,11 @@ body {
     @apply h-8 w-full rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors placeholder:text-gray-400 placeholder:text-[13px];
     border-color: var(--border);
     font-family:
-      'NotoArabicInput', 'Manrope', 'Segoe UI', Tahoma, system-ui, sans-serif;
+      'NotoArabicInput', 'Segoe UI', Tahoma, system-ui, sans-serif;
     line-height: 1.25rem;
+  }
+  html[lang='en'] .input {
+    font-family: var(--font-latin);
   }
   .input:focus {
     border-color: var(--primary);

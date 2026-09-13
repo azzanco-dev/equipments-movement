@@ -4,18 +4,16 @@ import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { InlineSpinner } from '@/components/Spinner'
 import { LogIn, LogOut, Truck, AlertCircle, Download } from 'lucide-react'
-import type { EntryExitLog, Equipment, EquipmentVisit } from '@/lib/types'
+import type { EntryExitLog, Equipment } from '@/lib/types'
 import { PageHeader } from '@/components/PageHeader'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
-import { movementsListConfig, visitsListConfig } from '@/lib/listConfigs'
+import { movementsListConfig } from '@/lib/listConfigs'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
-import { Modal } from '@/components/Modal'
-import { localizedName } from '@/lib/localizedName'
 import { MovementLogCard } from '@/components/MovementLogCard'
 
 async function loadLatestDriverNames(entryIds: string[], signal: AbortSignal) {
@@ -55,7 +53,7 @@ export function AdminDashboard({
   onSelectMovement?: (id: string) => void
   onCreateMovement?: (type: 'entry' | 'exit') => void
 }) {
-  const { t, lang } = useI18n()
+  const { t } = useI18n()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -107,14 +105,11 @@ export function AdminDashboard({
   )
   const list = useDataListState(movementsListConfig)
 
-  // Reports
-  const [visits, setVisits] = useState<EquipmentVisit[]>([])
-  const [loadingVisits, setLoadingVisits] = useState(true)
-  const [visitsTotal, setVisitsTotal] = useState(0)
-  const [selectedVisit, setSelectedVisit] = useState<EquipmentVisit | null>(
-    null,
-  )
-  const visitList = useDataListState(visitsListConfig, 'visit_')
+  // Movement reports preserve the prior report URL prefix for existing links.
+  const [reports, setReports] = useState<EntryExitLog[]>([])
+  const [loadingReports, setLoadingReports] = useState(true)
+  const [reportsTotal, setReportsTotal] = useState(0)
+  const reportList = useDataListState(movementsListConfig, 'visit_')
 
   const setTab = (nextTab: 'logs' | 'reports') => {
     const next = new URLSearchParams(searchParams.toString())
@@ -282,7 +277,7 @@ export function AdminDashboard({
   }, [selectedSummary, summaryPage])
 
   const startLogsRequest = useListRequest()
-  const startVisitsRequest = useListRequest()
+  const startReportsRequest = useListRequest()
   const fetchLogs = useCallback(async () => {
     const signal = startLogsRequest()
     setLoadingLogs(true)
@@ -348,59 +343,73 @@ export function AdminDashboard({
     list.sort,
   ])
 
-  const fetchVisits = useCallback(async () => {
-    const signal = startVisitsRequest()
-    setLoadingVisits(true)
+  const fetchReports = useCallback(async () => {
+    const signal = startReportsRequest()
+    setLoadingReports(true)
+    const term = sanitizeSearchTerm(reportList.search)
+    let equipmentIds: string[] = []
+    if (term) {
+      const { data: equipmentMatches } = await supabase
+        .from('equipment')
+        .select('id')
+        .or(
+          `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`,
+        )
+        .limit(100)
+        .abortSignal(signal)
+      if (signal.aborted) return
+      equipmentIds = (equipmentMatches ?? []).map((item) => item.id)
+    }
     let query = supabase
-      .from('equipment_visits')
+      .from('entry_exit_logs')
       .select(
-        'equipment_id,equipment_code,equipment_type,contractor_equipment_code,plate_number,project_id,project_name_ar,project_name_en,company_name_ar,company_name_en,entry_log_id,entry_recorded_at,entry_supervisor_id,entry_supervisor_name,driver_name,odometer_reading,notes,exit_log_id,exit_recorded_at,exit_supervisor_id,exit_supervisor_name,exit_driver_name,exit_odometer,exit_notes,movement_context',
+        'id,equipment_id,supervisor_id,movement_type,movement_context,driver_name,odometer_reading,notes,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name)',
         { count: 'exact' },
       )
-      .order(visitList.sort, { ascending: visitList.direction === 'asc' })
-      .order('entry_log_id', { ascending: visitList.direction === 'asc' })
+      .eq('movement_context', 'site')
+      .order(reportList.sort, { ascending: reportList.direction === 'asc' })
+      .order('id', { ascending: reportList.direction === 'asc' })
       .range(
-        (visitList.page - 1) * visitList.pageSize,
-        visitList.page * visitList.pageSize - 1,
+        (reportList.page - 1) * reportList.pageSize,
+        reportList.page * reportList.pageSize - 1,
       )
-    const term = sanitizeSearchTerm(visitList.search)
     if (term)
       query = query.or(
-        `equipment_code.ilike.%${term}%,equipment_type.ilike.%${term}%,driver_name.ilike.%${term}%,exit_driver_name.ilike.%${term}%,contractor_equipment_code.ilike.%${term}%`,
+        `driver_name.ilike.%${term}%,contractor_equipment_code.ilike.%${term}%${equipmentIds.length ? `,equipment_id.in.(${equipmentIds.join(',')})` : ''}`,
       )
     query = applyListFilters(
       query,
-      visitList.filters,
-      new Set(visitsListConfig.filterFields.map((field) => field.key)),
+      reportList.filters,
+      new Set(movementsListConfig.filterFields.map((field) => field.key)),
     )
     const { data, error, count } = await query.abortSignal(signal)
     if (signal.aborted) return
     if (error) console.error(error)
-    const rows = (data as unknown as EquipmentVisit[]) ?? []
+    const rows = (data as unknown as EntryExitLog[]) ?? []
     const latestDrivers = await loadLatestDriverNames(
-      rows.map((row) => row.entry_log_id),
+      rows.filter((row) => row.movement_type === 'entry').map((row) => row.id),
       signal,
     )
     if (signal.aborted) return
-    setVisits(
+    setReports(
       rows.map((row) => ({
         ...row,
-        last_driver_name:
-          row.exit_driver_name ??
-          latestDrivers.get(row.entry_log_id) ??
-          row.driver_name,
+        current_driver_name:
+          row.movement_type === 'entry'
+            ? (latestDrivers.get(row.id) ?? row.driver_name)
+            : row.driver_name,
       })),
     )
-    setVisitsTotal(count ?? 0)
-    setLoadingVisits(false)
+    setReportsTotal(count ?? 0)
+    setLoadingReports(false)
   }, [
-    visitList.direction,
-    startVisitsRequest,
-    visitList.filters,
-    visitList.page,
-    visitList.pageSize,
-    visitList.search,
-    visitList.sort,
+    reportList.direction,
+    startReportsRequest,
+    reportList.filters,
+    reportList.page,
+    reportList.pageSize,
+    reportList.search,
+    reportList.sort,
   ])
 
   // Initial load
@@ -437,8 +446,8 @@ export function AdminDashboard({
     if (tab === 'logs') fetchLogs()
   }, [fetchLogs, tab])
   useEffect(() => {
-    if (tab === 'reports') fetchVisits()
-  }, [fetchVisits, tab])
+    if (tab === 'reports') fetchReports()
+  }, [fetchReports, tab])
 
   const statCards = [
     {
@@ -644,7 +653,7 @@ export function AdminDashboard({
               : 'border-transparent text-muted hover:text-fg'
           }`}
         >
-          {t('visitReports')}
+          {t('movementReports')}
         </button>
       </div>
 
@@ -712,32 +721,32 @@ export function AdminDashboard({
         </div>
       )}
 
-      {/* Reports tab */}
+      {/* Movement reports tab */}
       {tab === 'reports' && (
         <div className="space-y-4">
           <DataListToolbar
-            config={visitsListConfig}
-            search={visitList.searchInput}
-            onSearch={visitList.setSearchInput}
-            sort={visitList.sort}
-            direction={visitList.direction}
-            onSort={visitList.setSort}
-            pageSize={visitList.pageSize}
-            onPageSize={visitList.setPageSize}
-            filters={visitList.filters}
-            onFilters={visitList.setFilters}
+            config={movementConfig}
+            search={reportList.searchInput}
+            onSearch={reportList.setSearchInput}
+            sort={reportList.sort}
+            direction={reportList.direction}
+            onSort={reportList.setSort}
+            pageSize={reportList.pageSize}
+            onPageSize={reportList.setPageSize}
+            filters={reportList.filters}
+            onFilters={reportList.setFilters}
             menuActions={
               <button
                 onClick={async () => {
-                  const { exportVisitsToExcel } = await import('@/lib/excel')
-                  exportVisitsToExcel(
-                    visits,
-                    `visits-${new Date().toISOString().slice(0, 10)}`,
+                  const { exportLogsToExcel } = await import('@/lib/excel')
+                  exportLogsToExcel(
+                    reports,
+                    `movement-reports-${new Date().toISOString().slice(0, 10)}`,
                     t as (k: string) => string,
                   )
                 }}
                 className="btn-ghost"
-                disabled={visits.length === 0}
+                disabled={reports.length === 0}
               >
                 <Download size={16} />
                 {t('exportExcel')}
@@ -745,162 +754,35 @@ export function AdminDashboard({
             }
           />
 
-          {/* Visits table */}
-          {loadingVisits ? (
+          {loadingReports ? (
             <InlineSpinner label={t('loading')} />
-          ) : visits.length === 0 ? (
+          ) : reports.length === 0 ? (
             <div className="card text-center py-12">
-              <p className="text-muted">{t('noVisits')}</p>
+              <p className="text-muted">{t('noResults')}</p>
             </div>
           ) : (
-            <div className="card p-0 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="compact-table min-w-[800px] w-full text-sm">
-                  <thead>
-                    <tr
-                      className="border-b"
-                      style={{ borderColor: 'var(--border)' }}
-                    >
-                      <th className="table-header text-start px-4 py-3">
-                        {t('contractorEquipmentCode')}
-                      </th>
-                      <th className="table-header text-start px-4 py-3">
-                        {t('equipmentCodeLabel')}
-                      </th>
-                      <th className="table-header text-start px-4 py-3">
-                        {t('equipmentNameLabel')}
-                      </th>
-                      <th className="table-header text-start px-4 py-3">
-                        {t('location')}
-                      </th>
-                      <th className="table-header text-start px-4 py-3">
-                        {t('driverName')}
-                      </th>
-                      <th className="table-header text-start px-4 py-3">
-                        {t('entryTime')}
-                      </th>
-                      <th className="table-header text-start px-4 py-3">
-                        {t('exitTime')}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visits.map((v) => (
-                      <tr
-                        key={v.entry_log_id}
-                        className="border-b last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-                        style={{ borderColor: 'var(--border)' }}
-                        onClick={() => setSelectedVisit(v)}
-                        tabIndex={0}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ')
-                            setSelectedVisit(v)
-                        }}
-                      >
-                        <td className="px-4 py-3 text-[13px] font-semibold">
-                          {v.contractor_equipment_code ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-[13px]">
-                          {v.equipment_code}
-                        </td>
-                        <td className="px-4 py-3 text-[13px]">
-                          {v.equipment_type}
-                        </td>
-                        <td className="px-4 py-3 text-[13px]">
-                          {v.movement_context === 'workshop'
-                            ? t('workshopLocation')
-                            : localizedName(
-                                lang,
-                                v.project_name_ar,
-                                v.project_name_en,
-                              )}
-                        </td>
-                        <td className="px-4 py-3 text-[13px]">
-                          {v.last_driver_name ?? v.driver_name ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-[12px] text-muted whitespace-nowrap">
-                          {formatDate(v.entry_recorded_at)}
-                        </td>
-                        <td className="px-4 py-3 text-[12px] text-muted whitespace-nowrap">
-                          {v.exit_recorded_at
-                            ? formatDate(v.exit_recorded_at)
-                            : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              {reports.map((log) => (
+                <MovementLogCard
+                  key={log.id}
+                  log={log}
+                  onSelect={
+                    onSelectMovement
+                      ? () => onSelectMovement(log.id)
+                      : undefined
+                  }
+                />
+              ))}
             </div>
           )}
           <DataListPagination
-            page={visitList.page}
-            pageSize={visitList.pageSize}
-            total={visitsTotal}
-            onPage={visitList.setPage}
+            page={reportList.page}
+            pageSize={reportList.pageSize}
+            total={reportsTotal}
+            onPage={reportList.setPage}
           />
         </div>
       )}
-      <Modal
-        open={selectedVisit !== null}
-        onClose={() => setSelectedVisit(null)}
-        title={t('visitDetails')}
-        size="lg"
-      >
-        {selectedVisit && (
-          <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
-            {[
-              [t('equipmentCodeLabel'), selectedVisit.equipment_code],
-              [t('equipmentNameLabel'), selectedVisit.equipment_type],
-              [t('plateNumber'), selectedVisit.plate_number],
-              [
-                t('contractorEquipmentCode'),
-                selectedVisit.contractor_equipment_code,
-              ],
-              [
-                t('company'),
-                localizedName(
-                  lang,
-                  selectedVisit.company_name_ar,
-                  selectedVisit.company_name_en,
-                ),
-              ],
-              [
-                t('project'),
-                localizedName(
-                  lang,
-                  selectedVisit.project_name_ar,
-                  selectedVisit.project_name_en,
-                ),
-              ],
-              [
-                t('driverName'),
-                selectedVisit.last_driver_name ?? selectedVisit.driver_name,
-              ],
-              [t('entryTime'), formatDate(selectedVisit.entry_recorded_at)],
-              [t('entryBy'), selectedVisit.entry_supervisor_name],
-              [
-                t('exitTime'),
-                selectedVisit.exit_recorded_at
-                  ? formatDate(selectedVisit.exit_recorded_at)
-                  : null,
-              ],
-              [t('exitBy'), selectedVisit.exit_supervisor_name],
-              [t('entryNotes'), selectedVisit.notes],
-              [t('exitNotes'), selectedVisit.exit_notes],
-            ].map(([label, value]) => (
-              <div
-                key={label}
-                className="min-w-0 border-b pb-3"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                <p className="text-xs text-muted">{label}</p>
-                <p className="mt-1 font-medium break-words">{value || '—'}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </Modal>
     </div>
   )
 }
