@@ -8,6 +8,7 @@ import {
   Menu,
   X,
   CircleUserRound,
+  ChevronDown,
 } from 'lucide-react'
 import { useTheme } from '@/theme/ThemeContext'
 import { useAuth } from '@/auth/AuthContext'
@@ -44,6 +45,9 @@ export function Layout({
   const [loggingOut, setLoggingOut] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [pendingPage, setPendingPage] = useState<string | null>(null)
+  const [expandedNavItems, setExpandedNavItems] = useState<
+    Record<string, boolean>
+  >({})
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -58,6 +62,7 @@ export function Layout({
   useEffect(() => {
     setPendingPage(null)
     setMobileOpen(false)
+    setExpandedNavItems({})
   }, [pathname])
 
   useEffect(() => {
@@ -251,40 +256,65 @@ export function Layout({
             <nav className="flex flex-col gap-1">
               {navItems.map((item) => (
                 <div key={item.key}>
-                  <button
-                    key={item.key}
-                    aria-current={activePage === item.key ? 'page' : undefined}
-                    onClick={() => {
-                      if (isCurrentPage(item.key)) return
-                      setPendingPage(item.key)
-                      onNavigate(item.key)
-                    }}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
-                      activePage === item.key
-                        ? 'nav-active'
-                        : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-fg'
-                    }`}
-                  >
-                    {item.icon}
-                    {item.label}
-                  </button>
-                  {item.children &&
-                    (activePage === item.key ||
-                      item.children.some((child) =>
+                  {(() => {
+                    const hasActiveChild = Boolean(
+                      item.children?.some((child) =>
                         pathname.startsWith(`/${child.key}`),
-                      )) && (
-                      <div className="ms-9 mt-1 space-y-0.5 border-s border-[var(--border)] ps-2">
-                        {item.children.map((child) => (
-                          <button
-                            key={child.key}
-                            className={`block w-full rounded px-2 py-1.5 text-start text-xs ${pathname.startsWith(`/${child.key}`) ? 'font-semibold text-fg' : 'text-muted hover:text-fg'}`}
-                            onClick={() => onNavigate(child.key)}
-                          >
-                            {child.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                      ),
+                    )
+                    const expanded =
+                      expandedNavItems[item.key] ?? hasActiveChild
+                    return (
+                      <>
+                        <button
+                          key={item.key}
+                          aria-current={
+                            activePage === item.key ? 'page' : undefined
+                          }
+                          aria-expanded={item.children ? expanded : undefined}
+                          onClick={() => {
+                            if (item.children) {
+                              setExpandedNavItems((current) => ({
+                                ...current,
+                                [item.key]: !expanded,
+                              }))
+                              return
+                            }
+                            if (isCurrentPage(item.key)) return
+                            setPendingPage(item.key)
+                            onNavigate(item.key)
+                          }}
+                          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
+                            activePage === item.key
+                              ? 'nav-active'
+                              : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-fg'
+                          }`}
+                        >
+                          {item.icon}
+                          {item.label}
+                          {item.children && (
+                            <ChevronDown
+                              size={16}
+                              className={`ms-auto transition-transform ${expanded ? 'rotate-180' : ''}`}
+                            />
+                          )}
+                        </button>
+                        {item.children && expanded && (
+                          <div className="ms-9 mt-1 space-y-0.5 border-s border-[var(--border)] ps-2">
+                            {item.children.map((child) => (
+                              <button
+                                key={child.key}
+                                className={`block w-full rounded px-2 py-1.5 text-start text-xs ${pathname.startsWith(`/${child.key}`) ? 'font-semibold text-fg' : 'text-muted hover:text-fg'}`}
+                                onClick={() => onNavigate(child.key)}
+                              >
+                                {child.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
                 </div>
               ))}
             </nav>
@@ -306,40 +336,66 @@ export function Layout({
               <nav className="flex flex-col gap-1">
                 {navItems.map((item) => (
                   <div key={item.key}>
-                    <button
-                      key={item.key}
-                      onClick={() => {
-                        setMobileOpen(false)
-                        if (isCurrentPage(item.key)) return
-                        setPendingPage(item.key)
-                        onNavigate(item.key)
-                        setMobileOpen(false)
-                      }}
-                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
-                        activePage === item.key
-                          ? 'nav-active'
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-                      }`}
-                    >
-                      {item.icon}
-                      {item.label}
-                    </button>
-                    {item.children && (
-                      <div className="ms-9 mt-1 space-y-0.5 border-s border-[var(--border)] ps-2">
-                        {item.children.map((child) => (
+                    {(() => {
+                      const hasActiveChild = Boolean(
+                        item.children?.some((child) =>
+                          pathname.startsWith(`/${child.key}`),
+                        ),
+                      )
+                      const expanded =
+                        expandedNavItems[item.key] ?? hasActiveChild
+                      return (
+                        <>
                           <button
-                            key={child.key}
-                            className={`block w-full rounded px-2 py-1.5 text-start text-xs ${pathname.startsWith(`/${child.key}`) ? 'font-semibold text-fg' : 'text-muted'}`}
+                            key={item.key}
+                            aria-expanded={item.children ? expanded : undefined}
                             onClick={() => {
+                              if (item.children) {
+                                setExpandedNavItems((current) => ({
+                                  ...current,
+                                  [item.key]: !expanded,
+                                }))
+                                return
+                              }
+                              if (isCurrentPage(item.key)) return
+                              setPendingPage(item.key)
+                              onNavigate(item.key)
                               setMobileOpen(false)
-                              onNavigate(child.key)
                             }}
+                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
+                              activePage === item.key
+                                ? 'nav-active'
+                                : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                            }`}
                           >
-                            {child.label}
+                            {item.icon}
+                            {item.label}
+                            {item.children && (
+                              <ChevronDown
+                                size={16}
+                                className={`ms-auto transition-transform ${expanded ? 'rotate-180' : ''}`}
+                              />
+                            )}
                           </button>
-                        ))}
-                      </div>
-                    )}
+                          {item.children && expanded && (
+                            <div className="ms-9 mt-1 space-y-0.5 border-s border-[var(--border)] ps-2">
+                              {item.children.map((child) => (
+                                <button
+                                  key={child.key}
+                                  className={`block w-full rounded px-2 py-1.5 text-start text-xs ${pathname.startsWith(`/${child.key}`) ? 'font-semibold text-fg' : 'text-muted'}`}
+                                  onClick={() => {
+                                    setMobileOpen(false)
+                                    onNavigate(child.key)
+                                  }}
+                                >
+                                  {child.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
                   </div>
                 ))}
               </nav>
