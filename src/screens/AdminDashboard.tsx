@@ -234,7 +234,7 @@ export function AdminDashboard({
         const { data, count, error } = await supabase
           .from('entry_exit_logs')
           .select(
-            'id,equipment_id,supervisor_id,movement_type,movement_context,driver_name,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name)',
+            'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)',
             { count: 'exact' },
           )
           .eq('movement_context', 'site')
@@ -301,7 +301,7 @@ export function AdminDashboard({
     let query = supabase
       .from('entry_exit_logs')
       .select(
-        'id,equipment_id,supervisor_id,movement_type,movement_context,driver_name,odometer_reading,notes,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name)',
+        'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,odometer_reading,notes,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)',
         { count: 'exact' },
       )
       .eq('movement_context', 'site')
@@ -367,7 +367,7 @@ export function AdminDashboard({
     let query = supabase
       .from('entry_exit_logs')
       .select(
-        'id,equipment_id,supervisor_id,movement_type,movement_context,driver_name,odometer_reading,notes,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name)',
+        'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,odometer_reading,notes,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)',
         { count: 'exact' },
       )
       .eq('movement_context', 'site')

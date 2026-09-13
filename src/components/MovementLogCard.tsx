@@ -105,6 +105,10 @@ export function MovementLogCard({
           label={t('driverName')}
           value={log.current_driver_name ?? log.driver_name}
         />
+        <MovementLogField
+          label={t('mobileNumber')}
+          value={log.driver?.mobile_number}
+        />
       </div>
 
       <div
