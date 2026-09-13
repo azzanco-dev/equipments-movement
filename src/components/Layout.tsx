@@ -259,7 +259,7 @@ export function Layout({
                       setPendingPage(item.key)
                       onNavigate(item.key)
                     }}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
+                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
                       activePage === item.key
                         ? 'nav-active'
                         : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-fg'
@@ -315,7 +315,7 @@ export function Layout({
                         onNavigate(item.key)
                         setMobileOpen(false)
                       }}
-                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
                         activePage === item.key
                           ? 'nav-active'
                           : 'hover:bg-gray-100 dark:hover:bg-gray-800'
