@@ -40,9 +40,7 @@ export function MovementLogCard({
     ? localizedName(lang, log.company.name_ar, log.company.name_en)
     : null
   const location =
-    log.movement_context === 'workshop'
-      ? t('workshopLocation')
-      : projectName
+    log.movement_context === 'workshop' ? t('workshopLocation') : projectName
 
   return (
     <button
@@ -66,14 +64,20 @@ export function MovementLogCard({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
-        {showTodayBadge && new Date(log.recorded_at).toDateString() === new Date().toDateString() && <span className="badge border border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-300">{t('todayBadge')}</span>}
-        <span
-          className={`badge border ${
-            isEntry ? 'status-entry' : 'status-exit'
-          }`}
-        >
-          {isEntry ? t('entry') : t('exit')}
-        </span>
+          {showTodayBadge &&
+            new Date(log.recorded_at).toDateString() ===
+              new Date().toDateString() && (
+              <span className="badge border border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-300">
+                {t('todayBadge')}
+              </span>
+            )}
+          <span
+            className={`badge border ${
+              isEntry ? 'status-entry' : 'status-exit'
+            }`}
+          >
+            {isEntry ? t('entry') : t('exit')}
+          </span>
         </div>
       </div>
 
@@ -111,7 +115,7 @@ export function MovementLogCard({
             label={t('driverName')}
             value={log.current_driver_name ?? log.driver_name}
           />
-          <div className='text-xs text-muted'>{log.driver?.mobile_number}</div>
+          <div className="text-xs text-muted">{log.driver?.mobile_number}</div>
         </div>
       </div>
 
