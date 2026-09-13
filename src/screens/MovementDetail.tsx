@@ -850,22 +850,21 @@ export function MovementDetail({
                 </span>
                 <div className="min-w-0">
                   <p className="text-xs text-muted">{t('driverName')}</p>
-                  <p className="font-medium break-words">
-                    {(isEntry
-                      ? driverChanges.at(-1)?.new_driver_name
-                      : undefined) ??
-                      log.driver?.full_name ??
-                      log.driver_name ??
-                      '—'}
-                  </p>
-                  {currentDriverMobileNumber && (
-                    <p
-                      className="select-text text-sm text-muted"
-                      dir="ltr"
-                    >
-                      {currentDriverMobileNumber}
+                  <div className="flex flex-col text-right" dir="rtl">
+                    <p className="font-medium break-words">
+                      {(isEntry
+                        ? driverChanges.at(-1)?.new_driver_name
+                        : undefined) ??
+                        log.driver?.full_name ??
+                        log.driver_name ??
+                        '—'}
                     </p>
-                  )}
+                      {currentDriverMobileNumber && (
+                        <p className="select-text text-muted" dir="ltr">
+                          <a href={`tel:${currentDriverMobileNumber}`}>{currentDriverMobileNumber}</a>
+                        </p>
+                      )}
+                  </div>
                 </div>
               </div>
             </>

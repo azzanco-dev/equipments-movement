@@ -206,7 +206,7 @@ export const translations = {
       'ابحث بكود المعدة او ترقيم الشركة او اللوحة او الشركة او الموقع',
     noEquipmentFound: 'لا توجد معدات مطابقة',
     selectedEquipment: 'المعدة المحددة',
-    driverName: 'اسم السائق / المشغّل',
+    driverName: 'اسم السائق',
     selectDriver: 'اختر السائق',
     driverRequired: 'يجب اختيار السائق قبل تسجيل الدخول.',
     driverInheritedFromEntry: 'سيتم استخدام سائق الدخولية السابقة',
