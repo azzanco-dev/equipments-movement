@@ -98,7 +98,9 @@ export function EntryReports({
     router.replace(`/reports/entries?period=${value}`, { scroll: false })
   }
   const number = (value: number | undefined) =>
-    new Intl.NumberFormat(lang === 'ar' ? 'ar-SA' : 'en-US').format(value ?? 0)
+    new Intl.NumberFormat(lang === 'ar' ? 'ar-SA-u-nu-latn' : 'en-US').format(
+      value ?? 0,
+    )
   const stats = [
     [t('totalEntries'), data?.total, 'text-fg'],
     [t('distinctEquipment'), data?.equipment, 'text-fg'],
