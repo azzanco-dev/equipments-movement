@@ -6,6 +6,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import { PageHeader } from '@/components/PageHeader'
 import { MovementLogCard } from '@/components/MovementLogCard'
 import { formatDate } from '@/lib/dateFormat'
+import { formatElapsedDuration } from '@/lib/duration'
 import type { EntryExitLog } from '@/lib/types'
 import type { TranslationKey } from '@/i18n/translations'
 
@@ -30,16 +31,6 @@ type ReportData = {
   top_projects: Ranked[]
   foremen: Ranked[]
 }
-function stayDuration(value: string, t: (key: TranslationKey) => string) {
-  const minutes = Math.max(
-    0,
-    Math.floor((Date.now() - new Date(value).getTime()) / 60000),
-  )
-  return minutes < 60
-    ? `${minutes} ${t('minutes')}`
-    : `${Math.floor(minutes / 60)} ${t('hours')} ${minutes % 60} ${t('minutes')}`
-}
-
 function rangeFor(value: string): Range {
   const now = new Date()
   const end = new Date(now)
@@ -254,7 +245,10 @@ export function EntryReports({
                 <p className="text-xs text-muted">
                   {formatDate(visit.entry_recorded_at)} ·{' '}
                   <span className="font-medium text-fg">
-                    {stayDuration(visit.entry_recorded_at, t)}
+                    {formatElapsedDuration(
+                      Date.now() - new Date(visit.entry_recorded_at).getTime(),
+                      t,
+                    )}
                   </span>
                 </p>
               </div>

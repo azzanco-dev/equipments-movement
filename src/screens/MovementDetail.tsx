@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
-import type { TranslationKey } from '@/i18n/translations'
 import { InlineSpinner } from '@/components/Spinner'
 import { PageHeader } from '@/components/PageHeader'
 import { Alert } from '@/components/Alert'
@@ -40,6 +39,7 @@ import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/components/Select'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
+import { formatElapsedDuration } from '@/lib/duration'
 import { localizedName } from '@/lib/localizedName'
 import { uploadMovementPhotosDirectly } from '@/lib/movementPhotoUpload'
 import { prepareMovementPhotos } from '@/lib/movementPhotoCompression'
@@ -49,21 +49,6 @@ interface MovementDetailProps {
   movementId: string
   onBack: () => void
   onNavigateMovement: (id: string) => void
-}
-
-function formatDuration(ms: number, t: (k: TranslationKey) => string): string {
-  if (ms < 0) ms = 0
-  const totalMinutes = Math.floor(ms / 60000)
-  const days = Math.floor(totalMinutes / 1440)
-  const hours = Math.floor((totalMinutes % 1440) / 60)
-  const minutes = totalMinutes % 60
-
-  const parts: string[] = []
-  if (days > 0) parts.push(`${days} ${t('days')}`)
-  if (hours > 0) parts.push(`${hours} ${t('hours')}`)
-  if (minutes > 0 || parts.length === 0)
-    parts.push(`${minutes} ${t('minutes')}`)
-  return parts.join(' ')
 }
 
 function InfoRow({
@@ -112,8 +97,9 @@ export function MovementDetail({
   const [photoBusy, setPhotoBusy] = useState(false)
   const [photoActionError, setPhotoActionError] = useState<string | null>(null)
   const [driverChanges, setDriverChanges] = useState<MovementDriverChange[]>([])
-  const [currentDriverMobileNumber, setCurrentDriverMobileNumber] =
-    useState<string | null>(null)
+  const [currentDriverMobileNumber, setCurrentDriverMobileNumber] = useState<
+    string | null
+  >(null)
   const [driverEntryId, setDriverEntryId] = useState<string | null>(null)
   const [driverChangeOpen, setDriverChangeOpen] = useState(false)
   const [newDriverId, setNewDriverId] = useState('')
@@ -859,11 +845,13 @@ export function MovementDetail({
                         log.driver_name ??
                         '—'}
                     </p>
-                      {currentDriverMobileNumber && (
-                        <p className="select-text text-muted" dir="ltr">
-                          <a href={`tel:${currentDriverMobileNumber}`}>{currentDriverMobileNumber}</a>
-                        </p>
-                      )}
+                    {currentDriverMobileNumber && (
+                      <p className="select-text text-muted" dir="ltr">
+                        <a href={`tel:${currentDriverMobileNumber}`}>
+                          {currentDriverMobileNumber}
+                        </a>
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1178,7 +1166,9 @@ export function MovementDetail({
                 <Clock size={16} className="text-muted shrink-0" />
                 <div>
                   <p className="text-xs text-muted">{t('durationOnSite')}</p>
-                  <p className="font-medium">{formatDuration(durationMs, t)}</p>
+                  <p className="font-medium">
+                    {formatElapsedDuration(durationMs, t)}
+                  </p>
                 </div>
               </div>
               <button
@@ -1245,7 +1235,9 @@ export function MovementDetail({
                 <Clock size={16} className="text-muted shrink-0" />
                 <div>
                   <p className="text-xs text-muted">{t('durationOnSite')}</p>
-                  <p className="font-medium">{formatDuration(durationMs, t)}</p>
+                  <p className="font-medium">
+                    {formatElapsedDuration(durationMs, t)}
+                  </p>
                 </div>
               </div>
               <button
