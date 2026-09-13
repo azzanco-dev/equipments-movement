@@ -9,19 +9,9 @@ export function formatElapsedDuration(ms: number, t: Translate): string {
 
   if (totalMinutes < 60) return `${totalMinutes} ${t('minutes')}`
 
-  if (totalHours < 24) {
-    const minutes = totalMinutes % 60
-    return minutes
-      ? `${totalHours} ${t('hours')} ${minutes} ${t('minutes')}`
-      : `${totalHours} ${t('hours')}`
-  }
+  if (totalHours < 24) return `${totalHours} ${t('hours')}`
 
-  if (totalDays < 30) {
-    const hours = totalHours % 24
-    return hours
-      ? `${totalDays} ${t('days')} ${hours} ${t('hours')}`
-      : `${totalDays} ${t('days')}`
-  }
+  if (totalDays < 30) return `${totalDays} ${t('days')}`
 
   if (totalDays < 365) {
     const months = Math.floor(totalDays / 30)
