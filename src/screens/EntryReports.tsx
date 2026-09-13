@@ -30,14 +30,14 @@ type ReportData = {
   top_projects: Ranked[]
   foremen: Ranked[]
 }
-function stayDuration(value: string) {
+function stayDuration(value: string, t: (key: TranslationKey) => string) {
   const minutes = Math.max(
     0,
     Math.floor((Date.now() - new Date(value).getTime()) / 60000),
   )
   return minutes < 60
-    ? `${minutes} د`
-    : `${Math.floor(minutes / 60)} س ${minutes % 60} د`
+    ? `${minutes} ${t('minutes')}`
+    : `${Math.floor(minutes / 60)} ${t('hours')} ${minutes % 60} ${t('minutes')}`
 }
 
 function rangeFor(value: string): Range {
@@ -179,7 +179,11 @@ export function EntryReports({
           <h2 className="text-lg font-semibold">{t('latestEntries')}</h2>
           <button
             className="btn-outline"
-            onClick={() => router.push(`/reports/entries/all?period=${period}`)}
+            onClick={() =>
+              router.push(
+                `/reports/entries/all?period=${period}&from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`,
+              )
+            }
           >
             <ExternalLink size={15} />
             {t('viewAll')}
@@ -229,29 +233,33 @@ export function EntryReports({
           </span>
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {data?.open_visits?.map((visit) => (
-            <div
-              className="card space-y-2 p-4"
-              key={`${visit.equipment_code}-${visit.entry_recorded_at}`}
-            >
-              <div className="flex justify-between">
-                <span className="font-semibold">{visit.equipment_code}</span>
-                <span className="badge status-entry">{t('entry')}</span>
+          {data?.open_visits?.length ? (
+            data.open_visits.map((visit) => (
+              <div
+                className="card space-y-2 p-4"
+                key={`${visit.equipment_code}-${visit.entry_recorded_at}`}
+              >
+                <div className="flex justify-between">
+                  <span className="font-semibold">{visit.equipment_code}</span>
+                  <span className="badge status-entry">{t('entry')}</span>
+                </div>
+                <p className="text-xs text-muted">
+                  {visit.equipment_type} · {visit.company_name ?? '—'}
+                </p>
+                <p className="text-xs">
+                  {visit.project_name ?? '—'} · {visit.driver_name ?? '—'}
+                </p>
+                <p className="text-xs text-muted">
+                  {formatDate(visit.entry_recorded_at)} ·{' '}
+                  <span className="font-medium text-fg">
+                    {stayDuration(visit.entry_recorded_at, t)}
+                  </span>
+                </p>
               </div>
-              <p className="text-xs text-muted">
-                {visit.equipment_type} · {visit.company_name ?? '—'}
-              </p>
-              <p className="text-xs">
-                {visit.project_name ?? '—'} · {visit.driver_name ?? '—'}
-              </p>
-              <p className="text-xs text-muted">
-                {formatDate(visit.entry_recorded_at)} ·{' '}
-                <span className="font-medium text-fg">
-                  {stayDuration(visit.entry_recorded_at)}
-                </span>
-              </p>
-            </div>
-          ))}
+            ))
+          ) : (
+            <p className="text-sm text-muted">{t('noReportData')}</p>
+          )}
         </div>
       </section>
     </div>
