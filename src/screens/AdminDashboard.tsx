@@ -159,11 +159,13 @@ export function AdminDashboard({
       supabase
         .from('entry_exit_logs')
         .select('id', { count: 'exact', head: true })
+        .eq('movement_context', 'site')
         .eq('movement_type', 'entry')
         .gte('recorded_at', todayStr),
       supabase
         .from('entry_exit_logs')
         .select('id', { count: 'exact', head: true })
+        .eq('movement_context', 'site')
         .eq('movement_type', 'exit')
         .gte('recorded_at', todayStr),
       supabase
@@ -235,6 +237,7 @@ export function AdminDashboard({
             'id,equipment_id,supervisor_id,movement_type,movement_context,driver_name,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name)',
             { count: 'exact' },
           )
+          .eq('movement_context', 'site')
           .eq(
             'movement_type',
             selectedSummary === 'today_entries' ? 'entry' : 'exit',
@@ -298,9 +301,10 @@ export function AdminDashboard({
     let query = supabase
       .from('entry_exit_logs')
       .select(
-        'id,equipment_id,supervisor_id,movement_type,movement_context,workshop_purpose,driver_name,odometer_reading,notes,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name)',
+        'id,equipment_id,supervisor_id,movement_type,movement_context,driver_name,odometer_reading,notes,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name)',
         { count: 'exact' },
       )
+      .eq('movement_context', 'site')
       .order(list.sort, { ascending: list.direction === 'asc' })
       .order('id', { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
