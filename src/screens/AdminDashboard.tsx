@@ -16,7 +16,7 @@ import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
 import { Modal } from '@/components/Modal'
 import { localizedName } from '@/lib/localizedName'
-import { RelativeTime } from '@/components/RelativeTime'
+import { MovementLogCard } from '@/components/MovementLogCard'
 
 async function loadLatestDriverNames(entryIds: string[], signal: AbortSignal) {
   if (!entryIds.length) return new Map<string, string>()
@@ -237,7 +237,7 @@ export function AdminDashboard({
         const { data, count, error } = await supabase
           .from('entry_exit_logs')
           .select(
-            'id,equipment_id,supervisor_id,movement_type,movement_context,registration_method,driver_name,driver_id,notes,photo_url,company_id,project_id,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),project:projects(id,name_ar,name_en)',
+            'id,equipment_id,supervisor_id,movement_type,movement_context,driver_name,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name)',
             { count: 'exact' },
           )
           .eq(
@@ -303,7 +303,7 @@ export function AdminDashboard({
     let query = supabase
       .from('entry_exit_logs')
       .select(
-        'id,equipment_id,supervisor_id,movement_type,movement_context,workshop_purpose,registration_method,driver_name,driver_id,notes,photo_url,company_id,project_id,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),project:projects(id,name_ar,name_en)',
+        'id,equipment_id,supervisor_id,movement_type,movement_context,workshop_purpose,driver_name,odometer_reading,notes,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name)',
         { count: 'exact' },
       )
       .order(list.sort, { ascending: list.direction === 'asc' })
@@ -538,6 +538,20 @@ export function AdminDashboard({
             <div className="card py-10 text-center text-sm text-muted">
               {t('noResults')}
             </div>
+          ) : summaryLogs.length > 0 ? (
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              {summaryLogs.map((log) => (
+                <MovementLogCard
+                  key={log.id}
+                  log={log}
+                  onSelect={
+                    onSelectMovement
+                      ? () => onSelectMovement(log.id)
+                      : undefined
+                  }
+                />
+              ))}
+            </div>
           ) : (
             <div className="card overflow-hidden p-0">
               <div className="overflow-x-auto">
@@ -557,9 +571,7 @@ export function AdminDashboard({
                         {t('plateNumber')}
                       </th>
                       <th className="table-header px-4 py-3 text-start">
-                        {summaryLogs.length
-                          ? t('movementType')
-                          : t('currentStatus')}
+                        {t('currentStatus')}
                       </th>
                       <th className="table-header px-4 py-3 text-start">
                         {t('recordedAt')}
@@ -567,36 +579,6 @@ export function AdminDashboard({
                     </tr>
                   </thead>
                   <tbody>
-                    {summaryLogs.map((log) => (
-                      <tr
-                        key={log.id}
-                        className="cursor-pointer border-b last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                        style={{ borderColor: 'var(--border)' }}
-                        onClick={() => onSelectMovement?.(log.id)}
-                      >
-                        <td className="px-4 py-3 font-medium">
-                          {log.equipment?.code ?? '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          {log.equipment?.type ?? '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          {log.equipment?.plate_number ?? '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`badge border ${log.movement_type === 'entry' ? 'status-entry' : 'status-exit'}`}
-                          >
-                            {log.movement_type === 'entry'
-                              ? t('entry')
-                              : t('exit')}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-muted">
-                          {formatDate(log.recorded_at)}
-                        </td>
-                      </tr>
-                    ))}
                     {summaryEquipment.map((equipment) => (
                       <tr
                         key={equipment.id}
@@ -699,7 +681,7 @@ export function AdminDashboard({
             }
           />
 
-          {/* Table */}
+          {/* Movement cards */}
           {loadingLogs ? (
             <InlineSpinner label={t('loading')} />
           ) : logs.length === 0 ? (
@@ -707,106 +689,18 @@ export function AdminDashboard({
               <p className="text-muted">{t('noResults')}</p>
             </div>
           ) : (
-            <div className="card p-0 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="compact-table w-full text-sm">
-                  <thead>
-                    <tr
-                      className="border-b"
-                      style={{ borderColor: 'var(--border)' }}
-                    >
-                      <th className="table-header text-start px-4 py-3">
-                        {t('contractorEquipmentCode')}
-                      </th>
-                      <th className="table-header text-start px-4 py-3">
-                        {t('equipmentCodeLabel')}
-                      </th>
-                      <th className="table-header text-start px-4 py-3">
-                        {t('equipmentNameLabel')}
-                      </th>
-                      <th className="table-header text-start px-4 py-3">
-                        {t('location')}
-                      </th>
-                      <th className="table-header text-start px-4 py-3">
-                        {t('movementType')}
-                      </th>
-                      <th className="table-header text-start px-4 py-3">
-                        {t('driverName')}
-                      </th>
-                      <th className="table-header text-start px-4 py-3">
-                        {t('recordedAt')}
-                      </th>
-                      <th
-                        className="table-header px-4 py-3"
-                        aria-label={t('createdAt')}
-                      />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {logs.map((log) => (
-                      <tr
-                        key={log.id}
-                        className={`border-b last:border-0 ${onSelectMovement ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors' : ''}`}
-                        style={{ borderColor: 'var(--border)' }}
-                        onClick={
-                          onSelectMovement
-                            ? () => onSelectMovement(log.id)
-                            : undefined
-                        }
-                      >
-                        <td className="px-4 py-3 font-semibold text-xs">
-                          {log.contractor_equipment_code ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-[13px]">
-                          {log.equipment?.code ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-[13px]">
-                          {log.equipment?.type ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-[13px]">
-                          <div>
-                            {log.movement_context === 'workshop'
-                              ? t('workshopLocation')
-                              : log.project
-                                ? localizedName(
-                                    lang,
-                                    log.project.name_ar,
-                                    log.project.name_en,
-                                  )
-                                : '—'}
-                          </div>
-                          {log.movement_context === 'workshop' &&
-                            log.workshop_purpose && (
-                              <div className="mt-0.5 text-[11px] text-muted">
-                                {log.workshop_purpose === 'maintenance'
-                                  ? t('maintenancePurpose')
-                                  : t('parkingPurpose')}
-                              </div>
-                            )}
-                        </td>
-                        <td className="px-4 py-3 text-[13px]">
-                          <span
-                            className={`badge border ${log.movement_type === 'entry' ? 'status-entry' : 'status-exit'}`}
-                          >
-                            {log.movement_type === 'entry'
-                              ? t('entry')
-                              : t('exit')}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-[13px]">
-                          {log.current_driver_name ?? log.driver_name ?? '—'}
-                        </td>
-                        <td className="px-4 py-3 text-[12px] text-muted whitespace-nowrap">
-                          {formatDate(log.recorded_at)}
-                        </td>
-                        <td className="px-4 py-3 text-[13px]">
-                          <RelativeTime value={log.created_at} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              {logs.map((log) => (
+                <MovementLogCard
+                  key={log.id}
+                  log={log}
+                  onSelect={
+                    onSelectMovement
+                      ? () => onSelectMovement(log.id)
+                      : undefined
+                  }
+                />
+              ))}
             </div>
           )}
           <DataListPagination
