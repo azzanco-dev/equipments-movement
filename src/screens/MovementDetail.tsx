@@ -112,6 +112,8 @@ export function MovementDetail({
   const [photoBusy, setPhotoBusy] = useState(false)
   const [photoActionError, setPhotoActionError] = useState<string | null>(null)
   const [driverChanges, setDriverChanges] = useState<MovementDriverChange[]>([])
+  const [currentDriverMobileNumber, setCurrentDriverMobileNumber] =
+    useState<string | null>(null)
   const [driverEntryId, setDriverEntryId] = useState<string | null>(null)
   const [driverChangeOpen, setDriverChangeOpen] = useState(false)
   const [newDriverId, setNewDriverId] = useState('')
@@ -156,6 +158,7 @@ export function MovementDetail({
     setFullImageSrc(null)
     setLinkedError(null)
     setDriverChanges([])
+    setCurrentDriverMobileNumber(null)
     setDriverEntryId(null)
     setError(null)
     setLoading(true)
@@ -182,6 +185,7 @@ export function MovementDetail({
       setLog(logData)
       setCompany(logData.company ?? null)
       setProject(logData.project ?? null)
+      setCurrentDriverMobileNumber(logData.driver?.mobile_number ?? null)
 
       const loadDriverChanges = async (entryId: string) => {
         const { data: changes } = await supabase
@@ -196,6 +200,17 @@ export function MovementDetail({
         if (signal.aborted) return
         setDriverEntryId(entryId)
         setDriverChanges((changes as unknown as MovementDriverChange[]) ?? [])
+        const latestChange = (changes as MovementDriverChange[] | null)?.at(-1)
+        if (latestChange?.new_driver_id) {
+          const { data: currentDriver } = await supabase
+            .from('drivers')
+            .select('mobile_number')
+            .eq('id', latestChange.new_driver_id)
+            .abortSignal(signal)
+            .maybeSingle()
+          if (signal.aborted) return
+          setCurrentDriverMobileNumber(currentDriver?.mobile_number ?? null)
+        }
       }
 
       await Promise.all([
@@ -829,17 +844,30 @@ export function MovementDetail({
                     : '—'
                 }
               />
-              <InfoRow
-                icon={<User size={16} />}
-                label={t('driverName')}
-                value={
-                  (isEntry
-                    ? driverChanges.at(-1)?.new_driver_name
-                    : undefined) ??
-                  log.driver?.full_name ??
-                  log.driver_name
-                }
-              />
+              <div className="flex items-start gap-3 py-2">
+                <span className="text-muted mt-0.5 shrink-0">
+                  <User size={16} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted">{t('driverName')}</p>
+                  <p className="font-medium break-words">
+                    {(isEntry
+                      ? driverChanges.at(-1)?.new_driver_name
+                      : undefined) ??
+                      log.driver?.full_name ??
+                      log.driver_name ??
+                      '—'}
+                  </p>
+                  {currentDriverMobileNumber && (
+                    <p
+                      className="select-text text-sm text-muted"
+                      dir="ltr"
+                    >
+                      {currentDriverMobileNumber}
+                    </p>
+                  )}
+                </div>
+              </div>
             </>
           )}
           {(profile?.role === 'admin' ||
