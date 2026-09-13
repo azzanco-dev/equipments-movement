@@ -19,7 +19,7 @@ interface LayoutProps {
   children: ReactNode
   activePage: string
   onNavigate: (page: string) => void
-  navItems: { key: string; label: string; icon: ReactNode }[]
+  navItems: { key: string; label: string; icon: ReactNode; children?: { key: string; label: string }[] }[]
 }
 
 export function Layout({
@@ -245,6 +245,7 @@ export function Layout({
           >
             <nav className="flex flex-col gap-1">
               {navItems.map((item) => (
+                <div key={item.key}>
                 <button
                   key={item.key}
                   aria-current={activePage === item.key ? 'page' : undefined}
@@ -262,6 +263,12 @@ export function Layout({
                   {item.icon}
                   {item.label}
                 </button>
+                {item.children && (activePage === item.key || item.children.some((child) => pathname.startsWith(`/${child.key}`))) && (
+                  <div className="ms-9 mt-1 space-y-0.5 border-s border-[var(--border)] ps-2">
+                    {item.children.map((child) => <button key={child.key} className={`block w-full rounded px-2 py-1.5 text-start text-xs ${pathname.startsWith(`/${child.key}`) ? 'font-semibold text-fg' : 'text-muted hover:text-fg'}`} onClick={() => onNavigate(child.key)}>{child.label}</button>)}
+                  </div>
+                )}
+                </div>
               ))}
             </nav>
           </aside>
@@ -281,6 +288,7 @@ export function Layout({
             >
               <nav className="flex flex-col gap-1">
                 {navItems.map((item) => (
+                  <div key={item.key}>
                   <button
                     key={item.key}
                     onClick={() => {
@@ -299,6 +307,8 @@ export function Layout({
                     {item.icon}
                     {item.label}
                   </button>
+                  {item.children && <div className="ms-9 mt-1 space-y-0.5 border-s border-[var(--border)] ps-2">{item.children.map((child) => <button key={child.key} className={`block w-full rounded px-2 py-1.5 text-start text-xs ${pathname.startsWith(`/${child.key}`) ? 'font-semibold text-fg' : 'text-muted'}`} onClick={() => { setMobileOpen(false); onNavigate(child.key) }}>{child.label}</button>)}</div>}
+                  </div>
                 ))}
               </nav>
             </div>

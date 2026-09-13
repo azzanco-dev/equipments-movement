@@ -25,9 +25,11 @@ function MovementLogField({
 export function MovementLogCard({
   log,
   onSelect,
+  showTodayBadge = false,
 }: {
   log: EntryExitLog
   onSelect?: () => void
+  showTodayBadge?: boolean
 }) {
   const { t, lang } = useI18n()
   const isEntry = log.movement_type === 'entry'
@@ -63,13 +65,16 @@ export function MovementLogCard({
             {log.equipment?.type ?? '—'}
           </p>
         </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+        {showTodayBadge && new Date(log.recorded_at).toDateString() === new Date().toDateString() && <span className="badge border border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-300">{t('todayBadge')}</span>}
         <span
-          className={`badge shrink-0 border ${
+          className={`badge border ${
             isEntry ? 'status-entry' : 'status-exit'
           }`}
         >
           {isEntry ? t('entry') : t('exit')}
         </span>
+        </div>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3">

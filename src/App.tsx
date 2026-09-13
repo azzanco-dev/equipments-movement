@@ -20,6 +20,7 @@ import {
   Settings,
   FileUp,
   History,
+  BarChart3,
 } from 'lucide-react'
 import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog'
 
@@ -106,6 +107,10 @@ const MovementActivity = dynamic(
     ),
   { loading: screenLoading },
 )
+const EntryReports = dynamic(
+  () => import('@/screens/EntryReports').then((module) => module.EntryReports),
+  { loading: screenLoading },
+)
 
 const ADMIN_PAGES = new Set([
   'dashboard',
@@ -119,6 +124,9 @@ const ADMIN_PAGES = new Set([
   'movement-import',
   'activity',
   'settings',
+  'reports',
+  'reports/entries',
+  'reports/entries/all',
 ])
 
 function AppContent() {
@@ -135,7 +143,7 @@ function AppContent() {
   const equipmentId = segments[0] === 'equipment' ? segments[1] : null
   const driverId = segments[0] === 'drivers' ? segments[1] : null
   const userId = segments[0] === 'users' ? segments[1] : null
-  const page = ADMIN_PAGES.has(segments[0] ?? '') ? segments[0] : 'dashboard'
+  const page = segments[0] === 'reports' ? 'reports' : (ADMIN_PAGES.has(segments[0] ?? '') ? segments[0] : 'dashboard')
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
@@ -246,6 +254,11 @@ function AppContent() {
     { key: 'drivers', label: t('drivers'), icon: <Contact size={18} /> },
     { key: 'users', label: t('users'), icon: <Users size={18} /> },
     { key: 'activity', label: t('activityLog'), icon: <History size={18} /> },
+    { key: 'reports', label: t('reports'), icon: <BarChart3 size={18} />, children: [
+      { key: 'reports/entries', label: t('entryReports') },
+      { key: 'reports/equipment', label: t('equipmentReports') },
+      { key: 'reports/drivers', label: t('driverReports') },
+    ] },
     {
       key: 'movement-import',
       label: t('movementImport'),
@@ -319,6 +332,7 @@ function AppContent() {
             )}
             {page === 'movement-import' && <MovementImport />}
             {page === 'activity' && <MovementActivity />}
+            {page === 'reports' && <EntryReports onSelectMovement={openMovement} />}
             {page === 'settings' && <AdminSettings />}
           </>
         )}
