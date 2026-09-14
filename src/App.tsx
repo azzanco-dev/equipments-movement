@@ -118,6 +118,20 @@ const EntryReportsAll = dynamic(
     ),
   { loading: screenLoading },
 )
+const EquipmentReports = dynamic(
+  () =>
+    import('@/screens/EquipmentReports').then(
+      (module) => module.EquipmentReports,
+    ),
+  { loading: screenLoading },
+)
+const WorkshopReports = dynamic(
+  () =>
+    import('@/screens/WorkshopReports').then(
+      (module) => module.WorkshopReports,
+    ),
+  { loading: screenLoading },
+)
 
 const ADMIN_PAGES = new Set([
   'dashboard',
@@ -134,6 +148,8 @@ const ADMIN_PAGES = new Set([
   'reports',
   'reports/entries',
   'reports/entries/all',
+  'reports/equipment',
+  'reports/workshop',
 ])
 
 function AppContent() {
@@ -270,7 +286,11 @@ function AppContent() {
       key: 'reports',
       label: t('reports'),
       icon: <BarChart3 size={18} />,
-      children: [{ key: 'reports/entries', label: t('entryReports') }],
+      children: [
+        { key: 'reports/entries', label: t('entryReports') },
+        { key: 'reports/equipment', label: t('equipmentReports') },
+        { key: 'reports/workshop', label: t('workshopReports') },
+      ],
     },
     {
       key: 'movement-import',
@@ -346,7 +366,11 @@ function AppContent() {
             {page === 'movement-import' && <MovementImport />}
             {page === 'activity' && <MovementActivity />}
             {page === 'reports' &&
-              (segments[1] === 'entries' && segments[2] === 'all' ? (
+              (segments[1] === 'workshop' ? (
+                <WorkshopReports onSelectMovement={openMovement} />
+              ) : segments[1] === 'equipment' ? (
+                <EquipmentReports />
+              ) : segments[1] === 'entries' && segments[2] === 'all' ? (
                 <EntryReportsAll onSelectMovement={openMovement} />
               ) : (
                 <EntryReports onSelectMovement={openMovement} />

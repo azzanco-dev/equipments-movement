@@ -2,6 +2,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import type { EntryExitLog } from '@/lib/types'
+import { MapPin } from 'lucide-react'
 
 function MovementLogField({
   label,
@@ -14,8 +15,8 @@ function MovementLogField({
 }) {
   return (
     <div className={`min-w-0 ${className}`}>
-      <p className="text-[11px] leading-4 text-muted">{label}</p>
-      <p className="truncate text-[13px] leading-5" title={value ?? undefined}>
+      <p className="text-[10px] leading-3 text-muted">{label}</p>
+      <p className="truncate text-xs leading-4" title={value ?? undefined}>
         {value || '—'}
       </p>
     </div>
@@ -26,10 +27,12 @@ export function MovementLogCard({
   log,
   onSelect,
   showTodayBadge = false,
+  showWorkshopPurpose = false,
 }: {
   log: EntryExitLog
   onSelect?: () => void
   showTodayBadge?: boolean
+  showWorkshopPurpose?: boolean
 }) {
   const { t, lang } = useI18n()
   const isEntry = log.movement_type === 'entry'
@@ -40,7 +43,11 @@ export function MovementLogCard({
     ? localizedName(lang, log.company.name_ar, log.company.name_en)
     : null
   const location =
-    log.movement_context === 'workshop' ? t('workshopLocation') : projectName
+    log.movement_context === 'workshop'
+      ? t('workshopLocation')
+      : [companyName, projectName].filter(Boolean).join(' · ') || null
+  const equipmentIdentifier =
+    log.equipment?.plate_number || log.equipment?.chassis_number || null
 
   return (
     <button
@@ -54,16 +61,24 @@ export function MovementLogCard({
       disabled={!onSelect}
       aria-label={onSelect ? t('viewDetails') : undefined}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">
+          <p className="truncate text-lg font-bold leading-5">
             {log.equipment?.code ?? '—'}
           </p>
-          <p className="mt-0.5 truncate text-[12px] text-muted">
-            {log.equipment?.type ?? '—'}
-          </p>
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] leading-4 text-muted">
+            <span className="truncate">{log.equipment?.type ?? '—'}</span>
+            {equipmentIdentifier && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="truncate" dir="ltr">
+                  {equipmentIdentifier}
+                </span>
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1">
           {showTodayBadge &&
             new Date(log.recorded_at).toDateString() ===
               new Date().toDateString() && (
@@ -81,52 +96,38 @@ export function MovementLogCard({
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-3">
-        <MovementLogField
-          label={t('plateNumber')}
-          value={log.equipment?.plate_number}
-        />
-        <MovementLogField
-          label={t('contractorEquipmentCode')}
-          value={log.contractor_equipment_code}
-        />
-        <MovementLogField label={t('company')} value={companyName} />
-        <MovementLogField
-          label={t('project')}
-          value={location}
-          className={log.movement_context === 'workshop' ? '' : 'sm:col-span-2'}
-        />
-        {log.movement_context === 'workshop' && log.workshop_purpose && (
-          <MovementLogField
-            label={t('workshopPurpose')}
-            value={
-              log.workshop_purpose === 'maintenance'
-                ? t('maintenancePurpose')
-                : t('parkingPurpose')
-            }
-          />
-        )}
+      <div className="mt-2.5 flex min-w-0 items-center gap-1.5 rounded-md bg-gray-50 px-2.5 py-2 text-xs dark:bg-gray-800/70">
+        <MapPin size={14} className="shrink-0 text-muted" />
+        <span className="text-[10px] text-muted">{t('location')}</span>
+        <span className="truncate font-medium" title={location ?? undefined}>
+          {location || '—'}
+        </span>
+      </div>
+
+      <div className="mt-2.5 grid grid-cols-3 gap-x-3">
         <MovementLogField
           label={t('supervisor')}
           value={log.supervisor?.full_name}
         />
-        <div>
-          <MovementLogField
-            label={t('driverName')}
-            value={log.current_driver_name ?? log.driver_name}
-          />
-          <div className="text-xs text-muted">{log.driver?.mobile_number}</div>
-        </div>
+        <MovementLogField
+          label={t('driverName')}
+          value={log.current_driver_name ?? log.driver_name}
+        />
+        <MovementLogField
+          label={t('movementDate')}
+          value={formatDate(log.recorded_at)}
+        />
       </div>
-
-      <div
-        className="mt-3 border-t pt-2 text-[12px] text-muted"
-        style={{ borderColor: 'var(--border)' }}
-      >
-        <span>{t('movementDate')}</span>
-        <span className="mx-1.5">•</span>
-        <time dateTime={log.recorded_at}>{formatDate(log.recorded_at)}</time>
-      </div>
+      {showWorkshopPurpose &&
+        log.movement_context === 'workshop' &&
+        log.workshop_purpose && (
+          <p className="mt-2 text-[10px] text-muted">
+            {t('workshopPurpose')}:{' '}
+            {log.workshop_purpose === 'maintenance'
+              ? t('maintenancePurpose')
+              : t('parkingPurpose')}
+          </p>
+        )}
     </button>
   )
 }

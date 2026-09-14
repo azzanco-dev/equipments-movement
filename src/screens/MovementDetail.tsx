@@ -1167,7 +1167,7 @@ export function MovementDetail({
                 <div>
                   <p className="text-xs text-muted">{t('durationOnSite')}</p>
                   <p className="font-medium">
-                    {formatElapsedDuration(durationMs, t)}
+                    {formatElapsedDuration(durationMs, t, lang)}
                   </p>
                 </div>
               </div>
@@ -1236,7 +1236,7 @@ export function MovementDetail({
                 <div>
                   <p className="text-xs text-muted">{t('durationOnSite')}</p>
                   <p className="font-medium">
-                    {formatElapsedDuration(durationMs, t)}
+                    {formatElapsedDuration(durationMs, t, lang)}
                   </p>
                 </div>
               </div>

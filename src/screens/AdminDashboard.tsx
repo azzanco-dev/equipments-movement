@@ -3,7 +3,14 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { InlineSpinner } from '@/components/Spinner'
-import { LogIn, LogOut, Truck, AlertCircle, Download } from 'lucide-react'
+import {
+  LogIn,
+  LogOut,
+  Truck,
+  AlertCircle,
+  Download,
+  Wrench,
+} from 'lucide-react'
 import type { EntryExitLog, Equipment } from '@/lib/types'
 import { PageHeader } from '@/components/PageHeader'
 import { sanitizeSearchTerm } from '@/lib/search'
@@ -31,6 +38,22 @@ async function loadLatestDriverNames(entryIds: string[], signal: AbortSignal) {
       latest.set(change.entry_log_id, change.new_driver_name)
   }
   return latest
+}
+
+function riyadhDayBounds() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Riyadh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const value = (type: string) =>
+    parts.find((part) => part.type === type)?.value
+  const date = `${value('year')}-${value('month')}-${value('day')}`
+  const start = new Date(`${date}T00:00:00+03:00`)
+  const end = new Date(start)
+  end.setUTCDate(end.getUTCDate() + 1)
+  return { from: start.toISOString(), to: end.toISOString() }
 }
 
 type SummaryKey =
@@ -78,6 +101,14 @@ export function AdminDashboard({
     outsideEquipment: 0,
   })
   const [loadingStats, setLoadingStats] = useState(true)
+  const [workshopStats, setWorkshopStats] = useState({
+    inside: 0,
+    entries: 0,
+    exits: 0,
+  })
+  const [workshopLogs, setWorkshopLogs] = useState<EntryExitLog[]>([])
+  const [loadingWorkshop, setLoadingWorkshop] = useState(true)
+  const [workshopLoadError, setWorkshopLoadError] = useState(false)
   const [summaryLogs, setSummaryLogs] = useState<EntryExitLog[]>([])
   const [summaryEquipment, setSummaryEquipment] = useState<
     EquipmentSummaryRow[]
@@ -213,6 +244,59 @@ export function AdminDashboard({
     setLoadingStats(false)
   }, [])
 
+  const fetchWorkshopOverview = useCallback(async (signal: AbortSignal) => {
+    setLoadingWorkshop(true)
+    setWorkshopLoadError(false)
+    const { from, to } = riyadhDayBounds()
+    const [inside, entries, exits, latest] = await Promise.all([
+      supabase
+        .from('equipment_current_state')
+        .select('id', { count: 'exact', head: true })
+        .eq('movement_context', 'workshop')
+        .eq('movement_type', 'entry')
+        .abortSignal(signal),
+      supabase
+        .from('entry_exit_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('movement_context', 'workshop')
+        .eq('movement_type', 'entry')
+        .gte('recorded_at', from)
+        .lt('recorded_at', to)
+        .abortSignal(signal),
+      supabase
+        .from('entry_exit_logs')
+        .select('id', { count: 'exact', head: true })
+        .eq('movement_context', 'workshop')
+        .eq('movement_type', 'exit')
+        .gte('recorded_at', from)
+        .lt('recorded_at', to)
+        .abortSignal(signal),
+      supabase
+        .from('entry_exit_logs')
+        .select(
+          'id,equipment_id,supervisor_id,movement_type,movement_context,workshop_purpose,driver_id,driver_name,recorded_at,created_at,equipment:equipment(id,code,type,plate_number,chassis_number),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)',
+        )
+        .eq('movement_context', 'workshop')
+        .order('recorded_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(10)
+        .abortSignal(signal),
+    ])
+    if (signal.aborted) return
+    if (inside.error || entries.error || exits.error || latest.error) {
+      setWorkshopLoadError(true)
+      setLoadingWorkshop(false)
+      return
+    }
+    setWorkshopStats({
+      inside: inside.count ?? 0,
+      entries: entries.count ?? 0,
+      exits: exits.count ?? 0,
+    })
+    setWorkshopLogs((latest.data as unknown as EntryExitLog[]) ?? [])
+    setLoadingWorkshop(false)
+  }, [])
+
   useEffect(() => {
     if (!selectedSummary) {
       setSummaryLogs([])
@@ -234,7 +318,7 @@ export function AdminDashboard({
         const { data, count, error } = await supabase
           .from('entry_exit_logs')
           .select(
-            'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)',
+            'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number,chassis_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)',
             { count: 'exact' },
           )
           .eq('movement_context', 'site')
@@ -301,7 +385,7 @@ export function AdminDashboard({
     let query = supabase
       .from('entry_exit_logs')
       .select(
-        'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,odometer_reading,notes,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)',
+        'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,odometer_reading,notes,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number,chassis_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)',
         { count: 'exact' },
       )
       .eq('movement_context', 'site')
@@ -367,7 +451,7 @@ export function AdminDashboard({
     let query = supabase
       .from('entry_exit_logs')
       .select(
-        'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,odometer_reading,notes,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)',
+        'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,odometer_reading,notes,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number,chassis_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)',
         { count: 'exact' },
       )
       .eq('movement_context', 'site')
@@ -420,6 +504,11 @@ export function AdminDashboard({
   useEffect(() => {
     fetchStats()
   }, [fetchStats])
+  useEffect(() => {
+    const controller = new AbortController()
+    void fetchWorkshopOverview(controller.signal)
+    return () => controller.abort()
+  }, [fetchWorkshopOverview])
 
   useEffect(() => {
     let active = true
@@ -633,6 +722,71 @@ export function AdminDashboard({
           />
         </div>
       )}
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <Wrench size={18} />
+            {t('workshopMovements')}
+          </h2>
+          <button
+            className="btn-outline"
+            onClick={() => router.push('/reports/workshop')}
+          >
+            {t('viewAll')}
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            [
+              t('insideWorkshopNow'),
+              workshopStats.inside,
+              'text-emerald-700 dark:text-emerald-400',
+            ],
+            [
+              t('workshopEntriesToday'),
+              workshopStats.entries,
+              'text-emerald-700 dark:text-emerald-400',
+            ],
+            [
+              t('workshopExitsToday'),
+              workshopStats.exits,
+              'text-amber-700 dark:text-amber-400',
+            ],
+          ].map(([label, value, color]) => (
+            <div key={label as string} className="card p-3">
+              <p className="text-xs text-muted">{label}</p>
+              <p className={`mt-1 text-xl font-bold ${color}`}>
+                {loadingWorkshop || workshopLoadError ? '—' : value}
+              </p>
+            </div>
+          ))}
+        </div>
+        {loadingWorkshop ? (
+          <InlineSpinner label={t('loading')} />
+        ) : workshopLoadError ? (
+          <div className="card py-8 text-center text-sm text-muted">
+            {t('workshopReportLoadError')}
+          </div>
+        ) : workshopLogs.length ? (
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            {workshopLogs.map((log) => (
+              <MovementLogCard
+                key={log.id}
+                log={log}
+                showWorkshopPurpose
+                onSelect={
+                  onSelectMovement ? () => onSelectMovement(log.id) : undefined
+                }
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="card py-8 text-center text-sm text-muted">
+            {t('noWorkshopMovements')}
+          </div>
+        )}
+      </section>
 
       {/* Tabs */}
       <div

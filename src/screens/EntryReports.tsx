@@ -248,6 +248,7 @@ export function EntryReports({
                     {formatElapsedDuration(
                       Date.now() - new Date(visit.entry_recorded_at).getTime(),
                       t,
+                      lang,
                     )}
                   </span>
                 </p>
