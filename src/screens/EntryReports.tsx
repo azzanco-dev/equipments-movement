@@ -5,12 +5,22 @@ import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { PageHeader } from '@/components/PageHeader'
 import { MovementLogCard } from '@/components/MovementLogCard'
+import { Alert } from '@/components/Alert'
 import { formatDate } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
+import {
+  isDateKey,
+  saudiDayEnd,
+  saudiDayStart,
+  saudiPeriodKeys,
+  type ReportPeriod,
+} from '@/lib/saudiTime'
 import type { EntryExitLog } from '@/lib/types'
 import type { TranslationKey } from '@/i18n/translations'
 
+type Period = ReportPeriod | 'custom'
 type Range = { from: string; to: string }
+const PERIODS: Period[] = ['today', 'week', 'month', 'custom']
 type Ranked = { name: string; count: number; last_entry?: string | null }
 type ReportData = {
   total: number
@@ -31,23 +41,6 @@ type ReportData = {
   top_projects: Ranked[]
   foremen: Ranked[]
 }
-function rangeFor(value: string): Range {
-  const now = new Date()
-  const end = new Date(now)
-  end.setHours(23, 59, 59, 999)
-  const start = new Date(now)
-  if (value === 'today') start.setHours(0, 0, 0, 0)
-  else if (value === 'week') {
-    const day = start.getDay()
-    start.setDate(start.getDate() - (day === 0 ? 6 : day - 1))
-    start.setHours(0, 0, 0, 0)
-  } else {
-    start.setDate(1)
-    start.setHours(0, 0, 0, 0)
-  }
-  return { from: start.toISOString(), to: end.toISOString() }
-}
-
 export function EntryReports({
   onSelectMovement,
 }: {
@@ -56,38 +49,65 @@ export function EntryReports({
   const { t, lang } = useI18n()
   const router = useRouter()
   const params = useSearchParams()
-  const preset = params.get('period') ?? 'month'
-  const [period, setPeriod] = useState(preset)
-  const [custom, setCustom] = useState<Range>({ from: '', to: '' })
+  const requested = params.get('period') as Period | null
+  const period: Period =
+    requested && PERIODS.includes(requested) ? requested : 'month'
+  // Range values are Saudi calendar dates (YYYY-MM-DD). A custom period keeps
+  // its dates in the URL so reloading or going back restores the same report.
+  const range = useMemo<Range>(() => {
+    if (period !== 'custom') return saudiPeriodKeys(period)
+    const from = params.get('from')
+    const to = params.get('to')
+    return {
+      from: isDateKey(from) ? from : '',
+      to: isDateKey(to) ? to : '',
+    }
+  }, [period, params])
+  const rangeReady = !!range.from && !!range.to
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
-  const range = useMemo(
-    () => (period === 'custom' ? custom : rangeFor(period)),
-    [period, custom],
-  )
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
-    if (!range.from || !range.to) return
+    if (!rangeReady) {
+      setData(null)
+      setLoading(false)
+      setLoadError(false)
+      return
+    }
     let cancelled = false
     setLoading(true)
+    setLoadError(false)
     supabase
-      .rpc('get_entry_report_summary', { p_from: range.from, p_to: range.to })
+      .rpc('get_entry_report_summary', {
+        p_from: saudiDayStart(range.from),
+        p_to: saudiDayEnd(range.to),
+      })
       .then(({ data: result, error }) => {
-        if (!cancelled) {
-          if (error) console.error('entry report load failed', error)
-          setData((result ?? null) as ReportData)
-          setLoading(false)
-        }
+        if (cancelled) return
+        if (error) console.error('entry report load failed', error)
+        setLoadError(!!error)
+        setData(error ? null : ((result ?? null) as ReportData))
+        setLoading(false)
       })
     return () => {
       cancelled = true
     }
-  }, [range])
+  }, [range.from, range.to, rangeReady])
 
-  const setPreset = (value: string) => {
-    setPeriod(value)
-    router.replace(`/reports/entries?period=${value}`, { scroll: false })
+  const replaceParams = (next: Record<string, string>) =>
+    router.replace(`/reports/entries?${new URLSearchParams(next).toString()}`, {
+      scroll: false,
+    })
+  const setPreset = (value: Period) => {
+    // Start a custom period from the dates currently shown, so the data on
+    // screen always matches the selected dates.
+    if (value === 'custom')
+      replaceParams({ period: 'custom', from: range.from, to: range.to })
+    else replaceParams({ period: value })
   }
+  const setCustomDate = (key: 'from' | 'to', value: string) =>
+    replaceParams({ period: 'custom', ...range, [key]: value })
   const number = (value: number | undefined) =>
     new Intl.NumberFormat(lang === 'ar' ? 'ar-SA-u-nu-latn' : 'en-US').format(
       value ?? 0,
@@ -108,7 +128,7 @@ export function EntryReports({
       />
       <div className="card flex flex-wrap items-center gap-2 p-3">
         <CalendarDays size={17} className="text-muted" />
-        {(['today', 'week', 'month', 'custom'] as const).map((value) => (
+        {PERIODS.map((value) => (
           <button
             key={value}
             className={period === value ? 'btn-primary' : 'btn-outline'}
@@ -128,26 +148,24 @@ export function EntryReports({
             <input
               type="date"
               className="input h-8"
-              onChange={(e) =>
-                setCustom((x) => ({
-                  ...x,
-                  from: new Date(`${e.target.value}T00:00:00`).toISOString(),
-                }))
-              }
+              aria-label={t('fromDate')}
+              value={range.from}
+              max={range.to || undefined}
+              onChange={(e) => setCustomDate('from', e.target.value)}
             />
             <input
               type="date"
               className="input h-8"
-              onChange={(e) =>
-                setCustom((x) => ({
-                  ...x,
-                  to: new Date(`${e.target.value}T23:59:59`).toISOString(),
-                }))
-              }
+              aria-label={t('toDate')}
+              value={range.to}
+              min={range.from || undefined}
+              onChange={(e) => setCustomDate('to', e.target.value)}
             />
           </>
         )}
       </div>
+      {loadError && <Alert type="error">{t('dataLoadError')}</Alert>}
+      {!rangeReady && <Alert type="info">{t('selectDateRange')}</Alert>}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map(([label, value, color]) => (
           <div key={label} className="card p-4">
@@ -155,8 +173,10 @@ export function EntryReports({
             <p className={`mt-2 text-2xl font-bold ${color}`}>
               {loading ? (
                 <Loader2 className="animate-spin" size={22} />
-              ) : (
+              ) : data ? (
                 number(value)
+              ) : (
+                '—'
               )}
             </p>
             {label === t('openEntries') && (
@@ -172,9 +192,10 @@ export function EntryReports({
           <h2 className="text-lg font-semibold">{t('latestEntries')}</h2>
           <button
             className="btn-outline"
+            disabled={!rangeReady}
             onClick={() =>
               router.push(
-                `/reports/entries/all?period=${period}&from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`,
+                `/reports/entries/all?${new URLSearchParams({ from: range.from, to: range.to }).toString()}`,
               )
             }
           >
@@ -195,7 +216,7 @@ export function EntryReports({
           </div>
         ) : (
           <div className="card p-6 text-center text-sm text-muted">
-            {t('noReportData')}
+            {data ? t('noReportData') : '—'}
           </div>
         )}
       </section>
@@ -255,7 +276,9 @@ export function EntryReports({
               </div>
             ))
           ) : (
-            <p className="text-sm text-muted">{t('noReportData')}</p>
+            <p className="text-sm text-muted">
+              {data ? t('noReportData') : '—'}
+            </p>
           )}
         </div>
       </section>

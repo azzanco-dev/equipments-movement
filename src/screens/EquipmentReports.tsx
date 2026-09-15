@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { PageHeader } from '@/components/PageHeader'
 import { InlineSpinner } from '@/components/Spinner'
+import { Alert } from '@/components/Alert'
 import { formatDateTime } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
 
@@ -36,6 +37,7 @@ export function EquipmentReports() {
   const params = useSearchParams()
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const page = Math.max(1, Number(params.get('page')) || 1)
   const pageSize = sizes.includes(Number(params.get('page_size')))
     ? Number(params.get('page_size'))
@@ -53,6 +55,7 @@ export function EquipmentReports() {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    setLoadError(false)
     supabase
       .rpc('get_equipment_attention_report', {
         p_limit: pageSize,
@@ -63,7 +66,8 @@ export function EquipmentReports() {
         if (cancelled) return
         if (error)
           console.error('equipment attention report load failed', error)
-        setData((result ?? null) as ReportData | null)
+        setLoadError(!!error)
+        setData(error ? null : ((result ?? null) as ReportData | null))
         setLoading(false)
       })
     return () => {
@@ -107,9 +111,15 @@ export function EquipmentReports() {
         {stats.map(([reason, label, description, color]) => (
           <div key={reason} className="card p-4">
             <p className="text-xs text-muted">{label}</p>
-            <p className={`mt-2 text-2xl font-bold ${color}`}>
-              {loading ? <InlineSpinner /> : number(data?.summary?.[reason])}
-            </p>
+            <div className={`mt-2 text-2xl font-bold ${color}`}>
+              {loading ? (
+                <InlineSpinner />
+              ) : data ? (
+                number(data.summary?.[reason])
+              ) : (
+                '—'
+              )}
+            </div>
             <p className="mt-1 text-[11px] leading-relaxed text-muted">
               {description}
             </p>
@@ -119,7 +129,10 @@ export function EquipmentReports() {
       <div className="card flex flex-wrap items-center gap-2 p-3">
         <Search size={16} className="text-muted" />
         <input
+          // Remount when the URL search changes (Back).
+          key={search}
           className="input h-8 min-w-52 flex-1"
+          aria-label={t('searchEquipmentReport')}
           defaultValue={search}
           placeholder={t('searchEquipmentReport')}
           onKeyDown={(event) => {
@@ -130,7 +143,7 @@ export function EquipmentReports() {
           className="input h-8"
           value={pageSize}
           onChange={(event) => setParam('page_size', event.target.value)}
-          aria-label={t('filters')}
+          aria-label={t('rowsPerPage')}
         >
           {sizes.map((size) => (
             <option key={size} value={size}>
@@ -143,10 +156,16 @@ export function EquipmentReports() {
         <div className="flex justify-center p-10">
           <InlineSpinner />
         </div>
+      ) : loadError ? (
+        <Alert type="error">{t('dataLoadError')}</Alert>
       ) : data?.rows.length ? (
         <div className="grid gap-3 lg:grid-cols-2">
           {data.rows.map((row) => (
-            <EquipmentAttentionCard key={row.equipment_id} row={row} />
+            <EquipmentAttentionCard
+              key={row.equipment_id}
+              row={row}
+              onOpen={() => router.push(`/equipment/${row.equipment_id}`)}
+            />
           ))}
         </div>
       ) : (
@@ -175,90 +194,94 @@ export function EquipmentReports() {
       </div>
     </div>
   )
+}
 
-  function EquipmentAttentionCard({ row }: { row: ReportRow }) {
-    const config = {
-      open_visit: {
-        label: t('equipmentReportOpenVisit'),
-        badge: 'status-entry',
-        border: 'border-emerald-500 dark:border-emerald-500',
-        durationLabel: t('currentVisitDuration'),
-        icon: Clock3,
-      },
-      outside_sites: {
-        label: t('equipmentReportOutside'),
-        badge: 'status-exit',
-        border: 'border-amber-500 dark:border-amber-500',
-        durationLabel: t('sinceLastExit'),
-        icon: MapPin,
-      },
-      no_movement: {
-        label: t('equipmentReportNoMovement'),
-        badge:
-          'border border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
-        border: 'border-slate-300 dark:border-slate-600',
-        durationLabel: t('elapsedDuration'),
-        icon: AlertTriangle,
-      },
-    }[row.attention_reason]
-    const Icon = config.icon
-    const location =
-      row.attention_reason === 'outside_sites'
-        ? t('outsideSites')
-        : row.movement_context === 'workshop'
-          ? t('workshopLocation')
-          : ((lang === 'ar' ? row.project_name_ar : row.project_name_en) ??
-            t('unknownLocation'))
-    return (
-      <article className={`card border-s-4 p-4 ${config.border}`}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="truncate font-semibold">{row.equipment_code}</p>
-            <p className="mt-0.5 truncate text-xs text-muted">
-              {row.equipment_type ?? '—'} · {row.plate_number ?? '—'}
+function EquipmentAttentionCard({
+  row,
+  onOpen,
+}: {
+  row: ReportRow
+  onOpen: () => void
+}) {
+  const { t, lang } = useI18n()
+  const config = {
+    open_visit: {
+      label: t('equipmentReportOpenVisit'),
+      badge: 'status-entry',
+      border: 'border-emerald-500 dark:border-emerald-500',
+      durationLabel: t('currentVisitDuration'),
+      icon: Clock3,
+    },
+    outside_sites: {
+      label: t('equipmentReportOutside'),
+      badge: 'status-exit',
+      border: 'border-amber-500 dark:border-amber-500',
+      durationLabel: t('sinceLastExit'),
+      icon: MapPin,
+    },
+    no_movement: {
+      label: t('equipmentReportNoMovement'),
+      badge:
+        'border border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+      border: 'border-slate-300 dark:border-slate-600',
+      durationLabel: t('elapsedDuration'),
+      icon: AlertTriangle,
+    },
+  }[row.attention_reason]
+  const Icon = config.icon
+  const location =
+    row.attention_reason === 'outside_sites'
+      ? t('outsideSites')
+      : row.movement_context === 'workshop'
+        ? t('workshopLocation')
+        : ((lang === 'ar' ? row.project_name_ar : row.project_name_en) ??
+          t('unknownLocation'))
+  return (
+    <article className={`card border-s-4 p-4 ${config.border}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate font-semibold">{row.equipment_code}</p>
+          <p className="mt-0.5 truncate text-xs text-muted">
+            {row.equipment_type ?? '—'} · {row.plate_number ?? '—'}
+          </p>
+        </div>
+        <span className={`badge shrink-0 ${config.badge}`}>
+          <Icon size={13} />
+          {config.label}
+        </span>
+      </div>
+      {row.last_movement_at ? (
+        <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <p className="text-muted">{t('lastMovement')}</p>
+            <p className="mt-1 font-medium">
+              {formatDateTime(row.last_movement_at)}
             </p>
           </div>
-          <span className={`badge shrink-0 ${config.badge}`}>
-            <Icon size={13} />
-            {config.label}
-          </span>
-        </div>
-        {row.last_movement_at ? (
-          <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
-            <div>
-              <p className="text-muted">{t('lastMovement')}</p>
-              <p className="mt-1 font-medium">
-                {formatDateTime(row.last_movement_at)}
-              </p>
-            </div>
-            <div>
-              <p className="text-muted">{t('location')}</p>
-              <p className="mt-1 font-medium">{location}</p>
-            </div>
-            <div className="col-span-2">
-              <p className="text-muted">{config.durationLabel}</p>
-              <p className="mt-1 font-medium">
-                {formatElapsedDuration(
-                  Date.now() - new Date(row.last_movement_at).getTime(),
-                  t,
-                  lang,
-                )}
-              </p>
-            </div>
+          <div>
+            <p className="text-muted">{t('location')}</p>
+            <p className="mt-1 font-medium">{location}</p>
           </div>
-        ) : (
-          <p className="mt-3 text-xs text-muted">
-            {t('equipmentReportNoMovementDesc')}
-          </p>
-        )}
-        <button
-          className="btn-outline mt-4 w-full"
-          onClick={() => router.push(`/equipment/${row.equipment_id}`)}
-        >
-          <ArrowLeft size={15} />
-          {t('viewDetails')}
-        </button>
-      </article>
-    )
-  }
+          <div className="col-span-2">
+            <p className="text-muted">{config.durationLabel}</p>
+            <p className="mt-1 font-medium">
+              {formatElapsedDuration(
+                Date.now() - new Date(row.last_movement_at).getTime(),
+                t,
+                lang,
+              )}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-muted">
+          {t('equipmentReportNoMovementDesc')}
+        </p>
+      )}
+      <button className="btn-outline mt-4 w-full" onClick={onOpen}>
+        <ArrowLeft size={15} />
+        {t('viewDetails')}
+      </button>
+    </article>
+  )
 }

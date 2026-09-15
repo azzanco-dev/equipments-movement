@@ -196,7 +196,7 @@ export function MovementActivity() {
                 >
                   <td className="px-3 py-2">
                     <span
-                      className={`badge ${row.action === 'delete' ? 'badge-exit' : row.action === 'create' ? 'badge-entry' : ''}`}
+                      className={`badge border ${row.action === 'delete' ? 'status-exit' : row.action === 'create' ? 'status-entry' : 'border-[var(--border)] bg-[var(--surface)]'}`}
                     >
                       {t(
                         row.action === 'create'

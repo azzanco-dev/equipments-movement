@@ -454,24 +454,32 @@ export function MovementDetail({
       return
     setEditBusy(true)
     setEditError(null)
-    const { data } = await supabase.auth.getSession()
-    const response = await fetch(`/api/movements/${log.id}`, {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${data.session?.access_token ?? ''}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        equipment_id: editEquipment.value,
-        supervisor_id: editSupervisor.value,
-        recorded_at: new Date(editRecordedAt).toISOString(),
-        company_id: editCompany?.value ?? null,
-        project_id: editProject?.value ?? null,
-        contractor_equipment_code: editContractorCode.trim() || null,
-        driver_id: log.driver_id ? null : (editDriver?.value ?? null),
-      }),
-    })
-    setEditBusy(false)
+    let response: Response
+    try {
+      const { data } = await supabase.auth.getSession()
+      response = await fetch(`/api/movements/${log.id}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${data.session?.access_token ?? ''}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          equipment_id: editEquipment.value,
+          supervisor_id: editSupervisor.value,
+          recorded_at: new Date(editRecordedAt).toISOString(),
+          company_id: editCompany?.value ?? null,
+          project_id: editProject?.value ?? null,
+          contractor_equipment_code: editContractorCode.trim() || null,
+          driver_id: log.driver_id ? null : (editDriver?.value ?? null),
+        }),
+      })
+    } catch (cause) {
+      console.error('Movement edit request failed', cause)
+      setEditError(t('movementEditFailed'))
+      return
+    } finally {
+      setEditBusy(false)
+    }
     if (!response.ok) {
       const result = (await response.json().catch(() => null)) as {
         error?: string
@@ -570,16 +578,24 @@ export function MovementDetail({
     if (!confirm(t('confirmDeletePhoto'))) return
     setPhotoBusy(true)
     setPhotoActionError(null)
-    const { data } = await supabase.auth.getSession()
-    const response = await fetch(`/api/movements/${movementId}/photos`, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${data.session?.access_token ?? ''}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ photoId }),
-    })
-    setPhotoBusy(false)
+    let response: Response
+    try {
+      const { data } = await supabase.auth.getSession()
+      response = await fetch(`/api/movements/${movementId}/photos`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${data.session?.access_token ?? ''}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ photoId }),
+      })
+    } catch (cause) {
+      console.error('Photo delete request failed', cause)
+      setPhotoActionError(t('photoDeleteFailed'))
+      return
+    } finally {
+      setPhotoBusy(false)
+    }
     if (!response.ok) {
       setPhotoActionError(t('photoDeleteFailed'))
       return

@@ -8,6 +8,7 @@ import { InlineSpinner } from '@/components/Spinner'
 import { MovementLogCard } from '@/components/MovementLogCard'
 import { DatePicker } from '@/components/DatePicker'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { isDateKey, saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
 import type { EntryExitLog } from '@/lib/types'
 
 const sizes = [20, 50, 100, 200, 350, 500]
@@ -80,16 +81,8 @@ export function WorkshopReports({
         query = query.eq('movement_type', movementType)
       if (purpose === 'maintenance' || purpose === 'parking')
         query = query.eq('workshop_purpose', purpose)
-      if (from)
-        query = query.gte(
-          'recorded_at',
-          new Date(`${from}T00:00:00+03:00`).toISOString(),
-        )
-      if (to) {
-        const end = new Date(`${to}T00:00:00+03:00`)
-        end.setUTCDate(end.getUTCDate() + 1)
-        query = query.lt('recorded_at', end.toISOString())
-      }
+      if (isDateKey(from)) query = query.gte('recorded_at', saudiDayStart(from))
+      if (isDateKey(to)) query = query.lte('recorded_at', saudiDayEnd(to))
       if (term) {
         if (!equipmentIds.length) {
           setRows([])
@@ -125,7 +118,10 @@ export function WorkshopReports({
       <div className="card flex flex-wrap items-center gap-2 p-3">
         <Search size={16} className="text-muted" />
         <input
+          // Remount when the URL search changes (Clear, Back).
+          key={search}
           className="input h-8 min-w-52 flex-1"
+          aria-label={t('searchWorkshopMovements')}
           defaultValue={search}
           placeholder={t('searchWorkshopMovements')}
           onKeyDown={(event) => {

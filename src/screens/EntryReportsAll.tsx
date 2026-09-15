@@ -5,12 +5,32 @@ import { useI18n } from '@/i18n/I18nContext'
 import { PageHeader } from '@/components/PageHeader'
 import { MovementLogCard } from '@/components/MovementLogCard'
 import { InlineSpinner } from '@/components/Spinner'
+import { Alert } from '@/components/Alert'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
+import {
+  isDateKey,
+  saudiDateKey,
+  saudiDayEnd,
+  saudiDayStart,
+  saudiPeriodKeys,
+  type ReportPeriod,
+} from '@/lib/saudiTime'
 import type { EntryExitLog } from '@/lib/types'
 import type { TranslationKey } from '@/i18n/translations'
 
 const sizes = [20, 50, 100, 200, 350, 500]
+
+function toOption(row: Record<string, string>) {
+  return { value: row.id, label: row.name_ar ?? row.full_name ?? row.code }
+}
+
+// Accepts Saudi date keys, plus full timestamps from older shared links.
+function dateKeyParam(value: string | null): string | null {
+  if (isDateKey(value)) return value
+  if (value && !Number.isNaN(Date.parse(value))) return saudiDateKey(value)
+  return null
+}
 const select =
   'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,contractor_equipment_code,registration_method,odometer_reading,notes,photo_url,company_id,project_id,recorded_at,created_at,equipment:equipment(id,code,type,plate_number,chassis_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)'
 
@@ -25,33 +45,31 @@ export function EntryReportsAll({
   const [rows, setRows] = useState<EntryExitLog[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const page = Math.max(1, Number(params.get('page')) || 1)
   const pageSize = sizes.includes(Number(params.get('page_size')))
     ? Number(params.get('page_size'))
     : 20
-  const period = params.get('period') ?? 'month'
-  const dateRange = (() => {
-    const now = new Date()
-    const end = new Date(now)
-    end.setHours(23, 59, 59, 999)
-    const start = new Date(now)
-    if (period === 'today') start.setHours(0, 0, 0, 0)
-    else if (period === 'week') {
-      const day = start.getDay()
-      start.setDate(start.getDate() - (day === 0 ? 6 : day - 1))
-      start.setHours(0, 0, 0, 0)
-    } else {
-      start.setDate(1)
-      start.setHours(0, 0, 0, 0)
-    }
-    return {
-      from: params.get('from') ?? start.toISOString(),
-      to: params.get('to') ?? end.toISOString(),
-    }
-  })()
+  const requestedPeriod = params.get('period')
+  const defaultRange = saudiPeriodKeys(
+    requestedPeriod === 'today' || requestedPeriod === 'week'
+      ? (requestedPeriod as ReportPeriod)
+      : 'month',
+  )
+  // Saudi calendar dates (YYYY-MM-DD); an empty value means no bound.
+  const dateRange = {
+    from: params.has('from')
+      ? (dateKeyParam(params.get('from')) ?? '')
+      : defaultRange.from,
+    to: params.has('to')
+      ? (dateKeyParam(params.get('to')) ?? '')
+      : defaultRange.to,
+  }
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params.toString())
-    if (value) next.set(key, value)
+    // Cleared dates stay in the URL as empty values so they do not fall back
+    // to the default period.
+    if (value || key === 'from' || key === 'to') next.set(key, value)
     else next.delete(key)
     if (key !== 'page') next.set('page', '1')
     router.replace(`/reports/entries/all?${next.toString()}`, { scroll: false })
@@ -59,6 +77,7 @@ export function EntryReportsAll({
   useEffect(() => {
     const controller = new AbortController()
     setLoading(true)
+    setLoadError(false)
     let query = supabase
       .from('entry_exit_logs')
       .select(select, { count: 'exact' })
@@ -71,8 +90,8 @@ export function EntryReportsAll({
     const from = dateRange.from
     const to = dateRange.to
     const q = params.get('q')
-    if (from) query = query.gte('recorded_at', from)
-    if (to) query = query.lte('recorded_at', to)
+    if (from) query = query.gte('recorded_at', saudiDayStart(from))
+    if (to) query = query.lte('recorded_at', saudiDayEnd(to))
     if (q) {
       const safe = sanitizeSearchTerm(q)
       if (safe)
@@ -91,10 +110,13 @@ export function EntryReportsAll({
       if (value) query = query.eq(key, value)
     }
     query.then(({ data, count, error }) => {
+      // A newer request replaced this one; keep the current rows on screen.
+      if (controller.signal.aborted) return
       if (error) {
         console.error('entry reports list load failed', error)
         setRows([])
         setTotal(0)
+        setLoadError(true)
         setLoading(false)
         return
       }
@@ -121,8 +143,12 @@ export function EntryReportsAll({
       />
       <div className="card flex flex-wrap gap-2 p-3">
         <input
+          // Remount when the URL search changes (Clear, Back) so the box
+          // always shows the active search.
+          key={params.get('q') ?? ''}
           className="input h-8 min-w-48"
           placeholder={t('search')}
+          aria-label={t('search')}
           defaultValue={params.get('q') ?? ''}
           onKeyDown={(e) => {
             if (e.key === 'Enter') setParam('q', e.currentTarget.value)
@@ -131,28 +157,18 @@ export function EntryReportsAll({
         <input
           type="date"
           className="input h-8"
-          value={dateRange.from.slice(0, 10)}
-          onChange={(e) =>
-            setParam(
-              'from',
-              e.target.value
-                ? new Date(`${e.target.value}T00:00:00`).toISOString()
-                : '',
-            )
-          }
+          aria-label={t('fromDate')}
+          value={dateRange.from}
+          max={dateRange.to || undefined}
+          onChange={(e) => setParam('from', e.target.value)}
         />
         <input
           type="date"
           className="input h-8"
-          value={dateRange.to.slice(0, 10)}
-          onChange={(e) =>
-            setParam(
-              'to',
-              e.target.value
-                ? new Date(`${e.target.value}T23:59:59`).toISOString()
-                : '',
-            )
-          }
+          aria-label={t('toDate')}
+          value={dateRange.to}
+          min={dateRange.from || undefined}
+          onChange={(e) => setParam('to', e.target.value)}
         />
         <select
           className="input h-8"
@@ -192,6 +208,8 @@ export function EntryReportsAll({
         <div className="flex justify-center p-10">
           <InlineSpinner />
         </div>
+      ) : loadError ? (
+        <Alert type="error">{t('dataLoadError')}</Alert>
       ) : rows.length ? (
         <div className="grid gap-3 lg:grid-cols-2">
           {rows.map((row) => (
@@ -251,14 +269,37 @@ function ReportRelationFilter({
           : filterKey === 'driver_id'
             ? 'drivers'
             : 'profiles'
+  const fields =
+    table === 'companies' || table === 'projects'
+      ? 'id,name_ar,name_en'
+      : table === 'equipment'
+        ? 'id,code,type'
+        : 'id,full_name'
+  // Show the selected record's name (not its id) after a reload or Back.
+  const [selectedLabel, setSelectedLabel] = useState<string | null>(null)
+  useEffect(() => {
+    if (!value) {
+      setSelectedLabel(null)
+      return
+    }
+    let active = true
+    supabase
+      .from(table)
+      .select(fields)
+      .eq('id', value)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active && data)
+          setSelectedLabel(
+            toOption(data as unknown as Record<string, string>).label,
+          )
+      })
+    return () => {
+      active = false
+    }
+  }, [value, table, fields])
   const loadOptions = async (raw: string) => {
     const safe = sanitizeSearchTerm(raw)
-    const fields =
-      table === 'companies' || table === 'projects'
-        ? 'id,name_ar,name_en'
-        : table === 'equipment'
-          ? 'id,code,type'
-          : 'id,full_name'
     let query = supabase.from(table).select(fields).limit(20)
     if (safe)
       query =
@@ -272,10 +313,7 @@ function ReportRelationFilter({
             )
     const { data } = await query
     return ((data as unknown as Record<string, string>[] | null) ?? []).map(
-      (row) => ({
-        value: row.id,
-        label: row.name_ar ?? row.full_name ?? row.code,
-      }),
+      toOption,
     )
   }
   const labelKey =
@@ -283,7 +321,9 @@ function ReportRelationFilter({
   return (
     <AsyncSearchSelect
       value={value}
-      selectedOption={value ? { value, label: value } : null}
+      selectedOption={
+        value ? { value, label: selectedLabel ?? t('loading') } : null
+      }
       onChange={(next) => onChange(next)}
       loadOptions={loadOptions}
       placeholder={t(labelKey as TranslationKey)}

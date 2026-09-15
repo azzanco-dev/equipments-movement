@@ -21,7 +21,9 @@ import { useListRequest } from '@/components/data-list/useListRequest'
 import { movementsListConfig } from '@/lib/listConfigs'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
+import { saudiDateKey, saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
 import { MovementLogCard } from '@/components/MovementLogCard'
+import { Alert } from '@/components/Alert'
 
 async function loadLatestDriverNames(entryIds: string[], signal: AbortSignal) {
   if (!entryIds.length) return new Map<string, string>()
@@ -40,20 +42,10 @@ async function loadLatestDriverNames(entryIds: string[], signal: AbortSignal) {
   return latest
 }
 
-function riyadhDayBounds() {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Riyadh',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date())
-  const value = (type: string) =>
-    parts.find((part) => part.type === type)?.value
-  const date = `${value('year')}-${value('month')}-${value('day')}`
-  const start = new Date(`${date}T00:00:00+03:00`)
-  const end = new Date(start)
-  end.setUTCDate(end.getUTCDate() + 1)
-  return { from: start.toISOString(), to: end.toISOString() }
+/** Today's bounds in Saudi time; `to` is inclusive. */
+function saudiTodayBounds() {
+  const today = saudiDateKey()
+  return { from: saudiDayStart(today), to: saudiDayEnd(today) }
 }
 
 type SummaryKey =
@@ -101,6 +93,7 @@ export function AdminDashboard({
     outsideEquipment: 0,
   })
   const [loadingStats, setLoadingStats] = useState(true)
+  const [statsLoadError, setStatsLoadError] = useState(false)
   const [workshopStats, setWorkshopStats] = useState({
     inside: 0,
     entries: 0,
@@ -115,10 +108,12 @@ export function AdminDashboard({
   >([])
   const [summaryTotal, setSummaryTotal] = useState(0)
   const [loadingSummary, setLoadingSummary] = useState(false)
+  const [summaryLoadError, setSummaryLoadError] = useState(false)
 
   // Logs
   const [logs, setLogs] = useState<EntryExitLog[]>([])
   const [loadingLogs, setLoadingLogs] = useState(true)
+  const [logsLoadError, setLogsLoadError] = useState(false)
   const [logsTotal, setLogsTotal] = useState(0)
   const [supervisorOptions, setSupervisorOptions] = useState<
     Array<{ value: string; label: string }>
@@ -139,6 +134,7 @@ export function AdminDashboard({
   // Movement reports preserve the prior report URL prefix for existing links.
   const [reports, setReports] = useState<EntryExitLog[]>([])
   const [loadingReports, setLoadingReports] = useState(true)
+  const [reportsLoadError, setReportsLoadError] = useState(false)
   const [reportsTotal, setReportsTotal] = useState(0)
   const reportList = useDataListState(movementsListConfig, 'visit_')
 
@@ -177,15 +173,14 @@ export function AdminDashboard({
 
   const fetchStats = useCallback(async () => {
     setLoadingStats(true)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const todayStr = today.toISOString()
+    setStatsLoadError(false)
+    const todayStr = saudiTodayBounds().from
 
     const [
-      { count: todayEntries },
-      { count: todayExits },
-      { count: activeCount },
-      { count: outsideCount },
+      { count: todayEntries, error: todayEntriesError },
+      { count: todayExits, error: todayExitsError },
+      { count: activeCount, error: activeError },
+      { count: outsideCount, error: outsideError },
     ] = await Promise.all([
       supabase
         .from('entry_exit_logs')
@@ -235,6 +230,9 @@ export function AdminDashboard({
     //   .select('id', { count: 'exact', head: true })
     //   .or('movement_type.eq.exit,movement_type.is.null')
 
+    setStatsLoadError(
+      !!(todayEntriesError || todayExitsError || activeError || outsideError),
+    )
     setStats({
       todayEntries: todayEntries ?? 0,
       todayExits: todayExits ?? 0,
@@ -247,7 +245,7 @@ export function AdminDashboard({
   const fetchWorkshopOverview = useCallback(async (signal: AbortSignal) => {
     setLoadingWorkshop(true)
     setWorkshopLoadError(false)
-    const { from, to } = riyadhDayBounds()
+    const { from, to } = saudiTodayBounds()
     const [inside, entries, exits, latest] = await Promise.all([
       supabase
         .from('equipment_current_state')
@@ -261,7 +259,7 @@ export function AdminDashboard({
         .eq('movement_context', 'workshop')
         .eq('movement_type', 'entry')
         .gte('recorded_at', from)
-        .lt('recorded_at', to)
+        .lte('recorded_at', to)
         .abortSignal(signal),
       supabase
         .from('entry_exit_logs')
@@ -269,7 +267,7 @@ export function AdminDashboard({
         .eq('movement_context', 'workshop')
         .eq('movement_type', 'exit')
         .gte('recorded_at', from)
-        .lt('recorded_at', to)
+        .lte('recorded_at', to)
         .abortSignal(signal),
       supabase
         .from('entry_exit_logs')
@@ -307,14 +305,13 @@ export function AdminDashboard({
     let active = true
     const load = async () => {
       setLoadingSummary(true)
+      setSummaryLoadError(false)
       const from = (summaryPage - 1) * 20
       const to = from + 19
       if (
         selectedSummary === 'today_entries' ||
         selectedSummary === 'today_exits'
       ) {
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
         const { data, count, error } = await supabase
           .from('entry_exit_logs')
           .select(
@@ -326,12 +323,13 @@ export function AdminDashboard({
             'movement_type',
             selectedSummary === 'today_entries' ? 'entry' : 'exit',
           )
-          .gte('recorded_at', today.toISOString())
+          .gte('recorded_at', saudiTodayBounds().from)
           .order('recorded_at', { ascending: false })
           .order('id', { ascending: false })
           .range(from, to)
         if (error) console.error(error)
         if (!active) return
+        setSummaryLoadError(!!error)
         setSummaryLogs((data as unknown as EntryExitLog[]) ?? [])
         setSummaryEquipment([])
         setSummaryTotal(count ?? 0)
@@ -351,6 +349,7 @@ export function AdminDashboard({
         const { data, count, error } = await query
         if (error) console.error(error)
         if (!active) return
+        setSummaryLoadError(!!error)
         setSummaryEquipment((data as EquipmentSummaryRow[] | null) ?? [])
         setSummaryLogs([])
         setSummaryTotal(count ?? 0)
@@ -404,6 +403,7 @@ export function AdminDashboard({
     const { data, error, count } = await query.abortSignal(signal)
     if (signal.aborted) return
     if (error) console.error(error)
+    setLogsLoadError(!!error)
     const rows = (data as unknown as EntryExitLog[]) ?? []
     const latestDrivers = await loadLatestDriverNames(
       rows.filter((row) => row.movement_type === 'entry').map((row) => row.id),
@@ -473,6 +473,7 @@ export function AdminDashboard({
     const { data, error, count } = await query.abortSignal(signal)
     if (signal.aborted) return
     if (error) console.error(error)
+    setReportsLoadError(!!error)
     const rows = (data as unknown as EntryExitLog[]) ?? []
     const latestDrivers = await loadLatestDriverNames(
       rows.filter((row) => row.movement_type === 'entry').map((row) => row.id),
@@ -593,6 +594,7 @@ export function AdminDashboard({
       )}
 
       {/* Stats */}
+      {statsLoadError && <Alert type="error">{t('dataLoadError')}</Alert>}
       {loadingStats ? (
         <InlineSpinner label={t('loading')} />
       ) : (
@@ -636,6 +638,8 @@ export function AdminDashboard({
           </div>
           {loadingSummary ? (
             <InlineSpinner label={t('loading')} />
+          ) : summaryLoadError ? (
+            <Alert type="error">{t('dataLoadError')}</Alert>
           ) : summaryLogs.length === 0 && summaryEquipment.length === 0 ? (
             <div className="card py-10 text-center text-sm text-muted">
               {t('noResults')}
@@ -851,6 +855,8 @@ export function AdminDashboard({
           {/* Movement cards */}
           {loadingLogs ? (
             <InlineSpinner label={t('loading')} />
+          ) : logsLoadError ? (
+            <Alert type="error">{t('dataLoadError')}</Alert>
           ) : logs.length === 0 ? (
             <div className="card text-center py-12">
               <p className="text-muted">{t('noResults')}</p>
@@ -914,6 +920,8 @@ export function AdminDashboard({
 
           {loadingReports ? (
             <InlineSpinner label={t('loading')} />
+          ) : reportsLoadError ? (
+            <Alert type="error">{t('dataLoadError')}</Alert>
           ) : reports.length === 0 ? (
             <div className="card text-center py-12">
               <p className="text-muted">{t('noResults')}</p>

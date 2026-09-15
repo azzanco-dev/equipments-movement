@@ -9,6 +9,7 @@ import type { EntryExitLog, MovementType } from '@/lib/types'
 import { Select } from '@/components/Select'
 import { PageHeader } from '@/components/PageHeader'
 import { formatDate } from '@/lib/dateFormat'
+import { isDateKey, saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
 import { Alert } from '@/components/Alert'
 import { RelativeTime } from '@/components/RelativeTime'
 import { sanitizeSearchTerm } from '@/lib/search'
@@ -56,11 +57,7 @@ export function SupervisorDashboard({
       ? requestedType
       : 'all'
   const requestedDate = params.get('movement_date') ?? ''
-  const filterDate =
-    /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) &&
-    Number.isFinite(Date.parse(`${requestedDate}T00:00:00`))
-      ? requestedDate
-      : ''
+  const filterDate = isDateKey(requestedDate) ? requestedDate : ''
   const [total, setTotal] = useState(0)
   const [loadError, setLoadError] = useState(false)
   const changeFilters = (values: Record<string, string>) => {
@@ -151,13 +148,9 @@ export function SupervisorDashboard({
       query = query.eq('movement_type', filterType)
     }
     if (filterDate) {
-      const start = new Date(filterDate)
-      start.setHours(0, 0, 0, 0)
-      const end = new Date(filterDate)
-      end.setHours(23, 59, 59, 999)
       query = query
-        .gte('recorded_at', start.toISOString())
-        .lte('recorded_at', end.toISOString())
+        .gte('recorded_at', saudiDayStart(filterDate))
+        .lte('recorded_at', saudiDayEnd(filterDate))
     }
 
     const { data, error, count } = await query.abortSignal(signal)
