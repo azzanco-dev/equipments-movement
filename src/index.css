@@ -259,6 +259,21 @@ body {
     border-color: var(--primary);
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 16%, transparent);
   }
+  .input[aria-invalid='true'] {
+    border-color: var(--danger);
+  }
+  .input[aria-invalid='true']:focus {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 18%, transparent);
+  }
+  .input:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    background-color: var(--surface);
+  }
+  /* SearchInput provides its own clear button. */
+  .input[type='search']::-webkit-search-cancel-button {
+    appearance: none;
+  }
   .label {
     @apply block text-sm font-medium mb-1.5;
   }

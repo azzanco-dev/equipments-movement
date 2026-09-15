@@ -24,6 +24,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import { useTheme } from '@/theme/ThemeContext'
 import { AuthScreen } from '@/screens/AuthScreen'
 import { FullPageSpinner } from '@/components/Spinner'
+import { ComponentShowcase } from '@/screens/ui-kit/ComponentShowcase'
 import {
   PALETTE_DIRECTIONS,
   contrastRatio,
@@ -96,56 +97,63 @@ function UiKitContent() {
 
       <ApprovedTokens />
 
-      <section aria-labelledby="directions-title" className="space-y-3">
-        <h2 id="directions-title" className="text-base font-semibold">
-          مقارنة اتجاهات الالوان (مرجع)
-        </h2>
-        <div
-          role="radiogroup"
-          aria-labelledby="directions-title"
-          className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
-        >
-          {PALETTE_DIRECTIONS.map((item) => (
-            <PaletteOption
-              key={item.id}
-              palette={item}
-              selected={item.id === paletteId}
-              onSelect={() => setPaletteId(item.id)}
-            />
-          ))}
-        </div>
-      </section>
+      <ComponentShowcase />
 
-      <section aria-labelledby="preview-title" className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 id="preview-title" className="text-base font-semibold">
-            معاينة: {palette.name}
+      <details className="group space-y-3">
+        <summary className="cursor-pointer text-base font-semibold">
+          مقارنة اتجاهات الالوان (مرجع)
+        </summary>
+        <section aria-labelledby="directions-title" className="mt-3 space-y-3">
+          <h2 id="directions-title" className="sr-only">
+            مقارنة اتجاهات الالوان
           </h2>
           <div
             role="radiogroup"
-            aria-label="وضع العرض"
-            className="inline-flex rounded-lg border border-[var(--border)] p-0.5"
+            aria-labelledby="directions-title"
+            className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
           >
-            {(['light', 'dark'] as const).map((value) => (
-              <button
-                key={value}
-                role="radio"
-                aria-checked={mode === value}
-                onClick={() => setMode(value)}
-                className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-[13px] ${
-                  mode === value ? 'nav-active' : 'text-muted'
-                }`}
-              >
-                {value === 'light' ? <Sun size={14} /> : <Moon size={14} />}
-                {value === 'light' ? 'فاتح' : 'داكن'}
-              </button>
+            {PALETTE_DIRECTIONS.map((item) => (
+              <PaletteOption
+                key={item.id}
+                palette={item}
+                selected={item.id === paletteId}
+                onSelect={() => setPaletteId(item.id)}
+              />
             ))}
           </div>
-        </div>
-        <PalettePreview tokens={tokens} />
-      </section>
+        </section>
 
-      <ContrastChecks tokens={tokens} mode={mode} />
+        <section aria-labelledby="preview-title" className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="preview-title" className="text-base font-semibold">
+              معاينة: {palette.name}
+            </h2>
+            <div
+              role="radiogroup"
+              aria-label="وضع العرض"
+              className="inline-flex rounded-lg border border-[var(--border)] p-0.5"
+            >
+              {(['light', 'dark'] as const).map((value) => (
+                <button
+                  key={value}
+                  role="radio"
+                  aria-checked={mode === value}
+                  onClick={() => setMode(value)}
+                  className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-[13px] ${
+                    mode === value ? 'nav-active' : 'text-muted'
+                  }`}
+                >
+                  {value === 'light' ? <Sun size={14} /> : <Moon size={14} />}
+                  {value === 'light' ? 'فاتح' : 'داكن'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <PalettePreview tokens={tokens} />
+        </section>
+
+        <ContrastChecks tokens={tokens} mode={mode} />
+      </details>
     </div>
   )
 }
