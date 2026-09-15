@@ -159,7 +159,8 @@ body {
   --success-soft: #ecfdf3;
   --warning: #b45309;
   --warning-soft: #fff7ed;
-  --danger: #dc2626;
+  /* Darkened from #dc2626 (4.4:1 on danger-soft) to pass WCAG AA (5.2:1). */
+  --danger: #c81e1e;
   --danger-soft: #fef2f2;
   --info: #0369a1;
   --info-soft: #f0f9ff;

@@ -71,7 +71,7 @@ export const PALETTE_DIRECTIONS: PaletteDirection[] = [
       exitSoft: '#FFF7ED',
       warning: '#B45309',
       warningSoft: '#FFF7ED',
-      danger: '#DC2626',
+      danger: '#C81E1E',
       dangerSoft: '#FEF2F2',
       info: '#0369A1',
       infoSoft: '#F0F9FF',
