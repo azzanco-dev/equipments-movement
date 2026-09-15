@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   AlertCircle,
   AlertTriangle,
@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
 import { useI18n } from '@/i18n/I18nContext'
+import { useTheme } from '@/theme/ThemeContext'
 import { AuthScreen } from '@/screens/AuthScreen'
 import { FullPageSpinner } from '@/components/Spinner'
 import {
@@ -55,8 +56,12 @@ export function UiKit() {
 
 type Mode = 'light' | 'dark'
 
+// Approved by the product owner on 2026-09-15.
+const APPROVED_PALETTE: PaletteDirection['id'] = 'current'
+
 function UiKitContent() {
-  const [paletteId, setPaletteId] = useState<PaletteDirection['id']>('brand')
+  const [paletteId, setPaletteId] =
+    useState<PaletteDirection['id']>(APPROVED_PALETTE)
   const [mode, setMode] = useState<Mode>('light')
   const palette =
     PALETTE_DIRECTIONS.find((item) => item.id === paletteId) ??
@@ -70,25 +75,30 @@ function UiKitContent() {
       lang="ar"
       className="mx-auto max-w-[1400px] space-y-6 px-4 py-6 sm:px-6"
     >
-      <header className="flex flex-wrap items-center gap-3">
-        <img
-          src="/azzanco-logo.png"
-          alt=""
-          aria-hidden="true"
-          className="h-10 w-10 rounded-lg object-contain"
-        />
-        <div>
-          <h1 className="text-xl font-bold">مكتبة الواجهة</h1>
-          <p className="text-sm text-muted">
-            الخطوة الاولى: اختيار اتجاه الالوان. كل البيانات في المعاينة
-            تجريبية.
-          </p>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <img
+            src="/azzanco-logo.png"
+            alt=""
+            aria-hidden="true"
+            className="h-10 w-10 rounded-lg object-contain"
+          />
+          <div>
+            <h1 className="text-xl font-bold">مكتبة الواجهة</h1>
+            <p className="text-sm text-muted">
+              تم اعتماد الالوان الحالية. الخطوة التالية: بناء الـ components. كل
+              البيانات في المعاينة تجريبية.
+            </p>
+          </div>
         </div>
+        <ThemeToggle />
       </header>
+
+      <ApprovedTokens />
 
       <section aria-labelledby="directions-title" className="space-y-3">
         <h2 id="directions-title" className="text-base font-semibold">
-          اتجاهات الالوان المقترحة
+          مقارنة اتجاهات الالوان (مرجع)
         </h2>
         <div
           role="radiogroup"
@@ -136,12 +146,105 @@ function UiKitContent() {
       </section>
 
       <ContrastChecks tokens={tokens} mode={mode} />
-
-      <p className="text-sm text-muted">
-        بعد ما تختار، ارسل اسم الاتجاه مع اي تعديل تبيه (مثلا لون الخروج او لون
-        القائمة)، وبعدها نبني عليه الـ components.
-      </p>
     </div>
+  )
+}
+
+function ThemeToggle() {
+  const { theme, toggleTheme } = useTheme()
+  return (
+    <button className="btn-outline" onClick={toggleTheme}>
+      {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+      {theme === 'dark' ? 'عرض الفاتح' : 'عرض الداكن'}
+    </button>
+  )
+}
+
+const TOKEN_GROUPS: Array<{
+  title: string
+  items: Array<{ name: string; token: string; soft?: string }>
+}> = [
+  {
+    title: 'الاساس',
+    items: [
+      { name: 'الخلفية', token: '--bg' },
+      { name: 'السطح', token: '--surface' },
+      { name: 'الحدود', token: '--border' },
+      { name: 'النص', token: '--fg' },
+      { name: 'النص الثانوي', token: '--muted' },
+      { name: 'الرئيسي', token: '--primary' },
+    ],
+  },
+  {
+    title: 'الالوان الوظيفية',
+    items: [
+      { name: 'دخول', token: '--entry', soft: '--entry-soft' },
+      { name: 'خروج', token: '--exit', soft: '--exit-soft' },
+      { name: 'تحذير', token: '--warning', soft: '--warning-soft' },
+      { name: 'خطا', token: '--danger', soft: '--danger-soft' },
+      { name: 'معلومة', token: '--info', soft: '--info-soft' },
+    ],
+  },
+]
+
+// The approved tokens as defined in src/index.css, read live for the
+// active theme.
+function ApprovedTokens() {
+  const { theme } = useTheme()
+  const [values, setValues] = useState<Record<string, string>>({})
+  useEffect(() => {
+    const styles = getComputedStyle(document.documentElement)
+    const tokens = TOKEN_GROUPS.flatMap((group) =>
+      group.items.flatMap((item) => [item.token, item.soft ?? '']),
+    ).filter(Boolean)
+    setValues(
+      Object.fromEntries(
+        tokens.map((token) => [token, styles.getPropertyValue(token).trim()]),
+      ),
+    )
+  }, [theme])
+
+  return (
+    <section aria-labelledby="tokens-title" className="card space-y-4">
+      <h2 id="tokens-title" className="text-base font-semibold">
+        الالوان المعتمدة ({theme === 'dark' ? 'داكن' : 'فاتح'})
+      </h2>
+      {TOKEN_GROUPS.map((group) => (
+        <div key={group.title} className="space-y-2">
+          <h3 className="text-sm font-medium text-muted">{group.title}</h3>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {group.items.map((item) => (
+              <div
+                key={item.token}
+                className="flex items-center gap-2 rounded-lg border p-2"
+              >
+                <span className="flex shrink-0 overflow-hidden rounded-md border">
+                  <span
+                    className="h-8 w-8"
+                    style={{ background: `var(${item.token})` }}
+                  />
+                  {item.soft && (
+                    <span
+                      className="h-8 w-8"
+                      style={{ background: `var(${item.soft})` }}
+                    />
+                  )}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm">{item.name}</span>
+                  <span
+                    dir="ltr"
+                    className="block truncate text-[11px] text-muted"
+                  >
+                    {item.token} {values[item.token]}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </section>
   )
 }
 
@@ -172,11 +275,13 @@ function PaletteOption({
     >
       <div className="flex items-center justify-between gap-2">
         <span className="font-semibold">{palette.name}</span>
-        {selected && (
-          <span className="badge nav-active">
+        {palette.id === APPROVED_PALETTE ? (
+          <span className="badge status-entry border">
             <Check size={12} />
-            المختار
+            معتمد
           </span>
+        ) : (
+          selected && <span className="badge nav-active">معروض</span>
         )}
       </div>
       <p className="text-xs leading-relaxed text-muted">{palette.summary}</p>

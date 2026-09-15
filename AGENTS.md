@@ -97,7 +97,7 @@
 
 - Arabic/RTL first, responsive, mobile-friendly, shadcn-style.
 - A unified design system is being built. Components are approved by the product owner on the admin-only `/ui-kit` page before screens are migrated to them. Do not migrate screens to unapproved components.
-- The approved direction is a more colorful, lively interface than the original neutral black/white look. Until the new palette is approved, keep the existing tokens in `src/index.css`. No gradients unless approved in `/ui-kit`.
+- Approved palette (2026-09-15, compared on `/ui-kit` against three brand-colored directions): keep the current neutral black/white foundation with functional colors, defined as tokens in `src/index.css`. Primary actions and active navigation are monochrome (black in light mode, white in dark mode). No gradients.
 - Shared components are built on Radix Primitives (the unstyled `radix-ui` package) and styled entirely with project tokens. `I18nProvider` supplies the Radix direction provider, so do not pass `dir` to individual primitives.
 - Use CSS variable tokens (through the Tailwind theme) for colors, borders, and surfaces. Do not hardcode Tailwind palette colors (`gray-*`, `emerald-*`, and so on) or hex values in screens.
 - Do not apply letter-spacing (`tracking-*`) or `uppercase` to Arabic text; it breaks letter joining.
