@@ -6,6 +6,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
+import { Direction } from 'radix-ui'
 import {
   translations,
   getLanguage,
@@ -53,6 +54,8 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     [lang],
   )
 
+  const dir = lang === 'ar' ? 'rtl' : 'ltr'
+
   return (
     <I18nContext.Provider
       value={{
@@ -60,10 +63,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
         t,
         toggleLanguage,
         setLang,
-        dir: lang === 'ar' ? 'rtl' : 'ltr',
+        dir,
       }}
     >
-      {children}
+      {/* Radix primitives (menus, dialogs, popovers) follow the interface direction. */}
+      <Direction.Provider dir={dir}>{children}</Direction.Provider>
     </I18nContext.Provider>
   )
 }

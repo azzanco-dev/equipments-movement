@@ -4,9 +4,11 @@
 
 - This is an Arabic-first equipment gate movement system. Reply to the product owner in Arabic unless they ask for another language.
 - For all newly added Arabic UI copy, do not use alif with hamza or madda. Normalize `أ`, `إ`, and `آ` to plain `ا`. Existing Arabic copy will be normalized separately later; do not rewrite it as part of unrelated changes.
-- Current scope is the operational foundation: equipment, drivers, companies, projects, lessors/owners, users, entry/exit movements, visit reports, and movement photos.
-- Do not introduce workshop, contracts/POs, timesheets, sales, purchasing, accounting, notifications, charts, or other future modules unless explicitly requested.
+- Current scope is the operational foundation (phase 1): equipment, drivers, companies, projects, lessors/owners, users, site and workshop entry/exit movements, movement photos, and the entry, equipment, and workshop reports.
+- Workshop ENTRY is classified by purpose: `maintenance` or `parking` (standby).
+- Planned later phases: phase 2 links equipment to contractor POs and monthly timesheets; phase 3 links external-supplier equipment to purchasing (POs and rental accruals). Do not introduce contracts/POs, timesheets, sales, purchasing, accounting, notifications, charts, or other future modules unless explicitly requested.
 - Preserve existing behavior and make incremental changes. Do not rebuild working features merely to match a preferred architecture.
+- The improvement plan and task status are tracked in Notion (page "Equipment Movement", database "مهام المشروع"). When a tracked task is completed, update its status there.
 
 ## Architecture
 
@@ -20,7 +22,14 @@
 
 ## Authorization and database integrity
 
-- Roles are `admin`, `supervisor`, and the limited `workshop` role; preserve the reviewed permission model for each movement context.
+- Roles are `admin`, `supervisor`, `workshop`, `assistant_workshop_manager`, `workshop_manager`, and `monitor`; preserve the reviewed permission model for each movement context.
+  - `admin`: full access to master data, users, reports, and settings.
+  - `supervisor`: site movements for their assigned companies.
+  - `workshop`: the limited workshop movement form.
+  - `assistant_workshop_manager` / `workshop_manager`: workshop movements plus workshop classification and management views.
+  - `monitor`: read-only dashboard, logs, and movement details.
+- Client-side role routing must fail closed: an unknown or missing role must never receive the admin interface.
+- Roles are assigned only by trusted server paths (admin Edge Functions or admin-only database functions), never from user-editable signup metadata.
 - Critical rules must be enforced in PostgreSQL/RLS, not only in React or API validation.
 - Do not weaken `entry_exit_logs`, `entry_exit_photos`, Storage, drivers, or master-data RLS.
 - Do not expose raw PostgreSQL or Supabase errors to users. Map known errors to safe, understandable UI messages.
@@ -86,11 +95,18 @@
 
 ## UI conventions
 
-- Arabic/RTL first, responsive, mobile-friendly, shadcn-style, neutral black/white foundation with restrained functional colors. No gradients.
+- Arabic/RTL first, responsive, mobile-friendly, shadcn-style.
+- A unified design system is being built. Components are approved by the product owner on the admin-only `/ui-kit` page before screens are migrated to them. Do not migrate screens to unapproved components.
+- The approved direction is a more colorful, lively interface than the original neutral black/white look. Until the new palette is approved, keep the existing tokens in `src/index.css`. No gradients unless approved in `/ui-kit`.
+- Shared components are built on Radix Primitives (the unstyled `radix-ui` package) and styled entirely with project tokens. `I18nProvider` supplies the Radix direction provider, so do not pass `dir` to individual primitives.
+- Use CSS variable tokens (through the Tailwind theme) for colors, borders, and surfaces. Do not hardcode Tailwind palette colors (`gray-*`, `emerald-*`, and so on) or hex values in screens.
+- Do not apply letter-spacing (`tracking-*`) or `uppercase` to Arabic text; it breaks letter joining.
+- Use logical direction utilities (`ms-`, `me-`, `ps-`, `pe-`, `start-`, `end-`, `text-start`) instead of left/right.
 - Shared inputs, selects, date/time controls, and standard buttons are 32 px high. Standard button text is 13 px at weight 400. Large textareas, image areas, plate UI, and primary scanning areas may remain larger when functionally necessary.
-- Primary actions and active navigation are monochrome: black in light mode and white in dark mode.
-- Use green for ENTRY/success and amber for EXIT/warnings; use red only for errors/destructive actions.
-- Dark theme uses the slightly lifted neutral palette defined in `src/index.css`; keep text contrast accessible.
+- Use green for ENTRY/success and amber for EXIT/warnings; use red only for errors/destructive actions. Show ENTRY/EXIT through the shared status badge rather than ad hoc colors.
+- Dark theme must keep text contrast accessible.
+- Report and dashboard day boundaries use Saudi time (UTC+03:00), not the browser's local timezone.
+- Show a visible error state when data fails to load; never render a load failure as an empty "no data" state.
 - Use the translation system in `src/i18n/translations.ts`; add Arabic and English keys together. Avoid hardcoded user-facing strings in reusable UI.
 - Mobile form controls must remain at least 16 px font size to prevent iOS focus zoom.
 
@@ -113,6 +129,7 @@ Run checks sequentially because `next build` and `tsc` both use `.next` and can 
 npm run build
 npm run typecheck
 npm run lint
+npm test
 git diff --check
 ```
 
@@ -134,3 +151,5 @@ npx supabase migration list --linked
 - Flag `USING (true)` photo access, public Storage reads, missing `uploaded_by = auth.uid()`, or service-role use in browser code.
 - Flag changes that drop legacy `driver_name` or `photo_url` compatibility.
 - Flag UI that reports total movement failure after the movement row was already saved.
+- Flag client routing that grants admin UI to an unknown role, and any role taken from user-editable signup metadata.
+- Flag new UI that bypasses approved shared components or hardcodes palette colors instead of tokens.
