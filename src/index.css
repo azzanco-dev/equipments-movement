@@ -99,7 +99,8 @@
 }
 
 :root {
-  --font-primary: 'Thmanyah', 'Tajawal', 'Segoe UI', Tahoma, system-ui, sans-serif;
+  --font-primary:
+    'Thmanyah', 'Tajawal', 'Segoe UI', Tahoma, system-ui, sans-serif;
   --font-latin: 'Roboto', 'Segoe UI', Arial, system-ui, sans-serif;
   --font-heading: 'Thmanyah Serif Display', 'Thmanyah', 'Segoe UI', serif;
 }
@@ -123,6 +124,15 @@ h6 {
 html[lang='en'],
 html[lang='en'] * {
   font-family: var(--font-latin);
+}
+
+/* Arabic blocks inside the English interface keep the Arabic font. */
+html[lang='en'] [lang='ar'],
+html[lang='en'] [lang='ar'] * {
+  font-family: var(--font-primary);
+}
+html[lang='en'] [lang='ar'] h1 {
+  font-family: var(--font-heading);
 }
 
 body {
@@ -224,8 +234,7 @@ body {
   .input {
     @apply h-8 w-full rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors placeholder:text-gray-400 placeholder:text-[13px];
     border-color: var(--border);
-    font-family:
-      'NotoArabicInput', 'Segoe UI', Tahoma, system-ui, sans-serif;
+    font-family: 'NotoArabicInput', 'Segoe UI', Tahoma, system-ui, sans-serif;
     line-height: 1.25rem;
   }
   html[lang='en'] .input {
