@@ -134,10 +134,11 @@ export async function POST(request: Request) {
       photoDescriptors.length ||
       pendingBatch?.file_paths.length ||
       Number(values.photo_count ?? 0)
-    if (
-      movementContext === 'workshop' &&
-      (!Number.isInteger(intendedPhotoCount) || intendedPhotoCount < 1)
-    ) {
+    // Workshop movements need real photos: multipart files or a staged batch
+    // (verified in Storage below). A client-reported count is not enough.
+    const verifiablePhotoCount =
+      photos.length || pendingBatch?.file_paths.length || 0
+    if (movementContext === 'workshop' && verifiablePhotoCount < 1) {
       return NextResponse.json({ error: 'photo_required' }, { status: 400 })
     }
     if (

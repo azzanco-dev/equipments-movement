@@ -79,6 +79,8 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       if (cause.code === 'forbidden') return t('userPermissionError')
       if (cause.code === 'notFound') return t('userNotFound')
       if (cause.code === 'server') return t('serverTemporaryError')
+      if (cause.serverCode === 'own_role') return t('cannotChangeOwnRole')
+      if (cause.serverCode === 'last_admin') return t('lastAdminRequired')
       return t('userUpdateError')
     },
     [t],

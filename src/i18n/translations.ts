@@ -580,6 +580,10 @@ export const translations = {
     profileLoadError:
       'تعذر تحميل بيانات حسابك. تحقق من الانترنت ثم حاول مرة اخرى',
     retry: 'اعادة المحاولة',
+    accountRoleUnavailable:
+      'حسابك لا يملك صلاحية لاستخدام النظام. تواصل مع مدير النظام.',
+    cannotChangeOwnRole: 'لا يمكنك تغيير دور حسابك بنفسك.',
+    lastAdminRequired: 'يجب ان يبقى مدير نظام واحد على الاقل.',
     optionsLoadError: 'تعذر تحميل الخيارات. حاول مرة اخرى.',
     navigationMenu: 'قائمة التنقل',
     rowsPerPage: 'عدد الصفوف في الصفحة',
@@ -1294,6 +1298,10 @@ export const translations = {
     profileLoadError:
       'Could not load your account. Check your connection and try again.',
     retry: 'Retry',
+    accountRoleUnavailable:
+      'Your account does not have access to this system. Contact your administrator.',
+    cannotChangeOwnRole: 'You cannot change the role of your own account.',
+    lastAdminRequired: 'At least one admin account is required.',
     optionsLoadError: 'Could not load options. Please try again.',
     navigationMenu: 'Navigation menu',
     rowsPerPage: 'Rows per page',

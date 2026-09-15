@@ -37,7 +37,15 @@ export async function PATCH(
     const token = authorization.slice(7)
     const supabase = client(token)
     const { id } = await context.params
-    const body = (await request.json()) as Record<string, unknown>
+    const body = (await request.json().catch(() => null)) as Record<
+      string,
+      unknown
+    > | null
+    if (!body || typeof body !== 'object')
+      return NextResponse.json(
+        { error: 'invalid_movement_payload' },
+        { status: 400 },
+      )
     const text = (key: string) =>
       typeof body[key] === 'string' && body[key] ? body[key] : null
 

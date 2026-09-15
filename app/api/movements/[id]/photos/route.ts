@@ -32,10 +32,27 @@ async function authenticate(request: Request) {
   return profile ? { supabase, user: data.user, role: profile.role } : null
 }
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ id: string }> },
-) {
+type RouteContext = { params: Promise<{ id: string }> }
+
+export async function POST(request: Request, context: RouteContext) {
+  try {
+    return await addPhotos(request, context)
+  } catch (error) {
+    console.error('Movement photo upload failed', error)
+    return NextResponse.json({ error: 'photo_upload_failed' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request, context: RouteContext) {
+  try {
+    return await deletePhoto(request, context)
+  } catch (error) {
+    console.error('Movement photo delete failed', error)
+    return NextResponse.json({ error: 'photo_delete_failed' }, { status: 500 })
+  }
+}
+
+async function addPhotos(request: Request, context: RouteContext) {
   const auth = await authenticate(request)
   if (!auth)
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
@@ -50,10 +67,12 @@ export async function POST(
   if (!movement)
     return NextResponse.json({ error: 'movement_not_found' }, { status: 404 })
 
-  const { count } = await auth.supabase
+  const { count, error: countError } = await auth.supabase
     .from('entry_exit_photos')
     .select('*', { count: 'exact', head: true })
     .eq('entry_exit_log_id', id)
+  if (countError)
+    return NextResponse.json({ error: 'photo_upload_failed' }, { status: 502 })
 
   if (
     (request.headers.get('content-type') ?? '').includes('application/json')
@@ -280,10 +299,7 @@ export async function POST(
   return NextResponse.json({ created: created.length }, { status: 201 })
 }
 
-export async function DELETE(
-  request: Request,
-  context: { params: Promise<{ id: string }> },
-) {
+async function deletePhoto(request: Request, context: RouteContext) {
   const auth = await authenticate(request)
   if (!auth)
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })

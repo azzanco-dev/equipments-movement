@@ -37,14 +37,18 @@ Deno.serve(async (req: Request) => {
     } = await userClient.auth.getUser()
     if (userError || !user) return json({ error: 'Unauthorized' }, 401)
 
-    const { data: callerProfile } = await userClient
+    const { data: callerProfile } = await adminClient
       .from('profiles')
-      .select('role')
+      .select('role,must_change_password')
       .eq('id', user.id)
       .maybeSingle()
     const body = await req.json()
 
     if (body.action === 'change_own_password') {
+      // This action exists only for the forced first-login change, so a stolen
+      // session cannot silently replace the password of an established account.
+      if (!callerProfile?.must_change_password)
+        return json({ error: 'Password change not required' }, 403)
       const password = String(body.password ?? '')
       if (password.length < 8)
         return json({ error: 'Password must be at least 8 characters' }, 400)
@@ -125,6 +129,34 @@ Deno.serve(async (req: Request) => {
         ].includes(role)
       )
         return json({ error: 'Invalid role' }, 400)
+
+      const { data: targetProfile, error: targetError } = await adminClient
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle()
+      if (targetError || !targetProfile)
+        return json({ error: 'User not found' }, 404)
+      if (targetProfile.role !== role) {
+        if (userId === user.id)
+          return json(
+            { error: 'You cannot change your own role', code: 'own_role' },
+            400,
+          )
+        if (targetProfile.role === 'admin') {
+          const { count, error: countError } = await adminClient
+            .from('profiles')
+            .select('id', { count: 'exact', head: true })
+            .eq('role', 'admin')
+          if (countError) return json({ error: 'Could not verify admins' }, 500)
+          if ((count ?? 0) <= 1)
+            return json(
+              { error: 'At least one admin is required', code: 'last_admin' },
+              400,
+            )
+        }
+      }
+
       const authAttributes: {
         email: string
         password?: string

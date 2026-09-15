@@ -116,7 +116,10 @@ Deno.serve(async (req: Request) => {
         email,
         password,
         email_confirm: true,
-        user_metadata: { full_name, role, admin_created: true },
+        user_metadata: { full_name },
+        // Only the service role can write app_metadata; handle_new_user reads
+        // the role from here, never from user-editable user_metadata.
+        app_metadata: { role, admin_created: true },
       })
 
     if (createError) {

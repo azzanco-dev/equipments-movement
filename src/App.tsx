@@ -153,7 +153,7 @@ const ADMIN_PAGES = new Set([
 ])
 
 function AppContent() {
-  const { profile, session, loading, profileLoadError, retryProfile } =
+  const { profile, session, loading, profileLoadError, retryProfile, signOut } =
     useAuth()
   const { t } = useI18n()
   const router = useRouter()
@@ -267,6 +267,19 @@ function AppContent() {
       </>
     )
   }
+
+  // Fail closed: only an explicit admin role reaches the admin interface.
+  if (profile.role !== 'admin')
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center p-4">
+        <div className="card w-full max-w-md space-y-4 text-center">
+          <p>{t('accountRoleUnavailable')}</p>
+          <button className="btn-primary mx-auto" onClick={() => void signOut()}>
+            {t('signOut')}
+          </button>
+        </div>
+      </div>
+    )
 
   const navItems = [
     {
