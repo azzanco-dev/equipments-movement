@@ -1,5 +1,6 @@
 // Candidate color directions for the design system, reviewed on /ui-kit.
-// Every direction keeps the brand amber (#F5A524) from the Azzanco logo.
+// `current` mirrors today's tokens in src/index.css for comparison; the new
+// directions keep the brand amber (#F5A524) from the Azzanco logo.
 
 export interface PaletteTokens {
   bg: string
@@ -33,7 +34,7 @@ export interface PaletteTokens {
 }
 
 export interface PaletteDirection {
-  id: 'brand' | 'industrial' | 'indigo'
+  id: 'current' | 'brand' | 'industrial' | 'indigo'
   name: string
   summary: string
   light: PaletteTokens
@@ -41,6 +42,70 @@ export interface PaletteDirection {
 }
 
 export const PALETTE_DIRECTIONS: PaletteDirection[] = [
+  {
+    id: 'current',
+    name: 'الالوان الحالية',
+    summary:
+      'الوان الموقع الحالي كما هي: اسود وابيض مع الوان وظيفية للدخول والخروج. للمقارنة مع الاتجاهات الجديدة.',
+    light: {
+      bg: '#FFFFFF',
+      fg: '#0A0A0A',
+      muted: '#6B7280',
+      border: '#E5E7EB',
+      surface: '#F9FAFB',
+      surfaceHover: '#F3F4F6',
+      primary: '#0A0A0A',
+      primaryHover: '#262626',
+      primaryContrast: '#FFFFFF',
+      primaryText: '#0A0A0A',
+      accent: '#0A0A0A',
+      accentContrast: '#FFFFFF',
+      sidebar: '#FFFFFF',
+      sidebarFg: '#0A0A0A',
+      sidebarMuted: '#6B7280',
+      sidebarActive: '#0A0A0A',
+      sidebarActiveFg: '#FFFFFF',
+      entry: '#15803D',
+      entrySoft: '#ECFDF3',
+      exit: '#B45309',
+      exitSoft: '#FFF7ED',
+      warning: '#B45309',
+      warningSoft: '#FFF7ED',
+      danger: '#DC2626',
+      dangerSoft: '#FEF2F2',
+      info: '#0369A1',
+      infoSoft: '#F0F9FF',
+    },
+    dark: {
+      bg: '#1A1A1A',
+      fg: '#F5F5F5',
+      muted: '#A8ADB7',
+      border: '#424242',
+      surface: '#242424',
+      surfaceHover: '#303030',
+      primary: '#F5F5F5',
+      primaryHover: '#D4D4D4',
+      primaryContrast: '#0A0A0A',
+      primaryText: '#F5F5F5',
+      accent: '#F5F5F5',
+      accentContrast: '#0A0A0A',
+      sidebar: '#1A1A1A',
+      sidebarFg: '#F5F5F5',
+      sidebarMuted: '#A8ADB7',
+      sidebarActive: '#F5F5F5',
+      sidebarActiveFg: '#0A0A0A',
+      entry: '#4ADE80',
+      entrySoft: '#13271B',
+      exit: '#FBBF24',
+      exitSoft: '#2B2112',
+      warning: '#FBBF24',
+      warningSoft: '#2B2112',
+      danger: '#F87171',
+      dangerSoft: '#2A1414',
+      info: '#7DD3FC',
+      infoSoft: '#0C1F2C',
+    },
+  },
   {
     id: 'brand',
     name: 'هوية ازانكو',

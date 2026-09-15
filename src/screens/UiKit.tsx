@@ -93,7 +93,7 @@ function UiKitContent() {
         <div
           role="radiogroup"
           aria-labelledby="directions-title"
-          className="grid gap-3 md:grid-cols-3"
+          className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
         >
           {PALETTE_DIRECTIONS.map((item) => (
             <PaletteOption
