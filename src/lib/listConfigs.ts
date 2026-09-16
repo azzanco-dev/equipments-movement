@@ -68,8 +68,8 @@ export const driversListConfig: DataListConfig = {
 }
 export const equipmentListConfig: DataListConfig = {
   id: 'equipment',
-  searchPlaceholder: 'البحث بالكود أو اللوحة أو النوع',
-  searchFields: ['code', 'plate_number', 'type'],
+  searchPlaceholder: 'البحث بالكود او اللوحة او الشاصي او النوع',
+  searchFields: ['code', 'plate_number', 'chassis_number', 'type'],
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
   filterFields: [
@@ -164,7 +164,8 @@ export const lessorsListConfig: DataListConfig = {
 }
 export const movementsListConfig: DataListConfig = {
   id: 'movements',
-  searchPlaceholder: 'البحث بالمعدة أو السائق أو كود المقاول',
+  searchPlaceholder:
+    'البحث بالمعدة (كود او لوحة او شاصي) او السائق او كود المقاول',
   searchFields: ['equipment', 'driver_name', 'contractor_equipment_code'],
   defaultSort: 'created_at',
   defaultDirection: 'desc',
@@ -230,7 +231,8 @@ export const usersListConfig: DataListConfig = {
 }
 export const visitsListConfig: DataListConfig = {
   id: 'visits',
-  searchPlaceholder: 'البحث بالمعدة أو السائق أو كود المقاول',
+  searchPlaceholder:
+    'البحث بالمعدة (كود او لوحة او شاصي) او السائق او كود المقاول',
   searchFields: [
     'equipment_code',
     'equipment_type',

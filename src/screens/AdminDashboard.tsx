@@ -374,7 +374,7 @@ export function AdminDashboard({
         .from('equipment')
         .select('id')
         .or(
-          `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`,
+          `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%,chassis_number.ilike.%${term}%`,
         )
         .limit(100)
         .abortSignal(signal)
@@ -441,7 +441,7 @@ export function AdminDashboard({
         .from('equipment')
         .select('id')
         .or(
-          `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`,
+          `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%,chassis_number.ilike.%${term}%`,
         )
         .limit(100)
         .abortSignal(signal)

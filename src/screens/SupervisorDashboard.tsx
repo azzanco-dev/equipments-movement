@@ -97,7 +97,9 @@ export function SupervisorDashboard({
           supabase
             .from('equipment')
             .select('id')
-            .or(`code.ilike.%${term}%,plate_number.ilike.%${term}%`)
+            .or(
+              `code.ilike.%${term}%,plate_number.ilike.%${term}%,chassis_number.ilike.%${term}%`,
+            )
             .abortSignal(signal)
             .limit(100),
           supabase

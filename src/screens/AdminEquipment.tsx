@@ -148,7 +148,7 @@ export function AdminEquipment({
     const term = sanitizeSearchTerm(list.search)
     if (term) {
       query = query.or(
-        `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%`,
+        `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%,chassis_number.ilike.%${term}%`,
       )
     }
     query = applyListFilters(
