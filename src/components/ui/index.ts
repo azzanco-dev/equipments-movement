@@ -13,4 +13,19 @@ export { Field } from './Field'
 export type { FieldControlProps, FieldProps } from './Field'
 export { Badge, MovementBadge, WorkshopPurposeBadge } from './Badge'
 export type { BadgeProps, BadgeTone } from './Badge'
+export { Select } from './Select'
+export type { SelectOption, SelectProps } from './Select'
+export { ConfirmDialog, Dialog, useConfirm } from './Dialog'
+export type { ConfirmDialogProps, ConfirmOptions, DialogProps } from './Dialog'
+export {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './DropdownMenu'
+export type { DropdownMenuItemProps } from './DropdownMenu'
+export { Tabs, TabsContent, TabsList, TabsTrigger } from './Tabs'
+export type { TabsListProps, TabsVariant } from './Tabs'
 export { cn } from './cn'

@@ -38,6 +38,14 @@ export default {
       borderColor: {
         DEFAULT: 'var(--border)',
       },
+      // Opacity-only fade for overlays whose transform must not be overridden
+      // (dialogs, menus, select lists). Used as data-[state=open]:animate-*.
+      keyframes: {
+        'fade-in-opacity': { from: { opacity: '0' }, to: { opacity: '1' } },
+      },
+      animation: {
+        'fade-in-opacity': 'fade-in-opacity 0.15s ease-out',
+      },
     },
   },
   plugins: [],

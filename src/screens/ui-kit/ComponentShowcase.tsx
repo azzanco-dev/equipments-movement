@@ -20,6 +20,7 @@ import {
   Textarea,
   WorkshopPurposeBadge,
 } from '@/components/ui'
+import { OverlayShowcase } from './OverlayShowcase'
 
 // Live review of the shared components on /ui-kit. Sample copy only.
 export function ComponentShowcase() {
@@ -29,6 +30,7 @@ export function ComponentShowcase() {
       <ButtonsShowcase />
       <FieldsShowcase />
       <BadgesShowcase />
+      <OverlayShowcase />
     </div>
   )
 }
