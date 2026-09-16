@@ -13,7 +13,13 @@ import {
 } from 'lucide-react'
 import type { EntryExitLog, Equipment } from '@/lib/types'
 import { PageHeader } from '@/components/PageHeader'
-import { sanitizeSearchTerm } from '@/lib/search'
+import {
+  MOVEMENT_LOG_ADMIN_SELECT,
+  MOVEMENT_LOG_SEARCH_VIEW,
+  buildMovementSearchFilter,
+  mapMovementLogRows,
+  type MovementLogSearchRow,
+} from '@/lib/movementLogSearch'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { useDataListState } from '@/components/data-list/useDataListState'
@@ -367,34 +373,15 @@ export function AdminDashboard({
   const fetchLogs = useCallback(async () => {
     const signal = startLogsRequest()
     setLoadingLogs(true)
-    const term = sanitizeSearchTerm(list.search)
-    let equipmentIds: string[] = []
-    if (term) {
-      const { data: equipmentMatches } = await supabase
-        .from('equipment')
-        .select('id')
-        .or(
-          `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%,chassis_number.ilike.%${term}%`,
-        )
-        .limit(100)
-        .abortSignal(signal)
-      if (signal.aborted) return
-      equipmentIds = (equipmentMatches ?? []).map((item) => item.id)
-    }
     let query = supabase
-      .from('entry_exit_logs')
-      .select(
-        'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,odometer_reading,notes,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number,chassis_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)',
-        { count: 'exact' },
-      )
+      .from(MOVEMENT_LOG_SEARCH_VIEW)
+      .select(MOVEMENT_LOG_ADMIN_SELECT, { count: 'exact' })
       .eq('movement_context', 'site')
       .order(list.sort, { ascending: list.direction === 'asc' })
       .order('id', { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
-    if (term)
-      query = query.or(
-        `driver_name.ilike.%${term}%,contractor_equipment_code.ilike.%${term}%${equipmentIds.length ? `,equipment_id.in.(${equipmentIds.join(',')})` : ''}`,
-      )
+    const searchFilter = buildMovementSearchFilter(list.search)
+    if (searchFilter) query = query.or(searchFilter)
     query = applyListFilters(
       query,
       list.filters,
@@ -404,7 +391,7 @@ export function AdminDashboard({
     if (signal.aborted) return
     if (error) console.error(error)
     setLogsLoadError(!!error)
-    const rows = (data as unknown as EntryExitLog[]) ?? []
+    const rows = mapMovementLogRows(data as unknown as MovementLogSearchRow[])
     const latestDrivers = await loadLatestDriverNames(
       rows.filter((row) => row.movement_type === 'entry').map((row) => row.id),
       signal,
@@ -434,26 +421,9 @@ export function AdminDashboard({
   const fetchReports = useCallback(async () => {
     const signal = startReportsRequest()
     setLoadingReports(true)
-    const term = sanitizeSearchTerm(reportList.search)
-    let equipmentIds: string[] = []
-    if (term) {
-      const { data: equipmentMatches } = await supabase
-        .from('equipment')
-        .select('id')
-        .or(
-          `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%,chassis_number.ilike.%${term}%`,
-        )
-        .limit(100)
-        .abortSignal(signal)
-      if (signal.aborted) return
-      equipmentIds = (equipmentMatches ?? []).map((item) => item.id)
-    }
     let query = supabase
-      .from('entry_exit_logs')
-      .select(
-        'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,odometer_reading,notes,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type,plate_number,chassis_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)',
-        { count: 'exact' },
-      )
+      .from(MOVEMENT_LOG_SEARCH_VIEW)
+      .select(MOVEMENT_LOG_ADMIN_SELECT, { count: 'exact' })
       .eq('movement_context', 'site')
       .order(reportList.sort, { ascending: reportList.direction === 'asc' })
       .order('id', { ascending: reportList.direction === 'asc' })
@@ -461,10 +431,8 @@ export function AdminDashboard({
         (reportList.page - 1) * reportList.pageSize,
         reportList.page * reportList.pageSize - 1,
       )
-    if (term)
-      query = query.or(
-        `driver_name.ilike.%${term}%,contractor_equipment_code.ilike.%${term}%${equipmentIds.length ? `,equipment_id.in.(${equipmentIds.join(',')})` : ''}`,
-      )
+    const searchFilter = buildMovementSearchFilter(reportList.search)
+    if (searchFilter) query = query.or(searchFilter)
     query = applyListFilters(
       query,
       reportList.filters,
@@ -474,7 +442,7 @@ export function AdminDashboard({
     if (signal.aborted) return
     if (error) console.error(error)
     setReportsLoadError(!!error)
-    const rows = (data as unknown as EntryExitLog[]) ?? []
+    const rows = mapMovementLogRows(data as unknown as MovementLogSearchRow[])
     const latestDrivers = await loadLatestDriverNames(
       rows.filter((row) => row.movement_type === 'entry').map((row) => row.id),
       signal,

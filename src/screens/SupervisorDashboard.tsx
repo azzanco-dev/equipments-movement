@@ -12,7 +12,13 @@ import { formatDate } from '@/lib/dateFormat'
 import { isDateKey, saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
 import { Alert } from '@/components/Alert'
 import { RelativeTime } from '@/components/RelativeTime'
-import { sanitizeSearchTerm } from '@/lib/search'
+import {
+  MOVEMENT_LOG_SEARCH_VIEW,
+  MOVEMENT_LOG_SUPERVISOR_SELECT,
+  buildMovementSearchFilter,
+  mapMovementLogRows,
+  type MovementLogSearchRow,
+} from '@/lib/movementLogSearch'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
@@ -87,62 +93,18 @@ export function SupervisorDashboard({
     setLoading(true)
     setLoadError(false)
 
-    const term = sanitizeSearchTerm(search)
-    let equipmentIds: string[] = []
-    let companyIds: string[] = []
-    let projectIds: string[] = []
-    if (term) {
-      const [equipmentResult, companyResult, projectResult] = await Promise.all(
-        [
-          supabase
-            .from('equipment')
-            .select('id')
-            .or(
-              `code.ilike.%${term}%,plate_number.ilike.%${term}%,chassis_number.ilike.%${term}%`,
-            )
-            .abortSignal(signal)
-            .limit(100),
-          supabase
-            .from('companies')
-            .select('id')
-            .or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
-            .abortSignal(signal)
-            .limit(100),
-          supabase
-            .from('projects')
-            .select('id')
-            .or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
-            .abortSignal(signal)
-            .limit(100),
-        ],
-      )
-      if (signal.aborted) return
-      equipmentIds = (equipmentResult.data ?? []).map((item) => item.id)
-      companyIds = (companyResult.data ?? []).map((item) => item.id)
-      projectIds = (projectResult.data ?? []).map((item) => item.id)
-    }
-
     let query = supabase
-      .from('entry_exit_logs')
-      .select(
-        'id,equipment_id,supervisor_id,movement_type,movement_context,workshop_purpose,driver_name,contractor_equipment_code,recorded_at,created_at,equipment:equipment(id,code,type),supervisor:profiles(id,full_name)',
-        { count: 'exact' },
-      )
+      .from(MOVEMENT_LOG_SEARCH_VIEW)
+      .select(MOVEMENT_LOG_SUPERVISOR_SELECT, { count: 'exact' })
       .eq('movement_context', workshopMode ? 'workshop' : 'site')
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
 
-    if (term) {
-      const filters = [`contractor_equipment_code.ilike.%${term}%`]
-      if (equipmentIds.length)
-        filters.push(`equipment_id.in.(${equipmentIds.join(',')})`)
-      if (companyIds.length)
-        filters.push(`company_id.in.(${companyIds.join(',')})`)
-      if (projectIds.length)
-        filters.push(`project_id.in.(${projectIds.join(',')})`)
-      query = query.or(filters.join(','))
-    }
+    const searchFilter = buildMovementSearchFilter(search, {
+      includeCompanyProject: true,
+    })
+    if (searchFilter) query = query.or(searchFilter)
 
     if (!workshopMode) query = query.eq('supervisor_id', user.id)
 
@@ -158,7 +120,7 @@ export function SupervisorDashboard({
     const { data, error, count } = await query.abortSignal(signal)
     if (signal.aborted) return
     if (error) setLoadError(true)
-    const rows = (data as unknown as EntryExitLog[]) ?? []
+    const rows = mapMovementLogRows(data as unknown as MovementLogSearchRow[])
     const latestDrivers = await loadLatestDriverNames(
       rows.filter((row) => row.movement_type === 'entry').map((row) => row.id),
       signal,

@@ -7,13 +7,17 @@ import { PageHeader } from '@/components/PageHeader'
 import { InlineSpinner } from '@/components/Spinner'
 import { MovementLogCard } from '@/components/MovementLogCard'
 import { DatePicker } from '@/components/DatePicker'
-import { sanitizeSearchTerm } from '@/lib/search'
+import {
+  MOVEMENT_LOG_SEARCH_VIEW,
+  MOVEMENT_LOG_WORKSHOP_SELECT,
+  buildMovementSearchFilter,
+  mapMovementLogRows,
+  type MovementLogSearchRow,
+} from '@/lib/movementLogSearch'
 import { isDateKey, saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
 import type { EntryExitLog } from '@/lib/types'
 
 const sizes = [20, 50, 100, 200, 350, 500]
-const select =
-  'id,equipment_id,supervisor_id,movement_type,movement_context,workshop_purpose,driver_id,driver_name,recorded_at,created_at,equipment:equipment(id,code,type,plate_number,chassis_number),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)'
 
 export function WorkshopReports({
   onSelectMovement,
@@ -46,28 +50,9 @@ export function WorkshopReports({
     const load = async () => {
       setLoading(true)
       setLoadError(false)
-      const term = sanitizeSearchTerm(search)
-      let equipmentIds: string[] = []
-      if (term) {
-        const { data, error } = await supabase
-          .from('equipment')
-          .select('id')
-          .or(
-            `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%,chassis_number.ilike.%${term}%`,
-          )
-          .limit(100)
-          .abortSignal(controller.signal)
-        if (controller.signal.aborted) return
-        if (error) {
-          setLoadError(true)
-          setLoading(false)
-          return
-        }
-        equipmentIds = (data ?? []).map((item) => item.id)
-      }
       let query = supabase
-        .from('entry_exit_logs')
-        .select(select, { count: 'exact' })
+        .from(MOVEMENT_LOG_SEARCH_VIEW)
+        .select(MOVEMENT_LOG_WORKSHOP_SELECT, { count: 'exact' })
         .eq('movement_context', 'workshop')
         .order('recorded_at', { ascending: false })
         .order('id', { ascending: false })
@@ -83,15 +68,8 @@ export function WorkshopReports({
         query = query.eq('workshop_purpose', purpose)
       if (isDateKey(from)) query = query.gte('recorded_at', saudiDayStart(from))
       if (isDateKey(to)) query = query.lte('recorded_at', saudiDayEnd(to))
-      if (term) {
-        if (!equipmentIds.length) {
-          setRows([])
-          setTotal(0)
-          setLoading(false)
-          return
-        }
-        query = query.in('equipment_id', equipmentIds)
-      }
+      const searchFilter = buildMovementSearchFilter(search)
+      if (searchFilter) query = query.or(searchFilter)
       const { data, count, error } = await query
       if (controller.signal.aborted) return
       if (error) {
@@ -99,7 +77,7 @@ export function WorkshopReports({
         setRows([])
         setTotal(0)
       } else {
-        setRows((data as unknown as EntryExitLog[]) ?? [])
+        setRows(mapMovementLogRows(data as unknown as MovementLogSearchRow[]))
         setTotal(count ?? 0)
       }
       setLoading(false)
