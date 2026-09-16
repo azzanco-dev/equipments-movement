@@ -15,6 +15,7 @@ export default {
         bg: 'var(--bg)',
         fg: 'var(--fg)',
         muted: 'var(--muted)',
+        placeholder: 'var(--placeholder)',
         surface: {
           DEFAULT: 'var(--surface)',
           hover: 'var(--surface-hover)',

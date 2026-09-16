@@ -26,6 +26,7 @@ import { AuthScreen } from '@/screens/AuthScreen'
 import { FullPageSpinner } from '@/components/Spinner'
 import { ComponentShowcase } from '@/screens/ui-kit/ComponentShowcase'
 import { DataTableShowcase } from '@/screens/ui-kit/DataTableShowcase'
+import { SelectPlaceholderShowcase } from '@/screens/ui-kit/SelectPlaceholderShowcase'
 import {
   PALETTE_DIRECTIONS,
   contrastRatio,
@@ -99,6 +100,8 @@ function UiKitContent() {
       <ApprovedTokens />
 
       <ComponentShowcase />
+
+      <SelectPlaceholderShowcase />
 
       <DataTableShowcase />
 

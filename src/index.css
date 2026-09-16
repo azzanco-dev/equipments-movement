@@ -148,6 +148,9 @@ body {
   --bg: #ffffff;
   --fg: #0a0a0a;
   --muted: #6b7280;
+  /* One color for every field placeholder (native ::placeholder and the
+     Select "no value" state), so placeholders read the same everywhere. */
+  --placeholder: var(--muted);
   --border: #e5e7eb;
   --surface: #f9fafb;
   --surface-hover: #f3f4f6;
@@ -176,6 +179,7 @@ body {
   --bg: #1a1a1a;
   --fg: #f5f5f5;
   --muted: #a8adb7;
+  --placeholder: var(--muted);
   --border: #424242;
   --surface: #242424;
   --surface-hover: #303030;
@@ -247,7 +251,7 @@ body {
     @apply btn;
   }
   .input {
-    @apply h-8 w-full rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors placeholder:text-gray-400 placeholder:text-[13px];
+    @apply h-8 w-full rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors placeholder:text-placeholder;
     border-color: var(--border);
     font-family: 'NotoArabicInput', 'Segoe UI', Tahoma, system-ui, sans-serif;
     line-height: 1.25rem;
@@ -369,9 +373,14 @@ a:focus-visible,
   }
 }
 
+/* Same placeholder color everywhere, including native inputs outside the
+   shared `.input` class (e.g. inline search boxes in legacy dropdowns).
+   Size and family are left to inherit from the field itself, so a
+   placeholder never shrinks or switches font relative to typed text. */
 input::placeholder,
 textarea::placeholder {
-  font-size: 13px !important;
+  color: var(--placeholder);
+  font-style: normal;
 }
 
 /* Custom scrollbar */

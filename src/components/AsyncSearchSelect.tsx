@@ -3,13 +3,30 @@ import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Loader2, Search, X } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import type { SelectOption } from '@/components/Select'
+import { cn } from '@/components/ui/cn'
 import { prepareFloatingMenu } from '@/lib/floatingMenu'
+
+/**
+ * `SelectOption` plus an optional secondary line, e.g. a driver's id/mobile
+ * number under their name. Purely additive, so existing callers that only
+ * pass `{ value, label }` keep working unchanged.
+ */
+export interface AsyncSearchSelectOption extends SelectOption {
+  /** Rendered under the label in muted text (list) — never in the trigger. */
+  description?: string
+}
+
+/** Plain-text tooltip built from label/description, for truncated text. */
+function optionTitle(option?: AsyncSearchSelectOption | null): string | undefined {
+  if (!option) return undefined
+  return [option.label, option.description].filter(Boolean).join(' — ') || undefined
+}
 
 interface AsyncSearchSelectProps {
   value: string
-  selectedOption?: SelectOption | null
-  onChange: (value: string, option: SelectOption | null) => void
-  loadOptions: (query: string) => Promise<SelectOption[]>
+  selectedOption?: AsyncSearchSelectOption | null
+  onChange: (value: string, option: AsyncSearchSelectOption | null) => void
+  loadOptions: (query: string) => Promise<AsyncSearchSelectOption[]>
   placeholder?: string
   className?: string
   disabled?: boolean
@@ -33,7 +50,7 @@ export function AsyncSearchSelect({
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [options, setOptions] = useState<SelectOption[]>([])
+  const [options, setOptions] = useState<AsyncSearchSelectOption[]>([])
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [retry, setRetry] = useState(0)
@@ -151,10 +168,16 @@ export function AsyncSearchSelect({
         className="flex h-8 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors focus:border-black disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-white"
         style={{ borderColor: 'var(--border)' }}
       >
-        <span className={selectedOption ? '' : 'text-gray-400'}>
+        <span
+          className={cn(
+            'min-w-0 flex-1 truncate text-start',
+            !selectedOption && 'text-placeholder',
+          )}
+          title={optionTitle(selectedOption)}
+        >
           {selectedOption?.label ?? placeholder}
         </span>
-        <span className="flex items-center gap-1">
+        <span className="flex shrink-0 items-center gap-1">
           {value && (
             <span
               role="button"
@@ -251,15 +274,27 @@ export function AsyncSearchSelect({
                   <button
                     key={option.value}
                     type="button"
+                    title={optionTitle(option)}
                     onClick={() => {
                       onChange(option.value, option)
                       setOpen(false)
                       setQuery('')
                     }}
-                    className={`flex w-full items-center justify-between gap-2 px-3.5 py-2 text-start text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${option.value === value ? 'font-semibold' : ''}`}
+                    className={`flex w-full items-start justify-between gap-2 px-3.5 py-2 text-start text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${option.value === value ? 'font-semibold' : ''}`}
                   >
-                    <span>{option.label}</span>
-                    {option.value === value && <Check size={14} />}
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="min-w-0 whitespace-normal break-words">
+                        {option.label}
+                      </span>
+                      {option.description && (
+                        <span className="min-w-0 truncate text-xs font-normal text-muted">
+                          {option.description}
+                        </span>
+                      )}
+                    </span>
+                    {option.value === value && (
+                      <Check size={14} className="mt-0.5 shrink-0" />
+                    )}
                   </button>
                 ))
               )}
