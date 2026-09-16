@@ -6,11 +6,11 @@ import { Button, IconButton } from './Button'
 import { cn } from './cn'
 
 const overlay =
-  'fixed inset-0 z-50 bg-[var(--overlay)] data-[state=open]:animate-fade-in-opacity'
+  'fixed inset-0 z-50 bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-fade-in-opacity'
 
 // Centering is symmetric, so physical left/translate is direction-safe here.
 const panel =
-  'fixed left-1/2 top-1/2 z-50 flex max-h-[90dvh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border bg-bg text-fg shadow-xl outline-none data-[state=open]:animate-fade-in-opacity'
+  'fixed left-1/2 top-1/2 z-50 flex max-h-[90dvh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border bg-bg text-fg shadow-xl outline-none focus-visible:!outline-none data-[state=open]:animate-fade-in-opacity'
 
 const widths = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-3xl' } as const
 
