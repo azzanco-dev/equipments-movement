@@ -119,7 +119,7 @@
 - Keep server/API payloads minimal, validate at both UX and database/server boundaries, and avoid logging secrets or sensitive data.
 - Do not start a local or remote data mutation merely to test unless the user has provided a dedicated test account/environment or explicitly authorized production test records.
 - For database changes: inspect migration history, add a forward migration, apply it to the linked project when authorized, run linked DB lint, and verify local/remote migration history.
-- When implementation is requested and checks pass, commit the scoped changes and push the working branch to `origin/main`, following the established repository workflow unless the user says not to push.
+- Work on the `main-home` branch. After each completed task, when checks pass, commit the scoped changes and push to `origin/main-home`; that branch deploys to a separate test domain for the product owner to review. Never push directly to `main`: the product owner merges `main-home` into `main` after approving. Do not force-push.
 
 ## Verification
 

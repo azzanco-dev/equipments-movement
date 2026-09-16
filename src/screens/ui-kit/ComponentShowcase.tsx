@@ -20,12 +20,14 @@ import {
   Textarea,
   WorkshopPurposeBadge,
 } from '@/components/ui'
+import { ButtonHeightOptions } from './ButtonHeightOptions'
 
 // Live review of the shared components on /ui-kit. Sample copy only.
 export function ComponentShowcase() {
   return (
     <div className="space-y-4">
       <h2 className="text-base font-semibold">الـ components (للمراجعة)</h2>
+      <ButtonHeightOptions />
       <ButtonsShowcase />
       <FieldsShowcase />
       <BadgesShowcase />
