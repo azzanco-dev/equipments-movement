@@ -27,6 +27,7 @@ import {
   Upload,
   RefreshCw,
   Pencil,
+  Store,
 } from 'lucide-react'
 import type {
   EntryExitLog,
@@ -822,12 +823,16 @@ export function MovementDetail({
               <InfoRow
                 icon={<FileText size={16} />}
                 label={t('contractorEquipmentCode')}
-                value={
-                  log.contractor_equipment_code +
-                  ' - ' +
-                  (log.equipment?.lessor?.name || '')
-                }
+                value={log.contractor_equipment_code}
               />
+              {log.equipment?.ownership_status === 'external_supplier' &&
+                log.equipment?.lessor?.name && (
+                  <InfoRow
+                    icon={<Store size={16} />}
+                    label={t('lessor')}
+                    value={log.equipment.lessor.name}
+                  />
+                )}
               <InfoRow
                 icon={<Building2 size={16} />}
                 label={t('company')}
