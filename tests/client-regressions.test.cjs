@@ -79,6 +79,7 @@ function harness(file, dependencies = {}) {
       clearTimeout,
       window: { setTimeout, clearTimeout, ...dependencies.window },
       document: dependencies.document,
+      URL: dependencies.URL,
       require(name) {
         if (name === 'react') return hooks
         if (name === 'react/jsx-runtime') return { jsx: (_, props) => props }
@@ -328,5 +329,161 @@ test('auth initializes once, ignores duplicate events, and rejects stale account
   state = await app.flush()
   assert.equal(queries, 2)
   assert.equal(state.loading, false)
+  app.unmount()
+})
+
+function photoStagingHarness() {
+  const uploaded = []
+  const discarded = []
+  const revoked = []
+  let batchCounter = 0
+  const app = harness('src/components/useMovementPhotoStaging.ts', {
+    URL: {
+      createObjectURL: (file) => `blob:${file.name}`,
+      revokeObjectURL: (url) => revoked.push(url),
+    },
+    '@/lib/supabase': {
+      supabase: {
+        auth: {
+          getSession: async () => ({
+            data: { session: { access_token: 'token' } },
+          }),
+        },
+      },
+    },
+    '@/lib/movementPhotoCompression': {
+      prepareMovementPhotos: async (files) => files,
+    },
+    '@/lib/movementPhotoUpload': {
+      discardPendingMovementPhotoBatch: async (batchId) =>
+        discarded.push(batchId),
+      async uploadPendingMovementPhoto(file, _token, onProgress) {
+        uploaded.push(file.name)
+        onProgress(100)
+        if (file.name === 'fails.jpg') throw new Error('photo_transfer_failed')
+        batchCounter += 1
+        const batchId = `batch-${batchCounter}`
+        return { batchId, paths: [`user/${batchId}/${file.name}`] }
+      },
+    },
+  })
+  return { app, uploaded, discarded, revoked }
+}
+
+const photo = (name) => ({ name, type: 'image/jpeg', size: 1024 })
+
+// Values built inside the sandbox realm need a local copy before deep compare.
+const plain = (value) => Array.from(value)
+
+test('adding a photo never re-uploads the photos already staged', async () => {
+  const errors = []
+  const { app, uploaded, discarded } = photoStagingHarness()
+  let staging = app.start((module) =>
+    module.useMovementPhotoStaging({ onError: (error) => errors.push(error) }),
+  )
+
+  staging.addPhotos([photo('first.jpg')])
+  staging = await app.flush()
+  assert.deepEqual(uploaded, ['first.jpg'])
+  assert.deepEqual(plain(staging.uploadBatchIds()), ['batch-1'])
+
+  staging.addPhotos([photo('second.jpg')])
+  staging = await app.flush()
+  assert.deepEqual(
+    uploaded,
+    ['first.jpg', 'second.jpg'],
+    'the already uploaded photo must not be uploaded again',
+  )
+  assert.deepEqual(
+    discarded,
+    [],
+    'a finished upload must not be discarded when another photo is added',
+  )
+  assert.deepEqual(
+    plain(
+      staging.photos.map((item) => [item.name, item.status, item.progress]),
+    ),
+    [
+      ['first.jpg', 'uploaded', 100],
+      ['second.jpg', 'uploaded', 100],
+    ],
+  )
+  assert.deepEqual(plain(staging.uploadBatchIds()), ['batch-1', 'batch-2'])
+  assert.equal(staging.ready, true)
+  assert.equal(staging.uploading, false)
+  app.unmount()
+})
+
+test('removing a staged photo discards only that photo', async () => {
+  const { app, uploaded, discarded, revoked } = photoStagingHarness()
+  let staging = app.start((module) =>
+    module.useMovementPhotoStaging({ onError: () => {} }),
+  )
+  staging.addPhotos([photo('first.jpg'), photo('second.jpg')])
+  staging = await app.flush()
+  assert.deepEqual(plain(staging.uploadBatchIds()), ['batch-1', 'batch-2'])
+
+  staging.removePhoto(0)
+  staging = await app.flush()
+  assert.deepEqual(discarded, ['batch-1'])
+  assert.deepEqual(revoked, ['blob:first.jpg'])
+  assert.deepEqual(plain(staging.photos.map((item) => item.name)), [
+    'second.jpg',
+  ])
+  assert.deepEqual(plain(staging.uploadBatchIds()), ['batch-2'])
+  assert.deepEqual(uploaded, ['first.jpg', 'second.jpg'])
+  app.unmount()
+})
+
+test('retry re-uploads only the failed photo and keeps the limits', async () => {
+  const errors = []
+  const { app, uploaded, discarded } = photoStagingHarness()
+  let staging = app.start((module) =>
+    module.useMovementPhotoStaging({ onError: (error) => errors.push(error) }),
+  )
+  staging.addPhotos([photo('first.jpg'), photo('fails.jpg')])
+  staging = await app.flush()
+  assert.deepEqual(plain(staging.photos.map((item) => item.status)), [
+    'uploaded',
+    'error',
+  ])
+  assert.equal(staging.hasFailedUploads, true)
+  assert.equal(staging.ready, false)
+  assert.ok(errors.includes('upload_failed'))
+
+  staging.retryFailedUploads()
+  staging = await app.flush()
+  assert.deepEqual(
+    uploaded,
+    ['first.jpg', 'fails.jpg', 'fails.jpg'],
+    'retry must not touch the photo that already uploaded',
+  )
+  assert.deepEqual(discarded, [])
+  assert.deepEqual(plain(staging.uploadBatchIds()), ['batch-1'])
+
+  staging.addPhotos([photo('third.jpg'), photo('fourth.jpg')])
+  staging = await app.flush()
+  assert.equal(staging.photos.length, 3, 'at most three photos are staged')
+
+  errors.length = 0
+  staging.addPhotos([{ name: 'doc.pdf', type: 'application/pdf', size: 10 }])
+  assert.deepEqual(errors, [], 'a full selection is ignored before validation')
+  app.unmount()
+})
+
+test('oversized and unsupported photos are rejected before any upload', async () => {
+  const errors = []
+  const { app, uploaded } = photoStagingHarness()
+  const staging = app.start((module) =>
+    module.useMovementPhotoStaging({ onError: (error) => errors.push(error) }),
+  )
+  staging.addPhotos([{ name: 'doc.pdf', type: 'application/pdf', size: 10 }])
+  staging.addPhotos([
+    { name: 'huge.jpg', type: 'image/jpeg', size: 10 * 1024 * 1024 + 1 },
+  ])
+  await app.flush()
+  assert.deepEqual(errors, ['invalid_type', 'too_large'])
+  assert.deepEqual(uploaded, [])
+  assert.equal(app.render().photos.length, 0)
   app.unmount()
 })

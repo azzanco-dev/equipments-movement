@@ -159,10 +159,12 @@ export async function discardPendingMovementPhotoBatch(
   }).catch(() => undefined)
 }
 
-export async function uploadPendingMovementPhotos(
-  files: File[],
+// One staged photo is one batch, so adding or removing a photo never touches
+// the storage objects of the photos that are already uploaded.
+export async function uploadPendingMovementPhoto(
+  file: File,
   accessToken: string,
-  onProgress: (index: number, progress: number) => void,
+  onProgress: (progress: number) => void,
 ): Promise<PendingMovementPhotoBatch> {
   const response = await fetch('/api/movements/photo-uploads', {
     method: 'POST',
@@ -171,11 +173,13 @@ export async function uploadPendingMovementPhotos(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      files: files.map((file) => ({
-        fileName: file.name,
-        contentType: file.type,
-        size: file.size,
-      })),
+      files: [
+        {
+          fileName: file.name,
+          contentType: file.type,
+          size: file.size,
+        },
+      ],
     }),
   })
   if (!response.ok) throw new Error('photo_authorization_failed')
@@ -183,26 +187,19 @@ export async function uploadPendingMovementPhotos(
     batchId?: string
     uploads?: UploadAuthorization[]
   }
-  if (!result.batchId || result.uploads?.length !== files.length)
+  const authorization =
+    result.uploads?.length === 1 ? result.uploads[0] : undefined
+  if (!result.batchId || !authorization)
     throw new Error('photo_authorization_failed')
 
   try {
-    await Promise.all(
-      files.map((file, index) =>
-        uploadResumably(file, result.uploads![index], accessToken, (progress) =>
-          onProgress(index, progress),
-        ),
-      ),
-    )
+    await uploadResumably(file, authorization, accessToken, onProgress)
   } catch (error) {
     await discardPendingMovementPhotoBatch(result.batchId, accessToken)
     throw error
   }
 
-  return {
-    batchId: result.batchId,
-    paths: result.uploads.map((upload) => upload.path),
-  }
+  return { batchId: result.batchId, paths: [authorization.path] }
 }
 
 async function uploadDirectly(

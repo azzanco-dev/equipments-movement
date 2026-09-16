@@ -21,24 +21,20 @@ import type { Driver, Equipment, MovementType, LastMovement } from '@/lib/types'
 import { DatePicker } from '@/components/DatePicker'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { extractPlateSearchParts } from '@/lib/plate'
 import { Select, type SelectOption } from '@/components/Select'
 import { PlateNumberInput } from '@/components/PlateNumberInput'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import {
-  discardPendingMovementPhotoBatch,
-  uploadPendingMovementPhotos,
-  type PendingMovementPhotoBatch,
-} from '@/lib/movementPhotoUpload'
-import { prepareMovementPhotos } from '@/lib/movementPhotoCompression'
+  ALLOWED_MOVEMENT_PHOTO_TYPES,
+  MAX_MOVEMENT_PHOTOS,
+  useMovementPhotoStaging,
+  type StagedPhotoError,
+} from '@/components/useMovementPhotoStaging'
 
-const FRONTEND_MAX_PHOTO_BYTES = 10 * 1024 * 1024
-const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-const MAX_PHOTOS = 3
-type PhotoUploadState = {
-  status: 'preparing' | 'uploading' | 'uploaded' | 'error'
-  progress: number
-}
+const ALLOWED_PHOTO_TYPES = ALLOWED_MOVEMENT_PHOTO_TYPES
+const MAX_PHOTOS = MAX_MOVEMENT_PHOTOS
 
 interface EntryExitFormProps {
   open: boolean
@@ -81,14 +77,8 @@ export function EntryExitForm({
     null,
   )
   const [notes, setNotes] = useState('')
-  const [photoFiles, setPhotoFiles] = useState<File[]>([])
-  const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
-  const [photoUploadStates, setPhotoUploadStates] = useState<
-    PhotoUploadState[]
-  >([])
   const [carouselIndex, setCarouselIndex] = useState(0)
   const [saving, setSaving] = useState(false)
-  const [uploadingPhotos, setUploadingPhotos] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveWarning, setSaveWarning] = useState<string | null>(null)
   const [movementSaved, setMovementSaved] = useState(false)
@@ -129,8 +119,20 @@ export function EntryExitForm({
   const equipmentListRef = useRef<HTMLDivElement>(null)
   const quickEquipmentRef = useRef<HTMLDivElement>(null)
   const successRef = useRef<HTMLDivElement>(null)
-  const pendingPhotoBatchRef = useRef<PendingMovementPhotoBatch | null>(null)
-  const photoUploadAttemptRef = useRef(0)
+
+  const photoErrorMessage = (error: StagedPhotoError) => {
+    if (error === 'invalid_type') return t('invalidPhotoType')
+    if (error === 'too_large') return t('photoTooLargeMulti')
+    if (error === 'session_expired') return t('sessionExpiredError')
+    return t('photoUploadFailed')
+  }
+  const photoStaging = useMovementPhotoStaging({
+    onError: (error) => setSaveError(error ? photoErrorMessage(error) : null),
+  })
+  const stagedPhotos = photoStaging.photos
+  const uploadingPhotos = photoStaging.uploading
+  const { reset: resetPhotoStaging } = photoStaging
+  const currentStagedPhoto = stagedPhotos[carouselIndex] ?? stagedPhotos[0]
 
   const isEntry = movementType === 'entry'
   const workshopMode =
@@ -159,23 +161,10 @@ export function EntryExitForm({
     setDriverId('')
     setSelectedDriver(null)
     setNotes('')
-    setPhotoFiles([])
-    photoUploadAttemptRef.current += 1
-    const pendingBatch = pendingPhotoBatchRef.current
-    pendingPhotoBatchRef.current = null
-    if (pendingBatch) {
-      void supabase.auth.getSession().then(({ data }) => {
-        const token = data.session?.access_token
-        if (token)
-          void discardPendingMovementPhotoBatch(pendingBatch.batchId, token)
-      })
-    }
-    setPhotoPreviews([])
-    setPhotoUploadStates([])
+    resetPhotoStaging()
     setCarouselIndex(0)
     setSaveError(null)
     setSaveWarning(null)
-    setUploadingPhotos(false)
     setMovementSaved(false)
     setSavedMovementId('')
     setSelectedCompanyId('')
@@ -197,7 +186,7 @@ export function EntryExitForm({
     })
     setSelectedQuickLessor(null)
     setQuickLessor({ open: false, name: '', error: '' })
-  }, [])
+  }, [resetPhotoStaging])
 
   useEffect(() => {
     if (open) {
@@ -254,10 +243,18 @@ export function EntryExitForm({
             .eq('is_active', true)
             .order('code')
           if (ownerFilter) query = query.eq('ownership_status', ownerFilter)
-          if (term)
-            query = query.or(
-              `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%,chassis_number.ilike.%${term}%`,
-            )
+          if (term) {
+            const orParts = [
+              `code.ilike.%${term}%`,
+              `type.ilike.%${term}%`,
+              `plate_number.ilike.%${term}%`,
+              `chassis_number.ilike.%${term}%`,
+            ]
+            const { digits, letters } = extractPlateSearchParts(term)
+            if (digits) orParts.push(`plate_digits.ilike.%${digits}%`)
+            if (letters) orParts.push(`plate_letters_en.ilike.%${letters}%`)
+            query = query.or(orParts.join(','))
+          }
           result = await query.limit(20)
         }
         const { data, error } = result
@@ -555,124 +552,28 @@ export function EntryExitForm({
     handleSelectEquipment(data as Equipment)
   }
 
-  const stagePhotoSelection = async (files: File[]) => {
-    const attemptId = photoUploadAttemptRef.current + 1
-    photoUploadAttemptRef.current = attemptId
-    const previousBatch = pendingPhotoBatchRef.current
-    pendingPhotoBatchRef.current = null
-    setPhotoUploadStates(
-      files.map(() => ({ status: 'preparing', progress: 0 })),
-    )
-    setUploadingPhotos(files.length > 0)
-
-    const { data: sessionData } = await supabase.auth.getSession()
-    const accessToken = sessionData.session?.access_token
-    if (previousBatch && accessToken)
-      void discardPendingMovementPhotoBatch(previousBatch.batchId, accessToken)
-    if (!files.length) {
-      if (photoUploadAttemptRef.current === attemptId) setUploadingPhotos(false)
-      return
-    }
-    if (!accessToken) {
-      setPhotoUploadStates(files.map(() => ({ status: 'error', progress: 0 })))
-      setUploadingPhotos(false)
-      setSaveError(t('sessionExpiredError'))
-      return
-    }
-
-    try {
-      const preparedFiles = await prepareMovementPhotos(files)
-      if (photoUploadAttemptRef.current !== attemptId) return
-      setPhotoUploadStates(
-        files.map(() => ({ status: 'uploading', progress: 0 })),
-      )
-      const batch = await uploadPendingMovementPhotos(
-        preparedFiles,
-        accessToken,
-        (index, progress) => {
-          if (photoUploadAttemptRef.current !== attemptId) return
-          setPhotoUploadStates((current) =>
-            current.map((item, itemIndex) =>
-              itemIndex === index ? { status: 'uploading', progress } : item,
-            ),
-          )
-        },
-      )
-      if (photoUploadAttemptRef.current !== attemptId) {
-        await discardPendingMovementPhotoBatch(batch.batchId, accessToken)
-        return
-      }
-      pendingPhotoBatchRef.current = batch
-      setPhotoUploadStates(
-        files.map(() => ({ status: 'uploaded', progress: 100 })),
-      )
-      setSaveError(null)
-    } catch (error) {
-      if (photoUploadAttemptRef.current !== attemptId) return
-      console.error(
-        'Pending photo upload failed',
-        error instanceof Error ? error.message : 'unknown_error',
-      )
-      setPhotoUploadStates(files.map(() => ({ status: 'error', progress: 0 })))
-      setSaveError(t('photoUploadFailed'))
-    } finally {
-      if (photoUploadAttemptRef.current === attemptId) setUploadingPhotos(false)
-    }
-  }
-
   const handleAddPhotos = (files: FileList | null) => {
-    if (!files?.length) return
-
-    const remainingSlots = MAX_PHOTOS - photoFiles.length
-    if (remainingSlots <= 0) return
-
-    const selectedFiles = Array.from(files).slice(0, remainingSlots)
-    if (
-      selectedFiles.some((file) => !ALLOWED_PHOTO_TYPES.includes(file.type))
-    ) {
-      setSaveError(t('invalidPhotoType'))
-      return
-    }
-    if (selectedFiles.some((file) => file.size > FRONTEND_MAX_PHOTO_BYTES)) {
-      setSaveError(t('photoTooLargeMulti'))
-      return
-    }
-
-    setSaveError(null)
-    const previews = selectedFiles.map((file) => URL.createObjectURL(file))
-    const nextFiles = [...photoFiles, ...selectedFiles]
-    setPhotoFiles(nextFiles)
-    void stagePhotoSelection(nextFiles)
-    setPhotoPreviews((prev) => [...prev, ...previews])
-    setCarouselIndex(photoFiles.length)
+    // Only the newly selected files are staged; photos already uploaded keep
+    // their state and their staged storage objects.
+    const firstNewIndex = stagedPhotos.length
+    if (photoStaging.addPhotos(files) > 0) setCarouselIndex(firstNewIndex)
   }
 
   const handleRemovePhoto = (index: number) => {
-    URL.revokeObjectURL(photoPreviews[index])
-    const nextFiles = photoFiles.filter((_, i) => i !== index)
-    setPhotoFiles(nextFiles)
-    void stagePhotoSelection(nextFiles)
-    setPhotoPreviews((prev) => prev.filter((_, i) => i !== index))
+    photoStaging.removePhoto(index)
     setCarouselIndex((prev) =>
-      Math.max(0, Math.min(prev, photoFiles.length - 2)),
+      Math.max(0, Math.min(prev, stagedPhotos.length - 2)),
     )
   }
-
-  useEffect(() => {
-    return () => {
-      photoPreviews.forEach((url) => URL.revokeObjectURL(url))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const handleSave = async () => {
     if (!selected || !user) return
     if (validationError) return
-    if (workshopMode && photoFiles.length === 0) {
+    if (workshopMode && stagedPhotos.length === 0) {
       setSaveError(t('workshopPhotoRequired'))
       return
     }
-    if (photoFiles.length > 0 && !pendingPhotoBatchRef.current) {
+    if (stagedPhotos.length > 0 && !photoStaging.ready) {
       setSaveError(t('photosMustFinishUploading'))
       return
     }
@@ -716,10 +617,10 @@ export function EntryExitForm({
         movement_context: workshopMode ? 'workshop' : 'site',
         registration_method: 'manual',
         recorded_at: actualMovementDate.toISOString(),
-        photo_count: photoFiles.length,
+        photo_count: stagedPhotos.length,
       }
-      if (pendingPhotoBatchRef.current)
-        payload.upload_batch_id = pendingPhotoBatchRef.current.batchId
+      const uploadBatchIds = photoStaging.uploadBatchIds()
+      if (uploadBatchIds.length) payload.upload_batch_ids = uploadBatchIds
       if (notes) payload.notes = notes
       if (!workshopMode && isEntry) {
         payload.driver_id = driverId
@@ -758,7 +659,9 @@ export function EntryExitForm({
       onSaved()
       setSavedMovementId(result.id)
       onViewMovement?.(result.id)
-      pendingPhotoBatchRef.current = null
+      // The saved movement now owns the staged objects, so they must not be
+      // discarded when the form resets.
+      photoStaging.releaseUploads()
       const photoFailures = result.photoFailures ?? 0
       if (photoFailures) {
         setSaveWarning(t('movementSavedPhotosFailed'))
@@ -1481,7 +1384,7 @@ export function EntryExitForm({
                   {t('photo')}
                   {workshopMode ? ' *' : ''}
                 </label>
-                {photoFiles.length > 0 && (
+                {currentStagedPhoto && (
                   <div className="mb-3">
                     <div
                       className="relative rounded-lg overflow-hidden"
@@ -1493,20 +1396,20 @@ export function EntryExitForm({
                     >
                       <div className="absolute inset-0 flex items-center justify-center">
                         <img
-                          src={photoPreviews[carouselIndex]}
+                          src={currentStagedPhoto.previewUrl}
                           alt={`Photo ${carouselIndex + 1}`}
                           className="max-h-full max-w-full object-contain"
                         />
                       </div>
-                      {photoFiles.length > 1 && (
+                      {stagedPhotos.length > 1 && (
                         <>
                           <button
                             type="button"
                             onClick={() =>
                               setCarouselIndex(
                                 (prev) =>
-                                  (prev - 1 + photoFiles.length) %
-                                  photoFiles.length,
+                                  (prev - 1 + stagedPhotos.length) %
+                                  stagedPhotos.length,
                               )
                             }
                             className="absolute start-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
@@ -1517,7 +1420,7 @@ export function EntryExitForm({
                             type="button"
                             onClick={() =>
                               setCarouselIndex(
-                                (prev) => (prev + 1) % photoFiles.length,
+                                (prev) => (prev + 1) % stagedPhotos.length,
                               )
                             }
                             className="absolute end-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
@@ -1525,7 +1428,7 @@ export function EntryExitForm({
                             <ChevronRight size={20} className="rtl-flip" />
                           </button>
                           <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-white bg-black/50 rounded-full px-2 py-0.5">
-                            {carouselIndex + 1} / {photoFiles.length}
+                            {carouselIndex + 1} / {stagedPhotos.length}
                           </span>
                         </>
                       )}
@@ -1542,77 +1445,69 @@ export function EntryExitForm({
                 )}
                 <p className="text-xs text-muted mb-2">
                   {t('photosCount')
-                    .replace('{count}', String(photoFiles.length))
+                    .replace('{count}', String(stagedPhotos.length))
                     .replace('{max}', String(MAX_PHOTOS))}
                 </p>
-                {photoFiles.length > 0 && (
+                {stagedPhotos.length > 0 && (
                   <div className="mb-3 space-y-2">
-                    {photoFiles.map((file, index) => {
-                      const upload = photoUploadStates[index] ?? {
-                        status: 'preparing' as const,
-                        progress: 0,
-                      }
-                      return (
-                        <div
-                          key={`${file.name}-${file.lastModified}-${index}`}
-                          className="rounded-md border p-2"
-                          style={{ borderColor: 'var(--border)' }}
-                        >
-                          <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-                            <span className="min-w-0 truncate" dir="auto">
-                              {file.name}
-                            </span>
-                            <span className="flex shrink-0 items-center gap-1 text-muted">
-                              {(upload.status === 'preparing' ||
-                                upload.status === 'uploading') && (
-                                <Loader2 size={13} className="animate-spin" />
-                              )}
-                              {upload.status === 'preparing'
-                                ? t('preparingPhoto')
-                                : upload.status === 'uploading'
-                                  ? `${upload.progress}%`
-                                  : upload.status === 'uploaded'
-                                    ? t('photoUploadComplete')
-                                    : t('photoUploadFailedShort')}
-                            </span>
-                          </div>
-                          <div className="h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                            <div
-                              className={`h-full transition-[width] duration-200 ${
-                                upload.status === 'error'
-                                  ? 'bg-red-600'
-                                  : upload.status === 'uploaded'
-                                    ? 'bg-green-600'
-                                    : 'bg-black dark:bg-white'
-                              }`}
-                              style={{
-                                width: `${
-                                  upload.status === 'preparing'
-                                    ? 5
-                                    : upload.status === 'error'
-                                      ? 100
-                                      : upload.progress
-                                }%`,
-                              }}
-                            />
-                          </div>
+                    {stagedPhotos.map((photo) => (
+                      <div
+                        key={photo.id}
+                        className="rounded-md border p-2"
+                        style={{ borderColor: 'var(--border)' }}
+                      >
+                        <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+                          <span className="min-w-0 truncate" dir="auto">
+                            {photo.name}
+                          </span>
+                          <span className="flex shrink-0 items-center gap-1 text-muted">
+                            {(photo.status === 'preparing' ||
+                              photo.status === 'uploading') && (
+                              <Loader2 size={13} className="animate-spin" />
+                            )}
+                            {photo.status === 'preparing'
+                              ? t('preparingPhoto')
+                              : photo.status === 'uploading'
+                                ? `${photo.progress}%`
+                                : photo.status === 'uploaded'
+                                  ? t('photoUploadComplete')
+                                  : t('photoUploadFailedShort')}
+                          </span>
                         </div>
-                      )
-                    })}
-                    {photoUploadStates.some(
-                      (upload) => upload.status === 'error',
-                    ) && (
+                        <div className="h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                          <div
+                            className={`h-full transition-[width] duration-200 ${
+                              photo.status === 'error'
+                                ? 'bg-red-600'
+                                : photo.status === 'uploaded'
+                                  ? 'bg-green-600'
+                                  : 'bg-black dark:bg-white'
+                            }`}
+                            style={{
+                              width: `${
+                                photo.status === 'preparing'
+                                  ? 5
+                                  : photo.status === 'error'
+                                    ? 100
+                                    : photo.progress
+                              }%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    {photoStaging.hasFailedUploads && (
                       <button
                         type="button"
                         className="btn-outline w-full"
-                        onClick={() => void stagePhotoSelection(photoFiles)}
+                        onClick={() => photoStaging.retryFailedUploads()}
                       >
                         {t('retryPhotoUpload')}
                       </button>
                     )}
                   </div>
                 )}
-                {photoFiles.length < MAX_PHOTOS ? (
+                {stagedPhotos.length < MAX_PHOTOS ? (
                   <label
                     className="flex items-center justify-center gap-2 rounded-lg border border-dashed p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     style={{ borderColor: 'var(--border)' }}
@@ -1659,10 +1554,7 @@ export function EntryExitForm({
                       uploadingPhotos ||
                       !!validationError ||
                       loadingMovement ||
-                      (photoFiles.length > 0 &&
-                        photoUploadStates.some(
-                          (upload) => upload.status !== 'uploaded',
-                        ))
+                      (stagedPhotos.length > 0 && !photoStaging.ready)
                     }
                     className="btn-primary flex-1"
                   >
