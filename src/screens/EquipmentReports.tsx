@@ -8,6 +8,7 @@ import { InlineSpinner } from '@/components/Spinner'
 import { Alert } from '@/components/Alert'
 import { formatDateTime } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
+import { sanitizeSearchTerm } from '@/lib/search'
 
 const sizes = [20, 50, 100, 200, 350, 500]
 
@@ -60,7 +61,7 @@ export function EquipmentReports() {
       .rpc('get_equipment_attention_report', {
         p_limit: pageSize,
         p_offset: (page - 1) * pageSize,
-        p_search: search || null,
+        p_search: sanitizeSearchTerm(search) || null,
       })
       .then(({ data: result, error }) => {
         if (cancelled) return

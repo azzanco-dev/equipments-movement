@@ -47,7 +47,16 @@ export function convertArabicPlateText(value: string): string {
     .join('')
 }
 
-export function normalizePlateNumber(value: string): string {
+export interface PlateSearchParts {
+  digits: string
+  letters: string
+}
+
+// Extracts the digit and Latin-letter parts a plate search term resolves to,
+// in the same canonical order stored in `plate_digits` / `plate_letters_en`.
+// Handles Arabic letters/digits, Latin letters/digits, with or without
+// separators, and the visual right-to-left order of Arabic plate letters.
+export function extractPlateSearchParts(value: string): PlateSearchParts {
   const converted = convertArabicPlateText(value).toUpperCase()
   const hasArabicLetters = /[ء-ي]/.test(value)
   const hasEnglishLetters = /[A-Za-z]/.test(value)
@@ -55,7 +64,12 @@ export function normalizePlateNumber(value: string): string {
   const letters = (
     hasArabicLetters && !hasEnglishLetters ? letterParts.reverse() : letterParts
   ).join('')
-  const numbers = converted.match(/[0-9]/g)?.join('') ?? ''
-  if (letters && numbers) return `${numbers}-${letters}`
-  return numbers || letters
+  const digits = converted.match(/[0-9]/g)?.join('') ?? ''
+  return { digits, letters }
+}
+
+export function normalizePlateNumber(value: string): string {
+  const { digits, letters } = extractPlateSearchParts(value)
+  if (letters && digits) return `${digits}-${letters}`
+  return digits || letters
 }

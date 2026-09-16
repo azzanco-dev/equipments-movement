@@ -82,7 +82,8 @@ export function AdminSettings() {
       .order('updated_at', { ascending: false })
       .order('id', { ascending: false })
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
-    if (search.trim()) query = query.ilike('name', `%${search.trim()}%`)
+    const term = sanitizeSearchTerm(search)
+    if (term) query = query.ilike('name', `%${term}%`)
     const { data, count } = await query.abortSignal(signal)
     if (signal.aborted) return
     setRows(

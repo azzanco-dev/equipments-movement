@@ -35,6 +35,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { DatePicker } from '@/components/DatePicker'
 import { PlateNumberInput } from '@/components/PlateNumberInput'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { extractPlateSearchParts } from '@/lib/plate'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
@@ -147,9 +148,16 @@ export function AdminEquipment({
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
     const term = sanitizeSearchTerm(list.search)
     if (term) {
-      query = query.or(
-        `code.ilike.%${term}%,type.ilike.%${term}%,plate_number.ilike.%${term}%,chassis_number.ilike.%${term}%`,
-      )
+      const orParts = [
+        `code.ilike.%${term}%`,
+        `type.ilike.%${term}%`,
+        `plate_number.ilike.%${term}%`,
+        `chassis_number.ilike.%${term}%`,
+      ]
+      const { digits, letters } = extractPlateSearchParts(term)
+      if (digits) orParts.push(`plate_digits.ilike.%${digits}%`)
+      if (letters) orParts.push(`plate_letters_en.ilike.%${letters}%`)
+      query = query.or(orParts.join(','))
     }
     query = applyListFilters(
       query,

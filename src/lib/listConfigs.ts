@@ -69,7 +69,14 @@ export const driversListConfig: DataListConfig = {
 export const equipmentListConfig: DataListConfig = {
   id: 'equipment',
   searchPlaceholder: 'البحث بالكود او اللوحة او الشاصي او النوع',
-  searchFields: ['code', 'plate_number', 'chassis_number', 'type'],
+  searchFields: [
+    'code',
+    'plate_number',
+    'plate_digits',
+    'plate_letters_en',
+    'chassis_number',
+    'type',
+  ],
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
   filterFields: [
