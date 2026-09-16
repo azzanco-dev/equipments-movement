@@ -21,6 +21,7 @@ import {
   WorkshopPurposeBadge,
 } from '@/components/ui'
 import { OverlayShowcase } from './OverlayShowcase'
+import { SelectPlaceholderShowcase } from './SelectPlaceholderShowcase'
 
 // Live review of the shared components on /ui-kit. Sample copy only.
 export function ComponentShowcase() {
@@ -31,6 +32,7 @@ export function ComponentShowcase() {
       <FieldsShowcase />
       <BadgesShowcase />
       <OverlayShowcase />
+      <SelectPlaceholderShowcase />
     </div>
   )
 }
