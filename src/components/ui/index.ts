@@ -28,4 +28,13 @@ export {
 export type { DropdownMenuItemProps } from './DropdownMenu'
 export { Tabs, TabsContent, TabsList, TabsTrigger } from './Tabs'
 export type { TabsListProps, TabsVariant } from './Tabs'
+export { DataTable } from './DataTable'
+export type {
+  DataTableAlign,
+  DataTableColumn,
+  DataTableProps,
+  DataTableSize,
+  DataTableSort,
+  DataTableSortDirection,
+} from './DataTable'
 export { cn } from './cn'

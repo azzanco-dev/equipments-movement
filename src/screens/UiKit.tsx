@@ -25,6 +25,7 @@ import { useTheme } from '@/theme/ThemeContext'
 import { AuthScreen } from '@/screens/AuthScreen'
 import { FullPageSpinner } from '@/components/Spinner'
 import { ComponentShowcase } from '@/screens/ui-kit/ComponentShowcase'
+import { DataTableShowcase } from '@/screens/ui-kit/DataTableShowcase'
 import {
   PALETTE_DIRECTIONS,
   contrastRatio,
@@ -98,6 +99,8 @@ function UiKitContent() {
       <ApprovedTokens />
 
       <ComponentShowcase />
+
+      <DataTableShowcase />
 
       <details className="group space-y-3">
         <summary className="cursor-pointer text-base font-semibold">
