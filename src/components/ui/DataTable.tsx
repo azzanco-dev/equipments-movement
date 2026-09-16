@@ -218,7 +218,7 @@ export function DataTable<Row>({
                         alignFlex[align],
                       )}
                     >
-                      <span className="truncate">{column.header}</span>
+                      <span className="truncate-safe">{column.header}</span>
                       <SortIndicator
                         active={active}
                         direction={sort?.direction ?? 'asc'}

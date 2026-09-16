@@ -17,9 +17,13 @@ export interface AsyncSearchSelectOption extends SelectOption {
 }
 
 /** Plain-text tooltip built from label/description, for truncated text. */
-function optionTitle(option?: AsyncSearchSelectOption | null): string | undefined {
+function optionTitle(
+  option?: AsyncSearchSelectOption | null,
+): string | undefined {
   if (!option) return undefined
-  return [option.label, option.description].filter(Boolean).join(' — ') || undefined
+  return (
+    [option.label, option.description].filter(Boolean).join(' — ') || undefined
+  )
 }
 
 interface AsyncSearchSelectProps {
@@ -170,8 +174,8 @@ export function AsyncSearchSelect({
       >
         <span
           className={cn(
-            'min-w-0 flex-1 truncate text-start',
-            !selectedOption && 'text-placeholder',
+            'min-w-0 flex-1 truncate-safe text-start',
+            !selectedOption && 'text-placeholder text-[13px]',
           )}
           title={optionTitle(selectedOption)}
         >
@@ -287,7 +291,7 @@ export function AsyncSearchSelect({
                         {option.label}
                       </span>
                       {option.description && (
-                        <span className="min-w-0 truncate text-xs font-normal text-muted">
+                        <span className="min-w-0 truncate-safe text-xs font-normal text-muted">
                           {option.description}
                         </span>
                       )}

@@ -80,12 +80,12 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(
           aria-invalid={invalid || undefined}
           className={cn(
             'input select-trigger flex h-10 items-center justify-between gap-2 text-start md:h-9',
-            'data-[placeholder]:text-placeholder',
+            'data-[placeholder]:text-placeholder data-[placeholder]:text-[13px]',
             className,
           )}
           {...aria}
         >
-          <span className="min-w-0 truncate" title={triggerTitle}>
+          <span className="min-w-0 truncate-safe" title={triggerTitle}>
             <RadixSelect.Value placeholder={placeholder} />
           </span>
           <RadixSelect.Icon className="shrink-0 text-muted">
@@ -117,7 +117,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(
                       </span>
                     </RadixSelect.ItemText>
                     {option.description && (
-                      <span className="block min-w-0 truncate text-xs text-muted">
+                      <span className="block min-w-0 truncate-safe text-xs text-muted">
                         {option.description}
                       </span>
                     )}

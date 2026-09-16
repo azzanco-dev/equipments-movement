@@ -156,7 +156,7 @@ function PlaceholderShowcase() {
   return (
     <Section
       title="توحيد لون وحجم التلميح (Placeholder)"
-      description="كل الحقول تستخدم نفس لون التلميح ونفس حجم الخط (14 بكسل)، بدون خط مائل، بدل الالوان والاحجام المختلفة سابقا."
+      description="كل الحقول تستخدم نفس لون التلميح، وهو لون فاتح اخف من النص المكتوب، بحجم خط اصغر منه (13 بكسل بدل 14)، بدون خط مائل، بدل الالوان والاحجام المختلفة سابقا."
     >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Field label="حقل نصي">
