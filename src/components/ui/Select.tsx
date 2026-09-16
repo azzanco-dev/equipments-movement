@@ -59,7 +59,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(
           id={id}
           aria-invalid={invalid || undefined}
           className={cn(
-            'input flex h-10 items-center justify-between gap-2 text-start md:h-9',
+            'input select-trigger flex h-10 items-center justify-between gap-2 text-start md:h-9',
             'data-[placeholder]:text-muted',
             className,
           )}

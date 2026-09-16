@@ -265,6 +265,29 @@ body {
   .input[aria-invalid='true']:focus {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 18%, transparent);
   }
+  /* Select trigger is a <button>: show one ring, only for keyboard focus or
+     while the list is open, instead of the input :focus ring plus the global
+     button outline (and not stuck after choosing an option with the mouse).
+     All rules share one specificity, so the later "show" rules win. */
+  .select-trigger:not([aria-invalid='true']):focus {
+    border-color: var(--border);
+    box-shadow: none;
+  }
+  .select-trigger[aria-invalid='true']:focus {
+    box-shadow: none;
+  }
+  .select-trigger:not([aria-invalid='true']):focus-visible,
+  .select-trigger:not([aria-invalid='true'])[data-state='open'] {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 16%, transparent);
+  }
+  .select-trigger[aria-invalid='true']:focus-visible,
+  .select-trigger[aria-invalid='true'][data-state='open'] {
+    outline: none;
+    border-color: var(--danger);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--danger) 18%, transparent);
+  }
   .input:disabled {
     cursor: not-allowed;
     opacity: 0.6;
