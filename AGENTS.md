@@ -102,7 +102,7 @@
 - Use CSS variable tokens (through the Tailwind theme) for colors, borders, and surfaces. Do not hardcode Tailwind palette colors (`gray-*`, `emerald-*`, and so on) or hex values in screens.
 - Do not apply letter-spacing (`tracking-*`) or `uppercase` to Arabic text; it breaks letter joining.
 - Use logical direction utilities (`ms-`, `me-`, `ps-`, `pe-`, `start-`, `end-`, `text-start`) instead of left/right.
-- Shared inputs, selects, date/time controls, and standard buttons are 32 px high. Standard button text is 13 px at weight 400. Large textareas, image areas, plate UI, and primary scanning areas may remain larger when functionally necessary.
+- Approved control height (2026-09-16): shared buttons and inputs are 40 px on mobile (below 768 px) and 36 px from 768 px up, with 14 px text at weight 400 (`size="sm"` is 28 px for tables and toolbars). Legacy `.btn-*`/`.input` screens stay 32 px until they are migrated to the shared components. Large textareas, image areas, plate UI, and primary scanning areas may remain larger when functionally necessary.
 - Use green for ENTRY/success and amber for EXIT/warnings; use red only for errors/destructive actions. Show ENTRY/EXIT through the shared status badge rather than ad hoc colors.
 - Dark theme must keep text contrast accessible.
 - Report and dashboard day boundaries use Saudi time (UTC+03:00), not the browser's local timezone.
@@ -119,7 +119,7 @@
 - Keep server/API payloads minimal, validate at both UX and database/server boundaries, and avoid logging secrets or sensitive data.
 - Do not start a local or remote data mutation merely to test unless the user has provided a dedicated test account/environment or explicitly authorized production test records.
 - For database changes: inspect migration history, add a forward migration, apply it to the linked project when authorized, run linked DB lint, and verify local/remote migration history.
-- Work on the `main-home` branch. After each completed task, when checks pass, commit the scoped changes and push to `origin/main-home`; that branch deploys to a separate test domain for the product owner to review. Never push directly to `main`: the product owner merges `main-home` into `main` after approving. Do not force-push.
+- Work on the `main-home` branch. After each completed task, when checks pass, commit the scoped changes locally. Do not push: the product owner pushes `main-home` to the test domain and merges into `main` themselves.
 
 ## Verification
 

@@ -19,12 +19,13 @@ const variants: Record<ButtonVariant, string> = {
 
 const sizes: Record<ButtonSize, string> = {
   sm: 'h-7 px-2.5 text-xs',
-  md: 'h-8 px-3 text-[13px]',
+  // Approved 2026-09-16: 40 px on mobile, 36 px from the md breakpoint.
+  md: 'h-10 px-4 text-sm md:h-9 md:px-3.5',
 }
 
 const iconSizes: Record<ButtonSize, string> = {
   sm: 'h-7 w-7',
-  md: 'h-8 w-8',
+  md: 'h-10 w-10 md:h-9 md:w-9',
 }
 
 export function buttonClasses({

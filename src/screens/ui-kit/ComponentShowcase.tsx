@@ -20,14 +20,12 @@ import {
   Textarea,
   WorkshopPurposeBadge,
 } from '@/components/ui'
-import { ButtonHeightOptions } from './ButtonHeightOptions'
 
 // Live review of the shared components on /ui-kit. Sample copy only.
 export function ComponentShowcase() {
   return (
     <div className="space-y-4">
       <h2 className="text-base font-semibold">الـ components (للمراجعة)</h2>
-      <ButtonHeightOptions />
       <ButtonsShowcase />
       <FieldsShowcase />
       <BadgesShowcase />
@@ -73,7 +71,7 @@ function ButtonsShowcase() {
   return (
     <ShowcaseSection
       title="الازرار"
-      description="Button و IconButton. الارتفاع 32 بكسل، والخط 13. الزر الايقوني لازم يكون له اسم يقرا للمكفوفين."
+      description="Button و IconButton. الارتفاع 40 بكسل على الجوال و36 على الكمبيوتر (معتمد)، والخط 14. الزر الايقوني لازم يكون له اسم يقرا للمكفوفين."
     >
       <Row label="الانواع">
         <Button variant="primary">حفظ</Button>

@@ -17,8 +17,10 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   invalid?: boolean
 }
 
-// Built on the shared `.input` class in index.css (32 px, token border,
-// primary focus ring, 16 px text on mobile to avoid iOS zoom).
+// Built on the shared `.input` class in index.css (token border, primary focus
+// ring, 16 px text on mobile to avoid iOS zoom). Shared inputs match the
+// approved button height: 40 px on mobile, 36 px from md; legacy `.input`
+// fields stay 32 px until their screens are migrated.
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   { startIcon, endSlot, invalid, className, ...props },
   ref,
@@ -28,7 +30,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       ref={ref}
       aria-invalid={invalid || props['aria-invalid'] || undefined}
       className={cn(
-        'input',
+        'input h-10 md:h-9',
         !!startIcon && 'ps-9',
         !!endSlot && 'pe-9',
         !startIcon && !endSlot && className,
