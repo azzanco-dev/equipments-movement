@@ -35,7 +35,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { DatePicker } from '@/components/DatePicker'
 import { PlateNumberInput } from '@/components/PlateNumberInput'
 import { sanitizeSearchTerm } from '@/lib/search'
-import { extractPlateSearchParts } from '@/lib/plate'
+import { plateDigitsSearchTerm, toLatinDigits } from '@/lib/plate'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
@@ -146,7 +146,7 @@ export function AdminEquipment({
       .order(list.sort, { ascending: list.direction === 'asc' })
       .order('id', { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
-    const term = sanitizeSearchTerm(list.search)
+    const term = toLatinDigits(sanitizeSearchTerm(list.search))
     if (term) {
       const orParts = [
         `code.ilike.%${term}%`,
@@ -154,9 +154,8 @@ export function AdminEquipment({
         `plate_number.ilike.%${term}%`,
         `chassis_number.ilike.%${term}%`,
       ]
-      const { digits, letters } = extractPlateSearchParts(term)
-      if (digits) orParts.push(`plate_digits.ilike.%${digits}%`)
-      if (letters) orParts.push(`plate_letters_en.ilike.%${letters}%`)
+      const plateDigits = plateDigitsSearchTerm(term)
+      if (plateDigits) orParts.push(`plate_digits.ilike.%${plateDigits}%`)
       query = query.or(orParts.join(','))
     }
     query = applyListFilters(

@@ -73,3 +73,19 @@ export function normalizePlateNumber(value: string): string {
   if (letters && digits) return `${digits}-${letters}`
   return digits || letters
 }
+
+// Search helpers. People search equipment by its code or by the plate DIGITS,
+// so a search term is never split into plate letters: doing that made a term
+// such as "a341" match every plate containing the letter A.
+export function toLatinDigits(value: string): string {
+  return Array.from(value)
+    .map((character) => ARABIC_NUMBER_MAP[character] ?? character)
+    .join('')
+}
+
+// Digits to probe `plate_digits` with, only when the whole term is digits
+// (spaces and dashes ignored). Returns null for any term containing letters.
+export function plateDigitsSearchTerm(value: string): string | null {
+  const compact = toLatinDigits(value).replace(/[\s-]/g, '')
+  return /^[0-9]+$/.test(compact) ? compact : null
+}

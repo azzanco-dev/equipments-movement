@@ -1,4 +1,4 @@
-import { extractPlateSearchParts } from '@/lib/plate'
+import { plateDigitsSearchTerm, toLatinDigits } from '@/lib/plate'
 import { sanitizeSearchTerm } from '@/lib/search'
 import type {
   EntryExitLog,
@@ -123,11 +123,10 @@ export function mapMovementLogRows(
  * strips the characters that are structural in a PostgREST filter, including
  * the `%` / `_` / `*` wildcards), so nothing here can break out of its pattern.
  *
- * Plates are also matched through `extractPlateSearchParts` (the same
- * normalization `normalizePlateNumber` uses), which maps Arabic letters/digits
- * to their Latin plate equivalents and reverses the Arabic letter order, so an
- * Arabic plate query reaches `plate_digits` and `plate_letters_en`. Movement
- * notes and the foreman name are intentionally not searched.
+ * The term is searched as plain text. Arabic-Indic digits are converted to
+ * ASCII first, and a digits-only term also probes `plate_digits`. The term is
+ * never split into plate letters (that made "a341" match every plate with an
+ * A). Movement notes and the foreman name are intentionally not searched.
  *
  * Returns `null` when the term is empty after sanitizing.
  */
@@ -135,7 +134,7 @@ export function buildMovementSearchFilter(
   rawTerm: string,
   options: { includeCompanyProject?: boolean } = {},
 ): string | null {
-  const term = sanitizeSearchTerm(rawTerm)
+  const term = toLatinDigits(sanitizeSearchTerm(rawTerm))
   if (!term) return null
 
   const parts = [
@@ -147,9 +146,8 @@ export function buildMovementSearchFilter(
     `contractor_equipment_code.ilike.%${term}%`,
   ]
 
-  const { digits, letters } = extractPlateSearchParts(term)
-  if (digits) parts.push(`equipment_plate_digits.ilike.%${digits}%`)
-  if (letters) parts.push(`equipment_plate_letters_en.ilike.%${letters}%`)
+  const plateDigits = plateDigitsSearchTerm(term)
+  if (plateDigits) parts.push(`equipment_plate_digits.ilike.%${plateDigits}%`)
 
   if (options.includeCompanyProject)
     parts.push(
