@@ -22,6 +22,10 @@ import {
 } from '@/components/ui'
 import { OverlayShowcase } from './OverlayShowcase'
 import { SelectPlaceholderShowcase } from './SelectPlaceholderShowcase'
+import { DateAndFloatingShowcase } from './DateAndFloatingShowcase'
+import { FeedbackAndFormShowcase } from './FeedbackAndFormShowcase'
+import { PhotoGalleryShowcase } from './PhotoGalleryShowcase'
+import { LastEntrySummaryShowcase } from './LastEntrySummaryShowcase'
 
 // Live review of the shared components on /ui-kit. Sample copy only.
 export function ComponentShowcase() {
@@ -33,6 +37,10 @@ export function ComponentShowcase() {
       <BadgesShowcase />
       <OverlayShowcase />
       <SelectPlaceholderShowcase />
+      <DateAndFloatingShowcase />
+      <FeedbackAndFormShowcase />
+      <PhotoGalleryShowcase />
+      <LastEntrySummaryShowcase />
     </div>
   )
 }
