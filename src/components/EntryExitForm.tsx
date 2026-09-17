@@ -22,6 +22,7 @@ import { DatePicker } from '@/components/DatePicker'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { plateDigitsSearchTerm, toLatinDigits } from '@/lib/plate'
+import { siteExitEquipmentArgs } from '@/lib/exitEquipmentSearch'
 import { Select, type SelectOption } from '@/components/Select'
 import { PlateNumberInput } from '@/components/PlateNumberInput'
 import { formatDate } from '@/lib/dateFormat'
@@ -69,6 +70,7 @@ export function EntryExitForm({
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [selected, setSelected] = useState<Equipment | null>(null)
   const [loadingEquipment, setLoadingEquipment] = useState(false)
+  const [equipmentError, setEquipmentError] = useState(false)
   const [lastMovement, setLastMovement] = useState<LastMovement | null>(null)
   const [loadingMovement, setLoadingMovement] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
@@ -139,6 +141,9 @@ export function EntryExitForm({
     profile?.role === 'workshop' ||
     profile?.role === 'assistant_workshop_manager' ||
     profile?.role === 'workshop_manager'
+  // A site EXIT may only be registered by the foreman who registered the open
+  // ENTRY, or by an admin, so its equipment list is filtered in the database.
+  const siteExitMode = !workshopMode && !isEntry
   const currentLocalDateTime = toLocalDateTimeInput(new Date())
   const movementDate = recordedAt.slice(0, 10)
 
@@ -154,6 +159,7 @@ export function EntryExitForm({
     setStep('select')
     setSearch('')
     setOwnerFilter('')
+    setEquipmentError(false)
     setSelected(null)
     setLastMovement(null)
     setLoadingMovement(false)
@@ -234,6 +240,11 @@ export function EntryExitForm({
             p_search: term || null,
             p_ownership_status: ownerFilter || null,
           })
+        } else if (siteExitMode) {
+          result = await supabase.rpc(
+            'search_site_exit_equipment',
+            siteExitEquipmentArgs(term, ownerFilter),
+          )
         } else {
           let query = supabase
             .from('equipment')
@@ -259,6 +270,7 @@ export function EntryExitForm({
         const { data, error } = result
         if (!active) return
         if (error) console.error(error)
+        setEquipmentError(Boolean(error))
         setEquipment((data as unknown as Equipment[]) ?? [])
         setLoadingEquipment(false)
       },
@@ -269,7 +281,15 @@ export function EntryExitForm({
       active = false
       window.clearTimeout(timer)
     }
-  }, [open, step, search, ownerFilter, workshopMode, movementType])
+  }, [
+    open,
+    step,
+    search,
+    ownerFilter,
+    workshopMode,
+    siteExitMode,
+    movementType,
+  ])
 
   // Check last movement when equipment is selected
   const checkLastMovement = useCallback(
@@ -679,6 +699,7 @@ export function EntryExitForm({
         project_required: t('projectRequiredForEntry'),
         driver_required: t('driverRequired'),
         no_prior_entry: t('noPriorEntryAtSelectedTime'),
+        exit_not_entry_owner: t('siteExitNotEntryOwner'),
         workshop_exit_owner: t('workshopExitOwner'),
         invalid_sequence: isEntry
           ? t('entrySequenceConflict')
@@ -775,10 +796,18 @@ export function EntryExitForm({
                 ref={equipmentListRef}
                 className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2"
               >
-                {equipment.length === 0 && (
-                  <p className="col-span-full py-4 text-center text-sm text-muted">
-                    {t('noEquipmentFound')}
+                {equipmentError && (
+                  <p className="col-span-full py-4 text-center text-sm text-danger">
+                    {t('equipmentLoadError')}
                   </p>
+                )}
+                {!equipmentError && equipment.length === 0 && (
+                  <div className="col-span-full space-y-1 py-4 text-center text-sm text-muted">
+                    <p>{t('noEquipmentFound')}</p>
+                    {siteExitMode && profile?.role !== 'admin' && (
+                      <p className="text-xs">{t('siteExitOwnEquipmentOnly')}</p>
+                    )}
+                  </div>
                 )}
                 {equipment.map((eq) => (
                   <button
