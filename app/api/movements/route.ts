@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { movementErrorCode, movementErrorStatus } from '@/lib/movementErrors'
 
 export const runtime = 'nodejs'
 
@@ -11,27 +12,6 @@ interface PhotoDescriptor {
   fileName: string
   contentType: string
   size: number
-}
-
-function movementErrorCode(message: string): string {
-  if (message.includes('movement time cannot be in the future'))
-    return 'future_time'
-  if (message.includes('company_id is required')) return 'company_required'
-  if (message.includes('project_id is required')) return 'project_required'
-  if (
-    message.includes('driver_id is required') ||
-    message.includes('invalid driver_id')
-  )
-    return 'driver_required'
-  if (
-    message.includes('no prior entry') ||
-    message.includes('not inside the gate')
-  )
-    return 'no_prior_entry'
-  if (message.includes('workshop exit must be registered by entry user'))
-    return 'workshop_exit_owner'
-  if (message.includes('sequence would be invalid')) return 'invalid_sequence'
-  return 'movement_save_failed'
 }
 
 function authenticatedClient(accessToken: string) {
@@ -257,9 +237,10 @@ export async function POST(request: Request) {
       .single()
     if (insertError) {
       console.error('Movement insert failed', insertError)
+      const errorCode = movementErrorCode(insertError.message)
       return NextResponse.json(
-        { error: movementErrorCode(insertError.message) },
-        { status: 409 },
+        { error: errorCode },
+        { status: movementErrorStatus(errorCode) },
       )
     }
 

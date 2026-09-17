@@ -123,6 +123,12 @@ export const translations = {
     allWorkshopPurposes: 'كل اغراض الورشة',
     fromDate: 'من تاريخ',
     toDate: 'الى تاريخ',
+    previousMonth: 'الشهر السابق',
+    nextMonth: 'الشهر التالي',
+    previousYear: 'السنة السابقة',
+    nextYear: 'السنة التالية',
+    selectDatePlaceholder: 'اختر تاريخ',
+    reportPeriodLabel: 'فترة التقرير',
     workshopReportLoadError: 'تعذر تحميل حركات الورشة. حاول مرة اخرى.',
     equipmentReportsDesc:
       'متابعة المعدات التي تحتاج اجراء بناء على اخر حركة مسجلة.',
@@ -252,6 +258,14 @@ export const translations = {
     noLogs: 'لا توجد سجلات بعد',
     viewAll: 'عرض الكل',
 
+    // Home page (shared home components, under review on /ui-kit)
+    siteContext: 'موقع',
+    workshopContext: 'ورشة',
+    sinceDays: 'منذ {count} يوم',
+    latestMovements: 'اخر الحركات',
+    equipmentPageLink: 'صفحة المعدة وكل حركاتها',
+    noAttentionItems: 'لا يوجد ما يحتاج متابعة',
+
     // Entry/Exit form
     selectEquipment: 'تحديد المعدة',
     scanQR: 'مسح QR',
@@ -299,9 +313,16 @@ export const translations = {
     exitBlockedMsg: 'لا يمكن تسجيل خروج لأن المعدة ليست داخل موقع حاليًا.',
     workshopExitOwner:
       'يمكن تسجيل خروج المعدة فقط بواسطة المستخدم الذي سجل دخولها.',
+    siteExitNotEntryOwner:
+      'لا يمكن تسجيل الخروج: الدخول سجله مستخدم اخر. يسجل الخروج صاحب الدخول او المدير فقط.',
+    siteExitOwnEquipmentOnly:
+      'تظهر هنا المعدات التي سجلت دخولها انت فقط وما زالت داخل الموقع.',
     exitNoPreviousMsg: 'لا يمكن تسجيل خروج لأنه لا توجد حركة سابقة للمعدة.',
     latestEntryBrief: 'بيانات آخر دخول',
     entryDateTime: 'تاريخ الدخول',
+    lastEntrySummaryTitle: 'بيانات اخر دخول',
+    driverAndMobile: 'السائق ورقم جواله',
+    companyProjectLabel: 'الشركة - المشروع',
     movementStateChanged:
       'تغيرت حالة المعدة بين الفحص والإرسال. يرجى المحاولة مرة أخرى.',
     dateTimeLabel: 'التاريخ والوقت',
@@ -355,6 +376,11 @@ export const translations = {
     photosCount: '{count} / {max} صور',
     addPhoto: 'إضافة صورة',
     removePhoto: 'إزالة',
+    photoGalleryMainAlt: 'صورة الحركة الرئيسية',
+    photoGalleryOpenAria: 'تكبير الصورة',
+    photoGallerySelectAria: 'اختيار الصورة {index}',
+    photoGalleryRemoveAria: 'ازالة الصورة {index}',
+    photoGalleryRetryAria: 'اعادة رفع الصورة {index}',
     photoTooLargeMulti: 'حجم الصورة يجب ألا يتجاوز 10 ميجابايت.',
     photoCompressionFailed:
       'تعذر ضغط الصور. اختر الصور مجددا او حاول مرة اخرى.',
@@ -839,6 +865,12 @@ export const translations = {
     allWorkshopPurposes: 'All workshop purposes',
     fromDate: 'From date',
     toDate: 'To date',
+    previousMonth: 'Previous month',
+    nextMonth: 'Next month',
+    previousYear: 'Previous year',
+    nextYear: 'Next year',
+    selectDatePlaceholder: 'Select date',
+    reportPeriodLabel: 'Report period',
     workshopReportLoadError:
       'Could not load workshop movements. Please try again.',
     equipmentReportsDesc:
@@ -976,6 +1008,13 @@ export const translations = {
     noLogs: 'No logs yet',
     viewAll: 'View All',
 
+    siteContext: 'Site',
+    workshopContext: 'Workshop',
+    sinceDays: '{count} days ago',
+    latestMovements: 'Latest movements',
+    equipmentPageLink: 'Equipment page and all movements',
+    noAttentionItems: 'Nothing needs attention',
+
     selectEquipment: 'Select Equipment',
     scanQR: 'Scan QR',
     manualSelect: 'Manual Select',
@@ -1021,10 +1060,17 @@ export const translations = {
       'Cannot register an exit because the equipment is not currently on site.',
     workshopExitOwner:
       'Only the user who registered the equipment entry can register its exit.',
+    siteExitNotEntryOwner:
+      'This exit cannot be registered: another user registered the entry. Only that user or an admin can register the exit.',
+    siteExitOwnEquipmentOnly:
+      'This list shows only equipment you registered the entry for and that is still on site.',
     exitNoPreviousMsg:
       'Cannot register an exit because the equipment has no previous movement.',
     latestEntryBrief: 'Latest entry details',
     entryDateTime: 'Entry date',
+    lastEntrySummaryTitle: 'Last entry data',
+    driverAndMobile: 'Driver & mobile number',
+    companyProjectLabel: 'Company - Project',
     movementStateChanged:
       'The equipment state changed between checking and submitting. Please try again.',
     dateTimeLabel: 'Date & Time',
@@ -1079,6 +1125,11 @@ export const translations = {
     photosCount: '{count} / {max} photos',
     addPhoto: 'Add Photo',
     removePhoto: 'Remove',
+    photoGalleryMainAlt: 'Main movement photo',
+    photoGalleryOpenAria: 'View photo',
+    photoGallerySelectAria: 'Select photo {index}',
+    photoGalleryRemoveAria: 'Remove photo {index}',
+    photoGalleryRetryAria: 'Retry uploading photo {index}',
     photoTooLargeMulti: 'Image size must not exceed 10 MB.',
     photoCompressionFailed:
       'The photos could not be compressed. Select them again or retry.',
