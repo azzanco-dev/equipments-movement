@@ -22,12 +22,8 @@ function loadPublishModule() {
   return exports
 }
 
-const {
-  parsePublishRequest,
-  currentSystemDriverPayload,
-  erpUserPayload,
-  erpEmployeePayload,
-} = loadPublishModule()
+const { parsePublishRequest, currentSystemDriverPayload, erpEmployeePayload } =
+  loadPublishModule()
 
 const data = {
   full_name_ar: 'اسم عربي كامل',
@@ -74,23 +70,22 @@ test('local payload only contains columns that already exist', () => {
   ])
 })
 
-test('ERP user receives the complete Arabic name as first_name', () => {
-  const payload = erpUserPayload(data)
-  assert.equal(payload.first_name, data.full_name_ar)
-  assert.equal(payload.username, data.id_number)
-  assert.ok(!('full_name' in payload))
-})
-
 test('ERP employee never writes expiry into issue date', () => {
   process.env.ERPNEXT_RESIDENCE_EXPIRY_FIELD =
     'custom_residence_permit_expiry_date'
   process.env.ERPNEXT_EMPLOYER_NAME_FIELD = 'custom_sponsor_name'
-  const payload = erpEmployeePayload(data)
-  assert.equal(
-    payload.custom_residence_permit_expiry_date,
-    data.residence_expiry_date,
-  )
-  assert.equal(payload.custom_sponsor_name, data.employer_name)
+  const availableFields = new Set([
+    'custom_employee_name_en',
+    'custom_nationality',
+    'custom_residence_permit_number',
+    'custom_rp_valid_upto',
+  ])
+  const payload = erpEmployeePayload(data, availableFields)
+  assert.equal(payload.custom_rp_valid_upto, data.residence_expiry_date)
+  assert.equal(payload.custom_nationality, data.nationality)
+  assert.equal(payload.user_id, data.email)
+  assert.ok(!('custom_sponsor_name' in payload))
+  assert.ok(!('custom_employer_name' in payload))
   assert.ok(!('custom_rp_date_of_issue' in payload))
   delete process.env.ERPNEXT_RESIDENCE_EXPIRY_FIELD
   delete process.env.ERPNEXT_EMPLOYER_NAME_FIELD

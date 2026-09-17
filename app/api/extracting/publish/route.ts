@@ -4,7 +4,6 @@ import {
   configuredFieldName,
   currentSystemDriverPayload,
   erpEmployeePayload,
-  erpUserPayload,
   parsePublishRequest,
   type ExtractionPublishData,
   type TargetPublishResult,
@@ -147,16 +146,89 @@ async function findEmployeeByResidence(idNumber: string) {
   }
 }
 
+async function employeeFieldNames() {
+  const params = new URLSearchParams({
+    fields: JSON.stringify(['fieldname']),
+    filters: JSON.stringify([['dt', '=', 'Employee']]),
+    limit_page_length: '500',
+  })
+  const response = await erpRequest(
+    `/api/resource/Custom%20Field?${params.toString()}`,
+  )
+  if (!response.ok) throw new Error('erp_employee_metadata_failed')
+  const names = new Set<string>([
+    'first_name',
+    'user_id',
+    'status',
+    'gender',
+    'date_of_birth',
+    'date_of_joining',
+    'company',
+    'employment_type',
+    'department',
+    'designation',
+    'cell_number',
+  ])
+  const rows = response.data?.data
+  if (Array.isArray(rows))
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue
+      const fieldName = (row as Record<string, unknown>).fieldname
+      if (typeof fieldName === 'string') names.add(fieldName)
+    }
+  return names
+}
+
+async function erpLinkExists(doctype: string, name: string) {
+  if (!name) return true
+  const response = await erpRequest(
+    `/api/resource/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}`,
+  )
+  if (response.status === 404) return false
+  if (!response.ok) throw new Error('erp_reference_lookup_failed')
+  return true
+}
+
+async function validateErpReferences(data: ExtractionPublishData) {
+  const checks: Array<[string, string, string]> = [
+    ['Gender', data.gender, 'erp_gender_not_found'],
+    ['Company', data.company, 'erp_company_not_found'],
+    ['Employment Type', data.employment_type, 'erp_employment_type_not_found'],
+    ['Department', data.department, 'erp_department_not_found'],
+    ['Designation', data.occupation, 'erp_designation_not_found'],
+  ]
+  const results = await Promise.all(
+    checks.map(async ([doctype, name, code]) => ({
+      code,
+      exists: await erpLinkExists(doctype, name),
+    })),
+  )
+  return results.find((result) => !result.exists)?.code ?? null
+}
+
 async function publishErpNext(
   data: ExtractionPublishData,
 ): Promise<TargetPublishResult> {
-  if (!data.email || !data.gender || !data.company || !data.date_of_joining)
+  if (
+    !data.email ||
+    !data.gender ||
+    !data.nationality ||
+    !data.date_of_birth ||
+    !data.company ||
+    !data.date_of_joining
+  )
     return { status: 'failed', error: 'erp_required_fields_missing' }
   if (!erpConfiguration())
     return { status: 'failed', error: 'erp_not_configured' }
 
   try {
-    let userStatus: TargetPublishResult['status'] = 'existing'
+    const [availableFields, invalidReference] = await Promise.all([
+      employeeFieldNames(),
+      validateErpReferences(data),
+    ])
+    if (invalidReference) return { status: 'failed', error: invalidReference }
+
+    const userStatus: TargetPublishResult['status'] = 'existing'
     let employeeStatus: TargetPublishResult['status'] = 'existing'
     let userId = data.email
     const existingEmployee = await findEmployeeByResidence(data.id_number)
@@ -173,17 +245,14 @@ async function publishErpNext(
     const userLookup = await erpRequest(
       `/api/resource/User/${encodeURIComponent(data.email)}`,
     )
-    if (!userLookup.ok && userLookup.status !== 404)
-      throw new Error('erp_user_lookup_failed')
-    if (userLookup.status === 404) {
-      const createdUser = await erpRequest('/api/resource/User', {
-        method: 'POST',
-        body: JSON.stringify(erpUserPayload(data)),
-      })
-      if (!createdUser.ok) throw new Error('erp_user_create_failed')
-      userId = resourceName(createdUser.data) ?? data.email
-      userStatus = 'created'
-    }
+    if (userLookup.status === 404)
+      return {
+        status: 'failed',
+        steps: { user: 'failed', employee: 'skipped' },
+        error: 'erp_user_not_found',
+      }
+    if (!userLookup.ok) throw new Error('erp_user_lookup_failed')
+    userId = resourceName(userLookup.data) ?? data.email
 
     if (existingEmployee && !existingEmployee.userId) {
       const linkedEmployee = await erpRequest(
@@ -201,7 +270,7 @@ async function publishErpNext(
     } else if (!employeeId) {
       const createdEmployee = await erpRequest('/api/resource/Employee', {
         method: 'POST',
-        body: JSON.stringify(erpEmployeePayload(data)),
+        body: JSON.stringify(erpEmployeePayload(data, availableFields)),
       })
       if (!createdEmployee.ok)
         return {
@@ -215,10 +284,7 @@ async function publishErpNext(
     }
 
     return {
-      status:
-        userStatus === 'created' || employeeStatus === 'created'
-          ? 'created'
-          : 'existing',
+      status: employeeStatus === 'created' ? 'created' : 'existing',
       userId,
       employeeId: employeeId ?? undefined,
       steps: { user: userStatus, employee: employeeStatus },
@@ -230,9 +296,16 @@ async function publishErpNext(
       'erp_invalid_field_mapping',
       'erp_employee_lookup_failed',
       'erp_user_lookup_failed',
-      'erp_user_create_failed',
+      'erp_user_not_found',
       'erp_employee_user_conflict',
       'erp_employee_link_failed',
+      'erp_employee_metadata_failed',
+      'erp_reference_lookup_failed',
+      'erp_gender_not_found',
+      'erp_company_not_found',
+      'erp_employment_type_not_found',
+      'erp_department_not_found',
+      'erp_designation_not_found',
     ])
     return {
       status: 'failed',

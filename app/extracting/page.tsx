@@ -96,11 +96,19 @@ const ERROR_LABELS: Record<string, string> = {
   erp_invalid_field_mapping: 'اعدادات حقول ERPNext غير صالحة',
   erp_employee_lookup_failed: 'تعذر التحقق من الموظف في ERPNext',
   erp_user_lookup_failed: 'تعذر التحقق من المستخدم في ERPNext',
-  erp_user_create_failed: 'تعذر انشاء المستخدم في ERPNext',
-  erp_employee_create_failed: 'تم المستخدم وتعذر انشاء الموظف في ERPNext',
+  erp_user_not_found:
+    'مستخدم ERPNext غير موجود. اضف المستخدم اولا ثم اعد المحاولة',
+  erp_employee_create_failed: 'تعذر انشاء الموظف في ERPNext',
   erp_employee_user_conflict:
     'الموظف مرتبط بمستخدم ERPNext مختلف ويحتاج مراجعة',
   erp_employee_link_failed: 'تعذر ربط الموظف بمستخدم ERPNext',
+  erp_employee_metadata_failed: 'تعذر قراءة اعدادات موظف ERPNext',
+  erp_reference_lookup_failed: 'تعذر التحقق من قوائم ERPNext',
+  erp_gender_not_found: 'قيمة الجنس غير موجودة في ERPNext',
+  erp_company_not_found: 'اسم الشركة غير موجود في ERPNext',
+  erp_employment_type_not_found: 'نوع التوظيف غير موجود في ERPNext',
+  erp_department_not_found: 'اسم القسم غير موجود في ERPNext',
+  erp_designation_not_found: 'المهنة غير موجودة كـ Designation في ERPNext',
   erp_connection_failed: 'تعذر الاتصال بمنصة ERPNext',
 }
 
@@ -218,10 +226,17 @@ export default function ExtractingPage() {
     }
     if (
       targets.erpnext &&
-      (!data.email || !data.gender || !data.company || !data.date_of_joining)
+      (!data.email ||
+        !data.gender ||
+        !data.nationality ||
+        !data.date_of_birth ||
+        !data.company ||
+        !data.date_of_joining)
     ) {
       setNoticeType('error')
-      setNotice('البريد والجنس والشركة وتاريخ المباشرة مطلوبة لـ ERPNext')
+      setNotice(
+        'البريد والجنس والجنسية وتاريخ الميلاد والشركة وتاريخ المباشرة مطلوبة لـ ERPNext',
+      )
       return
     }
 
@@ -321,7 +336,12 @@ export default function ExtractingPage() {
                 <Field
                   key={key}
                   label={label}
-                  required={key === 'full_name_ar' || key === 'id_number'}
+                  required={
+                    key === 'full_name_ar' ||
+                    key === 'id_number' ||
+                    (targets.erpnext &&
+                      ['date_of_birth', 'nationality'].includes(key))
+                  }
                 >
                   {(control) => (
                     <Input

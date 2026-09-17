@@ -101,25 +101,21 @@ export function configuredFieldName(
   return FIELD_NAME_PATTERN.test(fieldName) ? fieldName : null
 }
 
-export function erpUserPayload(data: ExtractionPublishData) {
-  return {
-    email: data.email,
-    first_name: data.full_name_ar,
-    username: data.id_number,
-    language: 'ar',
-    enabled: 1,
-    send_welcome_email: 0,
-    role_profile_name: process.env.ERPNEXT_DRIVER_ROLE_PROFILE || 'Driver',
-    module_profile: process.env.ERPNEXT_DRIVER_MODULE_PROFILE || 'Employee',
-    ...(data.date_of_birth ? { birth_date: data.date_of_birth } : {}),
-    ...(data.gender ? { gender: data.gender } : {}),
-    ...(data.mobile_number
-      ? { mobile_no: data.mobile_number, phone: data.mobile_number }
-      : {}),
-  }
+function availableFieldName(
+  availableFields: ReadonlySet<string> | undefined,
+  configured: string | undefined,
+  fallback: string,
+): string | null {
+  const preferred = configuredFieldName(configured)
+  if (preferred && (!availableFields || availableFields.has(preferred)))
+    return preferred
+  return !availableFields || availableFields.has(fallback) ? fallback : null
 }
 
-export function erpEmployeePayload(data: ExtractionPublishData) {
+export function erpEmployeePayload(
+  data: ExtractionPublishData,
+  availableFields?: ReadonlySet<string>,
+) {
   const payload: Record<string, string> = {
     first_name: data.full_name_ar,
     user_id: data.email,
@@ -127,7 +123,6 @@ export function erpEmployeePayload(data: ExtractionPublishData) {
   }
   const optional: Array<[string, string]> = [
     ['gender', data.gender],
-    ['nationality', data.nationality],
     ['date_of_birth', data.date_of_birth],
     ['date_of_joining', data.date_of_joining],
     ['company', data.company],
@@ -138,27 +133,45 @@ export function erpEmployeePayload(data: ExtractionPublishData) {
   ]
   for (const [key, value] of optional) if (value) payload[key] = value
 
+  const nationalityField = availableFieldName(
+    availableFields,
+    process.env.ERPNEXT_NATIONALITY_FIELD,
+    'custom_nationality',
+  )
+  if (nationalityField && data.nationality)
+    payload[nationalityField] = data.nationality
+
   const customFields: Array<[string | null, string]> = [
     [
-      configuredFieldName(
+      availableFieldName(
+        availableFields,
         process.env.ERPNEXT_EMPLOYEE_NAME_EN_FIELD,
         'custom_employee_name_en',
       ),
       data.full_name_en,
     ],
     [
-      configuredFieldName(
+      availableFieldName(
+        availableFields,
         process.env.ERPNEXT_RESIDENCE_NUMBER_FIELD,
         'custom_residence_permit_number',
       ),
       data.id_number,
     ],
     [
-      configuredFieldName(process.env.ERPNEXT_RESIDENCE_EXPIRY_FIELD),
+      availableFieldName(
+        availableFields,
+        process.env.ERPNEXT_RESIDENCE_EXPIRY_FIELD,
+        'custom_rp_valid_upto',
+      ),
       data.residence_expiry_date,
     ],
     [
-      configuredFieldName(process.env.ERPNEXT_EMPLOYER_NAME_FIELD),
+      availableFieldName(
+        availableFields,
+        process.env.ERPNEXT_EMPLOYER_NAME_FIELD,
+        'custom_employer_name',
+      ),
       data.employer_name,
     ],
   ]
