@@ -73,7 +73,6 @@ export const equipmentListConfig: DataListConfig = {
     'code',
     'plate_number',
     'plate_digits',
-    'plate_letters_en',
     'chassis_number',
     'type',
   ],

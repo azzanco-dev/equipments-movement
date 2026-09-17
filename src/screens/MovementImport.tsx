@@ -13,7 +13,7 @@ import {
 } from '@/lib/movementExcel'
 import { localizedName } from '@/lib/localizedName'
 import { sanitizeSearchTerm } from '@/lib/search'
-import { extractPlateSearchParts } from '@/lib/plate'
+import { plateDigitsSearchTerm, toLatinDigits } from '@/lib/plate'
 import { supabase } from '@/lib/supabase'
 
 interface MovementImportRow extends ParsedMovementImportRow {
@@ -95,16 +95,15 @@ export function MovementImport() {
         .select('id,code,type,plate_number')
         .order('code')
         .limit(20)
-      const term = sanitizeSearchTerm(search)
+      const term = toLatinDigits(sanitizeSearchTerm(search))
       if (term) {
         const orParts = [
           `code.ilike.%${term}%`,
           `type.ilike.%${term}%`,
           `plate_number.ilike.%${term}%`,
         ]
-        const { digits, letters } = extractPlateSearchParts(term)
-        if (digits) orParts.push(`plate_digits.ilike.%${digits}%`)
-        if (letters) orParts.push(`plate_letters_en.ilike.%${letters}%`)
+        const plateDigits = plateDigitsSearchTerm(term)
+        if (plateDigits) orParts.push(`plate_digits.ilike.%${plateDigits}%`)
         query = query.or(orParts.join(','))
       }
       const { data } = await query

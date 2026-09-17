@@ -18,7 +18,12 @@ function loadPlate() {
   return exports
 }
 
-const { extractPlateSearchParts, normalizePlateNumber } = loadPlate()
+const {
+  extractPlateSearchParts,
+  normalizePlateNumber,
+  plateDigitsSearchTerm,
+  toLatinDigits,
+} = loadPlate()
 
 // Parts come back from a separate vm context, so compare fields individually
 // rather than with assert.deepEqual (cross-realm plain objects are not
@@ -63,4 +68,19 @@ test('normalizePlateNumber still formats digits-letters from the same parts', ()
   assert.equal(normalizePlateNumber('1234'), '1234')
   assert.equal(normalizePlateNumber('ABJ'), 'ABJ')
   assert.equal(normalizePlateNumber(''), '')
+})
+
+test('search terms only probe plate digits when they are digits only', () => {
+  assert.equal(plateDigitsSearchTerm('341'), '341')
+  assert.equal(plateDigitsSearchTerm('٣٤١'), '341')
+  assert.equal(plateDigitsSearchTerm('12-34'), '1234')
+  // A code such as a341 is plain text: no plate probing at all.
+  assert.equal(plateDigitsSearchTerm('a341'), null)
+  assert.equal(plateDigitsSearchTerm('حفار'), null)
+  assert.equal(plateDigitsSearchTerm(''), null)
+})
+
+test('toLatinDigits converts digits and leaves letters untouched', () => {
+  assert.equal(toLatinDigits('A٣٤١'), 'A341')
+  assert.equal(toLatinDigits('حفار 12'), 'حفار 12')
 })

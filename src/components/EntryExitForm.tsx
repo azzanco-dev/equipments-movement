@@ -21,7 +21,7 @@ import type { Driver, Equipment, MovementType, LastMovement } from '@/lib/types'
 import { DatePicker } from '@/components/DatePicker'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import { sanitizeSearchTerm } from '@/lib/search'
-import { extractPlateSearchParts } from '@/lib/plate'
+import { plateDigitsSearchTerm, toLatinDigits } from '@/lib/plate'
 import { Select, type SelectOption } from '@/components/Select'
 import { PlateNumberInput } from '@/components/PlateNumberInput'
 import { formatDate } from '@/lib/dateFormat'
@@ -224,7 +224,7 @@ export function EntryExitForm({
     let active = true
     setLoadingEquipment(true)
 
-    const term = sanitizeSearchTerm(search)
+    const term = toLatinDigits(sanitizeSearchTerm(search))
     const timer = window.setTimeout(
       async () => {
         let result
@@ -250,9 +250,8 @@ export function EntryExitForm({
               `plate_number.ilike.%${term}%`,
               `chassis_number.ilike.%${term}%`,
             ]
-            const { digits, letters } = extractPlateSearchParts(term)
-            if (digits) orParts.push(`plate_digits.ilike.%${digits}%`)
-            if (letters) orParts.push(`plate_letters_en.ilike.%${letters}%`)
+            const plateDigits = plateDigitsSearchTerm(term)
+            if (plateDigits) orParts.push(`plate_digits.ilike.%${plateDigits}%`)
             query = query.or(orParts.join(','))
           }
           result = await query.limit(20)

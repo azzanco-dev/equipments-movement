@@ -70,11 +70,19 @@ test('search covers equipment, driver snapshot and contractor code', () => {
   )
 })
 
-test('an Arabic plate query reaches the normalized plate columns', () => {
-  // ١٢٣٤ أ ب ج -> digits 1234, letters reversed to JBA.
-  const filter = buildMovementSearchFilter('١٢٣٤ ا ب ح')
+test('a code-like term is plain text and never becomes plate letters', () => {
+  // Regression: "a341" used to add plate_letters_en.ilike.%A%, which matched
+  // every plate containing an A (440 of 788 equipment rows in production).
+  const filter = buildMovementSearchFilter('a341')
+  assert.ok(filter.includes('equipment_code.ilike.%a341%'))
+  assert.ok(!filter.includes('equipment_plate_letters_en'))
+  assert.ok(!filter.includes('equipment_plate_digits'))
+})
+
+test('Arabic-Indic digits are searched as ASCII digits', () => {
+  const filter = buildMovementSearchFilter('١٢٣٤')
+  assert.ok(filter.includes('equipment_code.ilike.%1234%'))
   assert.ok(filter.includes('equipment_plate_digits.ilike.%1234%'))
-  assert.ok(filter.includes('equipment_plate_letters_en.ilike.%JBA%'))
 })
 
 test('a digits-only query still probes plate digits', () => {
