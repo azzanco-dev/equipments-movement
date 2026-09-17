@@ -322,7 +322,8 @@ export function DataTable<Row>({
   )
 }
 
-/** Arrow for the active column, subtle hover hint for the other sortable ones. */
+/** Arrow for the active column; the other sortable columns always show a muted
+ *  up/down hint (owner decision 2026-09-17) that brightens on hover/focus. */
 function SortIndicator({
   active,
   direction,
@@ -335,7 +336,7 @@ function SortIndicator({
       <ChevronsUpDown
         size={13}
         aria-hidden="true"
-        className="shrink-0 text-muted opacity-0 transition-opacity group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100"
+        className="shrink-0 text-muted opacity-70 transition-opacity group-hover/sort:opacity-100 group-focus-visible/sort:opacity-100"
       />
     )
   const Icon = direction === 'asc' ? ArrowUp : ArrowDown
