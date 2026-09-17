@@ -302,6 +302,22 @@ body {
     opacity: 0.6;
     background-color: var(--surface);
   }
+  /* Shared invalid-state border for non-.input controls (checkbox, switch,
+     radio) so a conditional Tailwind class never has to race the base
+     `border` utility on specificity. */
+  .control-invalid[aria-invalid='true'] {
+    border-color: var(--danger);
+  }
+  /* Switch thumb position: logical, so it moves toward the checked side
+     correctly in both RTL and LTR (a plain `translate-x` utility would not
+     reverse with direction). Distance = track width (36px) - thumb (14px) -
+     2 * inner padding (2px) = 18px. */
+  .switch-thumb[data-state='checked'] {
+    transform: translateX(1.125rem);
+  }
+  [dir='rtl'] .switch-thumb[data-state='checked'] {
+    transform: translateX(-1.125rem);
+  }
   /* SearchInput provides its own clear button. */
   .input[type='search']::-webkit-search-cancel-button {
     appearance: none;

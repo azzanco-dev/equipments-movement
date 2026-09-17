@@ -43,9 +43,27 @@ export default {
       // (dialogs, menus, select lists). Used as data-[state=open]:animate-*.
       keyframes: {
         'fade-in-opacity': { from: { opacity: '0' }, to: { opacity: '1' } },
+        // Toast enter/exit: same slide+fade in both directions (the toast
+        // stack sits at the bottom in both RTL and LTR, so a vertical slide
+        // needs no direction-specific variant).
+        'toast-in': {
+          from: { opacity: '0', transform: 'translateY(16px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        'toast-out': {
+          from: { opacity: '1', transform: 'translateY(0)' },
+          to: { opacity: '0', transform: 'translateY(16px)' },
+        },
+        'toast-swipe-out': {
+          from: { opacity: '1' },
+          to: { opacity: '0', transform: 'translateY(100%)' },
+        },
       },
       animation: {
         'fade-in-opacity': 'fade-in-opacity 0.15s ease-out',
+        'toast-in': 'toast-in 0.2s ease-out',
+        'toast-out': 'toast-out 0.15s ease-in forwards',
+        'toast-swipe-out': 'toast-swipe-out 0.15s ease-in forwards',
       },
     },
   },
