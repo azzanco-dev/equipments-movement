@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { useAuth } from '@/auth/AuthContext'
 import { useI18n } from '@/i18n/I18nContext'
 import { useTheme } from '@/theme/ThemeContext'
-import { Sun, Moon, Languages, AlertCircle } from 'lucide-react'
+import { Sun, Moon, Languages } from 'lucide-react'
 import { PasswordInput } from '@/components/PasswordInput'
+import { Alert } from '@/components/Alert'
+import { Button, Field, IconButton, Input } from '@/components/ui'
 import { useRouter } from 'next/navigation'
 
 export function AuthScreen() {
@@ -38,23 +40,22 @@ export function AuthScreen() {
     >
       {/* Top controls */}
       <div className="absolute top-4 end-4 flex items-center gap-1.5 z-10">
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={toggleLanguage}
-          className="btn-ghost p-2"
           title={t('toggleLanguage')}
+          icon={<Languages size={16} />}
         >
-          <Languages size={18} />
-          <span className="text-xs font-medium">
-            {lang === 'ar' ? 'EN' : 'ع'}
-          </span>
-        </button>
-        <button
+          {lang === 'ar' ? 'EN' : 'ع'}
+        </Button>
+        <IconButton
+          label={t('toggleTheme')}
+          variant="ghost"
+          size="sm"
           onClick={toggleTheme}
-          className="btn-ghost p-2"
-          title={t('toggleTheme')}
-        >
-          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
+          icon={theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+        />
       </div>
 
       <div className="flex flex-1 items-center justify-center px-4 py-20">
@@ -79,55 +80,41 @@ export function AuthScreen() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="login-email" className="label">
-                  {t('email')}
-                </label>
-                <input
-                  id="login-email"
-                  autoComplete="username"
-                  type="email"
-                  className="input"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={t('emailPlaceholder')}
-                  required
-                  dir="ltr"
-                />
-              </div>
-              <div>
-                <label htmlFor="login-password" className="label">
-                  {t('password')}
-                </label>
-                <PasswordInput
-                  id="login-password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={t('passwordPlaceholder')}
-                  required
-                  dir="ltr"
-                />
-              </div>
+              <Field label={t('email')} required>
+                {(control) => (
+                  <Input
+                    {...control}
+                    autoComplete="username"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder={t('emailPlaceholder')}
+                    dir="ltr"
+                  />
+                )}
+              </Field>
+              <Field label={t('password')} required>
+                {(control) => (
+                  <PasswordInput
+                    {...control}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={t('passwordPlaceholder')}
+                  />
+                )}
+              </Field>
 
-              {error && (
-                <div
-                  role="alert"
-                  className="flex items-start gap-2.5 rounded-lg border p-3 text-sm"
-                  style={{ borderColor: 'var(--fg)' }}
-                >
-                  <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
+              {error && <Alert type="error">{error}</Alert>}
 
-              <button
+              <Button
                 type="submit"
-                className="btn-primary w-full"
-                disabled={loading}
+                variant="primary"
+                loading={loading}
+                className="w-full"
               >
-                {loading ? t('loading') : t('signInButton')}
-              </button>
+                {t('signInButton')}
+              </Button>
             </form>
           </div>
         </div>

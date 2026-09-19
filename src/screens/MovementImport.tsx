@@ -2,9 +2,18 @@ import { useCallback, useMemo, useState } from 'react'
 import { Download, FileSpreadsheet, Upload } from 'lucide-react'
 import { Alert } from '@/components/Alert'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
-import { PageHeader } from '@/components/PageHeader'
 import { Select, type SelectOption } from '@/components/Select'
-import { useConfirm } from '@/components/ui'
+import {
+  Badge,
+  Button,
+  DataTable,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  Skeleton,
+  useConfirm,
+} from '@/components/ui'
+import type { DataTableColumn } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import {
   downloadMovementImportTemplate,
@@ -80,10 +89,10 @@ export function MovementImport() {
     [rowErrors, rows],
   )
 
-  const updateRow = (index: number, patch: Partial<MovementImportRow>) => {
+  const updateRow = (rowNumber: number, patch: Partial<MovementImportRow>) => {
     setRows((current) =>
-      current.map((row, rowIndex) =>
-        rowIndex === index
+      current.map((row) =>
+        row.row_number === rowNumber
           ? { ...row, ...patch, import_error: undefined }
           : row,
       ),
@@ -285,6 +294,257 @@ export function MovementImport() {
     return t(key as Parameters<typeof t>[0])
   }
 
+  const columns: DataTableColumn<MovementImportRow>[] = [
+    {
+      key: 'row_number',
+      header: t('row'),
+      align: 'center',
+      width: '3.5rem',
+      cell: (row) => row.row_number,
+    },
+    {
+      key: 'mode',
+      header: t('importMode'),
+      width: '10rem',
+      cell: (row) => (
+        <Select
+          value={row.mode}
+          onChange={(value) =>
+            updateRow(row.row_number, { mode: value as MovementImportMode })
+          }
+          options={modeOptions}
+        />
+      ),
+    },
+    {
+      key: 'equipment',
+      header: t('equipment'),
+      width: '16rem',
+      cell: (row) => (
+        <AsyncSearchSelect
+          value={row.equipment_id ?? ''}
+          selectedOption={
+            row.equipment_id
+              ? {
+                  value: row.equipment_id,
+                  label: row.equipment_label ?? row.equipment_code,
+                }
+              : null
+          }
+          onChange={(value, option) =>
+            updateRow(row.row_number, {
+              equipment_id: value || null,
+              equipment_label: option?.label ?? null,
+            })
+          }
+          loadOptions={loadEquipment}
+          placeholder={
+            row.equipment_code || row.plate_number || t('selectEquipment')
+          }
+        />
+      ),
+    },
+    {
+      key: 'company',
+      header: t('company'),
+      width: '14rem',
+      cell: (row) => (
+        <AsyncSearchSelect
+          value={row.company_id ?? ''}
+          selectedOption={
+            row.company_id
+              ? {
+                  value: row.company_id,
+                  label: row.company_label ?? row.company_name,
+                }
+              : null
+          }
+          onChange={(value, option) =>
+            updateRow(row.row_number, {
+              company_id: value || null,
+              company_label: option?.label ?? null,
+            })
+          }
+          loadOptions={loadCompanies}
+          disabled={row.mode === 'exit'}
+          placeholder={row.company_name || t('selectCompany')}
+        />
+      ),
+    },
+    {
+      key: 'project',
+      header: t('project'),
+      width: '14rem',
+      cell: (row) => (
+        <AsyncSearchSelect
+          value={row.project_id ?? ''}
+          selectedOption={
+            row.project_id
+              ? {
+                  value: row.project_id,
+                  label: row.project_label ?? row.project_name,
+                }
+              : null
+          }
+          onChange={(value, option) =>
+            updateRow(row.row_number, {
+              project_id: value || null,
+              project_label: option?.label ?? null,
+            })
+          }
+          loadOptions={loadProjects}
+          disabled={row.mode === 'exit'}
+          placeholder={row.project_name || t('selectProject')}
+        />
+      ),
+    },
+    {
+      key: 'driver',
+      header: t('driverName'),
+      width: '14rem',
+      cell: (row) => (
+        <AsyncSearchSelect
+          value={row.driver_id ?? ''}
+          selectedOption={
+            row.driver_id
+              ? {
+                  value: row.driver_id,
+                  label: row.driver_label ?? row.driver_name,
+                }
+              : null
+          }
+          onChange={(value, option) =>
+            updateRow(row.row_number, {
+              driver_id: value || null,
+              driver_label: option?.label ?? null,
+            })
+          }
+          loadOptions={loadDrivers}
+          disabled={row.mode === 'exit'}
+          placeholder={row.driver_name || t('selectDriver')}
+        />
+      ),
+    },
+    {
+      key: 'supervisor',
+      header: t('supervisor'),
+      width: '13rem',
+      cell: (row) => (
+        <AsyncSearchSelect
+          value={row.supervisor_id ?? ''}
+          selectedOption={
+            row.supervisor_id
+              ? {
+                  value: row.supervisor_id,
+                  label: row.supervisor_label ?? row.supervisor_name,
+                }
+              : null
+          }
+          onChange={(value, option) =>
+            updateRow(row.row_number, {
+              supervisor_id: value || null,
+              supervisor_label: option?.label ?? null,
+              supervisor_name: option?.label ?? '',
+            })
+          }
+          loadOptions={loadSupervisors}
+        />
+      ),
+    },
+    {
+      key: 'contractor_equipment_code',
+      header: t('companyNumber'),
+      width: '10rem',
+      cell: (row) => (
+        <input
+          className="input"
+          value={row.contractor_equipment_code}
+          onChange={(event) =>
+            updateRow(row.row_number, {
+              contractor_equipment_code: event.target.value,
+            })
+          }
+        />
+      ),
+    },
+    {
+      key: 'entry_date',
+      header: t('entryDate'),
+      width: '10rem',
+      cell: (row) => (
+        <input
+          type="date"
+          className="input"
+          value={row.entry_date}
+          disabled={row.mode === 'exit'}
+          onChange={(event) =>
+            updateRow(row.row_number, { entry_date: event.target.value })
+          }
+        />
+      ),
+    },
+    {
+      key: 'exit_date',
+      header: t('exitDate'),
+      width: '10rem',
+      cell: (row) => (
+        <input
+          type="date"
+          className="input"
+          value={row.exit_date}
+          disabled={row.mode === 'entry'}
+          onChange={(event) =>
+            updateRow(row.row_number, { exit_date: event.target.value })
+          }
+        />
+      ),
+    },
+    {
+      key: 'notes',
+      header: t('notes'),
+      width: '15rem',
+      cell: (row) => (
+        <input
+          className="input"
+          value={row.notes}
+          onChange={(event) =>
+            updateRow(row.row_number, { notes: event.target.value })
+          }
+        />
+      ),
+    },
+    {
+      key: 'status',
+      header: t('status'),
+      width: '14rem',
+      cell: (row) => {
+        const errors = rowErrors(row)
+        // `DataTable` cells default to `whitespace-nowrap`; an element's own
+        // explicit value always wins over an inherited one, so this override
+        // lets the error list wrap inside the fixed column width.
+        return (
+          <span className="block whitespace-normal break-words">
+            {errors.length ? (
+              <span className="block space-y-1 text-danger">
+                {errors.map((error) => (
+                  <span key={error} className="block">
+                    {errorLabel(error)}
+                  </span>
+                ))}
+              </span>
+            ) : (
+              <span className="text-success">{t('valid')}</span>
+            )}
+          </span>
+        )
+      },
+    },
+  ]
+
+  // A failed read/RPC with no rows loaded is a failed load, not "nothing
+  // uploaded yet" — never collapse the two into the same empty placeholder.
+  const readFailed = message?.type === 'error' && rows.length === 0
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -292,293 +552,84 @@ export function MovementImport() {
         description={t('movementImportDesc')}
         actions={
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="btn-outline"
+            <Button
+              variant="outline"
+              icon={<Download size={16} />}
               onClick={downloadMovementImportTemplate}
             >
-              <Download size={16} />
               {t('downloadTemplate')}
-            </button>
-            <label className="btn-primary cursor-pointer">
-              <Upload size={16} />
-              {t('uploadExcel')}
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                disabled={busy}
-                onChange={(event) => {
-                  chooseFile(event.target.files?.[0])
-                  event.target.value = ''
-                }}
-              />
-            </label>
+            </Button>
+            <Button asChild variant="primary">
+              <label className="cursor-pointer">
+                <Upload size={16} />
+                {t('uploadExcel')}
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  disabled={busy}
+                  onChange={(event) => {
+                    chooseFile(event.target.files?.[0])
+                    event.target.value = ''
+                  }}
+                />
+              </label>
+            </Button>
           </div>
         }
       />
 
-      {message && <Alert type={message.type}>{message.text}</Alert>}
+      {message && !readFailed && (
+        <Alert type={message.type}>{message.text}</Alert>
+      )}
 
       {!rows.length ? (
-        <div className="card border-dashed py-16 text-center text-muted">
-          <FileSpreadsheet className="mx-auto mb-3" size={32} />
-          <p>{t('movementImportEmpty')}</p>
-        </div>
+        readFailed ? (
+          <ErrorState description={message!.text} />
+        ) : busy ? (
+          <div className="rounded-xl border border-dashed py-16 text-center">
+            <Skeleton variant="circle" className="mx-auto mb-3 h-8 w-8" />
+            <Skeleton variant="text" className="mx-auto w-48" />
+          </div>
+        ) : (
+          <EmptyState
+            icon={<FileSpreadsheet size={32} />}
+            title={t('movementImportEmpty')}
+          />
+        )
       ) : (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
             <div className="flex gap-2">
-              <span className="badge status-entry border">
+              <Badge tone="success">
                 {t('valid')}: {validRows.length}
-              </span>
-              <span className="badge status-exit border">
+              </Badge>
+              <Badge tone="danger">
                 {t('invalid')}: {rows.length - validRows.length}
-              </span>
+              </Badge>
             </div>
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={busy || !validRows.length}
+            <Button
+              variant="primary"
+              loading={busy}
+              disabled={!validRows.length}
               onClick={importRows}
             >
-              {busy
-                ? t('processing')
-                : t('importValidRows').replace(
-                    '{count}',
-                    String(validRows.length),
-                  )}
-            </button>
+              {t('importValidRows').replace(
+                '{count}',
+                String(validRows.length),
+              )}
+            </Button>
           </div>
 
-          <div className="card overflow-hidden p-0">
-            <div className="max-h-[65vh] overflow-auto">
-              <table className="min-w-[1750px] text-xs">
-                <thead
-                  className="sticky top-0 z-10"
-                  style={{ background: 'var(--surface)' }}
-                >
-                  <tr>
-                    <th className="table-header p-2">{t('row')}</th>
-                    <th className="table-header w-40 p-2">{t('importMode')}</th>
-                    <th className="table-header w-64 p-2">{t('equipment')}</th>
-                    <th className="table-header w-56 p-2">{t('company')}</th>
-                    <th className="table-header w-56 p-2">{t('project')}</th>
-                    <th className="table-header w-56 p-2">{t('driverName')}</th>
-                    <th className="table-header w-52 p-2">{t('supervisor')}</th>
-                    <th className="table-header w-40 p-2">
-                      {t('companyNumber')}
-                    </th>
-                    <th className="table-header w-40 p-2">{t('entryDate')}</th>
-                    <th className="table-header w-40 p-2">{t('exitDate')}</th>
-                    <th className="table-header w-60 p-2">{t('notes')}</th>
-                    <th className="table-header w-56 p-2">{t('status')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row, index) => {
-                    const errors = rowErrors(row)
-                    return (
-                      <tr
-                        key={row.row_number}
-                        className="border-t align-top"
-                        style={{ borderColor: 'var(--border)' }}
-                      >
-                        <td className="p-2 text-center">{row.row_number}</td>
-                        <td className="p-2">
-                          <Select
-                            value={row.mode}
-                            onChange={(value) =>
-                              updateRow(index, {
-                                mode: value as MovementImportMode,
-                              })
-                            }
-                            options={modeOptions}
-                          />
-                        </td>
-                        <td className="p-2">
-                          <AsyncSearchSelect
-                            value={row.equipment_id ?? ''}
-                            selectedOption={
-                              row.equipment_id
-                                ? {
-                                    value: row.equipment_id,
-                                    label:
-                                      row.equipment_label ?? row.equipment_code,
-                                  }
-                                : null
-                            }
-                            onChange={(value, option) =>
-                              updateRow(index, {
-                                equipment_id: value || null,
-                                equipment_label: option?.label ?? null,
-                              })
-                            }
-                            loadOptions={loadEquipment}
-                            placeholder={
-                              row.equipment_code ||
-                              row.plate_number ||
-                              t('selectEquipment')
-                            }
-                          />
-                        </td>
-                        <td className="p-2">
-                          <AsyncSearchSelect
-                            value={row.company_id ?? ''}
-                            selectedOption={
-                              row.company_id
-                                ? {
-                                    value: row.company_id,
-                                    label:
-                                      row.company_label ?? row.company_name,
-                                  }
-                                : null
-                            }
-                            onChange={(value, option) =>
-                              updateRow(index, {
-                                company_id: value || null,
-                                company_label: option?.label ?? null,
-                              })
-                            }
-                            loadOptions={loadCompanies}
-                            disabled={row.mode === 'exit'}
-                            placeholder={row.company_name || t('selectCompany')}
-                          />
-                        </td>
-                        <td className="p-2">
-                          <AsyncSearchSelect
-                            value={row.project_id ?? ''}
-                            selectedOption={
-                              row.project_id
-                                ? {
-                                    value: row.project_id,
-                                    label:
-                                      row.project_label ?? row.project_name,
-                                  }
-                                : null
-                            }
-                            onChange={(value, option) =>
-                              updateRow(index, {
-                                project_id: value || null,
-                                project_label: option?.label ?? null,
-                              })
-                            }
-                            loadOptions={loadProjects}
-                            disabled={row.mode === 'exit'}
-                            placeholder={row.project_name || t('selectProject')}
-                          />
-                        </td>
-                        <td className="p-2">
-                          <AsyncSearchSelect
-                            value={row.driver_id ?? ''}
-                            selectedOption={
-                              row.driver_id
-                                ? {
-                                    value: row.driver_id,
-                                    label: row.driver_label ?? row.driver_name,
-                                  }
-                                : null
-                            }
-                            onChange={(value, option) =>
-                              updateRow(index, {
-                                driver_id: value || null,
-                                driver_label: option?.label ?? null,
-                              })
-                            }
-                            loadOptions={loadDrivers}
-                            disabled={row.mode === 'exit'}
-                            placeholder={row.driver_name || t('selectDriver')}
-                          />
-                        </td>
-                        <td className="p-2">
-                          <AsyncSearchSelect
-                            value={row.supervisor_id ?? ''}
-                            selectedOption={
-                              row.supervisor_id
-                                ? {
-                                    value: row.supervisor_id,
-                                    label:
-                                      row.supervisor_label ??
-                                      row.supervisor_name,
-                                  }
-                                : null
-                            }
-                            onChange={(value, option) =>
-                              updateRow(index, {
-                                supervisor_id: value || null,
-                                supervisor_label: option?.label ?? null,
-                                supervisor_name: option?.label ?? '',
-                              })
-                            }
-                            loadOptions={loadSupervisors}
-                          />
-                        </td>
-                        <td className="p-2">
-                          <input
-                            className="input"
-                            value={row.contractor_equipment_code}
-                            onChange={(event) =>
-                              updateRow(index, {
-                                contractor_equipment_code: event.target.value,
-                              })
-                            }
-                          />
-                        </td>
-                        <td className="p-2">
-                          <input
-                            type="date"
-                            className="input"
-                            value={row.entry_date}
-                            disabled={row.mode === 'exit'}
-                            onChange={(event) =>
-                              updateRow(index, {
-                                entry_date: event.target.value,
-                              })
-                            }
-                          />
-                        </td>
-                        <td className="p-2">
-                          <input
-                            type="date"
-                            className="input"
-                            value={row.exit_date}
-                            disabled={row.mode === 'entry'}
-                            onChange={(event) =>
-                              updateRow(index, {
-                                exit_date: event.target.value,
-                              })
-                            }
-                          />
-                        </td>
-                        <td className="p-2">
-                          <input
-                            className="input"
-                            value={row.notes}
-                            onChange={(event) =>
-                              updateRow(index, { notes: event.target.value })
-                            }
-                          />
-                        </td>
-                        <td className="p-2">
-                          {errors.length ? (
-                            <div className="space-y-1 text-red-600 dark:text-red-400">
-                              {errors.map((error) => (
-                                <p key={error}>{errorLabel(error)}</p>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-green-700 dark:text-green-400">
-                              {t('valid')}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <DataTable
+            size="sm"
+            columns={columns}
+            rows={rows}
+            rowKey={(row) => row.row_number}
+            loading={busy}
+            rowClassName={() => 'align-top'}
+            maxHeight="65vh"
+          />
         </>
       )}
       {confirmDialog}

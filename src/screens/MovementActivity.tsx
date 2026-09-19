@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Eye, Search } from 'lucide-react'
+import { Eye } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
-import { PageHeader } from '@/components/PageHeader'
-import { InlineSpinner } from '@/components/Spinner'
-import { Dialog } from '@/components/ui'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { formatDateTime } from '@/lib/dateFormat'
 import { sanitizeSearchTerm } from '@/lib/search'
-import { Select } from '@/components/Select'
+import {
+  Badge,
+  DataTable,
+  Dialog,
+  EmptyState,
+  ErrorState,
+  IconButton,
+  MovementBadge,
+  PageHeader,
+  SearchInput,
+  Select,
+} from '@/components/ui'
+import type { BadgeTone, DataTableColumn } from '@/components/ui'
 
 type AuditAction = 'create' | 'update' | 'delete'
 
@@ -28,6 +37,21 @@ interface MovementAuditRow {
 }
 
 const PAGE_SIZE = 20
+
+const actionLabelKey: Record<
+  AuditAction,
+  'activityCreated' | 'activityUpdated' | 'activityDeleted'
+> = {
+  create: 'activityCreated',
+  update: 'activityUpdated',
+  delete: 'activityDeleted',
+}
+
+const actionTone: Record<AuditAction, BadgeTone> = {
+  create: 'success',
+  update: 'info',
+  delete: 'danger',
+}
 
 export function MovementActivity() {
   const { t } = useI18n()
@@ -48,6 +72,8 @@ export function MovementActivity() {
   const [rows, setRows] = useState<MovementAuditRow[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const [reloadToken, setReloadToken] = useState(0)
   const [selected, setSelected] = useState<MovementAuditRow | null>(null)
 
   const replaceParams = useCallback(
@@ -67,6 +93,7 @@ export function MovementActivity() {
     const timeout = window.setTimeout(() => {
       const load = async () => {
         setLoading(true)
+        setLoadError(false)
         let query = supabase
           .from('movement_audit_logs')
           .select(
@@ -87,7 +114,14 @@ export function MovementActivity() {
           controller.signal,
         )
         if (controller.signal.aborted) return
-        if (error) console.error('Movement activity load failed', error)
+        if (error) {
+          console.error('Movement activity load failed', error)
+          setRows([])
+          setTotal(0)
+          setLoadError(true)
+          setLoading(false)
+          return
+        }
         setRows((data as MovementAuditRow[] | null) ?? [])
         setTotal(count ?? 0)
         setLoading(false)
@@ -98,7 +132,7 @@ export function MovementActivity() {
       window.clearTimeout(timeout)
       controller.abort()
     }
-  }, [action, context, page, search])
+  }, [action, context, page, search, reloadToken])
 
   const fieldLabels = useMemo<Record<string, string>>(
     () => ({
@@ -125,28 +159,74 @@ export function MovementActivity() {
     return String(item)
   }
 
+  const columns: DataTableColumn<MovementAuditRow>[] = [
+    {
+      key: 'action',
+      header: t('action'),
+      cell: (row) => (
+        <Badge size="sm" tone={actionTone[row.action]}>
+          {t(actionLabelKey[row.action])}
+        </Badge>
+      ),
+    },
+    {
+      key: 'equipment_code',
+      header: t('equipment'),
+      className: 'font-medium',
+      cell: (row) => row.equipment_code ?? '—',
+    },
+    {
+      key: 'movement_type',
+      header: t('movementType'),
+      cell: (row) =>
+        row.movement_type ? <MovementBadge type={row.movement_type} /> : '—',
+    },
+    {
+      key: 'actor_name',
+      header: t('user'),
+      cell: (row) => row.actor_name ?? t('system'),
+    },
+    {
+      key: 'created_at',
+      header: t('dateAndTime'),
+      className: 'text-muted',
+      cell: (row) => formatDateTime(row.created_at),
+    },
+    {
+      key: 'view',
+      header: '',
+      width: '3rem',
+      align: 'end',
+      cell: (row) => (
+        <IconButton
+          label={t('viewDetails')}
+          size="sm"
+          variant="ghost"
+          icon={<Eye size={16} />}
+          onClick={() => setSelected(row)}
+        />
+      ),
+    },
+  ]
+
   return (
     <div className="space-y-5">
       <PageHeader title={t('activityLog')} description={t('activityLogDesc')} />
       <div className="flex flex-col gap-2 sm:flex-row">
-        <label className="input flex flex-1 items-center gap-2">
-          <Search size={16} className="text-muted" />
-          <input
-            className="min-w-0 flex-1 bg-transparent outline-none"
-            value={search}
-            onChange={(event) =>
-              replaceParams({ q: event.target.value, page: '' })
-            }
-            placeholder={t('searchActivity')}
-          />
-        </label>
+        <SearchInput
+          className="sm:flex-1"
+          value={search}
+          onValueChange={(next) => replaceParams({ q: next, page: '' })}
+          placeholder={t('searchActivity')}
+        />
         <Select
           className="sm:w-40"
-          value={action}
-          onChange={(value) => replaceParams({ action: value, page: '' })}
-          placeholder={t('allActions')}
+          value={action || 'all'}
+          onValueChange={(next) =>
+            replaceParams({ action: next === 'all' ? '' : next, page: '' })
+          }
           options={[
-            { value: '', label: t('allActions') },
+            { value: 'all', label: t('allActions') },
             { value: 'create', label: t('activityCreated') },
             { value: 'update', label: t('activityUpdated') },
             { value: 'delete', label: t('activityDeleted') },
@@ -154,86 +234,33 @@ export function MovementActivity() {
         />
         <Select
           className="sm:w-40"
-          value={context}
-          onChange={(value) => replaceParams({ context: value, page: '' })}
-          placeholder={t('allLocations')}
+          value={context || 'all'}
+          onValueChange={(next) =>
+            replaceParams({ context: next === 'all' ? '' : next, page: '' })
+          }
           options={[
-            { value: '', label: t('allLocations') },
+            { value: 'all', label: t('allLocations') },
             { value: 'site', label: t('location') },
             { value: 'workshop', label: t('workshopLocation') },
           ]}
         />
       </div>
 
-      {loading ? (
-        <InlineSpinner label={t('loading')} />
-      ) : rows.length === 0 ? (
-        <div className="card py-12 text-center text-sm text-muted">
-          {t('noActivity')}
-        </div>
+      {loadError ? (
+        <ErrorState onRetry={() => setReloadToken((value) => value + 1)} />
+      ) : !loading && rows.length === 0 ? (
+        <EmptyState title={t('noActivity')} />
       ) : (
-        <div
-          className="overflow-x-auto rounded-xl border"
-          style={{ borderColor: 'var(--border)' }}
-        >
-          <table className="w-full text-[13px]">
-            <thead style={{ background: 'var(--surface)' }}>
-              <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
-                <th className="px-3 py-2 text-start">{t('action')}</th>
-                <th className="px-3 py-2 text-start">{t('equipment')}</th>
-                <th className="px-3 py-2 text-start">{t('movementType')}</th>
-                <th className="px-3 py-2 text-start">{t('user')}</th>
-                <th className="px-3 py-2 text-start">{t('dateAndTime')}</th>
-                <th className="w-12 px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={row.id}
-                  className="border-b last:border-0"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  <td className="px-3 py-2">
-                    <span
-                      className={`badge border ${row.action === 'delete' ? 'status-exit' : row.action === 'create' ? 'status-entry' : 'border-[var(--border)] bg-[var(--surface)]'}`}
-                    >
-                      {t(
-                        row.action === 'create'
-                          ? 'activityCreated'
-                          : row.action === 'update'
-                            ? 'activityUpdated'
-                            : 'activityDeleted',
-                      )}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 font-medium">
-                    {row.equipment_code ?? '—'}
-                  </td>
-                  <td className="px-3 py-2">
-                    {row.movement_type
-                      ? t(row.movement_type === 'entry' ? 'entry' : 'exit')
-                      : '—'}
-                  </td>
-                  <td className="px-3 py-2">{row.actor_name ?? t('system')}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-muted">
-                    {formatDateTime(row.created_at)}
-                  </td>
-                  <td className="px-3 py-2">
-                    <button
-                      className="btn-ghost h-8 w-8 p-0"
-                      onClick={() => setSelected(row)}
-                      aria-label={t('viewDetails')}
-                    >
-                      <Eye size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          size="sm"
+          columns={columns}
+          rows={rows}
+          rowKey={(row) => row.id}
+          loading={loading}
+          loadingRows={6}
+        />
       )}
+
       <DataListPagination
         page={page}
         pageSize={PAGE_SIZE}
@@ -267,13 +294,7 @@ export function MovementActivity() {
               <div>
                 <p className="text-xs text-muted">{t('action')}</p>
                 <p className="font-medium">
-                  {t(
-                    selected.action === 'create'
-                      ? 'activityCreated'
-                      : selected.action === 'update'
-                        ? 'activityUpdated'
-                        : 'activityDeleted',
-                  )}
+                  {t(actionLabelKey[selected.action])}
                 </p>
               </div>
               <div>

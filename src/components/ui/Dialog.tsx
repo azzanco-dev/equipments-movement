@@ -23,6 +23,16 @@ export interface DialogProps {
   footer?: ReactNode
   size?: keyof typeof widths
   children?: ReactNode
+  /**
+   * When `false`, the user cannot dismiss the dialog: no close button, the
+   * Escape key does nothing, and clicking or otherwise interacting outside
+   * the panel does nothing. This component then never calls `onOpenChange`
+   * with `false` on its own — only the parent can close it, by flipping its
+   * own `open` state (e.g. once a forced action, such as a first-login
+   * password change, has completed). The focus trap is unaffected. Defaults
+   * to `true`.
+   */
+  dismissible?: boolean
 }
 
 /** Modal dialog on Radix: focus trap, Escape to close, labelled title. */
@@ -34,16 +44,32 @@ export function Dialog({
   footer,
   size = 'md',
   children,
+  dismissible = true,
 }: DialogProps) {
   const { t } = useI18n()
+  const handleOpenChange = (next: boolean) => {
+    // Belt-and-braces: even if some other interaction still asks to close a
+    // non-dismissible dialog, ignore it — the parent owns `open` instead.
+    if (!dismissible && !next) return
+    onOpenChange(next)
+  }
   return (
-    <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
+    <RadixDialog.Root open={open} onOpenChange={handleOpenChange}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className={overlay} />
         <RadixDialog.Content
           className={cn(panel, widths[size])}
           // Without a description Radix warns unless this is explicitly unset.
           {...(description ? {} : { 'aria-describedby': undefined })}
+          onEscapeKeyDown={(event) => {
+            if (!dismissible) event.preventDefault()
+          }}
+          onPointerDownOutside={(event) => {
+            if (!dismissible) event.preventDefault()
+          }}
+          onInteractOutside={(event) => {
+            if (!dismissible) event.preventDefault()
+          }}
         >
           <div className="flex items-start justify-between gap-3 border-b px-5 py-4">
             <div className="min-w-0">
@@ -56,14 +82,16 @@ export function Dialog({
                 </RadixDialog.Description>
               )}
             </div>
-            <RadixDialog.Close asChild>
-              <IconButton
-                label={t('close')}
-                size="sm"
-                icon={<X size={16} />}
-                className="-me-1 shrink-0"
-              />
-            </RadixDialog.Close>
+            {dismissible && (
+              <RadixDialog.Close asChild>
+                <IconButton
+                  label={t('close')}
+                  size="sm"
+                  icon={<X size={16} />}
+                  className="-me-1 shrink-0"
+                />
+              </RadixDialog.Close>
+            )}
           </div>
           {children && (
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">

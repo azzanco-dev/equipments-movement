@@ -12,8 +12,18 @@ import {
 } from 'lucide-react'
 import { useTheme } from '@/theme/ThemeContext'
 import { useAuth } from '@/auth/AuthContext'
-import { useEffect, useRef, useState } from 'react'
-import { ConfirmDialog } from '@/components/ui'
+import { useEffect, useState } from 'react'
+import {
+  Button,
+  ConfirmDialog,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  IconButton,
+} from '@/components/ui'
 import { usePathname } from 'next/navigation'
 
 interface LayoutProps {
@@ -48,16 +58,6 @@ export function Layout({
   const [expandedNavItems, setExpandedNavItems] = useState<
     Record<string, boolean>
   >({})
-  const userMenuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const close = (event: MouseEvent) => {
-      if (!userMenuRef.current?.contains(event.target as Node))
-        setUserMenuOpen(false)
-    }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [])
 
   useEffect(() => {
     setPendingPage(null)
@@ -66,16 +66,15 @@ export function Layout({
   }, [pathname])
 
   useEffect(() => {
-    if (!mobileOpen && !userMenuOpen) return
+    // The user menu is a Radix `DropdownMenu`, which already closes on
+    // Escape and outside interaction on its own.
+    if (!mobileOpen) return
     const close = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setMobileOpen(false)
-        setUserMenuOpen(false)
-      }
+      if (event.key === 'Escape') setMobileOpen(false)
     }
     document.addEventListener('keydown', close)
     return () => document.removeEventListener('keydown', close)
-  }, [mobileOpen, userMenuOpen])
+  }, [mobileOpen])
 
   const roleLabel =
     profile?.role === 'admin'
@@ -112,14 +111,14 @@ export function Layout({
         <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
             {navItems.length > 0 && (
-              <button
-                className="lg:hidden btn-ghost p-2"
-                aria-label={t('navigationMenu')}
+              <IconButton
+                className="lg:hidden"
+                label={t('navigationMenu')}
+                variant="ghost"
                 aria-expanded={mobileOpen}
                 onClick={() => setMobileOpen(!mobileOpen)}
-              >
-                {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-              </button>
+                icon={mobileOpen ? <X size={20} /> : <Menu size={20} />}
+              />
             )}
             <button
               className="flex items-center gap-2 cursor-pointer"
@@ -147,23 +146,22 @@ export function Layout({
           </div>
 
           <div className="hidden items-center gap-1.5 sm:flex">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={toggleLanguage}
-              className="btn-ghost p-2"
               title={t('toggleLanguage')}
+              icon={<Languages size={16} />}
             >
-              <Languages size={18} />
-              <span className="hidden sm:inline text-xs font-medium">
-                {lang === 'ar' ? 'EN' : 'ع'}
-              </span>
-            </button>
-            <button
+              {lang === 'ar' ? 'EN' : 'ع'}
+            </Button>
+            <IconButton
+              label={t('toggleTheme')}
+              variant="ghost"
+              size="sm"
               onClick={toggleTheme}
-              className="btn-ghost p-2"
-              title={t('toggleTheme')}
-            >
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
+              icon={theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            />
             <div
               className="mx-1 h-6 w-px"
               style={{ background: 'var(--border)' }}
@@ -172,76 +170,58 @@ export function Layout({
               <p className="text-xs font-medium">{profile?.full_name}</p>
               <p className="text-xs text-muted">{roleLabel}</p>
             </div>
-            <button
+            <IconButton
+              label={t('signOut')}
+              variant="ghost"
+              size="sm"
               onClick={() => setLogoutOpen(true)}
-              className="btn-ghost p-2"
-              title={t('signOut')}
-            >
-              <LogOut size={18} />
-            </button>
+              icon={<LogOut size={16} />}
+            />
           </div>
 
-          <div ref={userMenuRef} className="relative sm:hidden">
-            <button
-              type="button"
-              className="btn-ghost h-9 w-9 rounded-full p-0"
-              onClick={() => setUserMenuOpen((value) => !value)}
-              aria-label={t('userMenu')}
-              aria-expanded={userMenuOpen}
-            >
-              <CircleUserRound size={25} />
-            </button>
-            {userMenuOpen && (
-              <div
-                className="absolute end-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border shadow-xl"
-                style={{
-                  background: 'var(--bg)',
-                  borderColor: 'var(--border)',
-                }}
-              >
-                <div
-                  className="border-b px-4 py-3"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  <p className="text-sm font-semibold">
+          <div className="sm:hidden">
+            <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <IconButton
+                  label={t('userMenu')}
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 w-9 rounded-full"
+                  icon={<CircleUserRound size={25} />}
+                />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-64">
+                <DropdownMenuLabel>
+                  <p className="text-sm font-semibold text-fg">
                     {profile?.full_name ?? '—'}
                   </p>
                   <p className="mt-0.5 text-xs text-muted">{roleLabel}</p>
-                </div>
-                <div className="p-1.5">
-                  <button
-                    className="btn-ghost w-full justify-start"
-                    onClick={() => {
-                      toggleTheme()
-                      setUserMenuOpen(false)
-                    }}
-                  >
-                    {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-                    {theme === 'dark' ? t('lightMode') : t('darkMode')}
-                  </button>
-                  <button
-                    className="btn-ghost w-full justify-start"
-                    onClick={() => {
-                      toggleLanguage()
-                      setUserMenuOpen(false)
-                    }}
-                  >
-                    <Languages size={17} />
-                    {t('language')}: {lang === 'ar' ? 'English' : 'العربية'}
-                  </button>
-                  <button
-                    className="btn-ghost w-full justify-start text-red-600 dark:text-red-400"
-                    onClick={() => {
-                      setUserMenuOpen(false)
-                      setLogoutOpen(true)
-                    }}
-                  >
-                    <LogOut size={17} />
-                    {t('signOut')}
-                  </button>
-                </div>
-              </div>
-            )}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  icon={
+                    theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />
+                  }
+                  onSelect={toggleTheme}
+                >
+                  {theme === 'dark' ? t('lightMode') : t('darkMode')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  icon={<Languages size={16} />}
+                  onSelect={toggleLanguage}
+                >
+                  {t('language')}: {lang === 'ar' ? 'English' : 'العربية'}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  tone="danger"
+                  icon={<LogOut size={16} />}
+                  onSelect={() => setLogoutOpen(true)}
+                >
+                  {t('signOut')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>

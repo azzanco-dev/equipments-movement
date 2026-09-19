@@ -111,6 +111,7 @@ function DialogShowcase() {
   const [formOpen, setFormOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [lockedOpen, setLockedOpen] = useState(false)
   const [result, setResult] = useState<string | null>(null)
   const { confirm, confirmDialog } = useConfirm()
 
@@ -134,7 +135,7 @@ function DialogShowcase() {
   return (
     <Section
       title="النوافذ (Dialog و ConfirmDialog)"
-      description="النافذة تحبس التركيز وتقفل بزر Esc. نافذة التاكيد بديل confirm() حق المتصفح، وتبقى مفتوحة وقت التنفيذ."
+      description="النافذة تحبس التركيز وتقفل بزر Esc. نافذة التاكيد بديل confirm() حق المتصفح، وتبقى مفتوحة وقت التنفيذ. وفي نمط غير قابل للاغلاق للحالات الاجبارية مثل تغيير كلمة المرور اول مرة، ما ينقفل الا من زر بالنافذة نفسها."
     >
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="primary" onClick={() => setFormOpen(true)}>
@@ -149,6 +150,9 @@ function DialogShowcase() {
         </Button>
         <Button variant="outline" onClick={() => void askWithHook()}>
           تاكيد بطريقة useConfirm
+        </Button>
+        <Button variant="outline" onClick={() => setLockedOpen(true)}>
+          فتح نافذة غير قابلة للاغلاق
         </Button>
         {result && <span className="text-sm text-muted">{result}</span>}
       </div>
@@ -198,6 +202,24 @@ function DialogShowcase() {
         loading={deleting}
         onConfirm={runDelete}
       />
+
+      <Dialog
+        open={lockedOpen}
+        onOpenChange={setLockedOpen}
+        dismissible={false}
+        title="نافذة غير قابلة للاغلاق"
+        description="زر الاغلاق مخفي، ومفتاح Esc والضغط برا النافذة ما يسكرونها."
+        footer={
+          <Button variant="primary" onClick={() => setLockedOpen(false)}>
+            تم
+          </Button>
+        }
+      >
+        <p className="text-sm text-muted">
+          هذا يشبه نافذة تغيير كلمة المرور الاجباري: ما فيه طريقة للتجاوز الا
+          اكمال العملية من الزر بالاسفل.
+        </p>
+      </Dialog>
       {confirmDialog}
     </Section>
   )

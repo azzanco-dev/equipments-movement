@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Modal } from '@/components/Modal'
+import { Button, Dialog, Field } from '@/components/ui'
 import { PasswordInput } from '@/components/PasswordInput'
 import { Alert } from '@/components/Alert'
 import { useAuth } from '@/auth/AuthContext'
@@ -62,43 +62,49 @@ export function FirstLoginPasswordDialog() {
   }
 
   return (
-    <Modal
+    // No way to skip: `dismissible={false}` hides the close button and
+    // blocks Escape/outside-click, and `onOpenChange` here never turns
+    // `open` off on its own — only a successful password change (which
+    // flips `profile.must_change_password` server-side) does.
+    <Dialog
       open={required}
-      onClose={() => undefined}
-      title={t('firstLoginPasswordTitle')}
-      size="sm"
+      onOpenChange={() => undefined}
       dismissible={false}
-    >
-      <div className="space-y-4">
-        <p className="text-sm text-muted">
-          {t('firstLoginPasswordDescription')}
-        </p>
-        {error && <Alert type="error">{error}</Alert>}
-        <div>
-          <label className="label">{t('newPassword')} *</label>
-          <PasswordInput
-            dir="ltr"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </div>
-        <div>
-          <label className="label">{t('confirmPassword')} *</label>
-          <PasswordInput
-            dir="ltr"
-            value={confirmation}
-            onChange={(event) => setConfirmation(event.target.value)}
-          />
-        </div>
-        <button
-          type="button"
-          className="btn-primary w-full"
-          disabled={saving}
+      title={t('firstLoginPasswordTitle')}
+      description={t('firstLoginPasswordDescription')}
+      size="sm"
+      footer={
+        <Button
+          variant="primary"
+          className="w-full"
+          loading={saving}
           onClick={submit}
         >
-          {saving ? t('saving') : t('confirm')}
-        </button>
+          {t('confirm')}
+        </Button>
+      }
+    >
+      <div className="space-y-4">
+        {error && <Alert type="error">{error}</Alert>}
+        <Field label={t('newPassword')} required>
+          {(control) => (
+            <PasswordInput
+              {...control}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          )}
+        </Field>
+        <Field label={t('confirmPassword')} required>
+          {(control) => (
+            <PasswordInput
+              {...control}
+              value={confirmation}
+              onChange={(event) => setConfirmation(event.target.value)}
+            />
+          )}
+        </Field>
       </div>
-    </Modal>
+    </Dialog>
   )
 }
