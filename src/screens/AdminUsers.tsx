@@ -1,24 +1,38 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Users } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
-import { Alert } from '@/components/Alert'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
-import { Button, Dialog, useConfirm } from '@/components/ui'
-import { PageHeader } from '@/components/PageHeader'
+import {
+  Badge,
+  Button,
+  DataTable,
+  Dialog,
+  EmptyState,
+  ErrorState,
+  Field,
+  IconButton,
+  Input,
+  PageHeader,
+  Select,
+  useConfirm,
+} from '@/components/ui'
+import type { DataTableColumn } from '@/components/ui'
+// Imported directly: Notice is not yet wired into the `ui` barrel
+// (src/components/ui/index.ts), which is owned separately.
+import { Notice } from '@/components/ui/Notice'
 import { PasswordInput } from '@/components/PasswordInput'
 import { RelativeTime } from '@/components/RelativeTime'
-import { Select } from '@/components/Select'
-import { InlineSpinner } from '@/components/Spinner'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { usersListConfig } from '@/lib/listConfigs'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
+import { roleBadge, USER_ROLES } from '@/lib/userForm'
 import type { Profile, UserRole } from '@/lib/types'
 
 interface AdminUsersProps {
@@ -30,6 +44,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   const { user: currentUser } = useAuth()
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
   const list = useDataListState(usersListConfig)
   const [modalOpen, setModalOpen] = useState(false)
@@ -45,6 +60,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   const fetchUsers = useCallback(async () => {
     const signal = startListRequest()
     setLoading(true)
+    setLoadError(null)
     let query = supabase
       .from('profiles')
       .select('id,full_name,role,must_change_password,created_at', {
@@ -62,7 +78,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     )
     const { data, error, count } = await query.abortSignal(signal)
     if (signal.aborted) return
-    if (error) console.error(error)
+    if (error) setLoadError(t('usersLoadError'))
     setUsers((data as Profile[]) ?? [])
     setTotal(count ?? 0)
     setLoading(false)
@@ -74,35 +90,17 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     list.pageSize,
     list.search,
     list.sort,
+    t,
   ])
 
   useEffect(() => {
     fetchUsers()
   }, [fetchUsers])
 
-  const roleLabel = (value: UserRole) =>
-    value === 'admin'
-      ? t('admin')
-      : value === 'workshop'
-        ? t('workshopOfficer')
-        : value === 'assistant_workshop_manager'
-          ? t('assistantWorkshopManager')
-          : value === 'workshop_manager'
-            ? t('workshopManager')
-            : value === 'monitor'
-              ? t('monitoring')
-              : t('supervisor')
-  const roleOptions = [
-    { value: 'supervisor', label: t('supervisor') },
-    { value: 'workshop', label: t('workshopOfficer') },
-    {
-      value: 'assistant_workshop_manager',
-      label: t('assistantWorkshopManager'),
-    },
-    { value: 'workshop_manager', label: t('workshopManager') },
-    { value: 'monitor', label: t('monitoring') },
-    { value: 'admin', label: t('admin') },
-  ]
+  const roleOptions = USER_ROLES.map((value) => ({
+    value,
+    label: t(roleBadge(value).key),
+  }))
 
   function openAdd() {
     setEmail('')
@@ -175,24 +173,75 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     )
       return
     const { error } = await supabase.from('profiles').delete().eq('id', user.id)
-    if (error) console.error(error)
+    if (error) {
+      setLoadError(t('userDeleteError'))
+      return
+    }
     fetchUsers()
   }
+
+  const columns: DataTableColumn<Profile>[] = [
+    {
+      key: 'full_name',
+      header: t('fullName'),
+      sortable: true,
+      className: 'font-semibold',
+      cell: (row) => (
+        <>
+          {row.full_name}
+          {row.id === currentUser?.id ? ` (${t('you')})` : ''}
+        </>
+      ),
+    },
+    {
+      key: 'role',
+      header: t('role'),
+      sortable: true,
+      cell: (row) => {
+        const badge = roleBadge(row.role)
+        return <Badge tone={badge.tone}>{t(badge.key)}</Badge>
+      },
+    },
+    {
+      key: 'actions',
+      header: t('actions'),
+      cell: (row) =>
+        row.id === currentUser?.id ? null : (
+          <IconButton
+            size="sm"
+            label={t('delete')}
+            title={t('delete')}
+            icon={<Trash2 size={16} />}
+            onClick={() => handleDelete(row)}
+          />
+        ),
+    },
+    {
+      key: 'created_at',
+      header: t('createdAt'),
+      sortable: true,
+      className: 'text-muted',
+      hideBelow: 'md',
+      cell: (row) => <RelativeTime value={row.created_at} />,
+    },
+  ]
+
+  const addButton = (
+    <Button
+      variant="primary"
+      icon={<Plus size={16} aria-hidden="true" />}
+      onClick={openAdd}
+    >
+      {t('addUser')}
+    </Button>
+  )
 
   return (
     <div className="space-y-4">
       <PageHeader
         title={t('users')}
         description={t('usersDesc')}
-        actions={
-          <DataListActions
-            primaryAction={
-              <button onClick={openAdd} className="btn-primary">
-                <Plus size={18} /> {t('addUser')}
-              </button>
-            }
-          />
-        }
+        actions={<DataListActions primaryAction={addButton} />}
       />
       <DataListToolbar
         config={usersListConfig}
@@ -206,85 +255,36 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
         filters={list.filters}
         onFilters={list.setFilters}
       />
-      {loading ? (
-        <InlineSpinner label={t('loading')} />
-      ) : users.length === 0 ? (
-        <div className="card py-12 text-center">
-          <p className="text-muted">{t('noUsers')}</p>
-        </div>
+      {loadError ? (
+        <ErrorState description={loadError} onRetry={fetchUsers} />
+      ) : !loading && users.length === 0 ? (
+        <EmptyState
+          icon={<Users size={28} aria-hidden="true" />}
+          title={t('noUsers')}
+          action={addButton}
+        />
       ) : (
-        <div className="card overflow-hidden p-0">
-          <div className="overflow-x-auto">
-            <table className="compact-table w-full text-sm">
-              <thead>
-                <tr
-                  className="border-b"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  <th className="table-header px-4 py-3 text-start">
-                    {t('fullName')}
-                  </th>
-                  <th className="table-header px-4 py-3 text-start">
-                    {t('role')}
-                  </th>
-                  <th className="table-header px-4 py-3 text-start">
-                    {t('actions')}
-                  </th>
-                  <th
-                    className="table-header px-4 py-3"
-                    aria-label={t('createdAt')}
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="cursor-pointer border-b last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/60"
-                    style={{ borderColor: 'var(--border)' }}
-                    onClick={() => onSelectUser(user.id)}
-                    tabIndex={0}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') onSelectUser(user.id)
-                    }}
-                  >
-                    <td className="px-4 py-3 font-semibold">
-                      {user.full_name}
-                      {user.id === currentUser?.id ? ` (${t('you')})` : ''}
-                    </td>
-                    <td className="px-4 py-3 text-muted">
-                      {roleLabel(user.role)}
-                    </td>
-                    <td
-                      className="px-4 py-3"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      {user.id !== currentUser?.id && (
-                        <button
-                          onClick={() => handleDelete(user)}
-                          className="btn-ghost p-1.5"
-                          aria-label={t('delete')}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <RelativeTime value={user.created_at} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={users}
+          rowKey={(row) => row.id}
+          loading={loading}
+          loadingRows={6}
+          caption={t('users')}
+          sort={{ key: list.sort, direction: list.direction }}
+          onSortChange={list.setSort}
+          onRowClick={(row) => onSelectUser(row.id)}
+          empty={t('noUsers')}
+        />
       )}
-      <DataListPagination
-        page={list.page}
-        pageSize={list.pageSize}
-        total={total}
-        onPage={list.setPage}
-      />
+      {!loadError && total > 0 && (
+        <DataListPagination
+          page={list.page}
+          pageSize={list.pageSize}
+          total={total}
+          onPage={list.setPage}
+        />
+      )}
 
       <Dialog
         open={modalOpen}
@@ -302,52 +302,53 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
           </>
         }
       >
-        {formError && (
-          <div className="mb-4">
-            <Alert type="error">{formError}</Alert>
-          </div>
-        )}
         <div className="space-y-4">
-          <div>
-            <label className="label">{t('fullName')} *</label>
-            <input
-              className="input"
-              autoComplete="off"
-              placeholder={t('fullNamePlaceholder')}
-              value={fullName}
-              onChange={(event) => setFullName(event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="label">{t('email')} *</label>
-            <input
-              className="input"
-              type="email"
-              dir="ltr"
-              autoComplete="off"
-              placeholder={t('emailPlaceholder')}
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="label">{t('password')} *</label>
-            <PasswordInput
-              dir="ltr"
-              autoComplete="new-password"
-              placeholder={t('passwordPlaceholder')}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="label">{t('role')}</label>
-            <Select
-              value={role}
-              onChange={(value) => setRole(value as UserRole)}
-              options={roleOptions}
-            />
-          </div>
+          {formError && <Notice tone="danger">{formError}</Notice>}
+          <Field label={t('fullName')} required>
+            {(control) => (
+              <Input
+                {...control}
+                autoComplete="off"
+                placeholder={t('fullNamePlaceholder')}
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+              />
+            )}
+          </Field>
+          <Field label={t('email')} required>
+            {(control) => (
+              <Input
+                {...control}
+                type="email"
+                dir="ltr"
+                autoComplete="off"
+                placeholder={t('emailPlaceholder')}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            )}
+          </Field>
+          <Field label={t('password')} required>
+            {(control) => (
+              <PasswordInput
+                {...control}
+                autoComplete="new-password"
+                placeholder={t('passwordPlaceholder')}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            )}
+          </Field>
+          <Field label={t('role')}>
+            {(control) => (
+              <Select
+                {...control}
+                value={role}
+                onValueChange={(value) => setRole(value as UserRole)}
+                options={roleOptions}
+              />
+            )}
+          </Field>
         </div>
       </Dialog>
       {confirmDialog}

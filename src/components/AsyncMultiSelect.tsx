@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Loader2, Search, X } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
-import type { SelectOption } from '@/components/Select'
+import type { SelectOption } from '@/lib/selectOption'
 import { prepareFloatingMenu } from '@/lib/floatingMenu'
 
 interface AsyncMultiSelectProps {

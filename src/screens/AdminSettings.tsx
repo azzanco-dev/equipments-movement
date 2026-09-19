@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
-  ChevronLeft,
   ChevronRight,
   Download,
   Edit2,
@@ -13,13 +12,28 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
-import { PageHeader } from '@/components/PageHeader'
-import { Button, Dialog, useConfirm } from '@/components/ui'
-import { Alert } from '@/components/Alert'
-import { InlineSpinner } from '@/components/Spinner'
+import {
+  Button,
+  buttonClasses,
+  cn,
+  DataTable,
+  Dialog,
+  EmptyState,
+  ErrorState,
+  Field,
+  IconButton,
+  Input,
+  PageHeader,
+  SearchInput,
+  useConfirm,
+} from '@/components/ui'
+import type { DataTableColumn } from '@/components/ui'
+// Imported directly: Notice is not yet wired into the `ui` barrel
+// (src/components/ui/index.ts), which is owned separately.
+import { Notice } from '@/components/ui/Notice'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
-import type { SelectOption } from '@/components/Select'
+import type { SelectOption } from '@/lib/selectOption'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { RelativeTime } from '@/components/RelativeTime'
@@ -51,6 +65,7 @@ export function AdminSettings() {
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<EquipmentTypeRow | null>(null)
   const [name, setName] = useState('')
@@ -77,6 +92,7 @@ export function AdminSettings() {
   const fetchRows = useCallback(async () => {
     const signal = startRequest()
     setLoading(true)
+    setLoadError(null)
     let query = supabase
       .from('equipment_types')
       .select('id,name,updated_at,equipment(count)', { count: 'exact' })
@@ -85,8 +101,9 @@ export function AdminSettings() {
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
     const term = sanitizeSearchTerm(search)
     if (term) query = query.ilike('name', `%${term}%`)
-    const { data, count } = await query.abortSignal(signal)
+    const { data, error: fetchError, count } = await query.abortSignal(signal)
     if (signal.aborted) return
+    if (fetchError) setLoadError(t('equipmentTypesLoadError'))
     setRows(
       ((data as EquipmentTypeQueryRow[] | null) ?? []).map((row) => ({
         id: row.id,
@@ -97,7 +114,7 @@ export function AdminSettings() {
     )
     setTotal(count ?? 0)
     setLoading(false)
-  }, [page, search, startRequest])
+  }, [page, search, startRequest, t])
 
   useEffect(() => {
     supabase
@@ -261,22 +278,22 @@ export function AdminSettings() {
   if (showWorkshopOpening)
     return (
       <div className="space-y-4">
-        <button className="btn-ghost" onClick={() => router.push('/settings')}>
-          <ChevronLeft size={16} className="rtl-flip" />
-          {t('backToSettings')}
-        </button>
         <PageHeader
           title={t('workshopOpeningBalance')}
           description={t('workshopOpeningBalanceDesc')}
+          onBack={() => router.push('/settings')}
+          backLabel={t('backToSettings')}
         />
         {openingMessage && (
-          <Alert
-            type={
-              openingMessage === t('workshopOpeningSaved') ? 'success' : 'error'
+          <Notice
+            tone={
+              openingMessage === t('workshopOpeningSaved')
+                ? 'success'
+                : 'danger'
             }
           >
             {openingMessage}
-          </Alert>
+          </Notice>
         )}
         <div className="card max-w-2xl space-y-4">
           <div>
@@ -293,13 +310,14 @@ export function AdminSettings() {
               placeholder={t('selectEquipment')}
             />
           </div>
-          <button
-            className="btn-primary"
-            disabled={!openingEquipmentId || openingSaving}
+          <Button
+            variant="primary"
+            disabled={!openingEquipmentId}
+            loading={openingSaving}
             onClick={addOpeningBalance}
           >
-            {openingSaving ? t('saving') : t('markInsideWorkshop')}
-          </button>
+            {t('markInsideWorkshop')}
+          </Button>
         </div>
       </div>
     )
@@ -312,7 +330,7 @@ export function AdminSettings() {
           <button
             type="button"
             onClick={() => router.push('/settings/equipment-types')}
-            className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
           >
             <div className="mb-4 flex w-full items-start justify-between gap-3">
               <span
@@ -337,7 +355,7 @@ export function AdminSettings() {
           <button
             type="button"
             onClick={() => router.push('/settings/workshop-opening-balance')}
-            className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
           >
             <div className="mb-4 flex w-full items-start justify-between gap-3">
               <span
@@ -360,27 +378,71 @@ export function AdminSettings() {
       </div>
     )
 
+  const columns: DataTableColumn<EquipmentTypeRow>[] = [
+    {
+      key: 'name',
+      header: t('equipmentTypeName'),
+      className: 'font-semibold',
+      cell: (row) => row.name,
+    },
+    {
+      key: 'equipment_count',
+      header: t('linkedEquipmentCount'),
+      cell: (row) => row.equipment_count,
+    },
+    {
+      key: 'actions',
+      header: t('actions'),
+      cell: (row) => (
+        <span className="flex items-center gap-1">
+          <IconButton
+            size="sm"
+            label={t('edit')}
+            title={t('edit')}
+            icon={<Edit2 size={15} />}
+            onClick={() => openEdit(row)}
+          />
+          <IconButton
+            size="sm"
+            label={t('delete')}
+            title={t('delete')}
+            icon={<Trash2 size={15} />}
+            onClick={() => remove(row)}
+          />
+        </span>
+      ),
+    },
+    {
+      key: 'updated_at',
+      header: t('updatedAt'),
+      className: 'text-muted',
+      cell: (row) => <RelativeTime value={row.updated_at} />,
+    },
+  ]
+
   return (
     <div className="space-y-4">
-      <button className="btn-ghost" onClick={() => router.push('/settings')}>
-        <ChevronLeft size={16} className="rtl-flip" />
-        {t('backToSettings')}
-      </button>
       <PageHeader
         title={t('equipmentTypes')}
         description={t('equipmentTypesDesc')}
-      />
-      {error && <Alert type="error">{error}</Alert>}
-      <div className="card space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-bold">{t('equipmentTypes')}</h2>
-          <div className="flex flex-wrap gap-2">
-            <button className="btn-outline" onClick={downloadTemplate}>
-              <Download size={16} />
+        onBack={() => router.push('/settings')}
+        backLabel={t('backToSettings')}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              icon={<Download size={16} aria-hidden="true" />}
+              onClick={downloadTemplate}
+            >
               {t('downloadTemplate')}
-            </button>
-            <label className="btn-outline cursor-pointer">
-              <Upload size={16} />
+            </Button>
+            <label
+              className={cn(
+                buttonClasses({ variant: 'outline' }),
+                'cursor-pointer',
+              )}
+            >
+              <Upload size={16} aria-hidden="true" />
               {importing ? t('loading') : t('importExcel')}
               <input
                 ref={fileRef}
@@ -391,89 +453,60 @@ export function AdminSettings() {
                 onChange={(event) => importExcel(event.target.files?.[0])}
               />
             </label>
-            <button className="btn-primary" onClick={openCreate}>
-              <Plus size={16} />
+            <Button
+              variant="primary"
+              icon={<Plus size={16} aria-hidden="true" />}
+              onClick={openCreate}
+            >
               {t('addEquipmentType')}
-            </button>
-          </div>
-        </div>
-        <input
-          className="input max-w-md"
-          dir="ltr"
+            </Button>
+          </>
+        }
+      />
+      {error && <Notice tone="danger">{error}</Notice>}
+      <div className="space-y-3">
+        <SearchInput
           value={searchInput}
-          onChange={(event) => {
-            setSearchInput(event.target.value)
-          }}
+          onValueChange={setSearchInput}
           placeholder={t('searchEquipmentTypes')}
+          className="max-w-md"
         />
-        {loading ? (
-          <InlineSpinner label={t('loading')} />
+        {loadError ? (
+          <ErrorState description={loadError} onRetry={fetchRows} />
+        ) : !loading && rows.length === 0 ? (
+          <EmptyState
+            icon={<List size={28} aria-hidden="true" />}
+            title={t('noEquipmentTypes')}
+            action={
+              <Button
+                variant="primary"
+                icon={<Plus size={16} aria-hidden="true" />}
+                onClick={openCreate}
+              >
+                {t('addEquipmentType')}
+              </Button>
+            }
+          />
         ) : (
-          <div
-            className="overflow-hidden rounded-lg border"
-            style={{ borderColor: 'var(--border)' }}
-          >
-            <table className="compact-table w-full text-sm">
-              <thead>
-                <tr
-                  className="border-b"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  <th className="table-header px-3 py-2 text-start">
-                    {t('equipmentTypeName')}
-                  </th>
-                  <th className="table-header px-3 py-2 text-start">
-                    {t('linkedEquipmentCount')}
-                  </th>
-                  <th className="table-header px-3 py-2 text-start">
-                    {t('actions')}
-                  </th>
-                  <th
-                    className="table-header px-3 py-2"
-                    aria-label={t('updatedAt')}
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b last:border-0"
-                    style={{ borderColor: 'var(--border)' }}
-                  >
-                    <td className="px-3 py-2 font-medium">{row.name}</td>
-                    <td className="px-3 py-2">{row.equipment_count}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex gap-1">
-                        <button
-                          className="btn-ghost p-1.5"
-                          onClick={() => openEdit(row)}
-                        >
-                          <Edit2 size={15} />
-                        </button>
-                        <button
-                          className="btn-ghost p-1.5 text-red-600"
-                          onClick={() => remove(row)}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <RelativeTime value={row.updated_at} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            columns={columns}
+            rows={rows}
+            rowKey={(row) => row.id}
+            loading={loading}
+            loadingRows={6}
+            size="md"
+            caption={t('equipmentTypes')}
+            empty={t('noEquipmentTypes')}
+          />
         )}
-        <DataListPagination
-          page={page}
-          pageSize={PAGE_SIZE}
-          total={total}
-          onPage={setPage}
-        />
+        {!loadError && total > 0 && (
+          <DataListPagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={total}
+            onPage={setPage}
+          />
+        )}
       </div>
       <Dialog
         open={modalOpen}
@@ -491,14 +524,22 @@ export function AdminSettings() {
           </>
         }
       >
-        <div>
-          <label className="label">{t('equipmentTypeName')} *</label>
-          <input
-            className="input"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder={t('equipmentTypePlaceholder')}
-          />
+        <div className="space-y-4">
+          {error && (
+            <Notice tone="danger" size="compact">
+              {error}
+            </Notice>
+          )}
+          <Field label={t('equipmentTypeName')} required>
+            {(control) => (
+              <Input
+                {...control}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder={t('equipmentTypePlaceholder')}
+              />
+            )}
+          </Field>
         </div>
       </Dialog>
       {confirmDialog}

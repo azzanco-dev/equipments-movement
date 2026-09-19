@@ -1,8 +1,12 @@
 import { Plus, Trash2 } from 'lucide-react'
-import { Select } from '@/components/Select'
+import { Select } from '@/components/ui'
 import type { FilterField, FilterOperator, ListFilter } from './types'
 import { useI18n } from '@/i18n/I18nContext'
 import { createClientId } from '@/lib/clientId'
+
+/** Radix reserves '' for "no value" (see `DriverFormDialog`), so the value
+ * select for a filter with predefined options uses a sentinel for "any". */
+const ANY_FILTER_VALUE = '__any__'
 
 export function FilterBuilder({
   fields,
@@ -80,9 +84,9 @@ export function FilterBuilder({
             className="grid gap-2 sm:grid-cols-[1fr_140px_1fr_auto]"
           >
             <Select
-              compact={compact}
+              className={compact ? '!h-7 !text-xs' : undefined}
               value={filter.field}
-              onChange={(value) => {
+              onValueChange={(value) => {
                 const next =
                   fields.find((item) => item.key === value) ?? fields[0]
                 patch(filter.id, {
@@ -98,9 +102,9 @@ export function FilterBuilder({
               }))}
             />
             <Select
-              compact={compact}
+              className={compact ? '!h-7 !text-xs' : undefined}
               value={filter.operator}
-              onChange={(value) =>
+              onValueChange={(value) =>
                 patch(filter.id, { operator: value as FilterOperator })
               }
               options={field.operators.map((operator) => ({
@@ -112,10 +116,17 @@ export function FilterBuilder({
               <div />
             ) : field.options ? (
               <Select
-                compact={compact}
-                value={filter.value}
-                onChange={(value) => patch(filter.id, { value })}
-                options={[{ value: '', label: '—' }, ...field.options]}
+                className={compact ? '!h-7 !text-xs' : undefined}
+                value={filter.value || ANY_FILTER_VALUE}
+                onValueChange={(value) =>
+                  patch(filter.id, {
+                    value: value === ANY_FILTER_VALUE ? '' : value,
+                  })
+                }
+                options={[
+                  { value: ANY_FILTER_VALUE, label: '—' },
+                  ...field.options,
+                ]}
               />
             ) : (
               <div className="flex gap-2">

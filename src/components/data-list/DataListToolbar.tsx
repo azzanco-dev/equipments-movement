@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Select } from '@/components/Select'
+import { Select } from '@/components/ui'
 import { FilterBuilder } from './FilterBuilder'
 import {
   PAGE_SIZE_OPTIONS,
@@ -276,10 +276,10 @@ export function DataListToolbar({
             )}
           </div>
           <Select
-            compact
-            className="w-[78px]"
+            className="!h-7 w-[78px] !text-xs"
+            aria-label={t('rowsPerPage')}
             value={String(pageSize)}
-            onChange={(value) => onPageSize(Number(value))}
+            onValueChange={(value) => onPageSize(Number(value))}
             options={(config.pageSizeOptions ?? PAGE_SIZE_OPTIONS).map(
               (value) => ({ value: String(value), label: String(value) }),
             )}

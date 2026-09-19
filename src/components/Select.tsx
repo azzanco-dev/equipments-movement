@@ -3,11 +3,12 @@ import { createPortal } from 'react-dom'
 import { ChevronDown, Check, Search } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { prepareFloatingMenu } from '@/lib/floatingMenu'
+import type { SelectOption } from '@/lib/selectOption'
 
-export interface SelectOption {
-  value: string
-  label: string
-}
+// Re-exported for existing importers; the type itself now lives in
+// `@/lib/selectOption` so components that only need the shape (e.g.
+// `AsyncSearchSelect`, `AsyncMultiSelect`) have no dependency on this file.
+export type { SelectOption }
 
 interface SelectProps {
   value: string
