@@ -1,18 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  ArrowLeft,
-  Briefcase,
-  CreditCard,
-  Flag,
-  Phone,
-  User,
-} from 'lucide-react'
+import { Briefcase, CreditCard, Flag, Phone, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
-import { Alert } from '@/components/Alert'
-import { InlineSpinner } from '@/components/Spinner'
-import { PageHeader } from '@/components/PageHeader'
 import type { Driver } from '@/lib/types'
+import {
+  BackButton,
+  DescriptionList,
+  ErrorState,
+  PageHeader,
+  Skeleton,
+  type DescriptionListItem,
+} from '@/components/ui'
 
 export function DriverDetail({
   driverId,
@@ -41,51 +39,81 @@ export function DriverDetail({
   useEffect(() => {
     fetchDriver()
   }, [fetchDriver])
-  if (loading) return <InlineSpinner label={t('loading')} />
+  if (loading)
+    return (
+      <div
+        className="space-y-2 py-2"
+        aria-busy="true"
+        aria-label={t('loading')}
+      >
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-4/5" />
+      </div>
+    )
   if (error || !driver)
     return (
       <div className="space-y-4">
-        <button className="btn-ghost" onClick={onBack}>
-          <ArrowLeft size={18} className="rtl-flip" />
-          {t('back')}
-        </button>
-        <Alert type="error">{error}</Alert>
+        <BackButton onClick={onBack} label={t('back')} />
+        <ErrorState title={error ?? undefined} />
       </div>
     )
-  const items = [
-    [<User key="u" size={17} />, t('fullName'), driver.full_name],
-    [<User key="ue" size={17} />, t('driverNameEn'), driver.name_en ?? '—'],
-    [<CreditCard key="i" size={17} />, t('idNumber'), driver.id_number],
-    [<Phone key="p" size={17} />, t('mobileNumber'), driver.mobile_number],
-    [<Flag key="f" size={17} />, t('nationality'), driver.nationality],
-    [
-      <Briefcase key="e" size={17} />,
-      t('employmentType'),
-      driver.employment_type,
-    ],
-    [<Briefcase key="j" size={17} />, t('jobTitle'), driver.job_title ?? '—'],
-  ] as const
+  const items: DescriptionListItem[] = [
+    {
+      key: 'fullName',
+      icon: <User size={17} />,
+      label: t('fullName'),
+      value: driver.full_name,
+    },
+    {
+      key: 'nameEn',
+      icon: <User size={17} />,
+      label: t('driverNameEn'),
+      value: driver.name_en,
+    },
+    {
+      key: 'idNumber',
+      icon: <CreditCard size={17} />,
+      label: t('idNumber'),
+      value: driver.id_number,
+      dir: 'ltr',
+    },
+    {
+      key: 'mobileNumber',
+      icon: <Phone size={17} />,
+      label: t('mobileNumber'),
+      value: driver.mobile_number,
+      dir: 'ltr',
+    },
+    {
+      key: 'nationality',
+      icon: <Flag size={17} />,
+      label: t('nationality'),
+      value: driver.nationality,
+    },
+    {
+      key: 'employmentType',
+      icon: <Briefcase size={17} />,
+      label: t('employmentType'),
+      value: driver.employment_type,
+    },
+    {
+      key: 'jobTitle',
+      icon: <Briefcase size={17} />,
+      label: t('jobTitle'),
+      value: driver.job_title,
+    },
+  ]
   return (
     <div className="space-y-5">
-      <button className="btn-ghost" onClick={onBack}>
-        <ArrowLeft size={18} className="rtl-flip" />
-        {t('backToDrivers')}
-      </button>
-      <PageHeader title={driver.full_name} description={t('driverDetails')} />
-      <div className="card grid grid-cols-1 gap-x-6 sm:grid-cols-2">
-        {items.map(([icon, label, value]) => (
-          <div
-            key={label}
-            className="flex gap-3 border-b py-3 last:border-0"
-            style={{ borderColor: 'var(--border)' }}
-          >
-            <span className="mt-1 text-muted">{icon}</span>
-            <div>
-              <p className="text-xs text-muted">{label}</p>
-              <p className="font-medium">{value}</p>
-            </div>
-          </div>
-        ))}
+      <PageHeader
+        title={driver.full_name}
+        description={t('driverDetails')}
+        onBack={onBack}
+        backLabel={t('backToDrivers')}
+      />
+      <div className="card">
+        <DescriptionList items={items} columns={2} />
       </div>
     </div>
   )

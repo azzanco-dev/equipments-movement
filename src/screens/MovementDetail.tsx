@@ -1,12 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
-import { InlineSpinner } from '@/components/Spinner'
-import { PageHeader } from '@/components/PageHeader'
 import { Alert } from '@/components/Alert'
 import { useAuth } from '@/auth/AuthContext'
 import {
-  ArrowLeft,
   LogIn,
   LogOut,
   Truck,
@@ -36,7 +33,6 @@ import type {
   MovementDriverChange,
 } from '@/lib/types'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
-import { Lightbox, type LightboxItem } from '@/components/ui/Lightbox'
 import type { SelectOption } from '@/components/Select'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
@@ -45,6 +41,23 @@ import { localizedName } from '@/lib/localizedName'
 import { uploadMovementPhotosDirectly } from '@/lib/movementPhotoUpload'
 import { prepareMovementPhotos } from '@/lib/movementPhotoCompression'
 import { useListRequest } from '@/components/data-list/useListRequest'
+import {
+  BackButton,
+  Button,
+  DescriptionList,
+  ErrorState,
+  Field,
+  InfoRow,
+  Input,
+  Lightbox,
+  MovementBadge,
+  PageHeader,
+  Skeleton,
+  WorkshopPurposeBadge,
+  useConfirm,
+  type DescriptionListItem,
+  type LightboxItem,
+} from '@/components/ui'
 
 // Storage signed URLs are minted with a 3600s (60 min) expiry. Cached URLs
 // are reused across re-fetches (add/delete photo, edit, driver change) and
@@ -58,26 +71,6 @@ interface MovementDetailProps {
   onNavigateMovement: (id: string) => void
 }
 
-function InfoRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: string | null | undefined
-}) {
-  return (
-    <div className="flex items-start gap-3 py-2">
-      <span className="text-muted mt-0.5 shrink-0">{icon}</span>
-      <div className="min-w-0">
-        <p className="text-xs text-muted">{label}</p>
-        <p className="font-medium break-words">{value || '—'}</p>
-      </div>
-    </div>
-  )
-}
-
 export function MovementDetail({
   movementId,
   onBack,
@@ -85,6 +78,7 @@ export function MovementDetail({
 }: MovementDetailProps) {
   const { t, lang } = useI18n()
   const { user, profile } = useAuth()
+  const { confirm, confirmDialog } = useConfirm()
   const [log, setLog] = useState<EntryExitLog | null>(null)
   const [company, setCompany] = useState<Company | null>(null)
   const [project, setProject] = useState<Project | null>(null)
@@ -619,7 +613,8 @@ export function MovementDetail({
   }
 
   const deletePhoto = async (photoId: string) => {
-    if (!confirm(t('confirmDeletePhoto'))) return
+    if (!(await confirm({ title: t('confirmDeletePhoto'), tone: 'danger' })))
+      return
     setPhotoBusy(true)
     setPhotoActionError(null)
     let response: Response
@@ -648,15 +643,24 @@ export function MovementDetail({
     await fetchData()
   }
 
-  if (loading) return <InlineSpinner label={t('loading')} />
+  if (loading)
+    return (
+      <div
+        className="space-y-2 py-2"
+        aria-busy="true"
+        aria-label={t('loading')}
+      >
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-4/5" />
+      </div>
+    )
 
   if (error) {
     return (
       <div className="space-y-4">
-        <button onClick={onBack} className="btn-ghost">
-          <ArrowLeft size={18} className="rtl-flip" /> {t('backToMovements')}
-        </button>
-        <Alert type="error">{error}</Alert>
+        <BackButton onClick={onBack} label={t('backToMovements')} />
+        <ErrorState title={error} />
       </div>
     )
   }
@@ -682,284 +686,296 @@ export function MovementDetail({
     }
   }
 
+  const detailItems: DescriptionListItem[] = [
+    {
+      key: 'equipment',
+      icon: <Truck size={16} />,
+      label: t('equipmentNameLabel'),
+      value: log.equipment
+        ? `${log.equipment.code} — ${log.equipment.type}`
+        : null,
+    },
+    ...(isWorkshopMovement && isEntry
+      ? [
+          {
+            key: 'workshopPurpose',
+            icon: <FileText size={16} />,
+            label: t('workshopPurpose'),
+            value:
+              log.workshop_purpose === 'maintenance' ||
+              log.workshop_purpose === 'parking' ? (
+                <WorkshopPurposeBadge purpose={log.workshop_purpose} />
+              ) : (
+                t('pendingClassification')
+              ),
+          },
+        ]
+      : []),
+    ...(!isWorkshopMovement
+      ? [
+          {
+            key: 'contractorCode',
+            icon: <FileText size={16} />,
+            label: t('contractorEquipmentCode'),
+            value: log.contractor_equipment_code,
+          },
+          ...(log.equipment?.ownership_status === 'external_supplier' &&
+          log.equipment?.lessor?.name
+            ? [
+                {
+                  key: 'lessor',
+                  icon: <Store size={16} />,
+                  label: t('lessor'),
+                  value: log.equipment.lessor.name,
+                },
+              ]
+            : []),
+          {
+            key: 'company',
+            icon: <Building2 size={16} />,
+            label: t('company'),
+            value: company
+              ? localizedName(lang, company.name_ar, company.name_en)
+              : null,
+          },
+          {
+            key: 'project',
+            icon: <MapPin size={16} />,
+            label: t('project'),
+            value: project
+              ? localizedName(lang, project.name_ar, project.name_en)
+              : null,
+          },
+          {
+            key: 'driver',
+            icon: <User size={16} />,
+            label: t('driverName'),
+            value: (
+              <>
+                {(isEntry
+                  ? driverChanges.at(-1)?.new_driver_name
+                  : undefined) ??
+                  log.driver?.full_name ??
+                  log.driver_name ??
+                  '—'}
+                {currentDriverMobileNumber && (
+                  <span
+                    className="mt-0.5 block select-text text-muted"
+                    dir="ltr"
+                  >
+                    <a href={`tel:${currentDriverMobileNumber}`}>
+                      {currentDriverMobileNumber}
+                    </a>
+                  </span>
+                )}
+              </>
+            ),
+          },
+        ]
+      : []),
+    ...(profile?.role === 'admin' ||
+    profile?.role === 'monitor' ||
+    (['workshop_manager', 'assistant_workshop_manager'].includes(
+      profile?.role ?? '',
+    ) &&
+      isWorkshopMovement)
+      ? [
+          {
+            key: 'supervisor',
+            icon: <User size={16} />,
+            label: t('supervisorName'),
+            value: log.supervisor?.full_name,
+          },
+        ]
+      : []),
+    {
+      key: 'movementDate',
+      icon: <Clock size={16} />,
+      label: t('movementDate'),
+      value: formatDate(log.recorded_at),
+    },
+    ...(profile?.role === 'admin'
+      ? [
+          {
+            key: 'createdAt',
+            icon: <Clock size={16} />,
+            label: t('createdAt'),
+            value: log.created_at ? formatDateTime(log.created_at) : null,
+          },
+        ]
+      : []),
+  ]
+
   return (
     <div className="space-y-6">
-      <button onClick={onBack} className="btn-ghost">
-        <ArrowLeft size={18} className="rtl-flip" /> {t('backToMovements')}
-      </button>
-
       <PageHeader
         title={t('movementDetails')}
         description={t('movementDetailsDesc')}
+        onBack={onBack}
+        backLabel={t('backToMovements')}
+        actions={
+          profile?.role === 'admin' ? (
+            <Button
+              type="button"
+              variant="outline"
+              icon={<Pencil size={16} />}
+              onClick={openEdit}
+            >
+              {t('editMovement')}
+            </Button>
+          ) : undefined
+        }
       />
-
-      {profile?.role === 'admin' && (
-        <div className="flex justify-end">
-          <button type="button" className="btn-outline" onClick={openEdit}>
-            <Pencil size={16} /> {t('editMovement')}
-          </button>
-        </div>
-      )}
 
       {editOpen && profile?.role === 'admin' && (
         <div className="card space-y-4">
           <h3 className="font-bold">{t('editMovement')}</h3>
           {editError && <Alert type="error">{editError}</Alert>}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <label className="space-y-1 text-sm">
-              <span>{t('equipmentNameLabel')}</span>
-              <AsyncSearchSelect
-                value={editEquipment?.value ?? ''}
-                selectedOption={editEquipment}
-                onChange={(_, option) => setEditEquipment(option)}
-                loadOptions={loadEquipment}
-              />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>{t('supervisorName')}</span>
-              <AsyncSearchSelect
-                value={editSupervisor?.value ?? ''}
-                selectedOption={editSupervisor}
-                onChange={(_, option) => setEditSupervisor(option)}
-                loadOptions={loadSupervisors}
-              />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>{t('movementDate')}</span>
-              <input
-                type="datetime-local"
-                value={editRecordedAt}
-                max={new Date().toISOString().slice(0, 16)}
-                onChange={(event) => setEditRecordedAt(event.target.value)}
-                className="h-8 w-full rounded-lg border bg-transparent px-3 text-base sm:text-sm"
-                style={{ borderColor: 'var(--border)' }}
-              />
-            </label>
-            {!isWorkshopMovement && (
-              <label className="space-y-1 text-sm">
-                <span>{t('contractorEquipmentCode')}</span>
-                <input
-                  value={editContractorCode}
-                  onChange={(event) =>
-                    setEditContractorCode(event.target.value)
-                  }
-                  className="h-8 w-full rounded-lg border bg-transparent px-3 text-base sm:text-sm"
-                  style={{ borderColor: 'var(--border)' }}
+            <Field label={t('equipmentNameLabel')}>
+              {() => (
+                <AsyncSearchSelect
+                  value={editEquipment?.value ?? ''}
+                  selectedOption={editEquipment}
+                  onChange={(_, option) => setEditEquipment(option)}
+                  loadOptions={loadEquipment}
                 />
-              </label>
+              )}
+            </Field>
+            <Field label={t('supervisorName')}>
+              {() => (
+                <AsyncSearchSelect
+                  value={editSupervisor?.value ?? ''}
+                  selectedOption={editSupervisor}
+                  onChange={(_, option) => setEditSupervisor(option)}
+                  loadOptions={loadSupervisors}
+                />
+              )}
+            </Field>
+            <Field label={t('movementDate')}>
+              {(control) => (
+                <Input
+                  {...control}
+                  type="datetime-local"
+                  value={editRecordedAt}
+                  max={new Date().toISOString().slice(0, 16)}
+                  onChange={(event) => setEditRecordedAt(event.target.value)}
+                />
+              )}
+            </Field>
+            {!isWorkshopMovement && (
+              <Field label={t('contractorEquipmentCode')}>
+                {(control) => (
+                  <Input
+                    {...control}
+                    value={editContractorCode}
+                    onChange={(event) =>
+                      setEditContractorCode(event.target.value)
+                    }
+                  />
+                )}
+              </Field>
             )}
             {!isWorkshopMovement && (
-              <label className="space-y-1 text-sm">
-                <span>{t('company')}</span>
-                <AsyncSearchSelect
-                  value={editCompany?.value ?? ''}
-                  selectedOption={editCompany}
-                  onChange={(_, option) => setEditCompany(option)}
-                  loadOptions={loadCompanies}
-                />
-              </label>
+              <Field label={t('company')}>
+                {() => (
+                  <AsyncSearchSelect
+                    value={editCompany?.value ?? ''}
+                    selectedOption={editCompany}
+                    onChange={(_, option) => setEditCompany(option)}
+                    loadOptions={loadCompanies}
+                  />
+                )}
+              </Field>
             )}
             {!isWorkshopMovement && (
-              <label className="space-y-1 text-sm">
-                <span>{t('project')}</span>
-                <AsyncSearchSelect
-                  value={editProject?.value ?? ''}
-                  selectedOption={editProject}
-                  onChange={(_, option) => setEditProject(option)}
-                  loadOptions={loadProjects}
-                />
-              </label>
+              <Field label={t('project')}>
+                {() => (
+                  <AsyncSearchSelect
+                    value={editProject?.value ?? ''}
+                    selectedOption={editProject}
+                    onChange={(_, option) => setEditProject(option)}
+                    loadOptions={loadProjects}
+                  />
+                )}
+              </Field>
             )}
             {!isWorkshopMovement && !log.driver_id && (
-              <label className="space-y-1 text-sm">
-                <span>{t('driverName')}</span>
-                <AsyncSearchSelect
-                  value={editDriver?.value ?? ''}
-                  selectedOption={editDriver}
-                  onChange={(_, option) => setEditDriver(option)}
-                  loadOptions={loadDrivers}
-                />
-              </label>
+              <Field label={t('driverName')}>
+                {() => (
+                  <AsyncSearchSelect
+                    value={editDriver?.value ?? ''}
+                    selectedOption={editDriver}
+                    onChange={(_, option) => setEditDriver(option)}
+                    loadOptions={loadDrivers}
+                  />
+                )}
+              </Field>
             )}
           </div>
           {!isWorkshopMovement && log.driver_id && (
             <p className="text-xs text-muted">{t('existingDriverEditHint')}</p>
           )}
           <div className="flex gap-2">
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={editBusy}
-              onClick={saveEdit}
-            >
-              {editBusy ? t('loading') : t('saveChanges')}
-            </button>
-            <button
-              type="button"
-              className="btn-outline"
+            <Button variant="primary" loading={editBusy} onClick={saveEdit}>
+              {t('saveChanges')}
+            </Button>
+            <Button
+              variant="outline"
               disabled={editBusy}
               onClick={() => setEditOpen(false)}
             >
               {t('cancel')}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {/* Movement type banner */}
       <div
-        className="rounded-xl border p-4 flex items-center gap-3"
+        className="flex items-center gap-3 rounded-xl border p-4"
         style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
       >
         <div
           className="flex h-10 w-10 items-center justify-center rounded-full"
           style={{
-            background: isEntry
-              ? 'rgba(34,197,94,0.12)'
-              : 'rgba(245,158,11,0.12)',
+            backgroundColor: isEntry ? 'var(--entry-soft)' : 'var(--exit-soft)',
           }}
         >
           {isEntry ? (
-            <LogIn size={20} className="text-green-600 dark:text-green-400" />
+            <LogIn size={20} style={{ color: 'var(--entry)' }} />
           ) : (
-            <LogOut size={20} className="text-amber-600 dark:text-amber-400" />
+            <LogOut size={20} style={{ color: 'var(--exit)' }} />
           )}
         </div>
         <div>
           <p className="text-xs text-muted">{t('movementType')}</p>
-          <p className="font-bold text-lg">
-            {isEntry ? t('entry') : t('exit')}
-          </p>
+          <MovementBadge
+            type={isEntry ? 'entry' : 'exit'}
+            withIcon
+            className="mt-1"
+          />
         </div>
       </div>
 
       {/* Main details card */}
       <div className="card">
-        <h3 className="text-sm font-bold text-muted uppercase tracking-wide mb-2">
+        <h3 className="mb-2 text-sm font-bold text-muted">
           {t('movementDetails')}
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
-          <InfoRow
-            icon={<Truck size={16} />}
-            label={t('equipmentNameLabel')}
-            value={
-              log.equipment
-                ? `${log.equipment.code} — ${log.equipment.type}`
-                : '—'
-            }
-          />
-          {isWorkshopMovement && isEntry && (
-            <InfoRow
-              icon={<FileText size={16} />}
-              label={t('workshopPurpose')}
-              value={
-                log.workshop_purpose === 'maintenance'
-                  ? t('maintenancePurpose')
-                  : log.workshop_purpose === 'parking'
-                    ? t('parkingPurpose')
-                    : t('pendingClassification')
-              }
-            />
-          )}
-          {!isWorkshopMovement && (
-            <>
-              <InfoRow
-                icon={<FileText size={16} />}
-                label={t('contractorEquipmentCode')}
-                value={log.contractor_equipment_code}
-              />
-              {log.equipment?.ownership_status === 'external_supplier' &&
-                log.equipment?.lessor?.name && (
-                  <InfoRow
-                    icon={<Store size={16} />}
-                    label={t('lessor')}
-                    value={log.equipment.lessor.name}
-                  />
-                )}
-              <InfoRow
-                icon={<Building2 size={16} />}
-                label={t('company')}
-                value={
-                  company
-                    ? localizedName(lang, company.name_ar, company.name_en)
-                    : '—'
-                }
-              />
-              <InfoRow
-                icon={<MapPin size={16} />}
-                label={t('project')}
-                value={
-                  project
-                    ? localizedName(lang, project.name_ar, project.name_en)
-                    : '—'
-                }
-              />
-              <div className="flex items-start gap-3 py-2">
-                <span className="text-muted mt-0.5 shrink-0">
-                  <User size={16} />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted">{t('driverName')}</p>
-                  <div className="flex flex-col text-right" dir="rtl">
-                    <p className="font-medium break-words">
-                      {(isEntry
-                        ? driverChanges.at(-1)?.new_driver_name
-                        : undefined) ??
-                        log.driver?.full_name ??
-                        log.driver_name ??
-                        '—'}
-                    </p>
-                    {currentDriverMobileNumber && (
-                      <p className="select-text text-muted" dir="ltr">
-                        <a href={`tel:${currentDriverMobileNumber}`}>
-                          {currentDriverMobileNumber}
-                        </a>
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-          {(profile?.role === 'admin' ||
-            profile?.role === 'monitor' ||
-            (['workshop_manager', 'assistant_workshop_manager'].includes(
-              profile?.role ?? '',
-            ) &&
-              isWorkshopMovement)) && (
-            <InfoRow
-              icon={<User size={16} />}
-              label={t('supervisorName')}
-              value={log.supervisor?.full_name}
-            />
-          )}
-          <InfoRow
-            icon={<Clock size={16} />}
-            label={t('movementDate')}
-            value={formatDate(log.recorded_at)}
-          />
-          {profile?.role === 'admin' && (
-            <InfoRow
-              icon={<Clock size={16} />}
-              label={t('createdAt')}
-              value={log.created_at ? formatDateTime(log.created_at) : '—'}
-            />
-          )}
-        </div>
+        <DescriptionList items={detailItems} columns={2} />
 
         {/* Notes */}
         {log.notes && (
           <div
-            className="mt-4 pt-4 border-t"
+            className="mt-4 border-t pt-4"
             style={{ borderColor: 'var(--border)' }}
           >
-            <div className="flex items-start gap-3">
-              <StickyNote size={16} className="text-muted mt-0.5 shrink-0" />
-              <div>
-                <p className="text-xs text-muted">{t('notes')}</p>
-                <p className="font-medium whitespace-pre-wrap">{log.notes}</p>
-              </div>
-            </div>
+            <InfoRow
+              icon={<StickyNote size={16} />}
+              label={t('notes')}
+              value={<span className="whitespace-pre-wrap">{log.notes}</span>}
+            />
           </div>
         )}
 
@@ -1078,7 +1094,7 @@ export function MovementDetail({
           )}
           {profile?.role !== 'monitor' && photoItems.length < 3 && (
             <label
-              className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-sm hover:bg-surface-hover"
               style={{ borderColor: 'var(--border)' }}
             >
               <Upload size={16} />
@@ -1115,59 +1131,66 @@ export function MovementDetail({
               !linkedLog &&
               profile?.role !== 'workshop' &&
               profile?.role !== 'monitor' && (
-                <button
-                  className="btn-outline"
+                <Button
+                  variant="outline"
+                  icon={<RefreshCw size={16} />}
                   onClick={() => setDriverChangeOpen((value) => !value)}
                 >
-                  <RefreshCw size={16} />
                   {t('changeDriver')}
-                </button>
+                </Button>
               )}
           </div>
           {driverChangeOpen && (
             <div
-              className="rounded-lg border p-4 space-y-3"
+              className="space-y-3 rounded-lg border p-4"
               style={{ borderColor: 'var(--border)' }}
             >
-              <div>
-                <label className="label">{t('newDriver')} *</label>
-                <AsyncSearchSelect
-                  value={newDriverId}
-                  selectedOption={newDriverOption}
-                  onChange={(value, option) => {
-                    setNewDriverId(value)
-                    setNewDriverOption(option)
-                  }}
-                  loadOptions={loadDrivers}
-                  placeholder={t('selectDriver')}
-                />
-              </div>
-              <div>
-                <label className="label">{t('notes')}</label>
-                <input
-                  className="input"
-                  value={driverChangeNote}
-                  onChange={(event) => setDriverChangeNote(event.target.value)}
-                  placeholder={t('notesPlaceholder')}
-                />
-              </div>
+              <Field label={t('newDriver')} required>
+                {() => (
+                  <AsyncSearchSelect
+                    value={newDriverId}
+                    selectedOption={newDriverOption}
+                    onChange={(value, option) => {
+                      setNewDriverId(value)
+                      setNewDriverOption(option)
+                    }}
+                    loadOptions={loadDrivers}
+                    placeholder={t('selectDriver')}
+                  />
+                )}
+              </Field>
+              <Field label={t('notes')}>
+                {(control) => (
+                  <Input
+                    {...control}
+                    value={driverChangeNote}
+                    onChange={(event) =>
+                      setDriverChangeNote(event.target.value)
+                    }
+                    placeholder={t('notesPlaceholder')}
+                  />
+                )}
+              </Field>
               {driverChangeError && (
                 <Alert type="error">{driverChangeError}</Alert>
               )}
               <div className="flex gap-2">
-                <button
-                  className="btn-outline flex-1"
+                <Button
+                  variant="outline"
+                  className="flex-1"
                   onClick={() => setDriverChangeOpen(false)}
                 >
                   {t('cancel')}
-                </button>
-                <button
-                  className="btn-primary flex-1"
-                  disabled={!newDriverId || driverChangeBusy}
+                </Button>
+                <Button
+                  variant="primary"
+                  className="flex-1"
+                  disabled={!newDriverId}
+                  loading={driverChangeBusy}
                   onClick={changeDriver}
                 >
-                  {driverChangeBusy ? t('saving') : t('save')}
-                </button>
+                  {t('save')}
+                </Button>
               </div>
             </div>
           )}
@@ -1212,105 +1235,112 @@ export function MovementDetail({
       {/* Linked movement section */}
       {isEntry ? (
         <div className="card">
-          <h3 className="text-sm font-bold text-muted uppercase tracking-wide mb-3 flex items-center gap-2">
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-muted">
             <Link2 size={16} /> {t('linkedExit')}
           </h3>
           {linkedError ? (
             <Alert type="error">{linkedError}</Alert>
           ) : linkedLog ? (
             <div className="space-y-2">
-              <InfoRow
-                icon={<Clock size={16} />}
-                label={t('movementDate')}
-                value={formatDate(linkedLog.recorded_at)}
+              <DescriptionList
+                items={[
+                  {
+                    key: 'date',
+                    icon: <Clock size={16} />,
+                    label: t('movementDate'),
+                    value: formatDate(linkedLog.recorded_at),
+                  },
+                  {
+                    key: 'duration',
+                    icon: <Clock size={16} />,
+                    label: t('durationOnSite'),
+                    value: formatElapsedDuration(durationMs, t, lang),
+                  },
+                ]}
               />
-              <div className="flex items-center gap-3 py-2">
-                <Clock size={16} className="text-muted shrink-0" />
-                <div>
-                  <p className="text-xs text-muted">{t('durationOnSite')}</p>
-                  <p className="font-medium">
-                    {formatElapsedDuration(durationMs, t, lang)}
-                  </p>
-                </div>
-              </div>
-              <button
+              <Button
+                variant="outline"
+                icon={<ExternalLink size={16} />}
                 onClick={() => onNavigateMovement(linkedLog.id)}
-                className="btn-outline mt-2"
+                className="mt-2"
               >
-                <ExternalLink size={16} /> {t('viewDetails')}
-              </button>
+                {t('viewDetails')}
+              </Button>
             </div>
           ) : (
-            <p className="text-sm text-muted italic">{t('notExitedYet')}</p>
+            <p className="text-sm italic text-muted">{t('notExitedYet')}</p>
           )}
         </div>
       ) : (
         <div className="card">
-          <h3 className="text-sm font-bold text-muted uppercase tracking-wide mb-3 flex items-center gap-2">
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-muted">
             <Link2 size={16} /> {t('linkedEntry')}
           </h3>
           {linkedError ? (
             <Alert type="error">{linkedError}</Alert>
           ) : linkedLog ? (
             <div className="space-y-2">
-              <InfoRow
-                icon={<Clock size={16} />}
-                label={t('movementDate')}
-                value={formatDate(linkedLog.recorded_at)}
+              <DescriptionList
+                items={[
+                  {
+                    key: 'date',
+                    icon: <Clock size={16} />,
+                    label: t('movementDate'),
+                    value: formatDate(linkedLog.recorded_at),
+                  },
+                  ...(!isWorkshopMovement
+                    ? [
+                        {
+                          key: 'company',
+                          icon: <Building2 size={16} />,
+                          label: t('company'),
+                          value: linkedCompany
+                            ? localizedName(
+                                lang,
+                                linkedCompany.name_ar,
+                                linkedCompany.name_en,
+                              )
+                            : null,
+                        },
+                        {
+                          key: 'project',
+                          icon: <MapPin size={16} />,
+                          label: t('project'),
+                          value: linkedProject
+                            ? localizedName(
+                                lang,
+                                linkedProject.name_ar,
+                                linkedProject.name_en,
+                              )
+                            : null,
+                        },
+                        {
+                          key: 'contractorCode',
+                          icon: <FileText size={16} />,
+                          label: t('contractorEquipmentCode'),
+                          value: linkedLog.contractor_equipment_code,
+                        },
+                      ]
+                    : []),
+                  {
+                    key: 'duration',
+                    icon: <Clock size={16} />,
+                    label: t('durationOnSite'),
+                    value: formatElapsedDuration(durationMs, t, lang),
+                  },
+                ]}
               />
-              {!isWorkshopMovement && (
-                <>
-                  <InfoRow
-                    icon={<Building2 size={16} />}
-                    label={t('company')}
-                    value={
-                      linkedCompany
-                        ? localizedName(
-                            lang,
-                            linkedCompany.name_ar,
-                            linkedCompany.name_en,
-                          )
-                        : '—'
-                    }
-                  />
-                  <InfoRow
-                    icon={<MapPin size={16} />}
-                    label={t('project')}
-                    value={
-                      linkedProject
-                        ? localizedName(
-                            lang,
-                            linkedProject.name_ar,
-                            linkedProject.name_en,
-                          )
-                        : '—'
-                    }
-                  />
-                  <InfoRow
-                    icon={<FileText size={16} />}
-                    label={t('contractorEquipmentCode')}
-                    value={linkedLog.contractor_equipment_code}
-                  />
-                </>
-              )}
-              <div className="flex items-center gap-3 py-2">
-                <Clock size={16} className="text-muted shrink-0" />
-                <div>
-                  <p className="text-xs text-muted">{t('durationOnSite')}</p>
-                  <p className="font-medium">
-                    {formatElapsedDuration(durationMs, t, lang)}
-                  </p>
-                </div>
-              </div>
-              <button
+              <Button
+                variant="outline"
+                icon={<ExternalLink size={16} />}
                 onClick={() => onNavigateMovement(linkedLog.id)}
-                className="btn-outline mt-2"
+                className="mt-2"
               >
-                <ExternalLink size={16} /> {t('viewDetails')}
-              </button>
+                {t('viewDetails')}
+              </Button>
             </div>
           ) : (
-            <p className="text-sm text-muted italic">—</p>
+            <p className="text-sm italic text-muted">—</p>
           )}
         </div>
       )}
@@ -1322,6 +1352,7 @@ export function MovementDetail({
         index={photoCarouselIndex}
         onIndexChange={setPhotoCarouselIndex}
       />
+      {confirmDialog}
     </div>
   )
 }

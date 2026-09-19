@@ -1,17 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowRight } from 'lucide-react'
 import { Alert } from '@/components/Alert'
 import { AsyncMultiSelect } from '@/components/AsyncMultiSelect'
 import { PasswordInput } from '@/components/PasswordInput'
-import { Select, type SelectOption } from '@/components/Select'
-import { InlineSpinner } from '@/components/Spinner'
-import { useConfirm } from '@/components/ui'
+import type { SelectOption } from '@/components/Select'
 import { useI18n } from '@/i18n/I18nContext'
 import { localizedName } from '@/lib/localizedName'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
 import type { Profile, UserRole } from '@/lib/types'
+import {
+  Badge,
+  Button,
+  Field,
+  Input,
+  PageHeader,
+  Select,
+  Skeleton,
+  useConfirm,
+} from '@/components/ui'
 
 interface UserDetailProps {
   userId: string
@@ -222,112 +229,113 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     onBack()
   }
 
-  if (loading) return <InlineSpinner label={t('loading')} />
+  if (loading)
+    return (
+      <div
+        className="space-y-2 py-2"
+        aria-busy="true"
+        aria-label={t('loading')}
+      >
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-4/5" />
+      </div>
+    )
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <button
-        type="button"
-        onClick={handleBack}
-        className="btn-ghost gap-1 px-1"
-      >
-        <ArrowRight size={16} className={lang === 'en' ? 'rotate-180' : ''} />
-        {t('back')}
-      </button>
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-bold tracking-tight">
+      <PageHeader
+        onBack={handleBack}
+        backLabel={t('back')}
+        title={
+          <span className="inline-flex flex-wrap items-center gap-2">
             {t('userDetails')}
-          </h1>
-          {hasUnsavedChanges && (
-            <span className="badge border border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-200">
-              {t('unsavedData')}
-            </span>
-          )}
-          {user?.must_change_password && (
-            <span className="badge border border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700/70 dark:bg-amber-950/30 dark:text-amber-200">
-              {t('mustChangePassword')}
-            </span>
-          )}
-        </div>
-        {user && (
-          <p className="mt-0.5 text-[13px] text-muted">{user.full_name}</p>
-        )}
-      </div>
+            {hasUnsavedChanges && (
+              <Badge tone="warning">{t('unsavedData')}</Badge>
+            )}
+            {user?.must_change_password && (
+              <Badge tone="warning">{t('mustChangePassword')}</Badge>
+            )}
+          </span>
+        }
+        description={user?.full_name}
+      />
       <div className="card space-y-4">
         {error && <Alert type="error">{error}</Alert>}
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="label">{t('fullName')} *</label>
-            <input
-              className="input"
-              autoComplete="off"
-              value={fullName}
-              onChange={(event) => setFullName(event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="label">{t('email')} *</label>
-            <input
-              className="input"
-              type="email"
-              dir="ltr"
-              autoComplete="off"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </div>
-          <div>
-            <label className="label">{t('role')}</label>
-            <Select
-              value={role}
-              onChange={(value) => {
-                setRole(value as UserRole)
-                if (value !== 'supervisor') setCompanies([])
-              }}
-              options={roleOptions}
-            />
-          </div>
-          <div>
-            <label className="label">{t('temporaryPassword')}</label>
-            <PasswordInput
-              dir="ltr"
-              autoComplete="new-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-            <p className="mt-1 text-xs text-muted">
-              {t('temporaryPasswordHelp')}
-            </p>
-          </div>
+          <Field label={t('fullName')} required>
+            {(control) => (
+              <Input
+                {...control}
+                autoComplete="off"
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+              />
+            )}
+          </Field>
+          <Field label={t('email')} required>
+            {(control) => (
+              <Input
+                {...control}
+                type="email"
+                dir="ltr"
+                autoComplete="off"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            )}
+          </Field>
+          <Field label={t('role')}>
+            {(control) => (
+              <Select
+                {...control}
+                value={role}
+                onValueChange={(value) => {
+                  setRole(value as UserRole)
+                  if (value !== 'supervisor') setCompanies([])
+                }}
+                options={roleOptions}
+              />
+            )}
+          </Field>
+          <Field
+            label={t('temporaryPassword')}
+            hint={t('temporaryPasswordHelp')}
+          >
+            {({ id }) => (
+              <PasswordInput
+                id={id}
+                dir="ltr"
+                autoComplete="new-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            )}
+          </Field>
         </div>
         {role === 'supervisor' && (
-          <div>
-            <label className="label">{t('assignedCompanies')}</label>
-            <AsyncMultiSelect
-              value={companies}
-              onChange={setCompanies}
-              loadOptions={loadCompanies}
-              loadAllOptions={loadAllCompanies}
-              placeholder={t('selectCompanies')}
-            />
-            <p className="mt-1 text-xs text-muted">
-              {t('assignedCompaniesHelp')}
-            </p>
-          </div>
+          <Field
+            label={t('assignedCompanies')}
+            hint={t('assignedCompaniesHelp')}
+          >
+            {() => (
+              <AsyncMultiSelect
+                value={companies}
+                onChange={setCompanies}
+                loadOptions={loadCompanies}
+                loadAllOptions={loadAllCompanies}
+                placeholder={t('selectCompanies')}
+              />
+            )}
+          </Field>
         )}
         <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={handleBack} className="btn-outline">
+          <Button variant="outline" onClick={handleBack}>
             {t('cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="btn-primary"
-          >
-            {saving ? t('saving') : t('save')}
-          </button>
+          </Button>
+          <Button variant="primary" loading={saving} onClick={handleSave}>
+            {t('save')}
+          </Button>
         </div>
       </div>
       {confirmDialog}

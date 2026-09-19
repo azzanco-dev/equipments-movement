@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
-import { InlineSpinner } from '@/components/Spinner'
 import { QRCodeDisplay } from '@/components/QRCodeDisplay'
 import {
-  ArrowLeft,
   Edit2,
   Power,
   Printer,
@@ -20,7 +18,6 @@ import type {
   OperationalStatus,
   OwnershipStatus,
 } from '@/lib/types'
-import { PageHeader } from '@/components/PageHeader'
 import {
   isOwnedEquipment,
   usesExternalSupplier,
@@ -30,6 +27,20 @@ import { localizedName } from '@/lib/localizedName'
 import { printEquipmentQr } from '@/lib/printEquipmentQr'
 import { Alert } from '@/components/Alert'
 import { useListRequest } from '@/components/data-list/useListRequest'
+import {
+  BackButton,
+  Badge,
+  Button,
+  DataTable,
+  EmptyState,
+  ErrorState,
+  IconButton,
+  InfoRow,
+  MovementBadge,
+  PageHeader,
+  Skeleton,
+  type DataTableColumn,
+} from '@/components/ui'
 
 interface EquipmentDetailProps {
   equipmentId: string
@@ -110,6 +121,29 @@ export function EquipmentDetail({
           ? t('heavyEquipment')
           : '—'
 
+  const movementColumns: DataTableColumn<EntryExitLog>[] = [
+    {
+      key: 'movement_type',
+      header: t('movementType'),
+      cell: (log) => <MovementBadge type={log.movement_type} />,
+    },
+    {
+      key: 'supervisor',
+      header: t('supervisorName'),
+      cell: (log) => log.supervisor?.full_name ?? '—',
+    },
+    {
+      key: 'driver',
+      header: t('driverName'),
+      cell: (log) => log.driver_name ?? '—',
+    },
+    {
+      key: 'recorded_at',
+      header: t('recordedAt'),
+      cell: (log) => formatDate(log.recorded_at),
+    },
+  ]
+
   async function toggleActive(eq: Equipment) {
     const { error } = await supabase
       .from('equipment')
@@ -124,35 +158,39 @@ export function EquipmentDetail({
     void printEquipmentQr(eq, () => setError(t('printQrError')))
   }
 
-  if (loading) return <InlineSpinner label={t('loading')} />
+  if (loading)
+    return (
+      <div
+        className="space-y-2 py-2"
+        aria-busy="true"
+        aria-label={t('loading')}
+      >
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-4/5" />
+      </div>
+    )
   if (!equipment)
     return (
       <div className="space-y-4">
-        <button onClick={onBack} className="btn-ghost">
-          <ArrowLeft size={18} className="rtl-flip" /> {t('backToEquipment')}
-        </button>
-        <div className="card text-center py-12">
-          <p className="text-muted">{error ?? t('noEquipment')}</p>
-          {error && (
-            <button className="btn-outline mt-3" onClick={fetchData}>
-              {t('retry')}
-            </button>
-          )}
-        </div>
+        <BackButton onClick={onBack} label={t('backToEquipment')} />
+        {error ? (
+          <ErrorState description={error} onRetry={fetchData} />
+        ) : (
+          <EmptyState title={t('noEquipment')} />
+        )}
       </div>
     )
 
   return (
     <div className="space-y-6">
       {error && <Alert type="error">{error}</Alert>}
-      {/* Back button */}
-      <button onClick={onBack} className="btn-ghost">
-        <ArrowLeft size={18} className="rtl-flip" /> {t('backToEquipment')}
-      </button>
 
       <PageHeader
         title={t('equipmentDetails')}
         description={t('equipmentDetailDesc')}
+        onBack={onBack}
+        backLabel={t('backToEquipment')}
       />
 
       {/* Header card */}
@@ -162,27 +200,21 @@ export function EquipmentDetail({
           <div className="flex flex-col items-center gap-3 shrink-0">
             <QRCodeDisplay value={equipment.qr_value} size={160} />
             <div className="flex gap-2">
-              <button
+              <IconButton
+                label={t('printQR')}
+                icon={<Printer size={16} />}
                 onClick={() => printQR(equipment)}
-                className="btn-ghost p-2"
-                title={t('printQR')}
-              >
-                <Printer size={16} />
-              </button>
-              <button
+              />
+              <IconButton
+                label={t('editEquipment')}
+                icon={<Edit2 size={16} />}
                 onClick={() => onEdit(equipment)}
-                className="btn-ghost p-2"
-                title={t('editEquipment')}
-              >
-                <Edit2 size={16} />
-              </button>
-              <button
+              />
+              <IconButton
+                label={t('isActive')}
+                icon={<Power size={16} />}
                 onClick={() => toggleActive(equipment)}
-                className="btn-ghost p-2"
-                title={t('isActive')}
-              >
-                <Power size={16} />
-              </button>
+              />
             </div>
           </div>
 
@@ -191,32 +223,31 @@ export function EquipmentDetail({
             <div>
               <div className="flex items-center gap-3 flex-wrap">
                 <h2 className="text-2xl font-bold">{equipment.code}</h2>
-                <span
-                  className={`badge ${equipment.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}
-                >
+                <Badge tone={equipment.is_active ? 'success' : 'neutral'}>
                   {equipment.is_active ? t('active') : t('inactive')}
-                </span>
+                </Badge>
               </div>
               <p className="text-muted mt-1">{equipment.type}</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <InfoItem
+              <InfoRow
                 icon={<Truck size={16} />}
                 label={t('plateNumber')}
                 value={equipment.plate_number}
+                dir="ltr"
               />
-              <InfoItem
+              <InfoRow
                 icon={<Wrench size={16} />}
                 label={t('operationalStatus')}
                 value={statusLabel(equipment.operational_status)}
               />
-              <InfoItem
+              <InfoRow
                 icon={<Building2 size={16} />}
                 label={t('ownershipStatus')}
                 value={ownLabel(equipment.ownership_status)}
               />
-              <InfoItem
+              <InfoRow
                 label={t('ownershipState')}
                 value={
                   isOwnedEquipment(equipment.ownership_status)
@@ -224,21 +255,22 @@ export function EquipmentDetail({
                     : t('rented')
                 }
               />
-              <InfoItem label={t('brand')} value={equipment.brand} />
-              <InfoItem label={t('model')} value={equipment.model} />
-              <InfoItem
+              <InfoRow label={t('brand')} value={equipment.brand} />
+              <InfoRow label={t('model')} value={equipment.model} />
+              <InfoRow
                 label={t('manufactureYear')}
                 value={equipment.manufacture_year?.toString()}
               />
-              <InfoItem
+              <InfoRow
                 label={t('chassisNumber')}
                 value={equipment.chassis_number}
+                dir="ltr"
               />
-              <InfoItem
+              <InfoRow
                 label={t('registrationType')}
                 value={regLabel(equipment.registration_type)}
               />
-              <InfoItem
+              <InfoRow
                 label={t('project')}
                 value={
                   equipment.project
@@ -251,12 +283,12 @@ export function EquipmentDetail({
                 }
               />
               {usesExternalSupplier(equipment.ownership_status) && (
-                <InfoItem
+                <InfoRow
                   label={t('externalSupplier')}
                   value={equipment.lessor?.name}
                 />
               )}
-              <InfoItem
+              <InfoRow
                 icon={<Calendar size={16} />}
                 label={t('lastMaintenanceDate')}
                 value={
@@ -265,7 +297,7 @@ export function EquipmentDetail({
                     : null
                 }
               />
-              <InfoItem
+              <InfoRow
                 icon={<Calendar size={16} />}
                 label={t('registrationExpiry')}
                 value={
@@ -274,7 +306,7 @@ export function EquipmentDetail({
                     : null
                 }
               />
-              <InfoItem
+              <InfoRow
                 icon={<Calendar size={16} />}
                 label={t('insuranceExpiry')}
                 value={
@@ -295,97 +327,26 @@ export function EquipmentDetail({
             <FileText size={18} /> {t('movementHistory')}
           </h3>
           {onViewAllMovements && (
-            <button
-              className="btn-outline text-sm"
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => onViewAllMovements(equipment.code)}
             >
               {t('viewAll')}
-            </button>
+            </Button>
           )}
         </div>
-        {logs.length === 0 ? (
-          <div className="card text-center py-12">
-            <p className="text-muted">{t('noMovements')}</p>
-          </div>
-        ) : (
-          <div className="card p-0 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="compact-table w-full text-sm">
-                <thead>
-                  <tr
-                    className="border-b"
-                    style={{ borderColor: 'var(--border)' }}
-                  >
-                    <th className="table-header text-start px-4 py-3">
-                      {t('movementType')}
-                    </th>
-                    <th className="table-header text-start px-4 py-3">
-                      {t('supervisorName')}
-                    </th>
-                    <th className="table-header text-start px-4 py-3">
-                      {t('driverName')}
-                    </th>
-                    <th className="table-header text-start px-4 py-3">
-                      {t('recordedAt')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map((log) => (
-                    <tr
-                      key={log.id}
-                      className={`border-b last:border-0 ${onSelectMovement ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors' : ''}`}
-                      style={{ borderColor: 'var(--border)' }}
-                      onClick={
-                        onSelectMovement
-                          ? () => onSelectMovement(log.id)
-                          : undefined
-                      }
-                    >
-                      <td className="px-4 py-3">
-                        <span
-                          className="badge border"
-                          style={{ borderColor: 'var(--border)' }}
-                        >
-                          {log.movement_type === 'entry'
-                            ? t('entry')
-                            : t('exit')}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-muted">
-                        {log.supervisor?.full_name ?? '—'}
-                      </td>
-                      <td className="px-4 py-3">{log.driver_name ?? '—'}</td>
-                      <td className="px-4 py-3 text-muted whitespace-nowrap">
-                        {formatDate(log.recorded_at)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        <DataTable
+          size="sm"
+          columns={movementColumns}
+          rows={logs}
+          rowKey={(log) => log.id}
+          onRowClick={
+            onSelectMovement ? (log) => onSelectMovement(log.id) : undefined
+          }
+          empty={t('noMovements')}
+        />
       </div>
-    </div>
-  )
-}
-
-function InfoItem({
-  icon,
-  label,
-  value,
-}: {
-  icon?: React.ReactNode
-  label: string
-  value: string | null | undefined
-}) {
-  return (
-    <div>
-      <p className="text-xs text-muted mb-1 flex items-center gap-1.5">
-        {icon} {label}
-      </p>
-      <p className="font-medium">{value || '—'}</p>
     </div>
   )
 }
