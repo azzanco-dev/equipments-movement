@@ -1,3 +1,9 @@
+import {
+  APPROVED_PHOTO_COMPRESSION,
+  compressImage,
+  compressedFileName as compressedFileNameFor,
+} from '@/lib/imageCompression'
+
 const MAX_TOTAL_PHOTO_BYTES = 4 * 1024 * 1024
 const TARGET_TOTAL_PHOTO_BYTES = Math.floor(3.7 * 1024 * 1024)
 const MAX_IMAGE_DIMENSION = 2560
@@ -81,20 +87,41 @@ async function compressPhoto(file: File, targetBytes: number): Promise<File> {
   throw new Error('photo_compression_failed')
 }
 
+// Applies the approved setting to one photo. Falls back to the original file
+// when decoding fails so a stubborn photo still reaches the size-budget pass
+// below (which raises its own clear error).
+async function applyApprovedSetting(file: File): Promise<File> {
+  try {
+    const result = await compressImage(file, APPROVED_PHOTO_COMPRESSION)
+    if (result.usedOriginal) return file
+    return new File(
+      [result.blob],
+      compressedFileNameFor(file.name, result.outputType),
+      { type: result.outputType, lastModified: file.lastModified },
+    )
+  } catch {
+    return file
+  }
+}
+
 export async function prepareMovementPhotos(files: File[]): Promise<File[]> {
-  const totalBytes = files.reduce((total, file) => total + file.size, 0)
-  if (totalBytes <= MAX_TOTAL_PHOTO_BYTES) return files
+  // Pass 1 (owner-approved 2026-09-19): every photo is normalized to at most
+  // 2048 px on its longest side at JPEG quality 0.85. Sequential on purpose to
+  // avoid holding several decoded camera images in memory on low-end phones.
+  const normalized: File[] = []
+  for (const file of files) normalized.push(await applyApprovedSetting(file))
+
+  // Pass 2 (safety net, unchanged): if the batch is still above the total
+  // budget, squeeze each photo further until the batch fits.
+  const totalBytes = normalized.reduce((total, file) => total + file.size, 0)
+  if (totalBytes <= MAX_TOTAL_PHOTO_BYTES) return normalized
 
   const targetBytesPerPhoto = Math.floor(
-    TARGET_TOTAL_PHOTO_BYTES / files.length,
+    TARGET_TOTAL_PHOTO_BYTES / normalized.length,
   )
   const compressed: File[] = []
-
-  // Process sequentially to avoid holding several decoded camera images in
-  // memory at once on lower-end mobile devices.
-  for (const file of files) {
+  for (const file of normalized) {
     compressed.push(await compressPhoto(file, targetBytesPerPhoto))
   }
-
   return compressed
 }

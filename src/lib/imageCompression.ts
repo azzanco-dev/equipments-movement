@@ -23,6 +23,16 @@ export const ALLOWED_MOVEMENT_PHOTO_TYPES: readonly string[] = [
 
 export type CompressImageMimeType = 'image/jpeg' | 'image/webp'
 
+/**
+ * The upload setting the owner approved on 2026-09-19 after comparing the
+ * presets in the /ui-kit compression lab ("عالي"): longest side 2048 px,
+ * JPEG quality 0.85. `prepareMovementPhotos` applies it to every photo.
+ */
+export const APPROVED_PHOTO_COMPRESSION = {
+  maxDimension: 2048,
+  quality: 0.85,
+} as const
+
 export type CompressImageErrorCode =
   | 'image_type_not_supported'
   | 'image_too_large'

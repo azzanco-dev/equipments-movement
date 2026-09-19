@@ -32,7 +32,7 @@ import { prepareMovementPhotos } from '@/lib/movementPhotoCompression'
 const PRESETS = [
   { id: 'light', label: 'خفيف', maxDimension: 1280, quality: 0.7 },
   { id: 'balanced', label: 'متوازن', maxDimension: 1600, quality: 0.8 },
-  { id: 'high', label: 'عالي', maxDimension: 2048, quality: 0.85 },
+  { id: 'high', label: 'عالي (المعتمد)', maxDimension: 2048, quality: 0.85 },
 ] as const
 
 type PresetId = (typeof PRESETS)[number]['id'] | 'custom'
@@ -85,7 +85,7 @@ function formatSaved(value: number) {
 let nextItemId = 1
 
 export function ImageCompressionShowcase() {
-  const [presetId, setPresetId] = useState<PresetId>('balanced')
+  const [presetId, setPresetId] = useState<PresetId>('high')
   const [customDimension, setCustomDimension] = useState(1600)
   const [customQuality, setCustomQuality] = useState(0.8)
   const [items, setItems] = useState<LabItem[]>([])
