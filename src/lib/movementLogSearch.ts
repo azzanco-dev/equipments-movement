@@ -26,6 +26,10 @@ export const MOVEMENT_LOG_WORKSHOP_SELECT = `${LOG_FIELDS},workshop_purpose,equi
 /** Foreman / workshop dashboard list. */
 export const MOVEMENT_LOG_SUPERVISOR_SELECT = `${LOG_FIELDS},workshop_purpose,contractor_equipment_code,equipment_code,equipment_type,supervisor_name`
 
+/** Home page equipment card: the short timeline under one equipment. */
+export const MOVEMENT_LOG_HOME_TIMELINE_SELECT =
+  'id,movement_type,movement_context,workshop_purpose,recorded_at,company_name_ar,company_name_en,project_name_ar,project_name_en'
+
 export interface MovementLogSearchRow {
   id: string
   equipment_id: string

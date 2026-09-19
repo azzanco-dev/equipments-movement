@@ -26,11 +26,8 @@ import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog'
 
 const screenLoading = () => <FullPageSpinner />
 
-const SupervisorDashboard = dynamic(
-  () =>
-    import('@/screens/SupervisorDashboard').then(
-      (module) => module.SupervisorDashboard,
-    ),
+const HomeScreen = dynamic(
+  () => import('@/screens/HomeScreen').then((module) => module.HomeScreen),
   { loading: screenLoading },
 )
 const AdminDashboard = dynamic(
@@ -255,7 +252,7 @@ function AppContent() {
               onNavigateMovement={openMovement}
             />
           ) : (
-            <SupervisorDashboard
+            <HomeScreen
               onSelectMovement={openMovement}
               onCreateMovement={(type) =>
                 router.push(`/movements/new?type=${type}`)
@@ -274,7 +271,10 @@ function AppContent() {
       <div className="flex min-h-[100dvh] items-center justify-center p-4">
         <div className="card w-full max-w-md space-y-4 text-center">
           <p>{t('accountRoleUnavailable')}</p>
-          <button className="btn-primary mx-auto" onClick={() => void signOut()}>
+          <button
+            className="btn-primary mx-auto"
+            onClick={() => void signOut()}
+          >
             {t('signOut')}
           </button>
         </div>
