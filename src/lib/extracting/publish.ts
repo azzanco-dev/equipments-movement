@@ -6,7 +6,6 @@ export interface ExtractionPublishData {
   residence_expiry_date: string
   nationality: string
   occupation: string
-  employer_name: string
   email: string
   gender: string
   mobile_number: string
@@ -14,6 +13,8 @@ export interface ExtractionPublishData {
   company: string
   date_of_joining: string
   department: string
+  ctc: string
+  employee_number: string
 }
 
 export interface ExtractionPublishTargets {
@@ -39,6 +40,27 @@ function clean(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+export function normalizePublishDate(value: unknown): string {
+  const text = clean(value).replace(/[/.]/g, '-').replace(/\s+/g, '')
+  if (!text) return ''
+  const dmy = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(text)
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(text)
+  const year = Number(dmy?.[3] ?? iso?.[1])
+  const month = Number(dmy?.[2] ?? iso?.[2])
+  const day = Number(dmy?.[1] ?? iso?.[3])
+  if (!year || !month || !day) return ''
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  )
+    return ''
+  return `${year.toString().padStart(4, '0')}-${month
+    .toString()
+    .padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+}
+
 export function parsePublishRequest(value: unknown): {
   data: ExtractionPublishData
   targets: ExtractionPublishTargets
@@ -52,22 +74,26 @@ export function parsePublishRequest(value: unknown): {
 
   const source = rawData as Record<string, unknown>
   const targetSource = rawTargets as Record<string, unknown>
+  const rawBirthDate = clean(source.date_of_birth)
+  const rawExpiryDate = clean(source.residence_expiry_date)
+  const rawJoiningDate = clean(source.date_of_joining)
   const data: ExtractionPublishData = {
     full_name_ar: clean(source.full_name_ar),
     full_name_en: clean(source.full_name_en),
     id_number: clean(source.id_number),
-    date_of_birth: clean(source.date_of_birth),
-    residence_expiry_date: clean(source.residence_expiry_date),
+    date_of_birth: normalizePublishDate(rawBirthDate),
+    residence_expiry_date: normalizePublishDate(rawExpiryDate),
     nationality: clean(source.nationality),
     occupation: clean(source.occupation),
-    employer_name: clean(source.employer_name),
     email: clean(source.email).toLowerCase(),
     gender: clean(source.gender),
     mobile_number: clean(source.mobile_number),
     employment_type: clean(source.employment_type),
     company: clean(source.company),
-    date_of_joining: clean(source.date_of_joining),
+    date_of_joining: normalizePublishDate(rawJoiningDate),
     department: clean(source.department),
+    ctc: clean(source.ctc),
+    employee_number: clean(source.employee_number) || clean(source.id_number),
   }
   const targets = {
     currentSystem: targetSource.currentSystem === true,
@@ -75,9 +101,16 @@ export function parsePublishRequest(value: unknown): {
   }
   if (!targets.currentSystem && !targets.erpnext) return null
   if (!data.full_name_ar || !/^\d{5,20}$/.test(data.id_number)) return null
+  if (
+    (rawBirthDate && !data.date_of_birth) ||
+    (rawExpiryDate && !data.residence_expiry_date) ||
+    (rawJoiningDate && !data.date_of_joining)
+  )
+    return null
   if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return null
   if (data.mobile_number && !/^\+?\d{7,15}$/.test(data.mobile_number))
     return null
+  if (data.ctc && !/^\d+(?:\.\d{1,2})?$/.test(data.ctc)) return null
   return { data, targets }
 }
 
@@ -130,6 +163,8 @@ export function erpEmployeePayload(
     ['department', data.department],
     ['designation', data.occupation],
     ['cell_number', data.mobile_number],
+    ['ctc', data.ctc],
+    ['employee_number', data.employee_number || data.id_number],
   ]
   for (const [key, value] of optional) if (value) payload[key] = value
 
@@ -165,14 +200,6 @@ export function erpEmployeePayload(
         'custom_rp_valid_upto',
       ),
       data.residence_expiry_date,
-    ],
-    [
-      availableFieldName(
-        availableFields,
-        process.env.ERPNEXT_EMPLOYER_NAME_FIELD,
-        'custom_employer_name',
-      ),
-      data.employer_name,
     ],
   ]
   for (const [field, fieldValue] of customFields)

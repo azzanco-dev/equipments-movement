@@ -168,6 +168,8 @@ async function employeeFieldNames() {
     'department',
     'designation',
     'cell_number',
+    'ctc',
+    'employee_number',
   ])
   const rows = response.data?.data
   if (Array.isArray(rows))

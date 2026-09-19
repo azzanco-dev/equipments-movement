@@ -33,7 +33,6 @@ const data = {
   residence_expiry_date: '2026-07-31',
   nationality: 'اليمن',
   occupation: 'سائق شاحنة ثقيلة',
-  employer_name: 'صاحب عمل تجريبي',
   email: 'driver@example.com',
   gender: 'Male',
   mobile_number: '0500000000',
@@ -41,6 +40,8 @@ const data = {
   company: 'شركة تجريبية',
   date_of_joining: '2026-09-17',
   department: 'النقل',
+  ctc: '3500.50',
+  employee_number: '2554398733',
 }
 
 test('requires a selected target and a numeric identity', () => {
@@ -58,6 +59,23 @@ test('requires a selected target and a numeric identity', () => {
   assert.ok(parsePublishRequest({ data, targets: { currentSystem: true } }))
 })
 
+test('converts visible day-month-year dates for publishing', () => {
+  const parsed = parsePublishRequest({
+    data: {
+      ...data,
+      date_of_birth: '02-05-2000',
+      residence_expiry_date: '31-07-2026',
+      date_of_joining: '17-09-2026',
+      employee_number: '',
+    },
+    targets: { erpnext: true },
+  })
+  assert.equal(parsed.data.date_of_birth, '2000-05-02')
+  assert.equal(parsed.data.residence_expiry_date, '2026-07-31')
+  assert.equal(parsed.data.date_of_joining, '2026-09-17')
+  assert.equal(parsed.data.employee_number, data.id_number)
+})
+
 test('local payload only contains columns that already exist', () => {
   assert.deepEqual(Object.keys(currentSystemDriverPayload(data)).sort(), [
     'employment_type',
@@ -73,20 +91,20 @@ test('local payload only contains columns that already exist', () => {
 test('ERP employee never writes expiry into issue date', () => {
   process.env.ERPNEXT_RESIDENCE_EXPIRY_FIELD =
     'custom_residence_permit_expiry_date'
-  process.env.ERPNEXT_EMPLOYER_NAME_FIELD = 'custom_sponsor_name'
   const availableFields = new Set([
     'custom_employee_name_en',
     'custom_nationality',
     'custom_residence_permit_number',
     'custom_rp_valid_upto',
+    'ctc',
+    'employee_number',
   ])
   const payload = erpEmployeePayload(data, availableFields)
   assert.equal(payload.custom_rp_valid_upto, data.residence_expiry_date)
   assert.equal(payload.custom_nationality, data.nationality)
   assert.equal(payload.user_id, data.email)
-  assert.ok(!('custom_sponsor_name' in payload))
-  assert.ok(!('custom_employer_name' in payload))
+  assert.equal(payload.ctc, data.ctc)
+  assert.equal(payload.employee_number, data.id_number)
   assert.ok(!('custom_rp_date_of_issue' in payload))
   delete process.env.ERPNEXT_RESIDENCE_EXPIRY_FIELD
-  delete process.env.ERPNEXT_EMPLOYER_NAME_FIELD
 })

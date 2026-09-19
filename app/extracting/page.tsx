@@ -22,7 +22,6 @@ type FieldKey =
   | 'residence_expiry_date'
   | 'nationality'
   | 'occupation'
-  | 'employer_name'
   | 'email'
   | 'mobile_number'
   | 'gender'
@@ -30,6 +29,8 @@ type FieldKey =
   | 'employment_type'
   | 'department'
   | 'date_of_joining'
+  | 'ctc'
+  | 'employee_number'
 
 type ExtractionForm = Record<FieldKey, string>
 type PublishStep = 'created' | 'existing' | 'partial' | 'skipped' | 'failed'
@@ -42,42 +43,59 @@ type PublishResult = {
   error?: string
 }
 
-const EMPTY_FORM: ExtractionForm = {
-  full_name_ar: '',
-  full_name_en: '',
-  id_number: '',
-  date_of_birth: '',
-  residence_expiry_date: '',
-  nationality: '',
-  occupation: '',
-  employer_name: '',
-  email: '',
-  mobile_number: '',
-  gender: '',
-  company: '',
-  employment_type: '',
-  department: '',
-  date_of_joining: '',
+const DEFAULT_COMPANY = 'شركة عبدالله احمد العزاني للمقاولات'
+
+function saudiToday() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Riyadh',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).formatToParts(new Date())
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${value.day}-${value.month}-${value.year}`
+}
+
+function createDefaultForm(): ExtractionForm {
+  return {
+    full_name_ar: '',
+    full_name_en: '',
+    id_number: '',
+    date_of_birth: '',
+    residence_expiry_date: '',
+    nationality: '',
+    occupation: '',
+    email: '',
+    mobile_number: '',
+    gender: 'Male',
+    company: DEFAULT_COMPANY,
+    employment_type: 'نقدي',
+    department: '',
+    date_of_joining: saudiToday(),
+    ctc: '',
+    employee_number: '',
+  }
 }
 
 const EXTRACTED_FIELDS: Array<[FieldKey, string, string]> = [
   ['full_name_ar', 'الاسم بالعربي', 'text'],
   ['full_name_en', 'الاسم بالانجليزي', 'text'],
   ['id_number', 'رقم الهوية', 'text'],
-  ['date_of_birth', 'تاريخ الميلاد', 'date'],
-  ['residence_expiry_date', 'تاريخ انتهاء الاقامة', 'date'],
+  ['date_of_birth', 'تاريخ الميلاد', 'text'],
+  ['residence_expiry_date', 'تاريخ انتهاء الاقامة', 'text'],
   ['nationality', 'الجنسية', 'text'],
   ['occupation', 'المهنة', 'text'],
-  ['employer_name', 'اسم صاحب العمل', 'text'],
 ]
 
 const MANUAL_FIELDS: Array<[FieldKey, string, string]> = [
   ['email', 'بريد مستخدم ERPNext', 'email'],
+  ['employee_number', 'رقم الموظف', 'text'],
   ['mobile_number', 'رقم الجوال', 'tel'],
   ['company', 'الشركة في ERPNext', 'text'],
   ['employment_type', 'نوع التوظيف', 'text'],
   ['department', 'القسم', 'text'],
-  ['date_of_joining', 'تاريخ المباشرة', 'date'],
+  ['date_of_joining', 'تاريخ المباشرة', 'text'],
+  ['ctc', 'الراتب (CTC)', 'text'],
 ]
 
 const STATUS_LABELS: Record<PublishStep, string> = {
@@ -122,7 +140,7 @@ export default function ExtractingPage() {
   const { session, profile, loading } = useAuth()
   const [image, setImage] = useState<File | null>(null)
   const [preview, setPreview] = useState('')
-  const [data, setData] = useState<ExtractionForm>(EMPTY_FORM)
+  const [data, setData] = useState<ExtractionForm>(createDefaultForm)
   const [targets, setTargets] = useState({
     currentSystem: true,
     erpnext: false,
@@ -175,11 +193,21 @@ export default function ExtractingPage() {
     setStage('idle')
     setNotice('')
     setResults(null)
-    setData(EMPTY_FORM)
+    setData(createDefaultForm())
   }
 
   const update = (key: FieldKey, value: string) =>
-    setData((current) => ({ ...current, [key]: value }))
+    setData((current) => {
+      if (key !== 'id_number') return { ...current, [key]: value }
+      const followsIdentity =
+        !current.employee_number ||
+        current.employee_number === current.id_number
+      return {
+        ...current,
+        id_number: value,
+        employee_number: followsIdentity ? value : current.employee_number,
+      }
+    })
 
   const extractImage = async () => {
     if (!image || !token) return
@@ -200,7 +228,17 @@ export default function ExtractingPage() {
       }
       if (!response.ok)
         throw new Error(safeApiError(payload, 'تعذر قراءة صورة الاقامة'))
-      setData((current) => ({ ...current, ...payload.data }))
+      setData((current) => {
+        const identity = payload.data?.id_number || current.id_number
+        const followsIdentity =
+          !current.employee_number ||
+          current.employee_number === current.id_number
+        return {
+          ...current,
+          ...payload.data,
+          employee_number: followsIdentity ? identity : current.employee_number,
+        }
+      })
       setStage('review')
       setNoticeType('info')
       setNotice('راجع البيانات المستخرجة واكمل الحقول المطلوبة قبل النشر')
@@ -222,6 +260,11 @@ export default function ExtractingPage() {
     if (!data.full_name_ar || !/^\d{5,20}$/.test(data.id_number)) {
       setNoticeType('error')
       setNotice('تحقق من الاسم العربي ورقم الهوية')
+      return
+    }
+    if (data.ctc && !/^\d+(?:\.\d{1,2})?$/.test(data.ctc)) {
+      setNoticeType('error')
+      setNotice('الراتب يجب ان يكون رقما وبحد اقصى منزلتين عشريتين')
       return
     }
     if (
@@ -348,6 +391,11 @@ export default function ExtractingPage() {
                       {...control}
                       type={type}
                       inputMode={key === 'id_number' ? 'numeric' : undefined}
+                      placeholder={
+                        ['date_of_birth', 'residence_expiry_date'].includes(key)
+                          ? 'يوم-شهر-سنة'
+                          : undefined
+                      }
                       value={data[key]}
                       onChange={(event) => update(key, event.target.value)}
                     />
@@ -388,6 +436,16 @@ export default function ExtractingPage() {
                     <Input
                       {...control}
                       type={type}
+                      inputMode={
+                        key === 'ctc'
+                          ? 'decimal'
+                          : key === 'employee_number'
+                            ? 'numeric'
+                            : undefined
+                      }
+                      placeholder={
+                        key === 'date_of_joining' ? 'يوم-شهر-سنة' : undefined
+                      }
                       value={data[key]}
                       onChange={(event) => update(key, event.target.value)}
                     />

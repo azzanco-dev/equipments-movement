@@ -6,7 +6,6 @@ export const OCR_FIELDS = [
   'residence_expiry_date',
   'nationality',
   'occupation',
-  'employer_name',
 ] as const
 
 export type OcrFields = Record<(typeof OCR_FIELDS)[number], string>
@@ -44,10 +43,10 @@ export function normalizeOcrDate(value: unknown): string {
   const text = normalizeOcrText(value).replace(/[/.]/g, '-').replace(/\s+/g, '')
   const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(text)
   if (iso)
-    return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`
+    return `${iso[3].padStart(2, '0')}-${iso[2].padStart(2, '0')}-${iso[1]}`
   const dmy = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(text)
   if (dmy)
-    return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
+    return `${dmy[1].padStart(2, '0')}-${dmy[2].padStart(2, '0')}-${dmy[3]}`
   return text
 }
 

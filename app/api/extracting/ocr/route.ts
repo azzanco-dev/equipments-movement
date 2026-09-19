@@ -64,7 +64,7 @@ export async function POST(request: Request) {
           json_schema: { name: 'identity_fields', strict: true, schema },
         },
         document_annotation_prompt:
-          'Extract only the values visibly printed on this Saudi resident identity card. Preserve the printed Arabic and English names independently. Return empty strings for missing values. Normalize visible dates to YYYY-MM-DD without inventing or converting between calendars.',
+          'Extract only the values visibly printed on this Saudi resident identity card. Preserve the printed Arabic and English names independently. Return empty strings for missing values. Normalize visible dates to DD-MM-YYYY without inventing or converting between calendars.',
       }),
     })
     if (!response.ok) return error('ocr_failed', 502)

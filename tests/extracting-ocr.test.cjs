@@ -22,8 +22,8 @@ test('normalizes Arabic and Persian digits', () => {
 })
 
 test('normalizes dates without guessing missing values', () => {
-  assert.equal(normalizeOcrDate('٢٠٢٦/٧/٣١'), '2026-07-31')
-  assert.equal(normalizeOcrDate('31.7.2026'), '2026-07-31')
+  assert.equal(normalizeOcrDate('٢٠٢٦/٧/٣١'), '31-07-2026')
+  assert.equal(normalizeOcrDate('31.7.2026'), '31-07-2026')
   assert.equal(normalizeOcrDate(''), '')
 })
 
@@ -35,5 +35,6 @@ test('returns the complete extraction shape and empty missing fields', () => {
   assert.equal(result.full_name_ar, 'اسم تجريبي')
   assert.equal(result.id_number, '2554398733')
   assert.equal(result.full_name_en, '')
-  assert.equal(result.employer_name, '')
+  assert.equal(result.occupation, '')
+  assert.ok(!('employer_name' in result))
 })
