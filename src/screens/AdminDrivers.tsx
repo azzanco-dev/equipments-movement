@@ -5,7 +5,7 @@ import { sanitizeSearchTerm } from '@/lib/search'
 import { useI18n } from '@/i18n/I18nContext'
 import { Alert } from '@/components/Alert'
 import { InlineSpinner } from '@/components/Spinner'
-import { Modal } from '@/components/Modal'
+import { Button, Dialog, useConfirm } from '@/components/ui'
 import { PageHeader } from '@/components/PageHeader'
 import { Select } from '@/components/Select'
 import type { Driver } from '@/lib/types'
@@ -51,6 +51,7 @@ export function AdminDrivers({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const { confirm, confirmDialog } = useConfirm()
 
   const startListRequest = useListRequest()
   const fetchDrivers = useCallback(async () => {
@@ -153,7 +154,7 @@ export function AdminDrivers({
   }
 
   const remove = async (driver: Driver) => {
-    if (!confirm(t('confirmDelete'))) return
+    if (!(await confirm({ title: t('confirmDelete'), tone: 'danger' }))) return
     const { error: deleteError } = await supabase
       .from('drivers')
       .delete()
@@ -162,7 +163,11 @@ export function AdminDrivers({
     else fetchDrivers()
   }
   const removeSelected = async () => {
-    if (!selection.selected.size || !confirm(t('confirmDelete'))) return
+    if (
+      !selection.selected.size ||
+      !(await confirm({ title: t('confirmDelete'), tone: 'danger' }))
+    )
+      return
     const { error: deleteError } = await supabase
       .from('drivers')
       .delete()
@@ -346,11 +351,21 @@ export function AdminDrivers({
         onPage={list.setPage}
       />
 
-      <Modal
+      <Dialog
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onOpenChange={setModalOpen}
         title={editing ? t('editDriver') : t('addDriver')}
         size="md"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setModalOpen(false)}>
+              {t('cancel')}
+            </Button>
+            <Button variant="primary" loading={saving} onClick={save}>
+              {t('save')}
+            </Button>
+          </>
+        }
       >
         <div className="space-y-4">
           {error && <Alert type="error">{error}</Alert>}
@@ -455,28 +470,14 @@ export function AdminDrivers({
               }
             />
           </div>
-          <div className="flex gap-3 pt-2">
-            <button
-              className="btn-outline flex-1"
-              onClick={() => setModalOpen(false)}
-            >
-              {t('cancel')}
-            </button>
-            <button
-              className="btn-primary flex-1"
-              disabled={saving}
-              onClick={save}
-            >
-              {saving ? t('saving') : t('save')}
-            </button>
-          </div>
         </div>
-      </Modal>
+      </Dialog>
       <DriverExcelImport
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={fetchDrivers}
       />
+      {confirmDialog}
     </div>
   )
 }

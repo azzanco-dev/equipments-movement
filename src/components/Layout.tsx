@@ -13,7 +13,7 @@ import {
 import { useTheme } from '@/theme/ThemeContext'
 import { useAuth } from '@/auth/AuthContext'
 import { useEffect, useRef, useState } from 'react'
-import { Modal } from '@/components/Modal'
+import { ConfirmDialog } from '@/components/ui'
 import { usePathname } from 'next/navigation'
 
 interface LayoutProps {
@@ -406,35 +406,18 @@ export function Layout({
         {/* Main content */}
         <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
-      <Modal
+      <ConfirmDialog
         open={logoutOpen}
-        onClose={() => !loggingOut && setLogoutOpen(false)}
+        onOpenChange={setLogoutOpen}
         title={t('confirmSignOut')}
-        size="sm"
-      >
-        <div className="space-y-5">
-          <p className="text-sm text-muted">{t('confirmSignOutMessage')}</p>
-          <div className="flex gap-3">
-            <button
-              className="btn-outline flex-1"
-              disabled={loggingOut}
-              onClick={() => setLogoutOpen(false)}
-            >
-              {t('cancel')}
-            </button>
-            <button
-              className="btn-primary flex-1"
-              disabled={loggingOut}
-              onClick={async () => {
-                setLoggingOut(true)
-                await signOut()
-              }}
-            >
-              {loggingOut ? t('loading') : t('signOut')}
-            </button>
-          </div>
-        </div>
-      </Modal>
+        description={t('confirmSignOutMessage')}
+        confirmLabel={t('signOut')}
+        loading={loggingOut}
+        onConfirm={async () => {
+          setLoggingOut(true)
+          await signOut()
+        }}
+      />
     </div>
   )
 }

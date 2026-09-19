@@ -7,7 +7,7 @@ import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
-import { Modal } from '@/components/Modal'
+import { Button, Dialog, useConfirm } from '@/components/ui'
 import { PageHeader } from '@/components/PageHeader'
 import { PasswordInput } from '@/components/PasswordInput'
 import { RelativeTime } from '@/components/RelativeTime'
@@ -39,6 +39,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   const [role, setRole] = useState<UserRole>('supervisor')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   const startListRequest = useListRequest()
   const fetchUsers = useCallback(async () => {
@@ -168,7 +169,11 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   }
 
   async function handleDelete(user: Profile) {
-    if (user.id === currentUser?.id || !confirm(t('confirmDelete'))) return
+    if (
+      user.id === currentUser?.id ||
+      !(await confirm({ title: t('confirmDelete'), tone: 'danger' }))
+    )
+      return
     const { error } = await supabase.from('profiles').delete().eq('id', user.id)
     if (error) console.error(error)
     fetchUsers()
@@ -281,11 +286,21 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
         onPage={list.setPage}
       />
 
-      <Modal
+      <Dialog
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onOpenChange={setModalOpen}
         title={t('addUser')}
         size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setModalOpen(false)}>
+              {t('cancel')}
+            </Button>
+            <Button variant="primary" loading={saving} onClick={handleSave}>
+              {t('save')}
+            </Button>
+          </>
+        }
       >
         {formError && (
           <div className="mb-4">
@@ -334,22 +349,8 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
             />
           </div>
         </div>
-        <div className="flex gap-3 pt-4">
-          <button
-            onClick={() => setModalOpen(false)}
-            className="btn-outline flex-1"
-          >
-            {t('cancel')}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="btn-primary flex-1"
-          >
-            {saving ? t('saving') : t('save')}
-          </button>
-        </div>
-      </Modal>
+      </Dialog>
+      {confirmDialog}
     </div>
   )
 }

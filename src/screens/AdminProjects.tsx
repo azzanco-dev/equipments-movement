@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
-import { Modal } from '@/components/Modal'
+import { Button, Dialog, useConfirm } from '@/components/ui'
 import { Alert } from '@/components/Alert'
 import { InlineSpinner } from '@/components/Spinner'
 import { PageHeader } from '@/components/PageHeader'
@@ -58,6 +58,7 @@ export function AdminProjects() {
   } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
+  const { confirm, confirmDialog } = useConfirm()
 
   const startListRequest = useListRequest()
   const fetchProjects = useCallback(async () => {
@@ -138,7 +139,7 @@ export function AdminProjects() {
   }
 
   async function handleDelete(p: Project) {
-    if (!confirm(t('confirmDelete'))) return
+    if (!(await confirm({ title: t('confirmDelete'), tone: 'danger' }))) return
     const { error } = await supabase.from('projects').delete().eq('id', p.id)
     if (error) console.error(error)
     fetchProjects()
@@ -356,12 +357,22 @@ export function AdminProjects() {
         onPage={list.setPage}
       />
 
-      {/* Add/Edit Modal */}
-      <Modal
+      {/* Add/Edit Dialog */}
+      <Dialog
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onOpenChange={setModalOpen}
         title={editing ? t('editProject') : t('addProject')}
         size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setModalOpen(false)}>
+              {t('cancel')}
+            </Button>
+            <Button variant="primary" loading={saving} onClick={handleSave}>
+              {t('save')}
+            </Button>
+          </>
+        }
       >
         {formError && (
           <div className="mb-4">
@@ -390,29 +401,14 @@ export function AdminProjects() {
             />
           </div>
         </div>
-        <div className="flex gap-3 pt-4">
-          <button
-            onClick={() => setModalOpen(false)}
-            className="btn-outline flex-1"
-          >
-            {t('cancel')}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="btn-primary flex-1"
-          >
-            {saving ? t('saving') : t('save')}
-          </button>
-        </div>
-      </Modal>
+      </Dialog>
 
-      {/* Import Modal */}
-      <Modal
+      {/* Import Dialog */}
+      <Dialog
         open={importModalOpen}
-        onClose={() => setImportModalOpen(false)}
+        onOpenChange={setImportModalOpen}
         title={t('importProjects')}
-        size="xl"
+        size="lg"
       >
         {importError && (
           <div className="mb-4">
@@ -609,7 +605,8 @@ export function AdminProjects() {
             </button>
           </div>
         )}
-      </Modal>
+      </Dialog>
+      {confirmDialog}
     </div>
   )
 }

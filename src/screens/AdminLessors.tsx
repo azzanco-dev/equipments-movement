@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
-import { Modal } from '@/components/Modal'
+import { Button, Dialog, useConfirm } from '@/components/ui'
 import { Alert } from '@/components/Alert'
 import { InlineSpinner } from '@/components/Spinner'
 import { Plus, Edit2, Trash2 } from 'lucide-react'
@@ -30,6 +30,7 @@ export function AdminLessors() {
   const [formError, setFormError] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
   const list = useDataListState(lessorsListConfig)
+  const { confirm, confirmDialog } = useConfirm()
 
   const startListRequest = useListRequest()
   const fetchLessors = useCallback(async () => {
@@ -120,7 +121,7 @@ export function AdminLessors() {
   }
 
   async function handleDelete(l: Lessor) {
-    if (!confirm(t('confirmDelete'))) return
+    if (!(await confirm({ title: t('confirmDelete'), tone: 'danger' }))) return
     const { error } = await supabase.from('lessors').delete().eq('id', l.id)
     if (error) console.error(error)
     fetchLessors()
@@ -232,11 +233,21 @@ export function AdminLessors() {
         total={total}
         onPage={list.setPage}
       />
-      <Modal
+      <Dialog
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onOpenChange={setModalOpen}
         title={editing ? t('editLessor') : t('addLessor')}
         size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setModalOpen(false)}>
+              {t('cancel')}
+            </Button>
+            <Button variant="primary" loading={saving} onClick={handleSave}>
+              {t('save')}
+            </Button>
+          </>
+        }
       >
         {formError && (
           <div className="mb-4">
@@ -273,22 +284,8 @@ export function AdminLessors() {
             />
           </div>
         </div>
-        <div className="flex gap-3 pt-4">
-          <button
-            onClick={() => setModalOpen(false)}
-            className="btn-outline flex-1"
-          >
-            {t('cancel')}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="btn-primary flex-1"
-          >
-            {saving ? t('saving') : t('save')}
-          </button>
-        </div>
-      </Modal>
+      </Dialog>
+      {confirmDialog}
     </div>
   )
 }

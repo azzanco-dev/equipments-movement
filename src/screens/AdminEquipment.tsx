@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
-import { Modal } from '@/components/Modal'
+import { Button, Dialog } from '@/components/ui'
 import { Alert } from '@/components/Alert'
 import { InlineSpinner } from '@/components/Spinner'
 import { QRCodeDisplay } from '@/components/QRCodeDisplay'
@@ -806,11 +806,21 @@ export function AdminEquipment({
         </div>
       )}
 
-      <Modal
+      <Dialog
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onOpenChange={setModalOpen}
         title={editing ? t('editEquipment') : t('addEquipment')}
         size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setModalOpen(false)}>
+              {t('cancel')}
+            </Button>
+            <Button variant="primary" loading={saving} onClick={handleSave}>
+              {t('save')}
+            </Button>
+          </>
+        }
       >
         {formError && (
           <div className="mb-4">
@@ -1035,26 +1045,13 @@ export function AdminEquipment({
             />
           </div>
         </div>
-        <div className="flex gap-3 pt-4">
-          <button
-            onClick={() => setModalOpen(false)}
-            className="btn-outline flex-1"
-          >
-            {t('cancel')}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="btn-primary flex-1"
-          >
-            {saving ? t('saving') : t('save')}
-          </button>
-        </div>
-      </Modal>
+      </Dialog>
 
-      <Modal
+      <Dialog
         open={!!qrModal}
-        onClose={() => setQrModal(null)}
+        onOpenChange={(next) => {
+          if (!next) setQrModal(null)
+        }}
         title={t('qrValue')}
         size="sm"
       >
@@ -1072,13 +1069,13 @@ export function AdminEquipment({
             </button>
           </div>
         )}
-      </Modal>
+      </Dialog>
 
-      <Modal
+      <Dialog
         open={importModalOpen}
-        onClose={() => setImportModalOpen(false)}
+        onOpenChange={setImportModalOpen}
         title={t('importEquipment')}
-        size="xl"
+        size="lg"
       >
         {importError && (
           <div className="mb-4">
@@ -1293,7 +1290,7 @@ export function AdminEquipment({
             </button>
           </div>
         )}
-      </Modal>
+      </Dialog>
       <EquipmentExcelUpdate
         open={updateExcelOpen}
         onClose={() => setUpdateExcelOpen(false)}

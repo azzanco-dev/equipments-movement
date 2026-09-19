@@ -4,6 +4,7 @@ import { Alert } from '@/components/Alert'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import { PageHeader } from '@/components/PageHeader'
 import { Select, type SelectOption } from '@/components/Select'
+import { useConfirm } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import {
   downloadMovementImportTemplate,
@@ -45,6 +46,7 @@ export function MovementImport() {
     type: 'error' | 'success' | 'warning'
     text: string
   } | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   const modeOptions = [
     { value: 'entry', label: t('entryOnly') },
@@ -217,7 +219,11 @@ export function MovementImport() {
   }
 
   async function importRows() {
-    if (!validRows.length || !confirm(t('confirmMovementImport'))) return
+    if (
+      !validRows.length ||
+      !(await confirm({ title: t('confirmMovementImport') }))
+    )
+      return
     setBusy(true)
     setMessage(null)
     const payload = validRows.map((row) => ({
@@ -575,6 +581,7 @@ export function MovementImport() {
           </div>
         </>
       )}
+      {confirmDialog}
     </div>
   )
 }

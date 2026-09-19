@@ -5,6 +5,7 @@ import { AsyncMultiSelect } from '@/components/AsyncMultiSelect'
 import { PasswordInput } from '@/components/PasswordInput'
 import { Select, type SelectOption } from '@/components/Select'
 import { InlineSpinner } from '@/components/Spinner'
+import { useConfirm } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { localizedName } from '@/lib/localizedName'
 import { sanitizeSearchTerm } from '@/lib/search'
@@ -45,6 +46,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   const [role, setRole] = useState<UserRole>('supervisor')
   const [companies, setCompanies] = useState<SelectOption[]>([])
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   const currentSnapshot = useMemo(
     () => formSnapshot(fullName, email, password, role, companies),
@@ -211,8 +213,12 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     }
   }
 
-  function handleBack() {
-    if (hasUnsavedChanges && !confirm(t('unsavedChanges'))) return
+  async function handleBack() {
+    if (
+      hasUnsavedChanges &&
+      !(await confirm({ title: t('unsavedChanges'), tone: 'danger' }))
+    )
+      return
     onBack()
   }
 
@@ -324,6 +330,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           </button>
         </div>
       </div>
+      {confirmDialog}
     </div>
   )
 }

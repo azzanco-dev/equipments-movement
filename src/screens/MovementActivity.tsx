@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { PageHeader } from '@/components/PageHeader'
 import { InlineSpinner } from '@/components/Spinner'
-import { Modal } from '@/components/Modal'
+import { Dialog } from '@/components/ui'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { formatDateTime } from '@/lib/dateFormat'
 import { sanitizeSearchTerm } from '@/lib/search'
@@ -243,9 +243,11 @@ export function MovementActivity() {
         }
       />
 
-      <Modal
+      <Dialog
         open={Boolean(selected)}
-        onClose={() => setSelected(null)}
+        onOpenChange={(next) => {
+          if (!next) setSelected(null)
+        }}
         title={t('activityDetails')}
         size="lg"
       >
@@ -305,7 +307,7 @@ export function MovementActivity() {
             </div>
           </div>
         )}
-      </Modal>
+      </Dialog>
     </div>
   )
 }

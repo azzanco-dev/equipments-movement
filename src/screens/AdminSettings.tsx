@@ -14,7 +14,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { PageHeader } from '@/components/PageHeader'
-import { Modal } from '@/components/Modal'
+import { Button, Dialog, useConfirm } from '@/components/ui'
 import { Alert } from '@/components/Alert'
 import { InlineSpinner } from '@/components/Spinner'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
@@ -63,6 +63,7 @@ export function AdminSettings() {
   )
   const [openingSaving, setOpeningSaving] = useState(false)
   const [openingMessage, setOpeningMessage] = useState<string | null>(null)
+  const { confirm, confirmDialog } = useConfirm()
 
   const startRequest = useListRequest()
   useEffect(() => {
@@ -143,7 +144,13 @@ export function AdminSettings() {
   }
 
   async function remove(row: EquipmentTypeRow) {
-    if (!confirm(t('confirmDeleteEquipmentType'))) return
+    if (
+      !(await confirm({
+        title: t('confirmDeleteEquipmentType'),
+        tone: 'danger',
+      }))
+    )
+      return
     const { error: deleteError } = await supabase
       .from('equipment_types')
       .delete()
@@ -468,35 +475,33 @@ export function AdminSettings() {
           onPage={setPage}
         />
       </div>
-      <Modal
+      <Dialog
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onOpenChange={setModalOpen}
         title={editing ? t('editEquipmentType') : t('addEquipmentType')}
         size="sm"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="label">{t('equipmentTypeName')} *</label>
-            <input
-              className="input"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder={t('equipmentTypePlaceholder')}
-            />
-          </div>
-          <div className="flex gap-2">
-            <button
-              className="btn-outline flex-1"
-              onClick={() => setModalOpen(false)}
-            >
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setModalOpen(false)}>
               {t('cancel')}
-            </button>
-            <button className="btn-primary flex-1" onClick={save}>
+            </Button>
+            <Button variant="primary" onClick={save}>
               {t('save')}
-            </button>
-          </div>
+            </Button>
+          </>
+        }
+      >
+        <div>
+          <label className="label">{t('equipmentTypeName')} *</label>
+          <input
+            className="input"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder={t('equipmentTypePlaceholder')}
+          />
         </div>
-      </Modal>
+      </Dialog>
+      {confirmDialog}
     </div>
   )
 }

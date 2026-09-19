@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Download, FileSpreadsheet, Upload } from 'lucide-react'
 import { Alert } from '@/components/Alert'
-import { Modal } from '@/components/Modal'
+import { Dialog } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import type { Equipment } from '@/lib/types'
@@ -255,11 +255,13 @@ export function EquipmentExcelUpdate({
 
   const readyCount = rows.filter((row) => row._status === 'ready').length
   return (
-    <Modal
+    <Dialog
       open={open}
-      onClose={onClose}
+      onOpenChange={(next) => {
+        if (!next) onClose()
+      }}
       title={t('updateEquipmentExcel')}
-      size="xl"
+      size="lg"
     >
       <div className="space-y-4">
         {error && <Alert type="error">{error}</Alert>}
@@ -410,6 +412,6 @@ export function EquipmentExcelUpdate({
           </div>
         )}
       </div>
-    </Modal>
+    </Dialog>
   )
 }

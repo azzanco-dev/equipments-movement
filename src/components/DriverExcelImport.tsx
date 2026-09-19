@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Download, FileSpreadsheet, Upload } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Alert } from '@/components/Alert'
-import { Modal } from '@/components/Modal'
+import { Button, Dialog } from '@/components/ui'
 import {
   downloadDriverTemplate,
   parseDriverWorkbook,
@@ -105,11 +105,28 @@ export function DriverExcelImport({
           .replace('nationality غير معتمدة', 'Unsupported nationality')
           .replace('employment_type غير معتمد', 'Unsupported employment type')
   return (
-    <Modal
+    <Dialog
       open={open}
-      onClose={onClose}
+      onOpenChange={(next) => {
+        if (!next) onClose()
+      }}
       title={t('importDriversExcel')}
-      size="xl"
+      size="lg"
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose}>
+            {t('cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            loading={busy}
+            disabled={!valid.length}
+            onClick={confirmImport}
+          >
+            {t('importValidRows').replace('{count}', String(valid.length))}
+          </Button>
+        </>
+      }
     >
       <div className="space-y-4">
         {error && <Alert type="error">{error}</Alert>}
@@ -209,21 +226,7 @@ export function DriverExcelImport({
             </div>
           </>
         )}
-        <div className="flex gap-3 pt-2">
-          <button className="btn-outline flex-1" onClick={onClose}>
-            {t('cancel')}
-          </button>
-          <button
-            className="btn-primary flex-1"
-            disabled={busy || !valid.length}
-            onClick={confirmImport}
-          >
-            {busy
-              ? t('processing')
-              : t('importValidRows').replace('{count}', String(valid.length))}
-          </button>
-        </div>
       </div>
-    </Modal>
+    </Dialog>
   )
 }

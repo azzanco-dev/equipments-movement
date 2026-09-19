@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
-import { Modal } from '@/components/Modal'
+import { Button, Dialog, useConfirm } from '@/components/ui'
 import { Alert } from '@/components/Alert'
 import { InlineSpinner } from '@/components/Spinner'
 import { PageHeader } from '@/components/PageHeader'
@@ -94,6 +94,7 @@ export function AdminCompanies() {
   const [addProjectOption, setAddProjectOption] = useState<SelectOption | null>(
     null,
   )
+  const { confirm, confirmDialog } = useConfirm()
 
   const startListRequest = useListRequest()
   const fetchCompanies = useCallback(async () => {
@@ -174,7 +175,7 @@ export function AdminCompanies() {
   }
 
   async function handleDelete(c: Company) {
-    if (!confirm(t('confirmDelete'))) return
+    if (!(await confirm({ title: t('confirmDelete'), tone: 'danger' }))) return
     const { error } = await supabase.from('companies').delete().eq('id', c.id)
     if (error) console.error(error)
     fetchCompanies()
@@ -452,15 +453,15 @@ export function AdminCompanies() {
                 >
                   <Download size={16} /> {t('exportExcel')}
                 </button>
-              <button
-                onClick={() => {
-                  resetImport()
-                  setImportModalOpen(true)
-                }}
-                className="btn-ghost"
-              >
-                <Upload size={16} /> {t('importExcel')}
-              </button>
+                <button
+                  onClick={() => {
+                    resetImport()
+                    setImportModalOpen(true)
+                  }}
+                  className="btn-ghost"
+                >
+                  <Upload size={16} /> {t('importExcel')}
+                </button>
               </>
             }
             primaryAction={
@@ -561,11 +562,27 @@ export function AdminCompanies() {
         onPage={list.setPage}
       />
 
-      <Modal
+      <Dialog
         open={exportModalOpen}
-        onClose={() => setExportModalOpen(false)}
+        onOpenChange={setExportModalOpen}
         title={t('exportCompanies')}
         size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setExportModalOpen(false)}>
+              {t('cancel')}
+            </Button>
+            <Button
+              variant="primary"
+              icon={<Download size={16} />}
+              loading={exporting}
+              disabled={exportColumns.size === 0}
+              onClick={handleExport}
+            >
+              {t('exportExcel')}
+            </Button>
+          </>
+        }
       >
         <div className="space-y-4">
           {exportError && <Alert type="error">{exportError}</Alert>}
@@ -587,31 +604,25 @@ export function AdminCompanies() {
               </label>
             ))}
           </div>
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={() => setExportModalOpen(false)}
-              className="btn-outline flex-1"
-            >
-              {t('cancel')}
-            </button>
-            <button
-              onClick={handleExport}
-              disabled={exporting || exportColumns.size === 0}
-              className="btn-primary flex-1"
-            >
-              <Download size={16} />{' '}
-              {exporting ? t('processing') : t('exportExcel')}
-            </button>
-          </div>
         </div>
-      </Modal>
+      </Dialog>
 
-      {/* Add/Edit Modal */}
-      <Modal
+      {/* Add/Edit Dialog */}
+      <Dialog
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onOpenChange={setModalOpen}
         title={editing ? t('editCompany') : t('addCompany')}
         size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setModalOpen(false)}>
+              {t('cancel')}
+            </Button>
+            <Button variant="primary" loading={saving} onClick={handleSave}>
+              {t('save')}
+            </Button>
+          </>
+        }
       >
         {formError && (
           <div className="mb-4">
@@ -640,29 +651,14 @@ export function AdminCompanies() {
             />
           </div>
         </div>
-        <div className="flex gap-3 pt-4">
-          <button
-            onClick={() => setModalOpen(false)}
-            className="btn-outline flex-1"
-          >
-            {t('cancel')}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="btn-primary flex-1"
-          >
-            {saving ? t('saving') : t('save')}
-          </button>
-        </div>
-      </Modal>
+      </Dialog>
 
-      {/* Import Modal */}
-      <Modal
+      {/* Import Dialog */}
+      <Dialog
         open={importModalOpen}
-        onClose={() => setImportModalOpen(false)}
+        onOpenChange={setImportModalOpen}
         title={t('importCompanies')}
-        size="xl"
+        size="lg"
       >
         {importError && (
           <div className="mb-4">
@@ -859,12 +855,12 @@ export function AdminCompanies() {
             </button>
           </div>
         )}
-      </Modal>
+      </Dialog>
 
-      {/* Manage Projects Modal */}
-      <Modal
+      {/* Manage Projects Dialog */}
+      <Dialog
         open={projectsModalOpen}
-        onClose={() => setProjectsModalOpen(false)}
+        onOpenChange={setProjectsModalOpen}
         title={`${t('manageProjects')} — ${projectsModalCompany ? localizedName(lang, projectsModalCompany.name_ar, projectsModalCompany.name_en) : ''}`}
         size="md"
       >
@@ -946,7 +942,8 @@ export function AdminCompanies() {
             </div>
           </div>
         )}
-      </Modal>
+      </Dialog>
+      {confirmDialog}
     </div>
   )
 }
