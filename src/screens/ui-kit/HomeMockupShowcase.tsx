@@ -7,7 +7,6 @@ import {
   SearchInput,
   Select,
   Tabs,
-  TabsContent,
   TabsList,
   TabsTrigger,
   WorkshopPurposeBadge,
@@ -24,6 +23,7 @@ import type {
 } from '@/components/home/EquipmentStatusCard'
 import { AttentionList } from '@/components/home/AttentionList'
 import type { AttentionItem } from '@/components/home/AttentionList'
+import { AdminHomeMockup } from './AdminHomeMockup'
 
 // Home page mockup for owner approval on /ui-kit. Everything below is demo
 // data held in this file: the mockup never calls Supabase and never changes a
@@ -507,9 +507,7 @@ export function HomeMockupShowcase() {
           <WorkshopHome copy={copy} lang={lang} state={state} />
         )}
 
-        {role === 'admin' && (
-          <AdminHome copy={copy} lang={lang} state={state} />
-        )}
+        {role === 'admin' && <AdminHomeMockup lang={lang} state={state} />}
       </div>
     </section>
   )
@@ -635,107 +633,6 @@ function StatGrid({ children }: { children: ReactNode }) {
 
 function statValue(state: DemoState, value: number) {
   return state === 'error' ? '—' : value
-}
-
-function SitesPanel({
-  copy,
-  lang,
-  state,
-  movementsTitle,
-}: {
-  copy: Copy
-  lang: DemoLang
-  state: DemoState
-  movementsTitle: string
-}) {
-  const loading = state === 'loading'
-  const columns = useMemo(() => siteColumns(copy, lang), [copy, lang])
-  const items: AttentionItem[] = [
-    {
-      id: 'open30',
-      label: copy.openVisits30,
-      hint: copy.openVisits30Hint,
-      count: 7,
-      tone: 'warning',
-    },
-    {
-      id: 'noMovement',
-      label: copy.noMovementEquipment,
-      hint: copy.noMovementEquipmentHint,
-      count: 12,
-    },
-    {
-      id: 'incomplete',
-      label: copy.incompleteEquipment,
-      hint: copy.incompleteEquipmentHint,
-      count: 5,
-      tone: 'warning',
-    },
-  ]
-
-  return (
-    <div className="space-y-4">
-      <StatGrid>
-        <StatCard
-          label={copy.siteEntriesToday}
-          value={statValue(state, 14)}
-          tone="entry"
-          loading={loading}
-        />
-        <StatCard
-          label={copy.siteExitsToday}
-          value={statValue(state, 9)}
-          tone="exit"
-          loading={loading}
-        />
-        <StatCard
-          label={copy.insideSitesNow}
-          value={statValue(state, 63)}
-          loading={loading}
-        />
-        <StatCard
-          label={copy.outsideSites}
-          value={statValue(state, 28)}
-          loading={loading}
-        />
-      </StatGrid>
-
-      <Card className="space-y-3">
-        <SectionHeader
-          title={copy.attentionTitle}
-          description={copy.attentionSitesDescription}
-        />
-        <AttentionList
-          items={items}
-          loading={loading}
-          error={state === 'error' || undefined}
-        />
-      </Card>
-
-      <Card className="space-y-3">
-        <SectionHeader
-          title={movementsTitle}
-          description={copy.latestTen}
-          action={
-            <Button size="sm" variant="ghost">
-              {copy.viewAll}
-            </Button>
-          }
-        />
-        <DataTable
-          size="sm"
-          columns={columns}
-          rows={SITE_ROWS}
-          rowKey={(row) => row.id}
-          loading={loading}
-          loadingRows={5}
-          error={state === 'error' || undefined}
-          empty={copy.noMovements}
-          caption={movementsTitle}
-        />
-      </Card>
-    </div>
-  )
 }
 
 function WorkshopPanel({
@@ -873,42 +770,6 @@ function WorkshopPanel({
         />
       </Card>
     </div>
-  )
-}
-
-function AdminHome({
-  copy,
-  lang,
-  state,
-}: {
-  copy: Copy
-  lang: DemoLang
-  state: DemoState
-}) {
-  return (
-    <>
-      <Card className="space-y-3">
-        <SectionHeader title={copy.quickActions} />
-        <QuickActions copy={copy} />
-      </Card>
-      <Tabs defaultValue="sites">
-        <TabsList>
-          <TabsTrigger value="sites">{copy.tabSites}</TabsTrigger>
-          <TabsTrigger value="workshop">{copy.tabWorkshop}</TabsTrigger>
-        </TabsList>
-        <TabsContent value="sites">
-          <SitesPanel
-            copy={copy}
-            lang={lang}
-            state={state}
-            movementsTitle={copy.latestSiteMovements}
-          />
-        </TabsContent>
-        <TabsContent value="workshop">
-          <WorkshopPanel copy={copy} lang={lang} state={state} />
-        </TabsContent>
-      </Tabs>
-    </>
   )
 }
 
