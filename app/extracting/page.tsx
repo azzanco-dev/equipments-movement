@@ -93,7 +93,7 @@ const EXTRACTED_FIELDS: Array<[FieldKey, string, string]> = [
 const MANUAL_FIELDS: Array<[FieldKey, string, string]> = [
   ['email', 'بريد مستخدم ERPNext', 'email'],
   ['employee_number', 'رقم الموظف', 'text'],
-  ['mobile_number', 'رقم الجوال', 'tel'],
+  ['mobile_number', 'رقم الجوال', 'text'],
   ['company', 'الشركة في ERPNext', 'text'],
   ['employment_type', 'نوع التوظيف', 'text'],
   ['department', 'القسم', 'text'],
