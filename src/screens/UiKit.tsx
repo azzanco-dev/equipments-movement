@@ -27,6 +27,7 @@ import { FullPageSpinner } from '@/components/Spinner'
 import { ComponentShowcase } from '@/screens/ui-kit/ComponentShowcase'
 import { DataTableShowcase } from '@/screens/ui-kit/DataTableShowcase'
 import { HomeMockupShowcase } from '@/screens/ui-kit/HomeMockupShowcase'
+import { EquipmentInquiryShowcase } from '@/screens/ui-kit/EquipmentInquiryShowcase'
 import {
   PALETTE_DIRECTIONS,
   contrastRatio,
@@ -100,6 +101,8 @@ function UiKitContent() {
       <ApprovedTokens />
 
       <HomeMockupShowcase />
+
+      <EquipmentInquiryShowcase />
 
       <ComponentShowcase />
 

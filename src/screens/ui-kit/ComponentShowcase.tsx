@@ -26,6 +26,8 @@ import { DateAndFloatingShowcase } from './DateAndFloatingShowcase'
 import { FeedbackAndFormShowcase } from './FeedbackAndFormShowcase'
 import { PhotoGalleryShowcase } from './PhotoGalleryShowcase'
 import { LastEntrySummaryShowcase } from './LastEntrySummaryShowcase'
+import { ImageCompressionShowcase } from './ImageCompressionShowcase'
+import { LightboxShowcase } from './LightboxShowcase'
 
 // Live review of the shared components on /ui-kit. Sample copy only.
 export function ComponentShowcase() {
@@ -41,6 +43,8 @@ export function ComponentShowcase() {
       <FeedbackAndFormShowcase />
       <PhotoGalleryShowcase />
       <LastEntrySummaryShowcase />
+      <ImageCompressionShowcase />
+      <LightboxShowcase />
     </div>
   )
 }

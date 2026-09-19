@@ -91,4 +91,6 @@ export type {
   DateRangePreset,
   DateRangeValue,
 } from './DateRangeFilter'
+export { Lightbox } from './Lightbox'
+export type { LightboxItem, LightboxProps } from './Lightbox'
 export { cn } from './cn'
