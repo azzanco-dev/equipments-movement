@@ -124,6 +124,11 @@ export function DataTable<Row>({
   const { t } = useI18n()
   const density = sizes[size]
   const hasError = error !== undefined && error !== null && error !== false
+  // While a refetch (sort, page, filter) is in flight the current rows stay on
+  // screen, dimmed, so column widths do not jump between skeleton and data.
+  // The skeleton only appears when there is nothing to show yet.
+  const showSkeleton = loading && rows.length === 0
+  const refreshing = loading && rows.length > 0
   const isEmpty = !loading && !hasError && rows.length === 0
 
   const handleSort = (column: DataTableColumn<Row>) => {
@@ -235,7 +240,7 @@ export function DataTable<Row>({
           </tr>
         </thead>
         <tbody>
-          {loading &&
+          {showSkeleton &&
             Array.from({ length: Math.max(1, loadingRows) }).map((_, index) => (
               <tr key={`skeleton-${index}`} className="border-b last:border-0">
                 {columns.map((column, columnIndex) => (
@@ -288,7 +293,7 @@ export function DataTable<Row>({
             </tr>
           )}
 
-          {!loading &&
+          {!showSkeleton &&
             !hasError &&
             rows.map((row) => (
               <tr
@@ -296,6 +301,7 @@ export function DataTable<Row>({
                 {...rowInteraction(row)}
                 className={cn(
                   'border-b transition-colors last:border-0 hover:bg-surface-hover',
+                  refreshing && 'pointer-events-none opacity-60',
                   onRowClick &&
                     'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
                   rowClassName?.(row),
