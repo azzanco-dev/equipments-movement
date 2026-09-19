@@ -70,7 +70,7 @@ function createDefaultForm(): ExtractionForm {
     email: '',
     mobile_number: '',
     gender: 'Male',
-    language: 'ar',
+    language: 'العربية',
     company: DEFAULT_COMPANY,
     employment_type: 'نقدي',
     department: '',
@@ -437,8 +437,8 @@ export default function ExtractingPage() {
                     value={data.language}
                     onChange={(event) => update('language', event.target.value)}
                   >
-                    <option value="ar">العربية</option>
-                    <option value="en">English</option>
+                    <option value="العربية">العربية</option>
+                    <option value="English">English</option>
                   </select>
                 )}
               </Field>

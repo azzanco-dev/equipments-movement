@@ -40,7 +40,7 @@ const data = {
   occupation: 'سائق شاحنة ثقيلة',
   email: 'driver@example.com',
   gender: 'Male',
-  language: 'en',
+  language: 'English',
   mobile_number: '0500000000',
   employment_type: 'العزاني',
   company: 'شركة تجريبية',
@@ -99,7 +99,7 @@ test('ERP user is created from the reviewed identity data', () => {
   assert.equal(payload.email, data.email)
   assert.equal(payload.first_name, data.full_name_ar)
   assert.equal(payload.username, data.id_number)
-  assert.equal(payload.language, 'en')
+  assert.equal(payload.language, 'English')
   assert.equal(payload.send_welcome_email, 0)
 })
 
@@ -113,10 +113,10 @@ test('only Arabic and English user languages are accepted', () => {
   )
   assert.equal(
     parsePublishRequest({
-      data: { ...data, language: 'ar' },
+      data: { ...data, language: 'العربية' },
       targets: { erpnext: true },
     }).data.language,
-    'ar',
+    'العربية',
   )
 })
 
