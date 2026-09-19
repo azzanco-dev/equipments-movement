@@ -4,7 +4,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import { cn } from './cn'
 
 export type DataTableSortDirection = 'asc' | 'desc'
-export type DataTableSize = 'sm' | 'md'
+export type DataTableSize = 'sm' | 'md' | 'lg'
 export type DataTableAlign = 'start' | 'center' | 'end'
 
 export interface DataTableSort {
@@ -69,6 +69,8 @@ const sizes: Record<
   md: { header: 'h-10 md:h-9', row: 'h-11 md:h-10', cell: 'px-3 text-sm' },
   // Matches the 28 px toolbar/table controls.
   sm: { header: 'h-7', row: 'h-7', cell: 'px-2.5 text-[13px]' },
+  // Owner feedback (2026-09-19): taller 44 px rows for home-page tables.
+  lg: { header: 'h-11', row: 'h-11', cell: 'px-3 text-sm' },
 }
 
 const alignText: Record<DataTableAlign, string> = {
