@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { InlineSpinner } from '@/components/Spinner'
@@ -21,7 +21,6 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
-  X,
   Maximize2,
   Trash2,
   Upload,
@@ -37,6 +36,7 @@ import type {
   MovementDriverChange,
 } from '@/lib/types'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
+import { Lightbox, type LightboxItem } from '@/components/ui/Lightbox'
 import type { SelectOption } from '@/components/Select'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
@@ -45,6 +45,12 @@ import { localizedName } from '@/lib/localizedName'
 import { uploadMovementPhotosDirectly } from '@/lib/movementPhotoUpload'
 import { prepareMovementPhotos } from '@/lib/movementPhotoCompression'
 import { useListRequest } from '@/components/data-list/useListRequest'
+
+// Storage signed URLs are minted with a 3600s (60 min) expiry. Cached URLs
+// are reused across re-fetches (add/delete photo, edit, driver change) and
+// only re-requested once they are older than ~50 min, so switching photos or
+// re-loading the movement never waits on a fresh signed URL unnecessarily.
+const SIGNED_URL_REFRESH_AFTER_MS = 50 * 60 * 1000
 
 interface MovementDetailProps {
   movementId: string
@@ -90,8 +96,12 @@ export function MovementDetail({
     (EntryExitPhoto & { url: string })[]
   >([])
   const [photoCarouselIndex, setPhotoCarouselIndex] = useState(0)
-  const [fullImageOpen, setFullImageOpen] = useState(false)
-  const [fullImageSrc, setFullImageSrc] = useState<string | null>(null)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
+  // Signed URLs keyed by storage path, kept across re-fetches so navigating
+  // or re-loading the movement never re-requests a still-fresh URL.
+  const signedUrlCacheRef = useRef<
+    Map<string, { url: string; fetchedAt: number }>
+  >(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [linkedError, setLinkedError] = useState<string | null>(null)
@@ -125,6 +135,12 @@ export function MovementDetail({
   const [editRecordedAt, setEditRecordedAt] = useState('')
   const [editContractorCode, setEditContractorCode] = useState('')
   const photoUrls = photoItems.map((item) => item.url)
+  const lightboxItems: LightboxItem[] =
+    photoUrls.length > 0
+      ? photoItems.map((item) => ({ id: item.id, src: item.url }))
+      : photoUrl
+        ? [{ id: 'legacy-photo', src: photoUrl }]
+        : []
 
   const startRequest = useListRequest()
   const fetchData = useCallback(async () => {
@@ -141,8 +157,7 @@ export function MovementDetail({
     setPhotoUrl(null)
     setPhotoItems([])
     setPhotoCarouselIndex(0)
-    setFullImageOpen(false)
-    setFullImageSrc(null)
+    setLightboxOpen(false)
     setLinkedError(null)
     setDriverChanges([])
     setCurrentDriverMobileNumber(null)
@@ -215,18 +230,34 @@ export function MovementDetail({
           if (photoErr) {
             console.error(photoErr)
           } else if (photoRows && photoRows.length > 0) {
-            const { data: signed } = await supabase.storage
-              .from('log-photos')
-              .createSignedUrls(
-                photoRows.map((photo) => photo.file_path),
-                3600,
-              )
-            if (signal.aborted) return
-            const signedByPath = new Map(
-              (signed ?? []).map((item) => [item.path, item.signedUrl]),
-            )
+            const cache = signedUrlCacheRef.current
+            const now = Date.now()
+            // Only (re)request paths that are missing or stale — a photo
+            // that already has a fresh cached URL is never re-requested.
+            const stalePaths = photoRows
+              .map((photo) => photo.file_path)
+              .filter((path) => {
+                const cached = cache.get(path)
+                return (
+                  !cached ||
+                  now - cached.fetchedAt > SIGNED_URL_REFRESH_AFTER_MS
+                )
+              })
+
+            if (stalePaths.length > 0) {
+              const { data: signed } = await supabase.storage
+                .from('log-photos')
+                .createSignedUrls(stalePaths, 3600)
+              if (signal.aborted) return
+              for (const item of signed ?? []) {
+                if (item.path && item.signedUrl) {
+                  cache.set(item.path, { url: item.signedUrl, fetchedAt: now })
+                }
+              }
+            }
+
             const signedItems = (photoRows as EntryExitPhoto[]).map((photo) => {
-              const url = signedByPath.get(photo.file_path)
+              const url = cache.get(photo.file_path)?.url
               return url ? { ...photo, url } : null
             })
             setPhotoItems(
@@ -236,11 +267,23 @@ export function MovementDetail({
               ),
             )
           } else if (logData.photo_url) {
-            const { data: signed } = await supabase.storage
-              .from('log-photos')
-              .createSignedUrl(logData.photo_url, 3600)
-            if (signal.aborted) return
-            if (signed?.signedUrl) setPhotoUrl(signed.signedUrl)
+            const path = logData.photo_url
+            const cache = signedUrlCacheRef.current
+            const now = Date.now()
+            const cached = cache.get(path)
+            if (
+              !cached ||
+              now - cached.fetchedAt > SIGNED_URL_REFRESH_AFTER_MS
+            ) {
+              const { data: signed } = await supabase.storage
+                .from('log-photos')
+                .createSignedUrl(path, 3600)
+              if (signal.aborted) return
+              if (signed?.signedUrl)
+                cache.set(path, { url: signed.signedUrl, fetchedAt: now })
+            }
+            const finalUrl = cache.get(path)?.url
+            if (finalUrl) setPhotoUrl(finalUrl)
           }
         })(),
         (async () => {
@@ -946,16 +989,15 @@ export function MovementDetail({
               <div className="absolute inset-0 flex items-center justify-center">
                 <img
                   src={photoUrls[photoCarouselIndex]}
-                  alt={`Photo ${photoCarouselIndex + 1}`}
-                  className="max-h-full max-w-full object-contain"
+                  alt={`${t('photoGalleryMainAlt')} ${photoCarouselIndex + 1}`}
+                  className="max-h-full max-w-full object-contain cursor-zoom-in"
+                  onClick={() => setLightboxOpen(true)}
                 />
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setFullImageSrc(photoUrls[photoCarouselIndex])
-                  setFullImageOpen(true)
-                }}
+                aria-label={t('photoGalleryOpenAria')}
+                onClick={() => setLightboxOpen(true)}
                 className="absolute top-1 end-1 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
               >
                 <Maximize2 size={16} />
@@ -1017,16 +1059,15 @@ export function MovementDetail({
               <div className="absolute inset-0 flex items-center justify-center">
                 <img
                   src={photoUrl}
-                  alt={t('photo')}
-                  className="max-h-full max-w-full object-contain"
+                  alt={t('photoGalleryMainAlt')}
+                  className="max-h-full max-w-full object-contain cursor-zoom-in"
+                  onClick={() => setLightboxOpen(true)}
                 />
               </div>
               <button
                 type="button"
-                onClick={() => {
-                  setFullImageSrc(photoUrl)
-                  setFullImageOpen(true)
-                }}
+                aria-label={t('photoGalleryOpenAria')}
+                onClick={() => setLightboxOpen(true)}
                 className="absolute top-1 end-1 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
               >
                 <Maximize2 size={16} />
@@ -1274,26 +1315,13 @@ export function MovementDetail({
         </div>
       )}
 
-      {/* Full image modal */}
-      {fullImageOpen && fullImageSrc && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setFullImageOpen(false)}
-        >
-          <button
-            onClick={() => setFullImageOpen(false)}
-            className="absolute top-4 end-4 rounded-full p-2 bg-white/10 hover:bg-white/20 text-white transition-colors"
-          >
-            <X size={24} />
-          </button>
-          <img
-            src={fullImageSrc}
-            alt={t('photo')}
-            className="max-h-[90vh] max-w-[90vw] object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-        </div>
-      )}
+      <Lightbox
+        open={lightboxOpen}
+        onOpenChange={setLightboxOpen}
+        items={lightboxItems}
+        index={photoCarouselIndex}
+        onIndexChange={setPhotoCarouselIndex}
+      />
     </div>
   )
 }
