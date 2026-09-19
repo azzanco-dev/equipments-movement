@@ -8,27 +8,37 @@ import {
   MovementBadge,
   SearchInput,
   StatCard,
+  Switch,
   Tabs,
   TabsList,
   TabsTrigger,
   WorkshopPurposeBadge,
 } from '@/components/ui'
 import type { DataTableColumn, DateRangeValue } from '@/components/ui'
+import { MiniTable, MiniTableGrid } from '@/components/ui/MiniTable'
 import { AttentionList } from '@/components/home/AttentionList'
 import type { AttentionItem } from '@/components/home/AttentionList'
 import { CollapsibleSection } from '@/components/home/CollapsibleSection'
+import { FleetNowExplorer } from '@/components/home/FleetNowExplorer'
+import type { FleetStateCategory } from '@/components/home/FleetNowExplorer'
+import { HorizontalBarList } from '@/components/charts'
+import { EntriesLineChart } from '@/components/charts/lazy'
+import type { EntriesLinePoint } from '@/components/charts/lazy'
 import {
-  BarChart,
-  DonutChart,
-  HorizontalBarList,
-  StackedBar,
-} from '@/components/charts'
-import { saudiPeriodKeys } from '@/lib/saudiTime'
+  buildChartBuckets,
+  chartBucketLabel,
+  chartBucketRangeLabel,
+  type ChartBucket,
+  type ChartBucketUnit,
+} from '@/lib/chartBuckets'
+import { saudiDateKey, saudiPeriodKeys } from '@/lib/saudiTime'
 
-// Admin home mockup v2 for owner review on /ui-kit (owner request 2026-09-19:
-// a command dashboard with collapsible sections, simple SVG charts, no chart
-// library). Every number below is demo data held in this file: the mockup
-// never calls Supabase and never changes a real screen.
+// Admin home mockup v3 for owner review on /ui-kit, applying the owner's
+// review of v2 (2026-09-19): the movement bar chart is gone, entries are a
+// line chart whose granularity follows the period, the fleet donut drills in
+// both directions, the main tables use 44 px rows, and the smaller lists are
+// one-third-wide mini tables. Every number below is demo data held in this
+// file: the mockup never calls Supabase and never changes a real screen.
 
 export type MockLang = 'ar' | 'en'
 export type MockState = 'ready' | 'loading' | 'error'
@@ -41,15 +51,11 @@ const COPY = {
     // 0 — toolbar
     toolbarTitle: 'لوحة التحكم',
     toolbarDescription:
-      'بحث المعدة والاجراءات السريعة وفلتر فترة واحد يتحكم في الاقسام الزمنية.',
-    quickActions: 'اجراءات سريعة',
+      'الاجراءات السريعة وفلتر فترة واحد يتحكم في الاقسام الزمنية.',
     registerEntry: 'تسجيل دخول',
     registerExit: 'تسجيل خروج',
     periodLabel: 'الفترة',
     periodNote: 'يؤثر على الاقسام الزمنية فقط. اقسام «الان» لا تتغير.',
-    periodFrom: 'من',
-    periodTo: 'الى',
-    periodScoped: 'حسب الفترة',
     nowScoped: 'الان',
     // 1 — pulse
     pulseTitle: 'نبض اليوم',
@@ -60,25 +66,35 @@ const COPY = {
     inWorkshopNow: 'في الورشة الان',
     outsideAvailable: 'خارج / متاحة',
     vsYesterday: 'مقارنة بامس',
-    // 2 — trend
-    trendTitle: 'اتجاه الحركة',
-    trendDescription: 'الدخول مقابل الخروج لكل يوم خلال الفترة.',
-    trendSites: 'مواقع',
-    trendWorkshop: 'ورشة',
+    // 2 — entries line chart
+    flowTitle: 'حركة الدخول',
+    flowDescription:
+      'عدد الدخوليات خلال الفترة. التقسيم يتبع طول الفترة: السنة تعرض شهورا، والشهر يعرض ايامه، والفترة المخصصة تختار ايام او اسابيع او شهور حسب طولها.',
+    flowThisYear: 'هذه السنة',
+    flowThisMonth: 'هذا الشهر',
+    flowCustom: 'مخصص',
+    flowShowExits: 'اظهار الخروج',
+    flowAria: 'الدخول والخروج خلال الفترة',
     entries: 'دخول',
     exits: 'خروج',
-    trendAria: 'الدخول والخروج لكل يوم',
+    unitDay: 'يومي',
+    unitWeek: 'اسبوعي',
+    unitMonth: 'شهري',
     // 3 — fleet now
     fleetNowTitle: 'اين الاسطول الان',
-    fleetNowDescription: 'توزيع كل المعدات في هذه اللحظة.',
-    insideSites: 'داخل مواقع',
+    fleetNowDescription:
+      'توزيع المعدات في هذه اللحظة. اختر مالكا لتصفية التوزيع، او اضغط شريحة لعرضها حسب المالك.',
+    insideSites: 'داخل المواقع',
     workshopMaintenance: 'ورشة صيانة',
     workshopParking: 'ورشة وقوف',
-    outside: 'خارج',
+    outside: 'خارج المواقع',
     fleetTotal: 'معدة',
-    byOwnerTitle: 'حسب المالك',
-    donutAria: 'توزيع الاسطول الان',
-    ownerBarAria: 'توزيع الاسطول حسب المالك',
+    fleetAllOwners: 'الكل',
+    fleetOwnerFilter: 'تصفية حسب المالك',
+    fleetDrillHint: 'اضغط على شريحة لعرض توزيعها حسب المالك.',
+    fleetStateAria: 'توزيع الاسطول الان',
+    fleetOwnerAriaPrefix: 'حسب المالك',
+    back: 'رجوع',
     // 4 — idle
     idleTitle: 'المعدات بلا حركة',
     idleDescription:
@@ -121,31 +137,7 @@ const COPY = {
     attnExpiringHint: 'استمارة او وثيقة تامين قاربت على الانتهاء',
     attnIncomplete: 'بيانات معدات ناقصة',
     attnIncompleteHint: 'معدات تم انشاؤها سريعا وتنتظر مراجعة الادمن',
-    // 7 — companies
-    companiesTitle: 'الشركات والمشاريع',
-    companiesDescription: 'اكثر خمس شركات ومشاريع نشاطا.',
-    colCompanyProject: 'الشركة / المشروع',
-    colEquipmentNow: 'معدات داخلها الان',
-    colPeriodEntries: 'دخوليات الفترة',
-    colLongestVisit: 'اطول زيارة',
-    // 8 — foremen
-    foremenTitle: 'الفورمين',
-    foremenDescription: 'نشاط مسجلي الحركات خلال الفترة.',
-    colForeman: 'الفورمان',
-    colPeriodMovements: 'حركات الفترة',
-    colOpenVisits: 'زيارات مفتوحة',
-    colLastActivity: 'اخر نشاط',
-    noActivity7: 'بلا نشاط 7 ايام',
-    // 9 — workshop
-    workshopTitle: 'الورشة',
-    workshopDescription: 'حالة الورشة الان واطول المعدات بقاء فيها.',
-    maintenanceNow: 'صيانة الان',
-    parkingNow: 'وقوف الان',
-    avgStay: 'متوسط مدة البقاء',
-    longestInWorkshop: 'اطول خمس معدات في الورشة',
-    colPurpose: 'الغرض',
-    colStayDays: 'مدة البقاء',
-    // 10 — latest movements
+    // 7 — latest movements
     latestTitle: 'اخر الحركات',
     latestDescription: 'اخر 10 حركات في المواقع والورشة معا.',
     colContext: 'السياق',
@@ -155,7 +147,7 @@ const COPY = {
     siteChip: 'موقع',
     workshopChip: 'ورشة',
     noMovements: 'لا توجد حركات',
-    // 11 — fleet breakdown
+    // 8 — fleet breakdown
     fleetTitle: 'الاسطول',
     fleetDescription: 'توزيع المعدات حسب النوع او المالك او النشاط.',
     fleetByType: 'النوع',
@@ -166,36 +158,53 @@ const COPY = {
     fleetTypesAria: 'اكثر عشرة انواع معدات',
     fleetOwnersAria: 'المعدات حسب المالك',
     fleetActivityAria: 'المعدات حسب النشاط',
-    // 12 — data quality
+    // 9 — workshop
+    workshopTitle: 'الورشة',
+    workshopDescription: 'حالة الورشة في هذه اللحظة.',
+    maintenanceNow: 'صيانة الان',
+    parkingNow: 'وقوف الان',
+    avgStay: 'متوسط مدة البقاء',
+    // 10 — users
+    usersTitle: 'المستخدمون',
+    usersDescription: 'من يعمل اليوم.',
+    activeToday: 'مستخدمون نشطون اليوم',
+    editsToday: 'تعديلات اليوم',
+    // 11 — mini tables
+    companiesTitle: 'الشركات والمشاريع',
+    companiesDescription: 'اكثر خمس شركات نشاطا.',
+    colCompanyProject: 'الشركة / المشروع',
+    colEquipmentNow: 'داخلها الان',
+    foremenTitle: 'الفورمين',
+    foremenDescription: 'نشاط مسجلي الحركات.',
+    colForeman: 'الفورمان',
+    colPeriodMovements: 'حركات الفترة',
+    noActivity7: 'بلا نشاط 7 ايام',
+    longestInWorkshop: 'اطول بقاء في الورشة',
+    longestInWorkshopDescription: 'اطول خمس معدات بقاء داخل الورشة الان.',
+    colPurpose: 'الغرض',
+    colStayDays: 'المدة',
     qualityTitle: 'جودة البيانات',
     qualityDescription: 'نواقص تؤثر على دقة التقارير.',
+    colCheck: 'الفحص',
+    colCount: 'العدد',
     qualityNoPlate: 'معدات بلا لوحة او شاصي',
     qualityNoMobile: 'سائقون بلا جوال',
     qualityFewPhotos: 'حركات ورشة باقل من 3 صور',
     qualityQuickCreate: 'معدات الاضافة السريعة تنتظر مراجعة',
-    // 13 — users and audit
-    usersTitle: 'المستخدمون والتدقيق',
-    usersDescription: 'من يعمل اليوم واخر التعديلات على الحركات.',
-    activeToday: 'مستخدمون نشطون اليوم',
-    editsToday: 'تعديلات اليوم',
-    recentEdits: 'اخر خمسة تعديلات',
-    colWho: 'من',
-    colWhat: 'ماذا',
+    auditTitle: 'التدقيق',
+    auditDescription: 'اخر خمسة تعديلات على الحركات.',
+    colWhat: 'التعديل',
     colEditedAt: 'متى',
   },
   en: {
     toolbarTitle: 'Command dashboard',
     toolbarDescription:
-      'Equipment search, quick actions, and one period filter driving the time-based sections.',
-    quickActions: 'Quick actions',
+      'Quick actions and one period filter driving the time-based sections.',
     registerEntry: 'Register entry',
     registerExit: 'Register exit',
     periodLabel: 'Period',
     periodNote:
       'Affects time-based sections only. "Now" sections never change.',
-    periodFrom: 'From',
-    periodTo: 'To',
-    periodScoped: 'For the period',
     nowScoped: 'Now',
     pulseTitle: "Today's pulse",
     pulseDescription: "Today's numbers compared with yesterday.",
@@ -205,23 +214,33 @@ const COPY = {
     inWorkshopNow: 'In the workshop now',
     outsideAvailable: 'Outside / available',
     vsYesterday: 'vs yesterday',
-    trendTitle: 'Movement trend',
-    trendDescription: 'Entries against exits per day over the period.',
-    trendSites: 'Sites',
-    trendWorkshop: 'Workshop',
+    flowTitle: 'Entry flow',
+    flowDescription:
+      'Entries over the period. Granularity follows the length: a year shows months, a month shows its days, and a custom range picks days, weeks or months by length.',
+    flowThisYear: 'This year',
+    flowThisMonth: 'This month',
+    flowCustom: 'Custom',
+    flowShowExits: 'Show exits',
+    flowAria: 'Entries and exits over the period',
     entries: 'Entries',
     exits: 'Exits',
-    trendAria: 'Entries and exits per day',
+    unitDay: 'Daily',
+    unitWeek: 'Weekly',
+    unitMonth: 'Monthly',
     fleetNowTitle: 'Where the fleet is now',
-    fleetNowDescription: 'Every unit, at this moment.',
+    fleetNowDescription:
+      'Every unit, at this moment. Pick an owner to filter, or click a slice to see it split by owner.',
     insideSites: 'Inside sites',
     workshopMaintenance: 'Workshop maintenance',
     workshopParking: 'Workshop standby',
-    outside: 'Outside',
+    outside: 'Outside sites',
     fleetTotal: 'units',
-    byOwnerTitle: 'By owner',
-    donutAria: 'Fleet distribution now',
-    ownerBarAria: 'Fleet distribution by owner',
+    fleetAllOwners: 'All',
+    fleetOwnerFilter: 'Filter by owner',
+    fleetDrillHint: 'Click a slice to see it split by owner.',
+    fleetStateAria: 'Fleet distribution now',
+    fleetOwnerAriaPrefix: 'by owner',
+    back: 'Back',
     idleTitle: 'Equipment with no movement',
     idleDescription:
       'Longest-idle units first. Units with no movement at all are marked in red.',
@@ -261,27 +280,6 @@ const COPY = {
     attnExpiringHint: 'Registration card or insurance close to expiry',
     attnIncomplete: 'Incomplete equipment records',
     attnIncompleteHint: 'Quick-created equipment waiting for admin review',
-    companiesTitle: 'Companies and projects',
-    companiesDescription: 'The five busiest companies and projects.',
-    colCompanyProject: 'Company / project',
-    colEquipmentNow: 'Units inside now',
-    colPeriodEntries: 'Entries in period',
-    colLongestVisit: 'Longest visit',
-    foremenTitle: 'Foremen',
-    foremenDescription: 'Who recorded movements during the period.',
-    colForeman: 'Foreman',
-    colPeriodMovements: 'Movements in period',
-    colOpenVisits: 'Open visits',
-    colLastActivity: 'Last activity',
-    noActivity7: 'No activity for 7 days',
-    workshopTitle: 'Workshop',
-    workshopDescription: 'Workshop state now and the longest stays.',
-    maintenanceNow: 'Maintenance now',
-    parkingNow: 'Standby now',
-    avgStay: 'Average stay',
-    longestInWorkshop: 'Five longest stays in the workshop',
-    colPurpose: 'Purpose',
-    colStayDays: 'Stay',
     latestTitle: 'Latest movements',
     latestDescription: 'The last 10 movements across sites and workshop.',
     colContext: 'Context',
@@ -301,19 +299,40 @@ const COPY = {
     fleetTypesAria: 'Top ten equipment types',
     fleetOwnersAria: 'Equipment by owner',
     fleetActivityAria: 'Equipment by activity',
+    workshopTitle: 'Workshop',
+    workshopDescription: 'The workshop at this moment.',
+    maintenanceNow: 'Maintenance now',
+    parkingNow: 'Standby now',
+    avgStay: 'Average stay',
+    usersTitle: 'Users',
+    usersDescription: 'Who is working today.',
+    activeToday: 'Users active today',
+    editsToday: 'Edits today',
+    companiesTitle: 'Companies and projects',
+    companiesDescription: 'The five busiest companies.',
+    colCompanyProject: 'Company / project',
+    colEquipmentNow: 'Inside now',
+    foremenTitle: 'Foremen',
+    foremenDescription: 'Who recorded movements.',
+    colForeman: 'Foreman',
+    colPeriodMovements: 'Movements',
+    noActivity7: 'No activity for 7 days',
+    longestInWorkshop: 'Longest workshop stays',
+    longestInWorkshopDescription:
+      'The five units that have been in the workshop longest.',
+    colPurpose: 'Purpose',
+    colStayDays: 'Stay',
     qualityTitle: 'Data quality',
     qualityDescription: 'Gaps that affect report accuracy.',
+    colCheck: 'Check',
+    colCount: 'Count',
     qualityNoPlate: 'Units with no plate or chassis',
     qualityNoMobile: 'Drivers with no mobile number',
     qualityFewPhotos: 'Workshop movements with under 3 photos',
     qualityQuickCreate: 'Quick-created equipment awaiting review',
-    usersTitle: 'Users and audit',
-    usersDescription: 'Who is working today and the latest movement edits.',
-    activeToday: 'Users active today',
-    editsToday: 'Edits today',
-    recentEdits: 'Last five edits',
-    colWho: 'Who',
-    colWhat: 'What',
+    auditTitle: 'Audit',
+    auditDescription: 'The last five movement edits.',
+    colWhat: 'Edit',
     colEditedAt: 'When',
   },
 }
@@ -321,14 +340,9 @@ const COPY = {
 type Copy = typeof COPY.ar
 
 // ---------------------------------------------------------------------------
-// Demo data: a fleet of 812 units. Every breakdown below adds up to that total.
+// Demo data: a fleet of 812 units. Every breakdown below adds up to that
+// total, and the fleet matrix is the single source the totals derive from.
 // ---------------------------------------------------------------------------
-
-const FLEET_TOTAL = 812
-const INSIDE_SITES = 498
-const WORKSHOP_MAINTENANCE = 96
-const WORKSHOP_PARKING = 63
-const OUTSIDE = 155
 
 const TYPES: Bi[] = [
   bi('صهريج ماء', 'Water tanker'),
@@ -343,6 +357,8 @@ const TYPES: Bi[] = [
   bi('مولد كهرباء', 'Generator'),
 ]
 
+const OWNER_IDS = ['azani', 'takween', 'f', 'b', 'external'] as const
+
 const OWNERS: Bi[] = [
   bi('العزاني', 'Al-Azani'),
   bi('تكوين', 'Takween'),
@@ -350,6 +366,46 @@ const OWNERS: Bi[] = [
   bi('طرف ثالث B', 'Third party B'),
   bi('مورد خارجي', 'External supplier'),
 ]
+
+/**
+ * Units per owner and per state, right now. The states are data everywhere
+ * they are used, so a future state ("ورشة عامة" and so on) only needs a new
+ * key here plus a new entry in `fleetStates()` below.
+ */
+const FLEET_MATRIX: Record<string, Record<string, number>> = {
+  azani: { inside: 248, maintenance: 48, parking: 31, outside: 75 },
+  takween: { inside: 104, maintenance: 20, parking: 13, outside: 31 },
+  f: { inside: 64, maintenance: 13, parking: 8, outside: 19 },
+  b: { inside: 47, maintenance: 9, parking: 6, outside: 14 },
+  external: { inside: 35, maintenance: 6, parking: 5, outside: 16 },
+}
+
+const fleetCount = (ownerId: string, stateId: string) =>
+  FLEET_MATRIX[ownerId]?.[stateId] ?? 0
+
+const fleetStateTotal = (stateId: string) =>
+  OWNER_IDS.reduce((sum, id) => sum + fleetCount(id, stateId), 0)
+
+const INSIDE_SITES = fleetStateTotal('inside')
+const WORKSHOP_MAINTENANCE = fleetStateTotal('maintenance')
+const WORKSHOP_PARKING = fleetStateTotal('parking')
+const OUTSIDE = fleetStateTotal('outside')
+// The donut's middle number is the sum of whatever slices it is showing, so a
+// filtered view reports that owner's total instead of the whole 812.
+
+/** State categories, coloured with tokens. Order drives the donut. */
+function fleetStates(copy: Copy): FleetStateCategory[] {
+  return [
+    { id: 'inside', label: copy.insideSites, color: 'var(--entry)' },
+    {
+      id: 'maintenance',
+      label: copy.workshopMaintenance,
+      color: 'var(--exit)',
+    },
+    { id: 'parking', label: copy.workshopParking, color: 'var(--info)' },
+    { id: 'outside', label: copy.outside, color: 'var(--muted)' },
+  ]
+}
 
 /** [total, inside sites, in workshop, available] */
 type Counts = [number, number, number, number]
@@ -420,30 +476,24 @@ const AVAILABILITY_BY_TYPE: AvailabilityRow[] = [
   },
 ]
 
-// Ownership is derived: Al-Azani is owned, every other classification is
-// rented (AGENTS.md, equipment ownership).
-const AVAILABILITY_BY_OWNER: AvailabilityRow[] = [
-  {
-    id: 'azani',
-    label: OWNERS[0],
-    all: [402, 248, 79, 75],
-    owned: [402, 248, 79, 75],
-  },
-  {
-    id: 'takween',
-    label: OWNERS[1],
-    all: [168, 104, 33, 31],
-    owned: [0, 0, 0, 0],
-  },
-  { id: 'f', label: OWNERS[2], all: [104, 64, 21, 19], owned: [0, 0, 0, 0] },
-  { id: 'b', label: OWNERS[3], all: [76, 47, 15, 14], owned: [0, 0, 0, 0] },
-  {
-    id: 'external',
-    label: OWNERS[4],
-    all: [62, 35, 11, 16],
-    owned: [0, 0, 0, 0],
-  },
-]
+// Derived from the same matrix as the donut, so the two can never disagree.
+// Ownership is derived, not edited: Al-Azani is owned, every other
+// classification is rented (AGENTS.md, equipment ownership).
+const AVAILABILITY_BY_OWNER: AvailabilityRow[] = OWNER_IDS.map((id, index) => {
+  const cells = FLEET_MATRIX[id]
+  const all: Counts = [
+    cells.inside + cells.maintenance + cells.parking + cells.outside,
+    cells.inside,
+    cells.maintenance + cells.parking,
+    cells.outside,
+  ]
+  return {
+    id,
+    label: OWNERS[index],
+    all,
+    owned: id === 'azani' ? all : [0, 0, 0, 0],
+  }
+})
 
 type IdleRow = {
   id: string
@@ -554,49 +604,29 @@ const IDLE_ROWS: IdleRow[] = [
   },
 ]
 
-type CompanyRow = {
-  id: string
-  label: Bi
-  now: number
-  entries: number
-  longestVisit: number
-}
+type CompanyRow = { id: string; label: Bi; now: number }
 
 const COMPANY_ROWS: CompanyRow[] = [
   {
     id: 'c1',
-    label: bi('مقاولات الخليج · مشروع الرياض', 'Gulf Contracting · Riyadh'),
+    label: bi('مقاولات الخليج · الرياض', 'Gulf Contracting · Riyadh'),
     now: 128,
-    entries: 96,
-    longestVisit: 74,
   },
-  {
-    id: 'c2',
-    label: bi('شركة النخبة · مشروع جدة', 'Elite Co. · Jeddah'),
-    now: 96,
-    entries: 71,
-    longestVisit: 58,
-  },
+  { id: 'c2', label: bi('شركة النخبة · جدة', 'Elite Co. · Jeddah'), now: 96 },
   {
     id: 'c3',
-    label: bi('مقاولات الشرق · مشروع الدمام', 'East Contracting · Dammam'),
+    label: bi('مقاولات الشرق · الدمام', 'East Contracting · Dammam'),
     now: 84,
-    entries: 63,
-    longestVisit: 112,
   },
   {
     id: 'c4',
-    label: bi('البناء الحديث · مشروع الخبر', 'Modern Build · Khobar'),
+    label: bi('البناء الحديث · الخبر', 'Modern Build · Khobar'),
     now: 61,
-    entries: 44,
-    longestVisit: 39,
   },
   {
     id: 'c5',
-    label: bi('مجموعة الاعمار · مشروع القصيم', 'Emaar Group · Qassim'),
+    label: bi('مجموعة الاعمار · القصيم', 'Emaar Group · Qassim'),
     now: 47,
-    entries: 31,
-    longestVisit: 66,
   },
 ]
 
@@ -604,8 +634,6 @@ type ForemanRow = {
   id: string
   name: Bi
   movements: number
-  openVisits: number
-  lastActivity: Bi
   stale: boolean
 }
 
@@ -614,40 +642,30 @@ const FOREMAN_ROWS: ForemanRow[] = [
     id: 'f1',
     name: bi('سعد العمري', 'Saad Al-Amri'),
     movements: 142,
-    openVisits: 18,
-    lastActivity: bi('اليوم', 'Today'),
     stale: false,
   },
   {
     id: 'f2',
     name: bi('راشد الحربي', 'Rashed Al-Harbi'),
     movements: 118,
-    openVisits: 12,
-    lastActivity: bi('اليوم', 'Today'),
     stale: false,
   },
   {
     id: 'f3',
     name: bi('محمد الزهراني', 'Mohammed Al-Zahrani'),
     movements: 96,
-    openVisits: 9,
-    lastActivity: bi('امس', 'Yesterday'),
     stale: false,
   },
   {
     id: 'f4',
     name: bi('عمر السالم', 'Omar Al-Salem'),
     movements: 74,
-    openVisits: 6,
-    lastActivity: bi('12/09/2026', '12/09/2026'),
     stale: false,
   },
   {
     id: 'f5',
     name: bi('فهد القحطاني', 'Fahd Al-Qahtani'),
     movements: 12,
-    openVisits: 2,
-    lastActivity: bi('09/09/2026', '09/09/2026'),
     stale: true,
   },
 ]
@@ -655,29 +673,16 @@ const FOREMAN_ROWS: ForemanRow[] = [
 type WorkshopStayRow = {
   id: string
   code: string
-  type: Bi
   purpose: 'maintenance' | 'parking'
   days: number
 }
 
 const WORKSHOP_STAYS: WorkshopStayRow[] = [
-  {
-    id: 'ws1',
-    code: 'A-217',
-    type: TYPES[1],
-    purpose: 'maintenance',
-    days: 63,
-  },
-  { id: 'ws2', code: 'F-88', type: TYPES[3], purpose: 'parking', days: 47 },
-  {
-    id: 'ws3',
-    code: 'TK-330',
-    type: TYPES[2],
-    purpose: 'maintenance',
-    days: 39,
-  },
-  { id: 'ws4', code: 'B-24', type: TYPES[4], purpose: 'maintenance', days: 31 },
-  { id: 'ws5', code: 'U014', type: TYPES[9], purpose: 'parking', days: 27 },
+  { id: 'ws1', code: 'A-217', purpose: 'maintenance', days: 63 },
+  { id: 'ws2', code: 'F-88', purpose: 'parking', days: 47 },
+  { id: 'ws3', code: 'TK-330', purpose: 'maintenance', days: 39 },
+  { id: 'ws4', code: 'B-24', purpose: 'maintenance', days: 31 },
+  { id: 'ws5', code: 'U014', purpose: 'parking', days: 27 },
 ]
 
 type LatestRow = {
@@ -796,19 +801,19 @@ const EDIT_ROWS: EditRow[] = [
     id: 'e1',
     who: bi('سعد العمري', 'Saad Al-Amri'),
     what: bi('تغيير سائق الحركة 4821', 'Changed driver on movement 4821'),
-    at: bi('قبل 12 دقيقة', '12 minutes ago'),
+    at: bi('قبل 12 دقيقة', '12 min ago'),
   },
   {
     id: 'e2',
     who: bi('ادارة النظام', 'System admin'),
     what: bi('تصنيف دخول ورشة 4812', 'Classified workshop entry 4812'),
-    at: bi('قبل ساعتين', '2 hours ago'),
+    at: bi('قبل ساعتين', '2 h ago'),
   },
   {
     id: 'e3',
     who: bi('راشد الحربي', 'Rashed Al-Harbi'),
     what: bi('اضافة صورة للحركة 4805', 'Added a photo to movement 4805'),
-    at: bi('قبل 3 ساعات', '3 hours ago'),
+    at: bi('قبل 3 ساعات', '3 h ago'),
   },
   {
     id: 'e4',
@@ -824,38 +829,39 @@ const EDIT_ROWS: EditRow[] = [
   },
 ]
 
-// Deterministic demo trend, so the mockup looks the same on every render.
-function pseudoRandom(seed: number) {
-  let value = seed
-  return () => {
-    value = (value * 1664525 + 1013904223) % 4294967296
-    return value / 4294967296
+// --- Demo series -----------------------------------------------------------
+
+/** FNV-1a, so a bucket always gets the same demo numbers. */
+function hashKey(value: string): number {
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
   }
+  return hash >>> 0
 }
 
-const TREND_BASE = new Date('2026-09-19T00:00:00Z')
-
-function trendSeries(days: number, context: 'site' | 'workshop') {
-  const next = pseudoRandom(context === 'site' ? 20260919 : 77031)
-  const labels: string[] = []
-  const entries: number[] = []
-  const exits: number[] = []
-  for (let index = days - 1; index >= 0; index -= 1) {
-    const date = new Date(TREND_BASE.getTime() - index * 86400000)
-    const day = String(date.getUTCDate()).padStart(2, '0')
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0')
-    labels.push(`${day}/${month}`)
-    const weekend = date.getUTCDay() === 5
-    const scale = weekend ? 0.4 : 1
-    if (context === 'site') {
-      entries.push(Math.round((22 + next() * 26) * scale))
-      exits.push(Math.round((17 + next() * 24) * scale))
-    } else {
-      entries.push(Math.round((5 + next() * 11) * scale))
-      exits.push(Math.round((4 + next() * 10) * scale))
+/**
+ * Plausible demo traffic for a fleet of this size: roughly 24–40 entries and
+ * 18–32 exits a day. The numbers scale with the days each bucket covers, so a
+ * monthly chart and a daily chart of the same period stay consistent.
+ */
+function demoFlowPoints(
+  buckets: ChartBucket[],
+  lang: MockLang,
+): EntriesLinePoint[] {
+  return buckets.map((bucket) => {
+    const seed = hashKey(bucket.key)
+    const entriesPerDay = 24 + (seed % 17)
+    const exitsPerDay = 18 + ((seed >>> 8) % 15)
+    return {
+      key: bucket.key,
+      label: chartBucketLabel(bucket, lang),
+      title: chartBucketRangeLabel(bucket),
+      entries: entriesPerDay * bucket.days,
+      exits: exitsPerDay * bucket.days,
     }
-  }
-  return { labels, entries, exits }
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -877,9 +883,6 @@ export function AdminHomeMockup({
     return { preset: 'week', from, to }
   })
 
-  const periodDays =
-    period.preset === 'month' || period.preset === 'custom' ? 30 : 14
-
   return (
     <div className="space-y-4">
       <Toolbar
@@ -889,12 +892,10 @@ export function AdminHomeMockup({
         onPeriodChange={setPeriod}
       />
       <PulseSection copy={copy} loading={loading} error={error} />
-      <TrendSection
+      <FlowSection
         copy={copy}
         lang={lang}
         dir={dir}
-        days={periodDays}
-        period={period}
         loading={loading}
         error={error}
       />
@@ -913,26 +914,6 @@ export function AdminHomeMockup({
         error={error}
       />
       <AttentionSection copy={copy} loading={loading} error={error} />
-      <CompaniesSection
-        copy={copy}
-        lang={lang}
-        period={period}
-        loading={loading}
-        error={error}
-      />
-      <ForemenSection
-        copy={copy}
-        lang={lang}
-        period={period}
-        loading={loading}
-        error={error}
-      />
-      <WorkshopSection
-        copy={copy}
-        lang={lang}
-        loading={loading}
-        error={error}
-      />
       <LatestSection copy={copy} lang={lang} loading={loading} error={error} />
       <FleetBreakdownSection
         copy={copy}
@@ -941,8 +922,15 @@ export function AdminHomeMockup({
         loading={loading}
         error={error}
       />
-      <QualitySection copy={copy} loading={loading} />
-      <UsersSection copy={copy} lang={lang} loading={loading} error={error} />
+      <WorkshopSection copy={copy} loading={loading} error={error} />
+      <UsersSection copy={copy} loading={loading} error={error} />
+      <MiniTables
+        copy={copy}
+        lang={lang}
+        period={period}
+        loading={loading}
+        error={error}
+      />
     </div>
   )
 }
@@ -997,12 +985,12 @@ function Toolbar({
   )
 }
 
-/** Small chip repeating the selected range on every period-scoped section. */
-function PeriodChip({ period }: { period: DateRangeValue }) {
+/** Small chip repeating a range on a period-scoped section. */
+function PeriodChip({ from, to }: { from: string; to: string }) {
   return (
     <Badge>
       <span className="tabular-nums" dir="ltr">
-        {period.from} – {period.to}
+        {from} – {to}
       </span>
     </Badge>
   )
@@ -1045,13 +1033,7 @@ function PulseSection({
     delta: number
     tone?: 'entry' | 'exit' | 'info'
   }[] = [
-    {
-      id: 'in',
-      label: copy.entriesToday,
-      value: 38,
-      delta: 6,
-      tone: 'entry',
-    },
+    { id: 'in', label: copy.entriesToday, value: 38, delta: 6, tone: 'entry' },
     { id: 'out', label: copy.exitsToday, value: 29, delta: -4, tone: 'exit' },
     { id: 'sites', label: copy.insideSitesNow, value: INSIDE_SITES, delta: 9 },
     {
@@ -1089,66 +1071,114 @@ function PulseSection({
   )
 }
 
-// --- 2. Movement trend -----------------------------------------------------
+// --- 2. Entry flow ---------------------------------------------------------
 
-function TrendSection({
+type FlowPreset = 'year' | 'month' | 'custom'
+
+function unitLabel(copy: Copy, unit: ChartBucketUnit | undefined) {
+  if (unit === 'month') return copy.unitMonth
+  if (unit === 'week') return copy.unitWeek
+  return copy.unitDay
+}
+
+function FlowSection({
   copy,
   lang,
   dir,
-  days,
-  period,
   loading,
   error,
 }: {
   copy: Copy
   lang: MockLang
   dir: 'rtl' | 'ltr'
-  days: number
-  period: DateRangeValue
   loading: boolean
   error: true | undefined
 }) {
-  const [context, setContext] = useState<'site' | 'workshop'>('site')
-  const data = useMemo(() => trendSeries(days, context), [context, days])
+  // Read the clock once: a mockup that re-bucketed on every render would jump
+  // around while the owner is looking at it.
+  const today = useMemo(() => saudiDateKey(), [])
+  const [preset, setPreset] = useState<FlowPreset>('year')
+  const [showExits, setShowExits] = useState(false)
+  const [custom, setCustom] = useState<DateRangeValue>(() => {
+    const { from, to } = saudiPeriodKeys('month')
+    return { preset: 'month', from, to }
+  })
+
+  const range = useMemo(() => {
+    if (preset === 'custom')
+      return { from: custom.from, to: custom.to, unit: undefined }
+    if (preset === 'month') {
+      const { from, to } = saudiPeriodKeys('month')
+      // A month is always drawn day by day, even on the 2nd of the month.
+      return { from, to, unit: 'day' as ChartBucketUnit }
+    }
+    // "This year" is always monthly, so early January is still 12-month
+    // shaped instead of falling back to weeks.
+    return {
+      from: `${today.slice(0, 4)}-01-01`,
+      to: today,
+      unit: 'month' as ChartBucketUnit,
+    }
+  }, [custom.from, custom.to, preset, today])
+
+  const buckets = useMemo(
+    () => buildChartBuckets(range.from, range.to, range.unit),
+    [range],
+  )
+  const points = useMemo(() => demoFlowPoints(buckets, lang), [buckets, lang])
 
   return (
     <CollapsibleSection
       as="h2"
-      title={copy.trendTitle}
-      description={copy.trendDescription}
-      action={<PeriodChip period={period} />}
+      title={copy.flowTitle}
+      description={copy.flowDescription}
+      action={
+        <div className="flex items-center gap-2">
+          <Badge tone="info">{unitLabel(copy, buckets[0]?.unit)}</Badge>
+          <PeriodChip from={range.from} to={range.to} />
+        </div>
+      }
       bodyClassName="space-y-3"
     >
-      <Tabs
-        value={context}
-        onValueChange={(next) => setContext(next as 'site' | 'workshop')}
-      >
-        <TabsList variant="segmented">
-          <TabsTrigger value="site">{copy.trendSites}</TabsTrigger>
-          <TabsTrigger value="workshop">{copy.trendWorkshop}</TabsTrigger>
-        </TabsList>
-      </Tabs>
-      <BarChart
-        ariaLabel={copy.trendAria}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          value={preset}
+          onValueChange={(next) => setPreset(next as FlowPreset)}
+        >
+          <TabsList variant="segmented">
+            <TabsTrigger value="year">{copy.flowThisYear}</TabsTrigger>
+            <TabsTrigger value="month">{copy.flowThisMonth}</TabsTrigger>
+            <TabsTrigger value="custom">{copy.flowCustom}</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <Switch
+          checked={showExits}
+          onCheckedChange={setShowExits}
+          label={copy.flowShowExits}
+        />
+      </div>
+
+      {preset === 'custom' && (
+        <div className="-mx-1 overflow-x-auto px-1 pb-1">
+          <DateRangeFilter
+            value={custom}
+            onChange={setCustom}
+            lang={lang}
+            className="w-max flex-nowrap"
+          />
+        </div>
+      )}
+
+      <EntriesLineChart
+        ariaLabel={copy.flowAria}
         dir={dir}
         lang={lang}
-        labels={data.labels}
         loading={loading}
         error={error}
-        series={[
-          {
-            id: 'entries',
-            label: copy.entries,
-            color: 'var(--entry)',
-            values: data.entries,
-          },
-          {
-            id: 'exits',
-            label: copy.exits,
-            color: 'var(--exit)',
-            values: data.exits,
-          },
-        ]}
+        points={points}
+        entriesLabel={copy.entries}
+        exitsLabel={copy.exits}
+        showExits={showExits}
       />
     </CollapsibleSection>
   )
@@ -1169,63 +1199,38 @@ function FleetNowSection({
   loading: boolean
   error: true | undefined
 }) {
+  const states = useMemo(() => fleetStates(copy), [copy])
+  const owners = useMemo(
+    () => OWNER_IDS.map((id, index) => ({ id, label: OWNERS[index][lang] })),
+    [lang],
+  )
+
   return (
     <CollapsibleSection
       as="h2"
       title={copy.fleetNowTitle}
       description={copy.fleetNowDescription}
       action={<NowChip copy={copy} />}
-      bodyClassName="space-y-4"
     >
-      <DonutChart
-        ariaLabel={copy.donutAria}
+      <FleetNowExplorer
+        dir={dir}
         lang={lang}
         loading={loading}
         error={error}
-        centerValue={FLEET_TOTAL}
-        centerLabel={copy.fleetTotal}
-        slices={[
-          {
-            id: 'sites',
-            label: copy.insideSites,
-            value: INSIDE_SITES,
-            color: 'var(--entry)',
-          },
-          {
-            id: 'maintenance',
-            label: copy.workshopMaintenance,
-            value: WORKSHOP_MAINTENANCE,
-            color: 'var(--exit)',
-          },
-          {
-            id: 'parking',
-            label: copy.workshopParking,
-            value: WORKSHOP_PARKING,
-            color: 'var(--info)',
-          },
-          {
-            id: 'outside',
-            label: copy.outside,
-            value: OUTSIDE,
-            color: 'var(--muted)',
-          },
-        ]}
+        owners={owners}
+        states={states}
+        count={fleetCount}
+        labels={{
+          allOwners: copy.fleetAllOwners,
+          ownerFilter: copy.fleetOwnerFilter,
+          total: copy.fleetTotal,
+          byState: copy.fleetStateAria,
+          byOwner: (stateLabel) =>
+            `${stateLabel} — ${copy.fleetOwnerAriaPrefix}`,
+          drillHint: copy.fleetDrillHint,
+          back: copy.back,
+        }}
       />
-      <div className="space-y-2">
-        <h4 className="text-xs font-semibold text-fg">{copy.byOwnerTitle}</h4>
-        <StackedBar
-          ariaLabel={copy.ownerBarAria}
-          dir={dir}
-          lang={lang}
-          loading={loading}
-          error={error}
-          segments={AVAILABILITY_BY_OWNER.map((row) => ({
-            id: row.id,
-            label: row.label[lang],
-            value: row.all[0],
-          }))}
-        />
-      </div>
     </CollapsibleSection>
   )
 }
@@ -1372,7 +1377,7 @@ function IdleSection({
         />
       </div>
       <DataTable
-        size="sm"
+        size="lg"
         columns={columns}
         rows={rows}
         rowKey={(row) => row.id}
@@ -1386,7 +1391,7 @@ function IdleSection({
   )
 }
 
-// --- 5. Availability by type ----------------------------------------------
+// --- 5. Availability -------------------------------------------------------
 
 function SplitCell({
   copy,
@@ -1481,7 +1486,7 @@ function AvailabilitySection({
           className="max-w-xs"
         />
         <DataTable
-          size="sm"
+          size="lg"
           columns={availabilityColumns(copy, lang, copy.colType)}
           rows={typeRows}
           rowKey={(row) => row.id}
@@ -1497,7 +1502,7 @@ function AvailabilitySection({
           {copy.availabilityByOwner}
         </h4>
         <DataTable
-          size="sm"
+          size="lg"
           columns={availabilityColumns(copy, lang, copy.colOwner)}
           rows={AVAILABILITY_BY_OWNER}
           rowKey={(row) => row.id}
@@ -1562,236 +1567,7 @@ function AttentionSection({
   )
 }
 
-// --- 7. Companies and projects --------------------------------------------
-
-function CompaniesSection({
-  copy,
-  lang,
-  period,
-  loading,
-  error,
-}: {
-  copy: Copy
-  lang: MockLang
-  period: DateRangeValue
-  loading: boolean
-  error: true | undefined
-}) {
-  const columns: DataTableColumn<CompanyRow>[] = [
-    {
-      key: 'label',
-      header: copy.colCompanyProject,
-      cell: (row) => <span className="font-medium">{row.label[lang]}</span>,
-    },
-    {
-      key: 'now',
-      header: copy.colEquipmentNow,
-      align: 'end',
-      cell: (row) => <span className="tabular-nums">{row.now}</span>,
-    },
-    {
-      key: 'entries',
-      header: copy.colPeriodEntries,
-      align: 'end',
-      hideBelow: 'sm',
-      cell: (row) => <span className="tabular-nums">{row.entries}</span>,
-    },
-    {
-      key: 'longest',
-      header: copy.colLongestVisit,
-      align: 'end',
-      hideBelow: 'md',
-      cell: (row) => (
-        <span className="tabular-nums text-muted">
-          {row.longestVisit} {copy.dayUnit}
-        </span>
-      ),
-    },
-  ]
-  return (
-    <CollapsibleSection
-      as="h2"
-      title={copy.companiesTitle}
-      description={copy.companiesDescription}
-      action={
-        <div className="flex items-center gap-2">
-          <PeriodChip period={period} />
-          <Button size="sm" variant="ghost">
-            {copy.viewAll}
-          </Button>
-        </div>
-      }
-    >
-      <DataTable
-        size="sm"
-        columns={columns}
-        rows={COMPANY_ROWS}
-        rowKey={(row) => row.id}
-        loading={loading}
-        loadingRows={5}
-        error={error}
-        caption={copy.companiesTitle}
-      />
-    </CollapsibleSection>
-  )
-}
-
-// --- 8. Foremen ------------------------------------------------------------
-
-function ForemenSection({
-  copy,
-  lang,
-  period,
-  loading,
-  error,
-}: {
-  copy: Copy
-  lang: MockLang
-  period: DateRangeValue
-  loading: boolean
-  error: true | undefined
-}) {
-  const columns: DataTableColumn<ForemanRow>[] = [
-    {
-      key: 'name',
-      header: copy.colForeman,
-      cell: (row) => <span className="font-medium">{row.name[lang]}</span>,
-    },
-    {
-      key: 'movements',
-      header: copy.colPeriodMovements,
-      align: 'end',
-      cell: (row) => <span className="tabular-nums">{row.movements}</span>,
-    },
-    {
-      key: 'open',
-      header: copy.colOpenVisits,
-      align: 'end',
-      hideBelow: 'sm',
-      cell: (row) => <span className="tabular-nums">{row.openVisits}</span>,
-    },
-    {
-      key: 'last',
-      header: copy.colLastActivity,
-      align: 'end',
-      cell: (row) =>
-        row.stale ? (
-          <Badge tone="warning">{copy.noActivity7}</Badge>
-        ) : (
-          <span className="text-muted">{row.lastActivity[lang]}</span>
-        ),
-    },
-  ]
-  return (
-    <CollapsibleSection
-      as="h2"
-      title={copy.foremenTitle}
-      description={copy.foremenDescription}
-      action={<PeriodChip period={period} />}
-    >
-      <DataTable
-        size="sm"
-        columns={columns}
-        rows={FOREMAN_ROWS}
-        rowKey={(row) => row.id}
-        loading={loading}
-        loadingRows={5}
-        error={error}
-        caption={copy.foremenTitle}
-      />
-    </CollapsibleSection>
-  )
-}
-
-// --- 9. Workshop -----------------------------------------------------------
-
-function WorkshopSection({
-  copy,
-  lang,
-  loading,
-  error,
-}: {
-  copy: Copy
-  lang: MockLang
-  loading: boolean
-  error: true | undefined
-}) {
-  const columns: DataTableColumn<WorkshopStayRow>[] = [
-    {
-      key: 'code',
-      header: copy.colEquipment,
-      width: '7rem',
-      cell: (row) => <span className="font-semibold">{row.code}</span>,
-    },
-    {
-      key: 'type',
-      header: copy.colType,
-      hideBelow: 'sm',
-      cell: (row) => row.type[lang],
-    },
-    {
-      key: 'purpose',
-      header: copy.colPurpose,
-      cell: (row) => <WorkshopPurposeBadge purpose={row.purpose} />,
-    },
-    {
-      key: 'days',
-      header: copy.colStayDays,
-      align: 'end',
-      cell: (row) => (
-        <span className="font-semibold tabular-nums">
-          {row.days} {copy.dayUnit}
-        </span>
-      ),
-    },
-  ]
-  return (
-    <CollapsibleSection
-      as="h2"
-      title={copy.workshopTitle}
-      description={copy.workshopDescription}
-      action={<NowChip copy={copy} />}
-      bodyClassName="space-y-3"
-    >
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <StatCard
-          label={copy.maintenanceNow}
-          value={statValue(error, WORKSHOP_MAINTENANCE)}
-          tone="warning"
-          loading={loading}
-        />
-        <StatCard
-          label={copy.parkingNow}
-          value={statValue(error, WORKSHOP_PARKING)}
-          tone="info"
-          loading={loading}
-        />
-        <StatCard
-          label={copy.avgStay}
-          value={statValue(error, `11 ${copy.dayUnit}`)}
-          loading={loading}
-        />
-      </div>
-      <div className="space-y-2">
-        <h4 className="text-xs font-semibold text-fg">
-          {copy.longestInWorkshop}
-        </h4>
-        <DataTable
-          size="sm"
-          columns={columns}
-          rows={WORKSHOP_STAYS}
-          rowKey={(row) => row.id}
-          loading={loading}
-          loadingRows={5}
-          error={error}
-          caption={copy.longestInWorkshop}
-        />
-      </div>
-    </CollapsibleSection>
-  )
-}
-
-// --- 10. Latest movements --------------------------------------------------
+// --- 7. Latest movements ---------------------------------------------------
 
 function LatestSection({
   copy,
@@ -1858,7 +1634,7 @@ function LatestSection({
       }
     >
       <DataTable
-        size="sm"
+        size="lg"
         columns={columns}
         rows={LATEST_ROWS}
         rowKey={(row) => row.id}
@@ -1872,7 +1648,7 @@ function LatestSection({
   )
 }
 
-// --- 11. Fleet breakdown ---------------------------------------------------
+// --- 8. Fleet breakdown ----------------------------------------------------
 
 function FleetBreakdownSection({
   copy,
@@ -1949,98 +1725,262 @@ function FleetBreakdownSection({
   )
 }
 
-// --- 12. Data quality ------------------------------------------------------
+// --- 9. Workshop -----------------------------------------------------------
 
-function QualitySection({ copy, loading }: { copy: Copy; loading: boolean }) {
-  const cards = [
-    { id: 'plate', label: copy.qualityNoPlate, value: 37 },
-    { id: 'mobile', label: copy.qualityNoMobile, value: 14 },
-    { id: 'photos', label: copy.qualityFewPhotos, value: 62 },
-    { id: 'quick', label: copy.qualityQuickCreate, value: 9 },
-  ]
-  return (
-    <CollapsibleSection
-      as="h2"
-      title={copy.qualityTitle}
-      description={copy.qualityDescription}
-      bodyClassName="grid grid-cols-2 gap-3 lg:grid-cols-4"
-    >
-      {cards.map((card) => (
-        <StatCard
-          key={card.id}
-          label={card.label}
-          value={card.value}
-          tone="warning"
-          loading={loading}
-        />
-      ))}
-    </CollapsibleSection>
-  )
-}
-
-// --- 13. Users and audit ---------------------------------------------------
-
-function UsersSection({
+function WorkshopSection({
   copy,
-  lang,
   loading,
   error,
 }: {
   copy: Copy
-  lang: MockLang
   loading: boolean
   error: true | undefined
 }) {
-  const columns: DataTableColumn<EditRow>[] = [
-    {
-      key: 'who',
-      header: copy.colWho,
-      cell: (row) => <span className="font-medium">{row.who[lang]}</span>,
-    },
-    {
-      key: 'what',
-      header: copy.colWhat,
-      cell: (row) => row.what[lang],
-    },
-    {
-      key: 'at',
-      header: copy.colEditedAt,
-      align: 'end',
-      cell: (row) => <span className="text-muted">{row.at[lang]}</span>,
-    },
-  ]
+  return (
+    <CollapsibleSection
+      as="h2"
+      title={copy.workshopTitle}
+      description={copy.workshopDescription}
+      action={<NowChip copy={copy} />}
+      bodyClassName="grid grid-cols-2 gap-3 lg:grid-cols-3"
+    >
+      <StatCard
+        label={copy.maintenanceNow}
+        value={statValue(error, WORKSHOP_MAINTENANCE)}
+        tone="warning"
+        loading={loading}
+      />
+      <StatCard
+        label={copy.parkingNow}
+        value={statValue(error, WORKSHOP_PARKING)}
+        tone="info"
+        loading={loading}
+      />
+      <StatCard
+        label={copy.avgStay}
+        value={statValue(error, `11 ${copy.dayUnit}`)}
+        loading={loading}
+      />
+    </CollapsibleSection>
+  )
+}
+
+// --- 10. Users -------------------------------------------------------------
+
+function UsersSection({
+  copy,
+  loading,
+  error,
+}: {
+  copy: Copy
+  loading: boolean
+  error: true | undefined
+}) {
   return (
     <CollapsibleSection
       as="h2"
       title={copy.usersTitle}
       description={copy.usersDescription}
-      bodyClassName="space-y-3"
+      bodyClassName="grid grid-cols-2 gap-3 lg:grid-cols-4"
     >
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard
-          label={copy.activeToday}
-          value={statValue(error, 12)}
-          loading={loading}
-        />
-        <StatCard
-          label={copy.editsToday}
-          value={statValue(error, 7)}
-          loading={loading}
-        />
-      </div>
-      <div className="space-y-2">
-        <h4 className="text-xs font-semibold text-fg">{copy.recentEdits}</h4>
-        <DataTable
-          size="sm"
-          columns={columns}
-          rows={EDIT_ROWS}
-          rowKey={(row) => row.id}
-          loading={loading}
-          loadingRows={5}
-          error={error}
-          caption={copy.recentEdits}
-        />
-      </div>
+      <StatCard
+        label={copy.activeToday}
+        value={statValue(error, 12)}
+        loading={loading}
+      />
+      <StatCard
+        label={copy.editsToday}
+        value={statValue(error, 7)}
+        loading={loading}
+      />
     </CollapsibleSection>
+  )
+}
+
+// --- 11. Mini tables -------------------------------------------------------
+
+type QualityRow = { id: string; label: string; value: number }
+
+/**
+ * The narrow lists, three across on desktop and stacked on mobile. Each one
+ * shows five rows and hands the rest to "View all", so the page keeps a fixed
+ * height no matter how much data sits behind it.
+ */
+function MiniTables({
+  copy,
+  lang,
+  period,
+  loading,
+  error,
+}: {
+  copy: Copy
+  lang: MockLang
+  period: DateRangeValue
+  loading: boolean
+  error: true | undefined
+}) {
+  const periodNote = `${period.from} – ${period.to}`
+
+  const companyColumns: DataTableColumn<CompanyRow>[] = [
+    {
+      key: 'label',
+      header: copy.colCompanyProject,
+      cell: (row) => <span className="font-medium">{row.label[lang]}</span>,
+    },
+    {
+      key: 'now',
+      header: copy.colEquipmentNow,
+      align: 'end',
+      width: '6rem',
+      cell: (row) => (
+        <span className="font-semibold tabular-nums">{row.now}</span>
+      ),
+    },
+  ]
+
+  const foremanColumns: DataTableColumn<ForemanRow>[] = [
+    {
+      key: 'name',
+      header: copy.colForeman,
+      cell: (row) => (
+        <span>
+          <span className="block font-medium">{row.name[lang]}</span>
+          {row.stale && (
+            <Badge tone="warning" size="sm">
+              {copy.noActivity7}
+            </Badge>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'movements',
+      header: copy.colPeriodMovements,
+      align: 'end',
+      width: '6rem',
+      cell: (row) => (
+        <span className="font-semibold tabular-nums">{row.movements}</span>
+      ),
+    },
+  ]
+
+  const stayColumns: DataTableColumn<WorkshopStayRow>[] = [
+    {
+      key: 'code',
+      header: copy.colEquipment,
+      cell: (row) => <span className="font-semibold">{row.code}</span>,
+    },
+    {
+      key: 'purpose',
+      header: copy.colPurpose,
+      cell: (row) => <WorkshopPurposeBadge purpose={row.purpose} />,
+    },
+    {
+      key: 'days',
+      header: copy.colStayDays,
+      align: 'end',
+      width: '5rem',
+      cell: (row) => (
+        <span className="font-semibold tabular-nums">
+          {row.days} {copy.dayUnit}
+        </span>
+      ),
+    },
+  ]
+
+  const qualityRows: QualityRow[] = [
+    { id: 'plate', label: copy.qualityNoPlate, value: 37 },
+    { id: 'mobile', label: copy.qualityNoMobile, value: 14 },
+    { id: 'photos', label: copy.qualityFewPhotos, value: 62 },
+    { id: 'quick', label: copy.qualityQuickCreate, value: 9 },
+  ]
+
+  const qualityColumns: DataTableColumn<QualityRow>[] = [
+    { key: 'label', header: copy.colCheck, cell: (row) => row.label },
+    {
+      key: 'value',
+      header: copy.colCount,
+      align: 'end',
+      width: '5rem',
+      cell: (row) => (
+        <span className="font-semibold tabular-nums text-warning">
+          {row.value}
+        </span>
+      ),
+    },
+  ]
+
+  const editColumns: DataTableColumn<EditRow>[] = [
+    {
+      key: 'what',
+      header: copy.colWhat,
+      cell: (row) => (
+        <span>
+          <span className="block">{row.what[lang]}</span>
+          <span className="block text-[11px] text-muted">{row.who[lang]}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'at',
+      header: copy.colEditedAt,
+      align: 'end',
+      width: '6rem',
+      cell: (row) => <span className="text-muted">{row.at[lang]}</span>,
+    },
+  ]
+
+  return (
+    <MiniTableGrid>
+      <MiniTable
+        title={copy.companiesTitle}
+        description={`${copy.companiesDescription} · ${periodNote}`}
+        columns={companyColumns}
+        rows={COMPANY_ROWS}
+        rowKey={(row) => row.id}
+        loading={loading}
+        error={error}
+        onViewAll={() => undefined}
+      />
+      <MiniTable
+        title={copy.foremenTitle}
+        description={`${copy.foremenDescription} · ${periodNote}`}
+        columns={foremanColumns}
+        rows={FOREMAN_ROWS}
+        rowKey={(row) => row.id}
+        loading={loading}
+        error={error}
+        onViewAll={() => undefined}
+      />
+      <MiniTable
+        title={copy.longestInWorkshop}
+        description={copy.longestInWorkshopDescription}
+        columns={stayColumns}
+        rows={WORKSHOP_STAYS}
+        rowKey={(row) => row.id}
+        loading={loading}
+        error={error}
+        onViewAll={() => undefined}
+      />
+      <MiniTable
+        title={copy.qualityTitle}
+        description={copy.qualityDescription}
+        columns={qualityColumns}
+        rows={qualityRows}
+        rowKey={(row) => row.id}
+        loading={loading}
+        error={error}
+      />
+      <MiniTable
+        title={copy.auditTitle}
+        description={copy.auditDescription}
+        columns={editColumns}
+        rows={EDIT_ROWS}
+        rowKey={(row) => row.id}
+        loading={loading}
+        error={error}
+        onViewAll={() => undefined}
+      />
+    </MiniTableGrid>
   )
 }

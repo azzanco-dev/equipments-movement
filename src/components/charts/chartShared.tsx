@@ -200,6 +200,11 @@ export interface ChartLegendItem {
   color: string
   value?: ReactNode
   percent?: number
+  /** Makes this entry a button. A chart slice is not reachable with the
+   *  keyboard, so a clickable chart exposes the same action here. */
+  onSelect?: () => void
+  /** Marks the entry as the currently drilled-into one. */
+  selected?: boolean
 }
 
 /** Swatch + label list under a chart. Uses logical spacing for RTL and LTR. */
@@ -212,24 +217,45 @@ export function ChartLegend({
 }) {
   return (
     <ul className={cn('flex flex-wrap gap-x-4 gap-y-1.5', className)}>
-      {items.map((item) => (
-        <li key={item.id} className="flex items-center gap-1.5 text-xs">
-          <span
-            aria-hidden="true"
-            className="block h-2.5 w-2.5 shrink-0 rounded-sm"
-            style={{ backgroundColor: item.color }}
-          />
-          <span className="text-muted">{item.label}</span>
-          {item.value !== undefined && (
-            <span className="font-medium tabular-nums text-fg">
-              {item.value}
-            </span>
-          )}
-          {item.percent !== undefined && (
-            <span className="tabular-nums text-muted">({item.percent}%)</span>
-          )}
-        </li>
-      ))}
+      {items.map((item) => {
+        const body = (
+          <>
+            <span
+              aria-hidden="true"
+              className="block h-2.5 w-2.5 shrink-0 rounded-sm"
+              style={{ backgroundColor: item.color }}
+            />
+            <span className="text-muted">{item.label}</span>
+            {item.value !== undefined && (
+              <span className="font-medium tabular-nums text-fg">
+                {item.value}
+              </span>
+            )}
+            {item.percent !== undefined && (
+              <span className="tabular-nums text-muted">({item.percent}%)</span>
+            )}
+          </>
+        )
+        return (
+          <li key={item.id} className="text-xs">
+            {item.onSelect ? (
+              <button
+                type="button"
+                onClick={item.onSelect}
+                aria-pressed={item.selected ?? false}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-md px-1 py-0.5 -mx-1 transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  item.selected && 'bg-surface-hover',
+                )}
+              >
+                {body}
+              </button>
+            ) : (
+              <span className="flex items-center gap-1.5">{body}</span>
+            )}
+          </li>
+        )
+      })}
     </ul>
   )
 }
