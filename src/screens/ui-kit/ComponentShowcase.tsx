@@ -29,6 +29,7 @@ import { LastEntrySummaryShowcase } from './LastEntrySummaryShowcase'
 import { ImageCompressionShowcase } from './ImageCompressionShowcase'
 import { LightboxShowcase } from './LightboxShowcase'
 import { MiniTableShowcase } from './MiniTableShowcase'
+import { NoticeShowcase } from './NoticeShowcase'
 
 // Live review of the shared components on /ui-kit. Sample copy only.
 export function ComponentShowcase() {
@@ -47,6 +48,7 @@ export function ComponentShowcase() {
       <ImageCompressionShowcase />
       <LightboxShowcase />
       <MiniTableShowcase />
+      <NoticeShowcase />
     </div>
   )
 }
