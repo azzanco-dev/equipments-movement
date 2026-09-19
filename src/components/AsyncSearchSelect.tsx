@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Check, ChevronDown, Loader2, Search, X } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import type { SelectOption } from '@/components/Select'
+import { Badge, type BadgeTone } from '@/components/ui/Badge'
 import { cn } from '@/components/ui/cn'
 import { prepareFloatingMenu } from '@/lib/floatingMenu'
 
@@ -14,6 +15,11 @@ import { prepareFloatingMenu } from '@/lib/floatingMenu'
 export interface AsyncSearchSelectOption extends SelectOption {
   /** Rendered under the label in muted text (list) — never in the trigger. */
   description?: string
+  /**
+   * Optional state chip next to the label in the list, e.g. equipment that is
+   * currently inside a site. Rendered with the shared `Badge`.
+   */
+  badge?: { label: string; tone: BadgeTone }
 }
 
 /** Plain-text tooltip built from label/description, for truncated text. */
@@ -287,8 +293,15 @@ export function AsyncSearchSelect({
                     className={`flex w-full items-start justify-between gap-2 px-3.5 py-2 text-start text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${option.value === value ? 'font-semibold' : ''}`}
                   >
                     <span className="flex min-w-0 flex-col gap-0.5">
-                      <span className="min-w-0 whitespace-normal break-words">
-                        {option.label}
+                      <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className="min-w-0 whitespace-normal break-words">
+                          {option.label}
+                        </span>
+                        {option.badge && (
+                          <Badge tone={option.badge.tone}>
+                            {option.badge.label}
+                          </Badge>
+                        )}
                       </span>
                       {option.description && (
                         <span className="min-w-0 truncate-safe text-xs font-normal text-muted">
