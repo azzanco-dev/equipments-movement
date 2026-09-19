@@ -97,6 +97,16 @@ const skeletonWidths = ['w-16', 'w-24', 'w-20', 'w-28', 'w-20', 'w-24']
 /** Elements that handle their own click inside a clickable row. */
 const interactiveSelector = 'a,button,input,select,textarea,[role="button"]'
 
+// A click inside a nested control (row action button, checkbox, link) must not
+// also open the row. The row itself carries role="button", so the match has to
+// stop at the row: without that guard every row click matched the row and was
+// swallowed (owner report 2026-09-19: rows in equipment, drivers and workshop
+// lists did not open).
+function hitsNestedControl(target: EventTarget | null, row: HTMLElement) {
+  const hit = (target as HTMLElement | null)?.closest(interactiveSelector)
+  return Boolean(hit && hit !== row)
+}
+
 /**
  * Presentational table for the shared list system. It never sorts or paginates
  * data: `sort` and `onSortChange` are controlled by the caller so ordering
@@ -146,12 +156,12 @@ export function DataTable<Row>({
       tabIndex: 0,
       role: 'button' as const,
       onClick: (event: MouseEvent<HTMLTableRowElement>) => {
-        if ((event.target as HTMLElement).closest(interactiveSelector)) return
+        if (hitsNestedControl(event.target, event.currentTarget)) return
         onRowClick(row)
       },
       onKeyDown: (event: KeyboardEvent<HTMLTableRowElement>) => {
         if (event.key !== 'Enter' && event.key !== ' ') return
-        if ((event.target as HTMLElement).closest(interactiveSelector)) return
+        if (hitsNestedControl(event.target, event.currentTarget)) return
         event.preventDefault()
         onRowClick(row)
       },
