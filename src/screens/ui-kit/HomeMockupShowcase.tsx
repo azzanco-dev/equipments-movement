@@ -65,6 +65,8 @@ const COPY = {
     siteExitsToday: 'خروج اليوم',
     insideSitesNow: 'داخل المواقع الان',
     outsideSites: 'خارج المواقع',
+    myEquipmentInsideSitesNow: 'معداتي داخل المواقع الان',
+    todayActivityLine: 'اليوم: {entries} دخول · {exits} خروج',
     insideWorkshopNow: 'داخل الورشة الان',
     maintenance: 'صيانة',
     parking: 'وقوف',
@@ -129,6 +131,8 @@ const COPY = {
     siteExitsToday: 'Exits today',
     insideSitesNow: 'Inside sites now',
     outsideSites: 'Outside sites',
+    myEquipmentInsideSitesNow: 'My equipment inside sites now',
+    todayActivityLine: 'Today: {entries} entries · {exits} exits',
     insideWorkshopNow: 'Inside workshop now',
     maintenance: 'Maintenance',
     parking: 'Standby',
@@ -784,11 +788,30 @@ function ForemanHome({
 }) {
   const loading = state === 'loading'
   const columns = useMemo(() => siteColumns(copy, lang), [copy, lang])
+  // Owner decision 2026-09-19: asset-first stats. One large state card
+  // ("my equipment inside sites now") plus a small, muted activity line —
+  // demo numbers only, no real data.
+  const activityLine = copy.todayActivityLine
+    .replace('{entries}', String(statValue(state, 5)))
+    .replace('{exits}', String(statValue(state, 3)))
   return (
     <>
       <Card className="space-y-3">
         <SectionHeader as="h2" title={copy.quickActions} />
         <QuickActions copy={copy} large />
+      </Card>
+      <Card className="space-y-3">
+        <StatCard
+          label={copy.myEquipmentInsideSitesNow}
+          value={statValue(state, 14)}
+          loading={loading}
+          onClick={() => {}}
+        />
+        {!loading && (
+          <p className="text-sm text-muted">
+            {state === 'error' ? '—' : activityLine}
+          </p>
+        )}
       </Card>
       <Card className="space-y-3">
         <SectionHeader
@@ -826,13 +849,16 @@ function WorkshopHome({
   lang: DemoLang
   state: DemoState
 }) {
+  // Owner decision 2026-09-19: state cards first (equipment counts right
+  // now), so the pending-classification queue and the actions on it follow
+  // rather than lead.
   return (
     <>
       <Card className="space-y-3">
         <SectionHeader as="h2" title={copy.quickActions} />
         <QuickActions copy={copy} />
       </Card>
-      <WorkshopPanel copy={copy} lang={lang} state={state} classifyFirst />
+      <WorkshopPanel copy={copy} lang={lang} state={state} />
     </>
   )
 }

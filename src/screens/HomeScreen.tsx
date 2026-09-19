@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { LogIn, LogOut } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
@@ -50,6 +51,10 @@ export function HomeScreen({
 }) {
   const { t } = useI18n()
   const { user, profile } = useAuth()
+  const pathname = usePathname()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const movementsRef = useRef<HTMLDivElement>(null)
   const managerMode =
     profile?.role === 'workshop_manager' ||
     profile?.role === 'assistant_workshop_manager'
@@ -91,6 +96,20 @@ export function HomeScreen({
 
   const reload = useCallback(() => setRefreshToken((value) => value + 1), [])
 
+  // Reuses the movements list's own `movement_type` filter (no new query):
+  // the primary state card links to the closest thing the list already
+  // supports — every entry row — and scrolls the list into view.
+  const filterToOpenEntries = useCallback(() => {
+    const next = new URLSearchParams(searchParams.toString())
+    next.set('movement_type', 'entry')
+    next.delete('page')
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false })
+    window.setTimeout(
+      () => movementsRef.current?.scrollIntoView({ behavior: 'smooth' }),
+      50,
+    )
+  }, [pathname, router, searchParams])
+
   const classifyEntry = useCallback(
     async (entryLogId: string, purpose: string) => {
       setClassifyingId(entryLogId)
@@ -117,14 +136,16 @@ export function HomeScreen({
   )
 
   const movements = (
-    <HomeMovementsCard
-      workshopMode={workshopMode}
-      canClassify={managerMode}
-      onSelectMovement={onSelectMovement}
-      onClassify={onClassify}
-      classifyingId={classifyingId}
-      refreshToken={refreshToken}
-    />
+    <div ref={movementsRef}>
+      <HomeMovementsCard
+        workshopMode={workshopMode}
+        canClassify={managerMode}
+        onSelectMovement={onSelectMovement}
+        onClassify={onClassify}
+        classifyingId={classifyingId}
+        refreshToken={refreshToken}
+      />
+    </div>
   )
 
   const quickActions = (large: boolean) => (
@@ -161,19 +182,8 @@ export function HomeScreen({
 
       {workshopMode ? (
         <>
-          <PendingClassificationCard
-            rows={workshopStats.pending}
-            loading={statsLoading}
-            error={statsError}
-            onRetry={reload}
-            canClassify={managerMode}
-            onClassify={onClassify}
-            classifyingId={classifyingId}
-            classifyError={classifyError}
-          />
-
-          {quickActions(false)}
-
+          {/* State first: equipment counts right now, before the pending
+              queue and the actions that act on them. */}
           {statsError ? (
             <ErrorState onRetry={reload} />
           ) : (
@@ -204,6 +214,19 @@ export function HomeScreen({
             </div>
           )}
 
+          <PendingClassificationCard
+            rows={workshopStats.pending}
+            loading={statsLoading}
+            error={statsError}
+            onRetry={reload}
+            canClassify={managerMode}
+            onClassify={onClassify}
+            classifyingId={classifyingId}
+            classifyError={classifyError}
+          />
+
+          {quickActions(false)}
+
           <HomeEquipmentSearch />
           {movements}
         </>
@@ -216,25 +239,22 @@ export function HomeScreen({
           {statsError ? (
             <ErrorState onRetry={reload} />
           ) : (
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            <div className="space-y-2">
               <StatCard
-                label={t('myEntriesToday')}
-                value={foremanStats.entriesToday}
-                tone="entry"
-                loading={statsLoading}
-              />
-              <StatCard
-                label={t('myExitsToday')}
-                value={foremanStats.exitsToday}
-                tone="exit"
-                loading={statsLoading}
-              />
-              <StatCard
-                label={t('myEquipmentInsideSites')}
+                label={t('myEquipmentInsideSitesNow')}
                 value={foremanStats.insideNow}
                 loading={statsLoading}
-                className="col-span-2 lg:col-span-1"
+                onClick={filterToOpenEntries}
               />
+              {statsLoading ? (
+                <span className="block h-4 w-40 animate-pulse rounded bg-surface-hover" />
+              ) : (
+                <p className="text-sm text-muted">
+                  {t('todayActivityLine')
+                    .replace('{entries}', String(foremanStats.entriesToday))
+                    .replace('{exits}', String(foremanStats.exitsToday))}
+                </p>
+              )}
             </div>
           )}
 
