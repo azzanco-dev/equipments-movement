@@ -44,7 +44,7 @@ const DEMO_EQUIPMENT: DemoEquipment[] = [
     type: { ar: 'حفار', en: 'Excavator' },
     plate: '1234-ABJ',
     chassis: 'JCB4820JX1120',
-    state: 'inside_site',
+    state: 'outside',
   },
   {
     id: 'e2',
@@ -186,7 +186,9 @@ type VisitScript = {
 
 // Eight months of history, newest last: 18 visits -> about 35 movements.
 const VISIT_SCRIPT: VisitScript[] = [
-  { startsDaysAgo: 238, days: null, context: 'site', entry: false, photos: 2 },
+  // A lone legacy exit with no entry: `days: 0` puts it at `startsDaysAgo`
+  // itself (there is no start to count the duration from).
+  { startsDaysAgo: 238, days: 0, context: 'site', entry: false, photos: 2 },
   { startsDaysAgo: 232, days: 14, context: 'site', pick: 0, photos: 3 },
   {
     startsDaysAgo: 214,
@@ -257,7 +259,9 @@ const VISIT_SCRIPT: VisitScript[] = [
     purpose: 'maintenance',
     photos: 3,
   },
-  { startsDaysAgo: 18, days: 6, context: 'site', pick: 1, photos: 2 },
+  // Exits 10 days ago, and the workshop entry right below starts the very
+  // next day: an immediate transition, so no outside-gap segment shows here.
+  { startsDaysAgo: 18, days: 8, context: 'site', pick: 1, photos: 2 },
   {
     startsDaysAgo: 9,
     days: 3,
@@ -265,7 +269,9 @@ const VISIT_SCRIPT: VisitScript[] = [
     purpose: 'parking',
     photos: 2,
   },
-  { startsDaysAgo: 4, days: null, context: 'site', pick: 2, photos: 3 },
+  // Closed (not open) so the equipment reads as currently outside, which
+  // produces the trailing open-ended gap from this exit through today.
+  { startsDaysAgo: 4, days: 2, context: 'site', pick: 2, photos: 3 },
 ]
 
 // A fixed instant keeps the preview stable between renders and languages.
@@ -543,8 +549,8 @@ export function EquipmentInquiryShowcase() {
           </Block>
           <p className="text-xs text-muted" dir={direction}>
             {lang === 'ar'
-              ? `مجموع الحركات التجريبية للمعدة A120: ${demoMovements.length} حركة خلال ثمانية اشهر، تشمل زيارة مفتوحة وخروج قديم بدون دخول مسجل.`
-              : `A120 demo history: ${demoMovements.length} movements over eight months, including one open visit and one legacy exit with no entry.`}
+              ? `مجموع الحركات التجريبية للمعدة A120: ${demoMovements.length} حركة خلال ثمانية اشهر، تشمل فترات خروج بين الزيارات (اطولها 5 ايام واخرها ما زال مفتوحا حتى اليوم)، واعادة دخول في اليوم التالي مباشرة بدون فترة خروج، وخروج قديم بدون دخول مسجل.`
+              : `A120 demo history: ${demoMovements.length} movements over eight months, including outside-gap periods between visits (the longest is 5 days, and the latest is still open through today), one next-day re-entry with no gap at all, and one legacy exit with no entry.`}
           </p>
         </div>
       </div>

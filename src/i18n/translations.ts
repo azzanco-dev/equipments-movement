@@ -344,6 +344,9 @@ export const translations = {
     visitsCount: 'عدد الزيارات',
     daysOnSites: 'ايام في المواقع',
     daysInWorkshop: 'ايام في الورشة',
+    daysOutside: 'ايام خارج',
+    outsideGap: 'خارج',
+    outsideSince: 'خارج منذ',
     exitWithoutEntry: 'خروج بدون دخول مسجل',
     viewPhotos: 'عرض الصور',
     noMovementHistory: 'لا يوجد تاريخ',
@@ -606,6 +609,8 @@ export const translations = {
     addProject: 'إضافة مشروع',
     editProject: 'تعديل مشروع',
     noProjects: 'لا توجد مشاريع',
+    projectsLoadError: 'تعذر تحميل المشاريع. حاول مرة اخرى.',
+    projectValidationError: 'يرجى تعبئة اسم المشروع بالعربي والانجليزي.',
 
     // Companies management
     companies: 'الشركات',
@@ -615,6 +620,8 @@ export const translations = {
     addCompany: 'إضافة شركة',
     editCompany: 'تعديل شركة',
     noCompanies: 'لا توجد شركات',
+    companiesLoadError: 'تعذر تحميل الشركات. حاول مرة اخرى.',
+    companyValidationError: 'يرجى تعبئة اسم الشركة بالعربي والانجليزي.',
     importCompanies: 'استيراد شركات',
     exportCompanies: 'تصدير الشركات',
     companyExportHelp:
@@ -633,6 +640,7 @@ export const translations = {
     addLessor: 'إضافة مورّد',
     editLessor: 'تعديل مورّد',
     noLessors: 'لا يوجد مورّدون',
+    lessorsLoadError: 'تعذر تحميل الموردين. حاول مرة اخرى.',
 
     // Users management
     addUser: 'إضافة مستخدم',
@@ -1130,6 +1138,9 @@ export const translations = {
     visitsCount: 'Visits',
     daysOnSites: 'Days on sites',
     daysInWorkshop: 'Days in workshop',
+    daysOutside: 'Days outside',
+    outsideGap: 'Outside',
+    outsideSince: 'Outside since',
     exitWithoutEntry: 'Exit with no recorded entry',
     viewPhotos: 'View photos',
     noMovementHistory: 'No history yet',
@@ -1395,6 +1406,8 @@ export const translations = {
     addProject: 'Add Project',
     editProject: 'Edit Project',
     noProjects: 'No projects',
+    projectsLoadError: 'Unable to load projects. Please try again.',
+    projectValidationError: 'Enter the project name in Arabic and English.',
 
     // Companies management
     companies: 'Companies',
@@ -1404,6 +1417,8 @@ export const translations = {
     addCompany: 'Add Company',
     editCompany: 'Edit Company',
     noCompanies: 'No companies',
+    companiesLoadError: 'Unable to load companies. Please try again.',
+    companyValidationError: 'Enter the company name in Arabic and English.',
     importCompanies: 'Import Companies',
     exportCompanies: 'Export Companies',
     companyExportHelp:
@@ -1421,6 +1436,7 @@ export const translations = {
     addLessor: 'Add Lessor',
     editLessor: 'Edit Lessor',
     noLessors: 'No lessors',
+    lessorsLoadError: 'Unable to load lessors. Please try again.',
 
     addUser: 'Add User',
     editUser: 'Edit User',

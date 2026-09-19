@@ -54,9 +54,36 @@ export interface VisitSummary {
   visitCount: number
   siteDays: number
   workshopDays: number
+  /** Total days spent outside both site and workshop (all gaps combined). */
+  gapDays: number
   /** ISO timestamp of the newest movement, or null when there are none. */
   lastMovementAt: string | null
 }
+
+/**
+ * A period the equipment is outside both site and workshop, between one
+ * visit's exit and the next visit's entry regardless of context (a workshop
+ * visit sitting between two site visits is not a gap; it closes the gap on
+ * both sides instead).
+ */
+export interface OutsideGap {
+  /** Stable list key. */
+  key: string
+  /** First Saudi calendar day (YYYY-MM-DD) fully outside: the day after exit. */
+  startDayKey: string
+  /** Last Saudi calendar day fully outside; null while still outside. */
+  endDayKey: string | null
+  /** Whole days outside; an open gap counts through today. */
+  days: number
+  /** Still outside as of `now`: this is the trailing gap with no end yet. */
+  open: boolean
+  /** The closing exit's instant; gaps sort right after the visit they follow. */
+  sortAt: string
+}
+
+export type TimelineItem =
+  | { kind: 'visit'; key: string; sortAt: string; visit: EquipmentVisit }
+  | { kind: 'gap'; key: string; sortAt: string; gap: OutsideGap }
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -177,6 +204,113 @@ export function msToDays(ms: number): number {
   return days === 0 ? 1 : days
 }
 
+// Saudi calendar-day math, duplicated from src/lib/saudiTime.ts rather than
+// imported: this file stays import-free on purpose (see the header comment),
+// so the offset formula below must stay identical to saudiDateKey() there.
+const SAUDI_OFFSET_MS = 3 * 60 * 60 * 1000
+
+/** Saudi calendar date (YYYY-MM-DD) of an ISO instant. */
+function saudiDayKey(iso: string): string {
+  return new Date(instant(iso) + SAUDI_OFFSET_MS).toISOString().slice(0, 10)
+}
+
+/** Days-since-epoch index of an instant's Saudi calendar day. */
+function saudiDayIndex(iso: string): number {
+  return Math.floor(Date.parse(`${saudiDayKey(iso)}T00:00:00Z`) / DAY_MS)
+}
+
+/** Inverse of saudiDayIndex: the day key that index represents. */
+function dayIndexToKey(index: number): string {
+  return new Date(index * DAY_MS).toISOString().slice(0, 10)
+}
+
+/**
+ * The closed gap between one visit's exit and the next visit's entry, or
+ * null when there is no full day outside (same-day or next-day re-entry).
+ */
+function gapBetween(exitAt: string, entryAt: string): OutsideGap | null {
+  const startIndex = saudiDayIndex(exitAt) + 1
+  const endIndex = saudiDayIndex(entryAt) - 1
+  if (endIndex < startIndex) return null
+  return {
+    key: `gap:${exitAt}`,
+    startDayKey: dayIndexToKey(startIndex),
+    endDayKey: dayIndexToKey(endIndex),
+    days: endIndex - startIndex + 1,
+    open: false,
+    sortAt: exitAt,
+  }
+}
+
+/** The open-ended gap from the last exit through today, while still outside. */
+function trailingGap(exitAt: string, now: number): OutsideGap {
+  const startIndex = saudiDayIndex(exitAt) + 1
+  const todayIndex = saudiDayIndex(new Date(now).toISOString())
+  return {
+    key: `gap:trailing:${exitAt}`,
+    startDayKey: dayIndexToKey(startIndex),
+    endDayKey: null,
+    days: Math.max(0, todayIndex - startIndex + 1),
+    open: true,
+    sortAt: exitAt,
+  }
+}
+
+/**
+ * All outside-gaps for one equipment's visits (any context, any order),
+ * oldest first. Visits are compared in the order they started (entry
+ * instant, or the exit instant for a lone legacy exit) so a workshop visit
+ * sitting between two site visits breaks the pairing on both sides instead
+ * of leaving a gap straight across it.
+ */
+export function buildOutsideGaps(
+  visits: readonly EquipmentVisit[],
+  now: number = Date.now(),
+): OutsideGap[] {
+  const chronological = [...visits].reverse()
+  const gaps: OutsideGap[] = []
+
+  chronological.forEach((visit, index) => {
+    if (!visit.endedAt) return
+    const next = chronological[index + 1]
+    if (next) {
+      if (!next.startedAt) return
+      const gap = gapBetween(visit.endedAt, next.startedAt)
+      if (gap) gaps.push(gap)
+    } else {
+      // Same-day exit relative to `now` is not a gap yet, same as a same-day
+      // or next-day closed re-entry.
+      const gap = trailingGap(visit.endedAt, now)
+      if (gap.days > 0) gaps.push(gap)
+    }
+  })
+
+  return gaps
+}
+
+/**
+ * Visits merged with the outside-gaps between them, newest first, ready for
+ * the timeline to render as one list.
+ */
+export function buildTimelineItems(
+  visits: readonly EquipmentVisit[],
+  now: number = Date.now(),
+): TimelineItem[] {
+  const gapsByExit = new Map<string, OutsideGap>()
+  for (const gap of buildOutsideGaps(visits, now))
+    gapsByExit.set(gap.sortAt, gap)
+
+  const chronological = [...visits].reverse()
+  const items: TimelineItem[] = []
+  for (const visit of chronological) {
+    items.push({ kind: 'visit', key: visit.key, sortAt: visit.sortAt, visit })
+    const gap = visit.endedAt ? gapsByExit.get(visit.endedAt) : undefined
+    if (gap) items.push({ kind: 'gap', key: gap.key, sortAt: gap.sortAt, gap })
+  }
+
+  return items.reverse()
+}
+
 /** Headline numbers for the summary strip above the timeline. */
 export function summarizeVisits(
   visits: readonly EquipmentVisit[],
@@ -210,11 +344,17 @@ export function summarizeVisits(
       ? 'inside_site'
       : 'inside_workshop'
 
+  const gapDays = buildOutsideGaps(visits, now).reduce(
+    (sum, gap) => sum + gap.days,
+    0,
+  )
+
   return {
     status,
     visitCount: visits.length,
     siteDays: msToDays(siteMs),
     workshopDays: msToDays(workshopMs),
+    gapDays,
     lastMovementAt,
   }
 }

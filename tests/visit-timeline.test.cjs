@@ -20,6 +20,8 @@ function loadVisitTimeline() {
 
 const {
   buildEquipmentVisits,
+  buildOutsideGaps,
+  buildTimelineItems,
   msToDays,
   sortMovements,
   summarizeVisits,
@@ -215,4 +217,158 @@ test('a visit shorter than a day still counts as one day', () => {
   assert.equal(msToDays(60 * 1000), 1)
   assert.equal(msToDays(DAY), 1)
   assert.equal(msToDays(3 * DAY), 3)
+})
+
+// Outside gaps: periods the equipment is outside both site and workshop,
+// between one visit's exit and the next visit's entry.
+
+test('a multi-day gap between two closed visits uses day-after/day-before boundaries', () => {
+  // The owner's own example: exit 10-9, next entry 20-9 -> gap 11-9..19-9 (9 days).
+  // The second visit is left open (still inside) so there is no trailing gap
+  // to isolate this closed gap from.
+  const visits = buildEquipmentVisits([
+    movement('m1', 'entry', '2026-09-01T06:00:00Z'),
+    movement('m2', 'exit', '2026-09-10T06:00:00Z'),
+    movement('m3', 'entry', '2026-09-20T06:00:00Z'),
+  ])
+
+  const gaps = buildOutsideGaps(visits)
+  assert.equal(gaps.length, 1)
+  assert.equal(gaps[0].startDayKey, '2026-09-11')
+  assert.equal(gaps[0].endDayKey, '2026-09-19')
+  assert.equal(gaps[0].days, 9)
+  assert.equal(gaps[0].open, false)
+})
+
+test('a next-day re-entry produces no gap', () => {
+  const visits = buildEquipmentVisits([
+    movement('m1', 'entry', '2026-09-01T06:00:00Z'),
+    movement('m2', 'exit', '2026-09-10T06:00:00Z'),
+    // Re-enters the very next calendar day: zero full days outside.
+    movement('m3', 'entry', '2026-09-11T06:00:00Z'),
+  ])
+
+  assert.equal(buildOutsideGaps(visits).length, 0)
+})
+
+test('a same-day re-entry also produces no gap', () => {
+  const visits = buildEquipmentVisits([
+    movement('m1', 'entry', '2026-09-01T06:00:00Z'),
+    movement('m2', 'exit', '2026-09-10T06:00:00Z'),
+    movement('m3', 'entry', '2026-09-10T18:00:00Z'),
+  ])
+
+  assert.equal(buildOutsideGaps(visits).length, 0)
+})
+
+test('the trailing gap after the last exit is open-ended through today', () => {
+  const now = Date.parse('2026-09-15T06:00:00Z')
+  const visits = buildEquipmentVisits([
+    movement('m1', 'entry', '2026-09-01T06:00:00Z'),
+    movement('m2', 'exit', '2026-09-10T06:00:00Z'),
+  ])
+
+  const gaps = buildOutsideGaps(visits, now)
+  assert.equal(gaps.length, 1)
+  assert.equal(gaps[0].startDayKey, '2026-09-11')
+  assert.equal(gaps[0].endDayKey, null)
+  assert.equal(gaps[0].open, true)
+  assert.equal(gaps[0].days, 5)
+})
+
+test('an open visit never trails a gap: the equipment reads as still inside', () => {
+  const now = Date.parse('2026-09-20T06:00:00Z')
+  // Immediate next-day re-entry, then never exits again: no gap before it
+  // (next-day re-entry) and no fabricated gap after it (it is still open).
+  const visits = buildEquipmentVisits([
+    movement('m1', 'entry', '2026-09-01T06:00:00Z'),
+    movement('m2', 'exit', '2026-09-10T06:00:00Z'),
+    movement('m3', 'entry', '2026-09-11T06:00:00Z'),
+  ])
+
+  assert.equal(buildOutsideGaps(visits, now).length, 0)
+})
+
+test('a workshop visit between two site visits is not a gap when transitions are immediate', () => {
+  const visits = buildEquipmentVisits([
+    movement('s1', 'entry', '2026-09-01T06:00:00Z'),
+    // Straight from the site into the workshop the same day: no gap.
+    movement('s2', 'exit', '2026-09-05T06:00:00Z'),
+    movement('w1', 'entry', '2026-09-05T09:00:00Z', {
+      context: 'workshop',
+      purpose: 'maintenance',
+    }),
+    // Nine days in the workshop, then straight back onto a site: still no
+    // gap, even though the two SITE visits are nine days apart.
+    movement('w2', 'exit', '2026-09-14T06:00:00Z', { context: 'workshop' }),
+    movement('s3', 'entry', '2026-09-14T09:00:00Z'),
+  ])
+
+  assert.equal(buildOutsideGaps(visits).length, 0)
+})
+
+test('a workshop visit between two site visits still surfaces a real gap around it', () => {
+  const visits = buildEquipmentVisits([
+    movement('s1', 'entry', '2026-09-01T06:00:00Z'),
+    movement('s2', 'exit', '2026-09-05T06:00:00Z'),
+    // The workshop entry is four days later: that time outside is a real gap.
+    movement('w1', 'entry', '2026-09-09T06:00:00Z', {
+      context: 'workshop',
+      purpose: 'parking',
+    }),
+    movement('w2', 'exit', '2026-09-11T06:00:00Z', { context: 'workshop' }),
+    movement('s3', 'entry', '2026-09-11T09:00:00Z'),
+  ])
+
+  const gaps = buildOutsideGaps(visits)
+  assert.equal(gaps.length, 1)
+  assert.equal(gaps[0].startDayKey, '2026-09-06')
+  assert.equal(gaps[0].endDayKey, '2026-09-08')
+  assert.equal(gaps[0].days, 3)
+})
+
+test('the Saudi calendar day rolls over at 21:00 UTC, not at UTC midnight', () => {
+  // 21:30 UTC is 00:30 Saudi time the next day, so the exit's Saudi day is
+  // 9-11, not 9-10; the gap must start the day after that (9-12).
+  const visits = buildEquipmentVisits([
+    movement('m1', 'entry', '2026-09-01T06:00:00Z'),
+    movement('m2', 'exit', '2026-09-10T21:30:00Z'),
+    movement('m3', 'entry', '2026-09-13T06:00:00Z'),
+  ])
+
+  const gaps = buildOutsideGaps(visits)
+  assert.equal(gaps.length, 1)
+  assert.equal(gaps[0].startDayKey, '2026-09-12')
+  assert.equal(gaps[0].endDayKey, '2026-09-12')
+  assert.equal(gaps[0].days, 1)
+})
+
+test('summarizeVisits totals gapDays across every gap, including the open one', () => {
+  const now = Date.parse('2026-09-25T06:00:00Z')
+  const visits = buildEquipmentVisits([
+    movement('m1', 'entry', '2026-09-01T06:00:00Z'),
+    movement('m2', 'exit', '2026-09-10T06:00:00Z'),
+    movement('m3', 'entry', '2026-09-20T06:00:00Z'),
+    movement('m4', 'exit', '2026-09-22T06:00:00Z'),
+  ])
+
+  // Closed gap 9-11..9-19 (9 days) plus the open trailing gap from 9-23
+  // through 9-25 (3 days).
+  assert.equal(summarizeVisits(visits, now).gapDays, 12)
+})
+
+test('buildTimelineItems merges gaps and visits newest-first', () => {
+  const visits = buildEquipmentVisits([
+    movement('m1', 'entry', '2026-09-01T06:00:00Z'),
+    movement('m2', 'exit', '2026-09-10T06:00:00Z'),
+    movement('m3', 'entry', '2026-09-20T06:00:00Z'),
+    movement('m4', 'exit', '2026-09-25T06:00:00Z'),
+  ])
+
+  const items = buildTimelineItems(visits, Date.parse('2026-09-25T06:00:00Z'))
+  assert.equal(items.map((item) => item.kind).join('|'), 'visit|gap|visit')
+  // Newest first: the most recent visit comes before the gap that precedes it.
+  assert.equal(items[0].visit.key, 'm3')
+  assert.equal(items[1].gap.days, 9)
+  assert.equal(items[2].visit.key, 'm1')
 })

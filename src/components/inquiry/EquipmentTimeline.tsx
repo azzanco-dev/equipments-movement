@@ -20,15 +20,17 @@ import {
   WorkshopPurposeBadge,
   cn,
 } from '@/components/ui'
-import { formatDateTime } from '@/lib/dateFormat'
+import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
 import {
   buildEquipmentVisits,
+  buildTimelineItems,
   summarizeVisits,
   visitDurationMs,
   type EquipmentPresence,
   type EquipmentVisit,
   type MovementContext,
+  type OutsideGap,
   type TimelineMovement,
 } from '@/lib/visitTimeline'
 
@@ -98,13 +100,21 @@ export function EquipmentTimeline({
   const visits = useMemo(() => buildEquipmentVisits(movements), [movements])
   // The summary always describes the whole history; the tabs filter the list.
   const summary = useMemo(() => summarizeVisits(visits, nowMs), [visits, nowMs])
-  const shown = useMemo(
-    () =>
-      filter === 'all'
-        ? visits
-        : visits.filter((visit) => visit.context === filter),
-    [visits, filter],
+  const items = useMemo(
+    () => buildTimelineItems(visits, nowMs),
+    [visits, nowMs],
   )
+  const shown = useMemo(() => {
+    if (filter === 'all') return items
+    if (filter === 'workshop')
+      return items.filter(
+        (item) => item.kind === 'visit' && item.visit.context === 'workshop',
+      )
+    // 'site': gaps are periods outside every site, so they stay visible here.
+    return items.filter(
+      (item) => item.kind === 'gap' || item.visit.context === 'site',
+    )
+  }, [items, filter])
 
   if (movements.length === 0)
     return (
@@ -142,22 +152,26 @@ export function EquipmentTimeline({
             />
           ) : (
             <ol className="space-y-3">
-              {shown.map((visit) => {
-                const key = monthKey(visit.sortAt)
+              {shown.map((item) => {
+                const key = monthKey(item.sortAt)
                 const newMonth = key !== lastMonth
                 lastMonth = key
                 return (
-                  <li key={visit.key} className="space-y-3">
+                  <li key={item.key} className="space-y-3">
                     {newMonth && (
                       <p className="pt-1 text-xs font-semibold text-muted">
-                        {monthLabel(visit.sortAt, locale)}
+                        {monthLabel(item.sortAt, locale)}
                       </p>
                     )}
-                    <VisitSegment
-                      visit={visit}
-                      nowMs={nowMs}
-                      onOpenPhoto={onOpenPhoto}
-                    />
+                    {item.kind === 'gap' ? (
+                      <GapSegment gap={item.gap} />
+                    ) : (
+                      <VisitSegment
+                        visit={item.visit}
+                        nowMs={nowMs}
+                        onOpenPhoto={onOpenPhoto}
+                      />
+                    )}
                   </li>
                 )
               })}
@@ -187,7 +201,7 @@ function Summary({
       )
     : undefined
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
       <StatCard
         label={t('currentStatus')}
         value={
@@ -207,6 +221,7 @@ function Summary({
       <StatCard label={t('visitsCount')} value={summary.visitCount} />
       <StatCard label={t('daysOnSites')} value={summary.siteDays} />
       <StatCard label={t('daysInWorkshop')} value={summary.workshopDays} />
+      <StatCard label={t('daysOutside')} value={summary.gapDays} />
       <StatCard
         label={t('lastMovement')}
         value={
@@ -316,6 +331,42 @@ function VisitSegment({
             onOpen={() => onOpenPhoto(photoMovementId)}
           />
         )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A period the equipment is outside both site and workshop, rendered lighter
+ * than a real visit: dashed rule, muted surface, no entry/exit lines.
+ */
+function GapSegment({ gap }: { gap: OutsideGap }) {
+  const { t } = useI18n()
+  return (
+    <div className="relative border-s border-dashed ps-5">
+      <span
+        aria-hidden="true"
+        className="absolute -start-[5px] top-4 h-2.5 w-2.5 rounded-full border-2 border-bg bg-border"
+      />
+      <div className="card space-y-1.5 border-dashed bg-surface p-3 text-muted">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge>{t('outsideGap')}</Badge>
+          <span className="truncate-safe min-w-0 flex-1 text-sm">
+            {gap.open ? (
+              <>
+                {t('outsideSince')} {formatDate(gap.startDayKey)}
+              </>
+            ) : (
+              <>
+                {t('from')} {formatDate(gap.startDayKey)} {t('to')}{' '}
+                {formatDate(gap.endDayKey as string)}
+              </>
+            )}
+          </span>
+        </div>
+        <p className="text-xs">
+          {gap.days} {t('days')}
+        </p>
       </div>
     </div>
   )
