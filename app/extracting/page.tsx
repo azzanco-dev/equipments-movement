@@ -41,6 +41,7 @@ type PublishResult = {
   employeeId?: string
   steps?: { user?: PublishStep; employee?: PublishStep }
   error?: string
+  details?: string
 }
 
 const DEFAULT_COMPANY = 'شركة عبدالله احمد العزاني للمقاولات'
@@ -116,6 +117,7 @@ const ERROR_LABELS: Record<string, string> = {
   erp_user_lookup_failed: 'تعذر التحقق من المستخدم في ERPNext',
   erp_user_not_found:
     'مستخدم ERPNext غير موجود. اضف المستخدم اولا ثم اعد المحاولة',
+  erp_user_create_failed: 'تعذر انشاء المستخدم في ERPNext',
   erp_employee_create_failed: 'تعذر انشاء الموظف في ERPNext',
   erp_employee_user_conflict:
     'الموظف مرتبط بمستخدم ERPNext مختلف ويحتاج مراجعة',
@@ -539,6 +541,14 @@ export default function ExtractingPage() {
               {result.error ? (
                 <p className="mt-2 text-sm text-danger">
                   {ERROR_LABELS[result.error] || 'تعذر اكمال العملية'}
+                </p>
+              ) : null}
+              {result.details ? (
+                <p
+                  dir="auto"
+                  className="mt-2 break-words rounded-lg border border-danger bg-danger-soft p-2 text-sm text-danger"
+                >
+                  {result.details}
                 </p>
               ) : null}
             </article>

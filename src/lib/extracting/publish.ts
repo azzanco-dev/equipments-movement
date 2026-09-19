@@ -32,6 +32,7 @@ export interface TargetPublishResult {
   employeeId?: string
   steps?: { user: PublishStatus; employee: PublishStatus }
   error?: string
+  details?: string
 }
 
 const FIELD_NAME_PATTERN = /^[a-z][a-z0-9_]*$/
@@ -124,6 +125,70 @@ export function currentSystemDriverPayload(data: ExtractionPublishData) {
     employment_type: data.employment_type || null,
     job_title: data.occupation || null,
   }
+}
+
+export function erpUserPayload(data: ExtractionPublishData) {
+  return {
+    email: data.email,
+    first_name: data.full_name_ar,
+    username: data.id_number,
+    language: 'ar',
+    enabled: 1,
+    send_welcome_email: 0,
+    role_profile_name: process.env.ERPNEXT_DRIVER_ROLE_PROFILE || 'Driver',
+    module_profile: process.env.ERPNEXT_DRIVER_MODULE_PROFILE || 'Employee',
+    ...(data.date_of_birth ? { birth_date: data.date_of_birth } : {}),
+    ...(data.gender ? { gender: data.gender } : {}),
+    ...(data.mobile_number
+      ? { mobile_no: data.mobile_number, phone: data.mobile_number }
+      : {}),
+  }
+}
+
+function cleanErpMessage(value: string) {
+  return value
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/token\s+[^\s:]+:[^\s]+/gi, 'token [محجوب]')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function collectServerMessages(value: unknown, messages: string[], depth = 0) {
+  if (depth > 5 || messages.length >= 5) return
+  if (typeof value === 'string') {
+    try {
+      collectServerMessages(JSON.parse(value), messages, depth + 1)
+    } catch {
+      const cleaned = cleanErpMessage(value)
+      if (cleaned) messages.push(cleaned)
+    }
+    return
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectServerMessages(item, messages, depth + 1)
+    return
+  }
+  if (!value || typeof value !== 'object') return
+  const record = value as Record<string, unknown>
+  if (typeof record.message === 'string')
+    collectServerMessages(record.message, messages, depth + 1)
+}
+
+export function erpErrorDetails(
+  payload: Record<string, unknown> | undefined,
+  status: number,
+) {
+  const messages: string[] = []
+  collectServerMessages(payload?._server_messages, messages)
+  collectServerMessages(payload?.message, messages)
+  if (!messages.length && typeof payload?.exc_type === 'string')
+    messages.push(cleanErpMessage(payload.exc_type))
+  const unique = Array.from(new Set(messages)).filter(Boolean)
+  return (unique.join(' — ') || `ERPNext HTTP ${status}`).slice(0, 800)
 }
 
 export function configuredFieldName(

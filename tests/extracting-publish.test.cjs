@@ -22,8 +22,13 @@ function loadPublishModule() {
   return exports
 }
 
-const { parsePublishRequest, currentSystemDriverPayload, erpEmployeePayload } =
-  loadPublishModule()
+const {
+  parsePublishRequest,
+  currentSystemDriverPayload,
+  erpUserPayload,
+  erpEmployeePayload,
+  erpErrorDetails,
+} = loadPublishModule()
 
 const data = {
   full_name_ar: 'اسم عربي كامل',
@@ -86,6 +91,29 @@ test('local payload only contains columns that already exist', () => {
     'name_en',
     'nationality',
   ])
+})
+
+test('ERP user is created from the reviewed identity data', () => {
+  const payload = erpUserPayload(data)
+  assert.equal(payload.email, data.email)
+  assert.equal(payload.first_name, data.full_name_ar)
+  assert.equal(payload.username, data.id_number)
+  assert.equal(payload.send_welcome_email, 0)
+})
+
+test('ERP user errors expose useful messages without HTML or tokens', () => {
+  const details = erpErrorDetails(
+    {
+      _server_messages: JSON.stringify([
+        JSON.stringify({
+          message: '<b>Role Profile Driver does not exist</b> token key:secret',
+        }),
+      ]),
+    },
+    417,
+  )
+  assert.equal(details, 'Role Profile Driver does not exist token [محجوب]')
+  assert.equal(erpErrorDetails(undefined, 500), 'ERPNext HTTP 500')
 })
 
 test('ERP employee never writes expiry into issue date', () => {

@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server'
 import {
   configuredFieldName,
   currentSystemDriverPayload,
+  erpErrorDetails,
   erpEmployeePayload,
+  erpUserPayload,
   parsePublishRequest,
   type ExtractionPublishData,
   type TargetPublishResult,
@@ -224,13 +226,7 @@ async function publishErpNext(
     return { status: 'failed', error: 'erp_not_configured' }
 
   try {
-    const [availableFields, invalidReference] = await Promise.all([
-      employeeFieldNames(),
-      validateErpReferences(data),
-    ])
-    if (invalidReference) return { status: 'failed', error: invalidReference }
-
-    const userStatus: TargetPublishResult['status'] = 'existing'
+    let userStatus: TargetPublishResult['status'] = 'existing'
     let employeeStatus: TargetPublishResult['status'] = 'existing'
     let userId = data.email
     const existingEmployee = await findEmployeeByResidence(data.id_number)
@@ -247,14 +243,25 @@ async function publishErpNext(
     const userLookup = await erpRequest(
       `/api/resource/User/${encodeURIComponent(data.email)}`,
     )
-    if (userLookup.status === 404)
-      return {
-        status: 'failed',
-        steps: { user: 'failed', employee: 'skipped' },
-        error: 'erp_user_not_found',
-      }
-    if (!userLookup.ok) throw new Error('erp_user_lookup_failed')
-    userId = resourceName(userLookup.data) ?? data.email
+    if (!userLookup.ok && userLookup.status !== 404)
+      throw new Error('erp_user_lookup_failed')
+    if (userLookup.status === 404) {
+      const createdUser = await erpRequest('/api/resource/User', {
+        method: 'POST',
+        body: JSON.stringify(erpUserPayload(data)),
+      })
+      if (!createdUser.ok)
+        return {
+          status: 'failed',
+          steps: { user: 'failed', employee: 'skipped' },
+          error: 'erp_user_create_failed',
+          details: erpErrorDetails(createdUser.data, createdUser.status),
+        }
+      userId = resourceName(createdUser.data) ?? data.email
+      userStatus = 'created'
+    } else {
+      userId = resourceName(userLookup.data) ?? data.email
+    }
 
     if (existingEmployee && !existingEmployee.userId) {
       const linkedEmployee = await erpRequest(
@@ -270,6 +277,17 @@ async function publishErpNext(
           error: 'erp_employee_link_failed',
         }
     } else if (!employeeId) {
+      const [availableFields, invalidReference] = await Promise.all([
+        employeeFieldNames(),
+        validateErpReferences(data),
+      ])
+      if (invalidReference)
+        return {
+          status: userStatus === 'created' ? 'partial' : 'failed',
+          userId,
+          steps: { user: userStatus, employee: 'failed' },
+          error: invalidReference,
+        }
       const createdEmployee = await erpRequest('/api/resource/Employee', {
         method: 'POST',
         body: JSON.stringify(erpEmployeePayload(data, availableFields)),
@@ -286,7 +304,10 @@ async function publishErpNext(
     }
 
     return {
-      status: employeeStatus === 'created' ? 'created' : 'existing',
+      status:
+        userStatus === 'created' || employeeStatus === 'created'
+          ? 'created'
+          : 'existing',
       userId,
       employeeId: employeeId ?? undefined,
       steps: { user: userStatus, employee: employeeStatus },
@@ -299,6 +320,7 @@ async function publishErpNext(
       'erp_employee_lookup_failed',
       'erp_user_lookup_failed',
       'erp_user_not_found',
+      'erp_user_create_failed',
       'erp_employee_user_conflict',
       'erp_employee_link_failed',
       'erp_employee_metadata_failed',
