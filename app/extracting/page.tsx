@@ -122,6 +122,7 @@ const ERROR_LABELS: Record<string, string> = {
   erp_employee_user_conflict:
     'الموظف مرتبط بمستخدم ERPNext مختلف ويحتاج مراجعة',
   erp_employee_link_failed: 'تعذر ربط الموظف بمستخدم ERPNext',
+  erp_employee_update_failed: 'تعذر تحديث بيانات الموظف في ERPNext',
   erp_employee_metadata_failed: 'تعذر قراءة اعدادات موظف ERPNext',
   erp_reference_lookup_failed: 'تعذر التحقق من قوائم ERPNext',
   erp_gender_not_found: 'قيمة الجنس غير موجودة في ERPNext',

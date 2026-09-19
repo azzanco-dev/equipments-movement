@@ -127,7 +127,7 @@ async function findEmployeeByResidence(idNumber: string) {
   )
   if (!residenceField) throw new Error('erp_invalid_field_mapping')
   const params = new URLSearchParams({
-    fields: JSON.stringify(['name', 'user_id']),
+    fields: JSON.stringify(['name', 'user_id', 'cell_number']),
     filters: JSON.stringify([[residenceField, '=', idNumber]]),
     limit_page_length: '1',
   })
@@ -145,6 +145,7 @@ async function findEmployeeByResidence(idNumber: string) {
   return {
     name,
     userId: typeof row.user_id === 'string' ? row.user_id : '',
+    cellNumber: typeof row.cell_number === 'string' ? row.cell_number : '',
   }
 }
 
@@ -263,19 +264,26 @@ async function publishErpNext(
       userId = resourceName(userLookup.data) ?? data.email
     }
 
-    if (existingEmployee && !existingEmployee.userId) {
-      const linkedEmployee = await erpRequest(
-        `/api/resource/Employee/${encodeURIComponent(existingEmployee.name)}`,
-        { method: 'PUT', body: JSON.stringify({ user_id: userId }) },
-      )
-      if (!linkedEmployee.ok)
-        return {
-          status: 'partial',
-          userId,
-          employeeId: existingEmployee.name,
-          steps: { user: userStatus, employee: 'failed' },
-          error: 'erp_employee_link_failed',
-        }
+    if (existingEmployee) {
+      const update: Record<string, string> = {}
+      if (!existingEmployee.userId) update.user_id = userId
+      if (data.mobile_number && !existingEmployee.cellNumber)
+        update.cell_number = data.mobile_number
+
+      if (Object.keys(update).length) {
+        const linkedEmployee = await erpRequest(
+          `/api/resource/Employee/${encodeURIComponent(existingEmployee.name)}`,
+          { method: 'PUT', body: JSON.stringify(update) },
+        )
+        if (!linkedEmployee.ok)
+          return {
+            status: 'partial',
+            userId,
+            employeeId: existingEmployee.name,
+            steps: { user: userStatus, employee: 'failed' },
+            error: 'erp_employee_update_failed',
+          }
+      }
     } else if (!employeeId) {
       const [availableFields, invalidReference] = await Promise.all([
         employeeFieldNames(),
@@ -323,6 +331,7 @@ async function publishErpNext(
       'erp_user_create_failed',
       'erp_employee_user_conflict',
       'erp_employee_link_failed',
+      'erp_employee_update_failed',
       'erp_employee_metadata_failed',
       'erp_reference_lookup_failed',
       'erp_gender_not_found',

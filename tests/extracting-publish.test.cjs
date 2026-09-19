@@ -131,6 +131,8 @@ test('ERP employee never writes expiry into issue date', () => {
   assert.equal(payload.custom_rp_valid_upto, data.residence_expiry_date)
   assert.equal(payload.custom_nationality, data.nationality)
   assert.equal(payload.user_id, data.email)
+  assert.equal(payload.status, 'Inactive')
+  assert.equal(payload.cell_number, data.mobile_number)
   assert.equal(payload.ctc, data.ctc)
   assert.equal(payload.employee_number, data.id_number)
   assert.ok(!('custom_rp_date_of_issue' in payload))

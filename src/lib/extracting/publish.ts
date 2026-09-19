@@ -217,7 +217,7 @@ export function erpEmployeePayload(
   const payload: Record<string, string> = {
     first_name: data.full_name_ar,
     user_id: data.email,
-    status: 'Active',
+    status: 'Inactive',
   }
   const optional: Array<[string, string]> = [
     ['gender', data.gender],
