@@ -315,6 +315,8 @@ export const translations = {
       'يمكن تسجيل خروج المعدة فقط بواسطة المستخدم الذي سجل دخولها.',
     siteExitNotEntryOwner:
       'لا يمكن تسجيل الخروج: الدخول سجله مستخدم اخر. يسجل الخروج صاحب الدخول او المدير فقط.',
+    siteExitEquipmentInWorkshop:
+      'لا يمكن تسجيل الخروج: المعدة داخل الورشة حاليا، وخروجها يسجل من الورشة.',
     siteExitOwnEquipmentOnly:
       'تظهر هنا المعدات التي سجلت دخولها انت فقط وما زالت داخل الموقع.',
     exitNoPreviousMsg: 'لا يمكن تسجيل خروج لأنه لا توجد حركة سابقة للمعدة.',
@@ -1062,6 +1064,8 @@ export const translations = {
       'Only the user who registered the equipment entry can register its exit.',
     siteExitNotEntryOwner:
       'This exit cannot be registered: another user registered the entry. Only that user or an admin can register the exit.',
+    siteExitEquipmentInWorkshop:
+      'This exit cannot be registered: the equipment is currently inside the workshop and must be released from there.',
     siteExitOwnEquipmentOnly:
       'This list shows only equipment you registered the entry for and that is still on site.',
     exitNoPreviousMsg:

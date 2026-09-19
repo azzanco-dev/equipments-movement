@@ -9,6 +9,7 @@ export const MOVEMENT_ERROR_CODES = [
   'driver_required',
   'no_prior_entry',
   'exit_not_entry_owner',
+  'exit_equipment_in_workshop',
   'workshop_exit_owner',
   'invalid_sequence',
   'access_denied',
@@ -30,6 +31,8 @@ export function movementErrorCode(message: string): MovementErrorCode {
   // Checked before the generic "no prior entry" text: the owner rule is a
   // permission failure, not a missing entry.
   if (message.includes('exit_not_entry_owner')) return 'exit_not_entry_owner'
+  if (message.includes('exit_equipment_in_workshop'))
+    return 'exit_equipment_in_workshop'
   if (
     message.includes('no prior entry') ||
     message.includes('not inside the gate')
@@ -51,6 +54,7 @@ export function movementErrorCode(message: string): MovementErrorCode {
 // conflict (409).
 export function movementErrorStatus(code: MovementErrorCode): number {
   return code === 'exit_not_entry_owner' ||
+    code === 'exit_equipment_in_workshop' ||
     code === 'workshop_exit_owner' ||
     code === 'access_denied'
     ? 403

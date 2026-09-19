@@ -700,6 +700,7 @@ export function EntryExitForm({
         driver_required: t('driverRequired'),
         no_prior_entry: t('noPriorEntryAtSelectedTime'),
         exit_not_entry_owner: t('siteExitNotEntryOwner'),
+        exit_equipment_in_workshop: t('siteExitEquipmentInWorkshop'),
         workshop_exit_owner: t('workshopExitOwner'),
         invalid_sequence: isEntry
           ? t('entrySequenceConflict')

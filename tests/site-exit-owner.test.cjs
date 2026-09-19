@@ -48,6 +48,17 @@ test('the site exit owner rule maps to its own code and 403', () => {
   assert.equal(movementErrorStatus('exit_not_entry_owner'), 403)
 })
 
+test('a site exit on equipment inside the workshop maps to its own code and 403', () => {
+  // Migration 0088 raises this token with SQLSTATE 42501.
+  assert.equal(
+    movementErrorCode(
+      'exit_equipment_in_workshop\nHINT: The equipment is inside the workshop; a site exit cannot close a workshop entry.',
+    ),
+    'exit_equipment_in_workshop',
+  )
+  assert.equal(movementErrorStatus('exit_equipment_in_workshop'), 403)
+})
+
 test('the existing trigger messages keep their codes and 409', () => {
   const cases = {
     'movement time cannot be in the future': 'future_time',
