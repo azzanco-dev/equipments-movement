@@ -93,4 +93,6 @@ export type {
 } from './DateRangeFilter'
 export { Lightbox } from './Lightbox'
 export type { LightboxItem, LightboxProps } from './Lightbox'
+export { MiniTable, MiniTableGrid } from './MiniTable'
+export type { MiniTableGridProps, MiniTableProps } from './MiniTable'
 export { cn } from './cn'
