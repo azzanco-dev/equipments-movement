@@ -42,11 +42,20 @@ import { uploadMovementPhotosDirectly } from '@/lib/movementPhotoUpload'
 import { prepareMovementPhotos } from '@/lib/movementPhotoCompression'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import {
+  CONTRACTOR_CODE_MAX_LENGTH,
+  contractorCodeErrorKey,
+  contractorCodeUnchanged,
+  isValidContractorCode,
+  normalizeContractorCode,
+} from '@/lib/contractorCodeEdit'
+import {
   BackButton,
   Button,
   DescriptionList,
+  Dialog,
   ErrorState,
   Field,
+  IconButton,
   InfoRow,
   Input,
   Lightbox,
@@ -128,6 +137,12 @@ export function MovementDetail({
   const [editDriver, setEditDriver] = useState<SelectOption | null>(null)
   const [editRecordedAt, setEditRecordedAt] = useState('')
   const [editContractorCode, setEditContractorCode] = useState('')
+  // Foreman edit of the contractor code on his own open site ENTRY
+  // (migration 0093). Separate from the admin edit form above.
+  const [codeEditOpen, setCodeEditOpen] = useState(false)
+  const [codeEditValue, setCodeEditValue] = useState('')
+  const [codeEditBusy, setCodeEditBusy] = useState(false)
+  const [codeEditError, setCodeEditError] = useState<string | null>(null)
   const photoUrls = photoItems.map((item) => item.url)
   const lightboxItems: LightboxItem[] =
     photoUrls.length > 0
@@ -557,6 +572,40 @@ export function MovementDetail({
     await fetchData()
   }
 
+  const openContractorCodeEdit = () => {
+    setCodeEditValue(log?.contractor_equipment_code ?? '')
+    setCodeEditError(null)
+    setCodeEditOpen(true)
+  }
+
+  // The database is authoritative: `update_entry_contractor_code` re-checks the
+  // role, the ownership of the entry and that the visit is still open, and it
+  // writes that single column only. The audit row is written by the existing
+  // `audit_entry_exit_logs` trigger with the foreman as the actor.
+  const saveContractorCode = async () => {
+    if (!log) return
+    if (!isValidContractorCode(codeEditValue)) {
+      setCodeEditError(t('contractorCodeTooLong'))
+      return
+    }
+    setCodeEditBusy(true)
+    setCodeEditError(null)
+    const { error: rpcError } = await supabase.rpc(
+      'update_entry_contractor_code',
+      {
+        p_log_id: log.id,
+        p_code: normalizeContractorCode(codeEditValue),
+      },
+    )
+    setCodeEditBusy(false)
+    if (rpcError) {
+      setCodeEditError(t(contractorCodeErrorKey(rpcError.message)))
+      return
+    }
+    setCodeEditOpen(false)
+    await fetchData()
+  }
+
   useEffect(() => {
     fetchData()
   }, [fetchData])
@@ -669,6 +718,15 @@ export function MovementDetail({
 
   const isEntry = log.movement_type === 'entry'
   const isWorkshopMovement = log.movement_context === 'workshop'
+  // A foreman may correct the contractor code on HIS OWN site ENTRY while the
+  // visit is still open (`linkedLog` is the deterministically paired EXIT).
+  // The same conditions are re-enforced in PostgreSQL by migration 0093.
+  const canEditContractorCode =
+    profile?.role === 'supervisor' &&
+    isEntry &&
+    !isWorkshopMovement &&
+    !linkedLog &&
+    log.supervisor_id === user?.id
 
   let durationMs = 0
 
@@ -717,7 +775,27 @@ export function MovementDetail({
             key: 'contractorCode',
             icon: <FileText size={16} />,
             label: t('contractorEquipmentCode'),
-            value: log.contractor_equipment_code,
+            value: canEditContractorCode ? (
+              <span className="flex items-center gap-1">
+                <span
+                  className={
+                    log.contractor_equipment_code
+                      ? ''
+                      : 'text-muted font-normal'
+                  }
+                >
+                  {log.contractor_equipment_code ?? '—'}
+                </span>
+                <IconButton
+                  size="sm"
+                  label={t('editContractorCode')}
+                  icon={<Pencil size={14} />}
+                  onClick={openContractorCodeEdit}
+                />
+              </span>
+            ) : (
+              log.contractor_equipment_code
+            ),
           },
           ...(log.equipment?.ownership_status === 'external_supplier' &&
           log.equipment?.lessor?.name
@@ -1352,6 +1430,55 @@ export function MovementDetail({
         index={photoCarouselIndex}
         onIndexChange={setPhotoCarouselIndex}
       />
+
+      {canEditContractorCode && (
+        <Dialog
+          open={codeEditOpen}
+          onOpenChange={setCodeEditOpen}
+          title={t('editContractorCode')}
+          size="sm"
+          footer={
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setCodeEditOpen(false)}
+                disabled={codeEditBusy}
+              >
+                {t('cancel')}
+              </Button>
+              <Button
+                variant="primary"
+                loading={codeEditBusy}
+                disabled={contractorCodeUnchanged(
+                  codeEditValue,
+                  log.contractor_equipment_code,
+                )}
+                onClick={saveContractorCode}
+              >
+                {t('save')}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            {codeEditError && <Alert type="error">{codeEditError}</Alert>}
+            <Field label={t('contractorEquipmentCode')}>
+              {(control) => (
+                <Input
+                  {...control}
+                  type="text"
+                  dir="ltr"
+                  value={codeEditValue}
+                  maxLength={CONTRACTOR_CODE_MAX_LENGTH}
+                  placeholder={t('contractorCodePlaceholder')}
+                  onChange={(event) => setCodeEditValue(event.target.value)}
+                />
+              )}
+            </Field>
+          </div>
+        </Dialog>
+      )}
+
       {confirmDialog}
     </div>
   )
