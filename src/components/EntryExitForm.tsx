@@ -2,51 +2,59 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { useAuth } from '@/auth/AuthContext'
-import { Modal } from '@/components/Modal'
 import { Alert } from '@/components/Alert'
-import { Skeleton } from '@/components/Spinner'
-import {
-  Search,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  MapPin,
-  ChevronLeft,
-  ChevronRight,
-  X,
-  Camera,
-  Loader2,
-} from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import type { Driver, Equipment, MovementType, LastMovement } from '@/lib/types'
-import { DatePicker } from '@/components/DatePicker'
+import {
+  BackButton,
+  Button,
+  DatePicker,
+  Field,
+  Input,
+  Textarea,
+} from '@/components/ui'
 import {
   AsyncSearchSelect,
   type AsyncSearchSelectOption,
 } from '@/components/AsyncSearchSelect'
 import { driverOption } from '@/lib/driverOptions'
+import { useMovementFormOptions } from '@/components/movement/useMovementFormOptions'
 import { LastEntrySummary } from '@/components/movement/LastEntrySummary'
+import { EquipmentStep } from '@/components/movement/EquipmentStep'
+import { MovementFormShell } from '@/components/movement/MovementFormShell'
+import { MovementPhotosSection } from '@/components/movement/MovementPhotosSection'
+import { MovementStatusCard } from '@/components/movement/MovementStatusCard'
+import {
+  EMPTY_QUICK_DRIVER,
+  QuickDriverForm,
+} from '@/components/movement/QuickDriverForm'
+import {
+  EMPTY_QUICK_EQUIPMENT,
+  QuickEquipmentForm,
+} from '@/components/movement/QuickEquipmentForm'
+import {
+  EMPTY_QUICK_LESSOR,
+  QuickLessorDialog,
+} from '@/components/movement/QuickLessorDialog'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { toLatinDigits } from '@/lib/plate'
 import { siteExitEquipmentArgs } from '@/lib/exitEquipmentSearch'
 import {
   entryEquipmentArgs,
-  equipmentStateOption,
   type EntryEquipmentStateFields,
 } from '@/lib/entryEquipmentSearch'
-import { Badge } from '@/components/ui/Badge'
-import { Select, type SelectOption } from '@/components/Select'
-import { PlateNumberInput } from '@/components/PlateNumberInput'
-import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import {
-  ALLOWED_MOVEMENT_PHOTO_TYPES,
-  MAX_MOVEMENT_PHOTOS,
+  actualMovementDate,
+  movementDateKey,
+  toLocalDateTimeInput,
+  withCurrentLocalTime,
+} from '@/lib/movementFormTime'
+import { movementSaveErrorKey } from '@/lib/movementSaveErrors'
+import {
   useMovementPhotoStaging,
   type StagedPhotoError,
 } from '@/components/useMovementPhotoStaging'
-
-const ALLOWED_PHOTO_TYPES = ALLOWED_MOVEMENT_PHOTO_TYPES
-const MAX_PHOTOS = MAX_MOVEMENT_PHOTOS
 
 interface EntryExitFormProps {
   open: boolean
@@ -56,11 +64,6 @@ interface EntryExitFormProps {
   pageMode?: boolean
   onViewMovement?: (id: string) => void
   onGoHome?: () => void
-}
-
-function toLocalDateTimeInput(date: Date): string {
-  const localTime = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-  return localTime.toISOString().slice(0, 16)
 }
 
 export function EntryExitForm({
@@ -93,7 +96,7 @@ export function EntryExitForm({
   const [selectedDriver, setSelectedDriver] =
     useState<AsyncSearchSelectOption | null>(null)
   const [notes, setNotes] = useState('')
-  const [carouselIndex, setCarouselIndex] = useState(0)
+  const [photoIndex, setPhotoIndex] = useState(0)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveWarning, setSaveWarning] = useState<string | null>(null)
@@ -101,40 +104,29 @@ export function EntryExitForm({
   const [savedMovementId, setSavedMovementId] = useState('')
   const [selectedCompanyId, setSelectedCompanyId] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState('')
-  const [selectedCompany, setSelectedCompany] = useState<SelectOption | null>(
-    null,
-  )
-  const [selectedProject, setSelectedProject] = useState<SelectOption | null>(
-    null,
-  )
+  const [selectedCompany, setSelectedCompany] =
+    useState<AsyncSearchSelectOption | null>(null)
+  const [selectedProject, setSelectedProject] =
+    useState<AsyncSearchSelectOption | null>(null)
   const [contractorCode, setContractorCode] = useState('')
   const [recordedAt, setRecordedAt] = useState('')
-  const [quickDriver, setQuickDriver] = useState({
-    open: false,
-    fullName: '',
-    mobile: '',
-  })
-  const [quickEquipment, setQuickEquipment] = useState({
-    open: false,
-    plate: '',
-    chassis: '',
-    identifierType: 'plate' as 'plate' | 'chassis',
-    code: '',
-    type: '',
-    lessorId: '',
-    numberingStatus: 'numbered' as 'numbered' | 'unnumbered',
-  })
+  const [quickDriver, setQuickDriver] = useState(EMPTY_QUICK_DRIVER)
+  const [quickEquipment, setQuickEquipment] = useState(EMPTY_QUICK_EQUIPMENT)
   const [selectedQuickLessor, setSelectedQuickLessor] =
-    useState<SelectOption | null>(null)
-  const [quickLessor, setQuickLessor] = useState({
-    open: false,
-    name: '',
-    error: '',
-  })
+    useState<AsyncSearchSelectOption | null>(null)
+  const [quickLessor, setQuickLessor] = useState(EMPTY_QUICK_LESSOR)
   const [quickSaving, setQuickSaving] = useState(false)
   const equipmentListRef = useRef<HTMLDivElement>(null)
   const quickEquipmentRef = useRef<HTMLDivElement>(null)
   const successRef = useRef<HTMLDivElement>(null)
+
+  const {
+    loadDrivers,
+    loadCompanies,
+    loadProjects,
+    loadEquipmentTypes,
+    loadLessors,
+  } = useMovementFormOptions()
 
   const photoErrorMessage = (error: StagedPhotoError) => {
     if (error === 'invalid_type') return t('invalidPhotoType')
@@ -148,7 +140,6 @@ export function EntryExitForm({
   const stagedPhotos = photoStaging.photos
   const uploadingPhotos = photoStaging.uploading
   const { reset: resetPhotoStaging } = photoStaging
-  const currentStagedPhoto = stagedPhotos[carouselIndex] ?? stagedPhotos[0]
 
   const isEntry = movementType === 'entry'
   const workshopMode =
@@ -159,14 +150,14 @@ export function EntryExitForm({
   // ENTRY, or by an admin, so its equipment list is filtered in the database.
   const siteExitMode = !workshopMode && !isEntry
   const currentLocalDateTime = toLocalDateTimeInput(new Date())
-  const movementDate = recordedAt.slice(0, 10)
+  const movementDate = movementDateKey(recordedAt)
 
   const updateMovementDate = (date: string) => {
     if (!date) {
       setRecordedAt('')
       return
     }
-    setRecordedAt(`${date}T${currentLocalDateTime.slice(11, 16)}`)
+    setRecordedAt(withCurrentLocalTime(date, new Date()))
   }
 
   const reset = useCallback(() => {
@@ -182,7 +173,7 @@ export function EntryExitForm({
     setSelectedDriver(null)
     setNotes('')
     resetPhotoStaging()
-    setCarouselIndex(0)
+    setPhotoIndex(0)
     setSaveError(null)
     setSaveWarning(null)
     setMovementSaved(false)
@@ -193,19 +184,10 @@ export function EntryExitForm({
     setSelectedProject(null)
     setContractorCode('')
     setRecordedAt('')
-    setQuickDriver({ open: false, fullName: '', mobile: '' })
-    setQuickEquipment({
-      open: false,
-      plate: '',
-      chassis: '',
-      identifierType: 'plate',
-      code: '',
-      type: '',
-      lessorId: '',
-      numberingStatus: 'numbered',
-    })
+    setQuickDriver(EMPTY_QUICK_DRIVER)
+    setQuickEquipment(EMPTY_QUICK_EQUIPMENT)
     setSelectedQuickLessor(null)
-    setQuickLessor({ open: false, name: '', error: '' })
+    setQuickLessor(EMPTY_QUICK_LESSOR)
   }, [resetPhotoStaging])
 
   useEffect(() => {
@@ -342,99 +324,6 @@ export function EntryExitForm({
     [isEntry, t, workshopMode],
   )
 
-  const loadDrivers = useCallback(
-    async (query: string): Promise<AsyncSearchSelectOption[]> => {
-      let request = supabase
-        .from('drivers')
-        .select('id,full_name,name_en,id_number,mobile_number')
-        .order('full_name')
-        .limit(20)
-      const term = sanitizeSearchTerm(query)
-      if (term)
-        request = request.or(
-          `full_name.ilike.%${term}%,name_en.ilike.%${term}%,id_number.ilike.%${term}%,mobile_number.ilike.%${term}%`,
-        )
-      const { data, error } = await request
-      if (error) return []
-      return (data ?? []).map(driverOption)
-    },
-    [],
-  )
-
-  const loadCompanies = useCallback(
-    async (query: string): Promise<SelectOption[]> => {
-      let request = supabase
-        .from('companies')
-        .select('id,name_ar,name_en')
-        .order('name_ar')
-        .limit(20)
-      const term = sanitizeSearchTerm(query)
-      if (term)
-        request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
-      const { data } = await request
-      return (data ?? []).map((company) => ({
-        value: company.id,
-        label: localizedName(lang, company.name_ar, company.name_en),
-      }))
-    },
-    [lang],
-  )
-
-  const loadProjects = useCallback(
-    async (query: string): Promise<SelectOption[]> => {
-      let request = supabase
-        .from('projects')
-        .select('id,name_ar,name_en')
-        .order('name_ar')
-        .limit(20)
-      const term = sanitizeSearchTerm(query)
-      if (term)
-        request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
-      const { data } = await request
-      return (data ?? []).map((project) => ({
-        value: project.id,
-        label: localizedName(lang, project.name_ar, project.name_en),
-      }))
-    },
-    [lang],
-  )
-
-  const loadEquipmentTypes = useCallback(
-    async (query: string): Promise<SelectOption[]> => {
-      let request = supabase
-        .from('equipment_types')
-        .select('name')
-        .order('name')
-        .limit(20)
-      const term = sanitizeSearchTerm(query)
-      if (term) request = request.ilike('name', `%${term}%`)
-      const { data } = await request
-      return (data ?? []).map((item) => ({
-        value: item.name,
-        label: item.name,
-      }))
-    },
-    [],
-  )
-
-  const loadLessors = useCallback(
-    async (query: string): Promise<SelectOption[]> => {
-      let request = supabase
-        .from('lessors')
-        .select('id,name')
-        .order('name')
-        .limit(20)
-      const term = sanitizeSearchTerm(query)
-      if (term) request = request.ilike('name', `%${term}%`)
-      const { data } = await request
-      return (data ?? []).map((lessor) => ({
-        value: lessor.id,
-        label: lessor.name,
-      }))
-    },
-    [],
-  )
-
   const createQuickLessor = async () => {
     const trimmedName = quickLessor.name.trim()
     if (!trimmedName) {
@@ -458,7 +347,7 @@ export function EntryExitForm({
     const option = { value: lessor.id, label: lessor.name }
     setQuickEquipment((current) => ({ ...current, lessorId: lessor.id }))
     setSelectedQuickLessor(option)
-    setQuickLessor({ open: false, name: '', error: '' })
+    setQuickLessor(EMPTY_QUICK_LESSOR)
   }
 
   const handleSelectEquipment = (eq: Equipment) => {
@@ -492,7 +381,7 @@ export function EntryExitForm({
     const driver = data as Driver
     setDriverId(driver.id)
     setSelectedDriver(driverOption(driver))
-    setQuickDriver({ open: false, fullName: '', mobile: '' })
+    setQuickDriver(EMPTY_QUICK_DRIVER)
   }
 
   const createQuickEquipment = async () => {
@@ -551,16 +440,7 @@ export function EntryExitForm({
       setSaveError(t('saveFailed'))
       return
     }
-    setQuickEquipment({
-      open: false,
-      plate: '',
-      chassis: '',
-      identifierType: 'plate',
-      code: '',
-      type: '',
-      lessorId: '',
-      numberingStatus: 'numbered',
-    })
+    setQuickEquipment(EMPTY_QUICK_EQUIPMENT)
     setSelectedQuickLessor(null)
     handleSelectEquipment(data as Equipment)
   }
@@ -569,12 +449,12 @@ export function EntryExitForm({
     // Only the newly selected files are staged; photos already uploaded keep
     // their state and their staged storage objects.
     const firstNewIndex = stagedPhotos.length
-    if (photoStaging.addPhotos(files) > 0) setCarouselIndex(firstNewIndex)
+    if (photoStaging.addPhotos(files) > 0) setPhotoIndex(firstNewIndex)
   }
 
   const handleRemovePhoto = (index: number) => {
     photoStaging.removePhoto(index)
-    setCarouselIndex((prev) =>
+    setPhotoIndex((prev) =>
       Math.max(0, Math.min(prev, stagedPhotos.length - 2)),
     )
   }
@@ -606,11 +486,10 @@ export function EntryExitForm({
       setSaveError(`${t('actualMovementTime')}: ${t('required')}`)
       return
     }
-    const saveTime = toLocalDateTimeInput(new Date()).slice(11, 16)
-    const actualMovementDate = new Date(`${movementDate}T${saveTime}`)
+    const movementInstant = actualMovementDate(movementDate, new Date())
     if (
-      isNaN(actualMovementDate.getTime()) ||
-      actualMovementDate.getTime() > Date.now()
+      isNaN(movementInstant.getTime()) ||
+      movementInstant.getTime() > Date.now()
     ) {
       setSaveError(t('movementTimeCannotBeFuture'))
       return
@@ -629,7 +508,7 @@ export function EntryExitForm({
         movement_type: movementType,
         movement_context: workshopMode ? 'workshop' : 'site',
         registration_method: 'manual',
-        recorded_at: actualMovementDate.toISOString(),
+        recorded_at: movementInstant.toISOString(),
         photo_count: stagedPhotos.length,
       }
       const uploadBatchIds = photoStaging.uploadBatchIds()
@@ -687,29 +566,7 @@ export function EntryExitForm({
     } catch (err) {
       console.error(err)
       const code = err instanceof Error ? err.message : 'movement_save_failed'
-      const messages: Record<string, string> = {
-        future_time: t('movementTimeCannotBeFuture'),
-        company_required: t('companyRequiredForEntry'),
-        project_required: t('projectRequiredForEntry'),
-        driver_required: t('driverRequired'),
-        no_prior_entry: t('noPriorEntryAtSelectedTime'),
-        exit_not_entry_owner: t('siteExitNotEntryOwner'),
-        exit_equipment_in_workshop: t('siteExitEquipmentInWorkshop'),
-        workshop_exit_owner: t('workshopExitOwner'),
-        invalid_sequence: isEntry
-          ? t('entrySequenceConflict')
-          : t('exitSequenceConflict'),
-        invalid_photos: t('invalidPhotoType'),
-        photo_required: t('workshopPhotoRequired'),
-        photo_decode_failed: t('photoCompressionFailed'),
-        photo_compression_failed: t('photoCompressionFailed'),
-        invalid_movement_payload: t('movementSaveFailed'),
-        photo_upload_failed: t('photoUploadFailed'),
-        unauthorized: t('authError'),
-        access_denied: t('accessDenied'),
-        movement_save_failed: t('movementSaveFailed'),
-      }
-      setSaveError(messages[code] ?? t('movementSaveFailed'))
+      setSaveError(t(movementSaveErrorKey(code, isEntry)))
       checkLastMovement(selected)
     } finally {
       setSaving(false)
@@ -726,376 +583,73 @@ export function EntryExitForm({
       ? localizedName(lang, nameAr, nameEn)
       : null
 
-  // Current status derived from last movement
-  const currentStatus: 'inside' | 'outside' | 'none' = !lastMovement
-    ? 'none'
-    : lastMovement.movement_type === 'entry'
-      ? 'inside'
-      : 'outside'
-
   return (
     <>
-      <Modal
+      <MovementFormShell
         open={open}
         onClose={onClose}
+        pageMode={pageMode}
         title={isEntry ? t('registerEntry') : t('registerExit')}
-        size="lg"
-        inline={pageMode}
       >
         {step === 'select' && (
-          <div className="space-y-4">
-            {/* Owner filter */}
-            <div>
-              <label className="label">{t('selectOwner')}</label>
-              <Select
-                value={ownerFilter}
-                onChange={(value) => {
-                  equipmentListRef.current?.scrollTo({ top: 0 })
-                  setOwnerFilter(value)
-                }}
-                placeholder={t('allOwners')}
-                options={[
-                  { value: '', label: t('allOwners') },
-                  { value: 'alazani', label: t('ownershipAlazani') },
-                  { value: 'takween', label: t('ownershipTakween') },
-                  { value: 'third_party_f', label: t('ownershipThirdPartyF') },
-                  {
-                    value: 'third_party_partnership_b',
-                    label: t('ownershipThirdPartyPartnershipB'),
-                  },
-                  {
-                    value: 'external_supplier',
-                    label: t('ownershipExternalSupplier'),
-                  },
-                ]}
-              />
-            </div>
-
-            {/* Search */}
-            <div className="relative">
-              <Search
-                size={18}
-                className="absolute top-1/2 -translate-y-1/2 start-3 text-muted"
-              />
-              <input
-                type="text"
-                dir={lang === 'ar' && !search ? 'rtl' : 'ltr'}
-                className="input ps-10"
-                placeholder={t('searchingEquipment')}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                autoFocus
-              />
-            </div>
-
-            {/* Equipment list */}
-            {loadingEquipment ? (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Skeleton className="h-16" />
-                <Skeleton className="h-16" />
-                <Skeleton className="h-16" />
-                <Skeleton className="h-16" />
-              </div>
-            ) : (
-              <div
-                ref={equipmentListRef}
-                className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2"
-              >
-                {equipmentError && (
-                  <p className="col-span-full py-4 text-center text-sm text-danger">
-                    {t('equipmentLoadError')}
-                  </p>
-                )}
-                {!equipmentError && equipment.length === 0 && (
-                  <div className="col-span-full space-y-1 py-4 text-center text-sm text-muted">
-                    <p>{t('noEquipmentFound')}</p>
-                    {siteExitMode && profile?.role !== 'admin' && (
-                      <p className="text-xs">{t('siteExitOwnEquipmentOnly')}</p>
-                    )}
-                  </div>
-                )}
-                {equipment.map((eq) => {
-                  // Badge + ONE secondary state line; available equipment gets
-                  // neither. Selecting a listed piece keeps today's behavior:
-                  // the "current status" section and the ENTRY -> ENTRY
-                  // rejection still come from `get_last_movement`.
-                  const stateOption = equipmentStateOption(eq, lang, t)
-                  return (
-                    <button
-                      key={eq.id}
-                      onClick={() => handleSelectEquipment(eq)}
-                      className="w-full rounded-lg border px-3 py-2 text-start transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
-                      style={{
-                        borderColor:
-                          'color-mix(in srgb, var(--border) 72%, transparent)',
-                      }}
-                    >
-                      <div className="space-y-0.5 text-[13px] leading-4">
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-medium">{eq.code}</span>
-                          {stateOption.badge && (
-                            <Badge tone={stateOption.badge.tone}>
-                              {stateOption.badge.label}
-                            </Badge>
-                          )}
-                        </span>
-                        <p className="text-muted">{eq.type}</p>
-                        {eq.plate_number && (
-                          <p className="text-muted">
-                            {t('plateNumber')}: {eq.plate_number}
-                          </p>
-                        )}
-                        {!eq.plate_number && eq.chassis_number && (
-                          <p className="text-muted">
-                            {t('chassisNumber')}: {eq.chassis_number}
-                          </p>
-                        )}
-                        {stateOption.description && (
-                          <p className="truncate-safe text-muted">
-                            {stateOption.description}
-                          </p>
-                        )}
-                      </div>
-                    </button>
-                  )
-                })}
-                {isEntry && (
-                  <button
-                    type="button"
-                    className="w-full rounded-lg border px-3 py-4 text-start text-sm transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
-                    style={{ borderColor: 'var(--border)' }}
-                    onClick={() =>
-                      setQuickEquipment((value) => ({
-                        ...value,
-                        open: true,
-                        plate: search,
-                      }))
-                    }
-                  >
-                    {t('addEquipment')} +
-                  </button>
-                )}
-              </div>
-            )}
-            {quickEquipment.open && (
-              <div
-                ref={quickEquipmentRef}
-                className="space-y-2.5 rounded-lg border p-3 text-start"
-                style={{
-                  borderColor:
-                    'color-mix(in srgb, var(--border) 72%, transparent)',
-                }}
-              >
-                <p className="font-semibold">{t('quickEquipmentAdd')}</p>
-                {!workshopMode && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {(['plate', 'chassis'] as const).map((type) => (
-                      <label
-                        key={type}
-                        className={`flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-sm ${quickEquipment.identifierType === type ? 'bg-gray-100 dark:bg-gray-800' : ''}`}
-                        style={{ borderColor: 'var(--border)' }}
-                      >
-                        <span>
-                          {t(
-                            type === 'plate' ? 'plateNumber' : 'chassisNumber',
-                          )}
-                        </span>
-                        <input
-                          type="radio"
-                          name="quick-equipment-identifier"
-                          checked={quickEquipment.identifierType === type}
-                          onChange={() =>
-                            setQuickEquipment({
-                              ...quickEquipment,
-                              identifierType: type,
-                              plate:
-                                type === 'chassis' ? '' : quickEquipment.plate,
-                            })
-                          }
-                        />
-                      </label>
-                    ))}
-                  </div>
-                )}
-                {workshopMode && (
-                  <div
-                    className="flex gap-4 rounded-lg border p-3"
-                    style={{ borderColor: 'var(--border)' }}
-                  >
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        checked={quickEquipment.numberingStatus === 'numbered'}
-                        onChange={() =>
-                          setQuickEquipment({
-                            ...quickEquipment,
-                            numberingStatus: 'numbered',
-                          })
-                        }
-                      />{' '}
-                      {t('numbered')}
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        checked={
-                          quickEquipment.numberingStatus === 'unnumbered'
-                        }
-                        onChange={() =>
-                          setQuickEquipment({
-                            ...quickEquipment,
-                            numberingStatus: 'unnumbered',
-                            code: '',
-                          })
-                        }
-                      />{' '}
-                      {t('unnumbered')}
-                    </label>
-                  </div>
-                )}
-                {workshopMode &&
-                  quickEquipment.numberingStatus === 'numbered' && (
-                    <div>
-                      <label className="label">{t('equipmentCode')} *</label>
-                      <input
-                        className="input"
-                        dir="ltr"
-                        placeholder={t('equipmentCodePlaceholder')}
-                        value={quickEquipment.code}
-                        onChange={(event) =>
-                          setQuickEquipment({
-                            ...quickEquipment,
-                            code: event.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                  )}
-                {(workshopMode ||
-                  quickEquipment.identifierType === 'plate') && (
-                  <div>
-                    <label className="label">{t('plateNumber')} *</label>
-                    <PlateNumberInput
-                      value={quickEquipment.plate}
-                      onChange={(value) =>
-                        setQuickEquipment({ ...quickEquipment, plate: value })
-                      }
-                    />
-                  </div>
-                )}
-                {!workshopMode && (
-                  <>
-                    <div>
-                      <label className="label">
-                        {t('chassisNumber')}{' '}
-                        {quickEquipment.identifierType === 'chassis' ? '*' : ''}
-                      </label>
-                      <input
-                        className="input"
-                        dir="ltr"
-                        placeholder={t('chassisNumberPlaceholder')}
-                        value={quickEquipment.chassis}
-                        onChange={(event) =>
-                          setQuickEquipment({
-                            ...quickEquipment,
-                            chassis: event.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="label">{t('equipmentType')} *</label>
-                      <AsyncSearchSelect
-                        value={quickEquipment.type}
-                        selectedOption={
-                          quickEquipment.type
-                            ? {
-                                value: quickEquipment.type,
-                                label: quickEquipment.type,
-                              }
-                            : null
-                        }
-                        onChange={(value) =>
-                          setQuickEquipment({ ...quickEquipment, type: value })
-                        }
-                        loadOptions={loadEquipmentTypes}
-                        placeholder={t('selectEquipmentType')}
-                      />
-                    </div>
-                    <div>
-                      <label className="label">{t('externalSupplier')} *</label>
-                      <AsyncSearchSelect
-                        value={quickEquipment.lessorId}
-                        selectedOption={selectedQuickLessor}
-                        onChange={(value, option) => {
-                          setQuickEquipment({
-                            ...quickEquipment,
-                            lessorId: value,
-                          })
-                          setSelectedQuickLessor(option)
-                        }}
-                        loadOptions={loadLessors}
-                        placeholder={t('selectLessor')}
-                        createLabel={`${t('addNewSupplier')} +`}
-                        onCreate={(query) =>
-                          setQuickLessor({ open: true, name: query, error: '' })
-                        }
-                        alwaysShowCreate
-                        disabled={quickSaving}
-                      />
-                    </div>
-                  </>
-                )}
-                <div className="flex gap-2">
-                  <button
-                    className="btn-outline flex-1"
-                    onClick={() => {
-                      setQuickEquipment({
-                        open: false,
-                        plate: '',
-                        chassis: '',
-                        identifierType: 'plate',
-                        code: '',
-                        type: '',
-                        lessorId: '',
-                        numberingStatus: 'numbered',
-                      })
-                      setSelectedQuickLessor(null)
-                    }}
-                  >
-                    {t('cancel')}
-                  </button>
-                  <button
-                    className="btn-primary flex-1"
-                    disabled={quickSaving}
-                    onClick={createQuickEquipment}
-                  >
-                    {quickSaving ? t('saving') : t('save')}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <EquipmentStep
+            search={search}
+            onSearchChange={setSearch}
+            ownerFilter={ownerFilter}
+            onOwnerFilterChange={setOwnerFilter}
+            equipment={equipment}
+            loading={loadingEquipment}
+            loadError={equipmentError}
+            isEntry={isEntry}
+            siteExitMode={siteExitMode}
+            isAdmin={profile?.role === 'admin'}
+            onSelect={handleSelectEquipment}
+            onAddEquipment={() =>
+              setQuickEquipment((value) => ({
+                ...value,
+                open: true,
+                plate: search,
+              }))
+            }
+            listRef={equipmentListRef}
+            quickCreateSlot={
+              quickEquipment.open ? (
+                <QuickEquipmentForm
+                  ref={quickEquipmentRef}
+                  value={quickEquipment}
+                  onChange={setQuickEquipment}
+                  workshopMode={workshopMode}
+                  saving={quickSaving}
+                  selectedLessor={selectedQuickLessor}
+                  onSelectLessor={setSelectedQuickLessor}
+                  loadEquipmentTypes={loadEquipmentTypes}
+                  loadLessors={loadLessors}
+                  onCreateLessor={(query) =>
+                    setQuickLessor({ open: true, name: query, error: '' })
+                  }
+                  onCancel={() => {
+                    setQuickEquipment(EMPTY_QUICK_EQUIPMENT)
+                    setSelectedQuickLessor(null)
+                  }}
+                  onSave={createQuickEquipment}
+                />
+              ) : null
+            }
+          />
         )}
 
         {step === 'details' && selected && (
           <div className="space-y-4">
             {/* Selected equipment info */}
-            <div
-              className="rounded-lg border p-4"
-              style={{ borderColor: 'var(--border)' }}
-            >
-              <div className="flex items-center justify-between mb-2">
+            <div className="rounded-lg border p-4">
+              <div className="mb-2 flex items-center justify-between">
                 <h3 className="font-bold">{selected.code}</h3>
-                <button
+                <BackButton
                   onClick={() => {
                     setStep('select')
                     setSelected(null)
                   }}
-                  className="text-xs text-muted hover:text-fg"
-                >
-                  {t('back')}
-                </button>
+                />
               </div>
               <p className="text-sm text-muted">{selected.type}</p>
               {selected.plate_number && (
@@ -1115,118 +669,12 @@ export function EntryExitForm({
               )}
             </div>
 
-            {/* Latest movement brief card */}
-            {loadingMovement ? (
-              <div className="space-y-2 py-2">
-                <Skeleton className="h-14" />
-                <Skeleton className="h-8 w-2/3" />
-              </div>
-            ) : (
-              <div
-                className="rounded-lg border p-4 space-y-2"
-                style={{
-                  borderColor: validationError ? 'var(--fg)' : 'var(--border)',
-                  background: 'var(--surface)',
-                }}
-              >
-                {/* Header line */}
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  {currentStatus === 'inside' ? (
-                    <>
-                      <CheckCircle
-                        size={16}
-                        className="text-green-600 dark:text-green-400"
-                      />
-                      <span>
-                        {t('currentStatus')}:{' '}
-                        {t(
-                          lastMovement?.movement_context === 'workshop'
-                            ? 'insideWorkshop'
-                            : 'insideSite',
-                        )}
-                        {lastMovement?.movement_context === 'workshop' && (
-                          <>
-                            {' '}
-                            —{' '}
-                            {lastMovement.workshop_purpose === 'maintenance'
-                              ? t('maintenancePurpose')
-                              : lastMovement.workshop_purpose === 'parking'
-                                ? t('parkingPurpose')
-                                : t('pendingClassification')}
-                          </>
-                        )}
-                        {lastMovement?.movement_context === 'site' && (
-                          <>
-                            {(lastMovement.project_name_ar ||
-                              lastMovement.project_name_en) && (
-                              <>
-                                {' '}
-                                —{' '}
-                                {localizedName(
-                                  lang,
-                                  lastMovement.project_name_ar,
-                                  lastMovement.project_name_en,
-                                )}
-                              </>
-                            )}
-                            {lastMovement.supervisor_name && (
-                              <> — {lastMovement.supervisor_name}</>
-                            )}
-                          </>
-                        )}
-                      </span>
-                    </>
-                  ) : currentStatus === 'outside' ? (
-                    <>
-                      <MapPin
-                        size={16}
-                        className="text-amber-600 dark:text-amber-400"
-                      />
-                      <span>
-                        {t('currentStatus')}:{' '}
-                        {t(
-                          lastMovement?.movement_context === 'workshop'
-                            ? 'outsideWorkshop'
-                            : 'outsideSite',
-                        )}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Clock size={16} className="text-muted" />
-                      <span>{t('noPreviousMovement')}</span>
-                    </>
-                  )}
-                </div>
-
-                {/* Last movement detail */}
-                {lastMovement && (
-                  <div className="flex items-center gap-2 text-xs text-muted">
-                    <Clock size={14} />
-                    <span>
-                      {t('lastMovement')}:{' '}
-                      {lastMovement.movement_type === 'entry'
-                        ? t('entry')
-                        : t('exit')}{' '}
-                      — {formatDate(lastMovement.recorded_at)}
-                    </span>
-                  </div>
-                )}
-
-                {/* Allowed / blocked indicator */}
-                {!validationError && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <CheckCircle
-                      size={14}
-                      className="text-green-600 dark:text-green-400"
-                    />
-                    <span className="text-green-700 dark:text-green-300">
-                      {isEntry ? t('entryAllowed') : t('exitAllowed')}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
+            <MovementStatusCard
+              loading={loadingMovement}
+              lastMovement={lastMovement}
+              isEntry={isEntry}
+              blocked={!!validationError}
+            />
 
             {/* Validation warning */}
             {validationError && (
@@ -1262,313 +710,122 @@ export function EntryExitForm({
             <div className="space-y-4">
               {!workshopMode && isEntry ? (
                 <>
-                  <div>
-                    <label className="label">{t('company')} *</label>
-                    <AsyncSearchSelect
-                      value={selectedCompanyId}
-                      selectedOption={selectedCompany}
-                      onChange={(value, option) => {
-                        setSelectedCompanyId(value)
-                        setSelectedCompany(option)
-                      }}
-                      placeholder={t('selectCompany')}
-                      loadOptions={loadCompanies}
-                    />
-                  </div>
+                  <Field label={t('company')} required>
+                    {() => (
+                      <AsyncSearchSelect
+                        value={selectedCompanyId}
+                        selectedOption={selectedCompany}
+                        onChange={(value, option) => {
+                          setSelectedCompanyId(value)
+                          setSelectedCompany(option)
+                        }}
+                        placeholder={t('selectCompany')}
+                        loadOptions={loadCompanies}
+                      />
+                    )}
+                  </Field>
 
-                  <div>
-                    <label className="label">{t('project')} *</label>
-                    <AsyncSearchSelect
-                      value={selectedProjectId}
-                      selectedOption={selectedProject}
-                      onChange={(value, option) => {
-                        setSelectedProjectId(value)
-                        setSelectedProject(option)
-                      }}
-                      placeholder={t('selectProject')}
-                      loadOptions={loadProjects}
-                    />
-                  </div>
+                  <Field label={t('project')} required>
+                    {() => (
+                      <AsyncSearchSelect
+                        value={selectedProjectId}
+                        selectedOption={selectedProject}
+                        onChange={(value, option) => {
+                          setSelectedProjectId(value)
+                          setSelectedProject(option)
+                        }}
+                        placeholder={t('selectProject')}
+                        loadOptions={loadProjects}
+                      />
+                    )}
+                  </Field>
 
-                  <div>
-                    <label className="label">
-                      {t('contractorEquipmentCode')}
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      value={contractorCode}
-                      placeholder={t('contractorCodePlaceholder')}
-                      onChange={(e) => setContractorCode(e.target.value)}
-                      dir="ltr"
-                    />
-                  </div>
+                  <Field label={t('contractorEquipmentCode')}>
+                    {(control) => (
+                      <Input
+                        {...control}
+                        type="text"
+                        value={contractorCode}
+                        placeholder={t('contractorCodePlaceholder')}
+                        onChange={(e) => setContractorCode(e.target.value)}
+                        dir="ltr"
+                      />
+                    )}
+                  </Field>
                 </>
               ) : null}
 
               {/* Site EXIT has no driver field: the exit inherits the latest
                   current driver of the open visit server-side. */}
               {!workshopMode && isEntry && (
-                <div>
-                  <label className="label">{t('driverName')} *</label>
-                  <AsyncSearchSelect
-                    value={driverId}
-                    selectedOption={selectedDriver}
-                    onChange={(value, option) => {
-                      setDriverId(value)
-                      setSelectedDriver(option)
-                    }}
-                    loadOptions={loadDrivers}
-                    placeholder={t('selectDriver')}
-                    createLabel={`${t('addNewDriver')} +`}
-                    onCreate={(query) =>
-                      setQuickDriver({
-                        open: true,
-                        fullName: query,
-                        mobile: '',
-                      })
-                    }
-                    alwaysShowCreate
-                  />
-                </div>
-              )}
-              {!workshopMode && isEntry && quickDriver.open && (
-                <div
-                  className="rounded-lg border p-4 space-y-3"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  <p className="font-semibold">{t('quickDriverAdd')}</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="label">{t('fullName')} *</label>
-                      <input
-                        className="input"
-                        placeholder={t('fullNamePlaceholder')}
-                        value={quickDriver.fullName}
-                        onChange={(event) =>
-                          setQuickDriver({
-                            ...quickDriver,
-                            fullName: event.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="label">{t('mobileNumber')} *</label>
-                      <input
-                        className="input"
-                        dir="ltr"
-                        placeholder={t('mobileNumberPlaceholder')}
-                        value={quickDriver.mobile}
-                        onChange={(event) =>
-                          setQuickDriver({
-                            ...quickDriver,
-                            mobile: event.target.value.replace(/[^\d+]/g, ''),
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      className="btn-outline flex-1"
-                      onClick={() =>
+                <Field label={t('driverName')} required>
+                  {() => (
+                    <AsyncSearchSelect
+                      value={driverId}
+                      selectedOption={selectedDriver}
+                      onChange={(value, option) => {
+                        setDriverId(value)
+                        setSelectedDriver(option)
+                      }}
+                      loadOptions={loadDrivers}
+                      placeholder={t('selectDriver')}
+                      createLabel={`${t('addNewDriver')} +`}
+                      onCreate={(query) =>
                         setQuickDriver({
-                          open: false,
-                          fullName: '',
+                          open: true,
+                          fullName: query,
                           mobile: '',
                         })
                       }
-                    >
-                      {t('cancel')}
-                    </button>
-                    <button
-                      className="btn-primary flex-1"
-                      disabled={quickSaving}
-                      onClick={createQuickDriver}
-                    >
-                      {quickSaving ? t('saving') : t('save')}
-                    </button>
-                  </div>
-                </div>
+                      alwaysShowCreate
+                    />
+                  )}
+                </Field>
+              )}
+              {!workshopMode && isEntry && quickDriver.open && (
+                <QuickDriverForm
+                  value={quickDriver}
+                  onChange={setQuickDriver}
+                  saving={quickSaving}
+                  onCancel={() => setQuickDriver(EMPTY_QUICK_DRIVER)}
+                  onSave={createQuickDriver}
+                />
               )}
 
-              <div>
-                <label className="label">{t('actualMovementTime')}</label>
-                <div className="max-w">
+              <Field label={t('actualMovementTime')}>
+                {(control) => (
                   <DatePicker
+                    {...control}
                     value={movementDate}
                     onChange={updateMovementDate}
                     max={currentLocalDateTime.slice(0, 10)}
                     placeholder={t('date')}
                   />
-                </div>
-              </div>
+                )}
+              </Field>
 
-              <div>
-                <label className="label">{t('notes')}</label>
-                <textarea
-                  className="input min-h-20 resize-none p-2"
-                  value={notes}
-                  placeholder={t('notesPlaceholder')}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                />
-              </div>
+              <Field label={t('notes')}>
+                {(control) => (
+                  <Textarea
+                    {...control}
+                    value={notes}
+                    placeholder={t('notesPlaceholder')}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={3}
+                  />
+                )}
+              </Field>
 
-              <div>
-                <label className="label">
-                  {t('photo')}
-                  {workshopMode ? ' *' : ''}
-                </label>
-                {currentStagedPhoto && (
-                  <div className="mb-3">
-                    <div
-                      className="relative rounded-lg overflow-hidden"
-                      style={{
-                        background: 'var(--surface)',
-                        border: '1px solid var(--border)',
-                        height: '240px',
-                      }}
-                    >
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <img
-                          src={currentStagedPhoto.previewUrl}
-                          alt={`Photo ${carouselIndex + 1}`}
-                          className="max-h-full max-w-full object-contain"
-                        />
-                      </div>
-                      {stagedPhotos.length > 1 && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCarouselIndex(
-                                (prev) =>
-                                  (prev - 1 + stagedPhotos.length) %
-                                  stagedPhotos.length,
-                              )
-                            }
-                            className="absolute start-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
-                          >
-                            <ChevronLeft size={20} className="rtl-flip" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCarouselIndex(
-                                (prev) => (prev + 1) % stagedPhotos.length,
-                              )
-                            }
-                            className="absolute end-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
-                          >
-                            <ChevronRight size={20} className="rtl-flip" />
-                          </button>
-                          <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-white bg-black/50 rounded-full px-2 py-0.5">
-                            {carouselIndex + 1} / {stagedPhotos.length}
-                          </span>
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleRemovePhoto(carouselIndex)}
-                        disabled={uploadingPhotos}
-                        className="absolute top-1 end-1 rounded-full p-1 bg-black/40 hover:bg-red-600 text-white transition-colors"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  </div>
-                )}
-                <p className="text-xs text-muted mb-2">
-                  {t('photosCount')
-                    .replace('{count}', String(stagedPhotos.length))
-                    .replace('{max}', String(MAX_PHOTOS))}
-                </p>
-                {stagedPhotos.length > 0 && (
-                  <div className="mb-3 space-y-2">
-                    {stagedPhotos.map((photo) => (
-                      <div
-                        key={photo.id}
-                        className="rounded-md border p-2"
-                        style={{ borderColor: 'var(--border)' }}
-                      >
-                        <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-                          <span className="min-w-0 truncate" dir="auto">
-                            {photo.name}
-                          </span>
-                          <span className="flex shrink-0 items-center gap-1 text-muted">
-                            {(photo.status === 'preparing' ||
-                              photo.status === 'uploading') && (
-                              <Loader2 size={13} className="animate-spin" />
-                            )}
-                            {photo.status === 'preparing'
-                              ? t('preparingPhoto')
-                              : photo.status === 'uploading'
-                                ? `${photo.progress}%`
-                                : photo.status === 'uploaded'
-                                  ? t('photoUploadComplete')
-                                  : t('photoUploadFailedShort')}
-                          </span>
-                        </div>
-                        <div className="h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                          <div
-                            className={`h-full transition-[width] duration-200 ${
-                              photo.status === 'error'
-                                ? 'bg-red-600'
-                                : photo.status === 'uploaded'
-                                  ? 'bg-green-600'
-                                  : 'bg-black dark:bg-white'
-                            }`}
-                            style={{
-                              width: `${
-                                photo.status === 'preparing'
-                                  ? 5
-                                  : photo.status === 'error'
-                                    ? 100
-                                    : photo.progress
-                              }%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                    {photoStaging.hasFailedUploads && (
-                      <button
-                        type="button"
-                        className="btn-outline w-full"
-                        onClick={() => photoStaging.retryFailedUploads()}
-                      >
-                        {t('retryPhotoUpload')}
-                      </button>
-                    )}
-                  </div>
-                )}
-                {stagedPhotos.length < MAX_PHOTOS ? (
-                  <label
-                    className="flex items-center justify-center gap-2 rounded-lg border border-dashed p-4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    style={{ borderColor: 'var(--border)' }}
-                  >
-                    <Camera size={18} className="text-muted" />
-                    <span className="text-sm text-muted">{t('addPhoto')}</span>
-                    <input
-                      type="file"
-                      accept={ALLOWED_PHOTO_TYPES.join(',')}
-                      multiple
-                      disabled={uploadingPhotos}
-                      className="hidden"
-                      onChange={(e) => {
-                        handleAddPhotos(e.target.files)
-                        e.target.value = ''
-                      }}
-                    />
-                  </label>
-                ) : (
-                  <p className="text-xs text-muted text-center py-2">
-                    {t('maxPhotosReached')}
-                  </p>
-                )}
-              </div>
+              <MovementPhotosSection
+                photos={stagedPhotos}
+                selectedIndex={photoIndex}
+                onSelectIndex={setPhotoIndex}
+                uploading={uploadingPhotos}
+                required={workshopMode}
+                onAddFiles={handleAddPhotos}
+                onRemoveIndex={handleRemovePhoto}
+                onRetryPhoto={photoStaging.retryPhoto}
+              />
             </div>
 
             <div ref={successRef} className="space-y-3">
@@ -1581,11 +838,18 @@ export function EntryExitForm({
               {/* Actions */}
               {!movementSaved ? (
                 <div className="flex gap-3 pt-2">
-                  <button onClick={onClose} className="btn-outline flex-1">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={onClose}
+                  >
                     {t('cancel')}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="primary"
+                    className="flex-1"
                     onClick={handleSave}
+                    loading={saving}
                     disabled={
                       saving ||
                       uploadingPhotos ||
@@ -1593,88 +857,52 @@ export function EntryExitForm({
                       loadingMovement ||
                       (stagedPhotos.length > 0 && !photoStaging.ready)
                     }
-                    className="btn-primary flex-1"
                   >
                     {saving ? t('saving') : t('save')}
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 pt-2">
                   {onViewMovement && (
-                    <button
-                      className="btn-primary"
+                    <Button
+                      variant="primary"
                       onClick={() => onViewMovement(savedMovementId)}
                     >
                       {t('viewMovement')}
-                    </button>
+                    </Button>
                   )}
-                  <button
-                    className="btn-outline"
+                  <Button
+                    variant="outline"
                     onClick={() => {
                       reset()
                       window.scrollTo({ top: 0, behavior: 'smooth' })
                     }}
                   >
                     {t('registerAnotherMovement')}
-                  </button>
+                  </Button>
                   {onGoHome && (
-                    <button
-                      className="btn-outline col-span-2"
+                    <Button
+                      variant="outline"
+                      className="col-span-2"
                       onClick={onGoHome}
                     >
                       {t('dashboard')}
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}
             </div>
           </div>
         )}
-      </Modal>
+      </MovementFormShell>
 
-      <Modal
-        open={quickLessor.open}
-        onClose={() => setQuickLessor({ open: false, name: '', error: '' })}
-        title={t('addNewSupplier')}
-        size="sm"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="label">{t('lessorName')} *</label>
-            <input
-              className="input"
-              value={quickLessor.name}
-              placeholder={t('lessorNamePlaceholder')}
-              onChange={(event) =>
-                setQuickLessor({
-                  ...quickLessor,
-                  name: event.target.value,
-                  error: '',
-                })
-              }
-              autoFocus
-            />
-          </div>
-          {quickLessor.error && <Alert type="error">{quickLessor.error}</Alert>}
-          <div className="flex gap-2">
-            <button
-              className="btn-outline flex-1"
-              onClick={() =>
-                setQuickLessor({ open: false, name: '', error: '' })
-              }
-            >
-              {t('cancel')}
-            </button>
-            <button
-              className="btn-primary flex-1"
-              disabled={quickSaving || !quickLessor.name.trim()}
-              onClick={createQuickLessor}
-            >
-              {quickSaving ? t('saving') : t('save')}
-            </button>
-          </div>
-        </div>
-      </Modal>
+      <QuickLessorDialog
+        value={quickLessor}
+        onChange={setQuickLessor}
+        saving={quickSaving}
+        onClose={() => setQuickLessor(EMPTY_QUICK_LESSOR)}
+        onSave={createQuickLessor}
+      />
     </>
   )
 }

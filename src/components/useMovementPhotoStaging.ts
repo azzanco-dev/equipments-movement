@@ -47,6 +47,8 @@ export interface MovementPhotoStaging {
   // Returns how many photos were accepted and staged.
   addPhotos: (files: ArrayLike<File> | null) => number
   removePhoto: (index: number) => void
+  // Retries one failed slot; slots that already uploaded are never touched.
+  retryPhoto: (id: string) => void
   retryFailedUploads: () => void
   uploadBatchIds: () => string[]
   releaseUploads: () => void
@@ -212,6 +214,14 @@ export function useMovementPhotoStaging({
     [discardBatch, updatePhotos],
   )
 
+  const retryPhoto = useCallback(
+    (id: string) => {
+      const photo = photosRef.current.find((item) => item.id === id)
+      if (photo?.status === 'error') void uploadPhoto(id)
+    },
+    [uploadPhoto],
+  )
+
   const retryFailedUploads = useCallback(() => {
     for (const photo of photosRef.current) {
       if (photo.status === 'error') void uploadPhoto(photo.id)
@@ -259,6 +269,7 @@ export function useMovementPhotoStaging({
     hasFailedUploads: photos.some((photo) => photo.status === 'error'),
     addPhotos,
     removePhoto,
+    retryPhoto,
     retryFailedUploads,
     uploadBatchIds,
     releaseUploads,
