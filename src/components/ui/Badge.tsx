@@ -15,8 +15,12 @@ function toneStyle(tone: BadgeTone): CSSProperties | undefined {
   }
 }
 
+export type BadgeSize = 'sm' | 'md'
+
 export interface BadgeProps {
   tone?: BadgeTone
+  /** `sm` is for dense places such as dropdown options and table cells. */
+  size?: BadgeSize
   icon?: ReactNode
   className?: string
   children: ReactNode
@@ -24,6 +28,7 @@ export interface BadgeProps {
 
 export function Badge({
   tone = 'neutral',
+  size = 'md',
   icon,
   className,
   children,
@@ -31,7 +36,9 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium leading-5',
+        'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border font-medium',
+        size === 'md' && 'px-2.5 py-0.5 text-xs leading-5',
+        size === 'sm' && 'px-1.5 py-0 text-[11px] leading-4',
         tone === 'neutral' && 'bg-surface text-fg',
         className,
       )}

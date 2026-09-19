@@ -298,7 +298,7 @@ export function AsyncSearchSelect({
                           {option.label}
                         </span>
                         {option.badge && (
-                          <Badge tone={option.badge.tone}>
+                          <Badge tone={option.badge.tone} size="sm">
                             {option.badge.label}
                           </Badge>
                         )}
