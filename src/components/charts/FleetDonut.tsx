@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { cn } from '@/components/ui/cn'
 import {
+  CHART_AXIS_COLOR,
+  CHART_TEXT_COLOR,
   ChartLegend,
   ChartShell,
   ChartSrTable,
@@ -15,8 +17,10 @@ export interface FleetDonutSlice {
   id: string
   label: string
   value: number
-  /** CSS color; pass a token such as `var(--entry)`. */
+  /** CSS color; pass a pale tint token such as `var(--chart-1)`. */
   color: string
+  /** Outline for the slice; pass the matching `var(--chart-stroke-N)`. */
+  strokeColor?: string
 }
 
 export interface FleetDonutProps extends ChartBaseProps {
@@ -35,11 +39,35 @@ export interface FleetDonutProps extends ChartBaseProps {
   height?: number
 }
 
+const DEG = Math.PI / 180
+/** Under this share a slice is too narrow to hold text, so it labels outside. */
+const INSIDE_MIN_SHARE = 0.08
+/** From this share up the slice is wide enough to carry the count too. */
+const COUNT_MIN_SHARE = 0.14
+
+/** What Recharts hands a custom `label` renderer, narrowed to what is used. */
+type SliceLabelProps = {
+  cx?: number
+  cy?: number
+  midAngle?: number
+  innerRadius?: number
+  outerRadius?: number
+  percent?: number
+  value?: number
+  index?: number
+}
+
 /**
  * Where the fleet is right now, as a donut with a legend carrying counts and
  * shares. When `onSliceSelect` is given, both the slices and the legend
  * entries become controls, so the drill-down is reachable with a pointer and
  * with the keyboard.
+ *
+ * Owner rule (2026-09-19): the numbers are readable without hovering. Every
+ * slice carries its share, a wide slice carries the count as well, and a slice
+ * too narrow for text gets an outside label on a leader line. Touch devices
+ * have no hover, so the tooltip is extra detail and never the only copy of a
+ * number.
  */
 export function FleetDonut({
   slices,
@@ -83,8 +111,11 @@ export function FleetDonut({
         <span className="flex items-center gap-1.5">
           <span
             aria-hidden="true"
-            className="block h-2 w-2 shrink-0 rounded-sm"
-            style={{ backgroundColor: slice.color }}
+            className="block h-2 w-2 shrink-0 rounded-sm border"
+            style={{
+              backgroundColor: slice.color,
+              borderColor: slice.strokeColor ?? 'var(--border)',
+            }}
           />
           <span className="text-muted">{slice.label}</span>
           <span className="font-semibold tabular-nums text-fg">
@@ -95,6 +126,85 @@ export function FleetDonut({
           </span>
         </span>
       </div>
+    )
+  }
+
+  const renderSliceLabel = ({
+    cx = 0,
+    cy = 0,
+    midAngle = 0,
+    innerRadius = 0,
+    outerRadius = 0,
+    percent = 0,
+    value = 0,
+  }: SliceLabelProps) => {
+    if (value <= 0) return null
+    const share = Math.round(percent * 100)
+    // Recharts measures angles counter-clockwise from the positive X axis, so
+    // the Y component is negated to land back in SVG coordinates.
+    const cos = Math.cos(-midAngle * DEG)
+    const sin = Math.sin(-midAngle * DEG)
+
+    if (percent >= INSIDE_MIN_SHARE) {
+      const radius = innerRadius + (outerRadius - innerRadius) / 2
+      const x = cx + radius * cos
+      const y = cy + radius * sin
+      const withCount = percent >= COUNT_MIN_SHARE
+      return (
+        <text
+          x={x}
+          y={y}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize={11}
+          fill={CHART_TEXT_COLOR}
+          style={{ fontVariantNumeric: 'tabular-nums' }}
+        >
+          {withCount ? (
+            <>
+              <tspan x={x} dy="-0.45em" fontWeight={600}>
+                {value}
+              </tspan>
+              <tspan x={x} dy="1.1em">
+                {share}%
+              </tspan>
+            </>
+          ) : (
+            <tspan fontWeight={600}>{share}%</tspan>
+          )}
+        </text>
+      )
+    }
+
+    // Too narrow for text: elbow the label out of the ring instead of hiding
+    // the number behind a hover that a touch screen cannot produce.
+    const startX = cx + (outerRadius + 2) * cos
+    const startY = cy + (outerRadius + 2) * sin
+    const elbowX = cx + (outerRadius + 13) * cos
+    const elbowY = cy + (outerRadius + 13) * sin
+    const towardEnd = cos >= 0
+    const endX = elbowX + (towardEnd ? 10 : -10)
+    return (
+      <g>
+        <path
+          d={`M${startX},${startY}L${elbowX},${elbowY}L${endX},${elbowY}`}
+          stroke={CHART_AXIS_COLOR}
+          strokeWidth={1}
+          fill="none"
+        />
+        <text
+          x={endX + (towardEnd ? 3 : -3)}
+          y={elbowY}
+          textAnchor={towardEnd ? 'start' : 'end'}
+          dominantBaseline="central"
+          fontSize={11}
+          fontWeight={600}
+          fill="var(--fg)"
+          style={{ fontVariantNumeric: 'tabular-nums' }}
+        >
+          {`${value} · ${share}%`}
+        </text>
+      </g>
     )
   }
 
@@ -115,12 +225,13 @@ export function FleetDonut({
                 data={slices}
                 dataKey="value"
                 nameKey="label"
-                innerRadius="58%"
-                outerRadius="82%"
+                innerRadius="52%"
+                outerRadius="74%"
                 paddingAngle={1}
-                stroke="var(--bg)"
-                strokeWidth={2}
+                strokeWidth={1}
                 isAnimationActive={false}
+                label={renderSliceLabel}
+                labelLine={false}
                 onClick={
                   onSliceSelect
                     ? (entry: unknown) =>
@@ -132,6 +243,7 @@ export function FleetDonut({
                   <Cell
                     key={slice.id}
                     fill={slice.color}
+                    stroke={slice.strokeColor ?? 'var(--border)'}
                     opacity={activeId && activeId !== slice.id ? 0.35 : 1}
                     className={onSliceSelect ? 'cursor-pointer' : undefined}
                   />
@@ -156,6 +268,7 @@ export function FleetDonut({
           id: slice.id,
           label: slice.label,
           color: slice.color,
+          strokeColor: slice.strokeColor,
           value: slice.value,
           percent: percentOf(slice.value, total),
           onSelect: onSliceSelect ? () => onSliceSelect(slice) : undefined,

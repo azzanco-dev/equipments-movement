@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
 import { cn } from '@/components/ui/cn'
 import {
-  CHART_LABEL_COLOR,
   ChartShell,
   ChartSrTable,
   niceMax,
   seriesColor,
+  seriesStroke,
   useChartDirection,
   useChartText,
   type ChartBaseProps,
@@ -15,8 +15,10 @@ export interface HorizontalBarItem {
   id: string
   label: string
   value: number
-  /** CSS color; pass a token such as `var(--info)`. Defaults to the palette. */
+  /** Pale tint token such as `var(--chart-3)`. Defaults to the palette. */
   color?: string
+  /** Outline token such as `var(--chart-stroke-3)`. Defaults to the palette. */
+  strokeColor?: string
   /** Replaces the printed number, for example "٪12" or "12 يوم". */
   valueLabel?: string
 }
@@ -29,8 +31,10 @@ export interface HorizontalBarListProps extends ChartBaseProps {
   rowHeight?: number
   /** Width reserved for the labels, in viewBox units of 720. */
   labelWidth?: number
-  /** Uses one color for every bar instead of cycling the palette. */
+  /** Uses one tint for every bar instead of cycling the palette. */
   singleColor?: string
+  /** Outline that goes with `singleColor`. */
+  singleStroke?: string
 }
 
 const WIDTH = 720
@@ -40,6 +44,9 @@ const VALUE_WIDTH = 52
  * Ranked list drawn as horizontal bars (top equipment types, owners, ...).
  * Dependency-free SVG: labels sit on the start side and bars grow toward the
  * end side, so the whole list mirrors correctly in RTL.
+ *
+ * Owner rule (2026-09-19): bars are pale tints with a matching outline, and
+ * every bar's value is printed at its end, so nothing depends on a hover.
  */
 export function HorizontalBarList({
   items,
@@ -50,6 +57,7 @@ export function HorizontalBarList({
   rowHeight = 26,
   labelWidth = 170,
   singleColor,
+  singleStroke,
   loading,
   error,
   className,
@@ -118,6 +126,8 @@ export function HorizontalBarList({
                 height={barHeight}
                 rx={3}
                 fill={singleColor ?? seriesColor(index, item.color)}
+                stroke={singleStroke ?? seriesStroke(index, item.strokeColor)}
+                strokeWidth={1}
               >
                 <title>{`${item.label}: ${item.valueLabel ?? item.value}`}</title>
               </rect>
@@ -126,7 +136,9 @@ export function HorizontalBarList({
                 y={y + rowHeight / 2 + 4}
                 textAnchor={rtl ? 'start' : 'end'}
                 fontSize={12}
-                fill={CHART_LABEL_COLOR}
+                fontWeight={600}
+                fill="var(--fg)"
+                style={{ fontVariantNumeric: 'tabular-nums' }}
               >
                 {item.valueLabel ?? item.value}
               </text>

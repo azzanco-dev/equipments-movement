@@ -3,7 +3,7 @@ import { ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { cn } from '@/components/ui/cn'
-import { CHART_SERIES_COLORS } from '@/components/charts'
+import { seriesColor, seriesStroke } from '@/components/charts'
 import type { ChartDirection } from '@/components/charts'
 import { FleetDonut } from '@/components/charts/lazy'
 import type { Language } from '@/i18n/translations'
@@ -22,8 +22,10 @@ export interface FleetOwnerOption {
 export interface FleetStateCategory {
   id: string
   label: string
-  /** CSS color; pass a token such as `var(--entry)`. */
+  /** Pale tint token such as `var(--chart-1)`. */
   color: string
+  /** Matching outline token such as `var(--chart-stroke-1)`. */
+  strokeColor?: string
 }
 
 export interface FleetNowExplorerLabels {
@@ -50,6 +52,13 @@ export interface FleetNowExplorerProps {
   /** Units of one owner in one state, right now. */
   count: (ownerId: string, stateId: string) => number
   labels: FleetNowExplorerLabels
+  /**
+   * Pending owner decision (2026-09-19). `true` (the default) makes the
+   * drill-in always cover every owner, because "who owns the units in the
+   * workshop" is the question that was asked. `false` keeps the owner filter
+   * applied inside the drill, so a filtered donut drills into that owner only.
+   */
+  drillIgnoresOwnerFilter?: boolean
   /** Overrides the ambient direction, for side-by-side locale previews. */
   dir?: ChartDirection
   /** Overrides the ambient interface language for built-in chart labels. */
@@ -76,6 +85,7 @@ export function FleetNowExplorer({
   states,
   count,
   labels,
+  drillIgnoresOwnerFilter = true,
   dir,
   lang,
   loading = false,
@@ -97,6 +107,7 @@ export function FleetNowExplorer({
         id: state.id,
         label: state.label,
         color: state.color,
+        strokeColor: state.strokeColor,
         value:
           owner === ALL_OWNERS
             ? owners.reduce(
@@ -108,16 +119,25 @@ export function FleetNowExplorer({
     [count, owner, owners, states],
   )
 
-  // Drilled-in view: one state split by owner, across every owner.
+  // Drilled-in view: one state split by owner. Whether the owner filter still
+  // applies here is the pending decision above.
   const ownerSlices = useMemo(() => {
     if (!drillState) return []
-    return owners.map((option, index) => ({
-      id: option.id,
-      label: option.label,
-      color: CHART_SERIES_COLORS[index % CHART_SERIES_COLORS.length],
-      value: count(option.id, drillState.id),
-    }))
-  }, [count, drillState, owners])
+    const visible =
+      drillIgnoresOwnerFilter || owner === ALL_OWNERS
+        ? owners
+        : owners.filter((option) => option.id === owner)
+    return visible.map((option) => {
+      const index = owners.findIndex((entry) => entry.id === option.id)
+      return {
+        id: option.id,
+        label: option.label,
+        color: seriesColor(index),
+        strokeColor: seriesStroke(index),
+        value: count(option.id, drillState.id),
+      }
+    })
+  }, [count, drillIgnoresOwnerFilter, drillState, owner, owners])
 
   const ownerLabel =
     owners.find((option) => option.id === owner)?.label ?? labels.allOwners

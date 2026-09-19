@@ -14,20 +14,43 @@ import { cn } from '@/components/ui/cn'
  * and no chart hardcodes a palette value.
  */
 
-/** Categorical colors in order. Tokens only; see AGENTS.md UI conventions. */
+/**
+ * Categorical fills, in order. Owner rule (2026-09-19): a chart fills with a
+ * pale tint, never with a saturated color, so six tints carry the series and
+ * the matching `CHART_STROKE_COLORS` entry draws the outline, the line and the
+ * dot. The values live in `src/index.css` as `--chart-N` / `--chart-stroke-N`,
+ * so light and dark switch with the rest of the interface.
+ */
 export const CHART_SERIES_COLORS = [
-  'var(--entry)',
-  'var(--exit)',
-  'var(--info)',
-  'var(--muted)',
-  'var(--fg)',
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-6)',
+] as const
+
+/** Outline / line / dot color matching `CHART_SERIES_COLORS` index for index. */
+export const CHART_STROKE_COLORS = [
+  'var(--chart-stroke-1)',
+  'var(--chart-stroke-2)',
+  'var(--chart-stroke-3)',
+  'var(--chart-stroke-4)',
+  'var(--chart-stroke-5)',
+  'var(--chart-stroke-6)',
 ] as const
 
 export const CHART_AXIS_COLOR = 'var(--border)'
 export const CHART_LABEL_COLOR = 'var(--muted)'
+/** Value text written on top of a tint; readable on every tint, both themes. */
+export const CHART_TEXT_COLOR = 'var(--chart-text)'
 
 export function seriesColor(index: number, explicit?: string): string {
   return explicit ?? CHART_SERIES_COLORS[index % CHART_SERIES_COLORS.length]
+}
+
+export function seriesStroke(index: number, explicit?: string): string {
+  return explicit ?? CHART_STROKE_COLORS[index % CHART_STROKE_COLORS.length]
 }
 
 export type ChartDirection = 'rtl' | 'ltr'
@@ -198,6 +221,8 @@ export interface ChartLegendItem {
   id: string
   label: string
   color: string
+  /** Outline for the swatch; a pale tint alone disappears on a white card. */
+  strokeColor?: string
   value?: ReactNode
   percent?: number
   /** Makes this entry a button. A chart slice is not reachable with the
@@ -222,8 +247,11 @@ export function ChartLegend({
           <>
             <span
               aria-hidden="true"
-              className="block h-2.5 w-2.5 shrink-0 rounded-sm"
-              style={{ backgroundColor: item.color }}
+              className="block h-2.5 w-2.5 shrink-0 rounded-sm border"
+              style={{
+                backgroundColor: item.color,
+                borderColor: item.strokeColor ?? 'var(--border)',
+              }}
             />
             <span className="text-muted">{item.label}</span>
             {item.value !== undefined && (

@@ -33,12 +33,32 @@ import {
 } from '@/lib/chartBuckets'
 import { saudiDateKey, saudiPeriodKeys } from '@/lib/saudiTime'
 
-// Admin home mockup v3 for owner review on /ui-kit, applying the owner's
-// review of v2 (2026-09-19): the movement bar chart is gone, entries are a
-// line chart whose granularity follows the period, the fleet donut drills in
-// both directions, the main tables use 44 px rows, and the smaller lists are
-// one-third-wide mini tables. Every number below is demo data held in this
-// file: the mockup never calls Supabase and never changes a real screen.
+// Admin home mockup v4 for owner review on /ui-kit. v3 kept the line-chart
+// granularity, the two-way donut, the 44 px rows and the mini tables; this
+// round applies the owner's rules of 2026-09-19: charts fill with pale tints
+// from the `--chart-*` tokens, every value is readable without hovering (a
+// phone has no hover), and the pulse section leads with the fleet's state
+// instead of the day's movement counts. Every number below is demo data held
+// in this file: the mockup never calls Supabase and never changes a real
+// screen.
+
+// --- Pending owner decisions ------------------------------------------------
+// Both are still open (2026-09-19). Each is one constant, so flipping either
+// once the owner answers is a one-line change.
+
+/**
+ * `true`: "هذه السنة" runs from 1 January to today (year to date).
+ * `false`: it runs across the whole calendar year, 1 January to 31 December,
+ * so the months still to come are drawn as empty.
+ */
+const YEAR_TO_DATE = true
+
+/**
+ * `true`: clicking a donut slice always splits it across every owner, even
+ * while an owner filter is selected.
+ * `false`: the owner filter keeps applying inside the drill-down.
+ */
+const DRILL_IGNORES_OWNER_FILTER = true
 
 export type MockLang = 'ar' | 'en'
 export type MockState = 'ready' | 'loading' | 'error'
@@ -57,14 +77,16 @@ const COPY = {
     periodLabel: 'الفترة',
     periodNote: 'يؤثر على الاقسام الزمنية فقط. اقسام «الان» لا تتغير.',
     nowScoped: 'الان',
-    // 1 — pulse
-    pulseTitle: 'نبض اليوم',
-    pulseDescription: 'ارقام اليوم مقارنة بامس.',
-    entriesToday: 'دخول اليوم',
-    exitsToday: 'خروج اليوم',
+    // 1 — state now, then today's activity
+    pulseTitle: 'الحالة الان',
+    pulseDescription:
+      'اين المعدات في هذه اللحظة، ثم سطر واحد لنشاط اليوم مقارنة بامس.',
     insideSitesNow: 'داخل المواقع الان',
     inWorkshopNow: 'في الورشة الان',
-    outsideAvailable: 'خارج / متاحة',
+    availableNow: 'متاحة',
+    idleNow: 'بلا حركة',
+    idleNowHint: 'بلا حركة منذ 90 يوم',
+    todayActivity: 'اليوم',
     vsYesterday: 'مقارنة بامس',
     // 2 — entries line chart
     flowTitle: 'حركة الدخول',
@@ -206,13 +228,15 @@ const COPY = {
     periodNote:
       'Affects time-based sections only. "Now" sections never change.',
     nowScoped: 'Now',
-    pulseTitle: "Today's pulse",
-    pulseDescription: "Today's numbers compared with yesterday.",
-    entriesToday: 'Entries today',
-    exitsToday: 'Exits today',
+    pulseTitle: 'The fleet right now',
+    pulseDescription:
+      "Where every unit stands at this moment, then one line for today's activity against yesterday.",
     insideSitesNow: 'Inside sites now',
     inWorkshopNow: 'In the workshop now',
-    outsideAvailable: 'Outside / available',
+    availableNow: 'Available',
+    idleNow: 'Not moving',
+    idleNowHint: 'No movement for 90 days',
+    todayActivity: 'Today',
     vsYesterday: 'vs yesterday',
     flowTitle: 'Entry flow',
     flowDescription:
@@ -393,17 +417,41 @@ const OUTSIDE = fleetStateTotal('outside')
 // The donut's middle number is the sum of whatever slices it is showing, so a
 // filtered view reports that owner's total instead of the whole 812.
 
-/** State categories, coloured with tokens. Order drives the donut. */
+/** Units that have and have not moved in the last 90 days. */
+const ACTIVE_UNITS = 731
+const IDLE_UNITS = 81
+
+/**
+ * State categories, coloured with the pale chart tints. Order drives the
+ * donut; the stroke token is the matching outline, so a tint still has an
+ * edge on a white card.
+ */
 function fleetStates(copy: Copy): FleetStateCategory[] {
   return [
-    { id: 'inside', label: copy.insideSites, color: 'var(--entry)' },
+    {
+      id: 'inside',
+      label: copy.insideSites,
+      color: 'var(--chart-1)',
+      strokeColor: 'var(--chart-stroke-1)',
+    },
     {
       id: 'maintenance',
       label: copy.workshopMaintenance,
-      color: 'var(--exit)',
+      color: 'var(--chart-2)',
+      strokeColor: 'var(--chart-stroke-2)',
     },
-    { id: 'parking', label: copy.workshopParking, color: 'var(--info)' },
-    { id: 'outside', label: copy.outside, color: 'var(--muted)' },
+    {
+      id: 'parking',
+      label: copy.workshopParking,
+      color: 'var(--chart-3)',
+      strokeColor: 'var(--chart-stroke-3)',
+    },
+    {
+      id: 'outside',
+      label: copy.outside,
+      color: 'var(--chart-4)',
+      strokeColor: 'var(--chart-stroke-4)',
+    },
   ]
 }
 
@@ -1017,6 +1065,16 @@ function statValue(error: true | undefined, value: number | string) {
   return error ? '—' : value
 }
 
+const ENTRIES_TODAY = 38
+const EXITS_TODAY = 29
+
+/**
+ * Owner rule (2026-09-19): the assets come first. The four state cards answer
+ * "where is my fleet" and get the room; the day's entries and exits are one
+ * smaller card underneath, because a movement count is an activity number, not
+ * a state. Everything here is "now", so the section carries the "now" chip and
+ * the toolbar's period filter deliberately does not reach it.
+ */
 function PulseSection({
   copy,
   loading,
@@ -1026,24 +1084,27 @@ function PulseSection({
   loading: boolean
   error: true | undefined
 }) {
-  const cards: {
+  const stateCards: {
     id: string
     label: string
     value: number
-    delta: number
-    tone?: 'entry' | 'exit' | 'info'
+    delta?: number
+    hint?: string
   }[] = [
-    { id: 'in', label: copy.entriesToday, value: 38, delta: 6, tone: 'entry' },
-    { id: 'out', label: copy.exitsToday, value: 29, delta: -4, tone: 'exit' },
     { id: 'sites', label: copy.insideSitesNow, value: INSIDE_SITES, delta: 9 },
     {
       id: 'workshop',
       label: copy.inWorkshopNow,
       value: WORKSHOP_MAINTENANCE + WORKSHOP_PARKING,
       delta: 3,
-      tone: 'info',
     },
-    { id: 'free', label: copy.outsideAvailable, value: OUTSIDE, delta: -12 },
+    { id: 'free', label: copy.availableNow, value: OUTSIDE, delta: -12 },
+    {
+      id: 'idle',
+      label: copy.idleNow,
+      value: IDLE_UNITS,
+      hint: copy.idleNowHint,
+    },
   ]
 
   return (
@@ -1051,22 +1112,51 @@ function PulseSection({
       as="h2"
       title={copy.pulseTitle}
       description={copy.pulseDescription}
-      bodyClassName="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5"
+      action={<NowChip copy={copy} />}
+      bodyClassName="space-y-3"
     >
-      {cards.map((card) => (
-        <StatCard
-          key={card.id}
-          label={card.label}
-          value={statValue(error, card.value)}
-          tone={card.tone}
-          loading={loading}
-          hint={
-            error ? undefined : (
-              <Delta value={card.delta} label={copy.vsYesterday} />
-            )
-          }
-        />
-      ))}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {stateCards.map((card) => (
+          <StatCard
+            key={card.id}
+            label={card.label}
+            value={statValue(error, card.value)}
+            loading={loading}
+            className="p-4"
+            hint={
+              error ? undefined : card.hint ? (
+                card.hint
+              ) : (
+                <Delta value={card.delta ?? 0} label={copy.vsYesterday} />
+              )
+            }
+          />
+        ))}
+      </div>
+      {/* One activity line, deliberately smaller than the state cards. */}
+      <StatCard
+        className="sm:max-w-sm"
+        label={copy.todayActivity}
+        value={
+          error ? (
+            '—'
+          ) : (
+            <span className="text-base font-semibold">
+              {copy.entries} {ENTRIES_TODAY} · {copy.exits} {EXITS_TODAY}
+            </span>
+          )
+        }
+        loading={loading}
+        hint={
+          error ? undefined : (
+            <span className="flex flex-wrap items-center gap-x-2">
+              <Delta value={6} label={copy.entries} />
+              <Delta value={-4} label={copy.exits} />
+              <span className="text-muted">{copy.vsYesterday}</span>
+            </span>
+          )
+        }
+      />
     </CollapsibleSection>
   )
 }
@@ -1113,10 +1203,12 @@ function FlowSection({
       return { from, to, unit: 'day' as ChartBucketUnit }
     }
     // "This year" is always monthly, so early January is still 12-month
-    // shaped instead of falling back to weeks.
+    // shaped instead of falling back to weeks. YEAR_TO_DATE decides whether it
+    // stops at today or spans the whole calendar year.
+    const year = today.slice(0, 4)
     return {
-      from: `${today.slice(0, 4)}-01-01`,
-      to: today,
+      from: `${year}-01-01`,
+      to: YEAR_TO_DATE ? today : `${year}-12-31`,
       unit: 'month' as ChartBucketUnit,
     }
   }, [custom.from, custom.to, preset, today])
@@ -1220,6 +1312,7 @@ function FleetNowSection({
         owners={owners}
         states={states}
         count={fleetCount}
+        drillIgnoresOwnerFilter={DRILL_IGNORES_OWNER_FILTER}
         labels={{
           allOwners: copy.fleetAllOwners,
           ownerFilter: copy.fleetOwnerFilter,
@@ -1674,8 +1767,8 @@ function FleetBreakdownSection({
       }))
     if (mode === 'activity')
       return [
-        { id: 'active', label: copy.activeEquipment, value: 731 },
-        { id: 'inactive', label: copy.inactiveEquipment, value: 81 },
+        { id: 'active', label: copy.activeEquipment, value: ACTIVE_UNITS },
+        { id: 'inactive', label: copy.inactiveEquipment, value: IDLE_UNITS },
       ]
     return [...AVAILABILITY_BY_TYPE]
       .sort((a, b) => b.all[0] - a.all[0])
@@ -1718,7 +1811,10 @@ function FleetBreakdownSection({
         items={items}
         loading={loading}
         error={error}
-        singleColor="var(--fg)"
+        // One ranked list, so one tint: cycling six colors here would suggest
+        // six categories that do not exist.
+        singleColor="var(--chart-4)"
+        singleStroke="var(--chart-stroke-4)"
         labelWidth={dir === 'rtl' ? 200 : 220}
       />
     </CollapsibleSection>

@@ -176,6 +176,28 @@ body {
   --entry-soft: var(--success-soft);
   --exit: var(--warning);
   --exit-soft: var(--warning-soft);
+  /* Chart tints (2026-09-19, owner review of the admin home): every chart
+     fill is a pale tint, never a saturated block of color, so a page full of
+     charts stays as calm as the rest of the neutral palette. Each tint is a
+     lighter relative of a functional color (entry green, exit amber, info
+     blue, a neutral, a violet and a teal for the fifth and sixth series).
+     `--chart-stroke-N` is the matching outline, the line-chart stroke and the
+     dot fill: darker than the tint so a pale shape still has an edge, and at
+     least 3:1 against --bg. `--chart-text` is the value written on a tint;
+     it clears 10.6:1 on every tint above. */
+  --chart-1: #c9e9d6;
+  --chart-2: #fbe2bf;
+  --chart-3: #cde5f6;
+  --chart-4: #dfe2e7;
+  --chart-5: #ddd8f3;
+  --chart-6: #cbe8e7;
+  --chart-stroke-1: #3f8f63;
+  --chart-stroke-2: #b4793a;
+  --chart-stroke-3: #3e82ae;
+  --chart-stroke-4: #7c8390;
+  --chart-stroke-5: #7a6bc4;
+  --chart-stroke-6: #3e908e;
+  --chart-text: #1f2937;
 }
 
 .dark {
@@ -201,6 +223,23 @@ body {
   --info: #7dd3fc;
   --info-soft: #0c1f2c;
   --ring: #f5f5f5;
+  /* Dark theme keeps the same idea the other way round: low-chroma fills a
+     step above --bg instead of pale ones, because a genuinely light fill on a
+     dark page reads as a glare. `--chart-text` turns near-white and still
+     clears 8.9:1 on every tint below; the strokes clear 7:1 on --bg. */
+  --chart-1: #2c4a3a;
+  --chart-2: #4c3b22;
+  --chart-3: #26404f;
+  --chart-4: #3a3d42;
+  --chart-5: #3a3554;
+  --chart-6: #274646;
+  --chart-stroke-1: #6fcf97;
+  --chart-stroke-2: #e3b872;
+  --chart-stroke-3: #7fc0e8;
+  --chart-stroke-4: #a8adb7;
+  --chart-stroke-5: #a99ce8;
+  --chart-stroke-6: #74c2be;
+  --chart-text: #f5f5f5;
 }
 
 @layer base {

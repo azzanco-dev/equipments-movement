@@ -47,9 +47,60 @@ export interface EntriesLineChartProps extends ChartBaseProps {
 type TooltipRow = { name: string; value: number; color: string }
 
 /**
+ * Up to this many points every value is printed above its dot. Past it the
+ * labels would collide, so only the peak, the trough and the last point keep a
+ * printed value and the rest stay in the tooltip.
+ */
+const ALL_LABELS_MAX_POINTS = 14
+
+const ENTRY_TINT = 'var(--chart-1)'
+const ENTRY_STROKE = 'var(--chart-stroke-1)'
+const EXIT_TINT = 'var(--chart-2)'
+const EXIT_STROKE = 'var(--chart-stroke-2)'
+
+/** Indices worth printing when there are too many points to print them all. */
+function keyIndices(values: number[]): Set<number> {
+  const marked = new Set<number>()
+  if (values.length === 0) return marked
+  let highest = 0
+  let lowest = 0
+  values.forEach((value, index) => {
+    if (value > values[highest]) highest = index
+    if (value < values[lowest]) lowest = index
+  })
+  marked.add(highest)
+  marked.add(lowest)
+  marked.add(values.length - 1)
+  return marked
+}
+
+/**
+ * What Recharts hands a custom `label` renderer. It widens the coordinates to
+ * `string | number` for the axis cases, so they are narrowed here rather than
+ * in the signature, and the renderer must return an element rather than null.
+ */
+type PointLabelProps = {
+  x?: string | number
+  y?: string | number
+  value?: unknown
+  index?: number
+}
+
+const NO_LABEL = <g />
+
+function asNumber(value: unknown): number | undefined {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+/**
  * Entries over time, with an optional exits line. The X axis follows the
  * bucketing the caller chose (days, weeks or months), so the same component
  * draws a month day by day and a year month by month.
+ *
+ * Owner rule (2026-09-19): the values are readable without hovering, because a
+ * phone has no hover. Short series print every point; long ones print the
+ * highest, the lowest and the last, and leave the rest to the tooltip.
  *
  * Every color is a design token, and the axis is reversed in RTL so time still
  * reads from the start side of the page toward the end side.
@@ -93,6 +144,50 @@ export function EntriesLineChart({
     }
     return { entries, exits }
   }, [points])
+
+  // `null` means "print every point"; a set means "print only these".
+  const shownEntries = useMemo(
+    () =>
+      points.length <= ALL_LABELS_MAX_POINTS
+        ? null
+        : keyIndices(points.map((point) => point.entries)),
+    [points],
+  )
+  const shownExits = useMemo(
+    () =>
+      points.length <= ALL_LABELS_MAX_POINTS
+        ? null
+        : keyIndices(points.map((point) => point.exits ?? 0)),
+    [points],
+  )
+
+  /**
+   * Prints one point's value. The exits series is pushed below its dot so the
+   * two series never write on top of each other.
+   */
+  const pointLabel =
+    (shown: Set<number> | null, color: string, below: boolean) =>
+    ({ x, y, value, index }: PointLabelProps) => {
+      const cx = asNumber(x)
+      const cy = asNumber(y)
+      const printed = asNumber(value)
+      if (cx === undefined || cy === undefined || printed === undefined)
+        return NO_LABEL
+      if (shown && !shown.has(index ?? -1)) return NO_LABEL
+      return (
+        <text
+          x={cx}
+          y={cy + (below ? 15 : -8)}
+          textAnchor="middle"
+          fontSize={10}
+          fontWeight={600}
+          fill={color}
+          style={{ fontVariantNumeric: 'tabular-nums' }}
+        >
+          {printed}
+        </text>
+      )
+    }
 
   // Recharts positions the tooltip itself; the content only has to render the
   // rows it is handed, in the interface language.
@@ -160,7 +255,8 @@ export function EntriesLineChart({
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={data}
-            margin={{ top: 8, right: 8, bottom: 4, left: 8 }}
+            // Room above the highest point for its printed value.
+            margin={{ top: 18, right: 12, bottom: 4, left: 8 }}
           >
             <CartesianGrid
               stroke={CHART_AXIS_COLOR}
@@ -192,10 +288,18 @@ export function EntriesLineChart({
               type="monotone"
               dataKey="entries"
               name={entriesLabel}
-              stroke="var(--entry)"
+              stroke={ENTRY_STROKE}
               strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4 }}
+              // The dot is a tint disc with the stroke as its edge, so the
+              // printed value always has a mark to sit above.
+              dot={{
+                r: 3,
+                fill: ENTRY_TINT,
+                stroke: ENTRY_STROKE,
+                strokeWidth: 1.5,
+              }}
+              activeDot={{ r: 5, fill: ENTRY_TINT, stroke: ENTRY_STROKE }}
+              label={pointLabel(shownEntries, ENTRY_STROKE, false)}
               isAnimationActive={false}
             />
             {withExits && (
@@ -203,11 +307,17 @@ export function EntriesLineChart({
                 type="monotone"
                 dataKey="exits"
                 name={exitsLabel}
-                stroke="var(--exit)"
+                stroke={EXIT_STROKE}
                 strokeWidth={2}
                 strokeDasharray="5 3"
-                dot={false}
-                activeDot={{ r: 4 }}
+                dot={{
+                  r: 3,
+                  fill: EXIT_TINT,
+                  stroke: EXIT_STROKE,
+                  strokeWidth: 1.5,
+                }}
+                activeDot={{ r: 5, fill: EXIT_TINT, stroke: EXIT_STROKE }}
+                label={pointLabel(shownExits, EXIT_STROKE, true)}
                 isAnimationActive={false}
               />
             )}
@@ -220,7 +330,8 @@ export function EntriesLineChart({
           {
             id: 'entries',
             label: entriesLabel,
-            color: 'var(--entry)',
+            color: ENTRY_TINT,
+            strokeColor: ENTRY_STROKE,
             value: totals.entries,
           },
           ...(withExits
@@ -228,7 +339,8 @@ export function EntriesLineChart({
                 {
                   id: 'exits',
                   label: exitsLabel as string,
-                  color: 'var(--exit)',
+                  color: EXIT_TINT,
+                  strokeColor: EXIT_STROKE,
                   value: totals.exits,
                 },
               ]

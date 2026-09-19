@@ -13,9 +13,13 @@ export type {
 } from './HorizontalBarList'
 export {
   CHART_SERIES_COLORS,
+  CHART_STROKE_COLORS,
+  CHART_TEXT_COLOR,
   ChartLegend,
   ChartShell,
   ChartSrTable,
+  seriesColor,
+  seriesStroke,
 } from './chartShared'
 export type {
   ChartBaseProps,
