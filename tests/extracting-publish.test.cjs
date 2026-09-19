@@ -40,6 +40,7 @@ const data = {
   occupation: 'سائق شاحنة ثقيلة',
   email: 'driver@example.com',
   gender: 'Male',
+  language: 'en',
   mobile_number: '0500000000',
   employment_type: 'العزاني',
   company: 'شركة تجريبية',
@@ -98,7 +99,25 @@ test('ERP user is created from the reviewed identity data', () => {
   assert.equal(payload.email, data.email)
   assert.equal(payload.first_name, data.full_name_ar)
   assert.equal(payload.username, data.id_number)
+  assert.equal(payload.language, 'en')
   assert.equal(payload.send_welcome_email, 0)
+})
+
+test('only Arabic and English user languages are accepted', () => {
+  assert.equal(
+    parsePublishRequest({
+      data: { ...data, language: 'fr' },
+      targets: { erpnext: true },
+    }),
+    null,
+  )
+  assert.equal(
+    parsePublishRequest({
+      data: { ...data, language: 'ar' },
+      targets: { erpnext: true },
+    }).data.language,
+    'ar',
+  )
 })
 
 test('ERP user errors expose useful messages without HTML or tokens', () => {

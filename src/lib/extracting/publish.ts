@@ -8,6 +8,7 @@ export interface ExtractionPublishData {
   occupation: string
   email: string
   gender: string
+  language: 'ar' | 'en'
   mobile_number: string
   employment_type: string
   company: string
@@ -78,6 +79,8 @@ export function parsePublishRequest(value: unknown): {
   const rawBirthDate = clean(source.date_of_birth)
   const rawExpiryDate = clean(source.residence_expiry_date)
   const rawJoiningDate = clean(source.date_of_joining)
+  const language = clean(source.language) || 'ar'
+  if (language !== 'ar' && language !== 'en') return null
   const data: ExtractionPublishData = {
     full_name_ar: clean(source.full_name_ar),
     full_name_en: clean(source.full_name_en),
@@ -88,6 +91,7 @@ export function parsePublishRequest(value: unknown): {
     occupation: clean(source.occupation),
     email: clean(source.email).toLowerCase(),
     gender: clean(source.gender),
+    language,
     mobile_number: clean(source.mobile_number),
     employment_type: clean(source.employment_type),
     company: clean(source.company),
@@ -132,7 +136,7 @@ export function erpUserPayload(data: ExtractionPublishData) {
     email: data.email,
     first_name: data.full_name_ar,
     username: data.id_number,
-    language: 'ar',
+    language: data.language,
     enabled: 1,
     send_welcome_email: 0,
     role_profile_name: process.env.ERPNEXT_DRIVER_ROLE_PROFILE || 'Driver',

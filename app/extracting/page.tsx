@@ -25,6 +25,7 @@ type FieldKey =
   | 'email'
   | 'mobile_number'
   | 'gender'
+  | 'language'
   | 'company'
   | 'employment_type'
   | 'department'
@@ -69,6 +70,7 @@ function createDefaultForm(): ExtractionForm {
     email: '',
     mobile_number: '',
     gender: 'Male',
+    language: 'ar',
     company: DEFAULT_COMPANY,
     employment_type: 'نقدي',
     department: '',
@@ -423,6 +425,20 @@ export default function ExtractingPage() {
                     <option value="">اختر الجنس</option>
                     <option value="Male">ذكر</option>
                     <option value="Female">انثى</option>
+                  </select>
+                )}
+              </Field>
+              <Field label="اللغة" required={targets.erpnext}>
+                {({ invalid, ...control }) => (
+                  <select
+                    {...control}
+                    aria-invalid={invalid || undefined}
+                    className="input h-10 md:h-9"
+                    value={data.language}
+                    onChange={(event) => update('language', event.target.value)}
+                  >
+                    <option value="ar">العربية</option>
+                    <option value="en">English</option>
                   </select>
                 )}
               </Field>
