@@ -184,6 +184,11 @@ export interface LastMovement {
   contractor_equipment_code: string | null
   driver_id: string | null
   driver_name: string | null
+  // Added by migration 0091. Optional so the form keeps working against an
+  // older `get_last_movement`; the UI shows "—" while they are absent.
+  driver_mobile_number?: string | null
+  company_name_ar?: string | null
+  company_name_en?: string | null
 }
 
 export interface MovementDriverChange {

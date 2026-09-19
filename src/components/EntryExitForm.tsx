@@ -19,10 +19,21 @@ import {
 } from 'lucide-react'
 import type { Driver, Equipment, MovementType, LastMovement } from '@/lib/types'
 import { DatePicker } from '@/components/DatePicker'
-import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
+import {
+  AsyncSearchSelect,
+  type AsyncSearchSelectOption,
+} from '@/components/AsyncSearchSelect'
+import { driverOption } from '@/lib/driverOptions'
+import { LastEntrySummary } from '@/components/movement/LastEntrySummary'
 import { sanitizeSearchTerm } from '@/lib/search'
-import { plateDigitsSearchTerm, toLatinDigits } from '@/lib/plate'
+import { toLatinDigits } from '@/lib/plate'
 import { siteExitEquipmentArgs } from '@/lib/exitEquipmentSearch'
+import {
+  entryEquipmentArgs,
+  equipmentStateOption,
+  type EntryEquipmentStateFields,
+} from '@/lib/entryEquipmentSearch'
+import { Badge } from '@/components/ui/Badge'
 import { Select, type SelectOption } from '@/components/Select'
 import { PlateNumberInput } from '@/components/PlateNumberInput'
 import { formatDate } from '@/lib/dateFormat'
@@ -67,7 +78,11 @@ export function EntryExitForm({
   const [step, setStep] = useState<'select' | 'details'>('select')
   const [search, setSearch] = useState('')
   const [ownerFilter, setOwnerFilter] = useState('')
-  const [equipment, setEquipment] = useState<Equipment[]>([])
+  // The site ENTRY search adds the current state of each row; every other
+  // search leaves those fields undefined.
+  const [equipment, setEquipment] = useState<
+    (Equipment & EntryEquipmentStateFields)[]
+  >([])
   const [selected, setSelected] = useState<Equipment | null>(null)
   const [loadingEquipment, setLoadingEquipment] = useState(false)
   const [equipmentError, setEquipmentError] = useState(false)
@@ -75,9 +90,8 @@ export function EntryExitForm({
   const [loadingMovement, setLoadingMovement] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [driverId, setDriverId] = useState('')
-  const [selectedDriver, setSelectedDriver] = useState<SelectOption | null>(
-    null,
-  )
+  const [selectedDriver, setSelectedDriver] =
+    useState<AsyncSearchSelectOption | null>(null)
   const [notes, setNotes] = useState('')
   const [carouselIndex, setCarouselIndex] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -246,32 +260,23 @@ export function EntryExitForm({
             siteExitEquipmentArgs(term, ownerFilter),
           )
         } else {
-          let query = supabase
-            .from('equipment')
-            .select(
-              'id,code,type,plate_number,chassis_number,ownership_status,is_active,master_data_complete,numbering_status',
-            )
-            .eq('is_active', true)
-            .order('code')
-          if (ownerFilter) query = query.eq('ownership_status', ownerFilter)
-          if (term) {
-            const orParts = [
-              `code.ilike.%${term}%`,
-              `type.ilike.%${term}%`,
-              `plate_number.ilike.%${term}%`,
-              `chassis_number.ilike.%${term}%`,
-            ]
-            const plateDigits = plateDigitsSearchTerm(term)
-            if (plateDigits) orParts.push(`plate_digits.ilike.%${plateDigits}%`)
-            query = query.or(orParts.join(','))
-          }
-          result = await query.limit(20)
+          // Site ENTRY. Equipment that is already inside a site (entered by any
+          // foreman) stays listed with its state, so a foreman does not assume
+          // it is missing and quick-create a duplicate. The state comes from a
+          // narrowly scoped SECURITY DEFINER function because `entry_exit_logs`
+          // RLS hides other foremen's movements.
+          result = await supabase.rpc(
+            'search_entry_equipment',
+            entryEquipmentArgs(term, ownerFilter),
+          )
         }
         const { data, error } = result
         if (!active) return
         if (error) console.error(error)
         setEquipmentError(Boolean(error))
-        setEquipment((data as unknown as Equipment[]) ?? [])
+        setEquipment(
+          (data as unknown as (Equipment & EntryEquipmentStateFields)[]) ?? [],
+        )
         setLoadingEquipment(false)
       },
       search ? 300 : 0,
@@ -312,13 +317,8 @@ export function EntryExitForm({
 
       const last = (data as LastMovement[])[0] ?? null
       setLastMovement(last)
-      if (!isEntry && last?.driver_id) {
-        setDriverId(last.driver_id)
-        setSelectedDriver({
-          value: last.driver_id,
-          label: last.driver_name ?? '—',
-        })
-      }
+      // An EXIT carries no driver field: the database inherits the latest
+      // current driver of the open visit when the exit row is written.
 
       // Validation logic
       if (isEntry) {
@@ -343,7 +343,7 @@ export function EntryExitForm({
   )
 
   const loadDrivers = useCallback(
-    async (query: string): Promise<SelectOption[]> => {
+    async (query: string): Promise<AsyncSearchSelectOption[]> => {
       let request = supabase
         .from('drivers')
         .select('id,full_name,name_en,id_number,mobile_number')
@@ -356,10 +356,7 @@ export function EntryExitForm({
         )
       const { data, error } = await request
       if (error) return []
-      return (data ?? []).map((driver) => ({
-        value: driver.id,
-        label: `${driver.full_name}${driver.name_en ? ` — ${driver.name_en}` : ''} — ${driver.id_number} — ${driver.mobile_number}`,
-      }))
+      return (data ?? []).map(driverOption)
     },
     [],
   )
@@ -494,10 +491,7 @@ export function EntryExitForm({
     }
     const driver = data as Driver
     setDriverId(driver.id)
-    setSelectedDriver({
-      value: driver.id,
-      label: `${driver.full_name} — ${driver.mobile_number}`,
-    })
+    setSelectedDriver(driverOption(driver))
     setQuickDriver({ open: false, fullName: '', mobile: '' })
   }
 
@@ -722,6 +716,16 @@ export function EntryExitForm({
     }
   }
 
+  // `localizedName` falls back to an em dash, but the last-entry summary needs
+  // a missing name to stay empty so it does not render "— - project".
+  const optionalLocalizedName = (
+    nameAr?: string | null,
+    nameEn?: string | null,
+  ) =>
+    nameAr?.trim() || nameEn?.trim()
+      ? localizedName(lang, nameAr, nameEn)
+      : null
+
   // Current status derived from last movement
   const currentStatus: 'inside' | 'outside' | 'none' = !lastMovement
     ? 'none'
@@ -810,32 +814,51 @@ export function EntryExitForm({
                     )}
                   </div>
                 )}
-                {equipment.map((eq) => (
-                  <button
-                    key={eq.id}
-                    onClick={() => handleSelectEquipment(eq)}
-                    className="w-full rounded-lg border px-3 py-2 text-start transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
-                    style={{
-                      borderColor:
-                        'color-mix(in srgb, var(--border) 72%, transparent)',
-                    }}
-                  >
-                    <div className="space-y-0.5 text-[13px] leading-4">
-                      <p className="font-medium">{eq.code}</p>
-                      <p className="text-muted">{eq.type}</p>
-                      {eq.plate_number && (
-                        <p className="text-muted">
-                          {t('plateNumber')}: {eq.plate_number}
-                        </p>
-                      )}
-                      {!eq.plate_number && eq.chassis_number && (
-                        <p className="text-muted">
-                          {t('chassisNumber')}: {eq.chassis_number}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                ))}
+                {equipment.map((eq) => {
+                  // Badge + ONE secondary state line; available equipment gets
+                  // neither. Selecting a listed piece keeps today's behavior:
+                  // the "current status" section and the ENTRY -> ENTRY
+                  // rejection still come from `get_last_movement`.
+                  const stateOption = equipmentStateOption(eq, lang, t)
+                  return (
+                    <button
+                      key={eq.id}
+                      onClick={() => handleSelectEquipment(eq)}
+                      className="w-full rounded-lg border px-3 py-2 text-start transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                      style={{
+                        borderColor:
+                          'color-mix(in srgb, var(--border) 72%, transparent)',
+                      }}
+                    >
+                      <div className="space-y-0.5 text-[13px] leading-4">
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-medium">{eq.code}</span>
+                          {stateOption.badge && (
+                            <Badge tone={stateOption.badge.tone}>
+                              {stateOption.badge.label}
+                            </Badge>
+                          )}
+                        </span>
+                        <p className="text-muted">{eq.type}</p>
+                        {eq.plate_number && (
+                          <p className="text-muted">
+                            {t('plateNumber')}: {eq.plate_number}
+                          </p>
+                        )}
+                        {!eq.plate_number && eq.chassis_number && (
+                          <p className="text-muted">
+                            {t('chassisNumber')}: {eq.chassis_number}
+                          </p>
+                        )}
+                        {stateOption.description && (
+                          <p className="truncate-safe text-muted">
+                            {stateOption.description}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
                 {isEntry && (
                   <button
                     type="button"
@@ -1216,34 +1239,25 @@ export function EntryExitForm({
             )}
 
             {/* Form fields */}
-            {!workshopMode && !isEntry && lastMovement && !validationError && (
-              <div
-                className="rounded-lg border p-4 text-sm"
-                style={{
-                  borderColor: 'var(--border)',
-                  background: 'var(--surface)',
-                }}
-              >
-                <p className="mb-2 font-medium">{t('latestEntryBrief')}</p>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <span>
-                    <span className="text-muted">{t('entryDateTime')}:</span>{' '}
-                    {formatDate(lastMovement.recorded_at)}
-                  </span>
-                  <span>
-                    <span className="text-muted">{t('driverName')}:</span>{' '}
-                    {lastMovement.driver_name ?? '—'}
-                  </span>
-                  <span>
-                    <span className="text-muted">
-                      {t('contractorEquipmentCode')}:
-                    </span>{' '}
-                    {lastMovement.contractor_equipment_code ?? '—'}
-                  </span>
-                  <span className="text-muted">{t('exitInheritsEntry')}</span>
-                </div>
-              </div>
-            )}
+            {!workshopMode &&
+              !isEntry &&
+              (loadingMovement || (lastMovement && !validationError)) && (
+                <LastEntrySummary
+                  loading={loadingMovement}
+                  recordedAt={lastMovement?.recorded_at}
+                  driverName={lastMovement?.driver_name}
+                  driverMobile={lastMovement?.driver_mobile_number}
+                  contractorCode={lastMovement?.contractor_equipment_code}
+                  companyName={optionalLocalizedName(
+                    lastMovement?.company_name_ar,
+                    lastMovement?.company_name_en,
+                  )}
+                  projectName={optionalLocalizedName(
+                    lastMovement?.project_name_ar,
+                    lastMovement?.project_name_en,
+                  )}
+                />
+              )}
 
             <div className="space-y-4">
               {!workshopMode && isEntry ? (
@@ -1292,36 +1306,30 @@ export function EntryExitForm({
                 </>
               ) : null}
 
-              {!workshopMode && (
+              {/* Site EXIT has no driver field: the exit inherits the latest
+                  current driver of the open visit server-side. */}
+              {!workshopMode && isEntry && (
                 <div>
-                  <label className="label">
-                    {t('driverName')} {isEntry && '*'}
-                  </label>
-                  {isEntry ? (
-                    <AsyncSearchSelect
-                      value={driverId}
-                      selectedOption={selectedDriver}
-                      onChange={(value, option) => {
-                        setDriverId(value)
-                        setSelectedDriver(option)
-                      }}
-                      loadOptions={loadDrivers}
-                      placeholder={t('selectDriver')}
-                      createLabel={`${t('addNewDriver')} +`}
-                      onCreate={(query) =>
-                        setQuickDriver({
-                          open: true,
-                          fullName: query,
-                          mobile: '',
-                        })
-                      }
-                      alwaysShowCreate
-                    />
-                  ) : (
-                    <div className="input bg-gray-50 dark:bg-gray-900/30">
-                      {selectedDriver?.label ?? t('driverInheritedFromEntry')}
-                    </div>
-                  )}
+                  <label className="label">{t('driverName')} *</label>
+                  <AsyncSearchSelect
+                    value={driverId}
+                    selectedOption={selectedDriver}
+                    onChange={(value, option) => {
+                      setDriverId(value)
+                      setSelectedDriver(option)
+                    }}
+                    loadOptions={loadDrivers}
+                    placeholder={t('selectDriver')}
+                    createLabel={`${t('addNewDriver')} +`}
+                    onCreate={(query) =>
+                      setQuickDriver({
+                        open: true,
+                        fullName: query,
+                        mobile: '',
+                      })
+                    }
+                    alwaysShowCreate
+                  />
                 </div>
               )}
               {!workshopMode && isEntry && quickDriver.open && (
