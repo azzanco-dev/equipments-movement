@@ -8,7 +8,7 @@ export interface ExtractionPublishData {
   occupation: string
   email: string
   gender: string
-  language: 'العربية' | 'English'
+  language: 'ar' | 'en'
   mobile_number: string
   employment_type: string
   company: string
@@ -79,8 +79,8 @@ export function parsePublishRequest(value: unknown): {
   const rawBirthDate = clean(source.date_of_birth)
   const rawExpiryDate = clean(source.residence_expiry_date)
   const rawJoiningDate = clean(source.date_of_joining)
-  const language = clean(source.language) || 'العربية'
-  if (language !== 'العربية' && language !== 'English') return null
+  const language = clean(source.language) || 'ar'
+  if (language !== 'ar' && language !== 'en') return null
   const data: ExtractionPublishData = {
     full_name_ar: clean(source.full_name_ar),
     full_name_en: clean(source.full_name_en),
