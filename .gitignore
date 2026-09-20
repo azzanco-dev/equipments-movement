@@ -25,3 +25,8 @@ dist-ssr
 .env
 supabase/.temp/
 outputs/*
+
+# Local agent tooling, not part of the app
+.agents/
+.claude/
+skills-lock.json
