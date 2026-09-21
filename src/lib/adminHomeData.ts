@@ -31,8 +31,29 @@ import {
  * only learns that the section failed.
  */
 function fail(section: string, error: unknown): never {
-  console.error(`admin home: ${section} failed`, error)
+  // A request cancelled by its own AbortController (filter change, unmount,
+  // React's development double-effect) is not a failure worth logging; the
+  // hook already ignores the rejection for an aborted signal.
+  if (!isAbortError(error)) {
+    console.error(`admin home: ${section} failed`, error)
+  }
   throw new Error(section)
+}
+
+function isAbortError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const candidate = error as {
+    name?: unknown
+    code?: unknown
+    message?: unknown
+  }
+  return (
+    candidate.name === 'AbortError' ||
+    candidate.code === 20 ||
+    candidate.code === '20' ||
+    (typeof candidate.message === 'string' &&
+      candidate.message.startsWith('AbortError'))
+  )
 }
 
 export async function fetchFleetState(
