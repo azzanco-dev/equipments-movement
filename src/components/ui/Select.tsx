@@ -42,6 +42,13 @@ export interface SelectProps {
   'aria-label'?: string
   'aria-describedby'?: string
   'aria-required'?: boolean
+  /** `sm` is the 28 px table/toolbar size, mirroring Button's `sm`. */
+  size?: 'sm' | 'md'
+}
+
+const triggerSizes: Record<NonNullable<SelectProps['size']>, string> = {
+  sm: 'h-7 px-2.5 text-xs',
+  md: 'h-10 md:h-9',
 }
 
 /** Accessible select on Radix, matching the shared Input height and focus. */
@@ -58,6 +65,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(
       id,
       name,
       className,
+      size = 'md',
       ...aria
     },
     ref,
@@ -79,8 +87,11 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(
           id={id}
           aria-invalid={invalid || undefined}
           className={cn(
-            'input select-trigger flex h-10 items-center justify-between gap-2 text-start md:h-9',
-            'data-[placeholder]:text-placeholder data-[placeholder]:text-[13px]',
+            'input select-trigger flex items-center justify-between gap-2 text-start',
+            triggerSizes[size],
+            size === 'sm'
+              ? 'data-[placeholder]:text-placeholder'
+              : 'data-[placeholder]:text-placeholder data-[placeholder]:text-[13px]',
             className,
           )}
           {...aria}

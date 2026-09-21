@@ -335,7 +335,7 @@ export function HomeMovementsCard({
       ) : (
         <>
           <DataTable
-            size="sm"
+            size="md"
             columns={columns}
             rows={logs}
             rowKey={(log) => log.id}
@@ -364,6 +364,7 @@ export function HomeMovementsCard({
               pageSize={list.pageSize}
               total={total}
               onPage={list.setPage}
+              onPageSize={list.setPageSize}
             />
           </div>
         </>

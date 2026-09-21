@@ -97,6 +97,31 @@ export function daysSinceSaudi(
   return Math.max(0, Math.round((to - from) / 86_400_000))
 }
 
+/**
+ * The "inside workshop" state card's secondary line (e.g. "6 maintenance, 3
+ * parking"). `null` when there is nothing inside to break down, so the card
+ * never claims a split of zero.
+ */
+export function insideWorkshopBreakdown(
+  stats: WorkshopHomeStats,
+): { maintenance: number; parking: number } | null {
+  if (stats.insideNow <= 0) return null
+  return { maintenance: stats.maintenance, parking: stats.parking }
+}
+
+/**
+ * One purpose card's share of the current inside-workshop total (e.g.
+ * "6 of 21"). `null` when nothing is inside, so the card never divides by
+ * zero or shows a share of nothing.
+ */
+export function workshopPurposeShare(
+  count: number,
+  insideNow: number,
+): { count: number; total: number } | null {
+  if (insideNow <= 0) return null
+  return { count, total: insideNow }
+}
+
 export type WorkshopPurpose = 'maintenance' | 'parking'
 
 /** Structurally identical to `EquipmentState` in the shared status card. */

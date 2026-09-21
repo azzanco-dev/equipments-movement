@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { LogIn, LogOut } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  ClipboardList,
+  LogIn,
+  LogOut,
+  ParkingCircle,
+  Warehouse,
+  Wrench,
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { useAuth } from '@/auth/AuthContext'
@@ -10,10 +16,13 @@ import { StatCard } from '@/components/ui/StatCard'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { HomeEquipmentSearch } from '@/components/home/HomeEquipmentSearch'
 import { HomeMovementsCard } from '@/components/home/HomeMovementsCard'
+import { InquiryCard } from '@/components/home/InquiryCard'
 import { PendingClassificationCard } from '@/components/home/PendingClassificationCard'
 import {
+  insideWorkshopBreakdown,
   parseForemanHomeStats,
   parseWorkshopHomeStats,
+  workshopPurposeShare,
   type ForemanHomeStats,
   type WorkshopHomeStats,
 } from '@/lib/homeStats'
@@ -51,10 +60,6 @@ export function HomeScreen({
 }) {
   const { t } = useI18n()
   const { user, profile } = useAuth()
-  const pathname = usePathname()
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const movementsRef = useRef<HTMLDivElement>(null)
   const managerMode =
     profile?.role === 'workshop_manager' ||
     profile?.role === 'assistant_workshop_manager'
@@ -96,20 +101,6 @@ export function HomeScreen({
 
   const reload = useCallback(() => setRefreshToken((value) => value + 1), [])
 
-  // Reuses the movements list's own `movement_type` filter (no new query):
-  // the primary state card links to the closest thing the list already
-  // supports — every entry row — and scrolls the list into view.
-  const filterToOpenEntries = useCallback(() => {
-    const next = new URLSearchParams(searchParams.toString())
-    next.set('movement_type', 'entry')
-    next.delete('page')
-    router.replace(`${pathname}?${next.toString()}`, { scroll: false })
-    window.setTimeout(
-      () => movementsRef.current?.scrollIntoView({ behavior: 'smooth' }),
-      50,
-    )
-  }, [pathname, router, searchParams])
-
   const classifyEntry = useCallback(
     async (entryLogId: string, purpose: string) => {
       setClassifyingId(entryLogId)
@@ -136,37 +127,47 @@ export function HomeScreen({
   )
 
   const movements = (
-    <div ref={movementsRef}>
-      <HomeMovementsCard
-        workshopMode={workshopMode}
-        canClassify={managerMode}
-        onSelectMovement={onSelectMovement}
-        onClassify={onClassify}
-        classifyingId={classifyingId}
-        refreshToken={refreshToken}
-      />
-    </div>
+    <HomeMovementsCard
+      workshopMode={workshopMode}
+      canClassify={managerMode}
+      onSelectMovement={onSelectMovement}
+      onClassify={onClassify}
+      classifyingId={classifyingId}
+      refreshToken={refreshToken}
+    />
   )
 
-  const quickActions = (large: boolean) => (
-    <div className={`grid grid-cols-2 gap-3${large ? '' : ' sm:max-w-md'}`}>
+  // Same 64 px big-button style for both homes (owner decision, wave 6): the
+  // two primary actions always lead the page.
+  const quickActions = (
+    <div className="grid grid-cols-2 gap-3">
       <Button
         variant="primary"
         onClick={() => onCreateMovement('entry')}
-        icon={<LogIn size={large ? 18 : 15} aria-hidden="true" />}
-        className={large ? 'h-16 text-base' : undefined}
+        icon={<LogIn size={18} aria-hidden="true" />}
+        className="h-16 text-base"
       >
         {t('registerEntry')}
       </Button>
       <Button
         variant="outline"
         onClick={() => onCreateMovement('exit')}
-        icon={<LogOut size={large ? 18 : 15} aria-hidden="true" />}
-        className={large ? 'h-16 text-base' : undefined}
+        icon={<LogOut size={18} aria-hidden="true" />}
+        className="h-16 text-base"
       >
         {t('registerExit')}
       </Button>
     </div>
+  )
+
+  const insideBreakdown = insideWorkshopBreakdown(workshopStats)
+  const maintenanceShare = workshopPurposeShare(
+    workshopStats.maintenance,
+    workshopStats.insideNow,
+  )
+  const parkingShare = workshopPurposeShare(
+    workshopStats.parking,
+    workshopStats.insideNow,
   )
 
   return (
@@ -180,52 +181,93 @@ export function HomeScreen({
         }
       />
 
+      {/* The two primary actions and the equipment inquiry entry point
+          always lead the page, above every stat or list (owner decision,
+          wave 6). */}
+      {quickActions}
+      <InquiryCard />
+
       {workshopMode ? (
         <>
-          {/* State first: equipment counts right now, before the pending
-              queue and the actions that act on them. */}
+          {/* State next: equipment counts right now, before the pending
+              queue and the actions that act on them. Mobile layout (owner
+              decision): inside-workshop full width, maintenance/parking
+              side by side, awaiting-classification full width. Desktop:
+              4 across. */}
           {statsError ? (
             <ErrorState onRetry={reload} />
           ) : (
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <StatCard
+                className="col-span-2 md:col-span-1"
                 label={t('insideWorkshopNow')}
                 value={workshopStats.insideNow}
+                icon={<Warehouse size={18} aria-hidden="true" />}
+                hint={
+                  insideBreakdown
+                    ? t('insideWorkshopBreakdown')
+                        .replace(
+                          '{maintenance}',
+                          String(insideBreakdown.maintenance),
+                        )
+                        .replace('{parking}', String(insideBreakdown.parking))
+                    : undefined
+                }
                 loading={statsLoading}
               />
               <StatCard
                 label={t('maintenancePurpose')}
                 value={workshopStats.maintenance}
                 tone="warning"
+                icon={<Wrench size={18} aria-hidden="true" />}
+                hint={
+                  maintenanceShare
+                    ? t('workshopPurposeShare')
+                        .replace('{count}', String(maintenanceShare.count))
+                        .replace('{total}', String(maintenanceShare.total))
+                    : undefined
+                }
                 loading={statsLoading}
               />
               <StatCard
                 label={t('parkingPurpose')}
                 value={workshopStats.parking}
                 tone="info"
+                icon={<ParkingCircle size={18} aria-hidden="true" />}
+                hint={
+                  parkingShare
+                    ? t('workshopPurposeShare')
+                        .replace('{count}', String(parkingShare.count))
+                        .replace('{total}', String(parkingShare.total))
+                    : undefined
+                }
                 loading={statsLoading}
               />
               <StatCard
+                className="col-span-2 md:col-span-1"
                 label={t('awaitingClassification')}
                 value={workshopStats.pendingClassification}
                 tone="warning"
+                icon={<ClipboardList size={18} aria-hidden="true" />}
                 loading={statsLoading}
               />
             </div>
           )}
 
-          <PendingClassificationCard
-            rows={workshopStats.pending}
-            loading={statsLoading}
-            error={statsError}
-            onRetry={reload}
-            canClassify={managerMode}
-            onClassify={onClassify}
-            classifyingId={classifyingId}
-            classifyError={classifyError}
-          />
-
-          {quickActions(false)}
+          {/* The plain `workshop` role never sees the pending-classification
+              list, only the count card above (owner decision, wave 6). */}
+          {managerMode && (
+            <PendingClassificationCard
+              rows={workshopStats.pending}
+              loading={statsLoading}
+              error={statsError}
+              onRetry={reload}
+              canClassify={managerMode}
+              onClassify={onClassify}
+              classifyingId={classifyingId}
+              classifyError={classifyError}
+            />
+          )}
 
           <HomeEquipmentSearch />
           {movements}
@@ -234,28 +276,30 @@ export function HomeScreen({
         <>
           <HomeEquipmentSearch />
 
-          {quickActions(true)}
-
           {statsError ? (
             <ErrorState onRetry={reload} />
           ) : (
-            <div className="space-y-2">
+            <>
+              {/* Primary asset-state card (owner decision, wave 6): static,
+                  no longer a filter toggle onto the movements list. */}
               <StatCard
                 label={t('myEquipmentInsideSitesNow')}
                 value={foremanStats.insideNow}
                 loading={statsLoading}
-                onClick={filterToOpenEntries}
               />
-              {statsLoading ? (
-                <span className="block h-4 w-40 animate-pulse rounded bg-surface-hover" />
-              ) : (
-                <p className="text-sm text-muted">
-                  {t('todayActivityLine')
-                    .replace('{entries}', String(foremanStats.entriesToday))
-                    .replace('{exits}', String(foremanStats.exitsToday))}
-                </p>
-              )}
-            </div>
+              <div className="grid grid-cols-2 gap-3">
+                <StatCard
+                  label={t('entriesTodayCount')}
+                  value={foremanStats.entriesToday}
+                  loading={statsLoading}
+                />
+                <StatCard
+                  label={t('exitsTodayCount')}
+                  value={foremanStats.exitsToday}
+                  loading={statsLoading}
+                />
+              </div>
+            </>
           )}
 
           {movements}

@@ -77,18 +77,26 @@ export function PendingClassificationCard({
                 </span>
               </span>
               {canClassify ? (
-                <Select
-                  value=""
-                  onValueChange={(value) => onClassify(row.id, value)}
-                  disabled={classifyingId === row.id}
-                  placeholder={t('selectClassification')}
-                  aria-label={`${t('selectClassification')} — ${row.equipmentCode}`}
-                  className="w-40"
-                  options={[
-                    { value: 'maintenance', label: t('maintenancePurpose') },
-                    { value: 'parking', label: t('parkingPurpose') },
-                  ]}
-                />
+                <span className="flex shrink-0 items-center gap-2">
+                  <Badge tone="warning" size="sm">
+                    {t('awaitingClassification')}
+                  </Badge>
+                  {/* Compact width: this control sits next to the badge, not
+                      as a full-width field. */}
+                  <Select
+                    value=""
+                    onValueChange={(value) => onClassify(row.id, value)}
+                    disabled={classifyingId === row.id}
+                    placeholder={t('selectClassification')}
+                    aria-label={`${t('selectClassification')} — ${row.equipmentCode}`}
+                    size="sm"
+                    className="w-28"
+                    options={[
+                      { value: 'maintenance', label: t('maintenancePurpose') },
+                      { value: 'parking', label: t('parkingPurpose') },
+                    ]}
+                  />
+                </span>
               ) : (
                 <Badge tone="warning">{t('awaitingClassification')}</Badge>
               )}

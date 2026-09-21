@@ -13,7 +13,6 @@ export const translations = {
     signUp: 'إنشاء حساب',
     signOut: 'تسجيل الخروج',
     confirmSignOut: 'تأكيد تسجيل الخروج',
-    confirmSignOutMessage: 'هل أنت متأكد أنك تريد تسجيل الخروج من حسابك؟',
     email: 'البريد الإلكتروني',
     password: 'كلمة المرور',
     showPassword: 'إظهار كلمة المرور',
@@ -549,9 +548,7 @@ export const translations = {
     activate: 'تفعيل',
     deactivate: 'تعطيل',
     generateQR: 'توليد QR',
-    printQR: 'طباعة QR',
     noEquipment: 'لا توجد معدات',
-    confirmDelete: 'هل أنت متأكد من التعطيل؟',
 
     // Import equipment
     importExcel: 'استيراد من Excel',
@@ -689,15 +686,11 @@ export const translations = {
     rowsPerPage: 'عدد الصفوف في الصفحة',
     previousPage: 'الصفحة السابقة',
     nextPage: 'الصفحة التالية',
-    printQrError:
-      'تعذر فتح معاينة الطباعة. تحقق من السماح بالنوافذ المنبثقة وحاول مرة اخرى.',
     equipmentLoadError: 'تعذر تحميل بيانات المعدة. حاول مرة اخرى.',
     temporaryPassword: 'كلمة مرور مؤقتة جديدة',
     temporaryPasswordHelp: 'اتركها فارغة إذا لم ترغب في تغيير كلمة المرور.',
     mustChangePassword: 'يجب تغيير كلمة المرور',
     firstLoginPasswordTitle: 'تغيير كلمة المرور',
-    firstLoginPasswordDescription:
-      'هذه أول مرة تسجل فيها الدخول. أنشئ كلمة مرور جديدة للمتابعة.',
     newPassword: 'كلمة المرور الجديدة',
     confirmPassword: 'تأكيد كلمة المرور',
     passwordMinLength: 'يجب ألا تقل كلمة المرور عن 8 أحرف.',
@@ -812,6 +805,172 @@ export const translations = {
       'تسجيل حركات الورشة ومراجعة وتصنيف دخوليات جميع المسؤولين',
     equipmentDetailDesc: 'بيانات المعدة الكاملة وسجل الحركات',
     searchInList: 'ابحث في القائمة...',
+
+    // wave6-A
+    inquiryCardTitle: 'استعلام عن معدة',
+    inquiryCardDescription: 'الحالة الحالية وسجل الزيارات',
+    insideWorkshopBreakdown: 'منها {maintenance} صيانة و {parking} وقوف',
+    workshopPurposeShare: '{count} من {total} داخل الورشة',
+    entriesTodayCount: 'دخوليات اليوم',
+    exitsTodayCount: 'خروجيات اليوم',
+
+    // wave6-B
+    adminHomeTitle: 'لوحة التحكم',
+    adminHomeDescription:
+      'حالة الاسطول الان، المعدات المتوقفة عن الحركة، والتوفر والنشاط.',
+    adminHomeSectionError: 'تعذر تحميل هذا القسم',
+    adminHomeSectionErrorHint: 'تحقق من الاتصال ثم اعد المحاولة.',
+    adminHomeOwnerFilter: 'تصفية حسب المالك',
+    adminHomeOwnerAlazani: 'العزاني',
+    adminHomeOwnerTakween: 'تكوين',
+    adminHomeOwnerThirdPartyF: 'طرف ثالث F',
+    adminHomeOwnerThirdPartyB: 'طرف ثالث B',
+    adminHomeOwnerExternal: 'مالك اخر',
+    adminHomeNow: 'الان',
+    adminHomeStateTitle: 'الحالة الان',
+    adminHomeStateDescription: 'اين المعدات في هذه اللحظة.',
+    adminHomeInsideSites: 'داخل المواقع الان',
+    adminHomeInWorkshop: 'في الورشة الان',
+    adminHomeAvailable: 'متاحة',
+    adminHomeIdle: 'بلا حركة',
+    adminHomeIdleHint: 'بلا حركة منذ 90 يوم فاكثر',
+    adminHomeMaintenance: 'صيانة',
+    adminHomeParking: 'وقوف',
+    adminHomeUnclassified: 'بلا تصنيف',
+    adminHomeIdleBreakdown: 'بلا حركة منذ:',
+    adminHomeIdleNested:
+      'الفئات متداخلة: كل معدة بلا حركة 90 يوم محسوبة ايضا في 60 و30 يوم.',
+    adminHomeDayUnit: 'يوم',
+    adminHomeNoMovementTitle: 'معدات بلا حركة',
+    adminHomeNoMovementDescription:
+      'اطول المعدات بلا حركة مسجلة. المعدات بلا اي تاريخ حركة مميزة باللون الاحمر.',
+    adminHomeNoMovementThreshold: 'مدة التوقف',
+    adminHomeNoMovementEmpty: 'لا توجد معدات متوقفة بهذه المدة',
+    adminHomeNoMovementLimit: 'يعرض اول 20 معدة حسب الاطول توقفا.',
+    adminHomeNoMovementEver: 'لا يوجد تاريخ حركة',
+    adminHomeExitedOn: 'خروج بتاريخ',
+    adminHomeEnteredOn: 'دخول بتاريخ',
+    adminHomeColEquipment: 'المعدة',
+    adminHomeColType: 'النوع',
+    adminHomeColOwner: 'المالك',
+    adminHomeColLastMovement: 'اخر حركة',
+    adminHomeColDays: 'عدد الايام',
+    adminHomeAvailabilityTitle: 'التوفر حسب النوع',
+    adminHomeAvailabilityDescription:
+      'كل رقم مقسوم الى ملك ومستاجر. العزاني يعتبر ملكا وما عداه مستاجر.',
+    adminHomeSearchType: 'ابحث في الانواع',
+    adminHomeNoTypeMatch: 'لا يوجد نوع مطابق',
+    adminHomeColTotal: 'الاجمالي',
+    adminHomeColInside: 'داخل المواقع',
+    adminHomeColWorkshop: 'في الورشة',
+    adminHomeColAvailable: 'متاح',
+    adminHomeFlowTitle: 'حركة الدخول',
+    adminHomeFlowDescription:
+      'عدد الدخوليات خلال الفترة، مجمعة شهريا. فعل «اظهار الخروج» لمقارنتها بالخروج.',
+    adminHomeFlowPeriod: 'الفترة',
+    adminHomeFlowThisYear: 'هذه السنة',
+    adminHomeFlowLast12: 'اخر 12 شهرا',
+    adminHomeShowExits: 'اظهار الخروج',
+    adminHomeFlowAria: 'الدخول والخروج خلال الفترة',
+    adminHomeEntries: 'دخول',
+    adminHomeExits: 'خروج',
+    adminHomeUnitDay: 'يومي',
+    adminHomeUnitWeek: 'اسبوعي',
+    adminHomeUnitMonth: 'شهري',
+    adminHomeDonutTitle: 'اين الاسطول الان',
+    adminHomeDonutDescription:
+      'توزيع المعدات في هذه اللحظة. اضغط شريحة لعرضها حسب المالك.',
+    adminHomeDonutTotal: 'معدة',
+    adminHomeDonutHint: 'اضغط على شريحة لعرض توزيعها حسب المالك.',
+    adminHomeDonutStateAria: 'توزيع الاسطول الان',
+    adminHomeDonutOwnerAria: 'حسب المالك',
+    adminHomeBack: 'رجوع',
+    adminHomeStateInsideSite: 'داخل المواقع',
+    adminHomeStateMaintenance: 'ورشة صيانة',
+    adminHomeStateParking: 'ورشة وقوف',
+    adminHomeStateUnclassified: 'ورشة بلا تصنيف',
+    adminHomeStateAvailable: 'متاحة',
+    adminHomeForemenTitle: 'نشاط الفورمين',
+    adminHomeForemenDescription:
+      'حركات الفترة لكل فورمان، وعدد الزيارات المفتوحة لديه الان.',
+    adminHomeForemenTableHint: 'اكثر الفورمين نشاطا خلال الفترة',
+    adminHomeColForeman: 'الفورمان',
+    adminHomeColEntries: 'دخول',
+    adminHomeColExits: 'خروج',
+    adminHomeColOpenVisits: 'مفتوحة الان',
+    adminHomeNoActivity: 'لا يوجد نشاط في هذه الفترة',
+    adminHomeUnknown: 'غير معروف',
+    logsSites: 'المواقع',
+    logsWorkshop: 'الورشة',
+    logsAll: 'الكل',
+    logsContextFilter: 'سياق الحركة',
+    logsColContext: 'السياق',
+    logsColWhere: 'الشركة / المشروع',
+    logsColForeman: 'الفورمان',
+    logsLoadError: 'تعذر تحميل سجل الحركات',
+
+    // wave6-C
+    inquiryPageTitle: 'استعلام معدة',
+    inquiryPageDescription:
+      'ابحث بكود المعدة او اللوحة او الشاصي لعرض حالتها الحالية وسجل زياراتها كاملا.',
+    inquiryEmptyTitle: 'ابدا بالبحث عن معدة',
+    inquiryEmptyDescription:
+      'اكتب حرفين على الاقل لعرض الاقتراحات، مثل الكود او رقم اللوحة.',
+    inquiryChangeEquipment: 'تغيير المعدة',
+    inquiryShowMoreVisits: 'عرض المزيد من الزيارات',
+    inquiryEquipmentNotFound: 'لم يتم العثور على هذه المعدة',
+
+    // wave6-D
+    confirmDeleteTitle: 'تاكيد الحذف',
+    confirmDeleteQuestion: 'هل انت متاكد من الحذف؟',
+    dialogDescCompanyForm:
+      'الاسم بالعربي والاسم بالانجليزي كلاهما الزامي لحفظ الشركة',
+    dialogDescCompanyImport:
+      'ارفع ملف اكسل حسب القالب. الاسم المكرر مع شركة موجودة او مع صف اخر في الملف يُستبعد تلقائيا',
+    dialogDescCompanyProjects:
+      'هذه الروابط لا تؤثر على تسجيل الدخوليات حاليا، وهي محفوظة لاستخدام لاحق',
+    dialogDescCompanyDelete:
+      'الحذف نهائي ولا يمكن التراجع عنه. اذا كانت الشركة مستخدمة في حركات لن يكتمل الحذف',
+    dialogDescProjectForm:
+      'الاسم بالعربي والاسم بالانجليزي كلاهما الزامي لحفظ المشروع',
+    dialogDescProjectImport:
+      'ارفع ملف اكسل حسب القالب. الاسم المكرر مع مشروع موجود او مع صف اخر يُستبعد تلقائيا',
+    dialogDescProjectDelete:
+      'الحذف نهائي ولا يمكن التراجع عنه. قد يفشل اذا كان المشروع مستخدما في حركات او معدات',
+    dialogDescLessorForm:
+      'اسم المورد هو الحقل الالزامي الوحيد. جهة الاتصال ورقم التواصل اختياريان',
+    dialogDescLessorDelete:
+      'الحذف نهائي ولا يمكن التراجع عنه. لا يمكن حذف مورد مرتبط بمعدات',
+    dialogDescDriverForm:
+      'الاسم الكامل هو الحقل الالزامي الوحيد. رقم الهوية والجوال اختياريان ويجب ان يكونا بصيغة صحيحة عند ادخالهما',
+    dialogDescDriverImport:
+      'ارفع ملف اكسل حسب القالب. الصف الذي رقم هويته او جواله مكرر مع سائق موجود او صف اخر يُستبعد',
+    dialogDescDriverDelete:
+      'الحذف نهائي ولا يمكن التراجع عنه. لا يمكن حذف سائق مرتبط بحركات',
+    dialogDescEquipmentForm:
+      'الكود والنوع ونوع الترقيم الزامية. مع لوحة المركبة يصبح رقم اللوحة الزاميا، اما بطاقة الجمارك فلا تحتاج لوحة',
+    dialogDescEquipmentImport:
+      'ارفع ملف اكسل حسب القالب. النوع يجب ان يطابق نوعا موجودا في القوائم، والكود المكرر يُستبعد تلقائيا',
+    dialogDescEquipmentExcelUpdate:
+      'يُحدَّث الموجود فقط بمطابقة الكود. الصفوف التي لا تطابق كودا موجودا لا تُحدَّث',
+    dialogDescEquipmentTypeForm: 'اسم النوع مطلوب ويجب ان يكون فريدا',
+    dialogDescEquipmentTypeDelete:
+      'الحذف نهائي ولا يمكن التراجع عنه. لا يمكن حذف نوع مرتبط بمعدات موجودة',
+    dialogDescUserAdd:
+      'الاسم والبريد وكلمة المرور الزامية. كلمة المرور 8 احرف على الاقل، والصلاحية تحدد ما يصل اليه المستخدم',
+    dialogDescUserDelete:
+      'الحذف نهائي ولا يمكن التراجع عنه. يفقد المستخدم الدخول للنظام فورا',
+    dialogDescActivityDetail: 'عرض تفاصيل الحدث فقط، بدون تعديل',
+    dialogDescMovementImportConfirm:
+      'تُنشا الصفوف الصالحة فقط كحركات فعلية، وتُتجاهل الصفوف التي فيها اخطاء، ولا يمكن التراجع بعد الاستيراد',
+    dialogDescPhotoDelete: 'حذف الصورة نهائي ولا يمكن استرجاعها',
+    dialogDescQuickLessor:
+      'اسم المورد هو الحقل الوحيد المطلوب، ويُختار تلقائيا بعد الحفظ',
+    dialogDescFirstLoginPassword:
+      'يجب تعيين كلمة مرور جديدة (8 احرف على الاقل) قبل المتابعة، ولا يمكن تخطي هذه الخطوة',
+    dialogDescLogoutConfirm:
+      'سيتم تسجيل خروجك وستحتاج لتسجيل الدخول مجددا للمتابعة',
+    dialogDescUnsavedChanges: 'اذا غادرت الان تُفقد التعديلات غير المحفوظة',
   },
   en: {
     appName: 'Heavy Equipment Management',
@@ -821,7 +980,6 @@ export const translations = {
     signUp: 'Sign Up',
     signOut: 'Sign Out',
     confirmSignOut: 'Confirm sign out',
-    confirmSignOutMessage: 'Are you sure you want to sign out of your account?',
     email: 'Email',
     password: 'Password',
     showPassword: 'Show password',
@@ -1368,9 +1526,7 @@ export const translations = {
     activate: 'Activate',
     deactivate: 'Deactivate',
     generateQR: 'Generate QR',
-    printQR: 'Print QR',
     noEquipment: 'No equipment',
-    confirmDelete: 'Are you sure you want to deactivate?',
 
     // Import equipment
     importExcel: 'Import from Excel',
@@ -1508,15 +1664,11 @@ export const translations = {
     rowsPerPage: 'Rows per page',
     previousPage: 'Previous page',
     nextPage: 'Next page',
-    printQrError:
-      'Could not open the print preview. Allow popups and try again.',
     equipmentLoadError: 'Could not load the equipment. Please try again.',
     temporaryPassword: 'New Temporary Password',
     temporaryPasswordHelp: 'Leave blank to keep the current password.',
     mustChangePassword: 'Password change required',
     firstLoginPasswordTitle: 'Change Password',
-    firstLoginPasswordDescription:
-      'This is your first sign-in. Create a new password to continue.',
     newPassword: 'New Password',
     confirmPassword: 'Confirm Password',
     passwordMinLength: 'Password must be at least 8 characters.',
@@ -1631,6 +1783,175 @@ export const translations = {
       'Register workshop movements and review and classify all officers’ entries',
     equipmentDetailDesc: 'Full equipment details and movement history',
     searchInList: 'Search in list...',
+
+    // wave6-A
+    inquiryCardTitle: 'Equipment inquiry',
+    inquiryCardDescription: 'Current state and visit history',
+    insideWorkshopBreakdown:
+      'Of which {maintenance} maintenance, {parking} parking',
+    workshopPurposeShare: '{count} of {total} inside the workshop',
+    entriesTodayCount: "Today's entries",
+    exitsTodayCount: "Today's exits",
+
+    // wave6-B
+    adminHomeTitle: 'Command dashboard',
+    adminHomeDescription:
+      'The fleet right now, the equipment that stopped moving, availability and activity.',
+    adminHomeSectionError: 'This section could not be loaded',
+    adminHomeSectionErrorHint: 'Check the connection and try again.',
+    adminHomeOwnerFilter: 'Filter by owner',
+    adminHomeOwnerAlazani: 'Al-Azani',
+    adminHomeOwnerTakween: 'Takween',
+    adminHomeOwnerThirdPartyF: 'Third party F',
+    adminHomeOwnerThirdPartyB: 'Third party B',
+    adminHomeOwnerExternal: 'Other owner',
+    adminHomeNow: 'Now',
+    adminHomeStateTitle: 'The fleet right now',
+    adminHomeStateDescription: 'Where every unit stands at this moment.',
+    adminHomeInsideSites: 'Inside sites now',
+    adminHomeInWorkshop: 'In the workshop now',
+    adminHomeAvailable: 'Available',
+    adminHomeIdle: 'Not moving',
+    adminHomeIdleHint: 'No movement for 90 days or more',
+    adminHomeMaintenance: 'Maintenance',
+    adminHomeParking: 'Standby',
+    adminHomeUnclassified: 'Not classified',
+    adminHomeIdleBreakdown: 'No movement for:',
+    adminHomeIdleNested:
+      'The buckets are nested: a unit idle for 90 days is also counted in 60 and 30.',
+    adminHomeDayUnit: 'days',
+    adminHomeNoMovementTitle: 'Equipment with no movement',
+    adminHomeNoMovementDescription:
+      'Longest idle equipment first. Units with no movement history at all are marked in red.',
+    adminHomeNoMovementThreshold: 'Idle for',
+    adminHomeNoMovementEmpty: 'No equipment idle for this long',
+    adminHomeNoMovementLimit: 'Shows the 20 longest idle units.',
+    adminHomeNoMovementEver: 'No movement history',
+    adminHomeExitedOn: 'Exited on',
+    adminHomeEnteredOn: 'Entered on',
+    adminHomeColEquipment: 'Equipment',
+    adminHomeColType: 'Type',
+    adminHomeColOwner: 'Owner',
+    adminHomeColLastMovement: 'Last movement',
+    adminHomeColDays: 'Days',
+    adminHomeAvailabilityTitle: 'Availability by type',
+    adminHomeAvailabilityDescription:
+      'Every number split into owned and rented. Al-Azani is owned; every other owner is rented.',
+    adminHomeSearchType: 'Search types',
+    adminHomeNoTypeMatch: 'No matching type',
+    adminHomeColTotal: 'Total',
+    adminHomeColInside: 'Inside sites',
+    adminHomeColWorkshop: 'In workshop',
+    adminHomeColAvailable: 'Available',
+    adminHomeFlowTitle: 'Entry flow',
+    adminHomeFlowDescription:
+      'Entries over the period, grouped by month. Turn on "Show exits" to compare them.',
+    adminHomeFlowPeriod: 'Period',
+    adminHomeFlowThisYear: 'This year',
+    adminHomeFlowLast12: 'Last 12 months',
+    adminHomeShowExits: 'Show exits',
+    adminHomeFlowAria: 'Entries and exits over the period',
+    adminHomeEntries: 'Entries',
+    adminHomeExits: 'Exits',
+    adminHomeUnitDay: 'Daily',
+    adminHomeUnitWeek: 'Weekly',
+    adminHomeUnitMonth: 'Monthly',
+    adminHomeDonutTitle: 'Where the fleet is now',
+    adminHomeDonutDescription:
+      'Every unit at this moment. Click a slice to see it split by owner.',
+    adminHomeDonutTotal: 'units',
+    adminHomeDonutHint: 'Click a slice to split it by owner.',
+    adminHomeDonutStateAria: 'Fleet distribution right now',
+    adminHomeDonutOwnerAria: 'by owner',
+    adminHomeBack: 'Back',
+    adminHomeStateInsideSite: 'Inside sites',
+    adminHomeStateMaintenance: 'Workshop maintenance',
+    adminHomeStateParking: 'Workshop standby',
+    adminHomeStateUnclassified: 'Workshop, not classified',
+    adminHomeStateAvailable: 'Available',
+    adminHomeForemenTitle: 'Foreman activity',
+    adminHomeForemenDescription:
+      "Each foreman's movements over the period, plus the visits they have open right now.",
+    adminHomeForemenTableHint: 'Busiest foremen over the period',
+    adminHomeColForeman: 'Foreman',
+    adminHomeColEntries: 'Entries',
+    adminHomeColExits: 'Exits',
+    adminHomeColOpenVisits: 'Open now',
+    adminHomeNoActivity: 'No activity in this period',
+    adminHomeUnknown: 'Unknown',
+    logsSites: 'Sites',
+    logsWorkshop: 'Workshop',
+    logsAll: 'All',
+    logsContextFilter: 'Movement context',
+    logsColContext: 'Context',
+    logsColWhere: 'Company / project',
+    logsColForeman: 'Foreman',
+    logsLoadError: 'The movement log could not be loaded',
+
+    // wave6-C
+    inquiryPageTitle: 'Equipment inquiry',
+    inquiryPageDescription:
+      'Search by equipment code, plate, or chassis to see its current state and full visit history.',
+    inquiryEmptyTitle: 'Start by searching for equipment',
+    inquiryEmptyDescription:
+      'Type at least two characters to see suggestions, such as the code or plate number.',
+    inquiryChangeEquipment: 'Change equipment',
+    inquiryShowMoreVisits: 'Show more visits',
+    inquiryEquipmentNotFound: 'This equipment was not found',
+
+    // wave6-D
+    confirmDeleteTitle: 'Confirm Delete',
+    confirmDeleteQuestion: 'Are you sure you want to delete this?',
+    dialogDescCompanyForm:
+      'Both the Arabic and English names are required to save the company.',
+    dialogDescCompanyImport:
+      'Upload an Excel file using the template. A name that duplicates an existing company or another row in the file is skipped automatically.',
+    dialogDescCompanyProjects:
+      'These links do not affect movement recording yet; they are kept for later use.',
+    dialogDescCompanyDelete:
+      'Deletion is permanent and cannot be undone. If the company is used in movements, the delete will not complete.',
+    dialogDescProjectForm:
+      'Both the Arabic and English names are required to save the project.',
+    dialogDescProjectImport:
+      'Upload an Excel file using the template. A name that duplicates an existing project or another row is skipped automatically.',
+    dialogDescProjectDelete:
+      'Deletion is permanent and cannot be undone. It may fail if the project is used in movements or equipment.',
+    dialogDescLessorForm:
+      'The supplier name is the only required field. Contact person and number are optional.',
+    dialogDescLessorDelete:
+      'Deletion is permanent and cannot be undone. A supplier linked to equipment cannot be deleted.',
+    dialogDescDriverForm:
+      'Full name is the only required field. ID number and mobile are optional, and must be valid if entered.',
+    dialogDescDriverImport:
+      'Upload an Excel file using the template. A row whose ID number or mobile duplicates an existing driver or another row is skipped.',
+    dialogDescDriverDelete:
+      'Deletion is permanent and cannot be undone. A driver linked to movements cannot be deleted.',
+    dialogDescEquipmentForm:
+      'Code, type and numbering type are required. With a plate number the plate becomes required; a customs card needs no plate.',
+    dialogDescEquipmentImport:
+      'Upload an Excel file using the template. The type must match an existing type in the lists, and a duplicate code is skipped automatically.',
+    dialogDescEquipmentExcelUpdate:
+      'Only existing equipment is updated, matched by code. Rows that do not match an existing code are not updated.',
+    dialogDescEquipmentTypeForm:
+      'The type name is required and must be unique.',
+    dialogDescEquipmentTypeDelete:
+      'Deletion is permanent and cannot be undone. A type linked to existing equipment cannot be deleted.',
+    dialogDescUserAdd:
+      'Name, email and password are required. The password must be at least 8 characters, and the role determines what the user can access.',
+    dialogDescUserDelete:
+      'Deletion is permanent and cannot be undone. The user loses access to the system immediately.',
+    dialogDescActivityDetail: 'Shows the event details only, with no editing.',
+    dialogDescMovementImportConfirm:
+      'Only the valid rows are created as real movements; rows with errors are skipped, and the import cannot be undone.',
+    dialogDescPhotoDelete:
+      'Deleting the photo is permanent and cannot be recovered.',
+    dialogDescQuickLessor:
+      'The supplier name is the only required field, and it is selected automatically after saving.',
+    dialogDescFirstLoginPassword:
+      'You must set a new password (at least 8 characters) before continuing; this step cannot be skipped.',
+    dialogDescLogoutConfirm:
+      'You will be signed out and need to sign in again to continue.',
+    dialogDescUnsavedChanges: 'Leaving now discards your unsaved changes.',
   },
 } as const
 
