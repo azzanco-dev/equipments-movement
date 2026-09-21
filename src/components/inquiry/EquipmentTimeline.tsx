@@ -41,6 +41,8 @@ export interface EquipmentTimelineProps {
   movements: TimelineMovement[]
   /** Opens the photo viewer for a movement; thumbnails are hidden without it. */
   onOpenPhoto?: (movementId: string) => void
+  /** Opens a movement's own detail page; the entry/exit lines stay plain text without it. */
+  onSelectMovement?: (movementId: string) => void
   /** Reference instant for open-visit durations; defaults to now. */
   now?: Date | string | number
   className?: string
@@ -90,6 +92,7 @@ function monthLabel(iso: string, locale: string): string {
 export function EquipmentTimeline({
   movements,
   onOpenPhoto,
+  onSelectMovement,
   now,
   className,
 }: EquipmentTimelineProps) {
@@ -170,6 +173,7 @@ export function EquipmentTimeline({
                         visit={item.visit}
                         nowMs={nowMs}
                         onOpenPhoto={onOpenPhoto}
+                        onSelectMovement={onSelectMovement}
                       />
                     )}
                   </li>
@@ -241,10 +245,12 @@ function VisitSegment({
   visit,
   nowMs,
   onOpenPhoto,
+  onSelectMovement,
 }: {
   visit: EquipmentVisit
   nowMs: number
   onOpenPhoto?: (movementId: string) => void
+  onSelectMovement?: (movementId: string) => void
 }) {
   const { t, lang } = useI18n()
   const workshop = visit.context === 'workshop'
@@ -298,6 +304,9 @@ function VisitSegment({
               icon={<LogIn size={13} aria-hidden="true" />}
               label={t('entryTime')}
               value={formatDateTime(entry.recorded_at)}
+              onClick={
+                onSelectMovement ? () => onSelectMovement(entry.id) : undefined
+              }
             />
           )}
           {exit && (
@@ -305,6 +314,9 @@ function VisitSegment({
               icon={<LogOut size={13} aria-hidden="true" />}
               label={t('exitTime')}
               value={formatDateTime(exit.recorded_at)}
+              onClick={
+                onSelectMovement ? () => onSelectMovement(exit.id) : undefined
+              }
             />
           )}
           {duration !== null && (
@@ -376,10 +388,13 @@ function Line({
   icon,
   label,
   value,
+  onClick,
 }: {
   icon?: ReactNode
   label: string
   value: string
+  /** Renders `value` as a link-styled button that opens its own movement. */
+  onClick?: () => void
 }) {
   return (
     <div className="flex items-baseline gap-1.5">
@@ -389,7 +404,19 @@ function Line({
         </span>
       )}
       <dt className="shrink-0 text-xs text-muted">{label}</dt>
-      <dd className="truncate-safe min-w-0">{value}</dd>
+      {onClick ? (
+        <dd className="min-w-0">
+          <button
+            type="button"
+            onClick={onClick}
+            className="truncate-safe text-start underline decoration-dotted underline-offset-2 hover:text-fg"
+          >
+            {value}
+          </button>
+        </dd>
+      ) : (
+        <dd className="truncate-safe min-w-0">{value}</dd>
+      )}
     </div>
   )
 }

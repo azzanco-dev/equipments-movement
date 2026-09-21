@@ -208,7 +208,10 @@ function SuggestionRow({
   onPick: () => void
 }) {
   const { t } = useI18n()
-  const state = suggestion.state ?? 'outside'
+  // `state` is optional: a caller that has not computed the current state per
+  // row (e.g. a plain equipment search with no per-row movement lookup) omits
+  // it, and the row then shows no badge rather than a misleading "outside".
+  const state = suggestion.state
   return (
     <li
       id={id}
@@ -242,7 +245,7 @@ function SuggestionRow({
           )}
         </span>
       </span>
-      <Badge tone={STATE_TONE[state]}>{t(STATE_LABEL[state])}</Badge>
+      {state && <Badge tone={STATE_TONE[state]}>{t(STATE_LABEL[state])}</Badge>}
     </li>
   )
 }
