@@ -243,7 +243,12 @@ export function FleetDonut({
                   <Cell
                     key={slice.id}
                     fill={slice.color}
-                    stroke={slice.strokeColor ?? 'var(--border)'}
+                    // Owner request (2026-09-21): the slice outline is the
+                    // slice fill, so the ring reads as one flat shape instead
+                    // of a set of outlined wedges. `strokeColor` is still used
+                    // for the legend swatch, where a border is what separates
+                    // a pale tint from the card behind it.
+                    stroke={slice.color}
                     opacity={activeId && activeId !== slice.id ? 0.35 : 1}
                     className={onSliceSelect ? 'cursor-pointer' : undefined}
                   />

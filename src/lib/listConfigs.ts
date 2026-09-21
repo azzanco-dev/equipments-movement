@@ -268,3 +268,92 @@ export const visitsListConfig: DataListConfig = {
     { key: 'equipment_code', label: 'كود المعدة' },
   ],
 }
+
+/**
+ * Full movement log (`/logs`), served by the `movement_log_search` view.
+ *
+ * Search is the shared movement search (`buildMovementSearchFilter`), so the
+ * search box covers the equipment, the driver snapshot and the contractor
+ * code. The foreman is deliberately a filter and not a search field: searching
+ * it made an equipment code that happens to appear in a name match rows the
+ * user did not ask for.
+ *
+ * Every filter key below is a real column of the view and is allowlisted
+ * against this list before it reaches PostgREST, so no arbitrary column can be
+ * filtered. `supervisor_id` options are filled in by the screen from the
+ * foreman list.
+ */
+export const logsListConfig: DataListConfig = {
+  id: 'logs',
+  searchPlaceholder:
+    'البحث بالمعدة (كود او لوحة او شاصي) او السائق او كود المقاول',
+  searchFields: ['equipment', 'driver_name', 'contractor_equipment_code'],
+  defaultSort: 'recorded_at',
+  defaultDirection: 'desc',
+  filterFields: [
+    {
+      key: 'movement_type',
+      label: 'نوع الحركة',
+      type: 'select',
+      operators: ['eq', 'neq'],
+      options: [
+        { value: 'entry', label: 'دخول' },
+        { value: 'exit', label: 'خروج' },
+      ],
+    },
+    {
+      key: 'recorded_at',
+      label: 'وقت الحركة',
+      type: 'date',
+      operators: dateOps,
+    },
+    {
+      key: 'equipment_ownership_status',
+      label: 'المالك',
+      type: 'select',
+      operators: ['eq', 'neq', 'in', 'not_in'],
+      options: [
+        { value: 'alazani', label: 'العزاني' },
+        { value: 'takween', label: 'تكوين' },
+        { value: 'third_party_f', label: 'طرف ثالث F' },
+        { value: 'third_party_partnership_b', label: 'طرف ثالث B' },
+        { value: 'external_supplier', label: 'مالك اخر' },
+      ],
+    },
+    {
+      key: 'company_name_ar',
+      label: 'الشركة',
+      type: 'text',
+      operators: textOps,
+    },
+    {
+      key: 'project_name_ar',
+      label: 'المشروع',
+      type: 'text',
+      operators: textOps,
+    },
+    {
+      key: 'supervisor_id',
+      label: 'الفورمان',
+      type: 'select',
+      operators: ['eq', 'neq', 'in', 'not_in'],
+      options: [],
+    },
+    {
+      key: 'workshop_purpose',
+      label: 'غرض الورشة',
+      type: 'select',
+      operators: ['eq', 'neq', 'is_set', 'is_not_set'],
+      options: [
+        { value: 'maintenance', label: 'صيانة' },
+        { value: 'parking', label: 'وقوف' },
+      ],
+    },
+  ],
+  sortableFields: [
+    { key: 'recorded_at', label: 'وقت الحركة' },
+    { key: 'created_at', label: 'وقت الانشاء' },
+    { key: 'movement_type', label: 'نوع الحركة' },
+    { key: 'equipment_code', label: 'كود المعدة' },
+  ],
+}

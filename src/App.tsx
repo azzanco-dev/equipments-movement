@@ -21,6 +21,7 @@ import {
   FileUp,
   History,
   BarChart3,
+  Search,
 } from 'lucide-react'
 import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog'
 
@@ -30,9 +31,25 @@ const HomeScreen = dynamic(
   () => import('@/screens/HomeScreen').then((module) => module.HomeScreen),
   { loading: screenLoading },
 )
-const AdminDashboard = dynamic(
+const AdminHomeScreen = dynamic(
   () =>
-    import('@/screens/AdminDashboard').then((module) => module.AdminDashboard),
+    import('@/screens/admin-home/AdminHomeScreen').then(
+      (module) => module.AdminHomeScreen,
+    ),
+  { loading: screenLoading },
+)
+const LogsScreen = dynamic(
+  () =>
+    import('@/screens/admin-home/LogsScreen').then(
+      (module) => module.LogsScreen,
+    ),
+  { loading: screenLoading },
+)
+const EquipmentInquiryScreen = dynamic(
+  () =>
+    import('@/screens/inquiry/EquipmentInquiryScreen').then(
+      (module) => module.EquipmentInquiryScreen,
+    ),
   { loading: screenLoading },
 )
 const AdminEquipment = dynamic(
@@ -133,6 +150,7 @@ const WorkshopReports = dynamic(
 const ADMIN_PAGES = new Set([
   'dashboard',
   'logs',
+  'inquiry',
   'equipment',
   'projects',
   'companies',
@@ -194,7 +212,8 @@ function AppContent() {
   const backToDashboard = () => router.push('/dashboard')
 
   if (profile.role === 'monitor') {
-    const monitorPage = page === 'logs' ? 'logs' : 'dashboard'
+    const monitorPage =
+      page === 'logs' ? 'logs' : page === 'inquiry' ? 'inquiry' : 'dashboard'
     const monitorNavItems = [
       {
         key: 'dashboard',
@@ -202,6 +221,11 @@ function AppContent() {
         icon: <LayoutDashboard size={18} />,
       },
       { key: 'logs', label: t('logs'), icon: <FileText size={18} /> },
+      {
+        key: 'inquiry',
+        label: t('inquiryPageTitle'),
+        icon: <Search size={18} />,
+      },
     ]
     return (
       <>
@@ -216,8 +240,12 @@ function AppContent() {
               onBack={() => router.back()}
               onNavigateMovement={openMovement}
             />
+          ) : monitorPage === 'logs' ? (
+            <LogsScreen onSelectMovement={openMovement} />
+          ) : monitorPage === 'inquiry' ? (
+            <EquipmentInquiryScreen onSelectMovement={openMovement} />
           ) : (
-            <AdminDashboard onSelectMovement={openMovement} />
+            <AdminHomeScreen />
           )}
         </Layout>
         {passwordDialog}
@@ -251,6 +279,8 @@ function AppContent() {
               onBack={backToDashboard}
               onNavigateMovement={openMovement}
             />
+          ) : segments[0] === 'inquiry' ? (
+            <EquipmentInquiryScreen onSelectMovement={openMovement} />
           ) : (
             <HomeScreen
               onSelectMovement={openMovement}
@@ -288,6 +318,11 @@ function AppContent() {
       icon: <LayoutDashboard size={18} />,
     },
     { key: 'logs', label: t('logs'), icon: <FileText size={18} /> },
+    {
+      key: 'inquiry',
+      label: t('inquiryPageTitle'),
+      icon: <Search size={18} />,
+    },
     { key: 'equipment', label: t('equipment'), icon: <Truck size={18} /> },
     { key: 'projects', label: t('projects'), icon: <FolderKanban size={18} /> },
     { key: 'companies', label: t('companies'), icon: <Briefcase size={18} /> },
@@ -352,13 +387,17 @@ function AppContent() {
           <UserDetail userId={userId} onBack={() => router.push('/users')} />
         ) : (
           <>
-            {(page === 'dashboard' || page === 'logs') && (
-              <AdminDashboard
-                onSelectMovement={openMovement}
+            {page === 'dashboard' && (
+              <AdminHomeScreen
+                onSelectEquipment={(id) => router.push(`/equipment/${id}`)}
                 onCreateMovement={(type) =>
                   router.push(`/movements/new?type=${type}`)
                 }
               />
+            )}
+            {page === 'logs' && <LogsScreen onSelectMovement={openMovement} />}
+            {page === 'inquiry' && (
+              <EquipmentInquiryScreen onSelectMovement={openMovement} />
             )}
             {page === 'equipment' && (
               <AdminEquipment
