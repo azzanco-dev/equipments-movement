@@ -17,7 +17,6 @@ import { supabase } from '@/lib/supabase'
 import type { Equipment } from '@/lib/types'
 import { EquipmentFormDialog } from './EquipmentFormDialog'
 import { EquipmentImportDialog } from './EquipmentImportDialog'
-import { EquipmentQrDialog } from './EquipmentQrDialog'
 import { EquipmentTable } from './EquipmentTable'
 
 const LIST_SELECT =
@@ -41,7 +40,6 @@ export function EquipmentListScreen({
   const [loadError, setLoadError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Equipment | null>(null)
-  const [qrEquipment, setQrEquipment] = useState<Equipment | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [updateExcelOpen, setUpdateExcelOpen] = useState(false)
   const listTopRef = useRef<HTMLDivElement>(null)
@@ -193,8 +191,6 @@ export function EquipmentListScreen({
         sort={list.sort}
         direction={list.direction}
         onSort={list.setSort}
-        pageSize={list.pageSize}
-        onPageSize={list.setPageSize}
         filters={list.filters}
         onFilters={list.setFilters}
       />
@@ -209,7 +205,6 @@ export function EquipmentListScreen({
         onSortChange={list.setSort}
         onOpen={(id) => onSelectEquipment?.(id)}
         onEdit={openEdit}
-        onShowQr={setQrEquipment}
         onToggleActive={toggleActive}
         emptyAction={addButton}
       />
@@ -219,6 +214,7 @@ export function EquipmentListScreen({
           pageSize={list.pageSize}
           total={total}
           onPage={changePage}
+          onPageSize={list.setPageSize}
         />
       )}
 
@@ -227,12 +223,6 @@ export function EquipmentListScreen({
         onOpenChange={setFormOpen}
         equipment={editing}
         onSaved={fetchEquipment}
-      />
-      <EquipmentQrDialog
-        equipment={qrEquipment}
-        onOpenChange={(open) => {
-          if (!open) setQrEquipment(null)
-        }}
       />
       <EquipmentImportDialog
         open={importOpen}

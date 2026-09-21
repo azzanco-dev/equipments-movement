@@ -1,11 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
-import { QRCodeDisplay } from '@/components/QRCodeDisplay'
 import {
   Edit2,
   Power,
-  Printer,
   Calendar,
   Truck,
   Building2,
@@ -24,7 +22,6 @@ import {
 } from '@/lib/equipmentOwnership'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
-import { printEquipmentQr } from '@/lib/printEquipmentQr'
 import { Alert } from '@/components/Alert'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import {
@@ -153,11 +150,6 @@ export function EquipmentDetail({
     fetchData()
   }
 
-  function printQR(eq: Equipment) {
-    setError(null)
-    void printEquipmentQr(eq, () => setError(t('printQrError')))
-  }
-
   if (loading)
     return (
       <div
@@ -195,39 +187,31 @@ export function EquipmentDetail({
 
       {/* Header card */}
       <div className="card">
-        <div className="flex flex-col sm:flex-row gap-6">
-          {/* QR Code */}
-          <div className="flex flex-col items-center gap-3 shrink-0">
-            <QRCodeDisplay value={equipment.qr_value} size={160} />
-            <div className="flex gap-2">
-              <IconButton
-                label={t('printQR')}
-                icon={<Printer size={16} />}
-                onClick={() => printQR(equipment)}
-              />
-              <IconButton
-                label={t('editEquipment')}
-                icon={<Edit2 size={16} />}
-                onClick={() => onEdit(equipment)}
-              />
-              <IconButton
-                label={t('isActive')}
-                icon={<Power size={16} />}
-                onClick={() => toggleActive(equipment)}
-              />
-            </div>
-          </div>
-
+        <div className="flex flex-col gap-6">
           {/* Info */}
           <div className="flex-1 space-y-4">
-            <div>
-              <div className="flex items-center gap-3 flex-wrap">
-                <h2 className="text-2xl font-bold">{equipment.code}</h2>
-                <Badge tone={equipment.is_active ? 'success' : 'neutral'}>
-                  {equipment.is_active ? t('active') : t('inactive')}
-                </Badge>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h2 className="text-2xl font-bold">{equipment.code}</h2>
+                  <Badge tone={equipment.is_active ? 'success' : 'neutral'}>
+                    {equipment.is_active ? t('active') : t('inactive')}
+                  </Badge>
+                </div>
+                <p className="text-muted mt-1">{equipment.type}</p>
               </div>
-              <p className="text-muted mt-1">{equipment.type}</p>
+              <div className="flex gap-2">
+                <IconButton
+                  label={t('editEquipment')}
+                  icon={<Edit2 size={16} />}
+                  onClick={() => onEdit(equipment)}
+                />
+                <IconButton
+                  label={t('isActive')}
+                  icon={<Power size={16} />}
+                  onClick={() => toggleActive(equipment)}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ChevronRight, Edit2, PackageSearch, Power, QrCode } from 'lucide-react'
+import { ChevronRight, Edit2, PackageSearch, Power } from 'lucide-react'
 import {
   Badge,
   DataTable,
@@ -50,7 +50,6 @@ export interface EquipmentTableProps {
   onSortChange: (key: string, direction: 'asc' | 'desc') => void
   onOpen: (id: string) => void
   onEdit: (equipment: Equipment) => void
-  onShowQr: (equipment: Equipment) => void
   onToggleActive: (equipment: Equipment) => void
   /** Rendered in the empty state, e.g. the "add equipment" button. */
   emptyAction?: ReactNode
@@ -66,7 +65,6 @@ export function EquipmentTable({
   onSortChange,
   onOpen,
   onEdit,
-  onShowQr,
   onToggleActive,
   emptyAction,
 }: EquipmentTableProps) {
@@ -168,13 +166,6 @@ export function EquipmentTable({
             title={t('edit')}
             icon={<Edit2 size={15} />}
             onClick={() => onEdit(row)}
-          />
-          <IconButton
-            size="sm"
-            label={t('qrValue')}
-            title={t('qrValue')}
-            icon={<QrCode size={15} />}
-            onClick={() => onShowQr(row)}
           />
           <IconButton
             size="sm"
