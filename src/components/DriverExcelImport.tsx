@@ -111,6 +111,7 @@ export function DriverExcelImport({
         if (!next) onClose()
       }}
       title={t('importDriversExcel')}
+      description={t('dialogDescDriverImport')}
       size="lg"
       footer={
         <>

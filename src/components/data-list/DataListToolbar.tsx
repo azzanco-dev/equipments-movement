@@ -9,13 +9,8 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Select } from '@/components/ui'
 import { FilterBuilder } from './FilterBuilder'
-import {
-  PAGE_SIZE_OPTIONS,
-  type DataListConfig,
-  type ListFilter,
-} from './types'
+import { type DataListConfig, type ListFilter } from './types'
 import { useI18n } from '@/i18n/I18nContext'
 
 interface ToolbarProps {
@@ -25,8 +20,14 @@ interface ToolbarProps {
   sort: string
   direction: 'asc' | 'desc'
   onSort: (field: string, direction: 'asc' | 'desc') => void
-  pageSize: number
-  onPageSize: (size: number) => void
+  /**
+   * @deprecated The page-size control moved to `DataListPagination`
+   * (2026-09-21). Kept optional here so existing callers still type-check;
+   * the toolbar no longer renders it.
+   */
+  pageSize?: number
+  /** @deprecated see `pageSize` above. */
+  onPageSize?: (size: number) => void
   filters: ListFilter[]
   onFilters: (filters: ListFilter[]) => void
   selectedCount?: number
@@ -44,8 +45,6 @@ export function DataListToolbar({
   sort,
   direction,
   onSort,
-  pageSize,
-  onPageSize,
   filters,
   onFilters,
   selectedCount = 0,
@@ -247,13 +246,19 @@ export function DataListToolbar({
                 >
                   <button
                     className={`btn-ghost flex-1 ${direction === 'asc' ? 'bg-gray-100 dark:bg-gray-700' : ''}`}
-                    onClick={() => onSort(sort, 'asc')}
+                    onClick={() => {
+                      onSort(sort, 'asc')
+                      setOpen(null)
+                    }}
                   >
                     {t('ascending')}
                   </button>
                   <button
                     className={`btn-ghost flex-1 ${direction === 'desc' ? 'bg-gray-100 dark:bg-gray-700' : ''}`}
-                    onClick={() => onSort(sort, 'desc')}
+                    onClick={() => {
+                      onSort(sort, 'desc')
+                      setOpen(null)
+                    }}
                   >
                     {t('descending')}
                   </button>
@@ -275,15 +280,6 @@ export function DataListToolbar({
               </div>
             )}
           </div>
-          <Select
-            className="!h-7 w-[78px] !text-xs"
-            aria-label={t('rowsPerPage')}
-            value={String(pageSize)}
-            onValueChange={(value) => onPageSize(Number(value))}
-            options={(config.pageSizeOptions ?? PAGE_SIZE_OPTIONS).map(
-              (value) => ({ value: String(value), label: String(value) }),
-            )}
-          />
         </div>
         {menuActions && (
           <div className="relative">

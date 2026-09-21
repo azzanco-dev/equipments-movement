@@ -390,7 +390,7 @@ export function Layout({
         open={logoutOpen}
         onOpenChange={setLogoutOpen}
         title={t('confirmSignOut')}
-        description={t('confirmSignOutMessage')}
+        description={t('dialogDescLogoutConfirm')}
         confirmLabel={t('signOut')}
         loading={loggingOut}
         onConfirm={async () => {

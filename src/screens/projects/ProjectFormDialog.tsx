@@ -62,6 +62,7 @@ export function ProjectFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={project ? t('editProject') : t('addProject')}
+      description={t('dialogDescProjectForm')}
       size="sm"
       footer={
         <>

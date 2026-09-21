@@ -142,7 +142,7 @@ export function EquipmentStep({
                   <span className="flex flex-wrap items-center gap-1.5">
                     <span className="font-medium">{item.code}</span>
                     {stateOption.badge && (
-                      <Badge tone={stateOption.badge.tone}>
+                      <Badge tone={stateOption.badge.tone} size="sm">
                         {stateOption.badge.label}
                       </Badge>
                     )}
@@ -158,7 +158,7 @@ export function EquipmentStep({
                       {t('chassisNumber')}: {item.chassis_number}
                     </p>
                   )}
-                  {stateOption.description && (
+                  {item.state !== 'inside_site' && stateOption.description && (
                     <p className="truncate-safe text-muted">
                       {stateOption.description}
                     </p>

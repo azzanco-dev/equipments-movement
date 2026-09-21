@@ -169,7 +169,11 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   async function handleDelete(user: Profile) {
     if (
       user.id === currentUser?.id ||
-      !(await confirm({ title: t('confirmDelete'), tone: 'danger' }))
+      !(await confirm({
+        title: t('confirmDeleteTitle'),
+        description: `${t('confirmDeleteQuestion')} ${t('dialogDescUserDelete')}`,
+        tone: 'danger',
+      }))
     )
       return
     const { error } = await supabase.from('profiles').delete().eq('id', user.id)
@@ -250,8 +254,6 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
         sort={list.sort}
         direction={list.direction}
         onSort={list.setSort}
-        pageSize={list.pageSize}
-        onPageSize={list.setPageSize}
         filters={list.filters}
         onFilters={list.setFilters}
       />
@@ -283,6 +285,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
           pageSize={list.pageSize}
           total={total}
           onPage={list.setPage}
+          onPageSize={list.setPageSize}
         />
       )}
 
@@ -290,6 +293,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
         open={modalOpen}
         onOpenChange={setModalOpen}
         title={t('addUser')}
+        description={t('dialogDescUserAdd')}
         size="sm"
         footer={
           <>

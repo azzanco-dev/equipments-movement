@@ -164,6 +164,7 @@ export function AdminSettings() {
     if (
       !(await confirm({
         title: t('confirmDeleteEquipmentType'),
+        description: t('dialogDescEquipmentTypeDelete'),
         tone: 'danger',
       }))
     )
@@ -512,6 +513,7 @@ export function AdminSettings() {
         open={modalOpen}
         onOpenChange={setModalOpen}
         title={editing ? t('editEquipmentType') : t('addEquipmentType')}
+        description={t('dialogDescEquipmentTypeForm')}
         size="sm"
         footer={
           <>

@@ -261,6 +261,7 @@ export function EquipmentExcelUpdate({
         if (!next) onClose()
       }}
       title={t('updateEquipmentExcel')}
+      description={t('dialogDescEquipmentExcelUpdate')}
       size="lg"
     >
       <div className="space-y-4">

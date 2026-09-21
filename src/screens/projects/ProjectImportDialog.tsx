@@ -156,6 +156,7 @@ export function ProjectImportDialog({
         onOpenChange(next)
       }}
       title={t('importProjects')}
+      description={t('dialogDescProjectImport')}
       size="lg"
     >
       {importError && (

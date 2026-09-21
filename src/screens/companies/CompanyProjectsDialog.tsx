@@ -116,6 +116,7 @@ export function CompanyProjectsDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={`${t('manageProjects')} — ${company ? localizedName(lang, company.name_ar, company.name_en) : ''}`}
+      description={t('dialogDescCompanyProjects')}
       size="md"
     >
       {error && (

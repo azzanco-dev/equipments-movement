@@ -662,7 +662,13 @@ export function MovementDetail({
   }
 
   const deletePhoto = async (photoId: string) => {
-    if (!(await confirm({ title: t('confirmDeletePhoto'), tone: 'danger' })))
+    if (
+      !(await confirm({
+        title: t('confirmDeletePhoto'),
+        description: t('dialogDescPhotoDelete'),
+        tone: 'danger',
+      }))
+    )
       return
     setPhotoBusy(true)
     setPhotoActionError(null)

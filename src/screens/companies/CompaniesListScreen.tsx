@@ -86,7 +86,14 @@ export function CompaniesListScreen() {
   }
 
   const remove = async (company: Company) => {
-    if (!(await confirm({ title: t('confirmDelete'), tone: 'danger' }))) return
+    if (
+      !(await confirm({
+        title: t('confirmDeleteTitle'),
+        description: `${t('confirmDeleteQuestion')} ${t('dialogDescCompanyDelete')}`,
+        tone: 'danger',
+      }))
+    )
+      return
     const { error } = await supabase
       .from('companies')
       .delete()
@@ -141,8 +148,6 @@ export function CompaniesListScreen() {
         sort={list.sort}
         direction={list.direction}
         onSort={list.setSort}
-        pageSize={list.pageSize}
-        onPageSize={list.setPageSize}
         filters={list.filters}
         onFilters={list.setFilters}
       />
@@ -166,6 +171,7 @@ export function CompaniesListScreen() {
           pageSize={list.pageSize}
           total={total}
           onPage={list.setPage}
+          onPageSize={list.setPageSize}
         />
       )}
 

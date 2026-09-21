@@ -83,7 +83,14 @@ export function LessorsListScreen() {
   }
 
   const remove = async (lessor: Lessor) => {
-    if (!(await confirm({ title: t('confirmDelete'), tone: 'danger' }))) return
+    if (
+      !(await confirm({
+        title: t('confirmDeleteTitle'),
+        description: `${t('confirmDeleteQuestion')} ${t('dialogDescLessorDelete')}`,
+        tone: 'danger',
+      }))
+    )
+      return
     const { error } = await supabase
       .from('lessors')
       .delete()
@@ -116,8 +123,6 @@ export function LessorsListScreen() {
         sort={list.sort}
         direction={list.direction}
         onSort={list.setSort}
-        pageSize={list.pageSize}
-        onPageSize={list.setPageSize}
         filters={list.filters}
         onFilters={list.setFilters}
       />
@@ -140,6 +145,7 @@ export function LessorsListScreen() {
           pageSize={list.pageSize}
           total={total}
           onPage={list.setPage}
+          onPageSize={list.setPageSize}
         />
       )}
 

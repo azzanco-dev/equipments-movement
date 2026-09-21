@@ -349,6 +349,7 @@ export function EquipmentImportDialog({
         onOpenChange(next)
       }}
       title={t('importEquipment')}
+      description={t('dialogDescEquipmentImport')}
       size="lg"
     >
       {error && <ErrorState title={error} className="mb-4 p-4" />}

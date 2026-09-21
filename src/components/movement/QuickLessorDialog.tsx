@@ -37,6 +37,7 @@ export function QuickLessorDialog({
         if (!open) onClose()
       }}
       title={t('addNewSupplier')}
+      description={t('dialogDescQuickLessor')}
       size="sm"
       footer={
         <>

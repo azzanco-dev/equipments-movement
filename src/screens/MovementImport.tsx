@@ -230,7 +230,10 @@ export function MovementImport() {
   async function importRows() {
     if (
       !validRows.length ||
-      !(await confirm({ title: t('confirmMovementImport') }))
+      !(await confirm({
+        title: t('confirmMovementImport'),
+        description: t('dialogDescMovementImportConfirm'),
+      }))
     )
       return
     setBusy(true)

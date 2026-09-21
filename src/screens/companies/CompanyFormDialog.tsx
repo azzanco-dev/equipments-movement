@@ -62,6 +62,7 @@ export function CompanyFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={company ? t('editCompany') : t('addCompany')}
+      description={t('dialogDescCompanyForm')}
       size="sm"
       footer={
         <>

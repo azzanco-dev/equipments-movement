@@ -90,7 +90,14 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
   }
 
   const remove = async (driver: Driver) => {
-    if (!(await confirm({ title: t('confirmDelete'), tone: 'danger' }))) return
+    if (
+      !(await confirm({
+        title: t('confirmDeleteTitle'),
+        description: `${t('confirmDeleteQuestion')} ${t('dialogDescDriverDelete')}`,
+        tone: 'danger',
+      }))
+    )
+      return
     const { error } = await supabase
       .from('drivers')
       .delete()
@@ -102,7 +109,11 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
   const removeSelected = async () => {
     if (
       !selection.selected.size ||
-      !(await confirm({ title: t('confirmDelete'), tone: 'danger' }))
+      !(await confirm({
+        title: t('confirmDeleteTitle'),
+        description: `${t('confirmDeleteQuestion')} ${t('dialogDescDriverDelete')}`,
+        tone: 'danger',
+      }))
     )
       return
     const { error } = await supabase
@@ -154,8 +165,6 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
         sort={list.sort}
         direction={list.direction}
         onSort={list.setSort}
-        pageSize={list.pageSize}
-        onPageSize={list.setPageSize}
         filters={list.filters}
         onFilters={list.setFilters}
         selectedCount={selection.selected.size}
@@ -193,6 +202,7 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
           pageSize={list.pageSize}
           total={total}
           onPage={list.setPage}
+          onPageSize={list.setPageSize}
         />
       )}
 

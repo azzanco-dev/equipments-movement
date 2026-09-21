@@ -223,7 +223,11 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   async function handleBack() {
     if (
       hasUnsavedChanges &&
-      !(await confirm({ title: t('unsavedChanges'), tone: 'danger' }))
+      !(await confirm({
+        title: t('unsavedChanges'),
+        description: t('dialogDescUnsavedChanges'),
+        tone: 'danger',
+      }))
     )
       return
     onBack()

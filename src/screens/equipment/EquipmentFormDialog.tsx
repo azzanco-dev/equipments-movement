@@ -178,6 +178,7 @@ export function EquipmentFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={equipment ? t('editEquipment') : t('addEquipment')}
+      description={t('dialogDescEquipmentForm')}
       size="lg"
       footer={
         <>

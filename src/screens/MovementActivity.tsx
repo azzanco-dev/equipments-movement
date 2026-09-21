@@ -276,6 +276,7 @@ export function MovementActivity() {
           if (!next) setSelected(null)
         }}
         title={t('activityDetails')}
+        description={t('dialogDescActivityDetail')}
         size="lg"
       >
         {selected && (

@@ -62,6 +62,7 @@ export function LessorFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={lessor ? t('editLessor') : t('addLessor')}
+      description={t('dialogDescLessorForm')}
       size="sm"
       footer={
         <>

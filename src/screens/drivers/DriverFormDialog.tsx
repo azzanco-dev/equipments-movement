@@ -85,6 +85,7 @@ export function DriverFormDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={driver ? t('editDriver') : t('addDriver')}
+      description={t('dialogDescDriverForm')}
       size="md"
       footer={
         <>

@@ -156,6 +156,7 @@ export function CompanyImportDialog({
         onOpenChange(next)
       }}
       title={t('importCompanies')}
+      description={t('dialogDescCompanyImport')}
       size="lg"
     >
       {importError && (

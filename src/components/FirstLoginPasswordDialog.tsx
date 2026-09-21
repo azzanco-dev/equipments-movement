@@ -71,7 +71,7 @@ export function FirstLoginPasswordDialog() {
       onOpenChange={() => undefined}
       dismissible={false}
       title={t('firstLoginPasswordTitle')}
-      description={t('firstLoginPasswordDescription')}
+      description={t('dialogDescFirstLoginPassword')}
       size="sm"
       footer={
         <Button
