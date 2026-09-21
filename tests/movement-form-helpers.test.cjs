@@ -20,7 +20,8 @@ function loadLibModule(name, cache = new Map()) {
       exports,
       Date,
       require(request) {
-        const match = /^@\/lib\/(.+)$/.exec(request)
+        const match =
+          /^@\/lib\/(.+)$/.exec(request) ?? /^\.\/(.+)$/.exec(request)
         if (match) return loadLibModule(match[1], cache)
         throw new Error(`Unexpected module: ${request}`)
       },

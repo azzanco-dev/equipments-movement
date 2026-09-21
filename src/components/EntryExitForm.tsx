@@ -45,8 +45,8 @@ import {
 } from '@/lib/entryEquipmentSearch'
 import { localizedName } from '@/lib/localizedName'
 import {
-  actualMovementDate,
   movementDateKey,
+  resolveMovementInstant,
   toLocalDateTimeInput,
   withCurrentLocalTime,
 } from '@/lib/movementFormTime'
@@ -486,7 +486,11 @@ export function EntryExitForm({
       setSaveError(`${t('actualMovementTime')}: ${t('required')}`)
       return
     }
-    const movementInstant = actualMovementDate(movementDate, new Date())
+    const movementInstant = resolveMovementInstant(
+      movementDate,
+      new Date(),
+      lastMovement?.recorded_at,
+    )
     if (
       isNaN(movementInstant.getTime()) ||
       movementInstant.getTime() > Date.now()
