@@ -76,11 +76,14 @@ import {
 /**
  * The movement fields validated on save. `photos` is not a `Field`, so the
  * photos section is wrapped in its own `data-field` container.
+ *
+ * The driver is deliberately absent: since the owner decision of 2026-09-23 a
+ * site ENTRY may be registered without one (migration 0103 removed the
+ * database requirement too), so there is nothing left to validate about it.
  */
 interface MovementFields {
   company: string
   project: string
-  driver: string
   recorded_at: string
   photos: string
 }
@@ -88,7 +91,6 @@ interface MovementFields {
 const MOVEMENT_FIELD_ORDER = [
   'company',
   'project',
-  'driver',
   'recorded_at',
   'photos',
 ] as const
@@ -448,7 +450,6 @@ export function EntryExitForm({
     setSelectedDriver(driverOption(driver))
     setQuickDriver(EMPTY_QUICK_DRIVER)
     setQuickDriverErrors({})
-    clearMovementErrors('driver')
   }
 
   const createQuickEquipment = async () => {
@@ -520,7 +521,7 @@ export function EntryExitForm({
         siteEntry && !selectedCompanyId ? 'companyRequiredForEntry' : undefined,
       project:
         siteEntry && !selectedProjectId ? 'projectRequiredForEntry' : undefined,
-      driver: siteEntry && !driverId ? 'driverRequired' : undefined,
+      // No driver rule: a site ENTRY may be saved without one (2026-09-23).
       recorded_at: !recordedAt.trim()
         ? 'movementDateRequired'
         : isNaN(movementInstant.getTime()) ||
@@ -566,7 +567,9 @@ export function EntryExitForm({
       if (uploadBatchIds.length) payload.upload_batch_ids = uploadBatchIds
       if (notes) payload.notes = notes
       if (!workshopMode && isEntry) {
-        payload.driver_id = driverId
+        // Optional since 2026-09-23: an empty selection is left out of the
+        // payload entirely rather than sent as an empty string.
+        if (driverId) payload.driver_id = driverId
         if (selectedCompanyId) payload.company_id = selectedCompanyId
         if (selectedProjectId) payload.project_id = selectedProjectId
         if (contractorCode.trim())
@@ -832,19 +835,15 @@ export function EntryExitForm({
 
               {/* Site EXIT has no driver field: the exit inherits the latest
                   current driver of the open visit server-side. */}
+              {/* The driver is optional on a site ENTRY since 2026-09-23, so
+                  the field carries no required mark and no save rule. */}
               {!workshopMode && isEntry && (
-                <Field
-                  label={t('driverName')}
-                  name="driver"
-                  required
-                  error={movementErrors.driver && t(movementErrors.driver)}
-                >
+                <Field label={t('driverName')} name="driver">
                   {() => (
                     <AsyncSearchSelect
                       value={driverId}
                       selectedOption={selectedDriver}
                       onChange={(value, option) => {
-                        clearMovementErrors('driver')
                         setDriverId(value)
                         setSelectedDriver(option)
                       }}
