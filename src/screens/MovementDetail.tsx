@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { Alert } from '@/components/Alert'
@@ -51,6 +52,7 @@ import {
 import {
   BackButton,
   Button,
+  ConfirmDialog,
   DescriptionList,
   Dialog,
   ErrorState,
@@ -60,6 +62,7 @@ import {
   Input,
   Lightbox,
   MovementBadge,
+  Notice,
   PageHeader,
   Skeleton,
   WorkshopPurposeBadge,
@@ -67,6 +70,14 @@ import {
   type DescriptionListItem,
   type LightboxItem,
 } from '@/components/ui'
+// wave6-J3 — admin-only header menu: edit the note/driver, or delete the
+// movement. Both actions are authoritative in PostgreSQL (migration 0104).
+import { MovementAdminMenu } from '@/components/movement/MovementAdminMenu'
+import { MovementEditDialog } from '@/components/movement/MovementEditDialog'
+import {
+  movementAdminErrorKey,
+  movementDriverEditMode,
+} from '@/lib/movementAdmin'
 
 // Storage signed URLs are minted with a 3600s (60 min) expiry. Cached URLs
 // are reused across re-fetches (add/delete photo, edit, driver change) and
@@ -137,6 +148,14 @@ export function MovementDetail({
   const [editDriver, setEditDriver] = useState<SelectOption | null>(null)
   const [editRecordedAt, setEditRecordedAt] = useState('')
   const [editContractorCode, setEditContractorCode] = useState('')
+  // wave6-J3 — admin note/driver edit and admin delete, behind the header
+  // menu. Separate from the full admin correction form above (0068).
+  const router = useRouter()
+  const [detailsEditOpen, setDetailsEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deleted, setDeleted] = useState(false)
   // Foreman edit of the contractor code on his own open site ENTRY
   // (migration 0093). Separate from the admin edit form above.
   const [codeEditOpen, setCodeEditOpen] = useState(false)
@@ -606,6 +625,54 @@ export function MovementDetail({
     await fetchData()
   }
 
+  // The database is authoritative: `admin_delete_movement` (migration 0104)
+  // re-checks the admin role, refuses any movement that is not the last one of
+  // its (equipment, context) sequence, removes the driver-change and photo
+  // rows and writes the audit rows. The API route then removes the Storage
+  // objects; a leftover object is reported, never treated as a failed delete,
+  // because the movement row is already gone.
+  const deleteMovement = async () => {
+    setDeleteBusy(true)
+    setDeleteError(null)
+    let response: Response
+    try {
+      const { data } = await supabase.auth.getSession()
+      response = await fetch(`/api/movements/${movementId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${data.session?.access_token ?? ''}`,
+        },
+      })
+    } catch (cause) {
+      console.error('Movement delete request failed', cause)
+      // Close the confirmation first, otherwise the error banner would sit
+      // behind the modal overlay.
+      setDeleteOpen(false)
+      setDeleteError(t('movementDeleteFailed'))
+      return
+    } finally {
+      setDeleteBusy(false)
+    }
+
+    if (!response.ok) {
+      const result = (await response.json().catch(() => null)) as {
+        error?: string
+      } | null
+      setDeleteOpen(false)
+      setDeleteError(t(movementAdminErrorKey(result?.error, 'delete')))
+      return
+    }
+
+    const result = (await response.json().catch(() => null)) as {
+      storage_cleanup?: string
+    } | null
+    setDeleteOpen(false)
+    setDeleted(true)
+    if (result?.storage_cleanup === 'pending')
+      console.warn('Movement deleted; its photo files are still in storage')
+    router.push('/logs')
+  }
+
   useEffect(() => {
     fetchData()
   }, [fetchData])
@@ -698,6 +765,16 @@ export function MovementDetail({
     await fetchData()
   }
 
+  // The movement is gone: never keep rendering its details while the router
+  // navigates back to the log.
+  if (deleted)
+    return (
+      <div className="space-y-4">
+        <Notice tone="success">{t('movementDeleted')}</Notice>
+        <BackButton onClick={() => router.push('/logs')} label={t('logs')} />
+      </div>
+    )
+
   if (loading)
     return (
       <div
@@ -733,6 +810,26 @@ export function MovementDetail({
     !isWorkshopMovement &&
     !linkedLog &&
     log.supervisor_id === user?.id
+
+  // wave6-J3 — which driver path the admin edit must take. An open site visit
+  // keeps its immutable entry driver, so the dialog routes that change through
+  // the append-only `change_active_movement_driver`; the prefilled driver is
+  // then the CURRENT one (latest append), while a closed visit or an EXIT row
+  // corrects the row's own `driver_id` column.
+  const driverEditMode = movementDriverEditMode({
+    movementType: log.movement_type,
+    movementContext: log.movement_context,
+    hasLaterMovement: Boolean(linkedLog),
+  })
+  const latestDriverChange = driverChanges.at(-1)
+  const editDriverId =
+    driverEditMode === 'driver_change'
+      ? (latestDriverChange?.new_driver_id ?? log.driver_id ?? null)
+      : (log.driver_id ?? null)
+  const editDriverName =
+    driverEditMode === 'driver_change'
+      ? (latestDriverChange?.new_driver_name ?? log.driver_name ?? null)
+      : (log.driver_name ?? null)
 
   let durationMs = 0
 
@@ -899,17 +996,32 @@ export function MovementDetail({
         backLabel={t('backToMovements')}
         actions={
           profile?.role === 'admin' ? (
-            <Button
-              type="button"
-              variant="outline"
-              icon={<Pencil size={16} />}
-              onClick={openEdit}
-            >
-              {t('editMovement')}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                icon={<Pencil size={16} />}
+                onClick={openEdit}
+              >
+                {t('editMovement')}
+              </Button>
+              <MovementAdminMenu
+                busy={deleteBusy}
+                onEdit={() => {
+                  setDeleteError(null)
+                  setDetailsEditOpen(true)
+                }}
+                onDelete={() => {
+                  setDeleteError(null)
+                  setDeleteOpen(true)
+                }}
+              />
+            </div>
           ) : undefined
         }
       />
+
+      {deleteError && <Alert type="error">{deleteError}</Alert>}
 
       {editOpen && profile?.role === 'admin' && (
         <div className="card space-y-4">
@@ -1514,6 +1626,33 @@ export function MovementDetail({
             </Field>
           </div>
         </Dialog>
+      )}
+
+      {profile?.role === 'admin' && (
+        <>
+          <MovementEditDialog
+            open={detailsEditOpen}
+            onOpenChange={setDetailsEditOpen}
+            movementId={log.id}
+            notes={log.notes}
+            driverId={editDriverId}
+            driverName={editDriverName}
+            driverMode={driverEditMode}
+            driverEntryId={driverEntryId ?? (isEntry ? log.id : null)}
+            loadDrivers={loadDrivers}
+            onSaved={fetchData}
+          />
+          <ConfirmDialog
+            open={deleteOpen}
+            onOpenChange={setDeleteOpen}
+            title={t('confirmDeleteMovement')}
+            description={t('dialogDescMovementDelete')}
+            confirmLabel={t('delete')}
+            tone="danger"
+            loading={deleteBusy}
+            onConfirm={deleteMovement}
+          />
+        </>
       )}
 
       {confirmDialog}
