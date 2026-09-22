@@ -52,9 +52,46 @@ import {
 } from '@/lib/movementFormTime'
 import { movementSaveErrorKey } from '@/lib/movementSaveErrors'
 import {
+  QUICK_DRIVER_FIELD_ORDER,
+  validateQuickDriverForm,
+  type QuickDriverFormValues,
+} from '@/lib/driverForm'
+import {
+  QUICK_EQUIPMENT_FIELD_ORDER,
+  validateQuickEquipmentForm,
+  type QuickEquipmentFormValues,
+} from '@/lib/equipmentForm'
+import {
+  clearFieldErrors,
+  fieldErrors,
+  focusFirstError,
+  hasErrors,
+  type FieldErrors,
+} from '@/lib/formValidation'
+import {
   useMovementPhotoStaging,
   type StagedPhotoError,
 } from '@/components/useMovementPhotoStaging'
+
+/**
+ * The movement fields validated on save. `photos` is not a `Field`, so the
+ * photos section is wrapped in its own `data-field` container.
+ */
+interface MovementFields {
+  company: string
+  project: string
+  driver: string
+  recorded_at: string
+  photos: string
+}
+
+const MOVEMENT_FIELD_ORDER = [
+  'company',
+  'project',
+  'driver',
+  'recorded_at',
+  'photos',
+] as const
 
 interface EntryExitFormProps {
   open: boolean
@@ -116,6 +153,17 @@ export function EntryExitForm({
     useState<AsyncSearchSelectOption | null>(null)
   const [quickLessor, setQuickLessor] = useState(EMPTY_QUICK_LESSOR)
   const [quickSaving, setQuickSaving] = useState(false)
+  const [movementErrors, setMovementErrors] = useState<
+    FieldErrors<MovementFields>
+  >({})
+  const [quickDriverErrors, setQuickDriverErrors] = useState<
+    FieldErrors<QuickDriverFormValues>
+  >({})
+  const [quickEquipmentErrors, setQuickEquipmentErrors] = useState<
+    FieldErrors<QuickEquipmentFormValues>
+  >({})
+  const detailsRef = useRef<HTMLDivElement>(null)
+  const quickDriverRef = useRef<HTMLDivElement>(null)
   const equipmentListRef = useRef<HTMLDivElement>(null)
   const quickEquipmentRef = useRef<HTMLDivElement>(null)
   const successRef = useRef<HTMLDivElement>(null)
@@ -152,7 +200,12 @@ export function EntryExitForm({
   const currentLocalDateTime = toLocalDateTimeInput(new Date())
   const movementDate = movementDateKey(recordedAt)
 
+  /** Editing a field clears its message; nothing is validated while typing. */
+  const clearMovementErrors = (...fields: (keyof MovementFields)[]) =>
+    setMovementErrors((current) => clearFieldErrors(current, fields))
+
   const updateMovementDate = (date: string) => {
+    clearMovementErrors('recorded_at')
     if (!date) {
       setRecordedAt('')
       return
@@ -188,6 +241,9 @@ export function EntryExitForm({
     setQuickEquipment(EMPTY_QUICK_EQUIPMENT)
     setSelectedQuickLessor(null)
     setQuickLessor(EMPTY_QUICK_LESSOR)
+    setMovementErrors({})
+    setQuickDriverErrors({})
+    setQuickEquipmentErrors({})
   }, [resetPhotoStaging])
 
   useEffect(() => {
@@ -360,11 +416,12 @@ export function EntryExitForm({
   }
 
   const createQuickDriver = async () => {
-    if (
-      !quickDriver.fullName.trim() ||
-      !/^\+?\d{7,15}$/.test(quickDriver.mobile)
-    ) {
-      setSaveError(t('invalidQuickDriver'))
+    const invalid = validateQuickDriverForm(quickDriver)
+    if (hasErrors(invalid)) {
+      setQuickDriverErrors(invalid)
+      focusFirstError(invalid, QUICK_DRIVER_FIELD_ORDER, {
+        root: quickDriverRef.current,
+      })
       return
     }
     setQuickSaving(true)
@@ -382,40 +439,17 @@ export function EntryExitForm({
     setDriverId(driver.id)
     setSelectedDriver(driverOption(driver))
     setQuickDriver(EMPTY_QUICK_DRIVER)
+    setQuickDriverErrors({})
+    clearMovementErrors('driver')
   }
 
   const createQuickEquipment = async () => {
-    if (
-      (!workshopMode &&
-        quickEquipment.identifierType === 'plate' &&
-        !/[0-9]/.test(quickEquipment.plate)) ||
-      (workshopMode && !/[0-9]/.test(quickEquipment.plate))
-    ) {
-      setSaveError(t('plateRequired'))
-      return
-    }
-    if (
-      !workshopMode &&
-      !quickEquipment.chassis.trim() &&
-      quickEquipment.identifierType === 'chassis'
-    ) {
-      setSaveError(t('chassisNumberRequired'))
-      return
-    }
-    if (
-      workshopMode &&
-      quickEquipment.numberingStatus === 'numbered' &&
-      !quickEquipment.code.trim()
-    ) {
-      setSaveError(t('equipmentCodeRequired'))
-      return
-    }
-    if (!workshopMode && !quickEquipment.type) {
-      setSaveError(t('equipmentTypeRequired'))
-      return
-    }
-    if (!workshopMode && !quickEquipment.lessorId) {
-      setSaveError(t('lessorRequired'))
+    const invalid = validateQuickEquipmentForm(quickEquipment, workshopMode)
+    if (hasErrors(invalid)) {
+      setQuickEquipmentErrors(invalid)
+      focusFirstError(invalid, QUICK_EQUIPMENT_FIELD_ORDER, {
+        root: quickEquipmentRef.current,
+      })
       return
     }
     setQuickSaving(true)
@@ -441,11 +475,13 @@ export function EntryExitForm({
       return
     }
     setQuickEquipment(EMPTY_QUICK_EQUIPMENT)
+    setQuickEquipmentErrors({})
     setSelectedQuickLessor(null)
     handleSelectEquipment(data as Equipment)
   }
 
   const handleAddPhotos = (files: FileList | null) => {
+    clearMovementErrors('photos')
     // Only the newly selected files are staged; photos already uploaded keep
     // their state and their staged storage objects.
     const firstNewIndex = stagedPhotos.length
@@ -462,42 +498,45 @@ export function EntryExitForm({
   const handleSave = async () => {
     if (!selected || !user) return
     if (validationError) return
-    if (workshopMode && stagedPhotos.length === 0) {
-      setSaveError(t('workshopPhotoRequired'))
-      return
-    }
-    if (stagedPhotos.length > 0 && !photoStaging.ready) {
-      setSaveError(t('photosMustFinishUploading'))
-      return
-    }
-    if (!workshopMode && isEntry && !driverId) {
-      setSaveError(t('driverRequired'))
-      return
-    }
-    if (!workshopMode && isEntry && !selectedCompanyId) {
-      setSaveError(t('companyRequiredForEntry'))
-      return
-    }
-    if (!workshopMode && isEntry && !selectedProjectId) {
-      setSaveError(t('projectRequiredForEntry'))
-      return
-    }
-    if (!recordedAt.trim()) {
-      setSaveError(`${t('actualMovementTime')}: ${t('required')}`)
-      return
-    }
+
+    // Exactly the checks this form ran before, reported per field so the user
+    // sees where each problem is instead of one message at the bottom.
+    const siteEntry = !workshopMode && isEntry
     const movementInstant = resolveMovementInstant(
       movementDate,
       new Date(),
       lastMovement?.recorded_at,
     )
-    if (
-      isNaN(movementInstant.getTime()) ||
-      movementInstant.getTime() > Date.now()
-    ) {
-      setSaveError(t('movementTimeCannotBeFuture'))
+    const invalid = fieldErrors<MovementFields>({
+      company:
+        siteEntry && !selectedCompanyId ? 'companyRequiredForEntry' : undefined,
+      project:
+        siteEntry && !selectedProjectId ? 'projectRequiredForEntry' : undefined,
+      driver: siteEntry && !driverId ? 'driverRequired' : undefined,
+      recorded_at: !recordedAt.trim()
+        ? 'movementDateRequired'
+        : isNaN(movementInstant.getTime()) ||
+            movementInstant.getTime() > Date.now()
+          ? 'movementTimeCannotBeFuture'
+          : undefined,
+      photos:
+        workshopMode && stagedPhotos.length === 0
+          ? 'workshopPhotoRequired'
+          : stagedPhotos.length > 0 && !photoStaging.ready
+            ? 'photosMustFinishUploading'
+            : undefined,
+    })
+    if (hasErrors(invalid)) {
+      setMovementErrors(invalid)
+      setSaveError(null)
+      // Every validated field lives on the details step, which is the step
+      // the save button belongs to, so only focus is needed here.
+      focusFirstError(invalid, MOVEMENT_FIELD_ORDER, {
+        root: detailsRef.current,
+      })
       return
     }
+    setMovementErrors({})
 
     setSaving(true)
     setSaveError(null)
@@ -621,7 +660,18 @@ export function EntryExitForm({
                 <QuickEquipmentForm
                   ref={quickEquipmentRef}
                   value={quickEquipment}
-                  onChange={setQuickEquipment}
+                  onChange={(next) => {
+                    setQuickEquipmentErrors((current) =>
+                      clearFieldErrors(
+                        current,
+                        QUICK_EQUIPMENT_FIELD_ORDER.filter(
+                          (field) => next[field] !== quickEquipment[field],
+                        ),
+                      ),
+                    )
+                    setQuickEquipment(next)
+                  }}
+                  errors={quickEquipmentErrors}
                   workshopMode={workshopMode}
                   saving={quickSaving}
                   selectedLessor={selectedQuickLessor}
@@ -633,6 +683,7 @@ export function EntryExitForm({
                   }
                   onCancel={() => {
                     setQuickEquipment(EMPTY_QUICK_EQUIPMENT)
+                    setQuickEquipmentErrors({})
                     setSelectedQuickLessor(null)
                   }}
                   onSave={createQuickEquipment}
@@ -643,7 +694,7 @@ export function EntryExitForm({
         )}
 
         {step === 'details' && selected && (
-          <div className="space-y-4">
+          <div ref={detailsRef} className="space-y-4">
             {/* Selected equipment info */}
             <div className="rounded-lg border p-4">
               <div className="mb-2 flex items-center justify-between">
@@ -714,12 +765,18 @@ export function EntryExitForm({
             <div className="space-y-4">
               {!workshopMode && isEntry ? (
                 <>
-                  <Field label={t('company')} required>
+                  <Field
+                    label={t('company')}
+                    name="company"
+                    required
+                    error={movementErrors.company && t(movementErrors.company)}
+                  >
                     {() => (
                       <AsyncSearchSelect
                         value={selectedCompanyId}
                         selectedOption={selectedCompany}
                         onChange={(value, option) => {
+                          clearMovementErrors('company')
                           setSelectedCompanyId(value)
                           setSelectedCompany(option)
                         }}
@@ -729,12 +786,18 @@ export function EntryExitForm({
                     )}
                   </Field>
 
-                  <Field label={t('project')} required>
+                  <Field
+                    label={t('project')}
+                    name="project"
+                    required
+                    error={movementErrors.project && t(movementErrors.project)}
+                  >
                     {() => (
                       <AsyncSearchSelect
                         value={selectedProjectId}
                         selectedOption={selectedProject}
                         onChange={(value, option) => {
+                          clearMovementErrors('project')
                           setSelectedProjectId(value)
                           setSelectedProject(option)
                         }}
@@ -762,12 +825,18 @@ export function EntryExitForm({
               {/* Site EXIT has no driver field: the exit inherits the latest
                   current driver of the open visit server-side. */}
               {!workshopMode && isEntry && (
-                <Field label={t('driverName')} required>
+                <Field
+                  label={t('driverName')}
+                  name="driver"
+                  required
+                  error={movementErrors.driver && t(movementErrors.driver)}
+                >
                   {() => (
                     <AsyncSearchSelect
                       value={driverId}
                       selectedOption={selectedDriver}
                       onChange={(value, option) => {
+                        clearMovementErrors('driver')
                         setDriverId(value)
                         setSelectedDriver(option)
                       }}
@@ -787,16 +856,38 @@ export function EntryExitForm({
                 </Field>
               )}
               {!workshopMode && isEntry && quickDriver.open && (
-                <QuickDriverForm
-                  value={quickDriver}
-                  onChange={setQuickDriver}
-                  saving={quickSaving}
-                  onCancel={() => setQuickDriver(EMPTY_QUICK_DRIVER)}
-                  onSave={createQuickDriver}
-                />
+                <div ref={quickDriverRef}>
+                  <QuickDriverForm
+                    value={quickDriver}
+                    onChange={(next) => {
+                      setQuickDriverErrors((current) =>
+                        clearFieldErrors(
+                          current,
+                          QUICK_DRIVER_FIELD_ORDER.filter(
+                            (field) => next[field] !== quickDriver[field],
+                          ),
+                        ),
+                      )
+                      setQuickDriver(next)
+                    }}
+                    errors={quickDriverErrors}
+                    saving={quickSaving}
+                    onCancel={() => {
+                      setQuickDriver(EMPTY_QUICK_DRIVER)
+                      setQuickDriverErrors({})
+                    }}
+                    onSave={createQuickDriver}
+                  />
+                </div>
               )}
 
-              <Field label={t('actualMovementTime')}>
+              <Field
+                label={t('actualMovementTime')}
+                name="recorded_at"
+                error={
+                  movementErrors.recorded_at && t(movementErrors.recorded_at)
+                }
+              >
                 {(control) => (
                   <DatePicker
                     {...control}
@@ -808,7 +899,7 @@ export function EntryExitForm({
                 )}
               </Field>
 
-              <Field label={t('notes')}>
+              <Field label={t('notes')} name="notes">
                 {(control) => (
                   <Textarea
                     {...control}
@@ -820,16 +911,30 @@ export function EntryExitForm({
                 )}
               </Field>
 
-              <MovementPhotosSection
-                photos={stagedPhotos}
-                selectedIndex={photoIndex}
-                onSelectIndex={setPhotoIndex}
-                uploading={uploadingPhotos}
-                required={workshopMode}
-                onAddFiles={handleAddPhotos}
-                onRemoveIndex={handleRemovePhoto}
-                onRetryPhoto={photoStaging.retryPhoto}
-              />
+              {/* The photos section is not a `Field`, so it carries its own
+                  `data-field` container and message. */}
+              <div data-field="photos">
+                <MovementPhotosSection
+                  photos={stagedPhotos}
+                  selectedIndex={photoIndex}
+                  onSelectIndex={setPhotoIndex}
+                  uploading={uploadingPhotos}
+                  required={workshopMode}
+                  onAddFiles={handleAddPhotos}
+                  onRemoveIndex={handleRemovePhoto}
+                  onRetryPhoto={photoStaging.retryPhoto}
+                />
+                {movementErrors.photos && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-danger">
+                    <AlertTriangle
+                      size={13}
+                      aria-hidden="true"
+                      className="shrink-0"
+                    />
+                    {t(movementErrors.photos)}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div ref={successRef} className="space-y-3">

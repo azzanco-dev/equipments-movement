@@ -5,50 +5,118 @@ const path = require('node:path')
 const vm = require('node:vm')
 const ts = require('typescript')
 
-// src/lib/driverForm.ts only has type-only imports, so it loads on its own.
-function loadDriverForm() {
-  const file = path.join(__dirname, '..', 'src', 'lib', 'driverForm.ts')
+// Loads a src/lib module, resolving its `@/lib/...` imports to the real files
+// so the helpers are exercised exactly as the dialog uses them. Type-only
+// imports (`@/i18n`, `@/components/ui`) are erased by the transpile step.
+function loadLibModule(name, cache = new Map()) {
+  if (cache.has(name)) return cache.get(name)
+  const file = path.join(__dirname, '..', 'src', 'lib', `${name}.ts`)
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
   }).outputText
   const exports = {}
-  vm.runInNewContext(code, { exports }, { filename: file })
+  cache.set(name, exports)
+  vm.runInNewContext(
+    code,
+    {
+      exports,
+      Date,
+      Math,
+      parseInt,
+      require(request) {
+        const match = /^@\/lib\/(.+)$/.exec(request)
+        if (match) return loadLibModule(match[1], cache)
+        throw new Error(`Unexpected module: ${request}`)
+      },
+    },
+    { filename: file },
+  )
   return exports
 }
 
-const driverForm = loadDriverForm()
+const driverForm = loadLibModule('driverForm')
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null))
+const assertErrors = (actual, expected) =>
+  assert.deepEqual(plain(actual), expected)
 const base = () => plain(driverForm.EMPTY_DRIVER_FORM)
 
 test('only the full name is mandatory', () => {
-  assert.equal(driverForm.validateDriverForm(base()), 'driverValidationError')
-  assert.equal(
-    driverForm.validateDriverForm({ ...base(), full_name: '  ' }),
-    'driverValidationError',
-  )
-  assert.equal(
+  assertErrors(driverForm.validateDriverForm(base()), {
+    full_name: 'fullNameRequired',
+  })
+  assertErrors(driverForm.validateDriverForm({ ...base(), full_name: '  ' }), {
+    full_name: 'fullNameRequired',
+  })
+  assertErrors(
     driverForm.validateDriverForm({ ...base(), full_name: 'احمد محمد' }),
-    null,
+    {},
   )
 })
 
 test('an id or mobile number is validated only when it is filled in', () => {
   const named = { ...base(), full_name: 'احمد' }
-  assert.equal(driverForm.validateDriverForm({ ...named, id_number: '' }), null)
-  assert.equal(
-    driverForm.validateDriverForm({ ...named, id_number: '123' }),
-    'driverValidationError',
-  )
-  assert.equal(
+  assertErrors(driverForm.validateDriverForm({ ...named, id_number: '' }), {})
+  assertErrors(driverForm.validateDriverForm({ ...named, id_number: '123' }), {
+    id_number: 'idNumberFormatInvalid',
+  })
+  assertErrors(
     driverForm.validateDriverForm({ ...named, id_number: '1023456789' }),
-    null,
+    {},
   )
-  assert.equal(
+  assertErrors(
     driverForm.validateDriverForm({ ...named, mobile_number: '12345' }),
-    'driverValidationError',
+    { mobile_number: 'mobileNumberFormatInvalid' },
+  )
+  assertErrors(
+    driverForm.validateDriverForm({ ...named, mobile_number: '+966500000000' }),
+    {},
+  )
+})
+
+test('every broken rule is reported at once, one message per field', () => {
+  assertErrors(
+    driverForm.validateDriverForm({
+      ...base(),
+      id_number: '12',
+      mobile_number: '99',
+    }),
+    {
+      full_name: 'fullNameRequired',
+      id_number: 'idNumberFormatInvalid',
+      mobile_number: 'mobileNumberFormatInvalid',
+    },
+  )
+})
+
+test('quick create asks for the full name and a valid mobile number', () => {
+  assertErrors(
+    driverForm.validateQuickDriverForm({ fullName: '', mobile: '' }),
+    { fullName: 'fullNameRequired', mobile: 'mobileNumberRequired' },
+  )
+  assertErrors(
+    driverForm.validateQuickDriverForm({ fullName: 'احمد', mobile: '123' }),
+    { mobile: 'mobileNumberFormatInvalid' },
+  )
+  assertErrors(
+    driverForm.validateQuickDriverForm({
+      fullName: 'احمد',
+      mobile: '0500000000',
+    }),
+    {},
+  )
+})
+
+test('a duplicate mobile or id number is attributed to that field', () => {
+  assertErrors(
+    driverForm.driverSaveFieldErrors({
+      code: '23505',
+      message:
+        'duplicate key value violates unique constraint "drivers_mobile_number_unique"',
+    }),
+    { mobile_number: 'mobileExists' },
   )
   assert.equal(
-    driverForm.validateDriverForm({ ...named, mobile_number: '+966500000000' }),
+    driverForm.driverSaveFieldErrors({ code: '23505', message: 'other' }),
     null,
   )
 })
@@ -74,7 +142,7 @@ test('the payload trims text and turns empty optional fields into null', () => {
       job_title: '  سائق  ',
     }),
   )
-  assert.deepEqual(payload, {
+  assertErrors(payload, {
     full_name: 'احمد محمد',
     name_en: 'Ahmed',
     id_number: '1023456789',
@@ -100,7 +168,7 @@ test('a record maps onto the form with nulls turned into empty strings', () => {
       updated_at: '2026-01-02',
     }),
   )
-  assert.deepEqual(values, {
+  assertErrors(values, {
     full_name: 'احمد',
     name_en: '',
     id_number: '',

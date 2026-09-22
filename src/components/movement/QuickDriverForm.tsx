@@ -1,5 +1,7 @@
 import { useI18n } from '@/i18n/I18nContext'
 import { Button, Field, Input } from '@/components/ui'
+import type { FieldErrors } from '@/lib/formValidation'
+import type { QuickDriverFormValues } from '@/lib/driverForm'
 
 export interface QuickDriverDraft {
   open: boolean
@@ -16,6 +18,8 @@ export const EMPTY_QUICK_DRIVER: QuickDriverDraft = {
 export interface QuickDriverFormProps {
   value: QuickDriverDraft
   onChange: (value: QuickDriverDraft) => void
+  /** Per-field messages, set on save only. */
+  errors?: FieldErrors<QuickDriverFormValues>
   saving: boolean
   onCancel: () => void
   onSave: () => void
@@ -28,6 +32,7 @@ export interface QuickDriverFormProps {
 export function QuickDriverForm({
   value,
   onChange,
+  errors,
   saving,
   onCancel,
   onSave,
@@ -37,7 +42,12 @@ export function QuickDriverForm({
     <div className="space-y-3 rounded-lg border p-4">
       <p className="font-semibold">{t('quickDriverAdd')}</p>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={t('fullName')} required>
+        <Field
+          label={t('fullName')}
+          name="fullName"
+          required
+          error={errors?.fullName && t(errors.fullName)}
+        >
           {(control) => (
             <Input
               {...control}
@@ -49,7 +59,12 @@ export function QuickDriverForm({
             />
           )}
         </Field>
-        <Field label={t('mobileNumber')} required>
+        <Field
+          label={t('mobileNumber')}
+          name="mobile"
+          required
+          error={errors?.mobile && t(errors.mobile)}
+        >
           {(control) => (
             <Input
               {...control}

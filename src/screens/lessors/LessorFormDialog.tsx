@@ -1,14 +1,21 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, ErrorState, Field, Input } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { supabase } from '@/lib/supabase'
 import {
   EMPTY_LESSOR_FORM,
+  LESSOR_FIELD_ORDER,
   buildLessorPayload,
   lessorFormValues,
   validateLessorForm,
   type LessorFormValues,
 } from '@/lib/lessorForm'
+import {
+  clearFieldErrors,
+  focusFirstError,
+  hasErrors,
+  type FieldErrors,
+} from '@/lib/formValidation'
 import type { Lessor } from '@/lib/types'
 
 export interface LessorFormDialogProps {
@@ -29,17 +36,33 @@ export function LessorFormDialog({
   const [form, setForm] = useState<LessorFormValues>(EMPTY_LESSOR_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<FieldErrors<LessorFormValues>>({})
+  const bodyRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
     setForm(lessor ? lessorFormValues(lessor) : EMPTY_LESSOR_FORM)
     setError(null)
+    setErrors({})
   }, [open, lessor])
+
+  /** Editing a field clears its message; nothing is validated while typing. */
+  const update = (patch: Partial<LessorFormValues>) => {
+    setForm((current) => ({ ...current, ...patch }))
+    setErrors((current) =>
+      clearFieldErrors(
+        current,
+        Object.keys(patch) as (keyof LessorFormValues)[],
+      ),
+    )
+  }
 
   const save = async () => {
     const invalid = validateLessorForm(form)
-    if (invalid) {
-      setError(t(invalid))
+    if (hasErrors(invalid)) {
+      setErrors(invalid)
+      setError(null)
+      focusFirstError(invalid, LESSOR_FIELD_ORDER, { root: bodyRef.current })
       return
     }
     setSaving(true)
@@ -75,39 +98,36 @@ export function LessorFormDialog({
         </>
       }
     >
-      <div className="space-y-4">
+      <div ref={bodyRef} className="space-y-4">
         {error && <ErrorState title={error} className="p-4" />}
-        <Field label={t('lessorName')} required>
+        <Field
+          label={t('lessorName')}
+          name="name"
+          required
+          error={errors.name && t(errors.name)}
+        >
           {(control) => (
             <Input
               {...control}
               placeholder={t('lessorNamePlaceholder')}
               value={form.name}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  name: event.target.value,
-                }))
-              }
+              onChange={(event) => update({ name: event.target.value })}
             />
           )}
         </Field>
-        <Field label={t('contactPerson')}>
+        <Field label={t('contactPerson')} name="contact_person">
           {(control) => (
             <Input
               {...control}
               placeholder={t('contactPersonPlaceholder')}
               value={form.contact_person}
               onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  contact_person: event.target.value,
-                }))
+                update({ contact_person: event.target.value })
               }
             />
           )}
         </Field>
-        <Field label={t('contactNumber')}>
+        <Field label={t('contactNumber')} name="contact_number">
           {(control) => (
             <Input
               {...control}
@@ -115,10 +135,7 @@ export function LessorFormDialog({
               placeholder={t('contactNumberPlaceholder')}
               value={form.contact_number}
               onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  contact_number: event.target.value,
-                }))
+                update({ contact_number: event.target.value })
               }
             />
           )}

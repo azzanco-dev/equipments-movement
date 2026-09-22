@@ -5,18 +5,41 @@ const path = require('node:path')
 const vm = require('node:vm')
 const ts = require('typescript')
 
-// src/lib/userForm.ts only has type-only imports, so it loads on its own.
-function loadUserForm() {
-  const file = path.join(__dirname, '..', 'src', 'lib', 'userForm.ts')
+// Loads a src/lib module, resolving its `@/lib/...` imports to the real files
+// so the helpers are exercised exactly as the dialog uses them. Type-only
+// imports (`@/i18n`, `@/components/ui`) are erased by the transpile step.
+function loadLibModule(name, cache = new Map()) {
+  if (cache.has(name)) return cache.get(name)
+  const file = path.join(__dirname, '..', 'src', 'lib', `${name}.ts`)
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
   }).outputText
   const exports = {}
-  vm.runInNewContext(code, { exports }, { filename: file })
+  cache.set(name, exports)
+  vm.runInNewContext(
+    code,
+    {
+      exports,
+      Date,
+      Math,
+      parseInt,
+      require(request) {
+        const match = /^@\/lib\/(.+)$/.exec(request)
+        if (match) return loadLibModule(match[1], cache)
+        throw new Error(`Unexpected module: ${request}`)
+      },
+    },
+    { filename: file },
+  )
   return exports
 }
 
-const userForm = loadUserForm()
+/** vm-realm objects have a foreign prototype, so compare plain copies. */
+const plain = (value) => JSON.parse(JSON.stringify(value ?? null))
+const assertErrors = (actual, expected) =>
+  assert.deepEqual(plain(actual), expected)
+
+const userForm = loadLibModule('userForm')
 const ROLES = [
   'admin',
   'supervisor',
@@ -27,7 +50,7 @@ const ROLES = [
 ]
 
 test('USER_ROLES lists every role exactly once', () => {
-  assert.deepEqual([...userForm.USER_ROLES].sort(), [...ROLES].sort())
+  assertErrors([...userForm.USER_ROLES].sort(), [...ROLES].sort())
   assert.equal(
     new Set(userForm.USER_ROLES).size,
     userForm.USER_ROLES.length,
@@ -64,4 +87,43 @@ test('an unrecognized role fails closed to a neutral, unlabeled badge', () => {
       'must not read as an existing role label',
     )
   }
+})
+
+test('the add-user form reports its three rules per field', () => {
+  const base = () => ({ ...userForm.EMPTY_USER_FORM })
+  assertErrors(userForm.validateUserForm(base()), {
+    full_name: 'fullNameRequired',
+    email: 'emailRequired',
+    password: 'passwordRequired',
+  })
+  assertErrors(
+    userForm.validateUserForm({
+      ...base(),
+      full_name: 'احمد',
+      email: 'not-an-email',
+      password: 'short',
+    }),
+    { email: 'invalidUserEmail', password: 'passwordMinLength' },
+  )
+  assertErrors(
+    userForm.validateUserForm({
+      ...base(),
+      full_name: 'احمد',
+      email: 'name@example.com',
+      password: '12345678',
+    }),
+    {},
+  )
+})
+
+test('a rejected email or password is attributed to its field', () => {
+  assertErrors(userForm.userServerFieldErrors('email_exists'), {
+    email: 'userEmailExists',
+  })
+  assertErrors(userForm.userServerFieldErrors('weak_password'), {
+    password: 'passwordMinLength',
+  })
+  // Anything else stays a top-level message.
+  assert.equal(userForm.userServerFieldErrors('boom'), null)
+  assert.equal(userForm.userServerFieldErrors(undefined), null)
 })

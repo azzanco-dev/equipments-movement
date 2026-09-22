@@ -12,6 +12,8 @@ import {
   type AsyncSearchSelectOption,
 } from '@/components/AsyncSearchSelect'
 import { PlateNumberInput } from '@/components/PlateNumberInput'
+import type { FieldErrors } from '@/lib/formValidation'
+import type { QuickEquipmentFormValues } from '@/lib/equipmentForm'
 
 export interface QuickEquipmentDraft {
   open: boolean
@@ -38,6 +40,8 @@ export const EMPTY_QUICK_EQUIPMENT: QuickEquipmentDraft = {
 export interface QuickEquipmentFormProps {
   value: QuickEquipmentDraft
   onChange: (value: QuickEquipmentDraft) => void
+  /** Per-field messages, set on save only. */
+  errors?: FieldErrors<QuickEquipmentFormValues>
   /** The workshop form asks for a numbering status and a plate only. */
   workshopMode: boolean
   saving: boolean
@@ -62,6 +66,7 @@ export const QuickEquipmentForm = forwardRef<
   {
     value,
     onChange,
+    errors,
     workshopMode,
     saving,
     selectedLessor,
@@ -117,7 +122,12 @@ export const QuickEquipmentForm = forwardRef<
       )}
 
       {workshopMode && value.numberingStatus === 'numbered' && (
-        <Field label={t('equipmentCode')} required>
+        <Field
+          label={t('equipmentCode')}
+          name="code"
+          required
+          error={errors?.code && t(errors.code)}
+        >
           {(control) => (
             <Input
               {...control}
@@ -133,7 +143,12 @@ export const QuickEquipmentForm = forwardRef<
       )}
 
       {(workshopMode || value.identifierType === 'plate') && (
-        <Field label={t('plateNumber')} required>
+        <Field
+          label={t('plateNumber')}
+          name="plate"
+          required
+          error={errors?.plate && t(errors.plate)}
+        >
           {() => (
             <PlateNumberInput
               value={value.plate}
@@ -147,7 +162,9 @@ export const QuickEquipmentForm = forwardRef<
         <>
           <Field
             label={t('chassisNumber')}
+            name="chassis"
             required={value.identifierType === 'chassis'}
+            error={errors?.chassis && t(errors.chassis)}
           >
             {(control) => (
               <Input
@@ -162,7 +179,12 @@ export const QuickEquipmentForm = forwardRef<
             )}
           </Field>
 
-          <Field label={t('equipmentType')} required>
+          <Field
+            label={t('equipmentType')}
+            name="type"
+            required
+            error={errors?.type && t(errors.type)}
+          >
             {() => (
               <AsyncSearchSelect
                 value={value.type}
@@ -176,7 +198,12 @@ export const QuickEquipmentForm = forwardRef<
             )}
           </Field>
 
-          <Field label={t('externalSupplier')} required>
+          <Field
+            label={t('externalSupplier')}
+            name="lessorId"
+            required
+            error={errors?.lessorId && t(errors.lessorId)}
+          >
             {() => (
               <AsyncSearchSelect
                 value={value.lessorId}

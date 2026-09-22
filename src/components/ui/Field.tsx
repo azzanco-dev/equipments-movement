@@ -20,6 +20,9 @@ export interface FieldProps {
   /** Validation message; also marks the control invalid. */
   error?: ReactNode
   required?: boolean
+  /** Form field name, exposed as `data-field` so a form can focus and scroll
+   * to its first invalid field after a submit. */
+  name?: string
   className?: string
   children: (control: FieldControlProps) => ReactNode
 }
@@ -34,6 +37,7 @@ export function Field({
   hint,
   error,
   required,
+  name,
   className,
   children,
 }: FieldProps) {
@@ -43,7 +47,7 @@ export function Field({
   const describedBy = [errorId, hintId].filter(Boolean).join(' ') || undefined
 
   return (
-    <div className={cn('min-w-0', className)}>
+    <div data-field={name} className={cn('min-w-0', className)}>
       <Label.Root htmlFor={id} className="label">
         {label}
         {required && (

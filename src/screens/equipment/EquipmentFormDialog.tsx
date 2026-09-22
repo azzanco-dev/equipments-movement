@@ -20,14 +20,22 @@ import { localizedName } from '@/lib/localizedName'
 import { usesExternalSupplier } from '@/lib/equipmentOwnership'
 import {
   EMPTY_EQUIPMENT_FORM,
+  EQUIPMENT_FIELD_ORDER,
   applyEquipmentCode,
   applyOwnershipStatus,
   buildEquipmentPayload,
   equipmentFormValues,
+  equipmentSaveFieldErrors,
   genQrValue,
   validateEquipmentForm,
   type EquipmentFormValues,
 } from '@/lib/equipmentForm'
+import {
+  clearFieldErrors,
+  focusFirstError,
+  hasErrors,
+  type FieldErrors,
+} from '@/lib/formValidation'
 import type { Equipment, OperationalStatus, OwnershipStatus } from '@/lib/types'
 
 /** Radix reserves '' for "no value", so the optional select uses a sentinel. */
@@ -55,6 +63,12 @@ export function EquipmentFormDialog({
   const [lessorOption, setLessorOption] = useState<SelectOption | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<FieldErrors<EquipmentFormValues>>({})
+  const bodyRef = useRef<HTMLDivElement>(null)
+
+  /** Editing a field clears its message; nothing is validated while typing. */
+  const clearErrors = (...fields: (keyof EquipmentFormValues)[]) =>
+    setErrors((current) => clearFieldErrors(current, fields))
 
   // Reloads the form every time the dialog opens, and when the deep-linked
   // `?edit=` record arrives after the dialog is already open.
@@ -83,6 +97,7 @@ export function EquipmentFormDialog({
         : null,
     )
     setError(null)
+    setErrors({})
   }, [open, equipment])
 
   const loadEquipmentTypes = useCallback(async (query: string) => {
@@ -133,12 +148,14 @@ export function EquipmentFormDialog({
 
   /** Ownership is derived from the code prefix; a non-supplier owner clears
    *  the supplier selection as well as the stored `lessor_id`. */
-  const updateCode = (code: string) =>
+  const updateCode = (code: string) => {
+    clearErrors('code')
     setForm((current) => {
       const next = applyEquipmentCode(current, code)
       if (!usesExternalSupplier(next.ownership_status)) setLessorOption(null)
       return next
     })
+  }
 
   const updateOwnership = (status: OwnershipStatus) =>
     setForm((current) => {
@@ -148,8 +165,10 @@ export function EquipmentFormDialog({
 
   const handleSave = async () => {
     const invalid = validateEquipmentForm(form)
-    if (invalid) {
-      setError(t(invalid))
+    if (hasErrors(invalid)) {
+      setErrors(invalid)
+      setError(null)
+      focusFirstError(invalid, EQUIPMENT_FIELD_ORDER, { root: bodyRef.current })
       return
     }
     setSaving(true)
@@ -167,7 +186,19 @@ export function EquipmentFormDialog({
       onSaved()
     } catch (err) {
       console.error(err)
-      setError(t('saveFailed'))
+      // A duplicate code, QR value, or plate belongs on that field; anything
+      // else stays a safe top-level message, never the raw database text.
+      const attributed = equipmentSaveFieldErrors(
+        err as { code?: string | null; message?: string | null },
+      )
+      if (attributed) {
+        setErrors(attributed)
+        focusFirstError(attributed, EQUIPMENT_FIELD_ORDER, {
+          root: bodyRef.current,
+        })
+      } else {
+        setError(t('saveFailed'))
+      }
     } finally {
       setSaving(false)
     }
@@ -192,8 +223,13 @@ export function EquipmentFormDialog({
       }
     >
       {error && <ErrorState title={error} className="mb-4 p-4" />}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label={t('equipmentCode')} required>
+      <div ref={bodyRef} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field
+          label={t('equipmentCode')}
+          name="code"
+          required
+          error={errors.code && t(errors.code)}
+        >
           {(control) => (
             <Input
               {...control}
@@ -204,16 +240,22 @@ export function EquipmentFormDialog({
             />
           )}
         </Field>
-        <Field label={t('equipmentType')} required>
+        <Field
+          label={t('equipmentType')}
+          name="type"
+          required
+          error={errors.type && t(errors.type)}
+        >
           {() => (
             <AsyncSearchSelect
               value={form.type}
               selectedOption={
                 form.type ? { value: form.type, label: form.type } : null
               }
-              onChange={(value) =>
+              onChange={(value) => {
+                clearErrors('type')
                 setForm((current) => ({ ...current, type: value }))
-              }
+              }}
               loadOptions={loadEquipmentTypes}
               placeholder={t('selectEquipmentType')}
             />
@@ -221,13 +263,15 @@ export function EquipmentFormDialog({
         </Field>
         <Field
           label={t('equipmentIdentificationType')}
+          name="numbering_status"
           required
           className="sm:col-span-2"
         >
           {() => (
             <RadioGroup
               value={form.numbering_status}
-              onValueChange={(value) =>
+              onValueChange={(value) => {
+                clearErrors('plate_number')
                 setForm((current) =>
                   value === 'unnumbered'
                     ? {
@@ -237,7 +281,7 @@ export function EquipmentFormDialog({
                       }
                     : { ...current, numbering_status: 'numbered' },
                 )
-              }
+              }}
               className="!flex-row !gap-6 rounded-lg border px-3"
             >
               <RadioGroupItem value="numbered" label={t('vehiclePlate')} />
@@ -246,13 +290,20 @@ export function EquipmentFormDialog({
           )}
         </Field>
         {form.numbering_status === 'numbered' && (
-          <Field label={t('plateNumber')} required className="sm:col-span-2">
+          <Field
+            label={t('plateNumber')}
+            name="plate_number"
+            required
+            error={errors.plate_number && t(errors.plate_number)}
+            className="sm:col-span-2"
+          >
             {() => (
               <PlateNumberInput
                 value={form.plate_number}
-                onChange={(value) =>
+                onChange={(value) => {
+                  clearErrors('plate_number')
                   setForm((current) => ({ ...current, plate_number: value }))
-                }
+                }}
               />
             )}
           </Field>
@@ -452,19 +503,25 @@ export function EquipmentFormDialog({
             />
           )}
         </Field>
-        <Field label={t('qrValue')} required>
+        <Field
+          label={t('qrValue')}
+          name="qr_value"
+          required
+          error={errors.qr_value && t(errors.qr_value)}
+        >
           {(control) => (
             <Input
               {...control}
               dir="ltr"
               placeholder={t('qrValuePlaceholder')}
               value={form.qr_value}
-              onChange={(event) =>
+              onChange={(event) => {
+                clearErrors('qr_value')
                 setForm((current) => ({
                   ...current,
                   qr_value: event.target.value,
                 }))
-              }
+              }}
             />
           )}
         </Field>

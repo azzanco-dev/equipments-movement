@@ -10,6 +10,12 @@ import {
   inferOwnershipFromCode,
   usesExternalSupplier,
 } from '@/lib/equipmentOwnership'
+import {
+  duplicateFieldErrors,
+  fieldErrors,
+  required,
+  type FieldErrors,
+} from '@/lib/formValidation'
 
 /** Values held by the equipment add/edit dialog. Everything is a string so the
  *  form stays controlled; `buildEquipmentPayload` converts to database types. */
@@ -115,13 +121,97 @@ export function applyOwnershipStatus(
   }
 }
 
-/** Returns the translation key of the first problem, or null when valid. */
+/** The order the fields appear in, used to focus the first invalid one. */
+export const EQUIPMENT_FIELD_ORDER = [
+  'code',
+  'type',
+  'numbering_status',
+  'plate_number',
+  'qr_value',
+] as const
+
+/**
+ * Per-field messages for the rules the form already enforced: the plate of a
+ * numbered record, plus the code, type, and QR value the form marks required
+ * and the database stores `NOT NULL`.
+ */
 export function validateEquipmentForm(
   form: EquipmentFormValues,
-): TranslationKey | null {
-  if (form.numbering_status === 'numbered' && !/[0-9]/.test(form.plate_number))
-    return 'plateRequired'
-  return null
+): FieldErrors<EquipmentFormValues> {
+  return fieldErrors<EquipmentFormValues>({
+    code: required(form.code, 'equipmentCodeRequired'),
+    type: required(form.type, 'equipmentTypeRequired'),
+    plate_number:
+      form.numbering_status === 'numbered' && !/[0-9]/.test(form.plate_number)
+        ? 'plateRequired'
+        : undefined,
+    qr_value: required(form.qr_value, 'qrValueRequired'),
+  })
+}
+
+/** Values held by the inline quick-create equipment panel. */
+export interface QuickEquipmentFormValues {
+  plate: string
+  chassis: string
+  identifierType: 'plate' | 'chassis'
+  code: string
+  type: string
+  lessorId: string
+  numberingStatus: 'numbered' | 'unnumbered'
+}
+
+export const QUICK_EQUIPMENT_FIELD_ORDER = [
+  'code',
+  'plate',
+  'chassis',
+  'type',
+  'lessorId',
+] as const
+
+/**
+ * The same checks the movement form ran before saving a quick-created record,
+ * reported per field: the workshop panel asks for a code (when numbered) and
+ * a plate, the foreman panel for a plate or a chassis number plus the type
+ * and the external supplier.
+ */
+export function validateQuickEquipmentForm(
+  form: QuickEquipmentFormValues,
+  workshopMode: boolean,
+): FieldErrors<QuickEquipmentFormValues> {
+  const needsPlate = workshopMode || form.identifierType === 'plate'
+  return fieldErrors<QuickEquipmentFormValues>({
+    code:
+      workshopMode && form.numberingStatus === 'numbered'
+        ? required(form.code, 'equipmentCodeRequired')
+        : undefined,
+    plate:
+      needsPlate && !/[0-9]/.test(form.plate) ? 'plateRequired' : undefined,
+    chassis:
+      !workshopMode && form.identifierType === 'chassis'
+        ? required(form.chassis, 'chassisNumberRequired')
+        : undefined,
+    type: workshopMode
+      ? undefined
+      : required(form.type, 'equipmentTypeRequired'),
+    lessorId: workshopMode
+      ? undefined
+      : required(form.lessorId, 'lessorRequired'),
+  })
+}
+
+/** `equipment` is unique on the code, the QR value, and the plate parts. */
+export function equipmentSaveFieldErrors(
+  error: { code?: string | null; message?: string | null } | null | undefined,
+): FieldErrors<EquipmentFormValues> | null {
+  return duplicateFieldErrors<EquipmentFormValues>(error, [
+    {
+      match: 'equipment_plate',
+      field: 'plate_number',
+      key: 'plateNumberExists',
+    },
+    { match: 'equipment_qr_value', field: 'qr_value', key: 'qrValueExists' },
+    { match: 'equipment_code', field: 'code', key: 'equipmentCodeExists' },
+  ])
 }
 
 /** Insert/update payload for the `equipment` table. */

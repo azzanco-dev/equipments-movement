@@ -1,14 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, ErrorState, Field, Input } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { supabase } from '@/lib/supabase'
 import {
   EMPTY_PROJECT_FORM,
+  PROJECT_FIELD_ORDER,
   buildProjectPayload,
   projectFormValues,
+  projectSaveFieldErrors,
   validateProjectForm,
   type ProjectFormValues,
 } from '@/lib/projectForm'
+import {
+  clearFieldErrors,
+  focusFirstError,
+  hasErrors,
+  type FieldErrors,
+} from '@/lib/formValidation'
 import type { Project } from '@/lib/types'
 
 export interface ProjectFormDialogProps {
@@ -29,17 +37,33 @@ export function ProjectFormDialog({
   const [form, setForm] = useState<ProjectFormValues>(EMPTY_PROJECT_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<FieldErrors<ProjectFormValues>>({})
+  const bodyRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
     setForm(project ? projectFormValues(project) : EMPTY_PROJECT_FORM)
     setError(null)
+    setErrors({})
   }, [open, project])
+
+  /** Editing a field clears its message; nothing is validated while typing. */
+  const update = (patch: Partial<ProjectFormValues>) => {
+    setForm((current) => ({ ...current, ...patch }))
+    setErrors((current) =>
+      clearFieldErrors(
+        current,
+        Object.keys(patch) as (keyof ProjectFormValues)[],
+      ),
+    )
+  }
 
   const save = async () => {
     const invalid = validateProjectForm(form)
-    if (invalid) {
-      setError(t(invalid))
+    if (hasErrors(invalid)) {
+      setErrors(invalid)
+      setError(null)
+      focusFirstError(invalid, PROJECT_FIELD_ORDER, { root: bodyRef.current })
       return
     }
     setSaving(true)
@@ -50,6 +74,14 @@ export function ProjectFormDialog({
       : await supabase.from('projects').insert(payload)
     setSaving(false)
     if (result.error) {
+      const attributed = projectSaveFieldErrors(result.error)
+      if (attributed) {
+        setErrors(attributed)
+        focusFirstError(attributed, PROJECT_FIELD_ORDER, {
+          root: bodyRef.current,
+        })
+        return
+      }
       setError(t('saveFailed'))
       return
     }
@@ -75,37 +107,37 @@ export function ProjectFormDialog({
         </>
       }
     >
-      <div className="space-y-4">
+      <div ref={bodyRef} className="space-y-4">
         {error && <ErrorState title={error} className="p-4" />}
-        <Field label={t('projectNameAr')} required>
+        <Field
+          label={t('projectNameAr')}
+          name="name_ar"
+          required
+          error={errors.name_ar && t(errors.name_ar)}
+        >
           {(control) => (
             <Input
               {...control}
               dir="rtl"
               placeholder={t('projectNameArPlaceholder')}
               value={form.name_ar}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  name_ar: event.target.value,
-                }))
-              }
+              onChange={(event) => update({ name_ar: event.target.value })}
             />
           )}
         </Field>
-        <Field label={t('projectNameEn')} required>
+        <Field
+          label={t('projectNameEn')}
+          name="name_en"
+          required
+          error={errors.name_en && t(errors.name_en)}
+        >
           {(control) => (
             <Input
               {...control}
               dir="ltr"
               placeholder={t('projectNameEnPlaceholder')}
               value={form.name_en}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  name_en: event.target.value,
-                }))
-              }
+              onChange={(event) => update({ name_en: event.target.value })}
             />
           )}
         </Field>

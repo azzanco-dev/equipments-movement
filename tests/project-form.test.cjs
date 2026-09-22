@@ -5,36 +5,56 @@ const path = require('node:path')
 const vm = require('node:vm')
 const ts = require('typescript')
 
-// src/lib/projectForm.ts only has type-only imports, so it loads on its own.
-function loadProjectForm() {
-  const file = path.join(__dirname, '..', 'src', 'lib', 'projectForm.ts')
+// Loads a src/lib module, resolving its `@/lib/...` imports to the real files
+// so the helpers are exercised exactly as the dialog uses them. Type-only
+// imports (`@/i18n`, `@/components/ui`) are erased by the transpile step.
+function loadLibModule(name, cache = new Map()) {
+  if (cache.has(name)) return cache.get(name)
+  const file = path.join(__dirname, '..', 'src', 'lib', `${name}.ts`)
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
   }).outputText
   const exports = {}
-  vm.runInNewContext(code, { exports }, { filename: file })
+  cache.set(name, exports)
+  vm.runInNewContext(
+    code,
+    {
+      exports,
+      Date,
+      Math,
+      parseInt,
+      require(request) {
+        const match = /^@\/lib\/(.+)$/.exec(request)
+        if (match) return loadLibModule(match[1], cache)
+        throw new Error(`Unexpected module: ${request}`)
+      },
+    },
+    { filename: file },
+  )
   return exports
 }
 
-const projectForm = loadProjectForm()
+const projectForm = loadLibModule('projectForm')
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null))
+const assertErrors = (actual, expected) =>
+  assert.deepEqual(plain(actual), expected)
 const base = () => plain(projectForm.EMPTY_PROJECT_FORM)
 
 test('both the Arabic and English names are mandatory', () => {
-  assert.equal(
-    projectForm.validateProjectForm(base()),
-    'projectValidationError',
-  )
-  assert.equal(
+  assertErrors(projectForm.validateProjectForm(base()), {
+    name_ar: 'projectNameArRequired',
+    name_en: 'projectNameEnRequired',
+  })
+  assertErrors(
     projectForm.validateProjectForm({ ...base(), name_ar: 'مشروع الرياض' }),
-    'projectValidationError',
+    { name_en: 'projectNameEnRequired' },
   )
-  assert.equal(
+  assertErrors(
     projectForm.validateProjectForm({
       name_ar: 'مشروع الرياض',
       name_en: 'Riyadh Project',
     }),
-    null,
+    {},
   )
 })
 
@@ -45,7 +65,7 @@ test('the payload trims both names', () => {
       name_en: '  Riyadh Project  ',
     }),
   )
-  assert.deepEqual(payload, {
+  assertErrors(payload, {
     name_ar: 'مشروع الرياض',
     name_en: 'Riyadh Project',
   })
@@ -61,7 +81,7 @@ test('a record maps onto the form as-is', () => {
       updated_at: '2026-01-02',
     }),
   )
-  assert.deepEqual(values, {
+  assertErrors(values, {
     name_ar: 'مشروع الرياض',
     name_en: 'Riyadh Project',
   })

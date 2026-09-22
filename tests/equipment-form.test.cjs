@@ -37,6 +37,8 @@ function loadLibModule(name, cache = new Map()) {
 
 const form = loadLibModule('equipmentForm')
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null))
+const assertErrors = (actual, expected) =>
+  assert.deepEqual(plain(actual), expected)
 
 const base = () => plain(form.EMPTY_EQUIPMENT_FORM)
 
@@ -98,19 +100,119 @@ test('choosing any owner other than Other Owner clears lessor_id', () => {
   )
 })
 
+// The code, type, and QR value are `NOT NULL` in the database and already
+// marked required in the dialog; only the plate rule is form-specific.
+const complete = () => ({
+  ...base(),
+  code: 'A145',
+  type: 'BOOM TRUCK',
+  qr_value: 'EQ-1',
+})
+
 test('a numbered equipment needs at least one digit in the plate', () => {
-  assert.equal(form.validateEquipmentForm(base()), 'plateRequired')
-  assert.equal(
-    form.validateEquipmentForm({ ...base(), plate_number: '1234-ABJ' }),
-    null,
+  assertErrors(
+    form.validateEquipmentForm({ ...complete(), plate_number: '' }),
+    { plate_number: 'plateRequired' },
   )
-  assert.equal(
+  assertErrors(
+    form.validateEquipmentForm({ ...complete(), plate_number: '1234-ABJ' }),
+    {},
+  )
+  assertErrors(
     form.validateEquipmentForm({
-      ...base(),
+      ...complete(),
       numbering_status: 'unnumbered',
       plate_number: '',
     }),
-    null,
+    {},
+  )
+})
+
+test('the required code, type, and QR value each get their own message', () => {
+  assertErrors(form.validateEquipmentForm(base()), {
+    code: 'equipmentCodeRequired',
+    type: 'equipmentTypeRequired',
+    plate_number: 'plateRequired',
+    qr_value: 'qrValueRequired',
+  })
+})
+
+test('a duplicate code, QR value, or plate is attributed to that field', () => {
+  const duplicate = (name) =>
+    form.equipmentSaveFieldErrors({
+      code: '23505',
+      message: `duplicate key value violates unique constraint "${name}"`,
+    })
+  assertErrors(duplicate('idx_equipment_code'), {
+    code: 'equipmentCodeExists',
+  })
+  assertErrors(duplicate('idx_equipment_qr_value'), {
+    qr_value: 'qrValueExists',
+  })
+  assertErrors(duplicate('equipment_plate_parts_unique_idx'), {
+    plate_number: 'plateNumberExists',
+  })
+  assert.equal(duplicate('some_other_idx'), null)
+})
+
+test('the workshop quick create asks for a code and a plate', () => {
+  const draft = {
+    plate: '',
+    chassis: '',
+    identifierType: 'plate',
+    code: '',
+    type: '',
+    lessorId: '',
+    numberingStatus: 'numbered',
+  }
+  assertErrors(form.validateQuickEquipmentForm(draft, true), {
+    code: 'equipmentCodeRequired',
+    plate: 'plateRequired',
+  })
+  // An unnumbered workshop record needs the plate only.
+  assertErrors(
+    form.validateQuickEquipmentForm(
+      { ...draft, numberingStatus: 'unnumbered', plate: '1234' },
+      true,
+    ),
+    {},
+  )
+})
+
+test('the foreman quick create asks for the type and the supplier', () => {
+  const draft = {
+    plate: '1234',
+    chassis: '',
+    identifierType: 'plate',
+    code: '',
+    type: '',
+    lessorId: '',
+    numberingStatus: 'numbered',
+  }
+  assertErrors(form.validateQuickEquipmentForm(draft, false), {
+    type: 'equipmentTypeRequired',
+    lessorId: 'lessorRequired',
+  })
+  assertErrors(
+    form.validateQuickEquipmentForm(
+      { ...draft, type: 'BOOM TRUCK', lessorId: 'lessor-1' },
+      false,
+    ),
+    {},
+  )
+  // Identifying by chassis asks for the chassis instead of the plate.
+  assertErrors(
+    form.validateQuickEquipmentForm(
+      {
+        ...draft,
+        identifierType: 'chassis',
+        plate: '',
+        type: 'BOOM TRUCK',
+        lessorId: 'lessor-1',
+      },
+      false,
+    ),
+    { chassis: 'chassisNumberRequired' },
   )
 })
 
@@ -191,20 +293,20 @@ test('a record maps onto the form with nulls turned into empty strings', () => {
 })
 
 test('badge mapping keeps amber for warnings and never red for a status', () => {
-  assert.deepEqual(plain(form.operationalStatusBadge('operational')), {
+  assertErrors(plain(form.operationalStatusBadge('operational')), {
     tone: 'success',
     key: 'operational',
   })
-  assert.deepEqual(plain(form.operationalStatusBadge('maintenance')), {
+  assertErrors(plain(form.operationalStatusBadge('maintenance')), {
     tone: 'warning',
     key: 'maintenance',
   })
-  assert.deepEqual(plain(form.operationalStatusBadge('stopped')), {
+  assertErrors(plain(form.operationalStatusBadge('stopped')), {
     tone: 'neutral',
     key: 'stopped',
   })
   assert.equal(form.activeBadge(true).key, 'active')
-  assert.deepEqual(plain(form.activeBadge(false)), {
+  assertErrors(plain(form.activeBadge(false)), {
     tone: 'warning',
     key: 'inactive',
   })

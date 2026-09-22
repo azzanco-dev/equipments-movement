@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, Trash2, Users } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
 import { DataListActions } from '@/components/data-list/DataListActions'
@@ -32,7 +32,21 @@ import { usersListConfig } from '@/lib/listConfigs'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
-import { roleBadge, USER_ROLES } from '@/lib/userForm'
+import {
+  EMPTY_USER_FORM,
+  roleBadge,
+  USER_FIELD_ORDER,
+  USER_ROLES,
+  userServerFieldErrors,
+  validateUserForm,
+  type UserFormValues,
+} from '@/lib/userForm'
+import {
+  clearFieldErrors,
+  focusFirstError,
+  hasErrors,
+  type FieldErrors,
+} from '@/lib/formValidation'
 import type { Profile, UserRole } from '@/lib/types'
 
 interface AdminUsersProps {
@@ -48,12 +62,19 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   const [total, setTotal] = useState(0)
   const list = useDataListState(usersListConfig)
   const [modalOpen, setModalOpen] = useState(false)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [role, setRole] = useState<UserRole>('supervisor')
+  const [form, setForm] = useState<UserFormValues>(EMPTY_USER_FORM)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<FieldErrors<UserFormValues>>({})
+  const bodyRef = useRef<HTMLDivElement>(null)
+
+  /** Editing a field clears its message; nothing is validated while typing. */
+  const update = (patch: Partial<UserFormValues>) => {
+    setForm((current) => ({ ...current, ...patch }))
+    setErrors((current) =>
+      clearFieldErrors(current, Object.keys(patch) as (keyof UserFormValues)[]),
+    )
+  }
   const { confirm, confirmDialog } = useConfirm()
 
   const startListRequest = useListRequest()
@@ -103,26 +124,18 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   }))
 
   function openAdd() {
-    setEmail('')
-    setPassword('')
-    setFullName('')
-    setRole('supervisor')
+    setForm(EMPTY_USER_FORM)
     setFormError(null)
+    setErrors({})
     setModalOpen(true)
   }
 
   async function handleSave() {
     setFormError(null)
-    if (!fullName.trim() || !email.trim() || !password) {
-      setFormError(t('userFieldsRequired'))
-      return
-    }
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
-      setFormError(t('invalidUserEmail'))
-      return
-    }
-    if (password.length < 8) {
-      setFormError(t('passwordMinLength'))
+    const invalid = validateUserForm(form)
+    if (hasErrors(invalid)) {
+      setErrors(invalid)
+      focusFirstError(invalid, USER_FIELD_ORDER, { root: bodyRef.current })
       return
     }
     setSaving(true)
@@ -130,10 +143,10 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
       const result = await callEdgeFunction<{ user: { id: string } }>(
         'create-user',
         {
-          email: email.trim(),
-          password,
-          full_name: fullName.trim(),
-          role,
+          email: form.email.trim(),
+          password: form.password,
+          full_name: form.full_name.trim(),
+          role: form.role,
         },
       )
       setModalOpen(false)
@@ -141,25 +154,25 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     } catch (error) {
       const code =
         error instanceof EdgeFunctionError ? error.serverCode : undefined
+      // A rejected email or password belongs on that field; every other
+      // failure stays a safe top-level message.
+      const attributed = userServerFieldErrors(code)
+      if (attributed) {
+        setErrors(attributed)
+        focusFirstError(attributed, USER_FIELD_ORDER, { root: bodyRef.current })
+        return
+      }
       setFormError(
-        code === 'email_exists'
-          ? t('userEmailExists')
-          : code === 'invalid_email'
-            ? t('invalidUserEmail')
-            : code === 'weak_password'
-              ? t('passwordMinLength')
-              : error instanceof EdgeFunctionError && error.code === 'network'
-                ? t('networkConnectionError')
-                : error instanceof EdgeFunctionError &&
-                    error.code === 'sessionExpired'
-                  ? t('sessionExpiredError')
-                  : error instanceof EdgeFunctionError &&
-                      error.code === 'forbidden'
-                    ? t('userPermissionError')
-                    : error instanceof EdgeFunctionError &&
-                        error.code === 'server'
-                      ? t('serverTemporaryError')
-                      : t('userCreateError'),
+        error instanceof EdgeFunctionError && error.code === 'network'
+          ? t('networkConnectionError')
+          : error instanceof EdgeFunctionError &&
+              error.code === 'sessionExpired'
+            ? t('sessionExpiredError')
+            : error instanceof EdgeFunctionError && error.code === 'forbidden'
+              ? t('userPermissionError')
+              : error instanceof EdgeFunctionError && error.code === 'server'
+                ? t('serverTemporaryError')
+                : t('userCreateError'),
       )
     } finally {
       setSaving(false)
@@ -306,20 +319,30 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
           </>
         }
       >
-        <div className="space-y-4">
+        <div ref={bodyRef} className="space-y-4">
           {formError && <Notice tone="danger">{formError}</Notice>}
-          <Field label={t('fullName')} required>
+          <Field
+            label={t('fullName')}
+            name="full_name"
+            required
+            error={errors.full_name && t(errors.full_name)}
+          >
             {(control) => (
               <Input
                 {...control}
                 autoComplete="off"
                 placeholder={t('fullNamePlaceholder')}
-                value={fullName}
-                onChange={(event) => setFullName(event.target.value)}
+                value={form.full_name}
+                onChange={(event) => update({ full_name: event.target.value })}
               />
             )}
           </Field>
-          <Field label={t('email')} required>
+          <Field
+            label={t('email')}
+            name="email"
+            required
+            error={errors.email && t(errors.email)}
+          >
             {(control) => (
               <Input
                 {...control}
@@ -327,28 +350,33 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
                 dir="ltr"
                 autoComplete="off"
                 placeholder={t('emailPlaceholder')}
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                value={form.email}
+                onChange={(event) => update({ email: event.target.value })}
               />
             )}
           </Field>
-          <Field label={t('password')} required>
+          <Field
+            label={t('password')}
+            name="password"
+            required
+            error={errors.password && t(errors.password)}
+          >
             {(control) => (
               <PasswordInput
                 {...control}
                 autoComplete="new-password"
                 placeholder={t('passwordPlaceholder')}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                value={form.password}
+                onChange={(event) => update({ password: event.target.value })}
               />
             )}
           </Field>
-          <Field label={t('role')}>
+          <Field label={t('role')} name="role">
             {(control) => (
               <Select
                 {...control}
-                value={role}
-                onValueChange={(value) => setRole(value as UserRole)}
+                value={form.role}
+                onValueChange={(value) => update({ role: value as UserRole })}
                 options={roleOptions}
               />
             )}

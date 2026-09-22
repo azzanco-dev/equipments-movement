@@ -35,6 +35,7 @@ import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/lib/selectOption'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { focusFirstError, type FieldErrors } from '@/lib/formValidation'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { RelativeTime } from '@/components/RelativeTime'
 
@@ -51,6 +52,10 @@ type EquipmentTypeQueryRow = {
   equipment: Array<{ count: number }>
 }
 const PAGE_SIZE = 20
+
+/** The equipment-type dialog holds a single field. */
+type TypeFormValues = { name: string }
+const TYPE_FIELD_ORDER = ['name'] as const
 
 export function AdminSettings() {
   const { t } = useI18n()
@@ -70,6 +75,10 @@ export function AdminSettings() {
   const [editing, setEditing] = useState<EquipmentTypeRow | null>(null)
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  // The equipment-type dialog has a single field, so its messages sit under
+  // that field; `error` stays for the page-level import and delete failures.
+  const [nameErrors, setNameErrors] = useState<FieldErrors<TypeFormValues>>({})
+  const typeFormRef = useRef<HTMLDivElement>(null)
   const [importing, setImporting] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const [openingEquipmentId, setOpeningEquipmentId] = useState('')
@@ -131,19 +140,25 @@ export function AdminSettings() {
     setEditing(null)
     setName('')
     setError(null)
+    setNameErrors({})
     setModalOpen(true)
   }
   const openEdit = (row: EquipmentTypeRow) => {
     setEditing(row)
     setName(row.name)
     setError(null)
+    setNameErrors({})
     setModalOpen(true)
   }
 
   async function save() {
     const clean = name.trim()
     if (!clean) {
-      setError(t('equipmentTypeRequired'))
+      const invalid: FieldErrors<TypeFormValues> = {
+        name: 'equipmentTypeRequired',
+      }
+      setNameErrors(invalid)
+      focusFirstError(invalid, TYPE_FIELD_ORDER, { root: typeFormRef.current })
       return
     }
     const result = editing
@@ -153,7 +168,11 @@ export function AdminSettings() {
           .eq('id', editing.id)
       : await supabase.from('equipment_types').insert({ name: clean })
     if (result.error) {
-      setError(t('duplicateEquipmentType'))
+      // The only unique constraint on `equipment_types` is the name.
+      setNameErrors({ name: 'duplicateEquipmentType' })
+      focusFirstError({ name: 'duplicateEquipmentType' }, TYPE_FIELD_ORDER, {
+        root: typeFormRef.current,
+      })
       return
     }
     setModalOpen(false)
@@ -526,18 +545,26 @@ export function AdminSettings() {
           </>
         }
       >
-        <div className="space-y-4">
+        <div ref={typeFormRef} className="space-y-4">
           {error && (
             <Notice tone="danger" size="compact">
               {error}
             </Notice>
           )}
-          <Field label={t('equipmentTypeName')} required>
+          <Field
+            label={t('equipmentTypeName')}
+            name="name"
+            required
+            error={nameErrors.name && t(nameErrors.name)}
+          >
             {(control) => (
               <Input
                 {...control}
                 value={name}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => {
+                  setName(event.target.value)
+                  setNameErrors({})
+                }}
                 placeholder={t('equipmentTypePlaceholder')}
               />
             )}

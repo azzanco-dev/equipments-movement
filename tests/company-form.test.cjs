@@ -5,45 +5,77 @@ const path = require('node:path')
 const vm = require('node:vm')
 const ts = require('typescript')
 
-// src/lib/companyForm.ts only has type-only imports, so it loads on its own.
-function loadCompanyForm() {
-  const file = path.join(__dirname, '..', 'src', 'lib', 'companyForm.ts')
+// Loads a src/lib module, resolving its `@/lib/...` imports to the real files
+// so the helpers are exercised exactly as the dialog uses them. Type-only
+// imports (`@/i18n`, `@/components/ui`) are erased by the transpile step.
+function loadLibModule(name, cache = new Map()) {
+  if (cache.has(name)) return cache.get(name)
+  const file = path.join(__dirname, '..', 'src', 'lib', `${name}.ts`)
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
   }).outputText
   const exports = {}
-  vm.runInNewContext(code, { exports }, { filename: file })
+  cache.set(name, exports)
+  vm.runInNewContext(
+    code,
+    {
+      exports,
+      Date,
+      Math,
+      parseInt,
+      require(request) {
+        const match = /^@\/lib\/(.+)$/.exec(request)
+        if (match) return loadLibModule(match[1], cache)
+        throw new Error(`Unexpected module: ${request}`)
+      },
+    },
+    { filename: file },
+  )
   return exports
 }
 
-const companyForm = loadCompanyForm()
+const companyForm = loadLibModule('companyForm')
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null))
+const assertErrors = (actual, expected) =>
+  assert.deepEqual(plain(actual), expected)
 const base = () => plain(companyForm.EMPTY_COMPANY_FORM)
 
 test('both the Arabic and English names are mandatory', () => {
-  assert.equal(
-    companyForm.validateCompanyForm(base()),
-    'companyValidationError',
-  )
-  assert.equal(
+  assertErrors(companyForm.validateCompanyForm(base()), {
+    name_ar: 'companyNameArRequired',
+    name_en: 'companyNameEnRequired',
+  })
+  assertErrors(
     companyForm.validateCompanyForm({ ...base(), name_ar: 'شركة العزاني' }),
-    'companyValidationError',
+    { name_en: 'companyNameEnRequired' },
   )
-  assert.equal(
+  assertErrors(
     companyForm.validateCompanyForm({
       ...base(),
       name_ar: '  ',
       name_en: 'Azani Co.',
     }),
-    'companyValidationError',
+    { name_ar: 'companyNameArRequired' },
   )
-  assert.equal(
+  assertErrors(
     companyForm.validateCompanyForm({
       name_ar: 'شركة العزاني',
       name_en: 'Azani Co.',
     }),
-    null,
+    {},
   )
+})
+
+test('a duplicate name is attributed to the name that caused it', () => {
+  assertErrors(
+    companyForm.companySaveFieldErrors({
+      code: '23505',
+      message:
+        'duplicate key value violates unique constraint "idx_companies_name_en"',
+    }),
+    { name_en: 'duplicateCompany' },
+  )
+  assert.equal(companyForm.companySaveFieldErrors({ code: '42501' }), null)
 })
 
 test('the payload trims both names', () => {
@@ -53,7 +85,7 @@ test('the payload trims both names', () => {
       name_en: '  Azani Co.  ',
     }),
   )
-  assert.deepEqual(payload, {
+  assertErrors(payload, {
     name_ar: 'شركة العزاني',
     name_en: 'Azani Co.',
   })
@@ -69,7 +101,7 @@ test('a record maps onto the form as-is', () => {
       updated_at: '2026-01-02',
     }),
   )
-  assert.deepEqual(values, {
+  assertErrors(values, {
     name_ar: 'شركة العزاني',
     name_en: 'Azani Co.',
   })

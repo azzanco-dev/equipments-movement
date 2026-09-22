@@ -1,14 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, ErrorState, Field, Input } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { supabase } from '@/lib/supabase'
 import {
+  COMPANY_FIELD_ORDER,
   EMPTY_COMPANY_FORM,
   buildCompanyPayload,
   companyFormValues,
+  companySaveFieldErrors,
   validateCompanyForm,
   type CompanyFormValues,
 } from '@/lib/companyForm'
+import {
+  clearFieldErrors,
+  focusFirstError,
+  hasErrors,
+  type FieldErrors,
+} from '@/lib/formValidation'
 import type { Company } from '@/lib/types'
 
 export interface CompanyFormDialogProps {
@@ -29,17 +37,33 @@ export function CompanyFormDialog({
   const [form, setForm] = useState<CompanyFormValues>(EMPTY_COMPANY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errors, setErrors] = useState<FieldErrors<CompanyFormValues>>({})
+  const bodyRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
     setForm(company ? companyFormValues(company) : EMPTY_COMPANY_FORM)
     setError(null)
+    setErrors({})
   }, [open, company])
+
+  /** Editing a field clears its message; nothing is validated while typing. */
+  const update = (patch: Partial<CompanyFormValues>) => {
+    setForm((current) => ({ ...current, ...patch }))
+    setErrors((current) =>
+      clearFieldErrors(
+        current,
+        Object.keys(patch) as (keyof CompanyFormValues)[],
+      ),
+    )
+  }
 
   const save = async () => {
     const invalid = validateCompanyForm(form)
-    if (invalid) {
-      setError(t(invalid))
+    if (hasErrors(invalid)) {
+      setErrors(invalid)
+      setError(null)
+      focusFirstError(invalid, COMPANY_FIELD_ORDER, { root: bodyRef.current })
       return
     }
     setSaving(true)
@@ -50,6 +74,16 @@ export function CompanyFormDialog({
       : await supabase.from('companies').insert(payload)
     setSaving(false)
     if (result.error) {
+      // A duplicate name belongs on the name that caused it; anything else
+      // stays a safe top-level message.
+      const attributed = companySaveFieldErrors(result.error)
+      if (attributed) {
+        setErrors(attributed)
+        focusFirstError(attributed, COMPANY_FIELD_ORDER, {
+          root: bodyRef.current,
+        })
+        return
+      }
       setError(t('saveFailed'))
       return
     }
@@ -75,37 +109,37 @@ export function CompanyFormDialog({
         </>
       }
     >
-      <div className="space-y-4">
+      <div ref={bodyRef} className="space-y-4">
         {error && <ErrorState title={error} className="p-4" />}
-        <Field label={t('companyNameAr')} required>
+        <Field
+          label={t('companyNameAr')}
+          name="name_ar"
+          required
+          error={errors.name_ar && t(errors.name_ar)}
+        >
           {(control) => (
             <Input
               {...control}
               dir="rtl"
               placeholder={t('companyNameArPlaceholder')}
               value={form.name_ar}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  name_ar: event.target.value,
-                }))
-              }
+              onChange={(event) => update({ name_ar: event.target.value })}
             />
           )}
         </Field>
-        <Field label={t('companyNameEn')} required>
+        <Field
+          label={t('companyNameEn')}
+          name="name_en"
+          required
+          error={errors.name_en && t(errors.name_en)}
+        >
           {(control) => (
             <Input
               {...control}
               dir="ltr"
               placeholder={t('companyNameEnPlaceholder')}
               value={form.name_en}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  name_en: event.target.value,
-                }))
-              }
+              onChange={(event) => update({ name_en: event.target.value })}
             />
           )}
         </Field>

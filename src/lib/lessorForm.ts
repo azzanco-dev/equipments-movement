@@ -1,5 +1,5 @@
-import type { TranslationKey } from '@/i18n/translations'
 import type { Lessor } from '@/lib/types'
+import { fieldErrors, required, type FieldErrors } from '@/lib/formValidation'
 
 /** Values held by the lessor add/edit dialog. */
 export interface LessorFormValues {
@@ -23,12 +23,23 @@ export function lessorFormValues(lessor: Lessor): LessorFormValues {
   }
 }
 
-/** Only the name is mandatory; contact details are optional. */
+/** The order the fields appear in, used to focus the first invalid one. */
+export const LESSOR_FIELD_ORDER = [
+  'name',
+  'contact_person',
+  'contact_number',
+] as const
+
+/**
+ * Only the name is mandatory; contact details are optional and stay
+ * unvalidated, exactly as before.
+ */
 export function validateLessorForm(
   form: LessorFormValues,
-): TranslationKey | null {
-  if (!form.name.trim()) return 'lessorNameRequired'
-  return null
+): FieldErrors<LessorFormValues> {
+  return fieldErrors<LessorFormValues>({
+    name: required(form.name, 'lessorNameRequired'),
+  })
 }
 
 /** Insert/update payload for the `lessors` table. */
