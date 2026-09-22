@@ -8,7 +8,6 @@ import { useI18n } from '@/i18n/I18nContext'
 import { localizedName } from '@/lib/localizedName'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import {
-  Badge,
   Button,
   Card,
   EmptyState,
@@ -17,20 +16,16 @@ import {
   SectionHeader,
   Skeleton,
 } from '@/components/ui'
-import type { BadgeTone } from '@/components/ui'
 import {
   EquipmentSuggestSearch,
   type EquipmentSuggestion,
 } from '@/components/inquiry/EquipmentSuggestSearch'
 import { EquipmentTimeline } from '@/components/inquiry/EquipmentTimeline'
-import type { EquipmentPresence, TimelineMovement } from '@/lib/visitTimeline'
+import type { TimelineMovement } from '@/lib/visitTimeline'
 import {
   buildEquipmentSuggestFilter,
-  deriveEquipmentState,
   parseEquipmentIdParam,
-  type InquiryLastMovement,
 } from '@/lib/equipmentInquiry'
-import type { OwnershipStatus } from '@/lib/types'
 
 /**
  * `/inquiry`: one search field finds an equipment by code/plate/chassis/type,
@@ -51,7 +46,6 @@ interface InquiryEquipmentRow {
   type: string | null
   plate_number: string | null
   chassis_number: string | null
-  ownership_status: OwnershipStatus
 }
 
 interface MovementLogTimelineRow {
@@ -78,18 +72,6 @@ const SUGGEST_DEBOUNCE_MS = 300
 // entry that actually opened it — a display nuance, not a data error.
 const MOVEMENTS_PAGE_SIZE = 40
 
-const STATE_TONE: Record<EquipmentPresence, BadgeTone> = {
-  inside_site: 'success',
-  inside_workshop: 'info',
-  outside: 'neutral',
-}
-
-const STATE_LABEL = {
-  inside_site: 'insideSite',
-  inside_workshop: 'insideWorkshop',
-  outside: 'outsideSite',
-} as const
-
 export function EquipmentInquiryScreen({
   onSelectMovement,
 }: {
@@ -112,9 +94,6 @@ export function EquipmentInquiryScreen({
   const [suggestLoading, setSuggestLoading] = useState(false)
 
   const [equipment, setEquipment] = useState<InquiryEquipmentRow | null>(null)
-  const [lastMovement, setLastMovement] = useState<InquiryLastMovement | null>(
-    null,
-  )
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState(false)
   const [detailMissing, setDetailMissing] = useState(false)
@@ -188,7 +167,7 @@ export function EquipmentInquiryScreen({
     }
   }, [query, startSuggestRequest])
 
-  // --- Selected equipment + current state -------------------------------
+  // --- Selected equipment -----------------------------------------------
 
   const fetchDetail = useCallback(
     async (id: string) => {
@@ -196,28 +175,19 @@ export function EquipmentInquiryScreen({
       setDetailError(false)
       setDetailMissing(false)
       const signal = startDetailRequest()
-      const [equipmentResult, lastMovementResult] = await Promise.all([
-        supabase
-          .from('equipment')
-          .select('id,code,type,plate_number,chassis_number,ownership_status')
-          .eq('id', id)
-          .abortSignal(signal)
-          .maybeSingle(),
-        // get_last_movement returns the latest movement across BOTH contexts
-        // regardless of the context argument (migration 0091) and is granted
-        // to every authenticated role, so the current state stays correct
-        // even when entry_exit_logs RLS would hide the row from a plain
-        // select (e.g. a foreman looking up equipment inside the workshop).
-        supabase.rpc('get_last_movement', {
-          p_equipment_id: id,
-          p_movement_context: 'site',
-        }),
-      ])
+      // The brief row is identity only (code, type, plate or chassis); the
+      // current state and the time since the last movement come from the
+      // timeline summary cards below, so no extra read is needed here.
+      const equipmentResult = await supabase
+        .from('equipment')
+        .select('id,code,type,plate_number,chassis_number')
+        .eq('id', id)
+        .abortSignal(signal)
+        .maybeSingle()
       if (signal.aborted) return
-      if (equipmentResult.error || lastMovementResult.error) {
+      if (equipmentResult.error) {
         setDetailError(true)
         setEquipment(null)
-        setLastMovement(null)
         setDetailLoading(false)
         return
       }
@@ -225,14 +195,10 @@ export function EquipmentInquiryScreen({
       if (!row) {
         setDetailMissing(true)
         setEquipment(null)
-        setLastMovement(null)
         setDetailLoading(false)
         return
       }
-      const lastRows =
-        (lastMovementResult.data as InquiryLastMovement[] | null) ?? []
       setEquipment(row)
-      setLastMovement(lastRows[0] ?? null)
       setQuery(row.code)
       setDetailLoading(false)
     },
@@ -276,7 +242,6 @@ export function EquipmentInquiryScreen({
   useEffect(() => {
     if (!equipmentId) {
       setEquipment(null)
-      setLastMovement(null)
       setMovements([])
       setMovementsOffset(0)
       setHasMoreMovements(false)
@@ -345,35 +310,6 @@ export function EquipmentInquiryScreen({
     [movements, lang],
   )
 
-  const state = useMemo(
-    () => deriveEquipmentState(lastMovement),
-    [lastMovement],
-  )
-
-  const ownerLabel = equipment
-    ? equipment.ownership_status === 'alazani'
-      ? t('ownershipAlazani')
-      : equipment.ownership_status === 'takween'
-        ? t('ownershipTakween')
-        : equipment.ownership_status === 'third_party_f'
-          ? t('ownershipThirdPartyF')
-          : equipment.ownership_status === 'third_party_partnership_b'
-            ? t('ownershipThirdPartyPartnershipB')
-            : t('ownershipExternalSupplier')
-    : null
-
-  // Company and project are two lines under the identity row (owner
-  // decision): one joined line overflowed the card on long names.
-  const stateCompany =
-    state.presence === 'inside_site'
-      ? localizedName(lang, state.companyNameAr, state.companyNameEn)
-      : null
-  const stateProject =
-    state.presence === 'inside_site'
-      ? localizedName(lang, state.projectNameAr, state.projectNameEn)
-      : null
-  const hasName = (value: string | null) => Boolean(value && value !== '—')
-
   return (
     <div className="space-y-5">
       <PageHeader
@@ -435,7 +371,11 @@ export function EquipmentInquiryScreen({
           />
         ) : equipment ? (
           <div className="space-y-4">
-            <div className="space-y-2 rounded-lg border bg-surface px-3 py-2.5">
+            {/* Identity only: code, type, and the plate — or the chassis
+                number when the equipment has no plate. The current state,
+                the time since the last movement, and the latest visit's
+                company/project/foreman all live in the timeline below. */}
+            <div className="rounded-lg border bg-surface px-3 py-2.5">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span className="font-semibold" dir="ltr">
                   {equipment.code}
@@ -443,53 +383,19 @@ export function EquipmentInquiryScreen({
                 <span className="truncate-safe min-w-0 text-sm text-muted">
                   {equipment.type || '—'}
                 </span>
-                {equipment.plate_number && (
+                {equipment.plate_number ? (
                   <span className="text-sm text-muted" dir="ltr">
                     {equipment.plate_number}
                   </span>
-                )}
-                {ownerLabel && <Badge>{ownerLabel}</Badge>}
-                <span className="mx-1 hidden text-muted sm:inline">·</span>
-                <Badge tone={STATE_TONE[state.presence]}>
-                  {t(STATE_LABEL[state.presence])}
-                </Badge>
-              </div>
-              {state.presence === 'inside_site' &&
-                (hasName(stateCompany) || hasName(stateProject)) && (
-                  <div className="min-w-0 space-y-0.5 text-sm">
-                    {hasName(stateCompany) && (
-                      <p
-                        className="truncate-safe text-fg"
-                        title={stateCompany!}
-                      >
-                        {stateCompany}
-                      </p>
-                    )}
-                    {hasName(stateProject) && (
-                      <p
-                        className="truncate-safe text-muted"
-                        title={stateProject!}
-                      >
-                        {stateProject}
-                      </p>
-                    )}
-                  </div>
-                )}
-              {state.presence === 'inside_site' && state.supervisorName && (
-                <p className="truncate-safe text-xs text-muted">
-                  {state.supervisorName}
-                </p>
-              )}
-              {state.presence === 'inside_workshop' &&
-                state.workshopPurpose && (
-                  <span className="text-xs text-muted">
-                    {t(
-                      state.workshopPurpose === 'maintenance'
-                        ? 'maintenancePurpose'
-                        : 'parkingPurpose',
-                    )}
+                ) : equipment.chassis_number ? (
+                  <span className="min-w-0 text-sm text-muted">
+                    {t('chassisNumber')}:{' '}
+                    <span dir="ltr" className="inline-block">
+                      {equipment.chassis_number}
+                    </span>
                   </span>
-                )}
+                ) : null}
+              </div>
             </div>
 
             {movementsError ? (
