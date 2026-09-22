@@ -21,6 +21,8 @@ import { usesExternalSupplier } from '@/lib/equipmentOwnership'
 import {
   EMPTY_EQUIPMENT_FORM,
   EQUIPMENT_FIELD_ORDER,
+  EQUIPMENT_STATUSES,
+  equipmentStatusKey,
   applyEquipmentCode,
   applyOwnershipStatus,
   buildEquipmentPayload,
@@ -36,7 +38,12 @@ import {
   hasErrors,
   type FieldErrors,
 } from '@/lib/formValidation'
-import type { Equipment, OperationalStatus, OwnershipStatus } from '@/lib/types'
+import type {
+  Equipment,
+  EquipmentStatus,
+  OperationalStatus,
+  OwnershipStatus,
+} from '@/lib/types'
 
 /** Radix reserves '' for "no value", so the optional select uses a sentinel. */
 const NO_REGISTRATION_TYPE = 'none'
@@ -386,6 +393,27 @@ export function EquipmentFormDialog({
                 { value: 'maintenance', label: t('maintenance') },
                 { value: 'stopped', label: t('stopped') },
               ]}
+            />
+          )}
+        </Field>
+        {/* Lifecycle status (migration 0102). It replaced the activate /
+            deactivate toggle, so this select is the only place a record leaves
+            or rejoins the fleet. */}
+        <Field label={t('equipmentStatus')} hint={t('equipmentStatusHint')}>
+          {(control) => (
+            <Select
+              {...control}
+              value={form.status}
+              onValueChange={(value) =>
+                setForm((current) => ({
+                  ...current,
+                  status: value as EquipmentStatus,
+                }))
+              }
+              options={EQUIPMENT_STATUSES.map((value) => ({
+                value,
+                label: t(equipmentStatusKey(value)),
+              }))}
             />
           )}
         </Field>

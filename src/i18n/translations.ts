@@ -545,8 +545,6 @@ export const translations = {
     isActive: 'نشطة',
     inactive: 'معطّلة',
     active: 'نشطة',
-    activate: 'تفعيل',
-    deactivate: 'تعطيل',
     generateQR: 'توليد QR',
     noEquipment: 'لا توجد معدات',
 
@@ -1036,6 +1034,53 @@ export const translations = {
 
     // wave6-M
     adminHomeNoTypes: 'لا توجد انواع معدات',
+
+    // wave6-I3
+    exportSheetVisits: 'الزيارات',
+    exportColExitOdometer: 'عداد الخروج',
+    exportColExitNotes: 'ملاحظات الخروج',
+    logsExportCapped:
+      'تم تصدير {count} حركة من اصل {total}. ضيّق البحث او التصفية لتصدير الباقي.',
+    logsExportFailed: 'تعذر تصدير الملف. حاول مرة اخرى.',
+
+    // wave6-H3
+    equipmentStatus: 'حالة المعدة',
+    equipmentStatusActive: 'نشطة',
+    equipmentStatusSold: 'مباعة',
+    equipmentStatusScrapped: 'مشطوبة',
+    equipmentStatusRentedOut: 'مؤجرة للغير',
+    equipmentStatusHint:
+      'المعدات غير النشطة تبقى في القائمة مع سجلها، ولا تظهر في نماذج الحركة ولا في التقارير ولا في احصائيات الصفحة الرئيسية',
+    underMaintenance: 'تحت الصيانة',
+    invalidEquipmentStatus: 'حالة المعدة غير معروفة',
+
+    // wave6-J3
+    movementActions: 'اجراءات الحركة',
+    movementEditDialogDesc:
+      'عدل ملاحظة الحركة او السائق فقط. تاريخ الحركة والمعدة والشركة والمشروع لا تتغير من هنا.',
+    movementEditOpenVisitDriverHint:
+      'الزيارة ما زالت مفتوحة، لذلك يسجل تغيير السائق كسجل جديد ويبقى سائق الدخول الاصلي كما هو.',
+    movementAdminDriverNotSupported: 'حركات الورشة تسجل بدون سائق.',
+    movementAdminAccessDenied: 'ليست لديك صلاحية لتعديل هذه الحركة او حذفها.',
+    movementAdminInvalidDriver: 'السائق المحدد غير موجود.',
+    movementAdminOpenVisitDriver:
+      'تغيير سائق زيارة مفتوحة يتم من خلال تغيير السائق، وليس من التعديل.',
+    movementNotesTooLong: 'الملاحظة تتجاوز 1000 حرف.',
+    confirmDeleteMovement: 'تاكيد حذف الحركة',
+    dialogDescMovementDelete:
+      'الحذف نهائي ولا يمكن التراجع عنه، وسيحذف معه صور الحركة وسجل تغيير السائقين المرتبط بها.',
+    movementDeleted: 'تم حذف الحركة',
+    movementDeleteFailed: 'تعذر حذف الحركة. حاول مرة اخرى.',
+    movementDeleteEntryHasExit:
+      'لا يمكن حذف دخول له خروج مسجل؛ احذف الخروج اولا.',
+    movementDeleteNotLast: 'يمكن حذف اخر حركة فقط لهذه المعدة في هذا السياق.',
+
+    // wave6-K3
+    reportFilterAlazaniOnly: 'العزاني فقط',
+    reportContextFilter: 'نطاق الحركة',
+    reportContextSite: 'مواقع',
+    reportContextWorkshop: 'ورشة',
+    reportContextAll: 'الكل',
   },
   en: {
     appName: 'Heavy Equipment Management',
@@ -1588,8 +1633,6 @@ export const translations = {
     isActive: 'Active',
     inactive: 'Inactive',
     active: 'Active',
-    activate: 'Activate',
-    deactivate: 'Deactivate',
     generateQR: 'Generate QR',
     noEquipment: 'No equipment',
 
@@ -2081,6 +2124,56 @@ export const translations = {
 
     // wave6-M
     adminHomeNoTypes: 'No equipment types',
+
+    // wave6-I3
+    exportSheetVisits: 'Visits',
+    exportColExitOdometer: 'Exit odometer',
+    exportColExitNotes: 'Exit notes',
+    logsExportCapped:
+      '{count} of {total} movements were exported. Narrow the search or the filters to export the rest.',
+    logsExportFailed: 'The file could not be exported. Please try again.',
+
+    // wave6-H3
+    equipmentStatus: 'Equipment status',
+    equipmentStatusActive: 'Active',
+    equipmentStatusSold: 'Sold',
+    equipmentStatusScrapped: 'Scrapped',
+    equipmentStatusRentedOut: 'Rented out',
+    equipmentStatusHint:
+      'Equipment that is not active stays in this list with its history, but is hidden from the movement forms, the reports and the home page stats.',
+    underMaintenance: 'Under maintenance',
+    invalidEquipmentStatus: 'Unknown equipment status.',
+
+    // wave6-J3
+    movementActions: 'Movement actions',
+    movementEditDialogDesc:
+      'Edit only the movement note and the driver. The movement date, equipment, company and project are not changed here.',
+    movementEditOpenVisitDriverHint:
+      'The visit is still open, so a driver change is appended as a new record and the original entry driver stays unchanged.',
+    movementAdminDriverNotSupported:
+      'Workshop movements are recorded without a driver.',
+    movementAdminAccessDenied:
+      'You do not have permission to edit or delete this movement.',
+    movementAdminInvalidDriver: 'The selected driver does not exist.',
+    movementAdminOpenVisitDriver:
+      'The driver of an open visit is changed from "Change driver", not from the edit dialog.',
+    movementNotesTooLong: 'The note is longer than 1000 characters.',
+    confirmDeleteMovement: 'Confirm movement deletion',
+    dialogDescMovementDelete:
+      'Deleting is permanent and cannot be undone. The movement photos and its driver-change history are deleted with it.',
+    movementDeleted: 'The movement was deleted',
+    movementDeleteFailed: 'The movement could not be deleted. Try again.',
+    movementDeleteEntryHasExit:
+      'An entry that already has an exit cannot be deleted; delete the exit first.',
+    movementDeleteNotLast:
+      'Only the last movement of this equipment in this context can be deleted.',
+
+    // wave6-K3
+    reportFilterAlazaniOnly: 'Al-Azani only',
+    reportContextFilter: 'Movement context',
+    reportContextSite: 'Sites',
+    reportContextWorkshop: 'Workshop',
+    reportContextAll: 'All',
   },
 } as const
 

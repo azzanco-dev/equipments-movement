@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { TranslationKey } from '@/i18n/translations'
-import type { Equipment } from '@/lib/types'
+import type { Equipment, EquipmentStatus } from '@/lib/types'
 import { parseEquipmentExcel, type EquipmentImportRow } from '@/lib/excel'
 
 export interface EquipmentUpdateRow extends EquipmentImportRow {
@@ -8,8 +8,42 @@ export interface EquipmentUpdateRow extends EquipmentImportRow {
   record_version: string
   project_id: string | null
   lessor_id: string | null
+  /** Lifecycle status (migration 0102). `null` means the sheet left the column
+   *  out or the cell blank, and the record keeps the status it has, so an
+   *  older exported workbook still uploads unchanged. */
+  status: EquipmentStatus | null
   _changedFields: string[]
   _status: 'ready' | 'unchanged' | 'error' | 'conflict'
+}
+
+/** The accepted spellings of each status, Arabic and English, matched after
+ *  trimming and lower-casing. The labels are the ones the export writes. */
+const STATUS_ALIASES: Record<string, EquipmentStatus> = {
+  نشطة: 'active',
+  نشط: 'active',
+  active: 'active',
+  مباعة: 'sold',
+  مباع: 'sold',
+  sold: 'sold',
+  مشطوبة: 'scrapped',
+  مشطوب: 'scrapped',
+  scrapped: 'scrapped',
+  'مؤجرة للغير': 'rented_out',
+  مؤجرة: 'rented_out',
+  'rented out': 'rented_out',
+  rented_out: 'rented_out',
+}
+
+/** Parses one status cell: blank keeps the current value (`null`), an unknown
+ *  spelling is `undefined` so the caller can report it per row. */
+export function parseEquipmentStatusCell(
+  value: unknown,
+): EquipmentStatus | null | undefined {
+  const raw = String(value ?? '')
+    .trim()
+    .toLowerCase()
+  if (!raw) return null
+  return STATUS_ALIASES[raw]
 }
 
 export function parseEquipmentUpdateExcel(
@@ -36,12 +70,19 @@ export function parseEquipmentUpdateExcel(
       errors.push(t('invalidRecordId'))
     if (!recordVersion || Number.isNaN(Date.parse(recordVersion)))
       errors.push(t('invalidRecordVersion'))
+    // The status column is optional and is read by its translated header, so a
+    // sheet exported before it existed still parses.
+    const statusCell =
+      rawRows[index]?.[t('equipmentStatus')] ?? rawRows[index]?.status
+    const status = parseEquipmentStatusCell(statusCell)
+    if (status === undefined) errors.push(t('invalidEquipmentStatus'))
     return {
       ...row,
       record_id: recordId,
       record_version: recordVersion,
       project_id: null,
       lessor_id: null,
+      status: status ?? null,
       _errors: errors,
       _changedFields: [],
       _status: errors.length ? 'error' : 'unchanged',
@@ -60,6 +101,15 @@ export function downloadEquipmentUpdateWorkbook(
     [t('equipmentType')]: item.type,
     [t('plateNumber')]: item.plate_number ?? '',
     [t('operationalStatus')]: t(item.operational_status),
+    [t('equipmentStatus')]: t(
+      item.status === 'sold'
+        ? 'equipmentStatusSold'
+        : item.status === 'scrapped'
+          ? 'equipmentStatusScrapped'
+          : item.status === 'rented_out'
+            ? 'equipmentStatusRentedOut'
+            : 'equipmentStatusActive',
+    ),
     [t('ownershipStatus')]:
       item.ownership_status === 'alazani'
         ? t('ownershipAlazani')
@@ -95,7 +145,7 @@ export function downloadEquipmentUpdateWorkbook(
   dataSheet['!cols'] = [
     { hidden: true },
     { hidden: true },
-    ...Array.from({ length: 15 }, () => ({ wch: 20 })),
+    ...Array.from({ length: 16 }, () => ({ wch: 20 })),
   ]
   const instructions = XLSX.utils.aoa_to_sheet([
     [t('equipmentUpdateInstructions')],

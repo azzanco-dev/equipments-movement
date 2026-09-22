@@ -149,17 +149,34 @@ export const equipmentListConfig: DataListConfig = {
         },
       ],
     },
+    // Replaces the `is_active` boolean filter: the lifecycle status is the
+    // field admins now read and set, and the allowlist is the same closed set
+    // as the database CHECK constraint from migration 0102.
     {
-      key: 'is_active',
-      label: 'isActive',
-      type: 'boolean',
-      operators: ['eq', 'neq'],
+      key: 'status',
+      label: 'equipmentStatus',
+      type: 'select',
+      operators: ['eq', 'neq', 'in', 'not_in'],
       options: [
-        { value: 'true', label: 'نشطة', labelI18n: 'isActive' },
         {
-          value: 'false',
-          label: 'غير نشطة',
-          labelI18n: { ar: 'غير نشطة', en: 'Inactive' },
+          value: 'active',
+          label: 'نشطة',
+          labelI18n: 'equipmentStatusActive',
+        },
+        {
+          value: 'sold',
+          label: 'مباعة',
+          labelI18n: 'equipmentStatusSold',
+        },
+        {
+          value: 'scrapped',
+          label: 'مشطوبة',
+          labelI18n: 'equipmentStatusScrapped',
+        },
+        {
+          value: 'rented_out',
+          label: 'مؤجرة للغير',
+          labelI18n: 'equipmentStatusRentedOut',
         },
       ],
     },
@@ -169,6 +186,7 @@ export const equipmentListConfig: DataListConfig = {
     { key: 'type', label: 'equipmentType' },
     { key: 'plate_number', label: 'plateNumber' },
     { key: 'operational_status', label: 'operationalStatus' },
+    { key: 'status', label: 'equipmentStatus' },
     { key: 'ownership_status', label: 'ownershipStatus' },
     { key: 'created_at', label: 'createdAt' },
     { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },

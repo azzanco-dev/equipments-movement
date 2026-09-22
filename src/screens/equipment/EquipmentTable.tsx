@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ChevronRight, Edit2, PackageSearch, Power } from 'lucide-react'
+import { ChevronRight, Edit2, PackageSearch } from 'lucide-react'
 import {
   Badge,
   DataTable,
@@ -13,7 +13,7 @@ import { RelativeTime } from '@/components/RelativeTime'
 import type { Equipment } from '@/lib/types'
 import { usesExternalSupplier } from '@/lib/equipmentOwnership'
 import {
-  activeBadge,
+  equipmentStatusBadge,
   masterDataBadge,
   operationalStatusBadge,
   ownershipBadge,
@@ -50,7 +50,6 @@ export interface EquipmentTableProps {
   onSortChange: (key: string, direction: 'asc' | 'desc') => void
   onOpen: (id: string) => void
   onEdit: (equipment: Equipment) => void
-  onToggleActive: (equipment: Equipment) => void
   /** Rendered in the empty state, e.g. the "add equipment" button. */
   emptyAction?: ReactNode
 }
@@ -65,7 +64,6 @@ export function EquipmentTable({
   onSortChange,
   onOpen,
   onEdit,
-  onToggleActive,
   emptyAction,
 }: EquipmentTableProps) {
   const { t } = useI18n()
@@ -148,10 +146,11 @@ export function EquipmentTable({
       },
     },
     {
-      key: 'is_active',
-      header: t('isActive'),
+      key: 'status',
+      header: t('equipmentStatus'),
+      sortable: true,
       cell: (row) => {
-        const badge = activeBadge(row.is_active)
+        const badge = equipmentStatusBadge(row.status)
         return <Badge tone={badge.tone}>{t(badge.key)}</Badge>
       },
     },
@@ -166,13 +165,6 @@ export function EquipmentTable({
             title={t('edit')}
             icon={<Edit2 size={15} />}
             onClick={() => onEdit(row)}
-          />
-          <IconButton
-            size="sm"
-            label={row.is_active ? t('deactivate') : t('activate')}
-            title={row.is_active ? t('deactivate') : t('activate')}
-            icon={<Power size={15} />}
-            onClick={() => onToggleActive(row)}
           />
           <ChevronRight
             size={15}

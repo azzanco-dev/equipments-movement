@@ -20,7 +20,7 @@ import { EquipmentImportDialog } from './EquipmentImportDialog'
 import { EquipmentTable } from './EquipmentTable'
 
 const LIST_SELECT =
-  'id,code,type,plate_number,plate_digits,plate_letters_en,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,master_data_complete,numbering_status,created_at,updated_at,project:projects(id,name_ar,name_en),lessor:lessors(id,name)'
+  'id,code,type,plate_number,plate_digits,plate_letters_en,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,status,master_data_complete,numbering_status,created_at,updated_at,project:projects(id,name_ar,name_en),lessor:lessors(id,name)'
 
 export interface EquipmentListScreenProps {
   onSelectEquipment?: (id: string) => void
@@ -136,15 +136,6 @@ export function EquipmentListScreen({
     return () => controller.abort()
   }, [editId, openEdit, t])
 
-  const toggleActive = async (row: Equipment) => {
-    const { error } = await supabase
-      .from('equipment')
-      .update({ is_active: !row.is_active })
-      .eq('id', row.id)
-    if (error) console.error(error)
-    fetchEquipment()
-  }
-
   const addButton = (
     <Button
       variant="primary"
@@ -205,7 +196,6 @@ export function EquipmentListScreen({
         onSortChange={list.setSort}
         onOpen={(id) => onSelectEquipment?.(id)}
         onEdit={openEdit}
-        onToggleActive={toggleActive}
         emptyAction={addButton}
       />
       {!loadError && total > 0 && (

@@ -2,6 +2,7 @@ import type { BadgeTone } from '@/components/ui/Badge'
 import type { TranslationKey } from '@/i18n/translations'
 import type {
   Equipment,
+  EquipmentStatus,
   OperationalStatus,
   OwnershipStatus,
   RegistrationType,
@@ -25,6 +26,8 @@ export interface EquipmentFormValues {
   plate_number: string
   numbering_status: 'numbered' | 'unnumbered'
   operational_status: OperationalStatus
+  /** Lifecycle status (migration 0102); replaces the deactivate toggle. */
+  status: EquipmentStatus
   ownership_status: OwnershipStatus
   project_id: string
   lessor_id: string
@@ -45,6 +48,7 @@ export const EMPTY_EQUIPMENT_FORM: EquipmentFormValues = {
   plate_number: '',
   numbering_status: 'numbered',
   operational_status: 'operational',
+  status: 'active',
   ownership_status: 'alazani',
   project_id: '',
   lessor_id: '',
@@ -75,6 +79,7 @@ export function equipmentFormValues(equipment: Equipment): EquipmentFormValues {
     plate_number: equipment.plate_number ?? '',
     numbering_status: equipment.numbering_status ?? 'numbered',
     operational_status: equipment.operational_status,
+    status: equipment.status ?? 'active',
     ownership_status: equipment.ownership_status,
     project_id: equipment.project_id ?? '',
     lessor_id: equipment.lessor_id ?? '',
@@ -223,6 +228,13 @@ export function buildEquipmentPayload(form: EquipmentFormValues) {
       form.numbering_status === 'numbered' ? form.plate_number || null : null,
     numbering_status: form.numbering_status,
     operational_status: form.operational_status,
+    status: form.status,
+    // The status replaced the activate/deactivate toggle, so the form is now
+    // the only place `is_active` is set: it mirrors the status. The database
+    // trigger from 0102 forces `is_active = false` for any non-active status
+    // but never turns it back on, so restoring a record to «نشطة» has to send
+    // this explicitly.
+    is_active: form.status === 'active',
     ownership_status: form.ownership_status,
     project_id: form.project_id || null,
     lessor_id: usesExternalSupplier(form.ownership_status)
@@ -273,10 +285,77 @@ export function ownershipBadge(status: OwnershipStatus): BadgeDescriptor {
   return { tone: 'neutral', key: 'ownershipExternalSupplier' }
 }
 
-export function activeBadge(isActive: boolean): BadgeDescriptor {
-  return isActive
-    ? { tone: 'neutral', key: 'active' }
-    : { tone: 'warning', key: 'inactive' }
+/** The four lifecycle values, in the order the form and the filter list them. */
+export const EQUIPMENT_STATUSES: readonly EquipmentStatus[] = [
+  'active',
+  'sold',
+  'scrapped',
+  'rented_out',
+] as const
+
+const EQUIPMENT_STATUS_KEYS: Record<EquipmentStatus, TranslationKey> = {
+  active: 'equipmentStatusActive',
+  sold: 'equipmentStatusSold',
+  scrapped: 'equipmentStatusScrapped',
+  rented_out: 'equipmentStatusRentedOut',
+}
+
+/** Translation key for a status, falling back to `active` (the column default)
+ *  for a row read before migration 0102 or by a select that omits it. */
+export function equipmentStatusKey(
+  status: EquipmentStatus | null | undefined,
+): TranslationKey {
+  return (
+    EQUIPMENT_STATUS_KEYS[status ?? 'active'] ?? EQUIPMENT_STATUS_KEYS.active
+  )
+}
+
+/**
+ * Only `active` is a fleet state, so it is the only one shown as success;
+ * sold / scrapped / rented out are facts, not failures, so they stay neutral
+ * rather than red, which AGENTS.md reserves for errors and destructive
+ * actions.
+ */
+export function equipmentStatusBadge(
+  status: EquipmentStatus | null | undefined,
+): BadgeDescriptor {
+  const resolved = status ?? 'active'
+  return {
+    tone: resolved === 'active' ? 'success' : 'neutral',
+    key: equipmentStatusKey(resolved),
+  }
+}
+
+/** A row counts as part of the fleet only when both flags agree, exactly like
+ *  the `is_active AND status = 'active'` predicate migration 0102 uses. */
+export function isFleetEquipment(
+  equipment: Pick<Equipment, 'is_active' | 'status'>,
+): boolean {
+  return equipment.is_active && (equipment.status ?? 'active') === 'active'
+}
+
+/**
+ * "تحت الصيانة" is derived, never stored (owner decision, 2026-09-23): an
+ * equipment is under maintenance exactly while its latest movement — across
+ * both contexts, ordered by (recorded_at DESC, id DESC) — is an open WORKSHOP
+ * entry classified as `maintenance`. A workshop EXIT is a later movement, so
+ * the state clears by itself.
+ */
+export function isUnderMaintenance(
+  latestMovement:
+    | {
+        movement_type: string
+        movement_context?: string | null
+        workshop_purpose?: string | null
+      }
+    | null
+    | undefined,
+): boolean {
+  return (
+    latestMovement?.movement_type === 'entry' &&
+    latestMovement.movement_context === 'workshop' &&
+    latestMovement.workshop_purpose === 'maintenance'
+  )
 }
 
 /** Quick-created equipment stays flagged until an admin reviews it. */

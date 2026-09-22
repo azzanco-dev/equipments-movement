@@ -75,7 +75,7 @@ export function EquipmentExcelUpdate({
         const { data, error: fetchError } = await supabase
           .from('equipment')
           .select(
-            'id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,master_data_complete,numbering_status,created_at,updated_at,project:projects(id,name_ar,name_en),lessor:lessors(id,name)',
+            'id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,status,master_data_complete,numbering_status,created_at,updated_at,project:projects(id,name_ar,name_en),lessor:lessors(id,name)',
           )
           .order('code')
           .range(from, from + 499)
@@ -107,7 +107,7 @@ export function EquipmentExcelUpdate({
         const { data, error: fetchError } = await supabase
           .from('equipment')
           .select(
-            'id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,master_data_complete,numbering_status,created_at,updated_at',
+            'id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,status,master_data_complete,numbering_status,created_at,updated_at',
           )
           .in('id', ids.slice(index, index + 100))
         if (fetchError) throw fetchError
@@ -178,9 +178,16 @@ export function EquipmentExcelUpdate({
           next._errors.push(t('projectNotFound'))
         if (row.lessor_name && !next.lessor_id)
           next._errors.push(t('lessorNotFound'))
-        const changed = COMPARE_FIELDS.filter(
+        const changed: string[] = COMPARE_FIELDS.filter(
           (field) => comparable(next[field]) !== comparable(current[field]),
         )
+        // The status column is optional: a sheet that omits it (or leaves the
+        // cell blank) parsed to `null`, which means "keep what the record
+        // has". Resolving it against the current value here is what stops an
+        // older workbook from looking like a change on every row.
+        const currentStatus = current.status ?? 'active'
+        if (next.status === null) next.status = currentStatus
+        else if (next.status !== currentStatus) changed.push('status')
         next._changedFields = [...changed]
         next._status = next._errors.length
           ? 'error'
@@ -222,6 +229,9 @@ export function EquipmentExcelUpdate({
           type: row.type,
           plate_number: row.plate_number ?? '',
           operational_status: row.operational_status,
+          // Resolved against the record above, so this is never blank here;
+          // the database function also treats a blank as "keep current".
+          status: row.status ?? '',
           ownership_status: row.ownership_status,
           project_id: row.project_id ?? '',
           lessor_id: row.lessor_id ?? '',

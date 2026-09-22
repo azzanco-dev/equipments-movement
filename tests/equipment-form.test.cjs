@@ -230,6 +230,52 @@ test('the payload drops the plate when the equipment is unnumbered', () => {
   assert.equal(payload.master_data_complete, true)
 })
 
+test('a new record defaults to the active status and is in the fleet', () => {
+  const payload = plain(form.buildEquipmentPayload({ ...base() }))
+  assert.equal(payload.status, 'active')
+  assert.equal(payload.is_active, true)
+})
+
+test('is_active mirrors the status, so it replaces the old toggle', () => {
+  for (const status of ['sold', 'scrapped', 'rented_out']) {
+    const payload = plain(form.buildEquipmentPayload({ ...base(), status }))
+    assert.equal(payload.status, status)
+    // The 0102 trigger also forces this, but the form has to send it so that
+    // restoring a record to «نشطة» brings it back into the fleet.
+    assert.equal(payload.is_active, false)
+  }
+})
+
+test('a record without a status maps onto the form as active', () => {
+  const values = plain(
+    form.equipmentFormValues({
+      code: 'A-1',
+      type: 'حفار',
+      plate_number: null,
+      operational_status: 'operational',
+      ownership_status: 'alazani',
+      qr_value: 'EQ-1',
+      is_active: true,
+    }),
+  )
+  assert.equal(values.status, 'active')
+  assert.equal(
+    plain(
+      form.equipmentFormValues({
+        code: 'A-1',
+        type: 'حفار',
+        plate_number: null,
+        operational_status: 'operational',
+        ownership_status: 'alazani',
+        qr_value: 'EQ-1',
+        is_active: false,
+        status: 'sold',
+      }),
+    ).status,
+    'sold',
+  )
+})
+
 test('the payload only stores lessor_id for Other Owner', () => {
   const rented = plain(
     form.buildEquipmentPayload({
@@ -304,11 +350,6 @@ test('badge mapping keeps amber for warnings and never red for a status', () => 
   assertErrors(plain(form.operationalStatusBadge('stopped')), {
     tone: 'neutral',
     key: 'stopped',
-  })
-  assert.equal(form.activeBadge(true).key, 'active')
-  assertErrors(plain(form.activeBadge(false)), {
-    tone: 'warning',
-    key: 'inactive',
   })
 })
 

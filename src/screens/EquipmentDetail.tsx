@@ -3,7 +3,6 @@ import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import {
   Edit2,
-  Power,
   Calendar,
   Truck,
   Building2,
@@ -20,6 +19,7 @@ import {
   isOwnedEquipment,
   usesExternalSupplier,
 } from '@/lib/equipmentOwnership'
+import { equipmentStatusBadge, isUnderMaintenance } from '@/lib/equipmentForm'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import { Alert } from '@/components/Alert'
@@ -141,14 +141,11 @@ export function EquipmentDetail({
     },
   ]
 
-  async function toggleActive(eq: Equipment) {
-    const { error } = await supabase
-      .from('equipment')
-      .update({ is_active: !eq.is_active })
-      .eq('id', eq.id)
-    if (error) console.error(error)
-    fetchData()
-  }
+  // `logs` is the latest 10 movements ordered (recorded_at DESC, id DESC), so
+  // the first row is the latest movement across both contexts — the same
+  // ordering every state derivation in the database uses.
+  const statusBadge = equipmentStatusBadge(equipment?.status)
+  const underMaintenance = isUnderMaintenance(logs[0])
 
   if (loading)
     return (
@@ -194,9 +191,12 @@ export function EquipmentDetail({
               <div>
                 <div className="flex items-center gap-3 flex-wrap">
                   <h2 className="text-2xl font-bold">{equipment.code}</h2>
-                  <Badge tone={equipment.is_active ? 'success' : 'neutral'}>
-                    {equipment.is_active ? t('active') : t('inactive')}
-                  </Badge>
+                  <Badge tone={statusBadge.tone}>{t(statusBadge.key)}</Badge>
+                  {/* Derived, never stored: the latest movement is an open
+                      workshop entry classified as maintenance. */}
+                  {underMaintenance && (
+                    <Badge tone="warning">{t('underMaintenance')}</Badge>
+                  )}
                 </div>
                 <p className="text-muted mt-1">{equipment.type}</p>
               </div>
@@ -205,11 +205,6 @@ export function EquipmentDetail({
                   label={t('editEquipment')}
                   icon={<Edit2 size={16} />}
                   onClick={() => onEdit(equipment)}
-                />
-                <IconButton
-                  label={t('isActive')}
-                  icon={<Power size={16} />}
-                  onClick={() => toggleActive(equipment)}
                 />
               </div>
             </div>

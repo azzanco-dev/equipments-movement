@@ -7,6 +7,13 @@ export type UserRole =
   | 'monitor'
 
 export type OperationalStatus = 'operational' | 'maintenance' | 'stopped'
+/**
+ * Equipment lifecycle status (migration 0102). Only `active` counts as part of
+ * the fleet; the other three keep their history and stay in the equipment list
+ * and the inquiry page, but are excluded from the home stats, the admin home,
+ * the movement equipment selectors and the current-state reports.
+ */
+export type EquipmentStatus = 'active' | 'sold' | 'scrapped' | 'rented_out'
 export type OwnershipStatus =
   | 'alazani'
   | 'takween'
@@ -87,6 +94,9 @@ export interface Equipment {
   registration_expiry: string | null
   insurance_expiry: string | null
   is_active: boolean
+  /** Optional so a row read by an older `select` list keeps compiling; the UI
+   *  treats a missing value as `active`, which is the column default. */
+  status?: EquipmentStatus
   master_data_complete?: boolean
   numbering_status?: 'numbered' | 'unnumbered'
   created_at: string
