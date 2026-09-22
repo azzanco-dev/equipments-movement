@@ -235,6 +235,42 @@ test('equipment inside the workshop shows the purpose as its only line', () => {
   assert.equal(standby.description, 'وقوف')
 })
 
+// The workshop equipment list (search_workshop_equipment) reuses this mapping
+// since migration 0100. Until 0100 is applied that function returns the plain
+// equipment columns, so the rows arrive without any state field: the mapping
+// must degrade to "no badge, no line" instead of throwing.
+test('a row from the pre-0100 workshop function maps without a badge', () => {
+  const option = equipmentStateOption(
+    { id: 'eq-6', code: 'TK20' },
+    'ar',
+    ar,
+    '2026-09-22T07:00:00Z',
+  )
+  assert.equal(option.value, 'eq-6')
+  assert.equal(option.label, 'TK20')
+  assert.equal(option.badge, undefined)
+  assert.equal(option.description, undefined)
+})
+
+test('a workshop row inside a site still gets the inside-site badge', () => {
+  const option = equipmentStateOption(
+    {
+      id: 'eq-7',
+      code: 'A310',
+      state: 'inside_site',
+      state_since: '2026-09-20T05:00:00Z',
+      state_company_name_ar: 'تكوين',
+      state_project_name_ar: 'مشروع جدة',
+    },
+    'ar',
+    ar,
+    '2026-09-22T07:00:00Z',
+  )
+  assert.equal(option.badge.label, 'داخل موقع')
+  assert.equal(option.badge.tone, 'entry')
+  assert.equal(option.description, 'تكوين - مشروع جدة · منذ 2 يوم')
+})
+
 test('available equipment gets no badge and no extra line', () => {
   for (const state of ['outside', 'none', null, undefined]) {
     const option = equipmentStateOption(

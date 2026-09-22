@@ -118,8 +118,10 @@ export function EntryExitForm({
   const [step, setStep] = useState<'select' | 'details'>('select')
   const [search, setSearch] = useState('')
   const [ownerFilter, setOwnerFilter] = useState('')
-  // The site ENTRY search adds the current state of each row; every other
-  // search leaves those fields undefined.
+  // The site ENTRY search and the workshop search add the current state of
+  // each row; the site EXIT search leaves those fields undefined. `EquipmentStep`
+  // maps every row through `equipmentStateOption`, so a row without the state
+  // columns simply gets no badge and no secondary line.
   const [equipment, setEquipment] = useState<
     (Equipment & EntryEquipmentStateFields)[]
   >([])
@@ -287,6 +289,12 @@ export function EntryExitForm({
       async () => {
         let result
         if (workshopMode) {
+          // Workshop ENTRY and EXIT. Since migration 0100 this returns the
+          // same state columns as the site ENTRY search below, so the list
+          // shows where each piece currently is; migration 0098 already lets
+          // the workshop roles read site movements. The EXIT list still comes
+          // scoped from the database: only equipment whose latest workshop
+          // movement is an entry.
           result = await supabase.rpc('search_workshop_equipment', {
             p_movement_type: movementType,
             p_search: term || null,
