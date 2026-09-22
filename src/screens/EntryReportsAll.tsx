@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
@@ -8,6 +8,14 @@ import { InlineSpinner } from '@/components/Spinner'
 import { Alert } from '@/components/Alert'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
+import { OwnerContextFilter } from '@/components/OwnerContextFilter'
+import type { AdminHomeOwner } from '@/lib/adminHomeStats'
+import {
+  applyReportFilterParams,
+  parseReportContext,
+  parseReportOwners,
+  type ReportContext,
+} from '@/lib/reportFilters'
 import {
   isDateKey,
   saudiDateKey,
@@ -31,8 +39,19 @@ function dateKeyParam(value: string | null): string | null {
   if (value && !Number.isNaN(Date.parse(value))) return saudiDateKey(value)
   return null
 }
-const select =
-  'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,contractor_equipment_code,registration_method,odometer_reading,notes,photo_url,company_id,project_id,recorded_at,created_at,equipment:equipment(id,code,type,plate_number,chassis_number),company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)'
+/**
+ * The movement columns this list shows.
+ *
+ * The equipment embed carries an `!inner` hint only while an owner filter is
+ * active: `equipment.ownership_status` is filtered through that embed, and an
+ * inner join is what makes the filter (and the `count`) apply to the movement
+ * rows. With no owner selected the embed stays the plain left join it has
+ * always been, so the unfiltered report is byte-for-byte the previous query.
+ */
+function buildSelect(ownerFiltered: boolean) {
+  const equipment = `equipment:equipment${ownerFiltered ? '!inner' : ''}(id,code,type,plate_number,chassis_number)`
+  return `id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,contractor_equipment_code,registration_method,odometer_reading,notes,photo_url,company_id,project_id,recorded_at,created_at,${equipment},company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)`
+}
 
 export function EntryReportsAll({
   onSelectMovement,
@@ -65,6 +84,12 @@ export function EntryReportsAll({
       ? (dateKeyParam(params.get('to')) ?? '')
       : defaultRange.to,
   }
+  // Owner + context filter, applied server-side and kept in the URL. The owner
+  // list is derived from the raw parameter so it keeps one identity per URL and
+  // the effect below does not re-run on every render.
+  const ownersParam = params.get('owners') ?? ''
+  const owners = useMemo(() => parseReportOwners(ownersParam), [ownersParam])
+  const context = parseReportContext(params.get('context'))
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params.toString())
     // Cleared dates stay in the URL as empty values so they do not fall back
@@ -74,19 +99,37 @@ export function EntryReportsAll({
     if (key !== 'page') next.set('page', '1')
     router.replace(`/reports/entries/all?${next.toString()}`, { scroll: false })
   }
+  const setFilters = (filters: {
+    owners?: AdminHomeOwner[]
+    context?: ReportContext
+  }) => {
+    const next = applyReportFilterParams(
+      new URLSearchParams(params.toString()),
+      filters.owners ?? owners,
+      filters.context ?? context,
+    )
+    next.set('page', '1')
+    router.replace(`/reports/entries/all?${next.toString()}`, { scroll: false })
+  }
   useEffect(() => {
     const controller = new AbortController()
     setLoading(true)
     setLoadError(false)
     let query = supabase
       .from('entry_exit_logs')
-      .select(select, { count: 'exact' })
-      .eq('movement_context', 'site')
+      .select(buildSelect(owners.length > 0), { count: 'exact' })
       .eq('movement_type', 'entry')
       .order('recorded_at', { ascending: false })
       .order('id', { ascending: false })
       .range((page - 1) * pageSize, page * pageSize - 1)
       .abortSignal(controller.signal)
+    // `all` drops the context bound entirely; anything else keeps the single
+    // context, and `site` is what this list always filtered on.
+    if (context !== 'all') query = query.eq('movement_context', context)
+    // The owner lives on the equipment record, so it is filtered through the
+    // embed, which `buildSelect` made an inner join for exactly this case. No
+    // owner selected means no filter at all.
+    if (owners.length) query = query.in('equipment.ownership_status', owners)
     const from = dateRange.from
     const to = dateRange.to
     const q = params.get('q')
@@ -125,7 +168,7 @@ export function EntryReportsAll({
       setLoading(false)
     })
     return () => controller.abort()
-  }, [page, pageSize, params, dateRange.from, dateRange.to])
+  }, [page, pageSize, params, dateRange.from, dateRange.to, owners, context])
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   return (
     <div className="mx-auto max-w-[1400px] space-y-5">
@@ -197,6 +240,13 @@ export function EntryReportsAll({
             onChange={(value) => setParam(key, value)}
           />
         ))}
+        <OwnerContextFilter
+          owners={owners}
+          onOwnersChange={(next) => setFilters({ owners: next })}
+          context={context}
+          onContextChange={(next) => setFilters({ context: next })}
+          showContext
+        />
         <button
           className="btn-outline"
           onClick={() => router.replace('/reports/entries/all')}

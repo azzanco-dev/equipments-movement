@@ -7,6 +7,8 @@ import { PageHeader } from '@/components/PageHeader'
 import { InlineSpinner } from '@/components/Spinner'
 import { MovementLogCard } from '@/components/MovementLogCard'
 import { DatePicker } from '@/components/DatePicker'
+import { OwnerContextFilter } from '@/components/OwnerContextFilter'
+import { parseReportOwners, serializeReportOwners } from '@/lib/reportFilters'
 import {
   MOVEMENT_LOG_SEARCH_VIEW,
   MOVEMENT_LOG_WORKSHOP_SELECT,
@@ -68,6 +70,11 @@ export function WorkshopReports({
         query = query.eq('workshop_purpose', purpose)
       if (isDateKey(from)) query = query.gte('recorded_at', saudiDayStart(from))
       if (isDateKey(to)) query = query.lte('recorded_at', saudiDayEnd(to))
+      // Owner filter, applied in PostgREST on the view's own
+      // `equipment_ownership_status` column. An empty selection means every
+      // owner, so no filter is added at all and the report is unchanged.
+      const owners = parseReportOwners(params.get('owners'))
+      if (owners.length) query = query.in('equipment_ownership_status', owners)
       const searchFilter = buildMovementSearchFilter(search)
       if (searchFilter) query = query.or(searchFilter)
       const { data, count, error } = await query
@@ -147,6 +154,13 @@ export function WorkshopReports({
             </option>
           ))}
         </select>
+        {/* Workshop movements only, so no context tabs. */}
+        <OwnerContextFilter
+          owners={parseReportOwners(params.get('owners'))}
+          onOwnersChange={(next) =>
+            setParam('owners', serializeReportOwners(next))
+          }
+        />
         <button
           className="btn-outline"
           onClick={() => router.replace('/reports/workshop')}

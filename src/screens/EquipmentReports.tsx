@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle, ArrowLeft, Clock3, MapPin, Search } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -6,9 +6,15 @@ import { useI18n } from '@/i18n/I18nContext'
 import { PageHeader } from '@/components/PageHeader'
 import { InlineSpinner } from '@/components/Spinner'
 import { Alert } from '@/components/Alert'
+import { OwnerContextFilter } from '@/components/OwnerContextFilter'
 import { formatDateTime } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
 import { sanitizeSearchTerm } from '@/lib/search'
+import {
+  parseReportOwners,
+  reportOwnersArgument,
+  serializeReportOwners,
+} from '@/lib/reportFilters'
 
 const sizes = [20, 50, 100, 200, 350, 500]
 
@@ -44,6 +50,13 @@ export function EquipmentReports() {
     ? Number(params.get('page_size'))
     : 20
   const search = params.get('q') ?? ''
+  // Owner filter, applied by the report function and kept in the URL. Parsed
+  // from the raw parameter so the array keeps one identity per URL and the
+  // effect below does not re-run on every render. This report is workshop and
+  // site at once (it is about the latest movement in any context), so it has
+  // no context tabs.
+  const ownersParam = params.get('owners') ?? ''
+  const owners = useMemo(() => parseReportOwners(ownersParam), [ownersParam])
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params.toString())
@@ -62,6 +75,7 @@ export function EquipmentReports() {
         p_limit: pageSize,
         p_offset: (page - 1) * pageSize,
         p_search: sanitizeSearchTerm(search) || null,
+        p_owners: reportOwnersArgument(owners),
       })
       .then(({ data: result, error }) => {
         if (cancelled) return
@@ -74,7 +88,7 @@ export function EquipmentReports() {
     return () => {
       cancelled = true
     }
-  }, [page, pageSize, search])
+  }, [page, pageSize, search, owners])
 
   const number = (value: number | undefined) =>
     new Intl.NumberFormat(lang === 'ar' ? 'ar-SA-u-nu-latn' : 'en-US').format(
@@ -152,6 +166,12 @@ export function EquipmentReports() {
             </option>
           ))}
         </select>
+        <OwnerContextFilter
+          owners={owners}
+          onOwnersChange={(next) =>
+            setParam('owners', serializeReportOwners(next))
+          }
+        />
       </div>
       {loading ? (
         <div className="flex justify-center p-10">

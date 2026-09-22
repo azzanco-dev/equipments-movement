@@ -5,7 +5,16 @@ import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { PageHeader } from '@/components/PageHeader'
 import { MovementLogCard } from '@/components/MovementLogCard'
+import { OwnerContextFilter } from '@/components/OwnerContextFilter'
 import { Alert } from '@/components/Alert'
+import type { AdminHomeOwner } from '@/lib/adminHomeStats'
+import {
+  applyReportFilterParams,
+  parseReportContext,
+  parseReportOwners,
+  reportOwnersArgument,
+  type ReportContext,
+} from '@/lib/reportFilters'
 import { formatDate } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
 import {
@@ -64,6 +73,12 @@ export function EntryReports({
     }
   }, [period, params])
   const rangeReady = !!range.from && !!range.to
+  // Owner + context filter, applied by the database function and kept in the
+  // URL. Parsed from the raw parameter so the owner array keeps one identity
+  // per URL and the effect below does not re-run on every render.
+  const ownersParam = params.get('owners') ?? ''
+  const owners = useMemo(() => parseReportOwners(ownersParam), [ownersParam])
+  const context = parseReportContext(params.get('context'))
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -82,6 +97,8 @@ export function EntryReports({
       .rpc('get_entry_report_summary', {
         p_from: saudiDayStart(range.from),
         p_to: saudiDayEnd(range.to),
+        p_owners: reportOwnersArgument(owners),
+        p_context: context,
       })
       .then(({ data: result, error }) => {
         if (cancelled) return
@@ -93,12 +110,27 @@ export function EntryReports({
     return () => {
       cancelled = true
     }
-  }, [range.from, range.to, rangeReady])
+  }, [range.from, range.to, rangeReady, owners, context])
 
-  const replaceParams = (next: Record<string, string>) =>
-    router.replace(`/reports/entries?${new URLSearchParams(next).toString()}`, {
-      scroll: false,
-    })
+  // The period controls rebuild the query string from scratch, so the owner and
+  // context filters are re-applied here rather than at every call site.
+  const replaceParams = (
+    next: Record<string, string>,
+    filters: { owners?: AdminHomeOwner[]; context?: ReportContext } = {},
+  ) =>
+    router.replace(
+      `/reports/entries?${applyReportFilterParams(
+        new URLSearchParams(next),
+        filters.owners ?? owners,
+        filters.context ?? context,
+      ).toString()}`,
+      { scroll: false },
+    )
+  // The dates currently in the URL, so a filter change keeps the same period.
+  const periodParams: Record<string, string> =
+    period === 'custom'
+      ? { period: 'custom', from: range.from, to: range.to }
+      : { period }
   const setPreset = (value: Period) => {
     // Start a custom period from the dates currently shown, so the data on
     // screen always matches the selected dates.
@@ -163,6 +195,18 @@ export function EntryReports({
             />
           </>
         )}
+        <OwnerContextFilter
+          className="ms-auto"
+          owners={owners}
+          onOwnersChange={(next) =>
+            replaceParams(periodParams, { owners: next })
+          }
+          context={context}
+          onContextChange={(next) =>
+            replaceParams(periodParams, { context: next })
+          }
+          showContext
+        />
       </div>
       {loadError && <Alert type="error">{t('dataLoadError')}</Alert>}
       {!rangeReady && <Alert type="info">{t('selectDateRange')}</Alert>}
@@ -195,7 +239,12 @@ export function EntryReports({
             disabled={!rangeReady}
             onClick={() =>
               router.push(
-                `/reports/entries/all?${new URLSearchParams({ from: range.from, to: range.to }).toString()}`,
+                // The drill-down keeps the filter that produced the summary.
+                `/reports/entries/all?${applyReportFilterParams(
+                  new URLSearchParams({ from: range.from, to: range.to }),
+                  owners,
+                  context,
+                ).toString()}`,
               )
             }
           >
