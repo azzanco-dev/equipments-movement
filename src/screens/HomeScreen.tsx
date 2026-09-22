@@ -186,14 +186,17 @@ export function HomeScreen({
         }
       />
 
-      {/* The two primary actions and the equipment inquiry entry point
-          always lead the page, above every stat or list (owner decision,
-          wave 6). */}
+      {/* The two primary actions always lead the page, above every stat or
+          list (owner decision, wave 6). */}
       {quickActions}
-      <InquiryCard />
 
       {workshopMode ? (
         <>
+          {/* The equipment inquiry entry point is workshop-only: the
+              foreman does not need it on the home (owner decision,
+              2026-09-22). */}
+          <InquiryCard />
+
           {/* State next: equipment counts right now, before the pending
               queue and the actions that act on them. Mobile layout (owner
               decision): inside-workshop full width, maintenance/parking
