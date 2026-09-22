@@ -205,7 +205,7 @@ function Summary({
       )
     : undefined
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-2">
       <StatCard
         label={t('currentStatus')}
         value={
@@ -222,20 +222,15 @@ function Summary({
           )
         }
       />
-      <StatCard label={t('visitsCount')} value={summary.visitCount} />
-      <StatCard label={t('daysOnSites')} value={summary.siteDays} />
-      <StatCard label={t('daysInWorkshop')} value={summary.workshopDays} />
-      <StatCard label={t('daysOutside')} value={summary.gapDays} />
+      {/* Owner decision (wave 6): the visit/day totals were dropped; the
+          header answers only "where is it" and "since when". */}
       <StatCard
         label={t('lastMovement')}
         value={
-          <span className="text-base font-semibold">
-            {lastMovement ? formatDateTime(lastMovement) : '—'}
-          </span>
+          <span className="text-base font-semibold">{sinceLast ?? '—'}</span>
         }
-        hint={sinceLast}
+        hint={lastMovement ? formatDateTime(lastMovement) : undefined}
         icon={<CalendarClock size={16} />}
-        className="col-span-2 sm:col-span-1"
       />
     </div>
   )
