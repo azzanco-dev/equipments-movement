@@ -1,10 +1,9 @@
 import { useCallback, useMemo } from 'react'
-import { Select } from '@/components/ui'
+import { Users } from 'lucide-react'
+import { MultiSelect } from '@/components/ui/MultiSelect'
 import { useI18n } from '@/i18n/I18nContext'
 import { ADMIN_HOME_OWNERS, type AdminHomeOwner } from '@/lib/adminHomeStats'
 import type { TranslationKey } from '@/i18n/translations'
-
-const ALL = '__all__'
 
 /** Short label per owner, for chart legends and compact table cells. The long
  *  registered names stay on the equipment forms. */
@@ -30,42 +29,69 @@ export function useOwnerLabel(): (owner: string) => string {
 }
 
 export interface OwnerFilterProps {
-  /** `null` means every owner. */
-  value: AdminHomeOwner | null
-  onChange: (value: AdminHomeOwner | null) => void
+  /** An empty array means every owner, never "no owners". */
+  value: AdminHomeOwner[]
+  onChange: (value: AdminHomeOwner[]) => void
   className?: string
 }
 
 /**
- * Owner filter for the whole admin home.
+ * The owner filter for the whole admin home (owner request, 2026-09-22: a
+ * multi-select, and the first control on the page).
  *
- * Deliberately the plain shared `Select` with a `value` / `onChange` pair of
- * exactly this shape: batch 3 replaces it with the unified owner filter, and
- * that swap must not touch the sections or the screen.
+ * An empty selection means "every owner" in all three places it is
+ * represented: here, in the `?owners=` URL parameter, and as a NULL
+ * `p_owners` argument in migration 0095. That is why there is no explicit
+ * "الكل" option to tick — clearing the selection IS that option, so the two
+ * can never be on at the same time.
  */
 export function OwnerFilter({ value, onChange, className }: OwnerFilterProps) {
   const { t } = useI18n()
   const label = useOwnerLabel()
   const options = useMemo(
-    () => [
-      { value: ALL, label: t('allOwners') },
-      ...ADMIN_HOME_OWNERS.map((owner) => ({
+    () =>
+      ADMIN_HOME_OWNERS.map((owner) => ({
         value: owner,
         label: label(owner),
       })),
-    ],
-    [label, t],
+    [label],
   )
 
   return (
-    <Select
+    <MultiSelect
       className={className}
       aria-label={t('adminHomeOwnerFilter')}
-      value={value ?? ALL}
       options={options}
-      onValueChange={(next) =>
-        onChange(next === ALL ? null : (next as AdminHomeOwner))
+      value={value}
+      onValueChange={(next) => onChange(next as AdminHomeOwner[])}
+      allLabel={t('allOwners')}
+      summaryLabel={(count) =>
+        t('adminHomeOwnerCount').replace('{count}', String(count))
       }
     />
+  )
+}
+
+/**
+ * The owner filter as the page's first row: a labelled card above the
+ * sections, full width on mobile and a fixed, comfortable width from sm up.
+ */
+export function OwnerFilterBar({
+  value,
+  onChange,
+}: Omit<OwnerFilterProps, 'className'>) {
+  const { t } = useI18n()
+  return (
+    <div className="card flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-3">
+      <span className="flex items-center gap-2 text-sm font-medium text-fg">
+        <Users size={16} aria-hidden="true" className="text-muted" />
+        {t('adminHomeOwnerFilter')}
+      </span>
+      <OwnerFilter
+        value={value}
+        onChange={onChange}
+        className="w-full sm:w-72"
+      />
+    </div>
   )
 }

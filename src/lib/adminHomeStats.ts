@@ -1,11 +1,16 @@
 /**
- * Shapes and pure helpers for the admin home page (migration 0094).
+ * Shapes and pure helpers for the admin home page (migrations 0094 / 0095).
  *
  * Everything here is free of React and Supabase so the counting and bucketing
  * rules can be unit tested, and so a malformed payload can never reach a
  * component as `any`. The screen calls `src/lib/adminHomeData.ts`, which calls
  * the database functions and hands the raw rows to the parsers below.
  */
+import {
+  addDaysToDateKey,
+  addMonthsToDateKey,
+  parseDateKey,
+} from '@/lib/calendar'
 import type { ChartBucket } from '@/lib/chartBuckets'
 import { saudiDateKey } from '@/lib/saudiTime'
 import type { OwnershipStatus } from '@/lib/types'
@@ -21,13 +26,43 @@ export const ADMIN_HOME_OWNERS = [
 
 export type AdminHomeOwner = (typeof ADMIN_HOME_OWNERS)[number]
 
-/** `null` means "every owner"; anything else must be a known owner. */
-export function normalizeOwnerFilter(
-  value: string | null | undefined,
-): AdminHomeOwner | null {
-  return ADMIN_HOME_OWNERS.includes(value as AdminHomeOwner)
-    ? (value as AdminHomeOwner)
-    : null
+function isAdminHomeOwner(value: string): value is AdminHomeOwner {
+  return (ADMIN_HOME_OWNERS as readonly string[]).includes(value)
+}
+
+/**
+ * Reads the `?owners=a,b` filter.
+ *
+ * An empty result means "every owner", exactly as it does in the database
+ * functions, so an unknown or hand-edited value degrades to the unfiltered
+ * page instead of an error. Duplicates are dropped and the result is put back
+ * into the canonical `ADMIN_HOME_OWNERS` order, so the same selection always
+ * produces the same URL and the same request signature.
+ */
+export function normalizeOwnerFilters(
+  value: string | string[] | null | undefined,
+): AdminHomeOwner[] {
+  const parts = Array.isArray(value) ? value : (value ?? '').split(',')
+  const chosen = new Set(
+    parts.map((part) => part.trim()).filter((part) => isAdminHomeOwner(part)),
+  )
+  return ADMIN_HOME_OWNERS.filter((owner) => chosen.has(owner))
+}
+
+/** The URL value for a selection; `null` clears the parameter entirely. */
+export function serializeOwnerFilters(owners: AdminHomeOwner[]): string | null {
+  const normalized = normalizeOwnerFilters(owners)
+  return normalized.length ? normalized.join(',') : null
+}
+
+/**
+ * The argument the database functions take: `null` for "every owner", never
+ * an empty array, so the two representations can never diverge.
+ */
+export function ownerFilterArgument(
+  owners: AdminHomeOwner[],
+): AdminHomeOwner[] | null {
+  return owners.length ? owners : null
 }
 
 /** Ownership is derived, never stored twice: only Al-Azani is owned. */
@@ -144,27 +179,32 @@ function optionalText(source: unknown, key: string): string | null {
   return value === '' ? null : value
 }
 
+function movementType(source: unknown, key: string): 'entry' | 'exit' | null {
+  const value = optionalText(source, key)
+  return value === 'entry' || value === 'exit' ? value : null
+}
+
+function movementContext(
+  source: unknown,
+  key: string,
+): 'site' | 'workshop' | null {
+  const value = optionalText(source, key)
+  return value === 'site' || value === 'workshop' ? value : null
+}
+
 export function parseNoMovementRows(source: unknown): NoMovementRow[] {
   if (!Array.isArray(source)) return []
   return source
     .map((row): NoMovementRow => {
       const days = (row as Record<string, unknown> | null)?.days_since
-      const movementType = optionalText(row, 'last_movement_type')
-      const movementContext = optionalText(row, 'last_movement_context')
       return {
         id: text(row, 'id'),
         code: text(row, 'code'),
         type: text(row, 'type'),
         owner: text(row, 'ownership_status'),
         lastMovementAt: optionalText(row, 'last_movement_at'),
-        lastMovementType:
-          movementType === 'entry' || movementType === 'exit'
-            ? movementType
-            : null,
-        lastMovementContext:
-          movementContext === 'site' || movementContext === 'workshop'
-            ? movementContext
-            : null,
+        lastMovementType: movementType(row, 'last_movement_type'),
+        lastMovementContext: movementContext(row, 'last_movement_context'),
         daysSince:
           typeof days === 'number' && Number.isFinite(days) && days >= 0
             ? Math.trunc(days)
@@ -176,50 +216,51 @@ export function parseNoMovementRows(source: unknown): NoMovementRow[] {
 
 // --- 3. Availability by type ----------------------------------------------
 
-export interface AvailabilityRow {
+/**
+ * One equipment type's current availability.
+ *
+ * The owned / rented split migration 0094 returned is gone (owner request,
+ * 2026-09-22): the multi-select owner filter above the page answers that
+ * question directly, so the sub-lines were removing room from the numbers that
+ * matter without adding anything the filter cannot say.
+ */
+export interface AvailabilityRow extends FleetStateCounts {
   type: string
-  all: FleetStateCounts
-  owned: FleetStateCounts
-  /** Derived, so the owned and rented halves can never drift apart. */
-  rented: FleetStateCounts
-}
-
-function minusCounts(
-  all: FleetStateCounts,
-  owned: FleetStateCounts,
-): FleetStateCounts {
-  return {
-    total: Math.max(0, all.total - owned.total),
-    insideSites: Math.max(0, all.insideSites - owned.insideSites),
-    inWorkshop: Math.max(0, all.inWorkshop - owned.inWorkshop),
-    available: Math.max(0, all.available - owned.available),
-  }
 }
 
 export function parseAvailabilityRows(source: unknown): AvailabilityRow[] {
   if (!Array.isArray(source)) return []
   return source
-    .map((row) => {
-      const all: FleetStateCounts = {
-        total: num(row, 'total'),
-        insideSites: num(row, 'inside_sites'),
-        inWorkshop: num(row, 'in_workshop'),
-        available: num(row, 'available'),
-      }
-      const owned: FleetStateCounts = {
-        total: num(row, 'owned_total'),
-        insideSites: num(row, 'owned_inside_sites'),
-        inWorkshop: num(row, 'owned_in_workshop'),
-        available: num(row, 'owned_available'),
-      }
-      return {
-        type: text(row, 'type'),
-        all,
-        owned,
-        rented: minusCounts(all, owned),
-      }
-    })
+    .map((row) => ({
+      type: text(row, 'type'),
+      insideSites: num(row, 'inside_sites'),
+      inWorkshop: num(row, 'in_workshop'),
+      available: num(row, 'available'),
+      total: num(row, 'total'),
+    }))
     .filter((row) => row.type !== '')
+}
+
+/** How many types the section shows before "عرض الكل" is used. */
+export const AVAILABILITY_TOP_TYPES = 10
+
+/**
+ * The rows the availability table renders.
+ *
+ * A search always looks at every type the database returned, so a type outside
+ * the top ten is still findable by name; without a search the list is capped at
+ * the top ten until the caller expands it. The database already ordered the
+ * rows by total, so "top ten" is a slice and never a re-sort in the browser.
+ */
+export function visibleAvailabilityRows(
+  all: AvailabilityRow[],
+  query: string,
+  expanded: boolean,
+): AvailabilityRow[] {
+  const needle = query.trim().toLowerCase()
+  if (needle)
+    return all.filter((row) => row.type.toLowerCase().includes(needle))
+  return expanded ? all : all.slice(0, AVAILABILITY_TOP_TYPES)
 }
 
 // --- 4. Entries series -----------------------------------------------------
@@ -242,6 +283,25 @@ export function parseDailySeries(source: unknown): DailyMovementCount[] {
     .filter((row) => row.day.length === 10)
 }
 
+/** One Saudi calendar year of movement counts (migration 0095). */
+export interface YearlyMovementCount {
+  year: number
+  entries: number
+  exits: number
+}
+
+export function parseYearlySeries(source: unknown): YearlyMovementCount[] {
+  if (!Array.isArray(source)) return []
+  return source
+    .map((row) => ({
+      year: num(row, 'year'),
+      entries: num(row, 'entries'),
+      exits: num(row, 'exits'),
+    }))
+    .filter((row) => row.year > 0)
+    .sort((a, b) => a.year - b.year)
+}
+
 export interface SeriesPoint {
   key: string
   entries: number
@@ -249,10 +309,10 @@ export interface SeriesPoint {
 }
 
 /**
- * Folds daily counts into the chart buckets the client picked (day, week or
- * month). The database always returns days, so switching granularity never
- * costs a request and a bucket clamped to the edge of the period only ever
- * sums the days it actually covers.
+ * Folds daily counts into the chart buckets the client picked (day or month).
+ * The database always returns days, so switching granularity never costs a
+ * request and a bucket clamped to the edge of the period only ever sums the
+ * days it actually covers.
  *
  * Days outside every bucket are dropped rather than silently added to the
  * nearest one, and a bucket with no movements is kept at zero so the line
@@ -295,6 +355,43 @@ export function aggregateDailySeries(
   return points
 }
 
+/**
+ * Fills the yearly view's x axis.
+ *
+ * The database only returns years that actually have movements, so a gap year
+ * in the middle would otherwise disappear and make the line lie about the
+ * distance between two points. The axis starts at the earliest year that has
+ * data (capped at `maxYears` back) and always ends at the current Saudi year,
+ * so "as far back as data exists" never stretches past the requested window
+ * and the current year is always the last point even before it has movements.
+ */
+export function buildYearlySeries(
+  yearly: YearlyMovementCount[],
+  maxYears: number,
+  today: string = saudiDateKey(),
+): SeriesPoint[] {
+  const currentYear = parseDateKey(today)?.year ?? new Date().getUTCFullYear()
+  const span = Math.max(1, Math.trunc(maxYears))
+  const floor = currentYear - span + 1
+  const withData = yearly.filter(
+    (row) => row.year >= floor && row.year <= currentYear,
+  )
+  const first = withData.length
+    ? Math.min(...withData.map((row) => row.year))
+    : currentYear
+  const counts = new Map(withData.map((row) => [row.year, row]))
+  const points: SeriesPoint[] = []
+  for (let year = first; year <= currentYear; year += 1) {
+    const row = counts.get(year)
+    points.push({
+      key: String(year),
+      entries: row?.entries ?? 0,
+      exits: row?.exits ?? 0,
+    })
+  }
+  return points
+}
+
 // --- 5. Owner x state matrix ----------------------------------------------
 
 export interface OwnerStateMatrix {
@@ -322,55 +419,122 @@ export function parseOwnerStateMatrix(source: unknown): OwnerStateMatrix {
   }
 }
 
-// --- 6. Foreman activity ---------------------------------------------------
+// --- 6. Foreman recent movements ------------------------------------------
 
-export interface ForemanActivityRow {
+export interface ForemanMovement {
+  id: string
+  equipmentId: string
+  equipmentCode: string
+  type: 'entry' | 'exit' | null
+  context: 'site' | 'workshop' | null
+  recordedAt: string | null
+}
+
+export interface ForemanRecentGroup {
   supervisorId: string
   name: string
-  entries: number
-  exits: number
-  /** Site visits this foreman has open right now, not a period number. */
-  openVisits: number
+  /** Every movement this foreman ever recorded, not only the ones listed. */
+  totalMovements: number
+  /** Newest first, capped by the database at `p_limit_per_foreman`. */
+  movements: ForemanMovement[]
 }
-
-export function parseForemanActivity(source: unknown): ForemanActivityRow[] {
-  if (!Array.isArray(source)) return []
-  return source
-    .map((row) => ({
-      supervisorId: text(row, 'supervisor_id'),
-      name: text(row, 'foreman_name'),
-      entries: num(row, 'entries'),
-      exits: num(row, 'exits'),
-      openVisits: num(row, 'open_visits'),
-    }))
-    .filter((row) => row.supervisorId !== '')
-}
-
-// --- Period presets --------------------------------------------------------
 
 /**
- * `year` is 1 January of the current Saudi year up to today; `last12` is the
- * 12 months ending today. Both are Saudi calendar date keys, so the chart and
- * the reports start a day at the same instant.
+ * Groups the flat rows of `get_admin_foreman_recent_movements` into one entry
+ * per foreman.
+ *
+ * The database already ordered the rows (busiest foreman first, then newest
+ * movement first inside each foreman), so the grouping preserves insertion
+ * order and never re-sorts: two foremen with the same total keep the
+ * deterministic order the database gave them.
  */
-export type AdminHomePeriod = 'year' | 'last12'
-
-export function isAdminHomePeriod(
-  value: string | null | undefined,
-): value is AdminHomePeriod {
-  return value === 'year' || value === 'last12'
+export function parseForemanRecentMovements(
+  source: unknown,
+): ForemanRecentGroup[] {
+  if (!Array.isArray(source)) return []
+  // The array is built alongside the index rather than spread out of it at the
+  // end, so the order is the database's insertion order by construction.
+  const order: ForemanRecentGroup[] = []
+  const groups = new Map<string, ForemanRecentGroup>()
+  source.forEach((row) => {
+    const supervisorId = text(row, 'supervisor_id')
+    const id = text(row, 'movement_id')
+    if (!supervisorId) return
+    let group = groups.get(supervisorId)
+    if (!group) {
+      group = {
+        supervisorId,
+        name: text(row, 'foreman_name'),
+        totalMovements: num(row, 'total_movements'),
+        movements: [],
+      }
+      groups.set(supervisorId, group)
+      order.push(group)
+    }
+    if (!id) return
+    group.movements.push({
+      id,
+      equipmentId: text(row, 'equipment_id'),
+      equipmentCode: text(row, 'equipment_code'),
+      type: movementType(row, 'movement_type'),
+      context: movementContext(row, 'movement_context'),
+      recordedAt: optionalText(row, 'recorded_at'),
+    })
+  })
+  return order
 }
 
-export function adminHomePeriodKeys(
-  period: AdminHomePeriod,
+// --- Chart granularity -----------------------------------------------------
+
+/**
+ * The entries chart's granularity (owner request, 2026-09-22): يوم shows the
+ * last 30 days day by day, شهر the last 12 months month by month, and سنة the
+ * last 5 years year by year.
+ */
+export const ADMIN_HOME_GRANULARITIES = ['day', 'month', 'year'] as const
+export type AdminHomeGranularity = (typeof ADMIN_HOME_GRANULARITIES)[number]
+
+/** Days shown by the يوم view. */
+export const GRANULARITY_DAYS = 30
+/** Months shown by the شهر view, including the current one. */
+export const GRANULARITY_MONTHS = 12
+/** Years the سنة view asks for; fewer are drawn when data starts later. */
+export const GRANULARITY_YEARS = 5
+
+/** Fails closed on an unknown value: an edited URL falls back to the month
+ *  view rather than asking the database for something it would reject. */
+export function normalizeGranularity(
+  value: string | null | undefined,
+): AdminHomeGranularity {
+  return (ADMIN_HOME_GRANULARITIES as readonly string[]).includes(value ?? '')
+    ? (value as AdminHomeGranularity)
+    : 'month'
+}
+
+/**
+ * The Saudi date range the daily series is requested for.
+ *
+ * Only the يوم and شهر views use it; سنة has its own database function because
+ * five years of days is past the 400-day cap `get_admin_entries_series`
+ * enforces. Both ranges below stay comfortably inside that cap: 30 days, and
+ * at most 366 days for twelve whole months.
+ */
+export function adminHomeFlowRange(
+  granularity: Exclude<AdminHomeGranularity, 'year'>,
   today: string = saudiDateKey(),
 ): { from: string; to: string } {
-  if (period === 'year')
-    return { from: `${today.slice(0, 4)}-01-01`, to: today }
-  // 12 months back, inclusive of the current month: the day after the same day
-  // one year ago, so the range is never longer than the database's 400-day cap.
-  const date = new Date(`${today}T00:00:00Z`)
-  date.setUTCFullYear(date.getUTCFullYear() - 1)
-  date.setUTCDate(date.getUTCDate() + 1)
-  return { from: date.toISOString().slice(0, 10), to: today }
+  if (granularity === 'day')
+    return {
+      from: addDaysToDateKey(today, -(GRANULARITY_DAYS - 1)) ?? today,
+      to: today,
+    }
+  // The first day of the month GRANULARITY_MONTHS - 1 back, so the chart shows
+  // twelve whole months ending with the current (partial) one.
+  const firstOfThisMonth = `${today.slice(0, 7)}-01`
+  return {
+    from:
+      addMonthsToDateKey(firstOfThisMonth, -(GRANULARITY_MONTHS - 1)) ??
+      firstOfThisMonth,
+    to: today,
+  }
 }

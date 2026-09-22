@@ -1,28 +1,31 @@
 /**
  * The only place the admin home talks to PostgreSQL.
  *
- * Every section calls one database function from migration 0094 and gets a
- * parsed, typed result back, so no component ever sees a raw PostgREST row and
- * no raw PostgreSQL error text can reach the interface: each loader throws a
- * plain `Error` and the section renders its own translated failure with a
+ * Every section calls one database function (migrations 0094 / 0095) and gets
+ * a parsed, typed result back, so no component ever sees a raw PostgREST row
+ * and no raw PostgreSQL error text can reach the interface: each loader throws
+ * a plain `Error` and the section renders its own translated failure with a
  * retry.
  */
 import { saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
 import { supabase } from '@/lib/supabase'
 import {
+  ownerFilterArgument,
   parseAvailabilityRows,
   parseDailySeries,
   parseFleetState,
-  parseForemanActivity,
+  parseForemanRecentMovements,
   parseNoMovementRows,
   parseOwnerStateMatrix,
+  parseYearlySeries,
   type AdminHomeOwner,
   type AvailabilityRow,
   type DailyMovementCount,
   type FleetState,
-  type ForemanActivityRow,
+  type ForemanRecentGroup,
   type NoMovementRow,
   type OwnerStateMatrix,
+  type YearlyMovementCount,
 } from '@/lib/adminHomeStats'
 
 /**
@@ -57,25 +60,25 @@ function isAbortError(error: unknown): boolean {
 }
 
 export async function fetchFleetState(
-  owner: AdminHomeOwner | null,
+  owners: AdminHomeOwner[],
   signal: AbortSignal,
 ): Promise<FleetState> {
   const { data, error } = await supabase
-    .rpc('get_admin_fleet_state', { p_owner: owner })
+    .rpc('get_admin_fleet_state', { p_owners: ownerFilterArgument(owners) })
     .abortSignal(signal)
   if (error) fail('fleetState', error)
   return parseFleetState(data)
 }
 
 export async function fetchNoMovementEquipment(
-  owner: AdminHomeOwner | null,
+  owners: AdminHomeOwner[],
   days: number,
   limit: number,
   signal: AbortSignal,
 ): Promise<NoMovementRow[]> {
   const { data, error } = await supabase
     .rpc('get_admin_no_movement_equipment', {
-      p_owner: owner,
+      p_owners: ownerFilterArgument(owners),
       p_days: days,
       p_limit: limit,
     })
@@ -85,11 +88,13 @@ export async function fetchNoMovementEquipment(
 }
 
 export async function fetchAvailabilityByType(
-  owner: AdminHomeOwner | null,
+  owners: AdminHomeOwner[],
   signal: AbortSignal,
 ): Promise<AvailabilityRow[]> {
   const { data, error } = await supabase
-    .rpc('get_admin_availability_by_type', { p_owner: owner })
+    .rpc('get_admin_availability_by_type', {
+      p_owners: ownerFilterArgument(owners),
+    })
     .abortSignal(signal)
   if (error) fail('availability', error)
   return parseAvailabilityRows(data)
@@ -98,7 +103,7 @@ export async function fetchAvailabilityByType(
 export async function fetchEntriesSeries(
   fromKey: string,
   toKey: string,
-  owner: AdminHomeOwner | null,
+  owners: AdminHomeOwner[],
   context: 'site' | 'workshop' | null,
   signal: AbortSignal,
 ): Promise<DailyMovementCount[]> {
@@ -107,7 +112,7 @@ export async function fetchEntriesSeries(
       // Saudi day bounds (UTC+03:00), never the browser's midnight.
       p_from: saudiDayStart(fromKey),
       p_to: saudiDayEnd(toKey),
-      p_owner: owner,
+      p_owners: ownerFilterArgument(owners),
       p_context: context,
     })
     .abortSignal(signal)
@@ -115,27 +120,51 @@ export async function fetchEntriesSeries(
   return parseDailySeries(data)
 }
 
+/**
+ * The سنة view. It is a separate database function rather than a longer daily
+ * range because five years of days is far past the 400-day cap
+ * `get_admin_entries_series` enforces, and raising that cap would hand every
+ * caller an unbounded payload.
+ */
+export async function fetchEntriesYearly(
+  years: number,
+  owners: AdminHomeOwner[],
+  context: 'site' | 'workshop' | null,
+  signal: AbortSignal,
+): Promise<YearlyMovementCount[]> {
+  const { data, error } = await supabase
+    .rpc('get_admin_entries_yearly', {
+      p_years: years,
+      p_owners: ownerFilterArgument(owners),
+      p_context: context,
+    })
+    .abortSignal(signal)
+  if (error) fail('entriesYearly', error)
+  return parseYearlySeries(data)
+}
+
 export async function fetchOwnerStateMatrix(
+  owners: AdminHomeOwner[],
   signal: AbortSignal,
 ): Promise<OwnerStateMatrix> {
   const { data, error } = await supabase
-    .rpc('get_admin_owner_state_matrix')
+    .rpc('get_admin_owner_state_matrix', {
+      p_owners: ownerFilterArgument(owners),
+    })
     .abortSignal(signal)
   if (error) fail('ownerStateMatrix', error)
   return parseOwnerStateMatrix(data)
 }
 
-export async function fetchForemanActivity(
-  fromKey: string,
-  toKey: string,
+export async function fetchForemanRecentMovements(
+  limitPerForeman: number,
   signal: AbortSignal,
-): Promise<ForemanActivityRow[]> {
+): Promise<ForemanRecentGroup[]> {
   const { data, error } = await supabase
-    .rpc('get_admin_foreman_discipline', {
-      p_from: saudiDayStart(fromKey),
-      p_to: saudiDayEnd(toKey),
+    .rpc('get_admin_foreman_recent_movements', {
+      p_limit_per_foreman: limitPerForeman,
     })
     .abortSignal(signal)
-  if (error) fail('foremanActivity', error)
-  return parseForemanActivity(data)
+  if (error) fail('foremanRecent', error)
+  return parseForemanRecentMovements(data)
 }

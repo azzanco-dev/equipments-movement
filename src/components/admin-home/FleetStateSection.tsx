@@ -7,7 +7,8 @@ import { AdminHomeSection } from './AdminHomeSection'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 export interface FleetStateSectionProps {
-  owner: AdminHomeOwner | null
+  /** An empty array means every owner. */
+  owners: AdminHomeOwner[]
 }
 
 /**
@@ -19,11 +20,11 @@ export interface FleetStateSectionProps {
  * section carries the "now" chip and the chart's period switcher deliberately
  * does not reach it.
  */
-export function FleetStateSection({ owner }: FleetStateSectionProps) {
+export function FleetStateSection({ owners }: FleetStateSectionProps) {
   const { t } = useI18n()
   const load = useCallback(
-    (signal: AbortSignal) => fetchFleetState(owner, signal),
-    [owner],
+    (signal: AbortSignal) => fetchFleetState(owners, signal),
+    [owners],
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
 

@@ -40,296 +40,350 @@ const buckets = loadLibModule('chartBuckets', cache)
 
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null))
 
-// --- owner filter ----------------------------------------------------------
+// --- owner filter (multi-select, migration 0095) ---------------------------
 
-test('normalizeOwnerFilter accepts only known ownership_status values', () => {
-  assert.equal(admin.normalizeOwnerFilter('alazani'), 'alazani')
-  assert.equal(
-    admin.normalizeOwnerFilter('external_supplier'),
-    'external_supplier',
+test('normalizeOwnerFilters accepts only known ownership_status values', () => {
+  assert.deepEqual(plain(admin.normalizeOwnerFilters('alazani')), ['alazani'])
+  assert.deepEqual(plain(admin.normalizeOwnerFilters('alazani,takween')), [
+    'alazani',
+    'takween',
+  ])
+  // Anything else is dropped rather than sent to a database function that
+  // would reject it, so a hand-edited URL can never break the page.
+  assert.deepEqual(plain(admin.normalizeOwnerFilters('alazani,owned')), [
+    'alazani',
+  ])
+  assert.deepEqual(plain(admin.normalizeOwnerFilters('owned')), [])
+  assert.deepEqual(plain(admin.normalizeOwnerFilters('')), [])
+  assert.deepEqual(plain(admin.normalizeOwnerFilters(null)), [])
+  assert.deepEqual(plain(admin.normalizeOwnerFilters(undefined)), [])
+})
+
+test('owner filters are deduplicated and canonically ordered', () => {
+  // The same selection must always produce the same URL and the same request
+  // signature, whatever order the user ticked the boxes in.
+  assert.deepEqual(
+    plain(admin.normalizeOwnerFilters('takween,alazani,takween')),
+    ['alazani', 'takween'],
   )
-  // Anything else means "every owner" rather than a filter the database would
-  // reject, so a hand-edited URL can never break the page.
-  assert.equal(admin.normalizeOwnerFilter('owned'), null)
-  assert.equal(admin.normalizeOwnerFilter(''), null)
-  assert.equal(admin.normalizeOwnerFilter(null), null)
-  assert.equal(admin.normalizeOwnerFilter(undefined), null)
+  assert.deepEqual(
+    plain(admin.normalizeOwnerFilters([' takween ', 'alazani'])),
+    ['alazani', 'takween'],
+  )
+})
+
+test('an empty selection serializes to no URL parameter at all', () => {
+  assert.equal(admin.serializeOwnerFilters([]), null)
+  assert.equal(admin.serializeOwnerFilters(['bogus']), null)
+  assert.equal(
+    admin.serializeOwnerFilters(['takween', 'alazani']),
+    'alazani,takween',
+  )
+})
+
+test('the database argument is NULL for "every owner", never an empty array', () => {
+  // The functions in 0095 treat NULL and an empty array the same, but only one
+  // of them may leave the client, so "no filter" has one representation.
+  assert.equal(admin.ownerFilterArgument([]), null)
+  assert.deepEqual(plain(admin.ownerFilterArgument(['alazani'])), ['alazani'])
 })
 
 test('only Al-Azani counts as owned', () => {
   assert.equal(admin.isOwnedOwner('alazani'), true)
   assert.equal(admin.isOwnedOwner('takween'), false)
-  assert.equal(admin.isOwnedOwner('third_party_f'), false)
   assert.equal(admin.isOwnedOwner('external_supplier'), false)
 })
 
-// --- fleet state -----------------------------------------------------------
-
-test('parseFleetState reads the payload and defaults every missing count', () => {
-  const state = admin.parseFleetState({
-    total: 812,
-    inside_sites: 498,
-    in_workshop: 159,
-    workshop_maintenance: 96,
-    workshop_parking: 63,
-    workshop_unclassified: 0,
-    available: 155,
-    idle_30: 120,
-    idle_60: 95,
-    idle_90: 81,
-    never_moved: 7,
-    by_owner: [
-      {
-        owner: 'alazani',
-        total: 402,
-        inside_sites: 248,
-        in_workshop: 79,
-        available: 75,
-      },
-      { owner: '', total: 9 },
-    ],
-    by_type: [
-      {
-        type: 'حفار',
-        total: 60,
-        inside_sites: 40,
-        in_workshop: 10,
-        available: 10,
-      },
-    ],
-  })
-  assert.equal(state.total, 812)
-  assert.equal(state.workshopUnclassified, 0)
-  assert.equal(state.neverMoved, 7)
-  // A group without an identity is dropped rather than rendered as a blank row.
-  assert.equal(state.byOwner.length, 1)
-  assert.equal(state.byOwner[0].key, 'alazani')
-  assert.equal(state.byType[0].key, 'حفار')
-})
+// --- parsers ---------------------------------------------------------------
 
 test('parseFleetState survives a malformed payload', () => {
-  const zero = admin.parseFleetState(null)
-  assert.equal(zero.total, 0)
-  assert.deepEqual(plain(zero.byOwner), [])
-  const junk = admin.parseFleetState({
-    total: 'many',
-    inside_sites: -4,
-    by_owner: 'nope',
+  const empty = admin.parseFleetState(null)
+  assert.equal(empty.total, 0)
+  assert.deepEqual(plain(empty.byOwner), [])
+  assert.deepEqual(plain(empty.byType), [])
+
+  const parsed = admin.parseFleetState({
+    total: 12,
+    inside_sites: 5,
+    in_workshop: 4,
+    workshop_maintenance: 3,
+    workshop_parking: 1,
+    workshop_unclassified: 0,
+    available: 3,
+    idle_30: 6,
+    idle_60: 4,
+    idle_90: 2,
+    never_moved: 1,
+    // Negative and non-numeric values must not reach a component.
+    by_owner: [
+      { owner: 'alazani', total: 7, inside_sites: -1, available: 'x' },
+      { owner: '', total: 4 },
+    ],
+    by_type: 'not-an-array',
   })
-  assert.equal(junk.total, 0)
-  assert.equal(junk.insideSites, 0)
-  assert.deepEqual(plain(junk.byOwner), [])
+  assert.equal(parsed.total, 12)
+  assert.equal(parsed.workshopMaintenance, 3)
+  assert.deepEqual(plain(parsed.byOwner), [
+    {
+      key: 'alazani',
+      total: 7,
+      insideSites: 0,
+      inWorkshop: 0,
+      available: 0,
+    },
+  ])
+  assert.deepEqual(plain(parsed.byType), [])
 })
 
-// --- no movement -----------------------------------------------------------
+test('parseAvailabilityRows returns flat counts, no owned/rented split', () => {
+  const rows = admin.parseAvailabilityRows([
+    { type: 'حفار', inside_sites: 4, in_workshop: 2, available: 3, total: 9 },
+    { type: '', inside_sites: 1, total: 1 },
+  ])
+  assert.deepEqual(plain(rows), [
+    { type: 'حفار', insideSites: 4, inWorkshop: 2, available: 3, total: 9 },
+  ])
+  assert.deepEqual(plain(admin.parseAvailabilityRows('nope')), [])
+})
 
-test('parseNoMovementRows keeps never-moved equipment distinguishable', () => {
+test('the availability table shows the top ten until it is expanded', () => {
+  const all = Array.from({ length: 14 }, (_, index) => ({
+    type: `type-${index}`,
+    insideSites: 0,
+    inWorkshop: 0,
+    available: 0,
+    total: 100 - index,
+  }))
+  assert.equal(admin.AVAILABILITY_TOP_TYPES, 10)
+  assert.equal(admin.visibleAvailabilityRows(all, '', false).length, 10)
+  assert.equal(admin.visibleAvailabilityRows(all, '', true).length, 14)
+  // The search must still find a type outside the top ten, expanded or not.
+  assert.deepEqual(
+    admin.visibleAvailabilityRows(all, 'type-13', false).map((row) => row.type),
+    ['type-13'],
+  )
+  assert.equal(admin.visibleAvailabilityRows(all, '  ', false).length, 10)
+})
+
+test('parseNoMovementRows keeps never-moved equipment identifiable', () => {
   const rows = admin.parseNoMovementRows([
     {
       id: 'a',
-      code: 'A101',
+      code: 'A-1',
       type: 'حفار',
       ownership_status: 'alazani',
       last_movement_at: null,
       last_movement_type: null,
-      last_movement_context: null,
       days_since: null,
     },
     {
       id: 'b',
-      code: 'B7',
-      type: 'قلاب',
+      code: 'B-1',
+      type: 'شيول',
       ownership_status: 'takween',
-      last_movement_at: '2026-06-01T09:00:00Z',
+      last_movement_at: '2026-01-01T00:00:00Z',
       last_movement_type: 'exit',
       last_movement_context: 'site',
-      days_since: 112,
+      days_since: 42,
     },
-    // No id: not a row that can be linked to, so it is dropped.
-    { id: '', code: 'X' },
+    { id: '', code: 'dropped' },
   ])
   assert.equal(rows.length, 2)
   assert.equal(rows[0].lastMovementAt, null)
   assert.equal(rows[0].daysSince, null)
   assert.equal(rows[1].lastMovementType, 'exit')
-  assert.equal(rows[1].daysSince, 112)
+  assert.equal(rows[1].lastMovementContext, 'site')
+  assert.equal(rows[1].daysSince, 42)
 })
 
-test('parseNoMovementRows rejects an unexpected movement type or context', () => {
-  const [row] = admin.parseNoMovementRows([
+test('parseForemanRecentMovements groups rows and keeps database order', () => {
+  const groups = admin.parseForemanRecentMovements([
     {
-      id: 'a',
-      code: 'A1',
-      type: 'x',
-      ownership_status: 'alazani',
-      last_movement_at: '2026-01-01T00:00:00Z',
-      last_movement_type: 'transfer',
-      last_movement_context: 'yard',
-      days_since: -3,
+      supervisor_id: 's1',
+      foreman_name: 'خالد',
+      total_movements: 40,
+      movement_rank: 1,
+      movement_id: 'm1',
+      equipment_id: 'e1',
+      equipment_code: 'A-1',
+      movement_type: 'entry',
+      movement_context: 'site',
+      recorded_at: '2026-09-20T07:00:00Z',
     },
-  ])
-  assert.equal(row.lastMovementType, null)
-  assert.equal(row.lastMovementContext, null)
-  // A negative day count is impossible, so it is treated as unknown.
-  assert.equal(row.daysSince, null)
-})
-
-// --- availability ----------------------------------------------------------
-
-test('rented is derived so the owned and rented halves always sum to the total', () => {
-  const [row] = admin.parseAvailabilityRows([
     {
-      type: 'شيول',
-      total: 50,
-      inside_sites: 30,
-      in_workshop: 12,
-      available: 8,
-      owned_total: 20,
-      owned_inside_sites: 14,
-      owned_in_workshop: 4,
-      owned_available: 2,
+      supervisor_id: 's1',
+      foreman_name: 'خالد',
+      total_movements: 40,
+      movement_rank: 2,
+      movement_id: 'm2',
+      equipment_id: 'e2',
+      equipment_code: 'A-2',
+      movement_type: 'exit',
+      movement_context: 'workshop',
+      recorded_at: '2026-09-19T07:00:00Z',
     },
+    {
+      supervisor_id: 's2',
+      foreman_name: '',
+      total_movements: 5,
+      movement_rank: 1,
+      movement_id: 'm3',
+      equipment_id: 'e3',
+      equipment_code: 'B-9',
+      movement_type: 'bogus',
+      movement_context: 'nowhere',
+      recorded_at: '2026-09-18T07:00:00Z',
+    },
+    // A row without a supervisor is not a foreman card.
+    { supervisor_id: '', movement_id: 'm4' },
   ])
-  assert.equal(row.rented.total, 30)
-  assert.equal(row.rented.insideSites, 16)
-  assert.equal(row.rented.inWorkshop, 8)
-  assert.equal(row.rented.available, 6)
-  assert.equal(row.owned.total + row.rented.total, row.all.total)
+  assert.equal(groups.length, 2)
+  assert.equal(groups[0].supervisorId, 's1')
+  assert.equal(groups[0].totalMovements, 40)
+  assert.deepEqual(
+    plain(groups[0].movements).map((row) => row.id),
+    ['m1', 'm2'],
+  )
+  assert.equal(groups[1].name, '')
+  // Unknown enum values become null rather than reaching a badge as free text.
+  assert.equal(groups[1].movements[0].type, null)
+  assert.equal(groups[1].movements[0].context, null)
 })
 
-test('an owned count larger than the total never produces a negative rented count', () => {
-  const [row] = admin.parseAvailabilityRows([
-    { type: 'x', total: 3, owned_total: 9 },
-  ])
-  assert.equal(row.rented.total, 0)
-})
-
-// --- entries series --------------------------------------------------------
-
-test('aggregateDailySeries folds Saudi days into the chart buckets', () => {
-  const range = buckets.buildChartBuckets('2026-01-01', '2026-03-15', 'month')
-  assert.deepEqual(plain(range.map((bucket) => bucket.key)), [
-    '2026-01',
-    '2026-02',
-    '2026-03',
-  ])
-  const points = admin.aggregateDailySeries(range, [
-    { day: '2026-01-05', entries: 3, exits: 1 },
-    { day: '2026-01-31', entries: 2, exits: 0 },
-    { day: '2026-02-14', entries: 7, exits: 4 },
-    // Outside the range: dropped rather than folded into the nearest bucket.
-    { day: '2025-12-31', entries: 99, exits: 99 },
-    { day: '2026-03-20', entries: 50, exits: 50 },
-  ])
-  assert.deepEqual(plain(points), [
-    { key: '2026-01', entries: 5, exits: 1 },
-    { key: '2026-02', entries: 7, exits: 4 },
-    // A bucket with no movements stays at zero so the line keeps its x axis.
-    { key: '2026-03', entries: 0, exits: 0 },
-  ])
-})
-
-test('aggregateDailySeries sums duplicate days and matches a daily range', () => {
-  const range = buckets.buildChartBuckets('2026-05-01', '2026-05-03', 'day')
-  const points = admin.aggregateDailySeries(range, [
-    { day: '2026-05-01', entries: 1, exits: 0 },
-    { day: '2026-05-01', entries: 2, exits: 3 },
-    { day: '2026-05-03', entries: 4, exits: 4 },
-  ])
-  assert.deepEqual(plain(points), [
-    { key: '2026-05-01', entries: 3, exits: 3 },
-    { key: '2026-05-02', entries: 0, exits: 0 },
-    { key: '2026-05-03', entries: 4, exits: 4 },
-  ])
-})
-
-test('parseDailySeries drops rows without a usable day', () => {
-  const rows = admin.parseDailySeries([
-    { day: '2026-05-01T00:00:00', entries: 2, exits: 1 },
-    { day: 'not-a-day', entries: 5, exits: 5 },
-    { entries: 5 },
-  ])
-  assert.deepEqual(plain(rows), [{ day: '2026-05-01', entries: 2, exits: 1 }])
-})
-
-// --- owner x state matrix --------------------------------------------------
-
-test('parseOwnerStateMatrix answers both drill directions from one payload', () => {
+test('parseOwnerStateMatrix answers both directions from one snapshot', () => {
   const matrix = admin.parseOwnerStateMatrix({
-    total: 12,
+    total: 9,
     cells: [
-      { owner: 'alazani', state: 'inside_site', count: 5 },
+      { owner: 'alazani', state: 'inside_site', count: 4 },
       { owner: 'alazani', state: 'available', count: 2 },
-      { owner: 'takween', state: 'inside_site', count: 4 },
-      { owner: 'takween', state: 'workshop_parking', count: 1 },
+      { owner: 'takween', state: 'inside_site', count: 3 },
       { owner: '', state: 'inside_site', count: 99 },
     ],
   })
-  assert.equal(matrix.total, 12)
-  // owner -> states
-  assert.equal(matrix.count('alazani', 'inside_site'), 5)
-  assert.equal(matrix.count('alazani', 'workshop_parking'), 0)
-  // state -> owners, from the same snapshot
-  assert.equal(matrix.count('takween', 'inside_site'), 4)
-  // Only owners that actually have units, in the canonical order.
+  assert.equal(matrix.total, 9)
+  assert.equal(matrix.count('alazani', 'inside_site'), 4)
+  assert.equal(matrix.count('takween', 'available'), 0)
+  assert.equal(matrix.count('nobody', 'inside_site'), 0)
   assert.deepEqual(plain(matrix.owners), ['alazani', 'takween'])
 })
 
-// --- foreman activity ------------------------------------------------------
+// --- chart series ----------------------------------------------------------
 
-test('parseForemanActivity keeps a foreman whose name the caller cannot read', () => {
-  const rows = admin.parseForemanActivity([
-    {
-      supervisor_id: '11111111-1111-1111-1111-111111111111',
-      foreman_name: null,
-      entries: 9,
-      exits: 7,
-      open_visits: 2,
-    },
-    { supervisor_id: '', foreman_name: 'x' },
+test('aggregateDailySeries sums days into their bucket and drops the rest', () => {
+  const range = buckets.buildChartBuckets('2026-01-01', '2026-03-31', 'month')
+  const points = admin.aggregateDailySeries(range, [
+    { day: '2026-01-05', entries: 2, exits: 1 },
+    { day: '2026-01-31', entries: 3, exits: 0 },
+    { day: '2026-03-01', entries: 1, exits: 4 },
+    // Outside every bucket: dropped, never folded into the nearest one.
+    { day: '2025-12-31', entries: 99, exits: 99 },
   ])
-  assert.equal(rows.length, 1)
-  assert.equal(rows[0].name, '')
-  assert.equal(rows[0].entries, 9)
-  assert.equal(rows[0].openVisits, 2)
+  assert.deepEqual(plain(points), [
+    { key: '2026-01', entries: 5, exits: 1 },
+    // A month with no movements stays at zero so the x axis is continuous.
+    { key: '2026-02', entries: 0, exits: 0 },
+    { key: '2026-03', entries: 1, exits: 4 },
+  ])
 })
 
-// --- period presets --------------------------------------------------------
+test('parseYearlySeries sorts and rejects malformed years', () => {
+  assert.deepEqual(
+    plain(
+      admin.parseYearlySeries([
+        { year: 2026, entries: 5, exits: 4 },
+        { year: 2024, entries: 1, exits: 1 },
+        { year: 'x', entries: 9, exits: 9 },
+      ]),
+    ),
+    [
+      { year: 2024, entries: 1, exits: 1 },
+      { year: 2026, entries: 5, exits: 4 },
+    ],
+  )
+  assert.deepEqual(plain(admin.parseYearlySeries(null)), [])
+})
 
-test('this year runs from 1 January in Saudi time to today', () => {
-  assert.deepEqual(plain(admin.adminHomePeriodKeys('year', '2026-09-21')), {
-    from: '2026-01-01',
-    to: '2026-09-21',
+test('buildYearlySeries fills gap years and always ends at the current year', () => {
+  const points = admin.buildYearlySeries(
+    [
+      { year: 2024, entries: 10, exits: 9 },
+      { year: 2026, entries: 3, exits: 2 },
+    ],
+    5,
+    '2026-09-22',
+  )
+  // 2025 had no movements at all; without the zero the line would put 2024
+  // next to 2026 and lie about the distance between them.
+  assert.deepEqual(plain(points), [
+    { key: '2024', entries: 10, exits: 9 },
+    { key: '2025', entries: 0, exits: 0 },
+    { key: '2026', entries: 3, exits: 2 },
+  ])
+})
+
+test('buildYearlySeries never reaches past the requested window', () => {
+  const points = admin.buildYearlySeries(
+    [
+      // Older than the 5-year window: ignored rather than stretching the axis.
+      { year: 2015, entries: 50, exits: 50 },
+      { year: 2023, entries: 1, exits: 1 },
+    ],
+    5,
+    '2026-09-22',
+  )
+  assert.deepEqual(
+    plain(points).map((point) => point.key),
+    ['2023', '2024', '2025', '2026'],
+  )
+})
+
+test('buildYearlySeries shows the current year alone when there is no data', () => {
+  assert.deepEqual(plain(admin.buildYearlySeries([], 5, '2026-09-22')), [
+    { key: '2026', entries: 0, exits: 0 },
+  ])
+})
+
+// --- granularity -----------------------------------------------------------
+
+test('normalizeGranularity fails closed on an unknown value', () => {
+  assert.equal(admin.normalizeGranularity('day'), 'day')
+  assert.equal(admin.normalizeGranularity('month'), 'month')
+  assert.equal(admin.normalizeGranularity('year'), 'year')
+  assert.equal(admin.normalizeGranularity('week'), 'month')
+  assert.equal(admin.normalizeGranularity(null), 'month')
+  assert.equal(admin.normalizeGranularity(undefined), 'month')
+})
+
+test('the day view asks for exactly 30 Saudi days', () => {
+  const range = admin.adminHomeFlowRange('day', '2026-09-22')
+  assert.deepEqual(plain(range), { from: '2026-08-24', to: '2026-09-22' })
+  assert.equal(buckets.chartRangeDays(range.from, range.to), 30)
+  assert.equal(
+    buckets.buildChartBuckets(range.from, range.to, 'day').length,
+    30,
+  )
+})
+
+test('the month view covers twelve whole months inside the 400-day cap', () => {
+  const range = admin.adminHomeFlowRange('month', '2026-09-22')
+  assert.deepEqual(plain(range), { from: '2025-10-01', to: '2026-09-22' })
+  assert.equal(
+    buckets.buildChartBuckets(range.from, range.to, 'month').length,
+    12,
+  )
+  // The database rejects anything past 400 days; a leap year is the long case.
+  for (const today of ['2026-09-22', '2028-02-29', '2028-12-31']) {
+    const window = admin.adminHomeFlowRange('month', today)
+    assert.ok(
+      buckets.chartRangeDays(window.from, window.to) <= 400,
+      `month range from ${today} is too long`,
+    )
+  }
+})
+
+test('a January month view still starts twelve months back', () => {
+  assert.deepEqual(plain(admin.adminHomeFlowRange('month', '2026-01-03')), {
+    from: '2025-02-01',
+    to: '2026-01-03',
   })
-  // Early January is still a valid single-day range rather than an empty one.
-  assert.deepEqual(plain(admin.adminHomePeriodKeys('year', '2026-01-01')), {
-    from: '2026-01-01',
-    to: '2026-01-01',
-  })
-})
-
-test('last 12 months stays inside the 400-day cap the database enforces', () => {
-  const range = admin.adminHomePeriodKeys('last12', '2026-09-21')
-  assert.deepEqual(plain(range), { from: '2025-09-22', to: '2026-09-21' })
-  const days =
-    (Date.parse(`${range.to}T00:00:00Z`) -
-      Date.parse(`${range.from}T00:00:00Z`)) /
-      86400000 +
-    1
-  assert.ok(days <= 400, `range is ${days} days`)
-  // A leap year is the long case and must still fit.
-  const leap = admin.adminHomePeriodKeys('last12', '2028-03-01')
-  const leapDays =
-    (Date.parse(`${leap.to}T00:00:00Z`) -
-      Date.parse(`${leap.from}T00:00:00Z`)) /
-      86400000 +
-    1
-  assert.ok(leapDays <= 400, `leap range is ${leapDays} days`)
-})
-
-test('isAdminHomePeriod fails closed on an unknown period', () => {
-  assert.equal(admin.isAdminHomePeriod('year'), true)
-  assert.equal(admin.isAdminHomePeriod('last12'), true)
-  assert.equal(admin.isAdminHomePeriod('week'), false)
-  assert.equal(admin.isAdminHomePeriod(null), false)
 })

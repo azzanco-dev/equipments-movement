@@ -17,7 +17,8 @@ type Threshold = (typeof THRESHOLDS)[number]
 const ROW_LIMIT = 20
 
 export interface NoMovementSectionProps {
-  owner: AdminHomeOwner | null
+  /** An empty array means every owner. */
+  owners: AdminHomeOwner[]
   onSelectEquipment?: (id: string) => void
 }
 
@@ -33,7 +34,7 @@ export interface NoMovementSectionProps {
  * pulls the equipment table into the browser to sort it.
  */
 export function NoMovementSection({
-  owner,
+  owners,
   onSelectEquipment,
 }: NoMovementSectionProps) {
   const { t } = useI18n()
@@ -42,8 +43,8 @@ export function NoMovementSection({
 
   const load = useCallback(
     (signal: AbortSignal) =>
-      fetchNoMovementEquipment(owner, days, ROW_LIMIT, signal),
-    [days, owner],
+      fetchNoMovementEquipment(owners, days, ROW_LIMIT, signal),
+    [days, owners],
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
 

@@ -37,9 +37,20 @@ export interface FleetDonutProps extends ChartBaseProps {
   /** Line under the legend explaining that slices are clickable. */
   hint?: string
   height?: number
+  /** Ring geometry as a share of the plot; defaults fill a half-width card. */
+  innerRadius?: string
+  outerRadius?: string
 }
 
 const DEG = Math.PI / 180
+/**
+ * Under this share a slice gets no label at all (owner request, 2026-09-22).
+ * Several 1-2% slices sit next to each other on the ring, and their outside
+ * labels were overlapping into an unreadable stack. The legend still lists
+ * every slice with its count and its share, and the tooltip still names it, so
+ * nothing is lost — only the labels that could not be read anyway.
+ */
+const LABEL_MIN_SHARE = 0.03
 /** Under this share a slice is too narrow to hold text, so it labels outside. */
 const INSIDE_MIN_SHARE = 0.08
 /** From this share up the slice is wide enough to carry the count too. */
@@ -79,7 +90,11 @@ export function FleetDonut({
   ariaLabel,
   dir,
   lang,
-  height = 260,
+  // Owner request (2026-09-22): two donuts side by side, each filling its half
+  // of the row, so the ring is noticeably larger than the single donut was.
+  height = 300,
+  innerRadius = '50%',
+  outerRadius = '78%',
   loading,
   error,
   className,
@@ -138,7 +153,7 @@ export function FleetDonut({
     percent = 0,
     value = 0,
   }: SliceLabelProps) => {
-    if (value <= 0) return null
+    if (value <= 0 || percent < LABEL_MIN_SHARE) return null
     const share = Math.round(percent * 100)
     // Recharts measures angles counter-clockwise from the positive X axis, so
     // the Y component is negated to land back in SVG coordinates.
@@ -225,8 +240,8 @@ export function FleetDonut({
                 data={slices}
                 dataKey="value"
                 nameKey="label"
-                innerRadius="52%"
-                outerRadius="74%"
+                innerRadius={innerRadius}
+                outerRadius={outerRadius}
                 paddingAngle={1}
                 strokeWidth={1}
                 isAnimationActive={false}

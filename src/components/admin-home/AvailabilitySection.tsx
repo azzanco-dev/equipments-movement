@@ -1,88 +1,79 @@
 import { useCallback, useMemo, useState } from 'react'
-import { Badge, DataTable, SearchInput } from '@/components/ui'
+import { Badge, Button, DataTable, SearchInput } from '@/components/ui'
 import type { DataTableColumn } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { fetchAvailabilityByType } from '@/lib/adminHomeData'
-import type {
-  AdminHomeOwner,
-  AvailabilityRow,
-  FleetStateCounts,
+import {
+  AVAILABILITY_TOP_TYPES,
+  visibleAvailabilityRows,
+  type AdminHomeOwner,
+  type AvailabilityRow,
+  type FleetStateCounts,
 } from '@/lib/adminHomeStats'
 import { AdminHomeSection } from './AdminHomeSection'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
-/** One metric, with the owned / rented split underneath it. */
-function SplitCell({
-  all,
-  owned,
-  rented,
-}: {
-  all: number
-  owned: number
-  rented: number
-}) {
-  const { t } = useI18n()
-  return (
-    <span className="block py-1 leading-tight">
-      <span className="block text-[13px] font-semibold tabular-nums text-fg">
-        {all}
-      </span>
-      <span className="block text-[11px] tabular-nums text-muted">
-        {t('owned')} {owned} · {t('rented')} {rented}
-      </span>
-    </span>
-  )
-}
-
 export interface AvailabilitySectionProps {
-  owner: AdminHomeOwner | null
+  owners: AdminHomeOwner[]
 }
 
 /**
  * "التوفر حسب النوع": per equipment type, how many units are inside sites, in
- * the workshop and available, each split into owned and rented.
+ * the workshop, available, and the total.
  *
- * The split is derived in one place: the database returns the owned half and
- * the total, and `parseAvailabilityRows` subtracts, so the two halves can
- * never disagree with the total shown above them.
+ * Owner review (2026-09-22): the owned / rented sub-lines are gone — the
+ * multi-select owner filter at the top of the page answers that question
+ * directly — and the totals column moved to the end, so the columns read in
+ * the order the operations team thinks in: where the units are first, how many
+ * there are last.
  *
- * The type list is an admin-managed master list capped at 100 rows by the
- * database, so filtering it by name in the browser is filtering an already
- * bounded result, not a table scan.
+ * Only the top ten types are listed. The database already returns them ordered
+ * by total (capped at 100), so "top ten" is a slice of an already bounded
+ * result: "عرض الكل" reveals the rest without a request, and the search box
+ * always looks at every returned type, so a type outside the top ten is still
+ * findable by name.
  */
-export function AvailabilitySection({ owner }: AvailabilitySectionProps) {
+export function AvailabilitySection({ owners }: AvailabilitySectionProps) {
   const { t } = useI18n()
   const [query, setQuery] = useState('')
+  const [expanded, setExpanded] = useState(false)
 
   const load = useCallback(
-    (signal: AbortSignal) => fetchAvailabilityByType(owner, signal),
-    [owner],
+    (signal: AbortSignal) => fetchAvailabilityByType(owners, signal),
+    [owners],
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
 
-  const rows = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    const all = data ?? []
-    if (!needle) return all
-    return all.filter((row) => row.type.toLowerCase().includes(needle))
-  }, [data, query])
+  const all = useMemo(() => data ?? [], [data])
+  const rows = useMemo(
+    () => visibleAvailabilityRows(all, query, expanded),
+    [all, expanded, query],
+  )
+  // The toggle is meaningless while a search is narrowing the list (the search
+  // already looks at every type) or when there is nothing more to reveal.
+  const canExpand = query.trim() === '' && all.length > AVAILABILITY_TOP_TYPES
 
   const metric = (
     key: string,
     header: string,
     field: keyof FleetStateCounts,
-    hideBelow?: 'sm' | 'md' | 'lg',
+    options: { hideBelow?: 'sm' | 'md' | 'lg'; strong?: boolean } = {},
   ): DataTableColumn<AvailabilityRow> => ({
     key,
     header,
     align: 'end',
-    hideBelow,
+    width: '6rem',
+    hideBelow: options.hideBelow,
     cell: (row) => (
-      <SplitCell
-        all={row.all[field]}
-        owned={row.owned[field]}
-        rented={row.rented[field]}
-      />
+      <span
+        className={
+          options.strong
+            ? 'font-semibold tabular-nums text-fg'
+            : 'tabular-nums text-fg'
+        }
+      >
+        {row[field]}
+      </span>
     ),
   })
 
@@ -92,10 +83,12 @@ export function AvailabilitySection({ owner }: AvailabilitySectionProps) {
       header: t('adminHomeColType'),
       cell: (row) => <span className="font-medium">{row.type}</span>,
     },
-    metric('total', t('adminHomeColTotal'), 'total'),
     metric('inside', t('adminHomeColInside'), 'insideSites'),
-    metric('workshop', t('adminHomeColWorkshop'), 'inWorkshop', 'sm'),
+    metric('workshop', t('adminHomeColWorkshop'), 'inWorkshop', {
+      hideBelow: 'sm',
+    }),
     metric('available', t('adminHomeColAvailable'), 'available'),
+    metric('total', t('adminHomeColTotal'), 'total', { strong: true }),
   ]
 
   return (
@@ -108,13 +101,24 @@ export function AvailabilitySection({ owner }: AvailabilitySectionProps) {
       onRetry={retry}
       skeletonClassName="h-64 w-full"
     >
-      <SearchInput
-        value={query}
-        onValueChange={setQuery}
-        placeholder={t('adminHomeSearchType')}
-        aria-label={t('adminHomeSearchType')}
-        className="max-w-xs"
-      />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <SearchInput
+          value={query}
+          onValueChange={setQuery}
+          placeholder={t('adminHomeSearchType')}
+          aria-label={t('adminHomeSearchType')}
+          className="max-w-xs"
+        />
+        {canExpand && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setExpanded((value) => !value)}
+          >
+            {expanded ? t('adminHomeShowTopTypes') : t('viewAll')}
+          </Button>
+        )}
+      </div>
       <DataTable
         size="lg"
         columns={columns}
@@ -124,6 +128,9 @@ export function AvailabilitySection({ owner }: AvailabilitySectionProps) {
         empty={t('adminHomeNoTypeMatch')}
         caption={t('adminHomeAvailabilityTitle')}
       />
+      {canExpand && !expanded && (
+        <p className="text-xs text-muted">{t('adminHomeTopTypes')}</p>
+      )}
     </AdminHomeSection>
   )
 }

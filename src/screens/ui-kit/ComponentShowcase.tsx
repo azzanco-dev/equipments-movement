@@ -30,6 +30,9 @@ import { ImageCompressionShowcase } from './ImageCompressionShowcase'
 import { LightboxShowcase } from './LightboxShowcase'
 import { MiniTableShowcase } from './MiniTableShowcase'
 import { NoticeShowcase } from './NoticeShowcase'
+import { DetailPagesShowcase } from './DetailPagesShowcase'
+import { FilterBarShowcase } from './FilterBarShowcase'
+import { MultiSelectShowcase } from './MultiSelectShowcase'
 
 // Live review of the shared components on /ui-kit. Sample copy only.
 export function ComponentShowcase() {
@@ -49,6 +52,9 @@ export function ComponentShowcase() {
       <LightboxShowcase />
       <MiniTableShowcase />
       <NoticeShowcase />
+      <DetailPagesShowcase />
+      <FilterBarShowcase />
+      <MultiSelectShowcase />
     </div>
   )
 }

@@ -7,68 +7,128 @@ import {
   buildChartBuckets,
   chartBucketLabel,
   chartBucketRangeLabel,
-  type ChartBucketUnit,
 } from '@/lib/chartBuckets'
-import { fetchEntriesSeries } from '@/lib/adminHomeData'
+import { fetchEntriesSeries, fetchEntriesYearly } from '@/lib/adminHomeData'
 import {
-  adminHomePeriodKeys,
+  ADMIN_HOME_GRANULARITIES,
+  GRANULARITY_YEARS,
+  adminHomeFlowRange,
   aggregateDailySeries,
+  buildYearlySeries,
+  type AdminHomeGranularity,
   type AdminHomeOwner,
-  type AdminHomePeriod,
+  type DailyMovementCount,
+  type YearlyMovementCount,
 } from '@/lib/adminHomeStats'
+import type { TranslationKey } from '@/i18n/translations'
 import { AdminHomeSection } from './AdminHomeSection'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 export interface EntriesFlowSectionProps {
-  owner: AdminHomeOwner | null
-  period: AdminHomePeriod
-  onPeriodChange: (period: AdminHomePeriod) => void
+  owners: AdminHomeOwner[]
+  granularity: AdminHomeGranularity
+  onGranularityChange: (value: AdminHomeGranularity) => void
   showExits: boolean
   onShowExitsChange: (value: boolean) => void
 }
 
-function unitLabelKey(unit: ChartBucketUnit | undefined) {
-  if (unit === 'month') return 'adminHomeUnitMonth' as const
-  if (unit === 'week') return 'adminHomeUnitWeek' as const
-  return 'adminHomeUnitDay' as const
+const GRANULARITY_LABEL: Record<AdminHomeGranularity, TranslationKey> = {
+  day: 'adminHomeFlowDay',
+  month: 'adminHomeFlowMonth',
+  year: 'adminHomeFlowYear',
 }
 
 /**
- * "حركة الدخول": entries (and optionally exits) over the selected period.
+ * What the section loaded, tagged with the view it belongs to: the يوم and شهر
+ * views share a daily payload while سنة has its own, and a response that
+ * arrives after the granularity changed must be recognisable as the other
+ * view's data rather than bucketed as if it were days.
+ */
+type FlowPayload =
+  | { kind: 'year'; rows: YearlyMovementCount[] }
+  | { kind: 'daily'; rows: DailyMovementCount[] }
+
+/** The window each granularity covers, shown as the section's chip. */
+const WINDOW_LABEL: Record<AdminHomeGranularity, TranslationKey> = {
+  day: 'adminHomeFlowLastDays',
+  month: 'adminHomeFlowLastMonths',
+  year: 'adminHomeFlowLastYears',
+}
+
+/**
+ * "حركة الدخول": entries (and optionally exits) at the selected granularity.
  *
- * The database always returns one row per Saudi calendar day; the granularity
- * of the chart is chosen here and the days are folded into buckets locally, so
- * switching between a monthly and a weekly view costs no request and both
- * views are guaranteed to sum to the same totals. Both presets are longer than
- * six months, so `buildChartBuckets` draws them monthly.
+ * Owner review (2026-09-22): the period switcher became a granularity switch —
+ * يوم is the last 30 days day by day, شهر the last 12 months month by month,
+ * and سنة the last 5 years year by year.
+ *
+ * The يوم and شهر views share one definition of a day: the database returns
+ * daily rows and `chartBuckets` folds them here, so the two views always sum
+ * to the same totals. سنة is the exception and comes from its own database
+ * function (`get_admin_entries_yearly`, migration 0095), because five years of
+ * days is far past the 400-day cap the daily series enforces and raising that
+ * cap would hand every caller an unbounded payload.
  */
 export function EntriesFlowSection({
-  owner,
-  period,
-  onPeriodChange,
+  owners,
+  granularity,
+  onGranularityChange,
   showExits,
   onShowExitsChange,
 }: EntriesFlowSectionProps) {
   const { t, lang, dir } = useI18n()
+  const yearly = granularity === 'year'
 
-  // The range is read from the clock once per period/owner change, so the
+  // The range is read from the clock once per granularity/owner change, so the
   // chart does not re-bucket itself on every render.
-  const range = useMemo(() => adminHomePeriodKeys(period), [period])
+  const range = useMemo(
+    () => adminHomeFlowRange(yearly ? 'month' : granularity),
+    [granularity, yearly],
+  )
 
+  // The result carries which shape it is, so a payload that arrives after the
+  // granularity changed is recognised as the other view's data and ignored
+  // instead of being bucketed as if it were days.
   const load = useCallback(
-    (signal: AbortSignal) =>
-      fetchEntriesSeries(range.from, range.to, owner, null, signal),
-    [owner, range.from, range.to],
+    (signal: AbortSignal): Promise<FlowPayload> =>
+      yearly
+        ? fetchEntriesYearly(GRANULARITY_YEARS, owners, null, signal).then(
+            (rows) => ({ kind: 'year' as const, rows }),
+          )
+        : fetchEntriesSeries(range.from, range.to, owners, null, signal).then(
+            (rows) => ({ kind: 'daily' as const, rows }),
+          ),
+    [owners, range.from, range.to, yearly],
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
 
   const buckets = useMemo(
-    () => buildChartBuckets(range.from, range.to, 'month'),
-    [range.from, range.to],
+    () =>
+      yearly
+        ? []
+        : buildChartBuckets(
+            range.from,
+            range.to,
+            granularity === 'day' ? 'day' : 'month',
+          ),
+    [granularity, range.from, range.to, yearly],
   )
 
   const points: EntriesLinePoint[] = useMemo(() => {
-    const totals = aggregateDailySeries(buckets, data ?? [])
+    if (yearly) {
+      const rows = data?.kind === 'year' ? data.rows : []
+      return buildYearlySeries(rows, GRANULARITY_YEARS).map((point) => ({
+        key: point.key,
+        label: point.key,
+        title: point.key,
+        entries: point.entries,
+        exits: point.exits,
+      }))
+    }
+    const totals = aggregateDailySeries(
+      buckets,
+      data?.kind === 'daily' ? data.rows : [],
+    )
     return buckets.map((bucket, index) => ({
       key: bucket.key,
       label: chartBucketLabel(bucket, lang),
@@ -76,13 +136,13 @@ export function EntriesFlowSection({
       entries: totals[index]?.entries ?? 0,
       exits: totals[index]?.exits ?? 0,
     }))
-  }, [buckets, data, lang])
+  }, [buckets, data, lang, yearly])
 
   return (
     <AdminHomeSection
       title={t('adminHomeFlowTitle')}
       description={t('adminHomeFlowDescription')}
-      action={<Badge tone="info">{t(unitLabelKey(buckets[0]?.unit))}</Badge>}
+      action={<Badge tone="info">{t(WINDOW_LABEL[granularity])}</Badge>}
       loading={loading}
       failed={failed}
       onRetry={retry}
@@ -90,12 +150,20 @@ export function EntriesFlowSection({
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs
-          value={period}
-          onValueChange={(value) => onPeriodChange(value as AdminHomePeriod)}
+          value={granularity}
+          onValueChange={(value) =>
+            onGranularityChange(value as AdminHomeGranularity)
+          }
         >
-          <TabsList variant="segmented" aria-label={t('adminHomeFlowPeriod')}>
-            <TabsTrigger value="year">{t('adminHomeFlowThisYear')}</TabsTrigger>
-            <TabsTrigger value="last12">{t('adminHomeFlowLast12')}</TabsTrigger>
+          <TabsList
+            variant="segmented"
+            aria-label={t('adminHomeFlowGranularity')}
+          >
+            {ADMIN_HOME_GRANULARITIES.map((value) => (
+              <TabsTrigger key={value} value={value}>
+                {t(GRANULARITY_LABEL[value])}
+              </TabsTrigger>
+            ))}
           </TabsList>
         </Tabs>
         <Switch

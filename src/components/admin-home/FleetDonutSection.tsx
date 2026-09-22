@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { ChevronLeft } from 'lucide-react'
+import { X } from 'lucide-react'
 import { Badge, Button } from '@/components/ui'
 import { seriesColor, seriesStroke } from '@/components/charts'
 import { FleetDonut } from '@/components/charts/lazy'
@@ -54,34 +54,42 @@ const STATE_STYLE: Record<
   },
 }
 
+/** Which chart the cross-filter is currently pinned to, if any. */
+type Focus =
+  | { kind: 'owner'; id: AdminHomeOwner }
+  | { kind: 'state'; id: FleetStateId }
+  | null
+
 export interface FleetDonutSectionProps {
-  owner: AdminHomeOwner | null
+  owners: AdminHomeOwner[]
 }
 
 /**
- * "اين الاسطول الان": the interactive donut, in both directions.
+ * "اين الاسطول الان": two donuts side by side — the fleet by owner and the
+ * fleet by state (owner request, 2026-09-22, replacing the single donut with
+ * its drill-down).
  *
- * Sideways, the page's owner filter narrows the donut to one owner's units
- * split across the states. Inwards, clicking a state flips the donut to that
- * state split by owner, with a breadcrumb back.
+ * The two charts cross-filter each other: selecting an owner redraws the state
+ * donut as that owner's states, selecting a state redraws the owner donut as
+ * the owners inside that state, and "الغاء التصفية" resets both. Only one
+ * focus exists at a time, so the pair always answers one question rather than
+ * two half-applied filters.
  *
- * Owner decision applied here: the drill-down RESPECTS the owner filter. With
- * "العزاني" selected, drilling into "في الورشة" answers "how many Al-Azani
- * units are in the workshop", never "who owns everything in the workshop" —
- * the filter the user set is never silently dropped.
+ * The page's own owner filter still narrows both charts first, so drilling
+ * never silently widens the scope the user set.
  *
- * Both directions come from one snapshot (`get_admin_owner_state_matrix`), so
- * a drill never costs a request and the two views can never be computed from
+ * Both charts come from one snapshot (`get_admin_owner_state_matrix`), so a
+ * cross-filter never costs a request and the halves can never be drawn from
  * two different moments.
  */
-export function FleetDonutSection({ owner }: FleetDonutSectionProps) {
+export function FleetDonutSection({ owners }: FleetDonutSectionProps) {
   const { t, lang, dir } = useI18n()
   const ownerLabel = useOwnerLabel()
-  const [drillState, setDrillState] = useState<FleetStateId | null>(null)
+  const [focus, setFocus] = useState<Focus>(null)
 
   const load = useCallback(
-    (signal: AbortSignal) => fetchOwnerStateMatrix(signal),
-    [],
+    (signal: AbortSignal) => fetchOwnerStateMatrix(owners, signal),
+    [owners],
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
 
@@ -90,10 +98,40 @@ export function FleetDonutSection({ owner }: FleetDonutSectionProps) {
     [data],
   )
 
-  // The owners in view: the whole list, or just the selected one.
+  // The owners in view: the page filter's selection, or every owner.
   const visibleOwners = useMemo(
-    () => (owner ? [owner] : [...ADMIN_HOME_OWNERS]),
-    [owner],
+    () => (owners.length ? owners : [...ADMIN_HOME_OWNERS]),
+    [owners],
+  )
+
+  // A focus on the other chart narrows this one; a focus on this chart only
+  // highlights it, so clicking an owner never reduces the owner donut to that
+  // single owner and hides the comparison the user is looking at.
+  const stateScope: readonly FleetStateId[] = useMemo(
+    () => (focus?.kind === 'state' ? [focus.id] : FLEET_STATES),
+    [focus],
+  )
+  const ownerScope: readonly AdminHomeOwner[] = useMemo(
+    () => (focus?.kind === 'owner' ? [focus.id] : visibleOwners),
+    [focus, visibleOwners],
+  )
+
+  const ownerSlices: FleetDonutSlice[] = useMemo(
+    () =>
+      visibleOwners.map((ownerId) => {
+        const index = ADMIN_HOME_OWNERS.indexOf(ownerId)
+        return {
+          id: ownerId,
+          label: ownerLabel(ownerId),
+          color: seriesColor(index),
+          strokeColor: seriesStroke(index),
+          value: stateScope.reduce(
+            (sum, state) => sum + count(ownerId, state),
+            0,
+          ),
+        }
+      }),
+    [count, ownerLabel, stateScope, visibleOwners],
   )
 
   const stateSlices: FleetDonutSlice[] = useMemo(
@@ -103,29 +141,20 @@ export function FleetDonutSection({ owner }: FleetDonutSectionProps) {
         label: t(STATE_STYLE[state].label),
         color: STATE_STYLE[state].color,
         strokeColor: STATE_STYLE[state].stroke,
-        value: visibleOwners.reduce(
+        value: ownerScope.reduce(
           (sum, ownerId) => sum + count(ownerId, state),
           0,
         ),
       })),
-    [count, t, visibleOwners],
+    [count, ownerScope, t],
   )
 
-  const ownerSlices: FleetDonutSlice[] = useMemo(() => {
-    if (!drillState) return []
-    return visibleOwners.map((ownerId) => {
-      const index = ADMIN_HOME_OWNERS.indexOf(ownerId)
-      return {
-        id: ownerId,
-        label: ownerLabel(ownerId),
-        color: seriesColor(index),
-        strokeColor: seriesStroke(index),
-        value: count(ownerId, drillState),
-      }
-    })
-  }, [count, drillState, ownerLabel, visibleOwners])
-
-  const scopeLabel = owner ? ownerLabel(owner) : t('allOwners')
+  const focusLabel =
+    focus?.kind === 'owner'
+      ? ownerLabel(focus.id)
+      : focus?.kind === 'state'
+        ? t(STATE_STYLE[focus.id].label)
+        : null
 
   return (
     <AdminHomeSection
@@ -135,67 +164,73 @@ export function FleetDonutSection({ owner }: FleetDonutSectionProps) {
       loading={loading}
       failed={failed}
       onRetry={retry}
-      skeletonClassName="h-64 w-full"
+      skeletonClassName="h-80 w-full"
     >
-      {drillState ? (
-        <div className="flex flex-wrap items-center gap-2">
+      {focusLabel && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+          <span>
+            {t('adminHomeDonutFilteredBy')}{' '}
+            <span className="font-medium text-fg">{focusLabel}</span>
+          </span>
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => setDrillState(null)}
-            icon={
-              <ChevronLeft
-                size={14}
-                aria-hidden="true"
-                className="ltr:rotate-0 rtl:rotate-180"
-              />
-            }
+            onClick={() => setFocus(null)}
+            icon={<X size={14} aria-hidden="true" />}
           >
-            {t('adminHomeBack')}
+            {t('adminHomeDonutClearFilter')}
           </Button>
-          <nav aria-label={t('adminHomeDonutStateAria')} className="min-w-0">
-            <ol className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
-              <li>
-                <button
-                  type="button"
-                  onClick={() => setDrillState(null)}
-                  className="rounded hover:text-fg hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {scopeLabel}
-                </button>
-              </li>
-              <li aria-hidden="true">/</li>
-              <li aria-current="page" className="font-medium text-fg">
-                {t(STATE_STYLE[drillState].label)}
-              </li>
-            </ol>
-          </nav>
         </div>
-      ) : null}
-
-      {drillState ? (
-        <FleetDonut
-          key="by-owner"
-          ariaLabel={`${t(STATE_STYLE[drillState].label)} — ${t(
-            'adminHomeDonutOwnerAria',
-          )}`}
-          dir={dir}
-          lang={lang}
-          slices={ownerSlices}
-          centerLabel={t('adminHomeDonutTotal')}
-        />
-      ) : (
-        <FleetDonut
-          key="by-state"
-          ariaLabel={t('adminHomeDonutStateAria')}
-          dir={dir}
-          lang={lang}
-          slices={stateSlices}
-          centerLabel={t('adminHomeDonutTotal')}
-          hint={t('adminHomeDonutHint')}
-          onSliceSelect={(slice) => setDrillState(slice.id as FleetStateId)}
-        />
       )}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="min-w-0 space-y-2">
+          <h3 className="text-sm font-medium text-fg">
+            {t('adminHomeDonutOwnerTitle')}
+          </h3>
+          <FleetDonut
+            ariaLabel={`${t('adminHomeDonutTitle')} — ${t(
+              'adminHomeDonutOwnerTitle',
+            )}`}
+            dir={dir}
+            lang={lang}
+            slices={ownerSlices}
+            centerLabel={t('adminHomeDonutTotal')}
+            activeId={focus?.kind === 'owner' ? focus.id : null}
+            hint={t('adminHomeDonutCrossHint')}
+            onSliceSelect={(slice) =>
+              setFocus((current) =>
+                current?.kind === 'owner' && current.id === slice.id
+                  ? null
+                  : { kind: 'owner', id: slice.id as AdminHomeOwner },
+              )
+            }
+          />
+        </div>
+        <div className="min-w-0 space-y-2">
+          <h3 className="text-sm font-medium text-fg">
+            {t('adminHomeDonutStateTitle')}
+          </h3>
+          <FleetDonut
+            ariaLabel={`${t('adminHomeDonutTitle')} — ${t(
+              'adminHomeDonutStateTitle',
+            )}`}
+            dir={dir}
+            lang={lang}
+            slices={stateSlices}
+            centerLabel={t('adminHomeDonutTotal')}
+            activeId={focus?.kind === 'state' ? focus.id : null}
+            hint={t('adminHomeDonutCrossHint')}
+            onSliceSelect={(slice) =>
+              setFocus((current) =>
+                current?.kind === 'state' && current.id === slice.id
+                  ? null
+                  : { kind: 'state', id: slice.id as FleetStateId },
+              )
+            }
+          />
+        </div>
+      </div>
     </AdminHomeSection>
   )
 }

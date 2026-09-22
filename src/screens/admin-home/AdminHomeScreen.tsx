@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { LogIn, LogOut } from 'lucide-react'
 import { Button, PageHeader } from '@/components/ui'
@@ -8,13 +8,14 @@ import { FleetDonutSection } from '@/components/admin-home/FleetDonutSection'
 import { FleetStateSection } from '@/components/admin-home/FleetStateSection'
 import { ForemanActivitySection } from '@/components/admin-home/ForemanActivitySection'
 import { NoMovementSection } from '@/components/admin-home/NoMovementSection'
-import { OwnerFilter } from '@/components/admin-home/OwnerFilter'
+import { OwnerFilterBar } from '@/components/admin-home/OwnerFilter'
 import { useI18n } from '@/i18n/I18nContext'
 import {
-  isAdminHomePeriod,
-  normalizeOwnerFilter,
+  normalizeGranularity,
+  normalizeOwnerFilters,
+  serializeOwnerFilters,
+  type AdminHomeGranularity,
   type AdminHomeOwner,
-  type AdminHomePeriod,
 } from '@/lib/adminHomeStats'
 
 export interface AdminHomeScreenProps {
@@ -26,16 +27,17 @@ export interface AdminHomeScreenProps {
 /**
  * The admin and monitor home page.
  *
- * Structure follows the approved mockup: the fleet's state right now, then the
- * equipment that has stopped moving (the section that asks for a decision),
- * then availability by type, the entries chart, the interactive donut and a
- * small foreman activity list.
+ * Order follows the owner's review (2026-09-22): the owner filter is the first
+ * thing on the page, because it scopes everything under it, then the fleet's
+ * state right now, the equipment that has stopped moving (the section that
+ * asks for a decision), availability by type, the entries chart, the two
+ * donuts and the per-foreman activity cards.
  *
  * Every section owns its request and its own loading / failure state, so one
  * slow or broken section never blanks the page, and the owner filter and the
- * period are the only shared state. Both live in the URL (`?owner=` and
- * `?period=`), so Back restores the view the user was looking at and a link to
- * a filtered home page works.
+ * chart granularity are the only shared state. Both live in the URL
+ * (`?owners=a,b` and `?flow=`), so Back restores the view the user was looking
+ * at and a link to a filtered home page works.
  */
 export function AdminHomeScreen({
   onSelectEquipment,
@@ -44,11 +46,16 @@ export function AdminHomeScreen({
   const { t } = useI18n()
   const pathname = usePathname()
   const params = useSearchParams()
-  const owner = normalizeOwnerFilter(params.get('owner'))
-  const requestedPeriod = params.get('period')
-  const period: AdminHomePeriod = isAdminHomePeriod(requestedPeriod)
-    ? requestedPeriod
-    : 'year'
+  // An empty selection is "every owner", so an unknown or hand-edited value
+  // degrades to the unfiltered page instead of an error. Memoized on the raw
+  // parameter: every section's loader depends on this array by identity, so a
+  // fresh array per render would reload the whole page on every render.
+  const ownersParam = params.get('owners') ?? ''
+  const owners = useMemo(
+    () => normalizeOwnerFilters(ownersParam),
+    [ownersParam],
+  )
+  const granularity = normalizeGranularity(params.get('flow'))
   // Not worth a URL entry: it is a view toggle on one chart, not a filter that
   // changes which data was requested.
   const [showExits, setShowExits] = useState(false)
@@ -70,12 +77,13 @@ export function AdminHomeScreen({
     [params, pathname],
   )
 
-  const setOwner = useCallback(
-    (value: AdminHomeOwner | null) => update({ owner: value }),
+  const setOwners = useCallback(
+    (value: AdminHomeOwner[]) =>
+      update({ owners: serializeOwnerFilters(value) }),
     [update],
   )
-  const setPeriod = useCallback(
-    (value: AdminHomePeriod) => update({ period: value }),
+  const setGranularity = useCallback(
+    (value: AdminHomeGranularity) => update({ flow: value }),
     [update],
   )
 
@@ -85,45 +93,42 @@ export function AdminHomeScreen({
         title={t('adminHomeTitle')}
         description={t('adminHomeDescription')}
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {onCreateMovement && (
-              <>
-                <Button
-                  variant="primary"
-                  onClick={() => onCreateMovement('entry')}
-                  icon={<LogIn size={16} aria-hidden="true" />}
-                >
-                  {t('registerEntry')}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => onCreateMovement('exit')}
-                  icon={<LogOut size={16} aria-hidden="true" />}
-                >
-                  {t('registerExit')}
-                </Button>
-              </>
-            )}
-            <OwnerFilter
-              value={owner}
-              onChange={setOwner}
-              className="min-w-44"
-            />
-          </div>
+          onCreateMovement ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="primary"
+                onClick={() => onCreateMovement('entry')}
+                icon={<LogIn size={16} aria-hidden="true" />}
+              >
+                {t('registerEntry')}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => onCreateMovement('exit')}
+                icon={<LogOut size={16} aria-hidden="true" />}
+              >
+                {t('registerExit')}
+              </Button>
+            </div>
+          ) : undefined
         }
       />
-      <FleetStateSection owner={owner} />
-      <NoMovementSection owner={owner} onSelectEquipment={onSelectEquipment} />
-      <AvailabilitySection owner={owner} />
+      <OwnerFilterBar value={owners} onChange={setOwners} />
+      <FleetStateSection owners={owners} />
+      <NoMovementSection
+        owners={owners}
+        onSelectEquipment={onSelectEquipment}
+      />
+      <AvailabilitySection owners={owners} />
       <EntriesFlowSection
-        owner={owner}
-        period={period}
-        onPeriodChange={setPeriod}
+        owners={owners}
+        granularity={granularity}
+        onGranularityChange={setGranularity}
         showExits={showExits}
         onShowExitsChange={setShowExits}
       />
-      <FleetDonutSection owner={owner} />
-      <ForemanActivitySection period={period} />
+      <FleetDonutSection owners={owners} />
+      <ForemanActivitySection />
     </div>
   )
 }
