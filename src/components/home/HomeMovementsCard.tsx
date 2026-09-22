@@ -383,23 +383,24 @@ function MovementLogTab({
  * The movements card on both homes: the recorded movements (`السجل`) and the
  * same data paired into visits (`الزيارات`).
  *
- * The log stays the default tab so nothing changes for anyone who does not
- * open the new one. The active tab is persisted in the URL as `?view=visits`
- * (the default is left out of the query string), exactly like the rest of the
- * list state, so Back restores the tab as well. Each tab keeps its own search
+ * Visits are the first and default tab (owner decision, wave 6): the home
+ * answers "who is inside and since when" before "what was recorded". The
+ * active tab is persisted in the URL as `?view=log` (the default is left out
+ * of the query string), exactly like the rest of the list state, so Back
+ * restores the tab as well. Each tab keeps its own search
  * and paging: the visits tab prefixes its parameters with `v`.
  */
 export function HomeMovementsCard(props: HomeMovementsCardProps) {
   const { t } = useI18n()
   const params = useSearchParams()
-  const view = params.get('view') === 'visits' ? 'visits' : 'log'
+  const view = params.get('view') === 'log' ? 'log' : 'visits'
   const title = props.workshopMode ? t('recentWorkshopLogs') : t('myMovements')
 
   // Next patches history.replaceState, so `useSearchParams` re-renders with the
   // new value; this is the same mechanism the filters above already use.
   const changeView = (value: string) => {
     const url = new URL(window.location.href)
-    if (value === 'visits') url.searchParams.set('view', 'visits')
+    if (value === 'log') url.searchParams.set('view', 'log')
     else url.searchParams.delete('view')
     window.history.replaceState(null, '', `${url.pathname}${url.search}`)
   }
@@ -409,8 +410,8 @@ export function HomeMovementsCard(props: HomeMovementsCardProps) {
       <SectionHeader as="h2" title={title} />
       <Tabs value={view} onValueChange={changeView}>
         <TabsList>
-          <TabsTrigger value="log">{t('movementsLogTab')}</TabsTrigger>
           <TabsTrigger value="visits">{t('visitsTab')}</TabsTrigger>
+          <TabsTrigger value="log">{t('movementsLogTab')}</TabsTrigger>
         </TabsList>
         <TabsContent value="log">
           <MovementLogTab {...props} />
