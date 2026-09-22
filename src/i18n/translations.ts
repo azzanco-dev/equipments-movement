@@ -809,8 +809,8 @@ export const translations = {
     // wave6-A
     inquiryCardTitle: 'استعلام عن معدة',
     inquiryCardDescription: 'الحالة الحالية وسجل الزيارات',
-    insideWorkshopBreakdown: 'منها {maintenance} صيانة و {parking} وقوف',
-    workshopPurposeShare: '{count} من {total} داخل الورشة',
+    changeSinceYesterday: '{delta} عن امس',
+    noChangeSinceYesterday: 'بلا تغيير عن امس',
     entriesTodayCount: 'دخوليات اليوم',
     exitsTodayCount: 'خروجيات اليوم',
 
@@ -1856,9 +1856,8 @@ export const translations = {
     // wave6-A
     inquiryCardTitle: 'Equipment inquiry',
     inquiryCardDescription: 'Current state and visit history',
-    insideWorkshopBreakdown:
-      'Of which {maintenance} maintenance, {parking} parking',
-    workshopPurposeShare: '{count} of {total} inside the workshop',
+    changeSinceYesterday: '{delta} since yesterday',
+    noChangeSinceYesterday: 'No change since yesterday',
     entriesTodayCount: "Today's entries",
     exitsTodayCount: "Today's exits",
 

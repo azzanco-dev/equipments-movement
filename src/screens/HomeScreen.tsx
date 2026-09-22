@@ -14,15 +14,14 @@ import { Button } from '@/components/ui'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { StatCard } from '@/components/ui/StatCard'
 import { ErrorState } from '@/components/ui/ErrorState'
-import { HomeEquipmentSearch } from '@/components/home/HomeEquipmentSearch'
 import { HomeMovementsCard } from '@/components/home/HomeMovementsCard'
 import { InquiryCard } from '@/components/home/InquiryCard'
 import { PendingClassificationCard } from '@/components/home/PendingClassificationCard'
 import {
-  insideWorkshopBreakdown,
+  changeSinceYesterday,
+  formatSignedDelta,
   parseForemanHomeStats,
   parseWorkshopHomeStats,
-  workshopPurposeShare,
   type ForemanHomeStats,
   type WorkshopHomeStats,
 } from '@/lib/homeStats'
@@ -38,6 +37,9 @@ const EMPTY_WORKSHOP: WorkshopHomeStats = {
   maintenance: 0,
   parking: 0,
   pendingClassification: 0,
+  insideYesterday: null,
+  maintenanceYesterday: null,
+  parkingYesterday: null,
   pending: [],
 }
 
@@ -160,15 +162,18 @@ export function HomeScreen({
     </div>
   )
 
-  const insideBreakdown = insideWorkshopBreakdown(workshopStats)
-  const maintenanceShare = workshopPurposeShare(
-    workshopStats.maintenance,
-    workshopStats.insideNow,
-  )
-  const parkingShare = workshopPurposeShare(
-    workshopStats.parking,
-    workshopStats.insideNow,
-  )
+  // Each workshop state card's secondary line is its change since yesterday
+  // (owner decision, wave 6): the maintenance/parking split is already its
+  // own cards, so it is not repeated here.
+  const yesterdayHint = (now: number, yesterday: number | null) => {
+    const delta = changeSinceYesterday(now, yesterday)
+    if (delta === null) return undefined
+    if (delta === 0) return t('noChangeSinceYesterday')
+    return t('changeSinceYesterday').replace(
+      '{delta}',
+      formatSignedDelta(delta),
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -203,16 +208,10 @@ export function HomeScreen({
                 label={t('insideWorkshopNow')}
                 value={workshopStats.insideNow}
                 icon={<Warehouse size={18} aria-hidden="true" />}
-                hint={
-                  insideBreakdown
-                    ? t('insideWorkshopBreakdown')
-                        .replace(
-                          '{maintenance}',
-                          String(insideBreakdown.maintenance),
-                        )
-                        .replace('{parking}', String(insideBreakdown.parking))
-                    : undefined
-                }
+                hint={yesterdayHint(
+                  workshopStats.insideNow,
+                  workshopStats.insideYesterday,
+                )}
                 loading={statsLoading}
               />
               <StatCard
@@ -220,13 +219,10 @@ export function HomeScreen({
                 value={workshopStats.maintenance}
                 tone="warning"
                 icon={<Wrench size={18} aria-hidden="true" />}
-                hint={
-                  maintenanceShare
-                    ? t('workshopPurposeShare')
-                        .replace('{count}', String(maintenanceShare.count))
-                        .replace('{total}', String(maintenanceShare.total))
-                    : undefined
-                }
+                hint={yesterdayHint(
+                  workshopStats.maintenance,
+                  workshopStats.maintenanceYesterday,
+                )}
                 loading={statsLoading}
               />
               <StatCard
@@ -234,13 +230,10 @@ export function HomeScreen({
                 value={workshopStats.parking}
                 tone="info"
                 icon={<ParkingCircle size={18} aria-hidden="true" />}
-                hint={
-                  parkingShare
-                    ? t('workshopPurposeShare')
-                        .replace('{count}', String(parkingShare.count))
-                        .replace('{total}', String(parkingShare.total))
-                    : undefined
-                }
+                hint={yesterdayHint(
+                  workshopStats.parking,
+                  workshopStats.parkingYesterday,
+                )}
                 loading={statsLoading}
               />
               <StatCard
@@ -269,13 +262,10 @@ export function HomeScreen({
             />
           )}
 
-          <HomeEquipmentSearch />
           {movements}
         </>
       ) : (
         <>
-          <HomeEquipmentSearch />
-
           {statsError ? (
             <ErrorState onRetry={reload} />
           ) : (

@@ -30,6 +30,11 @@ export interface WorkshopHomeStats {
   maintenance: number
   parking: number
   pendingClassification: number
+  /** The same three counts at the start of today (Saudi midnight), or null
+   *  when the stats function predates migration 0097. */
+  insideYesterday: number | null
+  maintenanceYesterday: number | null
+  parkingYesterday: number | null
   /** Latest 10 of the `pendingClassification` entries, newest first. */
   pending: PendingClassificationEntry[]
 }
@@ -40,6 +45,16 @@ function statNumber(source: unknown, key: string): number {
   const value = (source as Record<string, unknown>)[key]
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
     return 0
+  return Math.trunc(value)
+}
+
+/** Like `statNumber`, but a missing key is `null` rather than 0, so a card
+ *  can hide a comparison it has no data for instead of claiming "+40". */
+function statNumberOrNull(source: unknown, key: string): number | null {
+  if (!source || typeof source !== 'object') return null
+  const value = (source as Record<string, unknown>)[key]
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
+    return null
   return Math.trunc(value)
 }
 
@@ -78,6 +93,9 @@ export function parseWorkshopHomeStats(source: unknown): WorkshopHomeStats {
     maintenance: statNumber(source, 'maintenance'),
     parking: statNumber(source, 'parking'),
     pendingClassification: statNumber(source, 'pending_classification'),
+    insideYesterday: statNumberOrNull(source, 'inside_yesterday'),
+    maintenanceYesterday: statNumberOrNull(source, 'maintenance_yesterday'),
+    parkingYesterday: statNumberOrNull(source, 'parking_yesterday'),
     pending: parsePendingEntries(source),
   }
 }
@@ -98,28 +116,23 @@ export function daysSinceSaudi(
 }
 
 /**
- * The "inside workshop" state card's secondary line (e.g. "6 maintenance, 3
- * parking"). `null` when there is nothing inside to break down, so the card
- * never claims a split of zero.
+ * A state card's change since yesterday: today's count minus the count at
+ * the start of today. `null` when the yesterday figure is unknown, so the
+ * card shows no comparison rather than a false one.
  */
-export function insideWorkshopBreakdown(
-  stats: WorkshopHomeStats,
-): { maintenance: number; parking: number } | null {
-  if (stats.insideNow <= 0) return null
-  return { maintenance: stats.maintenance, parking: stats.parking }
+export function changeSinceYesterday(
+  now: number,
+  yesterday: number | null,
+): number | null {
+  if (yesterday === null) return null
+  return now - yesterday
 }
 
-/**
- * One purpose card's share of the current inside-workshop total (e.g.
- * "6 of 21"). `null` when nothing is inside, so the card never divides by
- * zero or shows a share of nothing.
- */
-export function workshopPurposeShare(
-  count: number,
-  insideNow: number,
-): { count: number; total: number } | null {
-  if (insideNow <= 0) return null
-  return { count, total: insideNow }
+/** "+3", "-2" or "0", with a Latin minus so RTL never flips the sign. */
+export function formatSignedDelta(delta: number): string {
+  if (delta > 0) return `+${delta}`
+  if (delta < 0) return `-${Math.abs(delta)}`
+  return '0'
 }
 
 export type WorkshopPurpose = 'maintenance' | 'parking'

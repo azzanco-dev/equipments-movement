@@ -35,45 +35,45 @@ const home = loadLibModule('homeStats')
 
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null))
 
-// Covers the wave6-A workshop home cards: the "inside workshop" card's
-// maintenance/parking breakdown line and each purpose card's share of the
-// inside-workshop total. Both must hide rather than show a false "0 of 0".
-test('insideWorkshopBreakdown hides when nothing is inside', () => {
-  assert.equal(
-    home.insideWorkshopBreakdown({
-      insideNow: 0,
-      maintenance: 0,
-      parking: 0,
-      pendingClassification: 0,
-      pending: [],
-    }),
-    null,
-  )
-  assert.deepEqual(
-    plain(
-      home.insideWorkshopBreakdown({
-        insideNow: 21,
-        maintenance: 13,
-        parking: 6,
-        pendingClassification: 2,
-        pending: [],
-      }),
-    ),
-    { maintenance: 13, parking: 6 },
-  )
+// Covers the workshop home state cards' "change since yesterday" line: the
+// comparison hides when the yesterday figure is unknown (stats function older
+// than migration 0097) and the sign is rendered with a Latin minus.
+test('changeSinceYesterday is null without a yesterday figure', () => {
+  assert.equal(home.changeSinceYesterday(40, null), null)
+  assert.equal(home.changeSinceYesterday(40, 37), 3)
+  assert.equal(home.changeSinceYesterday(35, 37), -2)
+  assert.equal(home.changeSinceYesterday(37, 37), 0)
 })
 
-test('workshopPurposeShare hides when nothing is inside and never divides by zero', () => {
-  assert.equal(home.workshopPurposeShare(0, 0), null)
-  assert.equal(home.workshopPurposeShare(5, 0), null)
-  assert.deepEqual(plain(home.workshopPurposeShare(13, 21)), {
-    count: 13,
-    total: 21,
+test('formatSignedDelta keeps an explicit sign', () => {
+  assert.equal(home.formatSignedDelta(3), '+3')
+  assert.equal(home.formatSignedDelta(-2), '-2')
+  assert.equal(home.formatSignedDelta(0), '0')
+})
+
+test('parseWorkshopHomeStats reads the yesterday snapshot when present', () => {
+  const withYesterday = home.parseWorkshopHomeStats({
+    inside_now: 40,
+    maintenance: 3,
+    parking: 31,
+    pending_classification: 6,
+    inside_yesterday: 38,
+    maintenance_yesterday: 2,
+    parking_yesterday: 30,
+    pending: [],
   })
-  // A purpose count of zero still reports its (zero) share of a non-zero
-  // inside-workshop total, rather than being treated as "nothing to show".
-  assert.deepEqual(plain(home.workshopPurposeShare(0, 21)), {
-    count: 0,
-    total: 21,
+  assert.equal(withYesterday.insideYesterday, 38)
+  assert.equal(withYesterday.maintenanceYesterday, 2)
+  assert.equal(withYesterday.parkingYesterday, 30)
+
+  const legacy = home.parseWorkshopHomeStats({
+    inside_now: 40,
+    maintenance: 3,
+    parking: 31,
+    pending_classification: 6,
+    pending: [],
   })
+  assert.equal(legacy.insideYesterday, null)
+  assert.equal(legacy.maintenanceYesterday, null)
+  assert.equal(legacy.parkingYesterday, null)
 })
