@@ -8,7 +8,7 @@
 -- foreman/workshop home would have to choose between a wrong page count and a
 -- full-table client-side pass.
 --
--- `equipment_visits` does the pairing in PostgreSQL, one row per visit, so the
+-- `movement_visits` does the pairing in PostgreSQL, one row per visit, so the
 -- home list can search, count, sort and paginate visits server-side exactly
 -- like every other list in the unified list system.
 --
@@ -75,7 +75,10 @@
 --   groups visits by day keeps using the Saudi (UTC+03:00) helpers in
 --   `src/lib/saudiTime.ts`, exactly as migrations 0090 and 0094 do in SQL.
 
-CREATE OR REPLACE VIEW public.equipment_visits
+-- Named movement_visits: an older `equipment_visits` view (migrations 0002 to
+-- 0056) still backs the entry-report functions (0081/0083) with a different
+-- column set, and CREATE OR REPLACE VIEW cannot change a view's columns.
+CREATE OR REPLACE VIEW public.movement_visits
 WITH (security_invoker = true)
 AS
 WITH paired AS (
@@ -158,10 +161,10 @@ LEFT JOIN public.profiles s ON s.id = p.supervisor_id
 -- all; the equipment inquiry timeline is the screen that still shows those.
 WHERE p.movement_type = 'entry';
 
-REVOKE ALL ON public.equipment_visits FROM PUBLIC, anon;
-GRANT SELECT ON public.equipment_visits TO authenticated;
+REVOKE ALL ON public.movement_visits FROM PUBLIC, anon;
+GRANT SELECT ON public.movement_visits TO authenticated;
 
-COMMENT ON VIEW public.equipment_visits IS
+COMMENT ON VIEW public.movement_visits IS
   'One row per visit: each ENTRY paired with the EXIT that follows it in the '
   'same (equipment, movement_context) sequence, ordered deterministically by '
   '(recorded_at, id). is_open is true when no EXIT is visible directly after '

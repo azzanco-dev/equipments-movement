@@ -4,7 +4,7 @@ import type { Language } from '@/i18n/translations'
 import type { DataListConfig } from '@/components/data-list/types'
 
 /**
- * `equipment_visits` (migration 0096) is a `security_invoker` view with one
+ * `movement_visits` (migration 0096) is a `security_invoker` view with one
  * row per visit: each ENTRY paired with the EXIT that follows it in the same
  * (equipment, movement_context) sequence, ordered by `(recorded_at, id)`.
  * Searching, counting, sorting and pagination therefore all run in PostgreSQL,
@@ -14,7 +14,7 @@ import type { DataListConfig } from '@/components/data-list/types'
  * it without React or a bundler; the only imports are other pure helpers and
  * types (erased at compile time).
  */
-export const EQUIPMENT_VISITS_VIEW = 'equipment_visits'
+export const EQUIPMENT_VISITS_VIEW = 'movement_visits'
 
 /** Only the columns the home visits tab renders or searches. */
 export const EQUIPMENT_VISITS_SELECT =

@@ -41,7 +41,7 @@ export interface HomeVisitsTableProps {
  * that closed it, or "still inside" when there is none.
  *
  * Everything — search, ordering, counting and paging — runs in PostgreSQL
- * through `equipment_visits` (migration 0096), whose `security_invoker` view
+ * through `movement_visits` (migration 0096), whose `security_invoker` view
  * keeps `entry_exit_logs` RLS authoritative. The list state lives in the URL
  * under a `v` prefix so it never collides with the log tab's own state and
  * Back restores both.
