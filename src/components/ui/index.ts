@@ -14,6 +14,8 @@ export type { FieldControlProps, FieldProps } from './Field'
 export { Badge, MovementBadge, WorkshopPurposeBadge } from './Badge'
 export type { BadgeProps, BadgeTone } from './Badge'
 export { Select } from './Select'
+export { MultiSelect } from './MultiSelect'
+export type { MultiSelectOption, MultiSelectProps } from './MultiSelect'
 export type { SelectOption, SelectProps } from './Select'
 export { ConfirmDialog, Dialog, useConfirm } from './Dialog'
 export type { ConfirmDialogProps, ConfirmOptions, DialogProps } from './Dialog'
@@ -97,4 +99,12 @@ export { MiniTable, MiniTableGrid } from './MiniTable'
 export type { MiniTableGridProps, MiniTableProps } from './MiniTable'
 export { Notice } from './Notice'
 export type { NoticeProps, NoticeSize, NoticeTone } from './Notice'
+export { DetailHeader } from './DetailHeader'
+export type { DetailHeaderProps } from './DetailHeader'
+export { InfoGrid, InfoGridSection } from './InfoGrid'
+export type {
+  InfoGridItem,
+  InfoGridProps,
+  InfoGridSectionProps,
+} from './InfoGrid'
 export { cn } from './cn'
