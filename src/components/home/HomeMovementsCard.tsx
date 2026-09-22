@@ -12,9 +12,14 @@ import {
   Badge,
   Button,
   DatePicker,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   type DataTableColumn,
 } from '@/components/ui'
 import { Card, SectionHeader } from '@/components/ui/Card'
+import { HomeVisitsTable } from '@/components/home/HomeVisitsCard'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { formatDate } from '@/lib/dateFormat'
 import { isDateKey, saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
@@ -64,11 +69,14 @@ export interface HomeMovementsCardProps {
 }
 
 /**
- * The movement list on the home page. Search, movement type, date, ordering,
- * and pagination all run in PostgreSQL through `movement_log_search`, and the
- * whole list state lives in the URL so Back restores it.
+ * The movement log tab. Search, movement type, date, ordering, and pagination
+ * all run in PostgreSQL through `movement_log_search`, and the whole list
+ * state lives in the URL so Back restores it.
+ *
+ * Rendered only while its tab is active (Radix unmounts inactive content), so
+ * opening the visits tab costs no movement request.
  */
-export function HomeMovementsCard({
+function MovementLogTab({
   workshopMode,
   canClassify,
   onSelectMovement,
@@ -286,9 +294,7 @@ export function HomeMovementsCard({
   const title = workshopMode ? t('recentWorkshopLogs') : t('myMovements')
 
   return (
-    <Card className="space-y-3">
-      <SectionHeader as="h2" title={title} />
-
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <SearchInput
           value={searchInput}
@@ -369,6 +375,54 @@ export function HomeMovementsCard({
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+/**
+ * The movements card on both homes: the recorded movements (`السجل`) and the
+ * same data paired into visits (`الزيارات`).
+ *
+ * The log stays the default tab so nothing changes for anyone who does not
+ * open the new one. The active tab is persisted in the URL as `?view=visits`
+ * (the default is left out of the query string), exactly like the rest of the
+ * list state, so Back restores the tab as well. Each tab keeps its own search
+ * and paging: the visits tab prefixes its parameters with `v`.
+ */
+export function HomeMovementsCard(props: HomeMovementsCardProps) {
+  const { t } = useI18n()
+  const params = useSearchParams()
+  const view = params.get('view') === 'visits' ? 'visits' : 'log'
+  const title = props.workshopMode ? t('recentWorkshopLogs') : t('myMovements')
+
+  // Next patches history.replaceState, so `useSearchParams` re-renders with the
+  // new value; this is the same mechanism the filters above already use.
+  const changeView = (value: string) => {
+    const url = new URL(window.location.href)
+    if (value === 'visits') url.searchParams.set('view', 'visits')
+    else url.searchParams.delete('view')
+    window.history.replaceState(null, '', `${url.pathname}${url.search}`)
+  }
+
+  return (
+    <Card className="space-y-3">
+      <SectionHeader as="h2" title={title} />
+      <Tabs value={view} onValueChange={changeView}>
+        <TabsList>
+          <TabsTrigger value="log">{t('movementsLogTab')}</TabsTrigger>
+          <TabsTrigger value="visits">{t('visitsTab')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="log">
+          <MovementLogTab {...props} />
+        </TabsContent>
+        <TabsContent value="visits">
+          <HomeVisitsTable
+            workshopMode={props.workshopMode}
+            onSelectMovement={props.onSelectMovement}
+            refreshToken={props.refreshToken}
+          />
+        </TabsContent>
+      </Tabs>
     </Card>
   )
 }
