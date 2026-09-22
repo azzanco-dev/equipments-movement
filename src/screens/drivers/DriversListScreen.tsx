@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { FileSpreadsheet, Plus, Trash2 } from 'lucide-react'
 import { Button, PageHeader, useConfirm } from '@/components/ui'
 import { DataListActions } from '@/components/data-list/DataListActions'
@@ -10,10 +11,15 @@ import { useRowSelection } from '@/components/data-list/useRowSelection'
 import { DriverExcelImport } from '@/components/DriverExcelImport'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
+import {
+  DRIVER_DIALOG_QUERY_PARAM,
+  driverIdFromSearchParams,
+} from '@/lib/driverEquipment'
 import { driversListConfig } from '@/lib/listConfigs'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import type { Driver } from '@/lib/types'
+import { DriverDetailDialog } from './DriverDetailDialog'
 import { DriverFormDialog } from './DriverFormDialog'
 import { DriversTable } from './DriversTable'
 
@@ -21,12 +27,25 @@ const LIST_SELECT =
   'id,full_name,name_en,id_number,mobile_number,nationality,employment_type,job_title,created_at,updated_at'
 
 export interface DriversListScreenProps {
+  /**
+   * Kept for compatibility with `src/App.tsx`, which still passes a
+   * `/drivers/:id` page navigation here. The list now opens the driver
+   * detail dialog itself (via the `?driver=` URL param) instead of calling
+   * this, so it is intentionally unused — see `DriverDetailDialog` and
+   * `DriverDetail` (now a thin redirect to `?driver=`). Safe to drop once
+   * `App.tsx` stops passing it.
+   */
   onSelectDriver: (id: string) => void
 }
 
 /** Orchestrator for the drivers list; same shape as the equipment screen. */
 export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
+  // See the prop's doc comment: the list now opens the dialog itself.
+  void onSelectDriver
   const { t } = useI18n()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const openDriverId = driverIdFromSearchParams(searchParams)
   const list = useDataListState(driversListConfig)
   const selection = useRowSelection()
   const [drivers, setDrivers] = useState<Driver[]>([])
@@ -87,6 +106,24 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
   const openEdit = (driver: Driver) => {
     setEditing(driver)
     setFormOpen(true)
+  }
+
+  // The detail dialog's open/closed state is derived straight from the URL
+  // (`openDriverId` above) rather than kept in React state, so a refresh or
+  // a shared link with `?driver=<id>` reopens it on its own. Opening pushes
+  // a new history entry (so the browser Back button closes it); closing
+  // through the dialog itself just drops the param, keeping the rest of the
+  // list's URL state (search, filters, sort, page) intact either way.
+  const openDriverDialog = (id: string) => {
+    const next = new URLSearchParams(searchParams.toString())
+    next.set(DRIVER_DIALOG_QUERY_PARAM, id)
+    router.push(`/drivers?${next.toString()}`)
+  }
+  const closeDriverDialog = () => {
+    const next = new URLSearchParams(searchParams.toString())
+    next.delete(DRIVER_DIALOG_QUERY_PARAM)
+    const query = next.toString()
+    router.push(query ? `/drivers?${query}` : '/drivers')
   }
 
   const remove = async (driver: Driver) => {
@@ -191,7 +228,7 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
         selected={selection.selected}
         onToggleRow={selection.toggle}
         onTogglePage={selection.togglePage}
-        onOpen={onSelectDriver}
+        onOpen={openDriverDialog}
         onEdit={openEdit}
         onDelete={remove}
         emptyAction={addButton}
@@ -216,6 +253,13 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={fetchDrivers}
+      />
+      <DriverDetailDialog
+        driverId={openDriverId}
+        open={openDriverId !== null}
+        onOpenChange={(open) => {
+          if (!open) closeDriverDialog()
+        }}
       />
       {confirmDialog}
     </div>

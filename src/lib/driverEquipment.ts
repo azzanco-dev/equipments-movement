@@ -64,6 +64,29 @@ export function buildDriverMovementsHref(fullName: string): string {
   return `/logs?filters=${encodeURIComponent(filters)}`
 }
 
+/** Query-string key that opens the driver detail dialog on the drivers list. */
+export const DRIVER_DIALOG_QUERY_PARAM = 'driver'
+
+/** URL for the drivers list with the detail dialog open on this driver. Also
+ *  the redirect target for the retired standalone `/drivers/:id` page. */
+export function buildDriverDialogHref(driverId: string): string {
+  return `/drivers?${DRIVER_DIALOG_QUERY_PARAM}=${encodeURIComponent(driverId)}`
+}
+
+/**
+ * Reads the open dialog's driver id from the drivers list URL search params.
+ * Takes anything with a `.get`, so it works with both `URLSearchParams` and
+ * Next's `ReadonlyURLSearchParams`. A missing or blank param returns null so
+ * callers never try to open a dialog for an empty id.
+ */
+export function driverIdFromSearchParams(
+  params: { get(name: string): string | null } | null | undefined,
+): string | null {
+  const value = params?.get(DRIVER_DIALOG_QUERY_PARAM)
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
 function positiveCount(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
     return 0

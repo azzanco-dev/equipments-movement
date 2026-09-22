@@ -1199,6 +1199,37 @@ export function MovementDetail({
         </div>
       </div>
 
+      {/* Equipment data */}
+      <div className="card">
+        <h3 className="mb-2 text-sm font-bold text-muted">
+          {t('sectionEquipmentDetails')}
+        </h3>
+        <DescriptionList
+          items={[
+            {
+              key: 'equipmentDetailsCode',
+              icon: <Truck size={16} />,
+              label: t('equipmentDetailsCode'),
+              value: log.equipment?.code,
+            },
+            {
+              key: 'equipmentDetailsType',
+              icon: <FileText size={16} />,
+              label: t('equipmentDetailsType'),
+              value: log.equipment?.type,
+            },
+            {
+              key: 'equipmentDetailsPlate',
+              icon: <FileText size={16} />,
+              label: t('plateNumber'),
+              value: log.equipment?.plate_number,
+              dir: 'ltr',
+            },
+          ]}
+          columns={2}
+        />
+      </div>
+
       {driverEntryId && log.movement_context !== 'workshop' && (
         <div className="card space-y-4">
           <div className="flex items-center justify-between gap-3">
