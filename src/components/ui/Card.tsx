@@ -22,7 +22,9 @@ export function Card({
   className,
 }: CardProps) {
   return (
-    <Tag className={cn('card', !padded && 'p-0', className)}>{children}</Tag>
+    <Tag className={cn('card min-w-0 max-w-full', !padded && 'p-0', className)}>
+      {children}
+    </Tag>
   )
 }
 

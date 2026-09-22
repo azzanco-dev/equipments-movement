@@ -92,7 +92,13 @@ const hideBelowClass = {
   lg: 'hidden lg:table-cell',
 } as const
 
-const skeletonWidths = ['w-16', 'w-24', 'w-20', 'w-28', 'w-20', 'w-24']
+// Fractions of the cell, not fixed rem widths: a fixed width (e.g. `w-28`,
+// 7rem) forces that much intrinsic column width even for a narrow column
+// (badge, duration), which on mobile can push the auto-layout table (and, if
+// an ancestor lacks `min-w-0`, the page itself) wider than the real header or
+// row content ever would (owner report, phone video, 2026-09-22). A fraction
+// resolves against the column's own auto width instead of dictating one.
+const skeletonWidths = ['w-3/4', 'w-1/2', 'w-2/3', 'w-5/6', 'w-2/5', 'w-1/2']
 
 /** Elements that handle their own click inside a clickable row. */
 const interactiveSelector = 'a,button,input,select,textarea,[role="button"]'
@@ -171,7 +177,12 @@ export function DataTable<Row>({
   return (
     <div
       className={cn(
-        'w-full overflow-x-auto rounded-xl border bg-bg',
+        // `min-w-0` + `max-w-full`: this wrapper is where horizontal scroll
+        // must stay contained. The table inside may render wider than the
+        // wrapper (that scrolls, by design), but the wrapper itself must
+        // never force an ancestor (e.g. a flex/grid item that defaults to
+        // `min-width: auto`) to grow past the viewport.
+        'w-full min-w-0 max-w-full overflow-x-auto rounded-xl border bg-bg',
         maxHeight && 'overflow-y-auto',
         className,
       )}
@@ -264,7 +275,7 @@ export function DataTable<Row>({
                   >
                     <span
                       className={cn(
-                        'block h-3 animate-pulse rounded bg-surface-hover',
+                        'block h-3 max-w-full animate-pulse rounded bg-surface-hover',
                         skeletonWidths[columnIndex % skeletonWidths.length],
                       )}
                     />

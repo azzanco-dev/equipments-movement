@@ -21,10 +21,15 @@ export const TabsList = forwardRef<HTMLDivElement, TabsListProps>(
         ref={ref}
         data-variant={variant}
         className={cn(
-          'group/tabs flex max-w-full items-center overflow-x-auto',
+          'group/tabs flex max-w-full items-center',
           variant === 'underline'
-            ? 'gap-4 border-b'
-            : 'inline-flex w-fit gap-0.5 rounded-lg border bg-surface p-0.5',
+            ? // No horizontal (or auto-computed vertical) scroll container here:
+              // the `-mb-px`/`border-b-2` active-trigger underline sits 1px below
+              // the row, and `overflow-x-auto` with the default `overflow-y`
+              // resolves to `overflow-y: auto` too, so that 1px alone was enough
+              // to show a scrollbar (owner report, phone video, 2026-09-22).
+              'flex-wrap gap-4 border-b'
+            : 'overflow-x-auto inline-flex w-fit gap-0.5 rounded-lg border bg-surface p-0.5',
           className,
         )}
         {...props}
@@ -62,7 +67,7 @@ export const TabsContent = forwardRef<
   return (
     <RadixTabs.Content
       ref={ref}
-      className={cn('mt-4 outline-none', className)}
+      className={cn('mt-4 min-w-0 max-w-full outline-none', className)}
       {...props}
     />
   )
