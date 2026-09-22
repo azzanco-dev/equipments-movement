@@ -362,15 +362,17 @@ export function EquipmentInquiryScreen({
             : t('ownershipExternalSupplier')
     : null
 
-  const stateLocation =
+  // Company and project are two lines under the identity row (owner
+  // decision): one joined line overflowed the card on long names.
+  const stateCompany =
     state.presence === 'inside_site'
-      ? [
-          localizedName(lang, state.companyNameAr, state.companyNameEn),
-          localizedName(lang, state.projectNameAr, state.projectNameEn),
-        ]
-          .filter((part) => part && part !== '—')
-          .join(' · ')
+      ? localizedName(lang, state.companyNameAr, state.companyNameEn)
       : null
+  const stateProject =
+    state.presence === 'inside_site'
+      ? localizedName(lang, state.projectNameAr, state.projectNameEn)
+      : null
+  const hasName = (value: string | null) => Boolean(value && value !== '—')
 
   return (
     <div className="space-y-5">
@@ -433,32 +435,50 @@ export function EquipmentInquiryScreen({
           />
         ) : equipment ? (
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border bg-surface px-3 py-2.5">
-              <span className="font-semibold" dir="ltr">
-                {equipment.code}
-              </span>
-              <span className="truncate-safe text-sm text-muted">
-                {equipment.type || '—'}
-              </span>
-              {equipment.plate_number && (
-                <span className="text-sm text-muted" dir="ltr">
-                  {equipment.plate_number}
+            <div className="space-y-2 rounded-lg border bg-surface px-3 py-2.5">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span className="font-semibold" dir="ltr">
+                  {equipment.code}
                 </span>
-              )}
-              {ownerLabel && <Badge>{ownerLabel}</Badge>}
-              <span className="mx-1 hidden text-muted sm:inline">·</span>
-              <Badge tone={STATE_TONE[state.presence]}>
-                {t(STATE_LABEL[state.presence])}
-              </Badge>
-              {state.presence === 'inside_site' && stateLocation && (
-                <span className="truncate-safe text-sm text-fg">
-                  {stateLocation}
+                <span className="truncate-safe min-w-0 text-sm text-muted">
+                  {equipment.type || '—'}
                 </span>
-              )}
+                {equipment.plate_number && (
+                  <span className="text-sm text-muted" dir="ltr">
+                    {equipment.plate_number}
+                  </span>
+                )}
+                {ownerLabel && <Badge>{ownerLabel}</Badge>}
+                <span className="mx-1 hidden text-muted sm:inline">·</span>
+                <Badge tone={STATE_TONE[state.presence]}>
+                  {t(STATE_LABEL[state.presence])}
+                </Badge>
+              </div>
+              {state.presence === 'inside_site' &&
+                (hasName(stateCompany) || hasName(stateProject)) && (
+                  <div className="min-w-0 space-y-0.5 text-sm">
+                    {hasName(stateCompany) && (
+                      <p
+                        className="truncate-safe text-fg"
+                        title={stateCompany!}
+                      >
+                        {stateCompany}
+                      </p>
+                    )}
+                    {hasName(stateProject) && (
+                      <p
+                        className="truncate-safe text-muted"
+                        title={stateProject!}
+                      >
+                        {stateProject}
+                      </p>
+                    )}
+                  </div>
+                )}
               {state.presence === 'inside_site' && state.supervisorName && (
-                <span className="text-xs text-muted">
+                <p className="truncate-safe text-xs text-muted">
                   {state.supervisorName}
-                </span>
+                </p>
               )}
               {state.presence === 'inside_workshop' &&
                 state.workshopPurpose && (

@@ -252,10 +252,13 @@ function VisitSegment({
   const duration = visitDurationMs(visit, nowMs)
   const entry = visit.entry
   const exit = visit.exit
-  const place = workshop
-    ? t('workshopLocation')
-    : [entry?.company_name, entry?.project_name].filter(Boolean).join(' · ') ||
-      '—'
+  // Company and project sit under the badges as two lines (owner decision);
+  // a joined line overflowed the card on long names.
+  const placeLines = workshop
+    ? [t('workshopLocation')]
+    : [entry?.company_name, entry?.project_name].filter(
+        (part): part is string => Boolean(part),
+      )
   const photoMovementId = entry?.id ?? exit?.id ?? null
 
   return (
@@ -288,9 +291,24 @@ function VisitSegment({
           {visit.orphanExit && (
             <Badge tone="warning">{t('exitWithoutEntry')}</Badge>
           )}
-          <span className="truncate-safe min-w-0 flex-1 text-sm font-semibold">
-            {place}
-          </span>
+        </div>
+        <div className="min-w-0 space-y-0.5 text-sm">
+          {placeLines.length === 0 ? (
+            <p className="font-semibold">—</p>
+          ) : (
+            placeLines.map((line, index) => (
+              <p
+                key={`${index}-${line}`}
+                className={cn(
+                  'truncate-safe',
+                  index === 0 ? 'font-semibold' : 'text-muted',
+                )}
+                title={line}
+              >
+                {line}
+              </p>
+            ))
+          )}
         </div>
 
         <dl className="grid gap-x-4 gap-y-1.5 text-sm sm:grid-cols-2">
