@@ -1,5 +1,6 @@
 /**
- * Shapes and pure helpers for the admin home page (migrations 0094 / 0095).
+ * Shapes and pure helpers for the admin home page (migrations 0094 / 0095 /
+ * 0101).
  *
  * Everything here is free of React and Supabase so the counting and bucketing
  * rules can be unit tested, and so a malformed payload can never reach a
@@ -31,13 +32,13 @@ function isAdminHomeOwner(value: string): value is AdminHomeOwner {
 }
 
 /**
- * Reads the `?owners=a,b` filter.
+ * Normalizes an owner selection.
  *
  * An empty result means "every owner", exactly as it does in the database
- * functions, so an unknown or hand-edited value degrades to the unfiltered
- * page instead of an error. Duplicates are dropped and the result is put back
- * into the canonical `ADMIN_HOME_OWNERS` order, so the same selection always
- * produces the same URL and the same request signature.
+ * functions, so an unknown value degrades to the unfiltered section instead of
+ * an error. Duplicates are dropped and the result is put back into the
+ * canonical `ADMIN_HOME_OWNERS` order, so the same selection always produces
+ * the same request signature whatever order the boxes were ticked in.
  */
 export function normalizeOwnerFilters(
   value: string | string[] | null | undefined,
@@ -49,20 +50,90 @@ export function normalizeOwnerFilters(
   return ADMIN_HOME_OWNERS.filter((owner) => chosen.has(owner))
 }
 
-/** The URL value for a selection; `null` clears the parameter entirely. */
-export function serializeOwnerFilters(owners: AdminHomeOwner[]): string | null {
-  const normalized = normalizeOwnerFilters(owners)
-  return normalized.length ? normalized.join(',') : null
-}
-
 /**
  * The argument the database functions take: `null` for "every owner", never
  * an empty array, so the two representations can never diverge.
+ *
+ * Unknown values are dropped rather than sent to a function that would reject
+ * the whole request, and a selection that contained nothing but unknown values
+ * therefore degrades to "every owner" — the same fail-safe the filter itself
+ * applies. `null` in means "every owner" in.
  */
 export function ownerFilterArgument(
-  owners: AdminHomeOwner[],
+  owners: AdminHomeOwner[] | string[] | null | undefined,
 ): AdminHomeOwner[] | null {
-  return owners.length ? owners : null
+  if (!owners || owners.length === 0) return null
+  const normalized = normalizeOwnerFilters(owners as string[])
+  return normalized.length ? normalized : null
+}
+
+// --- Server-side pagination ------------------------------------------------
+
+/** Rows per page for the admin home's paginated tables (owner request,
+ *  2026-09-22). It is the shared list system's default page size. */
+export const ADMIN_HOME_PAGE_SIZE = 20
+
+/**
+ * The `OFFSET` for a 1-based page.
+ *
+ * Pages are 1-based everywhere in the interface (the pagination control shows
+ * "1 / 4") and 0-based in SQL, so the conversion lives in exactly one place. A
+ * page below 1 — a stale state after a filter change, a hand-edited value —
+ * reads as the first page instead of a negative offset the database would
+ * clamp silently.
+ */
+export function pageOffset(page: number, pageSize: number): number {
+  const size = Math.max(1, Math.trunc(pageSize) || 1)
+  const safePage = Math.max(1, Math.trunc(page) || 1)
+  return (safePage - 1) * size
+}
+
+/** How many pages a total spans; always at least one, so an empty table still
+ *  reads "1 / 1" rather than "1 / 0". */
+export function pageCount(total: number, pageSize: number): number {
+  const size = Math.max(1, Math.trunc(pageSize) || 1)
+  const count = Math.max(0, Math.trunc(total) || 0)
+  return Math.max(1, Math.ceil(count / size))
+}
+
+/**
+ * Keeps the requested page inside the result.
+ *
+ * Deleting the last rows of the last page, or narrowing a filter while a later
+ * page is open, would otherwise leave the table on a page the database has no
+ * rows for, which reads as "there is nothing here".
+ */
+export function clampPage(
+  page: number,
+  total: number,
+  pageSize: number,
+): number {
+  return Math.min(
+    Math.max(1, Math.trunc(page) || 1),
+    pageCount(total, pageSize),
+  )
+}
+
+/**
+ * One page of rows plus the size of the whole filtered set.
+ *
+ * `total` comes from the database (`count(*) OVER ()`, repeated on every row),
+ * never from `rows.length`, so the page count is right on every page.
+ */
+export interface AdminHomePage<T> {
+  rows: T[]
+  total: number
+}
+
+/**
+ * Reads `total_count` out of a paginated payload.
+ *
+ * Every row carries the same value, so the first row is enough; an empty page
+ * legitimately has no row to read it from and is a total of zero.
+ */
+export function parseTotalCount(source: unknown): number {
+  if (!Array.isArray(source) || source.length === 0) return 0
+  return num(source[0], 'total_count')
 }
 
 /** Ownership is derived, never stored twice: only Al-Azani is owned. */
@@ -116,15 +187,19 @@ export interface FleetStateGroup extends FleetStateCounts {
   key: string
 }
 
+/**
+ * The fleet's state right now.
+ *
+ * The idle_30 / idle_60 / idle_90 / never_moved members `get_admin_fleet_state`
+ * still returns are deliberately not parsed (owner review, 2026-09-22): a long
+ * idle time is normal for this fleet, so the page no longer shows ages
+ * anywhere. Leaving them unparsed rather than dropping them from the database
+ * function keeps that a UI decision, reversible without a migration.
+ */
 export interface FleetState extends FleetStateCounts {
   workshopMaintenance: number
   workshopParking: number
   workshopUnclassified: number
-  /** Nested: idle90 ⊆ idle60 ⊆ idle30, and never-moved units are in all. */
-  idle30: number
-  idle60: number
-  idle90: number
-  neverMoved: number
   byOwner: FleetStateGroup[]
   byType: FleetStateGroup[]
 }
@@ -150,18 +225,23 @@ export function parseFleetState(source: unknown): FleetState {
     workshopMaintenance: num(source, 'workshop_maintenance'),
     workshopParking: num(source, 'workshop_parking'),
     workshopUnclassified: num(source, 'workshop_unclassified'),
-    idle30: num(source, 'idle_30'),
-    idle60: num(source, 'idle_60'),
-    idle90: num(source, 'idle_90'),
-    neverMoved: num(source, 'never_moved'),
     byOwner: parseGroups(source, 'by_owner', 'owner'),
     byType: parseGroups(source, 'by_type', 'type'),
   }
 }
 
-// --- 2. No movement --------------------------------------------------------
+// --- 2. Equipment that is outside right now --------------------------------
 
-export interface NoMovementRow {
+/**
+ * One unit that is outside right now (migration 0101).
+ *
+ * "Outside" is the `available` state of `admin_equipment_state`: the latest
+ * movement across both contexts is not an ENTRY, or there is no movement at
+ * all. Owner review (2026-09-22): the idle-days threshold and the days column
+ * are gone, because a long idle time is normal here and says nothing on its
+ * own — what the exit date answers is "since when".
+ */
+export interface OutsideEquipmentRow {
   id: string
   code: string
   type: string
@@ -170,8 +250,6 @@ export interface NoMovementRow {
   lastMovementAt: string | null
   lastMovementType: 'entry' | 'exit' | null
   lastMovementContext: 'site' | 'workshop' | null
-  /** Saudi calendar days since the last movement; `null` when never moved. */
-  daysSince: number | null
 }
 
 function optionalText(source: unknown, key: string): string | null {
@@ -192,26 +270,32 @@ function movementContext(
   return value === 'site' || value === 'workshop' ? value : null
 }
 
-export function parseNoMovementRows(source: unknown): NoMovementRow[] {
+export function parseOutsideEquipmentRows(
+  source: unknown,
+): OutsideEquipmentRow[] {
   if (!Array.isArray(source)) return []
   return source
-    .map((row): NoMovementRow => {
-      const days = (row as Record<string, unknown> | null)?.days_since
-      return {
-        id: text(row, 'id'),
-        code: text(row, 'code'),
-        type: text(row, 'type'),
-        owner: text(row, 'ownership_status'),
-        lastMovementAt: optionalText(row, 'last_movement_at'),
-        lastMovementType: movementType(row, 'last_movement_type'),
-        lastMovementContext: movementContext(row, 'last_movement_context'),
-        daysSince:
-          typeof days === 'number' && Number.isFinite(days) && days >= 0
-            ? Math.trunc(days)
-            : null,
-      }
-    })
+    .map((row): OutsideEquipmentRow => ({
+      id: text(row, 'id'),
+      code: text(row, 'code'),
+      type: text(row, 'type'),
+      owner: text(row, 'ownership_status'),
+      lastMovementAt: optionalText(row, 'last_movement_at'),
+      lastMovementType: movementType(row, 'last_movement_type'),
+      lastMovementContext: movementContext(row, 'last_movement_context'),
+    }))
     .filter((row) => row.id !== '')
+}
+
+/** One page of the outside-equipment table, with the size of the whole
+ *  filtered set the database counted. */
+export function parseOutsideEquipmentPage(
+  source: unknown,
+): AdminHomePage<OutsideEquipmentRow> {
+  return {
+    rows: parseOutsideEquipmentRows(source),
+    total: parseTotalCount(source),
+  }
 }
 
 // --- 3. Availability by type ----------------------------------------------
@@ -241,26 +325,21 @@ export function parseAvailabilityRows(source: unknown): AvailabilityRow[] {
     .filter((row) => row.type !== '')
 }
 
-/** How many types the section shows before "عرض الكل" is used. */
-export const AVAILABILITY_TOP_TYPES = 10
-
 /**
- * The rows the availability table renders.
+ * One page of the availability table.
  *
- * A search always looks at every type the database returned, so a type outside
- * the top ten is still findable by name; without a search the list is capped at
- * the top ten until the caller expands it. The database already ordered the
- * rows by total, so "top ten" is a slice and never a re-sort in the browser.
+ * Owner review (2026-09-22): the "top 10 / عرض الكل" slice is gone. Paging and
+ * the type search are the database's (migration 0101), so the browser never
+ * holds every type to filter or re-sort it, and a search reaches types on
+ * pages that were never downloaded.
  */
-export function visibleAvailabilityRows(
-  all: AvailabilityRow[],
-  query: string,
-  expanded: boolean,
-): AvailabilityRow[] {
-  const needle = query.trim().toLowerCase()
-  if (needle)
-    return all.filter((row) => row.type.toLowerCase().includes(needle))
-  return expanded ? all : all.slice(0, AVAILABILITY_TOP_TYPES)
+export function parseAvailabilityPage(
+  source: unknown,
+): AdminHomePage<AvailabilityRow> {
+  return {
+    rows: parseAvailabilityRows(source),
+    total: parseTotalCount(source),
+  }
 }
 
 // --- 4. Entries series -----------------------------------------------------

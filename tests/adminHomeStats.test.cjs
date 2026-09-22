@@ -37,6 +37,10 @@ function loadLibModule(name, cache = new Map()) {
 const cache = new Map()
 const admin = loadLibModule('adminHomeStats', cache)
 const buckets = loadLibModule('chartBuckets', cache)
+// The export helper deliberately keeps Supabase and `xlsx` out of its module
+// scope (the page loader is an argument, the workbook is a dynamic import), so
+// it loads here exactly as it does in the browser.
+const exporter = loadLibModule('adminHomeExport', cache)
 
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null))
 
@@ -72,20 +76,21 @@ test('owner filters are deduplicated and canonically ordered', () => {
   )
 })
 
-test('an empty selection serializes to no URL parameter at all', () => {
-  assert.equal(admin.serializeOwnerFilters([]), null)
-  assert.equal(admin.serializeOwnerFilters(['bogus']), null)
-  assert.equal(
-    admin.serializeOwnerFilters(['takween', 'alazani']),
-    'alazani,takween',
-  )
-})
-
 test('the database argument is NULL for "every owner", never an empty array', () => {
-  // The functions in 0095 treat NULL and an empty array the same, but only one
-  // of them may leave the client, so "no filter" has one representation.
+  // The functions in 0095/0101 treat NULL and an empty array the same, but only
+  // one of them may leave the client, so "no filter" has one representation.
   assert.equal(admin.ownerFilterArgument([]), null)
+  assert.equal(admin.ownerFilterArgument(null), null)
+  assert.equal(admin.ownerFilterArgument(undefined), null)
   assert.deepEqual(plain(admin.ownerFilterArgument(['alazani'])), ['alazani'])
+  // Sections hold plain strings, so the argument is validated on its way out:
+  // an unknown value is dropped rather than sent to a function that would
+  // reject the whole request, and a selection of nothing but unknown values
+  // degrades to "every owner".
+  assert.deepEqual(plain(admin.ownerFilterArgument(['takween', 'bogus'])), [
+    'takween',
+  ])
+  assert.equal(admin.ownerFilterArgument(['bogus']), null)
 })
 
 test('only Al-Azani counts as owned', () => {
@@ -123,6 +128,11 @@ test('parseFleetState survives a malformed payload', () => {
   })
   assert.equal(parsed.total, 12)
   assert.equal(parsed.workshopMaintenance, 3)
+  // The idle buckets are still in the payload but no longer parsed: the page
+  // stopped showing ages (owner review, 2026-09-22), and leaving them in the
+  // database keeps that a UI decision rather than a migration.
+  assert.equal('idle30' in parsed, false)
+  assert.equal('neverMoved' in parsed, false)
   assert.deepEqual(plain(parsed.byOwner), [
     {
       key: 'alazani',
@@ -146,37 +156,44 @@ test('parseAvailabilityRows returns flat counts, no owned/rented split', () => {
   assert.deepEqual(plain(admin.parseAvailabilityRows('nope')), [])
 })
 
-test('the availability table shows the top ten until it is expanded', () => {
-  const all = Array.from({ length: 14 }, (_, index) => ({
-    type: `type-${index}`,
-    insideSites: 0,
-    inWorkshop: 0,
-    available: 0,
-    total: 100 - index,
-  }))
-  assert.equal(admin.AVAILABILITY_TOP_TYPES, 10)
-  assert.equal(admin.visibleAvailabilityRows(all, '', false).length, 10)
-  assert.equal(admin.visibleAvailabilityRows(all, '', true).length, 14)
-  // The search must still find a type outside the top ten, expanded or not.
-  assert.deepEqual(
-    admin.visibleAvailabilityRows(all, 'type-13', false).map((row) => row.type),
-    ['type-13'],
-  )
-  assert.equal(admin.visibleAvailabilityRows(all, '  ', false).length, 10)
-})
-
-test('parseNoMovementRows keeps never-moved equipment identifiable', () => {
-  const rows = admin.parseNoMovementRows([
+test('the availability page carries the database total, not the page length', () => {
+  // Migration 0101 paginates this table server-side: `total_count` repeats on
+  // every row, so the page count must never be derived from `rows.length`.
+  const page = admin.parseAvailabilityPage([
     {
-      id: 'a',
-      code: 'A-1',
       type: 'حفار',
-      ownership_status: 'alazani',
-      last_movement_at: null,
-      last_movement_type: null,
-      days_since: null,
+      inside_sites: 4,
+      in_workshop: 2,
+      available: 3,
+      total: 9,
+      total_count: 37,
     },
     {
+      type: 'شيول',
+      inside_sites: 1,
+      in_workshop: 0,
+      available: 2,
+      total: 3,
+      total_count: 37,
+    },
+  ])
+  assert.equal(page.total, 37)
+  assert.equal(page.rows.length, 2)
+  // An empty page has no row to read the count from, and is a total of zero.
+  assert.deepEqual(plain(admin.parseAvailabilityPage([])), {
+    rows: [],
+    total: 0,
+  })
+  assert.deepEqual(plain(admin.parseAvailabilityPage(null)), {
+    rows: [],
+    total: 0,
+  })
+})
+
+test('parseOutsideEquipmentPage keeps never-moved equipment identifiable', () => {
+  const page = admin.parseOutsideEquipmentPage([
+    {
+      total_count: 2,
       id: 'b',
       code: 'B-1',
       type: 'شيول',
@@ -184,16 +201,160 @@ test('parseNoMovementRows keeps never-moved equipment identifiable', () => {
       last_movement_at: '2026-01-01T00:00:00Z',
       last_movement_type: 'exit',
       last_movement_context: 'site',
-      days_since: 42,
     },
-    { id: '', code: 'dropped' },
+    {
+      total_count: 2,
+      id: 'a',
+      code: 'A-1',
+      type: 'حفار',
+      ownership_status: 'alazani',
+      last_movement_at: null,
+      last_movement_type: null,
+    },
+    { total_count: 2, id: '', code: 'dropped' },
   ])
-  assert.equal(rows.length, 2)
-  assert.equal(rows[0].lastMovementAt, null)
-  assert.equal(rows[0].daysSince, null)
-  assert.equal(rows[1].lastMovementType, 'exit')
-  assert.equal(rows[1].lastMovementContext, 'site')
-  assert.equal(rows[1].daysSince, 42)
+  assert.equal(page.total, 2)
+  assert.equal(page.rows.length, 2)
+  assert.equal(page.rows[0].lastMovementType, 'exit')
+  assert.equal(page.rows[0].lastMovementContext, 'site')
+  // The never-moved row keeps a null date rather than an empty string, so the
+  // table can tell "no movements" from a date it failed to read.
+  assert.equal(page.rows[1].lastMovementAt, null)
+  assert.equal(page.rows[1].lastMovementType, null)
+  // The idle-days column is gone with the threshold (owner review 2026-09-22).
+  assert.equal('daysSince' in page.rows[0], false)
+})
+
+// --- server-side pagination ------------------------------------------------
+
+test('pages are 1-based in the interface and 0-based in SQL', () => {
+  assert.equal(admin.ADMIN_HOME_PAGE_SIZE, 20)
+  assert.equal(admin.pageOffset(1, 20), 0)
+  assert.equal(admin.pageOffset(3, 20), 40)
+  assert.equal(admin.pageOffset(2, 500), 500)
+  // A stale or hand-edited page reads as the first page rather than becoming a
+  // negative offset the database would have to clamp.
+  assert.equal(admin.pageOffset(0, 20), 0)
+  assert.equal(admin.pageOffset(-4, 20), 0)
+  assert.equal(admin.pageOffset(2, 0), 1)
+})
+
+test('pageCount is never zero and clampPage keeps the table on a real page', () => {
+  assert.equal(admin.pageCount(0, 20), 1)
+  assert.equal(admin.pageCount(20, 20), 1)
+  assert.equal(admin.pageCount(21, 20), 2)
+  assert.equal(admin.pageCount(37, 20), 2)
+  // Narrowing a filter while page 4 is open must not leave the table on a page
+  // the database has no rows for — that reads as "there is nothing here".
+  assert.equal(admin.clampPage(4, 37, 20), 2)
+  assert.equal(admin.clampPage(1, 0, 20), 1)
+  assert.equal(admin.clampPage(0, 100, 20), 1)
+  assert.equal(admin.clampPage(3, 100, 20), 3)
+})
+
+test('parseTotalCount refuses a malformed count instead of guessing', () => {
+  assert.equal(admin.parseTotalCount([{ total_count: 12 }]), 12)
+  assert.equal(admin.parseTotalCount([{ total_count: -3 }]), 0)
+  assert.equal(admin.parseTotalCount([{ total_count: 'many' }]), 0)
+  assert.equal(admin.parseTotalCount([]), 0)
+  assert.equal(admin.parseTotalCount(null), 0)
+})
+
+// --- the Excel export of the outside table ---------------------------------
+
+test('collectAllPages walks every page of the current filter', async () => {
+  const all = Array.from({ length: 12 }, (_, index) => ({ id: index }))
+  const asked = []
+  const collected = await exporter.collectAllPages(
+    async (page, pageSize) => {
+      asked.push([page, pageSize])
+      const from = (page - 1) * pageSize
+      return { rows: all.slice(from, from + pageSize), total: all.length }
+    },
+    { pageSize: 5 },
+  )
+  assert.deepEqual(asked, [
+    [1, 5],
+    [2, 5],
+    [3, 5],
+  ])
+  assert.equal(collected.rows.length, 12)
+  assert.equal(collected.total, 12)
+  assert.equal(collected.capped, false)
+})
+
+test('collectAllPages stops at the cap and says the export was truncated', async () => {
+  const collected = await exporter.collectAllPages(
+    async (page, pageSize) => ({
+      rows: Array.from({ length: pageSize }, (_, index) => ({
+        id: (page - 1) * pageSize + index,
+      })),
+      total: 10_000,
+    }),
+    { pageSize: 4, maxRows: 10 },
+  )
+  // Exactly the cap, never a page past it, and the caller is told so it can
+  // show the note instead of handing over a silently short file.
+  assert.equal(collected.rows.length, 10)
+  assert.equal(collected.capped, true)
+})
+
+test('collectAllPages terminates when a page comes back empty', async () => {
+  // A total that disagrees with the rows (a row deleted mid-walk) must not
+  // loop forever.
+  let calls = 0
+  const collected = await exporter.collectAllPages(
+    async () => {
+      calls += 1
+      return { rows: calls === 1 ? [{ id: 1 }] : [], total: 99 }
+    },
+    { pageSize: 5 },
+  )
+  assert.equal(calls, 2)
+  assert.equal(collected.rows.length, 1)
+  assert.equal(collected.capped, true)
+})
+
+test('the export sheet mirrors the table and never leaves a blank date', async () => {
+  const sheet = exporter.outsideEquipmentSheetData(
+    [
+      {
+        id: 'a',
+        code: 'A-1',
+        type: 'حفار',
+        owner: 'alazani',
+        lastMovementAt: '2026-09-01T07:00:00Z',
+        lastMovementType: 'exit',
+        lastMovementContext: 'site',
+      },
+      {
+        id: 'b',
+        code: 'B-1',
+        type: 'شيول',
+        owner: 'takween',
+        lastMovementAt: null,
+        lastMovementType: null,
+        lastMovementContext: null,
+      },
+    ],
+    { t: (key) => key, ownerLabel: (owner) => `owner:${owner}` },
+  )
+  assert.deepEqual(plain(sheet.headers), [
+    'adminHomeColEquipment',
+    'adminHomeColType',
+    'adminHomeColOwner',
+    'adminHomeColLastMovement',
+  ])
+  assert.equal(sheet.body.length, 2)
+  assert.deepEqual(plain(sheet.body[0].slice(0, 3)), [
+    'A-1',
+    'حفار',
+    'owner:alazani',
+  ])
+  assert.match(sheet.body[0][3], /^\d{2}\/\d{2}\/2026$/)
+  // A unit that never moved gets the explicit wording: an empty cell in a
+  // spreadsheet reads as missing data rather than as a fact.
+  assert.equal(sheet.body[1][3], 'adminHomeNeverMoved')
 })
 
 test('parseForemanRecentMovements groups rows and keeps database order', () => {

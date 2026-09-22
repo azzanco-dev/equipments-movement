@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Badge, Switch, Tabs, TabsList, TabsTrigger } from '@/components/ui'
 import { EntriesLineChart } from '@/components/charts/lazy'
 import type { EntriesLinePoint } from '@/components/charts/lazy'
@@ -22,10 +22,10 @@ import {
 } from '@/lib/adminHomeStats'
 import type { TranslationKey } from '@/i18n/translations'
 import { AdminHomeSection } from './AdminHomeSection'
+import { OwnerFilter } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 export interface EntriesFlowSectionProps {
-  owners: AdminHomeOwner[]
   granularity: AdminHomeGranularity
   onGranularityChange: (value: AdminHomeGranularity) => void
   showExits: boolean
@@ -68,15 +68,19 @@ const WINDOW_LABEL: Record<AdminHomeGranularity, TranslationKey> = {
  * function (`get_admin_entries_yearly`, migration 0095), because five years of
  * days is far past the 400-day cap the daily series enforces and raising that
  * cap would hand every caller an unbounded payload.
+ *
+ * The owner filter sits next to the granularity switch and is the section's
+ * own state (owner review, 2026-09-22, third pass): the page-level filter is
+ * gone, so the two controls that decide what this chart draws are together.
  */
 export function EntriesFlowSection({
-  owners,
   granularity,
   onGranularityChange,
   showExits,
   onShowExitsChange,
 }: EntriesFlowSectionProps) {
   const { t, lang, dir } = useI18n()
+  const [owners, setOwners] = useState<AdminHomeOwner[]>([])
   const yearly = granularity === 'year'
 
   // The range is read from the clock once per granularity/owner change, so the
@@ -149,23 +153,31 @@ export function EntriesFlowSection({
       skeletonClassName="h-64 w-full"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Tabs
-          value={granularity}
-          onValueChange={(value) =>
-            onGranularityChange(value as AdminHomeGranularity)
-          }
-        >
-          <TabsList
-            variant="segmented"
-            aria-label={t('adminHomeFlowGranularity')}
+        <div className="flex flex-wrap items-center gap-2">
+          <Tabs
+            value={granularity}
+            onValueChange={(value) =>
+              onGranularityChange(value as AdminHomeGranularity)
+            }
           >
-            {ADMIN_HOME_GRANULARITIES.map((value) => (
-              <TabsTrigger key={value} value={value}>
-                {t(GRANULARITY_LABEL[value])}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+            <TabsList
+              variant="segmented"
+              aria-label={t('adminHomeFlowGranularity')}
+            >
+              {ADMIN_HOME_GRANULARITIES.map((value) => (
+                <TabsTrigger key={value} value={value}>
+                  {t(GRANULARITY_LABEL[value])}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <OwnerFilter
+            size="sm"
+            value={owners}
+            onChange={setOwners}
+            className="w-36 sm:w-44"
+          />
+        </div>
         <Switch
           checked={showExits}
           onCheckedChange={onShowExitsChange}

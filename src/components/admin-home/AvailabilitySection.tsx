@@ -1,57 +1,85 @@
-import { useCallback, useMemo, useState } from 'react'
-import { Badge, Button, DataTable, SearchInput } from '@/components/ui'
+import { useCallback, useEffect, useState } from 'react'
+import { Badge, DataTable, SearchInput } from '@/components/ui'
 import type { DataTableColumn } from '@/components/ui'
+import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { useI18n } from '@/i18n/I18nContext'
 import { fetchAvailabilityByType } from '@/lib/adminHomeData'
-import {
-  AVAILABILITY_TOP_TYPES,
-  visibleAvailabilityRows,
-  type AdminHomeOwner,
-  type AvailabilityRow,
-  type FleetStateCounts,
+import type {
+  AdminHomeOwner,
+  AvailabilityRow,
+  FleetStateCounts,
 } from '@/lib/adminHomeStats'
 import { AdminHomeSection } from './AdminHomeSection'
+import { OwnerFilter } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
-export interface AvailabilitySectionProps {
-  owners: AdminHomeOwner[]
-}
+/** One page of types. Fixed: the section is half a row, not a list page. */
+const PAGE_SIZE = 20
 
 /**
  * "التوفر حسب النوع": per equipment type, how many units are inside sites, in
  * the workshop, available, and the total.
  *
- * Owner review (2026-09-22): the owned / rented sub-lines are gone — the
- * multi-select owner filter at the top of the page answers that question
- * directly — and the totals column moved to the end, so the columns read in
- * the order the operations team thinks in: where the units are first, how many
- * there are last.
+ * Owner review (2026-09-22, third pass): the owned / rented sub-lines are gone,
+ * the totals column moved to the end so the columns read in the order the
+ * operations team thinks in (where the units are first, how many there are
+ * last), and the section carries its own owner filter now that the page-level
+ * one is gone.
  *
- * Only the top ten types are listed. The database already returns them ordered
- * by total (capped at 100), so "top ten" is a slice of an already bounded
- * result: "عرض الكل" reveals the rest without a request, and the search box
- * always looks at every returned type, so a type outside the top ten is still
- * findable by name.
+ * The "top 10 / عرض الكل" toggle is gone with it. Searching and paging are the
+ * database's job: the type search is sent as `search` (debounced, and any new
+ * search starts again at page one) and the table shows 20 types a page, so the
+ * browser never receives a type it is not about to draw.
+ *
+ * A refetch keeps the current page on screen — the skeleton is for the first
+ * load only — because replacing a table the user is reading with a placeholder
+ * every time they page or type reads as a page that keeps breaking.
  */
-export function AvailabilitySection({ owners }: AvailabilitySectionProps) {
+export function AvailabilitySection() {
   const { t } = useI18n()
-  const [query, setQuery] = useState('')
-  const [expanded, setExpanded] = useState(false)
+  const [owners, setOwners] = useState<AdminHomeOwner[]>([])
+  // `input` is what the user typed; `search` is what the database was asked
+  // for. Keeping them apart is what makes the debounce possible without the
+  // box ever lagging behind the keyboard.
+  const [input, setInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    const trimmed = input.trim()
+    if (trimmed === search) return
+    const timer = window.setTimeout(() => {
+      setSearch(trimmed)
+      // A narrowed list has different pages; page 3 of the old search is not a
+      // meaningful place to land.
+      setPage(1)
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [input, search])
 
   const load = useCallback(
-    (signal: AbortSignal) => fetchAvailabilityByType(owners, signal),
-    [owners],
+    (signal: AbortSignal) =>
+      fetchAvailabilityByType(
+        {
+          // An empty selection is "every owner", which the database reads as a
+          // NULL filter rather than an empty list.
+          owners: owners.length ? owners : null,
+          search: search || null,
+          page,
+          pageSize: PAGE_SIZE,
+        },
+        signal,
+      ),
+    [owners, page, search],
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
 
-  const all = useMemo(() => data ?? [], [data])
-  const rows = useMemo(
-    () => visibleAvailabilityRows(all, query, expanded),
-    [all, expanded, query],
-  )
-  // The toggle is meaningless while a search is narrowing the list (the search
-  // already looks at every type) or when there is nothing more to reveal.
-  const canExpand = query.trim() === '' && all.length > AVAILABILITY_TOP_TYPES
+  const rows = data?.rows ?? []
+  const total = data?.total ?? 0
+  // The very first load has nothing to show yet, so it gets the skeleton; every
+  // later load keeps the rows that are already on screen.
+  const firstLoad = loading && data === null
+  const refreshing = loading && data !== null
 
   const metric = (
     key: string,
@@ -95,41 +123,58 @@ export function AvailabilitySection({ owners }: AvailabilitySectionProps) {
     <AdminHomeSection
       title={t('adminHomeAvailabilityTitle')}
       description={t('adminHomeAvailabilityDescription')}
-      action={<Badge tone="info">{t('adminHomeNow')}</Badge>}
-      loading={loading}
+      action={
+        <div className="flex items-center gap-2">
+          <OwnerFilter
+            size="sm"
+            value={owners}
+            onChange={(next) => {
+              setOwners(next)
+              setPage(1)
+            }}
+            className="w-36 sm:w-44"
+          />
+          <Badge tone="info">{t('adminHomeNow')}</Badge>
+        </div>
+      }
+      loading={firstLoad}
       failed={failed}
       onRetry={retry}
       skeletonClassName="h-64 w-full"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <SearchInput
-          value={query}
-          onValueChange={setQuery}
-          placeholder={t('adminHomeSearchType')}
-          aria-label={t('adminHomeSearchType')}
-          className="max-w-xs"
-        />
-        {canExpand && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setExpanded((value) => !value)}
-          >
-            {expanded ? t('adminHomeShowTopTypes') : t('viewAll')}
-          </Button>
-        )}
-      </div>
-      <DataTable
-        size="lg"
-        columns={columns}
-        rows={rows}
-        rowKey={(row) => row.type}
-        loadingRows={6}
-        empty={t('adminHomeNoTypeMatch')}
-        caption={t('adminHomeAvailabilityTitle')}
+      <SearchInput
+        value={input}
+        onValueChange={setInput}
+        placeholder={t('adminHomeSearchType')}
+        aria-label={t('adminHomeSearchType')}
+        className="max-w-xs"
       />
-      {canExpand && !expanded && (
-        <p className="text-xs text-muted">{t('adminHomeTopTypes')}</p>
+      <div
+        aria-busy={refreshing || undefined}
+        className={
+          refreshing
+            ? 'min-w-0 opacity-60 transition-opacity'
+            : 'min-w-0 transition-opacity'
+        }
+      >
+        <DataTable
+          size="lg"
+          columns={columns}
+          rows={rows}
+          rowKey={(row) => row.type}
+          loadingRows={6}
+          empty={search ? t('adminHomeNoTypeMatch') : t('adminHomeNoTypes')}
+          caption={t('adminHomeAvailabilityTitle')}
+        />
+        {refreshing && <span className="sr-only">{t('loading')}</span>}
+      </div>
+      {total > 0 && (
+        <DataListPagination
+          page={page}
+          pageSize={PAGE_SIZE}
+          total={total}
+          onPage={setPage}
+        />
       )}
     </AdminHomeSection>
   )

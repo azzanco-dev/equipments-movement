@@ -1,5 +1,4 @@
 import { useCallback, useMemo } from 'react'
-import { Users } from 'lucide-react'
 import { MultiSelect } from '@/components/ui/MultiSelect'
 import { useI18n } from '@/i18n/I18nContext'
 import { ADMIN_HOME_OWNERS, type AdminHomeOwner } from '@/lib/adminHomeStats'
@@ -32,20 +31,30 @@ export interface OwnerFilterProps {
   /** An empty array means every owner, never "no owners". */
   value: AdminHomeOwner[]
   onChange: (value: AdminHomeOwner[]) => void
+  /** `sm` is the 28 px toolbar size, for a filter sitting in a section header. */
+  size?: 'sm' | 'md'
   className?: string
 }
 
 /**
- * The owner filter for the whole admin home (owner request, 2026-09-22: a
- * multi-select, and the first control on the page).
+ * The owner filter: the shared `MultiSelect`, pre-filled with the five owner
+ * classifications and their short labels.
  *
- * An empty selection means "every owner" in all three places it is
- * represented: here, in the `?owners=` URL parameter, and as a NULL
- * `p_owners` argument in migration 0095. That is why there is no explicit
- * "الكل" option to tick — clearing the selection IS that option, so the two
- * can never be on at the same time.
+ * Owner review (2026-09-22, third pass): there is no page-level owner filter
+ * any more, so this is rendered by each section that needs one, in its own
+ * header, against its own local state.
+ *
+ * An empty selection means "every owner" in both places it is represented:
+ * here, and as a NULL `p_owners` argument in migration 0095. That is why there
+ * is no explicit "الكل" option to tick — clearing the selection IS that
+ * option, so the two can never be on at the same time.
  */
-export function OwnerFilter({ value, onChange, className }: OwnerFilterProps) {
+export function OwnerFilter({
+  value,
+  onChange,
+  size = 'md',
+  className,
+}: OwnerFilterProps) {
   const { t } = useI18n()
   const label = useOwnerLabel()
   const options = useMemo(
@@ -60,6 +69,7 @@ export function OwnerFilter({ value, onChange, className }: OwnerFilterProps) {
   return (
     <MultiSelect
       className={className}
+      size={size}
       aria-label={t('adminHomeOwnerFilter')}
       options={options}
       value={value}
@@ -69,29 +79,5 @@ export function OwnerFilter({ value, onChange, className }: OwnerFilterProps) {
         t('adminHomeOwnerCount').replace('{count}', String(count))
       }
     />
-  )
-}
-
-/**
- * The owner filter as the page's first row: a labelled card above the
- * sections, full width on mobile and a fixed, comfortable width from sm up.
- */
-export function OwnerFilterBar({
-  value,
-  onChange,
-}: Omit<OwnerFilterProps, 'className'>) {
-  const { t } = useI18n()
-  return (
-    <div className="card flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-3">
-      <span className="flex items-center gap-2 text-sm font-medium text-fg">
-        <Users size={16} aria-hidden="true" className="text-muted" />
-        {t('adminHomeOwnerFilter')}
-      </span>
-      <OwnerFilter
-        value={value}
-        onChange={onChange}
-        className="w-full sm:w-72"
-      />
-    </div>
   )
 }

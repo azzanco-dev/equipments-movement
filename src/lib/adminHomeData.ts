@@ -1,32 +1,55 @@
 /**
  * The only place the admin home talks to PostgreSQL.
  *
- * Every section calls one database function (migrations 0094 / 0095) and gets
- * a parsed, typed result back, so no component ever sees a raw PostgREST row
- * and no raw PostgreSQL error text can reach the interface: each loader throws
- * a plain `Error` and the section renders its own translated failure with a
- * retry.
+ * Every section calls one database function (migrations 0094 / 0095 / 0101)
+ * and gets a parsed, typed result back, so no component ever sees a raw
+ * PostgREST row and no raw PostgreSQL error text can reach the interface: each
+ * loader throws a plain `Error` and the section renders its own translated
+ * failure with a retry.
+ *
+ * The two paginated tables (equipment that is outside, availability by type)
+ * take a page descriptor rather than a limit: pages are 1-based here and in
+ * the pagination control, and `pageOffset` is the single place that turns one
+ * into the database's 0-based OFFSET.
  */
 import { saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
 import { supabase } from '@/lib/supabase'
 import {
   ownerFilterArgument,
-  parseAvailabilityRows,
+  pageOffset,
+  parseAvailabilityPage,
   parseDailySeries,
   parseFleetState,
   parseForemanRecentMovements,
-  parseNoMovementRows,
+  parseOutsideEquipmentPage,
   parseOwnerStateMatrix,
   parseYearlySeries,
   type AdminHomeOwner,
+  type AdminHomePage,
   type AvailabilityRow,
   type DailyMovementCount,
   type FleetState,
   type ForemanRecentGroup,
-  type NoMovementRow,
+  type OutsideEquipmentRow,
   type OwnerStateMatrix,
   type YearlyMovementCount,
 } from '@/lib/adminHomeStats'
+
+/** What a paginated section asks for. `owners` is `null` or an empty array for
+ *  "every owner", exactly as the database functions read it. */
+export interface AdminHomePageRequest {
+  owners: string[] | null
+  /** 1-based, like the pagination control. */
+  page: number
+  pageSize: number
+}
+
+/** The database caps a search term itself; this only keeps a pathological
+ *  value out of the request and turns "nothing typed" into no search. */
+function searchArgument(search: string | null | undefined): string | null {
+  const term = (search ?? '').trim().slice(0, 80)
+  return term === '' ? null : term
+}
 
 /**
  * Raw PostgreSQL / PostgREST messages must never reach the user, so the
@@ -70,34 +93,45 @@ export async function fetchFleetState(
   return parseFleetState(data)
 }
 
-export async function fetchNoMovementEquipment(
-  owners: AdminHomeOwner[],
-  days: number,
-  limit: number,
+/**
+ * One page of the equipment that is outside right now: the latest movement
+ * across both contexts is not an ENTRY, or the unit has never moved
+ * (migration 0101). The total is the database's `count(*) OVER ()`, so the
+ * page count is right even on the last page.
+ */
+export async function fetchOutsideEquipment(
+  params: AdminHomePageRequest,
   signal: AbortSignal,
-): Promise<NoMovementRow[]> {
+): Promise<AdminHomePage<OutsideEquipmentRow>> {
   const { data, error } = await supabase
-    .rpc('get_admin_no_movement_equipment', {
-      p_owners: ownerFilterArgument(owners),
-      p_days: days,
-      p_limit: limit,
+    .rpc('get_admin_outside_equipment', {
+      p_owners: ownerFilterArgument(params.owners),
+      p_limit: params.pageSize,
+      p_offset: pageOffset(params.page, params.pageSize),
     })
     .abortSignal(signal)
-  if (error) fail('noMovement', error)
-  return parseNoMovementRows(data)
+  if (error) fail('outsideEquipment', error)
+  return parseOutsideEquipmentPage(data)
 }
 
+/**
+ * One page of the per-type availability. The search is the database's too, so
+ * it reaches types that live on pages the browser never downloaded.
+ */
 export async function fetchAvailabilityByType(
-  owners: AdminHomeOwner[],
+  params: AdminHomePageRequest & { search: string | null },
   signal: AbortSignal,
-): Promise<AvailabilityRow[]> {
+): Promise<AdminHomePage<AvailabilityRow>> {
   const { data, error } = await supabase
     .rpc('get_admin_availability_by_type', {
-      p_owners: ownerFilterArgument(owners),
+      p_owners: ownerFilterArgument(params.owners),
+      p_search: searchArgument(params.search),
+      p_limit: params.pageSize,
+      p_offset: pageOffset(params.page, params.pageSize),
     })
     .abortSignal(signal)
   if (error) fail('availability', error)
-  return parseAvailabilityRows(data)
+  return parseAvailabilityPage(data)
 }
 
 export async function fetchEntriesSeries(

@@ -832,32 +832,17 @@ export const translations = {
     adminHomeInsideSites: 'داخل المواقع الان',
     adminHomeInWorkshop: 'في الورشة الان',
     adminHomeAvailable: 'متاحة',
-    adminHomeIdle: 'بلا حركة',
-    adminHomeIdleHint: 'بلا حركة منذ 90 يوم فاكثر',
     adminHomeMaintenance: 'صيانة',
     adminHomeParking: 'وقوف',
     adminHomeUnclassified: 'بلا تصنيف',
-    adminHomeIdleBreakdown: 'بلا حركة منذ:',
-    adminHomeIdleNested:
-      'الفئات متداخلة: كل معدة بلا حركة 90 يوم محسوبة ايضا في 60 و30 يوم.',
-    adminHomeDayUnit: 'يوم',
     adminHomeNoMovementTitle: 'معدات بلا حركة',
-    adminHomeNoMovementDescription:
-      'اطول المعدات بلا حركة مسجلة. المعدات بلا اي تاريخ حركة مميزة باللون الاحمر.',
-    adminHomeNoMovementThreshold: 'مدة التوقف',
-    adminHomeNoMovementEmpty: 'لا توجد معدات متوقفة بهذه المدة',
-    adminHomeNoMovementLimit: 'يعرض اول 20 معدة حسب الاطول توقفا.',
-    adminHomeNoMovementEver: 'لا يوجد تاريخ حركة',
-    adminHomeExitedOn: 'خروج بتاريخ',
-    adminHomeEnteredOn: 'دخول بتاريخ',
     adminHomeColEquipment: 'المعدة',
     adminHomeColType: 'النوع',
     adminHomeColOwner: 'المالك',
     adminHomeColLastMovement: 'اخر حركة',
-    adminHomeColDays: 'عدد الايام',
     adminHomeAvailabilityTitle: 'التوفر حسب النوع',
     adminHomeAvailabilityDescription:
-      'كل رقم مقسوم الى ملك ومستاجر. العزاني يعتبر ملكا وما عداه مستاجر.',
+      'اين معدات كل نوع الان: داخل المواقع، في الورشة، والمتاح منها.',
     adminHomeSearchType: 'ابحث في الانواع',
     adminHomeNoTypeMatch: 'لا يوجد نوع مطابق',
     adminHomeColTotal: 'الاجمالي',
@@ -1009,8 +994,6 @@ export const translations = {
     adminHomeFlowLastDays: 'اخر 30 يوم',
     adminHomeFlowLastMonths: 'اخر 12 شهر',
     adminHomeFlowLastYears: 'اخر 5 سنوات',
-    adminHomeTopTypes: 'ابرز 10 انواع حسب الاجمالي',
-    adminHomeShowTopTypes: 'عرض ابرز 10',
     adminHomeDonutOwnerTitle: 'حسب المالك',
     adminHomeDonutStateTitle: 'حسب الحالة',
     adminHomeDonutCrossHint: 'اضغط على شريحة لتصفية الرسم الاخر.',
@@ -1022,6 +1005,16 @@ export const translations = {
     adminHomeForemanLastCount: 'اخر {count} حركات',
     adminHomeColMovementDate: 'التاريخ',
     adminHomeNoForemen: 'لا يوجد نشاط للفورمين',
+
+    // wave6-L
+    adminHomeTotalEquipment: 'اجمالي المعدات',
+    adminHomeTotalEquipmentHint: 'المعدات النشطة في الاسطول',
+    adminHomeOutsideDescription:
+      'المعدات خارج المواقع والورشة الان: اخر حركة لها خروج، او بلا حركات.',
+    adminHomeOutsideEmpty: 'لا توجد معدات خارج المواقع الان',
+    adminHomeNeverMoved: 'بلا حركات',
+    adminHomeExportCapped: 'تم تصدير اول 5000 صف فقط.',
+    adminHomeExportFailed: 'تعذر تصدير الملف، حاول مرة اخرى.',
 
     // wave6-H
     companyNameArRequired: 'اسم الشركة بالعربي مطلوب',
@@ -1040,6 +1033,9 @@ export const translations = {
     emailRequired: 'البريد الالكتروني مطلوب',
     passwordRequired: 'كلمة المرور مطلوبة',
     movementDateRequired: 'تاريخ الحركة الفعلي مطلوب',
+
+    // wave6-M
+    adminHomeNoTypes: 'لا توجد انواع معدات',
   },
   en: {
     appName: 'Heavy Equipment Management',
@@ -1879,32 +1875,17 @@ export const translations = {
     adminHomeInsideSites: 'Inside sites now',
     adminHomeInWorkshop: 'In the workshop now',
     adminHomeAvailable: 'Available',
-    adminHomeIdle: 'Not moving',
-    adminHomeIdleHint: 'No movement for 90 days or more',
     adminHomeMaintenance: 'Maintenance',
     adminHomeParking: 'Standby',
     adminHomeUnclassified: 'Not classified',
-    adminHomeIdleBreakdown: 'No movement for:',
-    adminHomeIdleNested:
-      'The buckets are nested: a unit idle for 90 days is also counted in 60 and 30.',
-    adminHomeDayUnit: 'days',
     adminHomeNoMovementTitle: 'Equipment with no movement',
-    adminHomeNoMovementDescription:
-      'Longest idle equipment first. Units with no movement history at all are marked in red.',
-    adminHomeNoMovementThreshold: 'Idle for',
-    adminHomeNoMovementEmpty: 'No equipment idle for this long',
-    adminHomeNoMovementLimit: 'Shows the 20 longest idle units.',
-    adminHomeNoMovementEver: 'No movement history',
-    adminHomeExitedOn: 'Exited on',
-    adminHomeEnteredOn: 'Entered on',
     adminHomeColEquipment: 'Equipment',
     adminHomeColType: 'Type',
     adminHomeColOwner: 'Owner',
     adminHomeColLastMovement: 'Last movement',
-    adminHomeColDays: 'Days',
     adminHomeAvailabilityTitle: 'Availability by type',
     adminHomeAvailabilityDescription:
-      'Every number split into owned and rented. Al-Azani is owned; every other owner is rented.',
+      'Where each type is right now: inside sites, in the workshop, and available.',
     adminHomeSearchType: 'Search types',
     adminHomeNoTypeMatch: 'No matching type',
     adminHomeColTotal: 'Total',
@@ -2058,8 +2039,6 @@ export const translations = {
     adminHomeFlowLastDays: 'Last 30 days',
     adminHomeFlowLastMonths: 'Last 12 months',
     adminHomeFlowLastYears: 'Last 5 years',
-    adminHomeTopTypes: 'Top 10 types by total',
-    adminHomeShowTopTypes: 'Show top 10',
     adminHomeDonutOwnerTitle: 'By owner',
     adminHomeDonutStateTitle: 'By state',
     adminHomeDonutCrossHint: 'Select a slice to filter the other chart.',
@@ -2071,6 +2050,16 @@ export const translations = {
     adminHomeForemanLastCount: 'Last {count} movements',
     adminHomeColMovementDate: 'Date',
     adminHomeNoForemen: 'No foreman activity',
+
+    // wave6-L
+    adminHomeTotalEquipment: 'Total equipment',
+    adminHomeTotalEquipmentHint: 'Active units in the fleet',
+    adminHomeOutsideDescription:
+      'Equipment outside sites and the workshop right now: its last movement was an exit, or it has never moved.',
+    adminHomeOutsideEmpty: 'No equipment is outside right now',
+    adminHomeNeverMoved: 'No movements',
+    adminHomeExportCapped: 'Only the first 5,000 rows were exported.',
+    adminHomeExportFailed: 'The file could not be exported. Try again.',
 
     // wave6-H
     companyNameArRequired: 'The Arabic company name is required.',
@@ -2089,6 +2078,9 @@ export const translations = {
     emailRequired: 'The email address is required.',
     passwordRequired: 'The password is required.',
     movementDateRequired: 'The actual movement date is required.',
+
+    // wave6-M
+    adminHomeNoTypes: 'No equipment types',
   },
 } as const
 

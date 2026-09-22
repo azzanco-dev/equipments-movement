@@ -60,9 +60,13 @@ type Focus =
   | { kind: 'state'; id: FleetStateId }
   | null
 
-export interface FleetDonutSectionProps {
-  owners: AdminHomeOwner[]
-}
+/**
+ * No owner filter: the whole fleet, always. `ownerFilterArgument` turns an
+ * empty selection into the NULL `p_owners` the database reads as "every
+ * owner", and the constant lives at module scope so the loader's identity
+ * never changes and the section cannot reload itself on every render.
+ */
+const EVERY_OWNER: AdminHomeOwner[] = []
 
 /**
  * "اين الاسطول الان": two donuts side by side — the fleet by owner and the
@@ -75,21 +79,23 @@ export interface FleetDonutSectionProps {
  * focus exists at a time, so the pair always answers one question rather than
  * two half-applied filters.
  *
- * The page's own owner filter still narrows both charts first, so drilling
- * never silently widens the scope the user set.
+ * This section deliberately has no owner filter (owner review, 2026-09-22,
+ * third pass): the owner is one of the two slices drawn here, so filtering by
+ * owner would be filtering the answer out of the chart. Selecting an owner
+ * slice is the filter.
  *
  * Both charts come from one snapshot (`get_admin_owner_state_matrix`), so a
  * cross-filter never costs a request and the halves can never be drawn from
  * two different moments.
  */
-export function FleetDonutSection({ owners }: FleetDonutSectionProps) {
+export function FleetDonutSection() {
   const { t, lang, dir } = useI18n()
   const ownerLabel = useOwnerLabel()
   const [focus, setFocus] = useState<Focus>(null)
 
   const load = useCallback(
-    (signal: AbortSignal) => fetchOwnerStateMatrix(owners, signal),
-    [owners],
+    (signal: AbortSignal) => fetchOwnerStateMatrix(EVERY_OWNER, signal),
+    [],
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
 
@@ -98,11 +104,9 @@ export function FleetDonutSection({ owners }: FleetDonutSectionProps) {
     [data],
   )
 
-  // The owners in view: the page filter's selection, or every owner.
-  const visibleOwners = useMemo(
-    () => (owners.length ? owners : [...ADMIN_HOME_OWNERS]),
-    [owners],
-  )
+  // Every owner: the owner donut is the place the split is read, so it always
+  // draws the full set of classifications.
+  const visibleOwners = useMemo(() => [...ADMIN_HOME_OWNERS], [])
 
   // A focus on the other chart narrows this one; a focus on this chart only
   // highlights it, so clicking an owner never reduces the owner donut to that

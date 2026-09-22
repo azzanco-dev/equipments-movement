@@ -1,27 +1,33 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { Badge, StatCard } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { fetchFleetState } from '@/lib/adminHomeData'
 import type { AdminHomeOwner } from '@/lib/adminHomeStats'
 import { AdminHomeSection } from './AdminHomeSection'
+import { OwnerFilter } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
-export interface FleetStateSectionProps {
-  /** An empty array means every owner. */
-  owners: AdminHomeOwner[]
-}
-
 /**
- * "الحالة الان": where the fleet is at this moment, assets first.
+ * "الحالة الان": where the fleet is at this moment.
  *
- * The four state cards answer "where is my equipment" and get the room; the
- * no-movement breakdown is one smaller line underneath, because it is the
- * lead-in to the section that follows. Nothing here is period-scoped, so the
- * section carries the "now" chip and the chart's period switcher deliberately
- * does not reach it.
+ * Owner review (2026-09-22):
+ *   * the fleet total leads the section as a full-width card — it is the
+ *     number every other number on the page is a share of;
+ *   * the 30 / 60 / 90-day "no movement" line under the cards is gone. A long
+ *     idle time is normal for this fleet, so an age is not a state, and the
+ *     section that follows now answers the question that actually matters
+ *     ("what is outside right now") instead;
+ *   * the owner filter is the section's own, in the heading row, and reaches
+ *     nothing else on the page.
+ *
+ * Nothing here is period-scoped, so the section carries the "now" chip and the
+ * chart's granularity switch deliberately does not reach it.
  */
-export function FleetStateSection({ owners }: FleetStateSectionProps) {
+export function FleetStateSection() {
   const { t } = useI18n()
+  // Plain component state, not the URL: it scopes this section only, so it is
+  // a view control rather than something a shared link should carry.
+  const [owners, setOwners] = useState<AdminHomeOwner[]>([])
   const load = useCallback(
     (signal: AbortSignal) => fetchFleetState(owners, signal),
     [owners],
@@ -53,38 +59,35 @@ export function FleetStateSection({ owners }: FleetStateSectionProps) {
       value: data?.available ?? 0,
       hint: undefined,
     },
-    {
-      id: 'idle',
-      label: t('adminHomeIdle'),
-      value: data?.idle90 ?? 0,
-      hint: t('adminHomeIdleHint'),
-    },
   ]
-
-  const idleChips = data
-    ? [
-        { id: '30', label: `30+ ${t('adminHomeDayUnit')}`, value: data.idle30 },
-        { id: '60', label: `60+ ${t('adminHomeDayUnit')}`, value: data.idle60 },
-        { id: '90', label: `90+ ${t('adminHomeDayUnit')}`, value: data.idle90 },
-        {
-          id: 'never',
-          label: t('adminHomeNoMovementEver'),
-          value: data.neverMoved,
-        },
-      ]
-    : []
 
   return (
     <AdminHomeSection
       title={t('adminHomeStateTitle')}
       description={t('adminHomeStateDescription')}
-      action={<Badge tone="info">{t('adminHomeNow')}</Badge>}
+      action={
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="info">{t('adminHomeNow')}</Badge>
+          <OwnerFilter
+            size="sm"
+            className="w-44"
+            value={owners}
+            onChange={setOwners}
+          />
+        </div>
+      }
       loading={loading}
       failed={failed}
       onRetry={retry}
       skeletonClassName="h-28 w-full"
     >
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatCard
+        label={t('adminHomeTotalEquipment')}
+        value={data?.total ?? 0}
+        hint={t('adminHomeTotalEquipmentHint')}
+        className="p-4"
+      />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {cards.map((card) => (
           <StatCard
             key={card.id}
@@ -95,22 +98,6 @@ export function FleetStateSection({ owners }: FleetStateSectionProps) {
           />
         ))}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted">
-          {t('adminHomeIdleBreakdown')}
-        </span>
-        {idleChips.map((chip) => (
-          <Badge
-            key={chip.id}
-            tone={chip.id === 'never' ? 'danger' : 'neutral'}
-          >
-            <span className="tabular-nums">
-              {chip.label}: {chip.value}
-            </span>
-          </Badge>
-        ))}
-      </div>
-      <p className="text-xs text-muted">{t('adminHomeIdleNested')}</p>
     </AdminHomeSection>
   )
 }
