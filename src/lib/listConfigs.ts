@@ -1,11 +1,19 @@
 import type {
   DataListConfig,
   FilterOperator,
+  FilterOption,
 } from '@/components/data-list/types'
 import {
   DRIVER_EMPLOYMENT_TYPES,
   DRIVER_NATIONALITIES,
 } from '@/lib/driverExcel'
+
+/**
+ * Every label below is a `ListLabel`: a key of the shared translation table,
+ * or an inline `{ ar, en }` pair for wording that belongs to this one list.
+ * They used to be plain Arabic strings, so the sort menu and the filter
+ * builder stayed Arabic in the English UI. The Arabic text is unchanged.
+ */
 
 const textOps: FilterOperator[] = [
   'eq',
@@ -28,47 +36,57 @@ const dateOps: FilterOperator[] = [
   'is_set',
   'is_not_set',
 ]
-const select = (values: readonly string[]) =>
+/** Master-data values that are their own label (nationalities, and so on). */
+const select = (values: readonly string[]): FilterOption[] =>
   values.map((value) => ({ value, label: value }))
 
 export const driversListConfig: DataListConfig = {
   id: 'drivers',
-  searchPlaceholder: 'البحث بالاسم او الهوية او الجوال',
+  searchPlaceholder: {
+    ar: 'البحث بالاسم او الهوية او الجوال',
+    en: 'Search by name, ID or mobile',
+  },
   searchFields: ['full_name', 'name_en', 'id_number', 'mobile_number'],
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
   filterFields: [
     {
       key: 'nationality',
-      label: 'الجنسية',
+      label: 'nationality',
       type: 'select',
       operators: ['eq', 'neq', 'in', 'not_in', 'is_set', 'is_not_set'],
       options: select(DRIVER_NATIONALITIES),
     },
     {
       key: 'employment_type',
-      label: 'نوع التوظيف',
+      label: 'employmentType',
       type: 'select',
       operators: ['eq', 'neq', 'in', 'not_in', 'is_set', 'is_not_set'],
       options: select(DRIVER_EMPLOYMENT_TYPES),
     },
     {
       key: 'job_title',
-      label: 'المسمى الوظيفي',
+      label: 'jobTitle',
       type: 'text',
       operators: textOps,
     },
   ],
   sortableFields: [
-    { key: 'full_name', label: 'الاسم' },
-    { key: 'name_en', label: 'الاسم بالانجليزي' },
-    { key: 'created_at', label: 'تاريخ الإنشاء' },
-    { key: 'updated_at', label: 'تاريخ التعديل' },
+    { key: 'full_name', label: { ar: 'الاسم', en: 'Name' } },
+    { key: 'name_en', label: 'driverNameEn' },
+    { key: 'created_at', label: 'createdAt' },
+    {
+      key: 'updated_at',
+      label: { ar: 'تاريخ التعديل', en: 'Last updated' },
+    },
   ],
 }
 export const equipmentListConfig: DataListConfig = {
   id: 'equipment',
-  searchPlaceholder: 'البحث بالكود او اللوحة او الشاصي او النوع',
+  searchPlaceholder: {
+    ar: 'البحث بالكود او اللوحة او الشاصي او النوع',
+    en: 'Search by code, plate, chassis or type',
+  },
   searchFields: [
     'code',
     'plate_number',
@@ -81,164 +99,241 @@ export const equipmentListConfig: DataListConfig = {
   filterFields: [
     {
       key: 'operational_status',
-      label: 'الحالة التشغيلية',
-      type: 'select',
-      operators: ['eq', 'neq', 'in', 'not_in'],
-      options: select(['operational', 'maintenance', 'stopped']),
-    },
-    {
-      key: 'ownership_status',
-      label: 'المالك',
+      label: 'operationalStatus',
       type: 'select',
       operators: ['eq', 'neq', 'in', 'not_in'],
       options: [
-        { value: 'alazani', label: 'شركة عبدالله العزاني للمقاولات' },
-        { value: 'takween', label: 'شركة تكوين المعدات للمقاولات' },
-        { value: 'third_party_f', label: 'مملوكة للغير F' },
-        { value: 'third_party_partnership_b', label: 'مملوكة للغير شراكة B' },
-        { value: 'external_supplier', label: 'مالك آخر' },
+        {
+          value: 'operational',
+          label: 'operational',
+          labelI18n: 'operational',
+        },
+        {
+          value: 'maintenance',
+          label: 'maintenance',
+          labelI18n: 'maintenance',
+        },
+        { value: 'stopped', label: 'stopped', labelI18n: 'stopped' },
+      ],
+    },
+    {
+      key: 'ownership_status',
+      label: 'ownershipStatus',
+      type: 'select',
+      operators: ['eq', 'neq', 'in', 'not_in'],
+      options: [
+        {
+          value: 'alazani',
+          label: 'شركة عبدالله العزاني للمقاولات',
+          labelI18n: 'ownershipAlazani',
+        },
+        {
+          value: 'takween',
+          label: 'شركة تكوين المعدات للمقاولات',
+          labelI18n: 'ownershipTakween',
+        },
+        {
+          value: 'third_party_f',
+          label: 'مملوكة للغير F',
+          labelI18n: 'ownershipThirdPartyF',
+        },
+        {
+          value: 'third_party_partnership_b',
+          label: 'مملوكة للغير شراكة B',
+          labelI18n: 'ownershipThirdPartyPartnershipB',
+        },
+        {
+          value: 'external_supplier',
+          label: 'مالك آخر',
+          labelI18n: 'ownershipExternalSupplier',
+        },
       ],
     },
     {
       key: 'is_active',
-      label: 'نشطة',
+      label: 'isActive',
       type: 'boolean',
       operators: ['eq', 'neq'],
       options: [
-        { value: 'true', label: 'نشطة' },
-        { value: 'false', label: 'غير نشطة' },
+        { value: 'true', label: 'نشطة', labelI18n: 'isActive' },
+        {
+          value: 'false',
+          label: 'غير نشطة',
+          labelI18n: { ar: 'غير نشطة', en: 'Inactive' },
+        },
       ],
     },
   ],
   sortableFields: [
-    'code',
-    'type',
-    'plate_number',
-    'operational_status',
-    'ownership_status',
-    'created_at',
-    'updated_at',
-  ].map((key) => ({ key, label: key })),
+    { key: 'code', label: 'equipmentCode' },
+    { key: 'type', label: 'equipmentType' },
+    { key: 'plate_number', label: 'plateNumber' },
+    { key: 'operational_status', label: 'operationalStatus' },
+    { key: 'ownership_status', label: 'ownershipStatus' },
+    { key: 'created_at', label: 'createdAt' },
+    { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
+  ],
 }
 export const companiesListConfig: DataListConfig = {
   id: 'companies',
-  searchPlaceholder: 'البحث باسم الشركة',
+  searchPlaceholder: {
+    ar: 'البحث باسم الشركة',
+    en: 'Search by company name',
+  },
   searchFields: ['name_ar', 'name_en'],
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
   filterFields: [
-    { key: 'name_ar', label: 'الاسم العربي', type: 'text', operators: textOps },
+    {
+      key: 'name_ar',
+      label: { ar: 'الاسم العربي', en: 'Arabic name' },
+      type: 'text',
+      operators: textOps,
+    },
     {
       key: 'name_en',
-      label: 'الاسم الإنجليزي',
+      label: { ar: 'الاسم الإنجليزي', en: 'English name' },
       type: 'text',
       operators: textOps,
     },
   ],
   sortableFields: [
-    { key: 'name_ar', label: 'الاسم العربي' },
-    { key: 'name_en', label: 'الاسم الإنجليزي' },
-    { key: 'created_at', label: 'تاريخ الإنشاء' },
-    { key: 'updated_at', label: 'تاريخ التعديل' },
+    { key: 'name_ar', label: { ar: 'الاسم العربي', en: 'Arabic name' } },
+    { key: 'name_en', label: { ar: 'الاسم الإنجليزي', en: 'English name' } },
+    { key: 'created_at', label: 'createdAt' },
+    { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
   ],
 }
 export const projectsListConfig: DataListConfig = {
   ...companiesListConfig,
   id: 'projects',
-  searchPlaceholder: 'البحث باسم المشروع',
+  searchPlaceholder: {
+    ar: 'البحث باسم المشروع',
+    en: 'Search by project name',
+  },
 }
 export const lessorsListConfig: DataListConfig = {
   id: 'lessors',
-  searchPlaceholder: 'البحث بالاسم أو جهة الاتصال أو الجوال',
+  searchPlaceholder: {
+    ar: 'البحث بالاسم أو جهة الاتصال أو الجوال',
+    en: 'Search by name, contact person or mobile',
+  },
   searchFields: ['name', 'contact_person', 'contact_number'],
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
   filterFields: [
-    { key: 'name', label: 'الاسم', type: 'text', operators: textOps },
+    {
+      key: 'name',
+      label: { ar: 'الاسم', en: 'Name' },
+      type: 'text',
+      operators: textOps,
+    },
     {
       key: 'contact_number',
-      label: 'رقم التواصل',
+      label: 'contactNumber',
       type: 'text',
       operators: textOps,
     },
   ],
   sortableFields: [
-    { key: 'name', label: 'الاسم' },
-    { key: 'created_at', label: 'تاريخ الإنشاء' },
-    { key: 'updated_at', label: 'تاريخ التعديل' },
+    { key: 'name', label: { ar: 'الاسم', en: 'Name' } },
+    { key: 'created_at', label: 'createdAt' },
+    { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
   ],
+}
+const movementSearchPlaceholder = {
+  ar: 'البحث بالمعدة (كود او لوحة او شاصي) او السائق او كود المقاول',
+  en: 'Search by equipment (code, plate or chassis), driver or contractor code',
 }
 export const movementsListConfig: DataListConfig = {
   id: 'movements',
-  searchPlaceholder:
-    'البحث بالمعدة (كود او لوحة او شاصي) او السائق او كود المقاول',
+  searchPlaceholder: movementSearchPlaceholder,
   searchFields: ['equipment', 'driver_name', 'contractor_equipment_code'],
   defaultSort: 'created_at',
   defaultDirection: 'desc',
   filterFields: [
     {
       key: 'movement_type',
-      label: 'نوع الحركة',
+      label: 'movementType',
       type: 'select',
       operators: ['eq', 'neq', 'in', 'not_in'],
       options: [
-        { value: 'entry', label: 'دخول' },
-        { value: 'exit', label: 'خروج' },
+        { value: 'entry', label: 'دخول', labelI18n: 'entry' },
+        { value: 'exit', label: 'خروج', labelI18n: 'exit' },
       ],
     },
     {
       key: 'supervisor_id',
-      label: 'المشرف',
+      label: 'supervisorName',
       type: 'select',
       operators: ['eq', 'neq', 'in', 'not_in'],
       options: [],
     },
-    { key: 'driver_name', label: 'السائق', type: 'text', operators: textOps },
+    {
+      key: 'driver_name',
+      label: { ar: 'السائق', en: 'Driver' },
+      type: 'text',
+      operators: textOps,
+    },
     {
       key: 'recorded_at',
-      label: 'وقت الحركة',
+      label: { ar: 'وقت الحركة', en: 'Movement time' },
       type: 'date',
       operators: dateOps,
     },
   ],
   sortableFields: [
-    { key: 'created_at', label: 'وقت الإنشاء' },
-    { key: 'recorded_at', label: 'وقت الحركة' },
-    { key: 'movement_type', label: 'نوع الحركة' },
+    { key: 'created_at', label: { ar: 'وقت الإنشاء', en: 'Created' } },
+    { key: 'recorded_at', label: { ar: 'وقت الحركة', en: 'Movement time' } },
+    { key: 'movement_type', label: 'movementType' },
   ],
 }
 export const usersListConfig: DataListConfig = {
   id: 'users',
-  searchPlaceholder: 'البحث باسم المستخدم',
+  searchPlaceholder: {
+    ar: 'البحث باسم المستخدم',
+    en: 'Search by user name',
+  },
   searchFields: ['full_name'],
   defaultSort: 'created_at',
   defaultDirection: 'desc',
   filterFields: [
     {
       key: 'role',
-      label: 'الدور',
+      label: 'role',
       type: 'select',
       operators: ['eq', 'neq', 'in', 'not_in'],
       options: [
-        { value: 'admin', label: 'أدمن' },
-        { value: 'supervisor', label: 'فورمين' },
-        { value: 'workshop', label: 'مسؤول حركة الورشة' },
-        { value: 'assistant_workshop_manager', label: 'مساعد مدير الورشة' },
-        { value: 'workshop_manager', label: 'مدير الورشة' },
-        { value: 'monitor', label: 'متابعة' },
+        { value: 'admin', label: 'أدمن', labelI18n: 'admin' },
+        { value: 'supervisor', label: 'فورمين', labelI18n: 'supervisor' },
+        {
+          value: 'workshop',
+          label: 'مسؤول حركة الورشة',
+          labelI18n: 'workshopOfficer',
+        },
+        {
+          value: 'assistant_workshop_manager',
+          label: 'مساعد مدير الورشة',
+          labelI18n: 'assistantWorkshopManager',
+        },
+        {
+          value: 'workshop_manager',
+          label: 'مدير الورشة',
+          labelI18n: 'workshopManager',
+        },
+        { value: 'monitor', label: 'متابعة', labelI18n: 'monitoring' },
       ],
     },
   ],
   sortableFields: [
-    { key: 'full_name', label: 'الاسم' },
-    { key: 'role', label: 'الدور' },
-    { key: 'created_at', label: 'تاريخ الإنشاء' },
+    { key: 'full_name', label: { ar: 'الاسم', en: 'Name' } },
+    { key: 'role', label: 'role' },
+    { key: 'created_at', label: 'createdAt' },
   ],
 }
 export const visitsListConfig: DataListConfig = {
   id: 'visits',
-  searchPlaceholder:
-    'البحث بالمعدة (كود او لوحة او شاصي) او السائق او كود المقاول',
+  searchPlaceholder: movementSearchPlaceholder,
   searchFields: [
     'equipment_code',
     'equipment_type',
@@ -248,24 +343,32 @@ export const visitsListConfig: DataListConfig = {
   defaultSort: 'entry_recorded_at',
   defaultDirection: 'desc',
   filterFields: [
-    { key: 'driver_name', label: 'السائق', type: 'text', operators: textOps },
+    {
+      key: 'driver_name',
+      label: { ar: 'السائق', en: 'Driver' },
+      type: 'text',
+      operators: textOps,
+    },
     {
       key: 'entry_recorded_at',
-      label: 'وقت الدخول',
+      label: { ar: 'وقت الدخول', en: 'Entry time' },
       type: 'date',
       operators: dateOps,
     },
     {
       key: 'exit_recorded_at',
-      label: 'وقت الخروج',
+      label: { ar: 'وقت الخروج', en: 'Exit time' },
       type: 'date',
       operators: dateOps,
     },
   ],
   sortableFields: [
-    { key: 'entry_recorded_at', label: 'وقت الدخول' },
-    { key: 'exit_recorded_at', label: 'وقت الخروج' },
-    { key: 'equipment_code', label: 'كود المعدة' },
+    {
+      key: 'entry_recorded_at',
+      label: { ar: 'وقت الدخول', en: 'Entry time' },
+    },
+    { key: 'exit_recorded_at', label: { ar: 'وقت الخروج', en: 'Exit time' } },
+    { key: 'equipment_code', label: 'equipmentCode' },
   ],
 }
 
@@ -281,79 +384,103 @@ export const visitsListConfig: DataListConfig = {
  * Every filter key below is a real column of the view and is allowlisted
  * against this list before it reaches PostgREST, so no arbitrary column can be
  * filtered. `supervisor_id` options are filled in by the screen from the
- * foreman list.
+ * foreman list, and those labels are people's names, so they carry no
+ * `labelI18n`.
  */
 export const logsListConfig: DataListConfig = {
   id: 'logs',
-  searchPlaceholder:
-    'البحث بالمعدة (كود او لوحة او شاصي) او السائق او كود المقاول',
+  searchPlaceholder: movementSearchPlaceholder,
   searchFields: ['equipment', 'driver_name', 'contractor_equipment_code'],
   defaultSort: 'recorded_at',
   defaultDirection: 'desc',
   filterFields: [
     {
       key: 'movement_type',
-      label: 'نوع الحركة',
+      label: 'movementType',
       type: 'select',
       operators: ['eq', 'neq'],
       options: [
-        { value: 'entry', label: 'دخول' },
-        { value: 'exit', label: 'خروج' },
+        { value: 'entry', label: 'دخول', labelI18n: 'entry' },
+        { value: 'exit', label: 'خروج', labelI18n: 'exit' },
       ],
     },
     {
       key: 'recorded_at',
-      label: 'وقت الحركة',
+      label: { ar: 'وقت الحركة', en: 'Movement time' },
       type: 'date',
       operators: dateOps,
     },
     {
       key: 'equipment_ownership_status',
-      label: 'المالك',
+      label: 'ownershipStatus',
       type: 'select',
       operators: ['eq', 'neq', 'in', 'not_in'],
       options: [
-        { value: 'alazani', label: 'العزاني' },
-        { value: 'takween', label: 'تكوين' },
-        { value: 'third_party_f', label: 'طرف ثالث F' },
-        { value: 'third_party_partnership_b', label: 'طرف ثالث B' },
-        { value: 'external_supplier', label: 'مالك اخر' },
+        {
+          value: 'alazani',
+          label: 'العزاني',
+          labelI18n: 'adminHomeOwnerAlazani',
+        },
+        {
+          value: 'takween',
+          label: 'تكوين',
+          labelI18n: 'adminHomeOwnerTakween',
+        },
+        {
+          value: 'third_party_f',
+          label: 'طرف ثالث F',
+          labelI18n: 'adminHomeOwnerThirdPartyF',
+        },
+        {
+          value: 'third_party_partnership_b',
+          label: 'طرف ثالث B',
+          labelI18n: 'adminHomeOwnerThirdPartyB',
+        },
+        {
+          value: 'external_supplier',
+          label: 'مالك اخر',
+          labelI18n: 'adminHomeOwnerExternal',
+        },
       ],
     },
     {
       key: 'company_name_ar',
-      label: 'الشركة',
+      label: 'company',
       type: 'text',
       operators: textOps,
     },
     {
       key: 'project_name_ar',
-      label: 'المشروع',
+      label: 'project',
       type: 'text',
       operators: textOps,
     },
     {
       key: 'supervisor_id',
-      label: 'الفورمان',
+      label: 'logsColForeman',
       type: 'select',
       operators: ['eq', 'neq', 'in', 'not_in'],
       options: [],
     },
     {
       key: 'workshop_purpose',
-      label: 'غرض الورشة',
+      label: { ar: 'غرض الورشة', en: 'Workshop purpose' },
       type: 'select',
       operators: ['eq', 'neq', 'is_set', 'is_not_set'],
       options: [
-        { value: 'maintenance', label: 'صيانة' },
-        { value: 'parking', label: 'وقوف' },
+        {
+          value: 'maintenance',
+          label: 'صيانة',
+          labelI18n: 'maintenancePurpose',
+        },
+        { value: 'parking', label: 'وقوف', labelI18n: 'parkingPurpose' },
       ],
     },
   ],
   sortableFields: [
-    { key: 'recorded_at', label: 'وقت الحركة' },
-    { key: 'created_at', label: 'وقت الانشاء' },
-    { key: 'movement_type', label: 'نوع الحركة' },
-    { key: 'equipment_code', label: 'كود المعدة' },
+    { key: 'recorded_at', label: { ar: 'وقت الحركة', en: 'Movement time' } },
+    { key: 'created_at', label: { ar: 'وقت الانشاء', en: 'Created' } },
+    { key: 'movement_type', label: 'movementType' },
+    { key: 'equipment_code', label: 'equipmentCode' },
   ],
 }

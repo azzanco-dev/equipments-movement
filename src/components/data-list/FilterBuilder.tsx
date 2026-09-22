@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { Select } from '@/components/ui'
 import type { FilterField, FilterOperator, ListFilter } from './types'
+import { useListLabel, useOptionLabel } from './labels'
 import { useI18n } from '@/i18n/I18nContext'
 import { createClientId } from '@/lib/clientId'
 
@@ -20,6 +21,8 @@ export function FilterBuilder({
   compact?: boolean
 }) {
   const { t, lang } = useI18n()
+  const fieldLabel = useListLabel()
+  const optionLabel = useOptionLabel()
   const labels: Record<FilterOperator, string> =
     lang === 'ar'
       ? {
@@ -98,7 +101,7 @@ export function FilterBuilder({
               }}
               options={fields.map((item) => ({
                 value: item.key,
-                label: item.label,
+                label: fieldLabel(item.label),
               }))}
             />
             <Select
@@ -125,7 +128,10 @@ export function FilterBuilder({
                 }
                 options={[
                   { value: ANY_FILTER_VALUE, label: '—' },
-                  ...field.options,
+                  ...field.options.map((option) => ({
+                    value: option.value,
+                    label: optionLabel(option),
+                  })),
                 ]}
               />
             ) : (

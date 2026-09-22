@@ -10,6 +10,7 @@ import {
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { FilterBuilder } from './FilterBuilder'
+import { useListLabel } from './labels'
 import { type DataListConfig, type ListFilter } from './types'
 import { useI18n } from '@/i18n/I18nContext'
 
@@ -55,6 +56,7 @@ export function DataListToolbar({
   compact = false,
 }: ToolbarProps) {
   const { t } = useI18n()
+  const listLabel = useListLabel()
   const [open, setOpen] = useState<'filters' | 'sort' | 'actions' | null>(null)
   const [draftFilters, setDraftFilters] = useState(filters)
   const toolbarRef = useRef<HTMLDivElement>(null)
@@ -135,7 +137,7 @@ export function DataListToolbar({
             dir={config.id === 'equipment' ? 'ltr' : undefined}
             value={search}
             onChange={(event) => onSearch(event.target.value)}
-            placeholder={config.searchPlaceholder}
+            placeholder={listLabel(config.searchPlaceholder)}
           />
         </div>
         <div className="flex items-center gap-2 sm:ms-auto">
@@ -227,7 +229,7 @@ export function DataListToolbar({
                 <ArrowDownAZ size={15} />
               )}
               <span className="hidden sm:inline">
-                {currentSort?.label ?? t('sortBy')}
+                {currentSort ? listLabel(currentSort.label) : t('sortBy')}
               </span>
               <ChevronDown size={14} />
             </button>
@@ -273,7 +275,7 @@ export function DataListToolbar({
                         setOpen(null)
                       }}
                     >
-                      {field.label}
+                      {listLabel(field.label)}
                     </button>
                   ))}
                 </div>
