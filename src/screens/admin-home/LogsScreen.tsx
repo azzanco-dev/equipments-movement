@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { FileSpreadsheet } from 'lucide-react'
 import {
   Badge,
+  Button,
   DataTable,
   MovementBadge,
+  Notice,
   PageHeader,
   Tabs,
   TabsList,
@@ -72,6 +75,10 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [foremen, setForemen] = useState<{ value: string; label: string }[]>([])
+  const [exporting, setExporting] = useState(false)
+  const [exportNote, setExportNote] = useState<
+    { tone: 'warning' | 'danger'; text: string } | undefined
+  >(undefined)
   const listTopRef = useRef<HTMLDivElement>(null)
 
   // The foreman filter needs its options; `profiles` is a small master table
@@ -120,27 +127,39 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
     )
   }
 
-  const startRequest = useListRequest()
-  const fetchLogs = useCallback(async () => {
-    const signal = startRequest()
-    setLoading(true)
-    setLoadError(false)
+  /**
+   * The tab + search + filters + sort the user is looking at, as one query.
+   *
+   * Shared by the table and the Excel export so the exported file can never
+   * disagree with the list on screen; only the page range differs.
+   */
+  const buildLogsQuery = useCallback(() => {
     let query = supabase
       .from(MOVEMENT_LOG_SEARCH_VIEW)
       .select(LIST_SELECT, { count: 'exact' })
       .order(list.sort, { ascending: list.direction === 'asc' })
       // Deterministic paging: identical timestamps still resolve to one order.
       .order('id', { ascending: list.direction === 'asc' })
-      .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
     if (tab !== 'all') query = query.eq('movement_context', tab)
     const searchFilter = buildMovementSearchFilter(list.search, {
       includeCompanyProject: true,
     })
     if (searchFilter) query = query.or(searchFilter)
-    query = applyListFilters(
+    return applyListFilters(
       query,
       list.filters,
       new Set(logsListConfig.filterFields.map((field) => field.key)),
+    )
+  }, [list.direction, list.filters, list.search, list.sort, tab])
+
+  const startRequest = useListRequest()
+  const fetchLogs = useCallback(async () => {
+    const signal = startRequest()
+    setLoading(true)
+    setLoadError(false)
+    const query = buildLogsQuery().range(
+      (list.page - 1) * list.pageSize,
+      list.page * list.pageSize - 1,
     )
     const { data, error, count } = await query.abortSignal(signal)
     if (signal.aborted) return
@@ -154,20 +173,72 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
     setRows((data as unknown as LogRow[]) ?? [])
     setTotal(count ?? 0)
     setLoading(false)
-  }, [
-    list.direction,
-    list.filters,
-    list.page,
-    list.pageSize,
-    list.search,
-    list.sort,
-    startRequest,
-    tab,
-  ])
+  }, [buildLogsQuery, list.page, list.pageSize, startRequest])
 
   useEffect(() => {
     void fetchLogs()
   }, [fetchLogs])
+
+  /**
+   * Exports the current tab, search and filters — every page of them, not just
+   * the page on screen.
+   *
+   * The set is walked server-side in pages of `OUTSIDE_EXPORT_PAGE_SIZE` up to
+   * `OUTSIDE_EXPORT_MAX_ROWS`, exactly as the admin home's "outside" export
+   * does, so one press can never pull an unbounded table into the browser. If
+   * the cap truncates the file the user is told, rather than handed a silently
+   * short export; a failure is reported as a failure, never as an empty file.
+   * `xlsx` is imported dynamically so the log page does not carry the
+   * spreadsheet library until somebody presses the button.
+   */
+  const exportLogs = async () => {
+    setExporting(true)
+    setExportNote(undefined)
+    try {
+      const { collectAllPages, OUTSIDE_EXPORT_PAGE_SIZE } =
+        await import('@/lib/adminHomeExport')
+      const collected = await collectAllPages<LogRow>(
+        async (page, pageSize) => {
+          const { data, error, count } = await buildLogsQuery().range(
+            (page - 1) * pageSize,
+            page * pageSize - 1,
+          )
+          if (error) throw error
+          return {
+            rows: (data as unknown as LogRow[]) ?? [],
+            total: count ?? 0,
+          }
+        },
+        { pageSize: OUTSIDE_EXPORT_PAGE_SIZE },
+      )
+      const [{ exportRowsToExcel }, movementExcel] = await Promise.all([
+        import('@/lib/excel'),
+        import('@/lib/movementExcel'),
+      ])
+      exportRowsToExcel(
+        t('logs'),
+        movementExcel.movementExportColumns(t, lang),
+        collected.rows,
+        {
+          fileName: movementExcel.movementExportFileName(tab),
+          rtl: lang === 'ar',
+        },
+      )
+      if (collected.capped)
+        setExportNote({
+          tone: 'warning',
+          text: t('logsExportCapped')
+            .replace('{count}', String(collected.rows.length))
+            .replace('{total}', String(collected.total)),
+        })
+    } catch (error) {
+      // The raw PostgREST message never reaches the user.
+      console.error('logs export failed', error)
+      setExportNote({ tone: 'danger', text: t('logsExportFailed') })
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const changePage = (nextPage: number) => {
     list.setPage(nextPage)
@@ -276,16 +347,40 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
         </TabsList>
       </Tabs>
 
-      <DataListToolbar
-        config={config}
-        search={list.searchInput}
-        onSearch={list.setSearchInput}
-        sort={list.sort}
-        direction={list.direction}
-        onSort={list.setSort}
-        filters={list.filters}
-        onFilters={list.setFilters}
-      />
+      <div className="flex flex-wrap items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <DataListToolbar
+            config={config}
+            search={list.searchInput}
+            onSearch={list.setSearchInput}
+            sort={list.sort}
+            direction={list.direction}
+            onSort={list.setSort}
+            filters={list.filters}
+            onFilters={list.setFilters}
+          />
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void exportLogs()}
+          loading={exporting}
+          disabled={exporting || loadError}
+        >
+          <FileSpreadsheet size={14} aria-hidden="true" />
+          {t('exportExcel')}
+        </Button>
+      </div>
+
+      {exportNote && (
+        <Notice
+          tone={exportNote.tone}
+          size="compact"
+          onDismiss={() => setExportNote(undefined)}
+        >
+          {exportNote.text}
+        </Notice>
+      )}
 
       <DataTable
         columns={columns}

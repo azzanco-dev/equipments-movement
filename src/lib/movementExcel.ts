@@ -1,4 +1,7 @@
 import * as XLSX from 'xlsx'
+import type { TranslationKey } from '@/i18n/translations'
+import type { ExcelColumn } from '@/lib/excel'
+import { saudiDateKey } from '@/lib/saudiTime'
 
 export type MovementImportMode = 'entry' | 'exit' | 'both'
 
@@ -159,6 +162,153 @@ export async function parseMovementWorkbook(
         row.entry_date ||
         row.exit_date,
     )
+}
+
+// ============ MOVEMENT LOG EXPORT ============
+//
+// The columns of the `/logs` export and the file it is written to. Everything
+// here is pure so the headers, the fallbacks and the file name can be tested
+// without a spreadsheet library; `exportRowsToExcel` in `@/lib/excel` turns
+// the columns into the formatted sheet (frozen header, autofilter, widths,
+// RTL, Saudi-time date cells).
+
+type Translate = (key: TranslationKey) => string
+
+/** Which movements the export covers; mirrors the `/logs` tabs. */
+export type MovementExportContext = 'site' | 'workshop' | 'all'
+
+/**
+ * The movement fields the export reads.
+ *
+ * Declared here rather than imported so this file owns the shape it exports
+ * and stays independent of the movement list's row type.
+ */
+export interface MovementExportRow {
+  equipment_code?: string | null
+  equipment_type?: string | null
+  equipment_plate_number?: string | null
+  movement_type: 'entry' | 'exit'
+  movement_context?: 'site' | 'workshop' | null
+  workshop_purpose?: 'maintenance' | 'parking' | null
+  contractor_equipment_code?: string | null
+  company_name_ar?: string | null
+  company_name_en?: string | null
+  project_name_ar?: string | null
+  project_name_en?: string | null
+  driver_name?: string | null
+  supervisor_name?: string | null
+  notes?: string | null
+  recorded_at: string
+}
+
+/**
+ * A localized master-data name for a spreadsheet cell.
+ *
+ * `localizedName` falls back to an em dash, which is right on screen and wrong
+ * in a sheet: a placeholder character blocks filtering and sorting, so an
+ * unknown name is written as an empty cell instead.
+ */
+function exportName(
+  lang: 'ar' | 'en',
+  nameAr?: string | null,
+  nameEn?: string | null,
+): string {
+  const preferred = lang === 'ar' ? nameAr : nameEn
+  const fallback = lang === 'ar' ? nameEn : nameAr
+  return preferred?.trim() || fallback?.trim() || ''
+}
+
+/**
+ * The export's columns, in the order the log table shows them.
+ *
+ * Badges become plain text — دخول / خروج for the movement type and the
+ * workshop purpose spelled out — because a spreadsheet has no badges and a
+ * raw `entry` / `maintenance` code would leave the reader decoding values.
+ */
+export function movementExportColumns(
+  t: Translate,
+  lang: 'ar' | 'en',
+): ExcelColumn<MovementExportRow>[] {
+  return [
+    {
+      header: t('equipmentCodeLabel'),
+      width: 14,
+      value: (row) => row.equipment_code ?? '',
+    },
+    {
+      header: t('equipmentType'),
+      width: 24,
+      value: (row) => row.equipment_type ?? '',
+    },
+    {
+      header: t('plateNumber'),
+      width: 14,
+      value: (row) => row.equipment_plate_number ?? '',
+    },
+    {
+      header: t('movementType'),
+      width: 10,
+      value: (row) => (row.movement_type === 'entry' ? t('entry') : t('exit')),
+    },
+    {
+      header: t('logsColContext'),
+      width: 14,
+      value: (row) => {
+        if (row.movement_context !== 'workshop') return t('logsSites')
+        if (row.workshop_purpose === 'maintenance')
+          return t('maintenancePurpose')
+        if (row.workshop_purpose === 'parking') return t('parkingPurpose')
+        return t('logsWorkshop')
+      },
+    },
+    {
+      header: t('company'),
+      width: 24,
+      value: (row) =>
+        exportName(lang, row.company_name_ar, row.company_name_en),
+    },
+    {
+      header: t('project'),
+      width: 24,
+      value: (row) =>
+        exportName(lang, row.project_name_ar, row.project_name_en),
+    },
+    {
+      header: t('contractorEquipmentCode'),
+      width: 16,
+      value: (row) => row.contractor_equipment_code ?? '',
+    },
+    {
+      // Optional on a site entry since 2026-09-23, so a blank cell here is a
+      // fact about the visit rather than missing data.
+      header: t('driverName'),
+      width: 22,
+      value: (row) => row.driver_name ?? '',
+    },
+    {
+      header: t('logsColForeman'),
+      width: 22,
+      value: (row) => row.supervisor_name ?? '',
+    },
+    { header: t('notes'), width: 30, value: (row) => row.notes ?? '' },
+    {
+      header: t('recordedAt'),
+      width: 18,
+      type: 'date',
+      value: (row) => row.recorded_at ?? null,
+    },
+  ]
+}
+
+/**
+ * `movements-<context>-<yyyymmdd>.xlsx`, dated by the Saudi calendar day so a
+ * file exported late at night carries the day the operation belongs to.
+ */
+export function movementExportFileName(
+  context: MovementExportContext,
+  now: Date | string = new Date(),
+): string {
+  return `movements-${context}-${saudiDateKey(now).replace(/-/g, '')}.xlsx`
 }
 
 export function downloadMovementImportTemplate() {

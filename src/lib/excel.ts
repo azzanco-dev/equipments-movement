@@ -7,7 +7,6 @@ import type {
   OwnershipStatus,
   RegistrationType,
 } from '@/lib/types'
-import { formatDate } from '@/lib/dateFormat'
 import { normalizePlateNumber } from '@/lib/plate'
 
 export interface CompanyImportRow {
@@ -255,60 +254,295 @@ export function downloadEquipmentTemplate(t: (key: TranslationKey) => string) {
   XLSX.writeFile(wb, 'equipment-template.xlsx')
 }
 
+// ============ FORMATTED EXPORTS ============
+//
+// One shared way to write an export sheet, so every exported file in the app
+// opens the same way: Arabic headers from the translation system, a frozen
+// header row with an autofilter on it, readable column widths, a right-to-left
+// sheet for the Arabic interface, and timestamps that read as Saudi time
+// wherever the file is opened.
+
+/** Excel's own date format code; `hh` is 24-hour in a workbook number format. */
+export const EXCEL_DATETIME_FORMAT = 'dd/mm/yyyy hh:mm'
+
+/** Days between Excel's epoch (1899-12-30) and the Unix epoch. */
+const EXCEL_EPOCH_DAYS = 25569
+const MINUTES_PER_DAY = 24 * 60
+/** Saudi Arabia is UTC+03:00 all year, exactly as `@/lib/saudiTime` assumes. */
+const SAUDI_OFFSET_MINUTES = 3 * 60
+
+/**
+ * An instant as an Excel date serial in Saudi time, or `null` when it is
+ * missing or unparseable.
+ *
+ * A real date cell is written rather than pre-formatted text so the column
+ * still sorts and filters as a date in Excel. The serial is computed from the
+ * UTC instant plus a fixed +03:00, never from the machine's timezone, so the
+ * file shows the same Saudi wall-clock time on every device — the same rule
+ * the reports and the dashboard already follow. Whole minutes are used because
+ * the display format stops at minutes, and a rounded serial avoids a value
+ * like 23:59:59.9995 rendering as the next minute.
+ */
+export function saudiExcelSerial(
+  value: string | null | undefined,
+): number | null {
+  if (!value) return null
+  const ms = Date.parse(value)
+  if (Number.isNaN(ms)) return null
+  const minutes = Math.round(ms / 60000) + SAUDI_OFFSET_MINUTES
+  return EXCEL_EPOCH_DAYS + minutes / MINUTES_PER_DAY
+}
+
+export type ExcelCellValue = string | number | null
+
+/**
+ * One exported column.
+ *
+ * `type: 'date'` means `value` returns an ISO timestamp, which the writer
+ * converts to a Saudi-time date cell; everything else is written as given.
+ * Badges and enums are converted to plain text by `value` (دخول / خروج), never
+ * exported as a code the reader would have to decode.
+ */
+export interface ExcelColumn<T> {
+  header: string
+  /** Column width in characters; a sensible default is used when omitted. */
+  width?: number
+  type?: 'text' | 'date'
+  value: (row: T) => ExcelCellValue
+}
+
+export interface ExportRowsOptions {
+  /** File name, with or without the `.xlsx` suffix. */
+  fileName: string
+  /** Right-to-left sheet layout; pass `lang === 'ar'`. */
+  rtl?: boolean
+}
+
+const DEFAULT_COLUMN_WIDTH = 16
+
+/** `0 -> A`, `26 -> AA`; the autofilter needs the last column's letter. */
+export function excelColumnLetter(index: number): string {
+  let rest = Math.max(0, Math.trunc(index))
+  let letter = ''
+  for (;;) {
+    letter = String.fromCharCode(65 + (rest % 26)) + letter
+    if (rest < 26) return letter
+    rest = Math.floor(rest / 26) - 1
+  }
+}
+
+/**
+ * The sheet's cells, headers first.
+ *
+ * Kept pure and separate from the workbook so the headers, the column order
+ * and the Saudi-time conversion can be unit-tested without a spreadsheet
+ * library. A `null` cell is written as an empty cell rather than the string
+ * "null"; an em dash is never written, because in a spreadsheet a placeholder
+ * character blocks filtering and aggregation.
+ */
+export function sheetAoa<T>(
+  columns: ExcelColumn<T>[],
+  rows: T[],
+): ExcelCellValue[][] {
+  return [
+    columns.map((column) => column.header),
+    ...rows.map((row) =>
+      columns.map((column) => {
+        const value = column.value(row)
+        if (column.type === 'date')
+          return typeof value === 'string' ? saudiExcelSerial(value) : null
+        return value ?? null
+      }),
+    ),
+  ]
+}
+
+/**
+ * Builds and downloads one formatted sheet.
+ *
+ * Shared by the movement log export, the visit export and — once the report
+ * screens adopt it — the report exports, so a new export only has to describe
+ * its columns.
+ */
+export function exportRowsToExcel<T>(
+  sheetName: string,
+  columns: ExcelColumn<T>[],
+  rows: T[],
+  options: ExportRowsOptions,
+) {
+  const aoa = sheetAoa(columns, rows)
+  const sheet = XLSX.utils.aoa_to_sheet(aoa)
+
+  sheet['!cols'] = columns.map((column) => ({
+    wch: column.width ?? DEFAULT_COLUMN_WIDTH,
+  }))
+  // The header row stays visible while the reader scrolls a long export.
+  sheet['!freeze'] = {
+    xSplit: 0,
+    ySplit: 1,
+    topLeftCell: 'A2',
+    activePane: 'bottomLeft',
+    state: 'frozen',
+  }
+  const lastColumn = excelColumnLetter(Math.max(0, columns.length - 1))
+  sheet['!autofilter'] = { ref: `A1:${lastColumn}${aoa.length}` }
+  sheet['!rtl'] = Boolean(options.rtl)
+
+  // Date cells carry the display format; `aoa_to_sheet` wrote them as plain
+  // numbers, which would otherwise show as a five-digit serial.
+  columns.forEach((column, columnIndex) => {
+    if (column.type !== 'date') return
+    for (let rowIndex = 1; rowIndex < aoa.length; rowIndex += 1) {
+      const address = XLSX.utils.encode_cell({ c: columnIndex, r: rowIndex })
+      const cell = sheet[address] as XLSX.CellObject | undefined
+      if (!cell || typeof cell.v !== 'number') continue
+      cell.t = 'n'
+      cell.z = EXCEL_DATETIME_FORMAT
+    }
+  })
+
+  const workbook = XLSX.utils.book_new()
+  // Excel rejects a sheet name longer than 31 characters or containing []:*?/\
+  XLSX.utils.book_append_sheet(
+    workbook,
+    sheet,
+    sheetName.replace(/[[\]:*?/\\]/g, ' ').slice(0, 31) || 'Sheet1',
+  )
+  XLSX.writeFile(
+    workbook,
+    options.fileName.endsWith('.xlsx')
+      ? options.fileName
+      : `${options.fileName}.xlsx`,
+  )
+}
+
 export function exportLogsToExcel(
   logs: EntryExitLog[],
   fileName: string,
   t: (key: TranslationKey) => string,
+  lang: 'ar' | 'en' = 'ar',
 ) {
-  const data = logs.map((log) => ({
-    [t('contractorEquipmentCode')]: log.contractor_equipment_code ?? '',
-    [t('equipmentNameLabel')]: log.equipment
-      ? `${log.equipment.code} ${log.equipment.type}`
-      : '',
-    [t('plateNumber')]: log.equipment?.plate_number ?? '',
-    [t('movementType')]: log.movement_type === 'entry' ? t('entry') : t('exit'),
-    [t('driverName')]: log.current_driver_name ?? log.driver_name ?? '',
-    [t('odometerReading')]: log.odometer_reading ?? '',
-    [t('notes')]: log.notes ?? '',
-    [t('supervisorName')]: log.supervisor?.full_name ?? '',
-    [t('recordedAt')]: formatDate(log.recorded_at),
-  }))
-
-  const ws = XLSX.utils.json_to_sheet(data)
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'Logs')
-  XLSX.writeFile(wb, `${fileName}.xlsx`)
+  const columns: ExcelColumn<EntryExitLog>[] = [
+    {
+      header: t('contractorEquipmentCode'),
+      width: 16,
+      value: (log) => log.contractor_equipment_code ?? '',
+    },
+    {
+      header: t('equipmentNameLabel'),
+      width: 26,
+      value: (log) =>
+        log.equipment ? `${log.equipment.code} ${log.equipment.type}` : '',
+    },
+    {
+      header: t('plateNumber'),
+      width: 14,
+      value: (log) => log.equipment?.plate_number ?? '',
+    },
+    {
+      header: t('movementType'),
+      width: 10,
+      value: (log) => (log.movement_type === 'entry' ? t('entry') : t('exit')),
+    },
+    {
+      header: t('driverName'),
+      width: 22,
+      // The driver is optional on a site entry since 2026-09-23.
+      value: (log) => log.current_driver_name ?? log.driver_name ?? '',
+    },
+    {
+      header: t('odometerReading'),
+      width: 12,
+      value: (log) => log.odometer_reading ?? '',
+    },
+    { header: t('notes'), width: 30, value: (log) => log.notes ?? '' },
+    {
+      header: t('supervisorName'),
+      width: 22,
+      value: (log) => log.supervisor?.full_name ?? '',
+    },
+    {
+      header: t('recordedAt'),
+      width: 18,
+      type: 'date',
+      value: (log) => log.recorded_at ?? null,
+    },
+  ]
+  exportRowsToExcel(t('logs'), columns, logs, {
+    fileName,
+    rtl: lang === 'ar',
+  })
 }
 
 export function exportVisitsToExcel(
   visits: EquipmentVisit[],
   fileName: string,
   t: (key: TranslationKey) => string,
+  lang: 'ar' | 'en' = 'ar',
 ) {
-  const data = visits.map((v) => ({
-    [t('contractorEquipmentCode')]: v.contractor_equipment_code ?? '',
-    [t('equipmentNameLabel')]: `${v.equipment_code} ${v.equipment_type}`,
-    [t('plateNumber')]: v.plate_number ?? '',
-    [t('project')]: v.project_name_ar ?? '',
-    [t('company')]: v.company_name_ar ?? '',
-    [t('driverName')]:
-      v.last_driver_name ?? v.exit_driver_name ?? v.driver_name ?? '',
-    [t('entryTime')]: v.entry_recorded_at
-      ? formatDate(v.entry_recorded_at)
-      : '',
-    [t('entryBy')]: v.entry_supervisor_name ?? '',
-    [t('exitTime')]: v.exit_recorded_at ? formatDate(v.exit_recorded_at) : '',
-    [t('exitBy')]: v.exit_supervisor_name ?? '',
-    [t('odometerReading')]: v.odometer_reading ?? '',
-    ['Exit odometer']: v.exit_odometer ?? '',
-    [t('notes')]: v.notes ?? '',
-    ['Exit notes']: v.exit_notes ?? '',
-  }))
-
-  const ws = XLSX.utils.json_to_sheet(data)
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'Visits')
-  XLSX.writeFile(wb, `${fileName}.xlsx`)
+  const columns: ExcelColumn<EquipmentVisit>[] = [
+    {
+      header: t('contractorEquipmentCode'),
+      width: 16,
+      value: (v) => v.contractor_equipment_code ?? '',
+    },
+    {
+      header: t('equipmentNameLabel'),
+      width: 26,
+      value: (v) => `${v.equipment_code} ${v.equipment_type}`,
+    },
+    { header: t('plateNumber'), width: 14, value: (v) => v.plate_number ?? '' },
+    { header: t('project'), width: 22, value: (v) => v.project_name_ar ?? '' },
+    { header: t('company'), width: 22, value: (v) => v.company_name_ar ?? '' },
+    {
+      header: t('driverName'),
+      width: 22,
+      value: (v) =>
+        v.last_driver_name ?? v.exit_driver_name ?? v.driver_name ?? '',
+    },
+    {
+      header: t('entryTime'),
+      width: 18,
+      type: 'date',
+      value: (v) => v.entry_recorded_at ?? null,
+    },
+    {
+      header: t('entryBy'),
+      width: 22,
+      value: (v) => v.entry_supervisor_name ?? '',
+    },
+    {
+      header: t('exitTime'),
+      width: 18,
+      type: 'date',
+      value: (v) => v.exit_recorded_at ?? null,
+    },
+    {
+      header: t('exitBy'),
+      width: 22,
+      value: (v) => v.exit_supervisor_name ?? '',
+    },
+    {
+      header: t('odometerReading'),
+      width: 12,
+      value: (v) => v.odometer_reading ?? '',
+    },
+    {
+      header: t('exportColExitOdometer'),
+      width: 12,
+      value: (v) => v.exit_odometer ?? '',
+    },
+    { header: t('notes'), width: 30, value: (v) => v.notes ?? '' },
+    {
+      header: t('exportColExitNotes'),
+      width: 30,
+      value: (v) => v.exit_notes ?? '',
+    },
+  ]
+  exportRowsToExcel(t('exportSheetVisits'), columns, visits, {
+    fileName,
+    rtl: lang === 'ar',
+  })
 }
 
 // ============ COMPANIES ============
