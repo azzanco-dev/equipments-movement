@@ -8,6 +8,9 @@ export const OCR_FIELDS = [
   'occupation',
 ] as const
 
+export const OCR_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+export const OCR_MAX_BYTES = 10 * 1024 * 1024
+
 export type OcrFields = Record<(typeof OCR_FIELDS)[number], string>
 
 const DIGITS: Record<string, string> = {
@@ -48,6 +51,34 @@ export function normalizeOcrDate(value: unknown): string {
   if (dmy)
     return `${dmy[1].padStart(2, '0')}-${dmy[2].padStart(2, '0')}-${dmy[3]}`
   return text
+}
+
+/**
+ * Maps a failed Mistral OCR HTTP status to a specific, user-explainable code
+ * instead of forwarding the provider's raw status text.
+ */
+export function ocrErrorForStatus(status: number): string {
+  if (status === 401 || status === 403) return 'ocr_auth_failed'
+  if (status === 402 || status === 429) return 'ocr_rate_limited'
+  if (status === 400 || status === 413 || status === 415 || status === 422)
+    return 'ocr_image_rejected'
+  if (status === 408 || status === 504) return 'ocr_timeout'
+  if (status >= 500) return 'ocr_provider_unavailable'
+  return 'ocr_failed'
+}
+
+/** The Mistral annotation arrives either as an object or a JSON string. */
+export function readOcrAnnotation(value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  try {
+    return JSON.parse(value)
+  } catch {
+    return null
+  }
+}
+
+export function hasOcrData(fields: OcrFields): boolean {
+  return OCR_FIELDS.some((field) => fields[field] !== '')
 }
 
 export function parseOcrFields(value: unknown): OcrFields {

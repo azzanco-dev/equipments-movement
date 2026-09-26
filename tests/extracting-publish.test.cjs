@@ -1,34 +1,17 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
-const path = require('node:path')
-const vm = require('node:vm')
-const ts = require('typescript')
-
-function loadPublishModule() {
-  const file = path.join(
-    __dirname,
-    '..',
-    'src',
-    'lib',
-    'extracting',
-    'publish.ts',
-  )
-  const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS },
-  }).outputText
-  const exports = {}
-  vm.runInNewContext(code, { exports, process }, { filename: file })
-  return exports
-}
+const { loadExtractingModule } = require('./helpers/loadExtracting.cjs')
 
 const {
   parsePublishRequest,
+  missingErpFields,
   currentSystemDriverPayload,
   erpUserPayload,
   erpEmployeePayload,
   erpErrorDetails,
-} = loadPublishModule()
+} = loadExtractingModule('publish')
+const { validateExtractionForm, applyFormPatch, createDefaultForm } =
+  loadExtractingModule('form')
 
 const data = {
   full_name_ar: 'اسم عربي كامل',
@@ -156,4 +139,49 @@ test('ERP employee never writes expiry into issue date', () => {
   assert.equal(payload.employee_number, data.id_number)
   assert.ok(!('custom_rp_date_of_issue' in payload))
   delete process.env.ERPNEXT_RESIDENCE_EXPIRY_FIELD
+})
+
+test('the browser form reports each invalid field with a specific code', () => {
+  const form = {
+    ...createDefaultForm('26-09-2026'),
+    full_name_ar: 'اسم',
+    id_number: '12A',
+    email: 'bad-email',
+    mobile_number: '05',
+    ctc: '1.234',
+    date_of_birth: '31-02-2000',
+  }
+  const errors = validateExtractionForm(form, {
+    currentSystem: true,
+    erpnext: true,
+  })
+  assert.equal(errors.id_number, 'invalid_id_number')
+  assert.equal(errors.email, 'invalid_email')
+  assert.equal(errors.mobile_number, 'invalid_mobile')
+  assert.equal(errors.ctc, 'invalid_ctc')
+  assert.equal(errors.date_of_birth, 'invalid_date')
+  assert.equal(errors.nationality, 'required')
+  assert.equal(
+    validateExtractionForm(form, { currentSystem: true, erpnext: false })
+      .nationality,
+    undefined,
+  )
+})
+
+test('ERP-only required fields fail the ERPNext target, not the request', () => {
+  const parsed = parsePublishRequest({
+    data: { ...data, email: '', nationality: '' },
+    targets: { currentSystem: true, erpnext: true },
+  })
+  assert.ok(parsed)
+  assert.equal(missingErpFields(parsed.data).join(','), 'email,nationality')
+})
+
+test('the employee number follows the identity until edited', () => {
+  let form = createDefaultForm('26-09-2026')
+  form = applyFormPatch(form, { id_number: '123456' })
+  assert.equal(form.employee_number, '123456')
+  form = applyFormPatch(form, { employee_number: 'E-9' })
+  form = applyFormPatch(form, { id_number: '654321' })
+  assert.equal(form.employee_number, 'E-9')
 })

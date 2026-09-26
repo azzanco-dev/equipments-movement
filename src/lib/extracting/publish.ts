@@ -1,40 +1,21 @@
-export interface ExtractionPublishData {
-  full_name_ar: string
-  full_name_en: string
-  id_number: string
-  date_of_birth: string
-  residence_expiry_date: string
-  nationality: string
-  occupation: string
-  email: string
-  gender: string
-  language: 'ar' | 'en'
-  mobile_number: string
-  employment_type: string
-  company: string
-  date_of_joining: string
-  department: string
-  ctc: string
-  employee_number: string
-}
+import {
+  DATE_FIELDS,
+  ERP_REQUIRED_FIELDS,
+  EXTRACTION_FIELDS,
+  toIsoDate,
+  validateExtractionForm,
+  type ExtractionForm,
+  type PublishTargets,
+} from './form'
 
-export interface ExtractionPublishTargets {
-  currentSystem: boolean
-  erpnext: boolean
-}
+export type {
+  PublishStatus,
+  TargetPublishResult,
+  PublishTargets as ExtractionPublishTargets,
+} from './form'
 
-export type PublishStatus =
-  'created' | 'existing' | 'partial' | 'skipped' | 'failed'
-
-export interface TargetPublishResult {
-  status: PublishStatus
-  id?: string
-  userId?: string
-  employeeId?: string
-  steps?: { user: PublishStatus; employee: PublishStatus }
-  error?: string
-  details?: string
-}
+/** Reviewed data after server validation: trimmed, dates as YYYY-MM-DD. */
+export type ExtractionPublishData = ExtractionForm & { language: 'ar' | 'en' }
 
 const FIELD_NAME_PATTERN = /^[a-z][a-z0-9_]*$/
 
@@ -43,80 +24,52 @@ function clean(value: unknown): string {
 }
 
 export function normalizePublishDate(value: unknown): string {
-  const text = clean(value).replace(/[/.]/g, '-').replace(/\s+/g, '')
-  if (!text) return ''
-  const dmy = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(text)
-  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(text)
-  const year = Number(dmy?.[3] ?? iso?.[1])
-  const month = Number(dmy?.[2] ?? iso?.[2])
-  const day = Number(dmy?.[1] ?? iso?.[3])
-  if (!year || !month || !day) return ''
-  const date = new Date(Date.UTC(year, month - 1, day))
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  )
-    return ''
-  return `${year.toString().padStart(4, '0')}-${month
-    .toString()
-    .padStart(2, '0')}-${day.toString().padStart(2, '0')}`
+  return toIsoDate(clean(value))
 }
 
+/**
+ * Validates the publish request body. ERPNext-only required fields are not
+ * checked here: a missing one fails the ERPNext target alone (see
+ * `missingErpFields`) so the current system can still be published.
+ */
 export function parsePublishRequest(value: unknown): {
   data: ExtractionPublishData
-  targets: ExtractionPublishTargets
+  targets: PublishTargets
 } | null {
   if (!value || typeof value !== 'object') return null
   const body = value as Record<string, unknown>
-  const rawData = body.data
-  const rawTargets = body.targets
-  if (!rawData || typeof rawData !== 'object') return null
-  if (!rawTargets || typeof rawTargets !== 'object') return null
+  if (!body.data || typeof body.data !== 'object') return null
+  if (!body.targets || typeof body.targets !== 'object') return null
 
-  const source = rawData as Record<string, unknown>
-  const targetSource = rawTargets as Record<string, unknown>
-  const rawBirthDate = clean(source.date_of_birth)
-  const rawExpiryDate = clean(source.residence_expiry_date)
-  const rawJoiningDate = clean(source.date_of_joining)
-  const language = clean(source.language) || 'ar'
-  if (language !== 'ar' && language !== 'en') return null
-  const data: ExtractionPublishData = {
-    full_name_ar: clean(source.full_name_ar),
-    full_name_en: clean(source.full_name_en),
-    id_number: clean(source.id_number),
-    date_of_birth: normalizePublishDate(rawBirthDate),
-    residence_expiry_date: normalizePublishDate(rawExpiryDate),
-    nationality: clean(source.nationality),
-    occupation: clean(source.occupation),
-    email: clean(source.email).toLowerCase(),
-    gender: clean(source.gender),
-    language,
-    mobile_number: clean(source.mobile_number),
-    employment_type: clean(source.employment_type),
-    company: clean(source.company),
-    date_of_joining: normalizePublishDate(rawJoiningDate),
-    department: clean(source.department),
-    ctc: clean(source.ctc),
-    employee_number: clean(source.employee_number) || clean(source.id_number),
-  }
-  const targets = {
+  const source = body.data as Record<string, unknown>
+  const targetSource = body.targets as Record<string, unknown>
+  const targets: PublishTargets = {
     currentSystem: targetSource.currentSystem === true,
     erpnext: targetSource.erpnext === true,
   }
   if (!targets.currentSystem && !targets.erpnext) return null
-  if (!data.full_name_ar || !/^\d{5,20}$/.test(data.id_number)) return null
-  if (
-    (rawBirthDate && !data.date_of_birth) ||
-    (rawExpiryDate && !data.residence_expiry_date) ||
-    (rawJoiningDate && !data.date_of_joining)
-  )
-    return null
-  if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return null
-  if (data.mobile_number && !/^\+?\d{7,15}$/.test(data.mobile_number))
-    return null
-  if (data.ctc && !/^\d+(?:\.\d{1,2})?$/.test(data.ctc)) return null
+
+  const raw = Object.fromEntries(
+    EXTRACTION_FIELDS.map((key) => [key, clean(source[key])]),
+  ) as ExtractionForm
+  raw.language ||= 'ar'
+  const errors = validateExtractionForm(raw, {
+    currentSystem: true,
+    erpnext: false,
+  })
+  if (Object.keys(errors).length) return null
+
+  const data = {
+    ...raw,
+    email: raw.email.toLowerCase(),
+    employee_number: raw.employee_number || raw.id_number,
+  } as ExtractionPublishData
+  for (const key of DATE_FIELDS) data[key] = toIsoDate(raw[key])
   return { data, targets }
+}
+
+export function missingErpFields(data: ExtractionPublishData) {
+  return ERP_REQUIRED_FIELDS.filter((key) => !data[key])
 }
 
 export function currentSystemDriverPayload(data: ExtractionPublishData) {

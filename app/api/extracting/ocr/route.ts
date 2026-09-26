@@ -1,87 +1,109 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { OCR_FIELDS, parseOcrFields } from '@/lib/extracting/ocr'
+import {
+  OCR_FIELDS,
+  OCR_IMAGE_TYPES,
+  OCR_MAX_BYTES,
+  hasOcrData,
+  ocrErrorForStatus,
+  parseOcrFields,
+  readOcrAnnotation,
+} from '@/lib/extracting/ocr'
+import { apiError, requireAdmin } from '@/lib/extracting/server'
 
 export const runtime = 'nodejs'
-const MAX_BYTES = 10 * 1024 * 1024
-const TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
-function error(code: string, status: number) {
-  return NextResponse.json({ error: code }, { status })
-}
+const MISTRAL_OCR_URL = 'https://api.mistral.ai/v1/ocr'
+const OCR_TIMEOUT_MS = 30_000
 
-export async function POST(request: Request) {
-  const header = request.headers.get('authorization')
-  if (!header?.startsWith('Bearer ') || !header.slice(7).trim())
-    return error('unauthorized', 401)
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !key) return error('service_unavailable', 503)
-  try {
-    const token = header.slice(7).trim()
-    const supabase = createClient(url, key, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
-    const { data: claims, error: authError } =
-      await supabase.auth.getClaims(token)
-    const userId = claims?.claims?.sub
-    if (authError || !userId) return error('unauthorized', 401)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', userId)
-      .maybeSingle()
-    if (profile?.role !== 'admin') return error('forbidden', 403)
-    const mistralKey = process.env.MISTRAL_API_KEY
-    if (!mistralKey) return error('service_unavailable', 503)
-    const file = (await request.formData()).get('image')
-    if (!(file instanceof File) || file.size === 0)
-      return error('image_required', 400)
-    if (!TYPES.has(file.type)) return error('unsupported_image_type', 415)
-    if (file.size > MAX_BYTES) return error('image_too_large', 413)
-    const dataUrl = `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`
-    const schema = {
+const ANNOTATION_FORMAT = {
+  type: 'json_schema',
+  json_schema: {
+    name: 'identity_fields',
+    strict: true,
+    schema: {
       type: 'object',
       additionalProperties: false,
       properties: Object.fromEntries(
         OCR_FIELDS.map((field) => [field, { type: 'string' }]),
       ),
       required: [...OCR_FIELDS],
-    }
-    const response = await fetch('https://api.mistral.ai/v1/ocr', {
+    },
+  },
+}
+
+const ANNOTATION_PROMPT =
+  'Extract only the values visibly printed on this Saudi resident identity card. Preserve the printed Arabic and English names independently. Return empty strings for missing values. Normalize visible dates to DD-MM-YYYY without inventing or converting between calendars.'
+
+async function readImage(request: Request) {
+  try {
+    const file = (await request.formData()).get('image')
+    return file instanceof File ? file : null
+  } catch {
+    return null
+  }
+}
+
+/** Server-side log only: the provider message helps diagnose, never the UI. */
+async function logProviderFailure(response: Response) {
+  const body = await response.text().catch(() => '')
+  console.warn('[extracting/ocr] Mistral request failed', {
+    status: response.status,
+    body: body.slice(0, 300),
+  })
+}
+
+export async function POST(request: Request) {
+  const auth = await requireAdmin(request)
+  if ('response' in auth) return auth.response
+
+  const mistralKey = process.env.MISTRAL_API_KEY
+  if (!mistralKey) return apiError('ocr_not_configured', 503)
+
+  const file = await readImage(request)
+  if (!file || file.size === 0) return apiError('image_required', 400)
+  if (!OCR_IMAGE_TYPES.includes(file.type))
+    return apiError('unsupported_image_type', 415)
+  if (file.size > OCR_MAX_BYTES) return apiError('image_too_large', 413)
+
+  const base64 = Buffer.from(await file.arrayBuffer()).toString('base64')
+  let response: Response
+  try {
+    response = await fetch(MISTRAL_OCR_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${mistralKey}`,
         'Content-Type': 'application/json',
       },
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(OCR_TIMEOUT_MS),
       body: JSON.stringify({
         model: process.env.MISTRAL_OCR_MODEL || 'mistral-ocr-latest',
-        document: { type: 'document_url', document_url: dataUrl },
-        document_annotation_format: {
-          type: 'json_schema',
-          json_schema: { name: 'identity_fields', strict: true, schema },
+        document: {
+          type: 'document_url',
+          document_url: `data:${file.type};base64,${base64}`,
         },
-        document_annotation_prompt:
-          'Extract only the values visibly printed on this Saudi resident identity card. Preserve the printed Arabic and English names independently. Return empty strings for missing values. Normalize visible dates to DD-MM-YYYY without inventing or converting between calendars.',
+        document_annotation_format: ANNOTATION_FORMAT,
+        document_annotation_prompt: ANNOTATION_PROMPT,
       }),
     })
-    if (!response.ok) return error('ocr_failed', 502)
-    const payload = (await response.json()) as {
-      document_annotation?: unknown
-      pages?: Array<{ markdown?: string }>
-    }
-    let annotation = payload.document_annotation
-    if (typeof annotation === 'string') {
-      try {
-        annotation = JSON.parse(annotation)
-      } catch {
-        annotation = {}
-      }
-    }
-    return NextResponse.json({ data: parseOcrFields(annotation) })
-  } catch {
-    return error('ocr_failed', 502)
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === 'TimeoutError'
+    return apiError(timedOut ? 'ocr_timeout' : 'ocr_connection_failed', 502)
   }
+
+  if (!response.ok) {
+    await logProviderFailure(response)
+    return apiError(ocrErrorForStatus(response.status), 502, {
+      providerStatus: response.status,
+    })
+  }
+
+  let payload: { document_annotation?: unknown }
+  try {
+    payload = (await response.json()) as typeof payload
+  } catch {
+    return apiError('ocr_invalid_response', 502)
+  }
+  const data = parseOcrFields(readOcrAnnotation(payload.document_annotation))
+  if (!hasOcrData(data)) return apiError('ocr_no_data', 422)
+  return NextResponse.json({ data })
 }

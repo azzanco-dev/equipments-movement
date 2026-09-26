@@ -1,21 +1,32 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
-const path = require('node:path')
-const vm = require('node:vm')
-const ts = require('typescript')
+const { loadExtractingModule } = require('./helpers/loadExtracting.cjs')
 
-function loadOcrModule() {
-  const file = path.join(__dirname, '..', 'src', 'lib', 'extracting', 'ocr.ts')
-  const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS },
-  }).outputText
-  const exports = {}
-  vm.runInNewContext(code, { exports }, { filename: file })
-  return exports
-}
+const {
+  normalizeOcrText,
+  normalizeOcrDate,
+  parseOcrFields,
+  ocrErrorForStatus,
+  readOcrAnnotation,
+  hasOcrData,
+} = loadExtractingModule('ocr')
 
-const { normalizeOcrText, normalizeOcrDate, parseOcrFields } = loadOcrModule()
+test('maps provider failures to specific codes, never raw status text', () => {
+  assert.equal(ocrErrorForStatus(401), 'ocr_auth_failed')
+  assert.equal(ocrErrorForStatus(403), 'ocr_auth_failed')
+  assert.equal(ocrErrorForStatus(429), 'ocr_rate_limited')
+  assert.equal(ocrErrorForStatus(422), 'ocr_image_rejected')
+  assert.equal(ocrErrorForStatus(504), 'ocr_timeout')
+  assert.equal(ocrErrorForStatus(503), 'ocr_provider_unavailable')
+  assert.equal(ocrErrorForStatus(418), 'ocr_failed')
+})
+
+test('reads string or object annotations and detects empty results', () => {
+  assert.equal(readOcrAnnotation('{"id_number":"1"}').id_number, '1')
+  assert.equal(readOcrAnnotation('not json'), null)
+  assert.equal(hasOcrData(parseOcrFields(null)), false)
+  assert.equal(hasOcrData(parseOcrFields({ nationality: 'اليمن' })), true)
+})
 
 test('normalizes Arabic and Persian digits', () => {
   assert.equal(normalizeOcrText('  ١٢۳  '), '123')
