@@ -17,18 +17,6 @@ function client(token: string) {
   })
 }
 
-function errorCode(message: string) {
-  if (message.includes('admin_required')) return ['access_denied', 403] as const
-  if (message.includes('movement_not_found'))
-    return ['movement_not_found', 404] as const
-  if (message.includes('driver_already_assigned'))
-    return ['driver_already_assigned', 409] as const
-  if (message.includes('invalid_sequence'))
-    return ['invalid_sequence', 409] as const
-  if (message.includes('future_time')) return ['future_time', 409] as const
-  return ['movement_update_failed', 409] as const
-}
-
 type RouteContext = { params: Promise<{ id: string }> }
 
 /**
@@ -52,60 +40,44 @@ async function authenticateAdmin(request: Request) {
   return { status: 200 as const, supabase }
 }
 
+/**
+ * wave6-J4 — the ONE admin correction of a movement.
+ *
+ * Body (every key is read; ids are strings, missing ids are null):
+ *   { equipment_id, supervisor_id, recorded_at, company_id, project_id,
+ *     contractor_equipment_code, driver_id, notes }
+ *
+ * `admin_update_movement` (migration 0105) is authoritative: it re-checks the
+ * admin role fail-closed, writes every field in one transaction, re-checks the
+ * ENTRY/EXIT sequence and refuses an in-place driver change on an open site
+ * visit (that change goes through `change_active_movement_driver`). `notes`
+ * is always sent as the full note: '' clears it, a missing note keeps it.
+ * Every argument is passed by name so PostgREST resolves the single
+ * nine-argument signature. Errors are mapped to stable safe codes.
+ */
 export async function PATCH(request: Request, context: RouteContext) {
-  const authorization = request.headers.get('authorization')
-  if (!authorization?.startsWith('Bearer '))
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-
   try {
-    const token = authorization.slice(7)
-    const supabase = client(token)
+    const auth = await authenticateAdmin(request)
+    if (auth.status !== 200)
+      return NextResponse.json(
+        { error: auth.status === 401 ? 'unauthorized' : 'access_denied' },
+        { status: auth.status },
+      )
     const { id } = await context.params
     const body = (await request.json().catch(() => null)) as Record<
       string,
       unknown
     > | null
-    if (!body || typeof body !== 'object')
+    if (!body || typeof body !== 'object' || Array.isArray(body))
       return NextResponse.json(
         { error: 'invalid_movement_payload' },
         { status: 400 },
       )
     const text = (key: string) =>
-      typeof body[key] === 'string' && body[key] ? body[key] : null
+      typeof body[key] === 'string' && body[key] ? (body[key] as string) : null
+    const notes = typeof body.notes === 'string' ? body.notes : null
 
-    // wave6-J3: the admin menu edits only the note and the driver, through the
-    // narrower `admin_update_movement_details` (migration 0104). The original
-    // full correction path below is unchanged.
-    if (body.action === 'details') {
-      const auth = await authenticateAdmin(request)
-      if (auth.status !== 200)
-        return NextResponse.json(
-          {
-            error: auth.status === 401 ? 'unauthorized' : 'access_denied',
-          },
-          { status: auth.status },
-        )
-      const { error } = await auth.supabase.rpc(
-        'admin_update_movement_details',
-        {
-          p_log_id: id,
-          p_notes: text('notes'),
-          p_driver_id: text('driver_id'),
-          p_driver_name: text('driver_name'),
-        },
-      )
-      if (error) {
-        console.error('Movement details update failed', error)
-        const code = movementAdminErrorCode(error.message, 'update')
-        return NextResponse.json(
-          { error: code },
-          { status: movementAdminErrorStatus(code) },
-        )
-      }
-      return NextResponse.json({ id })
-    }
-
-    const { error } = await supabase.rpc('admin_update_movement', {
+    const { error } = await auth.supabase.rpc('admin_update_movement', {
       p_movement_id: id,
       p_equipment_id: text('equipment_id'),
       p_supervisor_id: text('supervisor_id'),
@@ -114,11 +86,15 @@ export async function PATCH(request: Request, context: RouteContext) {
       p_project_id: text('project_id'),
       p_contractor_equipment_code: text('contractor_equipment_code'),
       p_driver_id: text('driver_id'),
+      p_notes: notes,
     })
     if (error) {
-      console.error('Movement update failed', error)
-      const [code, status] = errorCode(error.message)
-      return NextResponse.json({ error: code }, { status })
+      console.error('Movement update failed', error.code ?? 'unknown_error')
+      const code = movementAdminErrorCode(error.message, 'update')
+      return NextResponse.json(
+        { error: code },
+        { status: movementAdminErrorStatus(code) },
+      )
     }
     return NextResponse.json({ id })
   } catch (error) {

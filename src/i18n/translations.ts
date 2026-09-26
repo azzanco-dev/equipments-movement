@@ -418,8 +418,6 @@ export const translations = {
       'تعذر حفظ تعديلات الحركة. تحقق من البيانات وحاول مرة اخرى.',
     movementEditSequenceError:
       'لا يمكن حفظ التعديل لانه يجعل تسلسل حركات المعدة غير صحيح.',
-    existingDriverEditHint:
-      'السائق الموجود لا يعدل من هنا. استخدم ميزة تغيير السائق للحفاظ على سجل التغييرات.',
     movementNotFound: 'لم يتم العثور على الحركة',
     movementLoadError: 'تعذر تحميل بيانات الحركة',
     linkedEntry: 'الدخول المرتبط',
@@ -1056,8 +1054,6 @@ export const translations = {
 
     // wave6-J3
     movementActions: 'اجراءات الحركة',
-    movementEditDialogDesc:
-      'عدل ملاحظة الحركة او السائق فقط. تاريخ الحركة والمعدة والشركة والمشروع لا تتغير من هنا.',
     movementEditOpenVisitDriverHint:
       'الزيارة ما زالت مفتوحة، لذلك يسجل تغيير السائق كسجل جديد ويبقى سائق الدخول الاصلي كما هو.',
     movementAdminDriverNotSupported: 'حركات الورشة تسجل بدون سائق.',
@@ -1074,6 +1070,20 @@ export const translations = {
     movementDeleteEntryHasExit:
       'لا يمكن حذف دخول له خروج مسجل؛ احذف الخروج اولا.',
     movementDeleteNotLast: 'يمكن حذف اخر حركة فقط لهذه المعدة في هذا السياق.',
+
+    // wave6-J4
+    movementCorrectionDialogDesc:
+      'صحح بيانات الحركة من مكان واحد. عند تغيير التاريخ او المعدة يعاد فحص تسلسل الدخول والخروج، وكل تعديل يسجل في سجل التدقيق.',
+    movementEditDateHint: 'يتغير اليوم فقط ويبقى وقت تسجيل الحركة كما هو.',
+    movementEditEquipmentRequired: 'اختر المعدة.',
+    movementEditSupervisorRequired: 'اختر المشرف.',
+    movementEditCompanyRequired: 'اختر الشركة.',
+    movementEditProjectRequired: 'اختر المشروع.',
+    movementEditFutureTime: 'لا يمكن ان يكون تاريخ الحركة في المستقبل.',
+    movementEditInvalidPayload:
+      'بيانات التعديل غير مكتملة. تحقق من الحقول المطلوبة وحاول مرة اخرى.',
+    movementEditDriverPartial:
+      'تم حفظ تعديلات الحركة، لكن تعذر تسجيل تغيير السائق. حاول تغيير السائق مرة اخرى.',
 
     // wave6-K3
     reportFilterAlazaniOnly: 'العزاني فقط',
@@ -1508,8 +1518,6 @@ export const translations = {
       'Could not save the movement changes. Check the data and try again.',
     movementEditSequenceError:
       'This change would make the equipment movement sequence invalid.',
-    existingDriverEditHint:
-      'An existing driver cannot be edited here. Use Change Driver to preserve the audit history.',
     movementNotFound: 'Movement not found',
     movementLoadError: 'Could not load the movement details',
     linkedEntry: 'Linked Entry',
@@ -2146,8 +2154,6 @@ export const translations = {
 
     // wave6-J3
     movementActions: 'Movement actions',
-    movementEditDialogDesc:
-      'Edit only the movement note and the driver. The movement date, equipment, company and project are not changed here.',
     movementEditOpenVisitDriverHint:
       'The visit is still open, so a driver change is appended as a new record and the original entry driver stays unchanged.',
     movementAdminDriverNotSupported:
@@ -2167,6 +2173,21 @@ export const translations = {
       'An entry that already has an exit cannot be deleted; delete the exit first.',
     movementDeleteNotLast:
       'Only the last movement of this equipment in this context can be deleted.',
+
+    // wave6-J4
+    movementCorrectionDialogDesc:
+      'Correct the movement in one place. Changing the date or the equipment re-checks the entry/exit sequence, and every change is recorded in the audit log.',
+    movementEditDateHint:
+      'Only the day changes; the recorded time of the movement is kept.',
+    movementEditEquipmentRequired: 'Select the equipment.',
+    movementEditSupervisorRequired: 'Select the supervisor.',
+    movementEditCompanyRequired: 'Select the company.',
+    movementEditProjectRequired: 'Select the project.',
+    movementEditFutureTime: 'The movement date cannot be in the future.',
+    movementEditInvalidPayload:
+      'The correction is incomplete. Check the required fields and try again.',
+    movementEditDriverPartial:
+      'The movement changes were saved, but the driver change could not be recorded. Try changing the driver again.',
 
     // wave6-K3
     reportFilterAlazaniOnly: 'Al-Azani only',

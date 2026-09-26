@@ -31,12 +31,25 @@ function loadLibModule(name, cache = new Map()) {
 
 const {
   MOVEMENT_NOTES_MAX_LENGTH,
+  MOVEMENT_CONTRACTOR_CODE_MAX_LENGTH,
+  MOVEMENT_EDIT_FIELD_ORDER,
+  buildMovementEditPayload: buildPayloadInSandbox,
   isValidMovementNotes,
+  localDateKey,
   movementAdminErrorKey,
   movementDriverEditMode,
+  movementEditRecordedAt,
   movementEditUnchanged,
   normalizeMovementNotes,
+  validateMovementEdit: validateInSandbox,
 } = loadLibModule('movementAdmin')
+
+// Objects built inside the vm sandbox carry that realm's Object prototype,
+// which `deepStrictEqual` rejects; compare their plain JSON shape instead.
+const plain = (value) => JSON.parse(JSON.stringify(value))
+const validateMovementEdit = (...args) => plain(validateInSandbox(...args))
+const buildMovementEditPayload = (...args) =>
+  plain(buildPayloadInSandbox(...args))
 
 const {
   MOVEMENT_ADMIN_ERROR_CODES,
@@ -44,14 +57,30 @@ const {
   movementAdminErrorStatus,
 } = loadLibModule('movementErrors')
 
+// Local-time instants, so the assertions hold in any test time zone.
+const RECORDED = new Date(2026, 8, 20, 14, 30, 15, 250)
+const NOW = new Date(2026, 8, 26, 10, 0, 0, 0)
+
+const base = {
+  equipment_id: 'equipment-1',
+  supervisor_id: 'supervisor-1',
+  movement_date: localDateKey(RECORDED),
+  company_id: 'company-1',
+  project_id: 'project-1',
+  contractor_code: 'C-12',
+  driver_id: 'driver-1',
+  notes: 'ملاحظة',
+}
+
 test('the note is trimmed and an empty note clears the field', () => {
   assert.equal(normalizeMovementNotes('  تمت المعاينة  '), 'تمت المعاينة')
   assert.equal(normalizeMovementNotes(''), null)
   assert.equal(normalizeMovementNotes('   '), null)
 })
 
-test('the client length check mirrors the 1000-character database check', () => {
+test('the client length checks mirror the database checks', () => {
   assert.equal(MOVEMENT_NOTES_MAX_LENGTH, 1000)
+  assert.equal(MOVEMENT_CONTRACTOR_CODE_MAX_LENGTH, 50)
   assert.equal(isValidMovementNotes(''), true)
   assert.equal(isValidMovementNotes('A'.repeat(1000)), true)
   // Trailing spaces are trimmed first, so they never push a valid note over.
@@ -59,38 +88,186 @@ test('the client length check mirrors the 1000-character database check', () => 
   assert.equal(isValidMovementNotes('A'.repeat(1001)), false)
 })
 
-test('Save stays disabled when neither the note nor the driver changed', () => {
-  const base = { currentNotes: 'ملاحظة', currentDriverId: 'driver-1' }
+test('the local date key follows the browser day', () => {
+  assert.equal(localDateKey(new Date(2026, 0, 5, 23, 59)), '2026-01-05')
+  assert.equal(localDateKey(new Date(2026, 11, 31, 0, 1)), '2026-12-31')
+})
+
+test('per-field validation of a site correction', () => {
+  assert.deepEqual(validateMovementEdit(base, 'site', NOW), {})
+  const empty = {
+    ...base,
+    equipment_id: '',
+    supervisor_id: '',
+    movement_date: '',
+    company_id: '',
+    project_id: '',
+    contractor_code: 'X'.repeat(51),
+    notes: 'A'.repeat(1001),
+  }
+  assert.deepEqual(validateMovementEdit(empty, 'site', NOW), {
+    equipment_id: 'movementEditEquipmentRequired',
+    supervisor_id: 'movementEditSupervisorRequired',
+    movement_date: 'movementDateRequired',
+    company_id: 'movementEditCompanyRequired',
+    project_id: 'movementEditProjectRequired',
+    contractor_code: 'contractorCodeTooLong',
+    notes: 'movementNotesTooLong',
+  })
+  // A future day is refused before the round trip.
+  assert.deepEqual(
+    validateMovementEdit({ ...base, movement_date: '2026-09-27' }, 'site', NOW),
+    { movement_date: 'movementEditFutureTime' },
+  )
+  assert.deepEqual(
+    validateMovementEdit({ ...base, movement_date: '2026-09-26' }, 'site', NOW),
+    {},
+  )
+})
+
+test('a workshop correction never asks for site-only fields', () => {
+  const workshop = {
+    ...base,
+    company_id: '',
+    project_id: '',
+    contractor_code: 'X'.repeat(80),
+    driver_id: '',
+  }
+  assert.deepEqual(validateMovementEdit(workshop, 'workshop', NOW), {})
+})
+
+test('the field order follows the dialog', () => {
+  assert.deepEqual(
+    [...MOVEMENT_EDIT_FIELD_ORDER],
+    [
+      'equipment_id',
+      'supervisor_id',
+      'movement_date',
+      'company_id',
+      'project_id',
+      'contractor_code',
+      'driver_id',
+      'notes',
+    ],
+  )
+})
+
+test('an unchanged day sends the stored instant untouched', () => {
+  const original = RECORDED.toISOString()
   assert.equal(
-    movementEditUnchanged({ ...base, notes: 'ملاحظة', driverId: 'driver-1' }),
+    movementEditRecordedAt(localDateKey(RECORDED), original, NOW),
+    original,
+  )
+})
+
+test('a new day keeps the original local time of day', () => {
+  const result = new Date(
+    movementEditRecordedAt('2026-09-18', RECORDED.toISOString(), NOW),
+  )
+  assert.equal(localDateKey(result), '2026-09-18')
+  assert.equal(result.getHours(), 14)
+  assert.equal(result.getMinutes(), 30)
+  assert.equal(result.getSeconds(), 15)
+})
+
+test('moving to today at a later hour is capped at now', () => {
+  const late = new Date(2026, 8, 20, 18, 0)
+  assert.equal(
+    movementEditRecordedAt(localDateKey(NOW), late.toISOString(), NOW),
+    NOW.toISOString(),
+  )
+})
+
+test('Save stays disabled when nothing changed', () => {
+  assert.equal(movementEditUnchanged({ ...base }, base), true)
+  assert.equal(
+    movementEditUnchanged({ ...base, notes: '  ملاحظة ' }, base),
     true,
   )
-  assert.equal(
-    movementEditUnchanged({ ...base, notes: '  ملاحظة ', driverId: null }),
-    true,
+  // A cleared driver is not a change: the database never removes a driver.
+  assert.equal(movementEditUnchanged({ ...base, driver_id: '' }, base), true)
+  for (const patch of [
+    { equipment_id: 'equipment-2' },
+    { supervisor_id: 'supervisor-2' },
+    { movement_date: '2026-09-18' },
+    { company_id: 'company-2' },
+    { project_id: 'project-2' },
+    { contractor_code: 'C-13' },
+    { driver_id: 'driver-2' },
+    { notes: 'ملاحظة اخرى' },
+    // Clearing an existing note is a real change.
+    { notes: '' },
+  ])
+    assert.equal(movementEditUnchanged({ ...base, ...patch }, base), false)
+})
+
+test('the payload sends every field and the full note', () => {
+  const payload = buildMovementEditPayload(
+    { ...base, contractor_code: '  C-12  ', notes: '  جديد  ' },
+    {
+      context: 'site',
+      originalRecordedAt: RECORDED.toISOString(),
+      currentDriverId: 'driver-1',
+      driverMode: 'admin',
+      now: NOW,
+    },
   )
+  assert.deepEqual(payload, {
+    equipment_id: 'equipment-1',
+    supervisor_id: 'supervisor-1',
+    recorded_at: RECORDED.toISOString(),
+    company_id: 'company-1',
+    project_id: 'project-1',
+    contractor_equipment_code: 'C-12',
+    driver_id: null,
+    notes: 'جديد',
+  })
+  // A cleared note is sent as '' so the database stores NULL.
   assert.equal(
-    movementEditUnchanged({ ...base, notes: 'ملاحظة اخرى', driverId: null }),
-    false,
+    buildMovementEditPayload(
+      { ...base, notes: '   ' },
+      {
+        context: 'site',
+        originalRecordedAt: RECORDED.toISOString(),
+        currentDriverId: 'driver-1',
+        driverMode: 'admin',
+      },
+    ).notes,
+    '',
   )
+})
+
+test('only a closed visit or an EXIT sends the driver in place', () => {
+  const params = {
+    context: 'site',
+    originalRecordedAt: RECORDED.toISOString(),
+    currentDriverId: 'driver-1',
+    now: NOW,
+  }
+  const changed = { ...base, driver_id: 'driver-2' }
   assert.equal(
-    movementEditUnchanged({ ...base, notes: 'ملاحظة', driverId: 'driver-2' }),
-    false,
+    buildMovementEditPayload(changed, { ...params, driverMode: 'admin' })
+      .driver_id,
+    'driver-2',
   )
-  // Clearing an existing note is a real change.
+  // An open visit appends through change_active_movement_driver instead.
   assert.equal(
-    movementEditUnchanged({ ...base, notes: '', driverId: 'driver-1' }),
-    false,
+    buildMovementEditPayload(changed, {
+      ...params,
+      driverMode: 'driver_change',
+    }).driver_id,
+    null,
   )
-  assert.equal(
-    movementEditUnchanged({
-      notes: '',
-      currentNotes: null,
-      driverId: null,
-      currentDriverId: null,
-    }),
-    true,
-  )
+  // Workshop movements send no site fields and no driver.
+  const workshop = buildMovementEditPayload(changed, {
+    ...params,
+    context: 'workshop',
+    driverMode: 'unsupported',
+  })
+  assert.equal(workshop.driver_id, null)
+  assert.equal(workshop.company_id, null)
+  assert.equal(workshop.project_id, null)
+  assert.equal(workshop.contractor_equipment_code, null)
 })
 
 test('an open site ENTRY keeps the append-only driver path', () => {
@@ -141,13 +318,17 @@ test('an open site ENTRY keeps the append-only driver path', () => {
   )
 })
 
-test('migration 0104 error tokens map to stable API codes', () => {
+test('migration 0105 error tokens map to stable API codes', () => {
   const cases = [
     ['admin_required', 'access_denied'],
     ['movement_not_found', 'movement_not_found'],
+    ['invalid_payload', 'invalid_movement_payload'],
+    ['future_time', 'future_time'],
+    ['invalid_sequence', 'invalid_sequence'],
     ['invalid_driver', 'invalid_driver'],
     ['driver_not_supported', 'driver_not_supported'],
     ['open_visit_driver_change', 'open_visit_driver_change'],
+    ['contractor_code_too_long', 'contractor_code_too_long'],
     ['movement_notes_too_long', 'movement_notes_too_long'],
     ['entry_has_later_exit', 'entry_has_later_exit'],
     ['movement_not_last', 'movement_not_last'],
@@ -188,11 +369,18 @@ test('unknown and missing messages fall back per operation', () => {
   )
 })
 
-test('a refused role is 403, a missing movement 404, a bad note 400', () => {
+test('a refused role is 403, a missing movement 404, bad input 400', () => {
   assert.equal(movementAdminErrorStatus('access_denied'), 403)
   assert.equal(movementAdminErrorStatus('movement_not_found'), 404)
-  assert.equal(movementAdminErrorStatus('movement_notes_too_long'), 400)
   for (const code of [
+    'invalid_movement_payload',
+    'contractor_code_too_long',
+    'movement_notes_too_long',
+  ])
+    assert.equal(movementAdminErrorStatus(code), 400)
+  for (const code of [
+    'future_time',
+    'invalid_sequence',
     'entry_has_later_exit',
     'movement_not_last',
     'invalid_driver',
@@ -209,9 +397,13 @@ test('every API code has a safe translation key, per operation', () => {
   const expected = {
     access_denied: 'movementAdminAccessDenied',
     movement_not_found: 'movementNotFound',
+    invalid_movement_payload: 'movementEditInvalidPayload',
+    future_time: 'movementEditFutureTime',
+    invalid_sequence: 'movementEditSequenceError',
     invalid_driver: 'movementAdminInvalidDriver',
     driver_not_supported: 'movementAdminDriverNotSupported',
     open_visit_driver_change: 'movementAdminOpenVisitDriver',
+    contractor_code_too_long: 'contractorCodeTooLong',
     movement_notes_too_long: 'movementNotesTooLong',
     entry_has_later_exit: 'movementDeleteEntryHasExit',
     movement_not_last: 'movementDeleteNotLast',
@@ -236,16 +428,28 @@ test('every API code has a safe translation key, per operation', () => {
 test('every translation key used by the admin actions exists in ar and en', () => {
   const file = path.join(__dirname, '..', 'src', 'i18n', 'translations.ts')
   const source = fs.readFileSync(file, 'utf8')
-  const [, ar, en] = source.split(/\n  (?:ar|en): \{\n/)
+  const [, ar, en] = source.split(/\n {2}(?:ar|en): \{\n/)
   const keys = [
     'movementActions',
-    'movementEditDialogDesc',
+    'editMovement',
+    'movementCorrectionDialogDesc',
+    'movementEditDateHint',
+    'movementEditEquipmentRequired',
+    'movementEditSupervisorRequired',
+    'movementEditCompanyRequired',
+    'movementEditProjectRequired',
+    'movementEditFutureTime',
+    'movementEditInvalidPayload',
+    'movementEditDriverPartial',
+    'movementEditSequenceError',
     'movementEditOpenVisitDriverHint',
     'movementAdminDriverNotSupported',
     'movementAdminAccessDenied',
     'movementAdminInvalidDriver',
     'movementAdminOpenVisitDriver',
     'movementNotesTooLong',
+    'movementDateRequired',
+    'contractorCodeTooLong',
     'confirmDeleteMovement',
     'dialogDescMovementDelete',
     'movementDeleted',
@@ -257,17 +461,20 @@ test('every translation key used by the admin actions exists in ar and en', () =
     assert.ok(new RegExp(`\\n    ${key}:`).test(ar), `missing ar key: ${key}`)
     assert.ok(new RegExp(`\\n    ${key}:`).test(en), `missing en key: ${key}`)
   }
+  // The keys of the removed separate forms are gone.
+  for (const key of ['movementEditDialogDesc', 'existingDriverEditHint'])
+    assert.ok(!source.includes(`\n    ${key}:`), `stale key: ${key}`)
 })
 
 test('the new Arabic copy never uses alif with hamza or madda', () => {
   const file = path.join(__dirname, '..', 'src', 'i18n', 'translations.ts')
   const source = fs.readFileSync(file, 'utf8')
-  const block = source.slice(
-    source.indexOf('// wave6-J3'),
-    source.indexOf('// wave6-J3') +
-      source.slice(source.indexOf('// wave6-J3')).indexOf('\n  },'),
-  )
-  for (const forbidden of ['أ', 'إ', 'آ']) {
-    assert.ok(!block.includes(forbidden), `forbidden letter: ${forbidden}`)
+  for (const marker of ['// wave6-J3', '// wave6-J4']) {
+    const start = source.indexOf(marker)
+    assert.ok(start >= 0, `missing block ${marker}`)
+    const block = source.slice(start, source.indexOf('\n\n', start))
+    for (const forbidden of ['أ', 'إ', 'آ']) {
+      assert.ok(!block.includes(forbidden), `${marker}: ${forbidden}`)
+    }
   }
 })

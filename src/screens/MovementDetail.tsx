@@ -70,8 +70,8 @@ import {
   type DescriptionListItem,
   type LightboxItem,
 } from '@/components/ui'
-// wave6-J3 — admin-only header menu: edit the note/driver, or delete the
-// movement. Both actions are authoritative in PostgreSQL (migration 0104).
+// wave6-J3/J4 — admin-only header menu: the single correction dialog, or
+// delete the movement. Both are authoritative in PostgreSQL (0104/0105).
 import { MovementAdminMenu } from '@/components/movement/MovementAdminMenu'
 import { MovementEditDialog } from '@/components/movement/MovementEditDialog'
 import {
@@ -136,28 +136,19 @@ export function MovementDetail({
   const [driverChangeError, setDriverChangeError] = useState<string | null>(
     null,
   )
-  const [editOpen, setEditOpen] = useState(false)
-  const [editBusy, setEditBusy] = useState(false)
-  const [editError, setEditError] = useState<string | null>(null)
-  const [editEquipment, setEditEquipment] = useState<SelectOption | null>(null)
-  const [editSupervisor, setEditSupervisor] = useState<SelectOption | null>(
-    null,
-  )
-  const [editCompany, setEditCompany] = useState<SelectOption | null>(null)
-  const [editProject, setEditProject] = useState<SelectOption | null>(null)
-  const [editDriver, setEditDriver] = useState<SelectOption | null>(null)
-  const [editRecordedAt, setEditRecordedAt] = useState('')
-  const [editContractorCode, setEditContractorCode] = useState('')
-  // wave6-J3 — admin note/driver edit and admin delete, behind the header
-  // menu. Separate from the full admin correction form above (0068).
+  // wave6-J3/J4 — the single admin correction dialog and the admin delete,
+  // behind the header menu (migrations 0104/0105).
   const router = useRouter()
   const [detailsEditOpen, setDetailsEditOpen] = useState(false)
+  // Partial success of the correction dialog (the correction was stored but
+  // the appended driver change failed). Survives the refetch.
+  const [editWarning, setEditWarning] = useState<string | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [deleted, setDeleted] = useState(false)
   // Foreman edit of the contractor code on his own open site ENTRY
-  // (migration 0093). Separate from the admin edit form above.
+  // (migration 0093). Separate from the admin correction dialog.
   const [codeEditOpen, setCodeEditOpen] = useState(false)
   const [codeEditValue, setCodeEditValue] = useState('')
   const [codeEditBusy, setCodeEditBusy] = useState(false)
@@ -402,170 +393,6 @@ export function MovementDetail({
     },
     [],
   )
-
-  const loadEquipment = useCallback(async (query: string) => {
-    const term = sanitizeSearchTerm(query)
-    let request = supabase
-      .from('equipment')
-      .select('id,code,type')
-      .order('code')
-      .limit(20)
-    if (term) request = request.or(`code.ilike.%${term}%,type.ilike.%${term}%`)
-    const { data } = await request
-    return (data ?? []).map((item) => ({
-      value: item.id,
-      label: `${item.code} — ${item.type}`,
-    }))
-  }, [])
-
-  const loadSupervisors = useCallback(async (query: string) => {
-    const term = sanitizeSearchTerm(query)
-    let request = supabase
-      .from('profiles')
-      .select('id,full_name')
-      .in('role', ['admin', 'supervisor'])
-      .order('full_name')
-      .limit(20)
-    if (term) request = request.ilike('full_name', `%${term}%`)
-    const { data } = await request
-    return (data ?? []).map((item) => ({
-      value: item.id,
-      label: item.full_name,
-    }))
-  }, [])
-
-  const loadCompanies = useCallback(
-    async (query: string) => {
-      const term = sanitizeSearchTerm(query)
-      let request = supabase
-        .from('companies')
-        .select('id,name_ar,name_en')
-        .order('name_ar')
-        .limit(20)
-      if (term)
-        request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
-      const { data } = await request
-      return (data ?? []).map((item) => ({
-        value: item.id,
-        label: localizedName(lang, item.name_ar, item.name_en),
-      }))
-    },
-    [lang],
-  )
-
-  const loadProjects = useCallback(
-    async (query: string) => {
-      const term = sanitizeSearchTerm(query)
-      let request = supabase
-        .from('projects')
-        .select('id,name_ar,name_en')
-        .order('name_ar')
-        .limit(20)
-      if (term)
-        request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
-      const { data } = await request
-      return (data ?? []).map((item) => ({
-        value: item.id,
-        label: localizedName(lang, item.name_ar, item.name_en),
-      }))
-    },
-    [lang],
-  )
-
-  const openEdit = () => {
-    if (!log) return
-    setEditEquipment(
-      log.equipment
-        ? {
-            value: log.equipment.id,
-            label: `${log.equipment.code} — ${log.equipment.type}`,
-          }
-        : null,
-    )
-    setEditSupervisor(
-      log.supervisor
-        ? { value: log.supervisor.id, label: log.supervisor.full_name }
-        : null,
-    )
-    setEditCompany(
-      company
-        ? {
-            value: company.id,
-            label: localizedName(lang, company.name_ar, company.name_en),
-          }
-        : null,
-    )
-    setEditProject(
-      project
-        ? {
-            value: project.id,
-            label: localizedName(lang, project.name_ar, project.name_en),
-          }
-        : null,
-    )
-    setEditDriver(null)
-    const date = new Date(log.recorded_at)
-    setEditRecordedAt(
-      new Date(date.getTime() - date.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 16),
-    )
-    setEditContractorCode(log.contractor_equipment_code ?? '')
-    setEditError(null)
-    setEditOpen(true)
-  }
-
-  const saveEdit = async () => {
-    if (
-      !log ||
-      !editEquipment ||
-      !editSupervisor ||
-      !editRecordedAt ||
-      (!isWorkshopMovement && (!editCompany || !editProject))
-    )
-      return
-    setEditBusy(true)
-    setEditError(null)
-    let response: Response
-    try {
-      const { data } = await supabase.auth.getSession()
-      response = await fetch(`/api/movements/${log.id}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${data.session?.access_token ?? ''}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          equipment_id: editEquipment.value,
-          supervisor_id: editSupervisor.value,
-          recorded_at: new Date(editRecordedAt).toISOString(),
-          company_id: editCompany?.value ?? null,
-          project_id: editProject?.value ?? null,
-          contractor_equipment_code: editContractorCode.trim() || null,
-          driver_id: log.driver_id ? null : (editDriver?.value ?? null),
-        }),
-      })
-    } catch (cause) {
-      console.error('Movement edit request failed', cause)
-      setEditError(t('movementEditFailed'))
-      return
-    } finally {
-      setEditBusy(false)
-    }
-    if (!response.ok) {
-      const result = (await response.json().catch(() => null)) as {
-        error?: string
-      } | null
-      setEditError(
-        result?.error === 'invalid_sequence'
-          ? t('movementEditSequenceError')
-          : t('movementEditFailed'),
-      )
-      return
-    }
-    setEditOpen(false)
-    await fetchData()
-  }
 
   const changeDriver = async () => {
     if (!driverEntryId || !newDriverId) return
@@ -996,136 +823,25 @@ export function MovementDetail({
         backLabel={t('backToMovements')}
         actions={
           profile?.role === 'admin' ? (
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                icon={<Pencil size={16} />}
-                onClick={openEdit}
-              >
-                {t('editMovement')}
-              </Button>
-              <MovementAdminMenu
-                busy={deleteBusy}
-                onEdit={() => {
-                  setDeleteError(null)
-                  setDetailsEditOpen(true)
-                }}
-                onDelete={() => {
-                  setDeleteError(null)
-                  setDeleteOpen(true)
-                }}
-              />
-            </div>
+            <MovementAdminMenu
+              busy={deleteBusy}
+              onEdit={() => {
+                setDeleteError(null)
+                setEditWarning(null)
+                setDetailsEditOpen(true)
+              }}
+              onDelete={() => {
+                setDeleteError(null)
+                setEditWarning(null)
+                setDeleteOpen(true)
+              }}
+            />
           ) : undefined
         }
       />
 
       {deleteError && <Alert type="error">{deleteError}</Alert>}
-
-      {editOpen && profile?.role === 'admin' && (
-        <div className="card space-y-4">
-          <h3 className="font-bold">{t('editMovement')}</h3>
-          {editError && <Alert type="error">{editError}</Alert>}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label={t('equipmentNameLabel')}>
-              {() => (
-                <AsyncSearchSelect
-                  value={editEquipment?.value ?? ''}
-                  selectedOption={editEquipment}
-                  onChange={(_, option) => setEditEquipment(option)}
-                  loadOptions={loadEquipment}
-                />
-              )}
-            </Field>
-            <Field label={t('supervisorName')}>
-              {() => (
-                <AsyncSearchSelect
-                  value={editSupervisor?.value ?? ''}
-                  selectedOption={editSupervisor}
-                  onChange={(_, option) => setEditSupervisor(option)}
-                  loadOptions={loadSupervisors}
-                />
-              )}
-            </Field>
-            <Field label={t('movementDate')}>
-              {(control) => (
-                <Input
-                  {...control}
-                  type="datetime-local"
-                  value={editRecordedAt}
-                  max={new Date().toISOString().slice(0, 16)}
-                  onChange={(event) => setEditRecordedAt(event.target.value)}
-                />
-              )}
-            </Field>
-            {!isWorkshopMovement && (
-              <Field label={t('contractorEquipmentCode')}>
-                {(control) => (
-                  <Input
-                    {...control}
-                    value={editContractorCode}
-                    onChange={(event) =>
-                      setEditContractorCode(event.target.value)
-                    }
-                  />
-                )}
-              </Field>
-            )}
-            {!isWorkshopMovement && (
-              <Field label={t('company')}>
-                {() => (
-                  <AsyncSearchSelect
-                    value={editCompany?.value ?? ''}
-                    selectedOption={editCompany}
-                    onChange={(_, option) => setEditCompany(option)}
-                    loadOptions={loadCompanies}
-                  />
-                )}
-              </Field>
-            )}
-            {!isWorkshopMovement && (
-              <Field label={t('project')}>
-                {() => (
-                  <AsyncSearchSelect
-                    value={editProject?.value ?? ''}
-                    selectedOption={editProject}
-                    onChange={(_, option) => setEditProject(option)}
-                    loadOptions={loadProjects}
-                  />
-                )}
-              </Field>
-            )}
-            {!isWorkshopMovement && !log.driver_id && (
-              <Field label={t('driverName')}>
-                {() => (
-                  <AsyncSearchSelect
-                    value={editDriver?.value ?? ''}
-                    selectedOption={editDriver}
-                    onChange={(_, option) => setEditDriver(option)}
-                    loadOptions={loadDrivers}
-                  />
-                )}
-              </Field>
-            )}
-          </div>
-          {!isWorkshopMovement && log.driver_id && (
-            <p className="text-xs text-muted">{t('existingDriverEditHint')}</p>
-          )}
-          <div className="flex gap-2">
-            <Button variant="primary" loading={editBusy} onClick={saveEdit}>
-              {t('saveChanges')}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={editBusy}
-              onClick={() => setEditOpen(false)}
-            >
-              {t('cancel')}
-            </Button>
-          </div>
-        </div>
-      )}
+      {editWarning && <Alert type="error">{editWarning}</Alert>}
 
       {/* Movement type banner */}
       <div
@@ -1633,14 +1349,18 @@ export function MovementDetail({
           <MovementEditDialog
             open={detailsEditOpen}
             onOpenChange={setDetailsEditOpen}
-            movementId={log.id}
-            notes={log.notes}
+            movement={log}
+            company={company}
+            project={project}
             driverId={editDriverId}
             driverName={editDriverName}
             driverMode={driverEditMode}
             driverEntryId={driverEntryId ?? (isEntry ? log.id : null)}
             loadDrivers={loadDrivers}
-            onSaved={fetchData}
+            onSaved={async (warning) => {
+              setEditWarning(warning ?? null)
+              await fetchData()
+            }}
           />
           <ConfirmDialog
             open={deleteOpen}

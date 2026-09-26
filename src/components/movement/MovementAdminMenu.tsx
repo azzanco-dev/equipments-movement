@@ -10,7 +10,7 @@ import {
 } from '@/components/ui'
 
 export interface MovementAdminMenuProps {
-  /** Opens the edit dialog (note and driver). */
+  /** Opens the single admin correction dialog (all editable fields). */
   onEdit: () => void
   /** Opens the delete confirmation. */
   onDelete: () => void
@@ -19,11 +19,13 @@ export interface MovementAdminMenuProps {
 }
 
 /**
- * wave6-J3 — admin-only actions in the movement detail header.
+ * wave6-J3/J4 — admin-only actions in the movement detail header: the ONE
+ * correction dialog and the delete.
  *
  * Rendered by `MovementDetail` only for `profile.role === 'admin'`; the
- * database functions behind both items (migration 0104) re-check the role and
- * fail closed, so hiding the menu is presentation, never the permission.
+ * database functions behind both items (`admin_update_movement`, migration
+ * 0105, and `admin_delete_movement`, migrations 0104/0105) re-check the role
+ * and fail closed, so hiding the menu is presentation, never the permission.
  */
 export function MovementAdminMenu({
   onEdit,

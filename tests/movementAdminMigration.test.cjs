@@ -3,30 +3,40 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 
-// Guards the security and invariant properties of migration 0104. The database
-// is the only authoritative place for these rules, so a change that drops one
-// of them must fail here rather than in production.
-const sql = fs.readFileSync(
-  path.join(
-    __dirname,
-    '..',
-    'supabase',
-    'migrations',
-    '20260923120000_0104_admin_edit_delete_movement.sql',
-  ),
-  'utf8',
-)
-
-function functionBody(name) {
-  const start = sql.indexOf(`CREATE OR REPLACE FUNCTION public.${name}(`)
-  assert.ok(start >= 0, `missing function: ${name}`)
-  const end = sql.indexOf('\n$$;', start)
-  assert.ok(end > start, `unterminated function: ${name}`)
-  return sql.slice(start, end)
+// Guards the security and invariant properties of migrations 0104 and 0105.
+// The database is the only authoritative place for these rules, so a change
+// that drops one of them must fail here rather than in production.
+function migration(file) {
+  return fs.readFileSync(
+    path.join(__dirname, '..', 'supabase', 'migrations', file),
+    'utf8',
+  )
 }
 
-const update = functionBody('admin_update_movement_details')
-const remove = functionBody('admin_delete_movement')
+const sql = migration('20260923120000_0104_admin_edit_delete_movement.sql')
+const sql0105 = migration('20260926100000_0105_admin_update_movement_notes.sql')
+
+function functionBody(source, name) {
+  const match = new RegExp(
+    `CREATE (?:OR REPLACE )?FUNCTION public\\.${name}\\(`,
+  ).exec(source)
+  assert.ok(match, `missing function: ${name}`)
+  const end = source.indexOf('\n$$;', match.index)
+  assert.ok(end > match.index, `unterminated function: ${name}`)
+  return source.slice(match.index, end)
+}
+
+function escape(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// 0105 holds the live definition of both admin functions.
+const update = functionBody(sql0105, 'admin_update_movement')
+const remove = functionBody(sql0105, 'admin_delete_movement')
+
+const UPDATE_SIGNATURE =
+  'public.admin_update_movement(uuid, uuid, uuid, timestamptz, uuid, uuid, text, uuid, text)'
+const DELETE_SIGNATURE = 'public.admin_delete_movement(uuid)'
 
 test('both functions are SECURITY DEFINER with a fixed search_path', () => {
   for (const body of [update, remove]) {
@@ -45,47 +55,142 @@ test('both functions check is_admin() fail-closed', () => {
 })
 
 test('anon cannot execute either function and authenticated can', () => {
-  for (const signature of [
-    'public.admin_update_movement_details(uuid, text, uuid, text)',
-    'public.admin_delete_movement(uuid)',
-  ]) {
-    assert.ok(
-      sql.includes(`REVOKE ALL ON FUNCTION ${signature}`) ||
-        sql.includes(`REVOKE ALL ON FUNCTION ${signature}\n`),
+  for (const signature of [UPDATE_SIGNATURE, DELETE_SIGNATURE]) {
+    assert.match(
+      sql0105,
+      new RegExp(
+        `REVOKE ALL ON FUNCTION ${escape(signature)}\\s+FROM PUBLIC, anon;`,
+      ),
       `missing REVOKE for ${signature}`,
     )
-    assert.ok(
-      sql.includes(`GRANT EXECUTE ON FUNCTION ${signature}`),
+    assert.match(
+      sql0105,
+      new RegExp(
+        `GRANT EXECUTE ON FUNCTION ${escape(signature)}\\s+TO authenticated;`,
+      ),
       `missing GRANT for ${signature}`,
     )
   }
-  assert.equal((sql.match(/FROM PUBLIC, anon/g) ?? []).length >= 2, true)
 })
 
-test('the edit writes only notes, driver_id and driver_name', () => {
-  const statement = update.slice(
-    update.indexOf('UPDATE public.entry_exit_logs'),
+test('0105 replaces the 0068 signature and adds p_notes last', () => {
+  // The old eight-argument signature is dropped BEFORE the new one exists, so
+  // PostgREST named-argument calls never meet two overloads.
+  const dropAt = sql0105.indexOf(
+    'DROP FUNCTION IF EXISTS public.admin_update_movement(uuid, uuid, uuid, timestamptz, uuid, uuid, text, uuid);',
   )
-  assert.match(statement, /SET notes =/)
-  assert.match(statement, /driver_id = CASE/)
-  assert.match(statement, /driver_name = CASE/)
-  for (const column of [
-    'recorded_at =',
-    'movement_type =',
-    'movement_context =',
-    'equipment_id =',
-    'company_id =',
-    'project_id =',
-    'contractor_equipment_code =',
-    'supervisor_id =',
+  const createAt = sql0105.indexOf(
+    'CREATE FUNCTION public.admin_update_movement(',
+  )
+  assert.ok(dropAt >= 0, 'the 0068 signature must be dropped')
+  assert.ok(createAt > dropAt, 'drop before create')
+  const params = update.slice(
+    update.indexOf('(') + 1,
+    update.indexOf(') RETURNS'),
+  )
+  assert.deepEqual(
+    params.split(',').map((param) => param.trim().split(/\s+/)[0]),
+    [
+      'p_movement_id',
+      'p_equipment_id',
+      'p_supervisor_id',
+      'p_recorded_at',
+      'p_company_id',
+      'p_project_id',
+      'p_contractor_equipment_code',
+      'p_driver_id',
+      'p_notes',
+    ],
+  )
+  assert.match(
+    params,
+    /p_driver_id uuid DEFAULT NULL,\s+p_notes text DEFAULT NULL\s*$/,
+  )
+})
+
+test('0105 drops the separate note/driver function of 0104', () => {
+  assert.match(
+    sql0105,
+    /DROP FUNCTION IF EXISTS public\.admin_update_movement_details\(uuid, text, uuid, text\);/,
+  )
+  // Nothing in the app still calls it.
+  for (const file of [
+    path.join('app', 'api', 'movements', '[id]', 'route.ts'),
+    path.join('src', 'components', 'movement', 'MovementEditDialog.tsx'),
+    path.join('src', 'screens', 'MovementDetail.tsx'),
+    path.join('src', 'lib', 'movementAdmin.ts'),
   ]) {
-    assert.ok(!statement.includes(column), `edit must not write ${column}`)
+    const source = fs.readFileSync(path.join(__dirname, '..', file), 'utf8')
+    assert.ok(
+      !source.includes('admin_update_movement_details'),
+      `${file} still calls the dropped function`,
+    )
+    assert.ok(
+      !source.includes("action: 'details'"),
+      `${file} still uses the removed PATCH action`,
+    )
   }
+})
+
+test('the correction writes notes trimmed, empty as NULL, max 1000', () => {
+  assert.match(update, /IF p_notes IS NULL THEN\s+v_notes := v_log\.notes;/)
+  assert.match(update, /v_notes := NULLIF\(btrim\(p_notes\), ''\);/)
+  assert.match(update, /char_length\(v_notes\) > 1000/)
+  assert.match(update, /RAISE EXCEPTION 'movement_notes_too_long'/)
+  const rowUpdate = update.slice(
+    update.indexOf('UPDATE public.entry_exit_logs l SET'),
+    update.indexOf('WHERE l.id = p_movement_id;'),
+  )
+  assert.match(rowUpdate, /notes = v_notes/)
+  // The note belongs to this row only, never to the paired visit row.
+  const pairUpdate = update.slice(
+    update.indexOf('WHERE l.id = p_movement_id;'),
+    update.indexOf('WHERE l.id = v_pair.id;'),
+  )
+  assert.ok(!pairUpdate.includes('notes ='))
+})
+
+test('the correction keeps every 0068 validation', () => {
+  for (const token of [
+    "RAISE EXCEPTION 'invalid_payload'",
+    "RAISE EXCEPTION 'future_time'",
+    "RAISE EXCEPTION 'invalid_sequence'",
+    "RAISE EXCEPTION 'movement_not_found'",
+  ])
+    assert.ok(update.includes(token), `missing ${token}`)
+  assert.match(
+    update,
+    /v_log\.movement_context = 'site' AND \(p_company_id IS NULL OR p_project_id IS NULL\)/,
+  )
+  // Deterministic pairing and sequence re-check by (recorded_at, id).
+  assert.match(
+    update,
+    /PARTITION BY equipment_id, movement_context ORDER BY recorded_at, id/,
+  )
+  assert.match(
+    update,
+    /\(l\.recorded_at, l\.id\) > \(v_log\.recorded_at, v_log\.id\)/,
+  )
+  assert.match(
+    update,
+    /\(l\.recorded_at, l\.id\) < \(v_log\.recorded_at, v_log\.id\)/,
+  )
+  // Inherited site facts stay consistent on the paired row.
+  assert.match(update, /WHERE l\.id = v_pair\.id;/)
+  // The foreman limit of 0093 also holds for an admin-changed code.
+  assert.match(update, /RAISE EXCEPTION 'contractor_code_too_long'/)
 })
 
 test('an open site visit keeps the append-only driver path', () => {
   assert.match(update, /RAISE EXCEPTION 'open_visit_driver_change'/)
-  assert.match(update, /driver_not_supported/)
+  assert.match(update, /RAISE EXCEPTION 'driver_not_supported'/)
+  assert.match(update, /RAISE EXCEPTION 'invalid_driver'/)
+  // The stored name comes from drivers, never from the caller.
+  assert.match(update, /SELECT d\.full_name INTO v_driver_name/)
+  assert.match(
+    update,
+    /IF p_driver_id IS NOT NULL AND p_driver_id IS DISTINCT FROM v_log\.driver_id THEN/,
+  )
 })
 
 test('both functions take the same advisory-lock key as the sequence trigger', () => {
@@ -95,6 +200,25 @@ test('both functions take the same advisory-lock key as the sequence trigger', (
       /pg_advisory_xact_lock\(\s*hashtextextended\(v_log\.equipment_id::text \|\| ':' \|\| v_log\.movement_context, 0\)\s*\)/,
     )
   }
+})
+
+test('0105 appends to text[] with array_append, never a bare literal', () => {
+  // `v_fields || 'x'` parses 'x' as an array literal and fails at runtime.
+  assert.ok(!/v_fields\s*:=\s*v_fields\s*\|\|\s*'/.test(remove))
+  assert.ok(!/v_paths\s*:=\s*v_paths\s*\|\|/.test(remove))
+  assert.match(
+    remove,
+    /v_fields := array_append\(v_fields, 'movement_driver_changes'::text\);/,
+  )
+  assert.match(
+    remove,
+    /v_fields := array_append\(v_fields, 'entry_exit_photos'::text\);/,
+  )
+  // Same signature and return type as 0104.
+  assert.match(
+    remove,
+    /CREATE OR REPLACE FUNCTION public\.admin_delete_movement\(p_log_id uuid\)\s+RETURNS text\[\]/,
+  )
 })
 
 test('the delete refuses any movement that is not the last of its sequence', () => {
@@ -126,7 +250,7 @@ test('the delete removes its dependants and audits them before the row goes', ()
 })
 
 test('the workshop photo guard is only escaped while its movement is deleted', () => {
-  const guard = functionBody('protect_workshop_required_photo')
+  const guard = functionBody(sql, 'protect_workshop_required_photo')
   assert.match(guard, /current_setting\('app\.movement_delete', true\)/)
   assert.match(
     guard,
@@ -134,6 +258,8 @@ test('the workshop photo guard is only escaped while its movement is deleted', (
   )
   // The original rule is still raised for a live workshop movement.
   assert.match(guard, /RAISE EXCEPTION 'workshop movement requires one photo'/)
+  // 0105 leaves the guard alone.
+  assert.ok(!/FUNCTION public\.protect_workshop_required_photo/.test(sql0105))
 })
 
 test('the storage delete policy adds an admin escape and nothing else', () => {
@@ -157,12 +283,18 @@ test('the storage delete policy adds an admin escape and nothing else', () => {
   assert.match(policy, /public\.pending_movement_photo_batches pending/)
   // …plus the admin escape for objects whose rows were just deleted.
   assert.match(policy, /AND \(\s*public\.is_admin\(\)/)
-  // No other storage policy is touched by this migration.
+  // No other storage policy is touched by 0104 or 0105.
   for (const policyName of [
     'select_log_photos',
     'insert_log_photos',
     'update_log_photos',
+    'delete_log_photos',
   ]) {
-    assert.ok(!sql.includes(policyName), `0104 must not touch ${policyName}`)
+    if (policyName !== 'delete_log_photos')
+      assert.ok(!sql.includes(policyName), `0104 must not touch ${policyName}`)
+    assert.ok(
+      !sql0105.includes(policyName),
+      `0105 must not touch ${policyName}`,
+    )
   }
 })
