@@ -1,13 +1,20 @@
 import type { ReactNode } from 'react'
 import { cn } from './cn'
+import { LtrValue } from './InfoGrid'
 
 export interface DetailHeaderProps {
   /** The big identifying value: an equipment code, a driver's name, a
    *  movement's type. */
   identifier: ReactNode
+  /** Set when `identifier` is a Latin/LTR value (a code, a VIN) so it is
+   *  isolated through `LtrValue` and still hugs the start edge in RTL,
+   *  instead of `dir="ltr"` on the heading pulling it to the left. */
+  identifierLtr?: boolean
   /** One-line supporting text under the identifier: a type, a role, a
    *  short description. */
   subtitle?: ReactNode
+  /** Same as `identifierLtr`, for `subtitle`. */
+  subtitleLtr?: boolean
   /** Status badges shown next to the identifier (ENTRY/EXIT, ownership,
    *  operational status, and so on). */
   badges?: ReactNode
@@ -27,12 +34,16 @@ export interface DetailHeaderProps {
  */
 export function DetailHeader({
   identifier,
+  identifierLtr,
   subtitle,
+  subtitleLtr,
   badges,
   actions,
   as: Heading = 'h2',
   className,
 }: DetailHeaderProps) {
+  const isIdentifierString = typeof identifier === 'string'
+  const isSubtitleString = typeof subtitle === 'string'
   return (
     <div
       className={cn(
@@ -42,8 +53,15 @@ export function DetailHeader({
     >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <Heading className="truncate text-lg font-bold text-fg sm:text-xl">
-            {identifier}
+          <Heading
+            title={isIdentifierString ? identifier : undefined}
+            className="min-w-0 truncate-safe text-start text-lg font-bold text-fg sm:text-xl"
+          >
+            {identifierLtr ? (
+              <LtrValue truncate={isIdentifierString}>{identifier}</LtrValue>
+            ) : (
+              identifier
+            )}
           </Heading>
           {badges && (
             <div className="flex shrink-0 flex-wrap items-center gap-1.5">
@@ -52,7 +70,16 @@ export function DetailHeader({
           )}
         </div>
         {subtitle && (
-          <p className="mt-0.5 truncate text-sm text-muted">{subtitle}</p>
+          <p
+            title={isSubtitleString ? subtitle : undefined}
+            className="mt-0.5 min-w-0 truncate-safe text-start text-sm text-muted"
+          >
+            {subtitleLtr ? (
+              <LtrValue truncate={isSubtitleString}>{subtitle}</LtrValue>
+            ) : (
+              subtitle
+            )}
+          </p>
         )}
       </div>
       {actions && (
