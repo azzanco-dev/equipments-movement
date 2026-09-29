@@ -64,7 +64,6 @@ import {
   MovementBadge,
   Notice,
   PageHeader,
-  Skeleton,
   WorkshopPurposeBadge,
   useConfirm,
   type DescriptionListItem,
@@ -73,6 +72,7 @@ import {
 // wave6-J3/J4 — admin-only header menu: the single correction dialog, or
 // delete the movement. Both are authoritative in PostgreSQL (0104/0105).
 import { MovementAdminMenu } from '@/components/movement/MovementAdminMenu'
+import { MovementDetailSkeleton } from '@/components/movement/MovementDetailSkeleton'
 import { MovementEditDialog } from '@/components/movement/MovementEditDialog'
 import {
   movementAdminErrorKey,
@@ -116,6 +116,8 @@ export function MovementDetail({
   const signedUrlCacheRef = useRef<
     Map<string, { url: string; fetchedAt: number }>
   >(new Map())
+  // Id of the movement whose data is currently on screen (null until loaded).
+  const loadedMovementIdRef = useRef<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [linkedError, setLinkedError] = useState<string | null>(null)
@@ -164,25 +166,32 @@ export function MovementDetail({
   const startRequest = useListRequest()
   const fetchData = useCallback(async () => {
     const signal = startRequest()
-    // Reset all movement-specific state so stale values from a previous
-    // movement cannot bleed into the next one (especially when navigating
-    // directly between linked ENTRY and EXIT records).
-    setLog(null)
-    setCompany(null)
-    setProject(null)
-    setLinkedLog(null)
-    setLinkedCompany(null)
-    setLinkedProject(null)
-    setPhotoUrl(null)
-    setPhotoItems([])
-    setPhotoCarouselIndex(0)
-    setLightboxOpen(false)
+    // A refetch of the movement that is already on screen (after an edit, a
+    // photo or a driver change) keeps the current page visible: no skeleton,
+    // and each section is overwritten when its new data arrives. Only a first
+    // load or a switch to another movement resets all movement-specific state,
+    // so stale values cannot bleed into the next one (especially when
+    // navigating directly between linked ENTRY and EXIT records).
+    const isRefetch = loadedMovementIdRef.current === movementId
+    if (!isRefetch) {
+      loadedMovementIdRef.current = null
+      setLog(null)
+      setCompany(null)
+      setProject(null)
+      setLinkedLog(null)
+      setLinkedCompany(null)
+      setLinkedProject(null)
+      setPhotoUrl(null)
+      setPhotoItems([])
+      setPhotoCarouselIndex(0)
+      setLightboxOpen(false)
+      setDriverChanges([])
+      setCurrentDriverMobileNumber(null)
+      setDriverEntryId(null)
+      setLoading(true)
+    }
     setLinkedError(null)
-    setDriverChanges([])
-    setCurrentDriverMobileNumber(null)
-    setDriverEntryId(null)
     setError(null)
-    setLoading(true)
 
     try {
       const { data, error: fetchError } = await supabase
@@ -203,6 +212,7 @@ export function MovementDetail({
       }
 
       const logData = data as EntryExitLog
+      loadedMovementIdRef.current = movementId
       setLog(logData)
       setCompany(logData.company ?? null)
       setProject(logData.project ?? null)
@@ -279,6 +289,7 @@ export function MovementDetail({
               const url = cache.get(photo.file_path)?.url
               return url ? { ...photo, url } : null
             })
+            setPhotoUrl(null)
             setPhotoItems(
               signedItems.filter(
                 (item): item is EntryExitPhoto & { url: string } =>
@@ -286,6 +297,7 @@ export function MovementDetail({
               ),
             )
           } else if (logData.photo_url) {
+            setPhotoItems([])
             const path = logData.photo_url
             const cache = signedUrlCacheRef.current
             const now = Date.now()
@@ -303,6 +315,9 @@ export function MovementDetail({
             }
             const finalUrl = cache.get(path)?.url
             if (finalUrl) setPhotoUrl(finalUrl)
+          } else {
+            setPhotoItems([])
+            setPhotoUrl(null)
           }
         })(),
         (async () => {
@@ -602,18 +617,9 @@ export function MovementDetail({
       </div>
     )
 
-  if (loading)
-    return (
-      <div
-        className="space-y-2 py-2"
-        aria-busy="true"
-        aria-label={t('loading')}
-      >
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-4/5" />
-      </div>
-    )
+  // Skeleton only for the first load (no movement yet); a refetch after an
+  // edit keeps the current page on screen.
+  if (loading && !log && !error) return <MovementDetailSkeleton />
 
   if (error) {
     return (
