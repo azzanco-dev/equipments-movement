@@ -11,6 +11,7 @@ import {
 import { fetchEntriesSeries, fetchEntriesYearly } from '@/lib/adminHomeData'
 import {
   ADMIN_HOME_GRANULARITIES,
+  DEFAULT_HOME_OWNERS,
   GRANULARITY_YEARS,
   adminHomeFlowRange,
   aggregateDailySeries,
@@ -80,7 +81,7 @@ export function EntriesFlowSection({
   onShowExitsChange,
 }: EntriesFlowSectionProps) {
   const { t, lang, dir } = useI18n()
-  const [owners, setOwners] = useState<AdminHomeOwner[]>([])
+  const [owners, setOwners] = useState<AdminHomeOwner[]>(DEFAULT_HOME_OWNERS)
   const yearly = granularity === 'year'
 
   // The range is read from the clock once per granularity/owner change, so the

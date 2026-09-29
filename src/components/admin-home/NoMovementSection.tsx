@@ -9,6 +9,7 @@ import { fetchOutsideEquipment } from '@/lib/adminHomeData'
 import {
   ADMIN_HOME_PAGE_SIZE,
   clampPage,
+  DEFAULT_HOME_OWNERS,
   type AdminHomeOwner,
   type OutsideEquipmentRow,
 } from '@/lib/adminHomeStats'
@@ -45,7 +46,7 @@ export function NoMovementSection({
   const ownerLabel = useOwnerLabel()
   // Per-section state, deliberately not in the URL: the owner asked for a
   // filter that reflects on this table only.
-  const [owners, setOwners] = useState<AdminHomeOwner[]>([])
+  const [owners, setOwners] = useState<AdminHomeOwner[]>(DEFAULT_HOME_OWNERS)
   const [page, setPage] = useState(1)
   const [exporting, setExporting] = useState(false)
   const [exportNote, setExportNote] = useState<'capped' | 'failed' | null>(null)

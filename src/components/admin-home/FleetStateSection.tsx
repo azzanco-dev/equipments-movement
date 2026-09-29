@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { Badge, StatCard } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { fetchFleetState } from '@/lib/adminHomeData'
-import type { AdminHomeOwner } from '@/lib/adminHomeStats'
+import { DEFAULT_HOME_OWNERS, type AdminHomeOwner } from '@/lib/adminHomeStats'
 import { AdminHomeSection } from './AdminHomeSection'
 import { OwnerFilter } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
@@ -27,7 +27,7 @@ export function FleetStateSection() {
   const { t } = useI18n()
   // Plain component state, not the URL: it scopes this section only, so it is
   // a view control rather than something a shared link should carry.
-  const [owners, setOwners] = useState<AdminHomeOwner[]>([])
+  const [owners, setOwners] = useState<AdminHomeOwner[]>(DEFAULT_HOME_OWNERS)
   const load = useCallback(
     (signal: AbortSignal) => fetchFleetState(owners, signal),
     [owners],

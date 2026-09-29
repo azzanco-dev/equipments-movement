@@ -76,6 +76,26 @@ test('owner filters are deduplicated and canonically ordered', () => {
   )
 })
 
+test('the home sections default to the three in-house owners', () => {
+  // Owner decision, 2026-09-29: Takween and external suppliers are opt-in.
+  assert.deepEqual(plain(admin.DEFAULT_HOME_OWNERS), [
+    'alazani',
+    'third_party_f',
+    'third_party_partnership_b',
+  ])
+  // Already canonical, so normalizing changes nothing, and every entry is a
+  // known owner.
+  assert.deepEqual(
+    plain(admin.normalizeOwnerFilters(admin.DEFAULT_HOME_OWNERS)),
+    plain(admin.DEFAULT_HOME_OWNERS),
+  )
+  // It is a real filter, not "every owner": the database gets the three.
+  assert.deepEqual(
+    plain(admin.ownerFilterArgument(admin.DEFAULT_HOME_OWNERS)),
+    plain(admin.DEFAULT_HOME_OWNERS),
+  )
+})
+
 test('the database argument is NULL for "every owner", never an empty array', () => {
   // The functions in 0095/0101 treat NULL and an empty array the same, but only
   // one of them may leave the client, so "no filter" has one representation.

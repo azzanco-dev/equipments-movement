@@ -9,12 +9,13 @@ import type { TranslationKey } from '@/i18n/translations'
 import { fetchOwnerStateMatrix } from '@/lib/adminHomeData'
 import {
   ADMIN_HOME_OWNERS,
+  DEFAULT_HOME_OWNERS,
   FLEET_STATES,
   type AdminHomeOwner,
   type FleetStateId,
 } from '@/lib/adminHomeStats'
 import { AdminHomeSection } from './AdminHomeSection'
-import { useOwnerLabel } from './OwnerFilter'
+import { OwnerFilter, useOwnerLabel } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 /**
@@ -61,14 +62,6 @@ type Focus =
   | null
 
 /**
- * No owner filter: the whole fleet, always. `ownerFilterArgument` turns an
- * empty selection into the NULL `p_owners` the database reads as "every
- * owner", and the constant lives at module scope so the loader's identity
- * never changes and the section cannot reload itself on every render.
- */
-const EVERY_OWNER: AdminHomeOwner[] = []
-
-/**
  * "اين الاسطول الان": two donuts side by side — the fleet by owner and the
  * fleet by state (owner request, 2026-09-22, replacing the single donut with
  * its drill-down).
@@ -79,10 +72,11 @@ const EVERY_OWNER: AdminHomeOwner[] = []
  * focus exists at a time, so the pair always answers one question rather than
  * two half-applied filters.
  *
- * This section deliberately has no owner filter (owner review, 2026-09-22,
- * third pass): the owner is one of the two slices drawn here, so filtering by
- * owner would be filtering the answer out of the chart. Selecting an owner
- * slice is the filter.
+ * The section starts on the three in-house owners (owner decision,
+ * 2026-09-29) and carries a small owner filter in its header so the user can
+ * widen it. The filter scopes the whole snapshot, so both donuts always cover
+ * the same set of owners; an empty selection means every owner. Selecting an
+ * owner slice is still the cross-filter between the two charts.
  *
  * Both charts come from one snapshot (`get_admin_owner_state_matrix`), so a
  * cross-filter never costs a request and the halves can never be drawn from
@@ -92,10 +86,11 @@ export function FleetDonutSection() {
   const { t, lang, dir } = useI18n()
   const ownerLabel = useOwnerLabel()
   const [focus, setFocus] = useState<Focus>(null)
+  const [owners, setOwners] = useState<AdminHomeOwner[]>(DEFAULT_HOME_OWNERS)
 
   const load = useCallback(
-    (signal: AbortSignal) => fetchOwnerStateMatrix(EVERY_OWNER, signal),
-    [],
+    (signal: AbortSignal) => fetchOwnerStateMatrix(owners, signal),
+    [owners],
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
 
@@ -104,9 +99,19 @@ export function FleetDonutSection() {
     [data],
   )
 
-  // Every owner: the owner donut is the place the split is read, so it always
-  // draws the full set of classifications.
-  const visibleOwners = useMemo(() => [...ADMIN_HOME_OWNERS], [])
+  // The owner donut draws exactly the owners the section is filtered to (every
+  // classification when the filter is cleared), so it matches the state donut.
+  const visibleOwners = useMemo(
+    () => (owners.length ? owners : [...ADMIN_HOME_OWNERS]),
+    [owners],
+  )
+
+  const changeOwners = (next: AdminHomeOwner[]) => {
+    setOwners(next)
+    // A focused owner may have just left the set; drop the cross-filter so the
+    // charts never describe an owner that is no longer drawn.
+    setFocus(null)
+  }
 
   // A focus on the other chart narrows this one; a focus on this chart only
   // highlights it, so clicking an owner never reduces the owner donut to that
@@ -164,7 +169,17 @@ export function FleetDonutSection() {
     <AdminHomeSection
       title={t('adminHomeDonutTitle')}
       description={t('adminHomeDonutDescription')}
-      action={<Badge tone="info">{t('adminHomeNow')}</Badge>}
+      action={
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="info">{t('adminHomeNow')}</Badge>
+          <OwnerFilter
+            size="sm"
+            className="w-44"
+            value={owners}
+            onChange={changeOwners}
+          />
+        </div>
+      }
       loading={loading}
       failed={failed}
       onRetry={retry}

@@ -27,6 +27,19 @@ export const ADMIN_HOME_OWNERS = [
 
 export type AdminHomeOwner = (typeof ADMIN_HOME_OWNERS)[number]
 
+/**
+ * The owners every admin-home section starts on (owner decision, 2026-09-29):
+ * the three in-house classifications. Takween and external suppliers are left
+ * out until the user widens a section's filter. Kept in the canonical
+ * `ADMIN_HOME_OWNERS` order, so it is already what `normalizeOwnerFilters`
+ * would return.
+ */
+export const DEFAULT_HOME_OWNERS: AdminHomeOwner[] = [
+  'alazani',
+  'third_party_f',
+  'third_party_partnership_b',
+]
+
 function isAdminHomeOwner(value: string): value is AdminHomeOwner {
   return (ADMIN_HOME_OWNERS as readonly string[]).includes(value)
 }

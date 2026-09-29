@@ -4,10 +4,11 @@ import type { DataTableColumn } from '@/components/ui'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { useI18n } from '@/i18n/I18nContext'
 import { fetchAvailabilityByType } from '@/lib/adminHomeData'
-import type {
-  AdminHomeOwner,
-  AvailabilityRow,
-  FleetStateCounts,
+import {
+  DEFAULT_HOME_OWNERS,
+  type AdminHomeOwner,
+  type AvailabilityRow,
+  type FleetStateCounts,
 } from '@/lib/adminHomeStats'
 import { AdminHomeSection } from './AdminHomeSection'
 import { OwnerFilter } from './OwnerFilter'
@@ -37,7 +38,7 @@ const PAGE_SIZE = 20
  */
 export function AvailabilitySection() {
   const { t } = useI18n()
-  const [owners, setOwners] = useState<AdminHomeOwner[]>([])
+  const [owners, setOwners] = useState<AdminHomeOwner[]>(DEFAULT_HOME_OWNERS)
   // `input` is what the user typed; `search` is what the database was asked
   // for. Keeping them apart is what makes the debounce possible without the
   // box ever lagging behind the keyboard.
@@ -89,7 +90,7 @@ export function AvailabilitySection() {
   ): DataTableColumn<AvailabilityRow> => ({
     key,
     header,
-    align: 'end',
+    align: 'center',
     width: '6rem',
     hideBelow: options.hideBelow,
     cell: (row) => (
