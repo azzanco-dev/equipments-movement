@@ -401,9 +401,9 @@ export const visitsListConfig: DataListConfig = {
  *
  * Every filter key below is a real column of the view and is allowlisted
  * against this list before it reaches PostgREST, so no arbitrary column can be
- * filtered. `supervisor_id` options are filled in by the screen from the
- * foreman list, and those labels are people's names, so they carry no
- * `labelI18n`.
+ * filtered. `supervisor_id` has no static options: `/logs` renders it in
+ * `FilterBar` as a relational search (`asyncFields`, first 20 foremen from
+ * `profile_names`, server-side search), so no foreman list is preloaded.
  */
 export const logsListConfig: DataListConfig = {
   id: 'logs',

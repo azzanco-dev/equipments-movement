@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Filter } from 'lucide-react'
 import {
   Badge,
@@ -22,6 +22,9 @@ import type { FilterField, FilterOperator, ListFilter } from './types'
 /** Radix reserves '' for "no value", so "any value" needs a sentinel. */
 const ANY_VALUE = '__any__'
 
+/** Same pause as the list search box before a typed filter reaches the URL. */
+const TEXT_DEBOUNCE_MS = 300
+
 /**
  * A relational field rendered with `AsyncSearchSelect` instead of a plain
  * select: the bar only needs to know how to search it. The picked option is
@@ -29,7 +32,111 @@ const ANY_VALUE = '__any__'
  */
 export interface FilterBarAsyncField {
   loadOptions: (query: string) => Promise<AsyncSearchSelectOption[]>
+  /**
+   * Looks up the label of a value the bar did not pick itself: a filter
+   * restored from the URL (Back, a shared link, a reload) carries only the id.
+   * Without it the trigger would read "All" while the filter is active.
+   */
+  resolveOption?: (value: string) => Promise<AsyncSearchSelectOption | null>
   placeholder?: string
+}
+
+/**
+ * One relational filter control. It remembers the option the user picked, and
+ * resolves the label once for a value that arrived from the URL instead.
+ */
+function AsyncFilterControl({
+  wiring,
+  value,
+  asyncField,
+  placeholder,
+  onPick,
+}: {
+  wiring: FieldControlProps
+  value: string
+  asyncField: FilterBarAsyncField
+  placeholder: string
+  onPick: (value: string) => void
+}) {
+  const [picked, setPicked] = useState<AsyncSearchSelectOption | null>(null)
+  const { resolveOption } = asyncField
+  const known = picked?.value === value
+
+  useEffect(() => {
+    if (!value || known || !resolveOption) return
+    let cancelled = false
+    resolveOption(value).then(
+      (option) => {
+        if (!cancelled && option) setPicked(option)
+      },
+      // An unresolved label is cosmetic; the filter itself still applies.
+      () => undefined,
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [value, known, resolveOption])
+
+  return (
+    <AsyncSearchSelect
+      {...wiring}
+      value={value}
+      selectedOption={known ? picked : null}
+      loadOptions={asyncField.loadOptions}
+      placeholder={asyncField.placeholder ?? placeholder}
+      onChange={(next, option) => {
+        setPicked(option)
+        onPick(next)
+      }}
+    />
+  )
+}
+
+/**
+ * A free-text filter. Typing stays local and reaches the list only after a
+ * short pause, so every keystroke is not a URL change plus a server query.
+ * A value changed from outside (Clear all, Back) replaces the draft.
+ */
+function TextFilterControl({
+  wiring,
+  type,
+  value,
+  onCommit,
+}: {
+  wiring: FieldControlProps
+  type: 'text' | 'number'
+  value: string
+  onCommit: (value: string) => void
+}) {
+  const [draft, setDraft] = useState(value)
+  const committed = useRef(value)
+  // The latest callback, so a parent re-render does not restart the pause.
+  const commit = useRef(onCommit)
+  commit.current = onCommit
+
+  useEffect(() => {
+    if (value === committed.current) return
+    committed.current = value
+    setDraft(value)
+  }, [value])
+
+  useEffect(() => {
+    if (draft === committed.current) return
+    const timer = window.setTimeout(() => {
+      committed.current = draft
+      commit.current(draft)
+    }, TEXT_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [draft])
+
+  return (
+    <Input
+      {...wiring}
+      type={type}
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+    />
+  )
 }
 
 export interface FilterBarProps {
@@ -56,8 +163,9 @@ function pickOperator(
 
 /**
  * The operator a field's control stands for. The bar deliberately hides
- * operators: one control per field, the obvious comparison for its type. The
- * full operator list stays available in the filter builder.
+ * operators: one control per field, the obvious comparison for its type.
+ * Since wave 7 (2026-09-29) the seven master/log lists use only this bar; the
+ * older `FilterBuilder` is kept for the `/ui-kit` comparison.
  */
 export function filterBarOperator(field: FilterField): FilterOperator {
   if (field.type === 'date') return pickOperator(field, ['between', 'eq'])
@@ -91,9 +199,6 @@ export function FilterBar({
   const fieldLabel = useListLabel()
   const optionLabel = useOptionLabel()
   const [expanded, setExpanded] = useState(false)
-  const [picked, setPicked] = useState<
-    Record<string, AsyncSearchSelectOption | null>
-  >({})
 
   const activeCount = useMemo(
     () =>
@@ -136,16 +241,12 @@ export function FilterBar({
 
     if (asyncField)
       return (
-        <AsyncSearchSelect
-          {...wiring}
+        <AsyncFilterControl
+          wiring={wiring}
           value={value}
-          selectedOption={picked[field.key] ?? null}
-          loadOptions={asyncField.loadOptions}
-          placeholder={asyncField.placeholder ?? t('all')}
-          onChange={(next, option) => {
-            setPicked((state) => ({ ...state, [field.key]: option }))
-            apply(field, next)
-          }}
+          asyncField={asyncField}
+          placeholder={t('all')}
+          onPick={(next) => apply(field, next)}
         />
       )
 
@@ -190,11 +291,11 @@ export function FilterBar({
       )
 
     return (
-      <Input
-        {...wiring}
+      <TextFilterControl
+        wiring={wiring}
         type={field.type === 'number' ? 'number' : 'text'}
         value={value}
-        onChange={(event) => apply(field, event.target.value)}
+        onCommit={(next) => apply(field, next)}
       />
     )
   }

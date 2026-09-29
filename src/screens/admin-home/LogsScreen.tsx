@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { FileSpreadsheet } from 'lucide-react'
 import {
@@ -16,9 +16,12 @@ import {
 import type { DataTableColumn } from '@/components/ui'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
+import {
+  FilterBar,
+  type FilterBarAsyncField,
+} from '@/components/data-list/FilterBar'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
-import type { DataListConfig } from '@/components/data-list/types'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDateTime } from '@/lib/dateFormat'
@@ -30,6 +33,7 @@ import {
   buildMovementSearchFilter,
   type MovementLogSearchRow,
 } from '@/lib/movementLogSearch'
+import { sanitizeSearchTerm } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 
 /** Which movements the tab shows; `all` applies no context predicate. */
@@ -42,6 +46,51 @@ function isLogsTab(value: string | null): value is LogsTab {
 }
 
 const LIST_SELECT = `${MOVEMENT_LOG_ADMIN_SELECT},workshop_purpose,equipment_ownership_status`
+
+/** Relational selectors show the first/best 20 matches, never more. */
+const FOREMAN_OPTION_LIMIT = 20
+
+/**
+ * The foreman filter searches names server-side instead of preloading every
+ * foreman into the config. `profile_names` (migration 0099) exposes only
+ * id/full_name/role to signed-in users, which is all a name lookup needs.
+ */
+const foremanFilter: FilterBarAsyncField = {
+  loadOptions: async (query) => {
+    let request = supabase
+      .from('profile_names')
+      .select('id,full_name')
+      .eq('role', 'supervisor')
+      .order('full_name')
+      .order('id')
+      .limit(FOREMAN_OPTION_LIMIT)
+    const term = sanitizeSearchTerm(query)
+    if (term) request = request.ilike('full_name', `%${term}%`)
+    const { data, error } = await request
+    // AsyncSearchSelect shows its own load-error state; the raw PostgREST
+    // message never reaches the user.
+    if (error) throw error
+    return (data ?? []).map((row) => ({
+      value: row.id as string,
+      label: (row.full_name as string | null) ?? '',
+    }))
+  },
+  resolveOption: async (value) => {
+    const { data, error } = await supabase
+      .from('profile_names')
+      .select('id,full_name')
+      .eq('id', value)
+      .maybeSingle()
+    if (error || !data) return null
+    return {
+      value: data.id as string,
+      label: (data.full_name as string | null) ?? '',
+    }
+  },
+}
+
+/** Stable across renders, so the bar's controls do not reload on each one. */
+const LOGS_ASYNC_FILTERS = { supervisor_id: foremanFilter }
 
 type LogRow = MovementLogSearchRow
 
@@ -74,45 +123,11 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [foremen, setForemen] = useState<{ value: string; label: string }[]>([])
   const [exporting, setExporting] = useState(false)
   const [exportNote, setExportNote] = useState<
     { tone: 'warning' | 'danger'; text: string } | undefined
   >(undefined)
   const listTopRef = useRef<HTMLDivElement>(null)
-
-  // The foreman filter needs its options; `profiles` is a small master table
-  // and the admin movement log already lists its users elsewhere.
-  useEffect(() => {
-    const controller = new AbortController()
-    void (async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id,full_name')
-        .eq('role', 'supervisor')
-        .order('full_name')
-        .limit(200)
-        .abortSignal(controller.signal)
-      if (controller.signal.aborted || error) return
-      setForemen(
-        (data ?? []).map((row) => ({
-          value: row.id as string,
-          label: (row.full_name as string) ?? '',
-        })),
-      )
-    })()
-    return () => controller.abort()
-  }, [])
-
-  const config: DataListConfig = useMemo(
-    () => ({
-      ...logsListConfig,
-      filterFields: logsListConfig.filterFields.map((field) =>
-        field.key === 'supervisor_id' ? { ...field, options: foremen } : field,
-      ),
-    }),
-    [foremen],
-  )
 
   const setTab = (next: LogsTab) => {
     const query = new URLSearchParams(params.toString())
@@ -350,14 +365,12 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
       <div className="flex flex-wrap items-start gap-2">
         <div className="min-w-0 flex-1">
           <DataListToolbar
-            config={config}
+            config={logsListConfig}
             search={list.searchInput}
             onSearch={list.setSearchInput}
             sort={list.sort}
             direction={list.direction}
             onSort={list.setSort}
-            filters={list.filters}
-            onFilters={list.setFilters}
           />
         </div>
         <Button
@@ -371,6 +384,13 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
           {t('exportExcel')}
         </Button>
       </div>
+
+      <FilterBar
+        fields={logsListConfig.filterFields}
+        filters={list.filters}
+        onChange={list.setFilters}
+        asyncFields={LOGS_ASYNC_FILTERS}
+      />
 
       {exportNote && (
         <Notice

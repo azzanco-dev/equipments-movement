@@ -147,3 +147,46 @@ test('every filter field of every config can be rendered by the bar', () => {
         )
     }
 })
+
+// Wave 7: the seven lists render FilterBar instead of the toolbar's popover.
+const SCREENS = {
+  'src/screens/equipment/EquipmentListScreen.tsx': 'equipmentListConfig',
+  'src/screens/drivers/DriversListScreen.tsx': 'driversListConfig',
+  'src/screens/companies/CompaniesListScreen.tsx': 'companiesListConfig',
+  'src/screens/projects/ProjectsListScreen.tsx': 'projectsListConfig',
+  'src/screens/lessors/LessorsListScreen.tsx': 'lessorsListConfig',
+  'src/screens/AdminUsers.tsx': 'usersListConfig',
+  'src/screens/admin-home/LogsScreen.tsx': 'logsListConfig',
+}
+
+const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8')
+
+test('each migrated list renders FilterBar from its own allowlisted config', () => {
+  for (const [file, config] of Object.entries(SCREENS)) {
+    const source = read(file)
+    assert.match(
+      source,
+      new RegExp(String.raw`<FilterBar\s+fields=\{${config}\.filterFields\}`),
+      `${file} should render FilterBar with ${config}.filterFields`,
+    )
+    assert.match(source, /onChange=\{list\.setFilters\}/, file)
+    assert.doesNotMatch(source, /onFilters=/, `${file} still wires onFilters`)
+  }
+})
+
+test('the toolbar no longer carries a filter popover', () => {
+  const source = read('src/components/data-list/DataListToolbar.tsx')
+  assert.doesNotMatch(source, /FilterBuilder/)
+  assert.doesNotMatch(source, /onFilters/)
+  assert.doesNotMatch(source, /createPortal/)
+})
+
+test('the /logs foreman filter is a bounded server-side search', () => {
+  const source = read('src/screens/admin-home/LogsScreen.tsx')
+  assert.match(source, /asyncFields=\{LOGS_ASYNC_FILTERS\}/)
+  assert.match(source, /supervisor_id: foremanFilter/)
+  assert.match(source, /from\('profile_names'\)/)
+  assert.match(source, /FOREMAN_OPTION_LIMIT = 20\b/)
+  // No preloaded foreman list is injected into the config any more.
+  assert.doesNotMatch(source, /setForemen|\.limit\(200\)/)
+})

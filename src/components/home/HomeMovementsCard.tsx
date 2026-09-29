@@ -200,7 +200,9 @@ function MovementLogTab({
           disabled={classifyingId === log.id}
           placeholder={t('selectClassification')}
           aria-label={t('workshopPurpose')}
-          className="w-36"
+          // Table-row control: compact like the pending-classification card.
+          size="sm"
+          className="w-28"
           options={[
             { value: 'maintenance', label: t('maintenancePurpose') },
             { value: 'parking', label: t('parkingPurpose') },

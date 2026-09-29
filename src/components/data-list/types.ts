@@ -36,10 +36,11 @@ export type ListLabel =
   | (string & Record<never, never>)
 
 /**
- * A filter value option. `label` stays a plain string because screens inject
- * runtime options (the foreman list in `/logs`, for example) whose text is
- * data, not copy; static options in `listConfigs` add `labelI18n` so they
- * follow the interface language.
+ * A filter value option. `label` stays a plain string so a screen can inject
+ * runtime options whose text is data, not copy; static options in
+ * `listConfigs` add `labelI18n` so they follow the interface language.
+ * Relational fields (the `/logs` foreman) use `FilterBar`'s `asyncFields`
+ * instead of injected options.
  */
 export type FilterOption = {
   value: string

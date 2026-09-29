@@ -4,6 +4,7 @@ import { useAuth } from '@/auth/AuthContext'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
+import { FilterBar } from '@/components/data-list/FilterBar'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import {
@@ -267,8 +268,11 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
         sort={list.sort}
         direction={list.direction}
         onSort={list.setSort}
+      />
+      <FilterBar
+        fields={usersListConfig.filterFields}
         filters={list.filters}
-        onFilters={list.setFilters}
+        onChange={list.setFilters}
       />
       {loadError ? (
         <ErrorState description={loadError} onRetry={fetchUsers} />

@@ -5,6 +5,7 @@ import { Button, PageHeader } from '@/components/ui'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
+import { FilterBar } from '@/components/data-list/FilterBar'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { EquipmentExcelUpdate } from '@/components/EquipmentExcelUpdate'
@@ -182,8 +183,11 @@ export function EquipmentListScreen({
         sort={list.sort}
         direction={list.direction}
         onSort={list.setSort}
+      />
+      <FilterBar
+        fields={equipmentListConfig.filterFields}
         filters={list.filters}
-        onFilters={list.setFilters}
+        onChange={list.setFilters}
       />
 
       <EquipmentTable

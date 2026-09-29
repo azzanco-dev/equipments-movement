@@ -2,18 +2,21 @@ import {
   ArrowDownAZ,
   ArrowUpAZ,
   ChevronDown,
-  Filter,
   MoreHorizontal,
   Search,
-  X,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
-import { FilterBuilder } from './FilterBuilder'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useListLabel } from './labels'
-import { type DataListConfig, type ListFilter } from './types'
+import { type DataListConfig } from './types'
 import { useI18n } from '@/i18n/I18nContext'
 
+/**
+ * Search, sort and actions row of the shared list system.
+ *
+ * Filtering is no longer part of the toolbar: the filter popover (field /
+ * operator / value builder rows) was replaced by `FilterBar`, which each list
+ * renders between this toolbar and its table (wave 7, 2026-09-29).
+ */
 interface ToolbarProps {
   config: DataListConfig
   search: string
@@ -29,8 +32,6 @@ interface ToolbarProps {
   pageSize?: number
   /** @deprecated see `pageSize` above. */
   onPageSize?: (size: number) => void
-  filters: ListFilter[]
-  onFilters: (filters: ListFilter[]) => void
   selectedCount?: number
   bulkActions?: ReactNode
   actions?: ReactNode
@@ -46,8 +47,6 @@ export function DataListToolbar({
   sort,
   direction,
   onSort,
-  filters,
-  onFilters,
   selectedCount = 0,
   bulkActions,
   actions,
@@ -57,42 +56,8 @@ export function DataListToolbar({
 }: ToolbarProps) {
   const { t } = useI18n()
   const listLabel = useListLabel()
-  const [open, setOpen] = useState<'filters' | 'sort' | 'actions' | null>(null)
-  const [draftFilters, setDraftFilters] = useState(filters)
-  const toolbarRef = useRef<HTMLDivElement>(null)
-  const filterTriggerRef = useRef<HTMLButtonElement>(null)
-  const [filterPosition, setFilterPosition] = useState({
-    top: 0,
-    left: 12,
-    width: 320,
-    maxHeight: 320,
-    openAbove: false,
-  })
+  const [open, setOpen] = useState<'sort' | 'actions' | null>(null)
   const currentSort = config.sortableFields.find((field) => field.key === sort)
-  const updateFilterPosition = useCallback(() => {
-    const rect = filterTriggerRef.current?.getBoundingClientRect()
-    if (!rect) return
-    const gap = 6
-    const padding = 12
-    const availableBelow = Math.max(
-      0,
-      window.innerHeight - rect.bottom - gap - padding,
-    )
-    const availableAbove = Math.max(0, rect.top - gap - padding)
-    const openAbove = availableBelow < 240 && availableAbove > availableBelow
-    const width = Math.min(560, window.innerWidth - padding * 2)
-    const left = Math.min(
-      Math.max(padding, rect.right - width),
-      window.innerWidth - width - padding,
-    )
-    setFilterPosition({
-      top: openAbove ? rect.top - gap : rect.bottom + gap,
-      left,
-      width,
-      maxHeight: openAbove ? availableAbove : availableBelow,
-      openAbove,
-    })
-  }, [])
   useEffect(() => {
     const close = (event: MouseEvent) => {
       const target = event.target as Element
@@ -107,25 +72,10 @@ export function DataListToolbar({
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [])
-  useEffect(() => {
-    if (open !== 'filters') return
-    updateFilterPosition()
-    window.addEventListener('resize', updateFilterPosition)
-    window.addEventListener('scroll', updateFilterPosition, true)
-    return () => {
-      window.removeEventListener('resize', updateFilterPosition)
-      window.removeEventListener('scroll', updateFilterPosition, true)
-    }
-  }, [open, updateFilterPosition])
-  const toggle = (target: 'filters' | 'sort' | 'actions') => {
-    if (target === 'filters') {
-      setDraftFilters(filters)
-      updateFilterPosition()
-    }
+  const toggle = (target: 'sort' | 'actions') =>
     setOpen((current) => (current === target ? null : target))
-  }
   return (
-    <div className="space-y-3" ref={toolbarRef}>
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] w-full sm:w-[360px] lg:w-[460px]">
           <Search
@@ -141,82 +91,6 @@ export function DataListToolbar({
           />
         </div>
         <div className="flex items-center gap-2 sm:ms-auto">
-          <div className="relative">
-            <button
-              ref={filterTriggerRef}
-              data-list-trigger="true"
-              className="btn-outline"
-              onClick={() => toggle('filters')}
-            >
-              <Filter size={15} />
-              {t('filters')}
-              {filters.length > 0 && (
-                <span className="rounded bg-gray-100 px-1.5 text-xs dark:bg-gray-700">
-                  {filters.length}
-                </span>
-              )}
-              <ChevronDown size={14} />
-            </button>
-            {open === 'filters' &&
-              createPortal(
-                <div
-                  data-list-popover="true"
-                  className="fixed z-[100] flex flex-col rounded-lg border p-3 shadow-xl"
-                  dir={document.documentElement.dir || 'rtl'}
-                  style={{
-                    background: 'var(--bg)',
-                    borderColor: 'var(--border)',
-                    left: filterPosition.left,
-                    width: filterPosition.width,
-                    maxHeight: filterPosition.maxHeight,
-                    ...(filterPosition.openAbove
-                      ? { bottom: window.innerHeight - filterPosition.top }
-                      : { top: filterPosition.top }),
-                  }}
-                >
-                  <div className="mb-3 flex shrink-0 items-center justify-between">
-                    <span className="text-sm font-semibold">
-                      {t('filterResults')}
-                    </span>
-                    <button
-                      className="btn-ghost p-1"
-                      onClick={() => setOpen(null)}
-                    >
-                      <X size={15} />
-                    </button>
-                  </div>
-                  <div className="min-h-0 flex-1 overscroll-contain overflow-y-auto">
-                    <FilterBuilder
-                      fields={config.filterFields}
-                      filters={draftFilters}
-                      onChange={setDraftFilters}
-                      compact
-                    />
-                  </div>
-                  <div
-                    className="mt-3 flex shrink-0 justify-end gap-2 border-t pt-3"
-                    style={{ borderColor: 'var(--border)' }}
-                  >
-                    <button
-                      className="btn-ghost"
-                      onClick={() => setDraftFilters([])}
-                    >
-                      {t('clear')}
-                    </button>
-                    <button
-                      className="btn-primary"
-                      onClick={() => {
-                        onFilters(draftFilters)
-                        setOpen(null)
-                      }}
-                    >
-                      {t('applyFilters')}
-                    </button>
-                  </div>
-                </div>,
-                document.body,
-              )}
-          </div>
           <div className="relative">
             <button
               data-list-trigger="true"
