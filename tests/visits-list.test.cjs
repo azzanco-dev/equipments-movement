@@ -33,8 +33,12 @@ function loadLibModule(name, cache = new Map()) {
 }
 
 const {
+  adminVisitsListConfig,
   buildVisitSearchFilter,
   formatVisitDuration,
+  visitContextFilter,
+  visitExportColumns,
+  visitExportFileName,
   visitSortField,
   visitStateView,
   visitsListConfig,
@@ -62,14 +66,36 @@ test('the search term cannot break out of the PostgREST or() filter', () => {
   }
 })
 
-test('a text term probes code, type, plate and the driver snapshot only', () => {
+test('a text term probes code, type, plate, driver and company number only', () => {
   assert.equal(
     buildVisitSearchFilter('A12'),
     'equipment_code.ilike.%A12%,' +
       'equipment_type.ilike.%A12%,' +
       'equipment_plate_number.ilike.%A12%,' +
-      'driver_name.ilike.%A12%',
+      'driver_name.ilike.%A12%,' +
+      'contractor_equipment_code.ilike.%A12%',
   )
+})
+
+test('the company number (contractor code) is searched with the sanitized term', () => {
+  // EM-198: a visit is found by the company number typed on its ENTRY.
+  const filter = buildVisitSearchFilter('  TK-7,(x)  ')
+  assert.ok(filter.includes('contractor_equipment_code.ilike.%TK-7 x%'))
+  // The structural characters never reach the pattern.
+  assert.ok(!/contractor_equipment_code\.ilike\.[^,]*[()]/.test(filter))
+})
+
+test('a digits-only term probes the company number and the plate digits', () => {
+  const filter = buildVisitSearchFilter('٠٤٢')
+  assert.ok(filter.includes('contractor_equipment_code.ilike.%042%'))
+  assert.ok(filter.includes('equipment_plate_digits.ilike.%042%'))
+})
+
+test('a lettered company number is matched as written, never split', () => {
+  const filter = buildVisitSearchFilter('B15')
+  assert.ok(filter.includes('contractor_equipment_code.ilike.%B15%'))
+  assert.ok(!filter.includes('plate_digits'))
+  assert.ok(!filter.includes('plate_letters'))
 })
 
 test('a digits-only term additionally probes the normalized plate digits', () => {
@@ -219,4 +245,149 @@ test('the select list carries every column the tab renders', () => {
     assert.ok(columns.includes(column), column)
   // `select('*')` is never acceptable for a list query.
   assert.ok(!columns.includes('*'))
+})
+
+test('the select list carries the company number appended by 0106', () => {
+  const columns = EQUIPMENT_VISITS_SELECT.split(',')
+  assert.ok(columns.includes('contractor_equipment_code'))
+  assert.ok(visitsListConfig.searchFields.includes('contractor_equipment_code'))
+})
+
+test('the context filter maps all to no predicate', () => {
+  assert.equal(visitContextFilter('site'), 'site')
+  assert.equal(visitContextFilter('workshop'), 'workshop')
+  assert.equal(visitContextFilter('all'), null)
+})
+
+// ---------------------------------------------------------------------------
+// Admin log visits view
+// ---------------------------------------------------------------------------
+
+test('the admin visits filters are an allowlist of movement_visits columns', () => {
+  const keys = adminVisitsListConfig.filterFields.map((field) => field.key)
+  assert.deepEqual(
+    [...keys].sort(),
+    [
+      'company_name_ar',
+      'entry_at',
+      'entry_supervisor_id',
+      'equipment_ownership_status',
+      'is_open',
+      'project_name_ar',
+      'workshop_purpose',
+    ].sort(),
+  )
+  // The owner filter offers the same five owners as the movement log.
+  const owner = adminVisitsListConfig.filterFields.find(
+    (field) => field.key === 'equipment_ownership_status',
+  )
+  assert.deepEqual(
+    [...owner.options.map((option) => option.value)],
+    [
+      'alazani',
+      'takween',
+      'third_party_f',
+      'third_party_partnership_b',
+      'external_supplier',
+    ],
+  )
+  // Search and sort are the home tab's, so the two views never diverge.
+  assert.equal(adminVisitsListConfig.defaultSort, 'entry_at')
+  assert.equal(adminVisitsListConfig.defaultDirection, 'desc')
+  assert.notEqual(adminVisitsListConfig.id, visitsListConfig.id)
+})
+
+test('new Arabic copy in the visits configs has no hamza or madda alif', () => {
+  const labels = []
+  for (const config of [visitsListConfig, adminVisitsListConfig]) {
+    labels.push(config.searchPlaceholder.ar)
+    for (const field of config.filterFields) {
+      if (typeof field.label === 'object') labels.push(field.label.ar)
+      for (const option of field.options ?? []) labels.push(option.label)
+    }
+  }
+  for (const label of labels) assert.ok(!/[أإآ]/.test(label), label)
+})
+
+// ---------------------------------------------------------------------------
+// Visits export
+// ---------------------------------------------------------------------------
+
+const fakeT = (key) => `[${key}]`
+
+function visit(overrides = {}) {
+  return {
+    entry_id: 'n1',
+    exit_id: 'x1',
+    equipment_id: 'e1',
+    equipment_code: 'A12',
+    equipment_type: 'Loader',
+    equipment_plate_number: '1234 ABC',
+    movement_context: 'site',
+    workshop_purpose: null,
+    company_id: 'c1',
+    company_name_ar: 'شركة',
+    company_name_en: 'Company',
+    project_id: 'p1',
+    project_name_ar: 'مشروع',
+    project_name_en: 'Project',
+    entry_supervisor_id: 's1',
+    entry_supervisor_name: 'Foreman',
+    exit_supervisor_id: 's1',
+    driver_id: null,
+    driver_name: null,
+    entry_at: '2026-09-20T07:00:00Z',
+    exit_at: '2026-09-20T10:00:00Z',
+    is_open: false,
+    duration_minutes: 180,
+    contractor_equipment_code: 'TK-7',
+    ...overrides,
+  }
+}
+
+test('the visits export writes plain text, the company number and Saudi dates', () => {
+  const columns = visitExportColumns(fakeT, 'en')
+  const headers = columns.map((column) => column.header)
+  assert.ok(headers.includes('[contractorEquipmentCode]'))
+  assert.ok(headers.includes('[visitEntryAt]'))
+  const row = visit()
+  const cell = (header) =>
+    columns.find((column) => column.header === header).value(row)
+  assert.equal(cell('[contractorEquipmentCode]'), 'TK-7')
+  assert.equal(cell('[company]'), 'Company')
+  assert.equal(cell('[logsColContext]'), '[logsSites]')
+  assert.equal(cell('[visitState]'), '[visitClosed]')
+  // A driverless entry (allowed since 2026-09-23) is an empty cell, not "—".
+  assert.equal(cell('[driverName]'), '')
+  assert.equal(cell('[visitDuration]'), '3 hours')
+  const dates = columns.filter((column) => column.type === 'date')
+  assert.equal(dates.length, 2)
+})
+
+test('an open visit exports no exit instant', () => {
+  const columns = visitExportColumns(fakeT, 'ar')
+  const exit = columns.find((column) => column.header === '[visitExitAt]')
+  assert.equal(
+    exit.value(visit({ is_open: true, exit_id: null, exit_at: null })),
+    null,
+  )
+  const context = columns.find((column) => column.header === '[logsColContext]')
+  assert.equal(
+    context.value(
+      visit({ movement_context: 'workshop', workshop_purpose: 'parking' }),
+    ),
+    '[parkingPurpose]',
+  )
+})
+
+test('the visits export file is named by context and Saudi day', () => {
+  // 22:30 UTC is already the next day in Saudi Arabia (UTC+03:00).
+  assert.equal(
+    visitExportFileName('all', '2026-09-28T22:30:00Z'),
+    'visits-all-20260929.xlsx',
+  )
+  assert.equal(
+    visitExportFileName('site', '2026-09-28T10:00:00Z'),
+    'visits-site-20260928.xlsx',
+  )
 })

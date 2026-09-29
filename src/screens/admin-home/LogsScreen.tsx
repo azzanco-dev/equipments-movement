@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { FileSpreadsheet } from 'lucide-react'
 import {
@@ -16,10 +16,8 @@ import {
 import type { DataTableColumn } from '@/components/ui'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
-import {
-  FilterBar,
-  type FilterBarAsyncField,
-} from '@/components/data-list/FilterBar'
+import type { FilterBarAsyncField } from '@/components/data-list/FilterBar'
+import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
@@ -35,6 +33,7 @@ import {
 } from '@/lib/movementLogSearch'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
+import { VisitsTable } from '@/components/visits/VisitsTable'
 
 /** Which movements the tab shows; `all` applies no context predicate. */
 type LogsTab = 'site' | 'workshop' | 'all'
@@ -44,6 +43,15 @@ const TABS: LogsTab[] = ['site', 'workshop', 'all']
 function isLogsTab(value: string | null): value is LogsTab {
   return value === 'site' || value === 'workshop' || value === 'all'
 }
+
+/**
+ * The second level (owner request EM-197): the recorded movements, or the
+ * same movements paired into visits. `log` is the default and is left out of
+ * the query string, like the `site` context above.
+ */
+type LogsView = 'log' | 'visits'
+
+const VIEWS: LogsView[] = ['log', 'visits']
 
 const LIST_SELECT = `${MOVEMENT_LOG_ADMIN_SELECT},workshop_purpose,equipment_ownership_status`
 
@@ -92,6 +100,12 @@ const foremanFilter: FilterBarAsyncField = {
 /** Stable across renders, so the bar's controls do not reload on each one. */
 const LOGS_ASYNC_FILTERS = { supervisor_id: foremanFilter }
 
+/** The visits view filters the ENTRY's recorder with the same search. */
+const VISITS_ASYNC_FILTERS = { entry_supervisor_id: foremanFilter }
+
+/** The visits view keeps its list state under its own URL prefix. */
+const VISITS_URL_PREFIX = 'v'
+
 type LogRow = MovementLogSearchRow
 
 export interface LogsScreenProps {
@@ -110,13 +124,25 @@ export interface LogsScreenProps {
  * Tab, search, filters, sort, page and page size all live in the URL, so Back
  * restores the list the user was looking at and a filtered log can be linked
  * to.
+ *
+ * A second level (`?view=visits`, EM-197) shows the same context as visits
+ * through the shared `VisitsTable` (`movement_visits`), with its own search,
+ * filters, paging and Excel export under the `v` URL prefix.
  */
 export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
+  // Company and project are multi-selects searched server-side; the foreman
+  // filter is module-level because it never changes.
+  const relationFilters = useCompanyProjectFilters()
+  const logsAsyncFilters = useMemo(
+    () => ({ ...LOGS_ASYNC_FILTERS, ...relationFilters }),
+    [relationFilters],
+  )
   const { t, lang } = useI18n()
   const pathname = usePathname()
   const params = useSearchParams()
   const requestedTab = params.get('context')
   const tab: LogsTab = isLogsTab(requestedTab) ? requestedTab : 'site'
+  const view: LogsView = params.get('view') === 'visits' ? 'visits' : 'log'
 
   const list = useDataListState(logsListConfig)
   const [rows, setRows] = useState<LogRow[]>([])
@@ -129,17 +155,30 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
   >(undefined)
   const listTopRef = useRef<HTMLDivElement>(null)
 
-  const setTab = (next: LogsTab) => {
-    const query = new URLSearchParams(params.toString())
-    if (next === 'site') query.delete('context')
-    else query.set('context', next)
-    query.delete('page')
+  const replaceQuery = (query: URLSearchParams) => {
     const search = query.toString()
     window.history.replaceState(
       null,
       '',
       search ? `${pathname}?${search}` : pathname,
     )
+  }
+
+  const setTab = (next: LogsTab) => {
+    const query = new URLSearchParams(params.toString())
+    if (next === 'site') query.delete('context')
+    else query.set('context', next)
+    // A new context is a new list for both views.
+    query.delete('page')
+    query.delete(`${VISITS_URL_PREFIX}page`)
+    replaceQuery(query)
+  }
+
+  const setView = (next: LogsView) => {
+    const query = new URLSearchParams(params.toString())
+    if (next === 'log') query.delete('view')
+    else query.set('view', next)
+    replaceQuery(query)
   }
 
   /**
@@ -191,8 +230,10 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
   }, [buildLogsQuery, list.page, list.pageSize, startRequest])
 
   useEffect(() => {
+    // The visits view runs its own query; the movement log waits until shown.
+    if (view !== 'log') return
     void fetchLogs()
-  }, [fetchLogs])
+  }, [fetchLogs, view])
 
   /**
    * Exports the current tab, search and filters — every page of them, not just
@@ -348,85 +389,109 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
     <div ref={listTopRef} className="scroll-mt-20 space-y-4">
       <PageHeader title={t('logs')} description={t('logsDesc')} />
 
-      <Tabs value={tab} onValueChange={(value) => setTab(value as LogsTab)}>
-        <TabsList variant="segmented" aria-label={t('logsContextFilter')}>
-          {TABS.map((value) => (
-            <TabsTrigger key={value} value={value}>
-              {value === 'site'
-                ? t('logsSites')
-                : value === 'workshop'
-                  ? t('logsWorkshop')
-                  : t('logsAll')}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-
-      <div className="flex flex-wrap items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <DataListToolbar
-            config={logsListConfig}
-            search={list.searchInput}
-            onSearch={list.setSearchInput}
-            sort={list.sort}
-            direction={list.direction}
-            onSort={list.setSort}
-          />
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => void exportLogs()}
-          loading={exporting}
-          disabled={exporting || loadError}
+      <div className="flex flex-wrap items-center gap-2">
+        <Tabs value={tab} onValueChange={(value) => setTab(value as LogsTab)}>
+          <TabsList variant="segmented" aria-label={t('logsContextFilter')}>
+            {TABS.map((value) => (
+              <TabsTrigger key={value} value={value}>
+                {value === 'site'
+                  ? t('logsSites')
+                  : value === 'workshop'
+                    ? t('logsWorkshop')
+                    : t('logsAll')}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <Tabs
+          value={view}
+          onValueChange={(value) => setView(value as LogsView)}
+          className="sm:ms-auto"
         >
-          <FileSpreadsheet size={14} aria-hidden="true" />
-          {t('exportExcel')}
-        </Button>
+          <TabsList variant="segmented" aria-label={t('logsViewFilter')}>
+            {VIEWS.map((value) => (
+              <TabsTrigger key={value} value={value}>
+                {value === 'log' ? t('movementsLogTab') : t('visitsTab')}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
 
-      <FilterBar
-        fields={logsListConfig.filterFields}
-        filters={list.filters}
-        onChange={list.setFilters}
-        asyncFields={LOGS_ASYNC_FILTERS}
-      />
-
-      {exportNote && (
-        <Notice
-          tone={exportNote.tone}
-          size="compact"
-          onDismiss={() => setExportNote(undefined)}
-        >
-          {exportNote.text}
-        </Notice>
-      )}
-
-      <DataTable
-        columns={columns}
-        rows={rows}
-        rowKey={(row) => row.id}
-        loading={loading}
-        loadingRows={8}
-        // A failed load is shown as a failure, never as "no movements".
-        error={loadError ? t('logsLoadError') : undefined}
-        empty={t('noMovements')}
-        sort={{ key: list.sort, direction: list.direction }}
-        onSortChange={list.setSort}
-        onRowClick={
-          onSelectMovement ? (row) => onSelectMovement(row.id) : undefined
-        }
-        caption={t('logs')}
-      />
-
-      {!loadError && total > 0 && (
-        <DataListPagination
-          page={list.page}
-          pageSize={list.pageSize}
-          total={total}
-          onPage={changePage}
-          onPageSize={list.setPageSize}
+      {view === 'visits' ? (
+        <VisitsTable
+          variant="log"
+          context={tab}
+          asyncFields={VISITS_ASYNC_FILTERS}
+          onSelectMovement={onSelectMovement}
+          urlPrefix={VISITS_URL_PREFIX}
         />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <DataListToolbar
+                config={logsListConfig}
+                search={list.searchInput}
+                onSearch={list.setSearchInput}
+                sort={list.sort}
+                direction={list.direction}
+                onSort={list.setSort}
+                filterFields={logsListConfig.filterFields}
+                filters={list.filters}
+                onFilters={list.setFilters}
+                asyncFields={logsAsyncFilters}
+              />
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void exportLogs()}
+              loading={exporting}
+              disabled={exporting || loadError}
+            >
+              <FileSpreadsheet size={14} aria-hidden="true" />
+              {t('exportExcel')}
+            </Button>
+          </div>
+
+          {exportNote && (
+            <Notice
+              tone={exportNote.tone}
+              size="compact"
+              onDismiss={() => setExportNote(undefined)}
+            >
+              {exportNote.text}
+            </Notice>
+          )}
+
+          <DataTable
+            columns={columns}
+            rows={rows}
+            rowKey={(row) => row.id}
+            loading={loading}
+            loadingRows={8}
+            // A failed load is shown as a failure, never as "no movements".
+            error={loadError ? t('logsLoadError') : undefined}
+            empty={t('noMovements')}
+            sort={{ key: list.sort, direction: list.direction }}
+            onSortChange={list.setSort}
+            onRowClick={
+              onSelectMovement ? (row) => onSelectMovement(row.id) : undefined
+            }
+            caption={t('logs')}
+          />
+
+          {!loadError && total > 0 && (
+            <DataListPagination
+              page={list.page}
+              pageSize={list.pageSize}
+              total={total}
+              onPage={changePage}
+              onPageSize={list.setPageSize}
+            />
+          )}
+        </>
       )}
     </div>
   )

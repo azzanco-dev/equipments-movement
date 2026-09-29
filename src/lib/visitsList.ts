@@ -1,7 +1,12 @@
 import { plateDigitsSearchTerm, toLatinDigits } from '@/lib/plate'
+import { saudiDateKey } from '@/lib/saudiTime'
 import { sanitizeSearchTerm } from '@/lib/search'
-import type { Language } from '@/i18n/translations'
-import type { DataListConfig } from '@/components/data-list/types'
+import type { Language, TranslationKey } from '@/i18n/translations'
+import type {
+  DataListConfig,
+  FilterOperator,
+} from '@/components/data-list/types'
+import type { ExcelColumn } from '@/lib/excel'
 
 /**
  * `movement_visits` (migration 0096) is a `security_invoker` view with one
@@ -16,9 +21,14 @@ import type { DataListConfig } from '@/components/data-list/types'
  */
 export const EQUIPMENT_VISITS_VIEW = 'movement_visits'
 
-/** Only the columns the home visits tab renders or searches. */
+/**
+ * Only the columns the visits tables render, search or export.
+ *
+ * `contractor_equipment_code` was appended to the view by migration 0106, so
+ * that migration must be applied before this select is shipped.
+ */
 export const EQUIPMENT_VISITS_SELECT =
-  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes'
+  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code'
 
 export interface EquipmentVisitRow {
   entry_id: string
@@ -44,6 +54,18 @@ export interface EquipmentVisitRow {
   exit_at: string | null
   is_open: boolean
   duration_minutes: number | null
+  /** The ENTRY's company number (migration 0106); site visits only. */
+  contractor_equipment_code?: string | null
+}
+
+/** Which visits a table lists; `all` applies no context predicate. */
+export type VisitsContext = 'site' | 'workshop' | 'all'
+
+/** The `movement_context` value to filter on, or `null` for every context. */
+export function visitContextFilter(
+  context: VisitsContext,
+): 'site' | 'workshop' | null {
+  return context === 'all' ? null : context
 }
 
 /** Sort keys the visits tab may ask the server for; anything else is ignored. */
@@ -61,10 +83,15 @@ export function visitSortField(
 export const visitsListConfig: DataListConfig = {
   id: 'visits',
   searchPlaceholder: {
-    ar: 'البحث بالمعدة (كود او نوع او لوحة) او السائق',
-    en: 'Search by equipment (code, type or plate) or driver',
+    ar: 'البحث بالمعدة (كود او نوع او لوحة) او ترقيم الشركة او السائق',
+    en: 'Search by equipment (code, type or plate), company number or driver',
   },
-  searchFields: ['equipment_code', 'equipment_plate_digits', 'driver_name'],
+  searchFields: [
+    'equipment_code',
+    'equipment_plate_digits',
+    'driver_name',
+    'contractor_equipment_code',
+  ],
   // Newest visit first; `entry_id` breaks ties so paging is deterministic.
   defaultSort: 'entry_at',
   defaultDirection: 'desc',
@@ -78,6 +105,127 @@ export const visitsListConfig: DataListConfig = {
   ],
 }
 
+const VISIT_TEXT_OPS: FilterOperator[] = [
+  'eq',
+  'neq',
+  'in',
+  'not_in',
+  'like',
+  'not_like',
+  'is_set',
+  'is_not_set',
+]
+
+const VISIT_DATE_OPS: FilterOperator[] = [
+  'eq',
+  'neq',
+  'gt',
+  'lt',
+  'gte',
+  'lte',
+  'between',
+  'is_set',
+  'is_not_set',
+]
+
+/**
+ * The visits view of the admin log (`/logs`, admin and monitor only).
+ *
+ * Same search and sort as the home tab, plus an allowlisted filter set that
+ * mirrors the movement log's: every key is a column of `movement_visits`
+ * (`equipment_ownership_status` since migration 0106), and the foreman is
+ * searched server-side through the screen's async field for
+ * `entry_supervisor_id` instead of injected options.
+ */
+export const adminVisitsListConfig: DataListConfig = {
+  ...visitsListConfig,
+  id: 'logsVisits',
+  filterFields: [
+    {
+      key: 'entry_at',
+      label: { ar: 'وقت الدخول', en: 'Entry time' },
+      type: 'date',
+      operators: VISIT_DATE_OPS,
+    },
+    {
+      key: 'is_open',
+      label: 'visitState',
+      type: 'select',
+      operators: ['eq'],
+      options: [
+        { value: 'true', label: 'داخل', labelI18n: 'visitOpen' },
+        { value: 'false', label: 'انتهت', labelI18n: 'visitClosed' },
+      ],
+    },
+    {
+      key: 'equipment_ownership_status',
+      label: 'ownershipStatus',
+      type: 'select',
+      operators: ['eq', 'neq', 'in', 'not_in'],
+      options: [
+        {
+          value: 'alazani',
+          label: 'العزاني',
+          labelI18n: 'adminHomeOwnerAlazani',
+        },
+        {
+          value: 'takween',
+          label: 'تكوين',
+          labelI18n: 'adminHomeOwnerTakween',
+        },
+        {
+          value: 'third_party_f',
+          label: 'طرف ثالث F',
+          labelI18n: 'adminHomeOwnerThirdPartyF',
+        },
+        {
+          value: 'third_party_partnership_b',
+          label: 'طرف ثالث B',
+          labelI18n: 'adminHomeOwnerThirdPartyB',
+        },
+        {
+          value: 'external_supplier',
+          label: 'مالك اخر',
+          labelI18n: 'adminHomeOwnerExternal',
+        },
+      ],
+    },
+    {
+      key: 'company_name_ar',
+      label: 'company',
+      type: 'text',
+      operators: VISIT_TEXT_OPS,
+    },
+    {
+      key: 'project_name_ar',
+      label: 'project',
+      type: 'text',
+      operators: VISIT_TEXT_OPS,
+    },
+    {
+      key: 'entry_supervisor_id',
+      label: 'logsColForeman',
+      type: 'select',
+      operators: ['eq', 'neq', 'in', 'not_in'],
+      options: [],
+    },
+    {
+      key: 'workshop_purpose',
+      label: { ar: 'غرض الورشة', en: 'Workshop purpose' },
+      type: 'select',
+      operators: ['eq', 'neq', 'is_set', 'is_not_set'],
+      options: [
+        {
+          value: 'maintenance',
+          label: 'صيانة',
+          labelI18n: 'maintenancePurpose',
+        },
+        { value: 'parking', label: 'وقوف', labelI18n: 'parkingPurpose' },
+      ],
+    },
+  ],
+}
+
 /**
  * Builds the PostgREST `or(...)` filter for a visit search term.
  *
@@ -85,8 +233,11 @@ export const visitsListConfig: DataListConfig = {
  * strips the characters that are structural inside `or=(...)`, including the
  * `%` / `_` / `*` wildcards), so nothing here can break out of its pattern.
  *
- * The term is matched as plain text. Arabic-Indic digits become ASCII first,
- * and a digits-only term additionally probes the normalized `plate_digits`.
+ * The term is matched as plain text against the equipment code, type and
+ * plate, the driver snapshot and the ENTRY's company number
+ * (`contractor_equipment_code`, migration 0106). Arabic-Indic digits become
+ * ASCII first, and a digits-only term additionally probes the normalized
+ * `plate_digits`.
  * The term is never split into plate letters — that made "a341" match every
  * plate containing an A (see `buildMovementSearchFilter`).
  *
@@ -101,6 +252,7 @@ export function buildVisitSearchFilter(rawTerm: string): string | null {
     `equipment_type.ilike.%${term}%`,
     `equipment_plate_number.ilike.%${term}%`,
     `driver_name.ilike.%${term}%`,
+    `contractor_equipment_code.ilike.%${term}%`,
   ]
 
   const plateDigits = plateDigitsSearchTerm(term)
@@ -196,4 +348,119 @@ export function formatVisitDuration(
         : Math.floor(whole / (60 * 24))
 
   return lang === 'ar' ? arabicUnit(count, unit) : englishUnit(count, unit)
+}
+
+// ============ VISITS EXPORT ============
+//
+// The columns of the admin log's visits export. Pure, like the movement
+// export in `@/lib/movementExcel`, so the headers and fallbacks can be tested
+// without a spreadsheet library; `exportRowsToExcel` writes the sheet.
+
+type Translate = (key: TranslationKey) => string
+
+/** A localized name for a sheet cell: empty, never an em dash. */
+function exportName(
+  lang: Language,
+  nameAr?: string | null,
+  nameEn?: string | null,
+): string {
+  const preferred = lang === 'ar' ? nameAr : nameEn
+  const fallback = lang === 'ar' ? nameEn : nameAr
+  return preferred?.trim() || fallback?.trim() || ''
+}
+
+export function visitExportColumns(
+  t: Translate,
+  lang: Language,
+): ExcelColumn<EquipmentVisitRow>[] {
+  return [
+    {
+      header: t('equipmentCodeLabel'),
+      width: 14,
+      value: (row) => row.equipment_code ?? '',
+    },
+    {
+      header: t('equipmentType'),
+      width: 24,
+      value: (row) => row.equipment_type ?? '',
+    },
+    {
+      header: t('plateNumber'),
+      width: 14,
+      value: (row) => row.equipment_plate_number ?? '',
+    },
+    {
+      header: t('contractorEquipmentCode'),
+      width: 16,
+      value: (row) => row.contractor_equipment_code ?? '',
+    },
+    {
+      header: t('logsColContext'),
+      width: 14,
+      value: (row) => {
+        if (row.movement_context !== 'workshop') return t('logsSites')
+        if (row.workshop_purpose === 'maintenance')
+          return t('maintenancePurpose')
+        if (row.workshop_purpose === 'parking') return t('parkingPurpose')
+        return t('logsWorkshop')
+      },
+    },
+    {
+      header: t('visitState'),
+      width: 10,
+      value: (row) => t(visitStateView(row).labelKey),
+    },
+    {
+      header: t('company'),
+      width: 24,
+      value: (row) =>
+        exportName(lang, row.company_name_ar, row.company_name_en),
+    },
+    {
+      header: t('project'),
+      width: 24,
+      value: (row) =>
+        exportName(lang, row.project_name_ar, row.project_name_en),
+    },
+    {
+      header: t('driverName'),
+      width: 22,
+      value: (row) => row.driver_name ?? '',
+    },
+    {
+      header: t('entryBy'),
+      width: 22,
+      value: (row) => row.entry_supervisor_name ?? '',
+    },
+    {
+      header: t('visitEntryAt'),
+      width: 18,
+      type: 'date',
+      value: (row) => row.entry_at ?? null,
+    },
+    {
+      header: t('visitExitAt'),
+      width: 18,
+      type: 'date',
+      // Only a visible, paired EXIT has an end instant (see visitStateView).
+      value: (row) =>
+        visitStateView(row).state === 'closed' ? row.exit_at : null,
+    },
+    {
+      header: t('visitDuration'),
+      width: 14,
+      value: (row) => formatVisitDuration(row.duration_minutes, lang) ?? '',
+    },
+  ]
+}
+
+/**
+ * `visits-<context>-<yyyymmdd>.xlsx`, dated by the Saudi calendar day like the
+ * movement export next to it.
+ */
+export function visitExportFileName(
+  context: VisitsContext,
+  now: Date | string = new Date(),
+): string {
+  return `visits-${context}-${saudiDateKey(now).replace(/-/g, '')}.xlsx`
 }
