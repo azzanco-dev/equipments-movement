@@ -4,20 +4,25 @@ import { AsyncMultiSelect } from '@/components/AsyncMultiSelect'
 import { PasswordInput } from '@/components/PasswordInput'
 import type { SelectOption } from '@/components/Select'
 import { useI18n } from '@/i18n/I18nContext'
+import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
 import type { Profile, UserRole } from '@/lib/types'
 import {
+  BackButton,
   Badge,
   Button,
+  DetailHeader,
   Field,
   Input,
-  PageHeader,
+  InfoGridSection,
+  SectionHeader,
   Select,
   Skeleton,
   useConfirm,
+  type InfoGridItem,
 } from '@/components/ui'
 
 interface UserDetailProps {
@@ -206,8 +211,27 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       setFullName(nextFullName)
       setEmail(nextEmail)
       setPassword('')
+      // The summary above the form shows the saved record, so it follows
+      // every field the update just wrote.
       setUser((current) =>
-        current ? { ...current, full_name: nextFullName } : current,
+        current
+          ? {
+              ...current,
+              full_name: nextFullName,
+              email: nextEmail,
+              role,
+              assigned_companies:
+                role === 'supervisor'
+                  ? // The selector only carries the already-localized label;
+                    // a language switch reloads the user and its names.
+                    companies.map((company) => ({
+                      id: company.value,
+                      name_ar: company.label,
+                      name_en: company.label,
+                    }))
+                  : [],
+            }
+          : current,
       )
       setSavedSnapshot(
         formSnapshot(nextFullName, nextEmail, '', role, companies),
@@ -246,25 +270,74 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       </div>
     )
 
+  const roleLabel = (value: UserRole) =>
+    roleOptions.find((option) => option.value === value)?.label ?? value
+
+  // Saved values only (`user`), never the unsaved form state below.
+  const accountItems: InfoGridItem[] = user
+    ? [
+        {
+          key: 'email',
+          label: t('email'),
+          value: user.email,
+          dir: 'ltr',
+        },
+        { key: 'role', label: t('role'), value: roleLabel(user.role) },
+        {
+          key: 'createdAt',
+          label: t('createdAt'),
+          value: user.created_at ? formatDate(user.created_at) : null,
+        },
+        ...(user.role === 'supervisor'
+          ? [
+              {
+                key: 'assignedCompanies',
+                label: t('assignedCompanies'),
+                value: user.assigned_companies?.length ? (
+                  <span className="flex flex-wrap gap-1.5">
+                    {user.assigned_companies.map((company) => (
+                      <Badge key={company.id} tone="neutral">
+                        {localizedName(lang, company.name_ar, company.name_en)}
+                      </Badge>
+                    ))}
+                  </span>
+                ) : null,
+                className: 'sm:col-span-2 lg:col-span-3',
+              },
+            ]
+          : []),
+      ]
+    : []
+
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <PageHeader
-        onBack={handleBack}
-        backLabel={t('back')}
-        title={
-          <span className="inline-flex flex-wrap items-center gap-2">
-            {t('userDetails')}
-            {hasUnsavedChanges && (
-              <Badge tone="warning">{t('unsavedData')}</Badge>
-            )}
-            {user?.must_change_password && (
-              <Badge tone="warning">{t('mustChangePassword')}</Badge>
-            )}
-          </span>
-        }
-        description={user?.full_name}
-      />
+      <BackButton onClick={handleBack} />
+      <div className="card space-y-5">
+        <DetailHeader
+          as="h1"
+          identifier={user?.full_name || t('userDetails')}
+          subtitle={user ? t('userDetails') : undefined}
+          badges={
+            <>
+              {user && <Badge tone="neutral">{roleLabel(user.role)}</Badge>}
+              {user?.must_change_password && (
+                <Badge tone="warning">{t('mustChangePassword')}</Badge>
+              )}
+              {hasUnsavedChanges && (
+                <Badge tone="warning">{t('unsavedData')}</Badge>
+              )}
+            </>
+          }
+        />
+        {user && (
+          <InfoGridSection
+            title={t('userSectionAccount')}
+            items={accountItems}
+          />
+        )}
+      </div>
       <div className="card space-y-4">
+        <SectionHeader title={t('editUser')} />
         {error && <Alert type="error">{error}</Alert>}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t('fullName')} required>

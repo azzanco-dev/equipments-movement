@@ -8,6 +8,10 @@ import { InlineSpinner } from '@/components/Spinner'
 import { Alert } from '@/components/Alert'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
+import {
+  fetchProfileNames,
+  withSupervisorNames,
+} from '@/components/details/profileNames'
 import { OwnerContextFilter } from '@/components/OwnerContextFilter'
 import type { AdminHomeOwner } from '@/lib/adminHomeStats'
 import {
@@ -47,10 +51,14 @@ function dateKeyParam(value: string | null): string | null {
  * inner join is what makes the filter (and the `count`) apply to the movement
  * rows. With no owner selected the embed stays the plain left join it has
  * always been, so the unfiltered report is byte-for-byte the previous query.
+ *
+ * The recorder's name is not embedded: `profiles` is hidden from other users
+ * by RLS, so it is read afterwards from the name-only `profile_names` view
+ * (migration 0099) for the ids on the page.
  */
 function buildSelect(ownerFiltered: boolean) {
   const equipment = `equipment:equipment${ownerFiltered ? '!inner' : ''}(id,code,type,plate_number,chassis_number)`
-  return `id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,contractor_equipment_code,registration_method,odometer_reading,notes,photo_url,company_id,project_id,recorded_at,created_at,${equipment},company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),supervisor:profiles(id,full_name),driver:drivers(id,mobile_number)`
+  return `id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,contractor_equipment_code,registration_method,odometer_reading,notes,photo_url,company_id,project_id,recorded_at,created_at,${equipment},company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),driver:drivers(id,mobile_number)`
 }
 
 export function EntryReportsAll({
@@ -152,21 +160,37 @@ export function EntryReportsAll({
       const value = params.get(key)
       if (value) query = query.eq(key, value)
     }
-    query.then(({ data, count, error }) => {
+    const load = async () => {
+      const { data, count, error } = await query
       // A newer request replaced this one; keep the current rows on screen.
       if (controller.signal.aborted) return
-      if (error) {
-        console.error('entry reports list load failed', error)
+      const pageRows = (data ?? []) as unknown as Array<{
+        supervisor_id: string | null
+      }>
+      const names = error
+        ? null
+        : await fetchProfileNames(
+            supabase,
+            pageRows.map((row) => row.supervisor_id),
+            controller.signal,
+          )
+      if (controller.signal.aborted) return
+      // A failed name lookup fails the list, exactly as the former embed did.
+      if (error || !names || names.failed) {
+        console.error('entry reports list load failed', error ?? 'names')
         setRows([])
         setTotal(0)
         setLoadError(true)
         setLoading(false)
         return
       }
-      setRows((data ?? []) as unknown as EntryExitLog[])
+      setRows(
+        withSupervisorNames(pageRows, names.names) as unknown as EntryExitLog[],
+      )
       setTotal(count ?? 0)
       setLoading(false)
-    })
+    }
+    void load()
     return () => controller.abort()
   }, [page, pageSize, params, dateRange.from, dateRange.to, owners, context])
   const totalPages = Math.max(1, Math.ceil(total / pageSize))

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState } from 'react'
 import {
   CalendarClock,
   History,
@@ -12,6 +12,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import {
   Badge,
   EmptyState,
+  InfoGrid,
   StatCard,
   Tabs,
   TabsContent,
@@ -19,6 +20,7 @@ import {
   TabsTrigger,
   WorkshopPurposeBadge,
   cn,
+  type InfoGridItem,
 } from '@/components/ui'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
@@ -260,6 +262,53 @@ function VisitSegment({
         (part): part is string => Boolean(part),
       )
   const photoMovementId = entry?.id ?? exit?.id ?? null
+  const driverName = exit?.driver_name || entry?.driver_name || null
+
+  // Only the lines this visit actually has; an absent exit, duration,
+  // foreman or driver is left out rather than shown as "—".
+  const lines: InfoGridItem[] = []
+  if (entry)
+    lines.push({
+      key: 'entry',
+      icon: <LogIn size={13} aria-hidden="true" />,
+      label: t('entryTime'),
+      value: (
+        <MovementTime
+          value={formatDateTime(entry.recorded_at)}
+          onClick={
+            onSelectMovement ? () => onSelectMovement(entry.id) : undefined
+          }
+        />
+      ),
+    })
+  if (exit)
+    lines.push({
+      key: 'exit',
+      icon: <LogOut size={13} aria-hidden="true" />,
+      label: t('exitTime'),
+      value: (
+        <MovementTime
+          value={formatDateTime(exit.recorded_at)}
+          onClick={
+            onSelectMovement ? () => onSelectMovement(exit.id) : undefined
+          }
+        />
+      ),
+    })
+  if (duration !== null)
+    lines.push({
+      key: 'duration',
+      label: visit.open ? t('durationOnSite') : t('visitDuration'),
+      value: formatElapsedDuration(duration, t, lang),
+    })
+  if (entry?.supervisor_name)
+    lines.push({
+      key: 'supervisor',
+      label: t('supervisor'),
+      value: entry.supervisor_name,
+    })
+  if (driverName)
+    lines.push({ key: 'driver', label: t('driverName'), value: driverName })
 
   return (
     // The dot sits on the shared vertical rule drawn by the start border.
@@ -311,43 +360,7 @@ function VisitSegment({
           )}
         </div>
 
-        <dl className="grid gap-x-4 gap-y-1.5 text-sm sm:grid-cols-2">
-          {entry && (
-            <Line
-              icon={<LogIn size={13} aria-hidden="true" />}
-              label={t('entryTime')}
-              value={formatDateTime(entry.recorded_at)}
-              onClick={
-                onSelectMovement ? () => onSelectMovement(entry.id) : undefined
-              }
-            />
-          )}
-          {exit && (
-            <Line
-              icon={<LogOut size={13} aria-hidden="true" />}
-              label={t('exitTime')}
-              value={formatDateTime(exit.recorded_at)}
-              onClick={
-                onSelectMovement ? () => onSelectMovement(exit.id) : undefined
-              }
-            />
-          )}
-          {duration !== null && (
-            <Line
-              label={visit.open ? t('durationOnSite') : t('visitDuration')}
-              value={formatElapsedDuration(duration, t, lang)}
-            />
-          )}
-          {entry?.supervisor_name && (
-            <Line label={t('supervisor')} value={entry.supervisor_name} />
-          )}
-          {(exit?.driver_name || entry?.driver_name) && (
-            <Line
-              label={t('driverName')}
-              value={exit?.driver_name || entry?.driver_name || ''}
-            />
-          )}
-        </dl>
+        <InfoGrid items={lines} columns={2} className="text-sm" />
 
         {onOpenPhoto && photoMovementId && visit.photoCount > 0 && (
           <PhotoStrip
@@ -397,40 +410,24 @@ function GapSegment({ gap }: { gap: OutsideGap }) {
   )
 }
 
-function Line({
-  icon,
-  label,
+/** A movement time; a link-styled button that opens its own movement when
+ *  `onClick` is given, plain text otherwise. */
+function MovementTime({
   value,
   onClick,
 }: {
-  icon?: ReactNode
-  label: string
   value: string
-  /** Renders `value` as a link-styled button that opens its own movement. */
   onClick?: () => void
 }) {
+  if (!onClick) return <>{value}</>
   return (
-    <div className="flex items-baseline gap-1.5">
-      {icon && (
-        <span aria-hidden="true" className="shrink-0 text-muted">
-          {icon}
-        </span>
-      )}
-      <dt className="shrink-0 text-xs text-muted">{label}</dt>
-      {onClick ? (
-        <dd className="min-w-0">
-          <button
-            type="button"
-            onClick={onClick}
-            className="truncate-safe text-start underline decoration-dotted underline-offset-2 hover:text-fg"
-          >
-            {value}
-          </button>
-        </dd>
-      ) : (
-        <dd className="truncate-safe min-w-0">{value}</dd>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="truncate-safe max-w-full text-start underline decoration-dotted underline-offset-2 hover:text-fg"
+    >
+      {value}
+    </button>
   )
 }
 

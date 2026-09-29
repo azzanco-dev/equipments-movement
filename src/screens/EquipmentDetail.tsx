@@ -2,16 +2,19 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import {
-  Edit2,
-  Calendar,
-  Truck,
   Building2,
+  Calendar,
+  Edit2,
+  Factory,
+  Hash,
+  MapPin,
+  ShieldCheck,
+  Truck,
   Wrench,
-  FileText,
 } from 'lucide-react'
 import type {
   Equipment,
-  EntryExitLog,
+  MovementType,
   OperationalStatus,
   OwnershipStatus,
 } from '@/lib/types'
@@ -25,18 +28,23 @@ import { localizedName } from '@/lib/localizedName'
 import { Alert } from '@/components/Alert'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import {
+  fetchProfileNames,
+  withSupervisorNames,
+  type ProfileName,
+} from '@/components/details/profileNames'
+import {
   BackButton,
   Badge,
   Button,
-  DataTable,
+  DetailHeader,
   EmptyState,
   ErrorState,
-  IconButton,
-  InfoRow,
+  InfoGridSection,
+  MiniTable,
   MovementBadge,
-  PageHeader,
   Skeleton,
   type DataTableColumn,
+  type InfoGridItem,
 } from '@/components/ui'
 
 interface EquipmentDetailProps {
@@ -45,6 +53,27 @@ interface EquipmentDetailProps {
   onEdit: (eq: Equipment) => void
   onSelectMovement?: (id: string) => void
   onViewAllMovements?: (equipmentCode: string) => void
+}
+
+/** The latest movements shown on the page; the full history is one "View
+ *  all" away, so the section never grows with the equipment's age. */
+const RECENT_MOVEMENTS_LIMIT = 10
+
+// Only what the recent-movements table and the derived "under maintenance"
+// badge read. The recorder's name is resolved separately through
+// `profile_names` (see `fetchProfileNames`).
+const RECENT_MOVEMENTS_SELECT =
+  'id,movement_type,movement_context,workshop_purpose,supervisor_id,driver_name,recorded_at'
+
+interface RecentMovementRow {
+  id: string
+  movement_type: MovementType
+  movement_context: 'site' | 'workshop' | null
+  workshop_purpose: 'maintenance' | 'parking' | null
+  supervisor_id: string | null
+  driver_name: string | null
+  recorded_at: string
+  supervisor: ProfileName | null
 }
 
 export function EquipmentDetail({
@@ -56,7 +85,7 @@ export function EquipmentDetail({
 }: EquipmentDetailProps) {
   const { t, lang } = useI18n()
   const [equipment, setEquipment] = useState<Equipment | null>(null)
-  const [logs, setLogs] = useState<EntryExitLog[]>([])
+  const [logs, setLogs] = useState<RecentMovementRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const startRequest = useListRequest()
@@ -68,24 +97,36 @@ export function EquipmentDetail({
     const [equipmentResult, logsResult] = await Promise.all([
       supabase
         .from('equipment')
-        .select('*, project:projects(*), lessor:lessors(*)')
+        .select(
+          '*, project:projects(id,name_ar,name_en), lessor:lessors(id,name)',
+        )
         .eq('id', equipmentId)
         .abortSignal(signal)
         .maybeSingle(),
       supabase
         .from('entry_exit_logs')
-        .select('*, supervisor:profiles(*)')
+        .select(RECENT_MOVEMENTS_SELECT)
         .eq('equipment_id', equipmentId)
         .order('recorded_at', { ascending: false })
         .order('id', { ascending: false })
-        .limit(10)
+        .limit(RECENT_MOVEMENTS_LIMIT)
         .abortSignal(signal),
     ])
     if (signal.aborted) return
-    if (equipmentResult.error || logsResult.error)
+    const rawLogs =
+      (logsResult.data as Omit<RecentMovementRow, 'supervisor'>[] | null) ?? []
+    const names = await fetchProfileNames(
+      supabase,
+      rawLogs.map((log) => log.supervisor_id),
+      signal,
+    )
+    if (signal.aborted) return
+    // A failed name lookup is reported like the movements it belongs to, so
+    // the table never silently shows every recorder as "—".
+    if (equipmentResult.error || logsResult.error || names.failed)
       setError(t('equipmentLoadError'))
     setEquipment(equipmentResult.data as Equipment | null)
-    setLogs((logsResult.data as EntryExitLog[]) ?? [])
+    setLogs(withSupervisorNames(rawLogs, names.names))
     setLoading(false)
   }, [equipmentId, startRequest, t])
 
@@ -116,9 +157,11 @@ export function EquipmentDetail({
         ? t('publicTransport')
         : s === 'heavy_equipment'
           ? t('heavyEquipment')
-          : '—'
+          : null
+  const dateOrNull = (value: string | null) =>
+    value ? formatDate(value) : null
 
-  const movementColumns: DataTableColumn<EntryExitLog>[] = [
+  const movementColumns: DataTableColumn<RecentMovementRow>[] = [
     {
       key: 'movement_type',
       header: t('movementType'),
@@ -141,9 +184,9 @@ export function EquipmentDetail({
     },
   ]
 
-  // `logs` is the latest 10 movements ordered (recorded_at DESC, id DESC), so
-  // the first row is the latest movement across both contexts — the same
-  // ordering every state derivation in the database uses.
+  // `logs` is the latest movements ordered (recorded_at DESC, id DESC), so the
+  // first row is the latest movement across both contexts — the same ordering
+  // every state derivation in the database uses.
   const statusBadge = equipmentStatusBadge(equipment?.status)
   const underMaintenance = isUnderMaintenance(logs[0])
 
@@ -171,161 +214,194 @@ export function EquipmentDetail({
       </div>
     )
 
+  const identityItems: InfoGridItem[] = [
+    {
+      key: 'code',
+      icon: <Hash size={16} />,
+      label: t('equipmentCode'),
+      value: equipment.code,
+      dir: 'ltr',
+    },
+    {
+      key: 'type',
+      icon: <Wrench size={16} />,
+      label: t('equipmentType'),
+      value: equipment.type,
+    },
+    {
+      key: 'plate',
+      icon: <Truck size={16} />,
+      label: t('plateNumber'),
+      value: equipment.plate_number,
+      dir: 'ltr',
+    },
+    {
+      key: 'chassis',
+      icon: <Hash size={16} />,
+      label: t('chassisNumber'),
+      value: equipment.chassis_number,
+      dir: 'ltr',
+    },
+    {
+      key: 'brand',
+      icon: <Factory size={16} />,
+      label: t('brand'),
+      value: equipment.brand,
+    },
+    {
+      key: 'model',
+      icon: <Factory size={16} />,
+      label: t('model'),
+      value: equipment.model,
+    },
+    {
+      key: 'manufactureYear',
+      icon: <Calendar size={16} />,
+      label: t('manufactureYear'),
+      value: equipment.manufacture_year?.toString(),
+      numeric: true,
+    },
+    {
+      key: 'registrationType',
+      icon: <ShieldCheck size={16} />,
+      label: t('registrationType'),
+      value: regLabel(equipment.registration_type),
+    },
+    {
+      key: 'operationalStatus',
+      icon: <Wrench size={16} />,
+      label: t('operationalStatus'),
+      value: statusLabel(equipment.operational_status),
+    },
+  ]
+
+  const ownershipItems: InfoGridItem[] = [
+    {
+      key: 'owner',
+      icon: <Building2 size={16} />,
+      label: t('ownershipStatus'),
+      value: ownLabel(equipment.ownership_status),
+    },
+    {
+      key: 'ownershipState',
+      icon: <Building2 size={16} />,
+      label: t('ownershipState'),
+      value: isOwnedEquipment(equipment.ownership_status)
+        ? t('owned')
+        : t('rented'),
+    },
+    // The supplier only exists for "Other owner"; every other owner clears
+    // `lessor_id`, so the row is hidden there instead of showing "—".
+    ...(usesExternalSupplier(equipment.ownership_status)
+      ? [
+          {
+            key: 'externalSupplier',
+            icon: <Building2 size={16} />,
+            label: t('externalSupplier'),
+            value: equipment.lessor?.name,
+          },
+        ]
+      : []),
+    {
+      key: 'project',
+      icon: <MapPin size={16} />,
+      label: t('project'),
+      value: equipment.project
+        ? localizedName(
+            lang,
+            equipment.project.name_ar,
+            equipment.project.name_en,
+          )
+        : null,
+    },
+  ]
+
+  const dateItems: InfoGridItem[] = [
+    {
+      key: 'registrationExpiry',
+      icon: <Calendar size={16} />,
+      label: t('registrationExpiry'),
+      value: dateOrNull(equipment.registration_expiry),
+    },
+    {
+      key: 'insuranceExpiry',
+      icon: <Calendar size={16} />,
+      label: t('insuranceExpiry'),
+      value: dateOrNull(equipment.insurance_expiry),
+    },
+    {
+      key: 'lastMaintenanceDate',
+      icon: <Calendar size={16} />,
+      label: t('lastMaintenanceDate'),
+      value: dateOrNull(equipment.last_maintenance_date),
+    },
+  ]
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      <BackButton onClick={onBack} label={t('backToEquipment')} />
+
       {error && <Alert type="error">{error}</Alert>}
 
-      <PageHeader
-        title={t('equipmentDetails')}
-        description={t('equipmentDetailDesc')}
-        onBack={onBack}
-        backLabel={t('backToEquipment')}
-      />
-
-      {/* Header card */}
-      <div className="card">
-        <div className="flex flex-col gap-6">
-          {/* Info */}
-          <div className="flex-1 space-y-4">
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              <div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h2 className="text-2xl font-bold">{equipment.code}</h2>
-                  <Badge tone={statusBadge.tone}>{t(statusBadge.key)}</Badge>
-                  {/* Derived, never stored: the latest movement is an open
-                      workshop entry classified as maintenance. */}
-                  {underMaintenance && (
-                    <Badge tone="warning">{t('underMaintenance')}</Badge>
-                  )}
-                </div>
-                <p className="text-muted mt-1">{equipment.type}</p>
-              </div>
-              <div className="flex gap-2">
-                <IconButton
-                  label={t('editEquipment')}
-                  icon={<Edit2 size={16} />}
-                  onClick={() => onEdit(equipment)}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <InfoRow
-                icon={<Truck size={16} />}
-                label={t('plateNumber')}
-                value={equipment.plate_number}
-                dir="ltr"
-              />
-              <InfoRow
-                icon={<Wrench size={16} />}
-                label={t('operationalStatus')}
-                value={statusLabel(equipment.operational_status)}
-              />
-              <InfoRow
-                icon={<Building2 size={16} />}
-                label={t('ownershipStatus')}
-                value={ownLabel(equipment.ownership_status)}
-              />
-              <InfoRow
-                label={t('ownershipState')}
-                value={
-                  isOwnedEquipment(equipment.ownership_status)
-                    ? t('owned')
-                    : t('rented')
-                }
-              />
-              <InfoRow label={t('brand')} value={equipment.brand} />
-              <InfoRow label={t('model')} value={equipment.model} />
-              <InfoRow
-                label={t('manufactureYear')}
-                value={equipment.manufacture_year?.toString()}
-              />
-              <InfoRow
-                label={t('chassisNumber')}
-                value={equipment.chassis_number}
-                dir="ltr"
-              />
-              <InfoRow
-                label={t('registrationType')}
-                value={regLabel(equipment.registration_type)}
-              />
-              <InfoRow
-                label={t('project')}
-                value={
-                  equipment.project
-                    ? localizedName(
-                        lang,
-                        equipment.project.name_ar,
-                        equipment.project.name_en,
-                      )
-                    : undefined
-                }
-              />
-              {usesExternalSupplier(equipment.ownership_status) && (
-                <InfoRow
-                  label={t('externalSupplier')}
-                  value={equipment.lessor?.name}
-                />
+      <div className="card space-y-5">
+        <DetailHeader
+          as="h1"
+          identifier={equipment.code}
+          identifierLtr
+          subtitle={equipment.type}
+          badges={
+            <>
+              <Badge tone={statusBadge.tone}>{t(statusBadge.key)}</Badge>
+              {/* Derived, never stored: the latest movement is an open
+                  workshop entry classified as maintenance. */}
+              {underMaintenance && (
+                <Badge tone="warning">{t('underMaintenance')}</Badge>
               )}
-              <InfoRow
-                icon={<Calendar size={16} />}
-                label={t('lastMaintenanceDate')}
-                value={
-                  equipment.last_maintenance_date
-                    ? formatDate(equipment.last_maintenance_date)
-                    : null
-                }
-              />
-              <InfoRow
-                icon={<Calendar size={16} />}
-                label={t('registrationExpiry')}
-                value={
-                  equipment.registration_expiry
-                    ? formatDate(equipment.registration_expiry)
-                    : null
-                }
-              />
-              <InfoRow
-                icon={<Calendar size={16} />}
-                label={t('insuranceExpiry')}
-                value={
-                  equipment.insurance_expiry
-                    ? formatDate(equipment.insurance_expiry)
-                    : null
-                }
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Movement history */}
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="flex items-center gap-2 text-lg font-bold">
-            <FileText size={18} /> {t('movementHistory')}
-          </h3>
-          {onViewAllMovements && (
+              <Badge tone="neutral">
+                {ownLabel(equipment.ownership_status)}
+              </Badge>
+            </>
+          }
+          actions={
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onViewAllMovements(equipment.code)}
+              icon={<Edit2 size={14} />}
+              onClick={() => onEdit(equipment)}
             >
-              {t('viewAll')}
+              {t('editEquipment')}
             </Button>
-          )}
-        </div>
-        <DataTable
-          size="sm"
-          columns={movementColumns}
-          rows={logs}
-          rowKey={(log) => log.id}
-          onRowClick={
-            onSelectMovement ? (log) => onSelectMovement(log.id) : undefined
           }
-          empty={t('noMovements')}
         />
+        <InfoGridSection
+          title={t('detailSectionIdentity')}
+          items={identityItems}
+        />
+        <InfoGridSection
+          title={t('detailSectionOwnership')}
+          items={ownershipItems}
+          columns={2}
+        />
+        <InfoGridSection title={t('detailSectionDates')} items={dateItems} />
       </div>
+
+      <MiniTable
+        title={t('movementHistory')}
+        description={t('detailRecentMovementsDesc')}
+        columns={movementColumns}
+        rows={logs}
+        rowKey={(log) => log.id}
+        maxRows={RECENT_MOVEMENTS_LIMIT}
+        onViewAll={
+          onViewAllMovements
+            ? () => onViewAllMovements(equipment.code)
+            : undefined
+        }
+        onRowClick={
+          onSelectMovement ? (log) => onSelectMovement(log.id) : undefined
+        }
+        empty={t('noMovements')}
+      />
     </div>
   )
 }

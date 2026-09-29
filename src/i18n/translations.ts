@@ -1208,6 +1208,20 @@ export const translations = {
     extractingErrErpDepartment: 'اسم القسم غير موجود في ERPNext',
     extractingErrErpDesignation: 'المهنة غير موجودة كـ Designation في ERPNext',
     extractingErrErpConnection: 'تعذر الاتصال بمنصة ERPNext',
+    // wave7-B
+    detailSectionIdentity: 'الهوية',
+    detailSectionOwnership: 'الملكية',
+    detailSectionDates: 'التواريخ',
+    detailRecentMovementsDesc: 'اخر 10 حركات لهذه المعدة',
+    userSectionAccount: 'بيانات الحساب',
+    // wave7-A
+    movementSectionMovement: 'بيانات الحركة',
+    movementSectionCompanyProject: 'الشركة والمشروع',
+    movementSectionDriver: 'السائق',
+    movementDeletePhoto: 'حذف الصورة',
+    movementRecordedBy: 'سجلها {name}',
+    dialogDescContractorCodeEdit:
+      'يعدل ترقيم الشركة لهذه الزيارة المفتوحة فقط',
   },
   en: {
     appName: 'Heavy Equipment Management',
@@ -2432,6 +2446,20 @@ export const translations = {
     extractingErrErpDesignation:
       'The occupation does not exist as a Designation in ERPNext',
     extractingErrErpConnection: 'Could not connect to ERPNext',
+    // wave7-B
+    detailSectionIdentity: 'Identity',
+    detailSectionOwnership: 'Ownership',
+    detailSectionDates: 'Dates',
+    detailRecentMovementsDesc: 'The last 10 movements for this equipment',
+    userSectionAccount: 'Account',
+    // wave7-A
+    movementSectionMovement: 'Movement',
+    movementSectionCompanyProject: 'Company and project',
+    movementSectionDriver: 'Driver',
+    movementDeletePhoto: 'Delete photo',
+    movementRecordedBy: 'Recorded by {name}',
+    dialogDescContractorCodeEdit:
+      'Changes the company number for this open visit only',
   },
 } as const
 

@@ -138,3 +138,28 @@ export function deriveEquipmentState(
     since: last.recorded_at ?? null,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Inquiry brief
+// ---------------------------------------------------------------------------
+
+export interface InquiryBriefIdentifier {
+  kind: 'plate' | 'chassis'
+  value: string | null
+}
+
+/**
+ * The third field of the inquiry brief (owner decision: code, type, and the
+ * plate — or the chassis number when the equipment has no plate). With
+ * neither, the plate row stays and shows its empty placeholder.
+ */
+export function inquiryBriefIdentifier(equipment: {
+  plate_number: string | null
+  chassis_number: string | null
+}): InquiryBriefIdentifier {
+  const plate = equipment.plate_number?.trim() || null
+  if (plate) return { kind: 'plate', value: plate }
+  const chassis = equipment.chassis_number?.trim() || null
+  if (chassis) return { kind: 'chassis', value: chassis }
+  return { kind: 'plate', value: null }
+}

@@ -12,9 +12,11 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  InfoGrid,
   PageHeader,
   SectionHeader,
   Skeleton,
+  type InfoGridItem,
 } from '@/components/ui'
 import {
   EquipmentSuggestSearch,
@@ -24,6 +26,7 @@ import { EquipmentTimeline } from '@/components/inquiry/EquipmentTimeline'
 import type { TimelineMovement } from '@/lib/visitTimeline'
 import {
   buildEquipmentSuggestFilter,
+  inquiryBriefIdentifier,
   parseEquipmentIdParam,
 } from '@/lib/equipmentInquiry'
 
@@ -71,6 +74,34 @@ const SUGGEST_DEBOUNCE_MS = 300
 // stand-alone "exit without entry" segment until "show more" pulls in the
 // entry that actually opened it — a display nuance, not a data error.
 const MOVEMENTS_PAGE_SIZE = 40
+
+/**
+ * The brief above the timeline: code, type, and the plate, or the chassis
+ * number when the equipment has no plate (owner decision). Codes, plates and
+ * chassis numbers are isolated LTR runs through `InfoGrid`, so they keep the
+ * RTL start edge instead of jumping to the left.
+ */
+function inquiryBriefItems(
+  equipment: InquiryEquipmentRow,
+  t: ReturnType<typeof useI18n>['t'],
+): InfoGridItem[] {
+  const identifier = inquiryBriefIdentifier(equipment)
+  return [
+    {
+      key: 'code',
+      label: t('equipmentCode'),
+      value: equipment.code,
+      dir: 'ltr',
+    },
+    { key: 'type', label: t('equipmentType'), value: equipment.type },
+    {
+      key: identifier.kind,
+      label: t(identifier.kind === 'plate' ? 'plateNumber' : 'chassisNumber'),
+      value: identifier.value,
+      dir: 'ltr',
+    },
+  ]
+}
 
 export function EquipmentInquiryScreen({
   onSelectMovement,
@@ -376,26 +407,7 @@ export function EquipmentInquiryScreen({
                 the time since the last movement, and the latest visit's
                 company/project/foreman all live in the timeline below. */}
             <div className="rounded-lg border bg-surface px-3 py-2.5">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <span className="font-semibold" dir="ltr">
-                  {equipment.code}
-                </span>
-                <span className="truncate-safe min-w-0 text-sm text-muted">
-                  {equipment.type || '—'}
-                </span>
-                {equipment.plate_number ? (
-                  <span className="text-sm text-muted" dir="ltr">
-                    {equipment.plate_number}
-                  </span>
-                ) : equipment.chassis_number ? (
-                  <span className="min-w-0 text-sm text-muted">
-                    {t('chassisNumber')}:{' '}
-                    <span dir="ltr" className="inline-block">
-                      {equipment.chassis_number}
-                    </span>
-                  </span>
-                ) : null}
-              </div>
+              <InfoGrid items={inquiryBriefItems(equipment, t)} />
             </div>
 
             {movementsError ? (

@@ -1,5 +1,5 @@
 import { useRouter } from 'next/navigation'
-import { Briefcase, CreditCard, Flag, Phone, Truck, User } from 'lucide-react'
+import { CreditCard, Flag, Phone, Truck, User } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { buildDriverMovementsHref } from '@/lib/driverEquipment'
 import type { DriverEquipmentItem } from '@/lib/driverEquipment'
@@ -9,16 +9,16 @@ import {
   Badge,
   Button,
   DataTable,
+  DetailHeader,
   Dialog,
   EmptyState,
   ErrorState,
+  InfoGrid,
   SectionHeader,
   Skeleton,
   type DataTableColumn,
+  type InfoGridItem,
 } from '@/components/ui'
-// InfoGrid is new (this change) and not yet wired into the `ui` barrel
-// (src/components/ui/index.ts), which is owned separately.
-import { InfoGrid, type InfoGridItem } from '@/components/ui/InfoGrid'
 
 export interface DriverDetailDialogProps {
   /** The driver to show, or `null` while the dialog is closed. The hook
@@ -33,6 +33,11 @@ export interface DriverDetailDialogProps {
  * `?driver=<id>` on the list URL; see `DriversListScreen`). Same content as
  * the former standalone `/drivers/:id` page: personal fields plus the
  * "related equipment" section from `driver_equipment_summary`.
+ *
+ * The dialog's own title stays the generic "Driver details" (it labels the
+ * dialog for assistive tech); the driver's name, job title and employment
+ * type sit in a `DetailHeader` inside the body, so they are not repeated in
+ * the info grid below it.
  *
  * The equipment section deliberately does not use the shared `MiniTable`:
  * `MiniTable`'s error slot renders inside a `<span>`, which cannot host
@@ -136,18 +141,6 @@ export function DriverDetailDialog({
           label: t('nationality'),
           value: driver.nationality,
         },
-        {
-          key: 'employmentType',
-          icon: <Briefcase size={16} />,
-          label: t('employmentType'),
-          value: driver.employment_type,
-        },
-        {
-          key: 'jobTitle',
-          icon: <Briefcase size={16} />,
-          label: t('jobTitle'),
-          value: driver.job_title,
-        },
       ]
     : []
 
@@ -158,8 +151,7 @@ export function DriverDetailDialog({
     <Dialog
       open={open}
       onOpenChange={onOpenChange}
-      title={driver?.full_name ?? t('driverDetailsDialogTitle')}
-      description={driver ? t('driverDetails') : undefined}
+      title={t('driverDetailsDialogTitle')}
       size="lg"
     >
       {loading ? (
@@ -176,6 +168,20 @@ export function DriverDetailDialog({
         <ErrorState title={error ?? undefined} />
       ) : (
         <div className="space-y-5">
+          <DetailHeader
+            as="h3"
+            identifier={driver.full_name}
+            subtitle={driver.job_title ?? undefined}
+            badges={
+              // Values such as "العزاني" or "نقدي" read like an owner on their
+              // own, so the badge carries its label.
+              driver.employment_type ? (
+                <Badge tone="neutral">
+                  {t('employmentType')}: {driver.employment_type}
+                </Badge>
+              ) : undefined
+            }
+          />
           <InfoGrid items={infoItems} columns={2} />
           <div className="space-y-3">
             <SectionHeader
