@@ -123,7 +123,9 @@ export function useExtraction(token: string | undefined) {
   }
 
   const publish = async () => {
-    if (!token || stage !== 'review') return
+    // The review-stage guard was dropped by the owner (2026-09-29) so the
+    // form can publish from any stage; the token is still required.
+    if (!token) return
     if (!targets.currentSystem && !targets.erpnext) {
       setNotice({ tone: 'danger', message: 'extractingSelectTarget' })
       return
