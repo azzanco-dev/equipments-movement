@@ -2,29 +2,20 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
-import { Alert } from '@/components/Alert'
 import { useAuth } from '@/auth/AuthContext'
 import {
-  LogIn,
-  LogOut,
-  Truck,
   Building2,
-  MapPin,
-  FileText,
-  User,
   Clock,
-  Camera,
-  StickyNote,
-  Link2,
   ExternalLink,
-  ChevronLeft,
-  ChevronRight,
-  Maximize2,
-  Trash2,
-  Upload,
-  RefreshCw,
+  FileText,
+  Hash,
+  Link2,
+  MapPin,
   Pencil,
+  StickyNote,
   Store,
+  Timer,
+  Wrench,
 } from 'lucide-react'
 import type {
   EntryExitLog,
@@ -33,7 +24,6 @@ import type {
   EntryExitPhoto,
   MovementDriverChange,
 } from '@/lib/types'
-import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/components/Select'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
@@ -43,32 +33,30 @@ import { uploadMovementPhotosDirectly } from '@/lib/movementPhotoUpload'
 import { prepareMovementPhotos } from '@/lib/movementPhotoCompression'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import {
-  CONTRACTOR_CODE_MAX_LENGTH,
-  contractorCodeErrorKey,
-  contractorCodeUnchanged,
-  isValidContractorCode,
-  normalizeContractorCode,
-} from '@/lib/contractorCodeEdit'
-import {
   BackButton,
+  Badge,
   Button,
+  Card,
   ConfirmDialog,
-  DescriptionList,
-  Dialog,
+  DetailHeader,
   ErrorState,
-  Field,
-  IconButton,
-  InfoRow,
-  Input,
+  InfoGrid,
+  InfoGridSection,
   Lightbox,
   MovementBadge,
   Notice,
-  PageHeader,
+  SectionHeader,
   WorkshopPurposeBadge,
   useConfirm,
-  type DescriptionListItem,
+  type InfoGridItem,
   type LightboxItem,
+  type PhotoGalleryItem,
 } from '@/components/ui'
+// wave7-A — sections extracted from this screen onto the approved
+// DetailHeader/InfoGrid layout.
+import { ContractorCodeDialog } from '@/components/movement/detail/ContractorCodeDialog'
+import { MovementDriverSection } from '@/components/movement/detail/MovementDriverSection'
+import { MovementPhotosPanel } from '@/components/movement/detail/MovementPhotosPanel'
 // wave6-J3/J4 — admin-only header menu: the single correction dialog, or
 // delete the movement. Both are authoritative in PostgreSQL (0104/0105).
 import { MovementAdminMenu } from '@/components/movement/MovementAdminMenu'
@@ -128,16 +116,6 @@ export function MovementDetail({
     string | null
   >(null)
   const [driverEntryId, setDriverEntryId] = useState<string | null>(null)
-  const [driverChangeOpen, setDriverChangeOpen] = useState(false)
-  const [newDriverId, setNewDriverId] = useState('')
-  const [newDriverOption, setNewDriverOption] = useState<SelectOption | null>(
-    null,
-  )
-  const [driverChangeNote, setDriverChangeNote] = useState('')
-  const [driverChangeBusy, setDriverChangeBusy] = useState(false)
-  const [driverChangeError, setDriverChangeError] = useState<string | null>(
-    null,
-  )
   // wave6-J3/J4 — the single admin correction dialog and the admin delete,
   // behind the header menu (migrations 0104/0105).
   const router = useRouter()
@@ -152,16 +130,19 @@ export function MovementDetail({
   // Foreman edit of the contractor code on his own open site ENTRY
   // (migration 0093). Separate from the admin correction dialog.
   const [codeEditOpen, setCodeEditOpen] = useState(false)
-  const [codeEditValue, setCodeEditValue] = useState('')
-  const [codeEditBusy, setCodeEditBusy] = useState(false)
-  const [codeEditError, setCodeEditError] = useState<string | null>(null)
-  const photoUrls = photoItems.map((item) => item.url)
   const lightboxItems: LightboxItem[] =
-    photoUrls.length > 0
+    photoItems.length > 0
       ? photoItems.map((item) => ({ id: item.id, src: item.url }))
       : photoUrl
         ? [{ id: 'legacy-photo', src: photoUrl }]
         : []
+  // The same photos for the shared gallery: new `entry_exit_photos` rows, or
+  // the single legacy `photo_url` photo, which stays readable.
+  const galleryPhotos: PhotoGalleryItem[] = lightboxItems.map((item) => ({
+    id: item.id,
+    src: item.src,
+    status: 'ready',
+  }))
 
   const startRequest = useListRequest()
   const fetchData = useCallback(async () => {
@@ -194,10 +175,18 @@ export function MovementDetail({
     setError(null)
 
     try {
+      // wave7-A — the recorder's name comes from `profile_names` (migration
+      // 0099: id, full_name, role only), not `profiles`: `select_profiles`
+      // hides other users' profile rows from non-admin roles, so the old
+      // `supervisor:profiles(*)` embed came back empty for them (and read
+      // every profile column for admins). PostgREST resolves the embed
+      // through the view via the `entry_exit_logs_supervisor_id_fkey` FK to
+      // `profiles(id)`; `entry_exit_logs` RLS still decides which movement
+      // is returned at all.
       const { data, error: fetchError } = await supabase
         .from('entry_exit_logs')
         .select(
-          '*, equipment:equipment(*, lessor:lessors(name)), supervisor:profiles(*), driver:drivers(*), company:companies(id,name_ar,name_en,created_at), project:projects(id,name_ar,name_en,created_at)',
+          '*, equipment:equipment(*, lessor:lessors(name)), supervisor:profile_names!entry_exit_logs_supervisor_id_fkey(id,full_name), driver:drivers(*), company:companies(id,name_ar,name_en,created_at), project:projects(id,name_ar,name_en,created_at)',
         )
         .eq('id', movementId)
         .abortSignal(signal)
@@ -222,7 +211,7 @@ export function MovementDetail({
         const { data: changes } = await supabase
           .from('movement_driver_changes')
           .select(
-            'id,entry_log_id,previous_driver_id,previous_driver_name,new_driver_id,new_driver_name,changed_by,changed_at,note,changer:profiles!movement_driver_changes_changed_by_fkey(id,full_name,role,created_at)',
+            'id,entry_log_id,previous_driver_id,previous_driver_name,new_driver_id,new_driver_name,changed_by,changed_at,note,changer:profile_names!movement_driver_changes_changed_by_fkey(id,full_name,role)',
           )
           .eq('entry_log_id', entryId)
           .order('changed_at')
@@ -330,7 +319,7 @@ export function MovementDetail({
             // Next EXIT: (recorded_at > entry) OR (recorded_at = entry AND id > entry.id)
             const { data: exitData, error: linkErr } = await supabase
               .from('entry_exit_logs')
-              .select('*, supervisor:profiles(*)')
+              .select('*')
               .eq('equipment_id', logData.equipment_id)
               .eq('movement_context', logData.movement_context ?? 'site')
               .eq('movement_type', 'exit')
@@ -354,7 +343,7 @@ export function MovementDetail({
             const { data: entryData, error: linkErr } = await supabase
               .from('entry_exit_logs')
               .select(
-                '*, supervisor:profiles(*), company:companies(id,name_ar,name_en,created_at), project:projects(id,name_ar,name_en,created_at)',
+                '*, company:companies(id,name_ar,name_en,created_at), project:projects(id,name_ar,name_en,created_at)',
               )
               .eq('equipment_id', logData.equipment_id)
               .eq('movement_context', logData.movement_context ?? 'site')
@@ -408,64 +397,6 @@ export function MovementDetail({
     },
     [],
   )
-
-  const changeDriver = async () => {
-    if (!driverEntryId || !newDriverId) return
-    setDriverChangeBusy(true)
-    setDriverChangeError(null)
-    const { error: changeError } = await supabase.rpc(
-      'change_active_movement_driver',
-      {
-        p_entry_log_id: driverEntryId,
-        p_new_driver_id: newDriverId,
-        p_note: driverChangeNote.trim() || null,
-      },
-    )
-    setDriverChangeBusy(false)
-    if (changeError) {
-      setDriverChangeError(t('driverChangeFailed'))
-      return
-    }
-    setDriverChangeOpen(false)
-    setNewDriverId('')
-    setNewDriverOption(null)
-    setDriverChangeNote('')
-    await fetchData()
-  }
-
-  const openContractorCodeEdit = () => {
-    setCodeEditValue(log?.contractor_equipment_code ?? '')
-    setCodeEditError(null)
-    setCodeEditOpen(true)
-  }
-
-  // The database is authoritative: `update_entry_contractor_code` re-checks the
-  // role, the ownership of the entry and that the visit is still open, and it
-  // writes that single column only. The audit row is written by the existing
-  // `audit_entry_exit_logs` trigger with the foreman as the actor.
-  const saveContractorCode = async () => {
-    if (!log) return
-    if (!isValidContractorCode(codeEditValue)) {
-      setCodeEditError(t('contractorCodeTooLong'))
-      return
-    }
-    setCodeEditBusy(true)
-    setCodeEditError(null)
-    const { error: rpcError } = await supabase.rpc(
-      'update_entry_contractor_code',
-      {
-        p_log_id: log.id,
-        p_code: normalizeContractorCode(codeEditValue),
-      },
-    )
-    setCodeEditBusy(false)
-    if (rpcError) {
-      setCodeEditError(t(contractorCodeErrorKey(rpcError.message)))
-      return
-    }
-    setCodeEditOpen(false)
-    await fetchData()
-  }
 
   // The database is authoritative: `admin_delete_movement` (migration 0104)
   // re-checks the admin role, refuses any movement that is not the last one of
@@ -680,15 +611,52 @@ export function MovementDetail({
     }
   }
 
-  const detailItems: DescriptionListItem[] = [
+  const role = profile?.role
+  const companyName = company
+    ? localizedName(lang, company.name_ar, company.name_en)
+    : null
+  const projectName = project
+    ? localizedName(lang, project.name_ar, project.name_en)
+    : null
+
+  // Photo permissions mirror the previous screen; the photo API route, RLS
+  // and Storage policies stay authoritative (uploader or admin may delete,
+  // monitor is read-only, max three per movement).
+  const selectedPhoto = photoItems[photoCarouselIndex]
+  const canAddPhotos = role !== 'monitor' && photoItems.length < 3
+  const canDeleteSelectedPhoto =
+    role !== 'monitor' &&
+    Boolean(selectedPhoto) &&
+    (selectedPhoto?.uploaded_by === user?.id || role === 'admin')
+
+  // The driver change is recorded on an open site ENTRY only; the database
+  // function re-checks the role and that the visit is still open.
+  const canChangeDriver =
+    isEntry && !linkedLog && role !== 'workshop' && role !== 'monitor'
+  const driverDisplayName =
+    (isEntry ? latestDriverChange?.new_driver_name : undefined) ??
+    log.driver?.full_name ??
+    log.driver_name ??
+    null
+
+  const movementItems: InfoGridItem[] = [
     {
-      key: 'equipment',
-      icon: <Truck size={16} />,
-      label: t('equipmentNameLabel'),
-      value: log.equipment
-        ? `${log.equipment.code} — ${log.equipment.type}`
-        : null,
+      key: 'movementDate',
+      icon: <Clock size={16} />,
+      label: t('movementDate'),
+      value: formatDate(log.recorded_at),
+      dir: 'ltr',
     },
+    ...(linkedLog
+      ? [
+          {
+            key: 'duration',
+            icon: <Timer size={16} />,
+            label: t('durationOnSite'),
+            value: formatElapsedDuration(durationMs, t, lang),
+          },
+        ]
+      : []),
     ...(isWorkshopMovement && isEntry
       ? [
           {
@@ -705,594 +673,278 @@ export function MovementDetail({
           },
         ]
       : []),
-    ...(!isWorkshopMovement
+    ...(log.notes
       ? [
           {
-            key: 'contractorCode',
-            icon: <FileText size={16} />,
-            label: t('contractorEquipmentCode'),
-            value: canEditContractorCode ? (
-              <span className="flex items-center gap-1">
-                <span
-                  className={
-                    log.contractor_equipment_code
-                      ? ''
-                      : 'text-muted font-normal'
-                  }
-                >
-                  {log.contractor_equipment_code ?? '—'}
-                </span>
-                <IconButton
-                  size="sm"
-                  label={t('editContractorCode')}
-                  icon={<Pencil size={14} />}
-                  onClick={openContractorCodeEdit}
-                />
-              </span>
-            ) : (
-              log.contractor_equipment_code
-            ),
-          },
-          ...(log.equipment?.ownership_status === 'external_supplier' &&
-          log.equipment?.lessor?.name
-            ? [
-                {
-                  key: 'lessor',
-                  icon: <Store size={16} />,
-                  label: t('lessor'),
-                  value: log.equipment.lessor.name,
-                },
-              ]
-            : []),
-          {
-            key: 'company',
-            icon: <Building2 size={16} />,
-            label: t('company'),
-            value: company
-              ? localizedName(lang, company.name_ar, company.name_en)
-              : null,
-          },
-          {
-            key: 'project',
-            icon: <MapPin size={16} />,
-            label: t('project'),
-            value: project
-              ? localizedName(lang, project.name_ar, project.name_en)
-              : null,
-          },
-          {
-            key: 'driver',
-            icon: <User size={16} />,
-            label: t('driverName'),
+            key: 'notes',
+            icon: <StickyNote size={16} />,
+            label: t('notes'),
+            // A node, not a string, so InfoGrid never truncates the note.
             value: (
-              <>
-                {(isEntry
-                  ? driverChanges.at(-1)?.new_driver_name
-                  : undefined) ??
-                  log.driver?.full_name ??
-                  log.driver_name ??
-                  '—'}
-                {currentDriverMobileNumber && (
-                  <span
-                    className="mt-0.5 block select-text text-muted"
-                    dir="ltr"
-                  >
-                    <a href={`tel:${currentDriverMobileNumber}`}>
-                      {currentDriverMobileNumber}
-                    </a>
-                  </span>
-                )}
-              </>
+              <span className="whitespace-pre-wrap break-words">
+                {log.notes}
+              </span>
             ),
-          },
-        ]
-      : []),
-    ...(profile?.role === 'admin' ||
-    profile?.role === 'monitor' ||
-    (['workshop_manager', 'assistant_workshop_manager'].includes(
-      profile?.role ?? '',
-    ) &&
-      isWorkshopMovement)
-      ? [
-          {
-            key: 'supervisor',
-            icon: <User size={16} />,
-            label: t('supervisorName'),
-            value: log.supervisor?.full_name,
-          },
-        ]
-      : []),
-    {
-      key: 'movementDate',
-      icon: <Clock size={16} />,
-      label: t('movementDate'),
-      value: formatDate(log.recorded_at),
-    },
-    ...(profile?.role === 'admin'
-      ? [
-          {
-            key: 'createdAt',
-            icon: <Clock size={16} />,
-            label: t('createdAt'),
-            value: log.created_at ? formatDateTime(log.created_at) : null,
           },
         ]
       : []),
   ]
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title={t('movementDetails')}
-        description={t('movementDetailsDesc')}
-        onBack={onBack}
-        backLabel={t('backToMovements')}
-        actions={
-          profile?.role === 'admin' ? (
-            <MovementAdminMenu
-              busy={deleteBusy}
-              onEdit={() => {
-                setDeleteError(null)
-                setEditWarning(null)
-                setDetailsEditOpen(true)
-              }}
-              onDelete={() => {
-                setDeleteError(null)
-                setEditWarning(null)
-                setDeleteOpen(true)
-              }}
-            />
-          ) : undefined
-        }
-      />
+  const equipmentItems: InfoGridItem[] = [
+    {
+      key: 'equipmentCode',
+      icon: <Hash size={16} />,
+      label: t('equipmentDetailsCode'),
+      value: log.equipment?.code,
+      dir: 'ltr',
+    },
+    {
+      key: 'equipmentType',
+      icon: <Wrench size={16} />,
+      label: t('equipmentDetailsType'),
+      value: log.equipment?.type,
+    },
+    {
+      key: 'plateNumber',
+      icon: <Hash size={16} />,
+      label: t('plateNumber'),
+      value: log.equipment?.plate_number,
+      dir: 'ltr',
+    },
+    ...(log.equipment?.ownership_status === 'external_supplier' &&
+    log.equipment?.lessor?.name
+      ? [
+          {
+            key: 'lessor',
+            icon: <Store size={16} />,
+            label: t('lessor'),
+            value: log.equipment.lessor.name,
+          },
+        ]
+      : []),
+  ]
 
-      {deleteError && <Alert type="error">{deleteError}</Alert>}
-      {editWarning && <Alert type="error">{editWarning}</Alert>}
+  const companyItems: InfoGridItem[] = [
+    {
+      key: 'company',
+      icon: <Building2 size={16} />,
+      label: t('company'),
+      value: companyName,
+    },
+    {
+      key: 'project',
+      icon: <MapPin size={16} />,
+      label: t('project'),
+      value: projectName,
+    },
+    {
+      key: 'contractorCode',
+      icon: <Hash size={16} />,
+      label: t('contractorEquipmentCode'),
+      value: log.contractor_equipment_code,
+      dir: 'ltr',
+    },
+  ]
 
-      {/* Movement type banner */}
-      <div
-        className="flex items-center gap-3 rounded-xl border p-4"
-        style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}
-      >
-        <div
-          className="flex h-10 w-10 items-center justify-center rounded-full"
-          style={{
-            backgroundColor: isEntry ? 'var(--entry-soft)' : 'var(--exit-soft)',
-          }}
-        >
-          {isEntry ? (
-            <LogIn size={20} style={{ color: 'var(--entry)' }} />
-          ) : (
-            <LogOut size={20} style={{ color: 'var(--exit)' }} />
-          )}
-        </div>
-        <div>
-          <p className="text-xs text-muted">{t('movementType')}</p>
-          <MovementBadge
-            type={isEntry ? 'entry' : 'exit'}
-            withIcon
-            className="mt-1"
-          />
-        </div>
-      </div>
+  const linkedItems: InfoGridItem[] = linkedLog
+    ? [
+        {
+          key: 'linkedDate',
+          icon: <Link2 size={16} />,
+          label: t('movementDate'),
+          value: formatDate(linkedLog.recorded_at),
+          dir: 'ltr',
+        },
+        // The EXIT page keeps showing what its ENTRY recorded.
+        ...(!isEntry && !isWorkshopMovement
+          ? [
+              {
+                key: 'linkedCompany',
+                icon: <Building2 size={16} />,
+                label: t('company'),
+                value: linkedCompany
+                  ? localizedName(
+                      lang,
+                      linkedCompany.name_ar,
+                      linkedCompany.name_en,
+                    )
+                  : null,
+              },
+              {
+                key: 'linkedProject',
+                icon: <MapPin size={16} />,
+                label: t('project'),
+                value: linkedProject
+                  ? localizedName(
+                      lang,
+                      linkedProject.name_ar,
+                      linkedProject.name_en,
+                    )
+                  : null,
+              },
+              {
+                key: 'linkedContractorCode',
+                icon: <Hash size={16} />,
+                label: t('contractorEquipmentCode'),
+                value: linkedLog.contractor_equipment_code,
+                dir: 'ltr' as const,
+              },
+            ]
+          : []),
+      ]
+    : []
 
-      {/* Main details card */}
-      <div className="card">
-        <h3 className="mb-2 text-sm font-bold text-muted">
-          {t('movementDetails')}
-        </h3>
-        <DescriptionList items={detailItems} columns={2} />
-
-        {/* Notes */}
-        {log.notes && (
-          <div
-            className="mt-4 border-t pt-4"
-            style={{ borderColor: 'var(--border)' }}
+  const headerActions =
+    canEditContractorCode || role === 'admin' ? (
+      <>
+        {canEditContractorCode && (
+          <Button
+            variant="outline"
+            size="sm"
+            icon={<Pencil size={14} />}
+            onClick={() => setCodeEditOpen(true)}
           >
-            <InfoRow
-              icon={<StickyNote size={16} />}
-              label={t('notes')}
-              value={<span className="whitespace-pre-wrap">{log.notes}</span>}
-            />
-          </div>
+            {t('editContractorCode')}
+          </Button>
+        )}
+        {role === 'admin' && (
+          <MovementAdminMenu
+            busy={deleteBusy}
+            onEdit={() => {
+              setDeleteError(null)
+              setEditWarning(null)
+              setDetailsEditOpen(true)
+            }}
+            onDelete={() => {
+              setDeleteError(null)
+              setEditWarning(null)
+              setDeleteOpen(true)
+            }}
+          />
+        )}
+      </>
+    ) : undefined
+
+  // The recorder's name is display data every role may see on a movement it
+  // can already read (owner decision 2026-09-22, migration 0099); the
+  // creation timestamp stays admin-only as before.
+  const recordedBy = t('movementRecordedBy').replace(
+    '{name}',
+    log.supervisor?.full_name || '—',
+  )
+
+  return (
+    <div className="space-y-4">
+      <BackButton onClick={onBack} label={t('backToMovements')} />
+
+      <Card className="space-y-6">
+        <DetailHeader
+          as="h1"
+          identifier={log.equipment?.code ?? t('movementDetails')}
+          identifierLtr={Boolean(log.equipment?.code)}
+          subtitle={log.equipment?.type}
+          badges={
+            <>
+              <MovementBadge type={isEntry ? 'entry' : 'exit'} withIcon />
+              {isWorkshopMovement && (
+                <Badge tone="neutral">{t('workshopContext')}</Badge>
+              )}
+            </>
+          }
+          actions={headerActions}
+        />
+
+        {deleteError && <Notice tone="danger">{deleteError}</Notice>}
+        {/* Partial success: the correction was stored, a follow-up step was
+            not. Never reported as a total failure. */}
+        {editWarning && <Notice tone="warning">{editWarning}</Notice>}
+
+        <InfoGridSection
+          title={t('movementSectionMovement')}
+          items={movementItems}
+        />
+
+        <section className="space-y-3">
+          <SectionHeader
+            title={isEntry ? t('linkedExit') : t('linkedEntry')}
+            action={
+              linkedLog ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={<ExternalLink size={14} />}
+                  onClick={() => onNavigateMovement(linkedLog.id)}
+                >
+                  {t('viewDetails')}
+                </Button>
+              ) : undefined
+            }
+          />
+          {linkedError ? (
+            <Notice tone="danger" size="compact">
+              {linkedError}
+            </Notice>
+          ) : linkedLog ? (
+            <InfoGrid items={linkedItems} />
+          ) : (
+            <p className="text-sm text-muted">
+              {isEntry ? t('notExitedYet') : '—'}
+            </p>
+          )}
+        </section>
+
+        <InfoGridSection
+          title={t('sectionEquipmentDetails')}
+          items={equipmentItems}
+        />
+
+        {!isWorkshopMovement && (
+          <InfoGridSection
+            title={t('movementSectionCompanyProject')}
+            items={companyItems}
+          />
         )}
 
-        {/* Photos */}
-        <div
-          className="mt-4 pt-4 border-t"
-          style={{ borderColor: 'var(--border)' }}
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <Camera size={16} className="text-muted" />
-            <p className="text-xs text-muted">{t('photo')}</p>
-          </div>
-          {photoActionError && (
-            <div className="mb-3">
-              <Alert type="error">{photoActionError}</Alert>
-            </div>
-          )}
-          {photoUrls.length > 0 ? (
-            <div
-              className="relative rounded-lg overflow-hidden"
-              style={{
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                height: '320px',
-              }}
-            >
-              <div className="absolute inset-0 flex items-center justify-center">
-                <img
-                  src={photoUrls[photoCarouselIndex]}
-                  alt={`${t('photoGalleryMainAlt')} ${photoCarouselIndex + 1}`}
-                  className="max-h-full max-w-full object-contain cursor-zoom-in"
-                  onClick={() => setLightboxOpen(true)}
-                />
-              </div>
-              <button
-                type="button"
-                aria-label={t('photoGalleryOpenAria')}
-                onClick={() => setLightboxOpen(true)}
-                className="absolute top-1 end-1 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
-              >
-                <Maximize2 size={16} />
-              </button>
-              {profile?.role !== 'monitor' &&
-                (photoItems[photoCarouselIndex]?.uploaded_by === user?.id ||
-                  profile?.role === 'admin') && (
-                  <button
-                    type="button"
-                    disabled={photoBusy}
-                    onClick={() =>
-                      deletePhoto(photoItems[photoCarouselIndex].id)
-                    }
-                    className="absolute top-1 start-1 rounded-full bg-red-600/80 p-1.5 text-white hover:bg-red-700"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              {photoUrls.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPhotoCarouselIndex(
-                        (prev) =>
-                          (prev - 1 + photoUrls.length) % photoUrls.length,
-                      )
-                    }
-                    className="absolute start-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
-                  >
-                    <ChevronLeft size={20} className="rtl-flip" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPhotoCarouselIndex(
-                        (prev) => (prev + 1) % photoUrls.length,
-                      )
-                    }
-                    className="absolute end-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
-                  >
-                    <ChevronRight size={20} className="rtl-flip" />
-                  </button>
-                  <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-white bg-black/50 rounded-full px-2 py-0.5">
-                    {photoCarouselIndex + 1} / {photoUrls.length}
-                  </span>
-                </>
-              )}
-            </div>
-          ) : photoUrl ? (
-            <div
-              className="relative rounded-lg overflow-hidden"
-              style={{
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                height: '320px',
-              }}
-            >
-              <div className="absolute inset-0 flex items-center justify-center">
-                <img
-                  src={photoUrl}
-                  alt={t('photoGalleryMainAlt')}
-                  className="max-h-full max-w-full object-contain cursor-zoom-in"
-                  onClick={() => setLightboxOpen(true)}
-                />
-              </div>
-              <button
-                type="button"
-                aria-label={t('photoGalleryOpenAria')}
-                onClick={() => setLightboxOpen(true)}
-                className="absolute top-1 end-1 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
-              >
-                <Maximize2 size={16} />
-              </button>
-            </div>
-          ) : (
-            <p className="text-sm text-muted italic">{t('noPhoto')}</p>
-          )}
-          {profile?.role !== 'monitor' && photoItems.length < 3 && (
-            <label
-              className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-sm hover:bg-surface-hover"
-              style={{ borderColor: 'var(--border)' }}
-            >
-              <Upload size={16} />
-              {photoBusy ? t('loading') : t('addPhoto')}
-              <input
-                type="file"
-                multiple
-                accept="image/jpeg,image/png,image/webp"
-                className="hidden"
-                disabled={photoBusy}
-                onChange={(event) => {
-                  addPhotos(event.target.files)
-                  event.target.value = ''
-                }}
-              />
-            </label>
-          )}
-        </div>
-      </div>
+        {!isWorkshopMovement && (
+          <MovementDriverSection
+            key={log.id}
+            driverName={driverDisplayName}
+            nameLabel={
+              isEntry && driverChanges.length > 0
+                ? t('currentDriver')
+                : t('driverName')
+            }
+            mobileNumber={currentDriverMobileNumber}
+            entryLogId={driverEntryId}
+            changes={driverChanges}
+            canChangeDriver={canChangeDriver}
+            loadDrivers={loadDrivers}
+            onChanged={fetchData}
+          />
+        )}
 
-      {/* Equipment data */}
-      <div className="card">
-        <h3 className="mb-2 text-sm font-bold text-muted">
-          {t('sectionEquipmentDetails')}
-        </h3>
-        <DescriptionList
-          items={[
-            {
-              key: 'equipmentDetailsCode',
-              icon: <Truck size={16} />,
-              label: t('equipmentDetailsCode'),
-              value: log.equipment?.code,
-            },
-            {
-              key: 'equipmentDetailsType',
-              icon: <FileText size={16} />,
-              label: t('equipmentDetailsType'),
-              value: log.equipment?.type,
-            },
-            {
-              key: 'equipmentDetailsPlate',
-              icon: <FileText size={16} />,
-              label: t('plateNumber'),
-              value: log.equipment?.plate_number,
-              dir: 'ltr',
-            },
-          ]}
-          columns={2}
+        <MovementPhotosPanel
+          photos={galleryPhotos}
+          selectedIndex={photoCarouselIndex}
+          onSelectIndex={setPhotoCarouselIndex}
+          onOpen={() => setLightboxOpen(true)}
+          canAdd={canAddPhotos}
+          onAddFiles={addPhotos}
+          canDeleteSelected={canDeleteSelectedPhoto}
+          onDeleteSelected={() => {
+            if (selectedPhoto) deletePhoto(selectedPhoto.id)
+          }}
+          busy={photoBusy}
+          error={photoActionError}
         />
-      </div>
 
-      {driverEntryId && log.movement_context !== 'workshop' && (
-        <div className="card space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h3 className="font-bold">{t('driverChangeHistory')}</h3>
-              <p className="text-xs text-muted">
-                {t('currentDriver')}:{' '}
-                {driverChanges.at(-1)?.new_driver_name ??
-                  (isEntry ? log.driver_name : linkedLog?.driver_name) ??
-                  '—'}
-              </p>
-            </div>
-            {isEntry &&
-              !linkedLog &&
-              profile?.role !== 'workshop' &&
-              profile?.role !== 'monitor' && (
-                <Button
-                  variant="outline"
-                  icon={<RefreshCw size={16} />}
-                  onClick={() => setDriverChangeOpen((value) => !value)}
-                >
-                  {t('changeDriver')}
-                </Button>
-              )}
-          </div>
-          {driverChangeOpen && (
-            <div
-              className="space-y-3 rounded-lg border p-4"
-              style={{ borderColor: 'var(--border)' }}
-            >
-              <Field label={t('newDriver')} required>
-                {() => (
-                  <AsyncSearchSelect
-                    value={newDriverId}
-                    selectedOption={newDriverOption}
-                    onChange={(value, option) => {
-                      setNewDriverId(value)
-                      setNewDriverOption(option)
-                    }}
-                    loadOptions={loadDrivers}
-                    placeholder={t('selectDriver')}
-                  />
-                )}
-              </Field>
-              <Field label={t('notes')}>
-                {(control) => (
-                  <Input
-                    {...control}
-                    value={driverChangeNote}
-                    onChange={(event) =>
-                      setDriverChangeNote(event.target.value)
-                    }
-                    placeholder={t('notesPlaceholder')}
-                  />
-                )}
-              </Field>
-              {driverChangeError && (
-                <Alert type="error">{driverChangeError}</Alert>
-              )}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setDriverChangeOpen(false)}
-                >
-                  {t('cancel')}
-                </Button>
-                <Button
-                  variant="primary"
-                  className="flex-1"
-                  disabled={!newDriverId}
-                  loading={driverChangeBusy}
-                  onClick={changeDriver}
-                >
-                  {t('save')}
-                </Button>
-              </div>
-            </div>
-          )}
-          {driverChanges.length === 0 ? (
-            <p className="text-sm text-muted">{t('noDriverChanges')}</p>
-          ) : (
-            <div className="space-y-2">
-              {driverChanges.map((change) => (
-                <div
-                  key={change.id}
-                  className="rounded-lg border px-3 py-2 text-sm"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  <div className="grid gap-1 sm:grid-cols-2">
-                    <p>
-                      <span className="text-muted">{t('previousDriver')}:</span>{' '}
-                      <span className="font-medium" dir="auto">
-                        {change.previous_driver_name}
-                      </span>
-                    </p>
-                    <p>
-                      <span className="text-muted">{t('newDriver')}:</span>{' '}
-                      <span className="font-medium" dir="auto">
-                        {change.new_driver_name}
-                      </span>
-                    </p>
-                  </div>
-                  <p className="mt-1 text-xs text-muted">
-                    {formatDateTime(change.changed_at)}
-                    {change.changer?.full_name
-                      ? ` — ${change.changer.full_name}`
-                      : ''}
-                  </p>
-                  {change.note && <p className="mt-1 text-xs">{change.note}</p>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Linked movement section */}
-      {isEntry ? (
-        <div className="card">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-muted">
-            <Link2 size={16} /> {t('linkedExit')}
-          </h3>
-          {linkedError ? (
-            <Alert type="error">{linkedError}</Alert>
-          ) : linkedLog ? (
-            <div className="space-y-2">
-              <DescriptionList
-                items={[
-                  {
-                    key: 'date',
-                    icon: <Clock size={16} />,
-                    label: t('movementDate'),
-                    value: formatDate(linkedLog.recorded_at),
-                  },
-                  {
-                    key: 'duration',
-                    icon: <Clock size={16} />,
-                    label: t('durationOnSite'),
-                    value: formatElapsedDuration(durationMs, t, lang),
-                  },
-                ]}
-              />
-              <Button
-                variant="outline"
-                icon={<ExternalLink size={16} />}
-                onClick={() => onNavigateMovement(linkedLog.id)}
-                className="mt-2"
-              >
-                {t('viewDetails')}
-              </Button>
-            </div>
-          ) : (
-            <p className="text-sm italic text-muted">{t('notExitedYet')}</p>
-          )}
-        </div>
-      ) : (
-        <div className="card">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-muted">
-            <Link2 size={16} /> {t('linkedEntry')}
-          </h3>
-          {linkedError ? (
-            <Alert type="error">{linkedError}</Alert>
-          ) : linkedLog ? (
-            <div className="space-y-2">
-              <DescriptionList
-                items={[
-                  {
-                    key: 'date',
-                    icon: <Clock size={16} />,
-                    label: t('movementDate'),
-                    value: formatDate(linkedLog.recorded_at),
-                  },
-                  ...(!isWorkshopMovement
-                    ? [
-                        {
-                          key: 'company',
-                          icon: <Building2 size={16} />,
-                          label: t('company'),
-                          value: linkedCompany
-                            ? localizedName(
-                                lang,
-                                linkedCompany.name_ar,
-                                linkedCompany.name_en,
-                              )
-                            : null,
-                        },
-                        {
-                          key: 'project',
-                          icon: <MapPin size={16} />,
-                          label: t('project'),
-                          value: linkedProject
-                            ? localizedName(
-                                lang,
-                                linkedProject.name_ar,
-                                linkedProject.name_en,
-                              )
-                            : null,
-                        },
-                        {
-                          key: 'contractorCode',
-                          icon: <FileText size={16} />,
-                          label: t('contractorEquipmentCode'),
-                          value: linkedLog.contractor_equipment_code,
-                        },
-                      ]
-                    : []),
-                  {
-                    key: 'duration',
-                    icon: <Clock size={16} />,
-                    label: t('durationOnSite'),
-                    value: formatElapsedDuration(durationMs, t, lang),
-                  },
-                ]}
-              />
-              <Button
-                variant="outline"
-                icon={<ExternalLink size={16} />}
-                onClick={() => onNavigateMovement(linkedLog.id)}
-                className="mt-2"
-              >
-                {t('viewDetails')}
-              </Button>
-            </div>
-          ) : (
-            <p className="text-sm italic text-muted">—</p>
-          )}
-        </div>
-      )}
+        <p className="border-t pt-3 text-xs text-muted">
+          {recordedBy}
+          {role === 'admin' && log.created_at
+            ? ` — ${t('createdAt')}: ${formatDateTime(log.created_at)}`
+            : ''}
+        </p>
+      </Card>
 
       <Lightbox
         open={lightboxOpen}
@@ -1303,54 +955,16 @@ export function MovementDetail({
       />
 
       {canEditContractorCode && (
-        <Dialog
+        <ContractorCodeDialog
           open={codeEditOpen}
           onOpenChange={setCodeEditOpen}
-          title={t('editContractorCode')}
-          size="sm"
-          footer={
-            <>
-              <Button
-                variant="outline"
-                onClick={() => setCodeEditOpen(false)}
-                disabled={codeEditBusy}
-              >
-                {t('cancel')}
-              </Button>
-              <Button
-                variant="primary"
-                loading={codeEditBusy}
-                disabled={contractorCodeUnchanged(
-                  codeEditValue,
-                  log.contractor_equipment_code,
-                )}
-                onClick={saveContractorCode}
-              >
-                {t('save')}
-              </Button>
-            </>
-          }
-        >
-          <div className="space-y-3">
-            {codeEditError && <Alert type="error">{codeEditError}</Alert>}
-            <Field label={t('contractorEquipmentCode')}>
-              {(control) => (
-                <Input
-                  {...control}
-                  type="text"
-                  dir="ltr"
-                  value={codeEditValue}
-                  maxLength={CONTRACTOR_CODE_MAX_LENGTH}
-                  placeholder={t('contractorCodePlaceholder')}
-                  onChange={(event) => setCodeEditValue(event.target.value)}
-                />
-              )}
-            </Field>
-          </div>
-        </Dialog>
+          logId={log.id}
+          currentCode={log.contractor_equipment_code}
+          onSaved={fetchData}
+        />
       )}
 
-      {profile?.role === 'admin' && (
+      {role === 'admin' && (
         <>
           <MovementEditDialog
             open={detailsEditOpen}

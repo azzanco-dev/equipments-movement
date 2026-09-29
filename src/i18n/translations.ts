@@ -1158,8 +1158,7 @@ export const translations = {
       'الخادم غير مهيا لهذه العملية. راجع اعدادات Supabase على الخادم',
     extractingErrNetwork:
       'تعذر الاتصال بالخادم. تحقق من الانترنت وحاول مرة اخرى',
-    extractingErrInvalidResponse:
-      'رد الخادم بصيغة غير متوقعة. حاول مرة اخرى',
+    extractingErrInvalidResponse: 'رد الخادم بصيغة غير متوقعة. حاول مرة اخرى',
     extractingErrImageRequired: 'اختر صورة اولا',
     extractingErrUnsupportedImage: 'يسمح بصور JPEG وPNG وWEBP فقط',
     extractingErrImageTooLarge:
@@ -1186,7 +1185,8 @@ export const translations = {
       'حدث خطا غير متوقع اثناء قراءة الصورة. حاول مرة اخرى',
     extractingErrInvalidPayload:
       'البيانات المرسلة غير صالحة. راجع الحقول وحاول مرة اخرى',
-    extractingErrPublishFailed: 'تعذر نشر البيانات بسبب خطا غير متوقع في الخادم',
+    extractingErrPublishFailed:
+      'تعذر نشر البيانات بسبب خطا غير متوقع في الخادم',
     extractingErrUnknown: 'تعذر اكمال العملية',
     extractingErrLocalLookup: 'تعذر التحقق من السائق في النظام الحالي',
     extractingErrLocalCreate: 'تعذر انشاء السائق في النظام الحالي',
@@ -1220,8 +1220,7 @@ export const translations = {
     movementSectionDriver: 'السائق',
     movementDeletePhoto: 'حذف الصورة',
     movementRecordedBy: 'سجلها {name}',
-    dialogDescContractorCodeEdit:
-      'يعدل ترقيم الشركة لهذه الزيارة المفتوحة فقط',
+    dialogDescContractorCodeEdit: 'يعدل ترقيم الشركة لهذه الزيارة المفتوحة فقط',
   },
   en: {
     appName: 'Heavy Equipment Management',
@@ -2384,7 +2383,8 @@ export const translations = {
     extractingInvalidRequired: 'This field is required',
     extractingInvalidIdNumber: 'The ID number must be 5 to 20 digits',
     extractingInvalidEmail: 'Invalid email format',
-    extractingInvalidMobile: 'The mobile number is 7 to 15 digits and may start with +',
+    extractingInvalidMobile:
+      'The mobile number is 7 to 15 digits and may start with +',
     extractingInvalidCtc: 'The salary is a number with at most two decimals',
     extractingInvalidDate: 'Invalid date. Use DD-MM-YYYY',
     extractingInvalidLanguage: 'Unsupported language',
@@ -2397,7 +2397,8 @@ export const translations = {
     extractingErrInvalidResponse:
       'The server answered in an unexpected format. Try again',
     extractingErrImageRequired: 'Choose a photo first',
-    extractingErrUnsupportedImage: 'Only JPEG, PNG, and WEBP photos are allowed',
+    extractingErrUnsupportedImage:
+      'Only JPEG, PNG, and WEBP photos are allowed',
     extractingErrImageTooLarge:
       'The photo must be larger than zero and at most 10 MB',
     extractingErrOcrNotConfigured:
@@ -2425,10 +2426,13 @@ export const translations = {
     extractingErrPublishFailed:
       'Publishing failed because of an unexpected server error',
     extractingErrUnknown: 'The action could not be completed',
-    extractingErrLocalLookup: 'Could not check the driver in the current system',
-    extractingErrLocalCreate: 'Could not create the driver in the current system',
+    extractingErrLocalLookup:
+      'Could not check the driver in the current system',
+    extractingErrLocalCreate:
+      'Could not create the driver in the current system',
     extractingErrErpRequiredFields: 'Complete the required ERPNext fields',
-    extractingErrErpNotConfigured: 'ERPNext settings are incomplete on the server',
+    extractingErrErpNotConfigured:
+      'ERPNext settings are incomplete on the server',
     extractingErrErpFieldMapping: 'The ERPNext field settings are invalid',
     extractingErrErpEmployeeLookup: 'Could not check the employee in ERPNext',
     extractingErrErpUserLookup: 'Could not check the user in ERPNext',
@@ -2441,7 +2445,8 @@ export const translations = {
     extractingErrErpReferenceLookup: 'Could not check the ERPNext lists',
     extractingErrErpGender: 'The gender value does not exist in ERPNext',
     extractingErrErpCompany: 'The company does not exist in ERPNext',
-    extractingErrErpEmploymentType: 'The employment type does not exist in ERPNext',
+    extractingErrErpEmploymentType:
+      'The employment type does not exist in ERPNext',
     extractingErrErpDepartment: 'The department does not exist in ERPNext',
     extractingErrErpDesignation:
       'The occupation does not exist as a Designation in ERPNext',
