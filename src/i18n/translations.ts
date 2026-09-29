@@ -1230,6 +1230,10 @@ export const translations = {
     // wave7-V1
     filterDialogDesc: 'حدد الحقول التي تريد تصفية القائمة بها',
     filterDialogDone: 'تم',
+    // wave7-L2
+    adminHomeWorkshopBreakdown: 'داخل الورشة حسب الغرض',
+    // wave7-L1
+    movementsLogsTab: 'السجلات',
   },
   en: {
     appName: 'Heavy Equipment Management',
@@ -2484,6 +2488,10 @@ export const translations = {
     // wave7-V1
     filterDialogDesc: 'Choose the fields to filter the list by',
     filterDialogDone: 'Done',
+    // wave7-L2
+    adminHomeWorkshopBreakdown: 'In the workshop, by purpose',
+    // wave7-L1
+    movementsLogsTab: 'Logs',
   },
 } as const
 

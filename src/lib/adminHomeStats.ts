@@ -41,10 +41,12 @@ export const ADMIN_HOME_OWNERS: readonly AdminHomeOwner[] = [
 ]
 
 /**
- * The owners every admin-home section starts on. It is the whole home set, so
- * "the default" and "an empty selection" are the same three owners.
+ * The owners every admin-home section starts on (owner request, 2026-09-30):
+ * Al-Azani only. The filter still offers the three home owners, and clearing
+ * the selection still means all three (`homeOwnerArgument`), so "the default"
+ * and "an empty selection" are now deliberately different.
  */
-export const DEFAULT_HOME_OWNERS: AdminHomeOwner[] = [...ADMIN_HOME_OWNERS]
+export const DEFAULT_HOME_OWNERS: AdminHomeOwner[] = ['alazani']
 
 function isKnownOwner(value: string): value is AdminHomeOwner {
   return (ALL_OWNERS as readonly string[]).includes(value)
@@ -202,6 +204,25 @@ export const FLEET_STATES = [
 ] as const
 
 export type FleetStateId = (typeof FLEET_STATES)[number]
+
+/**
+ * Every card of the "الحالة الان" section, in the order it is drawn (owner
+ * request, 2026-09-30). These are the ids a card click reports through
+ * `FleetStateSection`'s `onSelectState`, so the future drill-down panel and
+ * its `p_state` argument share one vocabulary: the three workshop purposes are
+ * the `FLEET_STATES` values, and `workshop` is their union.
+ */
+export const FLEET_DRILL_STATES = [
+  'total',
+  'inside_site',
+  'workshop',
+  'available',
+  'workshop_maintenance',
+  'workshop_parking',
+  'workshop_unclassified',
+] as const
+
+export type FleetDrillState = (typeof FLEET_DRILL_STATES)[number]
 
 function num(source: unknown, key: string): number {
   if (!source || typeof source !== 'object') return 0

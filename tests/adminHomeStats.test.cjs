@@ -100,9 +100,36 @@ const HOME_THREE = ['alazani', 'third_party_f', 'third_party_partnership_b']
 
 test('the admin home offers exactly Al-Azani, F and B', () => {
   assert.deepEqual(plain(admin.ADMIN_HOME_OWNERS), HOME_THREE)
-  assert.deepEqual(plain(admin.DEFAULT_HOME_OWNERS), HOME_THREE)
   assert.ok(!admin.ADMIN_HOME_OWNERS.includes('takween'))
   assert.ok(!admin.ADMIN_HOME_OWNERS.includes('external_supplier'))
+})
+
+test('every admin home section starts on Al-Azani only (2026-09-30)', () => {
+  assert.deepEqual(plain(admin.DEFAULT_HOME_OWNERS), ['alazani'])
+  // The default is one of the offered options, and it is not the same as an
+  // empty selection, which still means the three.
+  assert.ok(
+    admin.DEFAULT_HOME_OWNERS.every((owner) =>
+      admin.ADMIN_HOME_OWNERS.includes(owner),
+    ),
+  )
+  assert.deepEqual(plain(admin.homeOwnerArgument([])), HOME_THREE)
+})
+
+test('the fleet state cards share one drill-down vocabulary', () => {
+  assert.deepEqual(plain(admin.FLEET_DRILL_STATES), [
+    'total',
+    'inside_site',
+    'workshop',
+    'available',
+    'workshop_maintenance',
+    'workshop_parking',
+    'workshop_unclassified',
+  ])
+  // Every per-unit state the database classifies is reachable from a card.
+  admin.FLEET_STATES.forEach((state) =>
+    assert.ok(admin.FLEET_DRILL_STATES.includes(state), state),
+  )
 })
 
 test('normalizeHomeOwnerFilters drops Takween, external suppliers and unknowns', () => {
@@ -118,6 +145,10 @@ test('normalizeHomeOwnerFilters drops Takween, external suppliers and unknowns',
   // Already canonical, so normalizing the default changes nothing.
   assert.deepEqual(
     plain(admin.normalizeHomeOwnerFilters(admin.DEFAULT_HOME_OWNERS)),
+    ['alazani'],
+  )
+  assert.deepEqual(
+    plain(admin.normalizeHomeOwnerFilters(admin.ADMIN_HOME_OWNERS)),
     HOME_THREE,
   )
 })
@@ -127,10 +158,9 @@ test('the home p_owners argument is never NULL and never leaves the three', () =
   assert.deepEqual(plain(admin.homeOwnerArgument([])), HOME_THREE)
   assert.deepEqual(plain(admin.homeOwnerArgument(null)), HOME_THREE)
   assert.deepEqual(plain(admin.homeOwnerArgument(undefined)), HOME_THREE)
-  assert.deepEqual(
-    plain(admin.homeOwnerArgument(admin.DEFAULT_HOME_OWNERS)),
-    HOME_THREE,
-  )
+  assert.deepEqual(plain(admin.homeOwnerArgument(admin.DEFAULT_HOME_OWNERS)), [
+    'alazani',
+  ])
   assert.deepEqual(plain(admin.homeOwnerArgument(['third_party_f'])), [
     'third_party_f',
   ])

@@ -42,6 +42,7 @@ export type {
 export { Card, SectionHeader } from './Card'
 export type { CardProps, SectionHeaderProps } from './Card'
 export { StatCard } from './StatCard'
+export type { StatCardAccent } from './StatCard'
 export type { StatCardProps, StatCardTone } from './StatCard'
 export { PhotoGallery } from './PhotoGallery'
 export type {
