@@ -35,7 +35,7 @@ interface FleetCard {
   cellClassName?: string
 }
 
-const ICON_SIZE = 20
+const ICON_SIZE = 16
 
 /**
  * The seven cards, in drawing order. Accents are tokens only: green for
