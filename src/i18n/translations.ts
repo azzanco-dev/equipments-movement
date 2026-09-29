@@ -1214,15 +1214,6 @@ export const translations = {
     detailSectionDates: 'التواريخ',
     detailRecentMovementsDesc: 'اخر 10 حركات لهذه المعدة',
     userSectionAccount: 'بيانات الحساب',
-    // wave7-A
-    movementSectionMovement: 'بيانات الحركة',
-    movementSectionCompanyProject: 'الشركة والمشروع',
-    movementSectionDriver: 'السائق',
-    movementDeletePhoto: 'حذف الصورة',
-    movementRecordedBy: 'سجلها {name}',
-    dialogDescContractorCodeEdit: 'يعدل ترقيم الشركة لهذه الزيارة المفتوحة فقط',
-    // wave7-V2
-    movementRecordedByOn: 'سجلها {name} بتاريخ {date}',
     // wave7-V3
     logsViewFilter: 'طريقة العرض',
     visitContractorCodeLine: 'ترقيم الشركة {code}',
@@ -2470,16 +2461,6 @@ export const translations = {
     detailSectionDates: 'Dates',
     detailRecentMovementsDesc: 'The last 10 movements for this equipment',
     userSectionAccount: 'Account',
-    // wave7-A
-    movementSectionMovement: 'Movement',
-    movementSectionCompanyProject: 'Company and project',
-    movementSectionDriver: 'Driver',
-    movementDeletePhoto: 'Delete photo',
-    movementRecordedBy: 'Recorded by {name}',
-    dialogDescContractorCodeEdit:
-      'Changes the company number for this open visit only',
-    // wave7-V2
-    movementRecordedByOn: 'Recorded by {name} on {date}',
     // wave7-V3
     logsViewFilter: 'View',
     visitContractorCodeLine: 'Company no. {code}',
