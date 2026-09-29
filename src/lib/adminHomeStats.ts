@@ -16,8 +16,9 @@ import type { ChartBucket } from '@/lib/chartBuckets'
 import { saudiDateKey } from '@/lib/saudiTime'
 import type { OwnershipStatus } from '@/lib/types'
 
-/** The `ownership_status` values the database check constraint allows. */
-export const ADMIN_HOME_OWNERS = [
+/** Every `ownership_status` value the database check constraint allows. The
+ *  reports and `/logs` keep all five; only the admin home narrows them. */
+export const ALL_OWNERS = [
   'alazani',
   'takween',
   'third_party_f',
@@ -25,47 +26,71 @@ export const ADMIN_HOME_OWNERS = [
   'external_supplier',
 ] as const
 
-export type AdminHomeOwner = (typeof ADMIN_HOME_OWNERS)[number]
+export type AdminHomeOwner = (typeof ALL_OWNERS)[number]
 
 /**
- * The owners every admin-home section starts on (owner decision, 2026-09-29):
- * the three in-house classifications. Takween and external suppliers are left
- * out until the user widens a section's filter. Kept in the canonical
- * `ADMIN_HOME_OWNERS` order, so it is already what `normalizeOwnerFilters`
- * would return.
+ * The owners the admin home knows about (owner decision, 2026-09-29, EM-199):
+ * Takween and external suppliers are removed from the home entirely, from the
+ * data of every section as well as from the filter. This is the option list of
+ * the home's owner filter and the only set the home ever asks the database for.
  */
-export const DEFAULT_HOME_OWNERS: AdminHomeOwner[] = [
+export const ADMIN_HOME_OWNERS: readonly AdminHomeOwner[] = [
   'alazani',
   'third_party_f',
   'third_party_partnership_b',
 ]
 
+/**
+ * The owners every admin-home section starts on. It is the whole home set, so
+ * "the default" and "an empty selection" are the same three owners.
+ */
+export const DEFAULT_HOME_OWNERS: AdminHomeOwner[] = [...ADMIN_HOME_OWNERS]
+
+function isKnownOwner(value: string): value is AdminHomeOwner {
+  return (ALL_OWNERS as readonly string[]).includes(value)
+}
+
 function isAdminHomeOwner(value: string): value is AdminHomeOwner {
-  return (ADMIN_HOME_OWNERS as readonly string[]).includes(value)
+  return ADMIN_HOME_OWNERS.includes(value as AdminHomeOwner)
+}
+
+function ownerParts(value: string | string[] | null | undefined): string[] {
+  const parts = Array.isArray(value) ? value : (value ?? '').split(',')
+  return parts.map((part) => part.trim())
 }
 
 /**
- * Normalizes an owner selection.
+ * Normalizes an owner selection across all five classifications (the report
+ * screens' filter).
  *
  * An empty result means "every owner", exactly as it does in the database
  * functions, so an unknown value degrades to the unfiltered section instead of
  * an error. Duplicates are dropped and the result is put back into the
- * canonical `ADMIN_HOME_OWNERS` order, so the same selection always produces
- * the same request signature whatever order the boxes were ticked in.
+ * canonical `ALL_OWNERS` order, so the same selection always produces the same
+ * request signature whatever order the boxes were ticked in.
  */
 export function normalizeOwnerFilters(
   value: string | string[] | null | undefined,
 ): AdminHomeOwner[] {
-  const parts = Array.isArray(value) ? value : (value ?? '').split(',')
-  const chosen = new Set(
-    parts.map((part) => part.trim()).filter((part) => isAdminHomeOwner(part)),
-  )
+  const chosen = new Set(ownerParts(value).filter(isKnownOwner))
+  return ALL_OWNERS.filter((owner) => chosen.has(owner))
+}
+
+/**
+ * The admin home's normalizer: like `normalizeOwnerFilters`, but a value
+ * outside the home's three owners (Takween, external supplier, anything
+ * unknown) is dropped. An empty result means "the three", never "every owner".
+ */
+export function normalizeHomeOwnerFilters(
+  value: string | string[] | null | undefined,
+): AdminHomeOwner[] {
+  const chosen = new Set(ownerParts(value).filter(isAdminHomeOwner))
   return ADMIN_HOME_OWNERS.filter((owner) => chosen.has(owner))
 }
 
 /**
- * The argument the database functions take: `null` for "every owner", never
- * an empty array, so the two representations can never diverge.
+ * The argument the report functions take: `null` for "every owner", never an
+ * empty array, so the two representations can never diverge.
  *
  * Unknown values are dropped rather than sent to a function that would reject
  * the whole request, and a selection that contained nothing but unknown values
@@ -78,6 +103,19 @@ export function ownerFilterArgument(
   if (!owners || owners.length === 0) return null
   const normalized = normalizeOwnerFilters(owners as string[])
   return normalized.length ? normalized : null
+}
+
+/**
+ * The `p_owners` argument of every admin-home function. It is never `null` and
+ * never empty: an empty selection (or one of only Takween / unknown values)
+ * maps to the three home owners, so the database never aggregates the other
+ * two.
+ */
+export function homeOwnerArgument(
+  owners: AdminHomeOwner[] | string[] | null | undefined,
+): AdminHomeOwner[] {
+  const normalized = normalizeHomeOwnerFilters(owners as string[])
+  return normalized.length ? normalized : [...ADMIN_HOME_OWNERS]
 }
 
 // --- Server-side pagination ------------------------------------------------

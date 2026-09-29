@@ -46,7 +46,7 @@ const plain = (value) => JSON.parse(JSON.stringify(value ?? null))
 
 // --- owner filter (multi-select, migration 0095) ---------------------------
 
-test('normalizeOwnerFilters accepts only known ownership_status values', () => {
+test('normalizeOwnerFilters (reports) accepts all five known ownership_status values', () => {
   assert.deepEqual(plain(admin.normalizeOwnerFilters('alazani')), ['alazani'])
   assert.deepEqual(plain(admin.normalizeOwnerFilters('alazani,takween')), [
     'alazani',
@@ -61,9 +61,16 @@ test('normalizeOwnerFilters accepts only known ownership_status values', () => {
   assert.deepEqual(plain(admin.normalizeOwnerFilters('')), [])
   assert.deepEqual(plain(admin.normalizeOwnerFilters(null)), [])
   assert.deepEqual(plain(admin.normalizeOwnerFilters(undefined)), [])
+  assert.deepEqual(plain(admin.ALL_OWNERS), [
+    'alazani',
+    'takween',
+    'third_party_f',
+    'third_party_partnership_b',
+    'external_supplier',
+  ])
 })
 
-test('owner filters are deduplicated and canonically ordered', () => {
+test('report owner filters are deduplicated and canonically ordered', () => {
   // The same selection must always produce the same URL and the same request
   // signature, whatever order the user ticked the boxes in.
   assert.deepEqual(
@@ -76,41 +83,80 @@ test('owner filters are deduplicated and canonically ordered', () => {
   )
 })
 
-test('the home sections default to the three in-house owners', () => {
-  // Owner decision, 2026-09-29: Takween and external suppliers are opt-in.
-  assert.deepEqual(plain(admin.DEFAULT_HOME_OWNERS), [
-    'alazani',
-    'third_party_f',
-    'third_party_partnership_b',
-  ])
-  // Already canonical, so normalizing changes nothing, and every entry is a
-  // known owner.
-  assert.deepEqual(
-    plain(admin.normalizeOwnerFilters(admin.DEFAULT_HOME_OWNERS)),
-    plain(admin.DEFAULT_HOME_OWNERS),
-  )
-  // It is a real filter, not "every owner": the database gets the three.
-  assert.deepEqual(
-    plain(admin.ownerFilterArgument(admin.DEFAULT_HOME_OWNERS)),
-    plain(admin.DEFAULT_HOME_OWNERS),
-  )
-})
-
-test('the database argument is NULL for "every owner", never an empty array', () => {
-  // The functions in 0095/0101 treat NULL and an empty array the same, but only
-  // one of them may leave the client, so "no filter" has one representation.
+test('the report argument is NULL for "every owner", never an empty array', () => {
   assert.equal(admin.ownerFilterArgument([]), null)
   assert.equal(admin.ownerFilterArgument(null), null)
   assert.equal(admin.ownerFilterArgument(undefined), null)
   assert.deepEqual(plain(admin.ownerFilterArgument(['alazani'])), ['alazani'])
-  // Sections hold plain strings, so the argument is validated on its way out:
-  // an unknown value is dropped rather than sent to a function that would
-  // reject the whole request, and a selection of nothing but unknown values
-  // degrades to "every owner".
   assert.deepEqual(plain(admin.ownerFilterArgument(['takween', 'bogus'])), [
     'takween',
   ])
   assert.equal(admin.ownerFilterArgument(['bogus']), null)
+})
+
+// --- admin home owners (EM-199, 2026-09-29) --------------------------------
+
+const HOME_THREE = ['alazani', 'third_party_f', 'third_party_partnership_b']
+
+test('the admin home offers exactly Al-Azani, F and B', () => {
+  assert.deepEqual(plain(admin.ADMIN_HOME_OWNERS), HOME_THREE)
+  assert.deepEqual(plain(admin.DEFAULT_HOME_OWNERS), HOME_THREE)
+  assert.ok(!admin.ADMIN_HOME_OWNERS.includes('takween'))
+  assert.ok(!admin.ADMIN_HOME_OWNERS.includes('external_supplier'))
+})
+
+test('normalizeHomeOwnerFilters drops Takween, external suppliers and unknowns', () => {
+  assert.deepEqual(
+    plain(admin.normalizeHomeOwnerFilters('third_party_f,takween,alazani')),
+    ['alazani', 'third_party_f'],
+  )
+  assert.deepEqual(
+    plain(admin.normalizeHomeOwnerFilters(['external_supplier', 'bogus'])),
+    [],
+  )
+  assert.deepEqual(plain(admin.normalizeHomeOwnerFilters(null)), [])
+  // Already canonical, so normalizing the default changes nothing.
+  assert.deepEqual(
+    plain(admin.normalizeHomeOwnerFilters(admin.DEFAULT_HOME_OWNERS)),
+    HOME_THREE,
+  )
+})
+
+test('the home p_owners argument is never NULL and never leaves the three', () => {
+  // An empty selection is the three owners, not "all five".
+  assert.deepEqual(plain(admin.homeOwnerArgument([])), HOME_THREE)
+  assert.deepEqual(plain(admin.homeOwnerArgument(null)), HOME_THREE)
+  assert.deepEqual(plain(admin.homeOwnerArgument(undefined)), HOME_THREE)
+  assert.deepEqual(
+    plain(admin.homeOwnerArgument(admin.DEFAULT_HOME_OWNERS)),
+    HOME_THREE,
+  )
+  assert.deepEqual(plain(admin.homeOwnerArgument(['third_party_f'])), [
+    'third_party_f',
+  ])
+  // Takween / external / unknown values never reach the database; a selection
+  // of nothing else degrades to the three.
+  assert.deepEqual(plain(admin.homeOwnerArgument(['takween', 'alazani'])), [
+    'alazani',
+  ])
+  assert.deepEqual(plain(admin.homeOwnerArgument(['takween'])), HOME_THREE)
+  assert.deepEqual(
+    plain(admin.homeOwnerArgument(['external_supplier', 'bogus'])),
+    HOME_THREE,
+  )
+})
+
+test('the owner x state matrix only ever lists the three home owners', () => {
+  const matrix = admin.parseOwnerStateMatrix({
+    total: 9,
+    cells: [
+      { owner: 'external_supplier', state: 'inside', count: 2 },
+      { owner: 'third_party_f', state: 'inside', count: 3 },
+      { owner: 'takween', state: 'outside', count: 1 },
+      { owner: 'alazani', state: 'inside', count: 3 },
+    ],
+  })
+  assert.deepEqual(plain(matrix.owners), ['alazani', 'third_party_f'])
 })
 
 test('only Al-Azani counts as owned', () => {
@@ -437,15 +483,18 @@ test('parseOwnerStateMatrix answers both directions from one snapshot', () => {
     cells: [
       { owner: 'alazani', state: 'inside_site', count: 4 },
       { owner: 'alazani', state: 'available', count: 2 },
-      { owner: 'takween', state: 'inside_site', count: 3 },
+      { owner: 'third_party_f', state: 'inside_site', count: 3 },
+      // Never returned by the home functions any more; if one slipped through
+      // it is not listed.
+      { owner: 'takween', state: 'inside_site', count: 5 },
       { owner: '', state: 'inside_site', count: 99 },
     ],
   })
   assert.equal(matrix.total, 9)
   assert.equal(matrix.count('alazani', 'inside_site'), 4)
-  assert.equal(matrix.count('takween', 'available'), 0)
+  assert.equal(matrix.count('third_party_f', 'available'), 0)
   assert.equal(matrix.count('nobody', 'inside_site'), 0)
-  assert.deepEqual(plain(matrix.owners), ['alazani', 'takween'])
+  assert.deepEqual(plain(matrix.owners), ['alazani', 'third_party_f'])
 })
 
 // --- chart series ----------------------------------------------------------

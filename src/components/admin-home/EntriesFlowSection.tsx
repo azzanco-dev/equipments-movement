@@ -23,7 +23,7 @@ import {
 } from '@/lib/adminHomeStats'
 import type { TranslationKey } from '@/i18n/translations'
 import { AdminHomeSection } from './AdminHomeSection'
-import { OwnerFilter } from './OwnerFilter'
+import { HomeOwnerFilter } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 export interface EntriesFlowSectionProps {
@@ -172,7 +172,7 @@ export function EntriesFlowSection({
               ))}
             </TabsList>
           </Tabs>
-          <OwnerFilter
+          <HomeOwnerFilter
             size="sm"
             value={owners}
             onChange={setOwners}

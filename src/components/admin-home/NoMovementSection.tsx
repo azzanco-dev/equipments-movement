@@ -14,7 +14,7 @@ import {
   type OutsideEquipmentRow,
 } from '@/lib/adminHomeStats'
 import { AdminHomeSection } from './AdminHomeSection'
-import { OwnerFilter, useOwnerLabel } from './OwnerFilter'
+import { HomeOwnerFilter, useOwnerLabel } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 export interface NoMovementSectionProps {
@@ -146,7 +146,7 @@ export function NoMovementSection({
       description={t('adminHomeOutsideDescription')}
       action={
         <div className="flex flex-wrap items-center gap-2">
-          <OwnerFilter
+          <HomeOwnerFilter
             size="sm"
             className="w-44"
             value={owners}

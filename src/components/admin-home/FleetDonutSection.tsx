@@ -9,13 +9,14 @@ import type { TranslationKey } from '@/i18n/translations'
 import { fetchOwnerStateMatrix } from '@/lib/adminHomeData'
 import {
   ADMIN_HOME_OWNERS,
+  ALL_OWNERS,
   DEFAULT_HOME_OWNERS,
   FLEET_STATES,
   type AdminHomeOwner,
   type FleetStateId,
 } from '@/lib/adminHomeStats'
 import { AdminHomeSection } from './AdminHomeSection'
-import { OwnerFilter, useOwnerLabel } from './OwnerFilter'
+import { HomeOwnerFilter, useOwnerLabel } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 /**
@@ -72,11 +73,11 @@ type Focus =
  * focus exists at a time, so the pair always answers one question rather than
  * two half-applied filters.
  *
- * The section starts on the three in-house owners (owner decision,
- * 2026-09-29) and carries a small owner filter in its header so the user can
- * widen it. The filter scopes the whole snapshot, so both donuts always cover
- * the same set of owners; an empty selection means every owner. Selecting an
- * owner slice is still the cross-filter between the two charts.
+ * The section covers only the three home owners (owner decision, 2026-09-29,
+ * EM-199) and carries a small owner filter in its header to narrow them. The
+ * filter scopes the whole snapshot, so both donuts always cover the same set
+ * of owners; an empty selection means those three. Selecting an owner slice is
+ * still the cross-filter between the two charts.
  *
  * Both charts come from one snapshot (`get_admin_owner_state_matrix`), so a
  * cross-filter never costs a request and the halves can never be drawn from
@@ -99,8 +100,9 @@ export function FleetDonutSection() {
     [data],
   )
 
-  // The owner donut draws exactly the owners the section is filtered to (every
-  // classification when the filter is cleared), so it matches the state donut.
+  // The owner donut draws exactly the owners the section is filtered to (the
+  // three home owners when the filter is cleared), so it matches the state
+  // donut and never shows Takween or external suppliers.
   const visibleOwners = useMemo(
     () => (owners.length ? owners : [...ADMIN_HOME_OWNERS]),
     [owners],
@@ -128,7 +130,9 @@ export function FleetDonutSection() {
   const ownerSlices: FleetDonutSlice[] = useMemo(
     () =>
       visibleOwners.map((ownerId) => {
-        const index = ADMIN_HOME_OWNERS.indexOf(ownerId)
+        // Colours keep their five-owner positions so Al-Azani, F and B look
+        // the same as they did before Takween and external were removed.
+        const index = ALL_OWNERS.indexOf(ownerId)
         return {
           id: ownerId,
           label: ownerLabel(ownerId),
@@ -172,7 +176,7 @@ export function FleetDonutSection() {
       action={
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="info">{t('adminHomeNow')}</Badge>
-          <OwnerFilter
+          <HomeOwnerFilter
             size="sm"
             className="w-44"
             value={owners}

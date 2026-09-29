@@ -11,7 +11,7 @@ import {
   type FleetStateCounts,
 } from '@/lib/adminHomeStats'
 import { AdminHomeSection } from './AdminHomeSection'
-import { OwnerFilter } from './OwnerFilter'
+import { HomeOwnerFilter } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 /** One page of types. Fixed: the section is half a row, not a list page. */
@@ -62,8 +62,8 @@ export function AvailabilitySection() {
     (signal: AbortSignal) =>
       fetchAvailabilityByType(
         {
-          // An empty selection is "every owner", which the database reads as a
-          // NULL filter rather than an empty list.
+          // An empty selection is the three home owners; the data layer maps
+          // it, so the database never sees a NULL or empty filter.
           owners: owners.length ? owners : null,
           search: search || null,
           page,
@@ -126,7 +126,7 @@ export function AvailabilitySection() {
       description={t('adminHomeAvailabilityDescription')}
       action={
         <div className="flex items-center gap-2">
-          <OwnerFilter
+          <HomeOwnerFilter
             size="sm"
             value={owners}
             onChange={(next) => {

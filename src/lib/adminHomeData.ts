@@ -15,7 +15,7 @@
 import { saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
 import { supabase } from '@/lib/supabase'
 import {
-  ownerFilterArgument,
+  homeOwnerArgument,
   pageOffset,
   parseAvailabilityPage,
   parseDailySeries,
@@ -35,8 +35,8 @@ import {
   type YearlyMovementCount,
 } from '@/lib/adminHomeStats'
 
-/** What a paginated section asks for. `owners` is `null` or an empty array for
- *  "every owner", exactly as the database functions read it. */
+/** What a paginated section asks for. `owners` that is `null` or empty means
+ *  the three home owners (`homeOwnerArgument`); it never means every owner. */
 export interface AdminHomePageRequest {
   owners: string[] | null
   /** 1-based, like the pagination control. */
@@ -87,7 +87,7 @@ export async function fetchFleetState(
   signal: AbortSignal,
 ): Promise<FleetState> {
   const { data, error } = await supabase
-    .rpc('get_admin_fleet_state', { p_owners: ownerFilterArgument(owners) })
+    .rpc('get_admin_fleet_state', { p_owners: homeOwnerArgument(owners) })
     .abortSignal(signal)
   if (error) fail('fleetState', error)
   return parseFleetState(data)
@@ -105,7 +105,7 @@ export async function fetchOutsideEquipment(
 ): Promise<AdminHomePage<OutsideEquipmentRow>> {
   const { data, error } = await supabase
     .rpc('get_admin_outside_equipment', {
-      p_owners: ownerFilterArgument(params.owners),
+      p_owners: homeOwnerArgument(params.owners),
       p_limit: params.pageSize,
       p_offset: pageOffset(params.page, params.pageSize),
     })
@@ -124,7 +124,7 @@ export async function fetchAvailabilityByType(
 ): Promise<AdminHomePage<AvailabilityRow>> {
   const { data, error } = await supabase
     .rpc('get_admin_availability_by_type', {
-      p_owners: ownerFilterArgument(params.owners),
+      p_owners: homeOwnerArgument(params.owners),
       p_search: searchArgument(params.search),
       p_limit: params.pageSize,
       p_offset: pageOffset(params.page, params.pageSize),
@@ -146,7 +146,7 @@ export async function fetchEntriesSeries(
       // Saudi day bounds (UTC+03:00), never the browser's midnight.
       p_from: saudiDayStart(fromKey),
       p_to: saudiDayEnd(toKey),
-      p_owners: ownerFilterArgument(owners),
+      p_owners: homeOwnerArgument(owners),
       p_context: context,
     })
     .abortSignal(signal)
@@ -169,7 +169,7 @@ export async function fetchEntriesYearly(
   const { data, error } = await supabase
     .rpc('get_admin_entries_yearly', {
       p_years: years,
-      p_owners: ownerFilterArgument(owners),
+      p_owners: homeOwnerArgument(owners),
       p_context: context,
     })
     .abortSignal(signal)
@@ -183,7 +183,7 @@ export async function fetchOwnerStateMatrix(
 ): Promise<OwnerStateMatrix> {
   const { data, error } = await supabase
     .rpc('get_admin_owner_state_matrix', {
-      p_owners: ownerFilterArgument(owners),
+      p_owners: homeOwnerArgument(owners),
     })
     .abortSignal(signal)
   if (error) fail('ownerStateMatrix', error)

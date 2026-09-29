@@ -4,7 +4,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import { fetchFleetState } from '@/lib/adminHomeData'
 import { DEFAULT_HOME_OWNERS, type AdminHomeOwner } from '@/lib/adminHomeStats'
 import { AdminHomeSection } from './AdminHomeSection'
-import { OwnerFilter } from './OwnerFilter'
+import { HomeOwnerFilter } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 /**
@@ -68,7 +68,7 @@ export function FleetStateSection() {
       action={
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="info">{t('adminHomeNow')}</Badge>
-          <OwnerFilter
+          <HomeOwnerFilter
             size="sm"
             className="w-44"
             value={owners}
