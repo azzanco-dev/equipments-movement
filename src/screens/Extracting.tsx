@@ -42,6 +42,7 @@ function ExtractingWorkspace({ token }: { token: string | undefined }) {
   const { t } = useI18n()
   const extraction = useExtraction(token)
   const { form, errors, targets, stage, notice, results } = extraction
+  const showReview = stage === 'review' || stage === 'publishing' || !!results
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -64,33 +65,38 @@ function ExtractingWorkspace({ token }: { token: string | undefined }) {
         onRead={() => void extraction.extract()}
       />
 
-      <form onSubmit={submit} noValidate className="space-y-6">
-        <ExtractionFieldsCard
-          title="extractingExtractedSection"
-          fields={EXTRACTED_FIELDS}
-          form={form}
-          errors={errors}
-          targets={targets}
-          onChange={extraction.updateField}
-        />
-        <ExtractionFieldsCard
-          title="extractingEmploymentSection"
-          fields={EMPLOYMENT_FIELDS}
-          form={form}
-          errors={errors}
-          targets={targets}
-          onChange={extraction.updateField}
-        />
-        <PublishTargetsCard targets={targets} onChange={extraction.setTarget} />
-        <Button
-          type="submit"
-          variant="primary"
-          icon={<Send size={17} aria-hidden="true" />}
-          loading={stage === 'publishing'}
-        >
-          {t('extractingSubmit')}
-        </Button>
-      </form>
+      {showReview ? (
+        <form onSubmit={submit} noValidate className="space-y-6">
+          <ExtractionFieldsCard
+            title="extractingExtractedSection"
+            fields={EXTRACTED_FIELDS}
+            form={form}
+            errors={errors}
+            targets={targets}
+            onChange={extraction.updateField}
+          />
+          <ExtractionFieldsCard
+            title="extractingEmploymentSection"
+            fields={EMPLOYMENT_FIELDS}
+            form={form}
+            errors={errors}
+            targets={targets}
+            onChange={extraction.updateField}
+          />
+          <PublishTargetsCard
+            targets={targets}
+            onChange={extraction.setTarget}
+          />
+          <Button
+            type="submit"
+            variant="primary"
+            icon={<Send size={17} aria-hidden="true" />}
+            loading={stage === 'publishing'}
+          >
+            {t('extractingSubmit')}
+          </Button>
+        </form>
+      ) : null}
 
       {notice ? (
         <Notice tone={notice.tone}>
