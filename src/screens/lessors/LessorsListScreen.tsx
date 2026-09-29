@@ -4,7 +4,6 @@ import { Button, PageHeader, useConfirm } from '@/components/ui'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
-import { FilterBar } from '@/components/data-list/FilterBar'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
@@ -124,11 +123,9 @@ export function LessorsListScreen() {
         sort={list.sort}
         direction={list.direction}
         onSort={list.setSort}
-      />
-      <FilterBar
-        fields={lessorsListConfig.filterFields}
+        filterFields={lessorsListConfig.filterFields}
         filters={list.filters}
-        onChange={list.setFilters}
+        onFilters={list.setFilters}
       />
 
       <LessorsTable

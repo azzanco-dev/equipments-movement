@@ -1221,6 +1221,15 @@ export const translations = {
     movementDeletePhoto: 'حذف الصورة',
     movementRecordedBy: 'سجلها {name}',
     dialogDescContractorCodeEdit: 'يعدل ترقيم الشركة لهذه الزيارة المفتوحة فقط',
+    // wave7-V2
+    movementRecordedByOn: 'سجلها {name} بتاريخ {date}',
+    // wave7-V3
+    logsViewFilter: 'طريقة العرض',
+    visitContractorCodeLine: 'ترقيم الشركة {code}',
+    searchVisitsWithContractorCode: 'بحث بالمعدة او ترقيم الشركة او السائق',
+    // wave7-V1
+    filterDialogDesc: 'حدد الحقول التي تريد تصفية القائمة بها',
+    filterDialogDone: 'تم',
   },
   en: {
     appName: 'Heavy Equipment Management',
@@ -2465,6 +2474,16 @@ export const translations = {
     movementRecordedBy: 'Recorded by {name}',
     dialogDescContractorCodeEdit:
       'Changes the company number for this open visit only',
+    // wave7-V2
+    movementRecordedByOn: 'Recorded by {name} on {date}',
+    // wave7-V3
+    logsViewFilter: 'View',
+    visitContractorCodeLine: 'Company no. {code}',
+    searchVisitsWithContractorCode:
+      'Search by equipment, company number or driver',
+    // wave7-V1
+    filterDialogDesc: 'Choose the fields to filter the list by',
+    filterDialogDone: 'Done',
   },
 } as const
 

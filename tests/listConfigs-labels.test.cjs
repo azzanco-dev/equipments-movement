@@ -73,9 +73,11 @@ const ARABIC_SNAPSHOT = {
   },
   companies: {
     search: 'البحث باسم الشركة',
-    filters: ['الاسم العربي', 'الاسم الإنجليزي'],
+    // The name text filters were removed in the 2026-09-29 owner review: the
+    // search box already matches both names.
+    filters: [],
   },
-  lessors: { search: 'البحث بالاسم أو جهة الاتصال أو الجوال' },
+  lessors: { search: 'البحث بالاسم أو جهة الاتصال أو الجوال', filters: [] },
   logs: {
     filters: [
       'نوع الحركة',

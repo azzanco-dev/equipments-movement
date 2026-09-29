@@ -54,6 +54,13 @@ export type FilterField = {
   type: 'text' | 'number' | 'date' | 'boolean' | 'select'
   operators: FilterOperator[]
   options?: FilterOption[]
+  /**
+   * Several values at once: the filter dialog renders a multi-select and
+   * emits the `in` operator with the ids joined by commas (the field must
+   * allow `in`). A relational multi-select gets its search from
+   * `asyncFields` (company and project on `/logs`).
+   */
+  multiple?: boolean
 }
 export type ListFilter = {
   id: string

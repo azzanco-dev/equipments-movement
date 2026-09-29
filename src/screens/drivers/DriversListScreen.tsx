@@ -5,7 +5,6 @@ import { Button, PageHeader, useConfirm } from '@/components/ui'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
-import { FilterBar } from '@/components/data-list/FilterBar'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useRowSelection } from '@/components/data-list/useRowSelection'
@@ -203,6 +202,9 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
         sort={list.sort}
         direction={list.direction}
         onSort={list.setSort}
+        filterFields={driversListConfig.filterFields}
+        filters={list.filters}
+        onFilters={list.setFilters}
         selectedCount={selection.selected.size}
         bulkActions={
           <Button
@@ -214,11 +216,6 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
             {t('delete')}
           </Button>
         }
-      />
-      <FilterBar
-        fields={driversListConfig.filterFields}
-        filters={list.filters}
-        onChange={list.setFilters}
       />
 
       <DriversTable

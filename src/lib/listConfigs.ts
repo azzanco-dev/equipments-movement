@@ -201,20 +201,9 @@ export const companiesListConfig: DataListConfig = {
   searchFields: ['name_ar', 'name_en'],
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
-  filterFields: [
-    {
-      key: 'name_ar',
-      label: { ar: 'الاسم العربي', en: 'Arabic name' },
-      type: 'text',
-      operators: textOps,
-    },
-    {
-      key: 'name_en',
-      label: { ar: 'الاسم الإنجليزي', en: 'English name' },
-      type: 'text',
-      operators: textOps,
-    },
-  ],
+  // No filter fields (owner review, 2026-09-29): the search box already
+  // matches both names, so the toolbar hides its "Filters" button here.
+  filterFields: [],
   sortableFields: [
     { key: 'name_ar', label: { ar: 'الاسم العربي', en: 'Arabic name' } },
     { key: 'name_en', label: { ar: 'الاسم الإنجليزي', en: 'English name' } },
@@ -239,20 +228,9 @@ export const lessorsListConfig: DataListConfig = {
   searchFields: ['name', 'contact_person', 'contact_number'],
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
-  filterFields: [
-    {
-      key: 'name',
-      label: { ar: 'الاسم', en: 'Name' },
-      type: 'text',
-      operators: textOps,
-    },
-    {
-      key: 'contact_number',
-      label: 'contactNumber',
-      type: 'text',
-      operators: textOps,
-    },
-  ],
+  // No filter fields (owner review, 2026-09-29): the search box already
+  // matches the name, contact person and number.
+  filterFields: [],
   sortableFields: [
     { key: 'name', label: { ar: 'الاسم', en: 'Name' } },
     { key: 'created_at', label: 'createdAt' },
@@ -401,9 +379,11 @@ export const visitsListConfig: DataListConfig = {
  *
  * Every filter key below is a real column of the view and is allowlisted
  * against this list before it reaches PostgREST, so no arbitrary column can be
- * filtered. `supervisor_id` has no static options: `/logs` renders it in
- * `FilterBar` as a relational search (`asyncFields`, first 20 foremen from
- * `profile_names`, server-side search), so no foreman list is preloaded.
+ * filtered. `supervisor_id`, `company_id` and `project_id` have no static
+ * options: `/logs` renders them in the toolbar's filter dialog as relational
+ * searches (`asyncFields`, first 20 matches, server-side search), so no list
+ * is preloaded. `recorded_at` is one range control (`DateRangeFilter`) that
+ * emits `between` / `gte` / `lte` over Saudi-day boundaries.
  */
 export const logsListConfig: DataListConfig = {
   id: 'logs',
@@ -461,17 +441,25 @@ export const logsListConfig: DataListConfig = {
         },
       ],
     },
+    // Multi-select by id (owner review, 2026-09-29) instead of a name text
+    // box. The options come from `useCompanyProjectFilters()` passed as
+    // `asyncFields` (server-side search over `companies` / `projects`, 20
+    // results), and the filter is `in` over the view's id columns.
     {
-      key: 'company_name_ar',
+      key: 'company_id',
       label: 'company',
-      type: 'text',
-      operators: textOps,
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
     },
     {
-      key: 'project_name_ar',
+      key: 'project_id',
       label: 'project',
-      type: 'text',
-      operators: textOps,
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
     },
     {
       key: 'supervisor_id',

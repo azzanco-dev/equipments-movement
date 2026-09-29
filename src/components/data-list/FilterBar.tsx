@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, Filter } from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
 import {
-  Badge,
-  Button,
-  DatePicker,
+  DateRangeFilter,
   Field,
   Input,
+  MultiSelect,
   Select,
   cn,
+  type DateRangePreset,
+  type DateRangeValue,
   type FieldControlProps,
 } from '@/components/ui'
 import {
@@ -16,6 +16,15 @@ import {
 } from '@/components/AsyncSearchSelect'
 import { useI18n } from '@/i18n/I18nContext'
 import { createClientId } from '@/lib/clientId'
+import {
+  isDateKey,
+  saudiDateKey,
+  saudiDayEnd,
+  saudiDayStart,
+  saudiPeriodKeys,
+  type ReportPeriod,
+} from '@/lib/saudiTime'
+import { AsyncMultiSelect } from './AsyncMultiSelect'
 import { useListLabel, useOptionLabel } from './labels'
 import type { FilterField, FilterOperator, ListFilter } from './types'
 
@@ -26,9 +35,25 @@ const ANY_VALUE = '__any__'
 const TEXT_DEBOUNCE_MS = 300
 
 /**
- * A relational field rendered with `AsyncSearchSelect` instead of a plain
- * select: the bar only needs to know how to search it. The picked option is
- * remembered locally so the trigger keeps showing its label.
+ * The small (28 px) size for controls that have no `size` prop. `!` is needed
+ * because their own height classes are responsive (`h-10 md:h-9`). Text stays
+ * 16 px on phones for real inputs: the global iOS rule in index.css wins.
+ */
+const SMALL_INPUT = '!h-7 px-2.5 text-xs'
+const SMALL_ASYNC_TRIGGER =
+  '[&>button]:!h-7 [&>button]:!px-2.5 [&>button]:!text-xs'
+const SMALL_DATE_RANGE =
+  '[&_[role=tab]]:!h-7 [&_[role=tab]]:!px-2.5 [&_[role=tab]]:!text-xs [&_.select-trigger]:!h-7 [&_.select-trigger]:!text-xs'
+
+/** What a filter holds, without its identity (`id`, `field`). */
+export type FilterValue = Pick<ListFilter, 'operator' | 'value' | 'valueTo'>
+
+/**
+ * A relational field rendered with a server-side search instead of a plain
+ * select: the bar only needs to know how to search it. A single-value field
+ * uses `AsyncSearchSelect`; a field with `multiple: true` uses
+ * `AsyncMultiSelect`. Picked options are remembered locally so the trigger
+ * keeps showing their labels.
  */
 export interface FilterBarAsyncField {
   loadOptions: (query: string) => Promise<AsyncSearchSelectOption[]>
@@ -38,7 +63,125 @@ export interface FilterBarAsyncField {
    * Without it the trigger would read "All" while the filter is active.
    */
   resolveOption?: (value: string) => Promise<AsyncSearchSelectOption | null>
+  /**
+   * Batch form of `resolveOption` for a multi-select field: one query for all
+   * the ids restored from the URL. When absent, `resolveOption` is called once
+   * per id.
+   */
+  resolveOptions?: (values: string[]) => Promise<AsyncSearchSelectOption[]>
   placeholder?: string
+}
+
+/** First allowed operator from `preferred`, else the field's own first one. */
+function pickOperator(
+  field: FilterField,
+  preferred: FilterOperator[],
+): FilterOperator {
+  return (
+    preferred.find((operator) => field.operators.includes(operator)) ??
+    field.operators[0]
+  )
+}
+
+/**
+ * The operator a field's control stands for. The bar deliberately hides
+ * operators: one control per field, the obvious comparison for its type.
+ * A date field's range may also narrow to `gte` / `lte` when only one end is
+ * picked; see `dateRangeFilter`.
+ */
+export function filterBarOperator(field: FilterField): FilterOperator {
+  if (field.multiple) return pickOperator(field, ['in', 'eq'])
+  if (field.type === 'date') return pickOperator(field, ['between', 'eq'])
+  if (field.type === 'text' || field.type === 'number')
+    return pickOperator(field, ['like', 'eq'])
+  return pickOperator(field, ['eq', 'in'])
+}
+
+/** Number of filters that actually narrow the list (for "Filters (n)"). */
+export function countActiveFilters(filters: ListFilter[]): number {
+  return filters.filter(
+    (filter) =>
+      filter.value ||
+      filter.operator === 'is_set' ||
+      filter.operator === 'is_not_set',
+  ).length
+}
+
+/** The ids of a multi-value (`in`) filter, as stored in the URL. */
+export function splitFilterValues(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+}
+
+/**
+ * The filter a date range stands for. Date filter fields are timestamps, so
+ * each end becomes the first / last instant of that Saudi calendar day
+ * (report day boundaries are Saudi time): "today .. today" is the whole day,
+ * not the single instant at midnight UTC. Both ends → `between`; one end →
+ * `gte` / `lte`; nothing (or an operator the field does not allow) → `null`.
+ */
+export function dateRangeFilter(
+  field: FilterField,
+  from: string,
+  to: string,
+): FilterValue | null {
+  const allows = (operator: FilterOperator) =>
+    field.operators.includes(operator)
+  if (from && to && allows('between'))
+    return {
+      operator: 'between',
+      value: saudiDayStart(from),
+      valueTo: saudiDayEnd(to),
+    }
+  if (from && allows('gte'))
+    return { operator: 'gte', value: saudiDayStart(from) }
+  if (to && allows('lte')) return { operator: 'lte', value: saudiDayEnd(to) }
+  return null
+}
+
+/** Saudi date key of a stored bound (an ISO instant, or an older date key). */
+function boundKey(value: string | undefined): string {
+  if (!value) return ''
+  if (isDateKey(value)) return value
+  return Number.isNaN(Date.parse(value)) ? '' : saudiDateKey(value)
+}
+
+/** The from/to date keys a stored date filter shows in the range control. */
+export function dateRangeKeys(filter: ListFilter | undefined): {
+  from: string
+  to: string
+} {
+  if (!filter?.value) return { from: '', to: '' }
+  switch (filter.operator) {
+    case 'between':
+      return {
+        from: boundKey(filter.value),
+        to: boundKey(filter.valueTo ?? filter.value),
+      }
+    case 'eq':
+      return { from: boundKey(filter.value), to: boundKey(filter.value) }
+    case 'gte':
+    case 'gt':
+      return { from: boundKey(filter.value), to: '' }
+    case 'lte':
+    case 'lt':
+      return { from: '', to: boundKey(filter.value) }
+    default:
+      return { from: '', to: '' }
+  }
+}
+
+const PERIODS: ReportPeriod[] = ['today', 'week', 'month']
+
+/** The preset a from/to pair matches today, else "custom". */
+export function inferDatePreset(from: string, to: string): DateRangePreset {
+  for (const period of PERIODS) {
+    const keys = saudiPeriodKeys(period)
+    if (keys.from === from && keys.to === to) return period
+  }
+  return 'custom'
 }
 
 /**
@@ -80,6 +223,7 @@ function AsyncFilterControl({
   return (
     <AsyncSearchSelect
       {...wiring}
+      className={SMALL_ASYNC_TRIGGER}
       value={value}
       selectedOption={known ? picked : null}
       loadOptions={asyncField.loadOptions}
@@ -93,9 +237,82 @@ function AsyncFilterControl({
 }
 
 /**
+ * A relational multi-select filter (company, project). Like the single
+ * control it remembers picked labels and resolves ids restored from the URL,
+ * in one batch when the field offers `resolveOptions`.
+ */
+function AsyncMultiFilterControl({
+  wiring,
+  values,
+  asyncField,
+  onPick,
+}: {
+  wiring: FieldControlProps
+  values: string[]
+  asyncField: FilterBarAsyncField
+  onPick: (values: string[]) => void
+}) {
+  const [known, setKnown] = useState<AsyncSearchSelectOption[]>([])
+  const { resolveOption, resolveOptions } = asyncField
+  const missing = values
+    .filter((entry) => !known.some((option) => option.value === entry))
+    .join(',')
+
+  useEffect(() => {
+    if (!missing) return
+    const ids = missing.split(',')
+    const lookup = resolveOptions
+      ? resolveOptions(ids)
+      : resolveOption
+        ? Promise.all(ids.map((entry) => resolveOption(entry))).then((list) =>
+            list.filter(
+              (option): option is AsyncSearchSelectOption => !!option,
+            ),
+          )
+        : null
+    if (!lookup) return
+    let cancelled = false
+    lookup.then(
+      (options) => {
+        if (!cancelled && options.length)
+          setKnown((current) => [...current, ...options])
+      },
+      // An unresolved label is cosmetic; the filter itself still applies.
+      () => undefined,
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [missing, resolveOption, resolveOptions])
+
+  return (
+    <AsyncMultiSelect
+      id={wiring.id}
+      aria-describedby={wiring['aria-describedby']}
+      invalid={wiring.invalid}
+      size="sm"
+      value={values}
+      selectedOptions={known}
+      loadOptions={asyncField.loadOptions}
+      onValueChange={(next, options) => {
+        setKnown((current) => [
+          ...current.filter(
+            (option) => !options.some((entry) => entry.value === option.value),
+          ),
+          ...options,
+        ])
+        onPick(next)
+      }}
+    />
+  )
+}
+
+/**
  * A free-text filter. Typing stays local and reaches the list only after a
  * short pause, so every keystroke is not a URL change plus a server query.
- * A value changed from outside (Clear all, Back) replaces the draft.
+ * A value changed from outside (Clear all, Back) replaces the draft, and a
+ * draft still waiting when the control unmounts (the dialog closed within the
+ * pause) is committed then instead of being lost.
  */
 function TextFilterControl({
   wiring,
@@ -110,6 +327,8 @@ function TextFilterControl({
 }) {
   const [draft, setDraft] = useState(value)
   const committed = useRef(value)
+  const latestDraft = useRef(draft)
+  latestDraft.current = draft
   // The latest callback, so a parent re-render does not restart the pause.
   const commit = useRef(onCommit)
   commit.current = onCommit
@@ -129,13 +348,107 @@ function TextFilterControl({
     return () => window.clearTimeout(timer)
   }, [draft])
 
+  useEffect(
+    () => () => {
+      if (latestDraft.current === committed.current) return
+      committed.current = latestDraft.current
+      commit.current(latestDraft.current)
+    },
+    [],
+  )
+
   return (
     <Input
       {...wiring}
       type={type}
       value={draft}
+      className={SMALL_INPUT}
       onChange={(event) => setDraft(event.target.value)}
     />
+  )
+}
+
+/**
+ * The movement-time style range: one `DateRangeFilter` (today / this week /
+ * this month / custom from–to) instead of two separate date fields. Nothing
+ * is highlighted while the field is unfiltered; "custom" opens the two date
+ * pickers and either end alone is a valid filter (`gte` / `lte`).
+ */
+function DateRangeFilterControl({
+  label,
+  filter,
+  onRange,
+}: {
+  label: string
+  filter: ListFilter | undefined
+  onRange: (from: string, to: string) => void
+}) {
+  const { t } = useI18n()
+  const labelId = useId()
+  const { from, to } = dateRangeKeys(filter)
+  const active = !!(from || to)
+  // The preset the user last chose. "Custom" over the same dates as "today"
+  // must stay "custom", so the tab is not inferred from the dates alone.
+  const [chosen, setChosen] = useState<DateRangePreset | null>(null)
+  const wasActive = useRef(active)
+
+  useEffect(() => {
+    // Cleared from outside (Clear all, Back): forget the chosen preset.
+    if (wasActive.current && !active) setChosen(null)
+    wasActive.current = active
+  }, [active])
+
+  const preset: DateRangePreset | null = active
+    ? chosen === 'custom'
+      ? 'custom'
+      : chosen && inferDatePreset(from, to) === chosen
+        ? chosen
+        : inferDatePreset(from, to)
+    : chosen === 'custom'
+      ? 'custom'
+      : null
+
+  const value: DateRangeValue = {
+    // No tab is highlighted while the field is unfiltered; `DateRangeFilter`
+    // passes the preset straight to Radix Tabs, where an unmatched value
+    // simply selects nothing.
+    preset: (preset ?? '') as DateRangePreset,
+    from,
+    to,
+  }
+
+  return (
+    <div
+      role="group"
+      aria-labelledby={labelId}
+      className="min-w-0 sm:col-span-2"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span id={labelId} className="label block truncate-safe" title={label}>
+          {label}
+        </span>
+        {(active || preset) && (
+          <button
+            type="button"
+            onClick={() => {
+              setChosen(null)
+              onRange('', '')
+            }}
+            className="mb-1 shrink-0 rounded-md px-1.5 text-xs text-muted transition-colors hover:bg-surface-hover hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {t('clear')}
+          </button>
+        )}
+      </div>
+      <DateRangeFilter
+        value={value}
+        className={SMALL_DATE_RANGE}
+        onChange={(next) => {
+          setChosen(next.preset)
+          onRange(next.from, next.to)
+        }}
+      />
+    </div>
   )
 }
 
@@ -150,43 +463,20 @@ export interface FilterBarProps {
   className?: string
 }
 
-/** First allowed operator from `preferred`, else the field's own first one. */
-function pickOperator(
-  field: FilterField,
-  preferred: FilterOperator[],
-): FilterOperator {
-  return (
-    preferred.find((operator) => field.operators.includes(operator)) ??
-    field.operators[0]
-  )
-}
-
 /**
- * The operator a field's control stands for. The bar deliberately hides
- * operators: one control per field, the obvious comparison for its type.
- * Since wave 7 (2026-09-29) the seven master/log lists use only this bar; the
- * older `FilterBuilder` is kept for the `/ui-kit` comparison.
- */
-export function filterBarOperator(field: FilterField): FilterOperator {
-  if (field.type === 'date') return pickOperator(field, ['between', 'eq'])
-  if (field.type === 'text' || field.type === 'number')
-    return pickOperator(field, ['like', 'eq'])
-  return pickOperator(field, ['eq', 'in'])
-}
-
-/**
- * Compact filter row for the shared list system.
+ * The filter fields of the shared list system: one labelled control per
+ * allowlisted field, never a field/operator/value builder.
  *
- * It replaces the field/operator/value "filter builder" rows with one labelled
- * control per allowlisted field: a select for option fields, date pickers for
- * a date range, a text box for free text, and `AsyncSearchSelect` for a
- * relational field. It emits exactly the `ListFilter[]` the list system
- * already consumes (`applyListFilters` turns a date field into `between`), so
- * a screen can swap the builder for this bar without touching its queries.
+ * - option field → `Select` (or `MultiSelect` when `multiple`)
+ * - relational field (`asyncFields`) → `AsyncSearchSelect`, or
+ *   `AsyncMultiSelect` when `multiple` (emits `in` with the ids)
+ * - date field → one `DateRangeFilter` (emits `between` / `gte` / `lte`)
+ * - text / number → a debounced text box (`like`)
  *
- * Layout: a 2–4 column grid from `sm` up; below `md` everything collapses
- * behind a "Filters (n)" disclosure so a phone list is not buried under
- * controls. Labels truncate with `truncate-safe` and keep a `title`.
+ * Since the 2026-09-29 owner review this is the body of `FilterDialog`, opened
+ * from the toolbar's "Filters" button; lists no longer render it inline.
+ * Every control is the small (28 px) size. Changes apply immediately: each
+ * one is emitted as the complete `ListFilter[]` the list already consumes.
  */
 export function FilterBar({
   fields,
@@ -198,46 +488,60 @@ export function FilterBar({
   const { t } = useI18n()
   const fieldLabel = useListLabel()
   const optionLabel = useOptionLabel()
-  const [expanded, setExpanded] = useState(false)
-
-  const activeCount = useMemo(
-    () =>
-      filters.filter(
-        (filter) =>
-          filter.value ||
-          filter.operator === 'is_set' ||
-          filter.operator === 'is_not_set',
-      ).length,
-    [filters],
-  )
+  // Two changes can land before the parent re-renders (a text draft flushed
+  // while the dialog closes, right after a select change); each builds on the
+  // previous one instead of on a stale `filters` prop.
+  const latest = useRef(filters)
+  latest.current = filters
 
   const current = (key: string) => filters.find((item) => item.field === key)
 
-  const apply = (field: FilterField, value: string, valueTo?: string): void => {
-    const rest = filters.filter((item) => item.field !== field.key)
-    if (!value && !valueTo) {
-      onChange(rest)
-      return
-    }
-    const existing = current(field.key)
-    onChange([
-      ...rest,
-      {
-        id: existing?.id ?? createClientId(),
-        field: field.key,
-        operator: filterBarOperator(field),
-        value,
-        valueTo,
-      },
-    ])
+  const setFilter = (field: FilterField, next: FilterValue | null): void => {
+    const base = latest.current
+    const rest = base.filter((item) => item.field !== field.key)
+    const existing = base.find((item) => item.field === field.key)
+    const result = next
+      ? [
+          ...rest,
+          {
+            id: existing?.id ?? createClientId(),
+            field: field.key,
+            ...next,
+          },
+        ]
+      : rest
+    latest.current = result
+    onChange(result)
   }
 
-  const clearAll = () => onChange([])
+  const apply = (field: FilterField, value: string) =>
+    setFilter(
+      field,
+      value ? { operator: filterBarOperator(field), value } : null,
+    )
+
+  const applyMany = (field: FilterField, values: string[]) =>
+    setFilter(
+      field,
+      values.length
+        ? { operator: filterBarOperator(field), value: values.join(',') }
+        : null,
+    )
 
   const control = (field: FilterField, wiring: FieldControlProps) => {
     const filter = current(field.key)
     const value = filter?.value ?? ''
     const asyncField = asyncFields?.[field.key]
+
+    if (asyncField && field.multiple)
+      return (
+        <AsyncMultiFilterControl
+          wiring={wiring}
+          values={splitFilterValues(value)}
+          asyncField={asyncField}
+          onPick={(next) => applyMany(field, next)}
+        />
+      )
 
     if (asyncField)
       return (
@@ -250,10 +554,26 @@ export function FilterBar({
         />
       )
 
+    if (field.multiple)
+      return (
+        <MultiSelect
+          id={wiring.id}
+          aria-describedby={wiring['aria-describedby']}
+          size="sm"
+          value={splitFilterValues(value)}
+          onValueChange={(next) => applyMany(field, next)}
+          options={(field.options ?? []).map((option) => ({
+            value: option.value,
+            label: optionLabel(option),
+          }))}
+        />
+      )
+
     if (field.options?.length)
       return (
         <Select
           {...wiring}
+          size="sm"
           value={value || ANY_VALUE}
           onValueChange={(next) => apply(field, next === ANY_VALUE ? '' : next)}
           options={[
@@ -264,30 +584,6 @@ export function FilterBar({
             })),
           ]}
         />
-      )
-
-    if (field.type === 'date')
-      return (
-        <div className="flex items-center gap-2">
-          <DatePicker
-            {...wiring}
-            aria-label={t('from')}
-            value={value}
-            max={filter?.valueTo || undefined}
-            onChange={(next) => apply(field, next, filter?.valueTo)}
-            className="min-w-0 flex-1"
-          />
-          <span aria-hidden="true" className="text-sm text-muted">
-            –
-          </span>
-          <DatePicker
-            aria-label={t('to')}
-            value={filter?.valueTo ?? ''}
-            min={value || undefined}
-            onChange={(next) => apply(field, value, next)}
-            className="min-w-0 flex-1"
-          />
-        </div>
       )
 
     return (
@@ -308,68 +604,33 @@ export function FilterBar({
     )
 
   return (
-    <div className={cn('space-y-3', className)}>
-      <div className="flex items-center gap-2 md:hidden">
-        <Button
-          variant="outline"
-          icon={<Filter size={15} aria-hidden="true" />}
-          aria-expanded={expanded}
-          onClick={() => setExpanded((open) => !open)}
-        >
-          {t('filters')}
-          {activeCount > 0 && (
-            <Badge tone="neutral" size="sm">
-              {activeCount}
-            </Badge>
-          )}
-          <ChevronDown
-            size={14}
-            aria-hidden="true"
-            className={cn('transition-transform', expanded && 'rotate-180')}
-          />
-        </Button>
-        {activeCount > 0 && (
-          <Button variant="ghost" onClick={clearAll}>
-            {t('clearAll')}
-          </Button>
-        )}
-      </div>
-
-      <div
-        className={cn(
-          'gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4',
-          expanded ? 'grid' : 'hidden md:grid',
-        )}
-      >
-        {fields.map((field) => {
-          const label = fieldLabel(field.label)
+    <div className={cn('grid gap-3 sm:grid-cols-2', className)}>
+      {fields.map((field) => {
+        const label = fieldLabel(field.label)
+        if (field.type === 'date')
           return (
-            <Field
+            <DateRangeFilterControl
               key={field.key}
-              className={cn(field.type === 'date' && 'sm:col-span-2')}
-              label={
-                <span className="block truncate-safe" title={label}>
-                  {label}
-                </span>
+              label={label}
+              filter={current(field.key)}
+              onRange={(from, to) =>
+                setFilter(field, dateRangeFilter(field, from, to))
               }
-            >
-              {(props) => control(field, props)}
-            </Field>
+            />
           )
-        })}
-      </div>
-
-      <div className="hidden items-center gap-3 md:flex">
-        <span className="text-xs text-muted">
-          {t('filters')}
-          {activeCount > 0 ? ` (${activeCount})` : ''}
-        </span>
-        {activeCount > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearAll}>
-            {t('clearAll')}
-          </Button>
-        )}
-      </div>
+        return (
+          <Field
+            key={field.key}
+            label={
+              <span className="block truncate-safe" title={label}>
+                {label}
+              </span>
+            }
+          >
+            {(props) => control(field, props)}
+          </Field>
+        )
+      })}
     </div>
   )
 }
