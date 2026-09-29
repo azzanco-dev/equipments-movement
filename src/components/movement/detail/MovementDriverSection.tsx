@@ -110,7 +110,7 @@ export function MovementDriverSection({
   ]
 
   return (
-    <section className="space-y-3">
+    <div className="space-y-3">
       <SectionHeader
         title={t('movementSectionDriver')}
         action={
@@ -222,6 +222,6 @@ export function MovementDriverSection({
           )}
         </div>
       )}
-    </section>
+    </div>
   )
 }

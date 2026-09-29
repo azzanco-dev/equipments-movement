@@ -53,7 +53,7 @@ export function MovementPhotosPanel({
   const selectedId = photos[selectedIndex]?.id ?? photos[0]?.id ?? null
 
   return (
-    <section className="space-y-3">
+    <div className="space-y-3">
       <SectionHeader
         title={t('photo')}
         action={
@@ -105,6 +105,6 @@ export function MovementPhotosPanel({
           }}
         />
       )}
-    </section>
+    </div>
   )
 }

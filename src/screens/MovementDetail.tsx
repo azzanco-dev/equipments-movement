@@ -28,6 +28,7 @@ import type { SelectOption } from '@/components/Select'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
+import { saudiDateKey } from '@/lib/saudiTime'
 import { localizedName } from '@/lib/localizedName'
 import { uploadMovementPhotosDirectly } from '@/lib/movementPhotoUpload'
 import { prepareMovementPhotos } from '@/lib/movementPhotoCompression'
@@ -827,17 +828,24 @@ export function MovementDetail({
 
   // The recorder's name is display data every role may see on a movement it
   // can already read (owner decision 2026-09-22, migration 0099); the
-  // creation timestamp stays admin-only as before.
-  const recordedBy = t('movementRecordedBy').replace(
-    '{name}',
-    log.supervisor?.full_name || '—',
-  )
+  // creation timestamp stays admin-only as before. wave7-V2 — the line also
+  // carries the movement date as a Saudi calendar day (UTC+03:00), isolated
+  // LTR so the digits keep their order inside Arabic text.
+  const recordedBy = t('movementRecordedByOn')
+    .replace('{name}', log.supervisor?.full_name || '—')
+    .replace(
+      '{date}',
+      `\u2066${formatDate(saudiDateKey(log.recorded_at))}\u2069`,
+    )
 
   return (
     <div className="space-y-4">
       <BackButton onClick={onBack} label={t('backToMovements')} />
 
-      <Card className="space-y-6">
+      {/* wave7-V2 — owner review: every section sits in its own card. The
+          header card carries the audit line as its footer so "recorded by"
+          is visible without scrolling. */}
+      <Card className="space-y-3">
         <DetailHeader
           as="h1"
           identifier={log.equipment?.code ?? t('movementDetails')}
@@ -854,58 +862,44 @@ export function MovementDetail({
           actions={headerActions}
         />
 
-        {deleteError && <Notice tone="danger">{deleteError}</Notice>}
-        {/* Partial success: the correction was stored, a follow-up step was
-            not. Never reported as a total failure. */}
-        {editWarning && <Notice tone="warning">{editWarning}</Notice>}
+        <p className="border-t pt-3 text-xs text-muted">
+          {recordedBy}
+          {role === 'admin' && log.created_at
+            ? ` — ${t('createdAt')}: ${formatDateTime(log.created_at)}`
+            : ''}
+        </p>
+      </Card>
 
+      {deleteError && <Notice tone="danger">{deleteError}</Notice>}
+      {/* Partial success: the correction was stored, a follow-up step was
+          not. Never reported as a total failure. */}
+      {editWarning && <Notice tone="warning">{editWarning}</Notice>}
+
+      <Card>
         <InfoGridSection
           title={t('movementSectionMovement')}
           items={movementItems}
         />
+      </Card>
 
-        <section className="space-y-3">
-          <SectionHeader
-            title={isEntry ? t('linkedExit') : t('linkedEntry')}
-            action={
-              linkedLog ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  icon={<ExternalLink size={14} />}
-                  onClick={() => onNavigateMovement(linkedLog.id)}
-                >
-                  {t('viewDetails')}
-                </Button>
-              ) : undefined
-            }
-          />
-          {linkedError ? (
-            <Notice tone="danger" size="compact">
-              {linkedError}
-            </Notice>
-          ) : linkedLog ? (
-            <InfoGrid items={linkedItems} />
-          ) : (
-            <p className="text-sm text-muted">
-              {isEntry ? t('notExitedYet') : '—'}
-            </p>
-          )}
-        </section>
-
+      <Card>
         <InfoGridSection
           title={t('sectionEquipmentDetails')}
           items={equipmentItems}
         />
+      </Card>
 
-        {!isWorkshopMovement && (
+      {!isWorkshopMovement && (
+        <Card>
           <InfoGridSection
             title={t('movementSectionCompanyProject')}
             items={companyItems}
           />
-        )}
+        </Card>
+      )}
 
-        {!isWorkshopMovement && (
+      {!isWorkshopMovement && (
+        <Card>
           <MovementDriverSection
             key={log.id}
             driverName={driverDisplayName}
@@ -921,8 +915,10 @@ export function MovementDetail({
             loadDrivers={loadDrivers}
             onChanged={fetchData}
           />
-        )}
+        </Card>
+      )}
 
+      <Card>
         <MovementPhotosPanel
           photos={galleryPhotos}
           selectedIndex={photoCarouselIndex}
@@ -937,13 +933,36 @@ export function MovementDetail({
           busy={photoBusy}
           error={photoActionError}
         />
+      </Card>
 
-        <p className="border-t pt-3 text-xs text-muted">
-          {recordedBy}
-          {role === 'admin' && log.created_at
-            ? ` — ${t('createdAt')}: ${formatDateTime(log.created_at)}`
-            : ''}
-        </p>
+      {/* The linked exit/entry comes last, after everything else. */}
+      <Card className="space-y-3">
+        <SectionHeader
+          title={isEntry ? t('linkedExit') : t('linkedEntry')}
+          action={
+            linkedLog ? (
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<ExternalLink size={14} />}
+                onClick={() => onNavigateMovement(linkedLog.id)}
+              >
+                {t('viewDetails')}
+              </Button>
+            ) : undefined
+          }
+        />
+        {linkedError ? (
+          <Notice tone="danger" size="compact">
+            {linkedError}
+          </Notice>
+        ) : linkedLog ? (
+          <InfoGrid items={linkedItems} />
+        ) : (
+          <p className="text-sm text-muted">
+            {isEntry ? t('notExitedYet') : '—'}
+          </p>
+        )}
       </Card>
 
       <Lightbox
