@@ -286,39 +286,176 @@ test('the availability page carries the database total, not the page length', ()
   })
 })
 
-test('parseOutsideEquipmentPage keeps never-moved equipment identifiable', () => {
-  const page = admin.parseOutsideEquipmentPage([
+test('parseFleetEquipmentPage keeps never-moved equipment identifiable', () => {
+  const page = admin.parseFleetEquipmentPage([
     {
-      total_count: 2,
-      id: 'b',
-      code: 'B-1',
-      type: 'شيول',
-      ownership_status: 'takween',
-      last_movement_at: '2026-01-01T00:00:00Z',
-      last_movement_type: 'exit',
-      last_movement_context: 'site',
+      total_count: 3,
+      id: 'w',
+      code: 'A-7',
+      type: 'حفار',
+      ownership_status: 'alazani',
+      state: 'workshop_maintenance',
+      since: '2026-09-20T07:00:00Z',
+      last_movement_id: 'm7',
+      last_movement_type: 'entry',
+      last_movement_context: 'workshop',
+      workshop_purpose: 'maintenance',
+      company_name_ar: null,
     },
     {
-      total_count: 2,
+      total_count: 3,
+      id: 's',
+      code: 'A-2',
+      type: 'شيول',
+      ownership_status: 'alazani',
+      state: 'inside_site',
+      since: '2026-09-19T07:00:00Z',
+      last_movement_id: 'm2',
+      last_movement_type: 'entry',
+      last_movement_context: 'site',
+      workshop_purpose: 'bogus',
+      company_name_ar: 'شركة',
+      company_name_en: 'Company',
+      project_name_ar: 'مشروع',
+      project_name_en: 'Project',
+    },
+    {
+      total_count: 3,
       id: 'a',
       code: 'A-1',
       type: 'حفار',
       ownership_status: 'alazani',
-      last_movement_at: null,
-      last_movement_type: null,
+      state: 'available',
+      since: null,
     },
-    { total_count: 2, id: '', code: 'dropped' },
+    { total_count: 3, id: '', code: 'dropped' },
   ])
-  assert.equal(page.total, 2)
-  assert.equal(page.rows.length, 2)
-  assert.equal(page.rows[0].lastMovementType, 'exit')
-  assert.equal(page.rows[0].lastMovementContext, 'site')
+  assert.equal(page.total, 3)
+  assert.equal(page.rows.length, 3)
+  assert.equal(page.rows[0].state, 'workshop_maintenance')
+  assert.equal(page.rows[0].workshopPurpose, 'maintenance')
+  assert.equal(page.rows[0].lastMovementId, 'm7')
+  assert.equal(page.rows[0].companyNameAr, null)
+  // An unknown purpose is dropped rather than rendered as a badge.
+  assert.equal(page.rows[1].workshopPurpose, null)
+  assert.equal(page.rows[1].companyNameEn, 'Company')
+  assert.equal(page.rows[1].projectNameAr, 'مشروع')
   // The never-moved row keeps a null date rather than an empty string, so the
   // table can tell "no movements" from a date it failed to read.
-  assert.equal(page.rows[1].lastMovementAt, null)
-  assert.equal(page.rows[1].lastMovementType, null)
-  // The idle-days column is gone with the threshold (owner review 2026-09-22).
-  assert.equal('daysSince' in page.rows[0], false)
+  assert.equal(page.rows[2].since, null)
+  assert.equal(page.rows[2].lastMovementType, null)
+  assert.deepEqual(plain(admin.parseFleetEquipmentPage(null)), {
+    rows: [],
+    total: 0,
+  })
+})
+
+test('parseLatestEntryRows reads the movement log view and drops id-less rows', () => {
+  const rows = admin.parseLatestEntryRows([
+    {
+      id: 'm1',
+      equipment_id: 'e1',
+      equipment_code: 'A-1',
+      equipment_type: 'حفار',
+      equipment_ownership_status: 'alazani',
+      movement_context: 'workshop',
+      company_name_ar: null,
+      supervisor_name: 'خالد',
+      recorded_at: '2026-09-20T07:00:00Z',
+    },
+    { id: '', equipment_code: 'dropped' },
+  ])
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0].context, 'workshop')
+  assert.equal(rows[0].foreman, 'خالد')
+  assert.equal(rows[0].owner, 'alazani')
+  assert.equal(rows[0].companyNameAr, null)
+  assert.deepEqual(plain(admin.parseLatestEntryRows('nope')), [])
+})
+
+test('parseLatestEquipmentRows keeps the added date', () => {
+  const rows = admin.parseLatestEquipmentRows([
+    {
+      id: 'e1',
+      code: 'U001',
+      type: 'حفار',
+      ownership_status: 'third_party_f',
+      created_at: '2026-09-29T10:00:00Z',
+    },
+    { code: 'no id' },
+  ])
+  assert.deepEqual(plain(rows), [
+    {
+      id: 'e1',
+      code: 'U001',
+      type: 'حفار',
+      owner: 'third_party_f',
+      createdAt: '2026-09-29T10:00:00Z',
+    },
+  ])
+})
+
+test('pageTotal prefers the exact count and falls back to the rows', () => {
+  assert.equal(admin.pageTotal(42, 7), 42)
+  assert.equal(admin.pageTotal(0, 0), 0)
+  // A 7-row mini table asks for no count.
+  assert.equal(admin.pageTotal(null, 7), 7)
+  assert.equal(admin.pageTotal(undefined, 3), 3)
+  assert.equal(admin.pageTotal(-1, 3), 3)
+})
+
+// --- the fleet mini tables and the card jumps (migration 0107) -------------
+
+test('every state card jumps to the mini table that lists its units', () => {
+  const target = (state) => plain(admin.fleetJumpTarget(state))
+  assert.deepEqual(target('inside_site'), { table: 'inside' })
+  assert.deepEqual(target('workshop'), { table: 'workshop', purpose: 'all' })
+  assert.deepEqual(target('workshop_maintenance'), {
+    table: 'workshop',
+    purpose: 'maintenance',
+  })
+  assert.deepEqual(target('workshop_parking'), {
+    table: 'workshop',
+    purpose: 'parking',
+  })
+  assert.deepEqual(target('workshop_unclassified'), {
+    table: 'workshop',
+    purpose: 'unclassified',
+  })
+  assert.deepEqual(target('available'), { table: 'available' })
+  assert.deepEqual(target('total'), { table: 'added' })
+  // Every card has a table, and every jump target is a real mini table.
+  for (const state of admin.FLEET_DRILL_STATES) {
+    const jump = admin.fleetJumpTarget(state)
+    assert.ok(admin.FLEET_MINI_TABLES.includes(jump.table), state)
+    assert.equal(
+      admin.fleetMiniTableDomId(jump.table),
+      `admin-home-fleet-${jump.table}`,
+    )
+  }
+})
+
+test('the workshop chips map to p_purpose and fail closed to "all"', () => {
+  assert.deepEqual(plain(admin.WORKSHOP_PURPOSE_FILTERS), [
+    'all',
+    'maintenance',
+    'parking',
+    'unclassified',
+  ])
+  assert.equal(admin.workshopPurposeArgument('all'), null)
+  assert.equal(admin.workshopPurposeArgument('parking'), 'parking')
+  assert.equal(
+    admin.normalizeWorkshopPurposeFilter('unclassified'),
+    'unclassified',
+  )
+  assert.equal(admin.normalizeWorkshopPurposeFilter('storage'), 'all')
+  assert.equal(admin.normalizeWorkshopPurposeFilter(null), 'all')
+  assert.equal(admin.FLEET_MINI_ROWS, 7)
+  assert.deepEqual(plain(admin.FLEET_LIST_STATES), [
+    'inside_site',
+    'workshop',
+    'available',
+  ])
 })
 
 // --- server-side pagination ------------------------------------------------
@@ -356,7 +493,7 @@ test('parseTotalCount refuses a malformed count instead of guessing', () => {
   assert.equal(admin.parseTotalCount(null), 0)
 })
 
-// --- the Excel export of the outside table ---------------------------------
+// --- the Excel export of the fleet mini tables ---------------------------
 
 test('collectAllPages walks every page of the current filter', async () => {
   const all = Array.from({ length: 12 }, (_, index) => ({ id: index }))
@@ -411,46 +548,138 @@ test('collectAllPages terminates when a page comes back empty', async () => {
   assert.equal(collected.capped, true)
 })
 
-test('the export sheet mirrors the table and never leaves a blank date', async () => {
-  const sheet = exporter.outsideEquipmentSheetData(
-    [
-      {
-        id: 'a',
-        code: 'A-1',
-        type: 'حفار',
-        owner: 'alazani',
-        lastMovementAt: '2026-09-01T07:00:00Z',
-        lastMovementType: 'exit',
-        lastMovementContext: 'site',
-      },
-      {
-        id: 'b',
-        code: 'B-1',
-        type: 'شيول',
-        owner: 'takween',
-        lastMovementAt: null,
-        lastMovementType: null,
-        lastMovementContext: null,
-      },
-    ],
-    { t: (key) => key, ownerLabel: (owner) => `owner:${owner}` },
-  )
-  assert.deepEqual(plain(sheet.headers), [
+const exportLabels = {
+  t: (key) => key,
+  lang: 'ar',
+  ownerLabel: (owner) => `owner:${owner}`,
+}
+
+const fleetRow = (overrides) => ({
+  id: 'a',
+  code: 'A-1',
+  type: 'حفار',
+  owner: 'alazani',
+  state: 'inside_site',
+  since: '2026-09-01T07:00:00Z',
+  lastMovementId: 'm1',
+  lastMovementType: 'entry',
+  lastMovementContext: 'site',
+  workshopPurpose: null,
+  companyNameAr: 'شركة',
+  companyNameEn: 'Company',
+  projectNameAr: 'مشروع',
+  projectNameEn: 'Project',
+  ...overrides,
+})
+
+const cells = (columns, row) => columns.map((column) => column.value(row))
+
+test('the inside-sites export mirrors the table and adds type and owner', () => {
+  const columns = exporter.fleetEquipmentExcelColumns('inside', exportLabels)
+  assert.deepEqual(plain(columns.map((column) => column.header)), [
     'adminHomeColEquipment',
+    'adminHomeColCompanyProject',
+    'adminHomeColSince',
     'adminHomeColType',
     'adminHomeColOwner',
-    'adminHomeColLastMovement',
   ])
-  assert.equal(sheet.body.length, 2)
-  assert.deepEqual(plain(sheet.body[0].slice(0, 3)), [
+  assert.equal(columns[2].type, 'date')
+  assert.deepEqual(plain(cells(columns, fleetRow({}))), [
     'A-1',
+    'شركة · مشروع',
+    '2026-09-01T07:00:00Z',
     'حفار',
     'owner:alazani',
   ])
-  assert.match(sheet.body[0][3], /^\d{2}\/\d{2}\/2026$/)
+  // No company and no project is an empty cell, never a placeholder dash.
+  assert.equal(
+    columns[1].value(
+      fleetRow({
+        companyNameAr: null,
+        companyNameEn: null,
+        projectNameAr: null,
+        projectNameEn: null,
+      }),
+    ),
+    '',
+  )
+})
+
+test('the workshop export writes the purpose as words', () => {
+  const columns = exporter.fleetEquipmentExcelColumns('workshop', exportLabels)
+  assert.equal(columns[1].header, 'adminHomeColPurpose')
+  assert.equal(
+    columns[1].value(fleetRow({ workshopPurpose: 'maintenance' })),
+    'adminHomeMaintenance',
+  )
+  assert.equal(
+    columns[1].value(fleetRow({ workshopPurpose: 'parking' })),
+    'adminHomeParking',
+  )
+  assert.equal(
+    columns[1].value(fleetRow({ workshopPurpose: null })),
+    'adminHomeUnclassified',
+  )
+})
+
+test('the available export never leaves a blank date', () => {
+  const columns = exporter.fleetEquipmentExcelColumns('available', exportLabels)
+  assert.deepEqual(plain(columns.map((column) => column.header)), [
+    'adminHomeColEquipment',
+    'adminHomeColType',
+    'adminHomeColLastExit',
+    'adminHomeColOwner',
+  ])
+  assert.match(columns[2].value(fleetRow({})), /^\d{2}\/\d{2}\/2026$/)
   // A unit that never moved gets the explicit wording: an empty cell in a
   // spreadsheet reads as missing data rather than as a fact.
-  assert.equal(sheet.body[1][3], 'adminHomeNeverMoved')
+  assert.equal(
+    columns[2].value(fleetRow({ since: null })),
+    'adminHomeNeverMoved',
+  )
+})
+
+test('the latest-entries export reads «ورشة» for a workshop entry', () => {
+  const columns = exporter.latestEntriesExcelColumns(exportLabels)
+  const entry = {
+    id: 'm1',
+    equipmentId: 'e1',
+    equipmentCode: 'A-1',
+    equipmentType: 'حفار',
+    owner: 'alazani',
+    context: 'site',
+    companyNameAr: 'شركة',
+    companyNameEn: 'Company',
+    projectNameAr: null,
+    projectNameEn: null,
+    foreman: null,
+    recordedAt: '2026-09-20T07:00:00Z',
+  }
+  assert.deepEqual(plain(cells(columns, entry)), [
+    'A-1',
+    'شركة',
+    '',
+    '2026-09-20T07:00:00Z',
+    'حفار',
+    'owner:alazani',
+  ])
+  assert.equal(columns[3].type, 'date')
+  assert.equal(
+    columns[1].value({ ...entry, context: 'workshop' }),
+    'workshopContext',
+  )
+})
+
+test('the latest-equipment export carries the added date as a date cell', () => {
+  const columns = exporter.latestEquipmentExcelColumns(exportLabels)
+  assert.deepEqual(plain(columns.map((column) => column.header)), [
+    'adminHomeColEquipment',
+    'adminHomeColType',
+    'adminHomeColOwner',
+    'adminHomeColAddedAt',
+  ])
+  assert.equal(columns[3].type, 'date')
+  assert.equal(exporter.FLEET_EXPORT_FILE_NAMES.added, 'latest-equipment')
 })
 
 test('parseForemanRecentMovements groups rows and keeps database order', () => {

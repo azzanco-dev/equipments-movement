@@ -7,7 +7,6 @@ import { EntriesFlowSection } from '@/components/admin-home/EntriesFlowSection'
 import { FleetDonutSection } from '@/components/admin-home/FleetDonutSection'
 import { FleetStateSection } from '@/components/admin-home/FleetStateSection'
 import { ForemanActivitySection } from '@/components/admin-home/ForemanActivitySection'
-import { NoMovementSection } from '@/components/admin-home/NoMovementSection'
 import { useI18n } from '@/i18n/I18nContext'
 import {
   normalizeGranularity,
@@ -23,16 +22,18 @@ export interface AdminHomeScreenProps {
 /**
  * The admin and monitor home page.
  *
- * Order follows the owner's third review (2026-09-22): the fleet's state right
- * now across the full width, then the two tables that answer a question about
- * specific equipment side by side — "معدات بلا حركة" first, because it asks for
- * a decision, and "التوفر حسب النوع" next to it instead of underneath it — then
- * the two donuts, the entries chart and the per-foreman activity cards.
+ * Order follows the owner's third review (2026-09-22), revised by the
+ * approved design of 2026-09-30: the fleet's state right now across the full
+ * width, with its mini tables under the cards (inside sites, in the workshop,
+ * available, latest entries, latest added equipment — "متاحة" replaced the
+ * standalone "معدات بلا حركة" section), then "التوفر حسب النوع", the two
+ * donuts, the entries chart and the per-foreman activity cards.
  *
  * There is no page-level owner filter any more (owner review, same session):
  * the owner is a dimension each section answers for itself. The sections that
- * list equipment carry their own owner multi-select, and the donuts carry none
- * at all because owner is already one of the two slices they draw.
+ * list equipment carry their own owner multi-select (the fleet section's one
+ * filter reaches its cards and its mini tables together), and the donuts carry
+ * none at all because owner is already one of the two slices they draw.
  *
  * Every section owns its request and its own loading / failure state, so one
  * slow or broken section never blanks the page. The chart granularity is the
@@ -92,21 +93,11 @@ export function AdminHomeScreen({
           ) : undefined
         }
       />
-      <FleetStateSection />
-      {/* The owner asked why these two were stacked: they are two halves of the
-          same question (which units are idle, and which types are free), so
-          they sit side by side from lg up and stack on a phone. Each column is
-          `min-w-0`, without which a grid column keeps its content's intrinsic
-          width and the wide tables push the whole page sideways instead of
-          scrolling inside their own card. */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="min-w-0">
-          <NoMovementSection onSelectEquipment={onSelectEquipment} />
-        </div>
-        <div className="min-w-0">
-          <AvailabilitySection />
-        </div>
-      </div>
+      <FleetStateSection onSelectEquipment={onSelectEquipment} />
+      {/* Its former neighbour "معدات بلا حركة" is now the "متاحة" mini table
+          under the state cards, so the availability table takes the full
+          width. */}
+      <AvailabilitySection />
       <FleetDonutSection />
       <EntriesFlowSection
         granularity={granularity}

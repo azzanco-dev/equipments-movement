@@ -1,14 +1,15 @@
 /**
  * The only place the admin home talks to PostgreSQL.
  *
- * Every section calls one database function (migrations 0094 / 0095 / 0101)
- * and gets a parsed, typed result back, so no component ever sees a raw
+ * Every section calls one database function (migrations 0094 / 0095 / 0101 /
+ * 0107), or one narrow read of a security_invoker view or table, and gets a
+ * parsed, typed result back, so no component ever sees a raw
  * PostgREST row and no raw PostgreSQL error text can reach the interface: each
  * loader throws a plain `Error` and the section renders its own translated
  * failure with a retry.
  *
- * The two paginated tables (equipment that is outside, availability by type)
- * take a page descriptor rather than a limit: pages are 1-based here and in
+ * The paginated tables (the fleet mini tables, availability by type) take a
+ * page descriptor rather than a limit: pages are 1-based here and in
  * the pagination control, and `pageOffset` is the single place that turns one
  * into the database's 0-based OFFSET.
  */
@@ -20,19 +21,27 @@ import {
   parseAvailabilityPage,
   parseDailySeries,
   parseFleetState,
+  pageTotal,
+  parseFleetEquipmentPage,
   parseForemanRecentMovements,
-  parseOutsideEquipmentPage,
+  parseLatestEntryRows,
+  parseLatestEquipmentRows,
   parseOwnerStateMatrix,
   parseYearlySeries,
   type AdminHomeOwner,
   type AdminHomePage,
   type AvailabilityRow,
   type DailyMovementCount,
+  type FleetEquipmentRow,
+  type FleetListState,
   type FleetState,
   type ForemanRecentGroup,
-  type OutsideEquipmentRow,
+  type LatestEntryRow,
+  type LatestEquipmentRow,
   type OwnerStateMatrix,
+  type WorkshopPurposeFilter,
   type YearlyMovementCount,
+  workshopPurposeArgument,
 } from '@/lib/adminHomeStats'
 
 /** What a paginated section asks for. `owners` that is `null` or empty means
@@ -94,24 +103,107 @@ export async function fetchFleetState(
 }
 
 /**
- * One page of the equipment that is outside right now: the latest movement
- * across both contexts is not an ENTRY, or the unit has never moved
- * (migration 0101). The total is the database's `count(*) OVER ()`, so the
- * page count is right even on the last page.
+ * One page of the active equipment in one fleet state (migration 0107):
+ * inside a site, in the workshop (optionally one purpose chip), or available
+ * (the latest movement is an exit, or it never moved). The total is the
+ * database's `count(*) OVER ()`, so the page count is right even on the last
+ * page.
  */
-export async function fetchOutsideEquipment(
-  params: AdminHomePageRequest,
+export async function fetchFleetEquipment(
+  params: AdminHomePageRequest & {
+    state: FleetListState
+    /** Only with `workshop`; `all` sends no purpose filter. */
+    purpose?: WorkshopPurposeFilter
+  },
   signal: AbortSignal,
-): Promise<AdminHomePage<OutsideEquipmentRow>> {
+): Promise<AdminHomePage<FleetEquipmentRow>> {
   const { data, error } = await supabase
-    .rpc('get_admin_outside_equipment', {
+    .rpc('get_admin_fleet_equipment', {
+      p_state: params.state,
       p_owners: homeOwnerArgument(params.owners),
+      p_purpose:
+        params.state === 'workshop'
+          ? workshopPurposeArgument(params.purpose ?? 'all')
+          : null,
       p_limit: params.pageSize,
       p_offset: pageOffset(params.page, params.pageSize),
     })
     .abortSignal(signal)
-  if (error) fail('outsideEquipment', error)
-  return parseOutsideEquipmentPage(data)
+  if (error) fail('fleetEquipment', error)
+  return parseFleetEquipmentPage(data)
+}
+
+/** A mini table's page request; `count` asks PostgREST for the exact total,
+ *  which only the expanded, paginated form needs. */
+export interface AdminHomeListRequest extends AdminHomePageRequest {
+  count: boolean
+}
+
+/** Page bounds for PostgREST's inclusive `range`. */
+function pageRange(page: number, pageSize: number): [number, number] {
+  const size = Math.max(1, Math.min(500, Math.trunc(pageSize) || 1))
+  const from = pageOffset(page, size)
+  return [from, from + size - 1]
+}
+
+/**
+ * "اخر الدخوليات": the latest ENTRY movements in both contexts, newest first.
+ *
+ * Read from `movement_log_search` directly: it is security_invoker, so
+ * `entry_exit_logs` RLS decides what is returned (admin and monitor read every
+ * movement), and the order is the movement log's deterministic
+ * `(recorded_at DESC, id DESC)`. The owner filter is the equipment owner the
+ * view already carries.
+ */
+export async function fetchLatestEntries(
+  params: AdminHomeListRequest,
+  signal: AbortSignal,
+): Promise<AdminHomePage<LatestEntryRow>> {
+  const [from, to] = pageRange(params.page, params.pageSize)
+  const { data, error, count } = await supabase
+    .from('movement_log_search')
+    .select(
+      'id, equipment_id, equipment_code, equipment_type, equipment_ownership_status, movement_context, company_name_ar, company_name_en, project_name_ar, project_name_en, supervisor_name, recorded_at',
+      params.count ? { count: 'exact' } : undefined,
+    )
+    .eq('movement_type', 'entry')
+    .in('equipment_ownership_status', homeOwnerArgument(params.owners))
+    .order('recorded_at', { ascending: false })
+    .order('id', { ascending: false })
+    .range(from, to)
+    .abortSignal(signal)
+  if (error) fail('latestEntries', error)
+  const rows = parseLatestEntryRows(data)
+  return { rows, total: pageTotal(count, rows.length) }
+}
+
+/**
+ * "اخر المعدات المضافة": the latest active equipment by `created_at`, read
+ * from `equipment` directly (RLS applies). "Active" is the fleet predicate
+ * every card counts with (`is_active AND status = 'active'`), so the total
+ * card that jumps here and this list agree.
+ */
+export async function fetchLatestEquipment(
+  params: AdminHomeListRequest,
+  signal: AbortSignal,
+): Promise<AdminHomePage<LatestEquipmentRow>> {
+  const [from, to] = pageRange(params.page, params.pageSize)
+  const { data, error, count } = await supabase
+    .from('equipment')
+    .select(
+      'id, code, type, ownership_status, created_at',
+      params.count ? { count: 'exact' } : undefined,
+    )
+    .eq('is_active', true)
+    .eq('status', 'active')
+    .in('ownership_status', homeOwnerArgument(params.owners))
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .range(from, to)
+    .abortSignal(signal)
+  if (error) fail('latestEquipment', error)
+  const rows = parseLatestEquipmentRows(data)
+  return { rows, total: pageTotal(count, rows.length) }
 }
 
 /**

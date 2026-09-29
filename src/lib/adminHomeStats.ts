@@ -1,6 +1,6 @@
 /**
  * Shapes and pure helpers for the admin home page (migrations 0094 / 0095 /
- * 0101).
+ * 0101 / 0107).
  *
  * Everything here is free of React and Supabase so the counting and bucketing
  * rules can be unit tested, and so a malformed payload can never reach a
@@ -208,9 +208,10 @@ export type FleetStateId = (typeof FLEET_STATES)[number]
 /**
  * Every card of the "الحالة الان" section, in the order it is drawn (owner
  * request, 2026-09-30). These are the ids a card click reports through
- * `FleetStateSection`'s `onSelectState`, so the future drill-down panel and
- * its `p_state` argument share one vocabulary: the three workshop purposes are
- * the `FLEET_STATES` values, and `workshop` is their union.
+ * `FleetStateSection`'s `onSelectState`, and `fleetJumpTarget` maps each one
+ * to the mini table (and workshop chip) the card scrolls to: the three
+ * workshop purposes are the `FLEET_STATES` values, and `workshop` is their
+ * union.
  */
 export const FLEET_DRILL_STATES = [
   'total',
@@ -302,26 +303,118 @@ export function parseFleetState(source: unknown): FleetState {
   }
 }
 
-// --- 2. Equipment that is outside right now --------------------------------
+// --- 2. The fleet mini tables (migration 0107) -----------------------------
+
+/** Rows a mini table shows before "عرض الكل" (owner-approved design,
+ *  2026-09-30). */
+export const FLEET_MINI_ROWS = 7
+
+/** The `p_state` values `get_admin_fleet_equipment` accepts. */
+export const FLEET_LIST_STATES = [
+  'inside_site',
+  'workshop',
+  'available',
+] as const
+export type FleetListState = (typeof FLEET_LIST_STATES)[number]
+
+/** The chips of the "داخل الورشة" mini table, in drawing order. `all` is no
+ *  purpose filter; the other three are `p_purpose`. */
+export const WORKSHOP_PURPOSE_FILTERS = [
+  'all',
+  'maintenance',
+  'parking',
+  'unclassified',
+] as const
+export type WorkshopPurposeFilter = (typeof WORKSHOP_PURPOSE_FILTERS)[number]
+
+/** Fails closed on an unknown chip value: it reads as "all". */
+export function normalizeWorkshopPurposeFilter(
+  value: string | null | undefined,
+): WorkshopPurposeFilter {
+  return (WORKSHOP_PURPOSE_FILTERS as readonly string[]).includes(value ?? '')
+    ? (value as WorkshopPurposeFilter)
+    : 'all'
+}
+
+/** The `p_purpose` argument for a chip: `null` for "all", never the string. */
+export function workshopPurposeArgument(
+  filter: WorkshopPurposeFilter,
+): Exclude<WorkshopPurposeFilter, 'all'> | null {
+  return filter === 'all' ? null : filter
+}
+
+/** The five mini tables, in drawing order. */
+export const FLEET_MINI_TABLES = [
+  'inside',
+  'workshop',
+  'available',
+  'entries',
+  'added',
+] as const
+export type FleetMiniTableId = (typeof FLEET_MINI_TABLES)[number]
+
+/** The DOM id of a mini table, which the state cards point at with
+ *  `aria-controls` and scroll to. */
+export function fleetMiniTableDomId(table: FleetMiniTableId): string {
+  return `admin-home-fleet-${table}`
+}
+
+export interface FleetJumpTarget {
+  table: FleetMiniTableId
+  /** Only for the workshop table: the chip the jump selects. */
+  purpose?: WorkshopPurposeFilter
+}
 
 /**
- * One unit that is outside right now (migration 0101).
- *
- * "Outside" is the `available` state of `admin_equipment_state`: the latest
- * movement across both contexts is not an ENTRY, or there is no movement at
- * all. Owner review (2026-09-22): the idle-days threshold and the days column
- * are gone, because a long idle time is normal here and says nothing on its
- * own — what the exit date answers is "since when".
+ * Where a state card jumps (owner-approved design, 2026-09-30): each card
+ * scrolls to the mini table that lists its units, and the four workshop cards
+ * also pick the matching chip. The total has no single state, so it jumps to
+ * the latest added equipment.
  */
-export interface OutsideEquipmentRow {
+export function fleetJumpTarget(state: FleetDrillState): FleetJumpTarget {
+  switch (state) {
+    case 'inside_site':
+      return { table: 'inside' }
+    case 'workshop':
+      return { table: 'workshop', purpose: 'all' }
+    case 'workshop_maintenance':
+      return { table: 'workshop', purpose: 'maintenance' }
+    case 'workshop_parking':
+      return { table: 'workshop', purpose: 'parking' }
+    case 'workshop_unclassified':
+      return { table: 'workshop', purpose: 'unclassified' }
+    case 'available':
+      return { table: 'available' }
+    default:
+      return { table: 'added' }
+  }
+}
+
+/**
+ * One unit of `get_admin_fleet_equipment` (migration 0107).
+ *
+ * `since` is the time of the latest movement across both contexts: the entry
+ * that took a unit into a site or the workshop, or the exit that made it
+ * available. It is `null` for a unit that has never moved, which only the
+ * available table can contain.
+ */
+export interface FleetEquipmentRow {
   id: string
   code: string
   type: string
   owner: string
-  /** `null` for equipment that has never moved at all. */
-  lastMovementAt: string | null
+  state: FleetStateId | null
+  since: string | null
+  lastMovementId: string | null
   lastMovementType: 'entry' | 'exit' | null
   lastMovementContext: 'site' | 'workshop' | null
+  /** The workshop entry's purpose; `null` when unclassified or not in the
+   *  workshop. */
+  workshopPurpose: 'maintenance' | 'parking' | null
+  companyNameAr: string | null
+  companyNameEn: string | null
+  projectNameAr: string | null
+  projectNameEn: string | null
 }
 
 function optionalText(source: unknown, key: string): string | null {
@@ -342,32 +435,131 @@ function movementContext(
   return value === 'site' || value === 'workshop' ? value : null
 }
 
-export function parseOutsideEquipmentRows(
+function fleetStateId(source: unknown, key: string): FleetStateId | null {
+  const value = optionalText(source, key)
+  return (FLEET_STATES as readonly string[]).includes(value ?? '')
+    ? (value as FleetStateId)
+    : null
+}
+
+function workshopPurpose(
   source: unknown,
-): OutsideEquipmentRow[] {
+  key: string,
+): 'maintenance' | 'parking' | null {
+  const value = optionalText(source, key)
+  return value === 'maintenance' || value === 'parking' ? value : null
+}
+
+export function parseFleetEquipmentRows(source: unknown): FleetEquipmentRow[] {
   if (!Array.isArray(source)) return []
   return source
-    .map((row): OutsideEquipmentRow => ({
+    .map((row): FleetEquipmentRow => ({
       id: text(row, 'id'),
       code: text(row, 'code'),
       type: text(row, 'type'),
       owner: text(row, 'ownership_status'),
-      lastMovementAt: optionalText(row, 'last_movement_at'),
+      state: fleetStateId(row, 'state'),
+      since: optionalText(row, 'since'),
+      lastMovementId: optionalText(row, 'last_movement_id'),
       lastMovementType: movementType(row, 'last_movement_type'),
       lastMovementContext: movementContext(row, 'last_movement_context'),
+      workshopPurpose: workshopPurpose(row, 'workshop_purpose'),
+      companyNameAr: optionalText(row, 'company_name_ar'),
+      companyNameEn: optionalText(row, 'company_name_en'),
+      projectNameAr: optionalText(row, 'project_name_ar'),
+      projectNameEn: optionalText(row, 'project_name_en'),
     }))
     .filter((row) => row.id !== '')
 }
 
-/** One page of the outside-equipment table, with the size of the whole
- *  filtered set the database counted. */
-export function parseOutsideEquipmentPage(
+/** One page of a fleet state table, with the size of the whole filtered set
+ *  the database counted (`count(*) OVER ()`). */
+export function parseFleetEquipmentPage(
   source: unknown,
-): AdminHomePage<OutsideEquipmentRow> {
+): AdminHomePage<FleetEquipmentRow> {
   return {
-    rows: parseOutsideEquipmentRows(source),
+    rows: parseFleetEquipmentRows(source),
     total: parseTotalCount(source),
   }
+}
+
+/**
+ * One row of "اخر الدخوليات": an ENTRY movement from `movement_log_search`,
+ * in either context. The company is `null` for a workshop entry, which the
+ * table shows as «ورشة».
+ */
+export interface LatestEntryRow {
+  id: string
+  equipmentId: string
+  equipmentCode: string
+  equipmentType: string
+  owner: string
+  context: 'site' | 'workshop' | null
+  companyNameAr: string | null
+  companyNameEn: string | null
+  projectNameAr: string | null
+  projectNameEn: string | null
+  /** The foreman who recorded it (`profile_names`, migration 0099). */
+  foreman: string | null
+  recordedAt: string | null
+}
+
+export function parseLatestEntryRows(source: unknown): LatestEntryRow[] {
+  if (!Array.isArray(source)) return []
+  return source
+    .map((row): LatestEntryRow => ({
+      id: text(row, 'id'),
+      equipmentId: text(row, 'equipment_id'),
+      equipmentCode: text(row, 'equipment_code'),
+      equipmentType: text(row, 'equipment_type'),
+      owner: text(row, 'equipment_ownership_status'),
+      context: movementContext(row, 'movement_context'),
+      companyNameAr: optionalText(row, 'company_name_ar'),
+      companyNameEn: optionalText(row, 'company_name_en'),
+      projectNameAr: optionalText(row, 'project_name_ar'),
+      projectNameEn: optionalText(row, 'project_name_en'),
+      foreman: optionalText(row, 'supervisor_name'),
+      recordedAt: optionalText(row, 'recorded_at'),
+    }))
+    .filter((row) => row.id !== '')
+}
+
+/** One row of "اخر المعدات المضافة", read from `equipment` directly. */
+export interface LatestEquipmentRow {
+  id: string
+  code: string
+  type: string
+  owner: string
+  createdAt: string | null
+}
+
+export function parseLatestEquipmentRows(
+  source: unknown,
+): LatestEquipmentRow[] {
+  if (!Array.isArray(source)) return []
+  return source
+    .map((row): LatestEquipmentRow => ({
+      id: text(row, 'id'),
+      code: text(row, 'code'),
+      type: text(row, 'type'),
+      owner: text(row, 'ownership_status'),
+      createdAt: optionalText(row, 'created_at'),
+    }))
+    .filter((row) => row.id !== '')
+}
+
+/**
+ * The total behind a page read with PostgREST's `count: 'exact'`. A 7-row
+ * mini table does not ask for a count (it has no pagination), so a missing
+ * count falls back to the rows actually returned rather than to zero.
+ */
+export function pageTotal(
+  count: number | null | undefined,
+  rows: number,
+): number {
+  return typeof count === 'number' && Number.isFinite(count) && count >= 0
+    ? Math.trunc(count)
+    : rows
 }
 
 // --- 3. Availability by type ----------------------------------------------

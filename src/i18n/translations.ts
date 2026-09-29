@@ -1225,6 +1225,31 @@ export const translations = {
     adminHomeWorkshopBreakdown: 'داخل الورشة حسب الغرض',
     // wave7-L1
     movementsLogsTab: 'السجلات',
+    // wave7-M
+    adminHomeFleetInsideTitle: 'داخل المواقع',
+    adminHomeFleetInsideDescription:
+      'المعدات داخل المواقع الان، الاحدث دخولا اولا',
+    adminHomeFleetWorkshopTitle: 'داخل الورشة',
+    adminHomeFleetWorkshopDescription: 'المعدات في الورشة الان حسب الغرض',
+    adminHomeFleetAvailableDescription: 'اخر حركة لها خروج، او لم تتحرك بعد',
+    adminHomeFleetEntriesTitle: 'اخر الدخوليات',
+    adminHomeFleetEntriesDescription: 'اخر حركات الدخول في المواقع والورشة',
+    adminHomeFleetAddedTitle: 'اخر المعدات المضافة',
+    adminHomeFleetAddedDescription: 'اخر المعدات النشطة المسجلة في النظام',
+    adminHomeFleetInsideEmpty: 'لا توجد معدات داخل المواقع',
+    adminHomeFleetWorkshopEmpty: 'لا توجد معدات في الورشة',
+    adminHomeFleetAvailableEmpty: 'لا توجد معدات متاحة',
+    adminHomeFleetEntriesEmpty: 'لا توجد حركات دخول',
+    adminHomeFleetAddedEmpty: 'لا توجد معدات',
+    adminHomeFleetCount: '{count} معدة',
+    adminHomeFleetTableError: 'تعذر تحميل هذا الجدول',
+    adminHomeColCompanyProject: 'الشركة · المشروع',
+    adminHomeColSince: 'منذ',
+    adminHomeColPurpose: 'الغرض',
+    adminHomeColLastExit: 'اخر خروج',
+    adminHomeColAddedAt: 'تاريخ الاضافة',
+    adminHomePurposeFilter: 'تصفية حسب الغرض',
+    adminHomeCollapse: 'تصغير',
   },
   en: {
     appName: 'Heavy Equipment Management',
@@ -2473,6 +2498,33 @@ export const translations = {
     adminHomeWorkshopBreakdown: 'In the workshop, by purpose',
     // wave7-L1
     movementsLogsTab: 'Logs',
+    // wave7-M
+    adminHomeFleetInsideTitle: 'Inside sites',
+    adminHomeFleetInsideDescription:
+      'Units inside a site now, latest entry first',
+    adminHomeFleetWorkshopTitle: 'In the workshop',
+    adminHomeFleetWorkshopDescription: 'Units in the workshop now, by purpose',
+    adminHomeFleetAvailableDescription:
+      'The latest movement is an exit, or the unit has not moved yet',
+    adminHomeFleetEntriesTitle: 'Latest entries',
+    adminHomeFleetEntriesDescription: 'The latest site and workshop entries',
+    adminHomeFleetAddedTitle: 'Latest added equipment',
+    adminHomeFleetAddedDescription:
+      'The latest active equipment registered in the system',
+    adminHomeFleetInsideEmpty: 'No equipment inside a site',
+    adminHomeFleetWorkshopEmpty: 'No equipment in the workshop',
+    adminHomeFleetAvailableEmpty: 'No available equipment',
+    adminHomeFleetEntriesEmpty: 'No entries yet',
+    adminHomeFleetAddedEmpty: 'No equipment',
+    adminHomeFleetCount: '{count} units',
+    adminHomeFleetTableError: 'This table could not be loaded',
+    adminHomeColCompanyProject: 'Company · project',
+    adminHomeColSince: 'Since',
+    adminHomeColPurpose: 'Purpose',
+    adminHomeColLastExit: 'Last exit',
+    adminHomeColAddedAt: 'Added on',
+    adminHomePurposeFilter: 'Filter by purpose',
+    adminHomeCollapse: 'Show less',
   },
 } as const
 

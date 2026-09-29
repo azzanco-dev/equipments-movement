@@ -8,18 +8,21 @@ import {
   Warehouse,
   Wrench,
 } from 'lucide-react'
-import { Badge, StatCard, cn } from '@/components/ui'
+import { Badge, ErrorState, Skeleton, StatCard, cn } from '@/components/ui'
 import type { StatCardAccent } from '@/components/ui/StatCard'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import { fetchFleetState } from '@/lib/adminHomeData'
 import {
   DEFAULT_HOME_OWNERS,
+  fleetJumpTarget,
+  fleetMiniTableDomId,
   type AdminHomeOwner,
   type FleetDrillState,
   type FleetState,
 } from '@/lib/adminHomeStats'
 import { AdminHomeSection } from './AdminHomeSection'
+import { FleetMiniTables, type FleetJumpRequest } from './FleetMiniTables'
 import { HomeOwnerFilter } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
@@ -105,12 +108,14 @@ const WORKSHOP_CARDS: FleetCard[] = [
 
 export interface FleetStateSectionProps {
   /**
-   * Called with the card's state when a card is clicked. Until the drill-down
-   * panel exists (owner request 2026-09-30, design only), the screen does not
-   * pass it, and the cards stay plain, non-interactive cards: a card that looks
-   * clickable must never do nothing.
+   * Called with the card's state when a card is clicked, after the section
+   * has already scrolled to that card's mini table. Optional: the jump itself
+   * is the section's own.
    */
   onSelectState?: (state: FleetDrillState) => void
+  /** Opens an equipment from a mini table row; rows are not clickable
+   *  without it (the monitor has no equipment page). */
+  onSelectEquipment?: (id: string) => void
 }
 
 /**
@@ -130,10 +135,23 @@ export interface FleetStateSectionProps {
  * start border, bold number), and the workshop split that was a hint line
  * under "in the workshop" is a second row of three cards of its own.
  *
+ * Owner-approved design (2026-09-30): the mini tables under the cards
+ * (`FleetMiniTables`) list the units behind them, and every card is a button
+ * that scrolls to its table (`fleetJumpTarget`) and highlights it. The one
+ * owner filter in the heading reaches the cards and the tables together.
+ *
+ * The cards and the tables load independently: the section itself never
+ * swaps its body for one skeleton, so a slow or failed card request never
+ * hides the tables, and an owner change keeps every table's expanded state
+ * and chip.
+ *
  * Nothing here is period-scoped, so the section carries the "now" chip and the
  * chart's granularity switch deliberately does not reach it.
  */
-export function FleetStateSection({ onSelectState }: FleetStateSectionProps) {
+export function FleetStateSection({
+  onSelectState,
+  onSelectEquipment,
+}: FleetStateSectionProps) {
   const { t } = useI18n()
   // Plain component state, not the URL: it scopes this section only, so it is
   // a view control rather than something a shared link should carry.
@@ -143,6 +161,18 @@ export function FleetStateSection({ onSelectState }: FleetStateSectionProps) {
     [owners],
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
+  const [jump, setJump] = useState<FleetJumpRequest | null>(null)
+
+  const selectState = useCallback(
+    (state: FleetDrillState) => {
+      setJump((previous) => ({
+        ...fleetJumpTarget(state),
+        seq: (previous?.seq ?? 0) + 1,
+      }))
+      onSelectState?.(state)
+    },
+    [onSelectState],
+  )
 
   const renderCard = (card: FleetCard, className?: string) => (
     <StatCard
@@ -152,7 +182,10 @@ export function FleetStateSection({ onSelectState }: FleetStateSectionProps) {
       hint={card.hint ? t(card.hint) : undefined}
       accent={card.accent}
       icon={card.icon}
-      onClick={onSelectState ? () => onSelectState(card.id) : undefined}
+      onClick={() => selectState(card.id)}
+      ariaControls={fleetMiniTableDomId(fleetJumpTarget(card.id).table)}
+      // An owner change keeps the cards in place and only pulses the numbers.
+      loading={loading && Boolean(data)}
       className={className}
     />
   )
@@ -172,26 +205,45 @@ export function FleetStateSection({ onSelectState }: FleetStateSectionProps) {
           />
         </div>
       }
-      loading={loading}
-      failed={failed}
-      onRetry={retry}
-      skeletonClassName="h-72 w-full"
     >
-      {renderCard(TOTAL_CARD, 'p-4')}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        {STATE_CARDS.map((card) =>
-          renderCard(card, cn('p-4', card.cellClassName)),
-        )}
-      </div>
-      <div className="space-y-2">
-        <h3 className="text-sm font-medium text-muted">
-          {t('adminHomeWorkshopBreakdown')}
-        </h3>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-          {WORKSHOP_CARDS.map((card) =>
-            renderCard(card, cn('p-4', card.cellClassName)),
-          )}
-        </div>
+      {failed ? (
+        // A failed load is a failure with a retry, never zeros.
+        <ErrorState
+          title={t('adminHomeSectionError')}
+          description={t('adminHomeSectionErrorHint')}
+          onRetry={retry}
+        />
+      ) : !data ? (
+        <>
+          <Skeleton className="h-72 w-full" />
+          <span className="sr-only">{t('loading')}</span>
+        </>
+      ) : (
+        <>
+          {renderCard(TOTAL_CARD, 'p-4')}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {STATE_CARDS.map((card) =>
+              renderCard(card, cn('p-4', card.cellClassName)),
+            )}
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-muted">
+              {t('adminHomeWorkshopBreakdown')}
+            </h3>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+              {WORKSHOP_CARDS.map((card) =>
+                renderCard(card, cn('p-4', card.cellClassName)),
+              )}
+            </div>
+          </div>
+        </>
+      )}
+      <div className="pt-1">
+        <FleetMiniTables
+          owners={owners}
+          jump={jump}
+          onSelectEquipment={onSelectEquipment}
+        />
       </div>
     </AdminHomeSection>
   )

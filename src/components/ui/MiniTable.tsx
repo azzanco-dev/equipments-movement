@@ -20,6 +20,9 @@ export interface MiniTableProps<Row> {
    *  in code instead. */
   viewAllHref?: string
   onViewAll?: () => void
+  /** Optional controls under the heading, inside the card's header area (a
+   *  compact segmented filter). */
+  toolbar?: ReactNode
   loading?: boolean
   error?: ReactNode
   empty?: ReactNode
@@ -44,6 +47,7 @@ export function MiniTable<Row>({
   maxRows = 5,
   viewAllHref,
   onViewAll,
+  toolbar,
   loading = false,
   error,
   empty,
@@ -84,6 +88,7 @@ export function MiniTable<Row>({
           description={description}
           action={action}
         />
+        {toolbar && <div className="mt-3">{toolbar}</div>}
       </div>
       <div className="p-4">
         <DataTable

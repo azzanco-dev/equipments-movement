@@ -1,24 +1,34 @@
 /**
- * The Excel export of the admin home's "outside right now" table.
+ * The Excel export of the admin home's fleet mini tables (migration 0107).
  *
  * The export follows the filter the table is showing, not the page: the owner
- * asked for "the whole current filter", so the section walks the same database
- * function page by page and writes one sheet. Two caps keep that bounded — at
- * most `OUTSIDE_EXPORT_MAX_ROWS` rows, fetched `OUTSIDE_EXPORT_PAGE_SIZE` at a
- * time — and the caller is told when the cap actually truncated the file
+ * asked for "the whole current filter", so the table walks the same loader
+ * page by page and writes one sheet. Two caps keep that bounded — at most
+ * `OUTSIDE_EXPORT_MAX_ROWS` rows, fetched `OUTSIDE_EXPORT_PAGE_SIZE` at
+ * a time — and the caller is told when the cap actually truncated the file
  * rather than being handed a silently short export.
  *
- * Nothing here imports Supabase or `xlsx` at module level: the page walker
- * takes the fetcher as an argument, and the workbook is built behind a dynamic
- * import, so the ~400 KB spreadsheet library is only downloaded when someone
- * actually presses the export button on the landing page.
+ * Nothing here imports Supabase or `xlsx`: the page walker takes the fetcher
+ * as an argument, and the columns below are plain descriptions for the shared
+ * `exportRowsToExcel` (`src/lib/excel.ts`), which the table imports
+ * dynamically, so the ~400 KB spreadsheet library is only downloaded when
+ * someone actually presses the export button on the landing page.
  */
 import { formatDate } from '@/lib/dateFormat'
-import type { OutsideEquipmentRow } from '@/lib/adminHomeStats'
-import type { TranslationKey } from '@/i18n/translations'
+import { localizedName } from '@/lib/localizedName'
+import type {
+  FleetEquipmentRow,
+  FleetMiniTableId,
+  LatestEntryRow,
+  LatestEquipmentRow,
+} from '@/lib/adminHomeStats'
+import type { ExcelColumn } from '@/lib/excel'
+import type { Language, TranslationKey } from '@/i18n/translations'
 
 /** Hard ceiling on an export, so one press can never pull an unbounded list
- *  into the browser. */
+ *  into the browser (the "first 5000 rows" note names this number). The
+ *  `OUTSIDE_` names predate the mini tables and are kept because the movement
+ *  log and visits exports import them too. */
 export const OUTSIDE_EXPORT_MAX_ROWS = 5000
 /** Page size the export walks with: the largest the database function allows
  *  and the largest the shared list system offers. */
@@ -79,81 +89,194 @@ export async function collectAllPages<T>(
 
 type Translate = (key: TranslationKey) => string
 
-export interface OutsideExportOptions {
+export interface FleetExportLabels {
   t: Translate
-  /** Labels an `ownership_status`; the section already has this hook. */
+  lang: Language
+  /** Labels an `ownership_status`; the table already has this hook. */
   ownerLabel: (owner: string) => string
-  /** Right-to-left sheet layout for the Arabic interface. */
-  lang: 'ar' | 'en'
 }
 
-export interface OutsideSheetData {
-  headers: string[]
-  body: string[][]
+/** File names per table; ASCII so every operating system keeps them. */
+export const FLEET_EXPORT_FILE_NAMES: Record<FleetMiniTableId, string> = {
+  inside: 'inside-sites',
+  workshop: 'in-workshop',
+  available: 'available-equipment',
+  entries: 'latest-entries',
+  added: 'latest-equipment',
+}
+
+function companyProject(
+  lang: Language,
+  row: Pick<
+    FleetEquipmentRow,
+    'companyNameAr' | 'companyNameEn' | 'projectNameAr' | 'projectNameEn'
+  >,
+): string {
+  const parts = [
+    row.companyNameAr || row.companyNameEn
+      ? localizedName(lang, row.companyNameAr, row.companyNameEn)
+      : '',
+    row.projectNameAr || row.projectNameEn
+      ? localizedName(lang, row.projectNameAr, row.projectNameEn)
+      : '',
+  ].filter(Boolean)
+  return parts.join(' · ')
+}
+
+/** The purpose cell of a workshop row, as plain text rather than a code. */
+export function workshopPurposeLabel(
+  purpose: FleetEquipmentRow['workshopPurpose'],
+  t: Translate,
+): string {
+  if (purpose === 'maintenance') return t('adminHomeMaintenance')
+  if (purpose === 'parking') return t('adminHomeParking')
+  return t('adminHomeUnclassified')
 }
 
 /**
- * The sheet's cells, in the table's own column order.
+ * The sheet columns of one fleet state table, in the table's own order plus
+ * the type and owner the narrow card leaves out.
  *
- * Kept separate from the workbook so the wording and the fallbacks can be
- * tested without a spreadsheet library. Every row here is a unit that is
- * outside right now, so "last movement" is either the exit that took it out or
- * the explicit "no movements" of a unit that has never moved — never a blank
- * cell, which in a spreadsheet reads as missing data rather than as a fact.
+ * The date is a real Saudi-time date cell (`type: 'date'`) so it sorts and
+ * filters in Excel. The one exception is the available table: a unit that has
+ * never moved has no date, and a blank cell reads as missing data rather than
+ * as a fact, so that column is text carrying the explicit «بلا حركات» — as the
+ * export of the section it replaces already did.
  */
-export function outsideEquipmentSheetData(
-  rows: OutsideEquipmentRow[],
-  { t, ownerLabel }: Omit<OutsideExportOptions, 'lang'>,
-): OutsideSheetData {
-  return {
-    headers: [
-      t('adminHomeColEquipment'),
-      t('adminHomeColType'),
-      t('adminHomeColOwner'),
-      t('adminHomeColLastMovement'),
-    ],
-    body: rows.map((row) => [
-      row.code,
-      row.type,
-      ownerLabel(row.owner),
-      row.lastMovementAt
-        ? formatDate(row.lastMovementAt)
-        : t('adminHomeNeverMoved'),
-    ]),
+export function fleetEquipmentExcelColumns(
+  table: 'inside' | 'workshop' | 'available',
+  { t, lang, ownerLabel }: FleetExportLabels,
+): ExcelColumn<FleetEquipmentRow>[] {
+  const code: ExcelColumn<FleetEquipmentRow> = {
+    header: t('adminHomeColEquipment'),
+    width: 14,
+    value: (row) => row.code,
   }
+  const type: ExcelColumn<FleetEquipmentRow> = {
+    header: t('adminHomeColType'),
+    width: 24,
+    value: (row) => row.type,
+  }
+  const owner: ExcelColumn<FleetEquipmentRow> = {
+    header: t('adminHomeColOwner'),
+    width: 16,
+    value: (row) => ownerLabel(row.owner),
+  }
+  const since: ExcelColumn<FleetEquipmentRow> = {
+    header: t('adminHomeColSince'),
+    width: 18,
+    type: 'date',
+    value: (row) => row.since,
+  }
+  if (table === 'inside')
+    return [
+      code,
+      {
+        header: t('adminHomeColCompanyProject'),
+        width: 34,
+        value: (row) => companyProject(lang, row),
+      },
+      since,
+      type,
+      owner,
+    ]
+  if (table === 'workshop')
+    return [
+      code,
+      {
+        header: t('adminHomeColPurpose'),
+        width: 14,
+        value: (row) => workshopPurposeLabel(row.workshopPurpose, t),
+      },
+      since,
+      type,
+      owner,
+    ]
+  return [
+    code,
+    type,
+    {
+      header: t('adminHomeColLastExit'),
+      width: 16,
+      value: (row) =>
+        row.since ? formatDate(row.since) : t('adminHomeNeverMoved'),
+    },
+    owner,
+  ]
 }
 
-/**
- * Builds and downloads the workbook.
- *
- * `xlsx` is imported dynamically: this is the admin landing page, and the
- * library is only needed once someone presses the button.
- */
-export async function exportOutsideEquipmentToExcel(
-  rows: OutsideEquipmentRow[],
-  options: OutsideExportOptions,
-): Promise<void> {
-  const { t, lang } = options
-  const { headers, body } = outsideEquipmentSheetData(rows, options)
-  const XLSX = await import('xlsx')
-  const sheet = XLSX.utils.aoa_to_sheet([headers, ...body])
-  sheet['!cols'] = [{ wch: 14 }, { wch: 26 }, { wch: 18 }, { wch: 16 }]
-  sheet['!freeze'] = {
-    xSplit: 0,
-    ySplit: 1,
-    topLeftCell: 'A2',
-    activePane: 'bottomLeft',
-    state: 'frozen',
-  }
-  sheet['!autofilter'] = { ref: `A1:D${body.length + 1}` }
-  // The Arabic sheet opens right to left, like every other export here.
-  sheet['!rtl'] = lang === 'ar'
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(
-    workbook,
-    sheet,
-    // Excel rejects a sheet name over 31 characters.
-    t('adminHomeNoMovementTitle').slice(0, 31),
-  )
-  XLSX.writeFile(workbook, 'outside-equipment.xlsx')
+/** "اخر الدخوليات": a workshop entry has no company, so it reads «ورشة». */
+export function latestEntryCompany(
+  row: LatestEntryRow,
+  lang: Language,
+  t: Translate,
+): string {
+  if (row.context === 'workshop') return t('workshopContext')
+  if (!row.companyNameAr && !row.companyNameEn) return ''
+  return localizedName(lang, row.companyNameAr, row.companyNameEn)
+}
+
+export function latestEntriesExcelColumns({
+  t,
+  lang,
+  ownerLabel,
+}: FleetExportLabels): ExcelColumn<LatestEntryRow>[] {
+  return [
+    {
+      header: t('adminHomeColEquipment'),
+      width: 14,
+      value: (row) => row.equipmentCode,
+    },
+    {
+      header: t('company'),
+      width: 26,
+      value: (row) => latestEntryCompany(row, lang, t),
+    },
+    {
+      header: t('adminHomeColForeman'),
+      width: 22,
+      value: (row) => row.foreman ?? '',
+    },
+    {
+      header: t('adminHomeColMovementDate'),
+      width: 18,
+      type: 'date',
+      value: (row) => row.recordedAt,
+    },
+    {
+      header: t('adminHomeColType'),
+      width: 24,
+      value: (row) => row.equipmentType,
+    },
+    {
+      header: t('adminHomeColOwner'),
+      width: 16,
+      value: (row) => ownerLabel(row.owner),
+    },
+  ]
+}
+
+export function latestEquipmentExcelColumns({
+  t,
+  ownerLabel,
+}: FleetExportLabels): ExcelColumn<LatestEquipmentRow>[] {
+  return [
+    {
+      header: t('adminHomeColEquipment'),
+      width: 14,
+      value: (row) => row.code,
+    },
+    { header: t('adminHomeColType'), width: 24, value: (row) => row.type },
+    {
+      header: t('adminHomeColOwner'),
+      width: 16,
+      value: (row) => ownerLabel(row.owner),
+    },
+    {
+      header: t('adminHomeColAddedAt'),
+      width: 18,
+      type: 'date',
+      value: (row) => row.createdAt,
+    },
+  ]
 }

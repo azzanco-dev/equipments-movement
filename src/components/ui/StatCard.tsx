@@ -41,6 +41,9 @@ export interface StatCardProps {
   accent?: StatCardAccent
   /** Makes the whole card a button, for example to open a filtered list. */
   onClick?: () => void
+  /** With `onClick`: the id of the region the button reveals
+   *  (`aria-controls`). */
+  ariaControls?: string
   /** Replaces the value with a skeleton and announces a busy state. */
   loading?: boolean
   className?: string
@@ -82,6 +85,7 @@ export function StatCard({
   tone = 'neutral',
   accent,
   onClick,
+  ariaControls,
   loading = false,
   className,
 }: StatCardProps) {
@@ -150,6 +154,7 @@ export function StatCard({
       <button
         type="button"
         onClick={onClick}
+        aria-controls={ariaControls}
         aria-busy={loading || undefined}
         className={classes}
       >
