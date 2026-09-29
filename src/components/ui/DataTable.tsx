@@ -1,4 +1,12 @@
-import { type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import {
+  useCallback,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react'
 import { AlertCircle, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { cn } from './cn'
@@ -114,6 +122,165 @@ function hitsNestedControl(target: EventTarget | null, row: HTMLElement) {
 }
 
 /**
+ * Mouse drag-to-scroll (owner request 2026-09-30): a wide table scrolls
+ * sideways by dragging it, so nobody has to hunt for the scrollbar at the
+ * bottom of a long page. The native scrollbar stays; touch and pen keep their
+ * native scrolling because only `pointerType === 'mouse'` is handled.
+ */
+export const DRAG_SCROLL_THRESHOLD = 6
+
+/** Controls (and text inputs) a drag must never start on. Rows are excluded:
+ *  a clickable row carries role="button" but is exactly where a drag starts. */
+const dragScrollIgnoreSelector =
+  'a,button,input,select,textarea,label,summary,[contenteditable="true"],[role="button"]:not(tr),[role="link"],[role="checkbox"],[role="switch"],[role="menuitem"],[role="option"],[data-no-drag-scroll]'
+
+export interface DragScrollStart {
+  pointerType: string
+  button: number
+  /** `detail` of the pointer event: 2+ is a double/triple click (selecting). */
+  detail: number
+  /** Alt, Shift, Ctrl or Meta held: the user is selecting, not dragging. */
+  modifier: boolean
+  /** The pointer went down on (or inside) an interactive element. */
+  onControl: boolean
+  /** The content is wider than the wrapper, so there is something to scroll. */
+  overflowing: boolean
+}
+
+/** Whether a pointer-down may become a drag-to-scroll gesture. */
+export function canStartDragScroll(start: DragScrollStart): boolean {
+  return (
+    start.pointerType === 'mouse' &&
+    start.button === 0 &&
+    start.detail < 2 &&
+    !start.modifier &&
+    !start.onControl &&
+    start.overflowing
+  )
+}
+
+/**
+ * Classifies a pending gesture by how far the pointer has moved since
+ * pointer-down: under the threshold nothing happens yet (a plain click stays a
+ * click), a mostly-vertical move is left to the browser (text selection), and
+ * a mostly-horizontal move past the threshold becomes a drag.
+ */
+export function dragScrollIntent(
+  dx: number,
+  dy: number,
+  threshold = DRAG_SCROLL_THRESHOLD,
+): 'pending' | 'drag' | 'cancel' {
+  const ax = Math.abs(dx)
+  const ay = Math.abs(dy)
+  if (ax <= threshold && ay <= threshold) return 'pending'
+  return ax >= ay ? 'drag' : 'cancel'
+}
+
+interface DragScrollGesture {
+  pointerId: number
+  x: number
+  y: number
+  scrollLeft: number
+  dragging: boolean
+}
+
+function useDragScroll() {
+  const gesture = useRef<DragScrollGesture | null>(null)
+  // Set when a drag ends so the click that follows the pointer-up (on the row
+  // under the cursor) is swallowed instead of opening that row.
+  const suppressClick = useRef(false)
+  const [dragging, setDragging] = useState(false)
+
+  const end = useCallback((element: HTMLElement, pointerId: number) => {
+    const current = gesture.current
+    if (!current || current.pointerId !== pointerId) return
+    gesture.current = null
+    if (!current.dragging) return
+    setDragging(false)
+    if (element.hasPointerCapture(pointerId))
+      element.releasePointerCapture(pointerId)
+    suppressClick.current = true
+    // A click, when one follows, is dispatched right after pointer-up; if none
+    // comes (released outside the table) the flag must not eat a later click.
+    window.setTimeout(() => {
+      suppressClick.current = false
+    }, 0)
+  }, [])
+
+  const onPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const element = event.currentTarget
+    const target = event.target as Element | null
+    const allowed = canStartDragScroll({
+      pointerType: event.pointerType,
+      button: event.button,
+      detail: event.detail,
+      modifier:
+        event.altKey || event.shiftKey || event.ctrlKey || event.metaKey,
+      onControl: Boolean(target?.closest?.(dragScrollIgnoreSelector)),
+      overflowing: element.scrollWidth > element.clientWidth + 1,
+    })
+    gesture.current = allowed
+      ? {
+          pointerId: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+          scrollLeft: element.scrollLeft,
+          dragging: false,
+        }
+      : null
+  }, [])
+
+  const onPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const current = gesture.current
+    if (!current || current.pointerId !== event.pointerId) return
+    const element = event.currentTarget
+    const dx = event.clientX - current.x
+    if (!current.dragging) {
+      const intent = dragScrollIntent(dx, event.clientY - current.y)
+      if (intent === 'pending') return
+      if (intent === 'cancel') {
+        gesture.current = null
+        return
+      }
+      current.dragging = true
+      setDragging(true)
+      element.setPointerCapture(event.pointerId)
+      // Any selection the browser began before the threshold is dropped.
+      window.getSelection()?.removeAllRanges()
+    }
+    event.preventDefault()
+    // Moving the pointer towards the right always reveals what lies to the
+    // left: scrollLeft decreases, in LTR (0..max) and RTL (-max..0) alike.
+    element.scrollLeft = current.scrollLeft - dx
+  }, [])
+
+  const onPointerUp = useCallback(
+    (event: PointerEvent<HTMLDivElement>) =>
+      end(event.currentTarget, event.pointerId),
+    [end],
+  )
+
+  const onClickCapture = useCallback((event: MouseEvent<HTMLDivElement>) => {
+    if (!suppressClick.current) return
+    suppressClick.current = false
+    event.preventDefault()
+    event.stopPropagation()
+  }, [])
+
+  return {
+    dragging,
+    handlers: {
+      onPointerDown,
+      onPointerMove,
+      onPointerUp,
+      onPointerCancel: onPointerUp,
+      onLostPointerCapture: onPointerUp,
+      onClickCapture,
+    },
+  }
+}
+
+/**
  * Presentational table for the shared list system. It never sorts or paginates
  * data: `sort` and `onSortChange` are controlled by the caller so ordering
  * stays server-side. Clicking a sortable header sorts ascending, clicking the
@@ -138,6 +305,7 @@ export function DataTable<Row>({
   rowClassName,
 }: DataTableProps<Row>) {
   const { t } = useI18n()
+  const dragScroll = useDragScroll()
   const density = sizes[size]
   const hasError = error !== undefined && error !== null && error !== false
   // While a refetch (sort, page, filter) is in flight the current rows stay on
@@ -184,9 +352,14 @@ export function DataTable<Row>({
         // `min-width: auto`) to grow past the viewport.
         'w-full min-w-0 max-w-full overflow-x-auto rounded-xl border bg-bg',
         maxHeight && 'overflow-y-auto',
+        // While dragging: no text selection, and a grabbing cursor over the
+        // rows' pointer cursor.
+        dragScroll.dragging &&
+          'cursor-grabbing select-none [&_*]:cursor-grabbing',
         className,
       )}
       style={maxHeight ? { maxHeight } : undefined}
+      {...dragScroll.handlers}
     >
       <table
         className="w-full border-collapse text-start"

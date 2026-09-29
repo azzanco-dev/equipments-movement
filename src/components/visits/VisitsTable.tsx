@@ -19,7 +19,7 @@ import type { FilterBarAsyncField } from '@/components/data-list/FilterBar'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { applyListFilters } from '@/lib/applyListFilters'
-import { formatDate, formatDateTime } from '@/lib/dateFormat'
+import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import {
   EQUIPMENT_VISITS_SELECT,
@@ -212,7 +212,6 @@ export function VisitsTable({
   }
 
   const columns = useMemo<DataTableColumn<EquipmentVisitRow>[]>(() => {
-    const formatInstant = isLog ? formatDateTime : formatDate
     const equipment: DataTableColumn<EquipmentVisitRow> = {
       key: 'equipment_code',
       header: t('equipmentCodeLabel'),
@@ -303,13 +302,15 @@ export function VisitsTable({
       hideBelow: 'lg',
       cell: (visit) => visit.entry_supervisor_name || '—',
     }
+    // Entry and exit show the date only (owner request 2026-09-30); the
+    // duration column carries the length of the stay.
     const entryAt: DataTableColumn<EquipmentVisitRow> = {
       key: 'entry_at',
       header: t('visitEntryAt'),
       sortable: true,
       cell: (visit) => (
         <span className="whitespace-nowrap text-muted">
-          {formatInstant(visit.entry_at)}
+          {formatDate(visit.entry_at)}
         </span>
       ),
     }
@@ -330,11 +331,11 @@ export function VisitsTable({
                 onSelectMovement(visit.exit_id as string)
               }}
             >
-              {formatInstant(visit.exit_at)}
+              {formatDate(visit.exit_at)}
             </button>
           ) : (
             <span className="whitespace-nowrap text-muted">
-              {formatInstant(visit.exit_at)}
+              {formatDate(visit.exit_at)}
             </span>
           )
         ) : (
@@ -345,8 +346,9 @@ export function VisitsTable({
       key: 'duration_minutes',
       header: t('visitDuration'),
       align: 'end',
+      // 12 px, one step below the rest of the row (owner request 2026-09-30).
       cell: (visit) => (
-        <span className="text-muted">
+        <span className="text-xs text-muted">
           {formatVisitDuration(visit.duration_minutes, lang) ?? '—'}
         </span>
       ),
@@ -440,7 +442,10 @@ export function VisitsTable({
       ) : (
         <>
           <DataTable
-            size="md"
+            // 44 px rows on every width (owner request 2026-09-30). `md` rows
+            // are already 44 px below 768 px, so the phone view of the home is
+            // no taller; only desktop rows grow from 40 px.
+            size="lg"
             columns={columns}
             rows={visits}
             rowKey={(visit) => visit.entry_id}

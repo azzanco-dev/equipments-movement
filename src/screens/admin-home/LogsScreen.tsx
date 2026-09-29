@@ -46,12 +46,33 @@ function isLogsTab(value: string | null): value is LogsTab {
 
 /**
  * The second level (owner request EM-197): the recorded movements, or the
- * same movements paired into visits. `log` is the default and is left out of
- * the query string, like the `site` context above.
+ * same movements paired into visits. Visits are the first and default view
+ * (owner request 2026-09-30, like the home movements card), left out of the
+ * query string; the log is `?view=log`.
  */
 type LogsView = 'log' | 'visits'
 
-const VIEWS: LogsView[] = ['log', 'visits']
+const VIEWS: LogsView[] = ['visits', 'log']
+
+/**
+ * Unprefixed list state that only the movement log reads. Links into `/logs`
+ * from the foreman activity, the driver detail and the equipment detail carry
+ * `filters` / `q` for the log without a `view`, so a URL holding any of these
+ * still opens the log rather than dropping the filter on the visits view.
+ */
+const LOG_STATE_KEYS = ['q', 'filters', 'sort', 'dir', 'page', 'size']
+
+type QueryReader = Pick<URLSearchParams, 'get' | 'has'>
+
+function hasLogState(params: QueryReader): boolean {
+  return LOG_STATE_KEYS.some((key) => params.has(key))
+}
+
+function resolveLogsView(params: QueryReader): LogsView {
+  const requested = params.get('view')
+  if (requested === 'log' || requested === 'visits') return requested
+  return hasLogState(params) ? 'log' : 'visits'
+}
 
 const LIST_SELECT = `${MOVEMENT_LOG_ADMIN_SELECT},workshop_purpose,equipment_ownership_status`
 
@@ -125,9 +146,10 @@ export interface LogsScreenProps {
  * restores the list the user was looking at and a filtered log can be linked
  * to.
  *
- * A second level (`?view=visits`, EM-197) shows the same context as visits
- * through the shared `VisitsTable` (`movement_visits`), with its own search,
- * filters, paging and Excel export under the `v` URL prefix.
+ * A second level (EM-197) shows the same context as visits through the
+ * shared `VisitsTable` (`movement_visits`), with its own search, filters,
+ * paging and Excel export under the `v` URL prefix. Visits are the default
+ * view; the movement log is `?view=log`.
  */
 export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
   // Company and project are multi-selects searched server-side; the foreman
@@ -142,7 +164,7 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
   const params = useSearchParams()
   const requestedTab = params.get('context')
   const tab: LogsTab = isLogsTab(requestedTab) ? requestedTab : 'site'
-  const view: LogsView = params.get('view') === 'visits' ? 'visits' : 'log'
+  const view = resolveLogsView(params)
 
   const list = useDataListState(logsListConfig)
   const [rows, setRows] = useState<LogRow[]>([])
@@ -176,7 +198,9 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
 
   const setView = (next: LogsView) => {
     const query = new URLSearchParams(params.toString())
-    if (next === 'log') query.delete('view')
+    // Visits is the default and is left out, unless the URL still carries log
+    // state that would otherwise select the log (see `resolveLogsView`).
+    if (next === 'visits' && !hasLogState(query)) query.delete('view')
     else query.set('view', next)
     replaceQuery(query)
   }
@@ -411,7 +435,7 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
           <TabsList variant="segmented" aria-label={t('logsViewFilter')}>
             {VIEWS.map((value) => (
               <TabsTrigger key={value} value={value}>
-                {value === 'log' ? t('movementsLogTab') : t('visitsTab')}
+                {value === 'log' ? t('movementsLogsTab') : t('visitsTab')}
               </TabsTrigger>
             ))}
           </TabsList>
