@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface AdminHomeSectionState<T> {
+  /** The last successful result; kept while a newer request is in flight. */
   data: T | null
+  /**
+   * True for every request, first or not. Show a skeleton only while
+   * `loading && data === null`; when `data` is already there, keep it on
+   * screen and dim it (`aria-busy`) instead.
+   */
   loading: boolean
   /** True when the last attempt failed; never conflated with "no data". */
   failed: boolean

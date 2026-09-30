@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from 'react'
+import { useEffect, useState, type ReactNode, type RefObject } from 'react'
 import { useI18n } from '@/i18n/I18nContext'
 import {
   Badge,
@@ -9,6 +9,7 @@ import {
   SearchInput,
   Select,
   Skeleton,
+  cn,
 } from '@/components/ui'
 import {
   equipmentStateOption,
@@ -58,6 +59,16 @@ export function EquipmentStep({
 }: EquipmentStepProps) {
   const { t, lang } = useI18n()
 
+  // The skeleton is for the very first search only, before any result exists.
+  // Every later search (a keystroke, the owner filter) keeps what is on screen
+  // — the rows, or the "no equipment" state with its add button — and dims it,
+  // so the list does not turn into a placeholder and back on each key press.
+  const [settled, setSettled] = useState(!loading)
+  useEffect(() => {
+    if (!loading) setSettled(true)
+  }, [loading])
+  const firstLoad = loading && !settled && equipment.length === 0
+
   return (
     <div className="space-y-4">
       <Field label={t('selectOwner')}>
@@ -96,18 +107,24 @@ export function EquipmentStep({
         autoFocus
       />
 
-      {loading ? (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {firstLoad ? (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" aria-busy="true">
           <Skeleton className="h-16" />
           <Skeleton className="h-16" />
           <Skeleton className="h-16" />
           <Skeleton className="h-16" />
+          <span className="sr-only">{t('loading')}</span>
         </div>
       ) : (
         <div
           ref={listRef}
-          className="grid max-h-80 grid-cols-1 gap-2 overflow-y-auto sm:grid-cols-2"
+          aria-busy={loading || undefined}
+          className={cn(
+            'grid max-h-80 grid-cols-1 gap-2 overflow-y-auto transition-opacity sm:grid-cols-2',
+            loading && 'opacity-60',
+          )}
         >
+          {loading && <span className="sr-only">{t('loading')}</span>}
           {loadError && (
             <ErrorState
               className="col-span-full"

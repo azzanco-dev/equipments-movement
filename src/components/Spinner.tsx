@@ -1,28 +1,24 @@
 import { Loader2 } from 'lucide-react'
+import { Spinner as StatusSpinner } from '@/components/ui/Spinner'
 
 export function Spinner({ size = 24 }: { size?: number }) {
   return <Loader2 size={size} className="animate-spin" />
 }
 
+/**
+ * The loader for the phase before the application shell exists: the auth
+ * bootstrap, when nothing is known about the user yet.
+ *
+ * It is deliberately not shaped like a page. It used to draw a full fake
+ * dashboard, which then gave way to the real header, then to the screen's own
+ * skeleton, and read as one page appearing, vanishing and coming back. It sits
+ * on the same surface as `Layout`, so the shell appearing behind it is not a
+ * colour change. Screens that load inside the shell use `RouteFallback`.
+ */
 export function FullPageSpinner() {
   return (
-    <div
-      className="min-h-screen p-4 sm:p-8"
-      style={{ background: 'var(--bg)' }}
-    >
-      <div className="mx-auto max-w-6xl space-y-6">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-9 w-48" />
-          <Skeleton className="h-9 w-28" />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Skeleton className="h-28" />
-          <Skeleton className="h-28" />
-          <Skeleton className="h-28" />
-        </div>
-        <Skeleton className="h-12" />
-        <Skeleton className="h-72" />
-      </div>
+    <div className="flex min-h-[100dvh] items-center justify-center bg-surface p-4">
+      <StatusSpinner size="lg" />
     </div>
   )
 }
@@ -39,8 +35,6 @@ export function InlineSpinner({ label }: { label?: string }) {
 
 export function Skeleton({ className = '' }: { className?: string }) {
   return (
-    <div
-      className={`animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800 ${className}`}
-    />
+    <div className={`animate-pulse rounded-lg bg-surface-hover ${className}`} />
   )
 }

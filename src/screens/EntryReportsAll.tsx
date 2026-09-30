@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { PageHeader } from '@/components/PageHeader'
 import { MovementLogCard } from '@/components/MovementLogCard'
-import { InlineSpinner } from '@/components/Spinner'
+import { ReportListSkeleton } from '@/components/ReportListSkeleton'
 import { Alert } from '@/components/Alert'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
@@ -72,6 +72,9 @@ export function EntryReportsAll({
   const [rows, setRows] = useState<EntryExitLog[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  // True once a request has succeeded: from then on a refetch keeps the
+  // previous result (rows or the empty state) on screen instead of a skeleton.
+  const [loaded, setLoaded] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const page = Math.max(1, Number(params.get('page')) || 1)
   const pageSize = sizes.includes(Number(params.get('page_size')))
@@ -181,9 +184,11 @@ export function EntryReportsAll({
         setRows([])
         setTotal(0)
         setLoadError(true)
+        setLoaded(false)
         setLoading(false)
         return
       }
+      setLoaded(true)
       setRows(
         withSupervisorNames(pageRows, names.names) as unknown as EntryExitLog[],
       )
@@ -194,6 +199,8 @@ export function EntryReportsAll({
     return () => controller.abort()
   }, [page, pageSize, params, dateRange.from, dateRange.to, owners, context])
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const firstLoad = loading && !loaded
+  const refreshing = loading && loaded
   return (
     <div className="mx-auto max-w-[1400px] space-y-5">
       <PageHeader
@@ -278,14 +285,19 @@ export function EntryReportsAll({
           {t('clear')}
         </button>
       </div>
-      {loading ? (
-        <div className="flex justify-center p-10">
-          <InlineSpinner />
-        </div>
+      {firstLoad ? (
+        <ReportListSkeleton />
       ) : loadError ? (
         <Alert type="error">{t('dataLoadError')}</Alert>
       ) : rows.length ? (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div
+          aria-busy={refreshing || undefined}
+          className={
+            refreshing
+              ? 'grid gap-3 opacity-60 transition-opacity lg:grid-cols-2'
+              : 'grid gap-3 transition-opacity lg:grid-cols-2'
+          }
+        >
           {rows.map((row) => (
             <MovementLogCard
               key={row.id}
@@ -296,7 +308,14 @@ export function EntryReportsAll({
           ))}
         </div>
       ) : (
-        <div className="card p-8 text-center text-muted">
+        <div
+          aria-busy={refreshing || undefined}
+          className={
+            refreshing
+              ? 'card p-8 text-center text-muted opacity-60 transition-opacity'
+              : 'card p-8 text-center text-muted transition-opacity'
+          }
+        >
           {t('noReportData')}
         </div>
       )}

@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { Badge, Button } from '@/components/ui'
 import { seriesColor, seriesStroke } from '@/components/charts'
-import { FleetDonut } from '@/components/charts/lazy'
+import { FleetDonut, useFleetDonutReady } from '@/components/charts/lazy'
 import type { FleetDonutSlice } from '@/components/charts/lazy'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
@@ -94,6 +94,13 @@ export function FleetDonutSection() {
     [owners],
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
+  // Starts the chart download when the section mounts, not when the data
+  // arrives, so the two run side by side.
+  const chartReady = useFleetDonutReady()
+  // One skeleton, first load only: until there is data and the chart code is
+  // here. An owner-filter change keeps the donuts on screen and dims them.
+  const firstLoad = (loading && data === null) || !chartReady
+  const refreshing = loading && data !== null
 
   const count = useCallback(
     (ownerId: string, state: string) => data?.count(ownerId, state) ?? 0,
@@ -184,7 +191,7 @@ export function FleetDonutSection() {
           />
         </div>
       }
-      loading={loading}
+      loading={firstLoad}
       failed={failed}
       onRetry={retry}
       skeletonClassName="h-80 w-full"
@@ -206,7 +213,15 @@ export function FleetDonutSection() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div
+        aria-busy={refreshing || undefined}
+        className={
+          refreshing
+            ? 'grid gap-6 opacity-60 transition-opacity lg:grid-cols-2'
+            : 'grid gap-6 transition-opacity lg:grid-cols-2'
+        }
+      >
+        {refreshing && <span className="sr-only">{t('loading')}</span>}
         <div className="min-w-0 space-y-2">
           <h3 className="text-sm font-medium text-fg">
             {t('adminHomeDonutOwnerTitle')}

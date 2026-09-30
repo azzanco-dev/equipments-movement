@@ -8,6 +8,12 @@ export interface AdminHomeSectionProps {
   description?: ReactNode
   /** Trailing slot of the heading row (a chip, a segmented control). */
   action?: ReactNode
+  /**
+   * Replaces the whole body — controls included — with the skeleton, so pass
+   * the first load only (`loading && data === null`). A refetch keeps the body
+   * on screen and the section dims what is being reloaded itself; otherwise
+   * the tab or filter the user just clicked disappears under a placeholder.
+   */
   loading?: boolean
   /** A failed load. Never rendered as an empty state. */
   failed?: boolean

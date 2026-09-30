@@ -4,7 +4,7 @@ import { Search } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { PageHeader } from '@/components/PageHeader'
-import { InlineSpinner } from '@/components/Spinner'
+import { ReportListSkeleton } from '@/components/ReportListSkeleton'
 import { MovementLogCard } from '@/components/MovementLogCard'
 import { DatePicker } from '@/components/DatePicker'
 import { OwnerContextFilter } from '@/components/OwnerContextFilter'
@@ -32,6 +32,9 @@ export function WorkshopReports({
   const [rows, setRows] = useState<EntryExitLog[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  // True once a request has succeeded: from then on a refetch keeps the
+  // previous result (rows or the empty state) on screen instead of a skeleton.
+  const [loaded, setLoaded] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const page = Math.max(1, Number(params.get('page')) || 1)
   const pageSize = sizes.includes(Number(params.get('page_size')))
@@ -81,9 +84,11 @@ export function WorkshopReports({
       if (controller.signal.aborted) return
       if (error) {
         setLoadError(true)
+        setLoaded(false)
         setRows([])
         setTotal(0)
       } else {
+        setLoaded(true)
         setRows(mapMovementLogRows(data as unknown as MovementLogSearchRow[]))
         setTotal(count ?? 0)
       }
@@ -94,6 +99,8 @@ export function WorkshopReports({
   }, [page, pageSize, search, params])
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const firstLoad = loading && !loaded
+  const refreshing = loading && loaded
   return (
     <div className="mx-auto max-w-[1400px] space-y-5">
       <PageHeader
@@ -168,16 +175,21 @@ export function WorkshopReports({
           {t('clear')}
         </button>
       </div>
-      {loading ? (
-        <div className="flex justify-center p-10">
-          <InlineSpinner />
-        </div>
+      {firstLoad ? (
+        <ReportListSkeleton />
       ) : loadError ? (
         <div className="card p-8 text-center text-muted">
           {t('workshopReportLoadError')}
         </div>
       ) : rows.length ? (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div
+          aria-busy={refreshing || undefined}
+          className={
+            refreshing
+              ? 'grid gap-3 opacity-60 transition-opacity lg:grid-cols-2'
+              : 'grid gap-3 transition-opacity lg:grid-cols-2'
+          }
+        >
           {rows.map((row) => (
             <MovementLogCard
               key={row.id}
@@ -190,7 +202,14 @@ export function WorkshopReports({
           ))}
         </div>
       ) : (
-        <div className="card p-8 text-center text-muted">
+        <div
+          aria-busy={refreshing || undefined}
+          className={
+            refreshing
+              ? 'card p-8 text-center text-muted opacity-60 transition-opacity'
+              : 'card p-8 text-center text-muted transition-opacity'
+          }
+        >
           {t('noWorkshopMovements')}
         </div>
       )}

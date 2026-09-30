@@ -1,6 +1,9 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Badge, Switch, Tabs, TabsList, TabsTrigger } from '@/components/ui'
-import { EntriesLineChart } from '@/components/charts/lazy'
+import {
+  EntriesLineChart,
+  useEntriesLineChartReady,
+} from '@/components/charts/lazy'
 import type { EntriesLinePoint } from '@/components/charts/lazy'
 import { useI18n } from '@/i18n/I18nContext'
 import {
@@ -40,14 +43,22 @@ const GRANULARITY_LABEL: Record<AdminHomeGranularity, TranslationKey> = {
 }
 
 /**
- * What the section loaded, tagged with the view it belongs to: the يوم and شهر
- * views share a daily payload while سنة has its own, and a response that
- * arrives after the granularity changed must be recognisable as the other
- * view's data rather than bucketed as if it were days.
+ * What the section loaded, tagged with the view it was loaded for: the يوم and
+ * شهر views share a daily payload while سنة has its own. The daily payload
+ * also carries its own bucket size and range, so the chart is always drawn
+ * from the view the data belongs to. While another granularity is loading the
+ * previous chart therefore stays on screen (dimmed) as itself, instead of
+ * being re-bucketed as if it were the new view or replaced by a skeleton.
  */
 type FlowPayload =
   | { kind: 'year'; rows: YearlyMovementCount[] }
-  | { kind: 'daily'; rows: DailyMovementCount[] }
+  | {
+      kind: 'daily'
+      bucket: 'day' | 'month'
+      from: string
+      to: string
+      rows: DailyMovementCount[]
+    }
 
 /** The window each granularity covers, shown as the section's chip. */
 const WINDOW_LABEL: Record<AdminHomeGranularity, TranslationKey> = {
@@ -91,9 +102,8 @@ export function EntriesFlowSection({
     [granularity, yearly],
   )
 
-  // The result carries which shape it is, so a payload that arrives after the
-  // granularity changed is recognised as the other view's data and ignored
-  // instead of being bucketed as if it were days.
+  // The result carries the view it was loaded for, so the chart is bucketed by
+  // the payload's own granularity and range, never by a newer selection.
   const load = useCallback(
     (signal: AbortSignal): Promise<FlowPayload> =>
       yearly
@@ -101,39 +111,39 @@ export function EntriesFlowSection({
             (rows) => ({ kind: 'year' as const, rows }),
           )
         : fetchEntriesSeries(range.from, range.to, owners, null, signal).then(
-            (rows) => ({ kind: 'daily' as const, rows }),
+            (rows) => ({
+              kind: 'daily' as const,
+              bucket:
+                granularity === 'day' ? ('day' as const) : ('month' as const),
+              from: range.from,
+              to: range.to,
+              rows,
+            }),
           ),
-    [owners, range.from, range.to, yearly],
+    [granularity, owners, range.from, range.to, yearly],
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
-
-  const buckets = useMemo(
-    () =>
-      yearly
-        ? []
-        : buildChartBuckets(
-            range.from,
-            range.to,
-            granularity === 'day' ? 'day' : 'month',
-          ),
-    [granularity, range.from, range.to, yearly],
-  )
+  // Starts the chart download when the section mounts, not when the data
+  // arrives, so the two run side by side.
+  const chartReady = useEntriesLineChartReady()
+  // One skeleton, first load only: until there is data and the chart code is
+  // here. Every later load (granularity, owner filter) keeps the controls and
+  // the previous chart on screen and only dims the chart.
+  const firstLoad = (loading && data === null) || !chartReady
+  const refreshing = loading && data !== null
 
   const points: EntriesLinePoint[] = useMemo(() => {
-    if (yearly) {
-      const rows = data?.kind === 'year' ? data.rows : []
-      return buildYearlySeries(rows, GRANULARITY_YEARS).map((point) => ({
+    if (!data) return []
+    if (data.kind === 'year')
+      return buildYearlySeries(data.rows, GRANULARITY_YEARS).map((point) => ({
         key: point.key,
         label: point.key,
         title: point.key,
         entries: point.entries,
         exits: point.exits,
       }))
-    }
-    const totals = aggregateDailySeries(
-      buckets,
-      data?.kind === 'daily' ? data.rows : [],
-    )
+    const buckets = buildChartBuckets(data.from, data.to, data.bucket)
+    const totals = aggregateDailySeries(buckets, data.rows)
     return buckets.map((bucket, index) => ({
       key: bucket.key,
       label: chartBucketLabel(bucket, lang),
@@ -141,14 +151,14 @@ export function EntriesFlowSection({
       entries: totals[index]?.entries ?? 0,
       exits: totals[index]?.exits ?? 0,
     }))
-  }, [buckets, data, lang, yearly])
+  }, [data, lang])
 
   return (
     <AdminHomeSection
       title={t('adminHomeFlowTitle')}
       description={t('adminHomeFlowDescription')}
       action={<Badge tone="info">{t(WINDOW_LABEL[granularity])}</Badge>}
-      loading={loading}
+      loading={firstLoad}
       failed={failed}
       onRetry={retry}
       skeletonClassName="h-64 w-full"
@@ -185,15 +195,25 @@ export function EntriesFlowSection({
           label={t('adminHomeShowExits')}
         />
       </div>
-      <EntriesLineChart
-        ariaLabel={t('adminHomeFlowAria')}
-        dir={dir}
-        lang={lang}
-        points={points}
-        entriesLabel={t('adminHomeEntries')}
-        exitsLabel={t('adminHomeExits')}
-        showExits={showExits}
-      />
+      <div
+        aria-busy={refreshing || undefined}
+        className={
+          refreshing
+            ? 'min-w-0 opacity-60 transition-opacity'
+            : 'min-w-0 transition-opacity'
+        }
+      >
+        <EntriesLineChart
+          ariaLabel={t('adminHomeFlowAria')}
+          dir={dir}
+          lang={lang}
+          points={points}
+          entriesLabel={t('adminHomeEntries')}
+          exitsLabel={t('adminHomeExits')}
+          showExits={showExits}
+        />
+        {refreshing && <span className="sr-only">{t('loading')}</span>}
+      </div>
     </AdminHomeSection>
   )
 }

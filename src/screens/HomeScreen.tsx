@@ -72,6 +72,10 @@ export function HomeScreen({
   const [workshopStats, setWorkshopStats] =
     useState<WorkshopHomeStats>(EMPTY_WORKSHOP)
   const [statsLoading, setStatsLoading] = useState(true)
+  // True once the stats have loaded at least once. After that a refresh (it
+  // runs after every classification) keeps the numbers and the pending list on
+  // screen instead of flipping them to skeletons and back.
+  const [statsLoaded, setStatsLoaded] = useState(false)
   const [statsError, setStatsError] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
   const [classifyingId, setClassifyingId] = useState<string | null>(null)
@@ -94,6 +98,7 @@ export function HomeScreen({
       }
       if (workshopMode) setWorkshopStats(parseWorkshopHomeStats(data))
       else setForemanStats(parseForemanHomeStats(data))
+      setStatsLoaded(true)
       setStatsLoading(false)
     })()
     return () => {
@@ -102,6 +107,11 @@ export function HomeScreen({
   }, [user, workshopMode, refreshToken])
 
   const reload = useCallback(() => setRefreshToken((value) => value + 1), [])
+
+  // Skeleton on the first load only; `statsRefreshing` marks a background
+  // refresh of values that are already on screen.
+  const statsFirstLoad = statsLoading && !statsLoaded
+  const statsRefreshing = statsLoading && statsLoaded
 
   const classifyEntry = useCallback(
     async (entryLogId: string, purpose: string) => {
@@ -205,7 +215,10 @@ export function HomeScreen({
           {statsError ? (
             <ErrorState onRetry={reload} />
           ) : (
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div
+              className="grid grid-cols-2 gap-3 md:grid-cols-4"
+              aria-busy={statsRefreshing || undefined}
+            >
               <StatCard
                 className="col-span-2 md:col-span-1"
                 label={t('insideWorkshopNow')}
@@ -215,7 +228,7 @@ export function HomeScreen({
                   workshopStats.insideNow,
                   workshopStats.insideYesterday,
                 )}
-                loading={statsLoading}
+                loading={statsFirstLoad}
               />
               <StatCard
                 label={t('maintenancePurpose')}
@@ -226,7 +239,7 @@ export function HomeScreen({
                   workshopStats.maintenance,
                   workshopStats.maintenanceYesterday,
                 )}
-                loading={statsLoading}
+                loading={statsFirstLoad}
               />
               <StatCard
                 label={t('parkingPurpose')}
@@ -237,7 +250,7 @@ export function HomeScreen({
                   workshopStats.parking,
                   workshopStats.parkingYesterday,
                 )}
-                loading={statsLoading}
+                loading={statsFirstLoad}
               />
               <StatCard
                 className="col-span-2 md:col-span-1"
@@ -245,7 +258,7 @@ export function HomeScreen({
                 value={workshopStats.pendingClassification}
                 tone="warning"
                 icon={<ClipboardList size={18} aria-hidden="true" />}
-                loading={statsLoading}
+                loading={statsFirstLoad}
               />
             </div>
           )}
@@ -255,7 +268,8 @@ export function HomeScreen({
           {managerMode && (
             <PendingClassificationCard
               rows={workshopStats.pending}
-              loading={statsLoading}
+              loading={statsFirstLoad}
+              refreshing={statsRefreshing}
               error={statsError}
               onRetry={reload}
               canClassify={managerMode}
@@ -278,18 +292,18 @@ export function HomeScreen({
               <StatCard
                 label={t('myEquipmentInsideSitesNow')}
                 value={foremanStats.insideNow}
-                loading={statsLoading}
+                loading={statsFirstLoad}
               />
               <div className="grid grid-cols-2 gap-3">
                 <StatCard
                   label={t('entriesTodayCount')}
                   value={foremanStats.entriesToday}
-                  loading={statsLoading}
+                  loading={statsFirstLoad}
                 />
                 <StatCard
                   label={t('exitsTodayCount')}
                   value={foremanStats.exitsToday}
-                  loading={statsLoading}
+                  loading={statsFirstLoad}
                 />
               </div>
             </>

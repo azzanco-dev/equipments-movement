@@ -24,8 +24,90 @@ import {
   Search,
 } from 'lucide-react'
 import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog'
+import { RouteFallback } from '@/components/RouteFallback'
+import { MovementDetailSkeleton } from '@/components/movement/MovementDetailSkeleton'
 
-const screenLoading = () => <FullPageSpinner />
+// What `<main>` shows while a screen's code downloads. These render inside the
+// shell, so none of them is the full-screen loader: that one belongs to the
+// auth bootstrap only. The list screens and the movement detail get a
+// placeholder shaped like their own first frame, so the hand-over to the
+// screen's skeleton does not read as a page disappearing and coming back.
+const screenLoading = () => <RouteFallback />
+const listLoading = () => <RouteFallback variant="list" />
+const movementDetailLoading = () => <MovementDetailFallback />
+
+/**
+ * The movement detail page's own skeleton, with the same role-based shape the
+ * page picks before its movement row arrives, so the chunk fallback and the
+ * page's first frame are the same picture.
+ */
+function MovementDetailFallback() {
+  const { profile } = useAuth()
+  const role = profile?.role
+  const workshopRole =
+    role === 'workshop' ||
+    role === 'assistant_workshop_manager' ||
+    role === 'workshop_manager'
+  return (
+    <MovementDetailSkeleton
+      context={workshopRole ? 'workshop' : 'site'}
+      isAdmin={role === 'admin'}
+      canUpload={role !== 'monitor'}
+    />
+  )
+}
+
+/**
+ * Which home a signed-in user lands on, remembered from their last visit on
+ * this device. It is only a hint for which public code chunk to warm up while
+ * the profile is still loading; it never decides what is rendered — routing
+ * below reads the role from the loaded profile and nothing else.
+ */
+const LANDING_HINT_KEY = 'em.landing-hint'
+type LandingHint = 'admin-home' | 'home'
+
+function landingHintForRole(role: string | undefined): LandingHint | null {
+  if (role === 'admin' || role === 'monitor') return 'admin-home'
+  if (
+    role === 'supervisor' ||
+    role === 'workshop' ||
+    role === 'assistant_workshop_manager' ||
+    role === 'workshop_manager'
+  )
+    return 'home'
+  return null
+}
+
+function readLandingHint(): LandingHint | null {
+  try {
+    const value = window.localStorage.getItem(LANDING_HINT_KEY)
+    return value === 'admin-home' || value === 'home' ? value : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Starts downloading the screen the current URL is about to need, so the chunk
+ * is on its way while the profile request is still in flight instead of
+ * starting only after it. The `import()` calls resolve to the same chunks the
+ * `dynamic()` screens above use; a failed warm-up is ignored because the
+ * screen's own import reports a real failure.
+ */
+function preloadScreenForPath(segments: string[]) {
+  const ignore = () => undefined
+  if (segments[0] === 'movements' && segments[1]) {
+    if (segments[1] === 'new')
+      void import('@/screens/MovementCreate').catch(ignore)
+    else void import('@/screens/MovementDetail').catch(ignore)
+    return
+  }
+  if (segments.length > 0 && segments[0] !== 'dashboard') return
+  const hint = readLandingHint()
+  if (hint === 'admin-home')
+    void import('@/screens/admin-home/AdminHomeScreen').catch(ignore)
+  else if (hint === 'home') void import('@/screens/HomeScreen').catch(ignore)
+}
 
 const HomeScreen = dynamic(
   () => import('@/screens/HomeScreen').then((module) => module.HomeScreen),
@@ -43,7 +125,7 @@ const LogsScreen = dynamic(
     import('@/screens/admin-home/LogsScreen').then(
       (module) => module.LogsScreen,
     ),
-  { loading: screenLoading },
+  { loading: listLoading },
 )
 const EquipmentInquiryScreen = dynamic(
   () =>
@@ -55,7 +137,7 @@ const EquipmentInquiryScreen = dynamic(
 const AdminEquipment = dynamic(
   () =>
     import('@/screens/AdminEquipment').then((module) => module.AdminEquipment),
-  { loading: screenLoading },
+  { loading: listLoading },
 )
 const EquipmentDetail = dynamic(
   () =>
@@ -67,20 +149,20 @@ const EquipmentDetail = dynamic(
 const AdminProjects = dynamic(
   () =>
     import('@/screens/AdminProjects').then((module) => module.AdminProjects),
-  { loading: screenLoading },
+  { loading: listLoading },
 )
 const AdminCompanies = dynamic(
   () =>
     import('@/screens/AdminCompanies').then((module) => module.AdminCompanies),
-  { loading: screenLoading },
+  { loading: listLoading },
 )
 const AdminLessors = dynamic(
   () => import('@/screens/AdminLessors').then((module) => module.AdminLessors),
-  { loading: screenLoading },
+  { loading: listLoading },
 )
 const AdminUsers = dynamic(
   () => import('@/screens/AdminUsers').then((module) => module.AdminUsers),
-  { loading: screenLoading },
+  { loading: listLoading },
 )
 const UserDetail = dynamic(
   () => import('@/screens/UserDetail').then((module) => module.UserDetail),
@@ -88,7 +170,7 @@ const UserDetail = dynamic(
 )
 const AdminDrivers = dynamic(
   () => import('@/screens/AdminDrivers').then((module) => module.AdminDrivers),
-  { loading: screenLoading },
+  { loading: listLoading },
 )
 const DriverDetail = dynamic(
   () => import('@/screens/DriverDetail').then((module) => module.DriverDetail),
@@ -97,7 +179,7 @@ const DriverDetail = dynamic(
 const MovementDetail = dynamic(
   () =>
     import('@/screens/MovementDetail').then((module) => module.MovementDetail),
-  { loading: screenLoading },
+  { loading: movementDetailLoading },
 )
 const MovementCreate = dynamic(
   () =>
@@ -119,7 +201,7 @@ const MovementActivity = dynamic(
     import('@/screens/MovementActivity').then(
       (module) => module.MovementActivity,
     ),
-  { loading: screenLoading },
+  { loading: listLoading },
 )
 const EntryReports = dynamic(
   () => import('@/screens/EntryReports').then((module) => module.EntryReports),
@@ -192,6 +274,25 @@ function AppContent() {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
   }, [pathname])
 
+  // Warm the screen's chunk as soon as a session is known, while the profile
+  // is still loading.
+  const signedIn = Boolean(session)
+  useEffect(() => {
+    if (!signedIn) return
+    preloadScreenForPath(pathname.split('/').filter(Boolean))
+  }, [signedIn, pathname])
+
+  const landingHint = landingHintForRole(profile?.role)
+  useEffect(() => {
+    if (!landingHint) return
+    try {
+      window.localStorage.setItem(LANDING_HINT_KEY, landingHint)
+    } catch {
+      // Storage can be unavailable (private mode); the hint is optional.
+    }
+  }, [landingHint])
+
+  // Full-screen loader for the auth bootstrap only.
   if (loading) return <FullPageSpinner />
   if (session && profileLoadError)
     return (

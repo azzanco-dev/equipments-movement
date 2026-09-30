@@ -128,7 +128,9 @@ export function EntryExitForm({
     (Equipment & EntryEquipmentStateFields)[]
   >([])
   const [selected, setSelected] = useState<Equipment | null>(null)
-  const [loadingEquipment, setLoadingEquipment] = useState(false)
+  // Starts true: the equipment search always runs when the form opens, and a
+  // false start would flash the "no equipment found" state before it.
+  const [loadingEquipment, setLoadingEquipment] = useState(true)
   const [equipmentError, setEquipmentError] = useState(false)
   const [lastMovement, setLastMovement] = useState<LastMovement | null>(null)
   const [loadingMovement, setLoadingMovement] = useState(false)

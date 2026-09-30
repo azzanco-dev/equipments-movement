@@ -1,4 +1,4 @@
-import { Badge, Select, Skeleton } from '@/components/ui'
+import { Badge, Select, Skeleton, cn } from '@/components/ui'
 import { Card, SectionHeader } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { ErrorState } from '@/components/ui/ErrorState'
@@ -8,7 +8,10 @@ import type { PendingClassificationEntry } from '@/lib/homeStats'
 
 export interface PendingClassificationCardProps {
   rows: PendingClassificationEntry[]
+  /** First load only: nothing to show yet, so the list is a skeleton. */
   loading: boolean
+  /** A refresh of rows already on screen: they stay, dimmed and `aria-busy`. */
+  refreshing?: boolean
   error: boolean
   onRetry: () => void
   /** Only `assistant_workshop_manager` / `workshop_manager` may classify. */
@@ -28,6 +31,7 @@ export interface PendingClassificationCardProps {
 export function PendingClassificationCard({
   rows,
   loading,
+  refreshing = false,
   error,
   onRetry,
   canClassify,
@@ -62,7 +66,13 @@ export function PendingClassificationCard({
       ) : rows.length === 0 ? (
         <EmptyState title={t('noPendingClassification')} />
       ) : (
-        <ul className="divide-y rounded-lg border">
+        <ul
+          aria-busy={refreshing || undefined}
+          className={cn(
+            'divide-y rounded-lg border transition-opacity',
+            refreshing && 'opacity-60',
+          )}
+        >
           {rows.map((row) => (
             <li
               key={row.id}

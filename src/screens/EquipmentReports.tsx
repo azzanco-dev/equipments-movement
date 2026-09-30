@@ -4,7 +4,8 @@ import { AlertTriangle, ArrowLeft, Clock3, MapPin, Search } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { PageHeader } from '@/components/PageHeader'
-import { InlineSpinner } from '@/components/Spinner'
+import { Skeleton } from '@/components/ui'
+import { ReportListSkeleton } from '@/components/ReportListSkeleton'
 import { Alert } from '@/components/Alert'
 import { OwnerContextFilter } from '@/components/OwnerContextFilter'
 import { formatDateTime } from '@/lib/dateFormat'
@@ -115,6 +116,10 @@ export function EquipmentReports() {
     ],
   ]
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize))
+  // Skeleton only while there is nothing to show yet; a refetch (search, page,
+  // owner filter) keeps the previous numbers and rows on screen, dimmed.
+  const firstLoad = loading && !data
+  const refreshing = loading && !!data
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-5">
@@ -127,8 +132,8 @@ export function EquipmentReports() {
           <div key={reason} className="card p-4">
             <p className="text-xs text-muted">{label}</p>
             <div className={`mt-2 text-2xl font-bold ${color}`}>
-              {loading ? (
-                <InlineSpinner />
+              {firstLoad ? (
+                <Skeleton className="h-8 w-16" />
               ) : data ? (
                 number(data.summary?.[reason])
               ) : (
@@ -173,14 +178,19 @@ export function EquipmentReports() {
           }
         />
       </div>
-      {loading ? (
-        <div className="flex justify-center p-10">
-          <InlineSpinner />
-        </div>
+      {firstLoad ? (
+        <ReportListSkeleton />
       ) : loadError ? (
         <Alert type="error">{t('dataLoadError')}</Alert>
       ) : data?.rows.length ? (
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div
+          aria-busy={refreshing || undefined}
+          className={
+            refreshing
+              ? 'grid gap-3 opacity-60 transition-opacity lg:grid-cols-2'
+              : 'grid gap-3 transition-opacity lg:grid-cols-2'
+          }
+        >
           {data.rows.map((row) => (
             <EquipmentAttentionCard
               key={row.equipment_id}
