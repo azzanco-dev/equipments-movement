@@ -26,6 +26,7 @@ import {
   type WorkshopHomeStats,
 } from '@/lib/homeStats'
 import type { MovementType } from '@/lib/types'
+import { greetingName, greetingParts } from '@/lib/greetingName'
 
 const EMPTY_FOREMAN: ForemanHomeStats = {
   entriesToday: 0,
@@ -66,6 +67,15 @@ export function HomeScreen({
     profile?.role === 'workshop_manager' ||
     profile?.role === 'assistant_workshop_manager'
   const workshopMode = profile?.role === 'workshop' || managerMode
+  const name = greetingName(profile?.full_name)
+  const parts = greetingParts(t('homeGreeting'), name !== '')
+  const greeting = parts ? (
+    <>
+      {parts.before}
+      <bdi>{name}</bdi>
+      {parts.after}
+    </>
+  ) : null
 
   const [foremanStats, setForemanStats] =
     useState<ForemanHomeStats>(EMPTY_FOREMAN)
@@ -188,7 +198,7 @@ export function HomeScreen({
   return (
     <div className="space-y-4">
       <PageHeader
-        title={t('dashboard')}
+        title={greeting ?? t('dashboard')}
         description={
           managerMode
             ? t('workshopManagerDashboardDesc')

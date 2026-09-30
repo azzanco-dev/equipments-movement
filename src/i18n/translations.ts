@@ -664,6 +664,9 @@ export const translations = {
     workshopExitEquipmentOnSite:
       'لا يمكن تسجيل الخروج: المعدة داخل موقع حاليا، وخروجها يسجله من سجل دخولها او المدير.',
     // wave-8-security — end
+    // wave-9-greeting — start
+    homeGreeting: 'اهلاً، {name}',
+    // wave-9-greeting — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -1926,6 +1929,9 @@ export const translations = {
     workshopExitEquipmentOnSite:
       'This exit cannot be registered: the equipment is currently inside a site, and its exit is registered by the user who registered its entry or by an admin.',
     // wave-8-security — end
+    // wave-9-greeting — start
+    homeGreeting: 'Welcome, {name}',
+    // wave-9-greeting — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',

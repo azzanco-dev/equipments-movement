@@ -8,6 +8,8 @@ import { FleetDonutSection } from '@/components/admin-home/FleetDonutSection'
 import { FleetStateSection } from '@/components/admin-home/FleetStateSection'
 import { ForemanActivitySection } from '@/components/admin-home/ForemanActivitySection'
 import { useI18n } from '@/i18n/I18nContext'
+import { useAuth } from '@/auth/AuthContext'
+import { greetingName, greetingParts } from '@/lib/greetingName'
 import {
   normalizeGranularity,
   type AdminHomeGranularity,
@@ -45,6 +47,16 @@ export function AdminHomeScreen({
   onCreateMovement,
 }: AdminHomeScreenProps) {
   const { t } = useI18n()
+  const { profile } = useAuth()
+  const name = greetingName(profile?.full_name)
+  const parts = greetingParts(t('homeGreeting'), name !== '')
+  const greeting = parts ? (
+    <>
+      {parts.before}
+      <bdi>{name}</bdi>
+      {parts.after}
+    </>
+  ) : null
   const pathname = usePathname()
   const params = useSearchParams()
   const granularity = normalizeGranularity(params.get('flow'))
@@ -70,7 +82,7 @@ export function AdminHomeScreen({
   return (
     <div className="space-y-4">
       <PageHeader
-        title={t('adminHomeTitle')}
+        title={greeting ?? t('adminHomeTitle')}
         description={t('adminHomeDescription')}
         actions={
           onCreateMovement ? (
