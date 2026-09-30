@@ -3,10 +3,26 @@
 // the two names collide on a case-insensitive filesystem. The exported
 // symbols below are still the intended public API: Popover, PopoverTrigger,
 // PopoverContent, etc.
-import { forwardRef, type ComponentPropsWithoutRef } from 'react'
+import {
+  createContext,
+  forwardRef,
+  useContext,
+  type ComponentPropsWithoutRef,
+} from 'react'
 import { Popover as RadixPopover } from 'radix-ui'
 import { cn } from './cn'
 import { floatingPanel } from './popover'
+
+/**
+ * Where popovers opened inside a modal are portaled.
+ *
+ * A Radix Dialog locks scrolling for everything outside its content. A
+ * popover portaled to `<body>` sits outside it, so its list received no wheel
+ * or touch scrolling. `Dialog` provides its content element here and the
+ * popover portals into it instead; outside a dialog the value is `null` and
+ * the popover keeps portaling to `<body>`.
+ */
+export const PopoverContainerContext = createContext<HTMLElement | null>(null)
 
 /** Popover root; control with `open`/`onOpenChange` or leave uncontrolled. */
 export const Popover = RadixPopover.Root
@@ -32,8 +48,9 @@ export const PopoverContent = forwardRef<
   },
   ref,
 ) {
+  const container = useContext(PopoverContainerContext)
   return (
-    <RadixPopover.Portal>
+    <RadixPopover.Portal container={container ?? undefined}>
       <RadixPopover.Content
         ref={ref}
         sideOffset={sideOffset}

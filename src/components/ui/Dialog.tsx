@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { Button, IconButton } from './Button'
 import { cn } from './cn'
+import { PopoverContainerContext } from './FloatingPopover'
 
 const overlay =
   'fixed inset-0 z-50 bg-[var(--overlay)] backdrop-blur-sm data-[state=open]:animate-fade-in-opacity'
@@ -47,6 +48,9 @@ export function Dialog({
   dismissible = true,
 }: DialogProps) {
   const { t } = useI18n()
+  // Popovers opened from inside the dialog portal into its content, so the
+  // dialog's scroll lock does not swallow their wheel and touch scrolling.
+  const [content, setContent] = useState<HTMLDivElement | null>(null)
   const handleOpenChange = (next: boolean) => {
     // Belt-and-braces: even if some other interaction still asks to close a
     // non-dismissible dialog, ignore it — the parent owns `open` instead.
@@ -58,6 +62,7 @@ export function Dialog({
       <RadixDialog.Portal>
         <RadixDialog.Overlay className={overlay} />
         <RadixDialog.Content
+          ref={setContent}
           className={cn(panel, widths[size])}
           // Without a description Radix warns unless this is explicitly unset.
           {...(description ? {} : { 'aria-describedby': undefined })}
@@ -95,7 +100,9 @@ export function Dialog({
           </div>
           {children && (
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-              {children}
+              <PopoverContainerContext.Provider value={content}>
+                {children}
+              </PopoverContainerContext.Provider>
             </div>
           )}
           {footer && (
