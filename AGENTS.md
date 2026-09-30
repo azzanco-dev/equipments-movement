@@ -7,6 +7,7 @@
 - Current scope is the operational foundation (phase 1): equipment, drivers, companies, projects, lessors/owners, users, site and workshop entry/exit movements, movement photos, and the entry, equipment, and workshop reports.
 - Workshop ENTRY is classified by purpose: `maintenance` or `parking` (standby).
 - Planned later phases: phase 2 links equipment to contractor POs and monthly timesheets; phase 3 links external-supplier equipment to purchasing (POs and rental accruals). Do not introduce contracts/POs, timesheets, sales, purchasing, accounting, notifications, charts, or other future modules unless explicitly requested.
+- Explicitly requested so far, and limited to exactly this: charts on the admin home only (Recharts, loaded lazily through `src/components/charts/lazy.tsx`; light token shades with dark readable text, never saturated fills), and WhatsApp movement notices between the workshop and site foremen through UltraMsg (migration 0110). Notices are sent server-side only, from fixed templates, to a recipient resolved in the database; a failed send never delays or fails a movement; the gateway credentials are server environment variables.
 - Preserve existing behavior and make incremental changes. Do not rebuild working features merely to match a preferred architecture.
 - The improvement plan and task status are tracked in Notion (page "Equipment Movement", database "مهام المشروع"). When a tracked task is completed, update its status there.
 
@@ -38,7 +39,8 @@
 
 ## Movement invariants
 
-- Valid sequence per equipment and movement context (`site` or `workshop`) is strictly `ENTRY → EXIT → ENTRY → EXIT`.
+- Valid sequence per equipment is strictly `ENTRY → EXIT → ENTRY → EXIT`. Since migration 0043 it is ONE chain per equipment across both movement contexts (`site` and `workshop`): a unit inside a site cannot enter the workshop until its site exit exists. An EXIT closes an ENTRY of its own context; only an admin may record an exit whose context differs from the open entry's (migration 0108).
+- Every function that reads or changes the chain serialises on the sequence trigger's advisory key, `hashtextextended(equipment_id::text, 0)`, taking the row lock first when it locks a movement row.
 - Reject `ENTRY → ENTRY`, `EXIT → EXIT`, and `EXIT` without a preceding valid `ENTRY`.
 - Ordering is deterministic by `(recorded_at, id)`, including historical insertion and identical timestamps.
 - Preserve per-equipment concurrency protection; do not replace database locking with frontend state.
