@@ -18,6 +18,7 @@ import {
   Skeleton,
   type InfoGridItem,
 } from '@/components/ui'
+import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
 import {
   EquipmentSuggestSearch,
   type EquipmentSuggestion,
@@ -103,6 +104,44 @@ function inquiryBriefItems(
   ]
 }
 
+/** Placeholder shaped like `EquipmentTimeline`: the two summary cards, the
+ *  filter tabs and a few visit cards on the timeline rule. */
+function TimelineSkeleton() {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-2">
+        <Skeleton className="h-[86px] w-full" />
+        <Skeleton className="h-[86px] w-full" />
+      </div>
+      <Skeleton className="h-9 w-56 max-w-full" />
+      <div className="space-y-3">
+        {[0, 1, 2].map((index) => (
+          <div key={index} className="border-s ps-5">
+            <Skeleton className="h-40 w-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** The ONE placeholder of the selected equipment: brief row plus timeline,
+ *  shown until both the equipment and its movements have answered. */
+function InquiryResultSkeleton({ label }: { label: string }) {
+  return (
+    <div className="space-y-4" aria-busy="true">
+      <span className="sr-only" role="status">
+        {label}
+      </span>
+      {/* Same box as the brief, without the surface fill the bars use. */}
+      <div className="rounded-lg border px-3 py-2.5">
+        <InfoGridSkeleton count={3} />
+      </div>
+      <TimelineSkeleton />
+    </div>
+  )
+}
+
 export function EquipmentInquiryScreen({
   onSelectMovement,
 }: {
@@ -128,6 +167,8 @@ export function EquipmentInquiryScreen({
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState(false)
   const [detailMissing, setDetailMissing] = useState(false)
+  // The equipment id the detail answer (row, error or "missing") belongs to.
+  const [detailLoadedId, setDetailLoadedId] = useState<string | null>(null)
 
   const [movements, setMovements] = useState<MovementLogTimelineRow[]>([])
   const [movementsOffset, setMovementsOffset] = useState(0)
@@ -135,6 +176,10 @@ export function EquipmentInquiryScreen({
   const [movementsLoading, setMovementsLoading] = useState(false)
   const [movementsLoadingMore, setMovementsLoadingMore] = useState(false)
   const [movementsError, setMovementsError] = useState(false)
+  // The equipment id the first movements page (or its error) belongs to.
+  const [movementsLoadedId, setMovementsLoadedId] = useState<string | null>(
+    null,
+  )
 
   const selectMovement = useCallback(
     (id: string) => {
@@ -216,6 +261,7 @@ export function EquipmentInquiryScreen({
         .abortSignal(signal)
         .maybeSingle()
       if (signal.aborted) return
+      setDetailLoadedId(id)
       if (equipmentResult.error) {
         setDetailError(true)
         setEquipment(null)
@@ -255,6 +301,7 @@ export function EquipmentInquiryScreen({
         .range(offset, offset + MOVEMENTS_PAGE_SIZE - 1)
         .abortSignal(signal)
       if (signal.aborted) return
+      if (!append) setMovementsLoadedId(id)
       if (error) {
         setMovementsError(true)
         if (!append) setMovements([])
@@ -278,6 +325,9 @@ export function EquipmentInquiryScreen({
       setHasMoreMovements(false)
       setDetailError(false)
       setDetailMissing(false)
+      // Picking the same equipment again must start pending, not blank.
+      setDetailLoadedId(null)
+      setMovementsLoadedId(null)
       return
     }
     void fetchDetail(equipmentId)
@@ -316,6 +366,19 @@ export function EquipmentInquiryScreen({
     },
     [setEquipmentParam],
   )
+
+  // Derived, not raised by an effect: the very first render for a new
+  // `equipmentId` is already pending, so there is no blank frame and no
+  // second placeholder. Both reads must have answered for THIS id; a failed
+  // or missing equipment is reported without waiting for the movements.
+  const detailPending =
+    Boolean(equipmentId) && (detailLoading || detailLoadedId !== equipmentId)
+  const resultPending =
+    detailPending ||
+    (Boolean(equipmentId) &&
+      !detailError &&
+      !detailMissing &&
+      movementsLoadedId !== equipmentId)
 
   const timelineMovements = useMemo<TimelineMovement[]>(
     () =>
@@ -379,16 +442,8 @@ export function EquipmentInquiryScreen({
             title={t('inquiryEmptyTitle')}
             description={t('inquiryEmptyDescription')}
           />
-        ) : detailLoading ? (
-          <div
-            className="space-y-2 py-2"
-            aria-busy="true"
-            aria-label={t('loading')}
-          >
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
+        ) : resultPending ? (
+          <InquiryResultSkeleton label={t('loading')} />
         ) : detailError ? (
           <ErrorState onRetry={retryDetail} />
         ) : detailMissing ? (
@@ -413,14 +468,13 @@ export function EquipmentInquiryScreen({
             {movementsError ? (
               <ErrorState onRetry={retryMovements} />
             ) : movementsLoading ? (
-              <div
-                className="space-y-2 py-2"
-                aria-busy="true"
-                aria-label={t('loading')}
-              >
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-full" />
-                <Skeleton className="h-16 w-4/5" />
+              // Only a retry after a failed movements read gets here; the
+              // first load is covered by the single placeholder above.
+              <div aria-busy="true">
+                <span className="sr-only" role="status">
+                  {t('loading')}
+                </span>
+                <TimelineSkeleton />
               </div>
             ) : (
               <div className="space-y-3">

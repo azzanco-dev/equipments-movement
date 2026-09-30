@@ -18,36 +18,47 @@ import { useListRequest } from '@/components/data-list/useListRequest'
  * fetch logic exists exactly once. `driverId` of `null` skips both fetches,
  * which lets a caller mount the hook unconditionally (before a dialog has a
  * driver to show, for example) without firing a request.
+ *
+ * "Pending" is derived from "the requested id is not the loaded id", never
+ * from a flag that an effect raises after the first render: the very first
+ * render for a new `driverId` already reports `loading`, so a caller can
+ * never paint its error or empty state before the first fetch has answered.
  */
 export function useDriverDetail(driverId: string | null) {
   const { t } = useI18n()
   const [driver, setDriver] = useState<Driver | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // The id the `driver`/`failed` pair below belongs to.
+  const [driverLoadedId, setDriverLoadedId] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
   const [equipment, setEquipment] = useState<DriverEquipmentItem[]>([])
-  const [equipmentLoading, setEquipmentLoading] = useState(true)
+  // The id the `equipment`/`equipmentError` pair below belongs to.
+  const [equipmentLoadedId, setEquipmentLoadedId] = useState<string | null>(
+    null,
+  )
+  const [equipmentBusy, setEquipmentBusy] = useState(false)
   const [equipmentError, setEquipmentError] = useState(false)
+  const startDriverRequest = useListRequest()
   const startEquipmentRequest = useListRequest()
 
   const fetchDriver = useCallback(async () => {
-    if (!driverId) {
-      setDriver(null)
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    setError(null)
+    // Also aborts the request of the previous driver, so a slow answer for
+    // it can never overwrite the one on screen.
+    const signal = startDriverRequest()
+    if (!driverId) return
     const { data, error: fetchError } = await supabase
       .from('drivers')
       .select(
         'id,full_name,name_en,id_number,mobile_number,nationality,employment_type,job_title,created_at,updated_at',
       )
       .eq('id', driverId)
+      .abortSignal(signal)
       .maybeSingle()
-    if (fetchError || !data) setError(t('driverNotFound'))
-    else setDriver(data as Driver)
-    setLoading(false)
-  }, [driverId, t])
+    if (signal.aborted) return
+    const found = !fetchError && Boolean(data)
+    setDriver(found ? (data as Driver) : null)
+    setFailed(!found)
+    setDriverLoadedId(driverId)
+  }, [driverId, startDriverRequest])
 
   /**
    * Equipment derived from movements by `driver_equipment_summary`
@@ -56,14 +67,13 @@ export function useDriverDetail(driverId: string | null) {
    * here.
    */
   const fetchEquipment = useCallback(async () => {
+    const signal = startEquipmentRequest()
     if (!driverId) {
-      setEquipment([])
-      setEquipmentLoading(false)
+      setEquipmentBusy(false)
       return
     }
-    setEquipmentLoading(true)
+    setEquipmentBusy(true)
     setEquipmentError(false)
-    const signal = startEquipmentRequest()
     const { data, error: fetchError } = await supabase
       .from(DRIVER_EQUIPMENT_SUMMARY_VIEW)
       .select(DRIVER_EQUIPMENT_SELECT)
@@ -75,14 +85,16 @@ export function useDriverDetail(driverId: string | null) {
       .abortSignal(signal)
     if (signal.aborted) return
     // A failed load must never render as "no related equipment".
-    if (fetchError) setEquipmentError(true)
-    else
-      setEquipment(
-        mapDriverEquipmentRows(
-          data as unknown as DriverEquipmentSummaryRow[] | null,
-        ),
-      )
-    setEquipmentLoading(false)
+    setEquipmentError(Boolean(fetchError))
+    setEquipment(
+      fetchError
+        ? []
+        : mapDriverEquipmentRows(
+            data as unknown as DriverEquipmentSummaryRow[] | null,
+          ),
+    )
+    setEquipmentLoadedId(driverId)
+    setEquipmentBusy(false)
   }, [driverId, startEquipmentRequest])
 
   useEffect(() => {
@@ -93,13 +105,21 @@ export function useDriverDetail(driverId: string | null) {
     fetchEquipment()
   }, [fetchEquipment])
 
+  // While the dialog is closed (`driverId` null) the last record stays as it
+  // was; a new id is pending until its own answer arrived.
+  const loading = driverId !== null && driverLoadedId !== driverId
+  const equipmentPending = driverId !== null && equipmentLoadedId !== driverId
+
   return {
-    driver,
+    driver: loading ? null : driver,
     loading,
-    error,
-    equipment,
-    equipmentLoading,
-    equipmentError,
+    error: !loading && failed ? t('driverNotFound') : null,
+    equipment: equipmentPending ? [] : equipment,
+    /** First load of the equipment for this driver (no data to show yet). */
+    equipmentPending,
+    /** First load or a retry in flight. */
+    equipmentLoading: equipmentPending || equipmentBusy,
+    equipmentError: !equipmentPending && equipmentError,
     refetchEquipment: fetchEquipment,
   }
 }

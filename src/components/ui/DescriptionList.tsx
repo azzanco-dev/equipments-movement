@@ -1,12 +1,15 @@
 import type { ReactNode } from 'react'
 import { cn } from './cn'
+import { LtrValue } from './InfoGrid'
 
 export interface DescriptionListItem {
   key?: string
   icon?: ReactNode
   label: ReactNode
   value: ReactNode
-  /** Forces left-to-right for phone numbers, codes, plate numbers, etc. */
+  /** Forces left-to-right for phone numbers, codes, plate numbers, etc. The
+   *  value is isolated in an inline LTR run (`LtrValue`) and stays under its
+   *  label at the start edge; `dir` is never set on the block itself. */
   dir?: 'ltr'
 }
 
@@ -27,7 +30,7 @@ export function DescriptionList({
   return (
     <dl
       className={cn(
-        'grid gap-x-6',
+        'grid grid-cols-1 gap-x-6',
         columns === 2 && 'sm:grid-cols-2',
         className,
       )}
@@ -45,13 +48,18 @@ export function DescriptionList({
             <div className="min-w-0 flex-1">
               <dt className="text-xs text-muted">{item.label}</dt>
               <dd
-                dir={item.dir}
                 className={cn(
-                  'm-0 break-words leading-relaxed',
+                  'm-0 break-words text-start leading-relaxed',
                   isEmpty ? 'text-muted' : 'font-medium',
                 )}
               >
-                {isEmpty ? '—' : item.value}
+                {isEmpty ? (
+                  '—'
+                ) : item.dir === 'ltr' ? (
+                  <LtrValue>{item.value}</LtrValue>
+                ) : (
+                  item.value
+                )}
               </dd>
             </div>
           </div>

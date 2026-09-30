@@ -19,6 +19,7 @@ import {
   type DataTableColumn,
   type InfoGridItem,
 } from '@/components/ui'
+import { InfoGridSkeleton, LtrValue } from '@/components/ui/InfoGrid'
 
 export interface DriverDetailDialogProps {
   /** The driver to show, or `null` while the dialog is closed. The hook
@@ -58,10 +59,16 @@ export function DriverDetailDialog({
     loading,
     error,
     equipment,
+    equipmentPending,
     equipmentLoading,
     equipmentError,
     refetchEquipment,
   } = useDriverDetail(driverId)
+  // One placeholder for the whole body until the driver AND the first answer
+  // of the equipment section are in, so the centred dialog is sized once
+  // instead of growing when each part arrives. A failed driver load shows its
+  // error without waiting for the equipment.
+  const bodyPending = loading || (Boolean(driver) && equipmentPending)
 
   const equipmentColumns: DataTableColumn<DriverEquipmentItem>[] = [
     {
@@ -69,7 +76,15 @@ export function DriverDetailDialog({
       header: t('equipmentNameLabel'),
       cell: (item) => (
         <span className="flex flex-col">
-          <span className="font-medium text-fg">{item.code ?? '—'}</span>
+          {item.code ? (
+            // `self-start`: the column flex would otherwise stretch the LTR
+            // run to the full width and push the code to the left edge.
+            <LtrValue className="self-start font-medium text-fg">
+              {item.code}
+            </LtrValue>
+          ) : (
+            <span className="text-muted">—</span>
+          )}
           {item.type && (
             <span className="text-[11px] text-muted">{item.type}</span>
           )}
@@ -154,15 +169,41 @@ export function DriverDetailDialog({
       title={t('driverDetailsDialogTitle')}
       size="lg"
     >
-      {loading ? (
-        <div
-          className="space-y-2 py-2"
-          aria-busy="true"
-          aria-label={t('loading')}
-        >
-          <Skeleton className="h-8 w-2/3" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-4/5" />
+      {bodyPending ? (
+        // Mirrors the body below: header, the 2x2 info grid, the section
+        // heading and the table block.
+        <div className="space-y-5" aria-busy="true">
+          <span className="sr-only" role="status">
+            {t('loading')}
+          </span>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Skeleton className="h-7 w-48 max-w-full" />
+              <Skeleton className="h-[26px] w-24 rounded-full" />
+            </div>
+            <div className="mt-0.5 flex h-[21px] items-center">
+              <Skeleton variant="text" className="w-28" />
+            </div>
+          </div>
+          <InfoGridSkeleton count={4} columns={2} withIcon />
+          <div className="space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex h-5 items-center">
+                  <Skeleton variant="text" className="w-28" />
+                </div>
+                <div className="mt-0.5 flex h-4 items-center">
+                  <Skeleton variant="text" className="w-56 max-w-full" />
+                </div>
+              </div>
+              <Skeleton className="h-7 w-20 shrink-0" />
+            </div>
+            <div className="space-y-2">
+              {[0, 1, 2, 3, 4].map((index) => (
+                <Skeleton key={index} className="h-9 w-full" />
+              ))}
+            </div>
+          </div>
         </div>
       ) : error || !driver ? (
         <ErrorState title={error ?? undefined} />

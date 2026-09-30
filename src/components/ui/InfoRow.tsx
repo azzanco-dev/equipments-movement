@@ -1,11 +1,14 @@
 import type { ReactNode } from 'react'
 import { cn } from './cn'
+import { LtrValue } from './InfoGrid'
 
 export interface InfoRowProps {
   icon?: ReactNode
   label: ReactNode
   value: ReactNode
-  /** Forces left-to-right for phone numbers, codes, plate numbers, etc. */
+  /** Forces left-to-right for phone numbers, codes, plate numbers, etc. The
+   *  value is isolated in an inline LTR run (`LtrValue`) and stays under its
+   *  label at the start edge; `dir` is never set on the block itself. */
   dir?: 'ltr'
   className?: string
 }
@@ -24,13 +27,12 @@ export function InfoRow({ icon, label, value, dir, className }: InfoRowProps) {
       <div className="min-w-0 flex-1">
         <p className="text-xs text-muted">{label}</p>
         <p
-          dir={dir}
           className={cn(
-            'break-words leading-relaxed',
+            'break-words text-start leading-relaxed',
             isEmpty ? 'text-muted' : 'font-medium',
           )}
         >
-          {isEmpty ? '—' : value}
+          {isEmpty ? '—' : dir === 'ltr' ? <LtrValue>{value}</LtrValue> : value}
         </p>
       </div>
     </div>

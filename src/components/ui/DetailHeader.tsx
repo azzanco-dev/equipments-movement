@@ -64,7 +64,7 @@ export function DetailHeader({
             )}
           </Heading>
           {badges && (
-            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
               {badges}
             </div>
           )}

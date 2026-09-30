@@ -69,6 +69,7 @@ import {
   type DescriptionListItem,
   type LightboxItem,
 } from '@/components/ui'
+import { LtrValue } from '@/components/ui/InfoGrid'
 // wave6-J3/J4 — admin-only header menu: the single correction dialog, or
 // delete the movement. Both are authoritative in PostgreSQL (0104/0105).
 import { MovementAdminMenu } from '@/components/movement/MovementAdminMenu'
@@ -84,6 +85,9 @@ import {
 // only re-requested once they are older than ~50 min, so switching photos or
 // re-loading the movement never waits on a fresh signed URL unnecessarily.
 const SIGNED_URL_REFRESH_AFTER_MS = 50 * 60 * 1000
+
+// One title style for every card on the page.
+const SECTION_TITLE_CLASS = 'mb-2 text-sm font-bold text-muted'
 
 interface MovementDetailProps {
   movementId: string
@@ -625,9 +629,32 @@ export function MovementDetail({
       </div>
     )
 
-  // Skeleton only for the first load (no movement yet); a refetch after an
-  // edit keeps the current page on screen.
-  if (loading && !log && !error) return <MovementDetailSkeleton />
+  // Skeleton for the whole first load: `loading` is only raised for a first
+  // load or a switch to another movement (never for a refetch after an edit),
+  // and it stays up until the photos, the linked movement and the driver
+  // changes have all resolved. Revealing the page as soon as the movement row
+  // arrived made the photo box, the linked card and the driver card pop in
+  // one after the other.
+  if (loading && !error) {
+    const role = profile?.role
+    // The context is only known once the movement row arrived; until then the
+    // role gives the likeliest shape (workshop roles work on workshop
+    // movements, everyone else mostly on site movements).
+    const skeletonContext =
+      log?.movement_context ??
+      (role === 'workshop' ||
+      role === 'assistant_workshop_manager' ||
+      role === 'workshop_manager'
+        ? 'workshop'
+        : 'site')
+    return (
+      <MovementDetailSkeleton
+        context={skeletonContext === 'workshop' ? 'workshop' : 'site'}
+        isAdmin={role === 'admin'}
+        canUpload={role !== 'monitor'}
+      />
+    )
+  }
 
   if (error) {
     return (
@@ -688,14 +715,22 @@ export function MovementDetail({
     }
   }
 
+  const currentDriverName =
+    (isEntry ? driverChanges.at(-1)?.new_driver_name : undefined) ??
+    log.driver?.full_name ??
+    log.driver_name ??
+    null
+
   const detailItems: DescriptionListItem[] = [
     {
       key: 'equipment',
       icon: <Truck size={16} />,
       label: t('equipmentNameLabel'),
-      value: log.equipment
-        ? `${log.equipment.code} — ${log.equipment.type}`
-        : null,
+      value: log.equipment ? (
+        <>
+          <LtrValue>{log.equipment.code}</LtrValue> — {log.equipment.type}
+        </>
+      ) : null,
     },
     ...(isWorkshopMovement && isEntry
       ? [
@@ -721,15 +756,11 @@ export function MovementDetail({
             label: t('contractorEquipmentCode'),
             value: canEditContractorCode ? (
               <span className="flex items-center gap-1">
-                <span
-                  className={
-                    log.contractor_equipment_code
-                      ? ''
-                      : 'text-muted font-normal'
-                  }
-                >
-                  {log.contractor_equipment_code ?? '—'}
-                </span>
+                {log.contractor_equipment_code ? (
+                  <LtrValue>{log.contractor_equipment_code}</LtrValue>
+                ) : (
+                  <span className="font-normal text-muted">—</span>
+                )}
                 <IconButton
                   size="sm"
                   label={t('editContractorCode')}
@@ -737,9 +768,9 @@ export function MovementDetail({
                   onClick={openContractorCodeEdit}
                 />
               </span>
-            ) : (
-              log.contractor_equipment_code
-            ),
+            ) : log.contractor_equipment_code ? (
+              <LtrValue>{log.contractor_equipment_code}</LtrValue>
+            ) : null,
           },
           ...(log.equipment?.ownership_status === 'external_supplier' &&
           log.equipment?.lessor?.name
@@ -774,20 +805,19 @@ export function MovementDetail({
             label: t('driverName'),
             value: (
               <>
-                {(isEntry
-                  ? driverChanges.at(-1)?.new_driver_name
-                  : undefined) ??
-                  log.driver?.full_name ??
-                  log.driver_name ??
-                  '—'}
+                {currentDriverName ?? (
+                  // A driverless entry reads like every other empty value.
+                  <span className="font-normal text-muted">—</span>
+                )}
                 {currentDriverMobileNumber && (
-                  <span
-                    className="mt-0.5 block select-text text-muted"
-                    dir="ltr"
-                  >
-                    <a href={`tel:${currentDriverMobileNumber}`}>
-                      {currentDriverMobileNumber}
-                    </a>
+                  // The number is an inline LTR run under the name at the
+                  // start edge; `dir` never goes on the block itself.
+                  <span className="mt-0.5 block select-text text-muted">
+                    <LtrValue>
+                      <a href={`tel:${currentDriverMobileNumber}`}>
+                        {currentDriverMobileNumber}
+                      </a>
+                    </LtrValue>
                   </span>
                 )}
               </>
@@ -879,15 +909,14 @@ export function MovementDetail({
 
       {/* Main details card */}
       <div className="card">
-        <h3 className="mb-2 text-sm font-bold text-muted">
-          {t('movementDetails')}
-        </h3>
+        <h3 className={SECTION_TITLE_CLASS}>{t('movementDetails')}</h3>
         <DescriptionList items={detailItems} columns={2} />
 
-        {/* Notes */}
+        {/* Notes. `InfoRow` carries its own 8px block padding, so 8px here
+            gives the same 16px under the divider as the photos section. */}
         {log.notes && (
           <div
-            className="mt-4 border-t pt-4"
+            className="mt-4 border-t pt-2"
             style={{ borderColor: 'var(--border)' }}
           >
             <InfoRow
@@ -903,8 +932,8 @@ export function MovementDetail({
           className="mt-4 pt-4 border-t"
           style={{ borderColor: 'var(--border)' }}
         >
-          <div className="flex items-center gap-2 mb-2">
-            <Camera size={16} className="text-muted" />
+          <div className="mb-2 flex items-center gap-3">
+            <Camera size={16} className="shrink-0 text-muted" />
             <p className="text-xs text-muted">{t('photo')}</p>
           </div>
           {photoActionError && (
@@ -1036,9 +1065,7 @@ export function MovementDetail({
 
       {/* Equipment data */}
       <div className="card">
-        <h3 className="mb-2 text-sm font-bold text-muted">
-          {t('sectionEquipmentDetails')}
-        </h3>
+        <h3 className={SECTION_TITLE_CLASS}>{t('sectionEquipmentDetails')}</h3>
         <DescriptionList
           items={[
             {
@@ -1046,6 +1073,7 @@ export function MovementDetail({
               icon: <Truck size={16} />,
               label: t('equipmentDetailsCode'),
               value: log.equipment?.code,
+              dir: 'ltr',
             },
             {
               key: 'equipmentDetailsType',
@@ -1067,14 +1095,20 @@ export function MovementDetail({
 
       {driverEntryId && log.movement_context !== 'workshop' && (
         <div className="card space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h3 className="font-bold">{t('driverChangeHistory')}</h3>
-              <p className="text-xs text-muted">
-                {t('currentDriver')}:{' '}
+          {/* The text block may shrink (`min-w-0`) but starts from a 12rem
+              basis, so on a narrow phone the button wraps under it instead
+              of squeezing the driver name. */}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-[1_1_12rem]">
+              <h3 className={SECTION_TITLE_CLASS}>
+                {t('driverChangeHistory')}
+              </h3>
+              <p className="text-xs text-muted">{t('currentDriver')}</p>
+              <p className="break-words font-medium leading-relaxed">
                 {driverChanges.at(-1)?.new_driver_name ??
-                  (isEntry ? log.driver_name : linkedLog?.driver_name) ??
-                  '—'}
+                  (isEntry ? log.driver_name : linkedLog?.driver_name) ?? (
+                    <span className="font-normal text-muted">—</span>
+                  )}
               </p>
             </div>
             {isEntry &&
@@ -1154,19 +1188,28 @@ export function MovementDetail({
                   className="rounded-lg border px-3 py-2 text-sm"
                   style={{ borderColor: 'var(--border)' }}
                 >
-                  <div className="grid gap-1 sm:grid-cols-2">
-                    <p>
-                      <span className="text-muted">{t('previousDriver')}:</span>{' '}
-                      <span className="font-medium" dir="auto">
-                        {change.previous_driver_name}
-                      </span>
-                    </p>
-                    <p>
-                      <span className="text-muted">{t('newDriver')}:</span>{' '}
-                      <span className="font-medium" dir="auto">
-                        {change.new_driver_name}
-                      </span>
-                    </p>
+                  {/* Label above value, like every other field on the page.
+                      `<bdi>` isolates a Latin name inline, so the value
+                      keeps the start edge. */}
+                  <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted">
+                        {t('previousDriver')}
+                      </p>
+                      <p className="break-words font-medium">
+                        {change.previous_driver_name ? (
+                          <bdi>{change.previous_driver_name}</bdi>
+                        ) : (
+                          <span className="font-normal text-muted">—</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs text-muted">{t('newDriver')}</p>
+                      <p className="break-words font-medium">
+                        <bdi>{change.new_driver_name}</bdi>
+                      </p>
+                    </div>
                   </div>
                   <p className="mt-1 text-xs text-muted">
                     {formatDateTime(change.changed_at)}
@@ -1185,7 +1228,7 @@ export function MovementDetail({
       {/* Linked movement section */}
       {isEntry ? (
         <div className="card">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-muted">
+          <h3 className={`${SECTION_TITLE_CLASS} flex items-center gap-2`}>
             <Link2 size={16} /> {t('linkedExit')}
           </h3>
           {linkedError ? (
@@ -1207,6 +1250,7 @@ export function MovementDetail({
                     value: formatElapsedDuration(durationMs, t, lang),
                   },
                 ]}
+                columns={2}
               />
               <Button
                 variant="outline"
@@ -1223,7 +1267,7 @@ export function MovementDetail({
         </div>
       ) : (
         <div className="card">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-muted">
+          <h3 className={`${SECTION_TITLE_CLASS} flex items-center gap-2`}>
             <Link2 size={16} /> {t('linkedEntry')}
           </h3>
           {linkedError ? (
@@ -1269,6 +1313,7 @@ export function MovementDetail({
                           icon: <FileText size={16} />,
                           label: t('contractorEquipmentCode'),
                           value: linkedLog.contractor_equipment_code,
+                          dir: 'ltr' as const,
                         },
                       ]
                     : []),
@@ -1279,6 +1324,7 @@ export function MovementDetail({
                     value: formatElapsedDuration(durationMs, t, lang),
                   },
                 ]}
+                columns={2}
               />
               <Button
                 variant="outline"

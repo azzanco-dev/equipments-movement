@@ -6,6 +6,9 @@ import {
   LogIn,
   LogOut,
   MapPin,
+  Timer,
+  User,
+  UserCheck,
   Wrench,
 } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
@@ -265,7 +268,8 @@ function VisitSegment({
   const driverName = exit?.driver_name || entry?.driver_name || null
 
   // Only the lines this visit actually has; an absent exit, duration,
-  // foreman or driver is left out rather than shown as "—".
+  // foreman or driver is left out rather than shown as "—". Every line has
+  // an icon of the same size, so the labels share one start edge.
   const lines: InfoGridItem[] = []
   if (entry)
     lines.push({
@@ -298,17 +302,24 @@ function VisitSegment({
   if (duration !== null)
     lines.push({
       key: 'duration',
+      icon: <Timer size={13} aria-hidden="true" />,
       label: visit.open ? t('durationOnSite') : t('visitDuration'),
       value: formatElapsedDuration(duration, t, lang),
     })
   if (entry?.supervisor_name)
     lines.push({
       key: 'supervisor',
+      icon: <UserCheck size={13} aria-hidden="true" />,
       label: t('supervisor'),
       value: entry.supervisor_name,
     })
   if (driverName)
-    lines.push({ key: 'driver', label: t('driverName'), value: driverName })
+    lines.push({
+      key: 'driver',
+      icon: <User size={13} aria-hidden="true" />,
+      label: t('driverName'),
+      value: driverName,
+    })
 
   return (
     // The dot sits on the shared vertical rule drawn by the start border.

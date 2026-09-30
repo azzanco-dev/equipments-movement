@@ -15,6 +15,7 @@ import {
   Badge,
   Button,
   DetailHeader,
+  ErrorState,
   Field,
   Input,
   InfoGridSection,
@@ -24,11 +25,16 @@ import {
   useConfirm,
   type InfoGridItem,
 } from '@/components/ui'
+import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
 
 interface UserDetailProps {
   userId: string
   onBack: () => void
 }
+
+/** A company option that keeps both names, so its label follows the active
+ *  language at render time instead of needing a reload of the user. */
+type CompanyOption = SelectOption & { name_ar: string; name_en: string }
 
 function formSnapshot(
   fullName: string,
@@ -52,11 +58,19 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The cause of a failed load, turned into a message at render so it follows
+  // the active language without the load depending on it.
+  const [loadFailure, setLoadFailure] = useState<{ cause: unknown } | null>(
+    null,
+  )
+  const [reloadKey, setReloadKey] = useState(0)
+  // The `userId` the loaded `user` belongs to (null until a load succeeds).
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null)
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<UserRole>('supervisor')
-  const [companies, setCompanies] = useState<SelectOption[]>([])
+  const [companies, setCompanies] = useState<CompanyOption[]>([])
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
   const { confirm, confirmDialog } = useConfirm()
 
@@ -105,18 +119,23 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     async function load() {
       setLoading(true)
       setError(null)
+      setLoadFailure(null)
       try {
         const result = await callManageUser({ action: 'get', user_id: userId })
         if (!active) return
         const loadedUser = result.user as Profile
         setUser(loadedUser)
+        setLoadedUserId(userId)
         setFullName(loadedUser.full_name)
         setEmail(loadedUser.email ?? '')
         setRole(loadedUser.role)
         const assignedCompanies = (loadedUser.assigned_companies ?? []).map(
-          (company) => ({
+          (company): CompanyOption => ({
             value: company.id,
-            label: localizedName(lang, company.name_ar, company.name_en),
+            // Re-localized at render (see `companyOptions`).
+            label: company.name_ar,
+            name_ar: company.name_ar,
+            name_en: company.name_en,
           }),
         )
         setCompanies(assignedCompanies)
@@ -130,7 +149,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           ),
         )
       } catch (cause) {
-        if (active) setError(errorMessage(cause))
+        if (active) setLoadFailure({ cause })
       } finally {
         if (active) setLoading(false)
       }
@@ -139,7 +158,10 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     return () => {
       active = false
     }
-  }, [callManageUser, errorMessage, lang, userId])
+    // Neither the language nor `t` is a dependency: a language switch must
+    // not reload the user and wipe unsaved edits. Names and messages are
+    // localized at render instead.
+  }, [callManageUser, reloadKey, userId])
 
   useEffect(() => {
     if (!hasUnsavedChanges) return
@@ -151,7 +173,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   }, [hasUnsavedChanges])
 
   const loadCompanies = useCallback(
-    async (search: string): Promise<SelectOption[]> => {
+    async (search: string): Promise<CompanyOption[]> => {
       let query = supabase
         .from('companies')
         .select('id,name_ar,name_en')
@@ -164,12 +186,14 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       return (data ?? []).map((company) => ({
         value: company.id,
         label: localizedName(lang, company.name_ar, company.name_en),
+        name_ar: company.name_ar,
+        name_en: company.name_en,
       }))
     },
     [lang],
   )
 
-  const loadAllCompanies = useCallback(async (): Promise<SelectOption[]> => {
+  const loadAllCompanies = useCallback(async (): Promise<CompanyOption[]> => {
     const { data } = await supabase
       .from('companies')
       .select('id,name_ar,name_en')
@@ -177,8 +201,20 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     return (data ?? []).map((company) => ({
       value: company.id,
       label: localizedName(lang, company.name_ar, company.name_en),
+      name_ar: company.name_ar,
+      name_en: company.name_en,
     }))
   }, [lang])
+
+  // The selected companies with their labels in the active language.
+  const companyOptions = useMemo(
+    () =>
+      companies.map((company) => ({
+        ...company,
+        label: localizedName(lang, company.name_ar, company.name_en),
+      })),
+    [companies, lang],
+  )
 
   async function handleSave() {
     setError(null)
@@ -222,12 +258,10 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
               role,
               assigned_companies:
                 role === 'supervisor'
-                  ? // The selector only carries the already-localized label;
-                    // a language switch reloads the user and its names.
-                    companies.map((company) => ({
+                  ? companies.map((company) => ({
                       id: company.value,
-                      name_ar: company.label,
-                      name_en: company.label,
+                      name_ar: company.name_ar,
+                      name_en: company.name_en,
                     }))
                   : [],
             }
@@ -257,16 +291,19 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     onBack()
   }
 
-  if (loading)
+  // Skeleton only while there is no user to show yet.
+  if (loading && loadedUserId !== userId)
+    return <UserDetailSkeleton label={t('loading')} />
+
+  // A failed load is a page-level error, never an empty editable form.
+  if (!user || loadedUserId !== userId)
     return (
-      <div
-        className="space-y-2 py-2"
-        aria-busy="true"
-        aria-label={t('loading')}
-      >
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-4/5" />
+      <div className="mx-auto max-w-3xl space-y-4">
+        <BackButton onClick={onBack} />
+        <ErrorState
+          description={errorMessage(loadFailure?.cause)}
+          onRetry={() => setReloadKey((key) => key + 1)}
+        />
       </div>
     )
 
@@ -274,40 +311,39 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     roleOptions.find((option) => option.value === value)?.label ?? value
 
   // Saved values only (`user`), never the unsaved form state below.
-  const accountItems: InfoGridItem[] = user
-    ? [
-        {
-          key: 'email',
-          label: t('email'),
-          value: user.email,
-          dir: 'ltr',
-        },
-        { key: 'role', label: t('role'), value: roleLabel(user.role) },
-        {
-          key: 'createdAt',
-          label: t('createdAt'),
-          value: user.created_at ? formatDate(user.created_at) : null,
-        },
-        ...(user.role === 'supervisor'
-          ? [
-              {
-                key: 'assignedCompanies',
-                label: t('assignedCompanies'),
-                value: user.assigned_companies?.length ? (
-                  <span className="flex flex-wrap gap-1.5">
-                    {user.assigned_companies.map((company) => (
-                      <Badge key={company.id} tone="neutral">
-                        {localizedName(lang, company.name_ar, company.name_en)}
-                      </Badge>
-                    ))}
-                  </span>
-                ) : null,
-                className: 'sm:col-span-2 lg:col-span-3',
-              },
-            ]
-          : []),
-      ]
-    : []
+  const accountItems: InfoGridItem[] = [
+    {
+      key: 'email',
+      label: t('email'),
+      value: user.email,
+      dir: 'ltr',
+    },
+    { key: 'role', label: t('role'), value: roleLabel(user.role) },
+    {
+      key: 'createdAt',
+      label: t('createdAt'),
+      value: user.created_at ? formatDate(user.created_at) : null,
+    },
+    ...(user.role === 'supervisor'
+      ? [
+          {
+            key: 'assignedCompanies',
+            label: t('assignedCompanies'),
+            value: user.assigned_companies?.length ? (
+              <span className="flex flex-wrap gap-1.5">
+                {user.assigned_companies.map((company) => (
+                  <Badge key={company.id} tone="neutral">
+                    {localizedName(lang, company.name_ar, company.name_en)}
+                  </Badge>
+                ))}
+              </span>
+            ) : null,
+            // On the grid cell, so the badges get the whole row.
+            cellClassName: 'sm:col-span-2',
+          },
+        ]
+      : []),
+  ]
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
@@ -315,12 +351,12 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       <div className="card space-y-5">
         <DetailHeader
           as="h1"
-          identifier={user?.full_name || t('userDetails')}
-          subtitle={user ? t('userDetails') : undefined}
+          identifier={user.full_name || t('userDetails')}
+          subtitle={t('userDetails')}
           badges={
             <>
-              {user && <Badge tone="neutral">{roleLabel(user.role)}</Badge>}
-              {user?.must_change_password && (
+              <Badge tone="neutral">{roleLabel(user.role)}</Badge>
+              {user.must_change_password && (
                 <Badge tone="warning">{t('mustChangePassword')}</Badge>
               )}
               {hasUnsavedChanges && (
@@ -329,12 +365,13 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             </>
           }
         />
-        {user && (
-          <InfoGridSection
-            title={t('userSectionAccount')}
-            items={accountItems}
-          />
-        )}
+        {/* Two columns: the card is 768px wide at most, and three columns
+            truncated the email address. */}
+        <InfoGridSection
+          title={t('userSectionAccount')}
+          items={accountItems}
+          columns={2}
+        />
       </div>
       <div className="card space-y-4">
         <SectionHeader title={t('editUser')} />
@@ -397,8 +434,10 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           >
             {() => (
               <AsyncMultiSelect
-                value={companies}
-                onChange={setCompanies}
+                value={companyOptions}
+                // Every option comes from the loaders of this screen, which
+                // always carry both names.
+                onChange={(next) => setCompanies(next as CompanyOption[])}
                 loadOptions={loadCompanies}
                 loadAllOptions={loadAllCompanies}
                 placeholder={t('selectCompanies')}
@@ -416,6 +455,65 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
         </div>
       </div>
       {confirmDialog}
+    </div>
+  )
+}
+
+// A form field: label line, gap and a control of the shared control height.
+function FieldSkeleton() {
+  return (
+    <div className="min-w-0">
+      <div className="mb-1.5 flex h-5 items-center">
+        <Skeleton variant="text" className="w-24" />
+      </div>
+      <Skeleton className="h-10 w-full md:h-9" />
+    </div>
+  )
+}
+
+/** First-load placeholder that mirrors the page: the same centred column,
+ *  the account card (header plus the 2-column grid) and the edit card. */
+function UserDetailSkeleton({ label }: { label: string }) {
+  return (
+    <div className="mx-auto max-w-3xl space-y-4" aria-busy="true">
+      <span className="sr-only" role="status">
+        {label}
+      </span>
+      <Skeleton className="h-7 w-20" />
+
+      <div className="card space-y-5">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Skeleton className="h-7 w-40" />
+            <Skeleton className="h-[26px] w-20 rounded-full" />
+          </div>
+          <div className="mt-0.5 flex h-[21px] items-center">
+            <Skeleton variant="text" className="w-24" />
+          </div>
+        </div>
+        <div className="space-y-3">
+          <div className="flex h-5 items-center">
+            <Skeleton variant="text" className="w-24" />
+          </div>
+          <InfoGridSkeleton count={3} columns={2} />
+        </div>
+      </div>
+
+      <div className="card space-y-4">
+        <div className="flex h-5 items-center">
+          <Skeleton variant="text" className="w-28" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FieldSkeleton />
+          <FieldSkeleton />
+          <FieldSkeleton />
+          <FieldSkeleton />
+        </div>
+        <div className="flex justify-end gap-3 pt-2">
+          <Skeleton className="h-10 w-20 md:h-9" />
+          <Skeleton className="h-10 w-20 md:h-9" />
+        </div>
+      </div>
     </div>
   )
 }

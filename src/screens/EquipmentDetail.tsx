@@ -46,6 +46,7 @@ import {
   type DataTableColumn,
   type InfoGridItem,
 } from '@/components/ui'
+import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
 
 interface EquipmentDetailProps {
   equipmentId: string
@@ -87,6 +88,8 @@ export function EquipmentDetail({
   const [equipment, setEquipment] = useState<Equipment | null>(null)
   const [logs, setLogs] = useState<RecentMovementRow[]>([])
   const [loading, setLoading] = useState(true)
+  // The `equipmentId` the data on screen belongs to (null until a load ends).
+  const [loadedId, setLoadedId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const startRequest = useListRequest()
 
@@ -127,6 +130,7 @@ export function EquipmentDetail({
       setError(t('equipmentLoadError'))
     setEquipment(equipmentResult.data as Equipment | null)
     setLogs(withSupervisorNames(rawLogs, names.names))
+    setLoadedId(equipmentId)
     setLoading(false)
   }, [equipmentId, startRequest, t])
 
@@ -190,18 +194,11 @@ export function EquipmentDetail({
   const statusBadge = equipmentStatusBadge(equipment?.status)
   const underMaintenance = isUnderMaintenance(logs[0])
 
-  if (loading)
-    return (
-      <div
-        className="space-y-2 py-2"
-        aria-busy="true"
-        aria-label={t('loading')}
-      >
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-4/5" />
-      </div>
-    )
+  // Skeleton only while there is nothing to show for this equipment yet. A
+  // refetch of the equipment already on screen (retry, language switch) keeps
+  // the page in place instead of swapping it for the placeholder.
+  if (loading && (loadedId !== equipmentId || !equipment))
+    return <EquipmentDetailSkeleton label={t('loading')} />
   if (!equipment)
     return (
       <div className="space-y-4">
@@ -322,18 +319,21 @@ export function EquipmentDetail({
       icon: <Calendar size={16} />,
       label: t('registrationExpiry'),
       value: dateOrNull(equipment.registration_expiry),
+      numeric: true,
     },
     {
       key: 'insuranceExpiry',
       icon: <Calendar size={16} />,
       label: t('insuranceExpiry'),
       value: dateOrNull(equipment.insurance_expiry),
+      numeric: true,
     },
     {
       key: 'lastMaintenanceDate',
       icon: <Calendar size={16} />,
       label: t('lastMaintenanceDate'),
       value: dateOrNull(equipment.last_maintenance_date),
+      numeric: true,
     },
   ]
 
@@ -343,7 +343,9 @@ export function EquipmentDetail({
 
       {error && <Alert type="error">{error}</Alert>}
 
-      <div className="card space-y-5">
+      {/* 16px padding, the same as the movements card below, so the two
+          cards share one start edge. */}
+      <div className="card space-y-5 p-4">
         <DetailHeader
           as="h1"
           identifier={equipment.code}
@@ -380,7 +382,6 @@ export function EquipmentDetail({
         <InfoGridSection
           title={t('detailSectionOwnership')}
           items={ownershipItems}
-          columns={2}
         />
         <InfoGridSection title={t('detailSectionDates')} items={dateItems} />
       </div>
@@ -402,6 +403,68 @@ export function EquipmentDetail({
         }
         empty={t('noMovements')}
       />
+    </div>
+  )
+}
+
+// One section of the detail card: a 20px title line over the label/value grid.
+function SectionSkeleton({ count }: { count: number }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex h-5 items-center">
+        <Skeleton variant="text" className="w-24" />
+      </div>
+      <InfoGridSkeleton count={count} withIcon />
+    </div>
+  )
+}
+
+/** First-load placeholder that mirrors the page: back button, the detail card
+ *  (header plus the three label/value sections) and the movements table. */
+function EquipmentDetailSkeleton({ label }: { label: string }) {
+  return (
+    <div className="space-y-5" aria-busy="true">
+      <span className="sr-only" role="status">
+        {label}
+      </span>
+      <Skeleton className="h-7 w-28" />
+
+      <div className="card space-y-5 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Skeleton className="h-7 w-24" />
+              <Skeleton className="h-[26px] w-16 rounded-full" />
+              <Skeleton className="h-[26px] w-20 rounded-full" />
+            </div>
+            <div className="mt-0.5 flex h-[21px] items-center">
+              <Skeleton variant="text" className="w-32" />
+            </div>
+          </div>
+          <div className="w-full shrink-0 sm:w-auto">
+            <Skeleton className="h-7 w-28" />
+          </div>
+        </div>
+        <SectionSkeleton count={9} />
+        <SectionSkeleton count={3} />
+        <SectionSkeleton count={3} />
+      </div>
+
+      <div className="card space-y-4 p-4">
+        <div>
+          <div className="flex h-5 items-center">
+            <Skeleton variant="text" className="w-28" />
+          </div>
+          <div className="mt-0.5 flex h-4 items-center">
+            <Skeleton variant="text" className="w-48 max-w-full" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          {[0, 1, 2, 3, 4, 5].map((index) => (
+            <Skeleton key={index} className="h-9 w-full" />
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

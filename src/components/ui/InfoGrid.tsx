@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { SectionHeader } from './Card'
 import { cn } from './cn'
+import { Skeleton } from './Skeleton'
 
 export interface InfoGridItem {
   key: string
@@ -16,7 +17,11 @@ export interface InfoGridItem {
    *  change that block's own start edge to the left and pull the value
    *  away from its label in an RTL layout. */
   dir?: 'ltr'
+  /** Classes for the value (`<dd>`) only. */
   className?: string
+  /** Classes for the grid cell itself (the label + value wrapper), for
+   *  example a `col-span` that lets a long value use the whole row. */
+  cellClassName?: string
 }
 
 export interface InfoGridProps {
@@ -83,7 +88,13 @@ export function InfoGrid({ items, columns = 3, className }: InfoGridProps) {
         const isString = typeof item.value === 'string'
         const isLtr = item.dir === 'ltr' && !isEmpty
         return (
-          <div key={item.key} className="flex min-w-0 items-start gap-2.5">
+          <div
+            key={item.key}
+            className={cn(
+              'flex min-w-0 items-start gap-2.5',
+              item.cellClassName,
+            )}
+          >
             {item.icon && (
               <span aria-hidden="true" className="mt-0.5 shrink-0 text-muted">
                 {item.icon}
@@ -116,6 +127,63 @@ export function InfoGrid({ items, columns = 3, className }: InfoGridProps) {
         )
       })}
     </dl>
+  )
+}
+
+export interface InfoGridSkeletonProps {
+  /** Number of label/value cells to draw. */
+  count: number
+  columns?: 2 | 3
+  /** Draws the leading icon placeholder, for grids whose items have icons. */
+  withIcon?: boolean
+  className?: string
+}
+
+const SKELETON_VALUE_WIDTHS = ['w-2/3', 'w-1/2', 'w-3/4', 'w-3/5', 'w-2/5']
+
+/**
+ * Loading placeholder with the exact grid and cell box of `InfoGrid` (a 16px
+ * label line over a 24px value line), so a page skeleton built from it does
+ * not shift when the real grid replaces it. Purely decorative: the caller
+ * owns the `aria-busy` wrapper and the "loading" announcement.
+ */
+export function InfoGridSkeleton({
+  count,
+  columns = 3,
+  withIcon = false,
+  className,
+}: InfoGridSkeletonProps) {
+  return (
+    <div
+      aria-hidden="true"
+      className={cn(
+        'grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2',
+        columns === 3 && 'lg:grid-cols-3',
+        className,
+      )}
+    >
+      {Array.from({ length: count }, (_, index) => (
+        <div key={index} className="flex min-w-0 items-start gap-2.5">
+          {withIcon && (
+            <Skeleton variant="circle" className="mt-0.5 h-4 w-4 shrink-0" />
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex h-4 items-center">
+              <Skeleton variant="text" className="w-1/3" />
+            </div>
+            <div className="flex h-6 items-center">
+              <Skeleton
+                variant="text"
+                className={cn(
+                  'h-4',
+                  SKELETON_VALUE_WIDTHS[index % SKELETON_VALUE_WIDTHS.length],
+                )}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }
 
