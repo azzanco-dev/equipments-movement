@@ -667,6 +667,51 @@ export const translations = {
     // wave-9-greeting — start
     homeGreeting: 'اهلاً، {name}',
     // wave-9-greeting — end
+    // wave-9-notices — start
+    notifyForemanTitle: 'المعدة ما زالت مسجلة داخل موقع',
+    notifyForemanExplain:
+      'لا يمكن تسجيل دخولها للورشة حتى يسجل الفورمان خروجها من الموقع. يمكنك ابلاغه برسالة واتساب.',
+    notifyForemanForemanLabel: 'الفورمان',
+    notifyForemanFallbackName: 'الفورمان',
+    notifyForeman: 'ابلاغ الفورمان',
+    refreshEquipmentStatus: 'تحديث الحالة',
+    notifyForemanRefreshHint:
+      'بعد ان يسجل الفورمان خروج المعدة اضغط "تحديث الحالة" لتتمكن من تسجيل دخولها.',
+    notifyForemanSent: 'تم ابلاغ {name} عبر واتساب',
+    notifyForemanNotSent:
+      'تعذر ارسال رسالة واتساب الى {name}. حاول مرة اخرى او تواصل معه مباشرة.',
+    notifyForemanOpenWhatsapp: 'فتح واتساب',
+    notifyForemanNoMobile:
+      'رقم جوال {name} غير مسجل. تواصل معه مباشرة او اطلب من المدير اضافة رقمه.',
+    notifyForemanErrNotOnSite:
+      'المعدة لم تعد مسجلة داخل موقع. حدث حالتها ثم سجل دخولها.',
+    notifyForemanErrRecentlySent:
+      'تم ابلاغ الفورمان عن هذه المعدة قبل اقل من 10 دقائق. انتظر قليلا ثم حاول مرة اخرى.',
+    notifyForemanErrForbidden: 'ليس لديك صلاحية ابلاغ الفورمان.',
+    notifyForemanErrInvalid:
+      'تعذر تحديد المعدة. اخترها من جديد ثم حاول مرة اخرى.',
+    notifyForemanErrFailed: 'تعذر تنفيذ الابلاغ. حاول مرة اخرى.',
+    notifyForemanPrevious: 'تم الابلاغ {ago} بواسطة {name}',
+    notifyForemanPreviousNoName: 'تم الابلاغ {ago}',
+    notifyForemanPreviousFailed:
+      'اخر محاولة ابلاغ كانت {ago} بواسطة {name} ولم تصل الرسالة',
+    notifyForemanPreviousFailedNoName:
+      'اخر محاولة ابلاغ كانت {ago} ولم تصل الرسالة',
+    notifyForemanPreviousLoadError:
+      'تعذر التحقق من الابلاغات السابقة لهذه المعدة. يمكنك الابلاغ على اي حال.',
+    noticeAgoNow: 'قبل لحظات',
+    noticeAgoMinutes: 'قبل {count} دقيقة',
+    noticeAgoHours: 'قبل {count} ساعة',
+    noticeAgoDays: 'قبل {count} يوم',
+    userMobileHint:
+      'يستخدم لاشعارات واتساب. يكتب بصيغة 05XXXXXXXX او +9665XXXXXXXX.',
+    userMobileInvalid:
+      'رقم الجوال غير صالح. اكتب من 8 الى 15 رقما، ويمكن ان يبدا بعلامة +.',
+    userMobileLoadError: 'تعذر تحميل رقم الجوال.',
+    userMobileSaveError: 'تعذر حفظ رقم الجوال. حاول مرة اخرى.',
+    userSavedMobileFailed:
+      'تم حفظ بقية بيانات المستخدم، لكن رقم الجوال لم يحفظ.',
+    // wave-9-notices — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -1932,6 +1977,52 @@ export const translations = {
     // wave-9-greeting — start
     homeGreeting: 'Welcome, {name}',
     // wave-9-greeting — end
+    // wave-9-notices — start
+    notifyForemanTitle: 'The equipment is still recorded inside a site',
+    notifyForemanExplain:
+      'Its workshop entry cannot be registered until the foreman records its site exit. You can notify the foreman by WhatsApp.',
+    notifyForemanForemanLabel: 'Foreman',
+    notifyForemanFallbackName: 'the foreman',
+    notifyForeman: 'Notify the foreman',
+    refreshEquipmentStatus: 'Refresh status',
+    notifyForemanRefreshHint:
+      'Once the foreman records the site exit, press "Refresh status" to register the entry.',
+    notifyForemanSent: '{name} was notified by WhatsApp',
+    notifyForemanNotSent:
+      'The WhatsApp message to {name} could not be sent. Try again or contact them directly.',
+    notifyForemanOpenWhatsapp: 'Open WhatsApp',
+    notifyForemanNoMobile:
+      'No mobile number is on file for {name}. Contact them directly or ask the admin to add it.',
+    notifyForemanErrNotOnSite:
+      'The equipment is no longer recorded inside a site. Refresh its status, then register its entry.',
+    notifyForemanErrRecentlySent:
+      'The foreman was notified about this equipment less than 10 minutes ago. Wait a little, then try again.',
+    notifyForemanErrForbidden:
+      'You do not have permission to notify the foreman.',
+    notifyForemanErrInvalid:
+      'The equipment could not be identified. Select it again, then retry.',
+    notifyForemanErrFailed: 'The notice could not be processed. Try again.',
+    notifyForemanPrevious: 'Notified {ago} by {name}',
+    notifyForemanPreviousNoName: 'Notified {ago}',
+    notifyForemanPreviousFailed:
+      'The last notice attempt, {ago} by {name}, was not delivered',
+    notifyForemanPreviousFailedNoName:
+      'The last notice attempt, {ago}, was not delivered',
+    notifyForemanPreviousLoadError:
+      'Earlier notices for this equipment could not be checked. You can still notify the foreman.',
+    noticeAgoNow: 'moments ago',
+    noticeAgoMinutes: '{count} min ago',
+    noticeAgoHours: '{count} h ago',
+    noticeAgoDays: '{count} d ago',
+    userMobileHint:
+      'Used for WhatsApp notices. Write it as 05XXXXXXXX or +9665XXXXXXXX.',
+    userMobileInvalid:
+      'The mobile number is not valid. Enter 8 to 15 digits, optionally starting with +.',
+    userMobileLoadError: 'The mobile number could not be loaded.',
+    userMobileSaveError: 'The mobile number could not be saved. Try again.',
+    userSavedMobileFailed:
+      'The other user details were saved, but the mobile number was not.',
+    // wave-9-notices — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',

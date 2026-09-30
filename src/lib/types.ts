@@ -46,6 +46,9 @@ export interface Profile {
   assigned_companies?: Array<{ id: string; name_ar: string; name_en: string }>
   must_change_password: boolean
   created_at: string
+  // Added by migration 0110. Admin-maintained (`admin_set_user_mobile`), used
+  // for WhatsApp movement notices; never part of `profile_names`.
+  mobile_number?: string | null
 }
 
 export interface Company {

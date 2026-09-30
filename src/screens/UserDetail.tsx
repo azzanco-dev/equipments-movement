@@ -11,6 +11,11 @@ import { supabase } from '@/lib/supabase'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
 import type { Profile, UserRole } from '@/lib/types'
 import {
+  isValidUserMobile,
+  normalizeUserMobileInput,
+  userMobileErrorCode,
+} from '@/lib/userMobile'
+import {
   BackButton,
   Badge,
   Button,
@@ -19,6 +24,7 @@ import {
   Field,
   Input,
   InfoGridSection,
+  Notice,
   SectionHeader,
   Select,
   Skeleton,
@@ -72,14 +78,37 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   const [role, setRole] = useState<UserRole>('supervisor')
   const [companies, setCompanies] = useState<CompanyOption[]>([])
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
+  // wave 9 — the mobile number (migration 0110). It is read and written apart
+  // from the rest of the record: the `manage-user` Edge Function neither
+  // returns nor updates it, and `admin_set_user_mobile` is its only write
+  // path. A failed read is reported on the number alone and never takes the
+  // page down.
+  const [mobile, setMobile] = useState('')
+  const [mobileLoad, setMobileLoad] = useState<{
+    userId: string
+    state: 'loaded' | 'failed'
+    /** The stored number; '' when the user has none. */
+    saved: string
+  } | null>(null)
+  const [mobileReloadKey, setMobileReloadKey] = useState(0)
+  const [mobileError, setMobileError] = useState<string | null>(null)
+  // The rest of the record was saved but the number was not.
+  const [mobileNotSaved, setMobileNotSaved] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
 
   const currentSnapshot = useMemo(
     () => formSnapshot(fullName, email, password, role, companies),
     [companies, email, fullName, password, role],
   )
-  const hasUnsavedChanges =
+  const mainChanged =
     savedSnapshot !== null && currentSnapshot !== savedSnapshot
+  // Known only once the number of THIS user was read.
+  const mobileState =
+    mobileLoad?.userId === userId ? mobileLoad.state : 'loading'
+  const savedMobile = mobileLoad?.userId === userId ? mobileLoad.saved : ''
+  const mobileChanged =
+    mobileState === 'loaded' && normalizeUserMobileInput(mobile) !== savedMobile
+  const hasUnsavedChanges = mainChanged || mobileChanged
 
   const roleOptions = [
     { value: 'supervisor', label: t('supervisor') },
@@ -163,6 +192,36 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     // localized at render instead.
   }, [callManageUser, reloadKey, userId])
 
+  // The mobile number, read with the admin's own session (`select_profiles`
+  // lets an admin read every profile). Separate from the load above so its
+  // retry does not reload the user and wipe unsaved edits.
+  useEffect(() => {
+    let active = true
+    setMobileError(null)
+    setMobileNotSaved(false)
+    supabase
+      .from('profiles')
+      .select('mobile_number')
+      .eq('id', userId)
+      .maybeSingle()
+      .then(({ data, error: loadError }) => {
+        if (!active) return
+        if (loadError) {
+          setMobile('')
+          setMobileLoad({ userId, state: 'failed', saved: '' })
+          return
+        }
+        const stored =
+          (data as { mobile_number?: string | null } | null)?.mobile_number ??
+          ''
+        setMobile(stored)
+        setMobileLoad({ userId, state: 'loaded', saved: stored })
+      })
+    return () => {
+      active = false
+    }
+  }, [mobileReloadKey, userId])
+
   useEffect(() => {
     if (!hasUnsavedChanges) return
     const warnBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -218,6 +277,8 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
 
   async function handleSave() {
     setError(null)
+    setMobileError(null)
+    setMobileNotSaved(false)
     if (!fullName.trim() || !email.trim()) {
       setError(t('userFieldsRequired'))
       return
@@ -230,49 +291,101 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       setError(t('passwordMinLength'))
       return
     }
+    // Checked before anything is written, so a mistyped number does not leave
+    // the record half saved. The database function repeats the rule.
+    const nextMobile = normalizeUserMobileInput(mobile)
+    if (mobileChanged && !isValidUserMobile(nextMobile)) {
+      setMobileError(t('userMobileInvalid'))
+      return
+    }
     setSaving(true)
     try {
-      const nextFullName = fullName.trim()
-      const nextEmail = email.trim()
-      await callManageUser({
-        action: 'update',
-        user_id: userId,
-        full_name: nextFullName,
-        email: nextEmail,
-        password,
-        role,
-        company_ids:
-          role === 'supervisor' ? companies.map((item) => item.value) : [],
-      })
-      setFullName(nextFullName)
-      setEmail(nextEmail)
-      setPassword('')
-      // The summary above the form shows the saved record, so it follows
-      // every field the update just wrote.
-      setUser((current) =>
-        current
-          ? {
-              ...current,
-              full_name: nextFullName,
-              email: nextEmail,
-              role,
-              assigned_companies:
-                role === 'supervisor'
-                  ? companies.map((company) => ({
-                      id: company.value,
-                      name_ar: company.name_ar,
-                      name_en: company.name_en,
-                    }))
-                  : [],
-            }
-          : current,
-      )
-      setSavedSnapshot(
-        formSnapshot(nextFullName, nextEmail, '', role, companies),
-      )
-      setError(null)
-    } catch (cause) {
-      setError(errorMessage(cause))
+      // 1. The record itself, through the Edge Function as before. Skipped
+      //    only when the mobile number is the single change, so correcting a
+      //    number does not rewrite the login details and company assignments.
+      const saveMain = mainChanged || !mobileChanged
+      if (saveMain) {
+        const nextFullName = fullName.trim()
+        const nextEmail = email.trim()
+        try {
+          await callManageUser({
+            action: 'update',
+            user_id: userId,
+            full_name: nextFullName,
+            email: nextEmail,
+            password,
+            role,
+            company_ids:
+              role === 'supervisor' ? companies.map((item) => item.value) : [],
+          })
+        } catch (cause) {
+          // Nothing was written: the number is not attempted either, and
+          // every edit stays in the form.
+          setError(errorMessage(cause))
+          return
+        }
+        setFullName(nextFullName)
+        setEmail(nextEmail)
+        setPassword('')
+        // The summary above the form shows the saved record, so it follows
+        // every field the update just wrote.
+        setUser((current) =>
+          current
+            ? {
+                ...current,
+                full_name: nextFullName,
+                email: nextEmail,
+                role,
+                assigned_companies:
+                  role === 'supervisor'
+                    ? companies.map((company) => ({
+                        id: company.value,
+                        name_ar: company.name_ar,
+                        name_en: company.name_en,
+                      }))
+                    : [],
+              }
+            : current,
+        )
+        setSavedSnapshot(
+          formSnapshot(nextFullName, nextEmail, '', role, companies),
+        )
+      }
+
+      // 2. The mobile number, only when it changed. Its failure is reported
+      //    on its own: what step 1 saved stays saved and is said to be saved.
+      if (mobileChanged) {
+        let message: string | null = null
+        let failed = false
+        try {
+          const { error: mobileSaveError } = await supabase.rpc(
+            'admin_set_user_mobile',
+            { p_user_id: userId, p_mobile_number: nextMobile },
+          )
+          if (mobileSaveError) {
+            failed = true
+            message = mobileSaveError.message
+          }
+        } catch {
+          failed = true
+        }
+        if (failed) {
+          const code = userMobileErrorCode(message)
+          setMobileError(
+            code === 'invalid_mobile'
+              ? t('userMobileInvalid')
+              : code === 'admin_required'
+                ? t('userPermissionError')
+                : code === 'user_not_found'
+                  ? t('userNotFound')
+                  : t('userMobileSaveError'),
+          )
+          setMobileNotSaved(saveMain)
+          return
+        }
+        setMobile(nextMobile)
+        setMobileLoad({ userId, state: 'loaded', saved: nextMobile })
+      }
     } finally {
       setSaving(false)
     }
@@ -319,6 +432,30 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       dir: 'ltr',
     },
     { key: 'role', label: t('role'), value: roleLabel(user.role) },
+    {
+      key: 'mobile',
+      label: t('mobileNumber'),
+      // The saved number only. A failed read says so instead of showing the
+      // "no value" dash, and a pending read is not an empty value either.
+      ...(mobileState === 'loaded'
+        ? { value: savedMobile || null, dir: 'ltr' as const }
+        : mobileState === 'failed'
+          ? {
+              value: (
+                <span className="font-normal text-danger">
+                  {t('userMobileLoadError')}
+                </span>
+              ),
+            }
+          : {
+              value: (
+                <span className="flex h-6 items-center" aria-busy="true">
+                  <Skeleton variant="text" className="h-4 w-28" />
+                  <span className="sr-only">{t('loading')}</span>
+                </span>
+              ),
+            }),
+    },
     {
       key: 'createdAt',
       label: t('createdAt'),
@@ -376,6 +513,24 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       <div className="card space-y-4">
         <SectionHeader title={t('editUser')} />
         {error && <Alert type="error">{error}</Alert>}
+        {mobileNotSaved && (
+          <Notice tone="warning">{t('userSavedMobileFailed')}</Notice>
+        )}
+        {mobileState === 'failed' && (
+          <Notice
+            tone="danger"
+            action={
+              <Button
+                size="sm"
+                onClick={() => setMobileReloadKey((key) => key + 1)}
+              >
+                {t('retry')}
+              </Button>
+            }
+          >
+            {t('userMobileLoadError')}
+          </Notice>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t('fullName')} required>
             {(control) => (
@@ -423,6 +578,31 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 autoComplete="new-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
+              />
+            )}
+          </Field>
+          <Field
+            label={t('mobileNumber')}
+            name="mobile_number"
+            hint={t('userMobileHint')}
+            error={mobileError}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                type="tel"
+                inputMode="tel"
+                dir="ltr"
+                autoComplete="off"
+                maxLength={24}
+                // Editable only once the stored number is known, so a save
+                // can never clear a number that merely failed to load.
+                disabled={mobileState !== 'loaded'}
+                value={mobile}
+                onChange={(event) => {
+                  setMobileError(null)
+                  setMobile(event.target.value)
+                }}
               />
             )}
           </Field>
@@ -495,7 +675,7 @@ function UserDetailSkeleton({ label }: { label: string }) {
           <div className="flex h-5 items-center">
             <Skeleton variant="text" className="w-24" />
           </div>
-          <InfoGridSkeleton count={3} columns={2} />
+          <InfoGridSkeleton count={4} columns={2} />
         </div>
       </div>
 
@@ -504,6 +684,7 @@ function UserDetailSkeleton({ label }: { label: string }) {
           <Skeleton variant="text" className="w-28" />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
+          <FieldSkeleton />
           <FieldSkeleton />
           <FieldSkeleton />
           <FieldSkeleton />

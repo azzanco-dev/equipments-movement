@@ -24,6 +24,7 @@ import { EquipmentStep } from '@/components/movement/EquipmentStep'
 import { MovementFormShell } from '@/components/movement/MovementFormShell'
 import { MovementPhotosSection } from '@/components/movement/MovementPhotosSection'
 import { MovementStatusCard } from '@/components/movement/MovementStatusCard'
+import { NotifyForemanPanel } from '@/components/movement/NotifyForemanPanel'
 import {
   EMPTY_QUICK_DRIVER,
   QuickDriverForm,
@@ -133,6 +134,10 @@ export function EntryExitForm({
   const [loadingEquipment, setLoadingEquipment] = useState(true)
   const [equipmentError, setEquipmentError] = useState(false)
   const [lastMovement, setLastMovement] = useState<LastMovement | null>(null)
+  // The equipment `lastMovement` was read for. It stays on the previous unit
+  // until the next read answers, so anything that acts on the movement (the
+  // notify panel) checks it against the selected unit first.
+  const [lastMovementFor, setLastMovementFor] = useState<string | null>(null)
   const [loadingMovement, setLoadingMovement] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [driverId, setDriverId] = useState('')
@@ -226,6 +231,7 @@ export function EntryExitForm({
     setEquipmentError(false)
     setSelected(null)
     setLastMovement(null)
+    setLastMovementFor(null)
     setLoadingMovement(false)
     setValidationError(null)
     setDriverId('')
@@ -367,6 +373,7 @@ export function EntryExitForm({
 
       const last = (data as LastMovement[])[0] ?? null
       setLastMovement(last)
+      setLastMovementFor(eq.id)
       // An EXIT carries no driver field: the database inherits the latest
       // current driver of the open visit when the exit row is written.
 
@@ -629,6 +636,22 @@ export function EntryExitForm({
     }
   }
 
+  // wave 9 — a workshop ENTRY for a unit whose latest movement is an open
+  // SITE entry. The sequence is global per equipment, so this entry stays
+  // blocked until the foreman who recorded the site entry records its exit;
+  // the officer may notify him instead of phoning. Workshop roles only: a
+  // foreman or an admin uses the site form (`workshopMode` is false) and a
+  // monitor has no movement form at all.
+  const notifyForemanMovement =
+    workshopMode &&
+    isEntry &&
+    selected &&
+    lastMovementFor === selected.id &&
+    lastMovement?.movement_type === 'entry' &&
+    lastMovement.movement_context === 'site'
+      ? lastMovement
+      : null
+
   // `localizedName` falls back to an em dash, but the last-entry summary needs
   // a missing name to stay empty so it does not render "— - project".
   const optionalLocalizedName = (
@@ -744,8 +767,28 @@ export function EntryExitForm({
               blocked={!!validationError}
             />
 
-            {/* Validation warning */}
-            {validationError && (
+            {/* The unit is still inside a site: say why the entry is blocked
+                and let the officer notify the foreman. It stays mounted while
+                the status is re-read, so its result is not lost. */}
+            {notifyForemanMovement && (
+              <NotifyForemanPanel
+                key={selected.id}
+                equipmentId={selected.id}
+                projectName={optionalLocalizedName(
+                  notifyForemanMovement.project_name_ar,
+                  notifyForemanMovement.project_name_en,
+                )}
+                foremanName={
+                  notifyForemanMovement.supervisor_name?.trim() || null
+                }
+                refreshing={loadingMovement}
+                onRefresh={() => checkLastMovement(selected)}
+              />
+            )}
+
+            {/* Validation warning. The panel above already explains the
+                blocked entry, so the generic message is not repeated. */}
+            {validationError && !notifyForemanMovement && (
               <Alert type="error">
                 <div className="flex items-start gap-2">
                   <AlertTriangle size={16} className="mt-0.5 shrink-0" />
