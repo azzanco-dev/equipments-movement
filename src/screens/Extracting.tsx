@@ -2,6 +2,7 @@ import type { FormEvent } from 'react'
 import { Send } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
 import { FullPageSpinner } from '@/components/Spinner'
+import { EquipmentTypeLookup } from '@/components/extracting/EquipmentTypeLookup'
 import { ExtractionFieldsCard } from '@/components/extracting/ExtractionFieldsCard'
 import { ImagePickerCard } from '@/components/extracting/ImagePickerCard'
 import { PublishResultCard } from '@/components/extracting/PublishResultCard'
@@ -29,6 +30,7 @@ const EMPLOYMENT_FIELDS: ExtractionFieldKey[] = [
   'gender',
   'language',
   'email',
+  'password',
   'employee_number',
   'mobile_number',
   'company',
@@ -82,7 +84,10 @@ function ExtractingWorkspace({ token }: { token: string | undefined }) {
             errors={errors}
             targets={targets}
             onChange={extraction.updateField}
-          />
+          >
+            {/* Keyed by the photo so a new driver starts with no equipment. */}
+            <EquipmentTypeLookup key={extraction.preview} />
+          </ExtractionFieldsCard>
           <PublishTargetsCard
             targets={targets}
             onChange={extraction.setTarget}

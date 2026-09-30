@@ -185,3 +185,21 @@ test('the employee number follows the identity until edited', () => {
   form = applyFormPatch(form, { id_number: '654321' })
   assert.equal(form.employee_number, 'E-9')
 })
+
+test('the ERPNext password is optional, untrimmed and sent as new_password', () => {
+  assert.ok(!('new_password' in erpUserPayload(data)))
+  const parsed = parsePublishRequest({
+    data: { ...data, password: ' Pass word9 ' },
+    targets: { erpnext: true },
+  })
+  assert.equal(parsed.data.password, ' Pass word9 ')
+  assert.equal(erpUserPayload(parsed.data).new_password, ' Pass word9 ')
+  assert.ok(!('new_password' in currentSystemDriverPayload(parsed.data)))
+  assert.equal(
+    parsePublishRequest({
+      data: { ...data, password: 'short' },
+      targets: { erpnext: true },
+    }),
+    null,
+  )
+})

@@ -11,6 +11,7 @@ export const EXTRACTION_FIELDS = [
   'nationality',
   'occupation',
   'email',
+  'password',
   'mobile_number',
   'gender',
   'language',
@@ -50,6 +51,15 @@ export type PublishResults = Record<PublishTarget, TargetPublishResult>
 export const DEFAULT_COMPANY = 'شركة عبدالله احمد العزاني للمقاولات'
 export const DEFAULT_EMPLOYMENT_TYPE = 'نقدي'
 
+/** ERPNext company names, exactly as the Company records are named. */
+export const COMPANY_OPTIONS = [
+  DEFAULT_COMPANY,
+  `${DEFAULT_COMPANY} - تكوين المعدات`,
+] as const
+
+/** Shortest ERPNext user password accepted before ERPNext's own policy. */
+export const MIN_PASSWORD_LENGTH = 8
+
 /** Fields ERPNext needs before a user and employee can be created. */
 export const ERP_REQUIRED_FIELDS = [
   'email',
@@ -80,6 +90,7 @@ export type FieldErrorCode =
   | 'invalid_ctc'
   | 'invalid_date'
   | 'invalid_language'
+  | 'invalid_password'
 
 export type FieldErrors = Partial<Record<ExtractionFieldKey, FieldErrorCode>>
 
@@ -160,6 +171,9 @@ export function validateExtractionForm(
   )
   for (const key of DATE_FIELDS)
     check(key, (value) => !!toIsoDate(value), 'invalid_date')
+  // The password is optional and never trimmed: spaces are part of it.
+  if (data.password && data.password.length < MIN_PASSWORD_LENGTH)
+    errors.password = 'invalid_password'
   return errors
 }
 

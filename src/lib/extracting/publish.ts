@@ -53,6 +53,8 @@ export function parsePublishRequest(value: unknown): {
     EXTRACTION_FIELDS.map((key) => [key, clean(source[key])]),
   ) as ExtractionForm
   raw.language ||= 'ar'
+  // Sent to ERPNext exactly as typed; trimming would change the password.
+  raw.password = typeof source.password === 'string' ? source.password : ''
   const errors = validateExtractionForm(raw, {
     currentSystem: true,
     erpnext: false,
@@ -99,6 +101,8 @@ export function erpUserPayload(data: ExtractionPublishData) {
     ...(data.mobile_number
       ? { mobile_no: data.mobile_number, phone: data.mobile_number }
       : {}),
+    // `new_password` is the User doctype's "Set New Password" field.
+    ...(data.password ? { new_password: data.password } : {}),
   }
 }
 

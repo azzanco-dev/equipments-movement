@@ -61,6 +61,7 @@ export const FIELD_ERROR_MESSAGES: Record<FieldErrorCode, TranslationKey> = {
   invalid_ctc: 'extractingInvalidCtc',
   invalid_date: 'extractingInvalidDate',
   invalid_language: 'extractingInvalidLanguage',
+  invalid_password: 'passwordMinLength',
 }
 
 export const FIELD_LABELS: Record<ExtractionFieldKey, TranslationKey> = {
@@ -72,6 +73,7 @@ export const FIELD_LABELS: Record<ExtractionFieldKey, TranslationKey> = {
   nationality: 'extractingFieldNationality',
   occupation: 'extractingFieldOccupation',
   email: 'extractingFieldEmail',
+  password: 'password',
   employee_number: 'extractingFieldEmployeeNumber',
   mobile_number: 'extractingFieldMobile',
   gender: 'extractingFieldGender',
