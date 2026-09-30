@@ -1,5 +1,6 @@
 import { useI18n } from '@/i18n/I18nContext'
 import { Skeleton } from '@/components/ui'
+import { MOVEMENT_DETAIL_GALLERY_WIDTH_CLASS } from '@/lib/movementPhotoGallery'
 
 // One label bar over one value bar, the same box as a `DescriptionList` cell:
 // 8px block padding, a 16px label line and a 26px value line (58px in all).
@@ -45,6 +46,11 @@ const DETAIL_WIDTHS = [
 const SITE_FIELD_COUNT = 7
 const WORKSHOP_FIELD_COUNT = 3
 
+// The gallery always renders three squares (photos, add, empty). A literal on
+// purpose: this skeleton is in the app shell, so it must not import the
+// upload hook just for its photo limit.
+const PHOTO_SQUARE_COUNT = 3
+
 export interface MovementDetailSkeletonProps {
   /** Decides the number of detail rows and whether the driver card exists.
    *  The page passes the real context as soon as the movement row arrived,
@@ -52,19 +58,19 @@ export interface MovementDetailSkeletonProps {
   context?: 'site' | 'workshop'
   /** Admins have the header menu and the "created at" row. */
   isAdmin?: boolean
-  /** Every role but the read-only monitor sees the "add photo" row. */
+  /** Kept for the callers. It no longer changes the layout: the photo
+   *  gallery is the same box with and without its "add photo" square. */
   canUpload?: boolean
 }
 
 /** First-load placeholder for the movement detail page. It mirrors the real
  * layout box for box (header, movement type banner, details card with the
- * fixed 320px photo area, equipment card, driver card for site movements and
+ * photo gallery box, equipment card, driver card for site movements and
  * the linked-movement card) so the page does not jump when the data
  * arrives. */
 export function MovementDetailSkeleton({
   context = 'site',
   isAdmin = false,
-  canUpload = true,
 }: MovementDetailSkeletonProps) {
   const { t } = useI18n()
   const fieldCount =
@@ -118,9 +124,16 @@ export function MovementDetailSkeleton({
             <Skeleton variant="circle" className="h-4 w-4 shrink-0" />
             <Skeleton variant="text" className="w-16" />
           </div>
-          {/* Same fixed box as the real photo viewer. */}
-          <Skeleton className="h-[320px] w-full" />
-          {canUpload && <Skeleton className="mt-3 h-[46px] w-full" />}
+          {/* Same box as the page's `PhotoGallery`: the same width cap, a
+              4/3 main image and a row of equal squares under it. */}
+          <div className={`${MOVEMENT_DETAIL_GALLERY_WIDTH_CLASS} space-y-2`}>
+            <Skeleton className="aspect-[4/3] w-full" />
+            <div className="grid grid-cols-3 gap-2">
+              {Array.from({ length: PHOTO_SQUARE_COUNT }, (_, index) => (
+                <Skeleton key={index} className="aspect-square w-full" />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 

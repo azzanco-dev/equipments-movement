@@ -36,8 +36,27 @@ test('the movement detail skeleton stays up for the whole first load', () => {
   assert.match(source, /if \(loading && !error\) \{/)
   assert.doesNotMatch(source, /loading && !log && !error/)
   const skeleton = read('src/components/movement/MovementDetailSkeleton.tsx')
-  // Same fixed photo box as the page, and no always-on driver card.
-  assert.match(skeleton, /h-\[320px\]/)
+  // Same photo gallery box as the page (shared width cap, 4/3 main image, a
+  // row of equal squares), and no always-on driver card.
+  assert.doesNotMatch(skeleton, /h-\[320px\]/)
+  assert.match(
+    skeleton,
+    /className=\{`\$\{MOVEMENT_DETAIL_GALLERY_WIDTH_CLASS\} space-y-2`\}/,
+  )
+  assert.match(skeleton, /<Skeleton className="aspect-\[4\/3\] w-full" \/>/)
+  assert.match(skeleton, /grid grid-cols-3 gap-2/)
+  assert.match(skeleton, /const PHOTO_SQUARE_COUNT = 3\b/)
+  assert.match(skeleton, /length: PHOTO_SQUARE_COUNT/)
+  // In the app shell: it must not pull the upload hook into the main bundle.
+  assert.doesNotMatch(skeleton, /useMovementPhotoStaging/)
+  assert.match(
+    skeleton,
+    /<Skeleton key=\{index\} className="aspect-square w-full" \/>/,
+  )
+  assert.match(
+    source,
+    /<div className=\{MOVEMENT_DETAIL_GALLERY_WIDTH_CLASS\}>\s+<PhotoGallery/,
+  )
   assert.match(skeleton, /context === 'site' && \(/)
   assert.match(skeleton, /isAdmin && </)
 })

@@ -17,11 +17,6 @@ import {
   StickyNote,
   Link2,
   ExternalLink,
-  ChevronLeft,
-  ChevronRight,
-  Maximize2,
-  Trash2,
-  Upload,
   RefreshCw,
   Pencil,
   Store,
@@ -41,6 +36,15 @@ import { formatElapsedDuration } from '@/lib/duration'
 import { localizedName } from '@/lib/localizedName'
 import { uploadMovementPhotosDirectly } from '@/lib/movementPhotoUpload'
 import { prepareMovementPhotos } from '@/lib/movementPhotoCompression'
+import {
+  ALLOWED_MOVEMENT_PHOTO_TYPES,
+  MAX_MOVEMENT_PHOTOS,
+} from '@/components/useMovementPhotoStaging'
+import {
+  MOVEMENT_DETAIL_GALLERY_WIDTH_CLASS,
+  detailPhotosToGalleryItems,
+  type StagedPhotoLike,
+} from '@/lib/movementPhotoGallery'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import {
   CONTRACTOR_CODE_MAX_LENGTH,
@@ -64,10 +68,10 @@ import {
   MovementBadge,
   Notice,
   PageHeader,
+  PhotoGallery,
   WorkshopPurposeBadge,
   useConfirm,
   type DescriptionListItem,
-  type LightboxItem,
 } from '@/components/ui'
 import { LtrValue } from '@/components/ui/InfoGrid'
 // wave6-J3/J4 — admin-only header menu: the single correction dialog, or
@@ -113,8 +117,19 @@ export function MovementDetail({
   const [photoItems, setPhotoItems] = useState<
     (EntryExitPhoto & { url: string })[]
   >([])
-  const [photoCarouselIndex, setPhotoCarouselIndex] = useState(0)
+  // Index of the photo shown in the gallery's main box and in the lightbox.
+  const [photoIndex, setPhotoIndex] = useState(0)
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  // Local previews of the files being uploaded. `base` is the saved-photo
+  // list they were added to: as soon as the refetch replaces that list, the
+  // previews give way to the saved photos in the same render.
+  const [pendingUploads, setPendingUploads] = useState<{
+    base: (EntryExitPhoto & { url: string })[]
+    photos: StagedPhotoLike[]
+  } | null>(null)
+  // Object URLs of those previews that are still alive, for unmount cleanup.
+  const pendingPreviewUrlsRef = useRef<Set<string>>(new Set())
   // Signed URLs keyed by storage path, kept across re-fetches so navigating
   // or re-loading the movement never re-requests a still-fresh URL.
   const signedUrlCacheRef = useRef<
@@ -159,14 +174,6 @@ export function MovementDetail({
   const [codeEditValue, setCodeEditValue] = useState('')
   const [codeEditBusy, setCodeEditBusy] = useState(false)
   const [codeEditError, setCodeEditError] = useState<string | null>(null)
-  const photoUrls = photoItems.map((item) => item.url)
-  const lightboxItems: LightboxItem[] =
-    photoUrls.length > 0
-      ? photoItems.map((item) => ({ id: item.id, src: item.url }))
-      : photoUrl
-        ? [{ id: 'legacy-photo', src: photoUrl }]
-        : []
-
   const startRequest = useListRequest()
   const fetchData = useCallback(async () => {
     const signal = startRequest()
@@ -187,7 +194,7 @@ export function MovementDetail({
       setLinkedProject(null)
       setPhotoUrl(null)
       setPhotoItems([])
-      setPhotoCarouselIndex(0)
+      setPhotoIndex(0)
       setLightboxOpen(false)
       setDriverChanges([])
       setCurrentDriverMobileNumber(null)
@@ -531,6 +538,14 @@ export function MovementDetail({
     fetchData()
   }, [fetchData])
 
+  useEffect(() => {
+    const previewUrls = pendingPreviewUrlsRef.current
+    return () => {
+      for (const url of previewUrls) URL.revokeObjectURL(url)
+      previewUrls.clear()
+    }
+  }, [])
+
   const addPhotos = async (files: FileList | null) => {
     if (!files?.length || photoItems.length >= 3) return
     const selected = Array.from(files)
@@ -547,6 +562,19 @@ export function MovementDetail({
     }
     setPhotoBusy(true)
     setPhotoActionError(null)
+    // Show the selected files in the gallery right away, after the saved
+    // photos, with the busy overlay; the first of them becomes the main image.
+    const previews: StagedPhotoLike[] = selected.map((file, index) => ({
+      id: `pending-${index}`,
+      name: file.name,
+      previewUrl: URL.createObjectURL(file),
+      status: 'preparing',
+      progress: 0,
+    }))
+    for (const photo of previews)
+      pendingPreviewUrlsRef.current.add(photo.previewUrl)
+    setPendingUploads({ base: photoItems, photos: previews })
+    setPhotoIndex(photoItems.length)
     let failureMessage: string | null = user
       ? null
       : t('photo_authorization_failed')
@@ -574,12 +602,17 @@ export function MovementDetail({
     } finally {
       setPhotoBusy(false)
     }
-    if (failureMessage) {
-      setPhotoActionError(failureMessage)
-      await fetchData()
-      return
-    }
+    if (failureMessage) setPhotoActionError(failureMessage)
     await fetchData()
+    // The saved photos are on screen now; drop this batch of previews (a
+    // newer batch, if any, is left alone).
+    setPendingUploads((current) =>
+      current?.photos === previews ? null : current,
+    )
+    for (const photo of previews) {
+      URL.revokeObjectURL(photo.previewUrl)
+      pendingPreviewUrlsRef.current.delete(photo.previewUrl)
+    }
   }
 
   const deletePhoto = async (photoId: string) => {
@@ -615,7 +648,7 @@ export function MovementDetail({
       setPhotoActionError(t('photoDeleteFailed'))
       return
     }
-    setPhotoCarouselIndex(0)
+    setPhotoIndex(0)
     await fetchData()
   }
 
@@ -695,6 +728,26 @@ export function MovementDetail({
     profile?.role === 'admin' ||
     (profile?.role !== 'monitor' && profile?.role != null && isOwnMovement) ||
     (isWorkshopRole && isWorkshopMovement)
+
+  // The gallery shows the saved photos (or the legacy `photo_url` photo when
+  // the movement has no photo rows) followed by the files being uploaded.
+  // Only the uploader or an admin gets the remove button of a photo.
+  const galleryItems = detailPhotosToGalleryItems({
+    saved: photoItems,
+    legacyUrl: photoUrl,
+    pending: pendingUploads?.base === photoItems ? pendingUploads.photos : [],
+    viewer: { userId: user?.id, role: profile?.role },
+    busy: photoBusy,
+    alt: t('photoGalleryMainAlt'),
+  })
+  const selectedPhotoIndex = galleryItems[photoIndex] ? photoIndex : 0
+  const selectPhoto = (id: string) => {
+    const index = galleryItems.findIndex((item) => item.id === id)
+    if (index >= 0) setPhotoIndex(index)
+  }
+  // Nothing to add and nothing to remove: a plain read-only gallery.
+  const photosReadOnly =
+    !canAddPhotos && !galleryItems.some((item) => item.removable !== false)
 
   // wave6-J3 — which driver path the admin edit must take. An open site visit
   // keeps its immutable entry driver, so the dialog routes that change through
@@ -958,116 +1011,32 @@ export function MovementDetail({
               <Alert type="error">{photoActionError}</Alert>
             </div>
           )}
-          {photoUrls.length > 0 ? (
-            <div
-              className="relative rounded-lg overflow-hidden"
-              style={{
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                height: '320px',
+          {/* The "no photo" state lives in the gallery's main box, so the
+              block keeps the same height with and without photos. */}
+          <div className={MOVEMENT_DETAIL_GALLERY_WIDTH_CLASS}>
+            <PhotoGallery
+              photos={galleryItems}
+              max={MAX_MOVEMENT_PHOTOS}
+              selectedId={galleryItems[selectedPhotoIndex]?.id ?? null}
+              onSelect={selectPhoto}
+              // A disabled file input ignores the click, so no new files are
+              // accepted while a photo request is running.
+              onAdd={
+                canAddPhotos ? () => photoInputRef.current?.click() : undefined
+              }
+              onRemove={(id) => void deletePhoto(id)}
+              onOpen={(id) => {
+                selectPhoto(id)
+                setLightboxOpen(true)
               }}
-            >
-              <div className="absolute inset-0 flex items-center justify-center">
-                <img
-                  src={photoUrls[photoCarouselIndex]}
-                  alt={`${t('photoGalleryMainAlt')} ${photoCarouselIndex + 1}`}
-                  className="max-h-full max-w-full object-contain cursor-zoom-in"
-                  onClick={() => setLightboxOpen(true)}
-                />
-              </div>
-              <button
-                type="button"
-                aria-label={t('photoGalleryOpenAria')}
-                onClick={() => setLightboxOpen(true)}
-                className="absolute top-1 end-1 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
-              >
-                <Maximize2 size={16} />
-              </button>
-              {profile?.role !== 'monitor' &&
-                (photoItems[photoCarouselIndex]?.uploaded_by === user?.id ||
-                  profile?.role === 'admin') && (
-                  <button
-                    type="button"
-                    disabled={photoBusy}
-                    onClick={() =>
-                      deletePhoto(photoItems[photoCarouselIndex].id)
-                    }
-                    className="absolute top-1 start-1 rounded-full bg-danger p-1.5 text-white hover:opacity-90"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              {photoUrls.length > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPhotoCarouselIndex(
-                        (prev) =>
-                          (prev - 1 + photoUrls.length) % photoUrls.length,
-                      )
-                    }
-                    className="absolute start-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
-                  >
-                    <ChevronLeft size={20} className="rtl-flip" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPhotoCarouselIndex(
-                        (prev) => (prev + 1) % photoUrls.length,
-                      )
-                    }
-                    className="absolute end-1 top-1/2 -translate-y-1/2 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
-                  >
-                    <ChevronRight size={20} className="rtl-flip" />
-                  </button>
-                  <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-white bg-black/50 rounded-full px-2 py-0.5">
-                    {photoCarouselIndex + 1} / {photoUrls.length}
-                  </span>
-                </>
-              )}
-            </div>
-          ) : photoUrl ? (
-            <div
-              className="relative rounded-lg overflow-hidden"
-              style={{
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                height: '320px',
-              }}
-            >
-              <div className="absolute inset-0 flex items-center justify-center">
-                <img
-                  src={photoUrl}
-                  alt={t('photoGalleryMainAlt')}
-                  className="max-h-full max-w-full object-contain cursor-zoom-in"
-                  onClick={() => setLightboxOpen(true)}
-                />
-              </div>
-              <button
-                type="button"
-                aria-label={t('photoGalleryOpenAria')}
-                onClick={() => setLightboxOpen(true)}
-                className="absolute top-1 end-1 rounded-full p-1.5 bg-black/40 hover:bg-black/60 text-white transition-colors"
-              >
-                <Maximize2 size={16} />
-              </button>
-            </div>
-          ) : (
-            <p className="text-sm text-muted italic">{t('noPhoto')}</p>
-          )}
-          {canAddPhotos && photoItems.length < 3 && (
-            <label
-              className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-sm hover:bg-surface-hover"
-              style={{ borderColor: 'var(--border)' }}
-            >
-              <Upload size={16} />
-              {photoBusy ? t('loading') : t('addPhoto')}
+              readOnly={photosReadOnly}
+            />
+            {canAddPhotos && (
               <input
+                ref={photoInputRef}
                 type="file"
                 multiple
-                accept="image/jpeg,image/png,image/webp"
+                accept={ALLOWED_MOVEMENT_PHOTO_TYPES.join(',')}
                 className="hidden"
                 disabled={photoBusy}
                 onChange={(event) => {
@@ -1075,8 +1044,8 @@ export function MovementDetail({
                   event.target.value = ''
                 }}
               />
-            </label>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
@@ -1358,9 +1327,9 @@ export function MovementDetail({
       <Lightbox
         open={lightboxOpen}
         onOpenChange={setLightboxOpen}
-        items={lightboxItems}
-        index={photoCarouselIndex}
-        onIndexChange={setPhotoCarouselIndex}
+        items={galleryItems}
+        index={selectedPhotoIndex}
+        onIndexChange={setPhotoIndex}
       />
 
       {canEditContractorCode && (

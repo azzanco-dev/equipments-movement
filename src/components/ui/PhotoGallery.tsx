@@ -14,6 +14,10 @@ export interface PhotoGalleryItem {
   status: PhotoGalleryItemStatus
   /** Upload progress 0-100. Only meaningful while status is 'uploading'. */
   progress?: number
+  /** Set to `false` to hide the remove button of this photo only, e.g. when
+   * the viewer may delete some photos but not others. Defaults to `true`;
+   * `onRemove` and `readOnly` still apply to the whole gallery. */
+  removable?: boolean
 }
 
 type Translate = (key: TranslationKey) => string
@@ -252,7 +256,7 @@ function PhotoSquare({
           t={t}
         />
       )}
-      {onRemove && item.status !== 'uploading' && (
+      {onRemove && item.removable !== false && item.status !== 'uploading' && (
         <button
           type="button"
           onClick={() => onRemove(item.id)}
