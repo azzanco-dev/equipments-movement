@@ -1,4 +1,5 @@
 import { useAuth } from '@/auth/AuthContext'
+import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
 import { VisitsTable } from '@/components/visits/VisitsTable'
 
 export interface HomeVisitsTableProps {
@@ -18,6 +19,10 @@ export interface HomeVisitsTableProps {
  * workshop roles see workshop visits, a foreman sees the site visits whose
  * ENTRY they recorded. The list state stays under the `v` URL prefix so it
  * never collides with the log tab's own state and Back restores both.
+ *
+ * A foreman can filter by company and project, and is offered only the ones
+ * on their own movements. The workshop home gets no such filter: a workshop
+ * visit has neither.
  */
 export function HomeVisitsTable({
   workshopMode,
@@ -25,12 +30,14 @@ export function HomeVisitsTable({
   refreshToken,
 }: HomeVisitsTableProps) {
   const { user } = useAuth()
+  const ownRelations = useCompanyProjectFilters({ supervisorId: user?.id })
   // The foreman scope needs the signed-in user; never list unscoped.
   if (!user) return null
   return (
     <VisitsTable
       context={workshopMode ? 'workshop' : 'site'}
       supervisorId={workshopMode ? undefined : user.id}
+      asyncFields={workshopMode ? undefined : ownRelations}
       onSelectMovement={onSelectMovement}
       refreshToken={refreshToken}
       urlPrefix="v"

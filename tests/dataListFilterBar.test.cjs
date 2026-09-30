@@ -334,6 +334,87 @@ test('company and project searches are narrow, bounded and server-side', () => {
   assert.match(source, /\.in\('id', /)
 })
 
+test('the foreman scope limits the options to their own movements', () => {
+  const source = read('src/components/data-list/relationFilters.ts')
+  // One request: an inner embed of the movements through the named FK column,
+  // filtered to the foreman and capped at one embedded row per option.
+  assert.match(
+    source,
+    /`id,name_ar,name_en,entry_exit_logs!\$\{MOVEMENT_FK\[table\]\}!inner\(id\)`/,
+  )
+  assert.match(source, /companies: 'company_id',\s*projects: 'project_id',/)
+  assert.match(source, /\.eq\('entry_exit_logs\.supervisor_id', supervisorId\)/)
+  assert.match(source, /\.limit\(1, \{ foreignTable: 'entry_exit_logs' \}\)/)
+  // The scoped and the unscoped search share the order, the 20-row cap, the
+  // sanitized term and the rethrown error (a load error, never "no results").
+  assert.match(source, /let request = source\(\)\s*\.order\(nameColumn\)/)
+  assert.match(source, /if \(error\) throw error/)
+  // Ids restored from the URL resolve through the same scoped source.
+  assert.match(source, /await source\(\)\.in\('id', /)
+  // No full table is ever loaded to filter in the browser.
+  assert.doesNotMatch(source, /select\('\*'\)/)
+  assert.match(
+    source,
+    /namedRelationFilter\('companies', lang, \{ supervisorId \}\)/,
+  )
+  assert.match(source, /\[lang, supervisorId\]/)
+})
+
+test('both /logs views search every company and project', () => {
+  const source = read('src/screens/admin-home/LogsScreen.tsx')
+  // Unscoped for admin and monitor, shared by the log and the visits view.
+  assert.match(source, /const relationFilters = useCompanyProjectFilters\(\)/)
+  assert.match(
+    source,
+    /\{ \.\.\.VISITS_ASYNC_FILTERS, \.\.\.relationFilters \}/,
+  )
+  assert.match(source, /asyncFields=\{visitsAsyncFilters\}/)
+})
+
+test('the foreman home filters company and project on both tabs', () => {
+  const visits = read('src/components/home/HomeVisitsCard.tsx')
+  assert.match(
+    visits,
+    /useCompanyProjectFilters\(\{ supervisorId: user\?\.id \}\)/,
+  )
+  // The workshop home gets no company / project filter.
+  assert.match(
+    visits,
+    /asyncFields=\{workshopMode \? undefined : ownRelations\}/,
+  )
+
+  const table = read('src/components/visits/VisitsTable.tsx')
+  assert.match(table, /<FilterButton\s+fields=\{config\.filterFields\}/)
+  assert.match(table, /applyListFilters\(query, filters, allowedFilterKeys\)/)
+
+  const log = read('src/components/home/HomeMovementsCard.tsx')
+  assert.match(log, /useDataListState\(homeMovementsListConfig\)/)
+  assert.match(
+    log,
+    /useCompanyProjectFilters\(\{ supervisorId: user\?\.id \}\)/,
+  )
+  assert.match(log, /\{!workshopMode && \(\s*<FilterButton/)
+  assert.match(log, /applyListFilters\(query, filters, HOME_LOG_FILTER_KEYS\)/)
+  const home = configs.homeMovementsListConfig.filterFields
+  assert.deepEqual(
+    Array.from(home, (field) => field.key),
+    ['company_id', 'project_id'],
+  )
+  for (const field of home) {
+    assert.equal(field.multiple, true)
+    assert.equal(filterBarOperator(field), 'in')
+  }
+})
+
+test('the filter button opens the shared dialog and hides without fields', () => {
+  const source = read('src/components/data-list/FilterButton.tsx')
+  assert.match(source, /if \(!fields\.length\) return null/)
+  assert.match(source, /<FilterDialog\b/)
+  assert.match(source, /countActiveFilters\(filters\)/)
+  assert.match(source, /t\('filters'\)/)
+  assert.doesNotMatch(source, /btn-outline/)
+})
+
 test('the /logs foreman filter is a bounded server-side search', () => {
   const source = read('src/screens/admin-home/LogsScreen.tsx')
   assert.match(source, /asyncFields=\{/)

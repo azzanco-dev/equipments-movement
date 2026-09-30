@@ -13,19 +13,22 @@ import {
   WorkshopPurposeBadge,
   type DataTableColumn,
 } from '@/components/ui'
+import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import type { FilterBarAsyncField } from '@/components/data-list/FilterBar'
+import { FilterButton } from '@/components/data-list/FilterButton'
+import type { DataListConfig } from '@/components/data-list/types'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
-import { localizedName } from '@/lib/localizedName'
 import {
   EQUIPMENT_VISITS_SELECT,
   EQUIPMENT_VISITS_VIEW,
   adminVisitsListConfig,
   buildVisitSearchFilter,
+  foremanVisitsListConfig,
   formatVisitDuration,
   visitContextFilter,
   visitExportColumns,
@@ -37,10 +40,18 @@ import {
   type VisitsContext,
 } from '@/lib/visitsList'
 
+/** A config's allowlisted filter keys; nothing else reaches PostgREST. */
+const filterKeys = (config: DataListConfig) =>
+  new Set(config.filterFields.map((field) => field.key))
+
 /** Allowlisted filter keys of the admin log's visits view. */
-const ADMIN_FILTER_KEYS = new Set(
-  adminVisitsListConfig.filterFields.map((field) => field.key),
-)
+const ADMIN_FILTER_KEYS = filterKeys(adminVisitsListConfig)
+
+/** The foreman home filters by company and project only. */
+const FOREMAN_FILTER_KEYS = filterKeys(foremanVisitsListConfig)
+
+/** The workshop home has no filters, so no key is allowed through. */
+const NO_FILTER_KEYS = filterKeys(visitsListConfig)
 
 export interface VisitsTableProps {
   /** `site` / `workshop` lists one movement context; `all` lists both. */
@@ -52,12 +63,17 @@ export interface VisitsTableProps {
    */
   supervisorId?: string
   /**
-   * `home` is the compact home tab: search only. `log` is the admin log's
-   * visits view: the shared toolbar with its filter dialog, the foreman and
-   * context columns, and an Excel export of every page of the current set.
+   * `home` is the compact home tab: the search box, plus a filter button for
+   * the foreman's site visits (company and project only; the workshop home
+   * has no filters). `log` is the admin log's visits view: the shared toolbar
+   * with its filter dialog, the foreman and context columns, and an Excel
+   * export of every page of the current set.
    */
   variant?: 'home' | 'log'
-  /** Relational filters for the `log` variant (the foreman search). */
+  /**
+   * Relational filter searches by field key: the foreman, company and project
+   * of the `log` variant; the foreman home's own companies and projects.
+   */
   asyncFields?: Record<string, FilterBarAsyncField>
   /** Opens the movement detail of one side of the visit. */
   onSelectMovement?: (id: string) => void
@@ -92,7 +108,17 @@ export function VisitsTable({
 }: VisitsTableProps) {
   const { t, lang } = useI18n()
   const isLog = variant === 'log'
-  const config = isLog ? adminVisitsListConfig : visitsListConfig
+  // The home's site list is the foreman's; the workshop home has no filters.
+  const config = isLog
+    ? adminVisitsListConfig
+    : context === 'site'
+      ? foremanVisitsListConfig
+      : visitsListConfig
+  const allowedFilterKeys = isLog
+    ? ADMIN_FILTER_KEYS
+    : context === 'site'
+      ? FOREMAN_FILTER_KEYS
+      : NO_FILTER_KEYS
   const list = useDataListState(config, urlPrefix)
   const { search, searchInput, setSearchInput, filters } = list
   const [visits, setVisits] = useState<EquipmentVisitRow[]>([])
@@ -123,9 +149,17 @@ export function VisitsTable({
     if (supervisorId) query = query.eq('entry_supervisor_id', supervisorId)
     const searchFilter = buildVisitSearchFilter(search)
     if (searchFilter) query = query.or(searchFilter)
-    // Only the admin variant has filters; keys are allowlisted either way.
-    return isLog ? applyListFilters(query, filters, ADMIN_FILTER_KEYS) : query
-  }, [ascending, context, filters, isLog, search, sortKey, supervisorId])
+    // Keys are allowlisted per config before they reach PostgREST.
+    return applyListFilters(query, filters, allowedFilterKeys)
+  }, [
+    allowedFilterKeys,
+    ascending,
+    context,
+    filters,
+    search,
+    sortKey,
+    supervisorId,
+  ])
 
   const startListRequest = useListRequest()
   const fetchVisits = useCallback(async () => {
@@ -272,23 +306,13 @@ export function VisitsTable({
           <Badge tone="warning">{t('awaitingClassification')}</Badge>
         ),
     }
-    const company: DataTableColumn<EquipmentVisitRow> = {
-      key: 'company_name',
-      header: t('company'),
+    // One column for both (owner request 2026-09-30): the company with the
+    // project under it. The Excel export keeps them as two columns.
+    const companyProject: DataTableColumn<EquipmentVisitRow> = {
+      key: 'company_project',
+      header: t('logsColWhere'),
       hideBelow: 'md',
-      cell: (visit) =>
-        visit.company_id
-          ? localizedName(lang, visit.company_name_ar, visit.company_name_en)
-          : '—',
-    }
-    const project: DataTableColumn<EquipmentVisitRow> = {
-      key: 'project_name',
-      header: t('project'),
-      hideBelow: 'lg',
-      cell: (visit) =>
-        visit.project_id
-          ? localizedName(lang, visit.project_name_ar, visit.project_name_en)
-          : '—',
+      cell: (visit) => <CompanyProjectCell row={visit} />,
     }
     const driver: DataTableColumn<EquipmentVisitRow> = {
       key: 'driver_name',
@@ -363,21 +387,19 @@ export function VisitsTable({
         ? [
             equipment,
             state,
-            company,
-            project,
+            companyProject,
             driver,
             foreman,
             entryAt,
             exitAt,
             duration,
           ]
-        : [equipment, state, company, project, entryAt, exitAt, duration]
+        : [equipment, state, companyProject, entryAt, exitAt, duration]
     return [
       equipment,
       state,
       contextColumn,
-      company,
-      project,
+      companyProject,
       foreman,
       entryAt,
       exitAt,
@@ -415,12 +437,22 @@ export function VisitsTable({
           </Button>
         </div>
       ) : (
-        <SearchInput
-          value={searchInput}
-          onValueChange={setSearchInput}
-          placeholder={t('searchVisitsWithContractorCode')}
-          className="w-full sm:w-[340px]"
-        />
+        // Search and the filter button share one row on every width; the
+        // button is absent when the config has no filter fields (workshop).
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <SearchInput
+            value={searchInput}
+            onValueChange={setSearchInput}
+            placeholder={t('searchVisitsWithContractorCode')}
+            className="min-w-0 flex-1 sm:w-[340px] sm:flex-none"
+          />
+          <FilterButton
+            fields={config.filterFields}
+            filters={filters}
+            onChange={list.setFilters}
+            asyncFields={asyncFields}
+          />
+        </div>
       )}
 
       {exportNote && (

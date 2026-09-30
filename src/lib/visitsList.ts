@@ -4,6 +4,7 @@ import { sanitizeSearchTerm } from '@/lib/search'
 import type { Language, TranslationKey } from '@/i18n/translations'
 import type {
   DataListConfig,
+  FilterField,
   FilterOperator,
 } from '@/components/data-list/types'
 import type { ExcelColumn } from '@/lib/excel'
@@ -95,9 +96,9 @@ export const visitsListConfig: DataListConfig = {
   // Newest visit first; `entry_id` breaks ties so paging is deterministic.
   defaultSort: 'entry_at',
   defaultDirection: 'desc',
-  // The home tab deliberately exposes no filter builder: the context is fixed
-  // by the role and the state toggle is the only other axis the owner asked
-  // for. Filter fields stay an allowlist for whoever adds one later.
+  // The workshop home exposes no filters: the context is fixed by the role
+  // and a workshop visit has no company or project. The foreman home adds
+  // those two through `foremanVisitsListConfig` below.
   filterFields: [],
   sortableFields: [
     { key: 'entry_at', label: { ar: 'وقت الدخول', en: 'Entry time' } },
@@ -105,16 +106,42 @@ export const visitsListConfig: DataListConfig = {
   ],
 }
 
-const VISIT_TEXT_OPS: FilterOperator[] = [
-  'eq',
-  'neq',
-  'in',
-  'not_in',
-  'like',
-  'not_like',
-  'is_set',
-  'is_not_set',
+/**
+ * Company and project as multi-selects by id (owner request 2026-09-30), the
+ * same pattern as the movement log: `in` over the view's `company_id` /
+ * `project_id` columns. The options are searched server-side through the
+ * screen's `asyncFields` (`useCompanyProjectFilters`), never preloaded.
+ */
+const VISIT_COMPANY_PROJECT_FILTERS: FilterField[] = [
+  {
+    key: 'company_id',
+    label: 'company',
+    type: 'select',
+    operators: ['in'],
+    options: [],
+    multiple: true,
+  },
+  {
+    key: 'project_id',
+    label: 'project',
+    type: 'select',
+    operators: ['in'],
+    options: [],
+    multiple: true,
+  },
 ]
+
+/**
+ * The foreman home's visits tab: the home search and sort plus the company
+ * and project filters only. The screen scopes their options to the companies
+ * and projects of the foreman's own movements. The workshop home keeps
+ * `visitsListConfig`: a workshop visit has neither.
+ */
+export const foremanVisitsListConfig: DataListConfig = {
+  ...visitsListConfig,
+  id: 'homeSiteVisits',
+  filterFields: VISIT_COMPANY_PROJECT_FILTERS,
+}
 
 const VISIT_DATE_OPS: FilterOperator[] = [
   'eq',
@@ -133,9 +160,10 @@ const VISIT_DATE_OPS: FilterOperator[] = [
  *
  * Same search and sort as the home tab, plus an allowlisted filter set that
  * mirrors the movement log's: every key is a column of `movement_visits`
- * (`equipment_ownership_status` since migration 0106), and the foreman is
- * searched server-side through the screen's async field for
- * `entry_supervisor_id` instead of injected options.
+ * (`equipment_ownership_status` since migration 0106), and the foreman, the
+ * company and the project are searched server-side through the screen's async
+ * fields (`entry_supervisor_id`, `company_id`, `project_id`) instead of
+ * injected options.
  */
 export const adminVisitsListConfig: DataListConfig = {
   ...visitsListConfig,
@@ -190,18 +218,7 @@ export const adminVisitsListConfig: DataListConfig = {
         },
       ],
     },
-    {
-      key: 'company_name_ar',
-      label: 'company',
-      type: 'text',
-      operators: VISIT_TEXT_OPS,
-    },
-    {
-      key: 'project_name_ar',
-      label: 'project',
-      type: 'text',
-      operators: VISIT_TEXT_OPS,
-    },
+    ...VISIT_COMPANY_PROJECT_FILTERS,
     {
       key: 'entry_supervisor_id',
       label: 'logsColForeman',

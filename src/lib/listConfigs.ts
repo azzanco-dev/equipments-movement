@@ -284,6 +284,37 @@ export const movementsListConfig: DataListConfig = {
     { key: 'movement_type', label: 'movementType' },
   ],
 }
+
+/**
+ * The foreman home's log tab (owner request 2026-09-30). Search, sort and
+ * paging are the movements list's; the filter dialog holds company and project
+ * only, as multi-selects by id (`in` over the view's `company_id` /
+ * `project_id`), the same pattern as `/logs`. The home scopes their options to
+ * the foreman's own movements. Movement type and date stay the two inline
+ * controls they already were and are not part of this allowlist.
+ */
+export const homeMovementsListConfig: DataListConfig = {
+  ...movementsListConfig,
+  id: 'homeMovements',
+  filterFields: [
+    {
+      key: 'company_id',
+      label: 'company',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'project_id',
+      label: 'project',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+  ],
+}
 export const usersListConfig: DataListConfig = {
   id: 'users',
   searchPlaceholder: {

@@ -35,6 +35,7 @@ function loadLibModule(name, cache = new Map()) {
 const {
   adminVisitsListConfig,
   buildVisitSearchFilter,
+  foremanVisitsListConfig,
   formatVisitDuration,
   visitContextFilter,
   visitExportColumns,
@@ -268,15 +269,19 @@ test('the admin visits filters are an allowlist of movement_visits columns', () 
   assert.deepEqual(
     [...keys].sort(),
     [
-      'company_name_ar',
+      'company_id',
       'entry_at',
       'entry_supervisor_id',
       'equipment_ownership_status',
       'is_open',
-      'project_name_ar',
+      'project_id',
       'workshop_purpose',
     ].sort(),
   )
+  // Every filter key is a column the view's select list also reads.
+  const columns = EQUIPMENT_VISITS_SELECT.split(',')
+  for (const key of ['company_id', 'project_id'])
+    assert.ok(columns.includes(key), key)
   // The owner filter offers the same five owners as the movement log.
   const owner = adminVisitsListConfig.filterFields.find(
     (field) => field.key === 'equipment_ownership_status',
@@ -297,9 +302,47 @@ test('the admin visits filters are an allowlist of movement_visits columns', () 
   assert.notEqual(adminVisitsListConfig.id, visitsListConfig.id)
 })
 
+test('visits filter company and project by id, several at once', () => {
+  // Owner request 2026-09-30: selects, never the old name text boxes.
+  for (const config of [adminVisitsListConfig, foremanVisitsListConfig]) {
+    const keys = config.filterFields.map((field) => field.key)
+    assert.ok(!keys.includes('company_name_ar'), config.id)
+    assert.ok(!keys.includes('project_name_ar'), config.id)
+    for (const key of ['company_id', 'project_id']) {
+      const field = config.filterFields.find((item) => item.key === key)
+      assert.ok(field, `${config.id} ${key}`)
+      assert.equal(field.type, 'select')
+      assert.equal(field.multiple, true)
+      assert.deepEqual([...field.operators], ['in'])
+    }
+  }
+})
+
+test('the foreman home filters by company and project only', () => {
+  assert.deepEqual(
+    [...foremanVisitsListConfig.filterFields.map((field) => field.key)],
+    ['company_id', 'project_id'],
+  )
+  // Same search and sort as the other two visits lists, under its own id.
+  assert.equal(foremanVisitsListConfig.defaultSort, 'entry_at')
+  assert.deepEqual(
+    [...foremanVisitsListConfig.searchFields],
+    [...visitsListConfig.searchFields],
+  )
+  assert.notEqual(foremanVisitsListConfig.id, visitsListConfig.id)
+  assert.notEqual(foremanVisitsListConfig.id, adminVisitsListConfig.id)
+  // A workshop visit has no company or project: the workshop home has no
+  // filters at all.
+  assert.deepEqual([...visitsListConfig.filterFields], [])
+})
+
 test('new Arabic copy in the visits configs has no hamza or madda alif', () => {
   const labels = []
-  for (const config of [visitsListConfig, adminVisitsListConfig]) {
+  for (const config of [
+    visitsListConfig,
+    adminVisitsListConfig,
+    foremanVisitsListConfig,
+  ]) {
     labels.push(config.searchPlaceholder.ar)
     for (const field of config.filterFields) {
       if (typeof field.label === 'object') labels.push(field.label.ar)

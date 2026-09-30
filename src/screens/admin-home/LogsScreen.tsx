@@ -14,6 +14,7 @@ import {
   WorkshopPurposeBadge,
 } from '@/components/ui'
 import type { DataTableColumn } from '@/components/ui'
+import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import type { FilterBarAsyncField } from '@/components/data-list/FilterBar'
@@ -23,7 +24,6 @@ import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDateTime } from '@/lib/dateFormat'
-import { localizedName } from '@/lib/localizedName'
 import { logsListConfig } from '@/lib/listConfigs'
 import {
   MOVEMENT_LOG_ADMIN_SELECT,
@@ -152,11 +152,16 @@ export interface LogsScreenProps {
  * view; the movement log is `?view=log`.
  */
 export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
-  // Company and project are multi-selects searched server-side; the foreman
+  // Company and project are multi-selects searched server-side over every
+  // company and project (admin and monitor), in both views; the foreman
   // filter is module-level because it never changes.
   const relationFilters = useCompanyProjectFilters()
   const logsAsyncFilters = useMemo(
     () => ({ ...LOGS_ASYNC_FILTERS, ...relationFilters }),
+    [relationFilters],
+  )
+  const visitsAsyncFilters = useMemo(
+    () => ({ ...VISITS_ASYNC_FILTERS, ...relationFilters }),
     [relationFilters],
   )
   const { t, lang } = useI18n()
@@ -373,16 +378,8 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
       key: 'company',
       header: t('logsColWhere'),
       hideBelow: 'md',
-      cell: (row) => {
-        if (!row.company_id && !row.project_id) return '—'
-        const company = row.company_id
-          ? localizedName(lang, row.company_name_ar, row.company_name_en)
-          : ''
-        const project = row.project_id
-          ? localizedName(lang, row.project_name_ar, row.project_name_en)
-          : ''
-        return [company, project].filter(Boolean).join(' · ')
-      },
+      // Company on top, project under it; shared with the visits table.
+      cell: (row) => <CompanyProjectCell row={row} />,
     },
     {
       key: 'driver_name',
@@ -446,7 +443,7 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
         <VisitsTable
           variant="log"
           context={tab}
-          asyncFields={VISITS_ASYNC_FILTERS}
+          asyncFields={visitsAsyncFilters}
           onSelectMovement={onSelectMovement}
           urlPrefix={VISITS_URL_PREFIX}
         />

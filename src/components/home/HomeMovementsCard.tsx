@@ -35,8 +35,16 @@ import {
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
+import { FilterButton } from '@/components/data-list/FilterButton'
+import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
 import { PAGE_SIZE_OPTIONS } from '@/components/data-list/types'
-import { movementsListConfig } from '@/lib/listConfigs'
+import { applyListFilters } from '@/lib/applyListFilters'
+import { homeMovementsListConfig } from '@/lib/listConfigs'
+
+/** The foreman log's allowlisted filter keys: company and project only. */
+const HOME_LOG_FILTER_KEYS = new Set(
+  homeMovementsListConfig.filterFields.map((field) => field.key),
+)
 
 /** Latest driver per open site entry, after any auditable driver changes. */
 async function loadLatestDriverNames(entryIds: string[], signal: AbortSignal) {
@@ -69,9 +77,15 @@ export interface HomeMovementsCardProps {
 }
 
 /**
- * The movement log tab. Search, movement type, date, ordering, and pagination
- * all run in PostgreSQL through `movement_log_search`, and the whole list
- * state lives in the URL so Back restores it.
+ * The movement log tab. Search, movement type, date, the foreman's company and
+ * project filters, ordering, and pagination all run in PostgreSQL through
+ * `movement_log_search`, and the whole list state lives in the URL so Back
+ * restores it.
+ *
+ * Company and project sit behind the filter button next to the search box
+ * (the shared filter dialog), for the foreman only: a workshop movement has
+ * neither. Their options are the companies and projects of the foreman's own
+ * movements.
  *
  * Rendered only while its tab is active (Radix unmounts inactive content), so
  * opening the visits tab costs no movement request.
@@ -86,8 +100,9 @@ function MovementLogTab({
 }: HomeMovementsCardProps) {
   const { t } = useI18n()
   const { user } = useAuth()
-  const list = useDataListState(movementsListConfig)
-  const { search, searchInput, setSearchInput } = list
+  const list = useDataListState(homeMovementsListConfig)
+  const { search, searchInput, setSearchInput, filters } = list
+  const ownRelations = useCompanyProjectFilters({ supervisorId: user?.id })
   const params = useSearchParams()
   const requestedType = params.get('movement_type')
   const filterType =
@@ -131,7 +146,11 @@ function MovementLogTab({
     })
     if (searchFilter) query = query.or(searchFilter)
 
-    if (!workshopMode) query = query.eq('supervisor_id', user.id)
+    if (!workshopMode) {
+      query = query.eq('supervisor_id', user.id)
+      // Company / project, allowlisted before they reach PostgREST.
+      query = applyListFilters(query, filters, HOME_LOG_FILTER_KEYS)
+    }
 
     if (filterType !== 'all') query = query.eq('movement_type', filterType)
     if (filterDate) {
@@ -174,6 +193,7 @@ function MovementLogTab({
     workshopMode,
     filterType,
     filterDate,
+    filters,
     search,
     startListRequest,
     list.page,
@@ -298,12 +318,24 @@ function MovementLogTab({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={searchInput}
-          onValueChange={setSearchInput}
-          placeholder={t('searchMovementRecords')}
-          className="w-full sm:w-[340px]"
-        />
+        {/* Search and the filter button share the first row on a phone, so
+            the two inline controls below keep their own row at 375 px. */}
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <SearchInput
+            value={searchInput}
+            onValueChange={setSearchInput}
+            placeholder={t('searchMovementRecords')}
+            className="min-w-0 flex-1 sm:w-[340px] sm:flex-none"
+          />
+          {!workshopMode && (
+            <FilterButton
+              fields={homeMovementsListConfig.filterFields}
+              filters={filters}
+              onChange={list.setFilters}
+              asyncFields={ownRelations}
+            />
+          )}
+        </div>
         <Select
           className="w-32"
           value={filterType}

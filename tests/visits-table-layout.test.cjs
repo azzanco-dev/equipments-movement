@@ -22,6 +22,59 @@ test('the visits duration cells use the 12 px text size', () => {
   )
 })
 
+test('company and project share one column in the visits and log tables', () => {
+  const visits = read('src/components/visits/VisitsTable.tsx')
+  assert.match(visits, /header: t\('logsColWhere'\)/)
+  assert.match(visits, /<CompanyProjectCell row=\{visit\} \/>/)
+  assert.doesNotMatch(visits, /key: 'company_name'|key: 'project_name'/)
+  assert.doesNotMatch(visits, /header: t\('(company|project)'\)/)
+
+  const logs = read('src/screens/admin-home/LogsScreen.tsx')
+  assert.match(logs, /header: t\('logsColWhere'\)/)
+  assert.match(logs, /<CompanyProjectCell row=\{row\} \/>/)
+  assert.doesNotMatch(logs, /join\(' · '\)/)
+
+  const translations = read('src/i18n/translations.ts')
+  assert.match(translations, /logsColWhere: 'الشركة \/ المشروع'/)
+  assert.match(translations, /logsColWhere: 'Company \/ project'/)
+})
+
+test('the company / project cell keeps the 44 px rows', () => {
+  const source = read('src/components/data-list/CompanyProjectCell.tsx')
+  // Project: smaller and lighter, tokens only.
+  assert.match(source, /className="truncate-safe text-xs text-muted"/)
+  assert.doesNotMatch(
+    source,
+    /(gray|slate|zinc|neutral|emerald)-\d|#[0-9a-f]{3,6}\b/i,
+  )
+  assert.doesNotMatch(source, /tracking-|uppercase/)
+  // Long names are cut, with the full name in the tooltip.
+  assert.match(source, /title=\{primary\}/)
+  assert.match(source, /title=\{secondary\}/)
+  assert.match(source, /max-w-\[14rem\]/)
+  // `truncate-safe` is line-height 1.5: 14 px and 12 px text are 21 + 18 =
+  // 39 px, under both the 44 px visits rows and the 40 px log rows.
+  const css = read('src/index.css')
+  assert.match(css, /\.truncate-safe \{[^}]*line-height: 1\.5;/)
+  assert.ok(14 * 1.5 + 12 * 1.5 <= 40)
+  // The row cells have no vertical padding that could push a row past it.
+  const table = read('src/components/ui/DataTable.tsx')
+  assert.match(
+    table,
+    /lg: \{ header: 'h-11', row: 'h-11', cell: 'px-3 text-sm' \}/,
+  )
+  assert.match(
+    table,
+    /md: \{ header: 'h-10 md:h-9', row: 'h-11 md:h-10', cell: 'px-3 text-sm' \}/,
+  )
+})
+
+test('the visits Excel export keeps company and project as two columns', () => {
+  const source = read('src/lib/visitsList.ts')
+  assert.match(source, /header: t\('company'\),/)
+  assert.match(source, /header: t\('project'\),/)
+})
+
 test('/logs opens on visits and keeps the log behind ?view=log', () => {
   const source = read('src/screens/admin-home/LogsScreen.tsx')
   assert.match(source, /const VIEWS: LogsView\[\] = \['visits', 'log'\]/)
