@@ -658,6 +658,12 @@ export const translations = {
     noUsers: 'لا يوجد مستخدمون',
     usersLoadError: 'تعذر تحميل المستخدمين',
     userDeleteError: 'تعذر حذف المستخدم.',
+    // wave-8-security — start
+    userDeleteHasRecords:
+      'لا يمكن حذف المستخدم لان له حركات او صور او تغييرات سائقين مسجلة باسمه.',
+    workshopExitEquipmentOnSite:
+      'لا يمكن تسجيل الخروج: المعدة داخل موقع حاليا، وخروجها يسجله من سجل دخولها او المدير.',
+    // wave-8-security — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -1914,6 +1920,12 @@ export const translations = {
     noUsers: 'No users',
     usersLoadError: 'Unable to load users',
     userDeleteError: 'Unable to delete the user.',
+    // wave-8-security — start
+    userDeleteHasRecords:
+      'This user cannot be deleted because movements, photos or driver changes are recorded under their name.',
+    workshopExitEquipmentOnSite:
+      'This exit cannot be registered: the equipment is currently inside a site, and its exit is registered by the user who registered its entry or by an admin.',
+    // wave-8-security — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',

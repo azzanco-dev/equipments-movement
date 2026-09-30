@@ -56,7 +56,6 @@ export async function POST(request: Request) {
         'movement_context',
         'registration_method',
         'driver_id',
-        'driver_name',
         'company_id',
         'project_id',
         'contractor_equipment_code',
@@ -218,9 +217,11 @@ export async function POST(request: Request) {
       movement_context: movementContext,
       registration_method:
         value('registration_method') === 'qr' ? 'qr' : 'manual',
-      driver_name: value('driver_name'),
       notes: value('notes'),
     }
+    // `driver_name` is never taken from the client: the sequence trigger
+    // (migration 0108) snapshots it from `driver_id`, and a driverless entry
+    // stores NULL in both columns.
     if (movementType === 'entry') {
       payload.driver_id = value('driver_id')
       payload.company_id = value('company_id')

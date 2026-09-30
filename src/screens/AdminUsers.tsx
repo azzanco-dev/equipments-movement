@@ -191,7 +191,12 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
       return
     const { error } = await supabase.from('profiles').delete().eq('id', user.id)
     if (error) {
-      setLoadError(t('userDeleteError'))
+      // 23503 = foreign_key_violation: the user still owns photos, driver
+      // changes or movements (migration 0109 made the photo link RESTRICT).
+      // Only the SQLSTATE is read; the raw message never reaches the user.
+      setLoadError(
+        t(error.code === '23503' ? 'userDeleteHasRecords' : 'userDeleteError'),
+      )
       return
     }
     fetchUsers()

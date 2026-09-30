@@ -10,6 +10,7 @@ export const MOVEMENT_ERROR_CODES = [
   'no_prior_entry',
   'exit_not_entry_owner',
   'exit_equipment_in_workshop',
+  'exit_equipment_on_site',
   'workshop_exit_owner',
   'invalid_sequence',
   'access_denied',
@@ -33,6 +34,10 @@ export function movementErrorCode(message: string): MovementErrorCode {
   if (message.includes('exit_not_entry_owner')) return 'exit_not_entry_owner'
   if (message.includes('exit_equipment_in_workshop'))
     return 'exit_equipment_in_workshop'
+  // wave-8-security (migration 0108): the symmetrical rule for a workshop exit
+  // on a unit whose open entry is a site entry.
+  if (message.includes('exit_equipment_on_site'))
+    return 'exit_equipment_on_site'
   if (
     message.includes('no prior entry') ||
     message.includes('not inside the gate')
@@ -55,6 +60,7 @@ export function movementErrorCode(message: string): MovementErrorCode {
 export function movementErrorStatus(code: MovementErrorCode): number {
   return code === 'exit_not_entry_owner' ||
     code === 'exit_equipment_in_workshop' ||
+    code === 'exit_equipment_on_site' ||
     code === 'workshop_exit_owner' ||
     code === 'access_denied'
     ? 403

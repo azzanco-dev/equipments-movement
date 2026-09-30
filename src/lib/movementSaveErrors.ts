@@ -12,6 +12,7 @@ const MOVEMENT_SAVE_ERROR_KEYS: Record<string, TranslationKey> = {
   no_prior_entry: 'noPriorEntryAtSelectedTime',
   exit_not_entry_owner: 'siteExitNotEntryOwner',
   exit_equipment_in_workshop: 'siteExitEquipmentInWorkshop',
+  exit_equipment_on_site: 'workshopExitEquipmentOnSite',
   workshop_exit_owner: 'workshopExitOwner',
   invalid_photos: 'invalidPhotoType',
   photo_required: 'workshopPhotoRequired',

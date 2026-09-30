@@ -678,6 +678,23 @@ export function MovementDetail({
     !isWorkshopMovement &&
     !linkedLog &&
     log.supervisor_id === user?.id
+  // Who may act on this movement. Both rules only decide what is shown; they
+  // are enforced in PostgreSQL (migrations 0108 and 0109).
+  const isWorkshopRole =
+    profile?.role === 'workshop' ||
+    profile?.role === 'assistant_workshop_manager' ||
+    profile?.role === 'workshop_manager'
+  const isOwnMovement = log.supervisor_id === user?.id
+  // An admin, the foreman who registered the entry.
+  const canChangeDriver =
+    profile?.role === 'admin' ||
+    (profile?.role === 'supervisor' && isOwnMovement)
+  // An admin, the movement's own recorder, or a workshop role on a workshop
+  // movement. Monitor never uploads.
+  const canAddPhotos =
+    profile?.role === 'admin' ||
+    (profile?.role !== 'monitor' && profile?.role != null && isOwnMovement) ||
+    (isWorkshopRole && isWorkshopMovement)
 
   // wave6-J3 — which driver path the admin edit must take. An open site visit
   // keeps its immutable entry driver, so the dialog routes that change through
@@ -1040,7 +1057,7 @@ export function MovementDetail({
           ) : (
             <p className="text-sm text-muted italic">{t('noPhoto')}</p>
           )}
-          {profile?.role !== 'monitor' && photoItems.length < 3 && (
+          {canAddPhotos && photoItems.length < 3 && (
             <label
               className="mt-3 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-sm hover:bg-surface-hover"
               style={{ borderColor: 'var(--border)' }}
@@ -1111,18 +1128,15 @@ export function MovementDetail({
                   )}
               </p>
             </div>
-            {isEntry &&
-              !linkedLog &&
-              profile?.role !== 'workshop' &&
-              profile?.role !== 'monitor' && (
-                <Button
-                  variant="outline"
-                  icon={<RefreshCw size={16} />}
-                  onClick={() => setDriverChangeOpen((value) => !value)}
-                >
-                  {t('changeDriver')}
-                </Button>
-              )}
+            {isEntry && !linkedLog && canChangeDriver && (
+              <Button
+                variant="outline"
+                icon={<RefreshCw size={16} />}
+                onClick={() => setDriverChangeOpen((value) => !value)}
+              >
+                {t('changeDriver')}
+              </Button>
+            )}
           </div>
           {driverChangeOpen && (
             <div
