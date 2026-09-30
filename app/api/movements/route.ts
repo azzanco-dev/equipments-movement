@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { movementErrorCode, movementErrorStatus } from '@/lib/movementErrors'
+import { sendMovementExitNotice } from '@/lib/server/movementNotices'
 
 export const runtime = 'nodejs'
 
@@ -243,6 +244,18 @@ export async function POST(request: Request) {
         { error: errorCode },
         { status: movementErrorStatus(errorCode) },
       )
+    }
+
+    // wave 9 (migration 0110): the automatic WhatsApp notice of an EXIT runs
+    // AFTER the response is sent, so it can neither delay nor fail the saved
+    // movement. The database decides whether there is anything to send.
+    if (movementType === 'exit') {
+      const savedMovementId: string = insertedLog.id
+      try {
+        after(() => sendMovementExitNotice(supabase, savedMovementId))
+      } catch {
+        console.error('Movement exit notice was not scheduled')
+      }
     }
 
     if (pendingPaths.length) {
