@@ -1282,6 +1282,7 @@ export const translations = {
     // wave7-M
     adminHomeFleetInsideTitle: 'داخل المشاريع',
     adminHomeColLastSite: 'اخر موقع',
+    adminHomeLastSiteWorkshop: 'الورشة',
     adminHomeFleetInsideDescription:
       'المعدات داخل المشاريع الان، الاحدث دخولا اولا',
     adminHomeFleetWorkshopTitle: 'داخل الورشة',
@@ -2611,6 +2612,7 @@ export const translations = {
     // wave7-M
     adminHomeFleetInsideTitle: 'Inside projects',
     adminHomeColLastSite: 'Last site',
+    adminHomeLastSiteWorkshop: 'Workshop',
     adminHomeFleetInsideDescription:
       'Units inside a project now, latest entry first',
     adminHomeFleetWorkshopTitle: 'In the workshop',

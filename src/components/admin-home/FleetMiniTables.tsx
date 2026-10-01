@@ -584,10 +584,16 @@ export function FleetMiniTables({
     cell: (row) =>
       row.foreman ? row.foreman : <span className="text-muted">—</span>,
   }
+  // A unit whose last movement was the workshop exit was last in the
+  // workshop, not on a site: say so instead of an empty dash.
   const availableCompanyProjectColumn: DataTableColumn<ForemanRow> = {
     ...companyProjectColumn,
     header: t('adminHomeColLastSite'),
     hideBelow: 'md',
+    cell: (row) =>
+      row.lastMovementContext === 'workshop'
+        ? t('adminHomeLastSiteWorkshop')
+        : companyProjectColumn.cell(row),
   }
 
   // --- 4. latest entries --------------------------------------------------
