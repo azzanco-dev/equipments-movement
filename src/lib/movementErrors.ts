@@ -11,6 +11,9 @@ export const MOVEMENT_ERROR_CODES = [
   'exit_not_entry_owner',
   'exit_equipment_in_workshop',
   'exit_equipment_on_site',
+  // wave-10-exit-purpose (migration 0111)
+  'exit_purpose_required',
+  'invalid_exit_purpose',
   'workshop_exit_owner',
   'invalid_sequence',
   'access_denied',
@@ -38,6 +41,8 @@ export function movementErrorCode(message: string): MovementErrorCode {
   // on a unit whose open entry is a site entry.
   if (message.includes('exit_equipment_on_site'))
     return 'exit_equipment_on_site'
+  // wave-10-exit-purpose (migration 0111): a site exit needs its purpose.
+  if (message.includes('exit_purpose_required')) return 'exit_purpose_required'
   if (
     message.includes('no prior entry') ||
     message.includes('not inside the gate')
@@ -56,8 +61,10 @@ export function movementErrorCode(message: string): MovementErrorCode {
 }
 
 // Closing somebody else's visit is a permission failure (403), not a state
-// conflict (409).
+// conflict (409). A missing or unknown exit purpose is invalid input (400).
 export function movementErrorStatus(code: MovementErrorCode): number {
+  if (code === 'exit_purpose_required' || code === 'invalid_exit_purpose')
+    return 400
   return code === 'exit_not_entry_owner' ||
     code === 'exit_equipment_in_workshop' ||
     code === 'exit_equipment_on_site' ||

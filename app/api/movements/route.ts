@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { after, NextResponse } from 'next/server'
+import { isExitPurpose } from '@/lib/exitPurpose'
 import { movementErrorCode, movementErrorStatus } from '@/lib/movementErrors'
 import { sendMovementExitNotice } from '@/lib/server/movementNotices'
 
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
         'contractor_equipment_code',
         'notes',
         'recorded_at',
+        'exit_purpose',
       ]) {
         values[key] = form.get(key)
       }
@@ -77,6 +79,24 @@ export async function POST(request: Request) {
     if ((movementType !== 'entry' && movementType !== 'exit') || !equipmentId) {
       return NextResponse.json(
         { error: 'invalid_movement_payload' },
+        { status: 400 },
+      )
+    }
+    // wave-10-exit-purpose (migration 0111): a SITE exit must state its
+    // purpose, from the allowlist only. Workshop exits and entries never
+    // carry one, so the value is not forwarded for them. The database
+    // requirement follows once this form is live (supabase/pending/0112).
+    const exitPurpose = value('exit_purpose')
+    const isSiteExit = movementType === 'exit' && movementContext === 'site'
+    if (movementType === 'exit' && exitPurpose && !isExitPurpose(exitPurpose)) {
+      return NextResponse.json(
+        { error: 'invalid_exit_purpose' },
+        { status: 400 },
+      )
+    }
+    if (isSiteExit && !exitPurpose) {
+      return NextResponse.json(
+        { error: 'exit_purpose_required' },
         { status: 400 },
       )
     }
@@ -229,6 +249,7 @@ export async function POST(request: Request) {
       payload.project_id = value('project_id')
       payload.contractor_equipment_code = value('contractor_equipment_code')
     }
+    if (isSiteExit) payload.exit_purpose = exitPurpose
     const recordedAt = value('recorded_at')
     if (recordedAt) payload.recorded_at = recordedAt
 

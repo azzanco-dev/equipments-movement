@@ -34,6 +34,7 @@ import { sanitizeSearchTerm } from '@/lib/search'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
 import { localizedName } from '@/lib/localizedName'
+import { exitPurposeLabelKey } from '@/lib/exitPurpose'
 import { uploadMovementPhotosDirectly } from '@/lib/movementPhotoUpload'
 import { prepareMovementPhotos } from '@/lib/movementPhotoCompression'
 import {
@@ -791,6 +792,8 @@ export function MovementDetail({
     log.driver_name ??
     null
 
+  const exitPurposeKey = exitPurposeLabelKey(log.exit_purpose)
+
   const detailItems: DescriptionListItem[] = [
     {
       key: 'equipment',
@@ -815,6 +818,18 @@ export function MovementDetail({
               ) : (
                 t('pendingClassification')
               ),
+          },
+        ]
+      : []),
+    // wave-10-exit-purpose (migration 0111): site exits only. A row recorded
+    // before the purpose existed stores NULL and shows the muted dash.
+    ...(!isWorkshopMovement && !isEntry
+      ? [
+          {
+            key: 'exitPurpose',
+            icon: <FileText size={16} />,
+            label: t('exitPurpose'),
+            value: exitPurposeKey ? t(exitPurposeKey) : null,
           },
         ]
       : []),

@@ -712,6 +712,14 @@ export const translations = {
     userSavedMobileFailed:
       'تم حفظ بقية بيانات المستخدم، لكن رقم الجوال لم يحفظ.',
     // wave-9-notices — end
+    // wave-10-exit-purpose — start
+    exitPurpose: 'غرض الخروج',
+    exitPurposePlaceholder: 'اختر غرض الخروج',
+    exitPurposeMaintenance: 'للصيانة',
+    exitPurposeWorkCompleted: 'انتهاء عمل',
+    exitPurposeRequired: 'اختر غرض الخروج.',
+    exitPurposeInvalid: 'غرض الخروج غير صالح. اختره من القائمة.',
+    // wave-10-exit-purpose — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -2025,6 +2033,15 @@ export const translations = {
     userSavedMobileFailed:
       'The other user details were saved, but the mobile number was not.',
     // wave-9-notices — end
+    // wave-10-exit-purpose — start
+    exitPurpose: 'Purpose of exit',
+    exitPurposePlaceholder: 'Select the purpose of exit',
+    exitPurposeMaintenance: 'For maintenance',
+    exitPurposeWorkCompleted: 'Work completed',
+    exitPurposeRequired: 'Select the purpose of exit.',
+    exitPurposeInvalid:
+      'The purpose of exit is not valid. Select it from the list.',
+    // wave-10-exit-purpose — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',

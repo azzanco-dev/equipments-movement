@@ -115,6 +115,8 @@ export interface EntryExitLog {
   movement_type: MovementType
   movement_context?: 'site' | 'workshop'
   workshop_purpose?: 'maintenance' | 'parking' | null
+  /** wave-10-exit-purpose (migration 0111): site exits only; NULL on legacy rows. */
+  exit_purpose?: 'maintenance' | 'work_completed' | null
   current_driver_name?: string | null
   registration_method: RegistrationMethod
   driver_name: string | null

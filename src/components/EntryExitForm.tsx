@@ -11,6 +11,7 @@ import {
   DatePicker,
   Field,
   Input,
+  Select,
   Textarea,
 } from '@/components/ui'
 import {
@@ -53,6 +54,12 @@ import {
 } from '@/lib/movementFormTime'
 import { movementSaveErrorKey } from '@/lib/movementSaveErrors'
 import {
+  EXIT_PURPOSES,
+  EXIT_PURPOSE_LABEL_KEYS,
+  isExitPurpose,
+  type ExitPurpose,
+} from '@/lib/exitPurpose'
+import {
   QUICK_DRIVER_FIELD_ORDER,
   validateQuickDriverForm,
   type QuickDriverFormValues,
@@ -81,10 +88,14 @@ import {
  * The driver is deliberately absent: since the owner decision of 2026-09-23 a
  * site ENTRY may be registered without one (migration 0103 removed the
  * database requirement too), so there is nothing left to validate about it.
+ *
+ * `exit_purpose` is required on a SITE exit only (wave-10-exit-purpose,
+ * migration 0111); the workshop form and every ENTRY never show it.
  */
 interface MovementFields {
   company: string
   project: string
+  exit_purpose: string
   recorded_at: string
   photos: string
 }
@@ -92,6 +103,7 @@ interface MovementFields {
 const MOVEMENT_FIELD_ORDER = [
   'company',
   'project',
+  'exit_purpose',
   'recorded_at',
   'photos',
 ] as const
@@ -157,6 +169,8 @@ export function EntryExitForm({
   const [selectedProject, setSelectedProject] =
     useState<AsyncSearchSelectOption | null>(null)
   const [contractorCode, setContractorCode] = useState('')
+  // No default: the user must choose the purpose of a site exit.
+  const [exitPurpose, setExitPurpose] = useState<ExitPurpose | ''>('')
   const [recordedAt, setRecordedAt] = useState('')
   const [quickDriver, setQuickDriver] = useState(EMPTY_QUICK_DRIVER)
   const [quickEquipment, setQuickEquipment] = useState(EMPTY_QUICK_EQUIPMENT)
@@ -248,6 +262,7 @@ export function EntryExitForm({
     setSelectedCompany(null)
     setSelectedProject(null)
     setContractorCode('')
+    setExitPurpose('')
     setRecordedAt('')
     setQuickDriver(EMPTY_QUICK_DRIVER)
     setQuickEquipment(EMPTY_QUICK_EQUIPMENT)
@@ -530,6 +545,8 @@ export function EntryExitForm({
         siteEntry && !selectedCompanyId ? 'companyRequiredForEntry' : undefined,
       project:
         siteEntry && !selectedProjectId ? 'projectRequiredForEntry' : undefined,
+      exit_purpose:
+        siteExitMode && !exitPurpose ? 'exitPurposeRequired' : undefined,
       // No driver rule: a site ENTRY may be saved without one (2026-09-23).
       recorded_at: !recordedAt.trim()
         ? 'movementDateRequired'
@@ -584,6 +601,7 @@ export function EntryExitForm({
         if (contractorCode.trim())
           payload.contractor_equipment_code = contractorCode.trim()
       }
+      if (siteExitMode && exitPurpose) payload.exit_purpose = exitPurpose
 
       const submitMovement = (token: string) =>
         fetch('/api/movements', {
@@ -931,6 +949,36 @@ export function EntryExitForm({
                     onSave={createQuickDriver}
                   />
                 </div>
+              )}
+
+              {/* wave-10-exit-purpose: required on a SITE exit only, with no
+                  default selection. */}
+              {siteExitMode && (
+                <Field
+                  label={t('exitPurpose')}
+                  name="exit_purpose"
+                  required
+                  error={
+                    movementErrors.exit_purpose &&
+                    t(movementErrors.exit_purpose)
+                  }
+                >
+                  {(control) => (
+                    <Select
+                      {...control}
+                      value={exitPurpose}
+                      onValueChange={(value) => {
+                        clearMovementErrors('exit_purpose')
+                        setExitPurpose(isExitPurpose(value) ? value : '')
+                      }}
+                      placeholder={t('exitPurposePlaceholder')}
+                      options={EXIT_PURPOSES.map((purpose) => ({
+                        value: purpose,
+                        label: t(EXIT_PURPOSE_LABEL_KEYS[purpose]),
+                      }))}
+                    />
+                  )}
+                </Field>
               )}
 
               <Field
