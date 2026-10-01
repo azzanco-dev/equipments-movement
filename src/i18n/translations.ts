@@ -1280,9 +1280,10 @@ export const translations = {
     // wave7-L1
     movementsLogsTab: 'السجلات',
     // wave7-M
-    adminHomeFleetInsideTitle: 'داخل المواقع',
+    adminHomeFleetInsideTitle: 'داخل المشاريع',
+    adminHomeColLastSite: 'اخر موقع',
     adminHomeFleetInsideDescription:
-      'المعدات داخل المواقع الان، الاحدث دخولا اولا',
+      'المعدات داخل المشاريع الان، الاحدث دخولا اولا',
     adminHomeFleetWorkshopTitle: 'داخل الورشة',
     adminHomeFleetWorkshopDescription: 'المعدات في الورشة الان حسب الغرض',
     adminHomeFleetAvailableDescription: 'اخر حركة لها خروج، او لم تتحرك بعد',
@@ -2608,9 +2609,10 @@ export const translations = {
     // wave7-L1
     movementsLogsTab: 'Logs',
     // wave7-M
-    adminHomeFleetInsideTitle: 'Inside sites',
+    adminHomeFleetInsideTitle: 'Inside projects',
+    adminHomeColLastSite: 'Last site',
     adminHomeFleetInsideDescription:
-      'Units inside a site now, latest entry first',
+      'Units inside a project now, latest entry first',
     adminHomeFleetWorkshopTitle: 'In the workshop',
     adminHomeFleetWorkshopDescription: 'Units in the workshop now, by purpose',
     adminHomeFleetAvailableDescription:
