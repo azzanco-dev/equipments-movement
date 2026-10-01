@@ -3,8 +3,8 @@
 //
 // The texts are server-side templates. A client never supplies message text;
 // only facts resolved by the database are interpolated. Each message is
-// BILINGUAL, Arabic paragraph first and English second, because some foremen
-// do not read Arabic. Arabic copy uses the plain alif only (project rule).
+// BILINGUAL: the request line is in Arabic with its English line under it,
+// because some foremen do not read Arabic. Arabic copy uses the plain alif only (project rule).
 
 export const MOVEMENT_NOTICE_KINDS = [
   'workshop_arrival',
@@ -57,7 +57,7 @@ function unit(facts: MovementNoticeFacts): string {
   return type ? `${code} (${type})` : code
 }
 
-// " (project - company)" in the preferred language, or nothing.
+// "project - company" in the preferred language, or nothing.
 function place(facts: MovementNoticeFacts, language: 'ar' | 'en'): string {
   const project =
     language === 'ar'
@@ -67,21 +67,28 @@ function place(facts: MovementNoticeFacts, language: 'ar' | 'en'): string {
     language === 'ar'
       ? firstOf(facts.companyNameAr, facts.companyNameEn)
       : firstOf(facts.companyNameEn, facts.companyNameAr)
-  const parts = [project, company].filter(Boolean)
-  return parts.length ? ` (${parts.join(' - ')})` : ''
+  return [project, company].filter(Boolean).join(' - ')
 }
 
 // The sender's name is the one value a user can edit himself (`full_name`),
 // so only letters, spaces, apostrophes and hyphens survive: no digits, dots or
 // slashes, which keeps a link or a phone number out of a message the company
 // number sends.
-function signature(facts: MovementNoticeFacts): string {
-  const sender = clean(facts.senderName)
+function senderName(facts: MovementNoticeFacts): string {
+  return clean(facts.senderName)
     .replace(/[^\p{L}\p{M} '-]/gu, '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 40)
-  return sender ? ` — ${sender}` : ''
+}
+
+// One language block: short lines, with a blank line between the facts, the
+// request and the sender (owner review 2026-10-01: easier to read on a phone).
+function block(...sections: string[][]): string {
+  return sections
+    .map((lines) => lines.filter(Boolean).join('\n'))
+    .filter(Boolean)
+    .join('\n\n')
 }
 
 export function movementNoticeMessage(
@@ -89,21 +96,32 @@ export function movementNoticeMessage(
   facts: MovementNoticeFacts,
 ): string {
   const name = unit(facts)
+  const sender = senderName(facts)
+  // The facts once (the Arabic names, English as fallback), then the request
+  // in Arabic with its English line under it, then the sender. Short lines
+  // with a blank line between the sections (owner review 2026-10-01).
+  const facts1 = [`🚜 ${name}`]
   switch (kind) {
-    case 'workshop_arrival':
-      return [
-        `المعدة ${name} وصلت الورشة وهي ما زالت مسجلة داخل موقعك${place(facts, 'ar')}. الرجاء تسجيل خروجها من الموقع.${signature(facts)}`,
-        `Equipment ${name} has arrived at the workshop but is still recorded inside your site${place(facts, 'en')}. Please record its site exit.${signature(facts)}`,
-      ].join('\n\n')
+    case 'workshop_arrival': {
+      const where = place(facts, 'ar')
+      return block(
+        where ? [...facts1, `📍 ${where}`] : facts1,
+        [
+          '🔧 وصلت الورشة، الرجاء تسجيل خروجها من موقعك.',
+          'Arrived at the workshop. Please record its site exit.',
+        ],
+        [sender ? `👤 ${sender}` : ''],
+      )
+    }
     case 'site_exit':
-      return [
-        `تم تسجيل خروج المعدة ${name} من الموقع. يمكنك الان تسجيل دخولها للورشة.`,
-        `The site exit of equipment ${name} has been recorded. You can now record its workshop entry.`,
-      ].join('\n\n')
+      return block(facts1, [
+        '✅ خرجت من الموقع، سجل دخولها للورشة.',
+        'Site exit recorded. You can record its workshop entry.',
+      ])
     case 'workshop_exit':
-      return [
-        `المعدة ${name} خرجت من الورشة. اذا عادت لموقعك الرجاء تسجيل دخولها.`,
-        `Equipment ${name} has left the workshop. If it returns to your site, please record its entry.`,
-      ].join('\n\n')
+      return block(facts1, [
+        '✅ خرجت من الورشة. اذا عادت لموقعك سجل دخولها.',
+        'Left the workshop. If it returns to your site, record its entry.',
+      ])
   }
 }

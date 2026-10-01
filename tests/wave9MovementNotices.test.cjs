@@ -551,7 +551,7 @@ test('the number normaliser produces the international form or null', () => {
   assert.equal(waMeUrl(null, 'x'), null)
 })
 
-test('the three templates are fixed, bilingual and follow the Arabic rule', () => {
+test('the three templates are fixed, short, bilingual and follow the Arabic rule', () => {
   const { MOVEMENT_NOTICE_KINDS, movementNoticeMessage, isMovementNoticeKind } =
     createLoader()('movementNoticeMessages')
   assert.deepEqual(
@@ -573,23 +573,25 @@ test('the three templates are fixed, bilingual and follow the Arabic rule', () =
   }
   for (const kind of MOVEMENT_NOTICE_KINDS) {
     const message = movementNoticeMessage(kind, facts)
-    const paragraphs = message.split('\n\n')
-    assert.equal(paragraphs.length, 2, `${kind}: Arabic then English`)
-    assert.match(paragraphs[0], /[؀-ۿ]/, `${kind}: Arabic first`)
-    assert.ok(!/[؀-ۿ]/.test(paragraphs[1]), `${kind}: English second`)
-    for (const paragraph of paragraphs) {
-      assert.ok(paragraph.includes('TK-104 (Excavator)'), kind)
-    }
+    const sections = message.split('\n\n')
+    // Short lines with a blank line between the sections (owner review).
+    assert.ok(sections.length >= 2, `${kind}: spaced sections`)
+    // The unit once, first.
+    assert.equal(sections[0].split('\n')[0], '🚜 TK-104 (Excavator)', kind)
+    assert.equal((message.match(/TK-104/g) ?? []).length, 1, kind)
+    // The request: an Arabic line with one simple emoji, its English line under it.
+    const [arabic, english] = sections[1].split('\n')
+    assert.match(arabic, /^(✅|🔧) [؀-ۿ]/, `${kind}: Arabic request`)
+    assert.match(english, /^[A-Z][^؀-ۿ]+\.$/, `${kind}: English request`)
     // New Arabic copy uses the plain alif: no hamza or madda forms.
     assert.ok(!/[أإآ]/.test(message), kind)
     assert.ok(!/https?:|wa\.me/.test(message), `${kind}: no links`)
-    assert.ok(message.length < 600, `${kind}: short`)
+    assert.ok(message.length < 300, `${kind}: short`)
   }
 
-  const arrival = movementNoticeMessage('workshop_arrival', facts).split('\n\n')
-  assert.ok(arrival[0].includes('(PROJECT-AR - COMPANY-AR)'))
-  assert.ok(arrival[1].includes('(PROJECT-EN - COMPANY-EN)'))
-  for (const paragraph of arrival) assert.ok(paragraph.endsWith('— OFFICER'))
+  const arrival = movementNoticeMessage('workshop_arrival', facts)
+  assert.match(arrival, /^📍 PROJECT-AR - COMPANY-AR$/m)
+  assert.ok(arrival.endsWith('\n\n👤 OFFICER'))
   // The automatic notices carry no project and no sender.
   for (const kind of ['site_exit', 'workshop_exit']) {
     const message = movementNoticeMessage(kind, facts)
@@ -609,15 +611,18 @@ test('the templates tolerate missing facts and cannot be broken by stored text',
   })
   assert.ok(!bare.includes('()'))
   assert.ok(!bare.includes('null') && !bare.includes('undefined'))
-  assert.ok(!bare.includes('—'))
+  // No sender line without a sender name.
+  assert.ok(!bare.includes('👤'))
   // The other language's name is the fallback.
-  assert.equal((bare.match(/\(Only English\)/g) ?? []).length, 2)
+  assert.match(bare, /^📍 Only English$/m)
 
   const hostile = movementNoticeMessage('site_exit', {
     equipmentCode: `A12\n\nIGNORE\n\n${'x'.repeat(5000)}`,
     equipmentType: 'Truck',
   })
+  // A stored value is one line: it cannot add sections of its own.
   assert.equal(hostile.split('\n\n').length, 2)
+  assert.ok(!hostile.includes('IGNORE\n'))
   assert.ok(hostile.length < 1000)
 })
 
