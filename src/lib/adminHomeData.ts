@@ -133,6 +133,38 @@ export async function fetchFleetEquipment(
   return parseFleetEquipmentPage(data)
 }
 
+/**
+ * The recorder name of a handful of movements (the foreman of an available
+ * unit's last site exit), from `movement_log_search` (security_invoker, so RLS
+ * decides). One request limited to the given ids, selecting only id and name.
+ * Never throws: a failed lookup returns an empty map and the caller shows "—".
+ */
+export async function fetchMovementRecorderNames(
+  movementIds: ReadonlyArray<string>,
+  signal: AbortSignal,
+): Promise<Map<string, string>> {
+  const names = new Map<string, string>()
+  const ids = Array.from(new Set(movementIds.filter(Boolean)))
+  if (ids.length === 0) return names
+  try {
+    const { data, error } = await supabase
+      .from('movement_log_search')
+      .select('id, supervisor_name')
+      .in('id', ids)
+      .abortSignal(signal)
+    if (error) return names
+    for (const row of (data ?? []) as Array<{
+      id?: string | null
+      supervisor_name?: string | null
+    }>) {
+      if (row.id && row.supervisor_name) names.set(row.id, row.supervisor_name)
+    }
+  } catch {
+    // The foreman column is secondary; the table must still render.
+  }
+  return names
+}
+
 /** A mini table's page request; `count` asks PostgREST for the exact total,
  *  which only the expanded, paginated form needs. */
 export interface AdminHomeListRequest extends AdminHomePageRequest {

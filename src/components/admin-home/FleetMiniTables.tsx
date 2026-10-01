@@ -25,6 +25,7 @@ import {
   fetchFleetEquipment,
   fetchLatestEntries,
   fetchLatestEquipment,
+  fetchMovementRecorderNames,
 } from '@/lib/adminHomeData'
 import {
   collectAllPages,
@@ -57,6 +58,9 @@ import { useAdminHomeSection } from './useAdminHomeSection'
 
 /** How long a card jump keeps its target table highlighted. */
 const HIGHLIGHT_MS = 1500
+
+/** An available unit; `foreman` is filled only for the expanded table. */
+type AvailableRow = FleetEquipmentRow & { foreman?: string | null }
 
 const PURPOSE_LABEL: Record<WorkshopPurposeFilter, TranslationKey> = {
   all: 'all',
@@ -393,12 +397,37 @@ export function FleetMiniTables({
       ),
     [owners, purpose],
   )
-  const loadAvailable = useCallback<LoadPage<FleetEquipmentRow>>(
-    (page, pageSize, _count, signal) =>
-      fetchFleetEquipment(
+  // The foreman is only shown in the expanded table (`count` is true there and
+  // for the export; the export's pages are bigger than a table page), so the
+  // compact card and the export never pay for the extra lookup.
+  const loadAvailable = useCallback<LoadPage<AvailableRow>>(
+    async (page, pageSize, count, signal) => {
+      const result = await fetchFleetEquipment(
         { state: 'available', owners, page, pageSize },
         signal,
-      ),
+      )
+      if (!count || pageSize !== ADMIN_HOME_PAGE_SIZE) return result
+      // Only a site exit carries a foreman; a workshop exit has none.
+      const siteExitIds = result.rows
+        .filter(
+          (row) =>
+            row.lastMovementContext === 'site' &&
+            row.lastMovementType === 'exit' &&
+            row.lastMovementId,
+        )
+        .map((row) => row.lastMovementId as string)
+      const names = await fetchMovementRecorderNames(siteExitIds, signal)
+      return {
+        ...result,
+        rows: result.rows.map((row) => ({
+          ...row,
+          foreman:
+            row.lastMovementId && siteExitIds.includes(row.lastMovementId)
+              ? (names.get(row.lastMovementId) ?? null)
+              : null,
+        })),
+      }
+    },
     [owners],
   )
   const loadEntries = useCallback<LoadPage<LatestEntryRow>>(
@@ -529,6 +558,17 @@ export function FleetMiniTables({
     cell: (row) => row.type,
   }
   const availableColumns = [codeColumn, availableTypeColumn, lastExitColumn]
+  const availableForemanColumn: DataTableColumn<AvailableRow> = {
+    key: 'foreman',
+    header: t('adminHomeColForeman'),
+    hideBelow: 'md',
+    cell: (row) =>
+      row.foreman ? row.foreman : <span className="text-muted">—</span>,
+  }
+  const availableCompanyProjectColumn: DataTableColumn<AvailableRow> = {
+    ...companyProjectColumn,
+    hideBelow: 'md',
+  }
 
   // --- 4. latest entries --------------------------------------------------
   const entryColumns: DataTableColumn<LatestEntryRow>[] = [
@@ -657,6 +697,8 @@ export function FleetMiniTables({
           codeColumn,
           availableTypeColumn,
           ownerColumn,
+          availableCompanyProjectColumn,
+          availableForemanColumn,
           lastExitColumn,
         ]}
         loadPage={loadAvailable}
