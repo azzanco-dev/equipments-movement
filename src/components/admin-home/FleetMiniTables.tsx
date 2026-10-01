@@ -287,10 +287,9 @@ function FleetTable<Row>({
       setPage(1)
       setExportNote(null)
     }
+    // The page keeps its scroll position (owner review 2026-10-01): the card
+    // shrinks back in place and nothing scrolls the window.
     withLayoutTransition(update)
-    // The expanded table can be far taller than the card; bring the card
-    // back into view instead of leaving the reader below it.
-    wrapper.current?.scrollIntoView({ block: 'nearest' })
   }
 
   const runExport = async () => {
