@@ -530,3 +530,15 @@ textarea::placeholder {
 .animate-nav-progress {
   animation: navProgress 1.1s ease-in-out infinite;
 }
+
+/* Admin home: «عرض الكل» opens a fleet table with a View Transition (owner
+   review 2026-10-01). Only the cards move; the page itself is not
+   cross-faded. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-group(*) {
+  animation-duration: 300ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}

@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react'
+import { flushSync } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { FileSpreadsheet } from 'lucide-react'
 import {
@@ -139,6 +147,69 @@ interface FleetTableProps<Row> {
    *  total is `count(*) OVER ()` and costs nothing extra). */
   showCount?: boolean
   excelColumns: (labels: FleetExportLabels) => ExcelColumn<Row>[]
+  /** The card's position in `MiniTableGrid`, in source order. */
+  gridIndex: number
+}
+
+// `MiniTableGrid` is one column on phones, two from `md` and three from `xl`
+// (Tailwind's default 768 / 1280 px breakpoints).
+const GRID_QUERIES = [
+  { query: '(min-width: 1280px)', columns: 3 },
+  { query: '(min-width: 768px)', columns: 2 },
+] as const
+
+function subscribeToGridColumns(onChange: () => void) {
+  const lists = GRID_QUERIES.map(({ query }) => window.matchMedia(query))
+  for (const list of lists) list.addEventListener('change', onChange)
+  return () => {
+    for (const list of lists) list.removeEventListener('change', onChange)
+  }
+}
+
+function currentGridColumns() {
+  return (
+    GRID_QUERIES.find(({ query }) => window.matchMedia(query).matches)
+      ?.columns ?? 1
+  )
+}
+
+/** How many columns the mini table grid shows at the current width. */
+function useGridColumns() {
+  return useSyncExternalStore(
+    subscribeToGridColumns,
+    currentGridColumns,
+    () => 1,
+  )
+}
+
+/**
+ * The CSS `order` of a card. Cards keep their source order (`index * 2`); an
+ * expanded card moves to just before the first card of the row it was in, so
+ * it opens in that row across the whole grid and the cards of the row move
+ * down beneath it instead of the grid leaving a gap (owner review
+ * 2026-10-01).
+ */
+function gridOrder(index: number, columns: number, expanded: boolean) {
+  if (!expanded) return index * 2
+  const rowStart = Math.floor(index / columns) * columns
+  return rowStart * 2 - 1
+}
+
+/**
+ * Runs a layout change as a View Transition, so the browser animates every
+ * card from its old box to its new one. Falls back to an instant change where
+ * the API is missing or the reader asked for reduced motion.
+ */
+function withLayoutTransition(update: () => void) {
+  const canAnimate =
+    typeof document !== 'undefined' &&
+    typeof document.startViewTransition === 'function' &&
+    !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (!canAnimate) {
+    update()
+    return
+  }
+  document.startViewTransition(() => flushSync(update))
 }
 
 /**
@@ -165,11 +236,13 @@ function FleetTable<Row>({
   highlighted,
   showCount = false,
   excelColumns,
+  gridIndex,
 }: FleetTableProps<Row>) {
   const { t, lang } = useI18n()
   const ownerLabel = useOwnerLabel()
   const wrapper = useRef<HTMLDivElement>(null)
   const [expanded, setExpanded] = useState(false)
+  const gridColumns = useGridColumns()
   const [page, setPage] = useState(1)
   const [exporting, setExporting] = useState(false)
   const [exportNote, setExportNote] = useState<'capped' | 'failed' | null>(null)
@@ -201,14 +274,20 @@ function FleetTable<Row>({
   }, [data, expanded, page])
 
   const expand = () => {
-    setExpanded(true)
-    setPage(1)
+    const update = () => {
+      setExpanded(true)
+      setPage(1)
+    }
+    withLayoutTransition(update)
   }
 
   const collapse = () => {
-    setExpanded(false)
-    setPage(1)
-    setExportNote(null)
+    const update = () => {
+      setExpanded(false)
+      setPage(1)
+      setExportNote(null)
+    }
+    withLayoutTransition(update)
     // The expanded table can be far taller than the card; bring the card
     // back into view instead of leaving the reader below it.
     wrapper.current?.scrollIntoView({ block: 'nearest' })
@@ -267,6 +346,12 @@ function FleetTable<Row>({
       // Focused by a card jump (never by Tab), so the ring below is the only
       // focus indicator it needs.
       tabIndex={-1}
+      // Every card carries a transition name, so when one expands the others
+      // are animated to their new places too.
+      style={{
+        viewTransitionName: `fleet-table-${table}`,
+        order: gridOrder(gridIndex, gridColumns, expanded),
+      }}
       className={cn(
         'min-w-0 scroll-mt-20 rounded-xl outline-none transition-shadow duration-300',
         expanded && 'md:col-span-2 xl:col-span-3',
@@ -671,6 +756,7 @@ export function FleetMiniTables({
     <MiniTableGrid>
       <FleetTable
         table="inside"
+        gridIndex={0}
         title={t('adminHomeFleetInsideTitle')}
         description={t('adminHomeFleetInsideDescription')}
         columns={insideColumns}
@@ -692,6 +778,7 @@ export function FleetMiniTables({
       />
       <FleetTable
         table="workshop"
+        gridIndex={1}
         title={t('adminHomeFleetWorkshopTitle')}
         description={t('adminHomeFleetWorkshopDescription')}
         columns={workshopColumns}
@@ -716,6 +803,7 @@ export function FleetMiniTables({
       />
       <FleetTable
         table="available"
+        gridIndex={2}
         title={t('adminHomeAvailable')}
         description={t('adminHomeFleetAvailableDescription')}
         columns={availableColumns}
@@ -739,6 +827,7 @@ export function FleetMiniTables({
       />
       <FleetTable
         table="entries"
+        gridIndex={3}
         title={t('adminHomeFleetEntriesTitle')}
         description={t('adminHomeFleetEntriesDescription')}
         columns={entryColumns}
@@ -754,6 +843,7 @@ export function FleetMiniTables({
       />
       <FleetTable
         table="added"
+        gridIndex={4}
         title={t('adminHomeFleetAddedTitle')}
         description={t('adminHomeFleetAddedDescription')}
         columns={addedColumns}
