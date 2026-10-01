@@ -670,10 +670,9 @@ export function FleetMiniTables({
         columns={insideColumns}
         expandedColumns={[
           codeColumn,
+          typeColumn,
           companyProjectColumn,
           foremanColumn,
-          typeColumn,
-          ownerColumn,
           sinceColumn,
         ]}
         loadPage={loadInside}
