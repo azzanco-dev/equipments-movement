@@ -15,10 +15,13 @@ vm.runInNewContext(
 )
 const plain = (v) => JSON.parse(JSON.stringify(v))
 
-test('greetingName keeps at most the first two words', () => {
-  assert.equal(mod.greetingName('  محمد   احمد علي الغامدي '), 'محمد احمد')
+test('greetingName keeps the first name only, compound names whole', () => {
+  assert.equal(mod.greetingName('  محمد   احمد علي الغامدي '), 'محمد')
   assert.equal(mod.greetingName('Sara'), 'Sara')
-  assert.equal(mod.greetingName('John Michael Smith'), 'John Michael')
+  assert.equal(mod.greetingName('John Michael Smith'), 'John')
+  assert.equal(mod.greetingName('عبد الله سالم العزاني'), 'عبد الله')
+  assert.equal(mod.greetingName('ابو بكر احمد'), 'ابو بكر')
+  assert.equal(mod.greetingName('عبدالله سالم'), 'عبدالله')
 })
 
 test('greetingName is empty for a missing or blank name', () => {

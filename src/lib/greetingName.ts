@@ -1,8 +1,16 @@
-/** The first two words of a full name, for the home greeting. Full names are
- * often four parts long and would wrap on a phone. Empty when unusable. */
+// Compound Arabic first names are often written with a space («عبد الله»,
+// «ابو بكر»); the first word alone would read wrong in a greeting.
+const COMPOUND_NAME_PREFIXES = new Set(['عبد', 'ابو', 'أبو'])
+
+/** The first name of a full name, for the home greeting (owner review
+ * 2026-10-03). A compound first name keeps its second word. Empty when
+ * unusable. */
 export function greetingName(fullName: string | null | undefined): string {
   if (typeof fullName !== 'string') return ''
-  return fullName.trim().split(/\s+/).filter(Boolean).slice(0, 2).join(' ')
+  const words = fullName.trim().split(/\s+/).filter(Boolean)
+  if (words.length > 1 && COMPOUND_NAME_PREFIXES.has(words[0]))
+    return `${words[0]} ${words[1]}`
+  return words[0] ?? ''
 }
 
 /** Splits a greeting template around its `{name}` placeholder so the caller can
