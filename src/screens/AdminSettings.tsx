@@ -35,6 +35,7 @@ import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/lib/selectOption'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { unwrapRows } from '@/lib/supabaseResult'
 import { focusFirstError, type FieldErrors } from '@/lib/formValidation'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { RelativeTime } from '@/components/RelativeTime'
@@ -261,18 +262,25 @@ export function AdminSettings() {
 
   const loadOpeningCandidates = useCallback(
     async (query: string): Promise<SelectOption[]> => {
-      const { data } = await supabase.rpc(
-        'search_workshop_opening_candidates',
-        { p_search: sanitizeSearchTerm(query) || null },
-      )
-      return (data ?? []).map(
-        (item: {
-          id: string
-          code: string
-          type: string
-          plate_number: string | null
-        }) => ({ value: item.id, label: `${item.code} — ${item.type}` }),
-      )
+      const result = await supabase.rpc('search_workshop_opening_candidates', {
+        p_search: sanitizeSearchTerm(query) || null,
+      })
+      return unwrapRows(
+        result as {
+          data:
+            | {
+                id: string
+                code: string
+                type: string
+                plate_number: string | null
+              }[]
+            | null
+          error: unknown
+        },
+      ).map((item) => ({
+        value: item.id,
+        label: `${item.code} — ${item.type}`,
+      }))
     },
     [],
   )

@@ -16,6 +16,7 @@ import { PlateNumberInput } from '@/components/PlateNumberInput'
 import { useI18n } from '@/i18n/I18nContext'
 import { supabase } from '@/lib/supabase'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { unwrapRows } from '@/lib/supabaseResult'
 import { localizedName } from '@/lib/localizedName'
 import { usesExternalSupplier } from '@/lib/equipmentOwnership'
 import {
@@ -115,8 +116,10 @@ export function EquipmentFormDialog({
       .limit(20)
     const term = sanitizeSearchTerm(query)
     if (term) request = request.ilike('name', `%${term}%`)
-    const { data } = await request
-    return (data ?? []).map((item) => ({ value: item.name, label: item.name }))
+    return unwrapRows(await request).map((item) => ({
+      value: item.name,
+      label: item.name,
+    }))
   }, [])
 
   const loadProjects = useCallback(
@@ -129,8 +132,7 @@ export function EquipmentFormDialog({
       const term = sanitizeSearchTerm(query)
       if (term)
         request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
-      const { data } = await request
-      return (data ?? []).map((project) => ({
+      return unwrapRows(await request).map((project) => ({
         value: project.id,
         label: localizedName(lang, project.name_ar, project.name_en),
       }))
@@ -146,8 +148,7 @@ export function EquipmentFormDialog({
       .limit(20)
     const term = sanitizeSearchTerm(query)
     if (term) request = request.ilike('name', `%${term}%`)
-    const { data } = await request
-    return (data ?? []).map((lessor) => ({
+    return unwrapRows(await request).map((lessor) => ({
       value: lessor.id,
       label: lessor.name,
     }))

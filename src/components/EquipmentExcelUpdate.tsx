@@ -130,17 +130,25 @@ export function EquipmentExcelUpdate({
               .from('projects')
               .select('id,name_ar,name_en')
               .in('name_ar', projectNames)
-          : Promise.resolve({ data: [] }),
+          : Promise.resolve({ data: [], error: null }),
         projectNames.length
           ? supabase
               .from('projects')
               .select('id,name_ar,name_en')
               .in('name_en', projectNames)
-          : Promise.resolve({ data: [] }),
+          : Promise.resolve({ data: [], error: null }),
         lessorNames.length
           ? supabase.from('lessors').select('id,name').in('name', lessorNames)
-          : Promise.resolve({ data: [] }),
+          : Promise.resolve({ data: [], error: null }),
       ])
+      // A failed lookup must not read as "project/supplier not found" on every
+      // row: stop the preview and show an error instead.
+      if (projectsAr.error || projectsEn.error || lessors.error) {
+        setRows([])
+        setSelected(new Set())
+        setError(t('dataLoadError'))
+        return
+      }
       const projectMap = new Map(
         [...(projectsAr.data ?? []), ...(projectsEn.data ?? [])].flatMap(
           (item) => [

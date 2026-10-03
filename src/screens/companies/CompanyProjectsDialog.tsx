@@ -7,6 +7,7 @@ import type { SelectOption } from '@/components/Select'
 import { useI18n } from '@/i18n/I18nContext'
 import { localizedName } from '@/lib/localizedName'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { unwrapRows } from '@/lib/supabaseResult'
 import { supabase } from '@/lib/supabase'
 import type { Company, CompanyProject } from '@/lib/types'
 
@@ -36,22 +37,31 @@ export function CompanyProjectsDialog({
   const [links, setLinks] = useState<CompanyProjectWithProject[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The linked projects failed to load: show a retryable error instead of
+  // "no linked projects".
+  const [linksError, setLinksError] = useState(false)
   const [addProjectId, setAddProjectId] = useState('')
   const [addProjectOption, setAddProjectOption] = useState<SelectOption | null>(
     null,
   )
 
   const fetchLinks = useCallback(async (companyId: string) => {
-    const { data } = await supabase
+    const { data, error: linksLoadError } = await supabase
       .from('company_projects')
       .select(LINKS_SELECT)
       .eq('company_id', companyId)
+    if (linksLoadError) {
+      setLinksError(true)
+      return
+    }
+    setLinksError(false)
     setLinks((data as unknown as CompanyProjectWithProject[]) ?? [])
   }, [])
 
   useEffect(() => {
     if (!open || !company) return
     setError(null)
+    setLinksError(false)
     setAddProjectId('')
     setAddProjectOption(null)
     setLoading(true)
@@ -71,8 +81,7 @@ export function CompanyProjectsDialog({
       const term = sanitizeSearchTerm(query)
       if (term)
         request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
-      const { data } = await request
-      return (data ?? []).map((project) => ({
+      return unwrapRows(await request).map((project) => ({
         value: project.id,
         label: localizedName(lang, project.name_ar, project.name_en),
       }))
@@ -129,6 +138,15 @@ export function CompanyProjectsDialog({
         <div className="flex justify-center py-8">
           <Spinner label={t('loading')} />
         </div>
+      ) : linksError ? (
+        <ErrorState
+          className="p-4"
+          onRetry={() => {
+            if (!company) return
+            setLoading(true)
+            fetchLinks(company.id).finally(() => setLoading(false))
+          }}
+        />
       ) : (
         <div className="space-y-4">
           <div>

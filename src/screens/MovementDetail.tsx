@@ -31,6 +31,7 @@ import type {
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/components/Select'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { unwrapRows } from '@/lib/supabaseResult'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
 import { localizedName } from '@/lib/localizedName'
@@ -148,6 +149,9 @@ export function MovementDetail({
     string | null
   >(null)
   const [driverEntryId, setDriverEntryId] = useState<string | null>(null)
+  // The driver-change history failed to load: the card then shows a notice
+  // instead of presenting the original entry driver as the current one.
+  const [driverChangesError, setDriverChangesError] = useState(false)
   const [driverChangeOpen, setDriverChangeOpen] = useState(false)
   const [newDriverId, setNewDriverId] = useState('')
   const [newDriverOption, setNewDriverOption] = useState<SelectOption | null>(
@@ -200,6 +204,7 @@ export function MovementDetail({
       setDriverChanges([])
       setCurrentDriverMobileNumber(null)
       setDriverEntryId(null)
+      setDriverChangesError(false)
       setLoading(true)
     }
     setLinkedError(null)
@@ -239,7 +244,7 @@ export function MovementDetail({
       setCurrentDriverMobileNumber(logData.driver?.mobile_number ?? null)
 
       const loadDriverChanges = async (entryId: string) => {
-        const { data: changes } = await supabase
+        const { data: changes, error: changesError } = await supabase
           .from('movement_driver_changes')
           .select(
             'id,entry_log_id,previous_driver_id,previous_driver_name,new_driver_id,new_driver_name,changed_by,changed_at,note,changer:profile_names!movement_driver_changes_changed_by_fkey(id,full_name,role)',
@@ -250,8 +255,16 @@ export function MovementDetail({
           .abortSignal(signal)
         if (signal.aborted) return
         setDriverEntryId(entryId)
+        if (changesError) {
+          setDriverChanges([])
+          setDriverChangesError(true)
+          return
+        }
+        setDriverChangesError(false)
         setDriverChanges((changes as unknown as MovementDriverChange[]) ?? [])
-        const latestChange = (changes as MovementDriverChange[] | null)?.at(-1)
+        const latestChange = (
+          changes as unknown as MovementDriverChange[] | null
+        )?.at(-1)
         if (latestChange?.new_driver_id) {
           const { data: currentDriver } = await supabase
             .from('drivers')
@@ -420,8 +433,7 @@ export function MovementDetail({
         request = request.or(
           `full_name.ilike.%${term}%,name_en.ilike.%${term}%,mobile_number.ilike.%${term}%`,
         )
-      const { data } = await request
-      return (data ?? []).map((driver) => ({
+      return unwrapRows(await request).map((driver) => ({
         value: driver.id,
         label: `${driver.full_name}${driver.name_en ? ` — ${driver.name_en}` : ''}${driver.mobile_number ? ` — ${driver.mobile_number}` : ''}`,
       }))
@@ -1106,21 +1118,28 @@ export function MovementDetail({
               </h3>
               <p className="text-xs text-muted">{t('currentDriver')}</p>
               <p className="break-words font-medium leading-relaxed">
-                {driverChanges.at(-1)?.new_driver_name ??
+                {driverChangesError ? (
+                  <span className="font-normal text-muted">—</span>
+                ) : (
+                  (driverChanges.at(-1)?.new_driver_name ??
                   (isEntry ? log.driver_name : linkedLog?.driver_name) ?? (
                     <span className="font-normal text-muted">—</span>
-                  )}
+                  ))
+                )}
               </p>
             </div>
-            {isEntry && !linkedLog && canChangeDriver && (
-              <Button
-                variant="outline"
-                icon={<RefreshCw size={16} />}
-                onClick={() => setDriverChangeOpen((value) => !value)}
-              >
-                {t('changeDriver')}
-              </Button>
-            )}
+            {isEntry &&
+              !linkedLog &&
+              canChangeDriver &&
+              !driverChangesError && (
+                <Button
+                  variant="outline"
+                  icon={<RefreshCw size={16} />}
+                  onClick={() => setDriverChangeOpen((value) => !value)}
+                >
+                  {t('changeDriver')}
+                </Button>
+              )}
           </div>
           {driverChangeOpen && (
             <div
@@ -1176,7 +1195,24 @@ export function MovementDetail({
               </div>
             </div>
           )}
-          {driverChanges.length === 0 ? (
+          {driverChangesError ? (
+            <Notice
+              tone="danger"
+              size="compact"
+              action={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={<RefreshCw size={14} aria-hidden="true" />}
+                  onClick={() => void fetchData()}
+                >
+                  {t('retry')}
+                </Button>
+              }
+            >
+              {t('dataLoadError')}
+            </Notice>
+          ) : driverChanges.length === 0 ? (
             <p className="text-sm text-muted">{t('noDriverChanges')}</p>
           ) : (
             <div className="space-y-2">

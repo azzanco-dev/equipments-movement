@@ -7,6 +7,7 @@ import { MovementLogCard } from '@/components/MovementLogCard'
 import { ReportListSkeleton } from '@/components/ReportListSkeleton'
 import { Alert } from '@/components/Alert'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { unwrapRows } from '@/lib/supabaseResult'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import {
   fetchProfileNames,
@@ -381,8 +382,10 @@ function ReportRelationFilter({
       .select(fields)
       .eq('id', value)
       .maybeSingle()
-      .then(({ data }) => {
-        if (active && data)
+      .then(({ data, error }) => {
+        // A failed lookup must not leave the trigger on "loading" forever.
+        if (active && error) setSelectedLabel('—')
+        else if (active && data)
           setSelectedLabel(
             toOption(data as unknown as Record<string, string>).label,
           )
@@ -404,8 +407,7 @@ function ReportRelationFilter({
                 : 'full_name',
               `%${safe}%`,
             )
-    const { data } = await query
-    return ((data as unknown as Record<string, string>[] | null) ?? []).map(
+    return (unwrapRows(await query) as unknown as Record<string, string>[]).map(
       toOption,
     )
   }

@@ -127,17 +127,25 @@ export function EquipmentImportDialog({
               .from('projects')
               .select('id,name_ar,name_en')
               .in('name_ar', projectNames)
-          : Promise.resolve({ data: [] }),
+          : Promise.resolve({ data: [], error: null }),
         projectNames.length
           ? supabase
               .from('projects')
               .select('id,name_ar,name_en')
               .in('name_en', projectNames)
-          : Promise.resolve({ data: [] }),
+          : Promise.resolve({ data: [], error: null }),
         lessorNames.length
           ? supabase.from('lessors').select('id,name').in('name', lessorNames)
-          : Promise.resolve({ data: [] }),
+          : Promise.resolve({ data: [], error: null }),
       ])
+      // A failed lookup must not read as "project/supplier not found" on every
+      // row: stop the preview and show an error instead.
+      if (projectsAr.error || projectsEn.error || lessorRows.error) {
+        setRows([])
+        setSelectedRows(new Set())
+        setError(t('dataLoadError'))
+        return
+      }
       const matchedProjects = [
         ...(projectsAr.data ?? []),
         ...(projectsEn.data ?? []),

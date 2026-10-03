@@ -5,6 +5,7 @@ import type { AsyncSearchSelectOption } from '@/components/AsyncSearchSelect'
 import { driverOption } from '@/lib/driverOptions'
 import { localizedName } from '@/lib/localizedName'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { unwrapRows } from '@/lib/supabaseResult'
 
 export interface MovementFormOptionLoaders {
   loadDrivers: (query: string) => Promise<AsyncSearchSelectOption[]>
@@ -34,9 +35,7 @@ export function useMovementFormOptions(): MovementFormOptionLoaders {
         request = request.or(
           `full_name.ilike.%${term}%,name_en.ilike.%${term}%,id_number.ilike.%${term}%,mobile_number.ilike.%${term}%`,
         )
-      const { data, error } = await request
-      if (error) return []
-      return (data ?? []).map(driverOption)
+      return unwrapRows(await request).map(driverOption)
     },
     [],
   )
@@ -51,8 +50,7 @@ export function useMovementFormOptions(): MovementFormOptionLoaders {
       const term = sanitizeSearchTerm(query)
       if (term)
         request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
-      const { data } = await request
-      return (data ?? []).map((company) => ({
+      return unwrapRows(await request).map((company) => ({
         value: company.id,
         label: localizedName(lang, company.name_ar, company.name_en),
       }))
@@ -70,8 +68,7 @@ export function useMovementFormOptions(): MovementFormOptionLoaders {
       const term = sanitizeSearchTerm(query)
       if (term)
         request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
-      const { data } = await request
-      return (data ?? []).map((project) => ({
+      return unwrapRows(await request).map((project) => ({
         value: project.id,
         label: localizedName(lang, project.name_ar, project.name_en),
       }))
@@ -88,8 +85,7 @@ export function useMovementFormOptions(): MovementFormOptionLoaders {
         .limit(20)
       const term = sanitizeSearchTerm(query)
       if (term) request = request.ilike('name', `%${term}%`)
-      const { data } = await request
-      return (data ?? []).map((item) => ({
+      return unwrapRows(await request).map((item) => ({
         value: item.name,
         label: item.name,
       }))
@@ -106,8 +102,7 @@ export function useMovementFormOptions(): MovementFormOptionLoaders {
         .limit(20)
       const term = sanitizeSearchTerm(query)
       if (term) request = request.ilike('name', `%${term}%`)
-      const { data } = await request
-      return (data ?? []).map((lessor) => ({
+      return unwrapRows(await request).map((lessor) => ({
         value: lessor.id,
         label: lessor.name,
       }))

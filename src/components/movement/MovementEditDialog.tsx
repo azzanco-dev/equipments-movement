@@ -5,6 +5,7 @@ import { Alert } from '@/components/Alert'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/components/Select'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { unwrapRows } from '@/lib/supabaseResult'
 import { localizedName } from '@/lib/localizedName'
 import type { Company, EntryExitLog, Project } from '@/lib/types'
 import {
@@ -187,8 +188,7 @@ export function MovementEditDialog({
       .order('code')
       .limit(20)
     if (term) request = request.or(`code.ilike.%${term}%,type.ilike.%${term}%`)
-    const { data } = await request
-    return (data ?? []).map((item) => ({
+    return unwrapRows(await request).map((item) => ({
       value: item.id,
       label: `${item.code} — ${item.type}`,
     }))
@@ -204,8 +204,7 @@ export function MovementEditDialog({
         .order('full_name')
         .limit(20)
       if (term) request = request.ilike('full_name', `%${term}%`)
-      const { data } = await request
-      return (data ?? []).map((item) => ({
+      return unwrapRows(await request).map((item) => ({
         value: item.id,
         label: item.full_name,
       }))
@@ -223,8 +222,7 @@ export function MovementEditDialog({
         .limit(20)
       if (term)
         request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
-      const { data } = await request
-      return (data ?? []).map((item) => ({
+      return unwrapRows(await request).map((item) => ({
         value: item.id,
         label: localizedName(lang, item.name_ar, item.name_en),
       }))

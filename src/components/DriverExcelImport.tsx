@@ -39,14 +39,21 @@ export function DriverExcelImport({
       const [idResult, mobileResult] = await Promise.all([
         ids.length
           ? supabase.from('drivers').select('id_number').in('id_number', ids)
-          : Promise.resolve({ data: [] }),
+          : Promise.resolve({ data: [], error: null }),
         mobiles.length
           ? supabase
               .from('drivers')
               .select('mobile_number')
               .in('mobile_number', mobiles)
-          : Promise.resolve({ data: [] }),
+          : Promise.resolve({ data: [], error: null }),
       ])
+      // A failed duplicate check must not read as "no duplicates": stop the
+      // preview and show an error instead.
+      if (idResult.error || mobileResult.error) {
+        setRows([])
+        setError(t('dataLoadError'))
+        return
+      }
       const existingIds = new Set(
         (idResult.data ?? []).map((item) => item.id_number),
       )

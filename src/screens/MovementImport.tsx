@@ -23,6 +23,7 @@ import {
 } from '@/lib/movementExcel'
 import { localizedName } from '@/lib/localizedName'
 import { sanitizeSearchTerm } from '@/lib/search'
+import { unwrapRows } from '@/lib/supabaseResult'
 import { plateDigitsSearchTerm, toLatinDigits } from '@/lib/plate'
 import { supabase } from '@/lib/supabase'
 
@@ -117,8 +118,7 @@ export function MovementImport() {
         if (plateDigits) orParts.push(`plate_digits.ilike.%${plateDigits}%`)
         query = query.or(orParts.join(','))
       }
-      const { data } = await query
-      return (data ?? []).map((item) => ({
+      return unwrapRows(await query).map((item) => ({
         value: item.id,
         label: `${item.code} — ${item.type}${item.plate_number ? ` · ${item.plate_number}` : ''}`,
       }))
@@ -136,8 +136,7 @@ export function MovementImport() {
       const term = sanitizeSearchTerm(search)
       if (term)
         query = query.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
-      const { data } = await query
-      return (data ?? []).map((item) => ({
+      return unwrapRows(await query).map((item) => ({
         value: item.id,
         label: localizedName(lang, item.name_ar, item.name_en),
       }))
@@ -155,8 +154,7 @@ export function MovementImport() {
       const term = sanitizeSearchTerm(search)
       if (term)
         query = query.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
-      const { data } = await query
-      return (data ?? []).map((item) => ({
+      return unwrapRows(await query).map((item) => ({
         value: item.id,
         label: localizedName(lang, item.name_ar, item.name_en),
       }))
@@ -176,8 +174,7 @@ export function MovementImport() {
         query = query.or(
           `full_name.ilike.%${term}%,name_en.ilike.%${term}%,mobile_number.ilike.%${term}%`,
         )
-      const { data } = await query
-      return (data ?? []).map((item) => ({
+      return unwrapRows(await query).map((item) => ({
         value: item.id,
         label: `${item.full_name}${item.name_en ? ` · ${item.name_en}` : ''}${item.mobile_number ? ` · ${item.mobile_number}` : ''}`,
       }))
@@ -194,8 +191,7 @@ export function MovementImport() {
         .limit(20)
       const term = sanitizeSearchTerm(search)
       if (term) query = query.ilike('full_name', `%${term}%`)
-      const { data } = await query
-      return (data ?? []).map((item) => ({
+      return unwrapRows(await query).map((item) => ({
         value: item.id,
         label: item.full_name,
       }))

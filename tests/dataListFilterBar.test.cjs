@@ -280,6 +280,13 @@ test('each list hands its own allowlist to the toolbar filter dialog', () => {
 test('the toolbar opens the filter dialog only when there are fields', () => {
   const source = read('src/components/data-list/DataListToolbar.tsx')
   assert.doesNotMatch(source, /FilterBuilder/)
+  // The unreferenced legacy builder was deleted (wave 8 cleanup).
+  assert.equal(
+    fs.existsSync(
+      path.join(ROOT, 'src/components/data-list/FilterBuilder.tsx'),
+    ),
+    false,
+  )
   assert.doesNotMatch(source, /createPortal/)
   assert.match(source, /hasFilters = !!filterFields\?\.length && !!onFilters/)
   assert.match(source, /<FilterDialog\b/)
