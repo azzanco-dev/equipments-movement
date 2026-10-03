@@ -34,7 +34,7 @@ const { entryEquipmentArgs, equipmentStateOption, saudiDaysSince } =
 
 // The real Arabic/English copy for the keys the mapping uses.
 const AR = {
-  insideSiteBadge: 'داخل موقع',
+  insideSiteBadge: 'داخل مشروع',
   insideWorkshopBadge: 'في الورشة',
   sinceDays: 'منذ {count} يوم',
   maintenancePurpose: 'صيانة',
@@ -42,7 +42,7 @@ const AR = {
   pendingClassification: 'غير محدد',
 }
 const EN = {
-  insideSiteBadge: 'Inside site',
+  insideSiteBadge: 'Inside a project',
   insideWorkshopBadge: 'In workshop',
   sinceDays: '{count} days ago',
   maintenancePurpose: 'Maintenance',
@@ -136,7 +136,7 @@ test('equipment inside a site gets the badge and one company/project line', () =
   )
   assert.equal(option.value, 'eq-1')
   assert.equal(option.label, 'A282')
-  assert.equal(option.badge.label, 'داخل موقع')
+  assert.equal(option.badge.label, 'داخل مشروع')
   assert.equal(option.badge.tone, 'entry')
   assert.equal(option.description, 'العزاني - مشروع الرياض · منذ 4 يوم')
 })
@@ -157,7 +157,7 @@ test('the inside-site line follows the selected language', () => {
     en,
     '2026-09-19T07:00:00Z',
   )
-  assert.equal(option.badge.label, 'Inside site')
+  assert.equal(option.badge.label, 'Inside a project')
   assert.equal(option.description, 'Alazani - Riyadh project · 2 days ago')
 })
 
@@ -266,7 +266,7 @@ test('a workshop row inside a site still gets the inside-site badge', () => {
     ar,
     '2026-09-22T07:00:00Z',
   )
-  assert.equal(option.badge.label, 'داخل موقع')
+  assert.equal(option.badge.label, 'داخل مشروع')
   assert.equal(option.badge.tone, 'entry')
   assert.equal(option.description, 'تكوين - مشروع جدة · منذ 2 يوم')
 })

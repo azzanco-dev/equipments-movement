@@ -54,7 +54,7 @@ const exporter = loadLibModule('adminHomeExport', cache)
 const LABELS = {
   entry: 'دخول',
   exit: 'خروج',
-  logsSites: 'المواقع',
+  logsSites: 'المشاريع',
   logsWorkshop: 'الورشة',
   maintenancePurpose: 'صيانة',
   parkingPurpose: 'انتظار',
@@ -168,7 +168,7 @@ test('badges are exported as plain text, and the time as a Saudi date cell', () 
   const columns = movementExcel.movementExportColumns(t, 'ar')
   const [row] = excel.sheetAoa(columns, [siteEntry]).slice(1)
   assert.equal(row[3], 'دخول')
-  assert.equal(row[4], 'المواقع')
+  assert.equal(row[4], 'المشاريع')
   assert.equal(readSerial(row[11]), '23/09/2026 12:05')
 
   const [exitRow] = excel

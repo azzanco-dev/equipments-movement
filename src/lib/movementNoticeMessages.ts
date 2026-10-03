@@ -107,21 +107,21 @@ export function movementNoticeMessage(
       return block(
         where ? [...facts1, `📍 ${where}`] : facts1,
         [
-          '🔧 وصلت الورشة، الرجاء تسجيل خروجها من موقعك.',
-          'Arrived at the workshop. Please record its site exit.',
+          '🔧 وصلت الورشة، الرجاء تسجيل خروجها من مشروعك.',
+          'Arrived at the workshop. Please record its exit from your project.',
         ],
         [sender ? `👤 ${sender}` : ''],
       )
     }
     case 'site_exit':
       return block(facts1, [
-        '✅ خرجت من الموقع، سجل دخولها للورشة.',
-        'Site exit recorded. You can record its workshop entry.',
+        '✅ خرجت من المشروع، سجل دخولها للورشة.',
+        'Project exit recorded. You can record its workshop entry.',
       ])
     case 'workshop_exit':
       return block(facts1, [
-        '✅ خرجت من الورشة. اذا عادت لموقعك سجل دخولها.',
-        'Left the workshop. If it returns to your site, record its entry.',
+        '✅ خرجت من الورشة. اذا عادت لمشروعك سجل دخولها.',
+        'Left the workshop. If it returns to your project, record its entry.',
       ])
   }
 }

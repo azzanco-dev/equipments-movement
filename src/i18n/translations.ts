@@ -134,22 +134,22 @@ export const translations = {
       'متابعة المعدات التي تحتاج اجراء بناء على اخر حركة مسجلة.',
     equipmentReportOpenVisits: 'زيارات مفتوحة',
     equipmentReportOpenVisitsDesc: 'اخر حركة دخول ولم يسجل خروج بعدها.',
-    equipmentReportOutsideSites: 'خارج المواقع',
+    equipmentReportOutsideSites: 'خارج المشاريع',
     equipmentReportOutsideSitesDesc: 'اخر حركة خروج ولم تسجل دخول بعدها.',
     equipmentReportNoMovement: 'بلا حركة',
     equipmentReportNoMovementSummaryDesc: 'لم تسجل للمعدة اي حركة منذ اضافتها.',
     equipmentReportOpenVisit: 'زيارة مفتوحة',
-    equipmentReportOutside: 'خارج المواقع',
+    equipmentReportOutside: 'خارج المشاريع',
     equipmentReportNoMovementDesc: 'لم تسجل للمعدة اي حركة بعد.',
     searchEquipmentReport: 'ابحث برقم المعدة او النوع او اللوحة',
     noEquipmentAttention: 'لا توجد معدات تحتاج متابعة.',
     elapsedDuration: 'المدة',
     currentVisitDuration: 'مدة الزيارة الحالية',
     sinceLastExit: 'منذ اخر خروج',
-    outsideSites: 'خارج المواقع',
+    outsideSites: 'خارج المشاريع',
     unknownLocation: 'مكان غير محدد',
     driverReports: 'تقارير السواقين',
-    entryReportsDesc: 'ملخص سريع لحركة دخول المعدات في الموقع',
+    entryReportsDesc: 'ملخص سريع لحركة دخول المعدات الى المشاريع',
     thisWeek: 'هذا الاسبوع',
     thisMonth: 'هذا الشهر',
     customPeriod: 'فترة مخصصة',
@@ -173,7 +173,7 @@ export const translations = {
     activityLogDesc: 'مراجعة عمليات اضافة وتعديل وحذف الحركات',
     searchActivity: 'ابحث برقم المعدة او اسم المستخدم',
     allActions: 'كل العمليات',
-    allLocations: 'كل المواقع',
+    allLocations: 'الكل',
     activityCreated: 'اضافة',
     activityUpdated: 'تعديل',
     activityDeleted: 'حذف',
@@ -198,7 +198,7 @@ export const translations = {
     backToDrivers: 'العودة للسائقين',
     driverNotFound: 'السائق غير موجود',
     relatedEquipment: 'المعدات المرتبطة',
-    relatedEquipmentDesc: 'المعدات التي قادها هذا السائق حسب حركات الموقع',
+    relatedEquipmentDesc: 'المعدات التي قادها هذا السائق حسب حركات المشاريع',
     timesDriven: 'عدد المرات',
     lastDriven: 'اخر مرة',
     drivingNow: 'يقودها الان',
@@ -268,21 +268,21 @@ export const translations = {
     viewAll: 'عرض الكل',
 
     // Home page (shared home components, under review on /ui-kit)
-    siteContext: 'موقع',
+    siteContext: 'مشروع',
     workshopContext: 'ورشة',
     sinceDays: 'منذ {count} يوم',
     latestMovements: 'اخر الحركات',
     equipmentPageLink: 'صفحة المعدة وكل حركاتها',
     noAttentionItems: 'لا يوجد ما يحتاج متابعة',
     equipmentSearchTitle: 'بحث عن معدة',
-    equipmentSearchDesc: 'بحث واحد يغطي المواقع والورشة معا.',
+    equipmentSearchDesc: 'بحث واحد يغطي المشاريع والورشة معا.',
     equipmentSearchPlaceholder: 'كود المعدة او اللوحة او الشاصي',
     equipmentSearchPrompt: 'اكتب كود المعدة لعرض حالتها الحالية واخر حركاتها.',
     myMovements: 'حركاتي',
     myEntriesToday: 'دخولياتي اليوم',
     myExitsToday: 'خروجياتي اليوم',
-    myEquipmentInsideSites: 'معداتي داخل المواقع الان',
-    myEquipmentInsideSitesNow: 'معداتي داخل المواقع الان',
+    myEquipmentInsideSites: 'معداتي داخل المشاريع الان',
+    myEquipmentInsideSitesNow: 'معداتي داخل المشاريع الان',
     todayActivityLine: 'اليوم: {entries} دخول · {exits} خروج',
     awaitingClassification: 'بانتظار تصنيف',
     awaitingClassificationDesc:
@@ -305,7 +305,7 @@ export const translations = {
     scanQRCode: 'امسح رمز QR',
     searchingEquipment: 'ابحث عن المعدة بالكود أو النوع...',
     searchMovementRecords:
-      'ابحث بكود المعدة او ترقيم الشركة او اللوحة او الشركة او الموقع',
+      'ابحث بكود المعدة او ترقيم الشركة او اللوحة او الشركة او المشروع',
     noEquipmentFound: 'لا توجد معدات مطابقة',
     selectedEquipment: 'المعدة المحددة',
     driverName: 'اسم السائق',
@@ -324,8 +324,8 @@ export const translations = {
     manual: 'يدوي',
 
     // Validation messages
-    equipmentAlreadyInside: 'هذي المعدة مسجلة بالموقع أصلاً',
-    equipmentAlreadyOutside: 'هذي المعدة مسجلة خارج الموقع أصلاً',
+    equipmentAlreadyInside: 'هذي المعدة مسجلة بالمشروع أصلاً',
+    equipmentAlreadyOutside: 'هذي المعدة مسجلة خارج المشروع أصلاً',
     cannotRegisterEntry: 'لا يمكن تسجيل دخول — آخر حركة للمعده كانت دخول',
     cannotRegisterExit: 'لا يمكن تسجيل خروج — آخر حركة للمعده كانت خروج',
     lastMovement: 'آخر حركة',
@@ -340,25 +340,25 @@ export const translations = {
     confirmProceed: 'هل تريد المتابعة؟',
     noPreviousMovement: 'لا توجد حركة سابقة',
     currentStatus: 'الحالة الحالية',
-    insideSite: 'داخل الموقع',
+    insideSite: 'داخل المشروع',
     insideWorkshop: 'داخل الورشة',
     // Badges on the ENTRY equipment list: the equipment may be inside ANY
     // site, not necessarily the reader's, so these stay indefinite.
-    insideSiteBadge: 'داخل موقع',
+    insideSiteBadge: 'داخل مشروع',
     insideWorkshopBadge: 'في الورشة',
-    outsideSite: 'خارج الموقع',
+    outsideSite: 'خارج المشروع',
     outsideWorkshop: 'خارج الورشة',
     // Equipment inquiry timeline
     movementTimeline: 'سجل الحركات',
     searchEquipmentAnyField: 'ابحث بالكود او النوع او اللوحة او الشاصي',
     equipmentSuggestions: 'اقتراحات المعدات',
-    contextSite: 'موقع',
+    contextSite: 'مشروع',
     contextWorkshop: 'ورشة',
-    sites: 'المواقع',
+    sites: 'المشاريع',
     stillInside: 'ما زالت داخل',
     visitDuration: 'مدة الزيارة',
     visitsCount: 'عدد الزيارات',
-    daysOnSites: 'ايام في المواقع',
+    daysOnSites: 'ايام في المشاريع',
     daysInWorkshop: 'ايام في الورشة',
     daysOutside: 'ايام خارج',
     outsideGap: 'خارج',
@@ -370,7 +370,7 @@ export const translations = {
     entryAllowed: 'يمكن تسجيل الدخول',
     exitAllowed: 'يمكن تسجيل الخروج',
     entryBlockedMsg: 'لا يمكن تسجيل دخول جديد لأن آخر حركة للمعدة كانت دخول.',
-    exitBlockedMsg: 'لا يمكن تسجيل خروج لأن المعدة ليست داخل موقع حاليًا.',
+    exitBlockedMsg: 'لا يمكن تسجيل خروج لأن المعدة ليست داخل مشروع حاليًا.',
     workshopExitOwner:
       'يمكن تسجيل خروج المعدة فقط بواسطة المستخدم الذي سجل دخولها.',
     siteExitNotEntryOwner:
@@ -378,7 +378,7 @@ export const translations = {
     siteExitEquipmentInWorkshop:
       'لا يمكن تسجيل الخروج: المعدة داخل الورشة حاليا، وخروجها يسجل من الورشة.',
     siteExitOwnEquipmentOnly:
-      'تظهر هنا المعدات التي سجلت دخولها انت فقط وما زالت داخل الموقع.',
+      'تظهر هنا المعدات التي سجلت دخولها انت فقط وما زالت داخل المشروع.',
     exitNoPreviousMsg: 'لا يمكن تسجيل خروج لأنه لا توجد حركة سابقة للمعدة.',
     latestEntryBrief: 'بيانات آخر دخول',
     entryDateTime: 'تاريخ الدخول',
@@ -423,7 +423,7 @@ export const translations = {
     linkedEntry: 'الدخول المرتبط',
     linkedExit: 'الخروج المرتبط',
     notExitedYet: 'لم يتم تسجيل خروج بعد',
-    durationOnSite: 'مدة البقاء في الموقع',
+    durationOnSite: 'مدة البقاء في المشروع',
     viewDetails: 'عرض التفاصيل',
     noPhoto: 'لا توجد صورة',
     movementDate: 'تاريخ الحركة',
@@ -466,7 +466,7 @@ export const translations = {
     todayEntries: 'دخوليات اليوم',
     todayExits: 'خروجيات اليوم',
     activeEquipment: 'المعدات النشطة',
-    equipmentOutside: 'المعدات خارج الموقع',
+    equipmentOutside: 'المعدات خارج المشروع',
     allLogs: 'كل السجلات',
     filterByEquipment: 'فلترة بمعدة',
     filterBySupervisor: 'فلترة بمشرف',
@@ -662,15 +662,15 @@ export const translations = {
     userDeleteHasRecords:
       'لا يمكن حذف المستخدم لان له حركات او صور او تغييرات سائقين مسجلة باسمه.',
     workshopExitEquipmentOnSite:
-      'لا يمكن تسجيل الخروج: المعدة داخل موقع حاليا، وخروجها يسجله من سجل دخولها او المدير.',
+      'لا يمكن تسجيل الخروج: المعدة داخل مشروع حاليا، وخروجها يسجله من سجل دخولها او المدير.',
     // wave-8-security — end
     // wave-9-greeting — start
     homeGreeting: 'اهلاً، {name}',
     // wave-9-greeting — end
     // wave-9-notices — start
-    notifyForemanTitle: 'المعدة ما زالت مسجلة داخل موقع',
+    notifyForemanTitle: 'المعدة ما زالت مسجلة داخل مشروع',
     notifyForemanExplain:
-      'لا يمكن تسجيل دخولها للورشة حتى يسجل الفورمان خروجها من الموقع. يمكنك ابلاغه برسالة واتساب.',
+      'لا يمكن تسجيل دخولها للورشة حتى يسجل الفورمان خروجها من المشروع. يمكنك ابلاغه برسالة واتساب.',
     notifyForemanForemanLabel: 'الفورمان',
     notifyForemanFallbackName: 'الفورمان',
     notifyForeman: 'ابلاغ الفورمان',
@@ -684,7 +684,7 @@ export const translations = {
     notifyForemanNoMobile:
       'رقم جوال {name} غير مسجل. تواصل معه مباشرة او اطلب من المدير اضافة رقمه.',
     notifyForemanErrNotOnSite:
-      'المعدة لم تعد مسجلة داخل موقع. حدث حالتها ثم سجل دخولها.',
+      'المعدة لم تعد مسجلة داخل مشروع. حدث حالتها ثم سجل دخولها.',
     notifyForemanErrRecentlySent:
       'تم ابلاغ الفورمان عن هذه المعدة قبل اقل من 10 دقائق. انتظر قليلا ثم حاول مرة اخرى.',
     notifyForemanErrForbidden: 'ليس لديك صلاحية ابلاغ الفورمان.',
@@ -801,7 +801,7 @@ export const translations = {
     unsavedData: 'بيانات غير محفوظة',
     movementImport: 'استيراد الحركات',
     movementImportDesc:
-      'استيراد دخوليات وخروجيات الموقع من Excel مع المراجعة والتعديل قبل الحفظ',
+      'استيراد دخوليات وخروجيات المشاريع من Excel مع المراجعة والتعديل قبل الحفظ',
     movementImportEmpty: 'ارفع ملف Excel لعرض الصفوف ومراجعتها قبل الاستيراد',
     movementImportReadFailed: 'تعذر قراءة الملف او مطابقة بياناته',
     movementImportFailed: 'تعذر استيراد الحركات',
@@ -887,7 +887,7 @@ export const translations = {
     adminHomeNow: 'الان',
     adminHomeStateTitle: 'الحالة الان',
     adminHomeStateDescription: 'اين المعدات في هذه اللحظة.',
-    adminHomeInsideSites: 'داخل المواقع الان',
+    adminHomeInsideSites: 'داخل المشاريع الان',
     adminHomeInWorkshop: 'في الورشة الان',
     adminHomeAvailable: 'متاحة',
     adminHomeMaintenance: 'صيانة',
@@ -900,11 +900,11 @@ export const translations = {
     adminHomeColLastMovement: 'اخر حركة',
     adminHomeAvailabilityTitle: 'التوفر حسب النوع',
     adminHomeAvailabilityDescription:
-      'اين معدات كل نوع الان: داخل المواقع، في الورشة، والمتاح منها.',
+      'اين معدات كل نوع الان: داخل المشاريع، في الورشة، والمتاح منها.',
     adminHomeSearchType: 'ابحث في الانواع',
     adminHomeNoTypeMatch: 'لا يوجد نوع مطابق',
     adminHomeColTotal: 'الاجمالي',
-    adminHomeColInside: 'داخل المواقع',
+    adminHomeColInside: 'داخل المشاريع',
     adminHomeColWorkshop: 'في الورشة',
     adminHomeColAvailable: 'متاح',
     adminHomeFlowTitle: 'حركة الدخول',
@@ -928,7 +928,7 @@ export const translations = {
     adminHomeDonutStateAria: 'توزيع الاسطول الان',
     adminHomeDonutOwnerAria: 'حسب المالك',
     adminHomeBack: 'رجوع',
-    adminHomeStateInsideSite: 'داخل المواقع',
+    adminHomeStateInsideSite: 'داخل المشاريع',
     adminHomeStateMaintenance: 'ورشة صيانة',
     adminHomeStateParking: 'ورشة وقوف',
     adminHomeStateUnclassified: 'ورشة بلا تصنيف',
@@ -943,7 +943,7 @@ export const translations = {
     adminHomeColOpenVisits: 'مفتوحة الان',
     adminHomeNoActivity: 'لا يوجد نشاط في هذه الفترة',
     adminHomeUnknown: 'غير معروف',
-    logsSites: 'المواقع',
+    logsSites: 'المشاريع',
     logsWorkshop: 'الورشة',
     logsAll: 'الكل',
     logsContextFilter: 'سياق الحركة',
@@ -1068,8 +1068,8 @@ export const translations = {
     adminHomeTotalEquipment: 'اجمالي المعدات',
     adminHomeTotalEquipmentHint: 'المعدات النشطة في الاسطول',
     adminHomeOutsideDescription:
-      'المعدات خارج المواقع والورشة الان: اخر حركة لها خروج، او بلا حركات.',
-    adminHomeOutsideEmpty: 'لا توجد معدات خارج المواقع الان',
+      'المعدات خارج المشاريع والورشة الان: اخر حركة لها خروج، او بلا حركات.',
+    adminHomeOutsideEmpty: 'لا توجد معدات خارج المشاريع الان',
     adminHomeNeverMoved: 'بلا حركات',
     adminHomeExportCapped: 'تم تصدير اول 5000 صف فقط.',
     adminHomeExportFailed: 'تعذر تصدير الملف، حاول مرة اخرى.',
@@ -1150,7 +1150,7 @@ export const translations = {
     // wave6-K3
     reportFilterAlazaniOnly: 'العزاني فقط',
     reportContextFilter: 'نطاق الحركة',
-    reportContextSite: 'مواقع',
+    reportContextSite: 'مشاريع',
     reportContextWorkshop: 'ورشة',
     reportContextAll: 'الكل',
 
@@ -1289,7 +1289,7 @@ export const translations = {
     movementsLogsTab: 'السجلات',
     // wave7-M
     adminHomeFleetInsideTitle: 'داخل المشاريع',
-    adminHomeColLastSite: 'اخر موقع',
+    adminHomeColLastSite: 'اخر مشروع',
     adminHomeLastSiteWorkshop: 'الورشة',
     adminHomeFleetInsideDescription:
       'المعدات داخل المشاريع الان، الاحدث دخولا اولا',
@@ -1297,10 +1297,10 @@ export const translations = {
     adminHomeFleetWorkshopDescription: 'المعدات في الورشة الان حسب الغرض',
     adminHomeFleetAvailableDescription: 'اخر حركة لها خروج، او لم تتحرك بعد',
     adminHomeFleetEntriesTitle: 'اخر الدخوليات',
-    adminHomeFleetEntriesDescription: 'اخر حركات الدخول في المواقع والورشة',
+    adminHomeFleetEntriesDescription: 'اخر حركات الدخول في المشاريع والورشة',
     adminHomeFleetAddedTitle: 'اخر المعدات المضافة',
     adminHomeFleetAddedDescription: 'اخر المعدات النشطة المسجلة في النظام',
-    adminHomeFleetInsideEmpty: 'لا توجد معدات داخل المواقع',
+    adminHomeFleetInsideEmpty: 'لا توجد معدات داخل المشاريع',
     adminHomeFleetWorkshopEmpty: 'لا توجد معدات في الورشة',
     adminHomeFleetAvailableEmpty: 'لا توجد معدات متاحة',
     adminHomeFleetEntriesEmpty: 'لا توجد حركات دخول',
@@ -1450,14 +1450,14 @@ export const translations = {
     equipmentReportOpenVisits: 'Open visits',
     equipmentReportOpenVisitsDesc:
       'The latest movement is an entry with no later exit.',
-    equipmentReportOutsideSites: 'Outside sites',
+    equipmentReportOutsideSites: 'Outside projects',
     equipmentReportOutsideSitesDesc:
       'The latest movement is an exit with no later entry.',
     equipmentReportNoMovement: 'No movement',
     equipmentReportNoMovementSummaryDesc:
       'No movement has been recorded since the equipment was added.',
     equipmentReportOpenVisit: 'Open visit',
-    equipmentReportOutside: 'Outside sites',
+    equipmentReportOutside: 'Outside projects',
     equipmentReportNoMovementDesc:
       'No movement has been recorded for this equipment yet.',
     searchEquipmentReport: 'Search by equipment code, type, or plate',
@@ -1465,10 +1465,10 @@ export const translations = {
     elapsedDuration: 'Duration',
     currentVisitDuration: 'Current visit duration',
     sinceLastExit: 'Since last exit',
-    outsideSites: 'Outside sites',
+    outsideSites: 'Outside projects',
     unknownLocation: 'Unknown location',
     driverReports: 'Driver Reports',
-    entryReportsDesc: 'A quick summary of equipment entries at the site',
+    entryReportsDesc: 'A quick summary of equipment entries into projects',
     thisWeek: 'This week',
     thisMonth: 'This month',
     customPeriod: 'Custom period',
@@ -1492,7 +1492,7 @@ export const translations = {
     activityLogDesc: 'Review movement creation, updates, and deletions',
     searchActivity: 'Search by equipment code or user name',
     allActions: 'All actions',
-    allLocations: 'All locations',
+    allLocations: 'All',
     activityCreated: 'Created',
     activityUpdated: 'Updated',
     activityDeleted: 'Deleted',
@@ -1517,7 +1517,7 @@ export const translations = {
     backToDrivers: 'Back to Drivers',
     driverNotFound: 'Driver not found',
     relatedEquipment: 'Related Equipment',
-    relatedEquipmentDesc: 'Equipment this driver drove, from site movements',
+    relatedEquipmentDesc: 'Equipment this driver drove, from project movements',
     timesDriven: 'Times',
     lastDriven: 'Last Driven',
     drivingNow: 'Driving Now',
@@ -1570,7 +1570,7 @@ export const translations = {
     editEquipmentType: 'Edit Equipment Type',
     searchEquipmentTypes: 'Search equipment types',
     searchMovementRecords:
-      'Search by equipment code, company number, plate, company, or site',
+      'Search by equipment code, company number, plate, company, or project',
     equipmentTypeRequired: 'Equipment type name is required.',
     equipmentTypeNotFound: 'The equipment type does not exist in Settings.',
     selectEquipmentType: 'Select equipment type',
@@ -1590,22 +1590,23 @@ export const translations = {
     noLogs: 'No logs yet',
     viewAll: 'View All',
 
-    siteContext: 'Site',
+    siteContext: 'Project',
     workshopContext: 'Workshop',
     sinceDays: '{count} days ago',
     latestMovements: 'Latest movements',
     equipmentPageLink: 'Equipment page and all movements',
     noAttentionItems: 'Nothing needs attention',
     equipmentSearchTitle: 'Equipment search',
-    equipmentSearchDesc: 'One search covering sites and the workshop together.',
+    equipmentSearchDesc:
+      'One search covering projects and the workshop together.',
     equipmentSearchPlaceholder: 'Equipment code, plate or chassis',
     equipmentSearchPrompt:
       'Type an equipment code to see its current state and latest movements.',
     myMovements: 'My movements',
     myEntriesToday: 'My entries today',
     myExitsToday: 'My exits today',
-    myEquipmentInsideSites: 'My equipment inside sites now',
-    myEquipmentInsideSitesNow: 'My equipment inside sites now',
+    myEquipmentInsideSites: 'My equipment inside projects now',
+    myEquipmentInsideSitesNow: 'My equipment inside projects now',
     todayActivityLine: 'Today: {entries} entries · {exits} exits',
     awaitingClassification: 'Awaiting classification',
     awaitingClassificationDesc:
@@ -1642,8 +1643,10 @@ export const translations = {
     qr: 'QR',
     manual: 'Manual',
 
-    equipmentAlreadyInside: 'This equipment is already registered on site',
-    equipmentAlreadyOutside: 'This equipment is already registered off site',
+    equipmentAlreadyInside:
+      'This equipment is already registered inside the project',
+    equipmentAlreadyOutside:
+      'This equipment is already registered outside the project',
     cannotRegisterEntry: 'Cannot register entry — last movement was an entry',
     cannotRegisterExit: 'Cannot register exit — last movement was an exit',
     lastMovement: 'Last movement',
@@ -1661,23 +1664,23 @@ export const translations = {
     confirmProceed: 'Do you want to proceed?',
     noPreviousMovement: 'No previous movement',
     currentStatus: 'Current status',
-    insideSite: 'Inside site',
+    insideSite: 'Inside the project',
     insideWorkshop: 'Inside workshop',
-    insideSiteBadge: 'Inside site',
+    insideSiteBadge: 'Inside a project',
     insideWorkshopBadge: 'In workshop',
-    outsideSite: 'Outside site',
+    outsideSite: 'Outside the project',
     outsideWorkshop: 'Outside workshop',
     // Equipment inquiry timeline
     movementTimeline: 'Movement timeline',
     searchEquipmentAnyField: 'Search by code, type, plate, or chassis',
     equipmentSuggestions: 'Equipment suggestions',
-    contextSite: 'Site',
+    contextSite: 'Project',
     contextWorkshop: 'Workshop',
-    sites: 'Sites',
+    sites: 'Projects',
     stillInside: 'Still inside',
     visitDuration: 'Visit duration',
     visitsCount: 'Visits',
-    daysOnSites: 'Days on sites',
+    daysOnSites: 'Days in projects',
     daysInWorkshop: 'Days in workshop',
     daysOutside: 'Days outside',
     outsideGap: 'Outside',
@@ -1691,7 +1694,7 @@ export const translations = {
     entryBlockedMsg:
       "Cannot register a new entry because the equipment's last movement was an entry.",
     exitBlockedMsg:
-      'Cannot register an exit because the equipment is not currently on site.',
+      'Cannot register an exit because the equipment is not currently inside a project.',
     workshopExitOwner:
       'Only the user who registered the equipment entry can register its exit.',
     siteExitNotEntryOwner:
@@ -1699,7 +1702,7 @@ export const translations = {
     siteExitEquipmentInWorkshop:
       'This exit cannot be registered: the equipment is currently inside the workshop and must be released from there.',
     siteExitOwnEquipmentOnly:
-      'This list shows only equipment you registered the entry for and that is still on site.',
+      'This list shows only equipment you registered the entry for and that is still inside the project.',
     exitNoPreviousMsg:
       'Cannot register an exit because the equipment has no previous movement.',
     latestEntryBrief: 'Latest entry details',
@@ -1746,7 +1749,7 @@ export const translations = {
     linkedEntry: 'Linked Entry',
     linkedExit: 'Linked Exit',
     notExitedYet: 'No exit recorded yet',
-    durationOnSite: 'Time on site',
+    durationOnSite: 'Time in the project',
     viewDetails: 'View Details',
     noPhoto: 'No photo',
     movementDate: 'Movement Date / Time',
@@ -1788,7 +1791,7 @@ export const translations = {
     todayEntries: "Today's Entries",
     todayExits: "Today's Exits",
     activeEquipment: 'Active Equipment',
-    equipmentOutside: 'Equipment Off-site',
+    equipmentOutside: 'Equipment outside the project',
     allLogs: 'All Logs',
     filterByEquipment: 'Filter by equipment',
     filterBySupervisor: 'Filter by supervisor',
@@ -1982,21 +1985,21 @@ export const translations = {
     userDeleteHasRecords:
       'This user cannot be deleted because movements, photos or driver changes are recorded under their name.',
     workshopExitEquipmentOnSite:
-      'This exit cannot be registered: the equipment is currently inside a site, and its exit is registered by the user who registered its entry or by an admin.',
+      'This exit cannot be registered: the equipment is currently inside a project, and its exit is registered by the user who registered its entry or by an admin.',
     // wave-8-security — end
     // wave-9-greeting — start
     homeGreeting: 'Welcome, {name}',
     // wave-9-greeting — end
     // wave-9-notices — start
-    notifyForemanTitle: 'The equipment is still recorded inside a site',
+    notifyForemanTitle: 'The equipment is still recorded inside a project',
     notifyForemanExplain:
-      'Its workshop entry cannot be registered until the foreman records its site exit. You can notify the foreman by WhatsApp.',
+      'Its workshop entry cannot be registered until the foreman records its exit from the project. You can notify the foreman by WhatsApp.',
     notifyForemanForemanLabel: 'Foreman',
     notifyForemanFallbackName: 'the foreman',
     notifyForeman: 'Notify the foreman',
     refreshEquipmentStatus: 'Refresh status',
     notifyForemanRefreshHint:
-      'Once the foreman records the site exit, press "Refresh status" to register the entry.',
+      'Once the foreman records the exit from the project, press "Refresh status" to register the entry.',
     notifyForemanSent: '{name} was notified by WhatsApp',
     notifyForemanNotSent:
       'The WhatsApp message to {name} could not be sent. Try again or contact them directly.',
@@ -2004,7 +2007,7 @@ export const translations = {
     notifyForemanNoMobile:
       'No mobile number is on file for {name}. Contact them directly or ask the admin to add it.',
     notifyForemanErrNotOnSite:
-      'The equipment is no longer recorded inside a site. Refresh its status, then register its entry.',
+      'The equipment is no longer recorded inside a project. Refresh its status, then register its entry.',
     notifyForemanErrRecentlySent:
       'The foreman was notified about this equipment less than 10 minutes ago. Wait a little, then try again.',
     notifyForemanErrForbidden:
@@ -2122,7 +2125,7 @@ export const translations = {
     unsavedData: 'Unsaved data',
     movementImport: 'Movement Import',
     movementImportDesc:
-      'Import site entries and exits from Excel with review and editing before saving',
+      'Import project entries and exits from Excel with review and editing before saving',
     movementImportEmpty: 'Upload an Excel file to review rows before importing',
     movementImportReadFailed: 'Could not read the file or match its data',
     movementImportFailed: 'Could not import movements',
@@ -2210,7 +2213,7 @@ export const translations = {
     adminHomeNow: 'Now',
     adminHomeStateTitle: 'The fleet right now',
     adminHomeStateDescription: 'Where every unit stands at this moment.',
-    adminHomeInsideSites: 'Inside sites now',
+    adminHomeInsideSites: 'Inside projects now',
     adminHomeInWorkshop: 'In the workshop now',
     adminHomeAvailable: 'Available',
     adminHomeMaintenance: 'Maintenance',
@@ -2223,11 +2226,11 @@ export const translations = {
     adminHomeColLastMovement: 'Last movement',
     adminHomeAvailabilityTitle: 'Availability by type',
     adminHomeAvailabilityDescription:
-      'Where each type is right now: inside sites, in the workshop, and available.',
+      'Where each type is right now: inside projects, in the workshop, and available.',
     adminHomeSearchType: 'Search types',
     adminHomeNoTypeMatch: 'No matching type',
     adminHomeColTotal: 'Total',
-    adminHomeColInside: 'Inside sites',
+    adminHomeColInside: 'Inside projects',
     adminHomeColWorkshop: 'In workshop',
     adminHomeColAvailable: 'Available',
     adminHomeFlowTitle: 'Entry flow',
@@ -2251,7 +2254,7 @@ export const translations = {
     adminHomeDonutStateAria: 'Fleet distribution right now',
     adminHomeDonutOwnerAria: 'by owner',
     adminHomeBack: 'Back',
-    adminHomeStateInsideSite: 'Inside sites',
+    adminHomeStateInsideSite: 'Inside projects',
     adminHomeStateMaintenance: 'Workshop maintenance',
     adminHomeStateParking: 'Workshop standby',
     adminHomeStateUnclassified: 'Workshop, not classified',
@@ -2266,7 +2269,7 @@ export const translations = {
     adminHomeColOpenVisits: 'Open now',
     adminHomeNoActivity: 'No activity in this period',
     adminHomeUnknown: 'Unknown',
-    logsSites: 'Sites',
+    logsSites: 'Projects',
     logsWorkshop: 'Workshop',
     logsAll: 'All',
     logsContextFilter: 'Movement context',
@@ -2393,7 +2396,7 @@ export const translations = {
     adminHomeTotalEquipment: 'Total equipment',
     adminHomeTotalEquipmentHint: 'Active units in the fleet',
     adminHomeOutsideDescription:
-      'Equipment outside sites and the workshop right now: its last movement was an exit, or it has never moved.',
+      'Equipment outside projects and the workshop right now: its last movement was an exit, or it has never moved.',
     adminHomeOutsideEmpty: 'No equipment is outside right now',
     adminHomeNeverMoved: 'No movements',
     adminHomeExportCapped: 'Only the first 5,000 rows were exported.',
@@ -2479,7 +2482,7 @@ export const translations = {
     // wave6-K3
     reportFilterAlazaniOnly: 'Al-Azani only',
     reportContextFilter: 'Movement context',
-    reportContextSite: 'Sites',
+    reportContextSite: 'Projects',
     reportContextWorkshop: 'Workshop',
     reportContextAll: 'All',
 
@@ -2628,7 +2631,7 @@ export const translations = {
     movementsLogsTab: 'Logs',
     // wave7-M
     adminHomeFleetInsideTitle: 'Inside projects',
-    adminHomeColLastSite: 'Last site',
+    adminHomeColLastSite: 'Last project',
     adminHomeLastSiteWorkshop: 'Workshop',
     adminHomeFleetInsideDescription:
       'Units inside a project now, latest entry first',
@@ -2637,11 +2640,11 @@ export const translations = {
     adminHomeFleetAvailableDescription:
       'The latest movement is an exit, or the unit has not moved yet',
     adminHomeFleetEntriesTitle: 'Latest entries',
-    adminHomeFleetEntriesDescription: 'The latest site and workshop entries',
+    adminHomeFleetEntriesDescription: 'The latest project and workshop entries',
     adminHomeFleetAddedTitle: 'Latest added equipment',
     adminHomeFleetAddedDescription:
       'The latest active equipment registered in the system',
-    adminHomeFleetInsideEmpty: 'No equipment inside a site',
+    adminHomeFleetInsideEmpty: 'No equipment inside a project',
     adminHomeFleetWorkshopEmpty: 'No equipment in the workshop',
     adminHomeFleetAvailableEmpty: 'No available equipment',
     adminHomeFleetEntriesEmpty: 'No entries yet',
