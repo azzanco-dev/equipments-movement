@@ -31,6 +31,7 @@ function loadLibModule(name, cache = new Map()) {
       console,
       require(request) {
         if (request === 'xlsx') return require('xlsx')
+        if (request === 'xlsx-js-style') return require('xlsx-js-style')
         const alias = /^@\/lib\/(.+)$/.exec(request)
         if (alias) return loadLibModule(alias[1], cache)
         const relative = /^\.\/(.+)$/.exec(request)

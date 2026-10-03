@@ -30,6 +30,7 @@ function loadLibModule(name, cache = new Map()) {
         // The workbook reader is never called by the pure helpers under test;
         // it only has to exist at module scope.
         if (request === 'xlsx') return { read: () => ({}), utils: {} }
+        if (request === 'xlsx-js-style') return { utils: {} }
         throw new Error(`Unexpected module: ${request}`)
       },
     },

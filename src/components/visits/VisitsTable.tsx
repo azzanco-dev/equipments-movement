@@ -23,19 +23,25 @@ import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
+import { unwrapRows } from '@/lib/supabaseResult'
 import {
   EQUIPMENT_VISITS_SELECT,
   EQUIPMENT_VISITS_VIEW,
+  SUPPLIER_LOOKUP_CHUNK_SIZE,
   adminVisitsListConfig,
   buildVisitSearchFilter,
+  chunkItems,
+  distinctEquipmentIds,
   foremanVisitsListConfig,
   formatVisitDuration,
+  supplierNamesByEquipment,
   visitContextFilter,
   visitExportColumns,
   visitExportFileName,
   visitSortField,
   visitStateView,
   visitsListConfig,
+  type EquipmentSupplierRow,
   type EquipmentVisitRow,
   type VisitsContext,
 } from '@/lib/visitsList'
@@ -211,10 +217,33 @@ export function VisitsTable({
         },
         { pageSize: OUTSIDE_EXPORT_PAGE_SIZE },
       )
-      const { exportRowsToExcel } = await import('@/lib/excel')
+      // The view does not carry the supplier; look it up once for the units
+      // in the file. A failed lookup throws, so the owner sees an export
+      // failure instead of a file whose supplier cells are silently empty.
+      const supplierByEquipment = new Map<string, string>()
+      const idChunks = chunkItems(
+        distinctEquipmentIds(collected.rows),
+        SUPPLIER_LOOKUP_CHUNK_SIZE,
+      )
+      for (let start = 0; start < idChunks.length; start += 4)
+        await Promise.all(
+          idChunks.slice(start, start + 4).map(async (ids) => {
+            const rows = unwrapRows(
+              await supabase
+                .from('equipment')
+                .select('id,lessor:lessors(name)')
+                .in('id', ids),
+            )
+            supplierNamesByEquipment(
+              rows as unknown as EquipmentSupplierRow[],
+              supplierByEquipment,
+            )
+          }),
+        )
+      const { exportRowsToExcel } = await import('@/lib/excelExport')
       exportRowsToExcel(
         t('exportSheetVisits'),
-        visitExportColumns(t, lang),
+        visitExportColumns(t, lang, supplierByEquipment),
         collected.rows,
         { fileName: visitExportFileName(context), rtl: lang === 'ar' },
       )

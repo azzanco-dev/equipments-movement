@@ -22,7 +22,8 @@
     "react-dom": "^18.3.1",
     "recharts": "^3.10.1",
     "tus-js-client": "^4.3.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",

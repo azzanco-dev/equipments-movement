@@ -8,6 +8,8 @@ import type {
   RegistrationType,
 } from '@/lib/types'
 import { normalizePlateNumber } from '@/lib/plate'
+import { exportRowsToExcel } from '@/lib/excelExport'
+import type { ExcelColumn } from '@/lib/excelSheet'
 
 export interface CompanyImportRow {
   name_ar: string
@@ -256,165 +258,24 @@ export function downloadEquipmentTemplate(t: (key: TranslationKey) => string) {
 
 // ============ FORMATTED EXPORTS ============
 //
-// One shared way to write an export sheet, so every exported file in the app
-// opens the same way: Arabic headers from the translation system, a frozen
-// header row with an autofilter on it, readable column widths, a right-to-left
-// sheet for the Arabic interface, and timestamps that read as Saudi time
-// wherever the file is opened.
+// The shared export writer lives in `@/lib/excelExport` (the one module that
+// imports `xlsx-js-style`) and its pure column/cell helpers in
+// `@/lib/excelSheet`. They are re-exported here so existing callers keep
+// working; new code that only writes a sheet should import `@/lib/excelExport`
+// directly, which avoids pulling the import parsers' `xlsx` into the chunk.
 
-/** Excel's own date format code; `hh` is 24-hour in a workbook number format. */
-export const EXCEL_DATETIME_FORMAT = 'dd/mm/yyyy hh:mm'
-
-/** Days between Excel's epoch (1899-12-30) and the Unix epoch. */
-const EXCEL_EPOCH_DAYS = 25569
-const MINUTES_PER_DAY = 24 * 60
-/** Saudi Arabia is UTC+03:00 all year, exactly as `@/lib/saudiTime` assumes. */
-const SAUDI_OFFSET_MINUTES = 3 * 60
-
-/**
- * An instant as an Excel date serial in Saudi time, or `null` when it is
- * missing or unparseable.
- *
- * A real date cell is written rather than pre-formatted text so the column
- * still sorts and filters as a date in Excel. The serial is computed from the
- * UTC instant plus a fixed +03:00, never from the machine's timezone, so the
- * file shows the same Saudi wall-clock time on every device — the same rule
- * the reports and the dashboard already follow. Whole minutes are used because
- * the display format stops at minutes, and a rounded serial avoids a value
- * like 23:59:59.9995 rendering as the next minute.
- */
-export function saudiExcelSerial(
-  value: string | null | undefined,
-): number | null {
-  if (!value) return null
-  const ms = Date.parse(value)
-  if (Number.isNaN(ms)) return null
-  const minutes = Math.round(ms / 60000) + SAUDI_OFFSET_MINUTES
-  return EXCEL_EPOCH_DAYS + minutes / MINUTES_PER_DAY
-}
-
-export type ExcelCellValue = string | number | null
-
-/**
- * One exported column.
- *
- * `type: 'date'` means `value` returns an ISO timestamp, which the writer
- * converts to a Saudi-time date cell; everything else is written as given.
- * Badges and enums are converted to plain text by `value` (دخول / خروج), never
- * exported as a code the reader would have to decode.
- */
-export interface ExcelColumn<T> {
-  header: string
-  /** Column width in characters; a sensible default is used when omitted. */
-  width?: number
-  type?: 'text' | 'date'
-  value: (row: T) => ExcelCellValue
-}
-
-export interface ExportRowsOptions {
-  /** File name, with or without the `.xlsx` suffix. */
-  fileName: string
-  /** Right-to-left sheet layout; pass `lang === 'ar'`. */
-  rtl?: boolean
-}
-
-const DEFAULT_COLUMN_WIDTH = 16
-
-/** `0 -> A`, `26 -> AA`; the autofilter needs the last column's letter. */
-export function excelColumnLetter(index: number): string {
-  let rest = Math.max(0, Math.trunc(index))
-  let letter = ''
-  for (;;) {
-    letter = String.fromCharCode(65 + (rest % 26)) + letter
-    if (rest < 26) return letter
-    rest = Math.floor(rest / 26) - 1
-  }
-}
-
-/**
- * The sheet's cells, headers first.
- *
- * Kept pure and separate from the workbook so the headers, the column order
- * and the Saudi-time conversion can be unit-tested without a spreadsheet
- * library. A `null` cell is written as an empty cell rather than the string
- * "null"; an em dash is never written, because in a spreadsheet a placeholder
- * character blocks filtering and aggregation.
- */
-export function sheetAoa<T>(
-  columns: ExcelColumn<T>[],
-  rows: T[],
-): ExcelCellValue[][] {
-  return [
-    columns.map((column) => column.header),
-    ...rows.map((row) =>
-      columns.map((column) => {
-        const value = column.value(row)
-        if (column.type === 'date')
-          return typeof value === 'string' ? saudiExcelSerial(value) : null
-        return value ?? null
-      }),
-    ),
-  ]
-}
-
-/**
- * Builds and downloads one formatted sheet.
- *
- * Shared by the movement log export, the visit export and — once the report
- * screens adopt it — the report exports, so a new export only has to describe
- * its columns.
- */
-export function exportRowsToExcel<T>(
-  sheetName: string,
-  columns: ExcelColumn<T>[],
-  rows: T[],
-  options: ExportRowsOptions,
-) {
-  const aoa = sheetAoa(columns, rows)
-  const sheet = XLSX.utils.aoa_to_sheet(aoa)
-
-  sheet['!cols'] = columns.map((column) => ({
-    wch: column.width ?? DEFAULT_COLUMN_WIDTH,
-  }))
-  // The header row stays visible while the reader scrolls a long export.
-  sheet['!freeze'] = {
-    xSplit: 0,
-    ySplit: 1,
-    topLeftCell: 'A2',
-    activePane: 'bottomLeft',
-    state: 'frozen',
-  }
-  const lastColumn = excelColumnLetter(Math.max(0, columns.length - 1))
-  sheet['!autofilter'] = { ref: `A1:${lastColumn}${aoa.length}` }
-  sheet['!rtl'] = Boolean(options.rtl)
-
-  // Date cells carry the display format; `aoa_to_sheet` wrote them as plain
-  // numbers, which would otherwise show as a five-digit serial.
-  columns.forEach((column, columnIndex) => {
-    if (column.type !== 'date') return
-    for (let rowIndex = 1; rowIndex < aoa.length; rowIndex += 1) {
-      const address = XLSX.utils.encode_cell({ c: columnIndex, r: rowIndex })
-      const cell = sheet[address] as XLSX.CellObject | undefined
-      if (!cell || typeof cell.v !== 'number') continue
-      cell.t = 'n'
-      cell.z = EXCEL_DATETIME_FORMAT
-    }
-  })
-
-  const workbook = XLSX.utils.book_new()
-  // Excel rejects a sheet name longer than 31 characters or containing []:*?/\
-  XLSX.utils.book_append_sheet(
-    workbook,
-    sheet,
-    sheetName.replace(/[[\]:*?/\\]/g, ' ').slice(0, 31) || 'Sheet1',
-  )
-  XLSX.writeFile(
-    workbook,
-    options.fileName.endsWith('.xlsx')
-      ? options.fileName
-      : `${options.fileName}.xlsx`,
-  )
-}
+export {
+  EXCEL_DATETIME_FORMAT,
+  excelColumnLetter,
+  saudiExcelSerial,
+  sheetAoa,
+} from '@/lib/excelSheet'
+export type {
+  ExcelCellValue,
+  ExcelColumn,
+  ExportRowsOptions,
+} from '@/lib/excelSheet'
+export { exportRowsToExcel }
 
 export function exportLogsToExcel(
   logs: EntryExitLog[],

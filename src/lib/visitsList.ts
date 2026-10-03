@@ -29,7 +29,7 @@ export const EQUIPMENT_VISITS_VIEW = 'movement_visits'
  * that migration must be applied before this select is shipped.
  */
 export const EQUIPMENT_VISITS_SELECT =
-  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code'
+  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code,equipment_ownership_status'
 
 export interface EquipmentVisitRow {
   entry_id: string
@@ -57,6 +57,8 @@ export interface EquipmentVisitRow {
   duration_minutes: number | null
   /** The ENTRY's company number (migration 0106); site visits only. */
   contractor_equipment_code?: string | null
+  /** The equipment's owner (`ownership_status`); exposed by the view since 0106. */
+  equipment_ownership_status?: string | null
 }
 
 /** Which visits a table lists; `all` applies no context predicate. */
@@ -386,9 +388,84 @@ function exportName(
   return preferred?.trim() || fallback?.trim() || ''
 }
 
+/** Short owner labels, the same keys the owner filter above offers. */
+const OWNER_LABEL_KEYS: Record<string, TranslationKey> = {
+  alazani: 'adminHomeOwnerAlazani',
+  takween: 'adminHomeOwnerTakween',
+  third_party_f: 'adminHomeOwnerThirdPartyF',
+  third_party_partnership_b: 'adminHomeOwnerThirdPartyB',
+  external_supplier: 'adminHomeOwnerExternal',
+}
+
+/**
+ * The owner cell: the localized owner name, the raw value for an owner the app
+ * does not know yet (never blank), and empty when the view returned none.
+ */
+export function visitOwnerLabel(
+  status: string | null | undefined,
+  t: Translate,
+): string {
+  if (!status) return ''
+  const key = OWNER_LABEL_KEYS[status]
+  return key ? t(key) : status
+}
+
+/** Equipment ids are looked up this many per request, so a URL stays short. */
+export const SUPPLIER_LOOKUP_CHUNK_SIZE = 100
+
+/** Splits a list into consecutive chunks of at most `size` (at least one). */
+export function chunkItems<T>(items: readonly T[], size: number): T[][] {
+  const step = Math.max(1, Math.trunc(size))
+  const chunks: T[][] = []
+  for (let index = 0; index < items.length; index += step)
+    chunks.push(items.slice(index, index + step))
+  return chunks
+}
+
+/** The distinct, non-empty equipment ids of a set of visits, in first-seen order. */
+export function distinctEquipmentIds(
+  visits: readonly Pick<EquipmentVisitRow, 'equipment_id'>[],
+): string[] {
+  return Array.from(
+    new Set(
+      visits
+        .map((visit) => visit.equipment_id)
+        .filter((id): id is string => !!id),
+    ),
+  )
+}
+
+/** One `equipment` row as the supplier lookup selects it. */
+export interface EquipmentSupplierRow {
+  id: string
+  /** PostgREST returns an embedded to-one row as an object (or null). */
+  lessor?: { name: string | null } | { name: string | null }[] | null
+}
+
+/**
+ * Maps equipment id to supplier (lessor) name. A unit without a lessor, or a
+ * lessor without a name, is simply absent, so its cell exports empty.
+ */
+export function supplierNamesByEquipment(
+  rows: readonly EquipmentSupplierRow[],
+  into: Map<string, string> = new Map(),
+): Map<string, string> {
+  for (const row of rows) {
+    const lessor = Array.isArray(row.lessor) ? row.lessor[0] : row.lessor
+    const name = lessor?.name?.trim()
+    if (row.id && name) into.set(row.id, name)
+  }
+  return into
+}
+
+/**
+ * @param supplierByEquipment supplier names resolved at export time (the view
+ * does not carry them); a unit absent from the map exports an empty supplier.
+ */
 export function visitExportColumns(
   t: Translate,
   lang: Language,
+  supplierByEquipment: ReadonlyMap<string, string> = new Map(),
 ): ExcelColumn<EquipmentVisitRow>[] {
   return [
     {
@@ -405,6 +482,16 @@ export function visitExportColumns(
       header: t('plateNumber'),
       width: 14,
       value: (row) => row.equipment_plate_number ?? '',
+    },
+    {
+      header: t('ownershipStatus'),
+      width: 16,
+      value: (row) => visitOwnerLabel(row.equipment_ownership_status, t),
+    },
+    {
+      header: t('lessor'),
+      width: 24,
+      value: (row) => supplierByEquipment.get(row.equipment_id) ?? '',
     },
     {
       header: t('contractorEquipmentCode'),

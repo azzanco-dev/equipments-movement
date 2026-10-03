@@ -40,10 +40,15 @@ const {
   visitContextFilter,
   visitExportColumns,
   visitExportFileName,
+  visitOwnerLabel,
   visitSortField,
   visitStateView,
   visitsListConfig,
   EQUIPMENT_VISITS_SELECT,
+  SUPPLIER_LOOKUP_CHUNK_SIZE,
+  chunkItems,
+  distinctEquipmentIds,
+  supplierNamesByEquipment,
 } = loadLibModule('visitsList')
 
 // ---------------------------------------------------------------------------
@@ -357,6 +362,8 @@ test('new Arabic copy in the visits configs has no hamza or madda alif', () => {
 // ---------------------------------------------------------------------------
 
 const fakeT = (key) => `[${key}]`
+// The helpers run in their own vm realm; compare plain data, not realms.
+const plain = (value) => JSON.parse(JSON.stringify(value))
 
 function visit(overrides = {}) {
   return {
@@ -405,6 +412,91 @@ test('the visits export writes plain text, the company number and Saudi dates', 
   assert.equal(cell('[visitDuration]'), '3 hours')
   const dates = columns.filter((column) => column.type === 'date')
   assert.equal(dates.length, 2)
+})
+
+test('the export carries owner and supplier right after the equipment columns', () => {
+  const headers = visitExportColumns(fakeT, 'ar').map((column) => column.header)
+  assert.deepEqual(plain(headers.slice(0, 6)), [
+    '[equipmentCodeLabel]',
+    '[equipmentType]',
+    '[plateNumber]',
+    '[ownershipStatus]',
+    '[lessor]',
+    '[contractorEquipmentCode]',
+  ])
+  assert.ok(
+    EQUIPMENT_VISITS_SELECT.split(',').includes('equipment_ownership_status'),
+  )
+})
+
+test('the owner cell uses the short owner labels and never goes blank', () => {
+  const labels = {
+    adminHomeOwnerAlazani: 'Al-Azani',
+    adminHomeOwnerTakween: 'Takween',
+    adminHomeOwnerThirdPartyF: 'F',
+    adminHomeOwnerThirdPartyB: 'B',
+    adminHomeOwnerExternal: 'Other',
+  }
+  const t = (key) => labels[key] ?? key
+  assert.equal(visitOwnerLabel('alazani', t), 'Al-Azani')
+  assert.equal(visitOwnerLabel('takween', t), 'Takween')
+  assert.equal(visitOwnerLabel('third_party_f', t), 'F')
+  assert.equal(visitOwnerLabel('third_party_partnership_b', t), 'B')
+  assert.equal(visitOwnerLabel('external_supplier', t), 'Other')
+  assert.equal(visitOwnerLabel('something_new', t), 'something_new')
+  assert.equal(visitOwnerLabel(null, t), '')
+  assert.equal(visitOwnerLabel(undefined, t), '')
+})
+
+test('the supplier cell comes from the looked-up map and is empty without a lessor', () => {
+  const suppliers = new Map([['e1', 'Gulf Rentals']])
+  const columns = visitExportColumns(fakeT, 'en', suppliers)
+  const supplier = columns.find((column) => column.header === '[lessor]')
+  const owner = columns.find((column) => column.header === '[ownershipStatus]')
+  assert.equal(supplier.value(visit()), 'Gulf Rentals')
+  assert.equal(supplier.value(visit({ equipment_id: 'e2' })), '')
+  // Without a lookup the cell is simply empty.
+  const bare = visitExportColumns(fakeT, 'en')
+  assert.equal(
+    bare.find((column) => column.header === '[lessor]').value(visit()),
+    '',
+  )
+  assert.equal(
+    owner.value(visit({ equipment_ownership_status: 'takween' })),
+    '[adminHomeOwnerTakween]',
+  )
+})
+
+test('supplier names are mapped from the equipment rows, object or array', () => {
+  const map = supplierNamesByEquipment([
+    { id: 'a', lessor: { name: ' Alpha ' } },
+    { id: 'b', lessor: [{ name: 'Beta' }] },
+    { id: 'c', lessor: null },
+    { id: 'd', lessor: { name: '  ' } },
+    { id: 'e' },
+  ])
+  assert.deepEqual(plain([...map.entries()]), [
+    ['a', 'Alpha'],
+    ['b', 'Beta'],
+  ])
+  // A second chunk adds to the same map.
+  supplierNamesByEquipment([{ id: 'f', lessor: { name: 'Phi' } }], map)
+  assert.equal(map.get('f'), 'Phi')
+})
+
+test('equipment ids are de-duplicated and looked up in bounded chunks', () => {
+  const ids = distinctEquipmentIds([
+    { equipment_id: 'a' },
+    { equipment_id: 'b' },
+    { equipment_id: 'a' },
+    { equipment_id: '' },
+  ])
+  assert.deepEqual(plain(ids), ['a', 'b'])
+  const many = Array.from({ length: 250 }, (_, index) => `id${index}`)
+  const chunks = chunkItems(many, SUPPLIER_LOOKUP_CHUNK_SIZE)
+  assert.ok(chunks.every((chunk) => chunk.length <= SUPPLIER_LOOKUP_CHUNK_SIZE))
+  assert.equal(chunks.flat().length, 250)
+  assert.deepEqual(plain(chunkItems([], 100)), [])
 })
 
 test('an open visit exports no exit instant', () => {
