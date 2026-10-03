@@ -9,7 +9,7 @@ import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { projectsListConfig } from '@/lib/listConfigs'
-import { sanitizeSearchTerm } from '@/lib/search'
+import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import type { Project } from '@/lib/types'
 import { ProjectFormDialog } from './ProjectFormDialog'
@@ -42,9 +42,11 @@ export function ProjectsListScreen() {
       .order(list.sort, { ascending: list.direction === 'asc' })
       .order('id', { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
-    const term = sanitizeSearchTerm(list.search)
-    if (term)
-      query = query.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+    const searchFilter = buildSearchFilter(
+      projectsListConfig.searchFields,
+      list.search,
+    )
+    if (searchFilter) query = query.or(searchFilter)
     query = applyListFilters(
       query,
       list.filters,

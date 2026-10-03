@@ -48,10 +48,12 @@ test('buildEquipmentSuggestFilter returns null for an empty term', () => {
 })
 
 test('buildEquipmentSuggestFilter searches code/type/plate/chassis', () => {
+  // The type is matched through its normalized column (migration 0116), which
+  // gets the normalized (lower-case) term; every other column the term as typed.
   const filter = buildEquipmentSuggestFilter('A120')
   assert.equal(
     filter,
-    'code.ilike.%A120%,type.ilike.%A120%,plate_number.ilike.%A120%,chassis_number.ilike.%A120%',
+    'code.ilike.%A120%,type_search.ilike.%a120%,plate_number.ilike.%A120%,chassis_number.ilike.%A120%',
   )
 })
 
@@ -59,7 +61,7 @@ test('buildEquipmentSuggestFilter adds a plate_digits probe for a digits-only te
   const filter = buildEquipmentSuggestFilter('1234')
   assert.equal(
     filter,
-    'code.ilike.%1234%,type.ilike.%1234%,plate_number.ilike.%1234%,chassis_number.ilike.%1234%,plate_digits.ilike.%1234%',
+    'code.ilike.%1234%,type_search.ilike.%1234%,plate_number.ilike.%1234%,chassis_number.ilike.%1234%,plate_digits.ilike.%1234%',
   )
 })
 

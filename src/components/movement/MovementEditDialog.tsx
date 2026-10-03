@@ -4,7 +4,12 @@ import { useI18n } from '@/i18n/I18nContext'
 import { Alert } from '@/components/Alert'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/components/Select'
-import { sanitizeSearchTerm } from '@/lib/search'
+import {
+  buildSearchFilter,
+  COMPANY_PROJECT_SEARCH_FIELDS,
+  EQUIPMENT_CODE_TYPE_SEARCH_FIELDS,
+  sanitizeSearchTerm,
+} from '@/lib/search'
 import { unwrapRows } from '@/lib/supabaseResult'
 import { localizedName } from '@/lib/localizedName'
 import type { Company, EntryExitLog, Project } from '@/lib/types'
@@ -181,13 +186,16 @@ export function MovementEditDialog({
   }
 
   const loadEquipment = useCallback(async (query: string) => {
-    const term = sanitizeSearchTerm(query)
+    const searchFilter = buildSearchFilter(
+      EQUIPMENT_CODE_TYPE_SEARCH_FIELDS,
+      query,
+    )
     let request = supabase
       .from('equipment')
       .select('id,code,type')
       .order('code')
       .limit(20)
-    if (term) request = request.or(`code.ilike.%${term}%,type.ilike.%${term}%`)
+    if (searchFilter) request = request.or(searchFilter)
     return unwrapRows(await request).map((item) => ({
       value: item.id,
       label: `${item.code} — ${item.type}`,
@@ -214,14 +222,16 @@ export function MovementEditDialog({
 
   const loadNamed = useCallback(
     async (table: 'companies' | 'projects', query: string) => {
-      const term = sanitizeSearchTerm(query)
+      const searchFilter = buildSearchFilter(
+        COMPANY_PROJECT_SEARCH_FIELDS,
+        query,
+      )
       let request = supabase
         .from(table)
         .select('id,name_ar,name_en')
         .order('name_ar')
         .limit(20)
-      if (term)
-        request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+      if (searchFilter) request = request.or(searchFilter)
       return unwrapRows(await request).map((item) => ({
         value: item.id,
         label: localizedName(lang, item.name_ar, item.name_en),

@@ -1,5 +1,4 @@
-import { plateDigitsSearchTerm, toLatinDigits } from '@/lib/plate'
-import { sanitizeSearchTerm } from '@/lib/search'
+import { buildSearchFilter, EQUIPMENT_SEARCH_FIELDS } from '@/lib/search'
 import type {
   EquipmentPresence,
   MovementContext,
@@ -19,24 +18,15 @@ import type {
 
 /**
  * Builds the PostgREST `or(...)` filter for the equipment suggestion search:
- * code, type, plate (raw and normalized digits), and chassis number. The term
- * is sanitized and Arabic-Indic digits are converted first, and it is never
- * split into plate letters (see `plateDigitsSearchTerm`). Returns `null` when
- * the term is empty after sanitizing, so the caller can skip the request.
+ * code, type (normalized, `type_search` of migration 0116), plate (raw and
+ * normalized digits), and chassis number — `EQUIPMENT_SEARCH_FIELDS` through
+ * the shared `buildSearchFilter`. The term is sanitized and Arabic-Indic
+ * digits are converted first, and it is never split into plate letters (see
+ * `plateDigitsSearchTerm`). Returns `null` when the term is empty after
+ * sanitizing, so the caller can skip the request.
  */
 export function buildEquipmentSuggestFilter(rawTerm: string): string | null {
-  const term = toLatinDigits(sanitizeSearchTerm(rawTerm))
-  if (!term) return null
-
-  const parts = [
-    `code.ilike.%${term}%`,
-    `type.ilike.%${term}%`,
-    `plate_number.ilike.%${term}%`,
-    `chassis_number.ilike.%${term}%`,
-  ]
-  const digits = plateDigitsSearchTerm(term)
-  if (digits) parts.push(`plate_digits.ilike.%${digits}%`)
-  return parts.join(',')
+  return buildSearchFilter(EQUIPMENT_SEARCH_FIELDS, rawTerm)
 }
 
 // ---------------------------------------------------------------------------

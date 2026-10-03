@@ -6,7 +6,7 @@ import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/components/Select'
 import { useI18n } from '@/i18n/I18nContext'
 import { localizedName } from '@/lib/localizedName'
-import { sanitizeSearchTerm } from '@/lib/search'
+import { buildSearchFilter, COMPANY_PROJECT_SEARCH_FIELDS } from '@/lib/search'
 import { unwrapRows } from '@/lib/supabaseResult'
 import { supabase } from '@/lib/supabase'
 import type { Company, CompanyProject } from '@/lib/types'
@@ -78,9 +78,11 @@ export function CompanyProjectsDialog({
       const linkedIds = links.map((link) => link.project_id)
       if (linkedIds.length)
         request = request.not('id', 'in', `(${linkedIds.join(',')})`)
-      const term = sanitizeSearchTerm(query)
-      if (term)
-        request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+      const searchFilter = buildSearchFilter(
+        COMPANY_PROJECT_SEARCH_FIELDS,
+        query,
+      )
+      if (searchFilter) request = request.or(searchFilter)
       return unwrapRows(await request).map((project) => ({
         value: project.id,
         label: localizedName(lang, project.name_ar, project.name_en),

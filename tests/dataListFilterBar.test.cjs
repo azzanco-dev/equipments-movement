@@ -337,7 +337,11 @@ test('company and project searches are narrow, bounded and server-side', () => {
   assert.match(source, /RELATION_FILTER_LIMIT = 20\b/)
   assert.match(source, /\.select\('id,name_ar,name_en'\)/)
   assert.match(source, /\.limit\(RELATION_FILTER_LIMIT\)/)
-  assert.match(source, /sanitizeSearchTerm\(query\)/)
+  // Sanitized and normalized through the shared builder (migration 0116).
+  assert.match(
+    source,
+    /buildSearchFilter\(\s*COMPANY_PROJECT_SEARCH_FIELDS,\s*query,?\s*\)/,
+  )
   assert.match(source, /\.in\('id', /)
 })
 

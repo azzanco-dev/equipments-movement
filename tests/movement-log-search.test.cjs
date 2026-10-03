@@ -53,10 +53,11 @@ test('an empty search adds no filter at all', () => {
 test('search covers equipment, driver snapshot and contractor code', () => {
   const filter = buildMovementSearchFilter('A12')
   assert.ok(filter.includes('equipment_code.ilike.%A12%'))
-  assert.ok(filter.includes('equipment_type.ilike.%A12%'))
+  // Arabic text columns are searched normalized (migration 0116).
+  assert.ok(filter.includes('equipment_type_search.ilike.%a12%'))
   assert.ok(filter.includes('equipment_plate_number.ilike.%A12%'))
   assert.ok(filter.includes('equipment_chassis_number.ilike.%A12%'))
-  assert.ok(filter.includes('driver_name.ilike.%A12%'))
+  assert.ok(filter.includes('driver_name_search.ilike.%a12%'))
   assert.ok(filter.includes('contractor_equipment_code.ilike.%A12%'))
   // Owner decision pending: notes and the foreman name stay out of search.
   assert.ok(!filter.includes('notes.'))
@@ -65,7 +66,7 @@ test('search covers equipment, driver snapshot and contractor code', () => {
   assert.ok(!filter.includes('company_name_ar'))
   assert.ok(
     buildMovementSearchFilter('A12', { includeCompanyProject: true }).includes(
-      'company_name_ar.ilike.%A12%',
+      'company_name_ar_search.ilike.%a12%',
     ),
   )
 })

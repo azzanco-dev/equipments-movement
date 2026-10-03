@@ -29,7 +29,7 @@ import { RelativeTime } from '@/components/RelativeTime'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { usersListConfig } from '@/lib/listConfigs'
-import { sanitizeSearchTerm } from '@/lib/search'
+import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
 import {
@@ -90,8 +90,11 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
       .order(list.sort, { ascending: list.direction === 'asc' })
       .order('id', { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
-    const term = sanitizeSearchTerm(list.search)
-    if (term) query = query.ilike('full_name', `%${term}%`)
+    const searchFilter = buildSearchFilter(
+      usersListConfig.searchFields,
+      list.search,
+    )
+    if (searchFilter) query = query.or(searchFilter)
     query = applyListFilters(
       query,
       list.filters,

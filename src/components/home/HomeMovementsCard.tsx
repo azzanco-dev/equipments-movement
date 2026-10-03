@@ -36,6 +36,7 @@ import { useListRequest } from '@/components/data-list/useListRequest'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { FilterButton } from '@/components/data-list/FilterButton'
+import { useListLabel } from '@/components/data-list/labels'
 import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
 import { PAGE_SIZE_OPTIONS } from '@/components/data-list/types'
 import { applyListFilters } from '@/lib/applyListFilters'
@@ -102,6 +103,7 @@ function MovementLogTab({
   refreshToken,
 }: HomeMovementsCardProps) {
   const { t } = useI18n()
+  const listLabel = useListLabel()
   const { user } = useAuth()
   const list = useDataListState(homeMovementsListConfig)
   const { search, searchInput, setSearchInput, filters } = list
@@ -327,7 +329,11 @@ function MovementLogTab({
           <SearchInput
             value={searchInput}
             onValueChange={setSearchInput}
-            placeholder={t('searchMovementRecords')}
+            placeholder={
+              workshopMode
+                ? t('searchEquipmentAnyField')
+                : listLabel(homeMovementsListConfig.searchPlaceholder)
+            }
             className="min-w-0 flex-1 sm:w-[340px] sm:flex-none"
           />
           {!workshopMode && (

@@ -1,6 +1,5 @@
-import { plateDigitsSearchTerm, toLatinDigits } from '@/lib/plate'
 import { saudiDateKey } from '@/lib/saudiTime'
-import { sanitizeSearchTerm } from '@/lib/search'
+import { buildSearchFilter } from '@/lib/search'
 import type { Language, TranslationKey } from '@/i18n/translations'
 import type {
   DataListConfig,
@@ -83,18 +82,30 @@ export function visitSortField(
     : 'entry_at'
 }
 
+/**
+ * The `movement_visits` columns the visits search matches, in filter order:
+ * the equipment code, type and plate, the driver snapshot, the ENTRY's
+ * company number (`contractor_equipment_code`, migration 0106) and, for a
+ * digits-only term, the normalized plate digits. The type and the driver are
+ * matched through the `*_search` columns of migration 0116. This list is the
+ * search itself (`buildVisitSearchFilter`) and the config's `searchFields`.
+ */
+export const VISIT_SEARCH_FIELDS = [
+  'equipment_code',
+  'equipment_type_search',
+  'equipment_plate_number',
+  'driver_name_search',
+  'contractor_equipment_code',
+  'equipment_plate_digits',
+] as const
+
 export const visitsListConfig: DataListConfig = {
   id: 'visits',
   searchPlaceholder: {
     ar: 'البحث بالمعدة (كود او نوع او لوحة) او ترقيم الشركة او السائق',
     en: 'Search by equipment (code, type or plate), company number or driver',
   },
-  searchFields: [
-    'equipment_code',
-    'equipment_plate_digits',
-    'driver_name',
-    'contractor_equipment_code',
-  ],
+  searchFields: [...VISIT_SEARCH_FIELDS],
   // Newest visit first; `entry_id` breaks ties so paging is deterministic.
   defaultSort: 'entry_at',
   defaultDirection: 'desc',
@@ -246,38 +257,22 @@ export const adminVisitsListConfig: DataListConfig = {
 }
 
 /**
- * Builds the PostgREST `or(...)` filter for a visit search term.
+ * Builds the PostgREST `or(...)` filter for a visit search term over
+ * `VISIT_SEARCH_FIELDS`, through the shared `buildSearchFilter`.
  *
  * The term is sanitized first (`sanitizeSearchTerm` trims, caps the length and
  * strips the characters that are structural inside `or=(...)`, including the
  * `%` / `_` / `*` wildcards), so nothing here can break out of its pattern.
- *
- * The term is matched as plain text against the equipment code, type and
- * plate, the driver snapshot and the ENTRY's company number
- * (`contractor_equipment_code`, migration 0106). Arabic-Indic digits become
- * ASCII first, and a digits-only term additionally probes the normalized
- * `plate_digits`.
+ * Arabic-Indic digits become ASCII, the `*_search` columns get the normalized
+ * term (`normalizeSearchText`, migration 0116), and a digits-only term
+ * additionally probes the normalized `plate_digits`.
  * The term is never split into plate letters — that made "a341" match every
  * plate containing an A (see `buildMovementSearchFilter`).
  *
  * Returns `null` when the term is empty after sanitizing.
  */
 export function buildVisitSearchFilter(rawTerm: string): string | null {
-  const term = toLatinDigits(sanitizeSearchTerm(rawTerm))
-  if (!term) return null
-
-  const parts = [
-    `equipment_code.ilike.%${term}%`,
-    `equipment_type.ilike.%${term}%`,
-    `equipment_plate_number.ilike.%${term}%`,
-    `driver_name.ilike.%${term}%`,
-    `contractor_equipment_code.ilike.%${term}%`,
-  ]
-
-  const plateDigits = plateDigitsSearchTerm(term)
-  if (plateDigits) parts.push(`equipment_plate_digits.ilike.%${plateDigits}%`)
-
-  return parts.join(',')
+  return buildSearchFilter(VISIT_SEARCH_FIELDS, rawTerm)
 }
 
 export type VisitState = 'open' | 'closed'

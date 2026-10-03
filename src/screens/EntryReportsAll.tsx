@@ -6,7 +6,13 @@ import { PageHeader } from '@/components/PageHeader'
 import { MovementLogCard } from '@/components/MovementLogCard'
 import { ReportListSkeleton } from '@/components/ReportListSkeleton'
 import { Alert } from '@/components/Alert'
-import { sanitizeSearchTerm } from '@/lib/search'
+import {
+  buildSearchFilter,
+  COMPANY_PROJECT_SEARCH_FIELDS,
+  DRIVER_SEARCH_FIELDS,
+  EQUIPMENT_CODE_TYPE_SEARCH_FIELDS,
+  sanitizeSearchTerm,
+} from '@/lib/search'
 import { unwrapRows } from '@/lib/supabaseResult'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import {
@@ -395,18 +401,20 @@ function ReportRelationFilter({
     }
   }, [value, table, fields])
   const loadOptions = async (raw: string) => {
-    const safe = sanitizeSearchTerm(raw)
+    // Arabic names are matched normalized (migration 0116); foremen
+    // (`profiles`) have no normalized column and keep the plain name.
+    const searchFilter = buildSearchFilter(
+      table === 'equipment'
+        ? EQUIPMENT_CODE_TYPE_SEARCH_FIELDS
+        : table === 'companies' || table === 'projects'
+          ? COMPANY_PROJECT_SEARCH_FIELDS
+          : table === 'drivers'
+            ? DRIVER_SEARCH_FIELDS
+            : ['full_name'],
+      raw,
+    )
     let query = supabase.from(table).select(fields).limit(20)
-    if (safe)
-      query =
-        table === 'equipment'
-          ? query.or(`code.ilike.%${safe}%,type.ilike.%${safe}%`)
-          : query.ilike(
-              table === 'companies' || table === 'projects'
-                ? 'name_ar'
-                : 'full_name',
-              `%${safe}%`,
-            )
+    if (searchFilter) query = query.or(searchFilter)
     return (unwrapRows(await query) as unknown as Record<string, string>[]).map(
       toOption,
     )

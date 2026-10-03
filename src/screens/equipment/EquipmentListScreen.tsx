@@ -11,8 +11,8 @@ import { EquipmentExcelUpdate } from '@/components/EquipmentExcelUpdate'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { equipmentListConfig } from '@/lib/listConfigs'
-import { plateDigitsSearchTerm, toLatinDigits } from '@/lib/plate'
-import { sanitizeSearchTerm } from '@/lib/search'
+import { toLatinDigits } from '@/lib/plate'
+import { buildSearchFilter, sanitizeSearchTerm } from '@/lib/search'
 import {
   codeMatchesTerm,
   fetchPreviousCodeMatchIds,
@@ -92,18 +92,18 @@ export function EquipmentListScreen({
       }
       previousIds = previous.ids
     }
-    if (term) {
-      const orParts = [
-        `code.ilike.%${term}%`,
-        `type.ilike.%${term}%`,
-        `plate_number.ilike.%${term}%`,
-        `chassis_number.ilike.%${term}%`,
-      ]
-      const plateDigits = plateDigitsSearchTerm(term)
-      if (plateDigits) orParts.push(`plate_digits.ilike.%${plateDigits}%`)
+    // The config's `searchFields` is the search (code, normalized type,
+    // plate, chassis, plate digits); a previous code joins it as one more
+    // `or` part.
+    const searchFilter = buildSearchFilter(
+      equipmentListConfig.searchFields,
+      list.search,
+    )
+    if (searchFilter) {
       const previousPart = previousCodeOrPart(previousIds)
-      if (previousPart) orParts.push(previousPart)
-      query = query.or(orParts.join(','))
+      query = query.or(
+        previousPart ? `${searchFilter},${previousPart}` : searchFilter,
+      )
     }
     query = applyListFilters(
       query,

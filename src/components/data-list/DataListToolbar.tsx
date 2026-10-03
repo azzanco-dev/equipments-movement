@@ -130,6 +130,7 @@ export function DataListToolbar({
             value={search}
             onChange={(event) => onSearch(event.target.value)}
             placeholder={listLabel(config.searchPlaceholder)}
+            aria-label={listLabel(config.searchPlaceholder)}
           />
         </div>
         <div className="flex items-center gap-2 sm:ms-auto">

@@ -6,7 +6,7 @@ import type { SelectOption } from '@/components/Select'
 import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
-import { sanitizeSearchTerm } from '@/lib/search'
+import { buildSearchFilter, COMPANY_PROJECT_SEARCH_FIELDS } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
 import type { Profile, ProfileContact, UserRole } from '@/lib/types'
@@ -239,9 +239,11 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
         .select('id,name_ar,name_en')
         .order(lang === 'ar' ? 'name_ar' : 'name_en')
         .limit(20)
-      const term = sanitizeSearchTerm(search)
-      if (term)
-        query = query.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+      const searchFilter = buildSearchFilter(
+        COMPANY_PROJECT_SEARCH_FIELDS,
+        search,
+      )
+      if (searchFilter) query = query.or(searchFilter)
       const { data } = await query
       return (data ?? []).map((company) => ({
         value: company.id,

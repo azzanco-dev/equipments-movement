@@ -22,9 +22,14 @@ import {
   type ParsedMovementImportRow,
 } from '@/lib/movementExcel'
 import { localizedName } from '@/lib/localizedName'
-import { sanitizeSearchTerm } from '@/lib/search'
+import {
+  buildSearchFilter,
+  COMPANY_PROJECT_SEARCH_FIELDS,
+  DRIVER_SEARCH_FIELDS,
+  EQUIPMENT_SEARCH_FIELDS,
+  sanitizeSearchTerm,
+} from '@/lib/search'
 import { unwrapRows } from '@/lib/supabaseResult'
-import { plateDigitsSearchTerm, toLatinDigits } from '@/lib/plate'
 import { supabase } from '@/lib/supabase'
 
 interface MovementImportRow extends ParsedMovementImportRow {
@@ -107,17 +112,8 @@ export function MovementImport() {
         .select('id,code,type,plate_number')
         .order('code')
         .limit(20)
-      const term = toLatinDigits(sanitizeSearchTerm(search))
-      if (term) {
-        const orParts = [
-          `code.ilike.%${term}%`,
-          `type.ilike.%${term}%`,
-          `plate_number.ilike.%${term}%`,
-        ]
-        const plateDigits = plateDigitsSearchTerm(term)
-        if (plateDigits) orParts.push(`plate_digits.ilike.%${plateDigits}%`)
-        query = query.or(orParts.join(','))
-      }
+      const searchFilter = buildSearchFilter(EQUIPMENT_SEARCH_FIELDS, search)
+      if (searchFilter) query = query.or(searchFilter)
       return unwrapRows(await query).map((item) => ({
         value: item.id,
         label: `${item.code} — ${item.type}${item.plate_number ? ` · ${item.plate_number}` : ''}`,
@@ -133,9 +129,11 @@ export function MovementImport() {
         .select('id,name_ar,name_en')
         .order(lang === 'ar' ? 'name_ar' : 'name_en')
         .limit(20)
-      const term = sanitizeSearchTerm(search)
-      if (term)
-        query = query.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+      const searchFilter = buildSearchFilter(
+        COMPANY_PROJECT_SEARCH_FIELDS,
+        search,
+      )
+      if (searchFilter) query = query.or(searchFilter)
       return unwrapRows(await query).map((item) => ({
         value: item.id,
         label: localizedName(lang, item.name_ar, item.name_en),
@@ -151,9 +149,11 @@ export function MovementImport() {
         .select('id,name_ar,name_en')
         .order(lang === 'ar' ? 'name_ar' : 'name_en')
         .limit(20)
-      const term = sanitizeSearchTerm(search)
-      if (term)
-        query = query.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+      const searchFilter = buildSearchFilter(
+        COMPANY_PROJECT_SEARCH_FIELDS,
+        search,
+      )
+      if (searchFilter) query = query.or(searchFilter)
       return unwrapRows(await query).map((item) => ({
         value: item.id,
         label: localizedName(lang, item.name_ar, item.name_en),
@@ -169,11 +169,8 @@ export function MovementImport() {
         .select('id,full_name,name_en,mobile_number')
         .order('full_name')
         .limit(20)
-      const term = sanitizeSearchTerm(search)
-      if (term)
-        query = query.or(
-          `full_name.ilike.%${term}%,name_en.ilike.%${term}%,mobile_number.ilike.%${term}%`,
-        )
+      const searchFilter = buildSearchFilter(DRIVER_SEARCH_FIELDS, search)
+      if (searchFilter) query = query.or(searchFilter)
       return unwrapRows(await query).map((item) => ({
         value: item.id,
         label: `${item.full_name}${item.name_en ? ` · ${item.name_en}` : ''}${item.mobile_number ? ` · ${item.mobile_number}` : ''}`,

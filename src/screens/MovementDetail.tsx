@@ -30,7 +30,7 @@ import type {
 } from '@/lib/types'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/components/Select'
-import { sanitizeSearchTerm } from '@/lib/search'
+import { buildSearchFilter, DRIVER_SEARCH_FIELDS } from '@/lib/search'
 import { unwrapRows } from '@/lib/supabaseResult'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
@@ -428,11 +428,8 @@ export function MovementDetail({
         .select('id,full_name,name_en,mobile_number')
         .order('full_name')
         .limit(20)
-      const term = sanitizeSearchTerm(query)
-      if (term)
-        request = request.or(
-          `full_name.ilike.%${term}%,name_en.ilike.%${term}%,mobile_number.ilike.%${term}%`,
-        )
+      const searchFilter = buildSearchFilter(DRIVER_SEARCH_FIELDS, query)
+      if (searchFilter) request = request.or(searchFilter)
       return unwrapRows(await request).map((driver) => ({
         value: driver.id,
         label: `${driver.full_name}${driver.name_en ? ` — ${driver.name_en}` : ''}${driver.mobile_number ? ` — ${driver.mobile_number}` : ''}`,

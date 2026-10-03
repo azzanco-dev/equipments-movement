@@ -16,7 +16,11 @@ import type { SelectOption } from '@/components/Select'
 import { PlateNumberInput } from '@/components/PlateNumberInput'
 import { useI18n } from '@/i18n/I18nContext'
 import { supabase } from '@/lib/supabase'
-import { sanitizeSearchTerm } from '@/lib/search'
+import {
+  buildSearchFilter,
+  COMPANY_PROJECT_SEARCH_FIELDS,
+  NAME_SEARCH_FIELDS,
+} from '@/lib/search'
 import { unwrapRows } from '@/lib/supabaseResult'
 import { localizedName } from '@/lib/localizedName'
 import { usesExternalSupplier } from '@/lib/equipmentOwnership'
@@ -126,8 +130,8 @@ export function EquipmentFormDialog({
       .select('name')
       .order('name')
       .limit(20)
-    const term = sanitizeSearchTerm(query)
-    if (term) request = request.ilike('name', `%${term}%`)
+    const searchFilter = buildSearchFilter(NAME_SEARCH_FIELDS, query)
+    if (searchFilter) request = request.or(searchFilter)
     return unwrapRows(await request).map((item) => ({
       value: item.name,
       label: item.name,
@@ -141,9 +145,11 @@ export function EquipmentFormDialog({
         .select('id,name_ar,name_en')
         .order('name_ar')
         .limit(20)
-      const term = sanitizeSearchTerm(query)
-      if (term)
-        request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+      const searchFilter = buildSearchFilter(
+        COMPANY_PROJECT_SEARCH_FIELDS,
+        query,
+      )
+      if (searchFilter) request = request.or(searchFilter)
       return unwrapRows(await request).map((project) => ({
         value: project.id,
         label: localizedName(lang, project.name_ar, project.name_en),
@@ -158,8 +164,8 @@ export function EquipmentFormDialog({
       .select('id,name')
       .order('name')
       .limit(20)
-    const term = sanitizeSearchTerm(query)
-    if (term) request = request.ilike('name', `%${term}%`)
+    const searchFilter = buildSearchFilter(NAME_SEARCH_FIELDS, query)
+    if (searchFilter) request = request.or(searchFilter)
     return unwrapRows(await request).map((lessor) => ({
       value: lessor.id,
       label: lessor.name,

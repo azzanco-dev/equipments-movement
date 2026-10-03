@@ -3,7 +3,7 @@ import type { AsyncSearchSelectOption } from '@/components/AsyncSearchSelect'
 import { useI18n } from '@/i18n/I18nContext'
 import type { Language } from '@/i18n/translations'
 import { localizedName } from '@/lib/localizedName'
-import { sanitizeSearchTerm } from '@/lib/search'
+import { buildSearchFilter, COMPANY_PROJECT_SEARCH_FIELDS } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import type { FilterBarAsyncField } from './FilterBar'
 
@@ -74,9 +74,11 @@ export function namedRelationFilter(
         .order(nameColumn)
         .order('id')
         .limit(RELATION_FILTER_LIMIT)
-      const term = sanitizeSearchTerm(query)
-      if (term)
-        request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+      const searchFilter = buildSearchFilter(
+        COMPANY_PROJECT_SEARCH_FIELDS,
+        query,
+      )
+      if (searchFilter) request = request.or(searchFilter)
       const { data, error } = await request
       if (error) throw error
       // `toOption` reads only the three name fields, which drops the embed.

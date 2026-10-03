@@ -34,7 +34,11 @@ import { Notice } from '@/components/ui/Notice'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/lib/selectOption'
-import { sanitizeSearchTerm } from '@/lib/search'
+import {
+  buildSearchFilter,
+  NAME_SEARCH_FIELDS,
+  sanitizeSearchTerm,
+} from '@/lib/search'
 import { unwrapRows } from '@/lib/supabaseResult'
 import { focusFirstError, type FieldErrors } from '@/lib/formValidation'
 import { useListRequest } from '@/components/data-list/useListRequest'
@@ -109,8 +113,8 @@ export function AdminSettings() {
       .order('updated_at', { ascending: false })
       .order('id', { ascending: false })
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
-    const term = sanitizeSearchTerm(search)
-    if (term) query = query.ilike('name', `%${term}%`)
+    const searchFilter = buildSearchFilter(NAME_SEARCH_FIELDS, search)
+    if (searchFilter) query = query.or(searchFilter)
     const { data, error: fetchError, count } = await query.abortSignal(signal)
     if (signal.aborted) return
     if (fetchError) setLoadError(t('equipmentTypesLoadError'))

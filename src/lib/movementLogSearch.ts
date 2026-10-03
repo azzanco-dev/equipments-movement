@@ -1,5 +1,4 @@
-import { plateDigitsSearchTerm, toLatinDigits } from '@/lib/plate'
-import { sanitizeSearchTerm } from '@/lib/search'
+import { buildSearchFilter } from '@/lib/search'
 import type {
   EntryExitLog,
   MovementType,
@@ -121,16 +120,37 @@ export function mapMovementLogRows(
 }
 
 /**
- * Builds the PostgREST `or(...)` filter for a movement search term.
- *
- * The term is sanitized first (`sanitizeSearchTerm` trims, caps the length, and
- * strips the characters that are structural in a PostgREST filter, including
- * the `%` / `_` / `*` wildcards), so nothing here can break out of its pattern.
- *
- * The term is searched as plain text. Arabic-Indic digits are converted to
- * ASCII first, and a digits-only term also probes `plate_digits`. The term is
- * never split into plate letters (that made "a341" match every plate with an
- * A). Movement notes and the foreman name are intentionally not searched.
+ * The `movement_log_search` columns a movement search matches: the equipment
+ * (code, type, plate, normalized plate digits, chassis), the driver snapshot
+ * and the contractor code (company number). Movement notes and the foreman
+ * name are intentionally not searched. The Arabic text is matched through the
+ * `*_search` columns of migration 0116 (`normalize_search_text`).
+ */
+export const MOVEMENT_SEARCH_FIELDS = [
+  'equipment_code',
+  'equipment_type_search',
+  'equipment_plate_number',
+  'equipment_chassis_number',
+  'driver_name_search',
+  'contractor_equipment_code',
+  'equipment_plate_digits',
+] as const
+
+/** The company and project names, searched by the lists that show them. */
+export const MOVEMENT_COMPANY_PROJECT_SEARCH_FIELDS = [
+  'company_name_ar_search',
+  'company_name_en',
+  'project_name_ar_search',
+  'project_name_en',
+] as const
+
+/**
+ * Builds the PostgREST `or(...)` filter for a movement search term over
+ * `MOVEMENT_SEARCH_FIELDS` (plus the company and project names on request)
+ * through the shared `buildSearchFilter`: the term is sanitized, Arabic-Indic
+ * digits become ASCII, the `*_search` columns get the normalized term, and a
+ * digits-only term also probes the plate digits. The term is never split into
+ * plate letters (that made "a341" match every plate with an A).
  *
  * Returns `null` when the term is empty after sanitizing.
  */
@@ -138,28 +158,10 @@ export function buildMovementSearchFilter(
   rawTerm: string,
   options: { includeCompanyProject?: boolean } = {},
 ): string | null {
-  const term = toLatinDigits(sanitizeSearchTerm(rawTerm))
-  if (!term) return null
-
-  const parts = [
-    `equipment_code.ilike.%${term}%`,
-    `equipment_type.ilike.%${term}%`,
-    `equipment_plate_number.ilike.%${term}%`,
-    `equipment_chassis_number.ilike.%${term}%`,
-    `driver_name.ilike.%${term}%`,
-    `contractor_equipment_code.ilike.%${term}%`,
-  ]
-
-  const plateDigits = plateDigitsSearchTerm(term)
-  if (plateDigits) parts.push(`equipment_plate_digits.ilike.%${plateDigits}%`)
-
-  if (options.includeCompanyProject)
-    parts.push(
-      `company_name_ar.ilike.%${term}%`,
-      `company_name_en.ilike.%${term}%`,
-      `project_name_ar.ilike.%${term}%`,
-      `project_name_en.ilike.%${term}%`,
-    )
-
-  return parts.join(',')
+  return buildSearchFilter(
+    options.includeCompanyProject
+      ? [...MOVEMENT_SEARCH_FIELDS, ...MOVEMENT_COMPANY_PROJECT_SEARCH_FIELDS]
+      : MOVEMENT_SEARCH_FIELDS,
+    rawTerm,
+  )
 }

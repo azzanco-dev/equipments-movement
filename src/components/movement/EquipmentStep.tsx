@@ -103,7 +103,7 @@ export function EquipmentStep({
       <SearchInput
         value={search}
         onValueChange={onSearchChange}
-        placeholder={t('searchingEquipment')}
+        placeholder={t('searchEquipmentAnyField')}
         dir={lang === 'ar' && !search ? 'rtl' : 'ltr'}
         autoFocus
       />

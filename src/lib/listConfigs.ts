@@ -7,6 +7,16 @@ import {
   DRIVER_EMPLOYMENT_TYPES,
   DRIVER_NATIONALITIES,
 } from '@/lib/driverExcel'
+import {
+  MOVEMENT_COMPANY_PROJECT_SEARCH_FIELDS,
+  MOVEMENT_SEARCH_FIELDS,
+} from '@/lib/movementLogSearch'
+import {
+  COMPANY_PROJECT_SEARCH_FIELDS,
+  DRIVER_SEARCH_FIELDS,
+  EQUIPMENT_SEARCH_FIELDS,
+  LESSOR_SEARCH_FIELDS,
+} from '@/lib/search'
 
 /**
  * Every label below is a `ListLabel`: a key of the shared translation table,
@@ -46,7 +56,7 @@ export const driversListConfig: DataListConfig = {
     ar: 'البحث بالاسم او الهوية او الجوال',
     en: 'Search by name, ID or mobile',
   },
-  searchFields: ['full_name', 'name_en', 'id_number', 'mobile_number'],
+  searchFields: [...DRIVER_SEARCH_FIELDS],
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
   filterFields: [
@@ -87,13 +97,7 @@ export const equipmentListConfig: DataListConfig = {
     ar: 'البحث بالكود او اللوحة او الشاصي او النوع',
     en: 'Search by code, plate, chassis or type',
   },
-  searchFields: [
-    'code',
-    'plate_number',
-    'plate_digits',
-    'chassis_number',
-    'type',
-  ],
+  searchFields: [...EQUIPMENT_SEARCH_FIELDS],
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
   filterFields: [
@@ -198,7 +202,7 @@ export const companiesListConfig: DataListConfig = {
     ar: 'البحث باسم الشركة',
     en: 'Search by company name',
   },
-  searchFields: ['name_ar', 'name_en'],
+  searchFields: [...COMPANY_PROJECT_SEARCH_FIELDS],
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
   // No filter fields (owner review, 2026-09-29): the search box already
@@ -225,7 +229,7 @@ export const lessorsListConfig: DataListConfig = {
     ar: 'البحث بالاسم أو جهة الاتصال أو الجوال',
     en: 'Search by name, contact person or mobile',
   },
-  searchFields: ['name', 'contact_person', 'contact_number'],
+  searchFields: [...LESSOR_SEARCH_FIELDS],
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
   // No filter fields (owner review, 2026-09-29): the search box already
@@ -237,14 +241,25 @@ export const lessorsListConfig: DataListConfig = {
     { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
   ],
 }
+/**
+ * The movement search of `/logs` and the foreman home log
+ * (`buildMovementSearchFilter(…, { includeCompanyProject: true })`): the
+ * equipment, the driver, the company number (`contractor_equipment_code`) and
+ * the company and project names. The placeholder names every one of them
+ * (EM-116); `tests/search-normalisation.test.cjs` keeps the two in step.
+ */
 const movementSearchPlaceholder = {
-  ar: 'البحث بالمعدة (كود او لوحة او شاصي) او السائق او كود المقاول',
-  en: 'Search by equipment (code, plate or chassis), driver or contractor code',
+  ar: 'البحث بالمعدة (كود او نوع او لوحة او شاصي) او السائق او ترقيم الشركة او الشركة او المشروع',
+  en: 'Search by equipment (code, type, plate or chassis), driver, company number, company or project',
 }
+const movementSearchFields = [
+  ...MOVEMENT_SEARCH_FIELDS,
+  ...MOVEMENT_COMPANY_PROJECT_SEARCH_FIELDS,
+]
 export const movementsListConfig: DataListConfig = {
   id: 'movements',
   searchPlaceholder: movementSearchPlaceholder,
-  searchFields: ['equipment', 'driver_name', 'contractor_equipment_code'],
+  searchFields: movementSearchFields,
   defaultSort: 'created_at',
   defaultDirection: 'desc',
   filterFields: [
@@ -358,6 +373,11 @@ export const usersListConfig: DataListConfig = {
     { key: 'created_at', label: 'createdAt' },
   ],
 }
+/**
+ * Not wired to any screen: the visits tables use `visitsListConfig` and its
+ * `VISIT_SEARCH_FIELDS` from `@/lib/visitsList` (migration 0096 columns).
+ * Kept as it is; its keys predate `movement_visits` and are not a search.
+ */
 export const visitsListConfig: DataListConfig = {
   id: 'visits',
   searchPlaceholder: movementSearchPlaceholder,
@@ -402,11 +422,12 @@ export const visitsListConfig: DataListConfig = {
 /**
  * Full movement log (`/logs`), served by the `movement_log_search` view.
  *
- * Search is the shared movement search (`buildMovementSearchFilter`), so the
- * search box covers the equipment, the driver snapshot and the contractor
- * code. The foreman is deliberately a filter and not a search field: searching
- * it made an equipment code that happens to appear in a name match rows the
- * user did not ask for.
+ * Search is the shared movement search (`buildMovementSearchFilter` with the
+ * company and project names), so the search box covers the equipment, the
+ * driver snapshot, the contractor code and the company and project names;
+ * `searchFields` is that exact column list. The foreman is deliberately a
+ * filter and not a search field: searching it made an equipment code that
+ * happens to appear in a name match rows the user did not ask for.
  *
  * Every filter key below is a real column of the view and is allowlisted
  * against this list before it reaches PostgREST, so no arbitrary column can be
@@ -419,7 +440,7 @@ export const visitsListConfig: DataListConfig = {
 export const logsListConfig: DataListConfig = {
   id: 'logs',
   searchPlaceholder: movementSearchPlaceholder,
-  searchFields: ['equipment', 'driver_name', 'contractor_equipment_code'],
+  searchFields: movementSearchFields,
   defaultSort: 'recorded_at',
   defaultDirection: 'desc',
   filterFields: [

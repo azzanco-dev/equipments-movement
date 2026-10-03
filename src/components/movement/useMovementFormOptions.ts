@@ -4,7 +4,12 @@ import { useI18n } from '@/i18n/I18nContext'
 import type { AsyncSearchSelectOption } from '@/components/AsyncSearchSelect'
 import { driverOption } from '@/lib/driverOptions'
 import { localizedName } from '@/lib/localizedName'
-import { sanitizeSearchTerm } from '@/lib/search'
+import {
+  buildSearchFilter,
+  COMPANY_PROJECT_SEARCH_FIELDS,
+  DRIVER_SEARCH_FIELDS,
+  NAME_SEARCH_FIELDS,
+} from '@/lib/search'
 import { unwrapRows } from '@/lib/supabaseResult'
 
 export interface MovementFormOptionLoaders {
@@ -30,11 +35,8 @@ export function useMovementFormOptions(): MovementFormOptionLoaders {
         .select('id,full_name,name_en,id_number,mobile_number')
         .order('full_name')
         .limit(20)
-      const term = sanitizeSearchTerm(query)
-      if (term)
-        request = request.or(
-          `full_name.ilike.%${term}%,name_en.ilike.%${term}%,id_number.ilike.%${term}%,mobile_number.ilike.%${term}%`,
-        )
+      const searchFilter = buildSearchFilter(DRIVER_SEARCH_FIELDS, query)
+      if (searchFilter) request = request.or(searchFilter)
       return unwrapRows(await request).map(driverOption)
     },
     [],
@@ -47,9 +49,11 @@ export function useMovementFormOptions(): MovementFormOptionLoaders {
         .select('id,name_ar,name_en')
         .order('name_ar')
         .limit(20)
-      const term = sanitizeSearchTerm(query)
-      if (term)
-        request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+      const searchFilter = buildSearchFilter(
+        COMPANY_PROJECT_SEARCH_FIELDS,
+        query,
+      )
+      if (searchFilter) request = request.or(searchFilter)
       return unwrapRows(await request).map((company) => ({
         value: company.id,
         label: localizedName(lang, company.name_ar, company.name_en),
@@ -65,9 +69,11 @@ export function useMovementFormOptions(): MovementFormOptionLoaders {
         .select('id,name_ar,name_en')
         .order('name_ar')
         .limit(20)
-      const term = sanitizeSearchTerm(query)
-      if (term)
-        request = request.or(`name_ar.ilike.%${term}%,name_en.ilike.%${term}%`)
+      const searchFilter = buildSearchFilter(
+        COMPANY_PROJECT_SEARCH_FIELDS,
+        query,
+      )
+      if (searchFilter) request = request.or(searchFilter)
       return unwrapRows(await request).map((project) => ({
         value: project.id,
         label: localizedName(lang, project.name_ar, project.name_en),
@@ -83,8 +89,8 @@ export function useMovementFormOptions(): MovementFormOptionLoaders {
         .select('name')
         .order('name')
         .limit(20)
-      const term = sanitizeSearchTerm(query)
-      if (term) request = request.ilike('name', `%${term}%`)
+      const searchFilter = buildSearchFilter(NAME_SEARCH_FIELDS, query)
+      if (searchFilter) request = request.or(searchFilter)
       return unwrapRows(await request).map((item) => ({
         value: item.name,
         label: item.name,
@@ -100,8 +106,8 @@ export function useMovementFormOptions(): MovementFormOptionLoaders {
         .select('id,name')
         .order('name')
         .limit(20)
-      const term = sanitizeSearchTerm(query)
-      if (term) request = request.ilike('name', `%${term}%`)
+      const searchFilter = buildSearchFilter(NAME_SEARCH_FIELDS, query)
+      if (searchFilter) request = request.or(searchFilter)
       return unwrapRows(await request).map((lessor) => ({
         value: lessor.id,
         label: lessor.name,

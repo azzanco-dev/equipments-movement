@@ -113,9 +113,9 @@ export function WorkshopReports({
           // Remount when the URL search changes (Clear, Back).
           key={search}
           className="input h-8 min-w-52 flex-1"
-          aria-label={t('searchWorkshopMovements')}
+          aria-label={t('searchEquipmentAnyField')}
           defaultValue={search}
-          placeholder={t('searchWorkshopMovements')}
+          placeholder={t('searchEquipmentAnyField')}
           onKeyDown={(event) => {
             if (event.key === 'Enter') setParam('q', event.currentTarget.value)
           }}
