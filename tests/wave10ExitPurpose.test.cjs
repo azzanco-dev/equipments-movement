@@ -36,13 +36,11 @@ function withoutComments(source) {
 }
 
 const stripped = withoutComments(sql)
-// The database requirement is held back until the new form is live (see the
-// rollout note in 0111); it is still guarded here so it is ready to promote.
-const PENDING = read(
-  'supabase',
-  'pending',
-  '0112_require_site_exit_purpose.sql',
-)
+// The database requirement was held back until the new form was live (see
+// the rollout note in 0111) and is now migration 0115.
+const REQUIREMENT_MIGRATION =
+  '20261003120000_0115_require_site_exit_purpose.sql'
+const PENDING = read('supabase', 'migrations', REQUIREMENT_MIGRATION)
 const pendingStripped = withoutComments(PENDING)
 const trigger = functionBody(PENDING, 'enforce_site_exit_purpose')
 
@@ -87,7 +85,12 @@ test('the column is nullable with an allowlist and a site-exit-only check', () =
 test('0111 itself adds no trigger, so the live form keeps working when it is applied', () => {
   assert.ok(!/CREATE TRIGGER/.test(stripped))
   assert.ok(!/FUNCTION public\.enforce_site_exit_purpose/.test(stripped))
-  assert.match(sql, /supabase\/pending\/0112_require_site_exit_purpose\.sql/)
+  // The requirement follows in 0115, after 0111 in migration order.
+  const files = fs
+    .readdirSync(path.join(root, 'supabase', 'migrations'))
+    .filter((file) => file.endsWith('.sql'))
+    .sort()
+  assert.ok(files.indexOf(REQUIREMENT_MIGRATION) > files.indexOf(MIGRATION))
 })
 
 test('the big sequence trigger and the admin functions are not redefined', () => {

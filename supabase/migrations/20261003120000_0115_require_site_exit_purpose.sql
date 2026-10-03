@@ -1,9 +1,10 @@
--- HELD BACK — not a migration yet (2026-10-01).
+-- Migration 0115: the purpose of a SITE exit becomes required in PostgreSQL.
 --
--- Makes the purpose of a SITE exit required in PostgreSQL (column and checks
--- added by migration 0111). Move this file into supabase/migrations with the
--- next timestamp ONLY after the form that sends `exit_purpose` is live on
--- production; applied earlier, every site exit from the old form fails.
+-- Migration 0111 added `entry_exit_logs.exit_purpose` with its checks only, so
+-- the form live at that time kept working. The form that sends the purpose is
+-- now on production (main = 88879ab, 2026-10-03), so the requirement held
+-- back in supabase/pending/0112_require_site_exit_purpose.sql is promoted
+-- here unchanged.
 --
 -- A small separate BEFORE INSERT trigger, so enforce_movement_sequence() is
 -- not redefined. It fires after that trigger (same timing, name order: 'm' <
