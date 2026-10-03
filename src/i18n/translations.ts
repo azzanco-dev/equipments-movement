@@ -670,7 +670,7 @@ export const translations = {
     // wave-9-notices — start
     notifyForemanTitle: 'المعدة ما زالت مسجلة داخل مشروع',
     notifyForemanExplain:
-      'لا يمكن تسجيل دخولها للورشة حتى يسجل الفورمان خروجها من المشروع. يمكنك ابلاغه برسالة واتساب.',
+      'لا يمكن تسجيل دخول جديد لها حتى يسجل الفورمان خروجها من المشروع. يمكنك ابلاغه برسالة واتساب.',
     notifyForemanForemanLabel: 'الفورمان',
     notifyForemanFallbackName: 'الفورمان',
     notifyForeman: 'ابلاغ الفورمان',
@@ -1993,7 +1993,7 @@ export const translations = {
     // wave-9-notices — start
     notifyForemanTitle: 'The equipment is still recorded inside a project',
     notifyForemanExplain:
-      'Its workshop entry cannot be registered until the foreman records its exit from the project. You can notify the foreman by WhatsApp.',
+      'A new entry cannot be registered until the foreman records its exit from the project. You can notify the foreman by WhatsApp.',
     notifyForemanForemanLabel: 'Foreman',
     notifyForemanFallbackName: 'the foreman',
     notifyForeman: 'Notify the foreman',

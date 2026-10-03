@@ -240,7 +240,7 @@ export function MovementActivity() {
           }
           options={[
             { value: 'all', label: t('allLocations') },
-            { value: 'site', label: t('location') },
+            { value: 'site', label: t('logsSites') },
             { value: 'workshop', label: t('workshopLocation') },
           ]}
         />
