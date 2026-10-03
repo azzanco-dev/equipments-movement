@@ -434,15 +434,30 @@ test('the mobile helpers mirror admin_set_user_mobile', () => {
   assert.equal(mobile.userMobileErrorCode(null), 'failed')
 })
 
-test('the panel is offered to workshop roles on a workshop ENTRY only', () => {
+test('the panel is offered to workshop roles and the admin on an ENTRY only', () => {
   const form = read('src', 'components', 'EntryExitForm.tsx')
-  // `workshopMode` is the three workshop roles: a foreman, an admin and a
-  // monitor never reach the panel.
+  // `workshopMode` is the three workshop roles; since 2026-10-03 the admin
+  // also gets the panel in his site ENTRY form. A foreman (supervisor) and a
+  // monitor never reach it.
   assert.match(
     form,
-    /const notifyForemanMovement =\s+workshopMode &&\s+isEntry &&\s+selected &&\s+lastMovementFor === selected\.id &&\s+lastMovement\?\.movement_type === 'entry' &&\s+lastMovement\.movement_context === 'site'/,
+    /const canNotifyForeman = workshopMode \|\| profile\?\.role === 'admin'/,
+  )
+  assert.doesNotMatch(
+    form.match(/const canNotifyForeman =[^\r\n]*/)[0],
+    /supervisor|monitor/,
+  )
+  assert.match(
+    form,
+    /const workshopMode =\s+profile\?\.role === 'workshop' \|\|\s+profile\?\.role === 'assistant_workshop_manager' \|\|\s+profile\?\.role === 'workshop_manager'\r?\n/,
+  )
+  assert.match(
+    form,
+    /const notifyForemanMovement =\s+canNotifyForeman &&\s+isEntry &&\s+selected &&\s+lastMovementFor === selected\.id &&\s+lastMovement\?\.movement_type === 'entry' &&\s+lastMovement\.movement_context === 'site'/,
   )
   assert.match(form, /\{notifyForemanMovement && \(\s+<NotifyForemanPanel/)
+  // The panel replaces the generic blocked-entry message, for both.
+  assert.match(form, /\{validationError && !notifyForemanMovement && \(/)
   assert.match(form, /onRefresh=\{\(\) => checkLastMovement\(selected\)\}/)
   // The blocked save itself is untouched: the database rule still decides.
   assert.match(form, /!!validationError \|\|/)
@@ -464,7 +479,15 @@ test('the panel is offered to workshop roles on a workshop ENTRY only', () => {
 
 test('the user page reads and writes the mobile apart from the record', () => {
   const page = read('src', 'screens', 'UserDetail.tsx')
-  assert.match(page, /\.from\('profiles'\)\s+\.select\('mobile_number'\)/)
+  // Since 0113 the number lives in `profile_contacts` (admin or self only).
+  assert.match(
+    page,
+    /\.from\('profile_contacts'\)\s+\.select\('mobile_number'\)\s+\.eq\('user_id', userId\)\s+\.maybeSingle\(\)/,
+  )
+  assert.doesNotMatch(
+    page,
+    /\.from\('profiles'\)\s+\.select\('mobile_number'\)/,
+  )
   assert.match(
     page,
     /supabase\.rpc\(\s*'admin_set_user_mobile',\s*\{ p_user_id: userId, p_mobile_number: nextMobile \},/,
@@ -475,10 +498,16 @@ test('the user page reads and writes the mobile apart from the record', () => {
   assert.ok(
     page.indexOf("action: 'update'") < page.indexOf("'admin_set_user_mobile'"),
   )
+  const types = read('src', 'lib', 'types.ts')
   assert.match(
-    read('src', 'lib', 'types.ts'),
-    /mobile_number\?: string \| null/,
+    types,
+    /export interface ProfileContact \{\s+user_id: string\s+mobile_number: string \| null/,
   )
+  // The number is no longer a profile field.
+  const profileType = types.match(
+    /export interface Profile \{[\s\S]*?\r?\n\}/,
+  )[0]
+  assert.doesNotMatch(profileType, /mobile/)
   // The number never joins the name-only lookup.
   assert.doesNotMatch(
     read('src', 'components', 'details', 'profileNames.ts'),

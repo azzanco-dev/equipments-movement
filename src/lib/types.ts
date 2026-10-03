@@ -46,9 +46,15 @@ export interface Profile {
   assigned_companies?: Array<{ id: string; name_ar: string; name_en: string }>
   must_change_password: boolean
   created_at: string
-  // Added by migration 0110. Admin-maintained (`admin_set_user_mobile`), used
-  // for WhatsApp movement notices; never part of `profile_names`.
-  mobile_number?: string | null
+}
+
+// A user's private contact row (`profile_contacts`, migration 0113). Readable
+// by an admin and by the user himself only; written only by the admin RPC
+// `admin_set_user_mobile`. No row means no number.
+export interface ProfileContact {
+  user_id: string
+  mobile_number: string | null
+  updated_at: string
 }
 
 export interface Company {

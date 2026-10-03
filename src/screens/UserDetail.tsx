@@ -9,7 +9,7 @@ import { localizedName } from '@/lib/localizedName'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
-import type { Profile, UserRole } from '@/lib/types'
+import type { Profile, ProfileContact, UserRole } from '@/lib/types'
 import {
   isValidUserMobile,
   normalizeUserMobileInput,
@@ -192,17 +192,18 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     // localized at render instead.
   }, [callManageUser, reloadKey, userId])
 
-  // The mobile number, read with the admin's own session (`select_profiles`
-  // lets an admin read every profile). Separate from the load above so its
+  // The mobile number, read with the admin's own session from
+  // `profile_contacts` (migration 0113: an admin reads every row, a user only
+  // his own; no row means no number). Separate from the load above so its
   // retry does not reload the user and wipe unsaved edits.
   useEffect(() => {
     let active = true
     setMobileError(null)
     setMobileNotSaved(false)
     supabase
-      .from('profiles')
+      .from('profile_contacts')
       .select('mobile_number')
-      .eq('id', userId)
+      .eq('user_id', userId)
       .maybeSingle()
       .then(({ data, error: loadError }) => {
         if (!active) return
@@ -212,8 +213,8 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           return
         }
         const stored =
-          (data as { mobile_number?: string | null } | null)?.mobile_number ??
-          ''
+          (data as Pick<ProfileContact, 'mobile_number'> | null)
+            ?.mobile_number ?? ''
         setMobile(stored)
         setMobileLoad({ userId, state: 'loaded', saved: stored })
       })

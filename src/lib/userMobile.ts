@@ -1,5 +1,6 @@
-// The admin-maintained mobile number of a user (`profiles.mobile_number`,
-// migration 0110), used for WhatsApp movement notices. The database function
+// The admin-maintained mobile number of a user
+// (`profile_contacts.mobile_number`, migration 0113; `profiles.mobile_number`
+// in 0110), used for WhatsApp movement notices. The database function
 // `admin_set_user_mobile` is authoritative; these helpers only mirror its rule
 // so the form can answer before a round trip. Pure: no imports, no I/O.
 
@@ -34,7 +35,10 @@ export function userMobileErrorCode(
 ): UserMobileErrorCode {
   if (!message) return 'failed'
   if (message.includes('invalid_mobile')) return 'invalid_mobile'
-  // The column check, should a value ever get past the function's own rule.
+  // The column check, should a value ever get past the function's own rule
+  // (`profile_contacts` since 0113, `profiles` in 0110).
+  if (message.includes('profile_contacts_mobile_number_format'))
+    return 'invalid_mobile'
   if (message.includes('profiles_mobile_number_format')) return 'invalid_mobile'
   if (message.includes('admin_required')) return 'admin_required'
   if (message.includes('user_not_found')) return 'user_not_found'

@@ -654,14 +654,16 @@ export function EntryExitForm({
     }
   }
 
-  // wave 9 — a workshop ENTRY for a unit whose latest movement is an open
-  // SITE entry. The sequence is global per equipment, so this entry stays
-  // blocked until the foreman who recorded the site entry records its exit;
-  // the officer may notify him instead of phoning. Workshop roles only: a
-  // foreman or an admin uses the site form (`workshopMode` is false) and a
-  // monitor has no movement form at all.
+  // wave 9 — an ENTRY for a unit whose latest movement is an open SITE
+  // entry. The sequence is global per equipment, so this entry stays blocked
+  // until the foreman who recorded the site entry records its exit; the
+  // officer may notify him instead of phoning. Workshop roles see it in the
+  // workshop form, and (owner decision 2026-10-03) an admin sees it in his
+  // site form; the server route accepts both. A supervisor never sees it and
+  // a monitor has no movement form at all.
+  const canNotifyForeman = workshopMode || profile?.role === 'admin'
   const notifyForemanMovement =
-    workshopMode &&
+    canNotifyForeman &&
     isEntry &&
     selected &&
     lastMovementFor === selected.id &&
