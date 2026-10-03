@@ -72,7 +72,9 @@ export function useDataListState(config: DataListConfig, prefix = '') {
 
   useEffect(() => {
     pendingSearch.current = false
-    setSearchInput(search)
+    // The URL holds the trimmed term. Keep what the user typed when it is the
+    // same term, so a trailing space typed before the next word is not erased.
+    setSearchInput((current) => (current.trim() === search ? current : search))
   }, [search, pathname])
 
   useEffect(() => {
