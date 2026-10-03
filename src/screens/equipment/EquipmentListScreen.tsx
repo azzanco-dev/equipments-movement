@@ -13,6 +13,11 @@ import { applyListFilters } from '@/lib/applyListFilters'
 import { equipmentListConfig } from '@/lib/listConfigs'
 import { plateDigitsSearchTerm, toLatinDigits } from '@/lib/plate'
 import { sanitizeSearchTerm } from '@/lib/search'
+import {
+  codeMatchesTerm,
+  fetchPreviousCodeMatchIds,
+  previousCodeOrPart,
+} from '@/lib/equipmentCodeHistory'
 import { supabase } from '@/lib/supabase'
 import type { Equipment } from '@/lib/types'
 import { EquipmentFormDialog } from './EquipmentFormDialog'
@@ -35,6 +40,11 @@ export function EquipmentListScreen({
   const editId = useSearchParams().get('edit')
   const list = useDataListState(equipmentListConfig)
   const [equipment, setEquipment] = useState<Equipment[]>([])
+  // Rows found through a previous code only (EM-196), for the «رقم سابق»
+  // badge.
+  const [previousCodeIds, setPreviousCodeIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -66,6 +76,22 @@ export function EquipmentListScreen({
       .order('id', { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
     const term = toLatinDigits(sanitizeSearchTerm(list.search))
+    let previousIds: string[] = []
+    if (term) {
+      // A previous code still finds the same unit: the ids whose old code
+      // matches join the search as one more `or` part, so paging and the
+      // total stay server-side.
+      const previous = await fetchPreviousCodeMatchIds(supabase, term, signal)
+      if (signal.aborted) return
+      if (previous.error) {
+        setLoadError(t('equipmentLoadError'))
+        setEquipment([])
+        setTotal(0)
+        setLoading(false)
+        return
+      }
+      previousIds = previous.ids
+    }
     if (term) {
       const orParts = [
         `code.ilike.%${term}%`,
@@ -75,6 +101,8 @@ export function EquipmentListScreen({
       ]
       const plateDigits = plateDigitsSearchTerm(term)
       if (plateDigits) orParts.push(`plate_digits.ilike.%${plateDigits}%`)
+      const previousPart = previousCodeOrPart(previousIds)
+      if (previousPart) orParts.push(previousPart)
       query = query.or(orParts.join(','))
     }
     query = applyListFilters(
@@ -85,7 +113,19 @@ export function EquipmentListScreen({
     const { data, error, count } = await query.abortSignal(signal)
     if (signal.aborted) return
     if (error) setLoadError(t('equipmentLoadError'))
-    setEquipment((data as unknown as Equipment[]) ?? [])
+    const rows = (data as unknown as Equipment[]) ?? []
+    const previousSet = new Set(previousIds)
+    setPreviousCodeIds(
+      new Set(
+        rows
+          .filter(
+            (row) =>
+              previousSet.has(row.id) && !codeMatchesTerm(row.code, term),
+          )
+          .map((row) => row.id),
+      ),
+    )
+    setEquipment(rows)
     setTotal(count ?? 0)
     setLoading(false)
   }, [
@@ -198,6 +238,7 @@ export function EquipmentListScreen({
         onOpen={(id) => onSelectEquipment?.(id)}
         onEdit={openEdit}
         emptyAction={addButton}
+        previousCodeMatchIds={previousCodeIds}
       />
       {!loadError && total > 0 && (
         <DataListPagination

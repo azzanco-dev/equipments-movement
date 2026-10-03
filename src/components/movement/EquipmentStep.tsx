@@ -15,6 +15,7 @@ import {
   equipmentStateOption,
   type EntryEquipmentStateFields,
 } from '@/lib/entryEquipmentSearch'
+import { matchedPreviousCode } from '@/lib/equipmentCodeHistory'
 import type { Equipment } from '@/lib/types'
 
 // Radix reserves the empty string for "no value", so the "all owners" choice
@@ -161,6 +162,12 @@ export function EquipmentStep({
                     {stateOption.badge && (
                       <Badge tone={stateOption.badge.tone} size="sm">
                         {stateOption.badge.label}
+                      </Badge>
+                    )}
+                    {/* The search matched a previous code (EM-196). */}
+                    {matchedPreviousCode(item) && (
+                      <Badge tone="neutral" size="sm">
+                        {t('previousCodeBadge')}
                       </Badge>
                     )}
                   </span>

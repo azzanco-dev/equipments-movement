@@ -52,6 +52,8 @@ export interface EquipmentTableProps {
   onEdit: (equipment: Equipment) => void
   /** Rendered in the empty state, e.g. the "add equipment" button. */
   emptyAction?: ReactNode
+  /** Rows the search found through a previous code (EM-196). */
+  previousCodeMatchIds?: ReadonlySet<string>
 }
 
 export function EquipmentTable({
@@ -65,6 +67,7 @@ export function EquipmentTable({
   onOpen,
   onEdit,
   emptyAction,
+  previousCodeMatchIds,
 }: EquipmentTableProps) {
   const { t } = useI18n()
 
@@ -90,6 +93,11 @@ export function EquipmentTable({
         return (
           <span className="inline-flex items-center gap-2">
             <span dir="ltr">{row.code}</span>
+            {previousCodeMatchIds?.has(row.id) && (
+              <Badge tone="neutral" size="sm">
+                {t('previousCodeBadge')}
+              </Badge>
+            )}
             {incomplete && (
               <Badge tone={incomplete.tone} size="sm">
                 {t(incomplete.key)}

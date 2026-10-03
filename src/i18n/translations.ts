@@ -720,6 +720,22 @@ export const translations = {
     exitPurposeRequired: 'اختر غرض الخروج.',
     exitPurposeInvalid: 'غرض الخروج غير صالح. اختره من القائمة.',
     // wave-10-exit-purpose — end
+    // wave-10-code-history — start
+    previousCodesLabel: 'ارقام سابقة:',
+    previousCodeUntil: 'حتى {date}',
+    previousCodeBadge: 'رقم سابق',
+    previousCodesLoadError: 'تعذر تحميل الارقام السابقة.',
+    codeChangeReason: 'سبب تغيير الرقم',
+    codeChangeReasonPlaceholder: 'مثال: نقل المعدة الى مالك اخر',
+    codeChangeReasonHint:
+      'اختياري. يحفظ مع الرقم السابق في سجل المعدة، ويبقى البحث بالرقم السابق ممكنا.',
+    codeChangeOwnerNotice:
+      'الرقم الجديد يشير الى مالك مختلف: {owner}. تم تحديث حقل المالك، راجعه قبل الحفظ.',
+    equipmentCodePreviouslyUsed:
+      'هذا الرقم كان رقما سابقا لمعدة اخرى ولا يمكن استخدامه.',
+    equipmentCodeSavedPartially:
+      'تم حفظ الرقم الجديد، لكن تعذر حفظ باقي التعديلات. حاول الحفظ مرة اخرى.',
+    // wave-10-code-history — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -2045,6 +2061,22 @@ export const translations = {
     exitPurposeInvalid:
       'The purpose of exit is not valid. Select it from the list.',
     // wave-10-exit-purpose — end
+    // wave-10-code-history — start
+    previousCodesLabel: 'Previous codes:',
+    previousCodeUntil: 'until {date}',
+    previousCodeBadge: 'Previous code',
+    previousCodesLoadError: "Couldn't load the previous codes.",
+    codeChangeReason: 'Reason for the code change',
+    codeChangeReasonPlaceholder: 'Example: the unit moved to another owner',
+    codeChangeReasonHint:
+      'Optional. Saved with the previous code in the equipment history; searching the previous code still finds this unit.',
+    codeChangeOwnerNotice:
+      'The new code suggests a different owner: {owner}. The owner field was updated; check it before saving.',
+    equipmentCodePreviouslyUsed:
+      'This code was a previous code of another unit and cannot be used.',
+    equipmentCodeSavedPartially:
+      'The new code was saved, but the other changes were not. Try saving again.',
+    // wave-10-code-history — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',

@@ -47,6 +47,12 @@ import {
   type InfoGridItem,
 } from '@/components/ui'
 import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
+import { PreviousCodesLine } from '@/components/inquiry/PreviousCodes'
+import {
+  EQUIPMENT_CODE_CHANGES_LIMIT,
+  EQUIPMENT_CODE_CHANGE_SELECT,
+  type EquipmentCodeChange,
+} from '@/lib/equipmentCodeHistory'
 
 interface EquipmentDetailProps {
   equipmentId: string
@@ -87,6 +93,8 @@ export function EquipmentDetail({
   const { t, lang } = useI18n()
   const [equipment, setEquipment] = useState<Equipment | null>(null)
   const [logs, setLogs] = useState<RecentMovementRow[]>([])
+  const [codeChanges, setCodeChanges] = useState<EquipmentCodeChange[]>([])
+  const [codeChangesError, setCodeChangesError] = useState(false)
   const [loading, setLoading] = useState(true)
   // The `equipmentId` the data on screen belongs to (null until a load ends).
   const [loadedId, setLoadedId] = useState<string | null>(null)
@@ -97,7 +105,7 @@ export function EquipmentDetail({
     setLoading(true)
     setError(null)
     const signal = startRequest()
-    const [equipmentResult, logsResult] = await Promise.all([
+    const [equipmentResult, logsResult, codeChangesResult] = await Promise.all([
       supabase
         .from('equipment')
         .select(
@@ -113,6 +121,15 @@ export function EquipmentDetail({
         .order('recorded_at', { ascending: false })
         .order('id', { ascending: false })
         .limit(RECENT_MOVEMENTS_LIMIT)
+        .abortSignal(signal),
+      // Previous codes (EM-196, migration 0114) for the «ارقام سابقة» line.
+      supabase
+        .from('equipment_code_changes')
+        .select(EQUIPMENT_CODE_CHANGE_SELECT)
+        .eq('equipment_id', equipmentId)
+        .order('changed_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(EQUIPMENT_CODE_CHANGES_LIMIT)
         .abortSignal(signal),
     ])
     if (signal.aborted) return
@@ -130,6 +147,12 @@ export function EquipmentDetail({
       setError(t('equipmentLoadError'))
     setEquipment(equipmentResult.data as Equipment | null)
     setLogs(withSupervisorNames(rawLogs, names.names))
+    // A failed history read is said on its own line, not as "no previous
+    // codes", and does not take the rest of the page down with it.
+    setCodeChangesError(Boolean(codeChangesResult.error))
+    setCodeChanges(
+      (codeChangesResult.data as EquipmentCodeChange[] | null) ?? [],
+    )
     setLoadedId(equipmentId)
     setLoading(false)
   }, [equipmentId, startRequest, t])
@@ -374,6 +397,12 @@ export function EquipmentDetail({
               {t('editEquipment')}
             </Button>
           }
+        />
+        <PreviousCodesLine
+          changes={codeChanges}
+          currentCode={equipment.code}
+          error={codeChangesError}
+          className="-mt-3"
         />
         <InfoGridSection
           title={t('detailSectionIdentity')}

@@ -30,6 +30,17 @@ import {
   inquiryBriefIdentifier,
   parseEquipmentIdParam,
 } from '@/lib/equipmentInquiry'
+import { toLatinDigits } from '@/lib/plate'
+import { sanitizeSearchTerm } from '@/lib/search'
+import {
+  EQUIPMENT_CODE_CHANGES_LIMIT,
+  EQUIPMENT_CODE_CHANGE_SELECT,
+  codeMatchesTerm,
+  fetchPreviousCodeMatchIds,
+  previousCodeOrPart,
+  type EquipmentCodeChange,
+} from '@/lib/equipmentCodeHistory'
+import { PreviousCodesLine } from '@/components/inquiry/PreviousCodes'
 
 /**
  * `/inquiry`: one search field finds an equipment by code/plate/chassis/type,
@@ -164,6 +175,8 @@ export function EquipmentInquiryScreen({
   const [suggestLoading, setSuggestLoading] = useState(false)
 
   const [equipment, setEquipment] = useState<InquiryEquipmentRow | null>(null)
+  const [codeChanges, setCodeChanges] = useState<EquipmentCodeChange[]>([])
+  const [codeChangesError, setCodeChangesError] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState(false)
   const [detailMissing, setDetailMissing] = useState(false)
@@ -215,15 +228,25 @@ export function EquipmentInquiryScreen({
     setSuggestLoading(true)
     const timer = window.setTimeout(async () => {
       const signal = startSuggestRequest()
+      // A previous code (EM-196) still finds the same unit: the ids whose
+      // old code matches join the existing filter as one more `or` part.
+      const term = toLatinDigits(sanitizeSearchTerm(query))
+      const previous = await fetchPreviousCodeMatchIds(supabase, term, signal)
+      if (!active || signal.aborted) return
+      const previousPart = previousCodeOrPart(previous.ids)
       const { data, error } = await supabase
         .from('equipment')
         .select('id,code,type,plate_number,chassis_number')
-        .or(filter)
+        .or(previousPart ? `${filter},${previousPart}` : filter)
         .order('code')
         .limit(SUGGEST_LIMIT)
         .abortSignal(signal)
       if (!active || signal.aborted) return
       const rows = (data as InquiryEquipmentRow[] | null) ?? []
+      const previousIds = new Set(previous.ids)
+      // A failed previous-code lookup only drops the «رقم سابق» matches; the
+      // current-code matches still show (a load failure is never shown as
+      // "no results" when there are rows to show).
       setSuggestions(
         error
           ? []
@@ -233,6 +256,8 @@ export function EquipmentInquiryScreen({
               type_name: row.type,
               plate_number: row.plate_number,
               chassis_number: row.chassis_number,
+              matched_previous_code:
+                previousIds.has(row.id) && !codeMatchesTerm(row.code, term),
             })),
       )
       setSuggestLoading(false)
@@ -254,14 +279,29 @@ export function EquipmentInquiryScreen({
       // The brief row is identity only (code, type, plate or chassis); the
       // current state and the time since the last movement come from the
       // timeline summary cards below, so no extra read is needed here.
-      const equipmentResult = await supabase
-        .from('equipment')
-        .select('id,code,type,plate_number,chassis_number')
-        .eq('id', id)
-        .abortSignal(signal)
-        .maybeSingle()
+      const [equipmentResult, codeChangesResult] = await Promise.all([
+        supabase
+          .from('equipment')
+          .select('id,code,type,plate_number,chassis_number')
+          .eq('id', id)
+          .abortSignal(signal)
+          .maybeSingle(),
+        // Previous codes (EM-196) for the «ارقام سابقة» line under the brief.
+        supabase
+          .from('equipment_code_changes')
+          .select(EQUIPMENT_CODE_CHANGE_SELECT)
+          .eq('equipment_id', id)
+          .order('changed_at', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(EQUIPMENT_CODE_CHANGES_LIMIT)
+          .abortSignal(signal),
+      ])
       if (signal.aborted) return
       setDetailLoadedId(id)
+      setCodeChangesError(Boolean(codeChangesResult.error))
+      setCodeChanges(
+        (codeChangesResult.data as EquipmentCodeChange[] | null) ?? [],
+      )
       if (equipmentResult.error) {
         setDetailError(true)
         setEquipment(null)
@@ -423,9 +463,10 @@ export function EquipmentInquiryScreen({
           }
         />
 
-        {/* LTR: people type Latin equipment codes / plate digits here, even
-            though the rest of the page stays RTL for Arabic. */}
-        <div dir="ltr" className="max-w-xl text-start">
+        {/* `dir="auto"` on the input only: Latin codes and plate digits are
+            typed LTR, while the Arabic placeholder and the icons keep the
+            page's RTL start edge. */}
+        <div className="max-w-xl">
           <EquipmentSuggestSearch
             query={query}
             onQueryChange={setQuery}
@@ -433,6 +474,7 @@ export function EquipmentInquiryScreen({
             loading={suggestLoading}
             onPick={pickSuggestion}
             placeholder={t('searchEquipmentAnyField')}
+            inputDir="auto"
           />
         </div>
 
@@ -461,8 +503,13 @@ export function EquipmentInquiryScreen({
                 number when the equipment has no plate. The current state,
                 the time since the last movement, and the latest visit's
                 company/project/foreman all live in the timeline below. */}
-            <div className="rounded-lg border bg-surface px-3 py-2.5">
+            <div className="space-y-2 rounded-lg border bg-surface px-3 py-2.5">
               <InfoGrid items={inquiryBriefItems(equipment, t)} />
+              <PreviousCodesLine
+                changes={codeChanges}
+                currentCode={equipment.code}
+                error={codeChangesError}
+              />
             </div>
 
             {movementsError ? (

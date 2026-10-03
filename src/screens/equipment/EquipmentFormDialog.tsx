@@ -6,6 +6,7 @@ import {
   ErrorState,
   Field,
   Input,
+  Notice,
   RadioGroup,
   RadioGroupItem,
   Select,
@@ -30,6 +31,7 @@ import {
   equipmentFormValues,
   equipmentSaveFieldErrors,
   genQrValue,
+  ownershipBadge,
   validateEquipmentForm,
   type EquipmentFormValues,
 } from '@/lib/equipmentForm'
@@ -45,6 +47,12 @@ import type {
   OperationalStatus,
   OwnershipStatus,
 } from '@/lib/types'
+import {
+  CODE_CHANGE_REASON_MAX,
+  isEquipmentCodeChanged,
+  isPreviousCodeError,
+  ownerSuggestedByNewCode,
+} from '@/lib/equipmentCodeHistory'
 
 /** Radix reserves '' for "no value", so the optional select uses a sentinel. */
 const NO_REGISTRATION_TYPE = 'none'
@@ -72,6 +80,9 @@ export function EquipmentFormDialog({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errors, setErrors] = useState<FieldErrors<EquipmentFormValues>>({})
+  // EM-196: optional reason recorded with the previous code when an existing
+  // record's code changes.
+  const [codeReason, setCodeReason] = useState('')
   const bodyRef = useRef<HTMLDivElement>(null)
 
   /** Editing a field clears its message; nothing is validated while typing. */
@@ -106,6 +117,7 @@ export function EquipmentFormDialog({
     )
     setError(null)
     setErrors({})
+    setCodeReason('')
   }, [open, equipment])
 
   const loadEquipmentTypes = useCallback(async (query: string) => {
@@ -171,6 +183,15 @@ export function EquipmentFormDialog({
       return applyOwnershipStatus(current, status)
     })
 
+  // Editing only: a real code change (not case or spaces) keeps the same
+  // equipment and records the previous code in the history (migration 0114).
+  const codeChanged =
+    equipment !== null && isEquipmentCodeChanged(equipment.code, form.code)
+  const suggestedOwner =
+    equipment && codeChanged
+      ? ownerSuggestedByNewCode(equipment.ownership_status, form.code)
+      : null
+
   const handleSave = async () => {
     const invalid = validateEquipmentForm(form)
     if (hasErrors(invalid)) {
@@ -181,8 +202,29 @@ export function EquipmentFormDialog({
     }
     setSaving(true)
     setError(null)
+    // True once the code change itself is saved, so a later failure of the
+    // other fields is reported as the partial save it is.
+    let codeSaved = false
     try {
       const payload = buildEquipmentPayload(form)
+      if (equipment && codeChanged) {
+        // The code goes first through the admin RPC that carries the reason
+        // to the history trigger; a rejected code fails before anything is
+        // written. The update below then sends the same code, so no second
+        // history row is recorded.
+        const newCode = form.code.trim()
+        const { error: codeError } = await supabase.rpc(
+          'admin_change_equipment_code',
+          {
+            p_equipment_id: equipment.id,
+            p_new_code: newCode,
+            p_reason: codeReason.trim() || null,
+          },
+        )
+        if (codeError) throw codeError
+        codeSaved = true
+        payload.code = newCode
+      }
       const { error: saveError } = equipment
         ? await supabase
             .from('equipment')
@@ -196,10 +238,21 @@ export function EquipmentFormDialog({
       console.error(err)
       // A duplicate code, QR value, or plate belongs on that field; anything
       // else stays a safe top-level message, never the raw database text.
-      const attributed = equipmentSaveFieldErrors(
-        err as { code?: string | null; message?: string | null },
-      )
-      if (attributed) {
+      const saveError = err as {
+        code?: string | null
+        message?: string | null
+        details?: string | null
+      }
+      // A previous code of another unit (0114) has its own message; it is
+      // also a 23505, so it is checked before the generic duplicate mapping.
+      const attributed: FieldErrors<EquipmentFormValues> | null =
+        isPreviousCodeError(saveError)
+          ? { code: 'equipmentCodePreviouslyUsed' }
+          : equipmentSaveFieldErrors(saveError)
+      if (codeSaved) {
+        setError(t('equipmentCodeSavedPartially'))
+        onSaved()
+      } else if (attributed) {
         setErrors(attributed)
         focusFirstError(attributed, EQUIPMENT_FIELD_ORDER, {
           root: bodyRef.current,
@@ -248,6 +301,33 @@ export function EquipmentFormDialog({
             />
           )}
         </Field>
+        {codeChanged && (
+          <div className="space-y-3 sm:col-span-2">
+            {suggestedOwner && (
+              <Notice tone="info" size="compact">
+                {t('codeChangeOwnerNotice').replace(
+                  '{owner}',
+                  t(ownershipBadge(suggestedOwner).key),
+                )}
+              </Notice>
+            )}
+            <Field
+              label={t('codeChangeReason')}
+              name="code_change_reason"
+              hint={t('codeChangeReasonHint')}
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  placeholder={t('codeChangeReasonPlaceholder')}
+                  maxLength={CODE_CHANGE_REASON_MAX}
+                  value={codeReason}
+                  onChange={(event) => setCodeReason(event.target.value)}
+                />
+              )}
+            </Field>
+          </div>
+        )}
         <Field
           label={t('equipmentType')}
           name="type"

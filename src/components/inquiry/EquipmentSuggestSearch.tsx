@@ -22,6 +22,9 @@ export interface EquipmentSuggestion {
   chassis_number?: string | null
   /** Where the equipment is right now, for the small state badge. */
   state?: EquipmentPresence
+  /** The query matched a previous code of this unit, not its current code
+   *  (EM-196); the row shows a small neutral «رقم سابق» badge. */
+  matched_previous_code?: boolean
 }
 
 export interface EquipmentSuggestSearchProps {
@@ -34,6 +37,9 @@ export interface EquipmentSuggestSearchProps {
   selected?: EquipmentSuggestion | null
   placeholder?: string
   className?: string
+  /** Direction of the input itself. `auto` keeps an Arabic placeholder at
+   *  the RTL start while Latin codes are typed LTR. */
+  inputDir?: 'auto' | 'ltr' | 'rtl'
 }
 
 const STATE_TONE: Record<EquipmentPresence, BadgeTone> = {
@@ -63,6 +69,7 @@ export function EquipmentSuggestSearch({
   selected,
   placeholder,
   className,
+  inputDir,
 }: EquipmentSuggestSearchProps) {
   const { t } = useI18n()
   const listId = useId()
@@ -143,6 +150,10 @@ export function EquipmentSuggestSearch({
               onClick={() => setOpen(true)}
               onKeyDown={handleKeyDown}
               placeholder={placeholder ?? t('searchEquipmentAnyField')}
+              // An empty field keeps the page direction, so the placeholder
+              // sits at the start edge like every other search box; once
+              // something is typed, `auto` lets a Latin code read LTR.
+              dir={inputDir === 'auto' && !query ? undefined : inputDir}
               role="combobox"
               autoComplete="off"
               aria-expanded={panelOpen}
@@ -231,6 +242,11 @@ function SuggestionRow({
           <span className="truncate-safe font-semibold" dir="ltr">
             {suggestion.code}
           </span>
+          {suggestion.matched_previous_code && (
+            <Badge tone="neutral" size="sm">
+              {t('previousCodeBadge')}
+            </Badge>
+          )}
           {picked && (
             <Check size={14} aria-hidden="true" className="shrink-0 text-fg" />
           )}
