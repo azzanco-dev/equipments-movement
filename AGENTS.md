@@ -8,6 +8,7 @@
 - Workshop ENTRY is classified by purpose: `maintenance` or `parking` (standby).
 - Planned later phases: phase 2 links equipment to contractor POs and monthly timesheets; phase 3 links external-supplier equipment to purchasing (POs and rental accruals). Do not introduce contracts/POs, timesheets, sales, purchasing, accounting, notifications, charts, or other future modules unless explicitly requested.
 - Explicitly requested so far, and limited to exactly this: charts on the admin home only (Recharts, loaded lazily through `src/components/charts/lazy.tsx`; light token shades with dark readable text, never saturated fills), and WhatsApp movement notices between the workshop and site foremen through UltraMsg (migration 0110). Notices are sent server-side only, from fixed templates, to a recipient resolved in the database; a failed send never delays or fails a movement; the gateway credentials are server environment variables.
+- UI naming (owner decision 2026-10-03): the `site` movement context is called «المشاريع / مشروع» ("Projects / project") everywhere in the UI, including the WhatsApp notices. Database values, keys and code identifiers keep `site`.
 - Preserve existing behavior and make incremental changes. Do not rebuild working features merely to match a preferred architecture.
 - The improvement plan and task status are tracked in Notion (page "Equipment Movement", database "مهام المشروع"). When a tracked task is completed, update its status there.
 
@@ -45,6 +46,7 @@
 - Ordering is deterministic by `(recorded_at, id)`, including historical insertion and identical timestamps.
 - Preserve per-equipment concurrency protection; do not replace database locking with frontend state.
 - Site ENTRY requires equipment, independent company and project selections, and an actual movement date; the driver is optional since 2026-09-23 (migration 0103) and a driverless entry stores `driver_id` and `driver_name` as NULL. The UI selects the date only and applies the current local time internally when saving. `company_projects` remains for future use and must not restrict current ENTRY creation. Workshop ENTRY/EXIT uses the limited workshop form and requires equipment plus at least one selected photo; it does not require company, project, or driver.
+- A site EXIT requires its purpose, `exit_purpose` = `maintenance` (للصيانة) or `work_completed` (انتهاء عمل) (migrations 0111 and 0115): enforced by the API, the form and a BEFORE INSERT trigger. The admin Excel import is exempt and stores NULL; entries and workshop rows never carry a purpose; rows recorded before 0111 stay NULL and display a dash.
 - EXIT inherits company, project, and contractor equipment code from the corresponding latest valid ENTRY. Site EXIT uses the latest current driver after any auditable driver changes made during the open visit.
 - Store `driver_id` plus the `driver_name` snapshot. Legacy rows with only `driver_name` must keep displaying correctly.
 - Keep the original entry driver immutable. Driver changes during an open site visit are append-only records; multiple changes are supported and closed visits reject further changes.
@@ -76,6 +78,17 @@
 - Equipment code prefixes suggest classification in the UI: `A` → Al-Azani, `TK` → Takween, `F` → third-party F, `B` → third-party B, otherwise external supplier. Database fields remain the source of truth.
 - Quick-created equipment may be marked `master_data_complete = false` until an admin reviews it. Generated internal codes are short (`U001`, `U002`, ...), unique, and database-generated.
 
+## Equipment code history
+
+- Every change of `equipment.code` is recorded automatically in the append-only `equipment_code_changes` table (who, when, optional reason; migration 0114). The admin form changes a code through `admin_change_equipment_code`, which carries the reason; other paths (Excel update) are recorded with no reason.
+- A previous code of one unit cannot be given to another unit (`equipment_code_previously_used`); a unit may get its own previous code back. Codes are compared as `upper(btrim(code))`.
+- Equipment searches (the movement form RPCs, the inquiry suggestions, the equipment list) also match previous codes and mark such results «رقم سابق»; the detail and inquiry pages list «ارقام سابقة».
+
+## Users and notices
+
+- A user's mobile number lives in `profile_contacts` (migration 0113), readable only by an admin and by the user; it is written only by `admin_set_user_mobile`. Never add it to `profiles` or `profile_names`.
+- WhatsApp notices (UltraMsg, migration 0110): «ابلاغ الفورمان» is available to the workshop roles and the admin for a unit still inside a project; the site exit and workshop exit notices are automatic. Recipients are resolved in the database, sends are rate-limited per site entry, logged in `movement_notices`, and never block a movement.
+
 ## Equipment types
 
 - Equipment types are controlled by the `equipment_types` master table and managed by admins under Settings.
@@ -91,6 +104,7 @@
 - Standard page sizes are `20, 50, 100, 200, 350, 500`; default is 20.
 - Filter fields and operators are allowlisted per module. Do not expose arbitrary database columns.
 - Relational dropdowns use `AsyncSearchSelect`: first/best 20 results, server-side search, about 300 ms debounce, no load-more or infinite scroll.
+- Option loaders must throw on a failed query (use `unwrapRows` from `src/lib/supabaseResult.ts`) so the control shows its load error instead of "no results".
 - Select only fields needed by the list or selector; avoid `select('*')` for large list queries.
 - Detail pages show only 10–20 recent child records plus a “View All” route; do not embed a full DataList in details.
 - Review query plans and add focused indexes in a new migration when adding common search/filter/sort paths.
@@ -121,7 +135,10 @@
 - Keep server/API payloads minimal, validate at both UX and database/server boundaries, and avoid logging secrets or sensitive data.
 - Do not start a local or remote data mutation merely to test unless the user has provided a dedicated test account/environment or explicitly authorized production test records.
 - For database changes: inspect migration history, add a forward migration, apply it to the linked project when authorized, run linked DB lint, and verify local/remote migration history.
-- Work on the `main` branch. After each completed task, when checks pass, commit the scoped changes locally. Do not push: the product owner pushes.
+- Work on the `main-home` branch. After each completed task, when checks pass, commit the scoped changes by explicit paths. Push `main-home`, and fast-forward `main` (production, deployed by Vercel) from it, only when the product owner asks.
+- Another agent works on the identity-extraction / ERPNext feature in the same checkout: never edit or stage `src/screens/Extracting.tsx`, `src/components/extracting/**`, `src/lib/extracting/**` or `app/api/extracting/**`.
+- Rollout order for database changes: apply a migration before deploying UI that depends on it. When a new database requirement would break the UI that is live, ship the requirement in a later migration applied after the new UI is deployed (as 0111 then 0115 did).
+- The product owner applies migrations (`npx supabase db push --linked`); afterwards verify with `npx supabase migration list --linked` and `npx supabase db lint --linked --level error`. New migrations can be syntax-checked locally with the `libpg-query` parser (parse plus `parsePlPgSQL` for each function body).
 
 ## Verification
 
