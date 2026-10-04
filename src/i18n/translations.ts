@@ -1115,6 +1115,7 @@ export const translations = {
     exportSheetVisits: 'الزيارات',
     exportColExitOdometer: 'عداد الخروج',
     exportColExitNotes: 'ملاحظات الخروج',
+    exportColDriverMobile: 'جوال السائق',
     logsExportCapped:
       'تم تصدير {count} حركة من اصل {total}. ضيّق البحث او التصفية لتصدير الباقي.',
     logsExportFailed: 'تعذر تصدير الملف. حاول مرة اخرى.',
@@ -2459,6 +2460,7 @@ export const translations = {
     exportSheetVisits: 'Visits',
     exportColExitOdometer: 'Exit odometer',
     exportColExitNotes: 'Exit notes',
+    exportColDriverMobile: 'Driver mobile',
     logsExportCapped:
       '{count} of {total} movements were exported. Narrow the search or the filters to export the rest.',
     logsExportFailed: 'The file could not be exported. Please try again.',

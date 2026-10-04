@@ -31,7 +31,9 @@ import {
   adminVisitsListConfig,
   buildVisitSearchFilter,
   chunkItems,
+  distinctDriverIds,
   distinctEquipmentIds,
+  driverMobilesById,
   foremanVisitsListConfig,
   formatVisitDuration,
   supplierNamesByEquipment,
@@ -41,6 +43,7 @@ import {
   visitSortField,
   visitStateView,
   visitsListConfig,
+  type DriverMobileRow,
   type EquipmentSupplierRow,
   type EquipmentVisitRow,
   type VisitsContext,
@@ -240,10 +243,32 @@ export function VisitsTable({
             )
           }),
         )
+      // The driver's mobile number, looked up the same way for the drivers
+      // in the file.
+      const mobileByDriver = new Map<string, string>()
+      const driverChunks = chunkItems(
+        distinctDriverIds(collected.rows),
+        SUPPLIER_LOOKUP_CHUNK_SIZE,
+      )
+      for (let start = 0; start < driverChunks.length; start += 4)
+        await Promise.all(
+          driverChunks.slice(start, start + 4).map(async (ids) => {
+            const rows = unwrapRows(
+              await supabase
+                .from('drivers')
+                .select('id,mobile_number')
+                .in('id', ids),
+            )
+            driverMobilesById(
+              rows as unknown as DriverMobileRow[],
+              mobileByDriver,
+            )
+          }),
+        )
       const { exportRowsToExcel } = await import('@/lib/excelExport')
       exportRowsToExcel(
         t('exportSheetVisits'),
-        visitExportColumns(t, lang, supplierByEquipment),
+        visitExportColumns(t, lang, supplierByEquipment, mobileByDriver),
         collected.rows,
         { fileName: visitExportFileName(context), rtl: lang === 'ar' },
       )

@@ -47,7 +47,9 @@ const {
   EQUIPMENT_VISITS_SELECT,
   SUPPLIER_LOOKUP_CHUNK_SIZE,
   chunkItems,
+  distinctDriverIds,
   distinctEquipmentIds,
+  driverMobilesById,
   supplierNamesByEquipment,
 } = loadLibModule('visitsList')
 
@@ -527,4 +529,32 @@ test('the visits export file is named by context and Saudi day', () => {
     visitExportFileName('site', '2026-09-28T10:00:00Z'),
     'visits-site-20260928.xlsx',
   )
+})
+
+test('the driver mobile is exported from the lookup, empty when unknown', () => {
+  const mobiles = driverMobilesById([
+    { id: 'd1', mobile_number: ' 0500000001 ' },
+    { id: 'd2', mobile_number: null },
+  ])
+  assert.deepEqual(plain([...mobiles.entries()]), [['d1', '0500000001']])
+  assert.deepEqual(
+    plain(
+      distinctDriverIds([
+        { driver_id: 'd1' },
+        { driver_id: null },
+        { driver_id: 'd1' },
+      ]),
+    ),
+    ['d1'],
+  )
+  const columns = visitExportColumns(fakeT, 'en', new Map(), mobiles)
+  const headers = columns.map((column) => column.header)
+  const mobile = columns[headers.indexOf('[exportColDriverMobile]')]
+  assert.equal(
+    headers.indexOf('[exportColDriverMobile]'),
+    headers.indexOf('[driverName]') + 1,
+  )
+  assert.equal(mobile.value(visit({ driver_id: 'd1' })), '0500000001')
+  assert.equal(mobile.value(visit({ driver_id: 'd2' })), '')
+  assert.equal(mobile.value(visit({ driver_id: null })), '')
 })

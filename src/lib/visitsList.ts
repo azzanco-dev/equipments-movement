@@ -453,14 +453,49 @@ export function supplierNamesByEquipment(
   return into
 }
 
+/** The distinct, non-empty driver ids of a set of visits, in first-seen order. */
+export function distinctDriverIds(
+  visits: readonly Pick<EquipmentVisitRow, 'driver_id'>[],
+): string[] {
+  return Array.from(
+    new Set(
+      visits.map((visit) => visit.driver_id).filter((id): id is string => !!id),
+    ),
+  )
+}
+
+/** One `drivers` row as the mobile lookup selects it. */
+export interface DriverMobileRow {
+  id: string
+  mobile_number: string | null
+}
+
+/**
+ * Maps driver id to mobile number. A driver without a number is simply
+ * absent, so the cell exports empty.
+ */
+export function driverMobilesById(
+  rows: readonly DriverMobileRow[],
+  into: Map<string, string> = new Map(),
+): Map<string, string> {
+  for (const row of rows) {
+    const mobile = row.mobile_number?.trim()
+    if (row.id && mobile) into.set(row.id, mobile)
+  }
+  return into
+}
+
 /**
  * @param supplierByEquipment supplier names resolved at export time (the view
  * does not carry them); a unit absent from the map exports an empty supplier.
+ * @param mobileByDriver driver mobile numbers resolved the same way; a legacy
+ * visit with only a driver name, or a driver without a number, exports empty.
  */
 export function visitExportColumns(
   t: Translate,
   lang: Language,
   supplierByEquipment: ReadonlyMap<string, string> = new Map(),
+  mobileByDriver: ReadonlyMap<string, string> = new Map(),
 ): ExcelColumn<EquipmentVisitRow>[] {
   return [
     {
@@ -525,6 +560,13 @@ export function visitExportColumns(
       header: t('driverName'),
       width: 22,
       value: (row) => row.driver_name ?? '',
+    },
+    {
+      header: t('exportColDriverMobile'),
+      width: 16,
+      // Text, so a leading zero survives in the sheet.
+      value: (row) =>
+        (row.driver_id ? mobileByDriver.get(row.driver_id) : undefined) ?? '',
     },
     {
       header: t('entryBy'),
