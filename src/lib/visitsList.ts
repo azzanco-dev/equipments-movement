@@ -372,15 +372,13 @@ export function formatVisitDuration(
 
 type Translate = (key: TranslationKey) => string
 
-/** A localized name for a sheet cell: empty, never an em dash. */
-function exportName(
-  lang: Language,
-  nameAr?: string | null,
-  nameEn?: string | null,
-): string {
-  const preferred = lang === 'ar' ? nameAr : nameEn
-  const fallback = lang === 'ar' ? nameEn : nameAr
-  return preferred?.trim() || fallback?.trim() || ''
+/**
+ * A company or project name for a sheet cell: the English name in every
+ * interface language (owner decision 2026-10-04), the Arabic one only when
+ * there is no English name; empty, never an em dash.
+ */
+function exportName(nameAr?: string | null, nameEn?: string | null): string {
+  return nameEn?.trim() || nameAr?.trim() || ''
 }
 
 /** The owner names of the export file, as the owner asked for them (2026-10-04). */
@@ -591,14 +589,12 @@ export function visitExportColumns(
     {
       header: t('company'),
       width: 24,
-      value: (row) =>
-        exportName(lang, row.company_name_ar, row.company_name_en),
+      value: (row) => exportName(row.company_name_ar, row.company_name_en),
     },
     {
       header: t('project'),
       width: 24,
-      value: (row) =>
-        exportName(lang, row.project_name_ar, row.project_name_en),
+      value: (row) => exportName(row.project_name_ar, row.project_name_en),
     },
     {
       header: t('driverName'),

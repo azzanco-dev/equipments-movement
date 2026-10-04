@@ -598,3 +598,16 @@ test('a visit shows its latest driver change, else the entry driver', () => {
   ])
   assert.equal(later[0].driver_name, 'Newest')
 })
+
+test('the export names the company and the project in English in both languages', () => {
+  for (const lang of ['ar', 'en']) {
+    const columns = visitExportColumns(fakeT, lang)
+    const company = columns.find((column) => column.header === '[company]')
+    const project = columns.find((column) => column.header === '[project]')
+    assert.equal(company.value(visit()), 'Company')
+    assert.equal(project.value(visit()), 'Project')
+    // No English name: the Arabic one, never an empty cell.
+    assert.equal(company.value(visit({ company_name_en: null })), 'شركة')
+    assert.equal(project.value(visit({ project_name_en: ' ' })), 'مشروع')
+  }
+})
