@@ -27,6 +27,7 @@ import { unwrapRows } from '@/lib/supabaseResult'
 import {
   EQUIPMENT_VISITS_SELECT,
   EQUIPMENT_VISITS_VIEW,
+  VISIT_DRIVER_CHANGES_SELECT,
   SUPPLIER_LOOKUP_CHUNK_SIZE,
   adminVisitsListConfig,
   buildVisitSearchFilter,
@@ -43,11 +44,45 @@ import {
   visitSortField,
   visitStateView,
   visitsListConfig,
+  withCurrentDrivers,
   type DriverMobileRow,
   type EquipmentSupplierRow,
   type EquipmentVisitRow,
+  type VisitDriverChangeRow,
   type VisitsContext,
 } from '@/lib/visitsList'
+
+/**
+ * The driver changes of a set of visits, looked up in bounded chunks. Throws
+ * on a failed query; the caller decides whether that fails the whole request.
+ */
+async function loadVisitDriverChanges(
+  visits: readonly EquipmentVisitRow[],
+  signal?: AbortSignal,
+): Promise<VisitDriverChangeRow[]> {
+  const changes: VisitDriverChangeRow[] = []
+  const idChunks = chunkItems(
+    // Workshop rows carry no driver, so they are not looked up.
+    visits
+      .filter((visit) => visit.movement_context === 'site')
+      .map((visit) => visit.entry_id),
+    SUPPLIER_LOOKUP_CHUNK_SIZE,
+  )
+  for (let start = 0; start < idChunks.length; start += 4)
+    await Promise.all(
+      idChunks.slice(start, start + 4).map(async (ids) => {
+        const query = supabase
+          .from('movement_driver_changes')
+          .select(VISIT_DRIVER_CHANGES_SELECT)
+          .in('entry_log_id', ids)
+        const rows = unwrapRows(
+          await (signal ? query.abortSignal(signal) : query),
+        )
+        changes.push(...(rows as unknown as VisitDriverChangeRow[]))
+      }),
+    )
+  return changes
+}
 
 /** A config's allowlisted filter keys; nothing else reaches PostgREST. */
 const filterKeys = (config: DataListConfig) =>
@@ -186,8 +221,19 @@ export function VisitsTable({
       setLoading(false)
       return
     }
+    const rows = (data ?? []) as unknown as EquipmentVisitRow[]
+    // The driver changes are a secondary lookup: on failure the rows keep
+    // their entry driver snapshot instead of failing the whole list.
+    let changes: VisitDriverChangeRow[] = []
+    try {
+      changes = await loadVisitDriverChanges(rows, signal)
+    } catch (lookupError) {
+      if (signal.aborted) return
+      console.error('visit driver changes failed', lookupError)
+    }
+    if (signal.aborted) return
     setTotal(count ?? 0)
-    setVisits((data ?? []) as unknown as EquipmentVisitRow[])
+    setVisits(withCurrentDrivers(rows, changes))
     setLoading(false)
   }, [buildQuery, list.page, list.pageSize, startListRequest])
 
@@ -243,11 +289,16 @@ export function VisitsTable({
             )
           }),
         )
-      // The driver's mobile number, looked up the same way for the drivers
-      // in the file.
+      // The current driver of each visit (a driver added or changed after the
+      // entry lives only in the change records), then that driver's mobile
+      // number, looked up the same way for the drivers in the file.
+      const exportRows = withCurrentDrivers(
+        collected.rows,
+        await loadVisitDriverChanges(collected.rows),
+      )
       const mobileByDriver = new Map<string, string>()
       const driverChunks = chunkItems(
-        distinctDriverIds(collected.rows),
+        distinctDriverIds(exportRows),
         SUPPLIER_LOOKUP_CHUNK_SIZE,
       )
       for (let start = 0; start < driverChunks.length; start += 4)
@@ -269,7 +320,7 @@ export function VisitsTable({
       exportRowsToExcel(
         t('exportSheetVisits'),
         visitExportColumns(t, lang, supplierByEquipment, mobileByDriver),
-        collected.rows,
+        exportRows,
         { fileName: visitExportFileName(context), rtl: lang === 'ar' },
       )
       if (collected.capped)

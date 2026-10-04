@@ -48,6 +48,7 @@ const {
   SUPPLIER_LOOKUP_CHUNK_SIZE,
   chunkItems,
   distinctDriverIds,
+  withCurrentDrivers,
   distinctEquipmentIds,
   driverMobilesById,
   supplierNamesByEquipment,
@@ -557,4 +558,43 @@ test('the driver mobile is exported from the lookup, empty when unknown', () => 
   assert.equal(mobile.value(visit({ driver_id: 'd1' })), '0500000001')
   assert.equal(mobile.value(visit({ driver_id: 'd2' })), '')
   assert.equal(mobile.value(visit({ driver_id: null })), '')
+})
+
+test('a visit shows its latest driver change, else the entry driver', () => {
+  const change = (over) => ({
+    id: 'c1',
+    entry_log_id: 'e1',
+    new_driver_id: 'd9',
+    new_driver_name: 'Late Driver',
+    changed_at: '2026-10-01T10:00:00+00:00',
+    ...over,
+  })
+  const rows = [
+    { entry_id: 'e1', driver_id: null, driver_name: null },
+    { entry_id: 'e2', driver_id: 'd1', driver_name: 'Entry Driver' },
+  ]
+  const out = withCurrentDrivers(rows, [
+    change({ id: 'c1' }),
+    // Same instant: the higher id wins, whatever the input order.
+    change({ id: 'c3', new_driver_id: 'd7', new_driver_name: 'Last' }),
+    change({ id: 'c2', new_driver_id: 'd8', new_driver_name: 'Middle' }),
+  ])
+  assert.deepEqual(plain(out[0]), {
+    entry_id: 'e1',
+    driver_id: 'd7',
+    driver_name: 'Last',
+  })
+  // No change: the entry driver stays, and the input row is not mutated.
+  assert.deepEqual(plain(out[1]), plain(rows[1]))
+  assert.equal(rows[0].driver_name, null)
+  // A later instant beats a higher id.
+  const later = withCurrentDrivers(rows, [
+    change({ id: 'c9' }),
+    change({
+      id: 'c1',
+      new_driver_name: 'Newest',
+      changed_at: '2026-10-02T10:00:00+00:00',
+    }),
+  ])
+  assert.equal(later[0].driver_name, 'Newest')
 })

@@ -453,6 +453,50 @@ export function supplierNamesByEquipment(
   return into
 }
 
+/** One `movement_driver_changes` row as the current-driver lookup selects it. */
+export interface VisitDriverChangeRow {
+  id: string
+  entry_log_id: string
+  new_driver_id: string | null
+  new_driver_name: string | null
+  changed_at: string
+}
+
+/** The columns of `VisitDriverChangeRow`, for the lookup's select. */
+export const VISIT_DRIVER_CHANGES_SELECT =
+  'id,entry_log_id,new_driver_id,new_driver_name,changed_at'
+
+/**
+ * Visits with their CURRENT driver: the latest auditable driver change of the
+ * visit's entry, by `(changed_at, id)`, and the entry's own driver when the
+ * visit has no change. The entry row itself is never edited (the original
+ * entry driver is immutable), so a driver added to a driverless visit exists
+ * only as a change; without this the visit would keep showing no driver.
+ */
+export function withCurrentDrivers<
+  T extends Pick<EquipmentVisitRow, 'entry_id' | 'driver_id' | 'driver_name'>,
+>(visits: readonly T[], changes: readonly VisitDriverChangeRow[]): T[] {
+  const latest = new Map<string, VisitDriverChangeRow>()
+  for (const change of changes) {
+    const current = latest.get(change.entry_log_id)
+    if (
+      !current ||
+      change.changed_at > current.changed_at ||
+      (change.changed_at === current.changed_at && change.id > current.id)
+    )
+      latest.set(change.entry_log_id, change)
+  }
+  return visits.map((visit) => {
+    const change = latest.get(visit.entry_id)
+    if (!change?.new_driver_name) return visit
+    return {
+      ...visit,
+      driver_id: change.new_driver_id,
+      driver_name: change.new_driver_name,
+    }
+  })
+}
+
 /** The distinct, non-empty driver ids of a set of visits, in first-seen order. */
 export function distinctDriverIds(
   visits: readonly Pick<EquipmentVisitRow, 'driver_id'>[],
