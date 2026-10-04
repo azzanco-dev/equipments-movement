@@ -1116,6 +1116,9 @@ export const translations = {
     exportColExitOdometer: 'عداد الخروج',
     exportColExitNotes: 'ملاحظات الخروج',
     exportColDriverMobile: 'جوال السائق',
+    exportOwnerAlazani: 'المعدات المملوكة الخاصة (A)',
+    exportOwnerThirdPartyF: 'المعدات المملوكة للغير (F)',
+    exportOwnerThirdPartyB: 'المعدات المملوكة الشراكة (B)',
     logsExportCapped:
       'تم تصدير {count} حركة من اصل {total}. ضيّق البحث او التصفية لتصدير الباقي.',
     logsExportFailed: 'تعذر تصدير الملف. حاول مرة اخرى.',
@@ -2461,6 +2464,9 @@ export const translations = {
     exportColExitOdometer: 'Exit odometer',
     exportColExitNotes: 'Exit notes',
     exportColDriverMobile: 'Driver mobile',
+    exportOwnerAlazani: 'Own equipment (A)',
+    exportOwnerThirdPartyF: 'Third-party owned (F)',
+    exportOwnerThirdPartyB: 'Partnership owned (B)',
     logsExportCapped:
       '{count} of {total} movements were exported. Narrow the search or the filters to export the rest.',
     logsExportFailed: 'The file could not be exported. Please try again.',

@@ -383,12 +383,12 @@ function exportName(
   return preferred?.trim() || fallback?.trim() || ''
 }
 
-/** Short owner labels, the same keys the owner filter above offers. */
+/** The owner names of the export file, as the owner asked for them (2026-10-04). */
 const OWNER_LABEL_KEYS: Record<string, TranslationKey> = {
-  alazani: 'adminHomeOwnerAlazani',
-  takween: 'adminHomeOwnerTakween',
-  third_party_f: 'adminHomeOwnerThirdPartyF',
-  third_party_partnership_b: 'adminHomeOwnerThirdPartyB',
+  alazani: 'exportOwnerAlazani',
+  takween: 'ownershipTakween',
+  third_party_f: 'exportOwnerThirdPartyF',
+  third_party_partnership_b: 'exportOwnerThirdPartyB',
   external_supplier: 'adminHomeOwnerExternal',
 }
 

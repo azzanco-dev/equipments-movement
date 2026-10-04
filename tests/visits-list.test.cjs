@@ -436,10 +436,10 @@ test('the export carries owner and supplier right after the equipment columns', 
 
 test('the owner cell uses the short owner labels and never goes blank', () => {
   const labels = {
-    adminHomeOwnerAlazani: 'Al-Azani',
-    adminHomeOwnerTakween: 'Takween',
-    adminHomeOwnerThirdPartyF: 'F',
-    adminHomeOwnerThirdPartyB: 'B',
+    exportOwnerAlazani: 'Al-Azani',
+    ownershipTakween: 'Takween',
+    exportOwnerThirdPartyF: 'F',
+    exportOwnerThirdPartyB: 'B',
     adminHomeOwnerExternal: 'Other',
   }
   const t = (key) => labels[key] ?? key
@@ -468,7 +468,7 @@ test('the supplier cell comes from the looked-up map and is empty without a less
   )
   assert.equal(
     owner.value(visit({ equipment_ownership_status: 'takween' })),
-    '[adminHomeOwnerTakween]',
+    '[ownershipTakween]',
   )
 })
 
