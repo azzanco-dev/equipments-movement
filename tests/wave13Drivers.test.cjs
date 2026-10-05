@@ -236,28 +236,58 @@ test('the drivers list hides the external supplier by default, NULL kept', () =>
   const field = driversListConfig.filterFields.find(
     (entry) => entry.key === 'employment_type',
   )
-  assert.ok(field.operators.includes('neq'))
-  assert.equal(field.negationKeepsEmpty, true)
+  // A multi-select (owner decision 2026-10-05) with a "no value" option.
+  const { EMPTY_FILTER_VALUE, applyListFilters } = lib('applyListFilters')
+  assert.equal(field.multiple, true)
+  assert.ok(field.operators.includes('in'))
   assert.ok(field.options.some((option) => option.value === EXTERNAL))
+  assert.ok(field.options.some((option) => option.value === EMPTY_FILTER_VALUE))
   const defaults = plain(driversListConfig.defaultFilters)
-  assert.deepEqual(defaults, [
-    {
-      id: 'default-employment-type',
-      field: 'employment_type',
-      operator: 'neq',
-      value: EXTERNAL,
-    },
-  ])
-  // The default is shown in the dialog as its own entry, not as "= value".
-  const { matchingFilterChoice } = dataList('listFilterState')
-  assert.equal(
-    matchingFilterChoice(field, defaults[0]).label,
-    'driversExceptExternalSupplier',
+  assert.equal(defaults.length, 1)
+  assert.equal(defaults[0].field, 'employment_type')
+  assert.equal(defaults[0].operator, 'in')
+  // Everything is ticked except the external supplier, the empty type too.
+  const ticked = defaults[0].value.split(',')
+  assert.ok(!ticked.includes(EXTERNAL))
+  assert.ok(ticked.includes(EMPTY_FILTER_VALUE))
+  assert.equal(ticked.length, field.options.length - 1)
+  // NULL rows are matched together with the ticked values.
+  const calls = []
+  const query = {
+    in: (...args) => (calls.push(['in', ...args]), query),
+    is: (...args) => (calls.push(['is', ...args]), query),
+    or: (...args) => (calls.push(['or', ...args]), query),
+  }
+  const allowed = new Set(['employment_type'])
+  applyListFilters(query, defaults, allowed)
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0][0], 'or')
+  assert.ok(
+    calls[0][1].startsWith('employment_type.is.null,employment_type.in.("'),
   )
-  assert.equal(
-    matchingFilterChoice(field, { operator: 'eq', value: EXTERNAL }),
-    null,
+  assert.ok(!calls[0][1].includes(EMPTY_FILTER_VALUE))
+  assert.ok(!calls[0][1].includes(EXTERNAL))
+  calls.length = 0
+  applyListFilters(
+    query,
+    [
+      {
+        id: 'x',
+        field: 'employment_type',
+        operator: 'in',
+        value: EMPTY_FILTER_VALUE,
+      },
+    ],
+    allowed,
   )
+  assert.deepEqual(plain(calls), [['is', 'employment_type', null]])
+  calls.length = 0
+  applyListFilters(
+    query,
+    [{ id: 'x', field: 'employment_type', operator: 'in', value: EXTERNAL }],
+    allowed,
+  )
+  assert.deepEqual(plain(calls), [['in', 'employment_type', [EXTERNAL]]])
   // Only the drivers list has a default.
   for (const config of Object.values(configs))
     if (config !== driversListConfig)
@@ -267,7 +297,7 @@ test('the drivers list hides the external supplier by default, NULL kept', () =>
 test('URL state: fresh visit, cleared, and a list without defaults', () => {
   const { listFiltersFromParam, listFiltersParam } = dataList('listFilterState')
   const { driversListConfig } = lib('listConfigs')
-  assert.equal(listFiltersFromParam(null, driversListConfig)[0].value, EXTERNAL)
+  assert.equal(listFiltersFromParam(null, driversListConfig)[0].operator, 'in')
   assert.deepEqual(plain(listFiltersFromParam('[]', driversListConfig)), [])
   assert.deepEqual(plain(listFiltersFromParam('{bad', driversListConfig)), [])
   assert.equal(listFiltersParam([], driversListConfig), '[]')

@@ -1,5 +1,14 @@
 import type { ListFilter } from '@/components/data-list/types'
 
+/**
+ * The option value that stands for "no value" (SQL NULL) in a multi-select
+ * filter, e.g. drivers with no employment type. `applyListFilters` turns an
+ * `in` list holding it into `or=(field.is.null,field.in.(...))`, so the
+ * rows with an empty column can be ticked like any other option. No stored
+ * value can equal it.
+ */
+export const EMPTY_FILTER_VALUE = '__empty__'
+
 type QueryLike = {
   eq: (column: string, value: unknown) => QueryLike
   neq: (column: string, value: unknown) => QueryLike
@@ -58,9 +67,19 @@ export function applyListFilters<T>(
             )
           : query.neq(filter.field, filter.value)
         break
-      case 'in':
-        query = query.in(filter.field, values)
+      case 'in': {
+        // The "no value" option of a multi-select: NULL rows are matched
+        // together with the ticked values.
+        const listed = values.filter((value) => value !== EMPTY_FILTER_VALUE)
+        if (listed.length === values.length)
+          query = query.in(filter.field, values)
+        else if (!listed.length) query = query.is(filter.field, null)
+        else
+          query = query.or(
+            `${filter.field}.is.null,${filter.field}.in.(${listed.map(logicTreeValue).join(',')})`,
+          )
         break
+      }
       case 'not_in':
         query = keepEmpty
           ? query.or(

@@ -3,6 +3,7 @@ import type {
   FilterOperator,
   FilterOption,
 } from '@/components/data-list/types'
+import { EMPTY_FILTER_VALUE } from '@/lib/applyListFilters'
 import {
   DRIVER_EMPLOYMENT_TYPES,
   DRIVER_NATIONALITIES,
@@ -74,18 +75,18 @@ export const driversListConfig: DataListConfig = {
       label: 'employmentType',
       type: 'select',
       operators: ['eq', 'neq', 'in', 'not_in', 'is_set', 'is_not_set'],
-      options: select(DRIVER_EMPLOYMENT_TYPES),
-      // wave-13-drivers: "all except the external supplier", the default
-      // below. A driver with no employment type yet stays visible under it.
-      choices: [
+      // wave-13-drivers: a multi-select (owner decision 2026-10-05) whose
+      // last option stands for the drivers with no employment type yet, so
+      // the default below can tick everything except the external supplier.
+      multiple: true,
+      options: [
+        ...select(DRIVER_EMPLOYMENT_TYPES),
         {
-          key: 'not_external_supplier',
-          operator: 'neq',
-          value: EXTERNAL_SUPPLIER_EMPLOYMENT_TYPE,
-          label: 'driversExceptExternalSupplier',
+          value: EMPTY_FILTER_VALUE,
+          label: 'بدون نوع توظيف',
+          labelI18n: { ar: 'بدون نوع توظيف', en: 'No employment type' },
         },
       ],
-      negationKeepsEmpty: true,
     },
     {
       key: 'job_title',
@@ -101,8 +102,13 @@ export const driversListConfig: DataListConfig = {
     {
       id: 'default-employment-type',
       field: 'employment_type',
-      operator: 'neq',
-      value: EXTERNAL_SUPPLIER_EMPLOYMENT_TYPE,
+      operator: 'in',
+      value: [
+        ...DRIVER_EMPLOYMENT_TYPES.filter(
+          (type) => type !== EXTERNAL_SUPPLIER_EMPLOYMENT_TYPE,
+        ),
+        EMPTY_FILTER_VALUE,
+      ].join(','),
     },
   ],
   sortableFields: [
