@@ -107,36 +107,43 @@ export function useWhatsAppStatusPolling(enabled: boolean) {
   }, [enabled])
 }
 
-/** The sidebar line. Renders nothing when the status is not polled. */
+/**
+ * The sidebar line, shaped like a navigation item (owner decision
+ * 2026-10-05): a light green box with a green dot when connected, a light
+ * red box with a red dot when the device is not linked, and a neutral box
+ * while the status is unknown. Renders nothing when the status is not polled.
+ */
 export function WhatsAppStatusIndicator({ className }: { className?: string }) {
   const { t } = useI18n()
   const view = useWhatsAppStatus()
   if (view === 'off') return null
   const label = t(LABELS[view])
-
-  if (isWhatsAppStatusWarning(view)) {
-    return (
-      <Notice tone="warning" size="compact" className={className}>
-        {label}
-      </Notice>
-    )
-  }
+  const tone =
+    view === 'connected'
+      ? 'ok'
+      : isWhatsAppStatusWarning(view)
+        ? 'down'
+        : 'neutral'
 
   return (
     <div
       role="status"
       title={label}
       className={cn(
-        'flex items-center gap-2 px-3 py-1.5 text-xs',
-        view === 'connected' ? 'text-fg' : 'text-muted',
+        'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium',
+        tone === 'ok' && 'bg-success-soft text-fg',
+        tone === 'down' && 'bg-danger-soft text-fg',
+        tone === 'neutral' && 'bg-surface-hover text-muted',
         className,
       )}
     >
       <span
         aria-hidden="true"
         className={cn(
-          'h-2 w-2 shrink-0 rounded-full',
-          view === 'connected' ? 'bg-success' : 'bg-muted',
+          'h-2.5 w-2.5 shrink-0 rounded-full',
+          tone === 'ok' && 'bg-success',
+          tone === 'down' && 'bg-danger',
+          tone === 'neutral' && 'bg-muted',
         )}
       />
       <span className="min-w-0 truncate">{label}</span>
@@ -157,7 +164,7 @@ export function WhatsAppStatusAlert({ className }: { className?: string }) {
   if (!isWhatsAppStatusWarning(view)) return null
   return (
     <Notice
-      tone="warning"
+      tone="danger"
       size="compact"
       title={t(LABELS[view])}
       className={cn('lg:hidden', className)}
