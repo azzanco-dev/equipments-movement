@@ -7,6 +7,7 @@ import { EntriesFlowSection } from '@/components/admin-home/EntriesFlowSection'
 import { FleetDonutSection } from '@/components/admin-home/FleetDonutSection'
 import { FleetStateSection } from '@/components/admin-home/FleetStateSection'
 import { ForemanActivitySection } from '@/components/admin-home/ForemanActivitySection'
+import { WhatsAppStatusAlert } from '@/components/WhatsAppGatewayStatus'
 import { useI18n } from '@/i18n/I18nContext'
 import { useAuth } from '@/auth/AuthContext'
 import { greetingName, greetingParts } from '@/lib/greetingName'
@@ -80,44 +81,50 @@ export function AdminHomeScreen({
   )
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title={greeting ?? t('adminHomeTitle')}
-        description={t('adminHomeDescription')}
-        actions={
-          onCreateMovement ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="primary"
-                onClick={() => onCreateMovement('entry')}
-                icon={<LogIn size={16} aria-hidden="true" />}
-              >
-                {t('registerEntry')}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => onCreateMovement('exit')}
-                icon={<LogOut size={16} aria-hidden="true" />}
-              >
-                {t('registerExit')}
-              </Button>
-            </div>
-          ) : undefined
-        }
-      />
-      <FleetStateSection onSelectEquipment={onSelectEquipment} />
-      {/* Its former neighbour "معدات بلا حركة" is now the "متاحة" mini table
+    <>
+      {/* wave 12: small screens only, admin only, and only when the WhatsApp
+          gateway is known to be disconnected (the sidebar shows it on lg+).
+          Outside the spaced column so a hidden alert leaves no gap. */}
+      <WhatsAppStatusAlert className="mb-4" />
+      <div className="space-y-4">
+        <PageHeader
+          title={greeting ?? t('adminHomeTitle')}
+          description={t('adminHomeDescription')}
+          actions={
+            onCreateMovement ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="primary"
+                  onClick={() => onCreateMovement('entry')}
+                  icon={<LogIn size={16} aria-hidden="true" />}
+                >
+                  {t('registerEntry')}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => onCreateMovement('exit')}
+                  icon={<LogOut size={16} aria-hidden="true" />}
+                >
+                  {t('registerExit')}
+                </Button>
+              </div>
+            ) : undefined
+          }
+        />
+        <FleetStateSection onSelectEquipment={onSelectEquipment} />
+        {/* Its former neighbour "معدات بلا حركة" is now the "متاحة" mini table
           under the state cards, so the availability table takes the full
           width. */}
-      <AvailabilitySection />
-      <FleetDonutSection />
-      <EntriesFlowSection
-        granularity={granularity}
-        onGranularityChange={setGranularity}
-        showExits={showExits}
-        onShowExitsChange={setShowExits}
-      />
-      <ForemanActivitySection />
-    </div>
+        <AvailabilitySection />
+        <FleetDonutSection />
+        <EntriesFlowSection
+          granularity={granularity}
+          onGranularityChange={setGranularity}
+          showExits={showExits}
+          onShowExitsChange={setShowExits}
+        />
+        <ForemanActivitySection />
+      </div>
+    </>
   )
 }

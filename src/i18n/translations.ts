@@ -712,6 +712,19 @@ export const translations = {
     userSavedMobileFailed:
       'تم حفظ بقية بيانات المستخدم، لكن رقم الجوال لم يحفظ.',
     // wave-9-notices — end
+    // wave-12-whatsapp-status — start
+    whatsappStatusChecking: 'واتساب: جار التحقق',
+    whatsappStatusConnected: 'واتساب: متصل',
+    whatsappStatusDisconnected: 'واتساب: مفصول',
+    whatsappStatusQr: 'واتساب: مفصول، يلزم مسح رمز QR',
+    whatsappStatusLoading: 'واتساب: جار اعادة الاتصال',
+    whatsappStatusNotConfigured: 'واتساب: غير مفعل',
+    whatsappStatusUnknown: 'واتساب: تعذر التحقق',
+    whatsappStatusAlertHint:
+      'لن تصل اشعارات واتساب للحركات حتى يعود الاتصال.',
+    whatsappStatusQrHint:
+      'امسح رمز QR من لوحة UltraMsg لاعادة ربط الجهاز، ولن تصل اشعارات واتساب قبل ذلك.',
+    // wave-12-whatsapp-status — end
     // wave-10-exit-purpose — start
     exitPurpose: 'غرض الخروج',
     exitPurposePlaceholder: 'اختر غرض الخروج',
@@ -2056,6 +2069,19 @@ export const translations = {
     userSavedMobileFailed:
       'The other user details were saved, but the mobile number was not.',
     // wave-9-notices — end
+    // wave-12-whatsapp-status — start
+    whatsappStatusChecking: 'WhatsApp: checking',
+    whatsappStatusConnected: 'WhatsApp: connected',
+    whatsappStatusDisconnected: 'WhatsApp: disconnected',
+    whatsappStatusQr: 'WhatsApp: disconnected, QR scan needed',
+    whatsappStatusLoading: 'WhatsApp: reconnecting',
+    whatsappStatusNotConfigured: 'WhatsApp: not set up',
+    whatsappStatusUnknown: "WhatsApp: couldn't check",
+    whatsappStatusAlertHint:
+      'Movement WhatsApp notices will not be delivered until the connection is back.',
+    whatsappStatusQrHint:
+      'Scan the QR code in the UltraMsg dashboard to link the device again. WhatsApp notices will not be delivered until then.',
+    // wave-12-whatsapp-status — end
     // wave-10-exit-purpose — start
     exitPurpose: 'Purpose of exit',
     exitPurposePlaceholder: 'Select the purpose of exit',

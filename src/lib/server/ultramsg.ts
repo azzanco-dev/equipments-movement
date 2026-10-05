@@ -8,6 +8,15 @@
 // `sendWhatsAppText` never throws and never logs: the token, the request URL
 // and the message body must not reach the logs. The caller logs the notice id
 // and the short error code it gets back.
+//
+// wave 12: `getWhatsAppGatewayStatus` reads the instance connection status for
+// the admin, with the same rules (never throws, never logs) and a short
+// in-memory cache.
+
+import {
+  mapUltraMsgInstanceStatus,
+  type WhatsAppGatewayState,
+} from '@/lib/whatsappStatus'
 
 export type WhatsAppSendErrorCode =
   | 'timeout'
@@ -109,4 +118,83 @@ export async function sendWhatsAppText(
   } finally {
     if (timer) clearTimeout(timer)
   }
+}
+
+// --- wave 12: instance connection status -------------------------------------
+
+const STATUS_TIMEOUT_MS = 5000
+// One gateway request per server instance per minute at most. Serverless
+// instances do not share this memory, so it only bounds each instance.
+const STATUS_CACHE_MS = 60 * 1000
+
+export interface WhatsAppGatewayStatus {
+  state: WhatsAppGatewayState
+  /** ISO time of the gateway check (or of the configuration check). */
+  checkedAt: string
+}
+
+/**
+ * Asks the gateway for the instance status, uncached. Never throws and never
+ * logs: a failed or unexpected answer is `unknown`, never `connected`.
+ */
+export async function fetchWhatsAppInstanceState(): Promise<WhatsAppGatewayState> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const controller = new AbortController()
+  try {
+    const config = gatewayConfig()
+    if (!config) return 'not_configured'
+
+    timer = setTimeout(() => controller.abort(), STATUS_TIMEOUT_MS)
+    // The documented request is a GET with the token as a query parameter.
+    // The URL is never logged or returned, and a failure keeps nothing of it.
+    const query = new URLSearchParams({ token: config.token }).toString()
+    const response = await fetch(
+      `${ULTRAMSG_API_ORIGIN}/${config.instanceId}/instance/status?${query}`,
+      {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+        cache: 'no-store',
+      },
+    )
+    if (!response.ok) return 'unknown'
+
+    let payload: unknown
+    try {
+      payload = await response.json()
+    } catch {
+      return 'unknown'
+    }
+    return mapUltraMsgInstanceStatus(payload)
+  } catch {
+    return 'unknown'
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+let cachedStatus: { value: WhatsAppGatewayStatus; at: number } | null = null
+let pendingStatus: Promise<WhatsAppGatewayStatus> | null = null
+
+/**
+ * The instance status, cached in memory for a minute. Concurrent callers share
+ * one gateway request. Never rejects.
+ */
+export function getWhatsAppGatewayStatus(): Promise<WhatsAppGatewayStatus> {
+  if (cachedStatus && Date.now() - cachedStatus.at < STATUS_CACHE_MS) {
+    return Promise.resolve(cachedStatus.value)
+  }
+  if (pendingStatus) return pendingStatus
+  const request = fetchWhatsAppInstanceState().then((state) => {
+    const at = Date.now()
+    const value: WhatsAppGatewayStatus = {
+      state,
+      checkedAt: new Date(at).toISOString(),
+    }
+    cachedStatus = { value, at }
+    pendingStatus = null
+    return value
+  })
+  pendingStatus = request
+  return request
 }

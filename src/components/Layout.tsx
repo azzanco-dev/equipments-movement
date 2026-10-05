@@ -25,6 +25,10 @@ import {
   IconButton,
 } from '@/components/ui'
 import { usePathname } from 'next/navigation'
+import {
+  WhatsAppStatusIndicator,
+  useWhatsAppStatusPolling,
+} from '@/components/WhatsAppGatewayStatus'
 
 interface LayoutProps {
   children: ReactNode
@@ -88,6 +92,10 @@ export function Layout({
             : profile?.role === 'monitor'
               ? t('monitoring')
               : t('supervisor')
+
+  // wave 12: the WhatsApp gateway status is polled for the admin only.
+  const showWhatsAppStatus = profile?.role === 'admin' && navItems.length > 0
+  useWhatsAppStatusPolling(showWhatsAppStatus)
 
   return (
     <div
@@ -298,6 +306,11 @@ export function Layout({
                 </div>
               ))}
             </nav>
+            {showWhatsAppStatus && (
+              <div className="mt-auto border-t border-[var(--border)] pt-3">
+                <WhatsAppStatusIndicator />
+              </div>
+            )}
           </aside>
         )}
 
@@ -309,7 +322,7 @@ export function Layout({
             onClick={() => setMobileOpen(false)}
           >
             <div
-              className="absolute inset-y-0 start-0 w-64 border-e p-4 pt-20 overflow-y-auto"
+              className="absolute inset-y-0 start-0 flex w-64 flex-col border-e p-4 pt-20 overflow-y-auto"
               style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}
               onClick={(event) => event.stopPropagation()}
             >
@@ -379,6 +392,11 @@ export function Layout({
                   </div>
                 ))}
               </nav>
+              {showWhatsAppStatus && (
+                <div className="mt-auto border-t border-[var(--border)] pt-3">
+                  <WhatsAppStatusIndicator />
+                </div>
+              )}
             </div>
           </div>
         )}
