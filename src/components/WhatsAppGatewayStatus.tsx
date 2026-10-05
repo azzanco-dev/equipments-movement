@@ -56,6 +56,20 @@ const LABELS: Record<Exclude<WhatsAppStatusView, 'off'>, TranslationKey> = {
   unknown: 'whatsappStatusUnknown',
 }
 
+/** The state alone, shown at the end of the sidebar line. */
+const STATE_LABELS: Record<
+  Exclude<WhatsAppStatusView, 'off'>,
+  TranslationKey
+> = {
+  checking: 'whatsappStateChecking',
+  connected: 'whatsappStateConnected',
+  disconnected: 'whatsappStateDisconnected',
+  qr: 'whatsappStateQr',
+  loading: 'whatsappStateLoading',
+  not_configured: 'whatsappStateNotConfigured',
+  unknown: 'whatsappStateUnknown',
+}
+
 /**
  * Polls the status route while `enabled` (the admin only; nothing is
  * requested otherwise): once on mount, then every five minutes while the tab
@@ -129,24 +143,41 @@ export function WhatsAppStatusIndicator({ className }: { className?: string }) {
     <div
       role="status"
       title={label}
+      aria-label={label}
       className={cn(
-        'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-normal',
-        tone === 'ok' && 'bg-success-soft text-fg',
-        tone === 'down' && 'bg-danger-soft text-fg',
-        tone === 'neutral' && 'bg-surface-hover text-muted',
+        'flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs font-normal',
+        tone === 'ok' && 'bg-success-soft',
+        tone === 'down' && 'bg-danger-soft',
+        tone === 'neutral' && 'bg-surface-hover',
         className,
       )}
     >
+      {/* The dot sits in a soft halo of its own colour. */}
       <span
         aria-hidden="true"
         className={cn(
           'h-2 w-2 shrink-0 rounded-full',
-          tone === 'ok' && 'bg-success',
-          tone === 'down' && 'bg-danger',
+          tone === 'ok' &&
+            'bg-success shadow-[0_0_0_3px_color-mix(in_srgb,var(--success)_22%,transparent)]',
+          tone === 'down' &&
+            'bg-danger shadow-[0_0_0_3px_color-mix(in_srgb,var(--danger)_22%,transparent)]',
           tone === 'neutral' && 'bg-muted',
         )}
       />
-      <span className="min-w-0 truncate">{label}</span>
+      <span aria-hidden="true" className="min-w-0 truncate text-fg">
+        {t('whatsappStatusName')}
+      </span>
+      <span
+        aria-hidden="true"
+        className={cn(
+          'ms-auto shrink-0',
+          tone === 'ok' && 'text-success',
+          tone === 'down' && 'text-danger',
+          tone === 'neutral' && 'text-muted',
+        )}
+      >
+        {t(STATE_LABELS[view])}
+      </span>
     </div>
   )
 }

@@ -713,6 +713,14 @@ export const translations = {
       'تم حفظ بقية بيانات المستخدم، لكن رقم الجوال لم يحفظ.',
     // wave-9-notices — end
     // wave-12-whatsapp-status — start
+    whatsappStatusName: 'واتساب',
+    whatsappStateChecking: 'جار التحقق',
+    whatsappStateConnected: 'متصل',
+    whatsappStateDisconnected: 'مفصول',
+    whatsappStateQr: 'يلزم مسح QR',
+    whatsappStateLoading: 'جار اعادة الاتصال',
+    whatsappStateNotConfigured: 'غير مفعل',
+    whatsappStateUnknown: 'تعذر التحقق',
     whatsappStatusChecking: 'واتساب: جار التحقق',
     whatsappStatusConnected: 'واتساب: متصل',
     whatsappStatusDisconnected: 'واتساب: مفصول',
@@ -2070,6 +2078,14 @@ export const translations = {
       'The other user details were saved, but the mobile number was not.',
     // wave-9-notices — end
     // wave-12-whatsapp-status — start
+    whatsappStatusName: 'WhatsApp',
+    whatsappStateChecking: 'Checking',
+    whatsappStateConnected: 'Connected',
+    whatsappStateDisconnected: 'Disconnected',
+    whatsappStateQr: 'QR scan needed',
+    whatsappStateLoading: 'Reconnecting',
+    whatsappStateNotConfigured: 'Not set up',
+    whatsappStateUnknown: "Couldn't check",
     whatsappStatusChecking: 'WhatsApp: checking',
     whatsappStatusConnected: 'WhatsApp: connected',
     whatsappStatusDisconnected: 'WhatsApp: disconnected',
