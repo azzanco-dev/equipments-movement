@@ -130,7 +130,7 @@ export function WhatsAppStatusIndicator({ className }: { className?: string }) {
       role="status"
       title={label}
       className={cn(
-        'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium',
+        'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-normal',
         tone === 'ok' && 'bg-success-soft text-fg',
         tone === 'down' && 'bg-danger-soft text-fg',
         tone === 'neutral' && 'bg-surface-hover text-muted',
