@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx'
 import type { TranslationKey } from '@/i18n/translations'
 import type { ExcelColumn } from '@/lib/excel'
 import { saudiDateKey } from '@/lib/saudiTime'
+import { exitPurposeExportLabel } from '@/lib/exitPurpose'
 
 export type MovementImportMode = 'entry' | 'exit' | 'both'
 
@@ -190,6 +191,8 @@ export interface MovementExportRow {
   movement_type: 'entry' | 'exit'
   movement_context?: 'site' | 'workshop' | null
   workshop_purpose?: 'maintenance' | 'parking' | null
+  /** A site exit's purpose (migrations 0111 / 0118); `null` otherwise. */
+  exit_purpose?: string | null
   contractor_equipment_code?: string | null
   company_name_ar?: string | null
   company_name_en?: string | null
@@ -249,6 +252,16 @@ export function movementExportColumns(
       header: t('movementType'),
       width: 10,
       value: (row) => (row.movement_type === 'entry' ? t('entry') : t('exit')),
+    },
+    {
+      // wave-12: right after the movement type. Only a site exit recorded
+      // since migration 0111 has one; every other row is an empty cell.
+      header: t('exitPurpose'),
+      width: 14,
+      value: (row) =>
+        row.movement_type === 'exit'
+          ? exitPurposeExportLabel(row.exit_purpose, t)
+          : '',
     },
     {
       header: t('logsColContext'),

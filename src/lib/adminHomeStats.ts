@@ -14,6 +14,7 @@ import {
 } from '@/lib/calendar'
 import type { ChartBucket } from '@/lib/chartBuckets'
 import { saudiDateKey } from '@/lib/saudiTime'
+import { exitPurposeOrNull, type ExitPurpose } from '@/lib/exitPurpose'
 import type { OwnershipStatus } from '@/lib/types'
 
 /** Every `ownership_status` value the database check constraint allows. The
@@ -415,6 +416,13 @@ export interface FleetEquipmentRow {
   companyNameEn: string | null
   projectNameAr: string | null
   projectNameEn: string | null
+  /**
+   * The purpose of the latest movement when it is a site exit
+   * (`last_exit_purpose`, migration 0118): why an available unit left its
+   * project. `null` for every other row, a workshop exit and an exit recorded
+   * before migration 0111.
+   */
+  exitPurpose: ExitPurpose | null
 }
 
 function optionalText(source: unknown, key: string): string | null {
@@ -468,6 +476,8 @@ export function parseFleetEquipmentRows(source: unknown): FleetEquipmentRow[] {
       companyNameEn: optionalText(row, 'company_name_en'),
       projectNameAr: optionalText(row, 'project_name_ar'),
       projectNameEn: optionalText(row, 'project_name_en'),
+      // An unknown value is dropped rather than rendered as a badge.
+      exitPurpose: exitPurposeOrNull(optionalText(row, 'last_exit_purpose')),
     }))
     .filter((row) => row.id !== '')
 }

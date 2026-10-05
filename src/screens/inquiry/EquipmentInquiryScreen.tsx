@@ -75,6 +75,8 @@ interface MovementLogTimelineRow {
   project_name_en: string | null
   supervisor_name: string | null
   driver_name: string | null
+  /** A site exit's purpose (appended to the view by migration 0118). */
+  exit_purpose?: string | null
 }
 
 const SUGGEST_LIMIT = 20
@@ -333,7 +335,7 @@ export function EquipmentInquiryScreen({
       const { data, error } = await supabase
         .from('movement_log_search')
         .select(
-          'id,movement_type,movement_context,workshop_purpose,recorded_at,company_name_ar,company_name_en,project_name_ar,project_name_en,supervisor_name,driver_name',
+          'id,movement_type,movement_context,workshop_purpose,recorded_at,company_name_ar,company_name_en,project_name_ar,project_name_en,supervisor_name,driver_name,exit_purpose',
         )
         .eq('equipment_id', id)
         .order('recorded_at', { ascending: false })
@@ -438,6 +440,7 @@ export function EquipmentInquiryScreen({
           row.project_name_en,
         ),
         workshop_purpose: row.workshop_purpose,
+        exit_purpose: row.exit_purpose ?? null,
         supervisor_name: row.supervisor_name,
         driver_name: row.driver_name,
       })),

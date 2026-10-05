@@ -1,4 +1,5 @@
 import { buildSearchFilter } from '@/lib/search'
+import type { ExitPurpose } from '@/lib/exitPurpose'
 import type {
   EntryExitLog,
   MovementType,
@@ -22,8 +23,11 @@ export const MOVEMENT_LOG_ADMIN_SELECT = `${LOG_FIELDS},odometer_reading,notes,c
 /** Workshop report cards. */
 export const MOVEMENT_LOG_WORKSHOP_SELECT = `${LOG_FIELDS},workshop_purpose,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,supervisor_name,driver_mobile_number`
 
-/** Foreman / workshop dashboard list. */
-export const MOVEMENT_LOG_SUPERVISOR_SELECT = `${LOG_FIELDS},workshop_purpose,contractor_equipment_code,equipment_code,equipment_type,supervisor_name`
+/**
+ * Foreman / workshop dashboard list. `exit_purpose` is the site exit purpose
+ * appended to the view by migration 0118 (wave 12).
+ */
+export const MOVEMENT_LOG_SUPERVISOR_SELECT = `${LOG_FIELDS},workshop_purpose,contractor_equipment_code,equipment_code,equipment_type,supervisor_name,exit_purpose`
 
 /** Home page equipment card: the short timeline under one equipment. */
 export const MOVEMENT_LOG_HOME_TIMELINE_SELECT =
@@ -57,6 +61,8 @@ export interface MovementLogSearchRow {
   project_name_en?: string | null
   supervisor_name?: string | null
   driver_mobile_number?: string | null
+  /** The row's own site exit purpose (migration 0118); `null` otherwise. */
+  exit_purpose?: ExitPurpose | null
 }
 
 /**
@@ -71,6 +77,7 @@ export function mapMovementLogRow(row: MovementLogSearchRow): EntryExitLog {
     movement_type: row.movement_type,
     movement_context: row.movement_context,
     workshop_purpose: row.workshop_purpose,
+    exit_purpose: row.exit_purpose ?? null,
     registration_method: row.registration_method,
     driver_id: row.driver_id ?? null,
     driver_name: row.driver_name ?? null,

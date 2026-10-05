@@ -21,6 +21,9 @@ export interface TimelineMovement {
   company_name?: string | null
   project_name?: string | null
   workshop_purpose?: WorkshopPurpose | null
+  /** A site exit's purpose (migration 0111): `maintenance` or
+   *  `work_completed`; `null` for every other row and older exits. */
+  exit_purpose?: string | null
   supervisor_name?: string | null
   /** Snapshot name; legacy rows carry only this, with no driver record. */
   driver_name?: string | null

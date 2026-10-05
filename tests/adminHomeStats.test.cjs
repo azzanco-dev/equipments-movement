@@ -569,6 +569,7 @@ const fleetRow = (overrides) => ({
   companyNameEn: 'Company',
   projectNameAr: 'مشروع',
   projectNameEn: 'Project',
+  exitPurpose: null,
   ...overrides,
 })
 
@@ -628,6 +629,7 @@ test('the available export never leaves a blank date', () => {
     'adminHomeColEquipment',
     'adminHomeColType',
     'adminHomeColLastExit',
+    'exitPurpose',
     'adminHomeColOwner',
   ])
   assert.match(columns[2].value(fleetRow({})), /^\d{2}\/\d{2}\/2026$/)

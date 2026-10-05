@@ -25,6 +25,7 @@ import {
 } from '@/components/ui'
 import type { DataTableColumn } from '@/components/ui'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
+import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import { formatDate } from '@/lib/dateFormat'
@@ -660,7 +661,34 @@ export function FleetMiniTables({
     header: t('adminHomeColType'),
     cell: (row) => row.type,
   }
-  const availableColumns = [codeColumn, availableTypeColumn, lastExitColumn]
+  // wave-12: why an available unit left its project (the purpose of its last
+  // site exit, migration 0118), so «للصيانة» can be told apart from «انتهاء
+  // عمل» at a glance. Nothing for a unit that last left the workshop, one that
+  // never moved or an exit recorded before migration 0111.
+  const availableCodeColumn: DataTableColumn<FleetEquipmentRow> = {
+    ...codeColumn,
+    cell: (row) => (
+      <span className="flex flex-wrap items-center gap-1">
+        <span className="font-semibold">{row.code}</span>
+        <ExitPurposeBadge purpose={row.exitPurpose} />
+      </span>
+    ),
+  }
+  const exitPurposeColumn: DataTableColumn<FleetEquipmentRow> = {
+    key: 'exitPurpose',
+    header: t('exitPurpose'),
+    cell: (row) =>
+      row.exitPurpose ? (
+        <ExitPurposeBadge purpose={row.exitPurpose} />
+      ) : (
+        <span className="text-muted">—</span>
+      ),
+  }
+  const availableColumns = [
+    availableCodeColumn,
+    availableTypeColumn,
+    lastExitColumn,
+  ]
   const foremanColumn: DataTableColumn<ForemanRow> = {
     key: 'foreman',
     header: t('adminHomeColForeman'),
@@ -810,6 +838,7 @@ export function FleetMiniTables({
           codeColumn,
           availableTypeColumn,
           availableCompanyProjectColumn,
+          exitPurposeColumn,
           foremanColumn,
           lastExitColumn,
         ]}

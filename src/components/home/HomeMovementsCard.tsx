@@ -20,6 +20,7 @@ import {
 } from '@/components/ui'
 import { Card, SectionHeader } from '@/components/ui/Card'
 import { HomeVisitsTable } from '@/components/home/HomeVisitsCard'
+import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { formatDate } from '@/lib/dateFormat'
 import { isDateKey, saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
@@ -239,7 +240,16 @@ function MovementLogTab({
       key: 'movement_type',
       header: t('movementType'),
       width: '6rem',
-      cell: (log) => <MovementBadge type={log.movement_type} />,
+      // wave-12: a site exit also shows its purpose (migration 0118); the
+      // badge renders nothing for an entry, a workshop row or an older exit.
+      cell: (log) => (
+        <span className="flex flex-col items-start gap-1">
+          <MovementBadge type={log.movement_type} />
+          {log.movement_type === 'exit' && (
+            <ExitPurposeBadge purpose={log.exit_purpose} />
+          )}
+        </span>
+      ),
     }
     const recorded: DataTableColumn<EntryExitLog> = {
       key: 'recorded_at',

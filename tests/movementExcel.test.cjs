@@ -151,6 +151,7 @@ test('the movement export has Arabic headers in the table column order', () => {
     'equipmentType',
     'plateNumber',
     'movementType',
+    'exitPurpose',
     'logsColContext',
     'company',
     'project',
@@ -169,13 +170,33 @@ test('badges are exported as plain text, and the time as a Saudi date cell', () 
   const columns = movementExcel.movementExportColumns(t, 'ar')
   const [row] = excel.sheetAoa(columns, [siteEntry]).slice(1)
   assert.equal(row[3], 'دخول')
-  assert.equal(row[4], 'المشاريع')
-  assert.equal(readSerial(row[11]), '23/09/2026 12:05')
+  assert.equal(row[5], 'المشاريع')
+  assert.equal(readSerial(row[12]), '23/09/2026 12:05')
 
   const [exitRow] = excel
     .sheetAoa(columns, [{ ...siteEntry, movement_type: 'exit' }])
     .slice(1)
   assert.equal(exitRow[3], 'خروج')
+})
+
+test('wave 12: a site exit exports its purpose as words, every other row empty', () => {
+  const columns = movementExcel.movementExportColumns(t, 'ar')
+  const exit = { ...siteEntry, movement_type: 'exit' }
+  const cell = (row) => excel.sheetAoa(columns, [row])[1][4]
+  assert.equal(
+    cell({ ...exit, exit_purpose: 'maintenance' }),
+    t('exitPurposeMaintenance'),
+  )
+  assert.equal(
+    cell({ ...exit, exit_purpose: 'work_completed' }),
+    t('exitPurposeWorkCompleted'),
+  )
+  // An exit recorded before migration 0111, or a bad value: empty, no dash.
+  assert.equal(cell({ ...exit, exit_purpose: null }), '')
+  assert.equal(cell({ ...exit, exit_purpose: 'bogus' }), '')
+  assert.equal(cell(exit), '')
+  // An entry never carries a purpose, even if a value slipped through.
+  assert.equal(cell({ ...siteEntry, exit_purpose: 'maintenance' }), '')
 })
 
 test('a workshop movement exports its purpose as words', () => {
@@ -185,16 +206,16 @@ test('a workshop movement exports its purpose as words', () => {
     movement_context: 'workshop',
     workshop_purpose: 'maintenance',
   }
-  assert.equal(excel.sheetAoa(columns, [workshop])[1][4], 'صيانة')
+  assert.equal(excel.sheetAoa(columns, [workshop])[1][5], 'صيانة')
   assert.equal(
     excel.sheetAoa(columns, [
       { ...workshop, workshop_purpose: 'parking' },
-    ])[1][4],
+    ])[1][5],
     'انتظار',
   )
   // A workshop row with no purpose recorded still says where it happened.
   assert.equal(
-    excel.sheetAoa(columns, [{ ...workshop, workshop_purpose: null }])[1][4],
+    excel.sheetAoa(columns, [{ ...workshop, workshop_purpose: null }])[1][5],
     'الورشة',
   )
 })
@@ -203,18 +224,18 @@ test('a driverless site entry exports a blank driver cell', () => {
   // The driver became optional on a site ENTRY on 2026-09-23 (migration 0103).
   const columns = movementExcel.movementExportColumns(t, 'ar')
   const aoa = excel.sheetAoa(columns, [{ ...siteEntry, driver_name: null }])
-  assert.equal(aoa[1][8], '')
+  assert.equal(aoa[1][9], '')
 })
 
 test('company and project follow the interface language', () => {
   const arabic = excel.sheetAoa(movementExcel.movementExportColumns(t, 'ar'), [
     siteEntry,
   ])[1]
-  assert.equal(arabic[5], 'شركة')
+  assert.equal(arabic[6], 'شركة')
   const english = excel.sheetAoa(movementExcel.movementExportColumns(t, 'en'), [
     siteEntry,
   ])[1]
-  assert.equal(english[5], 'Company')
+  assert.equal(english[6], 'Company')
   // A name missing in the chosen language falls back to the other one, and a
   // name missing in both stays blank rather than becoming an em dash.
   const fallback = excel.sheetAoa(
@@ -228,8 +249,8 @@ test('company and project follow the interface language', () => {
       },
     ],
   )[1]
-  assert.equal(fallback[5], 'شركة')
-  assert.equal(fallback[6], '')
+  assert.equal(fallback[6], 'شركة')
+  assert.equal(fallback[7], '')
 })
 
 test('the file name carries the tab and the Saudi calendar day', () => {

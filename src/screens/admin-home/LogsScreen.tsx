@@ -19,6 +19,7 @@ import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import type { FilterBarAsyncField } from '@/components/data-list/FilterBar'
 import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
+import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
@@ -74,7 +75,9 @@ function resolveLogsView(params: QueryReader): LogsView {
   return hasLogState(params) ? 'log' : 'visits'
 }
 
-const LIST_SELECT = `${MOVEMENT_LOG_ADMIN_SELECT},workshop_purpose,equipment_ownership_status`
+// `exit_purpose` (a site exit's purpose) is appended to the view by migration
+// 0118; the table shows it on exit rows and the export writes it.
+const LIST_SELECT = `${MOVEMENT_LOG_ADMIN_SELECT},workshop_purpose,equipment_ownership_status,exit_purpose`
 
 /** Relational selectors show the first/best 20 matches, never more. */
 const FOREMAN_OPTION_LIMIT = 20
@@ -356,7 +359,16 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
       header: t('movementType'),
       sortable: true,
       width: '7rem',
-      cell: (row) => <MovementBadge type={row.movement_type} />,
+      // wave-12: a site exit also shows its purpose; nothing for an entry, a
+      // workshop row or an exit recorded before migration 0111.
+      cell: (row) => (
+        <span className="flex flex-col items-start gap-1">
+          <MovementBadge type={row.movement_type} />
+          {row.movement_type === 'exit' && (
+            <ExitPurposeBadge purpose={row.exit_purpose} />
+          )}
+        </span>
+      ),
     },
     {
       key: 'movement_context',

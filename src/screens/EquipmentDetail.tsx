@@ -48,6 +48,7 @@ import {
 } from '@/components/ui'
 import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
 import { PreviousCodesLine } from '@/components/inquiry/PreviousCodes'
+import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
 import {
   EQUIPMENT_CODE_CHANGES_LIMIT,
   EQUIPMENT_CODE_CHANGE_SELECT,
@@ -69,14 +70,17 @@ const RECENT_MOVEMENTS_LIMIT = 10
 // Only what the recent-movements table and the derived "under maintenance"
 // badge read. The recorder's name is resolved separately through
 // `profile_names` (see `fetchProfileNames`).
+// `exit_purpose` is a column of `entry_exit_logs` since migration 0111.
 const RECENT_MOVEMENTS_SELECT =
-  'id,movement_type,movement_context,workshop_purpose,supervisor_id,driver_name,recorded_at'
+  'id,movement_type,movement_context,workshop_purpose,supervisor_id,driver_name,recorded_at,exit_purpose'
 
 interface RecentMovementRow {
   id: string
   movement_type: MovementType
   movement_context: 'site' | 'workshop' | null
   workshop_purpose: 'maintenance' | 'parking' | null
+  /** A site exit's purpose (migration 0111); `null` for every other row. */
+  exit_purpose: string | null
   supervisor_id: string | null
   driver_name: string | null
   recorded_at: string
@@ -192,7 +196,16 @@ export function EquipmentDetail({
     {
       key: 'movement_type',
       header: t('movementType'),
-      cell: (log) => <MovementBadge type={log.movement_type} />,
+      // wave-12: a site exit also shows its purpose; nothing for an entry, a
+      // workshop row or an exit recorded before migration 0111.
+      cell: (log) => (
+        <span className="flex flex-wrap items-center gap-1">
+          <MovementBadge type={log.movement_type} />
+          {log.movement_type === 'exit' && (
+            <ExitPurposeBadge purpose={log.exit_purpose} />
+          )}
+        </span>
+      ),
     },
     {
       key: 'supervisor',

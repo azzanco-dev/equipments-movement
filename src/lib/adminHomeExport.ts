@@ -16,6 +16,7 @@
  */
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
+import { exitPurposeExportLabel } from '@/lib/exitPurpose'
 import type {
   FleetEquipmentRow,
   FleetMiniTableId,
@@ -200,6 +201,14 @@ export function fleetEquipmentExcelColumns(
       width: 16,
       value: (row) =>
         row.since ? formatDate(row.since) : t('adminHomeNeverMoved'),
+    },
+    {
+      // wave-12: why the unit left its project (migration 0118). Empty for a
+      // unit whose last movement was a workshop exit, one that never moved
+      // and an exit recorded before migration 0111.
+      header: t('exitPurpose'),
+      width: 14,
+      value: (row) => exitPurposeExportLabel(row.exitPurpose, t),
     },
     owner,
   ]

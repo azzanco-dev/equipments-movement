@@ -7,6 +7,7 @@ import {
   DRIVER_EMPLOYMENT_TYPES,
   DRIVER_NATIONALITIES,
 } from '@/lib/driverExcel'
+import { EXIT_PURPOSE_FILTER_FIELD } from '@/lib/exitPurpose'
 import {
   MOVEMENT_COMPANY_PROJECT_SEARCH_FIELDS,
   MOVEMENT_SEARCH_FIELDS,
@@ -534,6 +535,9 @@ export const logsListConfig: DataListConfig = {
         { value: 'parking', label: 'وقوف', labelI18n: 'parkingPurpose' },
       ],
     },
+    // The site exit purpose (`exit_purpose`, migration 0118): only site exits
+    // recorded since 0111 carry it.
+    EXIT_PURPOSE_FILTER_FIELD,
   ],
   sortableFields: [
     { key: 'recorded_at', label: { ar: 'وقت الحركة', en: 'Movement time' } },

@@ -12,6 +12,7 @@ import {
   Wrench,
 } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
+import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
 import {
   Badge,
   EmptyState,
@@ -290,13 +291,18 @@ function VisitSegment({
       key: 'exit',
       icon: <LogOut size={13} aria-hidden="true" />,
       label: t('exitTime'),
+      // wave-12: a site exit also shows its purpose; the badge renders
+      // nothing for a workshop exit or an exit recorded before migration 0111.
       value: (
-        <MovementTime
-          value={formatDateTime(exit.recorded_at)}
-          onClick={
-            onSelectMovement ? () => onSelectMovement(exit.id) : undefined
-          }
-        />
+        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <MovementTime
+            value={formatDateTime(exit.recorded_at)}
+            onClick={
+              onSelectMovement ? () => onSelectMovement(exit.id) : undefined
+            }
+          />
+          {!workshop && <ExitPurposeBadge purpose={exit.exit_purpose} />}
+        </span>
       ),
     })
   if (duration !== null)

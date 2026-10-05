@@ -7,6 +7,12 @@ import type {
   FilterOperator,
 } from '@/components/data-list/types'
 import type { ExcelColumn } from '@/lib/excel'
+import {
+  EXIT_PURPOSE_FILTER_FIELD,
+  exitPurposeExportLabel,
+  exitPurposeOrNull,
+  type ExitPurpose,
+} from '@/lib/exitPurpose'
 
 /**
  * `movement_visits` (migration 0096) is a `security_invoker` view with one
@@ -25,10 +31,11 @@ export const EQUIPMENT_VISITS_VIEW = 'movement_visits'
  * Only the columns the visits tables render, search or export.
  *
  * `contractor_equipment_code` was appended to the view by migration 0106, so
- * that migration must be applied before this select is shipped.
+ * that migration must be applied before this select is shipped. The same
+ * holds for `exit_purpose`, appended by migration 0118.
  */
 export const EQUIPMENT_VISITS_SELECT =
-  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code,equipment_ownership_status'
+  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code,equipment_ownership_status,exit_purpose'
 
 export interface EquipmentVisitRow {
   entry_id: string
@@ -58,6 +65,11 @@ export interface EquipmentVisitRow {
   contractor_equipment_code?: string | null
   /** The equipment's owner (`ownership_status`); exposed by the view since 0106. */
   equipment_ownership_status?: string | null
+  /**
+   * The purpose of the EXIT that closed the visit (migration 0118); `null`
+   * for an open visit, a workshop visit and an exit recorded before 0111.
+   */
+  exit_purpose?: ExitPurpose | null
 }
 
 /** Which visits a table lists; `all` applies no context predicate. */
@@ -253,6 +265,9 @@ export const adminVisitsListConfig: DataListConfig = {
         { value: 'parking', label: 'وقوف', labelI18n: 'parkingPurpose' },
       ],
     },
+    // The purpose of the EXIT that closed the visit (`exit_purpose`,
+    // migration 0118); an open or workshop visit never matches it.
+    EXIT_PURPOSE_FILTER_FIELD,
   ],
 }
 
@@ -300,6 +315,21 @@ export function visitStateView(
   return open
     ? { state: 'open', tone: 'success', labelKey: 'visitOpen' }
     : { state: 'closed', tone: 'neutral', labelKey: 'visitClosed' }
+}
+
+/**
+ * The purpose shown next to a visit's state: the purpose of the EXIT that
+ * closed it, only for a closed visit (the same reading as `visitStateView`).
+ * `null` for an open visit, a workshop visit and an exit without a purpose.
+ */
+export function visitExitPurpose(
+  visit: Pick<
+    EquipmentVisitRow,
+    'is_open' | 'exit_id' | 'exit_at' | 'exit_purpose'
+  >,
+): ExitPurpose | null {
+  if (visitStateView(visit).state !== 'closed') return null
+  return exitPurposeOrNull(visit.exit_purpose)
 }
 
 const ARABIC_UNITS = {
@@ -585,6 +615,13 @@ export function visitExportColumns(
       header: t('visitState'),
       width: 10,
       value: (row) => t(visitStateView(row).labelKey),
+    },
+    {
+      // Right after the state: the purpose of the EXIT that closed the visit,
+      // empty for an open, workshop or pre-0111 visit.
+      header: t('exitPurpose'),
+      width: 14,
+      value: (row) => exitPurposeExportLabel(visitExitPurpose(row), t),
     },
     {
       header: t('company'),
