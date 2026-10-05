@@ -542,3 +542,162 @@ textarea::placeholder {
   animation-duration: 300ms;
   animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+
+/* ===== Projects map (src/components/map) — start =====
+   Leaflet draws the markers and controls outside React, so they are styled
+   here with the approved tokens. Every selector starts with `.pm-map` (two
+   classes with `.leaflet-*`) so it wins over leaflet.css, which arrives later
+   in a lazily loaded chunk. Bubble colors follow the chart rule: a soft tint
+   with a darker border and readable text, never a saturated fill. */
+.pm-map.leaflet-container {
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 12px;
+}
+.pm-map.leaflet-container:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -3px;
+}
+.pm-map .pm-marker {
+  overflow: visible;
+}
+.pm-map .pm-marker:hover,
+.pm-map .pm-marker:focus-within {
+  /* Above every other marker (Leaflet sets z-index inline). */
+  z-index: 100001 !important;
+}
+.pm-map .pm-bubble {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 2px solid;
+  border-radius: 9999px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  pointer-events: auto;
+  /* A halo in the page color separates the bubble from busy streets. */
+  box-shadow: 0 0 0 2px var(--bg);
+  transition: box-shadow 0.15s ease;
+}
+.pm-map .pm-bubble--long {
+  font-size: 12px;
+}
+.pm-map .pm-bubble--project,
+.pm-swatch--project {
+  background-color: var(--success-soft);
+  border-color: var(--success);
+  color: var(--success);
+}
+/* The workshop is a rounded square as well as amber, so it never relies on
+   color alone. */
+.pm-map .pm-bubble--workshop,
+.pm-swatch--workshop {
+  background-color: var(--warning-soft);
+  border-color: var(--warning);
+  color: var(--warning);
+}
+.pm-map .pm-bubble--workshop {
+  border-radius: 30%;
+}
+.pm-swatch {
+  display: inline-block;
+  border: 2px solid;
+  border-radius: 9999px;
+}
+.pm-swatch--workshop {
+  border-radius: 3px;
+}
+.pm-map .pm-bubble:hover,
+.pm-map .pm-bubble.is-selected {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--fg);
+}
+.pm-map .pm-bubble:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+.pm-map .pm-label {
+  position: absolute;
+  inset-block-start: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 140px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--bg);
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 500;
+  /* Roomy line height keeps Arabic descenders unclipped. */
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow-x: clip;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.pm-map .pm-label-hidden .pm-label {
+  visibility: hidden;
+}
+.pm-map .pm-marker:hover .pm-label,
+.pm-map .pm-marker:focus-within .pm-label {
+  visibility: visible;
+}
+.pm-map.leaflet-container .leaflet-bar {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: none;
+  overflow: hidden;
+}
+.pm-map.leaflet-container .leaflet-bar a,
+.pm-map.leaflet-container .pm-reset-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background-color: var(--bg);
+  color: var(--fg);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.pm-map.leaflet-container .leaflet-bar a:last-child,
+.pm-map.leaflet-container .pm-reset-button:last-child {
+  border-bottom: 0;
+}
+.pm-map.leaflet-container .leaflet-bar a:hover,
+.pm-map.leaflet-container .leaflet-bar a:focus-visible,
+.pm-map.leaflet-container .pm-reset-button:hover,
+.pm-map.leaflet-container .pm-reset-button:focus-visible {
+  background-color: var(--surface-hover);
+}
+.pm-map.leaflet-container .leaflet-bar a.leaflet-disabled {
+  background-color: var(--surface);
+  color: var(--muted);
+}
+.pm-map.leaflet-container .leaflet-bar a:focus-visible,
+.pm-map.leaflet-container .pm-reset-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.pm-map.leaflet-container .leaflet-control-attribution {
+  background-color: var(--bg);
+  color: var(--muted);
+  font-size: 11px;
+}
+.pm-map.leaflet-container .leaflet-control-attribution a {
+  color: var(--fg);
+}
+/* ===== Projects map — end ===== */
