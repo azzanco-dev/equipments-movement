@@ -18,12 +18,12 @@ import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import type { FilterBarAsyncField } from '@/components/data-list/FilterBar'
 import { FilterButton } from '@/components/data-list/FilterButton'
-import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
 import type { DataListConfig } from '@/components/data-list/types'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
+import { exitPurposeLabelKey } from '@/lib/exitPurpose'
 import { unwrapRows } from '@/lib/supabaseResult'
 import {
   EQUIPMENT_VISITS_SELECT,
@@ -379,17 +379,24 @@ export function VisitsTable({
     const state: DataTableColumn<EquipmentVisitRow> = {
       key: 'is_open',
       header: t('visitState'),
-      width: '6rem',
+      width: '9rem',
       cell: (visit) => {
         const view = visitStateView(visit)
         // wave-12: a closed site visit also says why it left (migration
-        // 0118); an open, workshop or older visit shows the state alone.
-        const purpose = visitExitPurpose(visit)
+        // 0118), inside the same badge (owner decision 2026-10-05); an open,
+        // workshop or older visit shows the state alone.
+        const purposeKey = exitPurposeLabelKey(visitExitPurpose(visit))
         return (
-          <span className="flex flex-col items-start gap-1">
-            <Badge tone={view.tone}>{t(view.labelKey)}</Badge>
-            {purpose && <ExitPurposeBadge purpose={purpose} />}
-          </span>
+          <Badge tone={view.tone} className="whitespace-nowrap">
+            {t(view.labelKey)}
+            {purposeKey && (
+              <>
+                <span aria-hidden="true"> · </span>
+                <span className="sr-only">, {t('exitPurpose')}: </span>
+                {t(purposeKey)}
+              </>
+            )}
+          </Badge>
         )
       },
     }
