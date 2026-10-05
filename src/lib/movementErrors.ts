@@ -14,6 +14,8 @@ export const MOVEMENT_ERROR_CODES = [
   // wave-10-exit-purpose (migration 0111)
   'exit_purpose_required',
   'invalid_exit_purpose',
+  // wave-13-drivers (migration 0120): a site entry needs its driver.
+  'site_entry_driver_required',
   'workshop_exit_owner',
   'invalid_sequence',
   'access_denied',
@@ -25,6 +27,9 @@ export type MovementErrorCode = (typeof MOVEMENT_ERROR_CODES)[number]
 export function movementErrorCode(message: string): MovementErrorCode {
   if (message.includes('movement time cannot be in the future'))
     return 'future_time'
+  // wave-13-drivers (migration 0120): checked before the older driver text.
+  if (message.includes('site_entry_driver_required'))
+    return 'site_entry_driver_required'
   if (message.includes('company_id is required')) return 'company_required'
   if (message.includes('project_id is required')) return 'project_required'
   if (
@@ -61,9 +66,14 @@ export function movementErrorCode(message: string): MovementErrorCode {
 }
 
 // Closing somebody else's visit is a permission failure (403), not a state
-// conflict (409). A missing or unknown exit purpose is invalid input (400).
+// conflict (409). A missing or unknown exit purpose, and a site entry without
+// a driver, are invalid input (400).
 export function movementErrorStatus(code: MovementErrorCode): number {
-  if (code === 'exit_purpose_required' || code === 'invalid_exit_purpose')
+  if (
+    code === 'exit_purpose_required' ||
+    code === 'invalid_exit_purpose' ||
+    code === 'site_entry_driver_required'
+  )
     return 400
   return code === 'exit_not_entry_owner' ||
     code === 'exit_equipment_in_workshop' ||

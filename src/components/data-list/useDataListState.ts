@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { listFiltersFromParam, listFiltersParam } from './listFilterState'
 import type { DataListConfig, ListFilter } from './types'
 
 const validSizes = new Set([20, 50, 100, 200, 350, 500])
@@ -28,28 +29,17 @@ export function useDataListState(config: DataListConfig, prefix = '') {
       : params.get(key('dir')) === 'asc'
         ? 'asc'
         : (config.defaultDirection ?? 'asc')
-  const serializedFilters = params.get(key('filters')) ?? '[]'
-  const filters = useMemo<ListFilter[]>(() => {
-    try {
-      const value = JSON.parse(serializedFilters) as ListFilter[]
-      if (!Array.isArray(value)) return []
-      return value.filter(
-        (filter) =>
-          filter &&
-          typeof filter.id === 'string' &&
-          typeof filter.value === 'string' &&
-          (filter.valueTo === undefined ||
-            typeof filter.valueTo === 'string') &&
-          config.filterFields.some(
-            (field) =>
-              field.key === filter.field &&
-              field.operators.includes(filter.operator),
-          ),
-      )
-    } catch {
-      return []
-    }
-  }, [serializedFilters, config.filterFields])
+  // `null` (no parameter) is a fresh visit: the config's defaults apply.
+  const serializedFilters = params.get(key('filters'))
+  const { filterFields, defaultFilters } = config
+  const filters = useMemo<ListFilter[]>(
+    () =>
+      listFiltersFromParam(serializedFilters, {
+        filterFields,
+        defaultFilters,
+      }),
+    [serializedFilters, filterFields, defaultFilters],
+  )
 
   const update = useCallback(
     (values: Record<string, string | number | null>) => {
@@ -106,9 +96,12 @@ export function useDataListState(config: DataListConfig, prefix = '') {
       update({ [key('sort')]: field, [key('dir')]: dir, [key('page')]: 1 }),
     setFilters: (value: ListFilter[]) =>
       update({
-        [key('filters')]: value.length ? JSON.stringify(value) : null,
+        [key('filters')]: listFiltersParam(value, config),
         [key('page')]: 1,
       }),
+    // Resets the list to a fresh visit, defaults included. No screen calls it
+    // today; removing filters goes through `setFilters`, which keeps an
+    // explicit empty list so a removed default stays removed.
     clear: () => {
       pendingSearch.current = false
       setSearchInput('')

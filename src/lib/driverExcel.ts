@@ -9,6 +9,18 @@ export const DRIVER_NATIONALITIES = [
   'بنجلاديش',
   'السودان',
 ] as const
+/**
+ * wave-13-drivers: drivers of external-supplier equipment. Quick Create in the
+ * movement form gives it to a NEW driver when the selected equipment's owner
+ * is the external supplier (decided in `quick_create_driver`, migration 0119),
+ * and the drivers list hides these drivers by default.
+ */
+export const EXTERNAL_SUPPLIER_EMPLOYMENT_TYPE = 'مورد خارجي'
+
+/**
+ * Must match the `drivers.employment_type` CHECK constraint exactly (0033,
+ * widened by 0119). The extracting module keeps its own list.
+ */
 export const DRIVER_EMPLOYMENT_TYPES = [
   'العزاني',
   'تكوين',
@@ -16,6 +28,7 @@ export const DRIVER_EMPLOYMENT_TYPES = [
   'البدراني',
   'امدادات العربة',
   'نقدي',
+  EXTERNAL_SUPPLIER_EMPLOYMENT_TYPE,
 ] as const
 
 export type DriverImportRow = {

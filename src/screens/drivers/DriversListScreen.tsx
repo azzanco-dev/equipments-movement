@@ -26,6 +26,14 @@ import { DriversTable } from './DriversTable'
 const LIST_SELECT =
   'id,full_name,name_en,id_number,mobile_number,nationality,employment_type,job_title,created_at,updated_at'
 
+// wave-13-drivers: "all except the external supplier" (the list's default
+// filter) must keep the drivers whose employment type is still empty.
+const KEEP_EMPTY_ON_NEGATION = new Set(
+  driversListConfig.filterFields
+    .filter((field) => field.negationKeepsEmpty)
+    .map((field) => field.key),
+)
+
 export interface DriversListScreenProps {
   /**
    * Kept for compatibility with `src/App.tsx`, which still passes a
@@ -77,6 +85,7 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
       query,
       list.filters,
       new Set(driversListConfig.filterFields.map((field) => field.key)),
+      KEEP_EMPTY_ON_NEGATION,
     )
     const { data, error, count } = await query.abortSignal(signal)
     if (signal.aborted) return

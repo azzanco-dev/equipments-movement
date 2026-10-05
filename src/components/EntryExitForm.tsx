@@ -85,9 +85,10 @@ import {
  * The movement fields validated on save. `photos` is not a `Field`, so the
  * photos section is wrapped in its own `data-field` container.
  *
- * The driver is deliberately absent: since the owner decision of 2026-09-23 a
- * site ENTRY may be registered without one (migration 0103 removed the
- * database requirement too), so there is nothing left to validate about it.
+ * wave-13-drivers (owner decision 2026-10-05, reversing 2026-09-23): every
+ * SITE entry needs a driver again. The API refuses a site entry without one
+ * (`site_entry_driver_required`) and the database rule follows in migration
+ * 0120 once this form is live. Workshop movements never carry a driver.
  *
  * `exit_purpose` is required on a SITE exit only (wave-10-exit-purpose,
  * migration 0111); the workshop form and every ENTRY never show it.
@@ -95,6 +96,7 @@ import {
 interface MovementFields {
   company: string
   project: string
+  driver: string
   exit_purpose: string
   recorded_at: string
   photos: string
@@ -103,6 +105,7 @@ interface MovementFields {
 const MOVEMENT_FIELD_ORDER = [
   'company',
   'project',
+  'driver',
   'exit_purpose',
   'recorded_at',
   'photos',
@@ -463,6 +466,10 @@ export function EntryExitForm({
     const { data, error } = await supabase.rpc('quick_create_driver', {
       p_full_name: quickDriver.fullName.trim(),
       p_mobile_number: quickDriver.mobile.trim(),
+      // wave-13-drivers (migration 0119): the database reads this unit's
+      // owner and gives a NEW driver the «مورد خارجي» employment type when
+      // it is the external supplier. An existing driver is returned as is.
+      p_equipment_id: selected?.id ?? null,
     })
     setQuickSaving(false)
     if (error || !data) {
@@ -470,6 +477,7 @@ export function EntryExitForm({
       return
     }
     const driver = data as Driver
+    clearMovementErrors('driver')
     setDriverId(driver.id)
     setSelectedDriver(driverOption(driver))
     setQuickDriver(EMPTY_QUICK_DRIVER)
@@ -545,9 +553,10 @@ export function EntryExitForm({
         siteEntry && !selectedCompanyId ? 'companyRequiredForEntry' : undefined,
       project:
         siteEntry && !selectedProjectId ? 'projectRequiredForEntry' : undefined,
+      // wave-13-drivers: required on every site entry again (2026-10-05).
+      driver: siteEntry && !driverId ? 'driverRequired' : undefined,
       exit_purpose:
         siteExitMode && !exitPurpose ? 'exitPurposeRequired' : undefined,
-      // No driver rule: a site ENTRY may be saved without one (2026-09-23).
       recorded_at: !recordedAt.trim()
         ? 'movementDateRequired'
         : isNaN(movementInstant.getTime()) ||
@@ -593,8 +602,7 @@ export function EntryExitForm({
       if (uploadBatchIds.length) payload.upload_batch_ids = uploadBatchIds
       if (notes) payload.notes = notes
       if (!workshopMode && isEntry) {
-        // Optional since 2026-09-23: an empty selection is left out of the
-        // payload entirely rather than sent as an empty string.
+        // Required on a site entry (wave-13-drivers); validated above.
         if (driverId) payload.driver_id = driverId
         if (selectedCompanyId) payload.company_id = selectedCompanyId
         if (selectedProjectId) payload.project_id = selectedProjectId
@@ -900,15 +908,21 @@ export function EntryExitForm({
 
               {/* Site EXIT has no driver field: the exit inherits the latest
                   current driver of the open visit server-side. */}
-              {/* The driver is optional on a site ENTRY since 2026-09-23, so
-                  the field carries no required mark and no save rule. */}
+              {/* wave-13-drivers: required on every site ENTRY again
+                  (2026-10-05); Quick Create stays available. */}
               {!workshopMode && isEntry && (
-                <Field label={t('driverName')} name="driver">
+                <Field
+                  label={t('driverName')}
+                  name="driver"
+                  required
+                  error={movementErrors.driver && t(movementErrors.driver)}
+                >
                   {() => (
                     <AsyncSearchSelect
                       value={driverId}
                       selectedOption={selectedDriver}
                       onChange={(value, option) => {
+                        clearMovementErrors('driver')
                         setDriverId(value)
                         setSelectedDriver(option)
                       }}

@@ -68,6 +68,8 @@ export function validateMovementEdit(
   values: MovementEditValues,
   context: 'site' | 'workshop',
   now: Date = new Date(),
+  /** wave-13-drivers: see `movementEditKeepsDriver`. */
+  keepDriver = false,
 ): FieldErrors<MovementEditValues> {
   const site = context === 'site'
   const date = values.movement_date.trim()
@@ -95,6 +97,10 @@ export function validateMovementEdit(
       site &&
       values.contractor_code.trim().length > MOVEMENT_CONTRACTOR_CODE_MAX_LENGTH
         ? 'contractorCodeTooLong'
+        : undefined,
+    driver_id:
+      keepDriver && !values.driver_id.trim()
+        ? 'movementEditDriverRequired'
         : undefined,
     notes: isValidMovementNotes(values.notes)
       ? undefined
@@ -143,6 +149,27 @@ export function movementEditUnchanged(
     (!values.driver_id || same('driver_id')) &&
     normalizeMovementNotes(values.notes) ===
       normalizeMovementNotes(initial.notes)
+  )
+}
+
+/**
+ * wave-13-drivers (owner decision 2026-10-05): a SITE entry that has a driver
+ * must keep one in the correction dialog. The database never removes a driver
+ * (`admin_update_movement` treats NULL as "keep", and
+ * `change_active_movement_driver` needs a real driver), so clearing the field
+ * used to be dropped silently; it is now refused with a field message. A
+ * legacy driverless entry is not forced to get one: the admin may still
+ * correct its other fields, and may add a driver.
+ */
+export function movementEditKeepsDriver(params: {
+  movementType: string
+  movementContext: string | null | undefined
+  currentDriverId: string | null | undefined
+}): boolean {
+  return (
+    params.movementType === 'entry' &&
+    (params.movementContext ?? 'site') === 'site' &&
+    Boolean(params.currentDriverId)
   )
 }
 

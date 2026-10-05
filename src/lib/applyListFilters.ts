@@ -11,16 +11,36 @@ type QueryLike = {
   lt: (column: string, value: string) => QueryLike
   gte: (column: string, value: string) => QueryLike
   lte: (column: string, value: string) => QueryLike
+  or: (filters: string) => QueryLike
 }
 
+/**
+ * A value inside a PostgREST logic tree (`or=(...)`), always double-quoted so
+ * a space, comma, period or parenthesis in it cannot change the expression.
+ */
+export function logicTreeValue(value: string): string {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+}
+
+/**
+ * Applies the allowlisted list filters to a PostgREST query.
+ *
+ * `keepEmptyOnNegation` (wave-13-drivers) names the fields whose `neq` /
+ * `not_in` must also keep NULL rows (see `FilterField.negationKeepsEmpty`):
+ * they become `or=(field.is.null,field.neq."value")`. Several `or` parameters
+ * on one request are combined with AND by PostgREST, so this composes with
+ * the list's search `or`.
+ */
 export function applyListFilters<T>(
   source: T,
   filters: ListFilter[],
   allowedFields: Set<string>,
+  keepEmptyOnNegation: ReadonlySet<string> = new Set(),
 ): T {
   let query = source as unknown as QueryLike
   for (const filter of filters) {
     if (!allowedFields.has(filter.field)) continue
+    const keepEmpty = keepEmptyOnNegation.has(filter.field)
     const values = filter.value
       .split(',')
       .map((value) => value.trim())
@@ -32,13 +52,21 @@ export function applyListFilters<T>(
         query = query.eq(filter.field, filter.value)
         break
       case 'neq':
-        query = query.neq(filter.field, filter.value)
+        query = keepEmpty
+          ? query.or(
+              `${filter.field}.is.null,${filter.field}.neq.${logicTreeValue(filter.value)}`,
+            )
+          : query.neq(filter.field, filter.value)
         break
       case 'in':
         query = query.in(filter.field, values)
         break
       case 'not_in':
-        query = query.not(filter.field, 'in', `(${values.join(',')})`)
+        query = keepEmpty
+          ? query.or(
+              `${filter.field}.is.null,${filter.field}.not.in.(${values.map(logicTreeValue).join(',')})`,
+            )
+          : query.not(filter.field, 'in', `(${values.join(',')})`)
         break
       case 'like':
         query = query.ilike(filter.field, `%${filter.value}%`)

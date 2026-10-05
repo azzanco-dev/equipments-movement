@@ -100,6 +100,16 @@ export async function POST(request: Request) {
         { status: 400 },
       )
     }
+    // wave-13-drivers (owner decision 2026-10-05): every SITE entry names its
+    // driver again. Workshop movements never carry one. The database rule
+    // follows in migration 0120, applied once this route and form are live.
+    const isSiteEntry = movementType === 'entry' && movementContext === 'site'
+    if (isSiteEntry && !value('driver_id')) {
+      return NextResponse.json(
+        { error: 'site_entry_driver_required' },
+        { status: 400 },
+      )
+    }
 
     // Each staged photo is its own batch, so a movement can carry several.
     const uploadBatchIds: string[] = []
@@ -241,8 +251,9 @@ export async function POST(request: Request) {
       notes: value('notes'),
     }
     // `driver_name` is never taken from the client: the sequence trigger
-    // (migration 0108) snapshots it from `driver_id`, and a driverless entry
-    // stores NULL in both columns.
+    // (migration 0108) snapshots it from `driver_id`. A site entry always
+    // has a `driver_id` here (checked above); a workshop row is cleared by
+    // the trigger.
     if (movementType === 'entry') {
       payload.driver_id = value('driver_id')
       payload.company_id = value('company_id')

@@ -48,12 +48,36 @@ export type FilterOption = {
   labelI18n?: ListLabel
 }
 
+/**
+ * wave-13-drivers: one entry of an option field's select that stands for a
+ * whole filter (operator and value), not just a value, e.g. "all except an
+ * external supplier" (`neq`). `FilterBar` lists it after "All" and shows it as
+ * the selected entry while the matching filter is active, so a negative
+ * filter never reads like an "equals" one. The operator must be allowlisted on
+ * the field.
+ */
+export type FilterChoice = {
+  key: string
+  operator: FilterOperator
+  value: string
+  label: ListLabel
+}
+
 export type FilterField = {
   key: string
   label: ListLabel
   type: 'text' | 'number' | 'date' | 'boolean' | 'select'
   operators: FilterOperator[]
   options?: FilterOption[]
+  /** Whole-filter entries of a single-value option select; see `FilterChoice`. */
+  choices?: FilterChoice[]
+  /**
+   * wave-13-drivers: `neq` and `not_in` also keep the rows where the column is
+   * NULL (SQL `IS DISTINCT FROM`), instead of PostgREST's plain `<>`, which
+   * drops them. Used where an empty value means "not set yet" and must stay
+   * visible under "everything except X".
+   */
+  negationKeepsEmpty?: boolean
   /**
    * Several values at once: the filter dialog renders a multi-select and
    * emits the `in` operator with the ids joined by commas (the field must
@@ -79,5 +103,14 @@ export type DataListConfig = {
   pageSizeOptions?: readonly number[]
   defaultSort: string
   defaultDirection?: 'asc' | 'desc'
+  /**
+   * wave-13-drivers: filters applied while the URL carries no `filters`
+   * parameter (a fresh visit). They are ordinary, visible filters: the
+   * toolbar counts them and the filter dialog shows and removes them. Once
+   * the user changes the filters the URL always holds the explicit list
+   * (`[]` when everything was removed), so a cleared default stays cleared
+   * on the next render and after Back. See `listFilterState.ts`.
+   */
+  defaultFilters?: ListFilter[]
   bulkActions?: { key: string; label: string; icon?: ReactNode }[]
 }

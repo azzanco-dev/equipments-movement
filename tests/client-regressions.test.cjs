@@ -1,8 +1,27 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
+const path = require('node:path')
 const vm = require('node:vm')
 const ts = require('typescript')
+
+function plainModule(from, request) {
+  const target = path.join(path.dirname(from), `${request}.ts`)
+  const exports = {}
+  vm.runInNewContext(
+    ts.transpileModule(fs.readFileSync(target, 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS },
+    }).outputText,
+    {
+      exports,
+      require(name) {
+        throw new Error(`Unexpected module: ${name}`)
+      },
+    },
+    { filename: target },
+  )
+  return exports
+}
 
 // Small deterministic hook scheduler: exercises the actual modules with fake
 // navigation/auth boundaries, without network calls or production test records.
@@ -84,6 +103,9 @@ function harness(file, dependencies = {}) {
         if (name === 'react') return hooks
         if (name === 'react/jsx-runtime') return { jsx: (_, props) => props }
         if (name in dependencies) return dependencies[name]
+        // A sibling module of plain helpers (no imports of its own at run
+        // time), e.g. `./listFilterState` of the list state hook.
+        if (name.startsWith('./')) return plainModule(file, name)
         throw new Error(`Unexpected module: ${name}`)
       },
     },
@@ -191,6 +213,82 @@ test('malformed filter values and fractional/infinite page values are rejected',
     assert.equal(state.filters[0].id, 'good')
     app.unmount()
   }
+})
+
+test('a default filter applies on a fresh visit, and a removed default stays removed', () => {
+  // wave-13-drivers: the drivers list hides «مورد خارجي» by default.
+  const defaultFilter = {
+    id: 'default',
+    field: 'name',
+    operator: 'neq',
+    value: 'x',
+  }
+  const withDefault = {
+    ...config,
+    filterFields: [{ key: 'name', operators: ['eq', 'neq'] }],
+    defaultFilters: [defaultFilter],
+  }
+  let params = new URLSearchParams('')
+  const app = harness('src/components/data-list/useDataListState.ts', {
+    'next/navigation': {
+      usePathname: () => '/drivers',
+      useSearchParams: () => params,
+    },
+    window: {
+      history: {
+        replaceState(_, __, url) {
+          params = new URLSearchParams(url.split('?')[1] ?? '')
+        },
+      },
+    },
+  })
+  let state = app.start((module) => module.useDataListState(withDefault))
+  // Fresh visit: the default is an ordinary, visible filter.
+  assert.deepEqual(JSON.parse(JSON.stringify(state.filters)), [defaultFilter])
+  assert.equal(params.get('filters'), null)
+  // Removing it writes an explicit empty list, so it does not come back.
+  state.setFilters([])
+  state = app.render()
+  assert.equal(params.get('filters'), '[]')
+  assert.equal(state.filters.length, 0)
+  state = app.render()
+  assert.equal(state.filters.length, 0)
+  // Back to a URL that still holds the cleared state: still cleared.
+  params = new URLSearchParams('filters=%5B%5D&page=2')
+  state = app.render()
+  assert.equal(state.filters.length, 0)
+  // Another filter is kept as written, without the default.
+  const other = { id: 'o', field: 'name', operator: 'eq', value: 'y' }
+  state.setFilters([other])
+  state = app.render()
+  assert.deepEqual(JSON.parse(params.get('filters')), [other])
+  // A reset (no parameter) is a fresh visit again.
+  state.clear()
+  state = app.render()
+  assert.equal(params.get('filters'), null)
+  assert.equal(state.filters[0].id, 'default')
+  app.unmount()
+
+  // A list without defaults keeps removing the parameter.
+  let plainParams = new URLSearchParams('filters=%5B%5D')
+  const plain = harness('src/components/data-list/useDataListState.ts', {
+    'next/navigation': {
+      usePathname: () => '/logs',
+      useSearchParams: () => plainParams,
+    },
+    window: {
+      history: {
+        replaceState(_, __, url) {
+          plainParams = new URLSearchParams(url.split('?')[1] ?? '')
+        },
+      },
+    },
+  })
+  const plainState = plain.start((module) => module.useDataListState(config))
+  plainState.setFilters([])
+  plain.render()
+  assert.equal(plainParams.get('filters'), null)
+  plain.unmount()
 })
 
 test('new list requests abort earlier work and unmount aborts remaining work', () => {

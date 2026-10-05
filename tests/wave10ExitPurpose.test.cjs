@@ -282,7 +282,11 @@ test('the form shows a required purpose select on site exits only', () => {
     form,
     /exit_purpose:\s+siteExitMode && !exitPurpose \? 'exitPurposeRequired' : undefined,/,
   )
-  assert.match(form, /'project',\s+'exit_purpose',\s+'recorded_at',/)
+  // wave 13 put the (again required) driver between project and purpose.
+  assert.match(
+    form,
+    /'project',\s+'driver',\s+'exit_purpose',\s+'recorded_at',/,
+  )
   assert.match(
     form,
     /if \(siteExitMode && exitPurpose\) payload\.exit_purpose = exitPurpose/,

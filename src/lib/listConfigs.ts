@@ -6,6 +6,7 @@ import type {
 import {
   DRIVER_EMPLOYMENT_TYPES,
   DRIVER_NATIONALITIES,
+  EXTERNAL_SUPPLIER_EMPLOYMENT_TYPE,
 } from '@/lib/driverExcel'
 import { EXIT_PURPOSE_FILTER_FIELD } from '@/lib/exitPurpose'
 import {
@@ -74,12 +75,34 @@ export const driversListConfig: DataListConfig = {
       type: 'select',
       operators: ['eq', 'neq', 'in', 'not_in', 'is_set', 'is_not_set'],
       options: select(DRIVER_EMPLOYMENT_TYPES),
+      // wave-13-drivers: "all except the external supplier", the default
+      // below. A driver with no employment type yet stays visible under it.
+      choices: [
+        {
+          key: 'not_external_supplier',
+          operator: 'neq',
+          value: EXTERNAL_SUPPLIER_EMPLOYMENT_TYPE,
+          label: 'driversExceptExternalSupplier',
+        },
+      ],
+      negationKeepsEmpty: true,
     },
     {
       key: 'job_title',
       label: 'jobTitle',
       type: 'text',
       operators: textOps,
+    },
+  ],
+  // wave-13-drivers (owner decision 2026-10-05): the drivers of external
+  // supplier equipment are hidden on a fresh visit. It is an ordinary filter:
+  // counted on the Filters button, shown and removable in the filter dialog.
+  defaultFilters: [
+    {
+      id: 'default-employment-type',
+      field: 'employment_type',
+      operator: 'neq',
+      value: EXTERNAL_SUPPLIER_EMPLOYMENT_TYPE,
     },
   ],
   sortableFields: [

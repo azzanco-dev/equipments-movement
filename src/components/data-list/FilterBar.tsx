@@ -26,10 +26,14 @@ import {
 } from '@/lib/saudiTime'
 import { AsyncMultiSelect } from './AsyncMultiSelect'
 import { useListLabel, useOptionLabel } from './labels'
+import { matchingFilterChoice } from './listFilterState'
 import type { FilterField, FilterOperator, ListFilter } from './types'
 
 /** Radix reserves '' for "no value", so "any value" needs a sentinel. */
 const ANY_VALUE = '__any__'
+
+/** Select value of a `FilterChoice`; never a real option value. */
+const CHOICE_PREFIX = '__choice__:'
 
 /** Same pause as the list search box before a typed filter reaches the URL. */
 const TEXT_DEBOUNCE_MS = 300
@@ -569,15 +573,32 @@ export function FilterBar({
         />
       )
 
-    if (field.options?.length)
+    if (field.options?.length) {
+      // wave-13-drivers: a whole-filter entry ("all except ...") is shown as
+      // itself while its filter is active, never as the bare value.
+      const choice = matchingFilterChoice(field, filter)
       return (
         <Select
           {...wiring}
           size="sm"
-          value={value || ANY_VALUE}
-          onValueChange={(next) => apply(field, next === ANY_VALUE ? '' : next)}
+          value={choice ? CHOICE_PREFIX + choice.key : value || ANY_VALUE}
+          onValueChange={(next) => {
+            const picked = field.choices?.find(
+              (entry) => CHOICE_PREFIX + entry.key === next,
+            )
+            if (picked)
+              setFilter(field, {
+                operator: picked.operator,
+                value: picked.value,
+              })
+            else apply(field, next === ANY_VALUE ? '' : next)
+          }}
           options={[
             { value: ANY_VALUE, label: t('all') },
+            ...(field.choices ?? []).map((entry) => ({
+              value: CHOICE_PREFIX + entry.key,
+              label: fieldLabel(entry.label),
+            })),
             ...field.options.map((option) => ({
               value: option.value,
               label: optionLabel(option),
@@ -585,6 +606,7 @@ export function FilterBar({
           ]}
         />
       )
+    }
 
     return (
       <TextFilterControl

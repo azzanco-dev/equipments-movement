@@ -741,6 +741,11 @@ export const translations = {
     exitPurposeRequired: 'اختر غرض الخروج.',
     exitPurposeInvalid: 'غرض الخروج غير صالح. اختره من القائمة.',
     // wave-10-exit-purpose — end
+    // wave-13-drivers — start
+    driversExceptExternalSupplier: 'الكل عدا مورد خارجي',
+    movementEditDriverRequired:
+      'لا يمكن ترك سائق دخول المشروع فارغا. اختر سائقا.',
+    // wave-13-drivers — end
     // wave-10-code-history — start
     previousCodesLabel: 'ارقام سابقة:',
     previousCodeUntil: 'حتى {date}',
@@ -2107,6 +2112,11 @@ export const translations = {
     exitPurposeInvalid:
       'The purpose of exit is not valid. Select it from the list.',
     // wave-10-exit-purpose — end
+    // wave-13-drivers — start
+    driversExceptExternalSupplier: 'All except external supplier',
+    movementEditDriverRequired:
+      'A project entry cannot be left without a driver. Select a driver.',
+    // wave-13-drivers — end
     // wave-10-code-history — start
     previousCodesLabel: 'Previous codes:',
     previousCodeUntil: 'until {date}',

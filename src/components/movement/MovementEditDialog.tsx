@@ -26,6 +26,7 @@ import {
   buildMovementEditPayload,
   localDateKey,
   movementAdminErrorKey,
+  movementEditKeepsDriver,
   movementEditUnchanged,
   validateMovementEdit,
   type MovementDriverEditMode,
@@ -248,10 +249,19 @@ export function MovementEditDialog({
     [loadNamed],
   )
 
-  const unchanged = movementEditUnchanged(values, initial)
+  // wave-13-drivers: a site entry with a driver cannot be saved without one.
+  // Clearing it enables Save so the field message can explain why, instead of
+  // the database silently keeping the driver.
+  const keepDriver = movementEditKeepsDriver({
+    movementType: movement.movement_type,
+    movementContext: movement.movement_context,
+    currentDriverId: initial.driver_id,
+  })
+  const driverCleared = keepDriver && !values.driver_id.trim()
+  const unchanged = movementEditUnchanged(values, initial) && !driverCleared
 
   const save = async () => {
-    const invalid = validateMovementEdit(values, context)
+    const invalid = validateMovementEdit(values, context, undefined, keepDriver)
     if (hasErrors(invalid)) {
       setErrors(invalid)
       setError(null)
@@ -489,6 +499,7 @@ export function MovementEditDialog({
             <Field
               label={t('driverName')}
               name="driver_id"
+              required={keepDriver}
               error={fieldError('driver_id')}
               className="sm:col-span-2"
             >

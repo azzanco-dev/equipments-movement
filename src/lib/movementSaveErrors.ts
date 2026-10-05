@@ -16,6 +16,8 @@ const MOVEMENT_SAVE_ERROR_KEYS: Record<string, TranslationKey> = {
   // wave-10-exit-purpose (migration 0111)
   exit_purpose_required: 'exitPurposeRequired',
   invalid_exit_purpose: 'exitPurposeInvalid',
+  // wave-13-drivers (migration 0120)
+  site_entry_driver_required: 'driverRequired',
   workshop_exit_owner: 'workshopExitOwner',
   invalid_photos: 'invalidPhotoType',
   photo_required: 'workshopPhotoRequired',
