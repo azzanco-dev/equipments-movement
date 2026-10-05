@@ -5,7 +5,6 @@ import {
   Badge,
   Button,
   DataTable,
-  MovementBadge,
   Notice,
   PageHeader,
   Tabs,
@@ -19,7 +18,7 @@ import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import type { FilterBarAsyncField } from '@/components/data-list/FilterBar'
 import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
-import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
+import { MovementTypeBadge } from '@/components/movement/ExitPurposeBadge'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
@@ -358,16 +357,14 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
       key: 'movement_type',
       header: t('movementType'),
       sortable: true,
-      width: '7rem',
-      // wave-12: a site exit also shows its purpose; nothing for an entry, a
-      // workshop row or an exit recorded before migration 0111.
+      width: '9rem',
+      // wave-12: a site exit also shows its purpose, inside the same badge;
+      // nothing extra for an entry, a workshop row or an exit before 0111.
       cell: (row) => (
-        <span className="flex flex-col items-start gap-1">
-          <MovementBadge type={row.movement_type} />
-          {row.movement_type === 'exit' && (
-            <ExitPurposeBadge purpose={row.exit_purpose} />
-          )}
-        </span>
+        <MovementTypeBadge
+          type={row.movement_type}
+          exitPurpose={row.exit_purpose}
+        />
       ),
     },
     {

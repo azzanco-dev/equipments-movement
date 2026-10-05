@@ -5,7 +5,6 @@ import { useI18n } from '@/i18n/I18nContext'
 import { useAuth } from '@/auth/AuthContext'
 import {
   DataTable,
-  MovementBadge,
   SearchInput,
   Select,
   WorkshopPurposeBadge,
@@ -20,7 +19,7 @@ import {
 } from '@/components/ui'
 import { Card, SectionHeader } from '@/components/ui/Card'
 import { HomeVisitsTable } from '@/components/home/HomeVisitsCard'
-import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
+import { MovementTypeBadge } from '@/components/movement/ExitPurposeBadge'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { formatDate } from '@/lib/dateFormat'
 import { isDateKey, saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
@@ -239,16 +238,15 @@ function MovementLogTab({
     const status: DataTableColumn<EntryExitLog> = {
       key: 'movement_type',
       header: t('movementType'),
-      width: '6rem',
-      // wave-12: a site exit also shows its purpose (migration 0118); the
-      // badge renders nothing for an entry, a workshop row or an older exit.
+      width: '9rem',
+      // wave-12: a site exit also shows its purpose (migration 0118), inside
+      // the same badge; nothing extra for an entry, a workshop row or an
+      // older exit.
       cell: (log) => (
-        <span className="flex flex-col items-start gap-1">
-          <MovementBadge type={log.movement_type} />
-          {log.movement_type === 'exit' && (
-            <ExitPurposeBadge purpose={log.exit_purpose} />
-          )}
-        </span>
+        <MovementTypeBadge
+          type={log.movement_type}
+          exitPurpose={log.exit_purpose}
+        />
       ),
     }
     const recorded: DataTableColumn<EntryExitLog> = {

@@ -41,14 +41,13 @@ import {
   ErrorState,
   InfoGridSection,
   MiniTable,
-  MovementBadge,
   Skeleton,
   type DataTableColumn,
   type InfoGridItem,
 } from '@/components/ui'
 import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
 import { PreviousCodesLine } from '@/components/inquiry/PreviousCodes'
-import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
+import { MovementTypeBadge } from '@/components/movement/ExitPurposeBadge'
 import {
   EQUIPMENT_CODE_CHANGES_LIMIT,
   EQUIPMENT_CODE_CHANGE_SELECT,
@@ -196,15 +195,13 @@ export function EquipmentDetail({
     {
       key: 'movement_type',
       header: t('movementType'),
-      // wave-12: a site exit also shows its purpose; nothing for an entry, a
-      // workshop row or an exit recorded before migration 0111.
+      // wave-12: a site exit also shows its purpose, inside the same badge;
+      // nothing extra for an entry, a workshop row or an exit before 0111.
       cell: (log) => (
-        <span className="flex flex-wrap items-center gap-1">
-          <MovementBadge type={log.movement_type} />
-          {log.movement_type === 'exit' && (
-            <ExitPurposeBadge purpose={log.exit_purpose} />
-          )}
-        </span>
+        <MovementTypeBadge
+          type={log.movement_type}
+          exitPurpose={log.exit_purpose}
+        />
       ),
     },
     {
