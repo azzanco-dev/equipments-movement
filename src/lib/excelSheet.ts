@@ -51,6 +51,18 @@ export type ExcelCellValue = string | number | null
  * exported as a code the reader would have to decode.
  */
 export interface ExcelColumn<T> {
+  /**
+   * wave-15-export: a stable id for the column, used by the export dialog to
+   * select and remember columns (`@/lib/exportOptions`). The writer ignores
+   * it; a column without a key cannot be deselected.
+   */
+  key?: string
+  /**
+   * wave-15-export: always exported (the equipment, the movement type or
+   * visit state and the main date); the export dialog shows it checked and
+   * disabled. The writer ignores it.
+   */
+  mandatory?: boolean
   header: string
   /** Column width in characters; a sensible default is used when omitted. */
   width?: number

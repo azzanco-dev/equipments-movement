@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FileSpreadsheet } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import {
@@ -16,7 +16,15 @@ import {
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
-import type { FilterBarAsyncField } from '@/components/data-list/FilterBar'
+import {
+  ExportDialog,
+  type ExportCollected,
+  type ExportResult,
+} from '@/components/data-list/ExportDialog'
+import {
+  countActiveFilters,
+  type FilterBarAsyncField,
+} from '@/components/data-list/FilterBar'
 import { FilterButton } from '@/components/data-list/FilterButton'
 import type { DataListConfig } from '@/components/data-list/types'
 import { useDataListState } from '@/components/data-list/useDataListState'
@@ -24,6 +32,14 @@ import { useListRequest } from '@/components/data-list/useListRequest'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
 import { exitPurposeLabelKey } from '@/lib/exitPurpose'
+import type { ExportScope } from '@/lib/exportOptions'
+import {
+  previousCodeSearchTerm,
+  resolvePreviousCodeIds,
+  reusablePreviousCodeIds,
+  withPreviousCodeBranch,
+  type ResolvedPreviousCodes,
+} from '@/lib/previousCodeSearch'
 import { unwrapRows } from '@/lib/supabaseResult'
 import {
   EQUIPMENT_VISITS_SELECT,
@@ -171,7 +187,7 @@ export function VisitsTable({
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [exporting, setExporting] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const [exportNote, setExportNote] = useState<
     { tone: 'warning' | 'danger'; text: string } | undefined
   >(undefined)
@@ -182,37 +198,79 @@ export function VisitsTable({
 
   /**
    * Context + scope + search + filters + sort as one query, shared by the
-   * table and the export so the file can never disagree with the screen.
+   * table, the export count and the export so the file can never disagree
+   * with the screen. `scope: 'all'` (export only) keeps the context and the
+   * foreman scope and drops the search and filters. `previousIds` are the
+   * units whose previous code matched the search (wave-15-export, log
+   * variant). `head` asks for the count alone.
    */
-  const buildQuery = useCallback(() => {
-    let query = supabase
-      .from(EQUIPMENT_VISITS_VIEW)
-      .select(EQUIPMENT_VISITS_SELECT, { count: 'exact' })
-      .order(sortKey, { ascending, nullsFirst: false })
-      .order('entry_id', { ascending: false })
-    const movementContext = visitContextFilter(context)
-    if (movementContext) query = query.eq('movement_context', movementContext)
-    if (supervisorId) query = query.eq('entry_supervisor_id', supervisorId)
-    const searchFilter = buildVisitSearchFilter(search)
-    if (searchFilter) query = query.or(searchFilter)
-    // Keys are allowlisted per config before they reach PostgREST.
-    return applyListFilters(query, filters, allowedFilterKeys)
-  }, [
-    allowedFilterKeys,
-    ascending,
-    context,
-    filters,
-    search,
-    sortKey,
-    supervisorId,
-  ])
+  const buildQuery = useCallback(
+    ({
+      scope = 'current',
+      previousIds = [],
+      head = false,
+    }: {
+      scope?: ExportScope
+      previousIds?: readonly string[]
+      head?: boolean
+    } = {}) => {
+      let query = supabase
+        .from(EQUIPMENT_VISITS_VIEW)
+        .select(head ? 'entry_id' : EQUIPMENT_VISITS_SELECT, {
+          count: 'exact',
+          head,
+        })
+        .order(sortKey, { ascending, nullsFirst: false })
+        .order('entry_id', { ascending: false })
+      const movementContext = visitContextFilter(context)
+      if (movementContext) query = query.eq('movement_context', movementContext)
+      if (supervisorId) query = query.eq('entry_supervisor_id', supervisorId)
+      if (scope === 'all') return query
+      const searchFilter = withPreviousCodeBranch(
+        buildVisitSearchFilter(search),
+        previousIds,
+      )
+      if (searchFilter) query = query.or(searchFilter)
+      // Keys are allowlisted per config before they reach PostgREST.
+      return applyListFilters(query, filters, allowedFilterKeys)
+    },
+    [
+      allowedFilterKeys,
+      ascending,
+      context,
+      filters,
+      search,
+      sortKey,
+      supervisorId,
+    ],
+  )
+
+  /** The previous-code ids the list on screen was built with. */
+  const resolvedPreviousRef = useRef<ResolvedPreviousCodes | null>(null)
 
   const startListRequest = useListRequest()
   const fetchVisits = useCallback(async () => {
     const signal = startListRequest()
     setLoading(true)
     setLoadError(false)
-    const { data, error, count } = await buildQuery()
+    // The admin log also finds a unit by a previous code: the matching ids
+    // join the search as one more `or` branch. A failed probe is the list's
+    // load error, never a silently narrower search. The homes keep their
+    // search as it was.
+    let previousIds: string[] = []
+    if (isLog) {
+      try {
+        previousIds = await resolvePreviousCodeIds(supabase, search, signal)
+      } catch (lookupError) {
+        if (signal.aborted) return
+        console.error('visits previous-code lookup failed', lookupError)
+        setLoadError(true)
+        setLoading(false)
+        return
+      }
+      if (signal.aborted) return
+    }
+    const { data, error, count } = await buildQuery({ previousIds })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
       .abortSignal(signal)
     if (signal.aborted) return
@@ -234,39 +292,80 @@ export function VisitsTable({
       console.error('visit driver changes failed', lookupError)
     }
     if (signal.aborted) return
+    resolvedPreviousRef.current = {
+      term: previousCodeSearchTerm(search),
+      ids: previousIds,
+    }
     setTotal(count ?? 0)
     setVisits(withCurrentDrivers(rows, changes))
     setLoading(false)
-  }, [buildQuery, list.page, list.pageSize, startListRequest])
+  }, [buildQuery, isLog, list.page, list.pageSize, search, startListRequest])
 
   useEffect(() => {
     void fetchVisits()
   }, [fetchVisits, refreshToken])
 
+  // ============ EXPORT (wave-15-export, log variant) ============
+
   /**
-   * Exports every page of the current set, walked server-side in bounded
-   * pages exactly like the movement log export; a capped file is announced
-   * and a failure is reported as a failure, never as an empty file.
+   * The previous-code ids for the export: the ones the list resolved for this
+   * very search, so the file matches the screen; probed again only if the
+   * list has not resolved the current term yet.
    */
-  const exportVisits = async () => {
-    setExporting(true)
-    setExportNote(undefined)
-    try {
+  const exportPreviousIds = useCallback(
+    async (scope: ExportScope): Promise<string[]> => {
+      if (scope === 'all' || !isLog) return []
+      return (
+        reusablePreviousCodeIds(resolvedPreviousRef.current, search) ??
+        resolvePreviousCodeIds(supabase, search)
+      )
+    },
+    [isLog, search],
+  )
+
+  const countVisits = useCallback(
+    async (scope: ExportScope, signal: AbortSignal) => {
+      const previousIds = await exportPreviousIds(scope)
+      const { count, error } = await buildQuery({
+        scope,
+        previousIds,
+        head: true,
+      }).abortSignal(signal)
+      if (error) throw error
+      return count ?? 0
+    },
+    [buildQuery, exportPreviousIds],
+  )
+
+  /** The checklist's column descriptions; lookups are added at export time. */
+  const exportColumns = useMemo(() => visitExportColumns(t, lang), [t, lang])
+
+  /**
+   * Walks every page of the chosen scope, in bounded pages exactly like the
+   * movement log export, up to the file type's cap; a failure throws, so the
+   * dialog reports it rather than writing an empty file.
+   */
+  const collectVisits = useCallback(
+    async (
+      scope: ExportScope,
+      maxRows: number,
+    ): Promise<ExportCollected<EquipmentVisitRow>> => {
+      const previousIds = await exportPreviousIds(scope)
       const { collectAllPages, OUTSIDE_EXPORT_PAGE_SIZE } =
         await import('@/lib/adminHomeExport')
       const collected = await collectAllPages<EquipmentVisitRow>(
         async (page, pageSize) => {
-          const { data, error, count } = await buildQuery().range(
-            (page - 1) * pageSize,
-            page * pageSize - 1,
-          )
+          const { data, error, count } = await buildQuery({
+            scope,
+            previousIds,
+          }).range((page - 1) * pageSize, page * pageSize - 1)
           if (error) throw error
           return {
             rows: (data ?? []) as unknown as EquipmentVisitRow[],
             total: count ?? 0,
           }
         },
-        { pageSize: OUTSIDE_EXPORT_PAGE_SIZE },
+        { pageSize: OUTSIDE_EXPORT_PAGE_SIZE, maxRows },
       )
       // The view does not carry the supplier; look it up once for the units
       // in the file. A failed lookup throws, so the owner sees an export
@@ -318,28 +417,36 @@ export function VisitsTable({
             )
           }),
         )
-      const { exportRowsToExcel } = await import('@/lib/excelExport')
-      exportRowsToExcel(
-        t('exportSheetVisits'),
-        visitExportColumns(t, lang, supplierByEquipment, mobileByDriver),
-        exportRows,
-        { fileName: visitExportFileName(context), rtl: lang === 'ar' },
-      )
-      if (collected.capped)
-        setExportNote({
-          tone: 'warning',
-          text: t('logsExportCapped')
-            .replace('{count}', String(collected.rows.length))
-            .replace('{total}', String(collected.total)),
-        })
-    } catch (error) {
-      // The raw PostgREST message never reaches the user.
-      console.error('visits export failed', error)
-      setExportNote({ tone: 'danger', text: t('logsExportFailed') })
-    } finally {
-      setExporting(false)
-    }
+      return {
+        ...collected,
+        rows: exportRows,
+        columns: visitExportColumns(
+          t,
+          lang,
+          supplierByEquipment,
+          mobileByDriver,
+        ),
+      }
+    },
+    [buildQuery, exportPreviousIds, lang, t],
+  )
+
+  const onExported = (result: ExportResult) => {
+    if (result.capped)
+      setExportNote({
+        tone: 'warning',
+        text: t('logsExportCapped')
+          .replace('{count}', String(result.count))
+          .replace('{total}', String(result.total)),
+      })
   }
+
+  const contextLabel =
+    context === 'site'
+      ? t('logsSites')
+      : context === 'workshop'
+        ? t('logsWorkshop')
+        : t('logsAll')
 
   const changePage = (nextPage: number) => {
     list.setPage(nextPage)
@@ -550,13 +657,29 @@ export function VisitsTable({
           <Button
             size="sm"
             variant="outline"
-            onClick={() => void exportVisits()}
-            loading={exporting}
-            disabled={exporting || loadError}
+            onClick={() => {
+              setExportNote(undefined)
+              setExportOpen(true)
+            }}
+            disabled={loadError}
           >
-            <FileSpreadsheet size={14} aria-hidden="true" />
-            {t('exportExcel')}
+            <Download size={14} aria-hidden="true" />
+            {t('exportButton')}
           </Button>
+          <ExportDialog<EquipmentVisitRow>
+            open={exportOpen}
+            onOpenChange={setExportOpen}
+            listId={adminVisitsListConfig.id}
+            title={t('printTitleVisits')}
+            fileName={visitExportFileName(context)}
+            columns={exportColumns}
+            contextLabel={`${contextLabel} · ${t('visitsTab')}`}
+            search={search}
+            activeFilters={countActiveFilters(filters)}
+            countRows={countVisits}
+            collectRows={collectVisits}
+            onExported={onExported}
+          />
         </div>
       ) : (
         // Search and the filter button share one row on every width; the

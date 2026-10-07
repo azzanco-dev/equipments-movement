@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { FileSpreadsheet } from 'lucide-react'
+import { Download } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -16,7 +16,15 @@ import type { DataTableColumn } from '@/components/ui'
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
-import type { FilterBarAsyncField } from '@/components/data-list/FilterBar'
+import {
+  ExportDialog,
+  type ExportCollected,
+  type ExportResult,
+} from '@/components/data-list/ExportDialog'
+import {
+  countActiveFilters,
+  type FilterBarAsyncField,
+} from '@/components/data-list/FilterBar'
 import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
 import { MovementTypeBadge } from '@/components/movement/ExitPurposeBadge'
 import { useDataListState } from '@/components/data-list/useDataListState'
@@ -24,13 +32,22 @@ import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDateTime } from '@/lib/dateFormat'
+import type { ExportScope } from '@/lib/exportOptions'
 import { logsListConfig } from '@/lib/listConfigs'
+import type { MovementExportRow } from '@/lib/movementExcel'
 import {
   MOVEMENT_LOG_ADMIN_SELECT,
   MOVEMENT_LOG_SEARCH_VIEW,
   buildMovementSearchFilter,
   type MovementLogSearchRow,
 } from '@/lib/movementLogSearch'
+import {
+  previousCodeSearchTerm,
+  resolvePreviousCodeIds,
+  reusablePreviousCodeIds,
+  withPreviousCodeBranch,
+  type ResolvedPreviousCodes,
+} from '@/lib/previousCodeSearch'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { VisitsTable } from '@/components/visits/VisitsTable'
@@ -178,7 +195,12 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [exporting, setExporting] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportPreparing, setExportPreparing] = useState(false)
+  // The export columns' module, loaded on the first press (see openExport).
+  const [movementExcel, setMovementExcel] = useState<
+    typeof import('@/lib/movementExcel') | null
+  >(null)
   const [exportNote, setExportNote] = useState<
     { tone: 'warning' | 'danger'; text: string } | undefined
   >(undefined)
@@ -215,34 +237,70 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
   /**
    * The tab + search + filters + sort the user is looking at, as one query.
    *
-   * Shared by the table and the Excel export so the exported file can never
-   * disagree with the list on screen; only the page range differs.
+   * Shared by the table, the export count and the export itself, so the
+   * exported file can never disagree with the list on screen; only the page
+   * range differs. `scope: 'all'` (export only) keeps the tab's context and
+   * drops the search and filters. `previousIds` are the units whose previous
+   * code matched the search (wave-15-export), resolved once per list request
+   * and reused by the export. `head` asks for the count alone.
    */
-  const buildLogsQuery = useCallback(() => {
-    let query = supabase
-      .from(MOVEMENT_LOG_SEARCH_VIEW)
-      .select(LIST_SELECT, { count: 'exact' })
-      .order(list.sort, { ascending: list.direction === 'asc' })
-      // Deterministic paging: identical timestamps still resolve to one order.
-      .order('id', { ascending: list.direction === 'asc' })
-    if (tab !== 'all') query = query.eq('movement_context', tab)
-    const searchFilter = buildMovementSearchFilter(list.search, {
-      includeCompanyProject: true,
-    })
-    if (searchFilter) query = query.or(searchFilter)
-    return applyListFilters(
-      query,
-      list.filters,
-      new Set(logsListConfig.filterFields.map((field) => field.key)),
-    )
-  }, [list.direction, list.filters, list.search, list.sort, tab])
+  const buildLogsQuery = useCallback(
+    ({
+      scope = 'current',
+      previousIds = [],
+      head = false,
+    }: {
+      scope?: ExportScope
+      previousIds?: readonly string[]
+      head?: boolean
+    } = {}) => {
+      let query = supabase
+        .from(MOVEMENT_LOG_SEARCH_VIEW)
+        .select(head ? 'id' : LIST_SELECT, { count: 'exact', head })
+        .order(list.sort, { ascending: list.direction === 'asc' })
+        // Deterministic paging: identical timestamps still resolve to one order.
+        .order('id', { ascending: list.direction === 'asc' })
+      if (tab !== 'all') query = query.eq('movement_context', tab)
+      if (scope === 'all') return query
+      const searchFilter = withPreviousCodeBranch(
+        buildMovementSearchFilter(list.search, {
+          includeCompanyProject: true,
+        }),
+        previousIds,
+      )
+      if (searchFilter) query = query.or(searchFilter)
+      return applyListFilters(
+        query,
+        list.filters,
+        new Set(logsListConfig.filterFields.map((field) => field.key)),
+      )
+    },
+    [list.direction, list.filters, list.search, list.sort, tab],
+  )
+
+  /** The previous-code ids the list on screen was built with. */
+  const resolvedPreviousRef = useRef<ResolvedPreviousCodes | null>(null)
 
   const startRequest = useListRequest()
   const fetchLogs = useCallback(async () => {
     const signal = startRequest()
     setLoading(true)
     setLoadError(false)
-    const query = buildLogsQuery().range(
+    // A previous code still finds the unit: its ids join the search as one
+    // more `or` branch. A failed probe is the list's load error, never a
+    // silently narrower search.
+    let previousIds: string[]
+    try {
+      previousIds = await resolvePreviousCodeIds(supabase, list.search, signal)
+    } catch (lookupError) {
+      if (signal.aborted) return
+      console.error('logs previous-code lookup failed', lookupError)
+      setLoadError(true)
+      setLoading(false)
+      return
+    }
+    if (signal.aborted) return
+    const query = buildLogsQuery({ previousIds }).range(
       (list.page - 1) * list.pageSize,
       list.page * list.pageSize - 1,
     )
@@ -255,10 +313,14 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
       setLoading(false)
       return
     }
+    resolvedPreviousRef.current = {
+      term: previousCodeSearchTerm(list.search),
+      ids: previousIds,
+    }
     setRows((data as unknown as LogRow[]) ?? [])
     setTotal(count ?? 0)
     setLoading(false)
-  }, [buildLogsQuery, list.page, list.pageSize, startRequest])
+  }, [buildLogsQuery, list.page, list.pageSize, list.search, startRequest])
 
   useEffect(() => {
     // The visits view runs its own query; the movement log waits until shown.
@@ -266,66 +328,115 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
     void fetchLogs()
   }, [fetchLogs, view])
 
+  // ============ EXPORT (wave-15-export) ============
+
   /**
-   * Exports the current tab, search and filters — every page of them, not just
-   * the page on screen.
-   *
-   * The set is walked server-side in pages of `OUTSIDE_EXPORT_PAGE_SIZE` up to
-   * `OUTSIDE_EXPORT_MAX_ROWS`, exactly as the admin home's "outside" export
-   * does, so one press can never pull an unbounded table into the browser. If
-   * the cap truncates the file the user is told, rather than handed a silently
-   * short export; a failure is reported as a failure, never as an empty file.
-   * `xlsx` is imported dynamically so the log page does not carry the
-   * spreadsheet library until somebody presses the button.
+   * The previous-code ids for the export: the ones the list resolved for this
+   * very search, so the file matches the screen; probed again only if the
+   * list has not resolved the current term yet.
    */
-  const exportLogs = async () => {
-    setExporting(true)
-    setExportNote(undefined)
-    try {
+  const exportPreviousIds = useCallback(
+    async (scope: ExportScope): Promise<string[]> => {
+      if (scope === 'all') return []
+      return (
+        reusablePreviousCodeIds(resolvedPreviousRef.current, list.search) ??
+        resolvePreviousCodeIds(supabase, list.search)
+      )
+    },
+    [list.search],
+  )
+
+  const countLogs = useCallback(
+    async (scope: ExportScope, signal: AbortSignal) => {
+      const previousIds = await exportPreviousIds(scope)
+      const { count, error } = await buildLogsQuery({
+        scope,
+        previousIds,
+        head: true,
+      }).abortSignal(signal)
+      if (error) throw error
+      return count ?? 0
+    },
+    [buildLogsQuery, exportPreviousIds],
+  )
+
+  const exportColumns = useMemo(
+    () => movementExcel?.movementExportColumns(t, lang) ?? [],
+    [movementExcel, t, lang],
+  )
+
+  /**
+   * Walks the chosen scope server-side in pages of `OUTSIDE_EXPORT_PAGE_SIZE`
+   * up to the file type's cap, exactly as the admin home's export does, so
+   * one press can never pull an unbounded table into the browser. A failure
+   * throws, so the dialog reports it rather than writing an empty file.
+   */
+  const collectLogs = useCallback(
+    async (
+      scope: ExportScope,
+      maxRows: number,
+    ): Promise<ExportCollected<MovementExportRow>> => {
+      const previousIds = await exportPreviousIds(scope)
       const { collectAllPages, OUTSIDE_EXPORT_PAGE_SIZE } =
         await import('@/lib/adminHomeExport')
       const collected = await collectAllPages<LogRow>(
         async (page, pageSize) => {
-          const { data, error, count } = await buildLogsQuery().range(
-            (page - 1) * pageSize,
-            page * pageSize - 1,
-          )
+          const { data, error, count } = await buildLogsQuery({
+            scope,
+            previousIds,
+          }).range((page - 1) * pageSize, page * pageSize - 1)
           if (error) throw error
           return {
             rows: (data as unknown as LogRow[]) ?? [],
             total: count ?? 0,
           }
         },
-        { pageSize: OUTSIDE_EXPORT_PAGE_SIZE },
+        { pageSize: OUTSIDE_EXPORT_PAGE_SIZE, maxRows },
       )
-      const [{ exportRowsToExcel }, movementExcel] = await Promise.all([
-        import('@/lib/excel'),
-        import('@/lib/movementExcel'),
-      ])
-      exportRowsToExcel(
-        t('logs'),
-        movementExcel.movementExportColumns(t, lang),
-        collected.rows,
-        {
-          fileName: movementExcel.movementExportFileName(tab),
-          rtl: lang === 'ar',
-        },
-      )
-      if (collected.capped)
-        setExportNote({
-          tone: 'warning',
-          text: t('logsExportCapped')
-            .replace('{count}', String(collected.rows.length))
-            .replace('{total}', String(collected.total)),
-        })
+      return { ...collected, columns: exportColumns }
+    },
+    [buildLogsQuery, exportColumns, exportPreviousIds],
+  )
+
+  /**
+   * Opens the export dialog. The column descriptions live in
+   * `@/lib/movementExcel`, which also holds the import parser and its `xlsx`
+   * dependency, so it is loaded on the first press rather than with the page.
+   */
+  const openExport = async () => {
+    setExportNote(undefined)
+    if (movementExcel) {
+      setExportOpen(true)
+      return
+    }
+    setExportPreparing(true)
+    try {
+      setMovementExcel(await import('@/lib/movementExcel'))
+      setExportOpen(true)
     } catch (error) {
-      // The raw PostgREST message never reaches the user.
-      console.error('logs export failed', error)
+      console.error('logs export module failed', error)
       setExportNote({ tone: 'danger', text: t('logsExportFailed') })
     } finally {
-      setExporting(false)
+      setExportPreparing(false)
     }
   }
+
+  const onExported = (result: ExportResult) => {
+    if (result.capped)
+      setExportNote({
+        tone: 'warning',
+        text: t('logsExportCapped')
+          .replace('{count}', String(result.count))
+          .replace('{total}', String(result.total)),
+      })
+  }
+
+  const tabLabel =
+    tab === 'site'
+      ? t('logsSites')
+      : tab === 'workshop'
+        ? t('logsWorkshop')
+        : t('logsAll')
 
   const changePage = (nextPage: number) => {
     list.setPage(nextPage)
@@ -476,14 +587,31 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
             <Button
               size="sm"
               variant="outline"
-              onClick={() => void exportLogs()}
-              loading={exporting}
-              disabled={exporting || loadError}
+              onClick={() => void openExport()}
+              loading={exportPreparing}
+              disabled={exportPreparing || loadError}
             >
-              <FileSpreadsheet size={14} aria-hidden="true" />
-              {t('exportExcel')}
+              <Download size={14} aria-hidden="true" />
+              {t('exportButton')}
             </Button>
           </div>
+
+          {movementExcel && (
+            <ExportDialog<MovementExportRow>
+              open={exportOpen}
+              onOpenChange={setExportOpen}
+              listId={logsListConfig.id}
+              title={t('printTitleMovements')}
+              fileName={movementExcel.movementExportFileName(tab)}
+              columns={exportColumns}
+              contextLabel={`${tabLabel} · ${t('movementsLogsTab')}`}
+              search={list.search}
+              activeFilters={countActiveFilters(list.filters)}
+              countRows={countLogs}
+              collectRows={collectLogs}
+              onExported={onExported}
+            />
+          )}
 
           {exportNote && (
             <Notice

@@ -710,3 +710,20 @@ textarea::placeholder {
     saturate(0.35);
 }
 /* ===== Projects map — end ===== */
+
+/* ===== wave-15-export: print page — start =====
+   The PDF export prints on paper colors even when the app is in dark mode:
+   the print page re-declares the light values of the tokens it uses (the
+   same values as the light :root above) for print only. `:has()` raises the
+   specificity above `.dark`. */
+@media print {
+  html:has(.print-export) {
+    --bg: #ffffff;
+    --fg: #0a0a0a;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+    --surface: #f9fafb;
+    --surface-hover: #f3f4f6;
+  }
+}
+/* ===== wave-15-export: print page — end ===== */

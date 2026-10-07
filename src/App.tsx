@@ -221,6 +221,11 @@ const EquipmentReports = dynamic(
     ),
   { loading: screenLoading },
 )
+// wave-15-export: the print page of the PDF export, without the app chrome.
+const PrintExport = dynamic(
+  () => import('@/screens/PrintExport').then((module) => module.PrintExport),
+  { loading: screenLoading },
+)
 const WorkshopReports = dynamic(
   () =>
     import('@/screens/WorkshopReports').then(
@@ -308,6 +313,17 @@ function AppContent() {
   if (!profile) return <AuthScreen />
 
   const passwordDialog = <FirstLoginPasswordDialog />
+
+  // wave-15-export: the PDF export's print page renders outside the layout
+  // (no sidebar or header). It is reached from /logs, so only the roles that
+  // have the log (admin, monitor) get it; it reads a payload the export left
+  // in this tab and fetches nothing.
+  if (
+    segments[0] === 'print' &&
+    segments[1] === 'export' &&
+    (profile.role === 'admin' || profile.role === 'monitor')
+  )
+    return <PrintExport payloadKey={searchParams.get('key')} />
 
   const openMovement = (id: string) => router.push(`/movements/${id}`)
   const backToDashboard = () => router.push('/dashboard')

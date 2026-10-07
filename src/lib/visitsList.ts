@@ -571,36 +571,46 @@ export function visitExportColumns(
 ): ExcelColumn<EquipmentVisitRow>[] {
   return [
     {
+      key: 'equipment_code',
+      mandatory: true,
       header: t('equipmentCodeLabel'),
       width: 14,
       value: (row) => row.equipment_code ?? '',
     },
     {
+      key: 'equipment_type',
+      mandatory: true,
       header: t('equipmentType'),
       width: 24,
       value: (row) => row.equipment_type ?? '',
     },
     {
+      key: 'plate_number',
+      mandatory: true,
       header: t('plateNumber'),
       width: 14,
       value: (row) => row.equipment_plate_number ?? '',
     },
     {
+      key: 'owner',
       header: t('ownershipStatus'),
       width: 16,
       value: (row) => visitOwnerLabel(row.equipment_ownership_status, t),
     },
     {
+      key: 'supplier',
       header: t('lessor'),
       width: 24,
       value: (row) => supplierByEquipment.get(row.equipment_id) ?? '',
     },
     {
+      key: 'contractor_code',
       header: t('contractorEquipmentCode'),
       width: 16,
       value: (row) => row.contractor_equipment_code ?? '',
     },
     {
+      key: 'context',
       header: t('logsColContext'),
       width: 14,
       value: (row) => {
@@ -612,6 +622,8 @@ export function visitExportColumns(
       },
     },
     {
+      key: 'visit_state',
+      mandatory: true,
       header: t('visitState'),
       width: 10,
       value: (row) => t(visitStateView(row).labelKey),
@@ -619,26 +631,31 @@ export function visitExportColumns(
     {
       // Right after the state: the purpose of the EXIT that closed the visit,
       // empty for an open, workshop or pre-0111 visit.
+      key: 'exit_purpose',
       header: t('exitPurpose'),
       width: 14,
       value: (row) => exitPurposeExportLabel(visitExitPurpose(row), t),
     },
     {
+      key: 'company',
       header: t('company'),
       width: 24,
       value: (row) => exportName(row.company_name_ar, row.company_name_en),
     },
     {
+      key: 'project',
       header: t('project'),
       width: 24,
       value: (row) => exportName(row.project_name_ar, row.project_name_en),
     },
     {
+      key: 'driver_name',
       header: t('driverName'),
       width: 22,
       value: (row) => row.driver_name ?? '',
     },
     {
+      key: 'driver_mobile',
       header: t('exportColDriverMobile'),
       width: 16,
       // Text, so a leading zero survives in the sheet.
@@ -646,17 +663,21 @@ export function visitExportColumns(
         (row.driver_id ? mobileByDriver.get(row.driver_id) : undefined) ?? '',
     },
     {
+      key: 'entry_by',
       header: t('entryBy'),
       width: 22,
       value: (row) => row.entry_supervisor_name ?? '',
     },
     {
+      key: 'entry_at',
+      mandatory: true,
       header: t('visitEntryAt'),
       width: 18,
       type: 'date',
       value: (row) => row.entry_at ?? null,
     },
     {
+      key: 'exit_at',
       header: t('visitExitAt'),
       width: 18,
       type: 'date',
@@ -665,6 +686,7 @@ export function visitExportColumns(
         visitStateView(row).state === 'closed' ? row.exit_at : null,
     },
     {
+      key: 'duration',
       header: t('visitDuration'),
       width: 14,
       value: (row) => formatVisitDuration(row.duration_minutes, lang) ?? '',

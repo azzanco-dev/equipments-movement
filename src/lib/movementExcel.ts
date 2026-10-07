@@ -234,21 +234,29 @@ export function movementExportColumns(
 ): ExcelColumn<MovementExportRow>[] {
   return [
     {
+      key: 'equipment_code',
+      mandatory: true,
       header: t('equipmentCodeLabel'),
       width: 14,
       value: (row) => row.equipment_code ?? '',
     },
     {
+      key: 'equipment_type',
+      mandatory: true,
       header: t('equipmentType'),
       width: 24,
       value: (row) => row.equipment_type ?? '',
     },
     {
+      key: 'plate_number',
+      mandatory: true,
       header: t('plateNumber'),
       width: 14,
       value: (row) => row.equipment_plate_number ?? '',
     },
     {
+      key: 'movement_type',
+      mandatory: true,
       header: t('movementType'),
       width: 10,
       value: (row) => (row.movement_type === 'entry' ? t('entry') : t('exit')),
@@ -256,6 +264,7 @@ export function movementExportColumns(
     {
       // wave-12: right after the movement type. Only a site exit recorded
       // since migration 0111 has one; every other row is an empty cell.
+      key: 'exit_purpose',
       header: t('exitPurpose'),
       width: 14,
       value: (row) =>
@@ -264,6 +273,7 @@ export function movementExportColumns(
           : '',
     },
     {
+      key: 'context',
       header: t('logsColContext'),
       width: 14,
       value: (row) => {
@@ -275,18 +285,21 @@ export function movementExportColumns(
       },
     },
     {
+      key: 'company',
       header: t('company'),
       width: 24,
       value: (row) =>
         exportName(lang, row.company_name_ar, row.company_name_en),
     },
     {
+      key: 'project',
       header: t('project'),
       width: 24,
       value: (row) =>
         exportName(lang, row.project_name_ar, row.project_name_en),
     },
     {
+      key: 'contractor_code',
       header: t('contractorEquipmentCode'),
       width: 16,
       value: (row) => row.contractor_equipment_code ?? '',
@@ -294,17 +307,26 @@ export function movementExportColumns(
     {
       // Optional on a site entry since 2026-09-23, so a blank cell here is a
       // fact about the visit rather than missing data.
+      key: 'driver_name',
       header: t('driverName'),
       width: 22,
       value: (row) => row.driver_name ?? '',
     },
     {
+      key: 'foreman',
       header: t('logsColForeman'),
       width: 22,
       value: (row) => row.supervisor_name ?? '',
     },
-    { header: t('notes'), width: 30, value: (row) => row.notes ?? '' },
     {
+      key: 'notes',
+      header: t('notes'),
+      width: 30,
+      value: (row) => row.notes ?? '',
+    },
+    {
+      key: 'recorded_at',
+      mandatory: true,
       header: t('recordedAt'),
       width: 18,
       type: 'date',
