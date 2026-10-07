@@ -700,4 +700,13 @@ textarea::placeholder {
 .pm-map.leaflet-container .leaflet-control-attribution a {
   color: var(--fg);
 }
+/* The OSM tiles are colourful; tone them down to sit under the neutral
+   palette, and invert them for the dark theme so the streets stay readable. */
+.pm-map .leaflet-tile-pane {
+  filter: saturate(0.55) contrast(0.95);
+}
+.dark .pm-map .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.82) contrast(0.88)
+    saturate(0.35);
+}
 /* ===== Projects map — end ===== */

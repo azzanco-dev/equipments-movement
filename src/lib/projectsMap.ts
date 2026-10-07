@@ -23,24 +23,24 @@ export interface ProjectsMapUnplaced {
 
 /**
  * Basemap tiles, one entry per theme. This is the single place to swap the
- * provider. CARTO's Positron and Dark Matter are muted enough for the neutral
- * palette; their usage terms are an owner decision before production.
+ * provider. The standard OpenStreetMap raster tiles need no API key (CARTO's
+ * basemaps started answering "API key required" on 2026-10-07); their colours
+ * are toned down, and inverted for the dark theme, by the CSS filters on
+ * `.pm-map .leaflet-tile-pane` in src/index.css. OSM's tile usage policy
+ * allows light use with the attribution kept visible; a heavier use needs a
+ * paid provider (an owner decision before that point).
  */
+const OSM_TILES = {
+  url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  attribution:
+    '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
+  subdomains: '',
+  maxZoom: 19,
+} as const
+
 export const PROJECTS_MAP_TILES = {
-  light: {
-    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>',
-    subdomains: 'abcd',
-    maxZoom: 20,
-  },
-  dark: {
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>',
-    subdomains: 'abcd',
-    maxZoom: 20,
-  },
+  light: OSM_TILES,
+  dark: OSM_TILES,
 } as const
 
 /** Riyadh city centre, used when there is nothing to frame. */

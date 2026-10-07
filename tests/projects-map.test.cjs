@@ -269,7 +269,8 @@ test('tile provider config is one constant with attribution for both themes', ()
     const config = map.PROJECTS_MAP_TILES[theme]
     assert.match(config.url, /^https:\/\//)
     assert.match(config.attribution, /OpenStreetMap/)
-    assert.match(config.attribution, /CARTO/)
+    // No API key in the URL: the provider must stay keyless.
+    assert.ok(!/key|token/i.test(config.url))
   }
 })
 
