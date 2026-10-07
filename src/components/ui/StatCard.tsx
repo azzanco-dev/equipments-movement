@@ -94,7 +94,7 @@ export function StatCard({
   const classes = cn(
     'flex w-full items-start justify-between gap-2 rounded-xl border bg-bg p-3 text-start transition-colors',
     onClick &&
-      'cursor-pointer hover:border-fg hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+      'cursor-pointer hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
     className,
   )
   const body = (
