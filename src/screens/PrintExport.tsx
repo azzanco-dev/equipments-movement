@@ -20,6 +20,12 @@ type PrintState =
 const LANDSCAPE_FROM_COLUMNS = 7
 
 /**
+ * wave-15-export-fields: every field can be exported, so a very wide choice
+ * drops from 11 px to 10 px text with tighter cells to stay on the page.
+ */
+const COMPACT_FROM_COLUMNS = 14
+
+/**
  * This tab's session storage and the opener's (the /logs tab that exported):
  * the export writes the payload into both, so it is found whichever way the
  * browser shares session storage with a new tab. A storage that throws
@@ -121,6 +127,8 @@ export function PrintExport({ payloadKey }: PrintExportProps) {
 
   const shares = printColumnShares(payload.columns)
   const landscape = payload.columns.length >= LANDSCAPE_FROM_COLUMNS
+  const compact = payload.columns.length >= COMPACT_FROM_COLUMNS
+  const cellPadding = compact ? 'px-1 py-0.5' : 'px-1.5 py-1'
   const countLine = payload.capped
     ? t('printRecordCapped')
         .replace('{count}', String(payload.rows.length))
@@ -170,7 +178,9 @@ export function PrintExport({ payloadKey }: PrintExportProps) {
         </div>
       </header>
 
-      <table className="w-full table-fixed border-collapse text-[11px] leading-snug">
+      <table
+        className={`w-full table-fixed border-collapse leading-snug ${compact ? 'text-[10px]' : 'text-[11px]'}`}
+      >
         <colgroup>
           {shares.map((share, index) => (
             <col key={index} style={{ width: `${share}%` }} />
@@ -182,7 +192,9 @@ export function PrintExport({ payloadKey }: PrintExportProps) {
               <th
                 key={index}
                 scope="col"
-                className="border bg-surface-hover px-1.5 py-1 text-start align-bottom font-semibold"
+                // Headers wrap (and break a long word) inside their share
+                // rather than widening the table past the page.
+                className={`break-words border bg-surface-hover text-start align-bottom font-semibold [hyphens:auto] ${cellPadding}`}
               >
                 {column.header}
               </th>
@@ -195,7 +207,7 @@ export function PrintExport({ payloadKey }: PrintExportProps) {
               {row.map((cell, cellIndex) => (
                 <td
                   key={cellIndex}
-                  className="break-words border px-1.5 py-1 text-start align-top"
+                  className={`break-words border text-start align-top ${cellPadding}`}
                 >
                   {payload.columns[cellIndex]?.type === 'date' ? (
                     <span dir="ltr">{cell}</span>

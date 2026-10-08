@@ -61,6 +61,8 @@ export interface MovementLogSearchRow {
   project_name_en?: string | null
   supervisor_name?: string | null
   driver_mobile_number?: string | null
+  /** The equipment's owner (`ownership_status`, appended by migration 0094). */
+  equipment_ownership_status?: string | null
   /** The row's own site exit purpose (migration 0118); `null` otherwise. */
   exit_purpose?: ExitPurpose | null
 }

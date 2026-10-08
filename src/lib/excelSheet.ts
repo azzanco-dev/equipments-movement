@@ -63,6 +63,12 @@ export interface ExcelColumn<T> {
    * disabled. The writer ignores it.
    */
   mandatory?: boolean
+  /**
+   * wave-15-export-fields: the heading the export dialog lists the column
+   * under (consecutive columns with the same group share one heading). The
+   * writer ignores it.
+   */
+  group?: string
   header: string
   /** Column width in characters; a sensible default is used when omitted. */
   width?: number

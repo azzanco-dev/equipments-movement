@@ -40,21 +40,22 @@ import {
   withPreviousCodeBranch,
   type ResolvedPreviousCodes,
 } from '@/lib/previousCodeSearch'
-import { unwrapRows } from '@/lib/supabaseResult'
+import {
+  loadDriverChanges,
+  loadDriverMobiles,
+  loadEquipmentExportDetails,
+  loadProfileNames,
+} from '@/lib/exportFields'
 import {
   EQUIPMENT_VISITS_SELECT,
   EQUIPMENT_VISITS_VIEW,
-  VISIT_DRIVER_CHANGES_SELECT,
-  SUPPLIER_LOOKUP_CHUNK_SIZE,
   adminVisitsListConfig,
   buildVisitSearchFilter,
-  chunkItems,
   distinctDriverIds,
   distinctEquipmentIds,
-  driverMobilesById,
   foremanVisitsListConfig,
   formatVisitDuration,
-  supplierNamesByEquipment,
+  siteEntryIds,
   visitContextFilter,
   visitExportColumns,
   visitExitPurpose,
@@ -63,43 +64,21 @@ import {
   visitStateView,
   visitsListConfig,
   withCurrentDrivers,
-  type DriverMobileRow,
-  type EquipmentSupplierRow,
   type EquipmentVisitRow,
   type VisitDriverChangeRow,
   type VisitsContext,
 } from '@/lib/visitsList'
 
 /**
- * The driver changes of a set of visits, looked up in bounded chunks. Throws
- * on a failed query; the caller decides whether that fails the whole request.
+ * The driver changes of a set of visits (site visits only: a workshop row
+ * carries no driver), through the loader the exports share. Throws on a failed
+ * query; the caller decides whether that fails the whole request.
  */
-async function loadVisitDriverChanges(
+function loadVisitDriverChanges(
   visits: readonly EquipmentVisitRow[],
   signal?: AbortSignal,
 ): Promise<VisitDriverChangeRow[]> {
-  const changes: VisitDriverChangeRow[] = []
-  const idChunks = chunkItems(
-    // Workshop rows carry no driver, so they are not looked up.
-    visits
-      .filter((visit) => visit.movement_context === 'site')
-      .map((visit) => visit.entry_id),
-    SUPPLIER_LOOKUP_CHUNK_SIZE,
-  )
-  for (let start = 0; start < idChunks.length; start += 4)
-    await Promise.all(
-      idChunks.slice(start, start + 4).map(async (ids) => {
-        const query = supabase
-          .from('movement_driver_changes')
-          .select(VISIT_DRIVER_CHANGES_SELECT)
-          .in('entry_log_id', ids)
-        const rows = unwrapRows(
-          await (signal ? query.abortSignal(signal) : query),
-        )
-        changes.push(...(rows as unknown as VisitDriverChangeRow[]))
-      }),
-    )
-  return changes
+  return loadDriverChanges(supabase, siteEntryIds(visits), signal)
 }
 
 /** A config's allowlisted filter keys; nothing else reaches PostgREST. */
@@ -367,65 +346,39 @@ export function VisitsTable({
         },
         { pageSize: OUTSIDE_EXPORT_PAGE_SIZE, maxRows },
       )
-      // The view does not carry the supplier; look it up once for the units
-      // in the file. A failed lookup throws, so the owner sees an export
-      // failure instead of a file whose supplier cells are silently empty.
-      const supplierByEquipment = new Map<string, string>()
-      const idChunks = chunkItems(
-        distinctEquipmentIds(collected.rows),
-        SUPPLIER_LOOKUP_CHUNK_SIZE,
-      )
-      for (let start = 0; start < idChunks.length; start += 4)
-        await Promise.all(
-          idChunks.slice(start, start + 4).map(async (ids) => {
-            const rows = unwrapRows(
-              await supabase
-                .from('equipment')
-                .select('id,lessor:lessors(name)')
-                .in('id', ids),
-            )
-            supplierNamesByEquipment(
-              rows as unknown as EquipmentSupplierRow[],
-              supplierByEquipment,
-            )
-          }),
-        )
-      // The current driver of each visit (a driver added or changed after the
-      // entry lives only in the change records), then that driver's mobile
-      // number, looked up the same way for the drivers in the file.
+      // wave-15-export-fields: the values the view does not carry, looked up
+      // once for the rows in the file through the loaders both exports share
+      // (`@/lib/exportFields`). A failed lookup throws, so the owner sees an
+      // export failure instead of a file whose cells are silently empty.
+      // First the current driver of each visit (a driver added or changed
+      // after the entry lives only in the change records).
       const exportRows = withCurrentDrivers(
         collected.rows,
         await loadVisitDriverChanges(collected.rows),
       )
-      const mobileByDriver = new Map<string, string>()
-      const driverChunks = chunkItems(
-        distinctDriverIds(exportRows),
-        SUPPLIER_LOOKUP_CHUNK_SIZE,
-      )
-      for (let start = 0; start < driverChunks.length; start += 4)
-        await Promise.all(
-          driverChunks.slice(start, start + 4).map(async (ids) => {
-            const rows = unwrapRows(
-              await supabase
-                .from('drivers')
-                .select('id,mobile_number')
-                .in('id', ids),
-            )
-            driverMobilesById(
-              rows as unknown as DriverMobileRow[],
-              mobileByDriver,
-            )
-          }),
-        )
+      // The supplier and the chassis in one equipment request per chunk, the
+      // current driver's mobile, and the exit supervisor's name.
+      const [
+        { supplierByEquipment, chassisByEquipment },
+        mobileByDriver,
+        nameByProfile,
+      ] = await Promise.all([
+        loadEquipmentExportDetails(supabase, distinctEquipmentIds(exportRows)),
+        loadDriverMobiles(supabase, distinctDriverIds(exportRows)),
+        loadProfileNames(
+          supabase,
+          exportRows.map((row) => row.exit_supervisor_id),
+        ),
+      ])
       return {
         ...collected,
         rows: exportRows,
-        columns: visitExportColumns(
-          t,
-          lang,
+        columns: visitExportColumns(t, lang, {
           supplierByEquipment,
+          chassisByEquipment,
           mobileByDriver,
-        ),
+          nameByProfile,
+        }),
       }
     },
     [buildQuery, exportPreviousIds, lang, t],

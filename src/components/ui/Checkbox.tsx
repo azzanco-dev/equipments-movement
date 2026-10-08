@@ -20,16 +20,22 @@ export interface CheckboxProps extends Omit<
   label?: ReactNode
   /** Marks the control invalid; Field sets this automatically. */
   invalid?: boolean
+  /**
+   * wave-15-export-fields: `sm` is a 16 px box with 12 px label text in a
+   * 28 px row, for dense checklists (the export dialog's column list), like
+   * `size="sm"` buttons in tables and toolbars.
+   */
+  size?: 'md' | 'sm'
 }
 
 /**
  * Checkbox on Radix: 20 px box inside a 40/36 px row so the touch target
- * matches the other shared controls. Checked state uses the monochrome
- * primary token.
+ * matches the other shared controls (`size="sm"`: 16 px in a 28 px row).
+ * Checked state uses the monochrome primary token.
  */
 export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(
   function Checkbox(
-    { label, invalid, disabled, className, id, ...props },
+    { label, invalid, disabled, className, id, size = 'md', ...props },
     ref,
   ) {
     const generatedId = useId()
@@ -41,25 +47,35 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(
         disabled={disabled}
         aria-invalid={invalid || props['aria-invalid'] || undefined}
         className={cn(
-          'control-invalid peer inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-md border bg-bg text-primary-contrast transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+          'control-invalid peer inline-flex shrink-0 items-center justify-center border bg-bg text-primary-contrast transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+          size === 'sm' ? 'h-4 w-4 rounded' : 'h-5 w-5 rounded-md',
           'data-[state=checked]:border-primary data-[state=checked]:bg-primary',
           className,
         )}
         {...props}
       >
         <RadixCheckbox.Indicator>
-          <Check size={13} strokeWidth={3} aria-hidden="true" />
+          <Check
+            size={size === 'sm' ? 11 : 13}
+            strokeWidth={3}
+            aria-hidden="true"
+          />
         </RadixCheckbox.Indicator>
       </RadixCheckbox.Root>
     )
     if (!label) return box
     return (
-      <span className="inline-flex h-10 items-center gap-2 md:h-9">
+      <span
+        className={cn(
+          'inline-flex items-center',
+          size === 'sm' ? 'min-h-7 gap-1.5' : 'h-10 gap-2 md:h-9',
+        )}
+      >
         {box}
         <label
           htmlFor={checkboxId}
           className={cn(
-            'text-sm leading-snug',
+            size === 'sm' ? 'text-xs leading-tight' : 'text-sm leading-snug',
             disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           )}
         >

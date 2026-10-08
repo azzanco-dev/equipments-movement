@@ -32,6 +32,11 @@ import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDateTime } from '@/lib/dateFormat'
+import {
+  loadDriverChanges,
+  loadDriverMobiles,
+  loadEquipmentExportDetails,
+} from '@/lib/exportFields'
 import type { ExportScope } from '@/lib/exportOptions'
 import { logsListConfig } from '@/lib/listConfigs'
 import type { MovementExportRow } from '@/lib/movementExcel'
@@ -370,6 +375,11 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
    * up to the file type's cap, exactly as the admin home's export does, so
    * one press can never pull an unbounded table into the browser. A failure
    * throws, so the dialog reports it rather than writing an empty file.
+   *
+   * wave-15-export-fields: then the values the view does not carry, for the
+   * rows in the file only (`@/lib/exportFields`, shared with the visits
+   * export): the current driver of each site entry, the supplier of each
+   * unit, and the mobile of a changed driver. A failed lookup throws too.
    */
   const collectLogs = useCallback(
     async (
@@ -393,9 +403,31 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
         },
         { pageSize: OUTSIDE_EXPORT_PAGE_SIZE, maxRows },
       )
-      return { ...collected, columns: exportColumns }
+      if (!movementExcel) throw new Error('movement export module not loaded')
+      const rows = movementExcel.withCurrentMovementDrivers(
+        collected.rows,
+        await loadDriverChanges(
+          supabase,
+          movementExcel.movementDriverChangeEntryIds(collected.rows),
+        ),
+      )
+      const [{ supplierByEquipment }, mobileByDriver] = await Promise.all([
+        loadEquipmentExportDetails(
+          supabase,
+          rows.map((row) => row.equipment_id),
+        ),
+        loadDriverMobiles(supabase, movementExcel.changedDriverIds(rows)),
+      ])
+      return {
+        ...collected,
+        rows,
+        columns: movementExcel.movementExportColumns(t, lang, {
+          supplierByEquipment,
+          mobileByDriver,
+        }),
+      }
     },
-    [buildLogsQuery, exportColumns, exportPreviousIds],
+    [buildLogsQuery, exportPreviousIds, lang, movementExcel, t],
   )
 
   /**

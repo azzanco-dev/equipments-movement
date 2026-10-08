@@ -69,10 +69,16 @@ test('the company / project cell keeps the 44 px rows', () => {
   )
 })
 
-test('the visits Excel export keeps company and project as two columns', () => {
+test('the visits Excel export keeps company and project in separate columns', () => {
+  // wave-15-export-fields: each one in Arabic and in English.
   const source = read('src/lib/visitsList.ts')
-  assert.match(source, /header: t\('company'\),/)
-  assert.match(source, /header: t\('project'\),/)
+  for (const key of [
+    'companyNameAr',
+    'companyNameEn',
+    'projectNameAr',
+    'projectNameEn',
+  ])
+    assert.match(source, new RegExp(`header: t\\('${key}'\\),`))
 })
 
 test('/logs opens on visits and keeps the log behind ?view=log', () => {

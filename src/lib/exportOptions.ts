@@ -111,6 +111,31 @@ export function selectExportColumns<T>(
   )
 }
 
+/** A run of columns listed under one heading in the export dialog. */
+export interface ExportColumnGroup<C> {
+  /** The heading; empty for columns without a group. */
+  label: string
+  columns: C[]
+}
+
+/**
+ * wave-15-export-fields: the dialog's checklist headings. Consecutive columns
+ * with the same `group` share one heading, in column order; nothing is
+ * reordered, so the checklist reads like the file.
+ */
+export function groupExportColumns<C extends { group?: string }>(
+  columns: readonly C[],
+): ExportColumnGroup<C>[] {
+  const groups: ExportColumnGroup<C>[] = []
+  for (const column of columns) {
+    const label = column.group ?? ''
+    const last = groups[groups.length - 1]
+    if (last && last.label === label) last.columns.push(column)
+    else groups.push({ label, columns: [column] })
+  }
+  return groups
+}
+
 /** One remembered selection per list and file type. */
 export function columnSelectionStorageKey(
   listId: string,
@@ -121,6 +146,50 @@ export function columnSelectionStorageKey(
 
 type ReadableStorage = Pick<Storage, 'getItem'>
 type WritableStorage = Pick<Storage, 'setItem'>
+
+/**
+ * wave-15-export-fields: what is remembered per list and file type. `known`
+ * is every column key the list offered when the choice was saved, so a column
+ * added later (absent from `known`) can be told apart from one the user
+ * unticked.
+ */
+export interface StoredColumnSelection {
+  v: 2
+  known: string[]
+  selected: string[]
+}
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((entry) => typeof entry === 'string')
+
+/**
+ * The selection a stored value stands for, normalized for the current columns.
+ *
+ * Fallback choice (wave-15-export-fields): a column the saved choice did not
+ * know about is SELECTED, so a new column never disappears silently from the
+ * file; the columns the user did untick stay unticked. A plain array (the
+ * first wave-15 format) does not record which columns existed, so it cannot
+ * tell an unticked column from a new one: it resets to every column, as does
+ * anything missing, corrupt or misshapen.
+ */
+export function resolveStoredSelection(
+  columns: readonly KeyedColumn[],
+  stored: unknown,
+): string[] {
+  const keys = allColumnKeys(columns)
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored))
+    return keys
+  const value = stored as Partial<StoredColumnSelection>
+  if (
+    value.v !== 2 ||
+    !isStringArray(value.known) ||
+    !isStringArray(value.selected)
+  )
+    return keys
+  const known = new Set(value.known)
+  const added = keys.filter((key) => !known.has(key))
+  return normalizeColumnSelection(columns, [...value.selected, ...added])
+}
 
 /**
  * The remembered selection, normalized for the current columns; every column
@@ -139,20 +208,29 @@ export function readColumnSelection(
   } catch {
     stored = undefined
   }
-  return normalizeColumnSelection(columns, stored)
+  return resolveStoredSelection(columns, stored)
 }
 
-/** Remembers a selection; a storage failure only loses the convenience. */
+/**
+ * Remembers a selection with the column keys it was made from; a storage
+ * failure only loses the convenience.
+ */
 export function writeColumnSelection(
   storage: WritableStorage | null | undefined,
   listId: string,
   fileType: ExportFileType,
   selection: readonly string[],
+  columns: readonly KeyedColumn[],
 ): void {
+  const value: StoredColumnSelection = {
+    v: 2,
+    known: allColumnKeys(columns),
+    selected: [...selection],
+  }
   try {
     storage?.setItem(
       columnSelectionStorageKey(listId, fileType),
-      JSON.stringify(selection),
+      JSON.stringify(value),
     )
   } catch {
     // Private mode or a full quota: the next export starts from all columns.

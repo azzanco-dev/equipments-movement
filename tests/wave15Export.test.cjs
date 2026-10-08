@@ -51,6 +51,7 @@ const previous = loadLibModule('previousCodeSearch', cache)
 const movementExcel = loadLibModule('movementExcel', cache)
 const visits = loadLibModule('visitsList', cache)
 const exporter = loadLibModule('adminHomeExport', cache)
+const fields = loadLibModule('exportFields', cache)
 const plain = (value) => JSON.parse(JSON.stringify(value))
 const t = (key) => key
 
@@ -190,7 +191,13 @@ test('the column choice is remembered per list and file type', () => {
     options.columnSelectionStorageKey('logs', 'pdf'),
     'em.export-columns.logs.pdf',
   )
-  options.writeColumnSelection(storage, 'logs', 'pdf', ['code', 'date'])
+  options.writeColumnSelection(
+    storage,
+    'logs',
+    'pdf',
+    ['code', 'date'],
+    COLUMNS,
+  )
   assert.deepEqual(
     plain(options.readColumnSelection(storage, 'logs', 'pdf', COLUMNS)),
     ['code', 'date'],
@@ -212,7 +219,7 @@ test('the column choice is remembered per list and file type', () => {
     4,
   )
   assert.doesNotThrow(() =>
-    options.writeColumnSelection(blocked, 'logs', 'pdf', ['code']),
+    options.writeColumnSelection(blocked, 'logs', 'pdf', ['code'], COLUMNS),
   )
   assert.equal(
     options.readColumnSelection(null, 'logs', 'pdf', COLUMNS).length,
@@ -242,23 +249,22 @@ test('every export column of both /logs views has a unique key', () => {
     'visit_state',
     'entry_at',
   ])
-  // The writer still sees the same headers as before.
-  assert.deepEqual(plain(movement.map((column) => column.header).slice(0, 4)), [
-    'equipmentCodeLabel',
-    'equipmentType',
-    'plateNumber',
-    'movementType',
-  ])
+  // The equipment block opens both files.
+  for (const columns of [movement, visit])
+    assert.deepEqual(
+      plain(columns.map((column) => column.header).slice(0, 3)),
+      ['equipmentCodeLabel', 'equipmentType', 'plateNumber'],
+    )
 })
 
 test('the visits export columns built with lookups keep the same keys', () => {
   const bare = visits.visitExportColumns(t, 'ar')
-  const looked = visits.visitExportColumns(
-    t,
-    'ar',
-    new Map([['e1', 'Supplier']]),
-    new Map([['d1', '0500']]),
-  )
+  const looked = visits.visitExportColumns(t, 'ar', {
+    supplierByEquipment: new Map([['e1', 'Supplier']]),
+    chassisByEquipment: new Map([['e1', 'CH']]),
+    mobileByDriver: new Map([['d1', '0500']]),
+    nameByProfile: new Map([['u1', 'Name']]),
+  })
   assert.deepEqual(
     plain(looked.map((column) => column.key)),
     plain(bare.map((column) => column.key)),
@@ -562,4 +568,287 @@ test('the wave-15 strings exist in both languages and follow the Arabic rule', (
     'printMissingDesc',
   ])
     assert.match(arabic, new RegExp(`\\b${key}:`))
+})
+
+// --- wave-15-export-fields: every field ---------------------------------------
+
+test('a saved choice keeps unticked columns and selects columns added later', () => {
+  const storage = memoryStorage()
+  const before = COLUMNS.slice(0, 3) // code, company, driver
+  // The user unticks «company» while the list had three columns.
+  options.writeColumnSelection(
+    storage,
+    'logs',
+    'xlsx',
+    ['code', 'driver'],
+    before,
+  )
+  const saved = JSON.parse(storage.getItem('em.export-columns.logs.xlsx'))
+  assert.deepEqual(saved, {
+    v: 2,
+    known: ['code', 'company', 'driver'],
+    selected: ['code', 'driver'],
+  })
+  // A release adds «date» and «chassis»: both come in ticked, «company»
+  // stays unticked.
+  const after = [
+    ...COLUMNS,
+    { key: 'chassis', header: 'Chassis', value: () => '' },
+  ]
+  assert.deepEqual(
+    plain(options.readColumnSelection(storage, 'logs', 'xlsx', after)),
+    ['code', 'driver', 'date', 'chassis'],
+  )
+  // A removed column disappears from the selection.
+  assert.deepEqual(
+    plain(
+      options.readColumnSelection(storage, 'logs', 'xlsx', [
+        COLUMNS[0],
+        COLUMNS[2],
+      ]),
+    ),
+    ['code', 'driver'],
+  )
+})
+
+test('the first wave-15 format (a plain array) resets to every column', () => {
+  // It never recorded which columns existed, so a new column cannot be told
+  // from an unticked one: every column, rather than a silently hidden one.
+  const storage = memoryStorage({
+    'em.export-columns.logs.pdf': JSON.stringify(['code', 'date']),
+  })
+  assert.deepEqual(
+    plain(options.readColumnSelection(storage, 'logs', 'pdf', COLUMNS)),
+    ['code', 'company', 'driver', 'date'],
+  )
+  for (const value of [
+    { v: 1, known: [], selected: [] },
+    { v: 2, known: 'code', selected: [] },
+    { v: 2, known: [], selected: [3] },
+    null,
+  ])
+    assert.equal(options.resolveStoredSelection(COLUMNS, value).length, 4)
+  // A stored v2 choice still keeps the mandatory columns.
+  assert.deepEqual(
+    plain(
+      options.resolveStoredSelection(COLUMNS, {
+        v: 2,
+        known: ['code', 'company', 'driver', 'date'],
+        selected: [],
+      }),
+    ),
+    ['code', 'date'],
+  )
+})
+
+test('the checklist groups consecutive columns under one heading', () => {
+  const groups = options.groupExportColumns([
+    { key: 'a', group: 'G1' },
+    { key: 'b', group: 'G1' },
+    { key: 'c', group: 'G2' },
+    { key: 'd' },
+  ])
+  assert.deepEqual(
+    plain(
+      groups.map((group) => [
+        group.label,
+        group.columns.map((column) => column.key),
+      ]),
+    ),
+    [
+      ['G1', ['a', 'b']],
+      ['G2', ['c']],
+      ['', ['d']],
+    ],
+  )
+  const movement = movementExcel.movementExportColumns(t, 'ar')
+  const visit = visits.visitExportColumns(t, 'ar')
+  // Every column of both views is grouped, and each group appears once.
+  for (const columns of [movement, visit]) {
+    assert.ok(columns.every((column) => column.group))
+    const labels = options
+      .groupExportColumns(columns)
+      .map((group) => group.label)
+    assert.equal(new Set(labels).size, labels.length)
+  }
+})
+
+test('both views export the company and the project in Arabic and English', () => {
+  const pairs = ['company_ar', 'company_en', 'project_ar', 'project_en']
+  const movement = movementExcel.movementExportColumns(t, 'ar')
+  const visit = visits.visitExportColumns(t, 'ar')
+  for (const columns of [movement, visit]) {
+    const keys = columns.map((column) => column.key)
+    assert.deepEqual(
+      plain(keys.filter((key) => pairs.includes(key))),
+      pairs,
+      'Arabic then English, company then project',
+    )
+    assert.ok(!keys.includes('company') && !keys.includes('project'))
+    for (const key of [
+      'chassis_number',
+      'owner',
+      'supplier',
+      'contractor_code',
+      'context',
+      'workshop_purpose',
+      'exit_purpose',
+      'driver_name',
+      'driver_mobile',
+    ])
+      assert.ok(keys.includes(key), key)
+  }
+  const movementKeys = movement.map((column) => column.key)
+  for (const key of [
+    'foreman',
+    'recorded_at',
+    'created_at',
+    'notes',
+    'odometer_reading',
+  ])
+    assert.ok(movementKeys.includes(key), key)
+  const visitKeys = visit.map((column) => column.key)
+  for (const key of ['entry_by', 'exit_by', 'entry_at', 'exit_at', 'duration'])
+    assert.ok(visitKeys.includes(key), key)
+  // The owner cell is the one shared label in both files.
+  assert.equal(visits.visitOwnerLabel, fields.exportOwnerLabel)
+})
+
+/** A fake Supabase client that records each query and answers it. */
+function recordingClient(answer) {
+  const calls = []
+  return {
+    calls,
+    from(table) {
+      const call = { table, select: null, ids: null, column: null }
+      calls.push(call)
+      const chain = {
+        select(columns) {
+          call.select = columns
+          return chain
+        },
+        in(column, ids) {
+          call.column = column
+          call.ids = ids
+          return chain
+        },
+        abortSignal: () => chain,
+        then: (resolve, reject) =>
+          Promise.resolve(answer(call)).then(resolve, reject),
+      }
+      return chain
+    },
+  }
+}
+
+test('one shared equipment lookup gives the supplier and the chassis', async () => {
+  const ids = Array.from({ length: 230 }, (_, index) => `e${index}`)
+  const client = recordingClient((call) => ({
+    data: call.ids.map((id) => ({
+      id,
+      chassis_number: id === 'e1' ? ' CH-1 ' : null,
+      lessor: id === 'e2' ? { name: 'Gulf' } : null,
+    })),
+    error: null,
+  }))
+  const result = await fields.loadEquipmentExportDetails(client, [
+    ...ids,
+    'e1',
+    null,
+    '',
+  ])
+  // One request per chunk of at most 100 distinct ids, nothing else.
+  assert.equal(client.calls.length, 3)
+  for (const call of client.calls) {
+    assert.equal(call.table, 'equipment')
+    assert.equal(call.select, 'id,chassis_number,lessor:lessors(name)')
+    assert.equal(call.column, 'id')
+    assert.ok(call.ids.length <= fields.EXPORT_LOOKUP_CHUNK_SIZE)
+  }
+  assert.equal(client.calls.flatMap((call) => call.ids).length, 230)
+  assert.equal(result.chassisByEquipment.get('e1'), 'CH-1')
+  assert.equal(result.supplierByEquipment.get('e2'), 'Gulf')
+  assert.equal(result.supplierByEquipment.has('e1'), false)
+  // No ids, no request.
+  const idle = recordingClient(() => ({ data: [], error: null }))
+  await fields.loadEquipmentExportDetails(idle, [])
+  assert.equal(idle.calls.length, 0)
+})
+
+test('the shared lookups throw on a failed query instead of exporting blanks', async () => {
+  const failing = recordingClient(() => ({
+    data: null,
+    error: { message: 'x' },
+  }))
+  await assert.rejects(fields.loadEquipmentExportDetails(failing, ['e1']), {
+    name: 'SupabaseLoadError',
+  })
+  await assert.rejects(fields.loadDriverMobiles(failing, ['d1']), {
+    name: 'SupabaseLoadError',
+  })
+  await assert.rejects(fields.loadProfileNames(failing, ['u1']), {
+    name: 'SupabaseLoadError',
+  })
+  await assert.rejects(fields.loadDriverChanges(failing, ['m1']), {
+    name: 'SupabaseLoadError',
+  })
+  const names = recordingClient((call) => ({
+    data: call.ids.map((id) => ({ id, full_name: ` ${id} name ` })),
+    error: null,
+  }))
+  const map = await fields.loadProfileNames(names, ['u1', 'u1', null])
+  assert.equal(names.calls[0].table, 'profile_names')
+  assert.equal(names.calls[0].select, 'id,full_name')
+  assert.deepEqual(plain(names.calls[0].ids), ['u1'])
+  assert.equal(map.get('u1'), 'u1 name')
+})
+
+test('both /logs exports use the shared lookups, not their own queries', () => {
+  const logs = read('src', 'screens', 'admin-home', 'LogsScreen.tsx')
+  const table = read('src', 'components', 'visits', 'VisitsTable.tsx')
+  for (const source of [logs, table]) {
+    assert.match(source, /loadEquipmentExportDetails\(\s*supabase,/)
+    assert.match(source, /loadDriverMobiles\(supabase, /)
+    assert.match(source, /loadDriverChanges\(/)
+    assert.doesNotMatch(source, /\.from\('equipment'\)/)
+    assert.doesNotMatch(source, /\.from\('drivers'\)/)
+  }
+  assert.match(table, /loadProfileNames\(/)
+  assert.match(table, /exit_supervisor_id/)
+  assert.match(logs, /withCurrentMovementDrivers\(/)
+})
+
+test('the column list is compact: small checkboxes, 12 px, 2 then 3 columns', () => {
+  const dialog = read('src', 'components', 'data-list', 'ExportDialog.tsx')
+  assert.match(dialog, /size="sm"\s+label=\{column\.header\}/)
+  assert.match(dialog, /grid grid-cols-2 gap-x-3 sm:grid-cols-3/)
+  assert.match(dialog, /groupExportColumns\(columns\)/)
+  assert.match(dialog, /text-xs font-semibold text-muted/)
+  assert.match(
+    dialog,
+    /writeColumnSelection\(\s*localStore\(\),\s*listId,\s*fileType,\s*normalized,\s*columns,?\s*\)/,
+  )
+  const checkbox = read('src', 'components', 'ui', 'Checkbox.tsx')
+  assert.match(checkbox, /size === 'sm' \? 'h-4 w-4 rounded'/)
+  assert.match(checkbox, /size === 'sm' \? 'text-xs leading-tight'/)
+  // A wide print selection drops to 10 px and wraps its headers.
+  const page = read('src', 'screens', 'PrintExport.tsx')
+  assert.match(page, /const COMPACT_FROM_COLUMNS = 14/)
+  assert.match(page, /'text-\[10px\]' : 'text-\[11px\]'/)
+  assert.match(page, /break-words border bg-surface-hover/)
+})
+
+test('the wave-15-export-fields strings exist in both languages', () => {
+  const source = read('src', 'i18n', 'translations.ts')
+  const blocks = source.match(
+    /\/\/ wave-15-export-fields — start[\s\S]*?\/\/ wave-15-export-fields — end/g,
+  )
+  assert.equal(blocks?.length, 2, 'one delimited block per language')
+  const keysOf = (block) =>
+    Array.from(block.matchAll(/^\s+(\w+):/gm), (match) => match[1])
+  assert.deepEqual(keysOf(blocks[0]), keysOf(blocks[1]))
+  const arabic = blocks.find((block) => /[؀-ۿ]/.test(block))
+  assert.ok(arabic)
+  assert.ok(!/[أإآ]/.test(arabic))
+  assert.match(arabic, /exportColWorkshopPurpose: 'غرض دخول الورشة'/)
 })

@@ -144,45 +144,88 @@ const siteEntry = {
   recorded_at: '2026-09-23T09:05:00Z',
 }
 
-test('the movement export has Arabic headers in the table column order', () => {
+const MOVEMENT_HEADERS = [
+  'equipmentCodeLabel',
+  'equipmentType',
+  'plateNumber',
+  'chassisNumber',
+  'ownershipStatus',
+  'lessor',
+  'contractorEquipmentCode',
+  'logsColContext',
+  'exportColWorkshopPurpose',
+  'movementType',
+  'exitPurpose',
+  'companyNameAr',
+  'companyNameEn',
+  'projectNameAr',
+  'projectNameEn',
+  'driverName',
+  'exportColDriverMobile',
+  'logsColForeman',
+  'recordedAt',
+  'createdAt',
+  'notes',
+  'odometerReading',
+]
+
+/** The index of a column in the export, by its header key. */
+const at = (header) => {
+  const index = MOVEMENT_HEADERS.indexOf(header)
+  assert.ok(index >= 0, header)
+  return index
+}
+
+test('the movement export lists every field, grouped, in a sensible order', () => {
   const columns = movementExcel.movementExportColumns(t, 'ar')
-  assert.deepEqual(plain(columns.map((column) => column.header)), [
-    'equipmentCodeLabel',
-    'equipmentType',
-    'plateNumber',
-    'movementType',
-    'exitPurpose',
-    'logsColContext',
-    'company',
-    'project',
-    'contractorEquipmentCode',
-    'driverName',
-    'logsColForeman',
-    'notes',
-    'recordedAt',
-  ])
+  // wave-15-export-fields: the equipment block (with owner and supplier), the
+  // movement, company and project in Arabic then English, the driver, then
+  // who recorded it and when, the notes and the odometer.
+  assert.deepEqual(
+    plain(columns.map((column) => column.header)),
+    MOVEMENT_HEADERS,
+  )
   // Every column carries a width, so no exported sheet opens with clipped
   // columns the reader has to widen by hand.
   assert.ok(columns.every((column) => typeof column.width === 'number'))
+  // Every column has a group heading for the export dialog.
+  assert.deepEqual(
+    plain(Array.from(new Set(columns.map((column) => column.group)))),
+    [
+      'exportGroupEquipment',
+      'exportGroupMovement',
+      'exportGroupCompanyProject',
+      'exportGroupDriver',
+      'exportGroupRecording',
+    ],
+  )
+  const dates = columns.filter((column) => column.type === 'date')
+  assert.deepEqual(plain(dates.map((column) => column.key)), [
+    'recorded_at',
+    'created_at',
+  ])
 })
 
 test('badges are exported as plain text, and the time as a Saudi date cell', () => {
   const columns = movementExcel.movementExportColumns(t, 'ar')
   const [row] = excel.sheetAoa(columns, [siteEntry]).slice(1)
-  assert.equal(row[3], 'دخول')
-  assert.equal(row[5], 'المشاريع')
-  assert.equal(readSerial(row[12]), '23/09/2026 12:05')
+  assert.equal(row[at('movementType')], 'دخول')
+  assert.equal(row[at('logsColContext')], 'المشاريع')
+  assert.equal(row[at('exportColWorkshopPurpose')], '')
+  assert.equal(readSerial(row[at('recordedAt')]), '23/09/2026 12:05')
+  // No created_at on the row: an empty cell, not a date.
+  assert.equal(row[at('createdAt')], null)
 
   const [exitRow] = excel
     .sheetAoa(columns, [{ ...siteEntry, movement_type: 'exit' }])
     .slice(1)
-  assert.equal(exitRow[3], 'خروج')
+  assert.equal(exitRow[at('movementType')], 'خروج')
 })
 
 test('wave 12: a site exit exports its purpose as words, every other row empty', () => {
   const columns = movementExcel.movementExportColumns(t, 'ar')
   const exit = { ...siteEntry, movement_type: 'exit' }
-  const cell = (row) => excel.sheetAoa(columns, [row])[1][4]
+  const cell = (row) => excel.sheetAoa(columns, [row])[1][at('exitPurpose')]
   assert.equal(
     cell({ ...exit, exit_purpose: 'maintenance' }),
     t('exitPurposeMaintenance'),
@@ -197,6 +240,8 @@ test('wave 12: a site exit exports its purpose as words, every other row empty',
   assert.equal(cell(exit), '')
   // An entry never carries a purpose, even if a value slipped through.
   assert.equal(cell({ ...siteEntry, exit_purpose: 'maintenance' }), '')
+  // The purpose sits right after the movement type.
+  assert.equal(at('exitPurpose'), at('movementType') + 1)
 })
 
 test('a workshop movement exports its purpose as words', () => {
@@ -206,51 +251,136 @@ test('a workshop movement exports its purpose as words', () => {
     movement_context: 'workshop',
     workshop_purpose: 'maintenance',
   }
-  assert.equal(excel.sheetAoa(columns, [workshop])[1][5], 'صيانة')
-  assert.equal(
-    excel.sheetAoa(columns, [
-      { ...workshop, workshop_purpose: 'parking' },
-    ])[1][5],
-    'انتظار',
-  )
+  const row = (value) => excel.sheetAoa(columns, [value])[1]
+  assert.equal(row(workshop)[at('logsColContext')], 'صيانة')
+  assert.equal(row(workshop)[at('exportColWorkshopPurpose')], 'صيانة')
+  const parking = row({ ...workshop, workshop_purpose: 'parking' })
+  assert.equal(parking[at('logsColContext')], 'انتظار')
+  assert.equal(parking[at('exportColWorkshopPurpose')], 'انتظار')
   // A workshop row with no purpose recorded still says where it happened.
-  assert.equal(
-    excel.sheetAoa(columns, [{ ...workshop, workshop_purpose: null }])[1][5],
-    'الورشة',
-  )
+  const unclassified = row({ ...workshop, workshop_purpose: null })
+  assert.equal(unclassified[at('logsColContext')], 'الورشة')
+  assert.equal(unclassified[at('exportColWorkshopPurpose')], '')
 })
 
 test('a driverless site entry exports a blank driver cell', () => {
   // The driver became optional on a site ENTRY on 2026-09-23 (migration 0103).
   const columns = movementExcel.movementExportColumns(t, 'ar')
   const aoa = excel.sheetAoa(columns, [{ ...siteEntry, driver_name: null }])
-  assert.equal(aoa[1][9], '')
+  assert.equal(aoa[1][at('driverName')], '')
+  assert.equal(aoa[1][at('exportColDriverMobile')], '')
 })
 
-test('company and project follow the interface language', () => {
-  const arabic = excel.sheetAoa(movementExcel.movementExportColumns(t, 'ar'), [
-    siteEntry,
+test('company and project are written in Arabic and in English, in both languages', () => {
+  for (const lang of ['ar', 'en']) {
+    const row = excel.sheetAoa(movementExcel.movementExportColumns(t, lang), [
+      siteEntry,
+    ])[1]
+    assert.equal(row[at('companyNameAr')], 'شركة')
+    assert.equal(row[at('companyNameEn')], 'Company')
+    assert.equal(row[at('projectNameAr')], 'مشروع')
+    assert.equal(row[at('projectNameEn')], 'Project')
+  }
+  // A missing name stays blank rather than borrowing the other language or
+  // becoming an em dash.
+  const missing = excel.sheetAoa(movementExcel.movementExportColumns(t, 'en'), [
+    {
+      ...siteEntry,
+      company_name_en: null,
+      project_name_ar: '  ',
+      project_name_en: null,
+    },
   ])[1]
-  assert.equal(arabic[6], 'شركة')
-  const english = excel.sheetAoa(movementExcel.movementExportColumns(t, 'en'), [
-    siteEntry,
+  assert.equal(missing[at('companyNameAr')], 'شركة')
+  assert.equal(missing[at('companyNameEn')], '')
+  assert.equal(missing[at('projectNameAr')], '')
+  assert.equal(missing[at('projectNameEn')], '')
+})
+
+test('the equipment, owner, supplier and record fields are exported', () => {
+  const row = {
+    ...siteEntry,
+    id: 'm1',
+    equipment_id: 'e1',
+    equipment_chassis_number: ' CH-77 ',
+    equipment_ownership_status: 'external_supplier',
+    driver_id: 'd1',
+    driver_mobile_number: '0500000001',
+    created_at: '2026-09-23T10:00:00Z',
+    odometer_reading: 1520,
+  }
+  const columns = movementExcel.movementExportColumns(t, 'ar', {
+    supplierByEquipment: new Map([['e1', 'Gulf Rentals']]),
+  })
+  const cells = excel.sheetAoa(columns, [row])[1]
+  assert.equal(cells[at('chassisNumber')], 'CH-77')
+  assert.equal(cells[at('ownershipStatus')], 'adminHomeOwnerExternal')
+  assert.equal(cells[at('lessor')], 'Gulf Rentals')
+  assert.equal(cells[at('exportColDriverMobile')], '0500000001')
+  assert.equal(cells[at('logsColForeman')], 'فورمان')
+  assert.equal(readSerial(cells[at('createdAt')]), '23/09/2026 13:00')
+  assert.equal(cells[at('notes')], 'ملاحظة')
+  assert.equal(cells[at('odometerReading')], 1520)
+  // Without the lookup the supplier is simply empty; no odometer, no cell.
+  const bare = excel.sheetAoa(movementExcel.movementExportColumns(t, 'ar'), [
+    { ...row, odometer_reading: null },
   ])[1]
-  assert.equal(english[6], 'Company')
-  // A name missing in the chosen language falls back to the other one, and a
-  // name missing in both stays blank rather than becoming an em dash.
-  const fallback = excel.sheetAoa(
-    movementExcel.movementExportColumns(t, 'en'),
+  assert.equal(bare[at('lessor')], '')
+  assert.equal(bare[at('odometerReading')], null)
+})
+
+test("a site entry exports its current driver and that driver's mobile", () => {
+  const entry = {
+    ...siteEntry,
+    id: 'm1',
+    driver_id: 'd1',
+    driver_name: 'سالم',
+    driver_mobile_number: '0500000001',
+  }
+  const exit = { ...entry, id: 'm2', movement_type: 'exit' }
+  const workshop = { ...entry, id: 'm3', movement_context: 'workshop' }
+  assert.deepEqual(
+    plain(movementExcel.movementDriverChangeEntryIds([entry, exit, workshop])),
+    ['m1'],
+  )
+  const change = (over) => ({
+    id: 'c1',
+    entry_log_id: 'm1',
+    new_driver_id: 'd2',
+    new_driver_name: 'خالد',
+    changed_at: '2026-09-24T10:00:00+00:00',
+    ...over,
+  })
+  const rows = movementExcel.withCurrentMovementDrivers(
+    [entry, exit],
     [
-      {
-        ...siteEntry,
-        company_name_en: null,
-        project_name_ar: null,
-        project_name_en: null,
-      },
+      change({ id: 'c1' }),
+      change({ id: 'c2', new_driver_id: 'd3', new_driver_name: 'فهد' }),
+      // An exit is never rewritten, even if a change names its id.
+      change({ id: 'c3', entry_log_id: 'm2', new_driver_name: 'X' }),
     ],
+  )
+  assert.equal(rows[0].current_driver_name, 'فهد')
+  assert.equal(rows[0].current_driver_id, 'd3')
+  // The stored snapshot itself stays (the entry driver is immutable).
+  assert.equal(rows[0].driver_name, 'سالم')
+  assert.equal(rows[1].current_driver_name, undefined)
+  assert.deepEqual(plain(movementExcel.changedDriverIds(rows)), ['d3'])
+
+  const columns = movementExcel.movementExportColumns(t, 'ar', {
+    mobileByDriver: new Map([['d3', '0555555555']]),
+  })
+  const [changed, unchanged] = excel.sheetAoa(columns, rows).slice(1)
+  assert.equal(changed[at('driverName')], 'فهد')
+  assert.equal(changed[at('exportColDriverMobile')], '0555555555')
+  assert.equal(unchanged[at('driverName')], 'سالم')
+  assert.equal(unchanged[at('exportColDriverMobile')], '0500000001')
+  // A changed driver without a known mobile is empty, never the old one's.
+  const noMobile = excel.sheetAoa(
+    movementExcel.movementExportColumns(t, 'ar'),
+    rows,
   )[1]
-  assert.equal(fallback[6], 'شركة')
-  assert.equal(fallback[7], '')
+  assert.equal(noMobile[at('exportColDriverMobile')], '')
 })
 
 test('the file name carries the tab and the Saudi calendar day', () => {

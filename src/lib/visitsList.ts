@@ -13,6 +13,22 @@ import {
   exitPurposeOrNull,
   type ExitPurpose,
 } from '@/lib/exitPurpose'
+import {
+  DRIVER_CHANGES_SELECT,
+  EXPORT_LOOKUP_CHUNK_SIZE,
+  chunkItems,
+  distinctIds,
+  driverMobilesById,
+  exportOwnerLabel,
+  exportText,
+  latestDriverChanges,
+  lookupValue,
+  supplierNamesByEquipment,
+  type DriverChangeRow,
+  type DriverMobileRow,
+  type EquipmentExportRow,
+  type ExportLookups,
+} from '@/lib/exportFields'
 
 /**
  * `movement_visits` (migration 0096) is a `security_invoker` view with one
@@ -398,101 +414,29 @@ export function formatVisitDuration(
 //
 // The columns of the admin log's visits export. Pure, like the movement
 // export in `@/lib/movementExcel`, so the headers and fallbacks can be tested
-// without a spreadsheet library; `exportRowsToExcel` writes the sheet.
+// without a spreadsheet library; `exportRowsToExcel` writes the sheet. The
+// values the view does not carry are looked up at export time through the
+// loaders both exports share (`@/lib/exportFields`).
 
 type Translate = (key: TranslationKey) => string
 
-/**
- * A company or project name for a sheet cell: the English name in every
- * interface language (owner decision 2026-10-04), the Arabic one only when
- * there is no English name; empty, never an em dash.
- */
-function exportName(nameAr?: string | null, nameEn?: string | null): string {
-  return nameEn?.trim() || nameAr?.trim() || ''
-}
+/** The owner cell, shared with the movement export (`exportOwnerLabel`). */
+export const visitOwnerLabel = exportOwnerLabel
 
-/** The owner names of the export file, as the owner asked for them (2026-10-04). */
-const OWNER_LABEL_KEYS: Record<string, TranslationKey> = {
-  alazani: 'exportOwnerAlazani',
-  takween: 'ownershipTakween',
-  third_party_f: 'exportOwnerThirdPartyF',
-  third_party_partnership_b: 'exportOwnerThirdPartyB',
-  external_supplier: 'adminHomeOwnerExternal',
-}
-
-/**
- * The owner cell: the localized owner name, the raw value for an owner the app
- * does not know yet (never blank), and empty when the view returned none.
- */
-export function visitOwnerLabel(
-  status: string | null | undefined,
-  t: Translate,
-): string {
-  if (!status) return ''
-  const key = OWNER_LABEL_KEYS[status]
-  return key ? t(key) : status
-}
-
-/** Equipment ids are looked up this many per request, so a URL stays short. */
-export const SUPPLIER_LOOKUP_CHUNK_SIZE = 100
-
-/** Splits a list into consecutive chunks of at most `size` (at least one). */
-export function chunkItems<T>(items: readonly T[], size: number): T[][] {
-  const step = Math.max(1, Math.trunc(size))
-  const chunks: T[][] = []
-  for (let index = 0; index < items.length; index += step)
-    chunks.push(items.slice(index, index + step))
-  return chunks
-}
+/** Kept under the visits names the screen and the tests already use. */
+export const SUPPLIER_LOOKUP_CHUNK_SIZE = EXPORT_LOOKUP_CHUNK_SIZE
+export type EquipmentSupplierRow = EquipmentExportRow
+export type VisitDriverChangeRow = DriverChangeRow
+export const VISIT_DRIVER_CHANGES_SELECT = DRIVER_CHANGES_SELECT
+export { chunkItems, driverMobilesById, supplierNamesByEquipment }
+export type { DriverMobileRow }
 
 /** The distinct, non-empty equipment ids of a set of visits, in first-seen order. */
 export function distinctEquipmentIds(
   visits: readonly Pick<EquipmentVisitRow, 'equipment_id'>[],
 ): string[] {
-  return Array.from(
-    new Set(
-      visits
-        .map((visit) => visit.equipment_id)
-        .filter((id): id is string => !!id),
-    ),
-  )
+  return distinctIds(visits.map((visit) => visit.equipment_id))
 }
-
-/** One `equipment` row as the supplier lookup selects it. */
-export interface EquipmentSupplierRow {
-  id: string
-  /** PostgREST returns an embedded to-one row as an object (or null). */
-  lessor?: { name: string | null } | { name: string | null }[] | null
-}
-
-/**
- * Maps equipment id to supplier (lessor) name. A unit without a lessor, or a
- * lessor without a name, is simply absent, so its cell exports empty.
- */
-export function supplierNamesByEquipment(
-  rows: readonly EquipmentSupplierRow[],
-  into: Map<string, string> = new Map(),
-): Map<string, string> {
-  for (const row of rows) {
-    const lessor = Array.isArray(row.lessor) ? row.lessor[0] : row.lessor
-    const name = lessor?.name?.trim()
-    if (row.id && name) into.set(row.id, name)
-  }
-  return into
-}
-
-/** One `movement_driver_changes` row as the current-driver lookup selects it. */
-export interface VisitDriverChangeRow {
-  id: string
-  entry_log_id: string
-  new_driver_id: string | null
-  new_driver_name: string | null
-  changed_at: string
-}
-
-/** The columns of `VisitDriverChangeRow`, for the lookup's select. */
-export const VISIT_DRIVER_CHANGES_SELECT =
-  'id,entry_log_id,new_driver_id,new_driver_name,changed_at'
 
 /**
  * Visits with their CURRENT driver: the latest auditable driver change of the
@@ -503,17 +447,8 @@ export const VISIT_DRIVER_CHANGES_SELECT =
  */
 export function withCurrentDrivers<
   T extends Pick<EquipmentVisitRow, 'entry_id' | 'driver_id' | 'driver_name'>,
->(visits: readonly T[], changes: readonly VisitDriverChangeRow[]): T[] {
-  const latest = new Map<string, VisitDriverChangeRow>()
-  for (const change of changes) {
-    const current = latest.get(change.entry_log_id)
-    if (
-      !current ||
-      change.changed_at > current.changed_at ||
-      (change.changed_at === current.changed_at && change.id > current.id)
-    )
-      latest.set(change.entry_log_id, change)
-  }
+>(visits: readonly T[], changes: readonly DriverChangeRow[]): T[] {
+  const latest = latestDriverChanges(changes)
   return visits.map((visit) => {
     const change = latest.get(visit.entry_id)
     if (!change?.new_driver_name) return visit
@@ -529,50 +464,63 @@ export function withCurrentDrivers<
 export function distinctDriverIds(
   visits: readonly Pick<EquipmentVisitRow, 'driver_id'>[],
 ): string[] {
-  return Array.from(
-    new Set(
-      visits.map((visit) => visit.driver_id).filter((id): id is string => !!id),
-    ),
-  )
+  return distinctIds(visits.map((visit) => visit.driver_id))
 }
 
-/** One `drivers` row as the mobile lookup selects it. */
-export interface DriverMobileRow {
-  id: string
-  mobile_number: string | null
+/** The entry ids whose driver can have changed: site visits only. */
+export function siteEntryIds(
+  visits: readonly Pick<EquipmentVisitRow, 'entry_id' | 'movement_context'>[],
+): string[] {
+  return visits
+    .filter((visit) => visit.movement_context === 'site')
+    .map((visit) => visit.entry_id)
+}
+
+/** The workshop purpose in words; empty for a site row or an unclassified one. */
+function workshopPurposeLabel(
+  row: Pick<EquipmentVisitRow, 'movement_context' | 'workshop_purpose'>,
+  t: Translate,
+): string {
+  if (row.movement_context !== 'workshop') return ''
+  if (row.workshop_purpose === 'maintenance') return t('maintenancePurpose')
+  if (row.workshop_purpose === 'parking') return t('parkingPurpose')
+  return ''
+}
+
+/** The context cell: المشاريع, or the workshop with its purpose spelled out. */
+function visitContextLabel(
+  row: Pick<EquipmentVisitRow, 'movement_context' | 'workshop_purpose'>,
+  t: Translate,
+): string {
+  if (row.movement_context !== 'workshop') return t('logsSites')
+  return workshopPurposeLabel(row, t) || t('logsWorkshop')
 }
 
 /**
- * Maps driver id to mobile number. A driver without a number is simply
- * absent, so the cell exports empty.
- */
-export function driverMobilesById(
-  rows: readonly DriverMobileRow[],
-  into: Map<string, string> = new Map(),
-): Map<string, string> {
-  for (const row of rows) {
-    const mobile = row.mobile_number?.trim()
-    if (row.id && mobile) into.set(row.id, mobile)
-  }
-  return into
-}
-
-/**
- * @param supplierByEquipment supplier names resolved at export time (the view
- * does not carry them); a unit absent from the map exports an empty supplier.
- * @param mobileByDriver driver mobile numbers resolved the same way; a legacy
- * visit with only a driver name, or a driver without a number, exports empty.
+ * Every field of a visit, grouped for the export dialog: the equipment, the
+ * visit, the company and project (Arabic and English as separate columns),
+ * the driver, then who recorded it and when.
+ *
+ * @param lookups the values resolved at export time: the supplier and the
+ * chassis number by equipment, the mobile by (current) driver and the exit
+ * supervisor's name by profile. Without them those cells export empty, which
+ * is how the dialog builds its checklist before any row is read.
  */
 export function visitExportColumns(
   t: Translate,
   lang: Language,
-  supplierByEquipment: ReadonlyMap<string, string> = new Map(),
-  mobileByDriver: ReadonlyMap<string, string> = new Map(),
+  lookups: ExportLookups = {},
 ): ExcelColumn<EquipmentVisitRow>[] {
+  const equipment = t('exportGroupEquipment')
+  const visit = t('exportGroupVisit')
+  const companyProject = t('exportGroupCompanyProject')
+  const driver = t('exportGroupDriver')
+  const recording = t('exportGroupRecording')
   return [
     {
       key: 'equipment_code',
       mandatory: true,
+      group: equipment,
       header: t('equipmentCodeLabel'),
       width: 14,
       value: (row) => row.equipment_code ?? '',
@@ -580,6 +528,7 @@ export function visitExportColumns(
     {
       key: 'equipment_type',
       mandatory: true,
+      group: equipment,
       header: t('equipmentType'),
       width: 24,
       value: (row) => row.equipment_type ?? '',
@@ -587,43 +536,61 @@ export function visitExportColumns(
     {
       key: 'plate_number',
       mandatory: true,
+      group: equipment,
       header: t('plateNumber'),
       width: 14,
       value: (row) => row.equipment_plate_number ?? '',
     },
     {
+      // Looked up at export time: `movement_visits` has no chassis column.
+      key: 'chassis_number',
+      group: equipment,
+      header: t('chassisNumber'),
+      width: 20,
+      value: (row) => lookupValue(lookups.chassisByEquipment, row.equipment_id),
+    },
+    {
       key: 'owner',
+      group: equipment,
       header: t('ownershipStatus'),
       width: 16,
-      value: (row) => visitOwnerLabel(row.equipment_ownership_status, t),
+      value: (row) => exportOwnerLabel(row.equipment_ownership_status, t),
     },
     {
       key: 'supplier',
+      group: equipment,
       header: t('lessor'),
       width: 24,
-      value: (row) => supplierByEquipment.get(row.equipment_id) ?? '',
+      value: (row) =>
+        lookupValue(lookups.supplierByEquipment, row.equipment_id),
     },
     {
       key: 'contractor_code',
+      group: equipment,
       header: t('contractorEquipmentCode'),
       width: 16,
       value: (row) => row.contractor_equipment_code ?? '',
     },
     {
       key: 'context',
+      group: visit,
       header: t('logsColContext'),
       width: 14,
-      value: (row) => {
-        if (row.movement_context !== 'workshop') return t('logsSites')
-        if (row.workshop_purpose === 'maintenance')
-          return t('maintenancePurpose')
-        if (row.workshop_purpose === 'parking') return t('parkingPurpose')
-        return t('logsWorkshop')
-      },
+      value: (row) => visitContextLabel(row, t),
+    },
+    {
+      // The context already names the purpose; this column holds it alone,
+      // so the sheet can be filtered on it. Empty for a site visit.
+      key: 'workshop_purpose',
+      group: visit,
+      header: t('exportColWorkshopPurpose'),
+      width: 14,
+      value: (row) => workshopPurposeLabel(row, t),
     },
     {
       key: 'visit_state',
       mandatory: true,
+      group: visit,
       header: t('visitState'),
       width: 10,
       value: (row) => t(visitStateView(row).labelKey),
@@ -632,45 +599,77 @@ export function visitExportColumns(
       // Right after the state: the purpose of the EXIT that closed the visit,
       // empty for an open, workshop or pre-0111 visit.
       key: 'exit_purpose',
+      group: visit,
       header: t('exitPurpose'),
       width: 14,
       value: (row) => exitPurposeExportLabel(visitExitPurpose(row), t),
     },
     {
-      key: 'company',
-      header: t('company'),
+      key: 'company_ar',
+      group: companyProject,
+      header: t('companyNameAr'),
       width: 24,
-      value: (row) => exportName(row.company_name_ar, row.company_name_en),
+      value: (row) => exportText(row.company_name_ar),
     },
     {
-      key: 'project',
-      header: t('project'),
+      key: 'company_en',
+      group: companyProject,
+      header: t('companyNameEn'),
       width: 24,
-      value: (row) => exportName(row.project_name_ar, row.project_name_en),
+      value: (row) => exportText(row.company_name_en),
+    },
+    {
+      key: 'project_ar',
+      group: companyProject,
+      header: t('projectNameAr'),
+      width: 24,
+      value: (row) => exportText(row.project_name_ar),
+    },
+    {
+      key: 'project_en',
+      group: companyProject,
+      header: t('projectNameEn'),
+      width: 24,
+      value: (row) => exportText(row.project_name_en),
     },
     {
       key: 'driver_name',
+      group: driver,
       header: t('driverName'),
       width: 22,
       value: (row) => row.driver_name ?? '',
     },
     {
       key: 'driver_mobile',
+      group: driver,
       header: t('exportColDriverMobile'),
       width: 16,
       // Text, so a leading zero survives in the sheet.
-      value: (row) =>
-        (row.driver_id ? mobileByDriver.get(row.driver_id) : undefined) ?? '',
+      value: (row) => lookupValue(lookups.mobileByDriver, row.driver_id),
     },
     {
       key: 'entry_by',
+      group: recording,
       header: t('entryBy'),
       width: 22,
       value: (row) => row.entry_supervisor_name ?? '',
     },
     {
+      // The view carries the exit recorder's id only; the name is looked up
+      // through `profile_names` at export time. Empty for an open visit.
+      key: 'exit_by',
+      group: recording,
+      header: t('exitBy'),
+      width: 22,
+      value: (row) =>
+        visitStateView(row).state === 'closed'
+          ? lookupValue(lookups.nameByProfile, row.exit_supervisor_id)
+          : '',
+    },
+    {
       key: 'entry_at',
       mandatory: true,
+      group: recording,
       header: t('visitEntryAt'),
       width: 18,
       type: 'date',
@@ -678,6 +677,7 @@ export function visitExportColumns(
     },
     {
       key: 'exit_at',
+      group: recording,
       header: t('visitExitAt'),
       width: 18,
       type: 'date',
@@ -687,6 +687,7 @@ export function visitExportColumns(
     },
     {
       key: 'duration',
+      group: recording,
       header: t('visitDuration'),
       width: 14,
       value: (row) => formatVisitDuration(row.duration_minutes, lang) ?? '',

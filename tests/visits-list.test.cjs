@@ -410,7 +410,8 @@ test('the visits export writes plain text, the company number and Saudi dates', 
   const cell = (header) =>
     columns.find((column) => column.header === header).value(row)
   assert.equal(cell('[contractorEquipmentCode]'), 'TK-7')
-  assert.equal(cell('[company]'), 'Company')
+  assert.equal(cell('[companyNameEn]'), 'Company')
+  assert.equal(cell('[companyNameAr]'), 'شركة')
   assert.equal(cell('[logsColContext]'), '[logsSites]')
   assert.equal(cell('[visitState]'), '[visitClosed]')
   // A driverless entry (allowed since 2026-09-23) is an empty cell, not "—".
@@ -422,10 +423,11 @@ test('the visits export writes plain text, the company number and Saudi dates', 
 
 test('the export carries owner and supplier right after the equipment columns', () => {
   const headers = visitExportColumns(fakeT, 'ar').map((column) => column.header)
-  assert.deepEqual(plain(headers.slice(0, 6)), [
+  assert.deepEqual(plain(headers.slice(0, 7)), [
     '[equipmentCodeLabel]',
     '[equipmentType]',
     '[plateNumber]',
+    '[chassisNumber]',
     '[ownershipStatus]',
     '[lessor]',
     '[contractorEquipmentCode]',
@@ -456,7 +458,9 @@ test('the owner cell uses the short owner labels and never goes blank', () => {
 
 test('the supplier cell comes from the looked-up map and is empty without a lessor', () => {
   const suppliers = new Map([['e1', 'Gulf Rentals']])
-  const columns = visitExportColumns(fakeT, 'en', suppliers)
+  const columns = visitExportColumns(fakeT, 'en', {
+    supplierByEquipment: suppliers,
+  })
   const supplier = columns.find((column) => column.header === '[lessor]')
   const owner = columns.find((column) => column.header === '[ownershipStatus]')
   assert.equal(supplier.value(visit()), 'Gulf Rentals')
@@ -549,7 +553,7 @@ test('the driver mobile is exported from the lookup, empty when unknown', () => 
     ),
     ['d1'],
   )
-  const columns = visitExportColumns(fakeT, 'en', new Map(), mobiles)
+  const columns = visitExportColumns(fakeT, 'en', { mobileByDriver: mobiles })
   const headers = columns.map((column) => column.header)
   const mobile = columns[headers.indexOf('[exportColDriverMobile]')]
   assert.equal(
@@ -600,15 +604,61 @@ test('a visit shows its latest driver change, else the entry driver', () => {
   assert.equal(later[0].driver_name, 'Newest')
 })
 
-test('the export names the company and the project in English in both languages', () => {
+test('the export writes company and project in Arabic and in English, in both languages', () => {
+  // wave-15-export-fields: two explicit columns each, replacing the single
+  // English-preferring column.
   for (const lang of ['ar', 'en']) {
     const columns = visitExportColumns(fakeT, lang)
-    const company = columns.find((column) => column.header === '[company]')
-    const project = columns.find((column) => column.header === '[project]')
-    assert.equal(company.value(visit()), 'Company')
-    assert.equal(project.value(visit()), 'Project')
-    // No English name: the Arabic one, never an empty cell.
-    assert.equal(company.value(visit({ company_name_en: null })), 'شركة')
-    assert.equal(project.value(visit({ project_name_en: ' ' })), 'مشروع')
+    const cell = (header, row) =>
+      columns.find((column) => column.header === header).value(row)
+    assert.equal(cell('[companyNameAr]', visit()), 'شركة')
+    assert.equal(cell('[companyNameEn]', visit()), 'Company')
+    assert.equal(cell('[projectNameAr]', visit()), 'مشروع')
+    assert.equal(cell('[projectNameEn]', visit()), 'Project')
+    // A missing name is an empty cell, never the other language or a dash.
+    assert.equal(cell('[companyNameEn]', visit({ company_name_en: null })), '')
+    assert.equal(cell('[projectNameEn]', visit({ project_name_en: ' ' })), '')
+    assert.ok(!columns.some((column) => column.header === '[company]'))
   }
+})
+
+test('the visits export adds chassis, workshop purpose and the exit supervisor', () => {
+  const columns = visitExportColumns(fakeT, 'ar', {
+    chassisByEquipment: new Map([['e1', 'CH-1']]),
+    nameByProfile: new Map([['s2', 'Exit Foreman']]),
+  })
+  const cell = (header, row) =>
+    columns.find((column) => column.header === header).value(row)
+  assert.equal(cell('[chassisNumber]', visit()), 'CH-1')
+  assert.equal(cell('[chassisNumber]', visit({ equipment_id: 'e9' })), '')
+  // The purpose has its own column; the context keeps naming it too.
+  const workshop = visit({
+    movement_context: 'workshop',
+    workshop_purpose: 'maintenance',
+  })
+  assert.equal(
+    cell('[exportColWorkshopPurpose]', workshop),
+    '[maintenancePurpose]',
+  )
+  assert.equal(cell('[logsColContext]', workshop), '[maintenancePurpose]')
+  assert.equal(cell('[exportColWorkshopPurpose]', visit()), '')
+  // The exit supervisor is named from the lookup, only for a closed visit.
+  assert.equal(
+    cell('[exitBy]', visit({ exit_supervisor_id: 's2' })),
+    'Exit Foreman',
+  )
+  assert.equal(cell('[exitBy]', visit({ exit_supervisor_id: 's9' })), '')
+  assert.equal(
+    cell(
+      '[exitBy]',
+      visit({
+        exit_supervisor_id: 's2',
+        is_open: true,
+        exit_id: null,
+        exit_at: null,
+      }),
+    ),
+    '',
+  )
+  assert.equal(cell('[entryBy]', visit()), 'Foreman')
 })

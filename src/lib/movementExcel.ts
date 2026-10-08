@@ -3,6 +3,15 @@ import type { TranslationKey } from '@/i18n/translations'
 import type { ExcelColumn } from '@/lib/excel'
 import { saudiDateKey } from '@/lib/saudiTime'
 import { exitPurposeExportLabel } from '@/lib/exitPurpose'
+import {
+  distinctIds,
+  exportOwnerLabel,
+  exportText,
+  latestDriverChanges,
+  lookupValue,
+  type DriverChangeRow,
+  type ExportLookups,
+} from '@/lib/exportFields'
 
 export type MovementImportMode = 'entry' | 'exit' | 'both'
 
@@ -171,7 +180,10 @@ export async function parseMovementWorkbook(
 // here is pure so the headers, the fallbacks and the file name can be tested
 // without a spreadsheet library; `exportRowsToExcel` in `@/lib/excel` turns
 // the columns into the formatted sheet (frozen header, autofilter, widths,
-// RTL, Saudi-time date cells).
+// RTL, Saudi-time date cells). The values `movement_log_search` does not
+// carry (the supplier, a changed driver and that driver's mobile) are looked
+// up at export time through `@/lib/exportFields`, shared with the visits
+// export.
 
 type Translate = (key: TranslationKey) => string
 
@@ -185,9 +197,14 @@ export type MovementExportContext = 'site' | 'workshop' | 'all'
  * and stays independent of the movement list's row type.
  */
 export interface MovementExportRow {
+  id?: string
+  equipment_id?: string | null
   equipment_code?: string | null
   equipment_type?: string | null
   equipment_plate_number?: string | null
+  equipment_chassis_number?: string | null
+  /** The equipment's owner (`ownership_status`). */
+  equipment_ownership_status?: string | null
   movement_type: 'entry' | 'exit'
   movement_context?: 'site' | 'workshop' | null
   workshop_purpose?: 'maintenance' | 'parking' | null
@@ -198,44 +215,114 @@ export interface MovementExportRow {
   company_name_en?: string | null
   project_name_ar?: string | null
   project_name_en?: string | null
+  driver_id?: string | null
+  /** The driver snapshot stored on the row. */
   driver_name?: string | null
+  /** The mobile of `driver_id`, as the view joins it. */
+  driver_mobile_number?: string | null
+  /**
+   * Set by `withCurrentMovementDrivers` on a site entry whose driver was
+   * changed during the visit: the latest change's driver. Absent otherwise.
+   */
+  current_driver_id?: string | null
+  current_driver_name?: string | null
   supervisor_name?: string | null
   notes?: string | null
+  /** Kept for compatibility; not part of the current movement form. */
+  odometer_reading?: number | null
   recorded_at: string
+  created_at?: string | null
 }
 
 /**
- * A localized master-data name for a spreadsheet cell.
- *
- * `localizedName` falls back to an em dash, which is right on screen and wrong
- * in a sheet: a placeholder character blocks filtering and sorting, so an
- * unknown name is written as an empty cell instead.
+ * The entry ids whose driver can have changed: site entries only (an exit
+ * already stores the current driver, and a workshop row carries none).
  */
-function exportName(
-  lang: 'ar' | 'en',
-  nameAr?: string | null,
-  nameEn?: string | null,
-): string {
-  const preferred = lang === 'ar' ? nameAr : nameEn
-  const fallback = lang === 'ar' ? nameEn : nameAr
-  return preferred?.trim() || fallback?.trim() || ''
+export function movementDriverChangeEntryIds(
+  rows: readonly Pick<
+    MovementExportRow,
+    'id' | 'movement_type' | 'movement_context'
+  >[],
+): string[] {
+  return rows
+    .filter(
+      (row) =>
+        row.movement_type === 'entry' && row.movement_context !== 'workshop',
+    )
+    .map((row) => row.id ?? '')
+    .filter(Boolean)
 }
 
 /**
- * The export's columns, in the order the log table shows them.
+ * Movements with the CURRENT driver of each site entry: the latest auditable
+ * driver change, by `(changed_at, id)`, recorded during the visit it opened.
+ * The row's own snapshot is never rewritten (the entry driver is immutable);
+ * the export reads `current_driver_name ?? driver_name`.
+ */
+export function withCurrentMovementDrivers<T extends MovementExportRow>(
+  rows: readonly T[],
+  changes: readonly DriverChangeRow[],
+): (T &
+  Pick<MovementExportRow, 'current_driver_id' | 'current_driver_name'>)[] {
+  const latest = latestDriverChanges(changes)
+  return rows.map((row) => {
+    if (row.movement_type !== 'entry' || !row.id) return row
+    const change = latest.get(row.id)
+    if (!change?.new_driver_name) return row
+    return {
+      ...row,
+      current_driver_id: change.new_driver_id,
+      current_driver_name: change.new_driver_name,
+    }
+  })
+}
+
+/** The drivers whose mobile the view does not carry: the changed ones. */
+export function changedDriverIds(
+  rows: readonly Pick<MovementExportRow, 'current_driver_id'>[],
+): string[] {
+  return distinctIds(rows.map((row) => row.current_driver_id))
+}
+
+/** The workshop purpose in words; empty for a site row or an unclassified one. */
+function workshopPurposeLabel(row: MovementExportRow, t: Translate): string {
+  if (row.movement_context !== 'workshop') return ''
+  if (row.workshop_purpose === 'maintenance') return t('maintenancePurpose')
+  if (row.workshop_purpose === 'parking') return t('parkingPurpose')
+  return ''
+}
+
+/**
+ * Every field of a movement, grouped for the export dialog: the equipment
+ * (with owner and supplier), the movement (context, type, purposes), the
+ * company and project (Arabic and English as separate columns), the driver,
+ * then who recorded it and when, the notes and the odometer.
  *
  * Badges become plain text — دخول / خروج for the movement type and the
  * workshop purpose spelled out — because a spreadsheet has no badges and a
  * raw `entry` / `maintenance` code would leave the reader decoding values.
+ *
+ * @param lookups values resolved at export time: the supplier by equipment
+ * and the mobile of a changed driver. Without them those cells export empty,
+ * which is how the dialog builds its checklist before any row is read.
  */
 export function movementExportColumns(
   t: Translate,
-  lang: 'ar' | 'en',
+  // Kept for the callers: since every name has its own Arabic and English
+  // column, no cell depends on the interface language any more.
+  _lang: 'ar' | 'en',
+  lookups: ExportLookups = {},
 ): ExcelColumn<MovementExportRow>[] {
+  const equipment = t('exportGroupEquipment')
+  const movement = t('exportGroupMovement')
+  const companyProject = t('exportGroupCompanyProject')
+  const driver = t('exportGroupDriver')
+  const recording = t('exportGroupRecording')
   return [
     {
       key: 'equipment_code',
       mandatory: true,
+      group: equipment,
       header: t('equipmentCodeLabel'),
       width: 14,
       value: (row) => row.equipment_code ?? '',
@@ -243,6 +330,7 @@ export function movementExportColumns(
     {
       key: 'equipment_type',
       mandatory: true,
+      group: equipment,
       header: t('equipmentType'),
       width: 24,
       value: (row) => row.equipment_type ?? '',
@@ -250,13 +338,64 @@ export function movementExportColumns(
     {
       key: 'plate_number',
       mandatory: true,
+      group: equipment,
       header: t('plateNumber'),
       width: 14,
       value: (row) => row.equipment_plate_number ?? '',
     },
     {
+      key: 'chassis_number',
+      group: equipment,
+      header: t('chassisNumber'),
+      width: 20,
+      value: (row) => exportText(row.equipment_chassis_number),
+    },
+    {
+      key: 'owner',
+      group: equipment,
+      header: t('ownershipStatus'),
+      width: 16,
+      value: (row) => exportOwnerLabel(row.equipment_ownership_status, t),
+    },
+    {
+      // Looked up at export time, exactly like the visits export.
+      key: 'supplier',
+      group: equipment,
+      header: t('lessor'),
+      width: 24,
+      value: (row) =>
+        lookupValue(lookups.supplierByEquipment, row.equipment_id),
+    },
+    {
+      key: 'contractor_code',
+      group: equipment,
+      header: t('contractorEquipmentCode'),
+      width: 16,
+      value: (row) => row.contractor_equipment_code ?? '',
+    },
+    {
+      key: 'context',
+      group: movement,
+      header: t('logsColContext'),
+      width: 14,
+      value: (row) => {
+        if (row.movement_context !== 'workshop') return t('logsSites')
+        return workshopPurposeLabel(row, t) || t('logsWorkshop')
+      },
+    },
+    {
+      // The context already names the purpose; this column holds it alone,
+      // so the sheet can be filtered on it. Empty for a site row.
+      key: 'workshop_purpose',
+      group: movement,
+      header: t('exportColWorkshopPurpose'),
+      width: 14,
+      value: (row) => workshopPurposeLabel(row, t),
+    },
+    {
       key: 'movement_type',
       mandatory: true,
+      group: movement,
       header: t('movementType'),
       width: 10,
       value: (row) => (row.movement_type === 'entry' ? t('entry') : t('exit')),
@@ -265,6 +404,7 @@ export function movementExportColumns(
       // wave-12: right after the movement type. Only a site exit recorded
       // since migration 0111 has one; every other row is an empty cell.
       key: 'exit_purpose',
+      group: movement,
       header: t('exitPurpose'),
       width: 14,
       value: (row) =>
@@ -273,64 +413,99 @@ export function movementExportColumns(
           : '',
     },
     {
-      key: 'context',
-      header: t('logsColContext'),
-      width: 14,
-      value: (row) => {
-        if (row.movement_context !== 'workshop') return t('logsSites')
-        if (row.workshop_purpose === 'maintenance')
-          return t('maintenancePurpose')
-        if (row.workshop_purpose === 'parking') return t('parkingPurpose')
-        return t('logsWorkshop')
-      },
-    },
-    {
-      key: 'company',
-      header: t('company'),
+      key: 'company_ar',
+      group: companyProject,
+      header: t('companyNameAr'),
       width: 24,
-      value: (row) =>
-        exportName(lang, row.company_name_ar, row.company_name_en),
+      value: (row) => exportText(row.company_name_ar),
     },
     {
-      key: 'project',
-      header: t('project'),
+      key: 'company_en',
+      group: companyProject,
+      header: t('companyNameEn'),
       width: 24,
-      value: (row) =>
-        exportName(lang, row.project_name_ar, row.project_name_en),
+      value: (row) => exportText(row.company_name_en),
     },
     {
-      key: 'contractor_code',
-      header: t('contractorEquipmentCode'),
-      width: 16,
-      value: (row) => row.contractor_equipment_code ?? '',
+      key: 'project_ar',
+      group: companyProject,
+      header: t('projectNameAr'),
+      width: 24,
+      value: (row) => exportText(row.project_name_ar),
     },
     {
-      // Optional on a site entry since 2026-09-23, so a blank cell here is a
-      // fact about the visit rather than missing data.
+      key: 'project_en',
+      group: companyProject,
+      header: t('projectNameEn'),
+      width: 24,
+      value: (row) => exportText(row.project_name_en),
+    },
+    {
+      // The current driver: the latest change of a site entry's visit, else
+      // the row's snapshot. A driverless legacy entry is a blank cell.
       key: 'driver_name',
+      group: driver,
       header: t('driverName'),
       width: 22,
-      value: (row) => row.driver_name ?? '',
+      value: (row) => row.current_driver_name ?? row.driver_name ?? '',
+    },
+    {
+      // The mobile of that same driver: the view's join for the row's own
+      // driver, the looked-up one for a changed driver. Text, so a leading
+      // zero survives in the sheet.
+      key: 'driver_mobile',
+      group: driver,
+      header: t('exportColDriverMobile'),
+      width: 16,
+      value: (row) =>
+        row.current_driver_name
+          ? lookupValue(lookups.mobileByDriver, row.current_driver_id)
+          : exportText(row.driver_mobile_number),
     },
     {
       key: 'foreman',
+      group: recording,
       header: t('logsColForeman'),
       width: 22,
       value: (row) => row.supervisor_name ?? '',
     },
     {
+      key: 'recorded_at',
+      mandatory: true,
+      group: recording,
+      header: t('recordedAt'),
+      width: 18,
+      type: 'date',
+      value: (row) => row.recorded_at ?? null,
+    },
+    {
+      // When the row was saved, which can differ from the actual movement
+      // time (a date picked in the past, the Excel import).
+      key: 'created_at',
+      group: recording,
+      header: t('createdAt'),
+      width: 18,
+      type: 'date',
+      value: (row) => row.created_at ?? null,
+    },
+    {
       key: 'notes',
+      group: recording,
       header: t('notes'),
       width: 30,
       value: (row) => row.notes ?? '',
     },
     {
-      key: 'recorded_at',
-      mandatory: true,
-      header: t('recordedAt'),
-      width: 18,
-      type: 'date',
-      value: (row) => row.recorded_at ?? null,
+      // Kept in the database for compatibility; legacy rows may carry it.
+      key: 'odometer_reading',
+      group: recording,
+      header: t('odometerReading'),
+      width: 14,
+      value: (row) =>
+        typeof row.odometer_reading === 'number' &&
+        Number.isFinite(row.odometer_reading)
+          ? row.odometer_reading
+          : null,
     },
   ]
 }

@@ -13,6 +13,7 @@ import type { ExcelColumn } from '@/lib/excelSheet'
 import {
   allColumnKeys,
   exportedRowCount,
+  groupExportColumns,
   exportRowCap,
   isMandatoryColumn,
   mandatoryColumnKeys,
@@ -36,8 +37,9 @@ export interface ExportCollected<T> {
   rows: T[]
   /**
    * The columns to write. A view whose cells need lookups made at export
-   * time (the visits supplier and driver mobile) builds them with the
-   * looked-up values; the keys must match the dialog's `columns`.
+   * time (`@/lib/exportFields`: the supplier, the chassis, a driver's mobile,
+   * the exit supervisor) builds them with the looked-up values; the keys must
+   * match the dialog's `columns`.
    */
   columns: ExcelColumn<T>[]
   /** The size of the whole set, as the database counted it. */
@@ -188,7 +190,7 @@ export function ExportDialog<T>({
   const updateSelection = (next: string[]) => {
     const normalized = normalizeColumnSelection(columns, next)
     setSelection(normalized)
-    writeColumnSelection(localStore(), listId, fileType, normalized)
+    writeColumnSelection(localStore(), listId, fileType, normalized, columns)
   }
 
   const cap = exportRowCap(fileType)
@@ -285,6 +287,7 @@ export function ExportDialog<T>({
   const columnsLabelId = useId()
   const chosen = new Set(selection)
   const basicKeys = mandatoryColumnKeys(columns)
+  const columnGroups = groupExportColumns(columns)
 
   return (
     <Dialog
@@ -292,6 +295,7 @@ export function ExportDialog<T>({
       onOpenChange={(next) => {
         if (!exporting) onOpenChange(next)
       }}
+      size="lg"
       title={t('exportDialogTitle')}
       description={t('exportDialogDesc')}
       footer={
@@ -421,27 +425,46 @@ export function ExportDialog<T>({
               {t('exportClearAll')}
             </Button>
           </div>
-          <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-            {columns.map((column) =>
-              column.key ? (
-                <Checkbox
-                  key={column.key}
-                  label={column.header}
-                  checked={chosen.has(column.key)}
-                  disabled={exporting || isMandatoryColumn(column)}
-                  onCheckedChange={(checked) =>
-                    updateSelection(
-                      toggleColumnKey(
-                        columns,
-                        selection,
-                        column.key as string,
-                        checked === true,
-                      ),
-                    )
-                  }
-                />
-              ) : null,
-            )}
+          {/* wave-15-export-fields: every field, so the list is dense — 12 px
+              labels, small boxes, two columns on a phone and three from
+              `sm` up, under one heading per group. */}
+          <div className="space-y-2 rounded-lg border px-3 py-2">
+            {columnGroups.map((group, groupIndex) => (
+              <div
+                key={`${groupIndex}-${group.label}`}
+                role={group.label ? 'group' : undefined}
+                aria-label={group.label || undefined}
+              >
+                {group.label && (
+                  <p className="text-xs font-semibold text-muted">
+                    {group.label}
+                  </p>
+                )}
+                <div className="grid grid-cols-2 gap-x-3 sm:grid-cols-3">
+                  {group.columns.map((column) =>
+                    column.key ? (
+                      <Checkbox
+                        key={column.key}
+                        size="sm"
+                        label={column.header}
+                        checked={chosen.has(column.key)}
+                        disabled={exporting || isMandatoryColumn(column)}
+                        onCheckedChange={(checked) =>
+                          updateSelection(
+                            toggleColumnKey(
+                              columns,
+                              selection,
+                              column.key as string,
+                              checked === true,
+                            ),
+                          )
+                        }
+                      />
+                    ) : null,
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
           <p className="text-xs text-muted">{t('exportMandatoryHint')}</p>
         </div>

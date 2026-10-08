@@ -819,6 +819,15 @@ export const translations = {
       'صفحة الطباعة تفتح من زر التصدير في صفحة السجلات، ولا تبقى بعد تحديثها او فتحها من رابط.',
     printBackToLogs: 'العودة الى السجلات',
     // wave-15-export — end
+    // wave-15-export-fields — start
+    exportGroupEquipment: 'المعدة',
+    exportGroupMovement: 'الحركة',
+    exportGroupVisit: 'الزيارة',
+    exportGroupCompanyProject: 'الشركة والمشروع',
+    exportGroupDriver: 'السائق',
+    exportGroupRecording: 'التسجيل والتواريخ',
+    exportColWorkshopPurpose: 'غرض دخول الورشة',
+    // wave-15-export-fields — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -2247,6 +2256,15 @@ export const translations = {
       'The print page opens from the export button on the logs page and is not kept after a reload or when opened from a link.',
     printBackToLogs: 'Back to logs',
     // wave-15-export — end
+    // wave-15-export-fields — start
+    exportGroupEquipment: 'Equipment',
+    exportGroupMovement: 'Movement',
+    exportGroupVisit: 'Visit',
+    exportGroupCompanyProject: 'Company and project',
+    exportGroupDriver: 'Driver',
+    exportGroupRecording: 'Recording and dates',
+    exportColWorkshopPurpose: 'Workshop entry purpose',
+    // wave-15-export-fields — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',
