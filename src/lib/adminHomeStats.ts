@@ -344,6 +344,101 @@ export function workshopPurposeArgument(
   return filter === 'all' ? null : filter
 }
 
+/**
+ * wave-16-sort: the `p_sort` values `get_admin_fleet_equipment` accepts since
+ * migration 0121, the same allowlist the function checks. `NULL` there is
+ * `last_movement_desc`, the order the tables always had.
+ */
+export const FLEET_SORT_KEYS = [
+  'last_movement_desc',
+  'last_movement_asc',
+  'code_asc',
+  'code_desc',
+  'type_asc',
+  'type_desc',
+  'owner_asc',
+  'owner_desc',
+  'company_asc',
+  'company_desc',
+  'workshop_purpose_asc',
+  'workshop_purpose_desc',
+  'exit_purpose_asc',
+  'exit_purpose_desc',
+] as const
+export type FleetSortKey = (typeof FLEET_SORT_KEYS)[number]
+
+/** The database's default order; never sent, so the default request is the
+ *  same five arguments as before migration 0121. */
+export const DEFAULT_FLEET_SORT_KEY: FleetSortKey = 'last_movement_desc'
+
+export function isFleetSortKey(value: unknown): value is FleetSortKey {
+  return (
+    typeof value === 'string' &&
+    (FLEET_SORT_KEYS as readonly string[]).includes(value)
+  )
+}
+
+/**
+ * The sortable columns of the three state mini tables, by `DataTable` column
+ * key, and the database order each one asks for. Both date columns («منذ»,
+ * «اخر خروج») are the latest movement's time.
+ */
+export const FLEET_SORT_COLUMNS = {
+  code: 'code',
+  type: 'type',
+  owner: 'owner',
+  companyProject: 'company',
+  purpose: 'workshop_purpose',
+  exitPurpose: 'exit_purpose',
+  since: 'last_movement',
+  lastExit: 'last_movement',
+} as const satisfies Record<string, string>
+
+/**
+ * The `p_sort` argument for a header sort, or `null` (no argument) for the
+ * default order, an unknown column or an unknown direction. Fails closed: only
+ * an allowlisted value is ever sent.
+ */
+export function fleetSortArgument(
+  sort: { key: string; direction: string } | null | undefined,
+): FleetSortKey | null {
+  if (!sort || (sort.direction !== 'asc' && sort.direction !== 'desc'))
+    return null
+  if (!Object.prototype.hasOwnProperty.call(FLEET_SORT_COLUMNS, sort.key))
+    return null
+  const field = FLEET_SORT_COLUMNS[sort.key as keyof typeof FLEET_SORT_COLUMNS]
+  const value = `${field}_${sort.direction}`
+  if (!isFleetSortKey(value) || value === DEFAULT_FLEET_SORT_KEY) return null
+  return value
+}
+
+/** The arguments of one `get_admin_fleet_equipment` call. `p_sort` is only
+ *  present for a non-default, allowlisted order. */
+export function fleetEquipmentRpcArgs(params: {
+  state: FleetListState
+  owners: AdminHomeOwner[] | string[] | null | undefined
+  purpose?: WorkshopPurposeFilter
+  page: number
+  pageSize: number
+  sort?: FleetSortKey | null
+}) {
+  const sort =
+    isFleetSortKey(params.sort) && params.sort !== DEFAULT_FLEET_SORT_KEY
+      ? params.sort
+      : null
+  return {
+    p_state: params.state,
+    p_owners: homeOwnerArgument(params.owners),
+    p_purpose:
+      params.state === 'workshop'
+        ? workshopPurposeArgument(params.purpose ?? 'all')
+        : null,
+    p_limit: params.pageSize,
+    p_offset: pageOffset(params.page, params.pageSize),
+    ...(sort ? { p_sort: sort } : {}),
+  }
+}
+
 /** The five mini tables, in drawing order. */
 export const FLEET_MINI_TABLES = [
   'inside',

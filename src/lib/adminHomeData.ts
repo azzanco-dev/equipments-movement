@@ -16,6 +16,7 @@
 import { saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
 import { supabase } from '@/lib/supabase'
 import {
+  fleetEquipmentRpcArgs,
   homeOwnerArgument,
   pageOffset,
   parseAvailabilityPage,
@@ -34,6 +35,7 @@ import {
   type DailyMovementCount,
   type FleetEquipmentRow,
   type FleetListState,
+  type FleetSortKey,
   type FleetState,
   type ForemanRecentGroup,
   type LatestEntryRow,
@@ -41,7 +43,6 @@ import {
   type OwnerStateMatrix,
   type WorkshopPurposeFilter,
   type YearlyMovementCount,
-  workshopPurposeArgument,
 } from '@/lib/adminHomeStats'
 
 /** What a paginated section asks for. `owners` that is `null` or empty means
@@ -107,27 +108,21 @@ export async function fetchFleetState(
  * inside a site, in the workshop (optionally one purpose chip), or available
  * (the latest movement is an exit, or it never moved). The total is the
  * database's `count(*) OVER ()`, so the page count is right even on the last
- * page.
+ * page. `sort` (wave 16, migration 0121) is sent as `p_sort` only when it is
+ * an allowlisted, non-default order.
  */
 export async function fetchFleetEquipment(
   params: AdminHomePageRequest & {
     state: FleetListState
     /** Only with `workshop`; `all` sends no purpose filter. */
     purpose?: WorkshopPurposeFilter
+    /** `null` or absent: the default order (latest movement first). */
+    sort?: FleetSortKey | null
   },
   signal: AbortSignal,
 ): Promise<AdminHomePage<FleetEquipmentRow>> {
   const { data, error } = await supabase
-    .rpc('get_admin_fleet_equipment', {
-      p_state: params.state,
-      p_owners: homeOwnerArgument(params.owners),
-      p_purpose:
-        params.state === 'workshop'
-          ? workshopPurposeArgument(params.purpose ?? 'all')
-          : null,
-      p_limit: params.pageSize,
-      p_offset: pageOffset(params.page, params.pageSize),
-    })
+    .rpc('get_admin_fleet_equipment', fleetEquipmentRpcArgs(params))
     .abortSignal(signal)
   if (error) fail('fleetEquipment', error)
   return parseFleetEquipmentPage(data)

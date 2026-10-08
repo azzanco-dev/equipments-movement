@@ -23,7 +23,11 @@ import {
   WorkshopPurposeBadge,
   cn,
 } from '@/components/ui'
-import type { DataTableColumn } from '@/components/ui'
+import type {
+  DataTableColumn,
+  DataTableSort,
+  DataTableSortDirection,
+} from '@/components/ui'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
 import { useI18n } from '@/i18n/I18nContext'
@@ -50,6 +54,7 @@ import {
   clampPage,
   FLEET_MINI_ROWS,
   fleetMiniTableDomId,
+  fleetSortArgument,
   normalizeWorkshopPurposeFilter,
   WORKSHOP_PURPOSE_FILTERS,
   type AdminHomeOwner,
@@ -57,6 +62,7 @@ import {
   type FleetEquipmentRow,
   type FleetJumpTarget,
   type FleetMiniTableId,
+  type FleetSortKey,
   type LatestEntryRow,
   type LatestEquipmentRow,
   type WorkshopPurposeFilter,
@@ -119,13 +125,21 @@ export interface FleetJumpRequest extends FleetJumpTarget {
 }
 
 /** One page of a mini table. `count` is true for the expanded form and the
- *  export, which need the total behind the pagination. */
+ *  export, which need the total behind the pagination. `sort` is the
+ *  database order (wave 16, migration 0121); `null` is the default order, and
+ *  the tables that do not read `get_admin_fleet_equipment` ignore it. */
 type LoadPage<Row> = (
   page: number,
   pageSize: number,
   count: boolean,
   signal: AbortSignal,
+  sort: FleetSortKey | null,
 ) => Promise<AdminHomePage<Row>>
+
+/** wave-16-sort: a column the expanded table can sort by (server-side). */
+function sortable<Row>(column: DataTableColumn<Row>): DataTableColumn<Row> {
+  return { ...column, sortable: true }
+}
 
 interface FleetTableProps<Row> {
   table: FleetMiniTableId
@@ -150,6 +164,12 @@ interface FleetTableProps<Row> {
   excelColumns: (labels: FleetExportLabels) => ExcelColumn<Row>[]
   /** The card's position in `MiniTableGrid`, in source order. */
   gridIndex: number
+  /**
+   * wave-16-sort: the expanded table's starting sort, which must be the
+   * database's default order (latest movement first). Given only for the
+   * three state tables; without it the headers are not sortable.
+   */
+  defaultSort?: DataTableSort
 }
 
 // `MiniTableGrid` is one column on phones, two from `md` and three from `xl`
@@ -238,6 +258,7 @@ function FleetTable<Row>({
   showCount = false,
   excelColumns,
   gridIndex,
+  defaultSort,
 }: FleetTableProps<Row>) {
   const { t, lang } = useI18n()
   const ownerLabel = useOwnerLabel()
@@ -247,6 +268,13 @@ function FleetTable<Row>({
   const [page, setPage] = useState(1)
   const [exporting, setExporting] = useState(false)
   const [exportNote, setExportNote] = useState<'capped' | 'failed' | null>(null)
+  // wave-16-sort: the expanded table's header sort. Kept in component state,
+  // like the page and the owner and workshop filters of this page (only the
+  // chart granularity is in the URL). The collapsed card has no sortable
+  // headers (the shared `MiniTable` offers none), so it always reads the
+  // default order, and collapsing returns the table to it.
+  const [sort, setSort] = useState<DataTableSort | null>(defaultSort ?? null)
+  const sortArgument = expanded && defaultSort ? fleetSortArgument(sort) : null
 
   // A filter change (owner, workshop chip) starts again from the first page.
   // Adjusted during render rather than in an effect, so a request for the
@@ -261,8 +289,8 @@ function FleetTable<Row>({
   const pageSize = expanded ? ADMIN_HOME_PAGE_SIZE : FLEET_MINI_ROWS
   const load = useCallback(
     (signal: AbortSignal) =>
-      loadPage(expanded ? page : 1, pageSize, expanded, signal),
-    [loadPage, expanded, page, pageSize],
+      loadPage(expanded ? page : 1, pageSize, expanded, signal, sortArgument),
+    [loadPage, expanded, page, pageSize, sortArgument],
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
   const total = data?.total ?? 0
@@ -287,10 +315,18 @@ function FleetTable<Row>({
       setExpanded(false)
       setPage(1)
       setExportNote(null)
+      setSort(defaultSort ?? null)
     }
     // The page keeps its scroll position (owner review 2026-10-01): the card
     // shrinks back in place and nothing scrolls the window.
     withLayoutTransition(update)
+  }
+
+  // A new order starts again from the first page.
+  const changeSort = (key: string, direction: DataTableSortDirection) => {
+    setSort({ key, direction })
+    setPage(1)
+    setExportNote(null)
   }
 
   const runExport = async () => {
@@ -301,8 +337,9 @@ function FleetTable<Row>({
       // `xlsx` is only worth downloading once someone presses the button on
       // this landing page.
       const { exportRowsToExcel } = await import('@/lib/excel')
+      // The export walks the same order the table shows.
       const collected = await collectAllPages((exportPage, size) =>
-        loadPage(exportPage, size, true, controller.signal),
+        loadPage(exportPage, size, true, controller.signal, sortArgument),
       )
       exportRowsToExcel(
         title,
@@ -398,6 +435,8 @@ function FleetTable<Row>({
               empty={empty}
               caption={title}
               onRowClick={onRowClick}
+              sort={defaultSort ? sort : undefined}
+              onSortChange={defaultSort ? changeSort : undefined}
             />
             <DataListPagination
               page={page}
@@ -501,9 +540,9 @@ export function FleetMiniTables({
   // The foreman (who recorded the open site entry) is shown in the expanded
   // table only, so the compact card and the export skip the lookup.
   const loadInside = useCallback<LoadPage<ForemanRow>>(
-    async (page, pageSize, count, signal) => {
+    async (page, pageSize, count, signal, sort) => {
       const result = await fetchFleetEquipment(
-        { state: 'inside_site', owners, page, pageSize },
+        { state: 'inside_site', owners, page, pageSize, sort },
         signal,
       )
       if (!count || pageSize !== ADMIN_HOME_PAGE_SIZE) return result
@@ -512,9 +551,9 @@ export function FleetMiniTables({
     [owners],
   )
   const loadWorkshop = useCallback<LoadPage<FleetEquipmentRow>>(
-    (page, pageSize, _count, signal) =>
+    (page, pageSize, _count, signal, sort) =>
       fetchFleetEquipment(
-        { state: 'workshop', purpose, owners, page, pageSize },
+        { state: 'workshop', purpose, owners, page, pageSize, sort },
         signal,
       ),
     [owners, purpose],
@@ -523,9 +562,9 @@ export function FleetMiniTables({
   // for the export; the export's pages are bigger than a table page), so the
   // compact card and the export never pay for the extra lookup.
   const loadAvailable = useCallback<LoadPage<ForemanRow>>(
-    async (page, pageSize, count, signal) => {
+    async (page, pageSize, count, signal, sort) => {
       const result = await fetchFleetEquipment(
-        { state: 'available', owners, page, pageSize },
+        { state: 'available', owners, page, pageSize, sort },
         signal,
       )
       if (!count || pageSize !== ADMIN_HOME_PAGE_SIZE) return result
@@ -788,12 +827,13 @@ export function FleetMiniTables({
         description={t('adminHomeFleetInsideDescription')}
         columns={insideColumns}
         expandedColumns={[
-          codeColumn,
-          typeColumn,
-          companyProjectColumn,
+          sortable(codeColumn),
+          sortable(typeColumn),
+          sortable(companyProjectColumn),
           foremanColumn,
-          sinceColumn,
+          sortable(sinceColumn),
         ]}
+        defaultSort={{ key: sinceColumn.key, direction: 'desc' }}
         loadPage={loadInside}
         filterKey={ownersKey}
         rowKey={(row) => row.id}
@@ -810,12 +850,13 @@ export function FleetMiniTables({
         description={t('adminHomeFleetWorkshopDescription')}
         columns={workshopColumns}
         expandedColumns={[
-          codeColumn,
-          purposeColumn,
-          typeColumn,
-          ownerColumn,
-          sinceColumn,
+          sortable(codeColumn),
+          sortable(purposeColumn),
+          sortable(typeColumn),
+          sortable(ownerColumn),
+          sortable(sinceColumn),
         ]}
+        defaultSort={{ key: sinceColumn.key, direction: 'desc' }}
         loadPage={loadWorkshop}
         filterKey={`${ownersKey}|${purpose}`}
         rowKey={(row) => row.id}
@@ -835,13 +876,14 @@ export function FleetMiniTables({
         description={t('adminHomeFleetAvailableDescription')}
         columns={availableColumns}
         expandedColumns={[
-          codeColumn,
-          availableTypeColumn,
-          availableCompanyProjectColumn,
-          exitPurposeColumn,
+          sortable(codeColumn),
+          sortable(availableTypeColumn),
+          sortable(availableCompanyProjectColumn),
+          sortable(exitPurposeColumn),
           foremanColumn,
-          lastExitColumn,
+          sortable(lastExitColumn),
         ]}
+        defaultSort={{ key: lastExitColumn.key, direction: 'desc' }}
         loadPage={loadAvailable}
         filterKey={ownersKey}
         rowKey={(row) => row.id}
