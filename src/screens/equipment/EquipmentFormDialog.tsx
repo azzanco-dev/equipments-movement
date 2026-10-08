@@ -11,7 +11,17 @@ import {
   RadioGroupItem,
   Select,
 } from '@/components/ui'
-import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
+import {
+  AsyncSearchSelect,
+  type AsyncSearchSelectOption,
+} from '@/components/AsyncSearchSelect'
+import { useAuth } from '@/auth/AuthContext'
+import {
+  AFAQY_UNIT_NAME_MAX,
+  loadAfaqyUnits,
+  searchUnitList,
+  type AfaqyUnitsAnswer,
+} from '@/lib/afaqy'
 import type { SelectOption } from '@/components/Select'
 import { PlateNumberInput } from '@/components/PlateNumberInput'
 import { useI18n } from '@/i18n/I18nContext'
@@ -60,6 +70,26 @@ import {
 
 /** Radix reserves '' for "no value", so the optional select uses a sentinel. */
 const NO_REGISTRATION_TYPE = 'none'
+/** wave 17: the «بدون وحدة» option of the tracker unit selector. */
+const NO_TRACKER_UNIT = 'none'
+
+/** wave 17: the stored tracker link, read when the dialog opens (admin). */
+type TrackerLink =
+  | { state: 'loading' }
+  | { state: 'error' }
+  | { state: 'ready'; unitId: string | null; unitName: string | null }
+
+/** The unique index of migration 0122: one unit per equipment. */
+function isTrackerUnitTaken(error: {
+  code?: string | null
+  message?: string | null
+  details?: string | null
+}): boolean {
+  const text = [error.message, error.details].filter(Boolean).join(' ')
+  return (
+    error.code === '23505' && text.includes('equipment_tracker_unit_id_key')
+  )
+}
 
 export interface EquipmentFormDialogProps {
   open: boolean
@@ -76,6 +106,9 @@ export function EquipmentFormDialog({
   onSaved,
 }: EquipmentFormDialogProps) {
   const { t, lang } = useI18n()
+  const { profile } = useAuth()
+  // wave 17: the tracker link is admin-only (RLS: `update_equipment`).
+  const isAdmin = profile?.role === 'admin'
   const langRef = useRef(lang)
   langRef.current = lang
   const [form, setForm] = useState<EquipmentFormValues>(EMPTY_EQUIPMENT_FORM)
@@ -87,6 +120,17 @@ export function EquipmentFormDialog({
   // EM-196: optional reason recorded with the previous code when an existing
   // record's code changes.
   const [codeReason, setCodeReason] = useState('')
+  // wave 17: the Afaqy tracker unit. Only a CHANGED selection is saved, and
+  // only once the stored link was read, so a failed read never clears it.
+  const [trackerLink, setTrackerLink] = useState<TrackerLink>({
+    state: 'loading',
+  })
+  const [trackerUnitId, setTrackerUnitId] = useState('')
+  const [trackerOption, setTrackerOption] =
+    useState<AsyncSearchSelectOption | null>(null)
+  const [trackerError, setTrackerError] = useState<string | null>(null)
+  const [trackerNotConfigured, setTrackerNotConfigured] = useState(false)
+  const unitsRef = useRef<Promise<AfaqyUnitsAnswer | null> | null>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
 
   /** Editing a field clears its message; nothing is validated while typing. */
@@ -123,6 +167,84 @@ export function EquipmentFormDialog({
     setErrors({})
     setCodeReason('')
   }, [open, equipment])
+
+  // wave 17: read the stored tracker link (admin only). Kept out of the list
+  // select, so the list never depends on the link columns.
+  useEffect(() => {
+    if (!open || !isAdmin) return
+    setTrackerError(null)
+    setTrackerNotConfigured(false)
+    unitsRef.current = null
+    setTrackerUnitId('')
+    setTrackerOption(null)
+    if (!equipment) {
+      setTrackerLink({ state: 'ready', unitId: null, unitName: null })
+      return
+    }
+    let active = true
+    setTrackerLink({ state: 'loading' })
+    void supabase
+      .from('equipment')
+      .select('tracker_unit_id,tracker_unit_name')
+      .eq('id', equipment.id)
+      .maybeSingle()
+      .then(({ data, error: linkError }) => {
+        if (!active) return
+        if (linkError || !data) {
+          setTrackerLink({ state: 'error' })
+          return
+        }
+        const row = data as {
+          tracker_unit_id: string | null
+          tracker_unit_name: string | null
+        }
+        setTrackerLink({
+          state: 'ready',
+          unitId: row.tracker_unit_id,
+          unitName: row.tracker_unit_name,
+        })
+        setTrackerUnitId(row.tracker_unit_id ?? '')
+        setTrackerOption(
+          row.tracker_unit_id
+            ? {
+                value: row.tracker_unit_id,
+                label: row.tracker_unit_name || row.tracker_unit_id,
+              }
+            : null,
+        )
+      })
+    return () => {
+      active = false
+    }
+  }, [open, equipment, isAdmin])
+
+  // One units request per dialog session (the route also caches the list for
+  // five minutes). The few hundred units are searched in the browser: it is
+  // one admin call of a small external list, not a table of ours.
+  const loadTrackerUnits = useCallback(
+    async (query: string): Promise<AsyncSearchSelectOption[]> => {
+      unitsRef.current ??= loadAfaqyUnits(supabase)
+      const answer = await unitsRef.current
+      const none = { value: NO_TRACKER_UNIT, label: t('afaqyNoUnit') }
+      if (answer?.kind === 'not_configured') {
+        setTrackerNotConfigured(true)
+        return [none]
+      }
+      if (!answer || answer.kind !== 'ok') {
+        unitsRef.current = null
+        throw new Error('afaqy_units_failed')
+      }
+      return [
+        none,
+        ...searchUnitList(answer.units, query, 19).map((unit) => ({
+          value: unit.unitId,
+          label: unit.name || unit.unitId,
+          description: unit.imei ?? undefined,
+        })),
+      ]
+    },
+    [t],
+  )
 
   const loadEquipmentTypes = useCallback(async (query: string) => {
     let request = supabase
@@ -211,8 +333,30 @@ export function EquipmentFormDialog({
     // True once the code change itself is saved, so a later failure of the
     // other fields is reported as the partial save it is.
     let codeSaved = false
+    setTrackerError(null)
     try {
-      const payload = buildEquipmentPayload(form)
+      // wave 17: the three link columns travel only when the admin changed
+      // the selection after the stored link was read.
+      const trackerChanged =
+        isAdmin &&
+        trackerLink.state === 'ready' &&
+        trackerUnitId !== (trackerLink.unitId ?? '')
+      const trackerFields = !trackerChanged
+        ? {}
+        : trackerUnitId
+          ? {
+              tracker_unit_id: trackerUnitId,
+              tracker_unit_name:
+                (trackerOption?.label ?? '').slice(0, AFAQY_UNIT_NAME_MAX) ||
+                null,
+              tracker_linked_at: new Date().toISOString(),
+            }
+          : {
+              tracker_unit_id: null,
+              tracker_unit_name: null,
+              tracker_linked_at: null,
+            }
+      const payload = { ...buildEquipmentPayload(form), ...trackerFields }
       if (equipment && codeChanged) {
         // The code goes first through the admin RPC that carries the reason
         // to the history trigger; a rejected code fails before anything is
@@ -258,6 +402,8 @@ export function EquipmentFormDialog({
       if (codeSaved) {
         setError(t('equipmentCodeSavedPartially'))
         onSaved()
+      } else if (isTrackerUnitTaken(saveError)) {
+        setTrackerError(t('afaqyTrackerUnitTaken'))
       } else if (attributed) {
         setErrors(attributed)
         focusFirstError(attributed, EQUIPMENT_FIELD_ORDER, {
@@ -640,6 +786,44 @@ export function EquipmentFormDialog({
             />
           )}
         </Field>
+        {isAdmin && (
+          <Field
+            label={t('afaqyTrackerUnit')}
+            name="tracker_unit_id"
+            hint={
+              trackerNotConfigured
+                ? t('afaqyStatusNotConfigured')
+                : t('afaqyTrackerUnitHint')
+            }
+            error={
+              trackerError ??
+              (trackerLink.state === 'error'
+                ? t('afaqyTrackerLoadError')
+                : undefined)
+            }
+            className="sm:col-span-2"
+          >
+            {() => (
+              <AsyncSearchSelect
+                value={trackerUnitId}
+                selectedOption={trackerOption}
+                disabled={trackerLink.state !== 'ready'}
+                onChange={(value, option) => {
+                  setTrackerError(null)
+                  if (!value || value === NO_TRACKER_UNIT) {
+                    setTrackerUnitId('')
+                    setTrackerOption(null)
+                  } else {
+                    setTrackerUnitId(value)
+                    setTrackerOption(option)
+                  }
+                }}
+                loadOptions={loadTrackerUnits}
+                placeholder={t('afaqyNoUnit')}
+              />
+            )}
+          </Field>
+        )}
       </div>
     </Dialog>
   )

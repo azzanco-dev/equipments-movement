@@ -6,6 +6,7 @@ import {
   Edit2,
   List,
   Plus,
+  Satellite,
   Trash2,
   Upload,
   Warehouse,
@@ -43,6 +44,7 @@ import { unwrapRows } from '@/lib/supabaseResult'
 import { focusFirstError, type FieldErrors } from '@/lib/formValidation'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { RelativeTime } from '@/components/RelativeTime'
+import { AfaqySettings } from '@/components/afaqy/AfaqySettings'
 
 type EquipmentTypeRow = {
   id: string
@@ -68,6 +70,8 @@ export function AdminSettings() {
   const pathname = usePathname()
   const showEquipmentTypes = pathname === '/settings/equipment-types'
   const showWorkshopOpening = pathname === '/settings/workshop-opening-balance'
+  // wave 17: the Afaqy tracker link.
+  const showAfaqy = pathname === '/settings/afaqy'
   const [rows, setRows] = useState<EquipmentTypeRow[]>([])
   const [total, setTotal] = useState(0)
   const [typesCount, setTypesCount] = useState<number | null>(null)
@@ -354,6 +358,19 @@ export function AdminSettings() {
       </div>
     )
 
+  if (showAfaqy)
+    return (
+      <div className="space-y-4">
+        <PageHeader
+          title={t('afaqySettingsTitle')}
+          description={t('afaqySettingsDesc')}
+          onBack={() => router.push('/settings')}
+          backLabel={t('backToSettings')}
+        />
+        <AfaqySettings />
+      </div>
+    )
+
   if (!showEquipmentTypes)
     return (
       <div className="space-y-4">
@@ -405,6 +422,26 @@ export function AdminSettings() {
             <p className="mt-1 text-sm text-muted">
               {t('workshopOpeningBalanceDesc')}
             </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/settings/afaqy')}
+            className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
+          >
+            <div className="mb-4 flex w-full items-start justify-between gap-3">
+              <span
+                className="flex h-9 w-9 items-center justify-center rounded-lg border"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <Satellite size={18} />
+              </span>
+              <ChevronRight
+                size={18}
+                className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip"
+              />
+            </div>
+            <h2 className="font-semibold">{t('afaqySettingsTitle')}</h2>
+            <p className="mt-1 text-sm text-muted">{t('afaqySettingsDesc')}</p>
           </button>
         </div>
       </div>

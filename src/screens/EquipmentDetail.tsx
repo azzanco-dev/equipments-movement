@@ -48,6 +48,7 @@ import {
 import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
 import { PreviousCodesLine } from '@/components/inquiry/PreviousCodes'
 import { MovementTypeBadge } from '@/components/movement/ExitPurposeBadge'
+import { EquipmentLocationCard } from '@/components/afaqy/EquipmentLocationCard'
 import {
   EQUIPMENT_CODE_CHANGES_LIMIT,
   EQUIPMENT_CODE_CHANGE_SELECT,
@@ -424,6 +425,14 @@ export function EquipmentDetail({
         />
         <InfoGridSection title={t('detailSectionDates')} items={dateItems} />
       </div>
+
+      {/* wave 17: admin only (the card renders nothing for any other role
+          and never requests the position then). */}
+      <EquipmentLocationCard
+        equipmentId={equipment.id}
+        equipmentCode={equipment.code}
+        className="p-4"
+      />
 
       <MiniTable
         title={t('movementHistory')}

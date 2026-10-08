@@ -10,6 +10,7 @@ import {
   PROJECTS_MAP_TILES,
   bubbleDiameter,
   bubbleHtml,
+  escapeHtml,
   formatBubbleLabel,
   initialView,
   maxPointCount,
@@ -22,10 +23,12 @@ import {
 } from '@/lib/projectsMap'
 
 /**
- * The Leaflet half of `ProjectsMap`. Only `./ProjectsMap` imports this file,
- * and only through a dynamic import started in an effect, so Leaflet (and its
- * stylesheet) is downloaded when a map is actually on screen and is never
- * evaluated on the server (Leaflet reads `window` when it loads).
+ * The Leaflet half of `ProjectsMap` (and, since wave 17, of `LocationMap`).
+ * Only `./ProjectsMap` and `./LocationMap` import this file, and only through
+ * a dynamic import started in an effect, so Leaflet (and its stylesheet) is
+ * downloaded when a map is actually on screen and is never evaluated on the
+ * server (Leaflet reads `window` when it loads). It stays the ONLY file that
+ * imports Leaflet.
  */
 export interface LeafletProjectsMapProps {
   points: ProjectsMapPoint[]
@@ -395,6 +398,169 @@ export function LeafletProjectsMap({
               : hint === 'touch'
                 ? t('projectsMapTouchHint')
                 : t('projectsMapTilesError')}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// --- wave 17: one position on a small map (LocationMap) ----------------------
+
+export interface LeafletLocationMapProps {
+  lat: number
+  lng: number
+  /** Accessible name of the map region. */
+  label: string
+  /** Accessible name of the marker. */
+  markerLabel: string
+}
+
+/** Street level: close enough to read the site, far enough to see roads. */
+const LOCATION_ZOOM = 15
+const LOCATION_MARKER_SIZE = 22
+
+/**
+ * A single marker on the themed basemap: the last position of an
+ * equipment's tracker unit. Same conventions as the projects map: LTR
+ * container, controls on the page's start/end sides, wheel zoom only once
+ * the map has focus, one-finger scrolling kept for the page on touch.
+ */
+export function LeafletLocationMap({
+  lat,
+  lng,
+  label,
+  markerLabel,
+}: LeafletLocationMapProps) {
+  const { t } = useI18n()
+  const { theme } = useTheme()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<L.Map | null>(null)
+  const markerRef = useRef<L.Marker | null>(null)
+  const positionRef = useRef<[number, number]>([lat, lng])
+  const [tilesFailed, setTilesFailed] = useState(false)
+  positionRef.current = [lat, lng]
+
+  const zoomInTitle = t('projectsMapZoomIn')
+  const zoomOutTitle = t('projectsMapZoomOut')
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    const pageDir =
+      getComputedStyle(container.parentElement ?? container).direction === 'rtl'
+        ? 'rtl'
+        : 'ltr'
+    const coarse =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(pointer: coarse)').matches
+    const map = L.map(container, {
+      zoomControl: false,
+      attributionControl: false,
+      scrollWheelZoom: false,
+      dragging: !coarse,
+      touchZoom: true,
+      minZoom: 5,
+      maxZoom: 18,
+      zoomSnap: 1,
+    })
+    mapRef.current = map
+    L.control
+      .zoom({
+        position: pageDir === 'rtl' ? 'topright' : 'topleft',
+        zoomInTitle,
+        zoomOutTitle,
+      })
+      .addTo(map)
+    L.control
+      .attribution({
+        position: pageDir === 'rtl' ? 'bottomleft' : 'bottomright',
+        prefix: false,
+      })
+      .addTo(map)
+    const half = LOCATION_MARKER_SIZE / 2
+    markerRef.current = L.marker(positionRef.current, {
+      icon: L.divIcon({
+        className: 'pm-marker',
+        html: `<span class="pm-location" role="img" aria-label="${escapeHtml(markerLabel)}"></span>`,
+        iconSize: [LOCATION_MARKER_SIZE, LOCATION_MARKER_SIZE],
+        iconAnchor: [half, half],
+      }),
+      interactive: false,
+      keyboard: false,
+    }).addTo(map)
+    map.setView(positionRef.current, LOCATION_ZOOM)
+
+    const onFocusIn = () => map.scrollWheelZoom.enable()
+    const onFocusOut = (event: FocusEvent) => {
+      if (!container.contains(event.relatedTarget as Node | null))
+        map.scrollWheelZoom.disable()
+    }
+    container.addEventListener('focusin', onFocusIn)
+    container.addEventListener('focusout', onFocusOut)
+    const resize = new ResizeObserver(() => map.invalidateSize())
+    resize.observe(container)
+    return () => {
+      resize.disconnect()
+      container.removeEventListener('focusin', onFocusIn)
+      container.removeEventListener('focusout', onFocusOut)
+      map.remove()
+      mapRef.current = null
+      markerRef.current = null
+    }
+    // Created once per mount; the wrapper's `key` re-creates the map when the
+    // language changes (control titles, marker label).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // A new reading moves the marker and re-centres the map.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    markerRef.current?.setLatLng([lat, lng])
+    map.setView([lat, lng], map.getZoom() || LOCATION_ZOOM)
+  }, [lat, lng])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const config = PROJECTS_MAP_TILES[theme === 'dark' ? 'dark' : 'light']
+    let loaded = 0
+    setTilesFailed(false)
+    const layer = L.tileLayer(config.url, {
+      attribution: config.attribution,
+      subdomains: config.subdomains,
+      maxZoom: config.maxZoom,
+    })
+    layer.on('tileload', () => {
+      loaded += 1
+      setTilesFailed(false)
+    })
+    layer.on('tileerror', () => {
+      if (loaded === 0) setTilesFailed(true)
+    })
+    layer.addTo(map)
+    return () => {
+      layer.remove()
+    }
+  }, [theme])
+
+  return (
+    <div className="relative h-full w-full">
+      <div
+        ref={containerRef}
+        dir="ltr"
+        role="region"
+        aria-label={label}
+        className="pm-map h-full w-full"
+      />
+      {tilesFailed && (
+        <div
+          aria-live="polite"
+          className="pointer-events-none absolute inset-x-0 top-3 z-[1000] flex justify-center px-14"
+        >
+          <p className="rounded-lg border bg-bg px-3 py-1.5 text-center text-xs text-fg shadow-sm">
+            {t('projectsMapTilesError')}
           </p>
         </div>
       )}

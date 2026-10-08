@@ -41,6 +41,7 @@ import {
   type EquipmentCodeChange,
 } from '@/lib/equipmentCodeHistory'
 import { PreviousCodesLine } from '@/components/inquiry/PreviousCodes'
+import { EquipmentLocationCard } from '@/components/afaqy/EquipmentLocationCard'
 
 /**
  * `/inquiry`: one search field finds an equipment by code/plate/chassis/type,
@@ -514,6 +515,14 @@ export function EquipmentInquiryScreen({
                 error={codeChangesError}
               />
             </div>
+
+            {/* wave 17: admin only (the card renders nothing for any other
+                role and never requests the position then). */}
+            <EquipmentLocationCard
+              equipmentId={equipment.id}
+              equipmentCode={equipment.code}
+              className="p-4"
+            />
 
             {movementsError ? (
               <ErrorState onRetry={retryMovements} />
