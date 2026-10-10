@@ -5,6 +5,12 @@ import { useI18n } from '@/i18n/I18nContext'
 interface PlateNumberInputProps {
   value: string
   onChange: (value: string) => void
+  /** Set by `Field`; goes on the first cell so the label focuses it. */
+  id?: string
+  /** Marks the plate invalid (danger border); `Field` sets it automatically. */
+  invalid?: boolean
+  'aria-describedby'?: string
+  'aria-required'?: boolean
 }
 
 interface PlateParts {
@@ -74,7 +80,14 @@ function arabicNumbers(value: string): string {
   return value.replace(/[0-9]/g, (digit) => '٠١٢٣٤٥٦٧٨٩'[Number(digit)])
 }
 
-export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
+export function PlateNumberInput({
+  value,
+  onChange,
+  id,
+  invalid,
+  'aria-describedby': describedBy,
+  'aria-required': ariaRequired,
+}: PlateNumberInputProps) {
   const { t } = useI18n()
   const [parts, setParts] = useState<PlateParts>(() => parsePlate(value))
 
@@ -97,8 +110,12 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
     <div className="space-y-2">
       <div
         className="overflow-hidden rounded-xl border-2"
+        role="group"
+        aria-invalid={invalid || undefined}
         style={{
-          borderColor: 'color-mix(in srgb, var(--fg) 68%, transparent)',
+          borderColor: invalid
+            ? 'var(--danger)'
+            : 'color-mix(in srgb, var(--fg) 68%, transparent)',
           background: 'var(--bg)',
         }}
       >
@@ -129,6 +146,10 @@ export function PlateNumberInput({ value, onChange }: PlateNumberInputProps) {
                   {arabicLetters(parts.englishLetters) || 'ا س ف'}
                 </div>
                 <input
+                  id={id}
+                  aria-describedby={describedBy}
+                  aria-required={ariaRequired}
+                  aria-invalid={invalid || undefined}
                   aria-label="English plate letters"
                   dir="ltr"
                   value={parts.englishLetters}

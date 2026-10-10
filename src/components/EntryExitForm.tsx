@@ -1071,6 +1071,7 @@ export function EntryExitForm({
                   onSelectIndex={setPhotoIndex}
                   uploading={uploadingPhotos}
                   required={workshopMode}
+                  invalid={!!movementErrors.photos}
                   onAddFiles={handleAddPhotos}
                   onRemoveIndex={handleRemovePhoto}
                   onRetryPhoto={photoStaging.retryPhoto}

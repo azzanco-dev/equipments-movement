@@ -17,6 +17,9 @@ export interface MovementPhotosSectionProps {
   uploading: boolean
   /** Workshop movements need at least one photo; the server checks it too. */
   required: boolean
+  /** A submit failed on the photos (none selected, or still uploading): the
+   * gallery gets the danger border like any other invalid field. */
+  invalid?: boolean
   onAddFiles: (files: FileList | null) => void
   onRemoveIndex: (index: number) => void
   onRetryPhoto: (id: string) => void
@@ -33,6 +36,7 @@ export function MovementPhotosSection({
   onSelectIndex,
   uploading,
   required,
+  invalid = false,
   onAddFiles,
   onRemoveIndex,
   onRetryPhoto,
@@ -57,28 +61,35 @@ export function MovementPhotosSection({
         )}
       </p>
 
-      <PhotoGallery
-        photos={items}
-        max={MAX_MOVEMENT_PHOTOS}
-        selectedId={selectedId}
-        onSelect={(id) => {
-          const index = indexOfId(id)
-          if (index >= 0) onSelectIndex(index)
-        }}
-        // A disabled file input ignores the click, which keeps the previous
-        // behaviour of not accepting new files while an upload is running.
-        onAdd={() => fileInputRef.current?.click()}
-        onRemove={(id) => {
-          const index = indexOfId(id)
-          if (index >= 0) onRemoveIndex(index)
-        }}
-        onRetry={onRetryPhoto}
-        onOpen={(id) => {
-          const index = indexOfId(id)
-          if (index >= 0) onSelectIndex(index)
-          setLightboxOpen(true)
-        }}
-      />
+      <div
+        aria-invalid={invalid || undefined}
+        className={
+          invalid ? 'rounded-xl ring-2 ring-danger ring-offset-2' : undefined
+        }
+      >
+        <PhotoGallery
+          photos={items}
+          max={MAX_MOVEMENT_PHOTOS}
+          selectedId={selectedId}
+          onSelect={(id) => {
+            const index = indexOfId(id)
+            if (index >= 0) onSelectIndex(index)
+          }}
+          // A disabled file input ignores the click, which keeps the previous
+          // behaviour of not accepting new files while an upload is running.
+          onAdd={() => fileInputRef.current?.click()}
+          onRemove={(id) => {
+            const index = indexOfId(id)
+            if (index >= 0) onRemoveIndex(index)
+          }}
+          onRetry={onRetryPhoto}
+          onOpen={(id) => {
+            const index = indexOfId(id)
+            if (index >= 0) onSelectIndex(index)
+            setLightboxOpen(true)
+          }}
+        />
+      </div>
 
       <p className="mt-2 text-xs text-muted">
         {t('photosCount')

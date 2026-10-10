@@ -149,8 +149,9 @@ export const QuickEquipmentForm = forwardRef<
           required
           error={errors?.plate && t(errors.plate)}
         >
-          {() => (
+          {(control) => (
             <PlateNumberInput
+              {...control}
               value={value.plate}
               onChange={(plate) => onChange({ ...value, plate })}
             />

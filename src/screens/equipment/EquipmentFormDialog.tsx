@@ -486,8 +486,9 @@ export function EquipmentFormDialog({
           required
           error={errors.type && t(errors.type)}
         >
-          {() => (
+          {(control) => (
             <AsyncSearchSelect
+              {...control}
               value={form.type}
               selectedOption={
                 form.type ? { value: form.type, label: form.type } : null
@@ -507,8 +508,9 @@ export function EquipmentFormDialog({
           required
           className="sm:col-span-2"
         >
-          {() => (
+          {(control) => (
             <RadioGroup
+              {...control}
               value={form.numbering_status}
               onValueChange={(value) => {
                 clearErrors('plate_number')
@@ -537,8 +539,9 @@ export function EquipmentFormDialog({
             error={errors.plate_number && t(errors.plate_number)}
             className="sm:col-span-2"
           >
-            {() => (
+            {(control) => (
               <PlateNumberInput
+                {...control}
                 value={form.plate_number}
                 onChange={(value) => {
                   clearErrors('plate_number')
@@ -820,8 +823,9 @@ export function EquipmentFormDialog({
             }
             className="sm:col-span-2"
           >
-            {() => (
+            {(control) => (
               <AsyncSearchSelect
+                {...control}
                 value={trackerUnitId}
                 selectedOption={trackerOption}
                 disabled={trackerLink.state !== 'ready'}
