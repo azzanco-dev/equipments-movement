@@ -27,6 +27,8 @@ function loadLibModule(name, cache = new Map()) {
       require(request) {
         const match = /^@\/lib\/(.+)$/.exec(request)
         if (match) return loadLibModule(match[1], cache)
+        // wave 18: the form schemas are built with the real Zod.
+        if (request === 'zod') return require('zod')
         // The workbook reader is never called by the pure helpers under test;
         // it only has to exist at module scope.
         if (request === 'xlsx') return { read: () => ({}), utils: {} }

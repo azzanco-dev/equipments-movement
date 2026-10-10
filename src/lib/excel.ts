@@ -112,6 +112,18 @@ function parseDate(value: unknown): string | null {
   return null
 }
 
+/**
+ * wave 18: a row error names its column AND the reason («رقم المعدة: مطلوب»),
+ * instead of the bare column name.
+ */
+function columnError(
+  t: (key: TranslationKey) => string,
+  column: TranslationKey,
+  reason: 'importColumnRequired' | 'importColumnInvalid',
+): string {
+  return t(reason).replace('{column}', t(column))
+}
+
 export function parseEquipmentExcel(
   data: ArrayBuffer,
   t: (key: TranslationKey) => string,
@@ -158,36 +170,41 @@ export function parseEquipmentExcel(
     }
 
     const code = get('code')
-    if (!code) errors.push(t('equipmentCode'))
+    if (!code)
+      errors.push(columnError(t, 'equipmentCode', 'importColumnRequired'))
 
     const type = get('type')
-    if (!type) errors.push(t('equipmentType'))
+    if (!type)
+      errors.push(columnError(t, 'equipmentType', 'importColumnRequired'))
 
     const opRaw = normalizeKey(get('operational_status'))
     const opStatus =
       OP_STATUS_MAP[opRaw] ?? (opRaw === '' ? 'operational' : undefined)
-    if (!opStatus) errors.push(t('operationalStatus'))
+    if (!opStatus)
+      errors.push(columnError(t, 'operationalStatus', 'importColumnInvalid'))
 
     const ownRaw = normalizeKey(get('ownership_status'))
     const ownStatus =
       OWN_STATUS_MAP[ownRaw] ?? (ownRaw === '' ? 'alazani' : undefined)
-    if (!ownStatus) errors.push(t('ownershipStatus'))
+    if (!ownStatus)
+      errors.push(columnError(t, 'ownershipStatus', 'importColumnInvalid'))
 
     const regRaw = normalizeKey(get('registration_type'))
     const regType = regRaw ? (REG_TYPE_MAP[regRaw] ?? null) : null
-    if (regRaw && !regType) errors.push(t('registrationType'))
+    if (regRaw && !regType)
+      errors.push(columnError(t, 'registrationType', 'importColumnInvalid'))
 
     const yearRaw = get('manufacture_year')
     const year = yearRaw ? parseInt(yearRaw, 10) : null
     if (year !== null && (isNaN(year) || year < 1900 || year > 2100))
-      errors.push(t('manufactureYear'))
+      errors.push(columnError(t, 'manufactureYear', 'importColumnInvalid'))
 
     const rawPlateNumber = get('plate_number')
     const plateNumber = rawPlateNumber
       ? normalizePlateNumber(rawPlateNumber)
       : null
     if (plateNumber && !/^[0-9]{1,4}(?:-[A-Z]{1,3})?$/.test(plateNumber))
-      errors.push(t('plateNumber'))
+      errors.push(columnError(t, 'plateNumber', 'importColumnInvalid'))
 
     return {
       code,
@@ -433,10 +450,12 @@ export function parseCompaniesExcel(
     }
 
     const name_ar = get('name_ar')
-    if (!name_ar) errors.push(t('companyNameAr'))
+    if (!name_ar)
+      errors.push(columnError(t, 'companyNameAr', 'importColumnRequired'))
 
     const name_en = get('name_en')
-    if (!name_en) errors.push(t('companyNameEn'))
+    if (!name_en)
+      errors.push(columnError(t, 'companyNameEn', 'importColumnRequired'))
 
     return {
       name_ar,
@@ -488,10 +507,12 @@ export function parseProjectsExcel(
     }
 
     const name_ar = get('name_ar')
-    if (!name_ar) errors.push(t('projectNameAr'))
+    if (!name_ar)
+      errors.push(columnError(t, 'projectNameAr', 'importColumnRequired'))
 
     const name_en = get('name_en')
-    if (!name_en) errors.push(t('projectNameEn'))
+    if (!name_en)
+      errors.push(columnError(t, 'projectNameEn', 'importColumnRequired'))
 
     return {
       name_ar,

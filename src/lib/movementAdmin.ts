@@ -268,6 +268,30 @@ const MOVEMENT_ADMIN_ERROR_KEYS: Record<string, TranslationKey> = {
 }
 
 /**
+ * wave 18: the API codes of a failed correction that are about one field of
+ * the dialog (`admin_update_movement`, 0108). Every other code — access, a
+ * missing movement, a sequence conflict — stays a form-level message.
+ */
+const MOVEMENT_EDIT_FIELD_CODES: Record<string, keyof MovementEditValues> = {
+  future_time: 'movement_date',
+  invalid_driver: 'driver_id',
+  driver_not_supported: 'driver_id',
+  open_visit_driver_change: 'driver_id',
+  contractor_code_too_long: 'contractor_code',
+  movement_notes_too_long: 'notes',
+}
+
+export function movementEditFieldErrors(
+  code: string | null | undefined,
+): FieldErrors<MovementEditValues> | null {
+  const field = code ? MOVEMENT_EDIT_FIELD_CODES[code] : undefined
+  if (!field || !code) return null
+  return {
+    [field]: MOVEMENT_ADMIN_ERROR_KEYS[code],
+  } as FieldErrors<MovementEditValues>
+}
+
+/**
  * Translation key for a failed admin edit or delete. `operation` picks the
  * generic fallback so an unknown code never shows the wrong message.
  */

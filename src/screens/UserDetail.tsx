@@ -10,11 +10,19 @@ import { buildSearchFilter, COMPANY_PROJECT_SEARCH_FIELDS } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
 import type { Profile, ProfileContact, UserRole } from '@/lib/types'
+import { normalizeUserMobileInput, userMobileErrorCode } from '@/lib/userMobile'
 import {
-  isValidUserMobile,
-  normalizeUserMobileInput,
-  userMobileErrorCode,
-} from '@/lib/userMobile'
+  USER_EDIT_FIELD_ORDER,
+  userEditServerFieldErrors,
+  validateUserEditForm,
+  type UserEditFormValues,
+} from '@/lib/userForm'
+import {
+  clearFieldErrors,
+  focusFirstError,
+  hasErrors,
+  type FieldErrors,
+} from '@/lib/formValidation'
 import {
   BackButton,
   Badge,
@@ -92,6 +100,14 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   } | null>(null)
   const [mobileReloadKey, setMobileReloadKey] = useState(0)
   const [mobileError, setMobileError] = useState<string | null>(null)
+  // wave 18: the messages of the checks run on save, under their fields.
+  const [fieldErrors, setFieldErrors] = useState<
+    FieldErrors<UserEditFormValues>
+  >({})
+  const clearError = (field: keyof UserEditFormValues) =>
+    setFieldErrors((current) => clearFieldErrors(current, [field]))
+  const fieldError = (field: keyof UserEditFormValues) =>
+    fieldErrors[field] ? t(fieldErrors[field]) : undefined
   // The rest of the record was saved but the number was not.
   const [mobileNotSaved, setMobileNotSaved] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
@@ -149,6 +165,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       setLoading(true)
       setError(null)
       setLoadFailure(null)
+      setFieldErrors({})
       try {
         const result = await callManageUser({ action: 'get', user_id: userId })
         if (!active) return
@@ -282,25 +299,23 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     setError(null)
     setMobileError(null)
     setMobileNotSaved(false)
-    if (!fullName.trim() || !email.trim()) {
-      setError(t('userFieldsRequired'))
+    // Every field is checked before anything is written (so a mistyped number
+    // does not leave the record half saved), and each message goes under its
+    // field. The Edge Function and the database function repeat the rules.
+    const invalid = validateUserEditForm({
+      full_name: fullName,
+      email,
+      role,
+      password,
+      mobile_number: mobileChanged ? mobile : '',
+    })
+    if (hasErrors(invalid)) {
+      setFieldErrors(invalid)
+      focusFirstError(invalid, USER_EDIT_FIELD_ORDER)
       return
     }
-    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
-      setError(t('invalidUserEmail'))
-      return
-    }
-    if (password && password.length < 8) {
-      setError(t('passwordMinLength'))
-      return
-    }
-    // Checked before anything is written, so a mistyped number does not leave
-    // the record half saved. The database function repeats the rule.
+    setFieldErrors({})
     const nextMobile = normalizeUserMobileInput(mobile)
-    if (mobileChanged && !isValidUserMobile(nextMobile)) {
-      setMobileError(t('userMobileInvalid'))
-      return
-    }
     setSaving(true)
     try {
       // 1. The record itself, through the Edge Function as before. Skipped
@@ -323,8 +338,16 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           })
         } catch (cause) {
           // Nothing was written: the number is not attempted either, and
-          // every edit stays in the form.
-          setError(errorMessage(cause))
+          // every edit stays in the form. A refusal about the role goes
+          // under the role; anything else is a form-level message.
+          const attributed =
+            cause instanceof EdgeFunctionError
+              ? userEditServerFieldErrors(cause.serverCode)
+              : null
+          if (attributed) {
+            setFieldErrors(attributed)
+            focusFirstError(attributed, USER_EDIT_FIELD_ORDER)
+          } else setError(errorMessage(cause))
           return
         }
         setFullName(nextFullName)
@@ -535,17 +558,30 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           </Notice>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t('fullName')} required>
+          <Field
+            label={t('fullName')}
+            name="full_name"
+            required
+            error={fieldError('full_name')}
+          >
             {(control) => (
               <Input
                 {...control}
                 autoComplete="off"
                 value={fullName}
-                onChange={(event) => setFullName(event.target.value)}
+                onChange={(event) => {
+                  clearError('full_name')
+                  setFullName(event.target.value)
+                }}
               />
             )}
           </Field>
-          <Field label={t('email')} required>
+          <Field
+            label={t('email')}
+            name="email"
+            required
+            error={fieldError('email')}
+          >
             {(control) => (
               <Input
                 {...control}
@@ -553,16 +589,20 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 dir="ltr"
                 autoComplete="off"
                 value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                onChange={(event) => {
+                  clearError('email')
+                  setEmail(event.target.value)
+                }}
               />
             )}
           </Field>
-          <Field label={t('role')}>
+          <Field label={t('role')} name="role" error={fieldError('role')}>
             {(control) => (
               <Select
                 {...control}
                 value={role}
                 onValueChange={(value) => {
+                  clearError('role')
                   setRole(value as UserRole)
                   if (value !== 'supervisor') setCompanies([])
                 }}
@@ -572,15 +612,20 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           </Field>
           <Field
             label={t('temporaryPassword')}
+            name="password"
             hint={t('temporaryPasswordHelp')}
+            error={fieldError('password')}
           >
-            {({ id }) => (
+            {(control) => (
               <PasswordInput
-                id={id}
+                {...control}
                 dir="ltr"
                 autoComplete="new-password"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) => {
+                  clearError('password')
+                  setPassword(event.target.value)
+                }}
               />
             )}
           </Field>
@@ -588,7 +633,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             label={t('mobileNumber')}
             name="mobile_number"
             hint={t('userMobileHint')}
-            error={mobileError}
+            error={fieldError('mobile_number') ?? mobileError}
           >
             {(control) => (
               <Input
@@ -604,6 +649,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 value={mobile}
                 onChange={(event) => {
                   setMobileError(null)
+                  clearError('mobile_number')
                   setMobile(event.target.value)
                 }}
               />

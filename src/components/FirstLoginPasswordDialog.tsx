@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Button, Dialog, Field } from '@/components/ui'
 import { PasswordInput } from '@/components/PasswordInput'
 import { Alert } from '@/components/Alert'
@@ -6,6 +6,20 @@ import { useAuth } from '@/auth/AuthContext'
 import { useI18n } from '@/i18n/I18nContext'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
 import { supabase } from '@/lib/supabase'
+import {
+  clearFieldErrors,
+  focusFirstError,
+  hasErrors,
+  passwordChangeFormSchema,
+  validateWithSchema,
+  type FieldErrors,
+} from '@/lib/formValidation'
+
+interface PasswordChangeValues {
+  password: string
+  confirmation: string
+}
+const PASSWORD_FIELD_ORDER = ['password', 'confirmation'] as const
 
 export function FirstLoginPasswordDialog() {
   const { profile, session, refreshProfile } = useAuth()
@@ -14,17 +28,24 @@ export function FirstLoginPasswordDialog() {
   const [confirmation, setConfirmation] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<
+    FieldErrors<PasswordChangeValues>
+  >({})
+  const bodyRef = useRef<HTMLDivElement>(null)
 
   const required = Boolean(profile?.must_change_password)
 
   async function submit() {
     setError(null)
-    if (password.length < 8) {
-      setError(t('passwordMinLength'))
-      return
-    }
-    if (password !== confirmation) {
-      setError(t('passwordsDoNotMatch'))
+    // At least 8 characters, typed the same twice; each message goes under
+    // the field it is about.
+    const invalid = validateWithSchema(passwordChangeFormSchema, {
+      password,
+      confirmation,
+    })
+    setFieldErrors(invalid)
+    if (hasErrors(invalid)) {
+      focusFirstError(invalid, PASSWORD_FIELD_ORDER, { root: bodyRef.current })
       return
     }
     if (!session) return
@@ -84,23 +105,43 @@ export function FirstLoginPasswordDialog() {
         </Button>
       }
     >
-      <div className="space-y-4">
+      <div ref={bodyRef} className="space-y-4">
         {error && <Alert type="error">{error}</Alert>}
-        <Field label={t('newPassword')} required>
+        <Field
+          label={t('newPassword')}
+          name="password"
+          required
+          error={fieldErrors.password && t(fieldErrors.password)}
+        >
           {(control) => (
             <PasswordInput
               {...control}
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => {
+                setFieldErrors((current) =>
+                  clearFieldErrors(current, ['password']),
+                )
+                setPassword(event.target.value)
+              }}
             />
           )}
         </Field>
-        <Field label={t('confirmPassword')} required>
+        <Field
+          label={t('confirmPassword')}
+          name="confirmation"
+          required
+          error={fieldErrors.confirmation && t(fieldErrors.confirmation)}
+        >
           {(control) => (
             <PasswordInput
               {...control}
               value={confirmation}
-              onChange={(event) => setConfirmation(event.target.value)}
+              onChange={(event) => {
+                setFieldErrors((current) =>
+                  clearFieldErrors(current, ['confirmation']),
+                )
+                setConfirmation(event.target.value)
+              }}
             />
           )}
         </Field>

@@ -7,6 +7,9 @@ export interface QuickLessorDraft {
   error: string
 }
 
+/** `quick_create_lessor_by_name` accepts at most 150 characters (0109). */
+export const QUICK_LESSOR_NAME_MAX = 150
+
 export const EMPTY_QUICK_LESSOR: QuickLessorDraft = {
   open: false,
   name: '',
@@ -44,12 +47,7 @@ export function QuickLessorDialog({
           <Button variant="outline" onClick={onClose}>
             {t('cancel')}
           </Button>
-          <Button
-            variant="primary"
-            loading={saving}
-            disabled={!value.name.trim()}
-            onClick={onSave}
-          >
+          <Button variant="primary" loading={saving} onClick={onSave}>
             {saving ? t('saving') : t('save')}
           </Button>
         </>
@@ -60,6 +58,7 @@ export function QuickLessorDialog({
           <Input
             {...control}
             value={value.name}
+            maxLength={QUICK_LESSOR_NAME_MAX}
             placeholder={t('lessorNamePlaceholder')}
             onChange={(event) =>
               onChange({ ...value, name: event.target.value, error: '' })

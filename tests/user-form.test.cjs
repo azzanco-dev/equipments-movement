@@ -26,6 +26,8 @@ function loadLibModule(name, cache = new Map()) {
       require(request) {
         const match = /^@\/lib\/(.+)$/.exec(request)
         if (match) return loadLibModule(match[1], cache)
+        // wave 18: the form schemas are built with the real Zod.
+        if (request === 'zod') return require('zod')
         throw new Error(`Unexpected module: ${request}`)
       },
     },

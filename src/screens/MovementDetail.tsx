@@ -32,6 +32,12 @@ import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/components/Select'
 import { buildSearchFilter, DRIVER_SEARCH_FIELDS } from '@/lib/search'
 import { unwrapRows } from '@/lib/supabaseResult'
+import type { TranslationKey } from '@/i18n/translations'
+import {
+  driverChangeFormSchema,
+  focusFieldControl,
+  validateWithSchema,
+} from '@/lib/formValidation'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
 import { localizedName } from '@/lib/localizedName'
@@ -179,6 +185,13 @@ export function MovementDetail({
   const [codeEditValue, setCodeEditValue] = useState('')
   const [codeEditBusy, setCodeEditBusy] = useState(false)
   const [codeEditError, setCodeEditError] = useState<string | null>(null)
+  // wave 18: a problem with the typed code itself goes under the field.
+  const [codeEditFieldError, setCodeEditFieldError] =
+    useState<TranslationKey | null>(null)
+  // wave 18: the same for the driver of the driver-change panel.
+  const [driverChangeFieldError, setDriverChangeFieldError] =
+    useState<TranslationKey | null>(null)
+  const driverChangeRef = useRef<HTMLDivElement>(null)
   const startRequest = useListRequest()
   const fetchData = useCallback(async () => {
     const signal = startRequest()
@@ -439,9 +452,18 @@ export function MovementDetail({
   )
 
   const changeDriver = async () => {
-    if (!driverEntryId || !newDriverId) return
-    setDriverChangeBusy(true)
+    if (!driverEntryId) return
     setDriverChangeError(null)
+    const invalid = validateWithSchema(driverChangeFormSchema, {
+      driver_id: newDriverId,
+    })
+    if (invalid.driver_id) {
+      setDriverChangeFieldError(invalid.driver_id)
+      focusFieldControl('driver_id', driverChangeRef.current)
+      return
+    }
+    setDriverChangeFieldError(null)
+    setDriverChangeBusy(true)
     const { error: changeError } = await supabase.rpc(
       'change_active_movement_driver',
       {
@@ -452,7 +474,14 @@ export function MovementDetail({
     )
     setDriverChangeBusy(false)
     if (changeError) {
-      setDriverChangeError(t('driverChangeFailed'))
+      // 0108: the chosen driver is the current one or does not exist — both
+      // are about the field; a closed visit or no access stays form-level.
+      const message = changeError.message ?? ''
+      if (message.includes('driver_unchanged'))
+        setDriverChangeFieldError('driverChangeSameDriver')
+      else if (message.includes('invalid_driver_id'))
+        setDriverChangeFieldError('movementAdminInvalidDriver')
+      else setDriverChangeError(t('driverChangeFailed'))
       return
     }
     setDriverChangeOpen(false)
@@ -465,6 +494,7 @@ export function MovementDetail({
   const openContractorCodeEdit = () => {
     setCodeEditValue(log?.contractor_equipment_code ?? '')
     setCodeEditError(null)
+    setCodeEditFieldError(null)
     setCodeEditOpen(true)
   }
 
@@ -475,11 +505,12 @@ export function MovementDetail({
   const saveContractorCode = async () => {
     if (!log) return
     if (!isValidContractorCode(codeEditValue)) {
-      setCodeEditError(t('contractorCodeTooLong'))
+      setCodeEditFieldError('contractorCodeTooLong')
       return
     }
     setCodeEditBusy(true)
     setCodeEditError(null)
+    setCodeEditFieldError(null)
     const { error: rpcError } = await supabase.rpc(
       'update_entry_contractor_code',
       {
@@ -489,7 +520,10 @@ export function MovementDetail({
     )
     setCodeEditBusy(false)
     if (rpcError) {
-      setCodeEditError(t(contractorCodeErrorKey(rpcError.message)))
+      const key = contractorCodeErrorKey(rpcError.message)
+      // Only the length is about the typed value; the rest is about access.
+      if (key === 'contractorCodeTooLong') setCodeEditFieldError(key)
+      else setCodeEditError(t(key))
       return
     }
     setCodeEditOpen(false)
@@ -1132,7 +1166,10 @@ export function MovementDetail({
                 <Button
                   variant="outline"
                   icon={<RefreshCw size={16} />}
-                  onClick={() => setDriverChangeOpen((value) => !value)}
+                  onClick={() => {
+                    setDriverChangeFieldError(null)
+                    setDriverChangeOpen((value) => !value)
+                  }}
                 >
                   {t('changeDriver')}
                 </Button>
@@ -1140,17 +1177,25 @@ export function MovementDetail({
           </div>
           {driverChangeOpen && (
             <div
+              ref={driverChangeRef}
               className="space-y-3 rounded-lg border p-4"
               style={{ borderColor: 'var(--border)' }}
             >
-              <Field label={t('newDriver')} required>
-                {() => (
+              <Field
+                label={t('newDriver')}
+                name="driver_id"
+                required
+                error={driverChangeFieldError && t(driverChangeFieldError)}
+              >
+                {(control) => (
                   <AsyncSearchSelect
+                    {...control}
                     value={newDriverId}
                     selectedOption={newDriverOption}
                     onChange={(value, option) => {
                       setNewDriverId(value)
                       setNewDriverOption(option)
+                      setDriverChangeFieldError(null)
                     }}
                     loadOptions={loadDrivers}
                     placeholder={t('selectDriver')}
@@ -1183,7 +1228,6 @@ export function MovementDetail({
                 <Button
                   variant="primary"
                   className="flex-1"
-                  disabled={!newDriverId}
                   loading={driverChangeBusy}
                   onClick={changeDriver}
                 >
@@ -1411,7 +1455,11 @@ export function MovementDetail({
         >
           <div className="space-y-3">
             {codeEditError && <Alert type="error">{codeEditError}</Alert>}
-            <Field label={t('contractorEquipmentCode')}>
+            <Field
+              label={t('contractorEquipmentCode')}
+              name="contractor_code"
+              error={codeEditFieldError && t(codeEditFieldError)}
+            >
               {(control) => (
                 <Input
                   {...control}
@@ -1420,7 +1468,10 @@ export function MovementDetail({
                   value={codeEditValue}
                   maxLength={CONTRACTOR_CODE_MAX_LENGTH}
                   placeholder={t('contractorCodePlaceholder')}
-                  onChange={(event) => setCodeEditValue(event.target.value)}
+                  onChange={(event) => {
+                    setCodeEditFieldError(null)
+                    setCodeEditValue(event.target.value)
+                  }}
                 />
               )}
             </Field>

@@ -26,6 +26,7 @@ import {
   buildMovementEditPayload,
   localDateKey,
   movementAdminErrorKey,
+  movementEditFieldErrors,
   movementEditKeepsDriver,
   movementEditUnchanged,
   validateMovementEdit,
@@ -286,6 +287,7 @@ export function MovementEditDialog({
     setError(null)
     let stored = false
     let failure: string | null = null
+    let fieldFailure: FieldErrors<MovementEditValues> | null = null
 
     try {
       if (correctionNeeded) {
@@ -311,11 +313,14 @@ export function MovementEditDialog({
           const result = (await response.json().catch(() => null)) as {
             error?: string
           } | null
-          failure = t(movementAdminErrorKey(result?.error, 'update'))
+          // A refusal about one field goes under it; the rest is form-level.
+          fieldFailure = movementEditFieldErrors(result?.error)
+          if (!fieldFailure)
+            failure = t(movementAdminErrorKey(result?.error, 'update'))
         }
       }
 
-      if (!failure && appendDriver && driverEntryId) {
+      if (!failure && !fieldFailure && appendDriver && driverEntryId) {
         const { error: changeError } = await supabase.rpc(
           'change_active_movement_driver',
           {
@@ -340,6 +345,13 @@ export function MovementEditDialog({
       setBusy(false)
     }
 
+    if (fieldFailure) {
+      setErrors(fieldFailure)
+      focusFirstError(fieldFailure, MOVEMENT_EDIT_FIELD_ORDER, {
+        root: bodyRef.current,
+      })
+      return
+    }
     if (failure && !stored) {
       setError(failure)
       return

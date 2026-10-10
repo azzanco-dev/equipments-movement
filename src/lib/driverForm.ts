@@ -1,11 +1,15 @@
 import type { Driver } from '@/lib/types'
 import {
-  digitsRange,
-  duplicateFieldErrors,
-  fieldErrors,
-  pattern,
-  required,
+  driverFormSchema,
+  mapDatabaseErrorToField,
+  MOBILE_NUMBER_PATTERN,
+  PERSON_NAME_MAX,
+  PERSON_NAME_MIN,
+  quickDriverFormSchema,
+  validateWithSchema,
+  type DatabaseFieldRule,
   type FieldErrors,
+  type PostgresLikeError,
 } from '@/lib/formValidation'
 
 /** Values held by the driver add/edit dialog. */
@@ -53,7 +57,12 @@ export function sanitizeMobileNumber(value: string): string {
 }
 
 /** Mirrors the `drivers_mobile_number_check` database constraint. */
-export const DRIVER_MOBILE_PATTERN = /^\+?\d{7,15}$/
+export const DRIVER_MOBILE_PATTERN = MOBILE_NUMBER_PATTERN
+
+/** `drivers.full_name` and `drivers.name_en`: 2 to 150 characters once
+ *  trimmed (migrations 0033 and 0078). */
+export const DRIVER_NAME_MIN = PERSON_NAME_MIN
+export const DRIVER_NAME_MAX = PERSON_NAME_MAX
 
 /** The order the fields appear in, used to focus the first invalid one. */
 export const DRIVER_FIELD_ORDER = [
@@ -68,22 +77,15 @@ export const DRIVER_FIELD_ORDER = [
 
 /**
  * Only `full_name` is mandatory for a complete driver record (AGENTS.md);
- * the id and mobile numbers are validated only when they are filled in, and
- * their formats mirror the `drivers_id_number_check` and
- * `drivers_mobile_number_check` database constraints.
+ * the English name and the id and mobile numbers are validated only when they
+ * are filled in. Every rule mirrors a database check: the name lengths
+ * (`drivers_full_name_check`, `drivers_name_en_check`) and
+ * `drivers_id_number_check` / `drivers_mobile_number_check`.
  */
 export function validateDriverForm(
   form: DriverFormValues,
 ): FieldErrors<DriverFormValues> {
-  return fieldErrors<DriverFormValues>({
-    full_name: required(form.full_name, 'fullNameRequired'),
-    id_number: digitsRange(form.id_number, 5, 20, 'idNumberFormatInvalid'),
-    mobile_number: pattern(
-      form.mobile_number,
-      DRIVER_MOBILE_PATTERN,
-      'mobileNumberFormatInvalid',
-    ),
-  })
+  return validateWithSchema(driverFormSchema, form)
 }
 
 /** Values held by the inline quick-create driver panel. */
@@ -101,22 +103,115 @@ export const QUICK_DRIVER_FIELD_ORDER = ['fullName', 'mobile'] as const
 export function validateQuickDriverForm(
   form: QuickDriverFormValues,
 ): FieldErrors<QuickDriverFormValues> {
-  return fieldErrors<QuickDriverFormValues>({
-    fullName: required(form.fullName, 'fullNameRequired'),
-    mobile:
-      required(form.mobile, 'mobileNumberRequired') ??
-      pattern(form.mobile, DRIVER_MOBILE_PATTERN, 'mobileNumberFormatInvalid'),
-  })
+  return validateWithSchema(quickDriverFormSchema, form)
 }
 
-/** `drivers` is unique on the mobile number and on the id number. */
+/**
+ * `quick_create_driver` (migration 0119) raises `invalid_quick_driver` for a
+ * blank name or a malformed mobile; the form already refuses a blank name, so
+ * it is the mobile. The table checks still apply to the row it inserts.
+ */
+export const QUICK_DRIVER_DATABASE_RULES: readonly DatabaseFieldRule<QuickDriverFormValues>[] =
+  [
+    {
+      on: 'raised',
+      match: 'invalid_quick_driver',
+      field: 'mobile',
+      key: 'mobileNumberFormatInvalid',
+    },
+    {
+      on: 'check',
+      match: 'drivers_full_name',
+      field: 'fullName',
+      key: 'nameLengthInvalid',
+    },
+    {
+      on: 'check',
+      match: 'drivers_mobile_number',
+      field: 'mobile',
+      key: 'mobileNumberFormatInvalid',
+    },
+    {
+      on: 'unique',
+      match: 'mobile_number',
+      field: 'mobile',
+      key: 'mobileExists',
+    },
+  ]
+
+export function quickDriverSaveFieldErrors(
+  error: PostgresLikeError | null | undefined,
+): FieldErrors<QuickDriverFormValues> | null {
+  return mapDatabaseErrorToField(error, QUICK_DRIVER_DATABASE_RULES)
+}
+
+/**
+ * Database rejections of a driver save, by field: `drivers` is unique on the
+ * mobile and the id number, and its checks cover the name lengths, both number
+ * formats, and the controlled nationality and employment-type lists.
+ */
+export const DRIVER_DATABASE_RULES: readonly DatabaseFieldRule<DriverFormValues>[] =
+  [
+    {
+      on: 'unique',
+      match: 'mobile_number',
+      field: 'mobile_number',
+      key: 'mobileExists',
+    },
+    {
+      on: 'unique',
+      match: 'id_number',
+      field: 'id_number',
+      key: 'driverIdExists',
+    },
+    {
+      on: 'check',
+      match: 'drivers_full_name',
+      field: 'full_name',
+      key: 'nameLengthInvalid',
+    },
+    {
+      on: 'check',
+      match: 'drivers_name_en',
+      field: 'name_en',
+      key: 'nameLengthInvalid',
+    },
+    {
+      on: 'check',
+      match: 'drivers_id_number',
+      field: 'id_number',
+      key: 'idNumberFormatInvalid',
+    },
+    {
+      on: 'check',
+      match: 'drivers_mobile_number',
+      field: 'mobile_number',
+      key: 'mobileNumberFormatInvalid',
+    },
+    {
+      on: 'check',
+      match: 'drivers_nationality',
+      field: 'nationality',
+      key: 'valueNotInList',
+    },
+    {
+      on: 'check',
+      match: 'drivers_employment_type',
+      field: 'employment_type',
+      key: 'valueNotInList',
+    },
+    {
+      on: 'notNull',
+      match: '"full_name"',
+      field: 'full_name',
+      key: 'fullNameRequired',
+    },
+  ]
+
 export function driverSaveFieldErrors(
-  error: { code?: string | null; message?: string | null } | null | undefined,
+  error: PostgresLikeError | null | undefined,
 ): FieldErrors<DriverFormValues> | null {
-  return duplicateFieldErrors<DriverFormValues>(error, [
-    { match: 'mobile_number', field: 'mobile_number', key: 'mobileExists' },
-    { match: 'id_number', field: 'id_number', key: 'driverIdExists' },
-  ])
+  return mapDatabaseErrorToField(error, DRIVER_DATABASE_RULES)
 }
 
 /** Insert/update payload for the `drivers` table. */

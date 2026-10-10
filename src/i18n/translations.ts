@@ -728,8 +728,7 @@ export const translations = {
     whatsappStatusLoading: 'واتساب: جار اعادة الاتصال',
     whatsappStatusNotConfigured: 'واتساب: غير مفعل',
     whatsappStatusUnknown: 'واتساب: تعذر التحقق',
-    whatsappStatusAlertHint:
-      'لن تصل اشعارات واتساب للحركات حتى يعود الاتصال.',
+    whatsappStatusAlertHint: 'لن تصل اشعارات واتساب للحركات حتى يعود الاتصال.',
     whatsappStatusQrHint:
       'امسح رمز QR من لوحة UltraMsg لاعادة ربط الجهاز، ولن تصل اشعارات واتساب قبل ذلك.',
     // wave-12-whatsapp-status — end
@@ -879,6 +878,19 @@ export const translations = {
     afaqyLocationMapLabel: 'خريطة الموقع الحالي',
     afaqyRefresh: 'تحديث',
     // wave-17-afaqy — end
+    // wave-18-validation — start
+    nameLengthInvalid: 'من 2 الى 150 حرفا',
+    valueNotInList: 'اختر قيمة من القائمة',
+    plateNumberInvalid: 'رقم لوحة غير صالح: حتى 4 ارقام و3 احرف',
+    textTooLong: 'النص اطول من المسموح',
+    manufactureYearInvalid: 'سنة من 4 ارقام بين 1900 و2100',
+    lessorNameTooLong: 'الاسم اطول من 150 حرفا',
+    driverChangeDriverRequired: 'اختر السائق الجديد',
+    driverChangeSameDriver: 'هذا هو السائق الحالي',
+    workshopOpeningHasMovement: 'لهذه المعدة حركة ورشة مسجلة',
+    importColumnRequired: '{column}: مطلوب',
+    importColumnInvalid: '{column}: قيمة غير صالحة',
+    // wave-18-validation — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -2370,6 +2382,19 @@ export const translations = {
     afaqyLocationMapLabel: 'Current location map',
     afaqyRefresh: 'Refresh',
     // wave-17-afaqy — end
+    // wave-18-validation — start
+    nameLengthInvalid: 'Use 2 to 150 characters.',
+    valueNotInList: 'Choose a value from the list.',
+    plateNumberInvalid: 'Invalid plate: up to 4 digits and 3 letters.',
+    textTooLong: 'This text is too long.',
+    manufactureYearInvalid: 'Enter a 4-digit year between 1900 and 2100.',
+    lessorNameTooLong: 'The name cannot exceed 150 characters.',
+    driverChangeDriverRequired: 'Select the new driver.',
+    driverChangeSameDriver: 'This is already the current driver.',
+    workshopOpeningHasMovement: 'This unit already has a workshop movement.',
+    importColumnRequired: '{column}: required',
+    importColumnInvalid: '{column}: invalid value',
+    // wave-18-validation — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',

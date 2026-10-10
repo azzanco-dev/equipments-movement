@@ -127,6 +127,7 @@
 - Report and dashboard day boundaries use Saudi time (UTC+03:00), not the browser's local timezone.
 - Show a visible error state when data fails to load; never render a load failure as an empty "no data" state.
 - Use the translation system in `src/i18n/translations.ts`; add Arabic and English keys together. Avoid hardcoded user-facing strings in reusable UI.
+- Form validation (owner decision 2026-10-10): rules live as Zod schemas in `src/lib/formValidation.ts` (one schema per form, messages are translation keys); forms call `validateWithSchema` on submit, show the message under the field, focus the first invalid field, and map database errors to the responsible field with `mapDatabaseErrorToField` before falling back to a form-level message. Rules stay lenient: tell the user which field is wrong and why, do not over-restrict. No react-hook-form or resolver packages.
 - Mobile form controls must remain at least 16 px font size to prevent iOS focus zoom.
 
 ## Working rules

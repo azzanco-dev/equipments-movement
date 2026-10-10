@@ -37,6 +37,8 @@ function loadModule(file, cache = new Map()) {
       exports,
       React: { createElement: () => null },
       require(request) {
+        // wave 18: the form schemas are built with the real Zod.
+        if (request === 'zod') return require('zod')
         const target = request.startsWith('@/')
           ? path.join(root, 'src', request.slice(2))
           : request.startsWith('.')

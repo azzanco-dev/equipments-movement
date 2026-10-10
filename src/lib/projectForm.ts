@@ -1,8 +1,8 @@
 import type { Project } from '@/lib/types'
 import {
   duplicateFieldErrors,
-  fieldErrors,
-  required,
+  projectFormSchema,
+  validateWithSchema,
   type FieldErrors,
 } from '@/lib/formValidation'
 
@@ -32,10 +32,7 @@ export const PROJECT_FIELD_ORDER = ['name_ar', 'name_en'] as const
 export function validateProjectForm(
   form: ProjectFormValues,
 ): FieldErrors<ProjectFormValues> {
-  return fieldErrors<ProjectFormValues>({
-    name_ar: required(form.name_ar, 'projectNameArRequired'),
-    name_en: required(form.name_en, 'projectNameEnRequired'),
-  })
+  return validateWithSchema(projectFormSchema, form)
 }
 
 /** A duplicate name is attributed to the name the database names. */

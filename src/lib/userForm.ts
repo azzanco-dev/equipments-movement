@@ -2,9 +2,10 @@ import type { BadgeTone } from '@/components/ui/Badge'
 import type { TranslationKey } from '@/i18n/translations'
 import type { UserRole } from '@/lib/types'
 import {
-  fieldErrors,
-  pattern,
-  required,
+  PASSWORD_MIN_LENGTH,
+  userEditFormSchema,
+  userFormSchema,
+  validateWithSchema,
   type FieldErrors,
 } from '@/lib/formValidation'
 
@@ -54,29 +55,46 @@ export const USER_FIELD_ORDER = [
 ] as const
 
 /** The minimum the `create-user` Edge Function accepts. */
-export const PASSWORD_MIN_LENGTH = 8
-
-const EMAIL_PATTERN = /^\S+@\S+\.\S+$/
+export { PASSWORD_MIN_LENGTH }
 
 /**
  * The same three rules the dialog enforced before (name, email, and password
  * present; a plausible email; a password of at least 8 characters), reported
- * per field instead of as one message.
+ * per field instead of as one message (`userFormSchema`).
  */
 export function validateUserForm(
   form: UserFormValues,
 ): FieldErrors<UserFormValues> {
-  return fieldErrors<UserFormValues>({
-    full_name: required(form.full_name, 'fullNameRequired'),
-    email:
-      required(form.email, 'emailRequired') ??
-      pattern(form.email, EMAIL_PATTERN, 'invalidUserEmail'),
-    password: !form.password
-      ? 'passwordRequired'
-      : form.password.length < PASSWORD_MIN_LENGTH
-        ? 'passwordMinLength'
-        : undefined,
-  })
+  return validateWithSchema(userFormSchema, form)
+}
+
+/** Values held by the edit form of the user detail page. */
+export interface UserEditFormValues {
+  full_name: string
+  email: string
+  role: UserRole
+  password: string
+  mobile_number: string
+}
+
+/** The order the fields appear in, used to focus the first invalid one. */
+export const USER_EDIT_FIELD_ORDER = [
+  'full_name',
+  'email',
+  'role',
+  'password',
+  'mobile_number',
+] as const
+
+/**
+ * The edit form's rules (`userEditFormSchema`): name and email present, a
+ * plausible email, a new password of at least 8 characters when one is typed,
+ * and the mobile number rule of `admin_set_user_mobile`.
+ */
+export function validateUserEditForm(
+  form: UserEditFormValues,
+): FieldErrors<UserEditFormValues> {
+  return validateWithSchema(userEditFormSchema, form)
 }
 
 /**
@@ -90,6 +108,19 @@ export function userServerFieldErrors(
   if (serverCode === 'email_exists') return { email: 'userEmailExists' }
   if (serverCode === 'invalid_email') return { email: 'invalidUserEmail' }
   if (serverCode === 'weak_password') return { password: 'passwordMinLength' }
+  return null
+}
+
+/**
+ * The same for a `manage-user` update: the role refusals belong on the role
+ * field. Its other failures carry no code (a taken email is reported as
+ * "could not update login details"), so they stay a form-level message.
+ */
+export function userEditServerFieldErrors(
+  serverCode: string | undefined,
+): FieldErrors<UserEditFormValues> | null {
+  if (serverCode === 'own_role') return { role: 'cannotChangeOwnRole' }
+  if (serverCode === 'last_admin') return { role: 'lastAdminRequired' }
   return null
 }
 

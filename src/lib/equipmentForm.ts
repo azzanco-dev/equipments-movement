@@ -12,10 +12,15 @@ import {
   usesExternalSupplier,
 } from '@/lib/equipmentOwnership'
 import {
-  duplicateFieldErrors,
-  fieldErrors,
-  required,
+  equipmentFormSchema,
+  MANUFACTURE_YEAR_MAX,
+  MANUFACTURE_YEAR_MIN,
+  mapDatabaseErrorToField,
+  quickEquipmentFormSchema,
+  validateWithSchema,
+  type DatabaseFieldRule,
   type FieldErrors,
+  type PostgresLikeError,
 } from '@/lib/formValidation'
 
 /** Values held by the equipment add/edit dialog. Everything is a string so the
@@ -132,26 +137,24 @@ export const EQUIPMENT_FIELD_ORDER = [
   'type',
   'numbering_status',
   'plate_number',
+  'manufacture_year',
+  'project_id',
+  'lessor_id',
   'qr_value',
 ] as const
+
+export { MANUFACTURE_YEAR_MAX, MANUFACTURE_YEAR_MIN }
 
 /**
  * Per-field messages for the rules the form already enforced: the plate of a
  * numbered record, plus the code, type, and QR value the form marks required
- * and the database stores `NOT NULL`.
+ * and the database stores `NOT NULL`. The optional manufacture year, when
+ * filled in, must be a four-digit year in the range the Excel import accepts.
  */
 export function validateEquipmentForm(
   form: EquipmentFormValues,
 ): FieldErrors<EquipmentFormValues> {
-  return fieldErrors<EquipmentFormValues>({
-    code: required(form.code, 'equipmentCodeRequired'),
-    type: required(form.type, 'equipmentTypeRequired'),
-    plate_number:
-      form.numbering_status === 'numbered' && !/[0-9]/.test(form.plate_number)
-        ? 'plateRequired'
-        : undefined,
-    qr_value: required(form.qr_value, 'qrValueRequired'),
-  })
+  return validateWithSchema(equipmentFormSchema, form)
 }
 
 /** Values held by the inline quick-create equipment panel. */
@@ -183,40 +186,166 @@ export function validateQuickEquipmentForm(
   form: QuickEquipmentFormValues,
   workshopMode: boolean,
 ): FieldErrors<QuickEquipmentFormValues> {
-  const needsPlate = workshopMode || form.identifierType === 'plate'
-  return fieldErrors<QuickEquipmentFormValues>({
-    code:
-      workshopMode && form.numberingStatus === 'numbered'
-        ? required(form.code, 'equipmentCodeRequired')
-        : undefined,
-    plate:
-      needsPlate && !/[0-9]/.test(form.plate) ? 'plateRequired' : undefined,
-    chassis:
-      !workshopMode && form.identifierType === 'chassis'
-        ? required(form.chassis, 'chassisNumberRequired')
-        : undefined,
-    type: workshopMode
-      ? undefined
-      : required(form.type, 'equipmentTypeRequired'),
-    lessorId: workshopMode
-      ? undefined
-      : required(form.lessorId, 'lessorRequired'),
-  })
+  return validateWithSchema(quickEquipmentFormSchema(workshopMode), form)
 }
 
-/** `equipment` is unique on the code, the QR value, and the plate parts. */
-export function equipmentSaveFieldErrors(
-  error: { code?: string | null; message?: string | null } | null | undefined,
-): FieldErrors<EquipmentFormValues> | null {
-  return duplicateFieldErrors<EquipmentFormValues>(error, [
+/**
+ * Database rejections of an equipment save, by field. Raised tokens come from
+ * `admin_change_equipment_code` and the history trigger (0114), the plate
+ * parsing trigger (0077), and the workshop quick create (0109); `equipment` is
+ * unique on the code, the QR value, and the plate parts; its plate parts are
+ * checked; and the type, project, and supplier are foreign keys.
+ */
+export const EQUIPMENT_DATABASE_RULES: readonly DatabaseFieldRule<EquipmentFormValues>[] =
+  [
     {
+      on: 'raised',
+      match: 'equipment_code_previously_used',
+      field: 'code',
+      key: 'equipmentCodePreviouslyUsed',
+    },
+    {
+      on: 'raised',
+      match: 'equipment_code_required',
+      field: 'code',
+      key: 'equipmentCodeRequired',
+    },
+    {
+      on: 'raised',
+      match: 'invalid_plate_number',
+      field: 'plate_number',
+      key: 'plateNumberInvalid',
+    },
+    {
+      on: 'unique',
       match: 'equipment_plate',
       field: 'plate_number',
       key: 'plateNumberExists',
     },
-    { match: 'equipment_qr_value', field: 'qr_value', key: 'qrValueExists' },
-    { match: 'equipment_code', field: 'code', key: 'equipmentCodeExists' },
-  ])
+    {
+      on: 'unique',
+      match: 'equipment_qr_value',
+      field: 'qr_value',
+      key: 'qrValueExists',
+    },
+    {
+      on: 'unique',
+      match: 'equipment_code',
+      field: 'code',
+      key: 'equipmentCodeExists',
+    },
+    {
+      on: 'check',
+      match: 'equipment_plate',
+      field: 'plate_number',
+      key: 'plateNumberInvalid',
+    },
+    {
+      on: 'foreignKey',
+      match: 'equipment_type_fkey',
+      field: 'type',
+      key: 'equipmentTypeNotFound',
+    },
+    {
+      on: 'foreignKey',
+      match: 'project_id',
+      field: 'project_id',
+      key: 'projectNotFound',
+    },
+    {
+      on: 'foreignKey',
+      match: 'lessor_id',
+      field: 'lessor_id',
+      key: 'lessorNotFound',
+    },
+    {
+      on: 'notNull',
+      match: '"code"',
+      field: 'code',
+      key: 'equipmentCodeRequired',
+    },
+    {
+      on: 'notNull',
+      match: '"type"',
+      field: 'type',
+      key: 'equipmentTypeRequired',
+    },
+  ]
+
+export function equipmentSaveFieldErrors(
+  error: PostgresLikeError | null | undefined,
+): FieldErrors<EquipmentFormValues> | null {
+  return mapDatabaseErrorToField(error, EQUIPMENT_DATABASE_RULES)
+}
+
+/**
+ * Database rejections of a quick-created unit (migration 0109): the workshop
+ * RPC raises the code tokens (still in their older spaced wording), the
+ * foreman RPC checks the type and the supplier, and the table rules apply to
+ * the row either inserts.
+ */
+export const QUICK_EQUIPMENT_DATABASE_RULES: readonly DatabaseFieldRule<QuickEquipmentFormValues>[] =
+  [
+    {
+      on: 'raised',
+      match: 'equipment_code_previously_used',
+      field: 'code',
+      key: 'equipmentCodePreviouslyUsed',
+    },
+    {
+      on: 'raised',
+      match: 'duplicate equipment code',
+      field: 'code',
+      key: 'equipmentCodeExists',
+    },
+    {
+      on: 'raised',
+      match: 'equipment code required',
+      field: 'code',
+      key: 'equipmentCodeRequired',
+    },
+    {
+      on: 'raised',
+      match: 'invalid_plate_number',
+      field: 'plate',
+      key: 'plateNumberInvalid',
+    },
+    {
+      on: 'raised',
+      match: 'invalid_equipment_type',
+      field: 'type',
+      key: 'equipmentTypeNotFound',
+    },
+    {
+      on: 'raised',
+      match: 'invalid_lessor',
+      field: 'lessorId',
+      key: 'lessorNotFound',
+    },
+    {
+      on: 'unique',
+      match: 'equipment_plate',
+      field: 'plate',
+      key: 'plateNumberExists',
+    },
+    {
+      on: 'unique',
+      match: 'equipment_code',
+      field: 'code',
+      key: 'equipmentCodeExists',
+    },
+    {
+      on: 'check',
+      match: 'equipment_plate',
+      field: 'plate',
+      key: 'plateNumberInvalid',
+    },
+  ]
+
+export function quickEquipmentSaveFieldErrors(
+  error: PostgresLikeError | null | undefined,
+): FieldErrors<QuickEquipmentFormValues> | null {
+  return mapDatabaseErrorToField(error, QUICK_EQUIPMENT_DATABASE_RULES)
 }
 
 /** Insert/update payload for the `equipment` table. */

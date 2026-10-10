@@ -548,19 +548,24 @@ export function EquipmentFormDialog({
             )}
           </Field>
         )}
-        <Field label={t('manufactureYear')}>
+        <Field
+          label={t('manufactureYear')}
+          name="manufacture_year"
+          error={errors.manufacture_year && t(errors.manufacture_year)}
+        >
           {(control) => (
             <Input
               {...control}
               type="number"
               placeholder={t('manufactureYearPlaceholder')}
               value={form.manufacture_year}
-              onChange={(event) =>
+              onChange={(event) => {
+                clearErrors('manufacture_year')
                 setForm((current) => ({
                   ...current,
                   manufacture_year: event.target.value,
                 }))
-              }
+              }}
             />
           )}
         </Field>
@@ -695,12 +700,18 @@ export function EquipmentFormDialog({
             />
           )}
         </Field>
-        <Field label={t('project')}>
-          {() => (
+        <Field
+          label={t('project')}
+          name="project_id"
+          error={errors.project_id && t(errors.project_id)}
+        >
+          {(control) => (
             <AsyncSearchSelect
+              {...control}
               value={form.project_id}
               selectedOption={projectOption}
               onChange={(value, option) => {
+                clearErrors('project_id')
                 setForm((current) => ({ ...current, project_id: value }))
                 setProjectOption(option)
               }}
@@ -710,12 +721,18 @@ export function EquipmentFormDialog({
           )}
         </Field>
         {usesExternalSupplier(form.ownership_status) && (
-          <Field label={t('externalSupplier')}>
-            {() => (
+          <Field
+            label={t('externalSupplier')}
+            name="lessor_id"
+            error={errors.lessor_id && t(errors.lessor_id)}
+          >
+            {(control) => (
               <AsyncSearchSelect
+                {...control}
                 value={form.lessor_id}
                 selectedOption={lessorOption}
                 onChange={(value, option) => {
+                  clearErrors('lessor_id')
                   setForm((current) => ({ ...current, lessor_id: value }))
                   setLessorOption(option)
                 }}

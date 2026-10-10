@@ -41,7 +41,18 @@ import {
   sanitizeSearchTerm,
 } from '@/lib/search'
 import { unwrapRows } from '@/lib/supabaseResult'
-import { focusFirstError, type FieldErrors } from '@/lib/formValidation'
+import type { TranslationKey } from '@/i18n/translations'
+import {
+  equipmentTypeFormSchema,
+  focusFieldControl,
+  focusFirstError,
+  hasErrors,
+  mapDatabaseErrorToField,
+  validateWithSchema,
+  workshopOpeningFormSchema,
+  type DatabaseFieldRule,
+  type FieldErrors,
+} from '@/lib/formValidation'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { RelativeTime } from '@/components/RelativeTime'
 import { AfaqySettings } from '@/components/afaqy/AfaqySettings'
@@ -63,6 +74,22 @@ const PAGE_SIZE = 20
 /** The equipment-type dialog holds a single field. */
 type TypeFormValues = { name: string }
 const TYPE_FIELD_ORDER = ['name'] as const
+/** `equipment_types` (0039): unique on the name (and its lowercase), and a
+ *  check that the name is not blank. */
+const TYPE_DATABASE_RULES: readonly DatabaseFieldRule<TypeFormValues>[] = [
+  {
+    on: 'unique',
+    match: 'equipment_types_name',
+    field: 'name',
+    key: 'duplicateEquipmentType',
+  },
+  {
+    on: 'check',
+    match: 'equipment_types_name',
+    field: 'name',
+    key: 'equipmentTypeRequired',
+  },
+]
 
 export function AdminSettings() {
   const { t } = useI18n()
@@ -96,6 +123,9 @@ export function AdminSettings() {
   )
   const [openingSaving, setOpeningSaving] = useState(false)
   const [openingMessage, setOpeningMessage] = useState<string | null>(null)
+  const [openingFieldError, setOpeningFieldError] =
+    useState<TranslationKey | null>(null)
+  const openingFormRef = useRef<HTMLDivElement>(null)
   const { confirm, confirmDialog } = useConfirm()
 
   const startRequest = useListRequest()
@@ -162,10 +192,8 @@ export function AdminSettings() {
 
   async function save() {
     const clean = name.trim()
-    if (!clean) {
-      const invalid: FieldErrors<TypeFormValues> = {
-        name: 'equipmentTypeRequired',
-      }
+    const invalid = validateWithSchema(equipmentTypeFormSchema, { name })
+    if (hasErrors(invalid)) {
       setNameErrors(invalid)
       focusFirstError(invalid, TYPE_FIELD_ORDER, { root: typeFormRef.current })
       return
@@ -177,9 +205,19 @@ export function AdminSettings() {
           .eq('id', editing.id)
       : await supabase.from('equipment_types').insert({ name: clean })
     if (result.error) {
-      // The only unique constraint on `equipment_types` is the name.
-      setNameErrors({ name: 'duplicateEquipmentType' })
-      focusFirstError({ name: 'duplicateEquipmentType' }, TYPE_FIELD_ORDER, {
+      // The name is the only field: a duplicate or a blank name goes under
+      // it; any other failure (permission, network) is a form-level message
+      // instead of being reported as a duplicate.
+      const attributed = mapDatabaseErrorToField(
+        result.error,
+        TYPE_DATABASE_RULES,
+      )
+      if (!attributed) {
+        setError(t('saveFailed'))
+        return
+      }
+      setNameErrors(attributed)
+      focusFirstError(attributed, TYPE_FIELD_ORDER, {
         root: typeFormRef.current,
       })
       return
@@ -294,15 +332,30 @@ export function AdminSettings() {
   )
 
   async function addOpeningBalance() {
-    if (!openingEquipmentId) return
-    setOpeningSaving(true)
     setOpeningMessage(null)
+    const invalid = validateWithSchema(workshopOpeningFormSchema, {
+      equipment_id: openingEquipmentId,
+    })
+    if (invalid.equipment_id) {
+      // The single field of this form: say what is missing under it.
+      setOpeningFieldError(invalid.equipment_id)
+      focusFieldControl('opening_equipment', openingFormRef.current)
+      return
+    }
+    setOpeningFieldError(null)
+    setOpeningSaving(true)
     const { error: openingError } = await supabase.rpc(
       'add_workshop_opening_balance',
       { p_equipment_id: openingEquipmentId },
     )
     setOpeningSaving(false)
     if (openingError) {
+      // 0041 refuses a unit that already has a workshop movement; that is
+      // about the selected equipment, so it goes under the field.
+      if (openingError.message?.includes('workshop movement already exists')) {
+        setOpeningFieldError('workshopOpeningHasMovement')
+        return
+      }
       setOpeningMessage(t('workshopOpeningFailed'))
       return
     }
@@ -331,24 +384,31 @@ export function AdminSettings() {
             {openingMessage}
           </Notice>
         )}
-        <div className="card max-w-2xl space-y-4">
-          <div>
-            <label className="label">{t('equipment')} *</label>
-            <AsyncSearchSelect
-              value={openingEquipmentId}
-              selectedOption={openingEquipment}
-              onChange={(value, option) => {
-                setOpeningEquipmentId(value)
-                setOpeningEquipment(option)
-                setOpeningMessage(null)
-              }}
-              loadOptions={loadOpeningCandidates}
-              placeholder={t('selectEquipment')}
-            />
-          </div>
+        <div ref={openingFormRef} className="card max-w-2xl space-y-4">
+          <Field
+            label={t('equipment')}
+            name="opening_equipment"
+            required
+            error={openingFieldError && t(openingFieldError)}
+          >
+            {(control) => (
+              <AsyncSearchSelect
+                {...control}
+                value={openingEquipmentId}
+                selectedOption={openingEquipment}
+                onChange={(value, option) => {
+                  setOpeningEquipmentId(value)
+                  setOpeningEquipment(option)
+                  setOpeningMessage(null)
+                  setOpeningFieldError(null)
+                }}
+                loadOptions={loadOpeningCandidates}
+                placeholder={t('selectEquipment')}
+              />
+            )}
+          </Field>
           <Button
             variant="primary"
-            disabled={!openingEquipmentId}
             loading={openingSaving}
             onClick={addOpeningBalance}
           >

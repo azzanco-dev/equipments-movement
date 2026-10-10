@@ -1,5 +1,9 @@
 import type { Lessor } from '@/lib/types'
-import { fieldErrors, required, type FieldErrors } from '@/lib/formValidation'
+import {
+  lessorFormSchema,
+  validateWithSchema,
+  type FieldErrors,
+} from '@/lib/formValidation'
 
 /** Values held by the lessor add/edit dialog. */
 export interface LessorFormValues {
@@ -37,9 +41,7 @@ export const LESSOR_FIELD_ORDER = [
 export function validateLessorForm(
   form: LessorFormValues,
 ): FieldErrors<LessorFormValues> {
-  return fieldErrors<LessorFormValues>({
-    name: required(form.name, 'lessorNameRequired'),
-  })
+  return validateWithSchema(lessorFormSchema, form)
 }
 
 /** Insert/update payload for the `lessors` table. */

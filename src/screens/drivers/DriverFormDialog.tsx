@@ -15,6 +15,7 @@ import {
 } from '@/lib/driverExcel'
 import {
   DRIVER_FIELD_ORDER,
+  DRIVER_NAME_MAX,
   EMPTY_DRIVER_FORM,
   buildDriverPayload,
   driverFormValues,
@@ -143,18 +144,23 @@ export function DriverFormDialog({
           {(control) => (
             <Input
               {...control}
+              maxLength={DRIVER_NAME_MAX}
               placeholder={t('fullNamePlaceholder')}
               value={form.full_name}
               onChange={(event) => update({ full_name: event.target.value })}
             />
           )}
         </Field>
-        <Field label={t('driverNameEn')} name="name_en">
+        <Field
+          label={t('driverNameEn')}
+          name="name_en"
+          error={errors.name_en && t(errors.name_en)}
+        >
           {(control) => (
             <Input
               {...control}
               dir="ltr"
-              maxLength={150}
+              maxLength={DRIVER_NAME_MAX}
               placeholder={t('driverNameEnPlaceholder')}
               value={form.name_en}
               onChange={(event) => update({ name_en: event.target.value })}
@@ -202,7 +208,11 @@ export function DriverFormDialog({
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Field label={t('nationality')} name="nationality">
+          <Field
+            label={t('nationality')}
+            name="nationality"
+            error={errors.nationality && t(errors.nationality)}
+          >
             {(control) => (
               <Select
                 {...control}
@@ -214,7 +224,11 @@ export function DriverFormDialog({
               />
             )}
           </Field>
-          <Field label={t('employmentType')} name="employment_type">
+          <Field
+            label={t('employmentType')}
+            name="employment_type"
+            error={errors.employment_type && t(errors.employment_type)}
+          >
             {(control) => (
               <Select
                 {...control}

@@ -61,11 +61,13 @@ import {
 } from '@/lib/exitPurpose'
 import {
   QUICK_DRIVER_FIELD_ORDER,
+  quickDriverSaveFieldErrors,
   validateQuickDriverForm,
   type QuickDriverFormValues,
 } from '@/lib/driverForm'
 import {
   QUICK_EQUIPMENT_FIELD_ORDER,
+  quickEquipmentSaveFieldErrors,
   validateQuickEquipmentForm,
   type QuickEquipmentFormValues,
 } from '@/lib/equipmentForm'
@@ -74,6 +76,8 @@ import {
   fieldErrors,
   focusFirstError,
   hasErrors,
+  quickLessorFormSchema,
+  validateWithSchema,
   type FieldErrors,
 } from '@/lib/formValidation'
 import {
@@ -419,11 +423,12 @@ export function EntryExitForm({
 
   const createQuickLessor = async () => {
     const trimmedName = quickLessor.name.trim()
-    if (!trimmedName) {
-      setQuickLessor((current) => ({
-        ...current,
-        error: t('lessorNameRequired'),
-      }))
+    const invalid = validateWithSchema(quickLessorFormSchema, {
+      name: quickLessor.name,
+    })
+    if (invalid.name) {
+      const key = invalid.name
+      setQuickLessor((current) => ({ ...current, error: t(key) }))
       return
     }
     setQuickSaving(true)
@@ -433,7 +438,16 @@ export function EntryExitForm({
     })
     setQuickSaving(false)
     if (error || !data) {
-      setQuickLessor((current) => ({ ...current, error: t('saveFailed') }))
+      // `invalid_quick_lessor` is a blank or over-long name (0109); the blank
+      // case was refused above, so it is the length.
+      setQuickLessor((current) => ({
+        ...current,
+        error: t(
+          error?.message?.includes('invalid_quick_lessor')
+            ? 'lessorNameTooLong'
+            : 'saveFailed',
+        ),
+      }))
       return
     }
     const lessor = data as { id: string; name: string }
@@ -473,6 +487,16 @@ export function EntryExitForm({
     })
     setQuickSaving(false)
     if (error || !data) {
+      // A rejection the database ties to a field goes under that field;
+      // anything else stays the safe form-level message.
+      const attributed = quickDriverSaveFieldErrors(error)
+      if (attributed) {
+        setQuickDriverErrors(attributed)
+        focusFirstError(attributed, QUICK_DRIVER_FIELD_ORDER, {
+          root: quickDriverRef.current,
+        })
+        return
+      }
       setSaveError(t('saveFailed'))
       return
     }
@@ -512,6 +536,14 @@ export function EntryExitForm({
         })
     setQuickSaving(false)
     if (error || !data) {
+      const attributed = quickEquipmentSaveFieldErrors(error)
+      if (attributed) {
+        setQuickEquipmentErrors(attributed)
+        focusFirstError(attributed, QUICK_EQUIPMENT_FIELD_ORDER, {
+          root: quickEquipmentRef.current,
+        })
+        return
+      }
       setSaveError(t('saveFailed'))
       return
     }

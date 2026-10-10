@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useAuth } from '@/auth/AuthContext'
 import { useI18n } from '@/i18n/I18nContext'
 import { useTheme } from '@/theme/ThemeContext'
@@ -7,6 +7,20 @@ import { PasswordInput } from '@/components/PasswordInput'
 import { Alert } from '@/components/Alert'
 import { Button, Field, IconButton, Input } from '@/components/ui'
 import { useRouter } from 'next/navigation'
+import {
+  clearFieldErrors,
+  focusFirstError,
+  hasErrors,
+  signInFormSchema,
+  validateWithSchema,
+  type FieldErrors,
+} from '@/lib/formValidation'
+
+interface SignInValues {
+  email: string
+  password: string
+}
+const SIGN_IN_FIELD_ORDER = ['email', 'password'] as const
 
 export function AuthScreen() {
   const router = useRouter()
@@ -17,10 +31,20 @@ export function AuthScreen() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors<SignInValues>>({})
+  const formRef = useRef<HTMLFormElement>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    // Both fields are required; whether they match an account is the
+    // server's answer, shown as one form-level message (never which field).
+    const invalid = validateWithSchema(signInFormSchema, { email, password })
+    setFieldErrors(invalid)
+    if (hasErrors(invalid)) {
+      focusFirstError(invalid, SIGN_IN_FIELD_ORDER, { root: formRef.current })
+      return
+    }
     setLoading(true)
 
     const { error } = await signIn(email, password)
@@ -79,27 +103,52 @@ export function AuthScreen() {
               <p className="text-sm text-muted">{t('signInSubtitle')}</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Field label={t('email')} required>
+            <form
+              ref={formRef}
+              noValidate
+              onSubmit={handleSubmit}
+              className="space-y-4"
+            >
+              <Field
+                label={t('email')}
+                name="email"
+                required
+                error={fieldErrors.email && t(fieldErrors.email)}
+              >
                 {(control) => (
                   <Input
                     {...control}
                     autoComplete="username"
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setFieldErrors((current) =>
+                        clearFieldErrors(current, ['email']),
+                      )
+                      setEmail(e.target.value)
+                    }}
                     placeholder={t('emailPlaceholder')}
                     dir="ltr"
                   />
                 )}
               </Field>
-              <Field label={t('password')} required>
+              <Field
+                label={t('password')}
+                name="password"
+                required
+                error={fieldErrors.password && t(fieldErrors.password)}
+              >
                 {(control) => (
                   <PasswordInput
                     {...control}
                     autoComplete="current-password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setFieldErrors((current) =>
+                        clearFieldErrors(current, ['password']),
+                      )
+                      setPassword(e.target.value)
+                    }}
                     placeholder={t('passwordPlaceholder')}
                   />
                 )}

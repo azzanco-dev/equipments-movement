@@ -1,8 +1,8 @@
 import type { Company } from '@/lib/types'
 import {
+  companyFormSchema,
   duplicateFieldErrors,
-  fieldErrors,
-  required,
+  validateWithSchema,
   type FieldErrors,
 } from '@/lib/formValidation'
 
@@ -32,10 +32,7 @@ export const COMPANY_FIELD_ORDER = ['name_ar', 'name_en'] as const
 export function validateCompanyForm(
   form: CompanyFormValues,
 ): FieldErrors<CompanyFormValues> {
-  return fieldErrors<CompanyFormValues>({
-    name_ar: required(form.name_ar, 'companyNameArRequired'),
-    name_en: required(form.name_en, 'companyNameEnRequired'),
-  })
+  return validateWithSchema(companyFormSchema, form)
 }
 
 /** `companies` is unique on `lower(name_ar)` and on `lower(name_en)`. */
