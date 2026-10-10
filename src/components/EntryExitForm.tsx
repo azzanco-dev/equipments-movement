@@ -887,8 +887,9 @@ export function EntryExitForm({
                     required
                     error={movementErrors.company && t(movementErrors.company)}
                   >
-                    {() => (
+                    {(control) => (
                       <AsyncSearchSelect
+                        {...control}
                         value={selectedCompanyId}
                         selectedOption={selectedCompany}
                         onChange={(value, option) => {
@@ -908,8 +909,9 @@ export function EntryExitForm({
                     required
                     error={movementErrors.project && t(movementErrors.project)}
                   >
-                    {() => (
+                    {(control) => (
                       <AsyncSearchSelect
+                        {...control}
                         value={selectedProjectId}
                         selectedOption={selectedProject}
                         onChange={(value, option) => {
@@ -949,8 +951,9 @@ export function EntryExitForm({
                   required
                   error={movementErrors.driver && t(movementErrors.driver)}
                 >
-                  {() => (
+                  {(control) => (
                     <AsyncSearchSelect
+                      {...control}
                       value={driverId}
                       selectedOption={selectedDriver}
                       onChange={(value, option) => {

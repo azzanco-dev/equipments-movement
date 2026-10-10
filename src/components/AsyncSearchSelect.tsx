@@ -167,7 +167,11 @@ export function AsyncSearchSelect({
             aria-invalid={invalid || undefined}
             {...aria}
             className="flex h-8 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors focus:border-black disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-white"
-            style={{ borderColor: 'var(--border)' }}
+            // Inline, so it wins over the focus utilities; the danger colour
+            // is what `aria-invalid` shows on every other control.
+            style={{
+              borderColor: invalid ? 'var(--danger)' : 'var(--border)',
+            }}
           >
             <span
               className={cn(

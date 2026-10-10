@@ -185,8 +185,9 @@ export const QuickEquipmentForm = forwardRef<
             required
             error={errors?.type && t(errors.type)}
           >
-            {() => (
+            {(control) => (
               <AsyncSearchSelect
+                {...control}
                 value={value.type}
                 selectedOption={
                   value.type ? { value: value.type, label: value.type } : null
@@ -204,8 +205,9 @@ export const QuickEquipmentForm = forwardRef<
             required
             error={errors?.lessorId && t(errors.lessorId)}
           >
-            {() => (
+            {(control) => (
               <AsyncSearchSelect
+                {...control}
                 value={value.lessorId}
                 selectedOption={selectedLessor}
                 onChange={(lessorId, option) => {
