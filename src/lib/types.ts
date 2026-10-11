@@ -251,3 +251,108 @@ export interface MovementDriverChange {
   note: string | null
   changer?: Profile | null
 }
+
+/**
+ * wave 22A (migrations 0126/0127): roles and permissions, shipped INACTIVE.
+ * While `app_settings.roles_system.enabled` is false, `current_permissions()`
+ * answers from the frozen legacy mapping of `profiles.role`; when true, from
+ * `profile_roles` -> active `roles` -> `role_permissions`.
+ */
+export type PermissionScope = 'all' | 'site' | 'workshop' | 'companies' | 'own'
+
+/** Row of `public.permissions`: the fixed, code-owned catalogue. */
+export interface Permission {
+  key: string
+  group_key: string
+  name_ar: string
+  name_en: string
+  description_ar: string
+  description_en: string
+  scoped: boolean
+  /** Accepted scopes of a scoped key; null for an unscoped key. */
+  scopes: PermissionScope[] | null
+  /** Keys that must also be granted to a role holding this key. */
+  requires: string[]
+  /** Only the admin role may hold it (users.manage, settings.roles). */
+  admin_only: boolean
+  enforced_in: 'database' | 'interface' | 'reserved'
+  sort: number
+}
+
+/** Row of `public.roles`. */
+export interface Role {
+  key: string
+  name_ar: string
+  name_en: string
+  description_ar: string | null
+  description_en: string | null
+  is_system: boolean
+  is_active: boolean
+  created_at: string
+  created_by: string | null
+  updated_at: string
+  updated_by: string | null
+}
+
+/** Row of `public.role_permissions`; scope is null for an unscoped key. */
+export interface RolePermission {
+  role_key: string
+  permission_key: string
+  scope: PermissionScope | null
+}
+
+/** Row of `public.profile_roles` (one role per user). */
+export interface ProfileRole {
+  profile_id: string
+  role_key: string
+  assigned_at: string
+  assigned_by: string | null
+}
+
+/** Row of `current_permissions()`: scope is 'all' for an unscoped key. */
+export interface CurrentPermission {
+  permission_key: string
+  scope: PermissionScope
+}
+
+/** Row of `public.role_changes` (admin-readable audit). */
+export interface RoleChange {
+  id: number
+  changed_at: string
+  changed_by: string | null
+  action:
+    | 'seeded'
+    | 'role_created'
+    | 'role_updated'
+    | 'role_deleted'
+    | 'permission_granted'
+    | 'permission_scope_changed'
+    | 'permission_revoked'
+    | 'role_assigned'
+    | 'role_reassigned'
+    | 'role_unassigned'
+    | 'roles_system_enabled'
+    | 'roles_system_disabled'
+    | 'setting_changed'
+  role_key: string | null
+  permission_key: string | null
+  profile_id: string | null
+  old_value: unknown
+  new_value: unknown
+}
+
+/** One user that blocks activation (`admin_roles_system_offenders()`). */
+export interface RolesSystemOffender {
+  profile_id: string
+  full_name: string
+  legacy_role: UserRole
+  role_key: string | null
+  reason: 'no_role' | 'unknown_role' | 'inactive_role' | 'admin_mismatch'
+}
+
+/** Result of `set_roles_system_enabled(p_enabled)`. */
+export interface RolesSystemToggleResult {
+  enabled: boolean
+  changed: boolean
+  offenders: RolesSystemOffender[]
+}

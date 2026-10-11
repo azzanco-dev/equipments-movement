@@ -187,32 +187,63 @@ function statement(sql, start, end = /;\s*$/m) {
   return stop >= 0 ? rest.slice(0, stop + 1) : rest
 }
 
-test('movements: every workshop role reads both contexts (0098)', () => {
+/**
+ * wave 22A (0127) moved the read rule from role names to the permission key
+ * movements.read: the managers still read every context because the frozen
+ * legacy mapping (0126) gives them the scope 'all'.
+ */
+function legacyScope(role, key) {
+  const { sql } = latest(/FUNCTION public\.legacy_role_permissions\(/)
+  const row = new RegExp(
+    `\\('${role}', '${key.replace(/\./g, '\\.')}', (NULL|'(\\w+)')\\)`,
+  ).exec(sql)
+  return row ? (row[2] ?? 'all') : null
+}
+
+test('movements: every workshop role reads both contexts (0098, keys since 0127)', () => {
   const { file, sql } = latest(
-    /CREATE POLICY "select_entry_exit_logs" ON public\.entry_exit_logs/,
+    /CREATE POLICY "?select_entry_exit_logs"? ON public\.entry_exit_logs/,
   )
-  assert.match(file, /_0098_/)
   const policy = statement(
     sql,
-    /CREATE POLICY "select_entry_exit_logs"/,
+    /CREATE POLICY "?select_entry_exit_logs"?/,
     /\);\s*$/m,
   )
-  for (const role of MANAGERS) assert.match(policy, new RegExp(`'${role}'`))
-  assert.doesNotMatch(policy, /movement_context/)
+  if (/_0098_/.test(file)) {
+    for (const role of MANAGERS) assert.match(policy, new RegExp(`'${role}'`))
+    assert.doesNotMatch(policy, /movement_context/)
+  } else {
+    assert.match(file, /_0127_/)
+    assert.match(
+      policy,
+      /CASE \(SELECT public\.permission_scope\('movements\.read'\)\)\s+WHEN 'all' THEN true/,
+    )
+    for (const role of MANAGERS)
+      assert.equal(legacyScope(role, 'movements.read'), 'all', role)
+  }
 })
 
-test('movement detail and photos follow can_access_movement (0098)', () => {
+test('movement detail and photos follow can_access_movement (0098, keys since 0127)', () => {
   const { file, sql } = latest(
     /CREATE OR REPLACE FUNCTION public\.can_access_movement\(/,
   )
-  assert.match(file, /_0098_/)
   const fn = statement(
     sql,
     /CREATE OR REPLACE FUNCTION public\.can_access_movement\(/,
     /\$\$;/,
   )
-  for (const role of MANAGERS) assert.match(fn, new RegExp(`'${role}'`))
-  assert.doesNotMatch(fn, /movement_context/)
+  if (/_0098_/.test(file)) {
+    for (const role of MANAGERS) assert.match(fn, new RegExp(`'${role}'`))
+    assert.doesNotMatch(fn, /movement_context/)
+  } else {
+    assert.match(file, /_0127_/)
+    assert.match(
+      fn,
+      /public\.movement_scope_allows\(\s+public\.permission_scope\('movements\.read'\)/,
+    )
+    for (const role of MANAGERS)
+      assert.equal(legacyScope(role, 'movements.read'), 'all', role)
+  }
 
   // Photo rows, driver changes and the Storage read all delegate to it.
   const photos = latest(/CREATE POLICY "select_entry_exit_photos"/)
