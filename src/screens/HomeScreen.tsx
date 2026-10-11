@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Ban,
   ClipboardList,
@@ -18,6 +18,12 @@ import { ErrorState } from '@/components/ui/ErrorState'
 import { HomeMovementsCard } from '@/components/home/HomeMovementsCard'
 import { InquiryCard } from '@/components/home/InquiryCard'
 import { PendingClassificationCard } from '@/components/home/PendingClassificationCard'
+import { Card, SectionHeader } from '@/components/ui/Card'
+import { LogsScreen } from '@/screens/admin-home/LogsScreen'
+import {
+  ALL_CONTEXTS_HOME_DEFAULT_TAB,
+  homeMovementsScope,
+} from '@/lib/homeScope'
 import {
   changeSinceYesterday,
   formatSignedDelta,
@@ -56,6 +62,10 @@ const EMPTY_WORKSHOP: WorkshopHomeStats = {
  * only — the latest-driver lookup for the entries on the page. The workshop
  * classification section is served by the same stats call as the numbers, so
  * the list and its counter can never disagree.
+ *
+ * wave-21-workshop-scope: the stat cards stay about the workshop for every
+ * workshop role, but the two workshop managers' movements card is the admin
+ * log (`LogsScreen`, embedded) over both contexts; see `homeMovementsScope`.
  */
 export function HomeScreen({
   onSelectMovement,
@@ -66,10 +76,11 @@ export function HomeScreen({
 }) {
   const { t } = useI18n()
   const { user, profile } = useAuth()
-  const managerMode =
-    profile?.role === 'workshop_manager' ||
-    profile?.role === 'assistant_workshop_manager'
-  const workshopMode = profile?.role === 'workshop' || managerMode
+  // wave-21-workshop-scope: which movements the home lists. Fails closed: an
+  // unknown role gets the foreman's own-rows list, never a wider one.
+  const scope = homeMovementsScope(profile?.role)
+  const managerMode = scope === 'all_contexts'
+  const workshopMode = scope === 'workshop' || managerMode
   const name = greetingName(profile?.full_name)
   const parts = greetingParts(t('homeGreeting'), name !== '')
   const greeting = parts ? (
@@ -151,16 +162,38 @@ export function HomeScreen({
     [classifyEntry],
   )
 
-  const movements = (
-    <HomeMovementsCard
-      workshopMode={workshopMode}
-      canClassify={managerMode}
-      onSelectMovement={onSelectMovement}
-      onClassify={onClassify}
-      classifyingId={classifyingId}
-      refreshToken={refreshToken}
-    />
+  // wave-21-workshop-scope (owner decision 2026-10-11): the two workshop
+  // managers read every movement and visit through the admin log itself —
+  // its context tabs (projects / workshop / all, opening on the workshop),
+  // its filter dialog, its visits/log views and its export — with the
+  // classification of workshop entries kept on the workshop tab. The plain
+  // `workshop` role and the foreman keep their own lists.
+  const classify = useMemo(
+    () => ({ onClassify, classifyingId }),
+    [onClassify, classifyingId],
   )
+  const movements =
+    scope === 'all_contexts' ? (
+      <Card className="space-y-3">
+        <SectionHeader as="h2" title={t('homeAllMovementsTitle')} />
+        <LogsScreen
+          embedded
+          defaultContext={ALL_CONTEXTS_HOME_DEFAULT_TAB}
+          classify={classify}
+          onSelectMovement={onSelectMovement}
+          refreshToken={refreshToken}
+        />
+      </Card>
+    ) : (
+      <HomeMovementsCard
+        workshopMode={workshopMode}
+        canClassify={false}
+        onSelectMovement={onSelectMovement}
+        onClassify={onClassify}
+        classifyingId={classifyingId}
+        refreshToken={refreshToken}
+      />
+    )
 
   // Same 64 px big-button style for both homes (owner decision, wave 6): the
   // two primary actions always lead the page.

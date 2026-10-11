@@ -7,6 +7,7 @@ import {
   DataTable,
   Notice,
   PageHeader,
+  Select,
   Tabs,
   TabsList,
   TabsTrigger,
@@ -57,9 +58,13 @@ import { sanitizeSearchTerm } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { VisitsTable } from '@/components/visits/VisitsTable'
 import { displayDriverName } from '@/lib/driverDisplayName'
+import {
+  WORKSHOP_PURPOSES,
+  WORKSHOP_PURPOSE_LABEL_KEYS,
+} from '@/lib/equipmentState'
 
 /** Which movements the tab shows; `all` applies no context predicate. */
-type LogsTab = 'site' | 'workshop' | 'all'
+export type LogsTab = 'site' | 'workshop' | 'all'
 
 const TABS: LogsTab[] = ['site', 'workshop', 'all']
 
@@ -154,8 +159,33 @@ const VISITS_URL_PREFIX = 'v'
 
 type LogRow = MovementLogSearchRow
 
+/**
+ * wave-21-workshop-scope: the workshop managers classify a workshop ENTRY
+ * from the log row, as they did on their former workshop-only home log.
+ * PostgreSQL (`classify_workshop_entry`) keeps deciding who may.
+ */
+export interface LogsClassify {
+  onClassify: (logId: string, purpose: string) => void
+  classifyingId: string | null
+}
+
 export interface LogsScreenProps {
   onSelectMovement?: (id: string) => void
+  /**
+   * wave-21-workshop-scope: rendered inside the workshop managers' home card
+   * instead of as the `/logs` page, so the page header is left out.
+   */
+  embedded?: boolean
+  /**
+   * The context tab shown when the URL names none, and left out of the URL
+   * when chosen. `/logs` opens on the projects (`site`); the workshop
+   * managers' home opens on the workshop.
+   */
+  defaultContext?: LogsTab
+  /** Classification of workshop entries on the workshop tab of the log. */
+  classify?: LogsClassify
+  /** Bumped by the embedding screen after a mutation so both views refetch. */
+  refreshToken?: number
 }
 
 /**
@@ -175,8 +205,19 @@ export interface LogsScreenProps {
  * shared `VisitsTable` (`movement_visits`), with its own search, filters,
  * paging and Excel export under the `v` URL prefix. Visits are the default
  * view; the movement log is `?view=log`.
+ *
+ * wave-21-workshop-scope: the workshop managers' home embeds this same screen
+ * (`embedded`, opening on the workshop tab, with the classification of
+ * workshop entries), so their tabs, filters and export are the admin's.
+ * RLS decides the rows: those roles read both contexts since migration 0098.
  */
-export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
+export function LogsScreen({
+  onSelectMovement,
+  embedded = false,
+  defaultContext = 'site',
+  classify,
+  refreshToken = 0,
+}: LogsScreenProps) {
   // Company and project are multi-selects searched server-side over every
   // company and project (admin and monitor), in both views; the foreman
   // filter is module-level because it never changes.
@@ -193,7 +234,7 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
   const pathname = usePathname()
   const params = useSearchParams()
   const requestedTab = params.get('context')
-  const tab: LogsTab = isLogsTab(requestedTab) ? requestedTab : 'site'
+  const tab: LogsTab = isLogsTab(requestedTab) ? requestedTab : defaultContext
   const view = resolveLogsView(params)
 
   const list = useDataListState(logsListConfig)
@@ -223,7 +264,7 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
 
   const setTab = (next: LogsTab) => {
     const query = new URLSearchParams(params.toString())
-    if (next === 'site') query.delete('context')
+    if (next === defaultContext) query.delete('context')
     else query.set('context', next)
     // A new context is a new list for both views.
     query.delete('page')
@@ -332,7 +373,7 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
     // The visits view runs its own query; the movement log waits until shown.
     if (view !== 'log') return
     void fetchLogs()
-  }, [fetchLogs, view])
+  }, [fetchLogs, view, refreshToken])
 
   // ============ EXPORT (wave-15-export) ============
 
@@ -481,6 +522,53 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
     )
   }
 
+  const contextColumn: DataTableColumn<LogRow> = {
+    key: 'movement_context',
+    header: t('logsColContext'),
+    hideBelow: 'sm',
+    width: '7rem',
+    cell: (row) =>
+      row.movement_context === 'workshop' ? (
+        row.workshop_purpose ? (
+          <WorkshopPurposeBadge purpose={row.workshop_purpose} />
+        ) : (
+          <Badge tone="warning">{t('logsWorkshop')}</Badge>
+        )
+      ) : (
+        <Badge>{t('logsSites')}</Badge>
+      ),
+  }
+
+  // wave-21-workshop-scope: on the workshop tab every row is a workshop row,
+  // so a classifying viewer gets the classification there instead of the
+  // context: a select on each ENTRY (an EXIT carries no purpose of its own).
+  const classifyColumn: DataTableColumn<LogRow> | null = classify
+    ? {
+        key: 'workshop_purpose',
+        header: t('workshopPurpose'),
+        width: '8rem',
+        cell: (row) =>
+          row.movement_type === 'entry' ? (
+            <Select
+              value={row.workshop_purpose ?? ''}
+              onValueChange={(value) => classify.onClassify(row.id, value)}
+              disabled={classify.classifyingId === row.id}
+              placeholder={t('selectClassification')}
+              aria-label={t('workshopPurpose')}
+              // Table-row control, compact like the home's former log.
+              size="sm"
+              className="w-28"
+              options={WORKSHOP_PURPOSES.map((value) => ({
+                value,
+                label: t(WORKSHOP_PURPOSE_LABEL_KEYS[value]),
+              }))}
+            />
+          ) : (
+            <span className="text-muted">—</span>
+          ),
+      }
+    : null
+
   const columns: DataTableColumn<LogRow>[] = [
     {
       key: 'equipment_code',
@@ -511,22 +599,7 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
         />
       ),
     },
-    {
-      key: 'movement_context',
-      header: t('logsColContext'),
-      hideBelow: 'sm',
-      width: '7rem',
-      cell: (row) =>
-        row.movement_context === 'workshop' ? (
-          row.workshop_purpose ? (
-            <WorkshopPurposeBadge purpose={row.workshop_purpose} />
-          ) : (
-            <Badge tone="warning">{t('logsWorkshop')}</Badge>
-          )
-        ) : (
-          <Badge>{t('logsSites')}</Badge>
-        ),
-    },
+    classifyColumn && tab === 'workshop' ? classifyColumn : contextColumn,
     {
       key: 'company',
       header: t('logsColWhere'),
@@ -563,7 +636,9 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
 
   return (
     <div ref={listTopRef} className="scroll-mt-20 space-y-4">
-      <PageHeader title={t('logs')} description={t('logsDesc')} />
+      {!embedded && (
+        <PageHeader title={t('logs')} description={t('logsDesc')} />
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Tabs value={tab} onValueChange={(value) => setTab(value as LogsTab)}>
@@ -600,6 +675,7 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
           context={tab}
           asyncFields={visitsAsyncFilters}
           onSelectMovement={onSelectMovement}
+          refreshToken={refreshToken}
           urlPrefix={VISITS_URL_PREFIX}
         />
       ) : (

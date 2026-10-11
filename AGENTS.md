@@ -30,7 +30,7 @@
   - `admin`: full access to master data, users, reports, and settings.
   - `supervisor`: site movements for their assigned companies.
   - `workshop`: the limited workshop movement form.
-  - `assistant_workshop_manager` / `workshop_manager`: workshop movements plus workshop classification and management views.
+  - `assistant_workshop_manager` / `workshop_manager`: workshop movements plus workshop classification and management views. Since 2026-10-11 (owner decision, wave 21) they READ every movement and visit, projects and workshop: their home's movements card is the admin log embedded (`LogsScreen`: context tabs المشاريع / الورشة / الكل opening on الورشة, the admin filter dialog, the visits/log views and their Excel export), gated by `homeMovementsScope` in `src/lib/homeScope.ts` (an unknown role falls back to the narrowest list). They still record and classify workshop movements only. All workshop roles already read both contexts in RLS (`select_entry_exit_logs` / `can_access_movement`, migration 0098); the plain `workshop` home stays workshop-only. The admin reports (`/reports/*`) stay admin-only.
   - `monitor`: read-only dashboard, logs, and movement details.
 - Client-side role routing must fail closed: an unknown or missing role must never receive the admin interface.
 - Roles are assigned only by trusted server paths (admin Edge Functions or admin-only database functions), never from user-editable signup metadata.

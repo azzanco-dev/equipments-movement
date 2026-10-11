@@ -907,6 +907,9 @@ export const translations = {
     operationalStatusColumnIgnored:
       'عمود الحالة التشغيلية لم يعد مستخدما وتم تجاهله',
     // wave-20-state — end
+    // wave-21-workshop-scope — start
+    homeAllMovementsTitle: 'الحركات',
+    // wave-21-workshop-scope — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -2427,6 +2430,9 @@ export const translations = {
     operationalStatusColumnIgnored:
       'The operational status column is no longer used and was ignored',
     // wave-20-state — end
+    // wave-21-workshop-scope — start
+    homeAllMovementsTitle: 'Movements',
+    // wave-21-workshop-scope — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',
