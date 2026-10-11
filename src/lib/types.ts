@@ -350,9 +350,19 @@ export interface RolesSystemOffender {
   reason: 'no_role' | 'unknown_role' | 'inactive_role' | 'admin_mismatch'
 }
 
-/** Result of `set_roles_system_enabled(p_enabled)`. */
+/**
+ * Result of `set_roles_system_enabled(p_enabled, p_expected_preview_rows)`.
+ * Enabling needs `p_expected_preview_rows` = the row count of the
+ * `admin_roles_system_preview()` the admin reviewed; disabling passes null.
+ * `reason` is null on success, 'offenders' (see `offenders`) or
+ * 'preview_changed' (`preview_rows` is the current count) when refused.
+ * `reason` and `preview_rows` are optional here only so older readers keep
+ * compiling; the database always sends both.
+ */
 export interface RolesSystemToggleResult {
   enabled: boolean
   changed: boolean
   offenders: RolesSystemOffender[]
+  reason?: 'offenders' | 'preview_changed' | null
+  preview_rows?: number | null
 }

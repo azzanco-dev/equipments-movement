@@ -121,6 +121,10 @@ export function userEditServerFieldErrors(
 ): FieldErrors<UserEditFormValues> | null {
   if (serverCode === 'own_role') return { role: 'cannotChangeOwnRole' }
   if (serverCode === 'last_admin') return { role: 'lastAdminRequired' }
+  // wave 22B: the roles system is active and the user has a customised
+  // assignment (0126 trigger); the role is changed on the roles page.
+  if (serverCode === 'roles_system_active_use_assignment')
+    return { role: 'roleChangeUseAssignment' }
   return null
 }
 

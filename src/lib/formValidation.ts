@@ -470,6 +470,39 @@ export const workshopOpeningFormSchema = z.object({
   equipment_id: selected('movementEditEquipmentRequired'),
 })
 
+/**
+ * wave 22B — add/edit role (Settings › «الادوار والصلاحيات»), mirroring
+ * `admin_upsert_role` (0126): a key of 2 to 40 lowercase letters, digits or
+ * underscores starting with a letter, both names (60 characters at most) and
+ * optional descriptions (500 at most).
+ */
+export const ROLE_KEY_FORMAT = /^[a-z][a-z0-9_]{1,39}$/
+export const roleFormSchema = z.object({
+  key: z
+    .string()
+    .trim()
+    .min(1, message('roleKeyRequired'))
+    .refine((value) => !value || ROLE_KEY_FORMAT.test(value), {
+      message: 'roleKeyInvalid',
+    }),
+  name_ar: requiredText('roleNameArRequired', {
+    max: 60,
+    lengthKey: 'roleNameTooLong',
+  }),
+  name_en: requiredText('roleNameEnRequired', {
+    max: 60,
+    lengthKey: 'roleNameTooLong',
+  }),
+  description_ar: optionalText({
+    max: 500,
+    lengthKey: 'roleDescriptionTooLong',
+  }),
+  description_en: optionalText({
+    max: 500,
+    lengthKey: 'roleDescriptionTooLong',
+  }),
+})
+
 export interface PostgresLikeError {
   code?: string | null
   message?: string | null

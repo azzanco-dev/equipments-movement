@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Alert } from '@/components/Alert'
 import { AsyncMultiSelect } from '@/components/AsyncMultiSelect'
 import { PasswordInput } from '@/components/PasswordInput'
@@ -11,6 +12,10 @@ import { supabase } from '@/lib/supabase'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
 import type { Profile, ProfileContact, UserRole } from '@/lib/types'
 import { normalizeUserMobileInput, userMobileErrorCode } from '@/lib/userMobile'
+import {
+  legacyRoleChangeBlocked,
+  rolesSystemEnabledFromValue,
+} from '@/lib/rolesAdmin'
 import {
   USER_EDIT_FIELD_ORDER,
   userEditServerFieldErrors,
@@ -111,6 +116,20 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   // The rest of the record was saved but the number was not.
   const [mobileNotSaved, setMobileNotSaved] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
+  const router = useRouter()
+  // wave 22B: the user's role in the new roles system (`profile_roles`,
+  // migration 0126), read-only here; it is managed in Settings › «الادوار
+  // والصلاحيات» and changes nothing while that system is inactive.
+  const [systemRole, setSystemRole] = useState<{
+    userId: string
+    state: 'loaded' | 'failed'
+    roleKey: string | null
+    name: { name_ar: string; name_en: string } | null
+  } | null>(null)
+  // The roles system flag (`app_settings.roles_system`); null = unknown.
+  const [rolesSystemEnabled, setRolesSystemEnabled] = useState<boolean | null>(
+    null,
+  )
 
   const currentSnapshot = useMemo(
     () => formSnapshot(fullName, email, password, role, companies),
@@ -241,6 +260,57 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   }, [mobileReloadKey, userId])
 
   useEffect(() => {
+    let active = true
+    supabase
+      .from('profile_roles')
+      .select('role_key,roles(name_ar,name_en)')
+      .eq('profile_id', userId)
+      .maybeSingle()
+      .then(({ data, error: loadError }) => {
+        if (!active) return
+        if (loadError) {
+          setSystemRole({ userId, state: 'failed', roleKey: null, name: null })
+          return
+        }
+        const row = data as {
+          role_key: string
+          roles: { name_ar: string; name_en: string } | null
+        } | null
+        setSystemRole({
+          userId,
+          state: 'loaded',
+          roleKey: row?.role_key ?? null,
+          name: row
+            ? (row.roles ?? { name_ar: row.role_key, name_en: row.role_key })
+            : null,
+        })
+      })
+    return () => {
+      active = false
+    }
+  }, [userId])
+
+  useEffect(() => {
+    let active = true
+    supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'roles_system')
+      .maybeSingle()
+      .then(({ data, error: flagError }) => {
+        if (active && !flagError)
+          setRolesSystemEnabled(
+            rolesSystemEnabledFromValue(
+              (data as { value: unknown } | null)?.value,
+            ),
+          )
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
     if (!hasUnsavedChanges) return
     const warnBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault()
@@ -312,6 +382,26 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     if (hasErrors(invalid)) {
       setFieldErrors(invalid)
       focusFirstError(invalid, USER_EDIT_FIELD_ORDER)
+      return
+    }
+    // wave 22B: while the roles system is active, a customised assignment is
+    // changed on the roles page; the database refuses the legacy change, and
+    // checking first keeps the Edge Function from writing anything.
+    if (
+      user &&
+      systemRole?.userId === userId &&
+      legacyRoleChangeBlocked({
+        rolesSystemEnabled,
+        oldRole: user.role,
+        newRole: role,
+        assignedRoleKey: systemRole.roleKey,
+      })
+    ) {
+      const blocked: FieldErrors<UserEditFormValues> = {
+        role: 'roleChangeUseAssignment',
+      }
+      setFieldErrors(blocked)
+      focusFirstError(blocked, USER_EDIT_FIELD_ORDER)
       return
     }
     setFieldErrors({})
@@ -417,6 +507,19 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     }
   }
 
+  async function openRolesPage() {
+    if (
+      hasUnsavedChanges &&
+      !(await confirm({
+        title: t('unsavedChanges'),
+        description: t('dialogDescUnsavedChanges'),
+        tone: 'danger',
+      }))
+    )
+      return
+    router.push('/settings/roles?tab=users')
+  }
+
   async function handleBack() {
     if (
       hasUnsavedChanges &&
@@ -481,6 +584,34 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 </span>
               ),
             }),
+    },
+    {
+      key: 'newSystemRole',
+      label: t('userNewSystemRole'),
+      value: (
+        <span className="flex flex-wrap items-center gap-2">
+          {systemRole?.userId !== userId ? (
+            <Skeleton variant="text" className="h-4 w-24" />
+          ) : systemRole.state === 'failed' ? (
+            <span className="font-normal text-danger">
+              {t('userNewSystemRoleLoadError')}
+            </span>
+          ) : systemRole.name ? (
+            <span>
+              {localizedName(
+                lang,
+                systemRole.name.name_ar,
+                systemRole.name.name_en,
+              )}
+            </span>
+          ) : (
+            <Badge tone="danger">{t('roleUsersNoRole')}</Badge>
+          )}
+          <Button size="sm" variant="ghost" onClick={openRolesPage}>
+            {t('userNewSystemRoleManage')}
+          </Button>
+        </span>
+      ),
     },
     {
       key: 'createdAt',
@@ -656,6 +787,18 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             )}
           </Field>
         </div>
+        {fieldErrors.role === 'roleChangeUseAssignment' && (
+          <Notice
+            tone="warning"
+            action={
+              <Button size="sm" onClick={openRolesPage}>
+                {t('userNewSystemRoleManage')}
+              </Button>
+            }
+          >
+            {t('roleChangeUseAssignment')}
+          </Notice>
+        )}
         {role === 'supervisor' && (
           <Field
             label={t('assignedCompanies')}

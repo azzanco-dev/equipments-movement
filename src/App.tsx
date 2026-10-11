@@ -191,6 +191,17 @@ const AdminSettings = dynamic(
     import('@/screens/AdminSettings').then((module) => module.AdminSettings),
   { loading: screenLoading },
 )
+// wave 22B: Settings › «الادوار والصلاحيات». Rendered only in the admin
+// branch below (after the fail-closed `profile.role !== 'admin'` check); the
+// page also requires `settings.roles` itself. Routing everywhere still uses
+// `profiles.role`, not the new permissions.
+const RolesSettings = dynamic(
+  () =>
+    import('@/components/roles/RolesSettings').then(
+      (module) => module.RolesSettings,
+    ),
+  { loading: screenLoading },
+)
 const MovementImport = dynamic(
   () =>
     import('@/screens/MovementImport').then((module) => module.MovementImport),
@@ -544,7 +555,8 @@ function AppContent() {
               ) : (
                 <EntryReports onSelectMovement={openMovement} />
               ))}
-            {page === 'settings' && <AdminSettings />}
+            {page === 'settings' &&
+              (segments[1] === 'roles' ? <RolesSettings /> : <AdminSettings />)}
           </>
         )}
       </Layout>

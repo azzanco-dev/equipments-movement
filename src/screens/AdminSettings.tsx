@@ -7,6 +7,7 @@ import {
   List,
   Plus,
   Satellite,
+  ShieldCheck,
   Trash2,
   Upload,
   Warehouse,
@@ -14,6 +15,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import {
+  Badge,
   Button,
   buttonClasses,
   cn,
@@ -56,6 +58,7 @@ import {
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { RelativeTime } from '@/components/RelativeTime'
 import { AfaqySettings } from '@/components/afaqy/AfaqySettings'
+import { rolesSystemEnabledFromValue } from '@/lib/rolesAdmin'
 
 type EquipmentTypeRow = {
   id: string
@@ -127,6 +130,10 @@ export function AdminSettings() {
     useState<TranslationKey | null>(null)
   const openingFormRef = useRef<HTMLDivElement>(null)
   const { confirm, confirmDialog } = useConfirm()
+  // wave 22B: the roles system flag, shown on its card (null = unknown).
+  const [rolesSystemEnabled, setRolesSystemEnabled] = useState<boolean | null>(
+    null,
+  )
 
   const startRequest = useListRequest()
   useEffect(() => {
@@ -169,6 +176,24 @@ export function AdminSettings() {
       .from('equipment_types')
       .select('id', { count: 'exact', head: true })
       .then(({ count }) => setTypesCount(count ?? 0))
+  }, [])
+
+  // wave 22B: read-only status of the roles system for its card. A failed
+  // read leaves the status unknown; the page itself reports the error.
+  useEffect(() => {
+    supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'roles_system')
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!error)
+          setRolesSystemEnabled(
+            rolesSystemEnabledFromValue(
+              (data as { value: unknown } | null)?.value,
+            ),
+          )
+      })
   }, [])
 
   useEffect(() => {
@@ -502,6 +527,35 @@ export function AdminSettings() {
             </div>
             <h2 className="font-semibold">{t('afaqySettingsTitle')}</h2>
             <p className="mt-1 text-sm text-muted">{t('afaqySettingsDesc')}</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push('/settings/roles')}
+            className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
+          >
+            <div className="mb-4 flex w-full items-start justify-between gap-3">
+              <span
+                className="flex h-9 w-9 items-center justify-center rounded-lg border"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <ShieldCheck size={18} />
+              </span>
+              <ChevronRight
+                size={18}
+                className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip"
+              />
+            </div>
+            <h2 className="font-semibold">{t('rolesSettingsTitle')}</h2>
+            <p className="mt-1 text-sm text-muted">{t('rolesSettingsDesc')}</p>
+            {rolesSystemEnabled !== null && (
+              <span className="mt-auto pt-4">
+                <Badge tone={rolesSystemEnabled ? 'success' : 'warning'}>
+                  {rolesSystemEnabled
+                    ? t('rolesSystemStatusActive')
+                    : t('rolesSystemStatusInactive')}
+                </Badge>
+              </span>
+            )}
           </button>
         </div>
       </div>
