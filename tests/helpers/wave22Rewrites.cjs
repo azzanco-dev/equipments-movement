@@ -620,15 +620,23 @@ const FUNCTION_REWRITES = [
     signature: 'integer, integer, text, text[]',
     source: '0102',
     callable: true,
-    keys: ['reports.view'],
+    keys: ['reports.view', 'movements.read'],
     replacements: [
       [
         '  IF auth.uid() IS NULL OR NOT public.is_admin() THEN',
-        "  IF auth.uid() IS NULL OR public.permission_scope('reports.view') IS DISTINCT FROM 'all' THEN",
+        `  IF auth.uid() IS NULL
+     OR public.permission_scope('reports.view') IS DISTINCT FROM 'all'
+     OR public.permission_scope('movements.read') IS DISTINCT FROM 'all' THEN`,
       ],
     ],
     equivalence: [
-      gate('admin only', ['admin'], (p) => p.scope('reports.view') === 'all'),
+      gate(
+        'admin only',
+        ['admin'],
+        (p) =>
+          p.scope('reports.view') === 'all' &&
+          p.scope('movements.read') === 'all',
+      ),
     ],
   },
   {
@@ -697,8 +705,30 @@ const FUNCTION_REWRITES = [
         '  IF NOT public.is_admin() THEN',
         "  IF NOT public.has_permission('users.manage') THEN",
       ],
+      [
+        `
+  UPDATE public.profiles
+  SET role = p_role`,
+        `
+  IF public.roles_system_enabled() THEN
+    RAISE EXCEPTION 'roles_system_active_use_assignment'
+      USING ERRCODE = '55000',
+            HINT = 'The roles system is active: change the user''s role assignment instead of the account role.';
+  END IF;
+
+  UPDATE public.profiles
+  SET role = p_role`,
+      ],
     ],
-    equivalence: [gate('admin only', ['admin'], (p) => p.has('users.manage'))],
+    equivalence: [
+      gate('admin only', ['admin'], (p) => p.has('users.manage')),
+      {
+        // The new refusal only exists while the flag is on.
+        label: 'no new refusal while the roles system is inactive',
+        old: () => false,
+        new: () => false,
+      },
+    ],
   },
 ]
 

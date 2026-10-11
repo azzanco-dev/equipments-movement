@@ -496,6 +496,101 @@ test('the system ships inactive and only one function writes the flag', () => {
     assert.match(offenders, new RegExp(`'${reason}'`))
 })
 
+test('enabling needs the acknowledged preview row count', () => {
+  const sql = code(SQL_0126)
+  assert.match(
+    sql,
+    /CREATE OR REPLACE FUNCTION public\.set_roles_system_enabled\(\s+p_enabled boolean,\s+p_expected_preview_rows integer\s+\)/,
+  )
+  // One signature only: no one-argument overload is left callable.
+  assert.equal(
+    functionBlocks(SQL_0126).filter(
+      (b) => b.name === 'set_roles_system_enabled',
+    ).length,
+    1,
+  )
+  for (const statement of [
+    /REVOKE ALL ON FUNCTION public\.set_roles_system_enabled\(boolean, integer\) FROM PUBLIC, anon;/,
+    /GRANT EXECUTE ON FUNCTION public\.set_roles_system_enabled\(boolean, integer\) TO authenticated;/,
+    /COMMENT ON FUNCTION public\.set_roles_system_enabled\(boolean, integer\) IS/,
+  ])
+    assert.match(sql, statement)
+  assert.ok(!/set_roles_system_enabled\(boolean\)/.test(sql))
+
+  const body = code(lastFunction(SQL_0126, 'set_roles_system_enabled'))
+  const offenders = body.indexOf("'reason', 'offenders'")
+  const preview = body.indexOf('FROM public.admin_roles_system_preview();')
+  const mismatch = body.indexOf(
+    'IF p_expected_preview_rows IS DISTINCT FROM v_preview_rows THEN',
+  )
+  const write = body.indexOf('UPDATE public.app_settings')
+  // Offenders first, then the acknowledgement, and only then the write; both
+  // checks run only when enabling.
+  assert.ok(offenders > 0 && offenders < preview && preview < mismatch)
+  assert.ok(mismatch < write)
+  assert.ok(body.indexOf('IF p_enabled THEN') < offenders)
+  assert.match(
+    body,
+    /IF p_expected_preview_rows IS DISTINCT FROM v_preview_rows THEN\s+RETURN jsonb_build_object\(\s+'enabled', public\.roles_system_enabled\(\),\s+'changed', false,\s+'reason', 'preview_changed',\s+'offenders', '\[\]'::jsonb,\s+'preview_rows', v_preview_rows\s+\);/,
+  )
+  assert.match(
+    body,
+    /'reason', NULL,\s+'offenders', '\[\]'::jsonb,\s+'preview_rows', v_preview_rows/,
+  )
+})
+
+test('legacy role changes follow while off and are refused while on', () => {
+  const body = code(lastFunction(SQL_0126, 'sync_profile_role_assignment'))
+  // While the flag is ON, a non-admin legacy change of a customised
+  // assignment is refused.
+  assert.match(
+    body,
+    /IF public\.roles_system_enabled\(\)\s+AND NEW\.role <> 'admin'\s+AND OLD\.role <> 'admin'\s+AND v_found\s+AND v_current IS DISTINCT FROM OLD\.role THEN\s+RAISE EXCEPTION 'roles_system_active_use_assignment'\s+USING ERRCODE = '55000'/,
+  )
+  // Otherwise (flag OFF, never customised, or an admin parity move) the
+  // assignment follows NEW.role unconditionally.
+  const refusal = body.indexOf(
+    "RAISE EXCEPTION 'roles_system_active_use_assignment'",
+  )
+  const follow = body.indexOf(
+    'INSERT INTO public.profile_roles AS pr (profile_id, role_key, assigned_at, assigned_by)',
+  )
+  assert.ok(refusal > 0 && follow > refusal)
+  assert.match(
+    body.slice(follow),
+    /VALUES \(NEW\.id, NEW\.role, now\(\), auth\.uid\(\)\)\s+ON CONFLICT \(profile_id\) DO UPDATE\s+SET role_key = EXCLUDED\.role_key,[\s\S]*WHERE pr\.role_key IS DISTINCT FROM EXCLUDED\.role_key;/,
+  )
+  // No other condition (such as "still equals the old role") limits it.
+  assert.ok(!/pr\.role_key = OLD\.role/.test(body))
+
+  // admin_set_user_role refuses while the flag is on, before its UPDATE.
+  const setRole = lastFunction(SQL_0127, 'admin_set_user_role')
+  assert.match(
+    setRole,
+    /IF public\.roles_system_enabled\(\) THEN\s+RAISE EXCEPTION 'roles_system_active_use_assignment'\s+USING ERRCODE = '55000',[\s\S]*?END IF;\s+UPDATE public\.profiles\s+SET role = p_role/,
+  )
+})
+
+test('the DEFINER reads of every unit need the movements.read scope all', () => {
+  assert.match(
+    lastFunction(SQL_0127, 'get_equipment_attention_report'),
+    /IF auth\.uid\(\) IS NULL\s+OR public\.permission_scope\('reports\.view'\) IS DISTINCT FROM 'all'\s+OR public\.permission_scope\('movements\.read'\) IS DISTINCT FROM 'all' THEN\s+RAISE EXCEPTION 'admin required';/,
+  )
+  assert.match(
+    lastFunction(SQL_0127, 'get_all_equipment_last_movement'),
+    /WHERE public\.has_permission\('equipment\.read'\)\s+AND public\.permission_scope\('movements\.read'\) = 'all'/,
+  )
+  // Legacy-equivalent: only admin holds reports.view, and admin reads all.
+  for (const role of ALL_ROLES) {
+    const p = perms(role)
+    assert.equal(
+      p.scope('reports.view') === 'all' && p.scope('movements.read') === 'all',
+      role === 'admin',
+      role,
+    )
+  }
+})
+
 test('the two evaluation paths: legacy when off, assignments when on', () => {
   const scope = code(lastFunction(SQL_0126, 'permission_scope'))
   assert.match(scope, /WHEN p_key IS NULL OR auth\.uid\(\) IS NULL THEN NULL/)
@@ -837,9 +932,34 @@ test('after 0127 no live policy or function tests a role name, except by design'
     for (const block of functionBlocks(read(file)))
       if (block.drop) functions.delete(block.name)
       else functions.set(block.name, block.text)
-  const ROLE_TEST =
-    /public\.is_admin\(\)|current_user_role\(\)\s*(=|<>|IN\b|NOT IN\b)|v_role\s*(=|<>|IS (NOT )?DISTINCT FROM|NOT IN|IN)\s*\(?'|me\.role\b|v_role NOT IN|AND role = 'admin'/
+  const ROLE_TEST = new RegExp(
+    [
+      /public\.is_admin\(\)/,
+      /current_user_role\(\)\s*(=|<>|!=|IN\b|NOT IN\b)/,
+      /v_role\s*(=|<>|!=|IS (NOT )?DISTINCT FROM|NOT IN|IN)\s*\(?'/,
+      /v_role\s*=\s*ANY\s*\(/,
+      /CASE\s+v_role\s+WHEN/,
+      /\b\w+\.role\s*(=|<>|!=|IS (NOT )?DISTINCT FROM|NOT IN|IN)\s*\(?'/,
+      /\b\w+\.role\s*=\s*ANY\s*\(/,
+      /AND role = 'admin'/,
+    ]
+      .map((pattern) => pattern.source)
+      .join('|'),
+    'i',
+  )
+  // The widened test catches every shape it is meant to.
+  for (const sample of [
+    "v_role = ANY(ARRAY['admin'])",
+    "CASE v_role WHEN 'admin' THEN",
+    "me.role = 'admin'",
+    "p.role IN ('workshop')",
+    "x.role <> 'monitor'",
+    "IF v_role NOT IN ('admin') THEN",
+  ])
+    assert.match(sample, ROLE_TEST, sample)
   const BY_DESIGN = new Set([
+    // Admin parity: a legacy change to or from admin moves the assignment.
+    'sync_profile_role_assignment',
     'is_admin',
     'current_user_role',
     'handle_new_user',

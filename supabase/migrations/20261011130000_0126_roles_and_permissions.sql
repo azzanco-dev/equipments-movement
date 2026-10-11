@@ -20,8 +20,9 @@
 --   can change what anybody may do while the system is inactive.
 --
 --   Activation is a separate, explicit admin action later:
---   `public.set_roles_system_enabled(true)`, which refuses while the new
---   assignments are incomplete (see 6). Nothing activates it by default.
+--   `public.set_roles_system_enabled(true, <acknowledged preview rows>)`,
+--   which refuses while the new assignments are incomplete or the reviewed
+--   preview is out of date (see 6). Nothing activates it by default.
 --
 -- ===========================================================================
 -- 1. Two evaluation paths, one entry point
@@ -66,12 +67,19 @@
 --     admin_upsert_role, admin_set_role_permissions,
 --     admin_assign_profile_role, admin_delete_role
 --     admin_roles_system_offenders(), admin_roles_system_preview()
---     set_roles_system_enabled(boolean)
+--     set_roles_system_enabled(boolean, integer)
 --   Triggers:
---     sync_profile_role_assignment  profiles -> profile_roles (new users get
---                                   an assignment; legacy role changes follow
---                                   while the assignment was not customised;
---                                   admin transitions always follow)
+--     sync_profile_role_assignment  profiles -> profile_roles. New users get
+--                                   their legacy role as assignment. A legacy
+--                                   role change, flag OFF: the assignment
+--                                   always follows (the legacy editor is the
+--                                   only editor). Flag ON: it follows when it
+--                                   still equals the old legacy role or the
+--                                   change is to or from admin (parity);
+--                                   otherwise the change is REFUSED with
+--                                   roles_system_active_use_assignment
+--                                   (55000). 0127 makes admin_set_user_role
+--                                   refuse the same way while the flag is on.
 --     audit_role_change             the four tables -> role_changes (one
 --                                   audit_*_change function per table)
 --
@@ -114,14 +122,21 @@
 --   * Admin parity: the 'admin' role can be assigned only to a user whose
 --     legacy role is admin, and a legacy admin can only be assigned 'admin'.
 --     A legacy role change to or from admin moves the assignment with it.
+--   * While the flag is ON, roles change through admin_assign_profile_role:
+--     a legacy role change (other than to or from admin) of a user whose
+--     assignment was customised raises roles_system_active_use_assignment.
 --   * Every permission key must exist; scoped keys need an accepted scope,
 --     unscoped keys none; `admin_only` keys (users.manage, settings.roles)
 --     only on 'admin'; every key's `requires` must be granted too.
 --
 -- ===========================================================================
--- 6. Enabling (`set_roles_system_enabled(true)`) refuses, and reports the
---    offenders, while any profile has no assignment, an unknown or inactive
---    role, or breaks admin parity. Disabling is always allowed and returns
+-- 6. Enabling (`set_roles_system_enabled(true, n)`) refuses, writing
+--    nothing: reason 'offenders' (with the list) while any profile has no
+--    assignment, an unknown or inactive role, or breaks admin parity; reason
+--    'preview_changed' (with the current preview_rows) unless n equals the
+--    current row count of admin_roles_system_preview(), i.e. the admin
+--    acknowledges exactly the changes he reviewed. Disabling
+--    (`set_roles_system_enabled(false, NULL)`) is always allowed and returns
 --    everybody to the legacy mapping at once.
 --
 -- ===========================================================================
@@ -458,7 +473,7 @@ CREATE TABLE public.profile_roles (
 CREATE INDEX profile_roles_role_key_idx ON public.profile_roles (role_key);
 
 COMMENT ON TABLE public.profile_roles IS
-  'One role per user for the ACTIVE mode (0126). Seeded from profiles.role; profiles.role stays the legacy role and is not changed by this system. Written by admin_assign_profile_role and by the sync_profile_role_assignment trigger (new users; legacy role changes while the assignment still equals the old legacy role; every change to or from admin).';
+  'One role per user for the ACTIVE mode (0126). Seeded from profiles.role; profiles.role stays the legacy role and is not changed by this system. Written by admin_assign_profile_role and by the sync_profile_role_assignment trigger (new users; legacy role changes: always while the flag is off; while it is on only when the assignment still equals the old legacy role or for a change to or from admin, any other change being refused).';
 
 -- ===========================================================================
 -- 5. app_settings: the flag
@@ -1264,7 +1279,7 @@ REVOKE ALL ON FUNCTION public.admin_roles_system_offenders() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_roles_system_offenders() TO authenticated;
 
 COMMENT ON FUNCTION public.admin_roles_system_offenders() IS
-  'Admin-only (0126). The users that block activation, with the reason: no_role (no profile_roles row), unknown_role, inactive_role, admin_mismatch (profiles.role admin vs assigned admin differ). Empty means set_roles_system_enabled(true) will succeed. Code: admin_required (42501).';
+  'Admin-only (0126). The users that block activation, with the reason: no_role (no profile_roles row), unknown_role, inactive_role, admin_mismatch (profiles.role admin vs assigned admin differ). Empty means set_roles_system_enabled(true, <preview rows>) will not be refused for offenders. Code: admin_required (42501).';
 
 CREATE OR REPLACE FUNCTION public.admin_roles_system_preview()
 RETURNS TABLE(
@@ -1341,7 +1356,10 @@ GRANT EXECUTE ON FUNCTION public.admin_roles_system_preview() TO authenticated;
 COMMENT ON FUNCTION public.admin_roles_system_preview() IS
   'Admin-only (0126). For every user, each permission whose effect would change on activation: gained (not in the legacy mapping), lost (legacy only) or scope_changed, with both scopes (''all'' for an unscoped key). Empty means activation changes nobody''s permissions. Code: admin_required (42501).';
 
-CREATE OR REPLACE FUNCTION public.set_roles_system_enabled(p_enabled boolean)
+CREATE OR REPLACE FUNCTION public.set_roles_system_enabled(
+  p_enabled boolean,
+  p_expected_preview_rows integer
+)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -1349,6 +1367,7 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_offenders jsonb;
+  v_preview_rows integer;
   v_changed boolean;
 BEGIN
   IF auth.uid() IS NULL
@@ -1385,7 +1404,24 @@ BEGIN
       RETURN jsonb_build_object(
         'enabled', public.roles_system_enabled(),
         'changed', false,
-        'offenders', v_offenders
+        'reason', 'offenders',
+        'offenders', v_offenders,
+        'preview_rows', NULL
+      );
+    END IF;
+
+    -- The admin acknowledges the exact preview he reviewed: its row count
+    -- must still be the current one, so nothing changed under him.
+    SELECT count(*)::integer INTO v_preview_rows
+    FROM public.admin_roles_system_preview();
+
+    IF p_expected_preview_rows IS DISTINCT FROM v_preview_rows THEN
+      RETURN jsonb_build_object(
+        'enabled', public.roles_system_enabled(),
+        'changed', false,
+        'reason', 'preview_changed',
+        'offenders', '[]'::jsonb,
+        'preview_rows', v_preview_rows
       );
     END IF;
   END IF;
@@ -1401,16 +1437,18 @@ BEGIN
   RETURN jsonb_build_object(
     'enabled', public.roles_system_enabled(),
     'changed', v_changed,
-    'offenders', '[]'::jsonb
+    'reason', NULL,
+    'offenders', '[]'::jsonb,
+    'preview_rows', v_preview_rows
   );
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.set_roles_system_enabled(boolean) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.set_roles_system_enabled(boolean) TO authenticated;
+REVOKE ALL ON FUNCTION public.set_roles_system_enabled(boolean, integer) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.set_roles_system_enabled(boolean, integer) TO authenticated;
 
-COMMENT ON FUNCTION public.set_roles_system_enabled(boolean) IS
-  'Admin-only (0126). The ONLY writer of app_settings.roles_system. Returns {"enabled": bool, "changed": bool, "offenders": [...]}. Enabling is refused (changed false, nothing written) while admin_roles_system_offenders() returns anybody; the offenders are returned instead. Disabling is always allowed. Codes: admin_required (42501), invalid_payload (22023).';
+COMMENT ON FUNCTION public.set_roles_system_enabled(boolean, integer) IS
+  'Admin-only (0126). The ONLY writer of app_settings.roles_system. Returns {"enabled": bool, "changed": bool, "reason": null|"offenders"|"preview_changed", "offenders": [...], "preview_rows": int|null}. Enabling needs p_expected_preview_rows = the current row count of admin_roles_system_preview() (the acknowledged preview) and no offender; otherwise nothing is written and reason says why (offenders listed, or the current preview_rows). Disabling needs no acknowledgement (pass NULL) and is always allowed. Codes: admin_required (42501), invalid_payload (22023).';
 
 -- ===========================================================================
 -- 11. Triggers: assignment sync and audit
@@ -1421,6 +1459,9 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_current text;
+  v_found boolean;
 BEGIN
   IF TG_OP = 'INSERT' THEN
     INSERT INTO public.profile_roles (profile_id, role_key, assigned_by)
@@ -1430,21 +1471,34 @@ BEGIN
   END IF;
 
   IF NEW.role IS DISTINCT FROM OLD.role THEN
-    -- Follow the legacy role when the assignment was never customised (it
-    -- still equals the old legacy role), and ALWAYS for a change to or from
-    -- admin, which keeps the admin parity rule.
-    UPDATE public.profile_roles pr
-    SET role_key = NEW.role,
-        assigned_at = now(),
-        assigned_by = auth.uid()
+    SELECT pr.role_key INTO v_current
+    FROM public.profile_roles pr
     WHERE pr.profile_id = NEW.id
-      AND (pr.role_key = OLD.role OR NEW.role = 'admin' OR OLD.role = 'admin')
-      AND pr.role_key IS DISTINCT FROM NEW.role;
-    IF NOT FOUND THEN
-      INSERT INTO public.profile_roles (profile_id, role_key, assigned_by)
-      VALUES (NEW.id, NEW.role, auth.uid())
-      ON CONFLICT (profile_id) DO NOTHING;
+    FOR UPDATE;
+    v_found := FOUND;
+
+    -- Flag OFF: the legacy editor is the only editor, so the assignment
+    -- always follows the legacy role. Flag ON: it follows only when it was
+    -- never customised (it still equals the old legacy role) or for a move
+    -- to or from admin (admin parity); any other legacy change is refused,
+    -- the assignment is changed with admin_assign_profile_role instead.
+    IF public.roles_system_enabled()
+       AND NEW.role <> 'admin'
+       AND OLD.role <> 'admin'
+       AND v_found
+       AND v_current IS DISTINCT FROM OLD.role THEN
+      RAISE EXCEPTION 'roles_system_active_use_assignment'
+        USING ERRCODE = '55000',
+              HINT = 'The roles system is active: change the user''s role assignment instead of the account role.';
     END IF;
+
+    INSERT INTO public.profile_roles AS pr (profile_id, role_key, assigned_at, assigned_by)
+    VALUES (NEW.id, NEW.role, now(), auth.uid())
+    ON CONFLICT (profile_id) DO UPDATE
+      SET role_key = EXCLUDED.role_key,
+          assigned_at = EXCLUDED.assigned_at,
+          assigned_by = EXCLUDED.assigned_by
+      WHERE pr.role_key IS DISTINCT FROM EXCLUDED.role_key;
   END IF;
   RETURN NULL;
 END;
@@ -1453,7 +1507,7 @@ $$;
 REVOKE ALL ON FUNCTION public.sync_profile_role_assignment() FROM PUBLIC, anon, authenticated;
 
 COMMENT ON FUNCTION public.sync_profile_role_assignment() IS
-  'Trigger on profiles (0126). A new profile gets its legacy role as assignment. A legacy role change moves the assignment when it still equals the old legacy role, and always when admin is involved (admin parity). Not executable by client roles.';
+  'Trigger on profiles (0126). A new profile gets its legacy role as assignment. A legacy role change: flag off, the assignment always follows; flag on, it follows when it still equals the old legacy role or the change is to or from admin (admin parity), otherwise the change is refused with roles_system_active_use_assignment (55000). Not executable by client roles.';
 
 CREATE TRIGGER sync_profile_role_assignment
 AFTER INSERT OR UPDATE OF role ON public.profiles

@@ -105,7 +105,9 @@
 --                                            change_code requires)
 --     update_equipment_from_excel            equipment.import
 --     get_all_equipment_last_movement        equipment.read and the
---                                            movements.read scope all
+--                                            movements.read scope all (the
+--                                            other DEFINER read of every
+--                                            unit's last movement)
 --     insert/update/delete_drivers           drivers.create / edit / delete
 --     quick_create_driver                    drivers.quick_create
 --     projects, companies, company_projects
@@ -121,9 +123,22 @@
 --     select_profile_contacts,
 --     profile_projects (4), profile_companies (4),
 --     admin_set_user_mobile,
---     admin_set_user_role                    users.manage (admin only)
+--     admin_set_user_role                    users.manage (admin only).
+--                                            admin_set_user_role also
+--                                            refuses while the roles system
+--                                            is ON (roles_system_active_
+--                                            use_assignment, 55000): the
+--                                            role then changes through
+--                                            admin_assign_profile_role. Flag
+--                                            off: no new refusal.
 --   Reports and admin home
---     get_equipment_attention_report         reports.view scope all
+--     get_equipment_attention_report         reports.view scope all AND
+--                                            movements.read scope all (it is
+--                                            SECURITY DEFINER and reads every
+--                                            unit's latest movement; only
+--                                            admin holds reports.view in the
+--                                            legacy mapping, and admin reads
+--                                            all, so nothing changes)
 --     get_admin_foreman_discipline,
 --     get_admin_entries_series,
 --     get_admin_entries_yearly,
@@ -2546,7 +2561,7 @@ $$;
 REVOKE ALL ON FUNCTION public.admin_change_equipment_code(uuid, text, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_change_equipment_code(uuid, text, text) TO authenticated;
 
--- get_equipment_attention_report: latest 0102; reports.view.
+-- get_equipment_attention_report: latest 0102; reports.view, movements.read.
 CREATE OR REPLACE FUNCTION public.get_equipment_attention_report(
   p_limit integer DEFAULT 20,
   p_offset integer DEFAULT 0,
@@ -2565,7 +2580,9 @@ DECLARE
   v_search text := NULLIF(btrim(p_search), '');
   v_owners text[];
 BEGIN
-  IF auth.uid() IS NULL OR public.permission_scope('reports.view') IS DISTINCT FROM 'all' THEN
+  IF auth.uid() IS NULL
+     OR public.permission_scope('reports.view') IS DISTINCT FROM 'all'
+     OR public.permission_scope('movements.read') IS DISTINCT FROM 'all' THEN
     RAISE EXCEPTION 'admin required';
   END IF;
   v_owners := public.admin_home_owner_filter(p_owners);
@@ -3430,6 +3447,12 @@ BEGIN
     RAISE EXCEPTION 'cannot change your own role';
   END IF;
 
+  IF public.roles_system_enabled() THEN
+    RAISE EXCEPTION 'roles_system_active_use_assignment'
+      USING ERRCODE = '55000',
+            HINT = 'The roles system is active: change the user''s role assignment instead of the account role.';
+  END IF;
+
   UPDATE public.profiles
   SET role = p_role
   WHERE id = p_user_id;
@@ -3473,7 +3496,7 @@ BEGIN
     ('public.quick_create_driver(text, text, uuid)', 'drivers.quick_create'),
     ('public.update_equipment_from_excel(jsonb)', 'equipment.import'),
     ('public.admin_change_equipment_code(uuid, text, text)', 'equipment.change_code'),
-    ('public.get_equipment_attention_report(integer, integer, text, text[])', 'reports.view'),
+    ('public.get_equipment_attention_report(integer, integer, text, text[])', 'reports.view, movements.read'),
     ('public.get_all_equipment_last_movement()', 'equipment.read, movements.read'),
     ('public.get_admin_foreman_discipline(timestamptz, timestamptz)', 'home.admin'),
     ('public.get_admin_entries_series(timestamptz, timestamptz, text[], text)', 'home.admin'),
