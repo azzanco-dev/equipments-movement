@@ -44,12 +44,14 @@ const assertErrors = (actual, expected) =>
 
 const base = () => plain(form.EMPTY_EQUIPMENT_FORM)
 
-test('the empty form starts as an owned, numbered, operational equipment', () => {
+test('the empty form starts as an owned, numbered, active equipment', () => {
   const empty = base()
   assert.equal(empty.ownership_status, 'alazani')
   assert.equal(empty.numbering_status, 'numbered')
-  assert.equal(empty.operational_status, 'operational')
+  assert.equal(empty.status, 'active')
   assert.equal(empty.lessor_id, '')
+  // wave 20: the manual operational status is retired from the form.
+  assert.ok(!('operational_status' in empty))
 })
 
 test('a code prefix suggests the owner and clears a stale supplier', () => {
@@ -239,7 +241,7 @@ test('a new record defaults to the active status and is in the fleet', () => {
 })
 
 test('is_active mirrors the status, so it replaces the old toggle', () => {
-  for (const status of ['sold', 'scrapped', 'rented_out']) {
+  for (const status of ['sold']) {
     const payload = plain(form.buildEquipmentPayload({ ...base(), status }))
     assert.equal(payload.status, status)
     // The 0102 trigger also forces this, but the form has to send it so that
@@ -254,7 +256,6 @@ test('a record without a status maps onto the form as active', () => {
       code: 'A-1',
       type: 'حفار',
       plate_number: null,
-      operational_status: 'operational',
       ownership_status: 'alazani',
       qr_value: 'EQ-1',
       is_active: true,
@@ -267,7 +268,6 @@ test('a record without a status maps onto the form as active', () => {
         code: 'A-1',
         type: 'حفار',
         plate_number: null,
-        operational_status: 'operational',
         ownership_status: 'alazani',
         qr_value: 'EQ-1',
         is_active: false,
@@ -316,6 +316,8 @@ test('a record maps onto the form with nulls turned into empty strings', () => {
       code: 'A1',
       type: 'BOOM TRUCK',
       plate_number: null,
+      // A row read before wave 20 may still carry the retired column; the
+      // form ignores it.
       operational_status: 'stopped',
       ownership_status: 'takween',
       project_id: null,
@@ -337,22 +339,15 @@ test('a record maps onto the form with nulls turned into empty strings', () => {
   assert.equal(values.plate_number, '')
   assert.equal(values.manufacture_year, '2020')
   assert.equal(values.numbering_status, 'numbered')
-  assert.equal(values.operational_status, 'stopped')
+  assert.ok(!('operational_status' in values))
 })
 
-test('badge mapping keeps amber for warnings and never red for a status', () => {
-  assertErrors(plain(form.operationalStatusBadge('operational')), {
-    tone: 'success',
-    key: 'operational',
-  })
-  assertErrors(plain(form.operationalStatusBadge('maintenance')), {
-    tone: 'warning',
-    key: 'maintenance',
-  })
-  assertErrors(plain(form.operationalStatusBadge('stopped')), {
-    tone: 'neutral',
-    key: 'stopped',
-  })
+test('wave 20: the payload never writes the retired operational status', () => {
+  const payload = plain(
+    form.buildEquipmentPayload({ ...base(), operational_status: 'stopped' }),
+  )
+  assert.ok(!('operational_status' in payload))
+  assert.equal(form.operationalStatusBadge, undefined)
 })
 
 test('every owner maps to its own label and quick-created rows are flagged', () => {

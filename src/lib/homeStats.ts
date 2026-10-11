@@ -29,12 +29,15 @@ export interface WorkshopHomeStats {
   insideNow: number
   maintenance: number
   parking: number
+  /** wave 20 (migration 0125); 0 against an older database. */
+  outOfService: number
   pendingClassification: number
   /** The same three counts at the start of today (Saudi midnight), or null
    *  when the stats function predates migration 0097. */
   insideYesterday: number | null
   maintenanceYesterday: number | null
   parkingYesterday: number | null
+  outOfServiceYesterday: number | null
   /** Latest 10 of the `pendingClassification` entries, newest first. */
   pending: PendingClassificationEntry[]
 }
@@ -92,10 +95,12 @@ export function parseWorkshopHomeStats(source: unknown): WorkshopHomeStats {
     insideNow: statNumber(source, 'inside_now'),
     maintenance: statNumber(source, 'maintenance'),
     parking: statNumber(source, 'parking'),
+    outOfService: statNumber(source, 'out_of_service'),
     pendingClassification: statNumber(source, 'pending_classification'),
     insideYesterday: statNumberOrNull(source, 'inside_yesterday'),
     maintenanceYesterday: statNumberOrNull(source, 'maintenance_yesterday'),
     parkingYesterday: statNumberOrNull(source, 'parking_yesterday'),
+    outOfServiceYesterday: statNumberOrNull(source, 'out_of_service_yesterday'),
     pending: parsePendingEntries(source),
   }
 }
@@ -135,7 +140,7 @@ export function formatSignedDelta(delta: number): string {
   return '0'
 }
 
-export type WorkshopPurpose = 'maintenance' | 'parking'
+export type WorkshopPurpose = 'maintenance' | 'parking' | 'out_of_service'
 
 /** Structurally identical to `EquipmentState` in the shared status card. */
 export type HomeEquipmentState =
@@ -152,7 +157,11 @@ export interface HomeLastMovement {
 }
 
 function workshopPurpose(value: string | null): WorkshopPurpose | null {
-  return value === 'maintenance' || value === 'parking' ? value : null
+  return value === 'maintenance' ||
+    value === 'parking' ||
+    value === 'out_of_service'
+    ? value
+    : null
 }
 
 /**

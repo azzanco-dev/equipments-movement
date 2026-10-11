@@ -44,6 +44,13 @@ const STATE_STYLE: Record<
     color: 'var(--chart-3)',
     stroke: 'var(--chart-stroke-3)',
   },
+  // wave 20 (migration 0125). No chart tint is red, so it takes the danger
+  // token pair: the pale `--danger-soft` fill with the `--danger` outline.
+  workshop_out_of_service: {
+    label: 'adminHomeStateOutOfService',
+    color: 'var(--danger-soft)',
+    stroke: 'var(--danger)',
+  },
   workshop_unclassified: {
     label: 'adminHomeStateUnclassified',
     color: 'var(--chart-5)',

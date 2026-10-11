@@ -3,7 +3,6 @@ import type { TranslationKey } from '@/i18n/translations'
 import type {
   EntryExitLog,
   EquipmentVisit,
-  OperationalStatus,
   OwnershipStatus,
   RegistrationType,
 } from '@/lib/types'
@@ -29,7 +28,6 @@ export interface EquipmentImportRow {
   code: string
   type: string
   plate_number: string | null
-  operational_status: OperationalStatus
   ownership_status: OwnershipStatus
   brand: string | null
   model: string | null
@@ -43,18 +41,23 @@ export interface EquipmentImportRow {
   insurance_expiry: string | null
   _rowNumber: number
   _errors: string[]
+  /**
+   * wave 20: informational notes that do not block the row. A file that
+   * still carries the retired operational status column is accepted; each
+   * row with a value there says the value was ignored.
+   */
+  _notes: string[]
 }
 
-const OP_STATUS_MAP: Record<string, OperationalStatus> = {
-  operational: 'operational',
-  تعمل: 'operational',
-  maintenance: 'maintenance',
-  تحت_الصيانة: 'maintenance',
-  صيانة: 'maintenance',
-  stopped: 'stopped',
-  متوقفة: 'stopped',
-  متوقف: 'stopped',
-}
+/**
+ * The retired operational status column (wave 20, migration 0125), in both
+ * languages and as the raw key, normalized like every header. Its values are
+ * ignored: the state is derived from the movements.
+ */
+const LEGACY_OPERATIONAL_STATUS_HEADERS = new Set([
+  'الحالة_التشغيلية',
+  'operational_status',
+])
 
 const OWN_STATUS_MAP: Record<string, OwnershipStatus> = {
   alazani: 'alazani',
@@ -140,8 +143,11 @@ export function parseEquipmentExcel(
     if (nk === normalizeKey(t('equipmentCode'))) keyMap['code'] = k
     else if (nk === normalizeKey(t('equipmentType'))) keyMap['type'] = k
     else if (nk === normalizeKey(t('plateNumber'))) keyMap['plate_number'] = k
-    else if (nk === normalizeKey(t('operationalStatus')))
-      keyMap['operational_status'] = k
+    else if (
+      LEGACY_OPERATIONAL_STATUS_HEADERS.has(nk) ||
+      nk === normalizeKey(t('operationalStatus'))
+    )
+      keyMap['legacy_operational_status'] = k
     else if (nk === normalizeKey(t('ownershipStatus')))
       keyMap['ownership_status'] = k
     else if (nk === normalizeKey(t('brand'))) keyMap['brand'] = k
@@ -177,11 +183,10 @@ export function parseEquipmentExcel(
     if (!type)
       errors.push(columnError(t, 'equipmentType', 'importColumnRequired'))
 
-    const opRaw = normalizeKey(get('operational_status'))
-    const opStatus =
-      OP_STATUS_MAP[opRaw] ?? (opRaw === '' ? 'operational' : undefined)
-    if (!opStatus)
-      errors.push(columnError(t, 'operationalStatus', 'importColumnInvalid'))
+    // wave 20: the retired column is read only to say it was ignored.
+    const notes: string[] = []
+    if (get('legacy_operational_status'))
+      notes.push(t('operationalStatusColumnIgnored'))
 
     const ownRaw = normalizeKey(get('ownership_status'))
     const ownStatus =
@@ -210,7 +215,6 @@ export function parseEquipmentExcel(
       code,
       type,
       plate_number: plateNumber,
-      operational_status: opStatus ?? 'operational',
       ownership_status: ownStatus ?? 'alazani',
       brand: get('brand') || null,
       model: get('model') || null,
@@ -226,6 +230,7 @@ export function parseEquipmentExcel(
       insurance_expiry: parseDate(row[keyMap['insurance_expiry'] ?? '']),
       _rowNumber: idx + 2,
       _errors: errors,
+      _notes: notes,
     }
   })
 }
@@ -236,7 +241,6 @@ export function downloadEquipmentTemplate(t: (key: TranslationKey) => string) {
       [t('equipmentCode')]: 'A001',
       [t('equipmentType')]: 'Crane 50 Ton',
       [t('plateNumber')]: '1234-ABC',
-      [t('operationalStatus')]: t('operational'),
       [t('ownershipStatus')]: t('ownershipAlazani'),
       [t('brand')]: 'XCMG',
       [t('model')]: 'QY50K',
@@ -254,7 +258,6 @@ export function downloadEquipmentTemplate(t: (key: TranslationKey) => string) {
   ws['!cols'] = [
     { wch: 15 },
     { wch: 20 },
-    { wch: 15 },
     { wch: 15 },
     { wch: 12 },
     { wch: 12 },

@@ -15,7 +15,6 @@ const COMPARE_FIELDS = [
   'code',
   'type',
   'plate_number',
-  'operational_status',
   'ownership_status',
   'project_id',
   'lessor_id',
@@ -75,7 +74,9 @@ export function EquipmentExcelUpdate({
         const { data, error: fetchError } = await supabase
           .from('equipment')
           .select(
-            'id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,status,master_data_complete,numbering_status,created_at,updated_at,project:projects(id,name_ar,name_en),lessor:lessors(id,name)',
+            // wave 20: the derived state (computed fields, migration 0125)
+            // is written as a read-only column; the upload ignores it.
+            'id,code,type,plate_number,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,status,master_data_complete,numbering_status,created_at,updated_at,equipment_state,equipment_is_new,project:projects(id,name_ar,name_en),lessor:lessors(id,name)',
           )
           .order('code')
           .range(from, from + 499)
@@ -107,7 +108,7 @@ export function EquipmentExcelUpdate({
         const { data, error: fetchError } = await supabase
           .from('equipment')
           .select(
-            'id,code,type,plate_number,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,status,master_data_complete,numbering_status,created_at,updated_at',
+            'id,code,type,plate_number,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,status,master_data_complete,numbering_status,created_at,updated_at',
           )
           .in('id', ids.slice(index, index + 100))
         if (fetchError) throw fetchError
@@ -236,7 +237,6 @@ export function EquipmentExcelUpdate({
           code: row.code,
           type: row.type,
           plate_number: row.plate_number ?? '',
-          operational_status: row.operational_status,
           // Resolved against the record above, so this is never blank here;
           // the database function also treats a blank as "keep current".
           status: row.status ?? '',
@@ -395,6 +395,12 @@ export function EquipmentExcelUpdate({
                           (row._status === 'ready'
                             ? t('readyToUpdate')
                             : t('unchangedRows'))}
+                        {/* wave 20: notes never block a row. */}
+                        {row._notes.length > 0 && (
+                          <span className="block text-muted">
+                            {row._notes.join('، ')}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}

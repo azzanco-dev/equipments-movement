@@ -4,6 +4,7 @@ import { Skeleton, cn } from '@/components/ui'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import type { LastMovement } from '@/lib/types'
+import { workshopPurposeLabelKey } from '@/lib/equipmentState'
 
 export interface MovementStatusCardProps {
   loading: boolean
@@ -62,11 +63,10 @@ export function MovementStatusCard({
                 <>
                   {' '}
                   —{' '}
-                  {lastMovement.workshop_purpose === 'maintenance'
-                    ? t('maintenancePurpose')
-                    : lastMovement.workshop_purpose === 'parking'
-                      ? t('parkingPurpose')
-                      : t('pendingClassification')}
+                  {t(
+                    workshopPurposeLabelKey(lastMovement.workshop_purpose) ??
+                      'pendingClassification',
+                  )}
                 </>
               )}
               {lastMovement?.movement_context === 'site' && (

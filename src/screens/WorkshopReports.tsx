@@ -69,7 +69,11 @@ export function WorkshopReports({
       const to = params.get('to')
       if (movementType === 'entry' || movementType === 'exit')
         query = query.eq('movement_type', movementType)
-      if (purpose === 'maintenance' || purpose === 'parking')
+      if (
+        purpose === 'maintenance' ||
+        purpose === 'parking' ||
+        purpose === 'out_of_service'
+      )
         query = query.eq('workshop_purpose', purpose)
       if (isDateKey(from)) query = query.gte('recorded_at', saudiDayStart(from))
       if (isDateKey(to)) query = query.lte('recorded_at', saudiDayEnd(to))
@@ -137,6 +141,9 @@ export function WorkshopReports({
           <option value="">{t('allWorkshopPurposes')}</option>
           <option value="maintenance">{t('maintenancePurpose')}</option>
           <option value="parking">{t('parkingPurpose')}</option>
+          <option value="out_of_service">
+            {t('workshopPurposeOutOfService')}
+          </option>
         </select>
         <DatePicker
           value={params.get('from') ?? ''}

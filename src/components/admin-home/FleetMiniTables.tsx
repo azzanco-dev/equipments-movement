@@ -113,6 +113,7 @@ const PURPOSE_LABEL: Record<WorkshopPurposeFilter, TranslationKey> = {
   all: 'all',
   maintenance: 'adminHomeMaintenance',
   parking: 'adminHomeParking',
+  out_of_service: 'adminHomeOutOfService',
   unclassified: 'adminHomeUnclassified',
 }
 
@@ -704,12 +705,30 @@ export function FleetMiniTables({
   // site exit, migration 0118), so «للصيانة» can be told apart from «انتهاء
   // عمل» at a glance. Nothing for a unit that last left the workshop, one that
   // never moved or an exit recorded before migration 0111.
+  // wave 20 (migration 0125): a unit that has never moved carries a small
+  // «جديدة» mark next to its code, in the card and the expanded table.
+  const newBadge = (row: FleetEquipmentRow) =>
+    row.isNew ? (
+      <Badge tone="info" size="sm">
+        {t('equipmentStateNew')}
+      </Badge>
+    ) : null
   const availableCodeColumn: DataTableColumn<FleetEquipmentRow> = {
     ...codeColumn,
     cell: (row) => (
       <span className="flex flex-wrap items-center gap-1">
         <span className="font-semibold">{row.code}</span>
+        {newBadge(row)}
         <ExitPurposeBadge purpose={row.exitPurpose} />
+      </span>
+    ),
+  }
+  const availableExpandedCodeColumn: DataTableColumn<FleetEquipmentRow> = {
+    ...codeColumn,
+    cell: (row) => (
+      <span className="flex flex-wrap items-center gap-1">
+        <span className="font-semibold">{row.code}</span>
+        {newBadge(row)}
       </span>
     ),
   }
@@ -876,7 +895,7 @@ export function FleetMiniTables({
         description={t('adminHomeFleetAvailableDescription')}
         columns={availableColumns}
         expandedColumns={[
-          sortable(codeColumn),
+          sortable(availableExpandedCodeColumn),
           sortable(availableTypeColumn),
           sortable(availableCompanyProjectColumn),
           sortable(exitPurposeColumn),

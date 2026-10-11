@@ -284,9 +284,13 @@ export const quickDriverFormSchema = z.object({
   mobile: mobileNumber('mobileNumberRequired'),
 })
 
+/** The asset status values the database CHECK allows (migration 0125). */
+export const EQUIPMENT_ASSET_STATUSES = ['active', 'sold'] as const
+
 /**
  * Equipment add/edit: code, type and QR value are `NOT NULL`; a numbered unit
- * needs its plate; the optional manufacture year is a sensible year.
+ * needs its plate; the optional manufacture year is a sensible year; the asset
+ * status is active or sold.
  */
 export const equipmentFormSchema = z
   .object({
@@ -300,6 +304,15 @@ export const equipmentFormSchema = z
       'manufactureYearInvalid',
     ),
     qr_value: requiredText('qrValueRequired'),
+    // wave 20 (migration 0125): the asset status is active or sold only. The
+    // retired manual operational status is not a field of this schema.
+    status: z
+      .string()
+      .refine(
+        (value) =>
+          (EQUIPMENT_ASSET_STATUSES as readonly string[]).includes(value),
+        message('valueNotInList'),
+      ),
   })
   .superRefine((form, context) => {
     if (form.numbering_status !== 'numbered') return

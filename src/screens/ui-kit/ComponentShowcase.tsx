@@ -242,6 +242,7 @@ function BadgesShowcase() {
       <Row label="غرض الورشة">
         <WorkshopPurposeBadge purpose="maintenance" />
         <WorkshopPurposeBadge purpose="parking" />
+        <WorkshopPurposeBadge purpose="out_of_service" />
       </Row>
     </ShowcaseSection>
   )

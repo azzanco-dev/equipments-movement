@@ -9,7 +9,7 @@
 
 export type MovementContext = 'site' | 'workshop'
 export type MovementType = 'entry' | 'exit'
-export type WorkshopPurpose = 'maintenance' | 'parking'
+export type WorkshopPurpose = 'maintenance' | 'parking' | 'out_of_service'
 
 /** One movement row, reduced to what a timeline needs to render. */
 export interface TimelineMovement {

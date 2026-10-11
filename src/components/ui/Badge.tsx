@@ -1,6 +1,11 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { LogIn, LogOut, ParkingCircle, Wrench } from 'lucide-react'
+import { Ban, LogIn, LogOut, ParkingCircle, Wrench } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
+import {
+  WORKSHOP_PURPOSE_LABEL_KEYS,
+  workshopPurposeTone,
+  type WorkshopPurpose,
+} from '@/lib/equipmentState'
 import { cn } from './cn'
 
 export type BadgeTone =
@@ -73,24 +78,29 @@ export function MovementBadge({
   )
 }
 
-/** Workshop entry purpose: maintenance (warning) or parking/standby (info). */
+/** Workshop entry purpose: maintenance (warning), parking/standby (info) or
+ *  out of service (danger: light red with dark readable text, wave 20). */
 export function WorkshopPurposeBadge({
   purpose,
   className,
 }: {
-  purpose: 'maintenance' | 'parking'
+  purpose: WorkshopPurpose
   className?: string
 }) {
   const { t } = useI18n()
-  const maintenance = purpose === 'maintenance'
-  const Icon = maintenance ? Wrench : ParkingCircle
+  const Icon =
+    purpose === 'maintenance'
+      ? Wrench
+      : purpose === 'parking'
+        ? ParkingCircle
+        : Ban
   return (
     <Badge
-      tone={maintenance ? 'warning' : 'info'}
+      tone={workshopPurposeTone(purpose)}
       className={className}
       icon={<Icon size={12} aria-hidden="true" />}
     >
-      {t(maintenance ? 'maintenancePurpose' : 'parkingPurpose')}
+      {t(WORKSHOP_PURPOSE_LABEL_KEYS[purpose])}
     </Badge>
   )
 }

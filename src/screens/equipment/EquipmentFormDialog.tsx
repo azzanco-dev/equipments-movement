@@ -55,12 +55,7 @@ import {
   hasErrors,
   type FieldErrors,
 } from '@/lib/formValidation'
-import type {
-  Equipment,
-  EquipmentStatus,
-  OperationalStatus,
-  OwnershipStatus,
-} from '@/lib/types'
+import type { Equipment, EquipmentStatus, OwnershipStatus } from '@/lib/types'
 import {
   CODE_CHANGE_REASON_MAX,
   isEquipmentCodeChanged,
@@ -618,39 +613,27 @@ export function EquipmentFormDialog({
             />
           )}
         </Field>
-        <Field label={t('operationalStatus')}>
-          {(control) => (
-            <Select
-              {...control}
-              value={form.operational_status}
-              onValueChange={(value) =>
-                setForm((current) => ({
-                  ...current,
-                  operational_status: value as OperationalStatus,
-                }))
-              }
-              options={[
-                { value: 'operational', label: t('operational') },
-                { value: 'maintenance', label: t('maintenance') },
-                { value: 'stopped', label: t('stopped') },
-              ]}
-            />
-          )}
-        </Field>
-        {/* Lifecycle status (migration 0102). It replaced the activate /
-            deactivate toggle, so this select is the only place a record leaves
-            or rejoins the fleet. */}
-        <Field label={t('equipmentStatus')} hint={t('equipmentStatusHint')}>
+        {/* Asset status (migration 0102; active / sold since 0125). It
+            replaced the activate / deactivate toggle, so this select is the
+            only place a record leaves or rejoins the fleet. The operational
+            state is derived from the movements and is not edited here. */}
+        <Field
+          label={t('equipmentStatus')}
+          name="status"
+          hint={t('equipmentStatusHint')}
+          error={errors.status && t(errors.status)}
+        >
           {(control) => (
             <Select
               {...control}
               value={form.status}
-              onValueChange={(value) =>
+              onValueChange={(value) => {
+                clearErrors('status')
                 setForm((current) => ({
                   ...current,
                   status: value as EquipmentStatus,
                 }))
-              }
+              }}
               options={EQUIPMENT_STATUSES.map((value) => ({
                 value,
                 label: t(equipmentStatusKey(value)),

@@ -15,9 +15,9 @@ import { usesExternalSupplier } from '@/lib/equipmentOwnership'
 import {
   equipmentStatusBadge,
   masterDataBadge,
-  operationalStatusBadge,
   ownershipBadge,
 } from '@/lib/equipmentForm'
+import { EquipmentStateBadge } from '@/components/equipment/EquipmentStateBadge'
 
 /**
  * Pattern for the migrated list screens (equipment first, then drivers,
@@ -124,13 +124,18 @@ export function EquipmentTable({
       ),
     },
     {
-      key: 'operational_status',
-      header: t('operationalStatus'),
+      // wave 20 (migration 0125): the one state derived from the latest
+      // movement (the `equipment_state` computed field), replacing the
+      // retired manual operational status.
+      key: 'equipment_state',
+      header: t('equipmentState'),
       sortable: true,
-      cell: (row) => {
-        const badge = operationalStatusBadge(row.operational_status)
-        return <Badge tone={badge.tone}>{t(badge.key)}</Badge>
-      },
+      cell: (row) => (
+        <EquipmentStateBadge
+          state={row.equipment_state}
+          isNew={row.equipment_is_new}
+        />
+      ),
     },
     {
       key: 'ownership_status',

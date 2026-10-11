@@ -24,8 +24,10 @@ import { EquipmentFormDialog } from './EquipmentFormDialog'
 import { EquipmentImportDialog } from './EquipmentImportDialog'
 import { EquipmentTable } from './EquipmentTable'
 
+// wave 20: `equipment_state` / `equipment_is_new` are PostgREST computed
+// fields (migration 0125), selected, filtered and sorted like columns.
 const LIST_SELECT =
-  'id,code,type,plate_number,plate_digits,plate_letters_en,operational_status,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,status,master_data_complete,numbering_status,created_at,updated_at,project:projects(id,name_ar,name_en),lessor:lessors(id,name)'
+  'id,code,type,plate_number,plate_digits,plate_letters_en,ownership_status,project_id,lessor_id,brand,model,manufacture_year,chassis_number,registration_type,qr_value,last_maintenance_date,registration_expiry,insurance_expiry,is_active,status,master_data_complete,numbering_status,created_at,updated_at,equipment_state,equipment_is_new,project:projects(id,name_ar,name_en),lessor:lessors(id,name)'
 
 export interface EquipmentListScreenProps {
   onSelectEquipment?: (id: string) => void

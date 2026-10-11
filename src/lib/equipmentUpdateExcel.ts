@@ -2,22 +2,25 @@ import * as XLSX from 'xlsx'
 import type { TranslationKey } from '@/i18n/translations'
 import type { Equipment, EquipmentStatus } from '@/lib/types'
 import { parseEquipmentExcel, type EquipmentImportRow } from '@/lib/excel'
+import { equipmentStateText } from '@/lib/equipmentState'
 
 export interface EquipmentUpdateRow extends EquipmentImportRow {
   record_id: string
   record_version: string
   project_id: string | null
   lessor_id: string | null
-  /** Lifecycle status (migration 0102). `null` means the sheet left the column
-   *  out or the cell blank, and the record keeps the status it has, so an
-   *  older exported workbook still uploads unchanged. */
+  /** Asset status (migration 0102; active / sold since 0125). `null` means
+   *  the sheet left the column out or the cell blank, and the record keeps the
+   *  status it has, so an older exported workbook still uploads unchanged. */
   status: EquipmentStatus | null
   _changedFields: string[]
   _status: 'ready' | 'unchanged' | 'error' | 'conflict'
 }
 
 /** The accepted spellings of each status, Arabic and English, matched after
- *  trimming and lower-casing. The labels are the ones the export writes. */
+ *  trimming and lower-casing. The labels are the ones the export writes.
+ *  Scrapped and rented out were retired in migration 0125, so a cell that
+ *  still says so is reported on its row. */
 const STATUS_ALIASES: Record<string, EquipmentStatus> = {
   نشطة: 'active',
   نشط: 'active',
@@ -25,13 +28,6 @@ const STATUS_ALIASES: Record<string, EquipmentStatus> = {
   مباعة: 'sold',
   مباع: 'sold',
   sold: 'sold',
-  مشطوبة: 'scrapped',
-  مشطوب: 'scrapped',
-  scrapped: 'scrapped',
-  'مؤجرة للغير': 'rented_out',
-  مؤجرة: 'rented_out',
-  'rented out': 'rented_out',
-  rented_out: 'rented_out',
 }
 
 /** Parses one status cell: blank keeps the current value (`null`), an unknown
@@ -100,15 +96,15 @@ export function downloadEquipmentUpdateWorkbook(
     [t('equipmentCode')]: item.code,
     [t('equipmentType')]: item.type,
     [t('plateNumber')]: item.plate_number ?? '',
-    [t('operationalStatus')]: t(item.operational_status),
+    // wave 20: the derived state, where the retired operational status was.
+    // Informational only: the upload never reads it back.
+    [t('equipmentState')]: equipmentStateText(
+      t,
+      item.equipment_state ?? null,
+      item.equipment_is_new,
+    ),
     [t('equipmentStatus')]: t(
-      item.status === 'sold'
-        ? 'equipmentStatusSold'
-        : item.status === 'scrapped'
-          ? 'equipmentStatusScrapped'
-          : item.status === 'rented_out'
-            ? 'equipmentStatusRentedOut'
-            : 'equipmentStatusActive',
+      item.status === 'sold' ? 'equipmentStatusSold' : 'equipmentStatusActive',
     ),
     [t('ownershipStatus')]:
       item.ownership_status === 'alazani'

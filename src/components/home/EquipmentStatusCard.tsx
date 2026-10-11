@@ -20,7 +20,7 @@ export type EquipmentState =
   | { kind: 'inside_site'; location: string; days: number }
   | {
       kind: 'inside_workshop'
-      purpose: 'maintenance' | 'parking' | null
+      purpose: 'maintenance' | 'parking' | 'out_of_service' | null
       days: number
     }
   | { kind: 'outside' }

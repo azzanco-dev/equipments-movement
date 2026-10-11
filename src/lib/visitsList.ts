@@ -63,7 +63,7 @@ export interface EquipmentVisitRow {
   equipment_type: string | null
   equipment_plate_number?: string | null
   movement_context: 'site' | 'workshop'
-  workshop_purpose: 'maintenance' | 'parking' | null
+  workshop_purpose: 'maintenance' | 'parking' | 'out_of_service' | null
   company_id: string | null
   company_name_ar: string | null
   company_name_en: string | null
@@ -287,6 +287,11 @@ export const adminVisitsListConfig: DataListConfig = {
           labelI18n: 'maintenancePurpose',
         },
         { value: 'parking', label: 'وقوف', labelI18n: 'parkingPurpose' },
+        {
+          value: 'out_of_service',
+          label: 'خارج الخدمة',
+          labelI18n: 'workshopPurposeOutOfService',
+        },
       ],
     },
     // The purpose of the EXIT that closed the visit (`exit_purpose`,
@@ -512,6 +517,8 @@ function workshopPurposeLabel(
   if (row.movement_context !== 'workshop') return ''
   if (row.workshop_purpose === 'maintenance') return t('maintenancePurpose')
   if (row.workshop_purpose === 'parking') return t('parkingPurpose')
+  if (row.workshop_purpose === 'out_of_service')
+    return t('workshopPurposeOutOfService')
   return ''
 }
 

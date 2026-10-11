@@ -3,7 +3,6 @@ import type { TranslationKey } from '@/i18n/translations'
 import type {
   Equipment,
   EquipmentStatus,
-  OperationalStatus,
   OwnershipStatus,
   RegistrationType,
 } from '@/lib/types'
@@ -30,8 +29,9 @@ export interface EquipmentFormValues {
   type: string
   plate_number: string
   numbering_status: 'numbered' | 'unnumbered'
-  operational_status: OperationalStatus
-  /** Lifecycle status (migration 0102); replaces the deactivate toggle. */
+  /** Asset status (migration 0102; active / sold since 0125); replaces the
+   *  deactivate toggle. The operational state is derived from the movements
+   *  (wave 20) and is not a form field. */
   status: EquipmentStatus
   ownership_status: OwnershipStatus
   project_id: string
@@ -52,7 +52,6 @@ export const EMPTY_EQUIPMENT_FORM: EquipmentFormValues = {
   type: '',
   plate_number: '',
   numbering_status: 'numbered',
-  operational_status: 'operational',
   status: 'active',
   ownership_status: 'alazani',
   project_id: '',
@@ -83,7 +82,6 @@ export function equipmentFormValues(equipment: Equipment): EquipmentFormValues {
     type: equipment.type,
     plate_number: equipment.plate_number ?? '',
     numbering_status: equipment.numbering_status ?? 'numbered',
-    operational_status: equipment.operational_status,
     status: equipment.status ?? 'active',
     ownership_status: equipment.ownership_status,
     project_id: equipment.project_id ?? '',
@@ -138,6 +136,7 @@ export const EQUIPMENT_FIELD_ORDER = [
   'numbering_status',
   'plate_number',
   'manufacture_year',
+  'status',
   'project_id',
   'lessor_id',
   'qr_value',
@@ -356,7 +355,6 @@ export function buildEquipmentPayload(form: EquipmentFormValues) {
     plate_number:
       form.numbering_status === 'numbered' ? form.plate_number || null : null,
     numbering_status: form.numbering_status,
-    operational_status: form.operational_status,
     status: form.status,
     // The status replaced the activate/deactivate toggle, so the form is now
     // the only place `is_active` is set: it mirrors the status. The database
@@ -396,14 +394,6 @@ export interface BadgeDescriptor {
  * (instead of ad hoc colors in the table) is what AGENTS.md asks for: green
  * for success, amber for warnings, red only for errors.
  */
-export function operationalStatusBadge(
-  status: OperationalStatus,
-): BadgeDescriptor {
-  if (status === 'operational') return { tone: 'success', key: 'operational' }
-  if (status === 'maintenance') return { tone: 'warning', key: 'maintenance' }
-  return { tone: 'neutral', key: 'stopped' }
-}
-
 export function ownershipBadge(status: OwnershipStatus): BadgeDescriptor {
   if (status === 'alazani') return { tone: 'neutral', key: 'ownershipAlazani' }
   if (status === 'takween') return { tone: 'neutral', key: 'ownershipTakween' }
@@ -414,19 +404,16 @@ export function ownershipBadge(status: OwnershipStatus): BadgeDescriptor {
   return { tone: 'neutral', key: 'ownershipExternalSupplier' }
 }
 
-/** The four lifecycle values, in the order the form and the filter list them. */
+/** The two asset status values (migration 0125), in the order the form and
+ *  the filter list them. */
 export const EQUIPMENT_STATUSES: readonly EquipmentStatus[] = [
   'active',
   'sold',
-  'scrapped',
-  'rented_out',
 ] as const
 
 const EQUIPMENT_STATUS_KEYS: Record<EquipmentStatus, TranslationKey> = {
   active: 'equipmentStatusActive',
   sold: 'equipmentStatusSold',
-  scrapped: 'equipmentStatusScrapped',
-  rented_out: 'equipmentStatusRentedOut',
 }
 
 /** Translation key for a status, falling back to `active` (the column default)
@@ -441,7 +428,7 @@ export function equipmentStatusKey(
 
 /**
  * Only `active` is a fleet state, so it is the only one shown as success;
- * sold / scrapped / rented out are facts, not failures, so they stay neutral
+ * sold is a fact, not a failure, so it stays neutral
  * rather than red, which AGENTS.md reserves for errors and destructive
  * actions.
  */
@@ -461,30 +448,6 @@ export function isFleetEquipment(
   equipment: Pick<Equipment, 'is_active' | 'status'>,
 ): boolean {
   return equipment.is_active && (equipment.status ?? 'active') === 'active'
-}
-
-/**
- * "تحت الصيانة" is derived, never stored (owner decision, 2026-09-23): an
- * equipment is under maintenance exactly while its latest movement — across
- * both contexts, ordered by (recorded_at DESC, id DESC) — is an open WORKSHOP
- * entry classified as `maintenance`. A workshop EXIT is a later movement, so
- * the state clears by itself.
- */
-export function isUnderMaintenance(
-  latestMovement:
-    | {
-        movement_type: string
-        movement_context?: string | null
-        workshop_purpose?: string | null
-      }
-    | null
-    | undefined,
-): boolean {
-  return (
-    latestMovement?.movement_type === 'entry' &&
-    latestMovement.movement_context === 'workshop' &&
-    latestMovement.workshop_purpose === 'maintenance'
-  )
 }
 
 /** Quick-created equipment stays flagged until an admin reviews it. */

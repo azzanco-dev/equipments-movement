@@ -42,7 +42,7 @@ export interface EntryEquipmentStateFields {
   state_company_name_en?: string | null
   state_project_name_ar?: string | null
   state_project_name_en?: string | null
-  state_workshop_purpose?: 'maintenance' | 'parking' | null
+  state_workshop_purpose?: 'maintenance' | 'parking' | 'out_of_service' | null
 }
 
 export interface EntryEquipmentRow extends EntryEquipmentStateFields {
@@ -137,7 +137,9 @@ export function equipmentStateOption(
         ? t('maintenancePurpose')
         : row.state_workshop_purpose === 'parking'
           ? t('parkingPurpose')
-          : t('pendingClassification')
+          : row.state_workshop_purpose === 'out_of_service'
+            ? t('workshopPurposeOutOfService')
+            : t('pendingClassification')
     return option
   }
 

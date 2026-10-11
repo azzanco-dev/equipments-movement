@@ -43,6 +43,10 @@ import { applyListFilters } from '@/lib/applyListFilters'
 import { homeMovementsListConfig } from '@/lib/listConfigs'
 import { latestChangeDriverNames, loadDriverChanges } from '@/lib/exportFields'
 import { displayDriverName } from '@/lib/driverDisplayName'
+import {
+  WORKSHOP_PURPOSES,
+  WORKSHOP_PURPOSE_LABEL_KEYS,
+} from '@/lib/equipmentState'
 
 /** The foreman log's allowlisted filter keys: company and project only. */
 const HOME_LOG_FILTER_KEYS = new Set(
@@ -229,10 +233,10 @@ function MovementLogTab({
           // Table-row control: compact like the pending-classification card.
           size="sm"
           className="w-28"
-          options={[
-            { value: 'maintenance', label: t('maintenancePurpose') },
-            { value: 'parking', label: t('parkingPurpose') },
-          ]}
+          options={WORKSHOP_PURPOSES.map((value) => ({
+            value,
+            label: t(WORKSHOP_PURPOSE_LABEL_KEYS[value]),
+          }))}
         />
       )
     }

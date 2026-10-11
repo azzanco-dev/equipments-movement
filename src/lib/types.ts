@@ -1,3 +1,5 @@
+import type { EquipmentState } from '@/lib/equipmentState'
+
 export type UserRole =
   | 'admin'
   | 'supervisor'
@@ -6,14 +8,15 @@ export type UserRole =
   | 'workshop_manager'
   | 'monitor'
 
-export type OperationalStatus = 'operational' | 'maintenance' | 'stopped'
 /**
- * Equipment lifecycle status (migration 0102). Only `active` counts as part of
- * the fleet; the other three keep their history and stay in the equipment list
- * and the inquiry page, but are excluded from the home stats, the admin home,
- * the movement equipment selectors and the current-state reports.
+ * Equipment asset status (migration 0102; active / sold only since 0125).
+ * Only `active` counts as part of the fleet; a sold unit keeps its history and
+ * stays in the equipment list and the inquiry page, but is excluded from the
+ * home stats, the admin home, the movement equipment selectors and the
+ * current-state reports. The operational state is not stored: see
+ * `EquipmentState` (src/lib/equipmentState.ts).
  */
-export type EquipmentStatus = 'active' | 'sold' | 'scrapped' | 'rented_out'
+export type EquipmentStatus = 'active' | 'sold'
 export type OwnershipStatus =
   | 'alazani'
   | 'takween'
@@ -89,7 +92,6 @@ export interface Equipment {
   plate_number: string | null
   plate_digits?: string | null
   plate_letters_en?: string | null
-  operational_status: OperationalStatus
   ownership_status: OwnershipStatus
   project_id: string | null
   lessor_id: string | null
@@ -110,6 +112,13 @@ export interface Equipment {
   numbering_status?: 'numbered' | 'unnumbered'
   created_at: string
   updated_at: string
+  /**
+   * wave 20 (migration 0125): PostgREST computed fields, present only when the
+   * select names them. The one state derived from the latest movement, and
+   * whether the unit has never moved («جديدة»).
+   */
+  equipment_state?: EquipmentState | null
+  equipment_is_new?: boolean | null
   project?: Project | null
   lessor?: Lessor | null
 }
@@ -120,7 +129,7 @@ export interface EntryExitLog {
   supervisor_id: string
   movement_type: MovementType
   movement_context?: 'site' | 'workshop'
-  workshop_purpose?: 'maintenance' | 'parking' | null
+  workshop_purpose?: 'maintenance' | 'parking' | 'out_of_service' | null
   /** wave-10-exit-purpose (migration 0111): site exits only; NULL on legacy rows. */
   exit_purpose?: 'maintenance' | 'work_completed' | null
   /**
@@ -203,7 +212,7 @@ export interface EntryExitPhoto {
 export interface LastMovement {
   movement_type: MovementType
   movement_context: 'site' | 'workshop'
-  workshop_purpose: 'maintenance' | 'parking' | null
+  workshop_purpose: 'maintenance' | 'parking' | 'out_of_service' | null
   recorded_at: string
   supervisor_id: string
   supervisor_name: string | null

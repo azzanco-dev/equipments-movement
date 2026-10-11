@@ -42,6 +42,7 @@ import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
 import { localizedName } from '@/lib/localizedName'
 import { exitPurposeLabelKey } from '@/lib/exitPurpose'
+import { isWorkshopPurpose } from '@/lib/equipmentState'
 import { uploadMovementPhotosDirectly } from '@/lib/movementPhotoUpload'
 import { prepareMovementPhotos } from '@/lib/movementPhotoCompression'
 import {
@@ -890,13 +891,11 @@ export function MovementDetail({
             key: 'workshopPurpose',
             icon: <FileText size={16} />,
             label: t('workshopPurpose'),
-            value:
-              log.workshop_purpose === 'maintenance' ||
-              log.workshop_purpose === 'parking' ? (
-                <WorkshopPurposeBadge purpose={log.workshop_purpose} />
-              ) : (
-                t('pendingClassification')
-              ),
+            value: isWorkshopPurpose(log.workshop_purpose) ? (
+              <WorkshopPurposeBadge purpose={log.workshop_purpose} />
+            ) : (
+              t('pendingClassification')
+            ),
           },
         ]
       : []),

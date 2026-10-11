@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  Ban,
   ClipboardList,
   LogIn,
   LogOut,
@@ -37,10 +38,12 @@ const EMPTY_WORKSHOP: WorkshopHomeStats = {
   insideNow: 0,
   maintenance: 0,
   parking: 0,
+  outOfService: 0,
   pendingClassification: 0,
   insideYesterday: null,
   maintenanceYesterday: null,
   parkingYesterday: null,
+  outOfServiceYesterday: null,
   pending: [],
 }
 
@@ -226,7 +229,7 @@ export function HomeScreen({
             <ErrorState onRetry={reload} />
           ) : (
             <div
-              className="grid grid-cols-2 gap-3 md:grid-cols-4"
+              className="grid grid-cols-2 gap-3 md:grid-cols-5"
               aria-busy={statsRefreshing || undefined}
             >
               <StatCard
@@ -262,8 +265,19 @@ export function HomeScreen({
                 )}
                 loading={statsFirstLoad}
               />
+              {/* wave 20 (migration 0125): the third purpose. */}
               <StatCard
-                className="col-span-2 md:col-span-1"
+                label={t('workshopPurposeOutOfService')}
+                value={workshopStats.outOfService}
+                tone="danger"
+                icon={<Ban size={18} aria-hidden="true" />}
+                hint={yesterdayHint(
+                  workshopStats.outOfService,
+                  workshopStats.outOfServiceYesterday,
+                )}
+                loading={statsFirstLoad}
+              />
+              <StatCard
                 label={t('awaitingClassification')}
                 value={workshopStats.pendingClassification}
                 tone="warning"

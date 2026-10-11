@@ -47,13 +47,8 @@ const form = loadLibModule('equipmentForm')
 // tests/equipment-form.test.cjs does.
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null))
 
-test('the four owner-approved statuses are the only ones offered', () => {
-  assert.deepEqual(plain(form.EQUIPMENT_STATUSES), [
-    'active',
-    'sold',
-    'scrapped',
-    'rented_out',
-  ])
+test('active and sold are the only asset statuses offered (0125)', () => {
+  assert.deepEqual(plain(form.EQUIPMENT_STATUSES), ['active', 'sold'])
 })
 
 test('only an active status reads as a fleet badge', () => {
@@ -64,14 +59,6 @@ test('only an active status reads as a fleet badge', () => {
   assert.deepEqual(plain(form.equipmentStatusBadge('sold')), {
     tone: 'neutral',
     key: 'equipmentStatusSold',
-  })
-  assert.deepEqual(plain(form.equipmentStatusBadge('scrapped')), {
-    tone: 'neutral',
-    key: 'equipmentStatusScrapped',
-  })
-  assert.deepEqual(plain(form.equipmentStatusBadge('rented_out')), {
-    tone: 'neutral',
-    key: 'equipmentStatusRentedOut',
   })
 })
 
@@ -98,7 +85,7 @@ test('fleet membership needs both is_active and an active status', () => {
     false,
   )
   assert.equal(
-    form.isFleetEquipment({ is_active: false, status: 'scrapped' }),
+    form.isFleetEquipment({ is_active: false, status: 'sold' }),
     false,
   )
   // A row selected before migration 0102 has no status; is_active decides.
@@ -106,49 +93,17 @@ test('fleet membership needs both is_active and an active status', () => {
   assert.equal(form.isFleetEquipment({ is_active: false }), false)
 })
 
-test('under maintenance is derived from the latest movement only', () => {
-  const open = {
-    movement_type: 'entry',
-    movement_context: 'workshop',
-    workshop_purpose: 'maintenance',
-  }
-  assert.equal(form.isUnderMaintenance(open), true)
-  // Parking is a workshop entry too, but it is not maintenance.
-  assert.equal(
-    form.isUnderMaintenance({ ...open, workshop_purpose: 'parking' }),
-    false,
-  )
-  // Not classified yet.
-  assert.equal(
-    form.isUnderMaintenance({ ...open, workshop_purpose: null }),
-    false,
-  )
-  // The workshop exit is a later movement, so the state clears.
-  assert.equal(
-    form.isUnderMaintenance({ ...open, movement_type: 'exit' }),
-    false,
-  )
-  // A site entry is not maintenance whatever the purpose column holds.
-  assert.equal(
-    form.isUnderMaintenance({ ...open, movement_context: 'site' }),
-    false,
-  )
-  // Equipment that has never moved.
-  assert.equal(form.isUnderMaintenance(undefined), false)
-  assert.equal(form.isUnderMaintenance(null), false)
-})
-
 const updateExcel = loadLibModule('equipmentUpdateExcel')
 
 test('the Excel status cell accepts both languages and keeps blanks', () => {
   assert.equal(updateExcel.parseEquipmentStatusCell('نشطة'), 'active')
   assert.equal(updateExcel.parseEquipmentStatusCell('Sold'), 'sold')
-  assert.equal(updateExcel.parseEquipmentStatusCell('  مشطوبة '), 'scrapped')
-  assert.equal(updateExcel.parseEquipmentStatusCell('rented out'), 'rented_out')
-  assert.equal(
-    updateExcel.parseEquipmentStatusCell('مؤجرة للغير'),
-    'rented_out',
-  )
+  assert.equal(updateExcel.parseEquipmentStatusCell('  مباعة '), 'sold')
+  // wave 20 (migration 0125): scrapped and rented out are retired, so a cell
+  // that still says so is reported on its row instead of being sent.
+  assert.equal(updateExcel.parseEquipmentStatusCell('  مشطوبة '), undefined)
+  assert.equal(updateExcel.parseEquipmentStatusCell('rented out'), undefined)
+  assert.equal(updateExcel.parseEquipmentStatusCell('مؤجرة للغير'), undefined)
   // Blank / missing means "keep the current status", not "unknown".
   assert.equal(updateExcel.parseEquipmentStatusCell(''), null)
   assert.equal(updateExcel.parseEquipmentStatusCell('   '), null)

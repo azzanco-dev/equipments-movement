@@ -208,7 +208,7 @@ export interface MovementExportRow {
   equipment_ownership_status?: string | null
   movement_type: 'entry' | 'exit'
   movement_context?: 'site' | 'workshop' | null
-  workshop_purpose?: 'maintenance' | 'parking' | null
+  workshop_purpose?: 'maintenance' | 'parking' | 'out_of_service' | null
   /** A site exit's purpose (migrations 0111 / 0118); `null` otherwise. */
   exit_purpose?: string | null
   contractor_equipment_code?: string | null
@@ -299,6 +299,8 @@ function workshopPurposeLabel(row: MovementExportRow, t: Translate): string {
   if (row.movement_context !== 'workshop') return ''
   if (row.workshop_purpose === 'maintenance') return t('maintenancePurpose')
   if (row.workshop_purpose === 'parking') return t('parkingPurpose')
+  if (row.workshop_purpose === 'out_of_service')
+    return t('workshopPurposeOutOfService')
   return ''
 }
 

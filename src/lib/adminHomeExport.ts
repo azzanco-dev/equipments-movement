@@ -131,6 +131,7 @@ export function workshopPurposeLabel(
 ): string {
   if (purpose === 'maintenance') return t('adminHomeMaintenance')
   if (purpose === 'parking') return t('adminHomeParking')
+  if (purpose === 'out_of_service') return t('adminHomeOutOfService')
   return t('adminHomeUnclassified')
 }
 

@@ -44,7 +44,7 @@ export interface MovementLogSearchRow {
   supervisor_id: string
   movement_type: MovementType
   movement_context?: 'site' | 'workshop'
-  workshop_purpose?: 'maintenance' | 'parking' | null
+  workshop_purpose?: 'maintenance' | 'parking' | 'out_of_service' | null
   registration_method?: RegistrationMethod
   driver_id?: string | null
   driver_name: string | null

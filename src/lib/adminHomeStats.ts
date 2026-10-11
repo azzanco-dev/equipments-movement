@@ -200,6 +200,8 @@ export const FLEET_STATES = [
   'inside_site',
   'workshop_maintenance',
   'workshop_parking',
+  // wave 20 (migration 0125): the third workshop purpose.
+  'workshop_out_of_service',
   'workshop_unclassified',
   'available',
 ] as const
@@ -221,6 +223,7 @@ export const FLEET_DRILL_STATES = [
   'available',
   'workshop_maintenance',
   'workshop_parking',
+  'workshop_out_of_service',
   'workshop_unclassified',
 ] as const
 
@@ -273,6 +276,8 @@ export interface FleetStateGroup extends FleetStateCounts {
 export interface FleetState extends FleetStateCounts {
   workshopMaintenance: number
   workshopParking: number
+  /** wave 20 (migration 0125); 0 against an older database. */
+  workshopOutOfService: number
   workshopUnclassified: number
   byOwner: FleetStateGroup[]
   byType: FleetStateGroup[]
@@ -298,6 +303,7 @@ export function parseFleetState(source: unknown): FleetState {
     available: num(source, 'available'),
     workshopMaintenance: num(source, 'workshop_maintenance'),
     workshopParking: num(source, 'workshop_parking'),
+    workshopOutOfService: num(source, 'workshop_out_of_service'),
     workshopUnclassified: num(source, 'workshop_unclassified'),
     byOwner: parseGroups(source, 'by_owner', 'owner'),
     byType: parseGroups(source, 'by_type', 'type'),
@@ -319,11 +325,13 @@ export const FLEET_LIST_STATES = [
 export type FleetListState = (typeof FLEET_LIST_STATES)[number]
 
 /** The chips of the "داخل الورشة" mini table, in drawing order. `all` is no
- *  purpose filter; the other three are `p_purpose`. */
+ *  purpose filter; the other four are `p_purpose` (out_of_service since
+ *  migration 0125). */
 export const WORKSHOP_PURPOSE_FILTERS = [
   'all',
   'maintenance',
   'parking',
+  'out_of_service',
   'unclassified',
 ] as const
 export type WorkshopPurposeFilter = (typeof WORKSHOP_PURPOSE_FILTERS)[number]
@@ -463,7 +471,7 @@ export interface FleetJumpTarget {
 
 /**
  * Where a state card jumps (owner-approved design, 2026-09-30): each card
- * scrolls to the mini table that lists its units, and the four workshop cards
+ * scrolls to the mini table that lists its units, and the five workshop cards
  * also pick the matching chip. The total has no single state, so it jumps to
  * the latest added equipment.
  */
@@ -477,6 +485,8 @@ export function fleetJumpTarget(state: FleetDrillState): FleetJumpTarget {
       return { table: 'workshop', purpose: 'maintenance' }
     case 'workshop_parking':
       return { table: 'workshop', purpose: 'parking' }
+    case 'workshop_out_of_service':
+      return { table: 'workshop', purpose: 'out_of_service' }
     case 'workshop_unclassified':
       return { table: 'workshop', purpose: 'unclassified' }
     case 'available':
@@ -506,7 +516,7 @@ export interface FleetEquipmentRow {
   lastMovementContext: 'site' | 'workshop' | null
   /** The workshop entry's purpose; `null` when unclassified or not in the
    *  workshop. */
-  workshopPurpose: 'maintenance' | 'parking' | null
+  workshopPurpose: 'maintenance' | 'parking' | 'out_of_service' | null
   companyNameAr: string | null
   companyNameEn: string | null
   projectNameAr: string | null
@@ -518,6 +528,15 @@ export interface FleetEquipmentRow {
    * before migration 0111.
    */
   exitPurpose: ExitPurpose | null
+  /** wave 20 (migration 0125): the unit has never moved («جديدة»). `false`
+   *  against an older database that does not return `is_new`. */
+  isNew: boolean
+}
+
+/** A boolean column; anything but `true` is `false`. */
+function flag(source: unknown, key: string): boolean {
+  if (!source || typeof source !== 'object') return false
+  return (source as Record<string, unknown>)[key] === true
 }
 
 function optionalText(source: unknown, key: string): string | null {
@@ -548,9 +567,13 @@ function fleetStateId(source: unknown, key: string): FleetStateId | null {
 function workshopPurpose(
   source: unknown,
   key: string,
-): 'maintenance' | 'parking' | null {
+): 'maintenance' | 'parking' | 'out_of_service' | null {
   const value = optionalText(source, key)
-  return value === 'maintenance' || value === 'parking' ? value : null
+  return value === 'maintenance' ||
+    value === 'parking' ||
+    value === 'out_of_service'
+    ? value
+    : null
 }
 
 export function parseFleetEquipmentRows(source: unknown): FleetEquipmentRow[] {
@@ -573,6 +596,7 @@ export function parseFleetEquipmentRows(source: unknown): FleetEquipmentRow[] {
       projectNameEn: optionalText(row, 'project_name_en'),
       // An unknown value is dropped rather than rendered as a badge.
       exitPurpose: exitPurposeOrNull(optionalText(row, 'last_exit_purpose')),
+      isNew: flag(row, 'is_new'),
     }))
     .filter((row) => row.id !== '')
 }

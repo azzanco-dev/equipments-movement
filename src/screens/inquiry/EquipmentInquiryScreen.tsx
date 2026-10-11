@@ -43,6 +43,11 @@ import {
 import { PreviousCodesLine } from '@/components/inquiry/PreviousCodes'
 import { EquipmentLocationCard } from '@/components/afaqy/EquipmentLocationCard'
 import { preferRecordName } from '@/lib/driverDisplayName'
+import {
+  equipmentStateFromMovement,
+  type EquipmentState,
+} from '@/lib/equipmentState'
+import { EquipmentStateBadge } from '@/components/equipment/EquipmentStateBadge'
 
 /**
  * `/inquiry`: one search field finds an equipment by code/plate/chassis/type,
@@ -69,7 +74,7 @@ interface MovementLogTimelineRow {
   id: string
   movement_type: 'entry' | 'exit'
   movement_context: 'site' | 'workshop'
-  workshop_purpose: 'maintenance' | 'parking' | null
+  workshop_purpose: 'maintenance' | 'parking' | 'out_of_service' | null
   recorded_at: string
   company_name_ar: string | null
   company_name_en: string | null
@@ -94,13 +99,23 @@ const SUGGEST_DEBOUNCE_MS = 300
 const MOVEMENTS_PAGE_SIZE = 40
 
 /**
+ * wave 20 (migration 0125): the one equipment state of the brief. It is read
+ * through `get_last_movement` (SECURITY DEFINER), not the `equipment_state`
+ * computed field, because a foreman's RLS hides other people's movements and
+ * the computed field would then see only part of the chain. `error` keeps a
+ * failed read visible instead of showing a state.
+ */
+type InquiryState = { state: EquipmentState; isNew: boolean } | 'error' | null
+
+/**
  * The brief above the timeline: code, type, and the plate, or the chassis
- * number when the equipment has no plate (owner decision). Codes, plates and
+ * number when the equipment has no plate (owner decision), then the state. Codes, plates and
  * chassis numbers are isolated LTR runs through `InfoGrid`, so they keep the
  * RTL start edge instead of jumping to the left.
  */
 function inquiryBriefItems(
   equipment: InquiryEquipmentRow,
+  state: InquiryState,
   t: ReturnType<typeof useI18n>['t'],
 ): InfoGridItem[] {
   const identifier = inquiryBriefIdentifier(equipment)
@@ -117,6 +132,16 @@ function inquiryBriefItems(
       label: t(identifier.kind === 'plate' ? 'plateNumber' : 'chassisNumber'),
       value: identifier.value,
       dir: 'ltr',
+    },
+    {
+      key: 'equipmentState',
+      label: t('equipmentState'),
+      value:
+        state === 'error' ? (
+          <span className="text-danger">{t('dataLoadError')}</span>
+        ) : state ? (
+          <EquipmentStateBadge state={state.state} isNew={state.isNew} />
+        ) : null,
     },
   ]
 }
@@ -181,6 +206,7 @@ export function EquipmentInquiryScreen({
   const [suggestLoading, setSuggestLoading] = useState(false)
 
   const [equipment, setEquipment] = useState<InquiryEquipmentRow | null>(null)
+  const [inquiryState, setInquiryState] = useState<InquiryState>(null)
   const [codeChanges, setCodeChanges] = useState<EquipmentCodeChange[]>([])
   const [codeChangesError, setCodeChangesError] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -285,25 +311,48 @@ export function EquipmentInquiryScreen({
       // The brief row is identity only (code, type, plate or chassis); the
       // current state and the time since the last movement come from the
       // timeline summary cards below, so no extra read is needed here.
-      const [equipmentResult, codeChangesResult] = await Promise.all([
-        supabase
-          .from('equipment')
-          .select('id,code,type,plate_number,chassis_number')
-          .eq('id', id)
-          .abortSignal(signal)
-          .maybeSingle(),
-        // Previous codes (EM-196) for the «ارقام سابقة» line under the brief.
-        supabase
-          .from('equipment_code_changes')
-          .select(EQUIPMENT_CODE_CHANGE_SELECT)
-          .eq('equipment_id', id)
-          .order('changed_at', { ascending: false })
-          .order('id', { ascending: false })
-          .limit(EQUIPMENT_CODE_CHANGES_LIMIT)
-          .abortSignal(signal),
-      ])
+      const [equipmentResult, codeChangesResult, lastMovementResult] =
+        await Promise.all([
+          supabase
+            .from('equipment')
+            .select('id,code,type,plate_number,chassis_number')
+            .eq('id', id)
+            .abortSignal(signal)
+            .maybeSingle(),
+          // Previous codes (EM-196) for the «ارقام سابقة» line under the brief.
+          supabase
+            .from('equipment_code_changes')
+            .select(EQUIPMENT_CODE_CHANGE_SELECT)
+            .eq('equipment_id', id)
+            .order('changed_at', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(EQUIPMENT_CODE_CHANGES_LIMIT)
+            .abortSignal(signal),
+          // wave 20: the latest movement across both contexts, for the state.
+          supabase
+            .rpc('get_last_movement', {
+              p_equipment_id: id,
+              p_movement_context: 'site',
+            })
+            .abortSignal(signal),
+        ])
       if (signal.aborted) return
       setDetailLoadedId(id)
+      if (lastMovementResult.error) setInquiryState('error')
+      else {
+        const latest =
+          (
+            lastMovementResult.data as Array<{
+              movement_type: string | null
+              movement_context: string | null
+              workshop_purpose: string | null
+            }> | null
+          )?.[0] ?? null
+        setInquiryState({
+          state: equipmentStateFromMovement(latest),
+          isNew: latest === null,
+        })
+      }
       setCodeChangesError(Boolean(codeChangesResult.error))
       setCodeChanges(
         (codeChangesResult.data as EquipmentCodeChange[] | null) ?? [],
@@ -366,6 +415,7 @@ export function EquipmentInquiryScreen({
   useEffect(() => {
     if (!equipmentId) {
       setEquipment(null)
+      setInquiryState(null)
       setMovements([])
       setMovementsOffset(0)
       setHasMoreMovements(false)
@@ -512,7 +562,7 @@ export function EquipmentInquiryScreen({
                 the time since the last movement, and the latest visit's
                 company/project/foreman all live in the timeline below. */}
             <div className="space-y-2 rounded-lg border bg-surface px-3 py-2.5">
-              <InfoGrid items={inquiryBriefItems(equipment, t)} />
+              <InfoGrid items={inquiryBriefItems(equipment, inquiryState, t)} />
               <PreviousCodesLine
                 changes={codeChanges}
                 currentCode={equipment.code}

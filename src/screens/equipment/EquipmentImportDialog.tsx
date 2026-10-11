@@ -219,7 +219,6 @@ export function EquipmentImportDialog({
       code: row.code,
       type: row.type,
       plate_number: row.plate_number,
-      operational_status: row.operational_status,
       ownership_status: row.ownership_status,
       project_id: row.project_name
         ? (projectMap.get(row.project_name.toLowerCase()) ?? null)
@@ -314,12 +313,6 @@ export function EquipmentImportDialog({
       cell: (row) => <span dir="ltr">{row.plate_number ?? '—'}</span>,
     },
     {
-      key: 'operational_status',
-      header: t('operationalStatus'),
-      className: 'text-muted',
-      cell: (row) => row.operational_status,
-    },
-    {
       key: 'ownership_status',
       header: t('ownershipStatus'),
       className: 'text-muted',
@@ -329,10 +322,10 @@ export function EquipmentImportDialog({
       key: '_errors',
       header: t('rowErrors'),
       className: '!whitespace-normal',
-      cell: (row) =>
-        row._errors.length > 0 ? (
-          <span className="flex flex-wrap gap-1">
-            {row._errors.map((message, index) => (
+      cell: (row) => (
+        <span className="flex flex-wrap items-center gap-1">
+          {row._errors.length > 0 ? (
+            row._errors.map((message, index) => (
               <Badge
                 key={index}
                 tone="danger"
@@ -341,11 +334,23 @@ export function EquipmentImportDialog({
               >
                 {message}
               </Badge>
-            ))}
-          </span>
-        ) : (
-          <CheckCircle2 size={16} aria-hidden="true" className="text-success" />
-        ),
+            ))
+          ) : (
+            <CheckCircle2
+              size={16}
+              aria-hidden="true"
+              className="text-success"
+            />
+          )}
+          {/* wave 20: a note never blocks the row (the retired operational
+              status column is ignored, not rejected). */}
+          {row._notes.map((message, index) => (
+            <Badge key={`note-${index}`} tone="info" size="sm">
+              {message}
+            </Badge>
+          ))}
+        </span>
+      ),
     },
   ]
 

@@ -5,6 +5,10 @@ import { ErrorState } from '@/components/ui/ErrorState'
 import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
 import type { PendingClassificationEntry } from '@/lib/homeStats'
+import {
+  WORKSHOP_PURPOSES,
+  WORKSHOP_PURPOSE_LABEL_KEYS,
+} from '@/lib/equipmentState'
 
 export interface PendingClassificationCardProps {
   rows: PendingClassificationEntry[]
@@ -101,10 +105,10 @@ export function PendingClassificationCard({
                     aria-label={`${t('selectClassification')} — ${row.equipmentCode}`}
                     size="sm"
                     className="w-28"
-                    options={[
-                      { value: 'maintenance', label: t('maintenancePurpose') },
-                      { value: 'parking', label: t('parkingPurpose') },
-                    ]}
+                    options={WORKSHOP_PURPOSES.map((value) => ({
+                      value,
+                      label: t(WORKSHOP_PURPOSE_LABEL_KEYS[value]),
+                    }))}
                   />
                 </span>
               ) : (

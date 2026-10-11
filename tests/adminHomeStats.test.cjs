@@ -124,6 +124,7 @@ test('the fleet state cards share one drill-down vocabulary', () => {
     'available',
     'workshop_maintenance',
     'workshop_parking',
+    'workshop_out_of_service',
     'workshop_unclassified',
   ])
   // Every per-unit state the database classifies is reachable from a card.
@@ -440,9 +441,14 @@ test('the workshop chips map to p_purpose and fail closed to "all"', () => {
     'all',
     'maintenance',
     'parking',
+    'out_of_service',
     'unclassified',
   ])
   assert.equal(admin.workshopPurposeArgument('all'), null)
+  assert.equal(
+    admin.workshopPurposeArgument('out_of_service'),
+    'out_of_service',
+  )
   assert.equal(admin.workshopPurposeArgument('parking'), 'parking')
   assert.equal(
     admin.normalizeWorkshopPurposeFilter('unclassified'),

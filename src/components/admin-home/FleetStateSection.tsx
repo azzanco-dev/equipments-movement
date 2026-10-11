@@ -1,6 +1,7 @@
 import { useCallback, useState, type ReactNode } from 'react'
 import {
   CircleCheck,
+  Ban,
   ClipboardList,
   MapPin,
   ParkingCircle,
@@ -41,11 +42,12 @@ interface FleetCard {
 const ICON_SIZE = 16
 
 /**
- * The seven cards, in drawing order. Accents are tokens only: green for
+ * The eight cards, in drawing order. Accents are tokens only: green for
  * inside sites (the ENTRY colour), blue for the workshop, neutral for what is
- * free, amber for maintenance (as on the workshop home), and two light chart
- * hues for standby and unclassified, which carry no status meaning of their
- * own. The total is monochrome, like every primary element.
+ * free, amber for maintenance (as on the workshop home), red (danger) for
+ * out of service (wave 20), and two light chart hues for standby and
+ * unclassified, which carry no status meaning of their own. The total is
+ * monochrome, like every primary element.
  */
 const TOTAL_CARD: FleetCard = {
   id: 'total',
@@ -96,13 +98,20 @@ const WORKSHOP_CARDS: FleetCard[] = [
     accent: 'chart-6',
     icon: <ParkingCircle size={ICON_SIZE} />,
   },
+  // wave 20 (migration 0125): the third purpose, in the danger tone.
+  {
+    id: 'workshop_out_of_service',
+    label: 'adminHomeOutOfService',
+    value: (data) => data.workshopOutOfService,
+    accent: 'danger',
+    icon: <Ban size={ICON_SIZE} />,
+  },
   {
     id: 'workshop_unclassified',
     label: 'adminHomeUnclassified',
     value: (data) => data.workshopUnclassified,
     accent: 'chart-5',
     icon: <ClipboardList size={ICON_SIZE} />,
-    cellClassName: 'col-span-2 lg:col-span-1',
   },
 ]
 
@@ -230,7 +239,7 @@ export function FleetStateSection({
             <h3 className="text-sm font-medium text-muted">
               {t('adminHomeWorkshopBreakdown')}
             </h3>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               {WORKSHOP_CARDS.map((card) =>
                 renderCard(card, cn('p-4', card.cellClassName)),
               )}

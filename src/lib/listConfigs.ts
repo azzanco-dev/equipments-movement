@@ -131,23 +131,46 @@ export const equipmentListConfig: DataListConfig = {
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
   filterFields: [
+    // wave 20 (migration 0125): the one equipment state, derived from the
+    // latest movement and served by the `equipment_state` computed field, so
+    // PostgREST filters it server-side like a column. It replaces the retired
+    // manual operational status.
     {
-      key: 'operational_status',
-      label: 'operationalStatus',
+      key: 'equipment_state',
+      label: 'equipmentState',
       type: 'select',
       operators: ['eq', 'neq', 'in', 'not_in'],
       options: [
         {
-          value: 'operational',
-          label: 'operational',
-          labelI18n: 'operational',
+          value: 'working',
+          label: 'تعمل',
+          labelI18n: 'equipmentStateWorking',
+        },
+        {
+          value: 'available',
+          label: 'متاحة',
+          labelI18n: 'equipmentStateAvailable',
         },
         {
           value: 'maintenance',
-          label: 'maintenance',
-          labelI18n: 'maintenance',
+          label: 'صيانة',
+          labelI18n: 'equipmentStateMaintenance',
         },
-        { value: 'stopped', label: 'stopped', labelI18n: 'stopped' },
+        {
+          value: 'parking',
+          label: 'وقوف',
+          labelI18n: 'equipmentStateParking',
+        },
+        {
+          value: 'out_of_service',
+          label: 'خارج الخدمة',
+          labelI18n: 'equipmentStateOutOfService',
+        },
+        {
+          value: 'unclassified',
+          label: 'غير مصنفة',
+          labelI18n: 'equipmentStateUnclassified',
+        },
       ],
     },
     {
@@ -183,9 +206,9 @@ export const equipmentListConfig: DataListConfig = {
         },
       ],
     },
-    // Replaces the `is_active` boolean filter: the lifecycle status is the
-    // field admins now read and set, and the allowlist is the same closed set
-    // as the database CHECK constraint from migration 0102.
+    // Replaces the `is_active` boolean filter: the asset status is the field
+    // admins now read and set, and the allowlist is the same closed set as the
+    // database CHECK constraint (active / sold since migration 0125).
     {
       key: 'status',
       label: 'equipmentStatus',
@@ -202,16 +225,6 @@ export const equipmentListConfig: DataListConfig = {
           label: 'مباعة',
           labelI18n: 'equipmentStatusSold',
         },
-        {
-          value: 'scrapped',
-          label: 'مشطوبة',
-          labelI18n: 'equipmentStatusScrapped',
-        },
-        {
-          value: 'rented_out',
-          label: 'مؤجرة للغير',
-          labelI18n: 'equipmentStatusRentedOut',
-        },
       ],
     },
   ],
@@ -219,7 +232,7 @@ export const equipmentListConfig: DataListConfig = {
     { key: 'code', label: 'equipmentCode' },
     { key: 'type', label: 'equipmentType' },
     { key: 'plate_number', label: 'plateNumber' },
-    { key: 'operational_status', label: 'operationalStatus' },
+    { key: 'equipment_state', label: 'equipmentState' },
     { key: 'status', label: 'equipmentStatus' },
     { key: 'ownership_status', label: 'ownershipStatus' },
     { key: 'created_at', label: 'createdAt' },
@@ -562,6 +575,11 @@ export const logsListConfig: DataListConfig = {
           labelI18n: 'maintenancePurpose',
         },
         { value: 'parking', label: 'وقوف', labelI18n: 'parkingPurpose' },
+        {
+          value: 'out_of_service',
+          label: 'خارج الخدمة',
+          labelI18n: 'workshopPurposeOutOfService',
+        },
       ],
     },
     // The site exit purpose (`exit_purpose`, migration 0118): only site exits

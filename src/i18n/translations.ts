@@ -891,6 +891,22 @@ export const translations = {
     importColumnRequired: '{column}: مطلوب',
     importColumnInvalid: '{column}: قيمة غير صالحة',
     // wave-18-validation — end
+    // wave-20-state — start
+    equipmentState: 'الحالة',
+    equipmentStateWorking: 'تعمل',
+    equipmentStateAvailable: 'متاحة',
+    equipmentStateMaintenance: 'صيانة',
+    equipmentStateParking: 'وقوف',
+    equipmentStateOutOfService: 'خارج الخدمة',
+    equipmentStateUnclassified: 'غير مصنفة',
+    equipmentStateNew: 'جديدة',
+    equipmentStateInWorkshop: 'في الورشة',
+    workshopPurposeOutOfService: 'خارج الخدمة',
+    adminHomeOutOfService: 'خارج الخدمة',
+    adminHomeStateOutOfService: 'ورشة خارج الخدمة',
+    operationalStatusColumnIgnored:
+      'عمود الحالة التشغيلية لم يعد مستخدما وتم تجاهله',
+    // wave-20-state — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -2395,6 +2411,22 @@ export const translations = {
     importColumnRequired: '{column}: required',
     importColumnInvalid: '{column}: invalid value',
     // wave-18-validation — end
+    // wave-20-state — start
+    equipmentState: 'State',
+    equipmentStateWorking: 'Working',
+    equipmentStateAvailable: 'Available',
+    equipmentStateMaintenance: 'Maintenance',
+    equipmentStateParking: 'Standby',
+    equipmentStateOutOfService: 'Out of service',
+    equipmentStateUnclassified: 'Not classified',
+    equipmentStateNew: 'New',
+    equipmentStateInWorkshop: 'In the workshop',
+    workshopPurposeOutOfService: 'Out of service',
+    adminHomeOutOfService: 'Out of service',
+    adminHomeStateOutOfService: 'Workshop, out of service',
+    operationalStatusColumnIgnored:
+      'The operational status column is no longer used and was ignored',
+    // wave-20-state — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',

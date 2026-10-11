@@ -12,17 +12,13 @@ import {
   Truck,
   Wrench,
 } from 'lucide-react'
-import type {
-  Equipment,
-  MovementType,
-  OperationalStatus,
-  OwnershipStatus,
-} from '@/lib/types'
+import type { Equipment, MovementType, OwnershipStatus } from '@/lib/types'
 import {
   isOwnedEquipment,
   usesExternalSupplier,
 } from '@/lib/equipmentOwnership'
-import { equipmentStatusBadge, isUnderMaintenance } from '@/lib/equipmentForm'
+import { equipmentStatusBadge } from '@/lib/equipmentForm'
+import { EquipmentStateBadge } from '@/components/equipment/EquipmentStateBadge'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import { Alert } from '@/components/Alert'
@@ -68,8 +64,7 @@ interface EquipmentDetailProps {
  *  all" away, so the section never grows with the equipment's age. */
 const RECENT_MOVEMENTS_LIMIT = 10
 
-// Only what the recent-movements table and the derived "under maintenance"
-// badge read. The recorder's name is resolved separately through
+// Only what the recent-movements table reads. The recorder's name is resolved separately through
 // `profile_names` (see `fetchProfileNames`).
 // `exit_purpose` is a column of `entry_exit_logs` since migration 0111.
 // wave 19: the driver embed carries the record's CURRENT name, shown instead
@@ -81,7 +76,7 @@ interface RecentMovementRow {
   id: string
   movement_type: MovementType
   movement_context: 'site' | 'workshop' | null
-  workshop_purpose: 'maintenance' | 'parking' | null
+  workshop_purpose: 'maintenance' | 'parking' | 'out_of_service' | null
   /** A site exit's purpose (migration 0111); `null` for every other row. */
   exit_purpose: string | null
   supervisor_id: string | null
@@ -117,8 +112,10 @@ export function EquipmentDetail({
     const [equipmentResult, logsResult, codeChangesResult] = await Promise.all([
       supabase
         .from('equipment')
+        // wave 20: `equipment_state` / `equipment_is_new` are computed
+        // fields (migration 0125); `*` does not include them.
         .select(
-          '*, project:projects(id,name_ar,name_en), lessor:lessors(id,name)',
+          '*, equipment_state, equipment_is_new, project:projects(id,name_ar,name_en), lessor:lessors(id,name)',
         )
         .eq('id', equipmentId)
         .abortSignal(signal)
@@ -170,12 +167,6 @@ export function EquipmentDetail({
     fetchData()
   }, [fetchData])
 
-  const statusLabel = (s: OperationalStatus) =>
-    s === 'operational'
-      ? t('operational')
-      : s === 'maintenance'
-        ? t('maintenance')
-        : t('stopped')
   const ownLabel = (s: OwnershipStatus) =>
     s === 'alazani'
       ? t('ownershipAlazani')
@@ -228,11 +219,7 @@ export function EquipmentDetail({
     },
   ]
 
-  // `logs` is the latest movements ordered (recorded_at DESC, id DESC), so the
-  // first row is the latest movement across both contexts — the same ordering
-  // every state derivation in the database uses.
   const statusBadge = equipmentStatusBadge(equipment?.status)
-  const underMaintenance = isUnderMaintenance(logs[0])
 
   // Skeleton only while there is nothing to show for this equipment yet. A
   // refetch of the equipment already on screen (retry, language switch) keeps
@@ -305,10 +292,17 @@ export function EquipmentDetail({
       value: regLabel(equipment.registration_type),
     },
     {
-      key: 'operationalStatus',
+      // wave 20 (migration 0125): the one state, derived in the database from
+      // the latest movement; it replaces the retired operational status.
+      key: 'equipmentState',
       icon: <Wrench size={16} />,
-      label: t('operationalStatus'),
-      value: statusLabel(equipment.operational_status),
+      label: t('equipmentState'),
+      value: (
+        <EquipmentStateBadge
+          state={equipment.equipment_state}
+          isNew={equipment.equipment_is_new}
+        />
+      ),
     },
   ]
 
@@ -394,11 +388,6 @@ export function EquipmentDetail({
           badges={
             <>
               <Badge tone={statusBadge.tone}>{t(statusBadge.key)}</Badge>
-              {/* Derived, never stored: the latest movement is an open
-                  workshop entry classified as maintenance. */}
-              {underMaintenance && (
-                <Badge tone="warning">{t('underMaintenance')}</Badge>
-              )}
               <Badge tone="neutral">
                 {ownLabel(equipment.ownership_status)}
               </Badge>

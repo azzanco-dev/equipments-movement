@@ -68,8 +68,9 @@ const ARABIC_SNAPSHOT = {
   equipment: {
     search: 'البحث بالكود او اللوحة او الشاصي او النوع',
     // The `is_active` boolean filter («نشطة») was replaced by the lifecycle
-    // status filter in wave 6 batch 3.
-    filters: ['الحالة التشغيلية', 'المالك', 'حالة المعدة'],
+    // status filter in wave 6 batch 3; wave 20 replaced the retired
+    // operational status with the derived state («الحالة»).
+    filters: ['الحالة', 'المالك', 'حالة المعدة'],
   },
   companies: {
     search: 'البحث باسم الشركة',

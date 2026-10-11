@@ -3,6 +3,7 @@ import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import type { EntryExitLog } from '@/lib/types'
 import { displayDriverName, embeddedFullName } from '@/lib/driverDisplayName'
+import { workshopPurposeLabelKey } from '@/lib/equipmentState'
 import { MapPin } from 'lucide-react'
 
 function MovementLogField({
@@ -133,9 +134,10 @@ export function MovementLogCard({
         log.workshop_purpose && (
           <p className="mt-2 text-[10px] text-muted">
             {t('workshopPurpose')}:{' '}
-            {log.workshop_purpose === 'maintenance'
-              ? t('maintenancePurpose')
-              : t('parkingPurpose')}
+            {t(
+              workshopPurposeLabelKey(log.workshop_purpose) ??
+                'pendingClassification',
+            )}
           </p>
         )}
     </button>
