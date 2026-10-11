@@ -16,6 +16,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { TranslationKey } from '@/i18n/translations'
 import { unwrapRows } from '@/lib/supabaseResult'
+import { changeNewDriverName } from '@/lib/driverDisplayName'
 
 type Translate = (key: TranslationKey) => string
 
@@ -155,6 +156,27 @@ export function driverMobilesById(
   return into
 }
 
+/** One `drivers` row as the name lookup selects it. */
+export interface DriverNameRow {
+  id: string
+  full_name: string | null
+}
+
+/**
+ * Maps driver id to the record's CURRENT full name (wave 19); a driver without
+ * a name is absent, so the caller falls back to the stored snapshot.
+ */
+export function driverNamesById(
+  rows: readonly DriverNameRow[],
+  into: Map<string, string> = new Map(),
+): Map<string, string> {
+  for (const row of rows) {
+    const name = row.full_name?.trim()
+    if (row.id && name) into.set(row.id, name)
+  }
+  return into
+}
+
 /** One `profile_names` row as the name lookup selects it. */
 export interface ProfileNameRow {
   id: string
@@ -181,6 +203,12 @@ export interface DriverChangeRow {
   entry_log_id: string
   new_driver_id: string | null
   new_driver_name: string | null
+  /**
+   * The CURRENT `drivers.full_name` of `new_driver_id` (wave 19), set by
+   * `withChangeDriverNames`; absent when the record has no name or was not
+   * looked up, and the snapshot `new_driver_name` is shown instead.
+   */
+  new_driver_full_name?: string | null
   changed_at: string
 }
 
@@ -206,6 +234,39 @@ export function latestDriverChanges(
       latest.set(change.entry_log_id, change)
   }
   return latest
+}
+
+/**
+ * Changes with the CURRENT name of their new driver's record (wave 19). The
+ * stored snapshot is kept; the screens read `changeNewDriverName(change)`,
+ * which prefers `new_driver_full_name`. The input is not mutated.
+ */
+export function withChangeDriverNames<T extends DriverChangeRow>(
+  changes: readonly T[],
+  nameByDriver: ReadonlyMap<string, string>,
+): T[] {
+  return changes.map((change) => {
+    const name = change.new_driver_id
+      ? nameByDriver.get(change.new_driver_id)
+      : undefined
+    return name ? { ...change, new_driver_full_name: name } : change
+  })
+}
+
+/**
+ * Each entry's CURRENT driver name after its latest change (by `(changed_at,
+ * id)`): the new driver's record name, else the change's snapshot. Entries
+ * without a change are absent.
+ */
+export function latestChangeDriverNames(
+  changes: readonly DriverChangeRow[],
+): Map<string, string> {
+  const names = new Map<string, string>()
+  latestDriverChanges(changes).forEach((change, entryId) => {
+    const name = changeNewDriverName(change)
+    if (name) names.set(entryId, name)
+  })
+  return names
 }
 
 // ============ LOADERS ============
@@ -268,6 +329,26 @@ export async function loadDriverMobiles(
 }
 
 /**
+ * The CURRENT names of a set of driver records (wave 19), keyed by id. Throws
+ * on a failed query like every other lookup here.
+ */
+export async function loadDriverNames(
+  client: SupabaseClient,
+  driverIds: readonly (string | null | undefined)[],
+  signal?: AbortSignal,
+): Promise<Map<string, string>> {
+  const nameByDriver = new Map<string, string>()
+  await lookupInChunks(driverIds, async (ids) => {
+    const query = client.from('drivers').select('id,full_name').in('id', ids)
+    const rows = unwrapRows(
+      await (signal ? query.abortSignal(signal) : query),
+    ) as unknown as DriverNameRow[]
+    driverNamesById(rows, nameByDriver)
+  })
+  return nameByDriver
+}
+
+/**
  * The names of the profiles in a file, through `profile_names` (migration
  * 0099: id, full_name and role only, readable by every signed-in user).
  */
@@ -288,6 +369,10 @@ export async function loadProfileNames(
 /**
  * The driver changes of a set of entries. Only site entries can have one
  * (workshop rows carry no driver), so the caller passes those ids alone.
+ *
+ * wave 19: each change also carries its new driver's CURRENT record name
+ * (`new_driver_full_name`, one `drivers` lookup per chunk of new driver ids),
+ * so every list and export shows the corrected name instead of the snapshot.
  */
 export async function loadDriverChanges(
   client: SupabaseClient,
@@ -303,5 +388,11 @@ export async function loadDriverChanges(
     const rows = unwrapRows(await (signal ? query.abortSignal(signal) : query))
     changes.push(...(rows as unknown as DriverChangeRow[]))
   })
-  return changes
+  if (changes.length === 0) return changes
+  const nameByDriver = await loadDriverNames(
+    client,
+    changes.map((change) => change.new_driver_id),
+    signal,
+  )
+  return withChangeDriverNames(changes, nameByDriver)
 }

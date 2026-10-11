@@ -14,8 +14,13 @@ import type {
  */
 export const MOVEMENT_LOG_SEARCH_VIEW = 'movement_log_search'
 
+/**
+ * `driver_full_name` is the current name of the row's driver record, appended
+ * to the view by migration 0124 (wave 19), which must be applied before this
+ * select is shipped.
+ */
 const LOG_FIELDS =
-  'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,recorded_at,created_at'
+  'id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,driver_full_name,recorded_at,created_at'
 
 /** Admin movement log and movement reports tabs (also feeds the Excel export). */
 export const MOVEMENT_LOG_ADMIN_SELECT = `${LOG_FIELDS},odometer_reading,notes,contractor_equipment_code,company_id,project_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,company_name_ar,company_name_en,project_name_ar,project_name_en,supervisor_name,driver_mobile_number`
@@ -43,6 +48,8 @@ export interface MovementLogSearchRow {
   registration_method?: RegistrationMethod
   driver_id?: string | null
   driver_name: string | null
+  /** The CURRENT name of the row's driver record (migration 0124). */
+  driver_full_name?: string | null
   odometer_reading?: number | null
   notes?: string | null
   photo_url?: string | null
@@ -83,6 +90,7 @@ export function mapMovementLogRow(row: MovementLogSearchRow): EntryExitLog {
     registration_method: row.registration_method,
     driver_id: row.driver_id ?? null,
     driver_name: row.driver_name ?? null,
+    driver_full_name: row.driver_full_name ?? null,
     odometer_reading: row.odometer_reading ?? null,
     notes: row.notes ?? null,
     photo_url: row.photo_url ?? null,

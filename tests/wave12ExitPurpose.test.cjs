@@ -370,7 +370,8 @@ test('the /logs list and the inquiry timeline select the purpose', () => {
     path.join(ROOT, 'src', 'screens', 'inquiry', 'EquipmentInquiryScreen.tsx'),
     'utf8',
   )
-  assert.match(inquiry, /driver_name,exit_purpose'/)
+  // wave 19 (0124) appends driver_full_name after the purpose.
+  assert.match(inquiry, /driver_name,exit_purpose(,driver_full_name)?'/)
   assert.match(inquiry, /exit_purpose: row\.exit_purpose \?\? null/)
 })
 

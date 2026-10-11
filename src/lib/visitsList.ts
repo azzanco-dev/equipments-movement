@@ -29,6 +29,7 @@ import {
   type EquipmentExportRow,
   type ExportLookups,
 } from '@/lib/exportFields'
+import { changeNewDriverName, displayDriverName } from '@/lib/driverDisplayName'
 
 /**
  * `movement_visits` (migration 0096) is a `security_invoker` view with one
@@ -48,10 +49,11 @@ export const EQUIPMENT_VISITS_VIEW = 'movement_visits'
  *
  * `contractor_equipment_code` was appended to the view by migration 0106, so
  * that migration must be applied before this select is shipped. The same
- * holds for `exit_purpose`, appended by migration 0118.
+ * holds for `exit_purpose`, appended by migration 0118, and for
+ * `driver_full_name`, appended by migration 0124 (wave 19).
  */
 export const EQUIPMENT_VISITS_SELECT =
-  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code,equipment_ownership_status,exit_purpose'
+  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code,equipment_ownership_status,exit_purpose,driver_full_name'
 
 export interface EquipmentVisitRow {
   entry_id: string
@@ -86,6 +88,12 @@ export interface EquipmentVisitRow {
    * for an open visit, a workshop visit and an exit recorded before 0111.
    */
   exit_purpose?: ExitPurpose | null
+  /**
+   * The CURRENT name of the entry driver's record (migration 0124), shown
+   * instead of the `driver_name` snapshot; `null` for a legacy name-only
+   * visit. After `withCurrentDrivers` it is the changed driver's record name.
+   */
+  driver_full_name?: string | null
 }
 
 /** Which visits a table lists; `all` applies no context predicate. */
@@ -444,20 +452,40 @@ export function distinctEquipmentIds(
  * visit has no change. The entry row itself is never edited (the original
  * entry driver is immutable), so a driver added to a driverless visit exists
  * only as a change; without this the visit would keep showing no driver.
+ *
+ * wave 19: the changed driver is shown by its record's CURRENT name
+ * (`new_driver_full_name`, resolved by `loadDriverChanges`), so
+ * `driver_full_name` moves to that driver too; it is `null` when the record
+ * name is unknown, so the change's snapshot shows rather than the entry
+ * driver's name. Read the cell through `visitDriverName`.
  */
 export function withCurrentDrivers<
-  T extends Pick<EquipmentVisitRow, 'entry_id' | 'driver_id' | 'driver_name'>,
+  T extends Pick<
+    EquipmentVisitRow,
+    'entry_id' | 'driver_id' | 'driver_name' | 'driver_full_name'
+  >,
 >(visits: readonly T[], changes: readonly DriverChangeRow[]): T[] {
   const latest = latestDriverChanges(changes)
   return visits.map((visit) => {
     const change = latest.get(visit.entry_id)
-    if (!change?.new_driver_name) return visit
+    if (!changeNewDriverName(change)) return visit
     return {
       ...visit,
-      driver_id: change.new_driver_id,
-      driver_name: change.new_driver_name,
+      driver_id: change!.new_driver_id,
+      driver_name: change!.new_driver_name,
+      driver_full_name: change!.new_driver_full_name?.trim() || null,
     }
   })
+}
+
+/**
+ * The driver a visit shows: its current driver's record name, else the
+ * stored snapshot (legacy name-only visits); empty when it has none.
+ */
+export function visitDriverName(
+  visit: Pick<EquipmentVisitRow, 'driver_name' | 'driver_full_name'>,
+): string {
+  return displayDriverName(visit)
 }
 
 /** The distinct, non-empty driver ids of a set of visits, in first-seen order. */
@@ -637,7 +665,8 @@ export function visitExportColumns(
       group: driver,
       header: t('driverName'),
       width: 22,
-      value: (row) => row.driver_name ?? '',
+      // wave 19: the record's current name, else the snapshot.
+      value: (row) => visitDriverName(row),
     },
     {
       key: 'driver_mobile',

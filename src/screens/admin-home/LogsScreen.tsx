@@ -56,6 +56,7 @@ import {
 import { sanitizeSearchTerm } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { VisitsTable } from '@/components/visits/VisitsTable'
+import { displayDriverName } from '@/lib/driverDisplayName'
 
 /** Which movements the tab shows; `all` applies no context predicate. */
 type LogsTab = 'site' | 'workshop' | 'all'
@@ -537,7 +538,9 @@ export function LogsScreen({ onSelectMovement }: LogsScreenProps) {
       key: 'driver_name',
       header: t('driverName'),
       hideBelow: 'lg',
-      cell: (row) => row.driver_name || '—',
+      // wave 19: the driver record's current name (migration 0124), else
+      // the stored snapshot for a legacy name-only row.
+      cell: (row) => displayDriverName(row) || '—',
     },
     {
       key: 'supervisor_name',

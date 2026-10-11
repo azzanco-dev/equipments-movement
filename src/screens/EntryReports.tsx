@@ -25,6 +25,7 @@ import {
   type ReportPeriod,
 } from '@/lib/saudiTime'
 import type { EntryExitLog } from '@/lib/types'
+import { loadDriverNames } from '@/lib/exportFields'
 import type { TranslationKey } from '@/i18n/translations'
 
 type Period = ReportPeriod | 'custom'
@@ -104,8 +105,38 @@ export function EntryReports({
         if (cancelled) return
         if (error) console.error('entry report load failed', error)
         setLoadError(!!error)
-        setData(error ? null : ((result ?? null) as ReportData))
+        const report = error ? null : ((result ?? null) as ReportData)
+        setData(report)
         setLoading(false)
+        // wave 19: the latest entries show their driver record's CURRENT
+        // name. The summary returns `driver_id` with the snapshot, so the
+        // names are looked up once for the (few) rows shown; on failure the
+        // snapshots stay. The open visits carry no driver id and keep theirs.
+        const latest = report?.latest ?? []
+        if (!latest.some((log) => log.driver_id)) return
+        loadDriverNames(
+          supabase,
+          latest.map((log) => log.driver_id),
+        )
+          .then((nameByDriver) => {
+            if (cancelled) return
+            setData((current) =>
+              current === report && current
+                ? {
+                    ...current,
+                    latest: current.latest.map((log) => ({
+                      ...log,
+                      driver_full_name: log.driver_id
+                        ? (nameByDriver.get(log.driver_id) ?? null)
+                        : null,
+                    })),
+                  }
+                : current,
+            )
+          })
+          .catch(() => {
+            // Secondary lookup: the stored snapshots stay.
+          })
       })
     return () => {
       cancelled = true

@@ -41,31 +41,30 @@ import { useCompanyProjectFilters } from '@/components/data-list/relationFilters
 import { PAGE_SIZE_OPTIONS } from '@/components/data-list/types'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { homeMovementsListConfig } from '@/lib/listConfigs'
+import { latestChangeDriverNames, loadDriverChanges } from '@/lib/exportFields'
+import { displayDriverName } from '@/lib/driverDisplayName'
 
 /** The foreman log's allowlisted filter keys: company and project only. */
 const HOME_LOG_FILTER_KEYS = new Set(
   homeMovementsListConfig.filterFields.map((field) => field.key),
 )
 
-/** Latest driver per open site entry, after any auditable driver changes. */
+/**
+ * Latest driver per site entry, after any auditable driver changes, by
+ * `(changed_at, id)`. wave 19: the changed driver is named by its record's
+ * CURRENT name (`loadDriverChanges` resolves it), else the change's snapshot.
+ */
 async function loadLatestDriverNames(entryIds: string[], signal: AbortSignal) {
   if (!entryIds.length) return new Map<string, string>()
-  const { data, error } = await supabase
-    .from('movement_driver_changes')
-    .select('entry_log_id,new_driver_name,changed_at,id')
-    .in('entry_log_id', entryIds)
-    .order('changed_at', { ascending: false })
-    .order('id', { ascending: false })
-    .abortSignal(signal)
-  const latest = new Map<string, string>()
-  // The driver changes are a secondary lookup: on failure the rows keep
-  // their entry driver snapshot instead of failing the whole log.
-  if (error) return latest
-  for (const change of data ?? []) {
-    if (!latest.has(change.entry_log_id))
-      latest.set(change.entry_log_id, change.new_driver_name)
+  try {
+    return latestChangeDriverNames(
+      await loadDriverChanges(supabase, entryIds, signal),
+    )
+  } catch {
+    // The driver changes are a secondary lookup: on failure the rows keep
+    // their entry driver instead of failing the whole log.
+    return new Map<string, string>()
   }
-  return latest
 }
 
 export interface HomeMovementsCardProps {
@@ -186,10 +185,12 @@ function MovementLogTab({
     setLogs(
       rows.map((row) => ({
         ...row,
+        // Only a driver change sets it; otherwise the row's driver record
+        // (`driver_full_name`, migration 0124) or its snapshot is shown.
         current_driver_name:
           row.movement_type === 'entry'
-            ? (latestDrivers.get(row.id) ?? row.driver_name)
-            : row.driver_name,
+            ? (latestDrivers.get(row.id) ?? null)
+            : null,
       })),
     )
     setLoading(false)
@@ -319,7 +320,7 @@ function MovementLogTab({
         key: 'driver_name',
         header: t('driverName'),
         hideBelow: 'md',
-        cell: (log) => log.current_driver_name ?? log.driver_name ?? '—',
+        cell: (log) => displayDriverName(log) || '—',
       },
       recorded,
       created,

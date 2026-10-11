@@ -584,10 +584,13 @@ test('a visit shows its latest driver change, else the entry driver', () => {
     change({ id: 'c3', new_driver_id: 'd7', new_driver_name: 'Last' }),
     change({ id: 'c2', new_driver_id: 'd8', new_driver_name: 'Middle' }),
   ])
+  // wave 19: the changed driver's record name is unknown here, so
+  // driver_full_name is cleared and the change's snapshot shows.
   assert.deepEqual(plain(out[0]), {
     entry_id: 'e1',
     driver_id: 'd7',
     driver_name: 'Last',
+    driver_full_name: null,
   })
   // No change: the entry driver stays, and the input row is not mutated.
   assert.deepEqual(plain(out[1]), plain(rows[1]))

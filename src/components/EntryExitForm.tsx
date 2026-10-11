@@ -59,6 +59,8 @@ import {
   isExitPurpose,
   type ExitPurpose,
 } from '@/lib/exitPurpose'
+import { loadDriverNames } from '@/lib/exportFields'
+import { preferRecordName } from '@/lib/driverDisplayName'
 import {
   QUICK_DRIVER_FIELD_ORDER,
   quickDriverSaveFieldErrors,
@@ -396,6 +398,23 @@ export function EntryExitForm({
       const last = (data as LastMovement[])[0] ?? null
       setLastMovement(last)
       setLastMovementFor(eq.id)
+      // wave 19: the summary names the current driver by his record's
+      // CURRENT name; `get_last_movement` returns the snapshot with the id.
+      // Secondary and non-blocking: on failure the snapshot stays.
+      const lastDriverId = last?.driver_id
+      if (lastDriverId) {
+        loadDriverNames(supabase, [lastDriverId])
+          .then((nameByDriver) => {
+            const name = nameByDriver.get(lastDriverId)
+            if (!name) return
+            setLastMovement((current) =>
+              current === last ? { ...last, driver_full_name: name } : current,
+            )
+          })
+          .catch(() => {
+            // The stored snapshot stays.
+          })
+      }
       // An EXIT carries no driver field: the database inherits the latest
       // current driver of the open visit when the exit row is written.
 
@@ -864,7 +883,10 @@ export function EntryExitForm({
                 <LastEntrySummary
                   loading={loadingMovement}
                   recordedAt={lastMovement?.recorded_at}
-                  driverName={lastMovement?.driver_name}
+                  driverName={preferRecordName(
+                    lastMovement?.driver_full_name,
+                    lastMovement?.driver_name,
+                  )}
                   driverMobile={lastMovement?.driver_mobile_number}
                   contractorCode={lastMovement?.contractor_equipment_code}
                   companyName={optionalLocalizedName(

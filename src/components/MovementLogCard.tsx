@@ -2,6 +2,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import type { EntryExitLog } from '@/lib/types'
+import { displayDriverName, embeddedFullName } from '@/lib/driverDisplayName'
 import { MapPin } from 'lucide-react'
 
 function MovementLogField({
@@ -111,7 +112,16 @@ export function MovementLogCard({
         />
         <MovementLogField
           label={t('driverName')}
-          value={log.current_driver_name ?? log.driver_name}
+          // wave 19: a later driver change, else the driver record as it
+          // reads today, else the stored snapshot (legacy name-only rows).
+          value={
+            displayDriverName({
+              current_driver_name: log.current_driver_name,
+              driver_full_name:
+                log.driver_full_name ?? embeddedFullName(log.driver),
+              driver_name: log.driver_name,
+            }) || null
+          }
         />
         <MovementLogField
           label={t('movementDate')}

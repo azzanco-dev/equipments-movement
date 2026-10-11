@@ -59,13 +59,16 @@ function dateKeyParam(value: string | null): string | null {
  * rows. With no owner selected the embed stays the plain left join it has
  * always been, so the unfiltered report is byte-for-byte the previous query.
  *
+ * The driver embed carries `full_name` (wave 19) so the card shows the driver
+ * record's current name instead of the `driver_name` snapshot.
+ *
  * The recorder's name is not embedded: `profiles` is hidden from other users
  * by RLS, so it is read afterwards from the name-only `profile_names` view
  * (migration 0099) for the ids on the page.
  */
 function buildSelect(ownerFiltered: boolean) {
   const equipment = `equipment:equipment${ownerFiltered ? '!inner' : ''}(id,code,type,plate_number,chassis_number)`
-  return `id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,contractor_equipment_code,registration_method,odometer_reading,notes,photo_url,company_id,project_id,recorded_at,created_at,${equipment},company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),driver:drivers(id,mobile_number)`
+  return `id,equipment_id,supervisor_id,movement_type,movement_context,driver_id,driver_name,contractor_equipment_code,registration_method,odometer_reading,notes,photo_url,company_id,project_id,recorded_at,created_at,${equipment},company:companies(id,name_ar,name_en),project:projects(id,name_ar,name_en),driver:drivers(id,mobile_number,full_name)`
 }
 
 export function EntryReportsAll({

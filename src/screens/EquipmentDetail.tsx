@@ -49,6 +49,7 @@ import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
 import { PreviousCodesLine } from '@/components/inquiry/PreviousCodes'
 import { MovementTypeBadge } from '@/components/movement/ExitPurposeBadge'
 import { EquipmentLocationCard } from '@/components/afaqy/EquipmentLocationCard'
+import { embeddedFullName, preferRecordName } from '@/lib/driverDisplayName'
 import {
   EQUIPMENT_CODE_CHANGES_LIMIT,
   EQUIPMENT_CODE_CHANGE_SELECT,
@@ -71,8 +72,10 @@ const RECENT_MOVEMENTS_LIMIT = 10
 // badge read. The recorder's name is resolved separately through
 // `profile_names` (see `fetchProfileNames`).
 // `exit_purpose` is a column of `entry_exit_logs` since migration 0111.
+// wave 19: the driver embed carries the record's CURRENT name, shown instead
+// of the `driver_name` snapshot (which stays for legacy name-only rows).
 const RECENT_MOVEMENTS_SELECT =
-  'id,movement_type,movement_context,workshop_purpose,supervisor_id,driver_name,recorded_at,exit_purpose'
+  'id,movement_type,movement_context,workshop_purpose,supervisor_id,driver_name,recorded_at,exit_purpose,driver:drivers(full_name)'
 
 interface RecentMovementRow {
   id: string
@@ -83,6 +86,8 @@ interface RecentMovementRow {
   exit_purpose: string | null
   supervisor_id: string | null
   driver_name: string | null
+  /** The driver record (PostgREST to-one embed); `null` for a legacy row. */
+  driver?: { full_name: string | null } | { full_name: string | null }[] | null
   recorded_at: string
   supervisor: ProfileName | null
 }
@@ -213,7 +218,8 @@ export function EquipmentDetail({
     {
       key: 'driver',
       header: t('driverName'),
-      cell: (log) => log.driver_name ?? '—',
+      cell: (log) =>
+        preferRecordName(embeddedFullName(log.driver), log.driver_name) ?? '—',
     },
     {
       key: 'recorded_at',

@@ -64,6 +64,7 @@ import {
   visitStateView,
   visitsListConfig,
   withCurrentDrivers,
+  visitDriverName,
   type EquipmentVisitRow,
   type VisitDriverChangeRow,
   type VisitsContext,
@@ -500,7 +501,8 @@ export function VisitsTable({
       key: 'driver_name',
       header: t('driverName'),
       hideBelow: 'lg',
-      cell: (visit) => visit.driver_name || '—',
+      // wave 19: the driver record's current name, else the snapshot.
+      cell: (visit) => visitDriverName(visit) || '—',
     }
     const foreman: DataTableColumn<EquipmentVisitRow> = {
       key: 'entry_supervisor_name',

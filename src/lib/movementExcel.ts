@@ -12,6 +12,7 @@ import {
   type DriverChangeRow,
   type ExportLookups,
 } from '@/lib/exportFields'
+import { changeNewDriverName, displayDriverName } from '@/lib/driverDisplayName'
 
 export type MovementImportMode = 'entry' | 'exit' | 'both'
 
@@ -218,6 +219,11 @@ export interface MovementExportRow {
   driver_id?: string | null
   /** The driver snapshot stored on the row. */
   driver_name?: string | null
+  /**
+   * The CURRENT name of the row's driver record (migration 0124), exported
+   * instead of the snapshot; `null` for a legacy name-only row.
+   */
+  driver_full_name?: string | null
   /** The mobile of `driver_id`, as the view joins it. */
   driver_mobile_number?: string | null
   /**
@@ -257,7 +263,10 @@ export function movementDriverChangeEntryIds(
  * Movements with the CURRENT driver of each site entry: the latest auditable
  * driver change, by `(changed_at, id)`, recorded during the visit it opened.
  * The row's own snapshot is never rewritten (the entry driver is immutable);
- * the export reads `current_driver_name ?? driver_name`.
+ * the export reads `displayDriverName(row)`: the change's driver, else the
+ * row's driver record as it reads today, else the snapshot (wave 19). The
+ * change's driver is itself its record's current name when it was resolved
+ * (`new_driver_full_name`, see `loadDriverChanges`).
  */
 export function withCurrentMovementDrivers<T extends MovementExportRow>(
   rows: readonly T[],
@@ -268,11 +277,12 @@ export function withCurrentMovementDrivers<T extends MovementExportRow>(
   return rows.map((row) => {
     if (row.movement_type !== 'entry' || !row.id) return row
     const change = latest.get(row.id)
-    if (!change?.new_driver_name) return row
+    const name = changeNewDriverName(change)
+    if (!name) return row
     return {
       ...row,
-      current_driver_id: change.new_driver_id,
-      current_driver_name: change.new_driver_name,
+      current_driver_id: change!.new_driver_id,
+      current_driver_name: name,
     }
   })
 }
@@ -442,12 +452,13 @@ export function movementExportColumns(
     },
     {
       // The current driver: the latest change of a site entry's visit, else
-      // the row's snapshot. A driverless legacy entry is a blank cell.
+      // the row's driver record as it reads today (wave 19), else the row's
+      // snapshot. A driverless legacy entry is a blank cell.
       key: 'driver_name',
       group: driver,
       header: t('driverName'),
       width: 22,
-      value: (row) => row.current_driver_name ?? row.driver_name ?? '',
+      value: (row) => displayDriverName(row),
     },
     {
       // The mobile of that same driver: the view's join for the row's own

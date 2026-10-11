@@ -54,6 +54,13 @@ import {
   type StagedPhotoLike,
 } from '@/lib/movementPhotoGallery'
 import { useListRequest } from '@/components/data-list/useListRequest'
+import { loadDriverNames } from '@/lib/exportFields'
+import {
+  changeNewDriverName,
+  changePreviousDriverName,
+  displayDriverName,
+  embeddedFullName,
+} from '@/lib/driverDisplayName'
 import {
   CONTRACTOR_CODE_MAX_LENGTH,
   contractorCodeErrorKey,
@@ -273,11 +280,35 @@ export function MovementDetail({
           setDriverChangesError(true)
           return
         }
+        // wave 19: every change shows its drivers' CURRENT record names. The
+        // lookup is secondary: on failure the stored snapshots are shown.
+        let changeRows =
+          (changes as unknown as MovementDriverChange[] | null) ?? []
+        try {
+          const nameByDriver = await loadDriverNames(
+            supabase,
+            changeRows.flatMap((change) => [
+              change.previous_driver_id,
+              change.new_driver_id,
+            ]),
+            signal,
+          )
+          changeRows = changeRows.map((change) => ({
+            ...change,
+            previous_driver_full_name: change.previous_driver_id
+              ? (nameByDriver.get(change.previous_driver_id) ?? null)
+              : null,
+            new_driver_full_name: change.new_driver_id
+              ? (nameByDriver.get(change.new_driver_id) ?? null)
+              : null,
+          }))
+        } catch {
+          // The snapshots stay; the history itself loaded.
+        }
+        if (signal.aborted) return
         setDriverChangesError(false)
-        setDriverChanges((changes as unknown as MovementDriverChange[]) ?? [])
-        const latestChange = (
-          changes as unknown as MovementDriverChange[] | null
-        )?.at(-1)
+        setDriverChanges(changeRows)
+        const latestChange = changeRows.at(-1)
         if (latestChange?.new_driver_id) {
           const { data: currentDriver } = await supabase
             .from('drivers')
@@ -376,7 +407,8 @@ export function MovementDetail({
             // Next EXIT: (recorded_at > entry) OR (recorded_at = entry AND id > entry.id)
             const { data: exitData, error: linkErr } = await supabase
               .from('entry_exit_logs')
-              .select('*')
+              // wave 19: the driver record's current name (embed).
+              .select('*, driver:drivers(id,full_name)')
               .eq('equipment_id', logData.equipment_id)
               .eq('movement_context', logData.movement_context ?? 'site')
               .eq('movement_type', 'exit')
@@ -400,7 +432,7 @@ export function MovementDetail({
             const { data: entryData, error: linkErr } = await supabase
               .from('entry_exit_logs')
               .select(
-                '*, company:companies(id,name_ar,name_en,created_at), project:projects(id,name_ar,name_en,created_at)',
+                '*, company:companies(id,name_ar,name_en,created_at), project:projects(id,name_ar,name_en,created_at), driver:drivers(id,full_name)',
               )
               .eq('equipment_id', logData.equipment_id)
               .eq('movement_context', logData.movement_context ?? 'site')
@@ -808,10 +840,16 @@ export function MovementDetail({
     driverEditMode === 'driver_change'
       ? (latestDriverChange?.new_driver_id ?? log.driver_id ?? null)
       : (log.driver_id ?? null)
+  // wave 19: the row's driver record as it reads today, else its snapshot.
+  const logDriverName =
+    displayDriverName({
+      driver_full_name: embeddedFullName(log.driver),
+      driver_name: log.driver_name,
+    }) || null
   const editDriverName =
     driverEditMode === 'driver_change'
-      ? (latestDriverChange?.new_driver_name ?? log.driver_name ?? null)
-      : (log.driver_name ?? null)
+      ? (changeNewDriverName(latestDriverChange) ?? logDriverName)
+      : logDriverName
 
   let durationMs = 0
 
@@ -830,10 +868,8 @@ export function MovementDetail({
   }
 
   const currentDriverName =
-    (isEntry ? driverChanges.at(-1)?.new_driver_name : undefined) ??
-    log.driver?.full_name ??
-    log.driver_name ??
-    null
+    (isEntry ? changeNewDriverName(driverChanges.at(-1)) : null) ??
+    logDriverName
 
   const exitPurposeKey = exitPurposeLabelKey(log.exit_purpose)
 
@@ -1152,8 +1188,15 @@ export function MovementDetail({
                 {driverChangesError ? (
                   <span className="font-normal text-muted">—</span>
                 ) : (
-                  (driverChanges.at(-1)?.new_driver_name ??
-                  (isEntry ? log.driver_name : linkedLog?.driver_name) ?? (
+                  (changeNewDriverName(driverChanges.at(-1)) ??
+                  (isEntry
+                    ? logDriverName
+                    : linkedLog
+                      ? displayDriverName({
+                          driver_full_name: embeddedFullName(linkedLog.driver),
+                          driver_name: linkedLog.driver_name,
+                        }) || null
+                      : null) ?? (
                     <span className="font-normal text-muted">—</span>
                   ))
                 )}
@@ -1272,8 +1315,8 @@ export function MovementDetail({
                         {t('previousDriver')}
                       </p>
                       <p className="break-words font-medium">
-                        {change.previous_driver_name ? (
-                          <bdi>{change.previous_driver_name}</bdi>
+                        {changePreviousDriverName(change) ? (
+                          <bdi>{changePreviousDriverName(change)}</bdi>
                         ) : (
                           <span className="font-normal text-muted">—</span>
                         )}
@@ -1282,7 +1325,7 @@ export function MovementDetail({
                     <div className="min-w-0">
                       <p className="text-xs text-muted">{t('newDriver')}</p>
                       <p className="break-words font-medium">
-                        <bdi>{change.new_driver_name}</bdi>
+                        <bdi>{changeNewDriverName(change)}</bdi>
                       </p>
                     </div>
                   </div>

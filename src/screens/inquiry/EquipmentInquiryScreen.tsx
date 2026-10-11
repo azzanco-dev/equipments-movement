@@ -42,6 +42,7 @@ import {
 } from '@/lib/equipmentCodeHistory'
 import { PreviousCodesLine } from '@/components/inquiry/PreviousCodes'
 import { EquipmentLocationCard } from '@/components/afaqy/EquipmentLocationCard'
+import { preferRecordName } from '@/lib/driverDisplayName'
 
 /**
  * `/inquiry`: one search field finds an equipment by code/plate/chassis/type,
@@ -76,6 +77,8 @@ interface MovementLogTimelineRow {
   project_name_en: string | null
   supervisor_name: string | null
   driver_name: string | null
+  /** The driver record's current name (appended by migration 0124). */
+  driver_full_name?: string | null
   /** A site exit's purpose (appended to the view by migration 0118). */
   exit_purpose?: string | null
 }
@@ -336,7 +339,7 @@ export function EquipmentInquiryScreen({
       const { data, error } = await supabase
         .from('movement_log_search')
         .select(
-          'id,movement_type,movement_context,workshop_purpose,recorded_at,company_name_ar,company_name_en,project_name_ar,project_name_en,supervisor_name,driver_name,exit_purpose',
+          'id,movement_type,movement_context,workshop_purpose,recorded_at,company_name_ar,company_name_en,project_name_ar,project_name_en,supervisor_name,driver_name,exit_purpose,driver_full_name',
         )
         .eq('equipment_id', id)
         .order('recorded_at', { ascending: false })
@@ -443,7 +446,8 @@ export function EquipmentInquiryScreen({
         workshop_purpose: row.workshop_purpose,
         exit_purpose: row.exit_purpose ?? null,
         supervisor_name: row.supervisor_name,
-        driver_name: row.driver_name,
+        // wave 19: the driver record's current name, else the snapshot.
+        driver_name: preferRecordName(row.driver_full_name, row.driver_name),
       })),
     [movements, lang],
   )

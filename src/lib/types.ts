@@ -123,9 +123,18 @@ export interface EntryExitLog {
   workshop_purpose?: 'maintenance' | 'parking' | null
   /** wave-10-exit-purpose (migration 0111): site exits only; NULL on legacy rows. */
   exit_purpose?: 'maintenance' | 'work_completed' | null
+  /**
+   * The driver of the visit's latest driver change (resolved to that
+   * driver's record name); set only when such a change exists.
+   */
   current_driver_name?: string | null
   registration_method: RegistrationMethod
   driver_name: string | null
+  /**
+   * wave 19: the CURRENT name of the row's driver record (migration 0124 on
+   * the views, or resolved by the screen); shown instead of the snapshot.
+   */
+  driver_full_name?: string | null
   driver_id: string | null
   odometer_reading: number | null
   notes: string | null
@@ -205,6 +214,11 @@ export interface LastMovement {
   contractor_equipment_code: string | null
   driver_id: string | null
   driver_name: string | null
+  /**
+   * wave 19: the CURRENT name of `driver_id`'s record, looked up by the form
+   * after `get_last_movement`; shown instead of the `driver_name` snapshot.
+   */
+  driver_full_name?: string | null
   // Added by migration 0091. Optional so the form keeps working against an
   // older `get_last_movement`; the UI shows "—" while they are absent.
   driver_mobile_number?: string | null
@@ -217,8 +231,12 @@ export interface MovementDriverChange {
   entry_log_id: string
   previous_driver_id: string | null
   previous_driver_name: string | null
+  /** wave 19: the CURRENT name of `previous_driver_id`'s record, when resolved. */
+  previous_driver_full_name?: string | null
   new_driver_id: string
   new_driver_name: string
+  /** wave 19: the CURRENT name of `new_driver_id`'s record, when resolved. */
+  new_driver_full_name?: string | null
   changed_by: string
   changed_at: string
   note: string | null
