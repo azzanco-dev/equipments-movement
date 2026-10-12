@@ -923,7 +923,7 @@ test('after 0127 no live policy or function tests a role name, except by design'
       else policies.set(key, p.text)
     }
     for (const m of sql.matchAll(
-      /DROP TABLE(?: IF EXISTS)?s+((?:public.)?[a-z_]+)/gi,
+      /DROP TABLE(?: IF EXISTS)?\s+((?:public\.)?[a-z_]+)/gi,
     )) {
       const table = m[1].startsWith('public.') ? m[1] : 'public.' + m[1]
       for (const key of [...policies.keys()])
