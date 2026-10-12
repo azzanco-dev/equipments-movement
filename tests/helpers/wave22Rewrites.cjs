@@ -1099,21 +1099,6 @@ const POLICY_REWRITES = [
   },
   {
     ...adminPolicy(
-      'public.profile_projects',
-      'select_profile_projects',
-      'SELECT',
-      '0052',
-      'users.manage',
-    ),
-    using: `profile_id = auth.uid() OR ${hasKey('users.manage')}`,
-  },
-  ...crud('public.profile_projects', '0052', same('users.manage'), {
-    insert: 'insert_profile_projects',
-    update: 'update_profile_projects',
-    delete: 'delete_profile_projects',
-  }),
-  {
-    ...adminPolicy(
       'public.profile_companies',
       'select_profile_companies',
       'SELECT',

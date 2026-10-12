@@ -121,7 +121,7 @@
 --                                            legacy role is a workshop role)
 --     insert/update/delete_profiles,
 --     select_profile_contacts,
---     profile_projects (4), profile_companies (4),
+--     profile_companies (4),
 --     admin_set_user_mobile,
 --     admin_set_user_role                    users.manage (admin only).
 --                                            admin_set_user_role also
@@ -3749,45 +3749,6 @@ USING (
 );
 COMMENT ON POLICY select_profile_contacts ON public.profile_contacts IS
   '0127: was a role-name test (latest 0113); now permission key users.manage. Same result for every legacy role while the roles system is inactive.';
-
-DROP POLICY IF EXISTS select_profile_projects ON public.profile_projects;
-CREATE POLICY select_profile_projects ON public.profile_projects
-FOR SELECT TO authenticated
-USING (
-  profile_id = auth.uid() OR (SELECT public.has_permission('users.manage'))
-);
-COMMENT ON POLICY select_profile_projects ON public.profile_projects IS
-  '0127: was a role-name test (latest 0052); now permission key users.manage. Same result for every legacy role while the roles system is inactive.';
-
-DROP POLICY IF EXISTS insert_profile_projects ON public.profile_projects;
-CREATE POLICY insert_profile_projects ON public.profile_projects
-FOR INSERT TO authenticated
-WITH CHECK (
-  (SELECT public.has_permission('users.manage'))
-);
-COMMENT ON POLICY insert_profile_projects ON public.profile_projects IS
-  '0127: was a role-name test (latest 0052); now permission key users.manage. Same result for every legacy role while the roles system is inactive.';
-
-DROP POLICY IF EXISTS update_profile_projects ON public.profile_projects;
-CREATE POLICY update_profile_projects ON public.profile_projects
-FOR UPDATE TO authenticated
-USING (
-  (SELECT public.has_permission('users.manage'))
-)
-WITH CHECK (
-  (SELECT public.has_permission('users.manage'))
-);
-COMMENT ON POLICY update_profile_projects ON public.profile_projects IS
-  '0127: was a role-name test (latest 0052); now permission key users.manage. Same result for every legacy role while the roles system is inactive.';
-
-DROP POLICY IF EXISTS delete_profile_projects ON public.profile_projects;
-CREATE POLICY delete_profile_projects ON public.profile_projects
-FOR DELETE TO authenticated
-USING (
-  (SELECT public.has_permission('users.manage'))
-);
-COMMENT ON POLICY delete_profile_projects ON public.profile_projects IS
-  '0127: was a role-name test (latest 0052); now permission key users.manage. Same result for every legacy role while the roles system is inactive.';
 
 DROP POLICY IF EXISTS select_profile_companies ON public.profile_companies;
 CREATE POLICY select_profile_companies ON public.profile_companies
