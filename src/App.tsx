@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useMemo, type ReactNode } from 'react'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
@@ -28,9 +28,14 @@ import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog'
 import { RouteFallback } from '@/components/RouteFallback'
 import { MovementDetailSkeleton } from '@/components/movement/MovementDetailSkeleton'
 import {
+  navKeyOfPage,
+  planShell,
+  routePageOf,
   visibleNavItems,
   type NavChildKey,
   type NavItemKey,
+  type RoutePage,
+  type ShellKind,
 } from '@/lib/navPermissions'
 import type { TranslationKey } from '@/i18n/translations'
 
@@ -68,20 +73,14 @@ function MovementDetailFallback() {
  * Which home a signed-in user lands on, remembered from their last visit on
  * this device. It is only a hint for which public code chunk to warm up while
  * the profile is still loading; it never decides what is rendered — routing
- * below reads the role from the loaded profile and nothing else.
+ * below reads the shell from the loaded profile and permissions only.
  */
 const LANDING_HINT_KEY = 'em.landing-hint'
 type LandingHint = 'admin-home' | 'home'
 
-function landingHintForRole(role: string | undefined): LandingHint | null {
-  if (role === 'admin' || role === 'monitor') return 'admin-home'
-  if (
-    role === 'supervisor' ||
-    role === 'workshop' ||
-    role === 'assistant_workshop_manager' ||
-    role === 'workshop_manager'
-  )
-    return 'home'
+function landingHintForShell(kind: ShellKind): LandingHint | null {
+  if (kind === 'admin') return 'admin-home'
+  if (kind === 'foreman' || kind === 'workshop') return 'home'
   return null
 }
 
@@ -199,9 +198,8 @@ const AdminSettings = dynamic(
   { loading: screenLoading },
 )
 // wave 22B: Settings › «الادوار والصلاحيات». Rendered only in the admin
-// branch below (after the fail-closed `profile.role !== 'admin'` check); the
-// page also requires `settings.roles` itself. Routing everywhere still uses
-// `profiles.role`, not the new permissions.
+// shell, behind the `settings.roles` page gate (wave 23); the page itself
+// still also requires the legacy admin role (rolesPageAccess).
 const RolesSettings = dynamic(
   () =>
     import('@/components/roles/RolesSettings').then(
@@ -252,26 +250,6 @@ const WorkshopReports = dynamic(
   { loading: screenLoading },
 )
 
-const ADMIN_PAGES = new Set([
-  'dashboard',
-  'logs',
-  'inquiry',
-  'equipment',
-  'projects',
-  'companies',
-  'lessors',
-  'drivers',
-  'users',
-  'movement-import',
-  'activity',
-  'settings',
-  'reports',
-  'reports/entries',
-  'reports/entries/all',
-  'reports/equipment',
-  'reports/workshop',
-])
-
 // wave 23: the label and icon of each sidebar entry. WHICH entries show is
 // decided by the user's permissions in src/lib/navPermissions.ts.
 const NAV_PRESENTATION: Record<
@@ -299,38 +277,52 @@ const NAV_CHILD_LABELS: Record<NavChildKey, TranslationKey> = {
   'reports/workshop': 'workshopReports',
 }
 
-// The pages each role-based shell below can open; the menu never offers more.
-const MONITOR_NAV_PAGES: ReadonlySet<string> = new Set([
-  'dashboard',
-  'logs',
-  'inquiry',
-])
-const WORKER_NAV_PAGES: ReadonlySet<string> = new Set(['dashboard', 'inquiry'])
+/**
+ * wave 23 (routing by permissions, step 2): the account has a profile but its
+ * permissions open no page at all. Fail closed, with a way out.
+ */
+function NoPermissionsPage({ onSignOut }: { onSignOut: () => void }) {
+  const { t } = useI18n()
+  return (
+    <div className="flex min-h-[100dvh] items-center justify-center p-4">
+      <div className="card w-full max-w-md space-y-4 text-center">
+        <h1 className="text-lg font-semibold">{t('noPermissionsTitle')}</h1>
+        <p className="text-muted">{t('noPermissionsBody')}</p>
+        <button className="btn-primary mx-auto" onClick={onSignOut}>
+          {t('signOut')}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function AppContent() {
   const { profile, session, loading, profileLoadError, retryProfile, signOut } =
     useAuth()
   const { t } = useI18n()
-  // wave 23: the sidebar follows the permissions (re-rendered when the roles
-  // page calls reload()); the role is only the fallback while they load or
-  // after a failed load. Route guards below still decide by profiles.role.
+  // wave 23: the shell, its page guards and the sidebar follow the
+  // permissions (re-evaluated when the roles page calls reload()). The role
+  // is only the fallback while they load or after a failed load; see
+  // planShell in src/lib/navPermissions.ts.
   const permissionState = usePermissions()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const segments = pathname.split('/').filter(Boolean)
-  const movementId = segments[0] === 'movements' ? segments[1] : null
-  const isMovementCreate = segments[0] === 'movements' && segments[1] === 'new'
   const movementType = searchParams.get('type') === 'exit' ? 'exit' : 'entry'
-  const equipmentId = segments[0] === 'equipment' ? segments[1] : null
-  const driverId = segments[0] === 'drivers' ? segments[1] : null
-  const userId = segments[0] === 'users' ? segments[1] : null
-  const page =
-    segments[0] === 'reports'
-      ? 'reports'
-      : ADMIN_PAGES.has(segments[0] ?? '')
-        ? segments[0]
-        : 'dashboard'
+  // The id of a detail page (/movements/:id, /equipment/:id, ...).
+  const detailId = segments[1] ?? ''
+
+  const role = profile?.role
+  const { status: permissionStatus, permissions } = permissionState
+  const shell = useMemo(
+    () => planShell({ status: permissionStatus, permissions }, role),
+    [permissionStatus, permissions, role],
+  )
+  const requested = routePageOf(segments)
+  // A page this user may not open renders the shell's home, as an unknown
+  // URL always did.
+  const page: RoutePage = shell.pages.has(requested) ? requested : 'dashboard'
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
@@ -344,7 +336,7 @@ function AppContent() {
     preloadScreenForPath(pathname.split('/').filter(Boolean))
   }, [signedIn, pathname])
 
-  const landingHint = landingHintForRole(profile?.role)
+  const landingHint = profile ? landingHintForShell(shell.kind) : null
   useEffect(() => {
     if (!landingHint) return
     try {
@@ -354,8 +346,22 @@ function AppContent() {
     }
   }, [landingHint])
 
-  // Full-screen loader for the auth bootstrap only.
-  if (loading) return <FullPageSpinner />
+  // The minimal shell has no home: anything it does not open lands on its
+  // first page.
+  const minimalRedirect =
+    profile && shell.kind === 'minimal' && !shell.pages.has(requested)
+      ? `/${shell.landing ?? 'inquiry'}`
+      : null
+  useEffect(() => {
+    if (minimalRedirect) router.replace(minimalRedirect)
+  }, [minimalRedirect, router])
+
+  // Full-screen loader for the auth bootstrap only. For an account whose
+  // role the fallback does not know, that includes its permissions, instead
+  // of flashing the role-unavailable page before its shell.
+  const waitingForPermissions =
+    Boolean(profile) && !profileLoadError && shell.kind === 'pending'
+  if (loading || waitingForPermissions) return <FullPageSpinner />
   if (session && profileLoadError)
     return (
       <div className="flex min-h-[100dvh] items-center justify-center p-4">
@@ -372,103 +378,14 @@ function AppContent() {
   const passwordDialog = <FirstLoginPasswordDialog />
 
   // wave-15-export: the PDF export's print page renders outside the layout
-  // (no sidebar or header). It is reached from /logs, so only the roles that
-  // have the log (admin, monitor) get it; it reads a payload the export left
-  // in this tab and fetches nothing.
-  if (
-    segments[0] === 'print' &&
-    segments[1] === 'export' &&
-    (profile.role === 'admin' || profile.role === 'monitor')
-  )
+  // (no sidebar or header). It reads a payload the export left in this tab
+  // and fetches nothing; wave 23 opens it for `movements.export`.
+  if (requested === 'print/export' && shell.pages.has('print/export'))
     return <PrintExport payloadKey={searchParams.get('key')} />
 
-  const openMovement = (id: string) => router.push(`/movements/${id}`)
-  const backToDashboard = () => router.push('/dashboard')
-  const buildNavItems = (routable: ReadonlySet<string>) =>
-    visibleNavItems(permissionState, profile.role, routable).map((item) => ({
-      key: item.key,
-      label: t(NAV_PRESENTATION[item.key].label),
-      icon: NAV_PRESENTATION[item.key].icon,
-      children: item.children?.map((child) => ({
-        key: child,
-        label: t(NAV_CHILD_LABELS[child]),
-      })),
-    }))
-
-  if (profile.role === 'monitor') {
-    const monitorPage =
-      page === 'logs' ? 'logs' : page === 'inquiry' ? 'inquiry' : 'dashboard'
-    const monitorNavItems = buildNavItems(MONITOR_NAV_PAGES)
-    return (
-      <>
-        <Layout
-          activePage={monitorPage}
-          onNavigate={(target) => router.push(`/${target}`)}
-          navItems={monitorNavItems}
-        >
-          {movementId && movementId !== 'new' ? (
-            <MovementDetail
-              movementId={movementId}
-              onBack={() => router.back()}
-              onNavigateMovement={openMovement}
-            />
-          ) : monitorPage === 'logs' ? (
-            <LogsScreen onSelectMovement={openMovement} />
-          ) : monitorPage === 'inquiry' ? (
-            <EquipmentInquiryScreen onSelectMovement={openMovement} />
-          ) : (
-            <AdminHomeScreen />
-          )}
-        </Layout>
-        {passwordDialog}
-      </>
-    )
-  }
-
-  if (
-    profile.role === 'supervisor' ||
-    profile.role === 'workshop' ||
-    profile.role === 'assistant_workshop_manager' ||
-    profile.role === 'workshop_manager'
-  ) {
-    return (
-      <>
-        <Layout
-          activePage={segments[0] === 'inquiry' ? 'inquiry' : 'dashboard'}
-          onNavigate={(target) => router.push(`/${target}`)}
-          navItems={buildNavItems(WORKER_NAV_PAGES)}
-        >
-          {isMovementCreate ? (
-            <MovementCreate
-              movementType={movementType}
-              onClose={backToDashboard}
-              onViewMovement={openMovement}
-              onGoHome={backToDashboard}
-            />
-          ) : movementId ? (
-            <MovementDetail
-              movementId={movementId}
-              onBack={backToDashboard}
-              onNavigateMovement={openMovement}
-            />
-          ) : segments[0] === 'inquiry' ? (
-            <EquipmentInquiryScreen onSelectMovement={openMovement} />
-          ) : (
-            <HomeScreen
-              onSelectMovement={openMovement}
-              onCreateMovement={(type) =>
-                router.push(`/movements/new?type=${type}`)
-              }
-            />
-          )}
-        </Layout>
-        {passwordDialog}
-      </>
-    )
-  }
-
-  // Fail closed: only an explicit admin role reaches the admin interface.
-  if (profile.role !== 'admin')
+  // Fail closed: the role fallback for an unknown role after a failed load
+  // (or, defensively, one still waiting for its permissions).
+  if (shell.kind === 'unavailable' || shell.kind === 'pending')
     return (
       <div className="flex min-h-[100dvh] items-center justify-center p-4">
         <div className="card w-full max-w-md space-y-4 text-center">
@@ -482,30 +399,125 @@ function AppContent() {
         </div>
       </div>
     )
+  if (shell.kind === 'none')
+    return <NoPermissionsPage onSignOut={() => void signOut()} />
 
-  const navItems = buildNavItems(ADMIN_PAGES)
-
+  const openMovement = (id: string) => router.push(`/movements/${id}`)
+  const backToDashboard = () => router.push('/dashboard')
   const navigate = (target: string) => router.push(`/${target}`)
+  // Only the admin shell ever has entries (NAV_SHELL_PERMISSION); the routable
+  // set is the shell's open pages, so the menu and the guards agree.
+  const navItems = visibleNavItems(
+    permissionState,
+    profile.role,
+    shell.pages,
+  ).map((item) => ({
+    key: item.key,
+    label: t(NAV_PRESENTATION[item.key].label),
+    icon: NAV_PRESENTATION[item.key].icon,
+    children: item.children?.map((child) => ({
+      key: child,
+      label: t(NAV_CHILD_LABELS[child]),
+    })),
+  }))
+
+  if (shell.kind === 'minimal')
+    return (
+      <>
+        <Layout
+          activePage={navKeyOfPage(page)}
+          onNavigate={navigate}
+          navItems={navItems}
+        >
+          {minimalRedirect ? (
+            <RouteFallback />
+          ) : page === 'movements/:id' ? (
+            <MovementDetail
+              movementId={detailId}
+              onBack={() => router.back()}
+              onNavigateMovement={openMovement}
+            />
+          ) : page === 'logs' ? (
+            <LogsScreen onSelectMovement={openMovement} />
+          ) : (
+            <EquipmentInquiryScreen onSelectMovement={openMovement} />
+          )}
+        </Layout>
+        {passwordDialog}
+      </>
+    )
+
+  // The foreman and workshop homes. `movementsScope` comes from the home.*
+  // permission scope (undefined in the role fallback: HomeScreen then reads
+  // the role, as before).
+  if (shell.kind === 'foreman' || shell.kind === 'workshop')
+    return (
+      <>
+        <Layout
+          activePage={page === 'inquiry' ? 'inquiry' : 'dashboard'}
+          onNavigate={navigate}
+          navItems={navItems}
+        >
+          {page === 'movements/new' ? (
+            <MovementCreate
+              movementType={movementType}
+              onClose={backToDashboard}
+              onViewMovement={openMovement}
+              onGoHome={backToDashboard}
+            />
+          ) : page === 'movements/:id' ? (
+            <MovementDetail
+              movementId={detailId}
+              onBack={backToDashboard}
+              onNavigateMovement={openMovement}
+            />
+          ) : page === 'inquiry' ? (
+            <EquipmentInquiryScreen onSelectMovement={openMovement} />
+          ) : (
+            <HomeScreen
+              movementsScope={shell.homeScope}
+              onSelectMovement={openMovement}
+              onCreateMovement={(type) =>
+                router.push(`/movements/new?type=${type}`)
+              }
+            />
+          )}
+        </Layout>
+        {passwordDialog}
+      </>
+    )
+
+  // The admin shell (home.admin; the admin and monitor roles in the
+  // fallback). Each page renders only when its gate passes. Every other
+  // kind returned above; the compiler checks it, so nothing falls through.
+  const adminShell: 'admin' = shell.kind
+  void adminShell
+  const canOpenEquipment = shell.pages.has('equipment/:id')
+  const canCreateMovement = shell.pages.has('movements/new')
 
   return (
     <>
-      <Layout activePage={page} onNavigate={navigate} navItems={navItems}>
-        {isMovementCreate ? (
+      <Layout
+        activePage={navKeyOfPage(page)}
+        onNavigate={navigate}
+        navItems={navItems}
+      >
+        {page === 'movements/new' ? (
           <MovementCreate
             movementType={movementType}
             onClose={() => router.push('/logs')}
             onViewMovement={openMovement}
             onGoHome={backToDashboard}
           />
-        ) : movementId ? (
+        ) : page === 'movements/:id' ? (
           <MovementDetail
-            movementId={movementId}
+            movementId={detailId}
             onBack={() => router.back()}
             onNavigateMovement={openMovement}
           />
-        ) : equipmentId ? (
+        ) : page === 'equipment/:id' ? (
           <EquipmentDetail
-            equipmentId={equipmentId}
+            equipmentId={detailId}
             onBack={() => router.push('/equipment')}
             onEdit={(equipment) =>
               router.push(`/equipment?edit=${encodeURIComponent(equipment.id)}`)
@@ -515,20 +527,26 @@ function AppContent() {
               router.push(`/logs?q=${encodeURIComponent(code)}`)
             }
           />
-        ) : driverId ? (
+        ) : page === 'drivers/:id' ? (
           <DriverDetail
-            driverId={driverId}
+            driverId={detailId}
             onBack={() => router.push('/drivers')}
           />
-        ) : userId ? (
-          <UserDetail userId={userId} onBack={() => router.push('/users')} />
+        ) : page === 'users/:id' ? (
+          <UserDetail userId={detailId} onBack={() => router.push('/users')} />
         ) : (
           <>
             {page === 'dashboard' && (
               <AdminHomeScreen
-                onSelectEquipment={(id) => router.push(`/equipment/${id}`)}
-                onCreateMovement={(type) =>
-                  router.push(`/movements/new?type=${type}`)
+                onSelectEquipment={
+                  canOpenEquipment
+                    ? (id) => router.push(`/equipment/${id}`)
+                    : undefined
+                }
+                onCreateMovement={
+                  canCreateMovement
+                    ? (type) => router.push(`/movements/new?type=${type}`)
+                    : undefined
                 }
               />
             )}
@@ -554,18 +572,22 @@ function AppContent() {
             )}
             {page === 'movement-import' && <MovementImport />}
             {page === 'activity' && <MovementActivity />}
-            {page === 'reports' &&
-              (segments[1] === 'workshop' ? (
-                <WorkshopReports onSelectMovement={openMovement} />
-              ) : segments[1] === 'equipment' ? (
-                <EquipmentReports />
-              ) : segments[1] === 'entries' && segments[2] === 'all' ? (
-                <EntryReportsAll onSelectMovement={openMovement} />
-              ) : (
-                <EntryReports onSelectMovement={openMovement} />
-              ))}
-            {page === 'settings' &&
-              (segments[1] === 'roles' ? <RolesSettings /> : <AdminSettings />)}
+            {page === 'reports/workshop' && (
+              <WorkshopReports onSelectMovement={openMovement} />
+            )}
+            {page === 'reports/equipment' && <EquipmentReports />}
+            {page === 'reports/entries/all' && (
+              <EntryReportsAll onSelectMovement={openMovement} />
+            )}
+            {page === 'reports/entries' && (
+              <EntryReports onSelectMovement={openMovement} />
+            )}
+            {page === 'settings/roles' && <RolesSettings />}
+            {/* AdminSettings picks its sub-page from the pathname. */}
+            {(page === 'settings' ||
+              page === 'settings/equipment-types' ||
+              page === 'settings/workshop-opening-balance' ||
+              page === 'settings/afaqy') && <AdminSettings />}
           </>
         )}
       </Layout>

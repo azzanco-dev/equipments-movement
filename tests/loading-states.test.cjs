@@ -16,7 +16,12 @@ test('the full-screen loader is for the auth bootstrap only', () => {
   assert.doesNotMatch(app, /const \w+Loading = \(\) => <FullPageSpinner/)
   assert.match(app, /const screenLoading = \(\) => <RouteFallback \/>/)
   assert.equal(app.match(/<FullPageSpinner \/>/g)?.length, 1)
-  assert.match(app, /if \(loading\) return <FullPageSpinner \/>/)
+  // wave 23: an account whose role the fallback does not know also waits
+  // here for its permissions (bootstrap), never anywhere else.
+  assert.match(
+    app,
+    /if \(loading \|\| waitingForPermissions\) return <FullPageSpinner \/>/,
+  )
 })
 
 test('the route fallback lives inside the shell', () => {

@@ -512,14 +512,16 @@ test('both /logs views add the previous-code branch and reuse it on export', () 
 
 test('the print page is a chrome-less route of the signed-in app', () => {
   const app = read('src', 'App.tsx')
-  const route = app.indexOf("segments[0] === 'print'")
+  const route = app.indexOf("requested === 'print/export'")
   assert.ok(route > 0)
-  // After the session/profile gate, before any role layout.
+  // After the session/profile gate, before any shell layout. Since wave 23
+  // it opens for movements.export (the admin and monitor roles in the role
+  // fallback; tests/wave23Shell.test.cjs).
   assert.ok(route > app.indexOf('if (!profile) return <AuthScreen />'))
-  assert.ok(route < app.indexOf("if (profile.role === 'monitor')"))
+  assert.ok(route < app.indexOf("if (shell.kind === 'minimal')"))
   assert.match(
     app,
-    /\(profile\.role === 'admin' \|\| profile\.role === 'monitor'\)\s+\)\s+return <PrintExport payloadKey=\{searchParams\.get\('key'\)\} \/>/,
+    /if \(requested === 'print\/export' && shell\.pages\.has\('print\/export'\)\)\s+return <PrintExport payloadKey=\{searchParams\.get\('key'\)\} \/>/,
   )
   const page = read('src', 'screens', 'PrintExport.tsx')
   // Display strings only: no data access on the print page.

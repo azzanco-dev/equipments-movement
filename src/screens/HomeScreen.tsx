@@ -23,6 +23,7 @@ import { LogsScreen } from '@/screens/admin-home/LogsScreen'
 import {
   ALL_CONTEXTS_HOME_DEFAULT_TAB,
   homeMovementsScope,
+  type HomeMovementsScope,
 } from '@/lib/homeScope'
 import {
   changeSinceYesterday,
@@ -70,15 +71,23 @@ const EMPTY_WORKSHOP: WorkshopHomeStats = {
 export function HomeScreen({
   onSelectMovement,
   onCreateMovement,
+  movementsScope,
 }: {
   onSelectMovement: (id: string) => void
   onCreateMovement: (type: MovementType) => void
+  /**
+   * wave 23 (routing by permissions, step 2): the list this home shows, as
+   * src/App.tsx derives it from the home.foreman / home.workshop scope, so a
+   * custom role gets the right variant. Omitted while the permissions load
+   * or after a failed load: the home then derives it from the role.
+   */
+  movementsScope?: HomeMovementsScope
 }) {
   const { t } = useI18n()
   const { user, profile } = useAuth()
   // wave-21-workshop-scope: which movements the home lists. Fails closed: an
   // unknown role gets the foreman's own-rows list, never a wider one.
-  const scope = homeMovementsScope(profile?.role)
+  const scope = movementsScope ?? homeMovementsScope(profile?.role)
   const managerMode = scope === 'all_contexts'
   const workshopMode = scope === 'workshop' || managerMode
   const name = greetingName(profile?.full_name)

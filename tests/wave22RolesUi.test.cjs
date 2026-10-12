@@ -585,28 +585,30 @@ test('the roles page is admin only and fails closed', () => {
 
 test('the route is registered only in the admin branch, after the fail-closed check', () => {
   const app = read('src', 'App.tsx')
-  const failClosed = app.indexOf("if (profile.role !== 'admin')")
+  // wave 23: the admin shell is the one the compiler proves is `admin`, after
+  // every other shell kind returned; the page renders behind its gate
+  // (`settings/roles` -> settings.roles, tests/wave23Shell.test.cjs).
+  const failClosed = app.indexOf("const adminShell: 'admin' = shell.kind")
   const route = app.indexOf('<RolesSettings />')
   assert.ok(failClosed > 0 && route > failClosed)
   assert.equal(app.split('<RolesSettings />').length, 2, 'rendered once')
-  assert.match(
-    app,
-    /page === 'settings' &&\s*\(segments\[1\] === 'roles' \? <RolesSettings \/> : <AdminSettings \/>\)/,
-  )
-  // Route guards do not read the permissions yet. Since wave 23 App.tsx reads
-  // them for the sidebar only (tests/wave23Nav.test.cjs).
+  assert.match(app, /page === 'settings\/roles' && <RolesSettings \/>/)
+  // App.tsx reads the permissions once, through usePermissions(), for the
+  // sidebar and the shell (tests/wave23Nav.test.cjs, wave23Shell.test.cjs).
   assert.doesNotMatch(app, /current_permissions|has_permission/)
   assert.equal(app.split('usePermissions()').length, 2, 'read once')
-  assert.equal(app.split('permissionState').length, 3, 'nav only')
   assert.match(
     app,
-    /visibleNavItems\(permissionState, profile\.role, routable\)/,
+    /visibleNavItems\(\s*permissionState,\s*profile\.role,\s*shell\.pages,?\s*\)/,
   )
   const page = read('src', 'components', 'roles', 'RolesSettings.tsx')
   assert.match(page, /rolesPageAccess\(\s*profile\?\.role,/)
   assert.match(page, /if \(access !== 'allowed'\)/)
   const context = read('src', 'auth', 'PermissionsContext.tsx')
-  assert.match(context, /NOT USED FOR ROUTE GUARDS YET/)
+  assert.match(
+    context,
+    /In-screen actions, API\s+\* routes and Edge Functions still decide by `profiles\.role`/,
+  )
 })
 
 test('the flag changes only on an explicit click, after the typed confirmation', () => {

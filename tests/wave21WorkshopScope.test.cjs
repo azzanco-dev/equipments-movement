@@ -63,7 +63,12 @@ test('the all-contexts home opens on the workshop tab', () => {
 
 test('the home picks its list through homeMovementsScope', () => {
   const home = read('src', 'screens', 'HomeScreen.tsx')
-  assert.match(home, /const scope = homeMovementsScope\(profile\?\.role\)/)
+  // wave 23: App.tsx passes the scope derived from the home.* permission;
+  // the role decides only when it does not (permissions loading or failed).
+  assert.match(
+    home,
+    /const scope = movementsScope \?\? homeMovementsScope\(profile\?\.role\)/,
+  )
   assert.match(home, /const managerMode = scope === 'all_contexts'/)
   assert.match(
     home,

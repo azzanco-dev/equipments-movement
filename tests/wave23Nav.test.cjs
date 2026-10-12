@@ -122,24 +122,14 @@ const CAPTURED = {
   workshop_manager: [],
 }
 
-// The shell each role is routed to today, and the pages it can open (the
-// `routable` set App.tsx passes).
+// The pages of the shell each role is routed to (the `routable` set App.tsx
+// passes). Since wave 23 step 2 that is the shell plan's open pages; the
+// role-based table is checked against the 8f17f53 router in
+// tests/wave23Shell.test.cjs.
 const APP = read('src', 'App.tsx')
-const ADMIN_PAGES = new Set(
-  [
-    .../const ADMIN_PAGES = new Set\(\[([\s\S]*?)\]\)/
-      .exec(APP)[1]
-      .matchAll(/'([\w/-]+)'/g),
-  ].map((m) => m[1]),
+const SHELL_PAGES = Object.fromEntries(
+  ROLES.map((role) => [role, new Set(nav.LEGACY_SHELL_BY_ROLE[role].pages)]),
 )
-const SHELL_PAGES = {
-  admin: ADMIN_PAGES,
-  monitor: new Set(['dashboard', 'logs', 'inquiry']),
-  supervisor: new Set(['dashboard', 'inquiry']),
-  workshop: new Set(['dashboard', 'inquiry']),
-  assistant_workshop_manager: new Set(['dashboard', 'inquiry']),
-  workshop_manager: new Set(['dashboard', 'inquiry']),
-}
 
 const ready = (map) => ({ status: 'ready', permissions: map })
 
@@ -282,20 +272,17 @@ test('App.tsx builds every sidebar from visibleNavItems', () => {
     APP,
     /import \{ usePermissions \} from '@\/auth\/PermissionsContext'/,
   )
+  // One menu, built once, limited to the open pages of the chosen shell.
   assert.match(
     APP,
-    /visibleNavItems\(permissionState, profile\.role, routable\)/,
+    /const navItems = visibleNavItems\(\s*permissionState,\s*profile\.role,\s*shell\.pages,?\s*\)/,
   )
-  assert.match(
-    APP,
-    /const monitorNavItems = buildNavItems\(MONITOR_NAV_PAGES\)/,
-  )
-  assert.match(APP, /navItems=\{buildNavItems\(WORKER_NAV_PAGES\)\}/)
-  assert.match(APP, /const navItems = buildNavItems\(ADMIN_PAGES\)/)
+  assert.equal(APP.split('visibleNavItems(').length, 2)
+  assert.equal(APP.split('navItems={navItems}').length, 4, 'every shell')
   assert.doesNotMatch(APP, /navItems=\{\[\]\}/)
   // no hand-written role menus left
   assert.doesNotMatch(APP, /\{ key: 'logs', label: t\('logs'\)/)
-  // the route guards still decide by the role
-  assert.match(APP, /if \(profile\.role === 'monitor'\) \{/)
-  assert.match(APP, /if \(profile\.role !== 'admin'\)/)
+  // wave 23 step 2: the shells no longer branch on the role
+  assert.doesNotMatch(APP, /if \(profile\.role ===/)
+  assert.doesNotMatch(APP, /profile\.role !== 'admin'/)
 })

@@ -1107,6 +1107,11 @@ export const translations = {
     roleChangeUseAssignment:
       'نظام الادوار مفعل: غيّر الدور من صفحة الادوار والصلاحيات',
     // wave-22-roles — end
+    // wave-23-shell — start
+    noPermissionsTitle: 'لا توجد صلاحيات',
+    noPermissionsBody:
+      'حسابك لا يملك صلاحية لفتح اي صفحة في النظام. تواصل مع مدير النظام.',
+    // wave-23-shell — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -2839,6 +2844,11 @@ export const translations = {
     roleChangeUseAssignment:
       'The roles system is active: change the role on the Roles and permissions page',
     // wave-22-roles — end
+    // wave-23-shell — start
+    noPermissionsTitle: 'No permissions',
+    noPermissionsBody:
+      'Your account has no permission to open any page of the system. Contact your administrator.',
+    // wave-23-shell — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',
