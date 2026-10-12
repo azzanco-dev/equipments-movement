@@ -1112,6 +1112,14 @@ export const translations = {
     noPermissionsBody:
       'حسابك لا يملك صلاحية لفتح اي صفحة في النظام. تواصل مع مدير النظام.',
     // wave-23-shell — end
+    // wave-23-users — start
+    userRoleManagedInSettings:
+      'الادوار وصلاحياتها تدار من الاعدادات › الادوار والصلاحيات',
+    userCreatedRoleNotAssigned:
+      'تم انشاء المستخدم لكن تعذر تعيين الدور. يمكن تعيينه من صفحة المستخدم.',
+    userOpenPage: 'فتح صفحة المستخدم',
+    userRoleAssignFailed: 'تم حفظ البيانات لكن تعذر تعيين الدور',
+    // wave-23-users — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -2849,6 +2857,15 @@ export const translations = {
     noPermissionsBody:
       'Your account has no permission to open any page of the system. Contact your administrator.',
     // wave-23-shell — end
+    // wave-23-users — start
+    userRoleManagedInSettings:
+      'Roles and their permissions are managed in Settings › Roles and permissions',
+    userCreatedRoleNotAssigned:
+      'The user was created but the role could not be assigned. It can be set from the user page.',
+    userOpenPage: 'Open the user page',
+    userRoleAssignFailed:
+      'The record was saved but the role could not be assigned',
+    // wave-23-users — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',

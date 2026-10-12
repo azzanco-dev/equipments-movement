@@ -12,6 +12,8 @@ import {
 } from 'lucide-react'
 import { useTheme } from '@/theme/ThemeContext'
 import { useAuth } from '@/auth/AuthContext'
+import { usePermissions } from '@/auth/PermissionsContext'
+import { localizedName } from '@/lib/localizedName'
 import { useEffect, useState } from 'react'
 import {
   Button,
@@ -80,7 +82,7 @@ export function Layout({
     return () => document.removeEventListener('keydown', close)
   }, [mobileOpen])
 
-  const roleLabel =
+  const legacyRoleLabel =
     profile?.role === 'admin'
       ? t('admin')
       : profile?.role === 'workshop'
@@ -92,6 +94,15 @@ export function Layout({
             : profile?.role === 'monitor'
               ? t('monitoring')
               : t('supervisor')
+  // wave 23 (step 3): with the roles system ON the label under the name is
+  // the assigned role's name; the legacy label stays the fallback while the
+  // flag or the assignment load, after a failed load, with the flag OFF or
+  // unknown, and without an assignment.
+  const { rolesSystemEnabled, assignedRole } = usePermissions()
+  const roleLabel =
+    rolesSystemEnabled === true && assignedRole
+      ? localizedName(lang, assignedRole.name_ar, assignedRole.name_en)
+      : legacyRoleLabel
 
   // wave 12: the WhatsApp gateway status is polled for the admin only.
   const showWhatsAppStatus = profile?.role === 'admin' && navItems.length > 0

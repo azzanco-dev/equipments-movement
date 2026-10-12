@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Trash2, Users } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
+import { usePermissions } from '@/auth/PermissionsContext'
+import { useActiveRoles } from '@/components/roles/useActiveRoles'
+import { roleName } from '@/components/roles/roleRows'
+import type { FilterField } from '@/components/data-list/types'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
@@ -32,6 +36,13 @@ import { usersListConfig } from '@/lib/listConfigs'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
+import { localizedName } from '@/lib/localizedName'
+import {
+  assignedRoleFromEmbed,
+  isSystemRoleKey,
+  legacyRoleFor,
+  type AssignedRole,
+} from '@/lib/userRoleAssignment'
 import {
   EMPTY_USER_FORM,
   roleBadge,
@@ -53,10 +64,26 @@ interface AdminUsersProps {
   onSelectUser: (id: string) => void
 }
 
+/** A list row: the profile plus, with the roles system ON, its assignment. */
+type UserRow = Profile & { assignedRole: AssignedRole | null }
+
+/** The embedded assignment, read with the profile when the flag is ON. */
+const ASSIGNMENT_EMBED = 'profile_roles(role_key,roles(name_ar,name_en))'
+/** The same embed as an inner join, for a filter on the assigned role. */
+const ASSIGNMENT_EMBED_INNER =
+  'profile_roles!inner(role_key,roles(name_ar,name_en))'
+const ASSIGNED_ROLE_COLUMN = 'profile_roles.role_key'
+
 export function AdminUsers({ onSelectUser }: AdminUsersProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const { user: currentUser } = useAuth()
-  const [users, setUsers] = useState<Profile[]>([])
+  // wave 23 (step 3): with the roles system ON the list shows and the dialog
+  // assigns the `profile_roles` role; OFF or unknown keeps the legacy role
+  // exactly as before. The active roles are read only while ON.
+  const { rolesSystemEnabled } = usePermissions()
+  const rolesOn = rolesSystemEnabled === true
+  const { roles: activeRoles } = useActiveRoles(rolesOn)
+  const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
@@ -66,6 +93,12 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [errors, setErrors] = useState<FieldErrors<UserFormValues>>({})
+  // The assigned role chosen in the dialog while the roles system is ON
+  // (`roles.key`); `form.role` keeps the legacy role for the OFF dialog.
+  const [roleKey, setRoleKey] = useState<string>(EMPTY_USER_FORM.role)
+  // Set when `create-user` succeeded but the custom role could not be
+  // assigned: the user exists, so the dialog must not create him again.
+  const [createdUserId, setCreatedUserId] = useState<string | null>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
 
   /** Editing a field clears its message; nothing is validated while typing. */
@@ -82,11 +115,26 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     const signal = startListRequest()
     setLoading(true)
     setLoadError(null)
+    // With the roles system ON the role filter applies to the assignment
+    // (`profile_roles.role_key`); an inner join is needed for PostgREST to
+    // filter the parent rows by it, so it is used only while such a filter is
+    // active (otherwise users without an assignment would disappear).
+    const filters = rolesOn
+      ? list.filters.map((filter) =>
+          filter.field === 'role'
+            ? { ...filter, field: ASSIGNED_ROLE_COLUMN }
+            : filter,
+        )
+      : list.filters
+    const filtersAssignment = filters.some(
+      (filter) => filter.field === ASSIGNED_ROLE_COLUMN,
+    )
+    const columns = rolesOn
+      ? `id,full_name,role,must_change_password,created_at,${filtersAssignment ? ASSIGNMENT_EMBED_INNER : ASSIGNMENT_EMBED}`
+      : 'id,full_name,role,must_change_password,created_at'
     let query = supabase
       .from('profiles')
-      .select('id,full_name,role,must_change_password,created_at', {
-        count: 'exact',
-      })
+      .select(columns, { count: 'exact' })
       .order(list.sort, { ascending: list.direction === 'asc' })
       .order('id', { ascending: list.direction === 'asc' })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
@@ -97,13 +145,25 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     if (searchFilter) query = query.or(searchFilter)
     query = applyListFilters(
       query,
-      list.filters,
-      new Set(usersListConfig.filterFields.map((field) => field.key)),
+      filters,
+      new Set([
+        ...usersListConfig.filterFields.map((field) => field.key),
+        ...(rolesOn ? [ASSIGNED_ROLE_COLUMN] : []),
+      ]),
     )
     const { data, error, count } = await query.abortSignal(signal)
     if (signal.aborted) return
     if (error) setLoadError(t('usersLoadError'))
-    setUsers((data as Profile[]) ?? [])
+    const rows =
+      (data as unknown as Array<
+        Profile & { profile_roles?: unknown }
+      > | null) ?? []
+    setUsers(
+      rows.map(({ profile_roles, ...profile }) => ({
+        ...profile,
+        assignedRole: rolesOn ? assignedRoleFromEmbed(profile_roles) : null,
+      })),
+    )
     setTotal(count ?? 0)
     setLoading(false)
   }, [
@@ -114,6 +174,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     list.pageSize,
     list.search,
     list.sort,
+    rolesOn,
     t,
   ])
 
@@ -121,21 +182,63 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     fetchUsers()
   }, [fetchUsers])
 
-  const roleOptions = USER_ROLES.map((value) => ({
+  const legacyRoleOptions = USER_ROLES.map((value) => ({
     value,
     label: t(roleBadge(value).key),
   }))
+  // ON: the active roles, system roles first (`useActiveRoles`). Until they
+  // load, or when they could not be read, the legacy roles — every one of
+  // them is an active system role — keep the dialog usable.
+  const assignedRoleOptions = rolesOn && activeRoles
+  const roleOptions = assignedRoleOptions
+    ? assignedRoleOptions.map((role) => ({
+        value: role.key,
+        label: roleName(lang, role),
+      }))
+    : legacyRoleOptions
+
+  // The role filter: the assigned roles while ON (runtime labels in the
+  // active language), today's legacy options otherwise.
+  const filterFields = useMemo<FilterField[]>(
+    () =>
+      rolesOn && activeRoles
+        ? usersListConfig.filterFields.map((field) =>
+            field.key === 'role'
+              ? {
+                  ...field,
+                  options: activeRoles.map((role) => ({
+                    value: role.key,
+                    label: roleName(lang, role),
+                  })),
+                }
+              : field,
+          )
+        : usersListConfig.filterFields,
+    [activeRoles, lang, rolesOn],
+  )
 
   function openAdd() {
     setForm(EMPTY_USER_FORM)
+    setRoleKey(EMPTY_USER_FORM.role)
+    setCreatedUserId(null)
     setFormError(null)
     setErrors({})
     setModalOpen(true)
   }
 
   async function handleSave() {
+    if (createdUserId) return
     setFormError(null)
-    const invalid = validateUserForm(form)
+    // ON: the account is created with the legacy role derived from the chosen
+    // role (`legacyRoleFor`: a system role is itself, a custom role gives a
+    // new user `monitor`); a custom role is then assigned in a second step.
+    // The roles-system select is shown only once the active roles loaded;
+    // until then (or after a failed load) the legacy select and form.role apply.
+    const chosenRole = assignedRoleOptions ? roleKey : form.role
+    const legacyRole = assignedRoleOptions
+      ? legacyRoleFor(chosenRole, null)
+      : form.role
+    const invalid = validateUserForm({ ...form, role: legacyRole })
     if (hasErrors(invalid)) {
       setErrors(invalid)
       focusFirstError(invalid, USER_FIELD_ORDER, { root: bodyRef.current })
@@ -149,9 +252,33 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
           email: form.email.trim(),
           password: form.password,
           full_name: form.full_name.trim(),
-          role: form.role,
+          role: legacyRole,
         },
       )
+      if (rolesOn && !isSystemRoleKey(chosenRole)) {
+        // The user now exists with the derived legacy role (and, through the
+        // 0126 trigger, that role as assignment). A failure here is never
+        // reported as a failed creation: the role can be set on his page.
+        let assigned = false
+        try {
+          const { error: assignError } = await supabase.rpc(
+            'admin_assign_profile_role',
+            { p_profile_id: result.user.id, p_role_key: chosenRole },
+          )
+          assigned = !assignError
+        } catch {
+          assigned = false
+        }
+        if (!assigned) {
+          setCreatedUserId(result.user.id)
+          const partial: FieldErrors<UserFormValues> = {
+            role: 'userCreatedRoleNotAssigned',
+          }
+          setErrors(partial)
+          focusFirstError(partial, USER_FIELD_ORDER, { root: bodyRef.current })
+          return
+        }
+      }
       setModalOpen(false)
       onSelectUser(result.user.id)
     } catch (error) {
@@ -205,7 +332,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     fetchUsers()
   }
 
-  const columns: DataTableColumn<Profile>[] = [
+  const columns: DataTableColumn<UserRow>[] = [
     {
       key: 'full_name',
       header: t('fullName'),
@@ -223,6 +350,24 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
       header: t('role'),
       sortable: true,
       cell: (row) => {
+        // ON: the assigned role's name; a user without assignment, and the
+        // OFF state, show the legacy badge as before.
+        if (rolesOn && row.assignedRole)
+          return (
+            <Badge
+              tone={
+                isSystemRoleKey(row.assignedRole.key)
+                  ? roleBadge(row.assignedRole.key).tone
+                  : 'neutral'
+              }
+            >
+              {localizedName(
+                lang,
+                row.assignedRole.name_ar,
+                row.assignedRole.name_en,
+              )}
+            </Badge>
+          )
         const badge = roleBadge(row.role)
         return <Badge tone={badge.tone}>{t(badge.key)}</Badge>
       },
@@ -275,7 +420,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
         sort={list.sort}
         direction={list.direction}
         onSort={list.setSort}
-        filterFields={usersListConfig.filterFields}
+        filterFields={filterFields}
         filters={list.filters}
         onFilters={list.setFilters}
       />
@@ -322,14 +467,29 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
             <Button variant="outline" onClick={() => setModalOpen(false)}>
               {t('cancel')}
             </Button>
-            <Button variant="primary" loading={saving} onClick={handleSave}>
-              {t('save')}
-            </Button>
+            {createdUserId ? (
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setModalOpen(false)
+                  onSelectUser(createdUserId)
+                }}
+              >
+                {t('userOpenPage')}
+              </Button>
+            ) : (
+              <Button variant="primary" loading={saving} onClick={handleSave}>
+                {t('save')}
+              </Button>
+            )}
           </>
         }
       >
         <div ref={bodyRef} className="space-y-4">
           {formError && <Notice tone="danger">{formError}</Notice>}
+          {createdUserId && (
+            <Notice tone="warning">{t('userCreatedRoleNotAssigned')}</Notice>
+          )}
           <Field
             label={t('fullName')}
             name="full_name"
@@ -380,15 +540,34 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
               />
             )}
           </Field>
-          <Field label={t('role')} name="role">
-            {(control) => (
-              <Select
-                {...control}
-                value={form.role}
-                onValueChange={(value) => update({ role: value as UserRole })}
-                options={roleOptions}
-              />
-            )}
+          <Field
+            label={t('role')}
+            name="role"
+            hint={rolesOn ? t('userRoleManagedInSettings') : undefined}
+            error={errors.role && t(errors.role)}
+          >
+            {(control) =>
+              assignedRoleOptions ? (
+                <Select
+                  {...control}
+                  value={roleKey}
+                  disabled={Boolean(createdUserId)}
+                  onValueChange={(value) => {
+                    setRoleKey(value)
+                    setErrors((current) => clearFieldErrors(current, ['role']))
+                  }}
+                  options={roleOptions}
+                />
+              ) : (
+                <Select
+                  {...control}
+                  value={form.role}
+                  disabled={Boolean(createdUserId)}
+                  onValueChange={(value) => update({ role: value as UserRole })}
+                  options={roleOptions}
+                />
+              )
+            }
           </Field>
         </div>
       </Dialog>

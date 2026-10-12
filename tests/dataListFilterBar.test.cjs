@@ -263,14 +263,29 @@ const SCREENS = {
 
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8')
 
+// wave 23 (step 3): the users list derives its filter fields from the config
+// (the role options follow the roles system while it is ON) and passes the
+// derived list under the same name.
+const DERIVED_FILTER_FIELDS = new Set(['src/screens/AdminUsers.tsx'])
+
 test('each list hands its own allowlist to the toolbar filter dialog', () => {
   for (const [file, config] of Object.entries(SCREENS)) {
     const source = read(file)
-    assert.match(
-      source,
-      new RegExp(String.raw`filterFields=\{${config}\.filterFields\}`),
-      `${file} should pass ${config}.filterFields to the toolbar`,
-    )
+    if (DERIVED_FILTER_FIELDS.has(file)) {
+      assert.match(
+        source,
+        new RegExp(
+          String.raw`const filterFields = useMemo<FilterField\[\]>\([\s\S]*?${config}\.filterFields`,
+        ),
+        `${file} should derive filterFields from ${config}.filterFields`,
+      )
+      assert.match(source, /filterFields=\{filterFields\}/, file)
+    } else
+      assert.match(
+        source,
+        new RegExp(String.raw`filterFields=\{${config}\.filterFields\}`),
+        `${file} should pass ${config}.filterFields to the toolbar`,
+      )
     assert.match(source, /filters=\{list\.filters\}/, file)
     assert.match(source, /onFilters=\{list\.setFilters\}/, file)
     assert.doesNotMatch(source, /<FilterBar\b/, `${file} renders FilterBar`)
