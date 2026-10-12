@@ -593,13 +593,20 @@ test('the route is registered only in the admin branch, after the fail-closed ch
     app,
     /page === 'settings' &&\s*\(segments\[1\] === 'roles' \? <RolesSettings \/> : <AdminSettings \/>\)/,
   )
-  // Routing does not read the new permissions in this wave.
-  assert.doesNotMatch(app, /usePermissions|current_permissions|has_permission/)
+  // Route guards do not read the permissions yet. Since wave 23 App.tsx reads
+  // them for the sidebar only (tests/wave23Nav.test.cjs).
+  assert.doesNotMatch(app, /current_permissions|has_permission/)
+  assert.equal(app.split('usePermissions()').length, 2, 'read once')
+  assert.equal(app.split('permissionState').length, 3, 'nav only')
+  assert.match(
+    app,
+    /visibleNavItems\(permissionState, profile\.role, routable\)/,
+  )
   const page = read('src', 'components', 'roles', 'RolesSettings.tsx')
   assert.match(page, /rolesPageAccess\(\s*profile\?\.role,/)
   assert.match(page, /if \(access !== 'allowed'\)/)
   const context = read('src', 'auth', 'PermissionsContext.tsx')
-  assert.match(context, /NOT USED FOR ROUTING YET/)
+  assert.match(context, /NOT USED FOR ROUTE GUARDS YET/)
 })
 
 test('the flag changes only on an explicit click, after the typed confirmation', () => {

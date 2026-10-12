@@ -11,8 +11,9 @@ export function Providers({ children }: { children: ReactNode }) {
     <ThemeProvider>
       <I18nProvider>
         <AuthProvider>
-          {/* wave 22B: loads current_permissions() after sign-in; read only by
-              the roles settings page, routing still uses profiles.role. */}
+          {/* wave 22B: loads current_permissions() after sign-in; read by the
+              roles settings page and (wave 23) the sidebar, routing still
+              uses profiles.role. */}
           <PermissionsProvider>
             <div id="app-shell">{children}</div>
           </PermissionsProvider>

@@ -3,10 +3,10 @@ import type { CurrentPermission, PermissionScope } from '@/lib/types'
 /**
  * wave 22B — the client view of `current_permissions()` (migration 0126).
  *
- * IMPORTANT: routing and menus still decide by `profiles.role` (src/App.tsx).
- * These helpers are read only by the roles settings page until a later wave
- * switches routing to permissions, so nothing in the app's behaviour depends
- * on them while the roles system is inactive.
+ * IMPORTANT: routing still decides by `profiles.role` (src/App.tsx). These
+ * helpers are read by the roles settings page and, since wave 23, the sidebar
+ * (src/lib/navPermissions.ts). While the roles system is inactive the answer
+ * is the frozen legacy mapping, so the app behaves exactly as before.
  *
  * This file has no runtime imports so the node tests can load it directly.
  */

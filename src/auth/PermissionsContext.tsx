@@ -27,10 +27,11 @@ import type { CurrentPermission, PermissionScope } from '@/lib/types'
  * While the roles system is inactive the database answers from the frozen
  * legacy mapping of `profiles.role`, so this is exactly today's access.
  *
- * NOT USED FOR ROUTING YET: src/App.tsx and the menus still decide by
- * `profiles.role`. The only reader in this wave is the roles settings page
- * (to hide itself without `settings.roles`). A later wave, after the owner
- * activates the system, switches routing to `can()`/`scope()`.
+ * NOT USED FOR ROUTE GUARDS YET. Readers: the roles settings page (to hide
+ * itself without `settings.roles`) and, since wave 23, the sidebar (src/lib/navPermissions.ts through
+ * src/App.tsx; a `reload()` re-renders it). The route guards and home
+ * selection of src/App.tsx still decide by `profiles.role`; later steps of
+ * routing by permissions switch them to `can()`/`scope()`.
  */
 interface PermissionsContextValue {
   status: PermissionsStatus
