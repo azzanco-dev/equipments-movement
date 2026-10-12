@@ -913,13 +913,23 @@ test('every rewrite is equivalent for the six legacy roles under the frozen mapp
 
 test('after 0127 no live policy or function tests a role name, except by design', () => {
   // Latest policies across every migration.
+  // A dropped table takes its policies with it (profile_projects, 0079).
   const policies = new Map()
-  for (const file of FILES)
-    for (const p of policyStatements(read(file))) {
+  for (const file of FILES) {
+    const sql = read(file)
+    for (const p of policyStatements(sql)) {
       const key = `${p.table}:${p.name}`
       if (p.verb === 'DROP') policies.delete(key)
       else policies.set(key, p.text)
     }
+    for (const m of sql.matchAll(
+      /DROP TABLE(?: IF EXISTS)?s+((?:public.)?[a-z_]+)/gi,
+    )) {
+      const table = m[1].startsWith('public.') ? m[1] : 'public.' + m[1]
+      for (const key of [...policies.keys()])
+        if (key.startsWith(table + ':')) policies.delete(key)
+    }
+  }
   for (const [key, text] of policies)
     assert.ok(
       !/is_admin\(\)|current_user_role\(\)/.test(text),
