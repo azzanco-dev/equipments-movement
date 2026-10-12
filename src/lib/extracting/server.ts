@@ -5,11 +5,18 @@ export function apiError(code: string, status: number, extra?: object) {
   return NextResponse.json({ error: code, ...extra }, { status })
 }
 
+/** The permission that opens the extraction page and its routes (0128). */
+export const EXTRACTING_PERMISSION = 'extracting.view'
+
 /**
- * Resolves the signed-in admin behind the request's bearer token. The
- * returned client forwards that token, so Supabase RLS stays authoritative.
+ * Resolves the signed-in user behind the request's bearer token and requires
+ * the `extracting.view` permission, decided by `public.has_permission()`
+ * called WITH THAT TOKEN (wave 23; while the roles system is inactive the
+ * frozen legacy mapping grants it to the admin only). Anything but `true` is
+ * forbidden. The returned client forwards the token, so Supabase RLS stays
+ * authoritative.
  */
-export async function requireAdmin(
+export async function requireExtractingAccess(
   request: Request,
 ): Promise<{ supabase: SupabaseClient } | { response: NextResponse }> {
   const header = request.headers.get('authorization')
@@ -29,12 +36,11 @@ export async function requireAdmin(
   const userId = claims?.claims?.sub
   if (claimsError || !userId) return { response: apiError('unauthorized', 401) }
 
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
-    .maybeSingle()
-  if (profileError || profile?.role !== 'admin')
+  const { data: allowed, error: permissionError } = await supabase.rpc(
+    'has_permission',
+    { p_key: EXTRACTING_PERMISSION },
+  )
+  if (permissionError || allowed !== true)
     return { response: apiError('forbidden', 403) }
   return { supabase }
 }

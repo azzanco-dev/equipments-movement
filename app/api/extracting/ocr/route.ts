@@ -8,7 +8,7 @@ import {
   parseOcrFields,
   readOcrAnnotation,
 } from '@/lib/extracting/ocr'
-import { apiError, requireAdmin } from '@/lib/extracting/server'
+import { apiError, requireExtractingAccess } from '@/lib/extracting/server'
 
 export const runtime = 'nodejs'
 
@@ -53,7 +53,7 @@ async function logProviderFailure(response: Response) {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireAdmin(request)
+  const auth = await requireExtractingAccess(request)
   if ('response' in auth) return auth.response
 
   const mistralKey = process.env.MISTRAL_API_KEY

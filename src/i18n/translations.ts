@@ -1562,7 +1562,7 @@ export const translations = {
     extractingTitle: 'استخراج بيانات الاقامة',
     extractingSubtitle: 'ارفع صورة واضحة، راجع البيانات، ثم اختر منصات النشر',
     extractingNotAuthorized: 'غير مصرح',
-    extractingAdminOnly: 'هذه الصفحة متاحة للادمن فقط',
+    extractingAdminOnly: 'هذه الصفحة تحتاج صلاحية «صفحة استخراج النصوص»',
     extractingChooseImage: 'اختر صورة الاقامة',
     extractingImageHint: 'JPEG، PNG، WEBP — حد 10 ميجابايت',
     extractingKilobytes: 'كيلوبايت',
@@ -3316,7 +3316,7 @@ export const translations = {
     extractingSubtitle:
       'Upload a clear photo, review the data, then choose where to publish',
     extractingNotAuthorized: 'Not authorized',
-    extractingAdminOnly: 'This page is available to admins only',
+    extractingAdminOnly: 'This page requires the "Text extraction page" permission',
     extractingChooseImage: 'Choose the residence permit photo',
     extractingImageHint: 'JPEG, PNG, WEBP — up to 10 MB',
     extractingKilobytes: 'KB',

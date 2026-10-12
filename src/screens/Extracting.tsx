@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react'
 import { Send } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { FullPageSpinner } from '@/components/Spinner'
 import { EquipmentTypeLookup } from '@/components/extracting/EquipmentTypeLookup'
 import { ExtractionFieldsCard } from '@/components/extracting/ExtractionFieldsCard'
@@ -129,14 +130,26 @@ function ExtractingWorkspace({ token }: { token: string | undefined }) {
   )
 }
 
-/** Admin-only residence permit OCR and driver/ERPNext publishing. */
+/**
+ * Residence permit OCR and driver/ERPNext publishing, for users holding the
+ * `extracting.view` permission (migration 0128; wave 23). While the
+ * permissions load the page waits; after a failed load it fails closed to the
+ * legacy admin role, as the shell does. The API routes check the same
+ * permission server-side.
+ */
 export function Extracting() {
   const { t } = useI18n()
   const { session, profile, loading } = useAuth()
+  const permissions = usePermissions()
 
   if (loading) return <FullPageSpinner />
   if (!profile) return <AuthScreen />
-  if (profile.role !== 'admin')
+  if (permissions.status === 'loading') return <FullPageSpinner />
+  const allowed =
+    permissions.status === 'ready'
+      ? permissions.can('extracting.view')
+      : profile.role === 'admin'
+  if (!allowed)
     return (
       <main className="mx-auto max-w-3xl p-6">
         <Card className="p-8 text-center">
