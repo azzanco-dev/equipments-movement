@@ -68,10 +68,11 @@ interface AdminUsersProps {
 type UserRow = Profile & { assignedRole: AssignedRole | null }
 
 /** The embedded assignment, read with the profile when the flag is ON. */
-const ASSIGNMENT_EMBED = 'profile_roles(role_key,roles(name_ar,name_en))'
+const ASSIGNMENT_EMBED =
+  'profile_roles!profile_id(role_key,roles(name_ar,name_en))'
 /** The same embed as an inner join, for a filter on the assigned role. */
 const ASSIGNMENT_EMBED_INNER =
-  'profile_roles!inner(role_key,roles(name_ar,name_en))'
+  'profile_roles!profile_id!inner(role_key,roles(name_ar,name_en))'
 const ASSIGNED_ROLE_COLUMN = 'profile_roles.role_key'
 
 export function AdminUsers({ onSelectUser }: AdminUsersProps) {

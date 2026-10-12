@@ -304,12 +304,17 @@ test('the users list: ON reads the assignment and filters by it; OFF keeps the l
   assert.match(list, /const rolesOn = rolesSystemEnabled === true/)
   assert.match(
     list,
-    /const ASSIGNMENT_EMBED = 'profile_roles\(role_key,roles\(name_ar,name_en\)\)'/,
+    // `!profile_id` names the FK: profile_roles also points at profiles
+    // through assigned_by, and PostgREST refuses the ambiguous embed
+    // (PGRST201) without the hint.
+    /const ASSIGNMENT_EMBED =\s*'profile_roles!profile_id\(role_key,roles\(name_ar,name_en\)\)'/,
   )
   assert.match(
     list,
-    /'profile_roles!inner\(role_key,roles\(name_ar,name_en\)\)'/,
+    /'profile_roles!profile_id!inner\(role_key,roles\(name_ar,name_en\)\)'/,
   )
+  assert.ok(!/'profile_roles\(role_key/.test(list))
+  assert.ok(!/'profile_roles!inner\(/.test(list))
   // OFF: exactly the previous select.
   assert.match(list, /: 'id,full_name,role,must_change_password,created_at'/)
   // ON: the role column shows the assignment, the legacy badge otherwise.
