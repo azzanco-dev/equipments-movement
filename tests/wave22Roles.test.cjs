@@ -313,7 +313,7 @@ test('0126 and 0127 are new migrations ordered after 0125', () => {
     assert.equal(FILES.filter((file) => file.includes(`_${number}_`)).length, 1)
   assert.ok(FILES.indexOf(fileOf('0126')) > FILES.indexOf(fileOf('0125')))
   assert.ok(FILES.indexOf(fileOf('0127')) > FILES.indexOf(fileOf('0126')))
-  assert.equal(FILES[FILES.length - 1], fileOf('0127'))
+  assert.ok(FILES.indexOf(fileOf('0128')) > FILES.indexOf(fileOf('0127')))
   for (const sql of [SQL_0126, SQL_0127])
     assert.match(sql, /NOTIFY pgrst, 'reload schema';\s*$/)
 })
@@ -995,4 +995,42 @@ test('after 0127 no live policy or function tests a role name, except by design'
     'workshop',
     'workshop_manager',
   ])
+})
+
+// --- 0128 ---------------------------------------------------------------------
+
+test('0128 adds extracting.view for the admin only, on top of the 0126 mapping', () => {
+  const sql = read(fileOf('0128'))
+  assert.match(
+    sql,
+    /INSERT INTO public\.permissions \([\s\S]*?\('extracting\.view', 'settings', 'صفحة استخراج النصوص'[\s\S]*?false, NULL, '\{\}', false, 'interface', 830\)\s*ON CONFLICT \(key\) DO NOTHING;/,
+  )
+  // The frozen mapping is the 0126 body plus exactly one row for admin.
+  const before = code(lastFunction(SQL_0126, 'legacy_role_permissions'))
+  const after = code(lastFunction(sql, 'legacy_role_permissions'))
+  const row = "('admin', 'extracting.view', NULL),"
+  assert.equal(after.split(row).length, 2)
+  assert.equal(
+    after.replace(row, '').replace(/\s+/g, ' '),
+    before.replace(/\s+/g, ' '),
+  )
+  assert.ok(
+    !/\('(supervisor|workshop|assistant_workshop_manager|workshop_manager|monitor)', 'extracting\.view'/.test(
+      after,
+    ),
+  )
+  // The seed mirrors the mapping, and grants are restated.
+  assert.match(
+    sql,
+    /INSERT INTO public\.role_permissions \(role_key, permission_key, scope\)\s+VALUES \('admin', 'extracting\.view', NULL\)\s+ON CONFLICT \(role_key, permission_key\) DO NOTHING;/,
+  )
+  assert.match(
+    sql,
+    /REVOKE ALL ON FUNCTION public\.legacy_role_permissions\(text\)/,
+  )
+  assert.match(
+    sql,
+    /GRANT EXECUTE ON FUNCTION public\.legacy_role_permissions\(text\)/,
+  )
+  assert.ok(!/[أإآ]/.test(sql.replace(/--.*/g, '')))
 })
