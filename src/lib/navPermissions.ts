@@ -16,6 +16,14 @@ import type { PermissionScope } from '@/lib/types'
  * Callers pass the pages their current shell can render (`routable`) so the
  * menu never offers a link the router would not open.
  *
+ * The sidebar belongs to the ADMIN shell only: src/App.tsx builds it there
+ * (from these entries) and passes no entries to the foreman and workshop
+ * homes, so a field user who holds e.g. `inquiry.view` still has no sidebar.
+ * Inside the admin shell the menu lists exactly the sections the user's
+ * permissions pass; the home entry needs `home.admin` (owner decision
+ * 2026-10-13: a user whose permissions open any admin-shell section gets the
+ * admin shell with just those sections).
+ *
  * With the roles system OFF, `current_permissions()` answers from the frozen
  * `legacy_role_permissions(profiles.role)` mapping, and the menu built here is
  * exactly the role-based menu of before (tests/wave23Nav.test.cjs proves it
@@ -58,15 +66,13 @@ export interface NavEntry<K extends string = NavItemKey> {
 }
 
 /**
- * The sidebar exists only for the admin-home shell: a user without this key
- * (the foreman and workshop homes) gets no sidebar at all, as before.
+ * Item -> permission keys, in menu order. The order also decides where a user
+ * without `home.admin` lands (`planShell`: the first passing entry).
  */
-export const NAV_SHELL_PERMISSION = 'home.admin'
-
-/** Item -> permission keys, in menu order. */
 export const NAV_ENTRIES: readonly NavEntry[] = [
-  // Home: always (inside the admin-home shell).
-  { key: 'dashboard', requires: [] },
+  // The admin home: only with home.admin. Without it the admin shell has no
+  // dashboard and lands on the first section below.
+  { key: 'dashboard', requires: [{ key: 'home.admin' }] },
   {
     key: 'logs',
     requires: [{ key: 'movements.read', scopes: ['all', 'site', 'workshop'] }],
@@ -175,7 +181,6 @@ function allowed(
 function fromPermissions(
   permissions: ReadonlyMap<string, PermissionScope>,
 ): VisibleNavItem[] {
-  if (!passes(permissions, { key: NAV_SHELL_PERMISSION })) return []
   const items: VisibleNavItem[] = []
   for (const entry of NAV_ENTRIES) {
     if (!allowed(permissions, entry)) continue
@@ -199,9 +204,10 @@ function fromPermissions(
  *   fallback; a missing or unknown role gets nothing);
  * - `routable`, when given, drops entries the current shell cannot open.
  *
- * A menu holding nothing but home is returned empty: the sidebar is hidden
- * and home stays reachable through the header logo, sign-out through the
- * header, as for the roles that never had a sidebar.
+ * Only the admin shell calls this (the field homes pass no entries). A menu
+ * holding nothing but home is returned empty: the sidebar is hidden and home
+ * stays reachable through the header logo, sign-out through the header, as
+ * for the roles that never had a sidebar.
  */
 export function visibleNavItems(
   state: NavPermissionState,
@@ -242,13 +248,18 @@ export function visibleNavItems(
 //   home.foreman  -> 'foreman'  the field home, own-site list
 //   home.workshop -> 'workshop' the field home; scope 'all' = the managers'
 //                                variant with the embedded admin log
-//   none of them  -> 'minimal'  no sidebar, lands on /inquiry or /logs
-//                 -> 'none'     the no-permissions page (fail closed)
+//   none of them, but some sidebar section of NAV_ENTRIES passes
+//                 -> 'admin'    the sidebar shell WITHOUT the dashboard: the
+//                                sidebar lists the passing sections and the
+//                                user lands on the first of them (owner
+//                                decision 2026-10-13, e.g. equipment.read
+//                                alone -> «المعدات» only, landing /equipment)
+//   nothing       -> 'none'     the no-permissions page (fail closed)
 //
-// Precedence admin > foreman > workshop. While the permissions load, or after
-// their load failed, the decision is the role-based routing of before
-// (LEGACY_SHELL_BY_ROLE, captured from src/App.tsx at 8f17f53), so a legacy
-// user never sees a flash and a failed load changes nothing.
+// Precedence admin > foreman > workshop > sections. While the permissions
+// load, or after their load failed, the decision is the role-based routing of
+// before (LEGACY_SHELL_BY_ROLE, captured from src/App.tsx at 8f17f53), so a
+// legacy user never sees a flash and a failed load changes nothing.
 //
 // Only the shell and its page guards moved. In-screen actions, data hooks,
 // API routes and Edge Functions still decide by the role.
@@ -362,7 +373,6 @@ export type ShellKind =
   | 'admin'
   | 'foreman'
   | 'workshop'
-  | 'minimal'
   /** Permissions loaded and they open nothing: the no-permissions page. */
   | 'none'
   /** Fallback only: an unknown role after a failed load (as before). */
@@ -382,9 +392,13 @@ export interface ShellPlan {
    * role fallback, where HomeScreen keeps deriving it from the role.
    */
   homeScope?: ShellHomeScope
-  /** The minimal shell's landing page. */
-  landing?: 'inquiry' | 'logs'
-  /** The pages that render; any other URL renders the shell's home. */
+  /**
+   * The page a URL the shell does not open lands on: the shell's home
+   * ('dashboard'), except in the admin shell without home.admin, where it is
+   * the first open section in menu order (src/App.tsx then replaces the URL).
+   */
+  landing: RoutePage
+  /** The pages that render; any other URL renders `landing`. */
   pages: ReadonlySet<RoutePage>
 }
 
@@ -425,19 +439,10 @@ const FIELD_SHELL_PAGES: readonly RoutePage[] = [
   'movements/new',
   'movements/:id',
 ]
-const MINIMAL_SHELL_PAGES: readonly RoutePage[] = [
-  'inquiry',
-  'logs',
-  'movements/:id',
-]
-
-export const SHELL_PAGES: Readonly<
-  Record<HomeShell | 'minimal', readonly RoutePage[]>
-> = {
+export const SHELL_PAGES: Readonly<Record<HomeShell, readonly RoutePage[]>> = {
   admin: ADMIN_SHELL_PAGES,
   foreman: FIELD_SHELL_PAGES,
   workshop: FIELD_SHELL_PAGES,
-  minimal: MINIMAL_SHELL_PAGES,
 }
 
 /**
@@ -481,10 +486,38 @@ function openPages(
 }
 
 /**
+ * The pages of a field home: its own home page always (the dashboard gate,
+ * home.admin, belongs to the admin shell), the rest by their gates.
+ */
+function fieldPages(
+  permissions: ReadonlyMap<string, PermissionScope>,
+): Set<RoutePage> {
+  return openPages(permissions, FIELD_SHELL_PAGES).add('dashboard')
+}
+
+/**
+ * The first sidebar SECTION (every entry but the dashboard) the permissions
+ * pass, in menu order; for a parent with children, its first passing child.
+ * Undefined when no section passes.
+ */
+function firstOpenSection(
+  permissions: ReadonlyMap<string, PermissionScope>,
+): RoutePage | undefined {
+  for (const entry of NAV_ENTRIES) {
+    if (entry.key === 'dashboard' || !allowed(permissions, entry)) continue
+    if (!entry.children) return entry.key
+    const child = entry.children.find((item) => allowed(permissions, item))
+    if (child) return child.key
+  }
+  return undefined
+}
+
+/**
  * The shell for this user and the pages that render in it.
  *
  * - permissions `ready`: home.admin > home.foreman > home.workshop, else the
- *   minimal shell when /inquiry or /logs opens, else 'none';
+ *   admin shell without its dashboard when any sidebar section passes
+ *   (landing on the first one), else 'none';
  * - `loading` / `error`: LEGACY_SHELL_BY_ROLE (`role` is only this
  *   fallback). An unknown role waits ('pending') while loading and gets the
  *   role-unavailable page of before after a failure.
@@ -502,9 +535,15 @@ export function planShell(
       return {
         kind: state.status === 'loading' ? 'pending' : 'unavailable',
         source: 'role',
+        landing: 'dashboard',
         pages: new Set(),
       }
-    return { kind: legacy.kind, source: 'role', pages: new Set(legacy.pages) }
+    return {
+      kind: legacy.kind,
+      source: 'role',
+      landing: 'dashboard',
+      pages: new Set(legacy.pages),
+    }
   }
 
   const permissions = state.permissions
@@ -512,6 +551,7 @@ export function planShell(
     return {
       kind: 'admin',
       source: 'permissions',
+      landing: 'dashboard',
       pages: openPages(permissions, ADMIN_SHELL_PAGES),
     }
   // The field home has a single foreman variant (own site movements), so
@@ -521,7 +561,8 @@ export function planShell(
       kind: 'foreman',
       source: 'permissions',
       homeScope: 'own_site',
-      pages: openPages(permissions, FIELD_SHELL_PAGES),
+      landing: 'dashboard',
+      pages: fieldPages(permissions),
     }
   const workshopScope = permissions.get('home.workshop')
   if (workshopScope)
@@ -529,14 +570,24 @@ export function planShell(
       kind: 'workshop',
       source: 'permissions',
       homeScope: workshopScope === 'all' ? 'all_contexts' : 'workshop',
-      pages: openPages(permissions, FIELD_SHELL_PAGES),
+      landing: 'dashboard',
+      pages: fieldPages(permissions),
     }
-  const pages = openPages(permissions, MINIMAL_SHELL_PAGES)
-  const landing = pages.has('inquiry')
-    ? 'inquiry'
-    : pages.has('logs')
-      ? 'logs'
-      : undefined
-  if (!landing) return { kind: 'none', source: 'permissions', pages: new Set() }
-  return { kind: 'minimal', source: 'permissions', landing, pages }
+  // No home at all: the admin shell for the sections the permissions open.
+  // The dashboard is gated on home.admin, so openPages leaves it out and the
+  // user lands on the first open section instead.
+  const landing = firstOpenSection(permissions)
+  if (!landing)
+    return {
+      kind: 'none',
+      source: 'permissions',
+      landing: 'dashboard',
+      pages: new Set(),
+    }
+  return {
+    kind: 'admin',
+    source: 'permissions',
+    landing,
+    pages: openPages(permissions, ADMIN_SHELL_PAGES),
+  }
 }

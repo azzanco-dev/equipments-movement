@@ -518,7 +518,10 @@ test('the print page is a chrome-less route of the signed-in app', () => {
   // it opens for movements.export (the admin and monitor roles in the role
   // fallback; tests/wave23Shell.test.cjs).
   assert.ok(route > app.indexOf('if (!profile) return <AuthScreen />'))
-  assert.ok(route < app.indexOf("if (shell.kind === 'minimal')"))
+  assert.ok(
+    route <
+      app.indexOf("if (shell.kind === 'foreman' || shell.kind === 'workshop')"),
+  )
   assert.match(
     app,
     /if \(requested === 'print\/export' && shell\.pages\.has\('print\/export'\)\)\s+return <PrintExport payloadKey=\{searchParams\.get\('key'\)\} \/>/,

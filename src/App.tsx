@@ -35,7 +35,7 @@ import {
   type NavChildKey,
   type NavItemKey,
   type RoutePage,
-  type ShellKind,
+  type ShellPlan,
 } from '@/lib/navPermissions'
 import type { TranslationKey } from '@/i18n/translations'
 
@@ -78,8 +78,9 @@ function MovementDetailFallback() {
 const LANDING_HINT_KEY = 'em.landing-hint'
 type LandingHint = 'admin-home' | 'home'
 
-function landingHintForShell(kind: ShellKind): LandingHint | null {
-  if (kind === 'admin') return 'admin-home'
+function landingHintForShell({ kind, landing }: ShellPlan): LandingHint | null {
+  // The admin shell without home.admin lands on a section, not the home.
+  if (kind === 'admin') return landing === 'dashboard' ? 'admin-home' : null
   if (kind === 'foreman' || kind === 'workshop') return 'home'
   return null
 }
@@ -320,9 +321,10 @@ function AppContent() {
     [permissionStatus, permissions, role],
   )
   const requested = routePageOf(segments)
-  // A page this user may not open renders the shell's home, as an unknown
-  // URL always did.
-  const page: RoutePage = shell.pages.has(requested) ? requested : 'dashboard'
+  // A page this user may not open renders the shell's landing page: its home,
+  // as an unknown URL always did, or the first open section of an admin shell
+  // without home.admin.
+  const page: RoutePage = shell.pages.has(requested) ? requested : shell.landing
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
@@ -336,7 +338,7 @@ function AppContent() {
     preloadScreenForPath(pathname.split('/').filter(Boolean))
   }, [signedIn, pathname])
 
-  const landingHint = profile ? landingHintForShell(shell.kind) : null
+  const landingHint = profile ? landingHintForShell(shell) : null
   useEffect(() => {
     if (!landingHint) return
     try {
@@ -346,15 +348,16 @@ function AppContent() {
     }
   }, [landingHint])
 
-  // The minimal shell has no home: anything it does not open lands on its
-  // first page.
-  const minimalRedirect =
-    profile && shell.kind === 'minimal' && !shell.pages.has(requested)
-      ? `/${shell.landing ?? 'inquiry'}`
+  // The admin shell without home.admin has no dashboard: a URL it does not
+  // open (including /dashboard, where the header logo points) lands on its
+  // first open section, and the URL is replaced so it matches the page.
+  const landingRedirect =
+    profile && shell.landing !== 'dashboard' && !shell.pages.has(requested)
+      ? `/${shell.landing}`
       : null
   useEffect(() => {
-    if (minimalRedirect) router.replace(minimalRedirect)
-  }, [minimalRedirect, router])
+    if (landingRedirect) router.replace(landingRedirect)
+  }, [landingRedirect, router])
 
   // Full-screen loader for the auth bootstrap only. For an account whose
   // role the fallback does not know, that includes its permissions, instead
@@ -405,49 +408,9 @@ function AppContent() {
   const openMovement = (id: string) => router.push(`/movements/${id}`)
   const backToDashboard = () => router.push('/dashboard')
   const navigate = (target: string) => router.push(`/${target}`)
-  // Only the admin shell ever has entries (NAV_SHELL_PERMISSION); the routable
-  // set is the shell's open pages, so the menu and the guards agree.
-  const navItems = visibleNavItems(
-    permissionState,
-    profile.role,
-    shell.pages,
-  ).map((item) => ({
-    key: item.key,
-    label: t(NAV_PRESENTATION[item.key].label),
-    icon: NAV_PRESENTATION[item.key].icon,
-    children: item.children?.map((child) => ({
-      key: child,
-      label: t(NAV_CHILD_LABELS[child]),
-    })),
-  }))
 
-  if (shell.kind === 'minimal')
-    return (
-      <>
-        <Layout
-          activePage={navKeyOfPage(page)}
-          onNavigate={navigate}
-          navItems={navItems}
-        >
-          {minimalRedirect ? (
-            <RouteFallback />
-          ) : page === 'movements/:id' ? (
-            <MovementDetail
-              movementId={detailId}
-              onBack={() => router.back()}
-              onNavigateMovement={openMovement}
-            />
-          ) : page === 'logs' ? (
-            <LogsScreen onSelectMovement={openMovement} />
-          ) : (
-            <EquipmentInquiryScreen onSelectMovement={openMovement} />
-          )}
-        </Layout>
-        {passwordDialog}
-      </>
-    )
-
-  // The foreman and workshop homes. `movementsScope` comes from the home.*
+  // The foreman and workshop homes, which never have a sidebar (whatever
+  // other keys the user holds). `movementsScope` comes from the home.*
   // permission scope (undefined in the role fallback: HomeScreen then reads
   // the role, as before).
   if (shell.kind === 'foreman' || shell.kind === 'workshop')
@@ -456,7 +419,7 @@ function AppContent() {
         <Layout
           activePage={page === 'inquiry' ? 'inquiry' : 'dashboard'}
           onNavigate={navigate}
-          navItems={navItems}
+          navItems={[]}
         >
           {page === 'movements/new' ? (
             <MovementCreate
@@ -487,11 +450,29 @@ function AppContent() {
       </>
     )
 
-  // The admin shell (home.admin; the admin and monitor roles in the
-  // fallback). Each page renders only when its gate passes. Every other
-  // kind returned above; the compiler checks it, so nothing falls through.
+  // The admin shell: home.admin (the admin and monitor roles in the fallback),
+  // or any admin-shell section without a home, with the dashboard closed and
+  // the landing on the first section. Each page renders only when its gate
+  // passes; AdminHomeScreen only for 'dashboard', which opens with home.admin
+  // alone. Every other kind returned above; the compiler checks it, so
+  // nothing falls through.
   const adminShell: 'admin' = shell.kind
   void adminShell
+  // The sidebar lists the sections the permissions pass; the routable set is
+  // the shell's open pages, so the menu and the guards agree.
+  const navItems = visibleNavItems(
+    permissionState,
+    profile.role,
+    shell.pages,
+  ).map((item) => ({
+    key: item.key,
+    label: t(NAV_PRESENTATION[item.key].label),
+    icon: NAV_PRESENTATION[item.key].icon,
+    children: item.children?.map((child) => ({
+      key: child,
+      label: t(NAV_CHILD_LABELS[child]),
+    })),
+  }))
   const canOpenEquipment = shell.pages.has('equipment/:id')
   const canCreateMovement = shell.pages.has('movements/new')
 
@@ -502,7 +483,9 @@ function AppContent() {
         onNavigate={navigate}
         navItems={navItems}
       >
-        {page === 'movements/new' ? (
+        {landingRedirect ? (
+          <RouteFallback />
+        ) : page === 'movements/new' ? (
           <MovementCreate
             movementType={movementType}
             onClose={() => router.push('/logs')}

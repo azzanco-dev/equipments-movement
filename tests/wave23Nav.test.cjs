@@ -133,6 +133,18 @@ const SHELL_PAGES = Object.fromEntries(
 
 const ready = (map) => ({ status: 'ready', permissions: map })
 
+/**
+ * The sidebar App.tsx shows (2026-10-13): built from visibleNavItems in the
+ * ADMIN shell only, limited to the shell's open pages; the foreman and
+ * workshop homes pass `navItems={[]}`, whatever other keys the user holds.
+ */
+function shownMenu(state, role) {
+  const shell = nav.planShell(state, role)
+  return shell.kind === 'admin'
+    ? plain(nav.visibleNavItems(state, role, shell.pages))
+    : []
+}
+
 // --- Equivalence with the roles system OFF ------------------------------------
 
 test('the legacy mapping covers the six roles', () => {
@@ -142,35 +154,44 @@ test('the legacy mapping covers the six roles', () => {
 for (const role of ROLES) {
   test(`roles OFF: the permission menu of ${role} equals today's menu`, () => {
     const permissions = LEGACY.get(role)
-    // Without the shell restriction (pure permission decision)…
-    assert.deepEqual(
-      plain(nav.visibleNavItems(ready(permissions), role)),
-      CAPTURED[role],
-    )
-    // …and with the pages of the shell App.tsx routes this role to.
-    assert.deepEqual(
-      plain(nav.visibleNavItems(ready(permissions), role, SHELL_PAGES[role])),
-      CAPTURED[role],
-    )
+    // The menu the shell shows…
+    assert.deepEqual(shownMenu(ready(permissions), role), CAPTURED[role])
+    // …which, for the admin shell, is the pure permission decision limited
+    // to the pages of the shell App.tsx routes this role to.
+    if (permissions.has('home.admin')) {
+      assert.deepEqual(
+        plain(nav.visibleNavItems(ready(permissions), role)),
+        CAPTURED[role],
+      )
+      assert.deepEqual(
+        plain(nav.visibleNavItems(ready(permissions), role, SHELL_PAGES[role])),
+        CAPTURED[role],
+      )
+    } else {
+      // A field home: the role's shell shows no sidebar even though some of
+      // its keys (inquiry.view, movements.read) are sidebar entries.
+      assert.equal(
+        nav.planShell(ready(permissions), role).kind !== 'admin',
+        true,
+      )
+      assert.deepEqual(CAPTURED[role], [])
+    }
     // The role does not matter once permissions are ready.
     assert.deepEqual(
-      plain(nav.visibleNavItems(ready(permissions), 'someone-else')),
+      shownMenu(ready(permissions), 'someone-else'),
       CAPTURED[role],
     )
   })
 
   test(`loading / failed permissions: ${role} keeps today's menu`, () => {
-    for (const status of ['loading', 'error'])
+    for (const status of ['loading', 'error']) {
+      const state = { status, permissions: new Map() }
+      assert.deepEqual(shownMenu(state, role), CAPTURED[role])
       assert.deepEqual(
-        plain(
-          nav.visibleNavItems(
-            { status, permissions: new Map() },
-            role,
-            SHELL_PAGES[role],
-          ),
-        ),
+        plain(nav.visibleNavItems(state, role, SHELL_PAGES[role])),
         CAPTURED[role],
       )
+    }
   })
 }
 
@@ -196,15 +217,39 @@ test('an unknown or missing role with no permissions gets no sidebar', () => {
       )
 })
 
-test('without the admin-home shell key there is no sidebar', () => {
+test('without home.admin the menu lists the sections, not the home', () => {
   const map = new Map(LEGACY.get('admin'))
   map.delete('home.admin')
-  assert.deepEqual(plain(nav.visibleNavItems(ready(map), 'admin')), [])
+  const expected = CAPTURED.admin.filter((item) => item.key !== 'dashboard')
+  assert.deepEqual(plain(nav.visibleNavItems(ready(map), 'admin')), expected)
+  assert.deepEqual(shownMenu(ready(map), 'admin'), expected)
+  assert.equal(nav.planShell(ready(map), 'admin').landing, 'logs')
+  // one section alone
+  assert.deepEqual(
+    shownMenu(ready(new Map([['equipment.read', 'all']])), 'x'),
+    [{ key: 'equipment' }],
+  )
   // home alone is not a menu
   assert.deepEqual(
     plain(nav.visibleNavItems(ready(new Map([['home.admin', 'all']])), 'x')),
     [],
   )
+  assert.deepEqual(shownMenu(ready(new Map([['home.admin', 'all']])), 'x'), [])
+})
+
+test('a field home shows no sidebar whatever else the user holds', () => {
+  for (const home of ['home.foreman', 'home.workshop']) {
+    const state = ready(
+      new Map([
+        [home, 'all'],
+        ['inquiry.view', 'all'],
+        ['equipment.read', 'all'],
+        ['movements.read', 'all'],
+      ]),
+    )
+    assert.notEqual(nav.planShell(state, 'x').kind, 'admin')
+    assert.deepEqual(shownMenu(state, 'x'), [])
+  }
 })
 
 test('scopes and any-of gates', () => {
@@ -256,7 +301,12 @@ test('routable drops pages the current shell cannot open', () => {
 
 test('every gate is a key of the permission catalogue', () => {
   const catalogue = catalogueKeys()
-  assert.ok(catalogue.has(nav.NAV_SHELL_PERMISSION))
+  // The home entry's gate is the admin-home key (2026-10-13).
+  assert.deepEqual(plain(nav.NAV_ENTRIES[0]), {
+    key: 'dashboard',
+    requires: [{ key: 'home.admin' }],
+  })
+  assert.equal(nav.NAV_SHELL_PERMISSION, undefined)
   const gates = nav.NAV_ENTRIES.flatMap((entry) => [
     ...entry.requires,
     ...(entry.children ?? []).flatMap((child) => child.requires),
@@ -272,14 +322,25 @@ test('App.tsx builds every sidebar from visibleNavItems', () => {
     APP,
     /import \{ usePermissions \} from '@\/auth\/PermissionsContext'/,
   )
-  // One menu, built once, limited to the open pages of the chosen shell.
+  // One menu, built once for the admin shell, limited to its open pages.
   assert.match(
     APP,
     /const navItems = visibleNavItems\(\s*permissionState,\s*profile\.role,\s*shell\.pages,?\s*\)/,
   )
   assert.equal(APP.split('visibleNavItems(').length, 2)
-  assert.equal(APP.split('navItems={navItems}').length, 4, 'every shell')
-  assert.doesNotMatch(APP, /navItems=\{\[\]\}/)
+  assert.equal(APP.split('navItems={navItems}').length, 2, 'the admin shell')
+  // The field homes never have a sidebar, and the menu is built after them.
+  assert.equal(APP.split('navItems={[]}').length, 2, 'the field shell')
+  const fieldShell = APP.indexOf(
+    "if (shell.kind === 'foreman' || shell.kind === 'workshop')",
+  )
+  const menuBuilt = APP.indexOf('const navItems = visibleNavItems(')
+  const adminShell = APP.indexOf("const adminShell: 'admin' = shell.kind")
+  assert.ok(fieldShell > 0 && menuBuilt > 0 && adminShell > 0)
+  assert.ok(APP.indexOf('navItems={[]}') > fieldShell)
+  assert.ok(APP.indexOf('navItems={[]}') < adminShell)
+  assert.ok(menuBuilt > adminShell)
+  assert.ok(APP.indexOf('navItems={navItems}') > menuBuilt)
   // no hand-written role menus left
   assert.doesNotMatch(APP, /\{ key: 'logs', label: t\('logs'\)/)
   // wave 23 step 2: the shells no longer branch on the role

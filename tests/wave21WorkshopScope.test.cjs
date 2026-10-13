@@ -128,10 +128,11 @@ test('/logs keeps opening on the projects tab for admin and monitor', () => {
     /if \(next === defaultContext\) query\.delete\('context'\)/,
   )
   assert.match(logs, /const TABS: LogsTab\[\] = \['site', 'workshop', 'all'\]/)
-  // The admin and monitor routes pass none of the embedding props.
+  // The admin-shell route (the admin and monitor roles and, since 2026-10-13,
+  // anyone whose sections include the log) passes none of the embedding props.
   const app = read('src', 'App.tsx')
   const routes = app.match(/<LogsScreen[^>]*\/>/g)
-  assert.ok(routes && routes.length >= 2)
+  assert.ok(routes && routes.length >= 1)
   for (const route of routes)
     assert.equal(route, '<LogsScreen onSelectMovement={openMovement} />')
 })
