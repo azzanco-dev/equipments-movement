@@ -14,6 +14,7 @@ import {
 
 const STATUS_TONES: Record<PublishStatus, BadgeTone> = {
   created: 'success',
+  updated: 'success',
   existing: 'info',
   partial: 'warning',
   skipped: 'neutral',

@@ -1,4 +1,10 @@
-import type { ExtractionForm, PublishResults, PublishTargets } from './form'
+import type {
+  ExtractionForm,
+  PublishMode,
+  PublishResults,
+  PublishTargets,
+} from './form'
+import type { LookupResult } from './lookup'
 import type { OcrFields } from './ocr'
 
 /** An API failure carrying a code the screen maps to a translated message. */
@@ -59,10 +65,28 @@ export async function extractIdentity(
   return payload.data
 }
 
+/** What already exists for a residence number; read-only. */
+export async function lookupExtraction(
+  token: string,
+  idNumber: string,
+): Promise<LookupResult> {
+  return request<LookupResult>(
+    '/api/extracting/lookup',
+    token,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id_number: idNumber }),
+    },
+    'lookup_failed',
+  )
+}
+
 export async function publishExtraction(
   token: string,
   data: ExtractionForm,
   targets: PublishTargets,
+  mode: PublishMode = 'create',
 ): Promise<PublishResults> {
   const payload = await request<{ results: PublishResults }>(
     '/api/extracting/publish',
@@ -70,7 +94,7 @@ export async function publishExtraction(
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data, targets }),
+      body: JSON.stringify({ data, targets, mode }),
     },
     'publish_failed',
   )

@@ -1605,6 +1605,7 @@ export const translations = {
     extractingStepUser: 'المستخدم',
     extractingStepEmployee: 'الموظف',
     extractingStatusCreated: 'تم الانشاء',
+    extractingStatusUpdated: 'تم التحديث',
     extractingStatusExisting: 'موجود مسبقا',
     extractingStatusPartial: 'اكتمل جزئيا',
     extractingStatusSkipped: 'لم يتم اختياره',
@@ -1656,6 +1657,23 @@ export const translations = {
     extractingErrUnknown: 'تعذر اكمال العملية',
     extractingErrLocalLookup: 'تعذر التحقق من السائق في النظام الحالي',
     extractingErrLocalCreate: 'تعذر انشاء السائق في النظام الحالي',
+    extractingErrLocalUpdate: 'تعذر تحديث السائق في النظام الحالي',
+    extractingErrLookup: 'تعذر البحث عن سجل بهذا الرقم. حاول مرة اخرى',
+    extractingUpdateSubmit: 'تحديث السجل الموجود',
+    extractingUpdateNotice:
+      'في وضع التحديث تكتب حقول الهوية فقط، بالقيم غير الفارغة:',
+    extractingUpdateNoticeSuffix:
+      'لن يتم تغيير رقم الاقامة، ولا بريد مستخدم ERPNext او كلمة مروره، ولا بيانات التوظيف (الشركة، نوع التوظيف، القسم، تاريخ المباشرة، الراتب، رقم الموظف)',
+    extractingLookupSection: 'سجل موجود',
+    extractingLookupDescription: 'البحث برقم الاقامة في منصات النشر',
+    extractingLookupLoading: 'جار البحث عن سجل بهذا الرقم',
+    extractingLookupNone: 'لا يوجد سجل بهذا الرقم',
+    extractingLookupNoneInTarget: 'لا يوجد',
+    extractingLookupAdminOnly: 'التحديث متاح للادمن فقط',
+    extractingLookupErpNotConfigured: 'ERPNext غير مهيا على الخادم',
+    extractingLookupDriverId: 'رقم السجل',
+    extractingLookupEmployeeId: 'رقم الموظف',
+    extractingLookupUserId: 'المستخدم',
     extractingErrErpRequiredFields: 'اكمل حقول ERPNext المطلوبة',
     extractingErrErpNotConfigured: 'اعدادات ERPNext غير مكتملة على الخادم',
     extractingErrErpFieldMapping: 'اعدادات حقول ERPNext غير صالحة',
@@ -3360,6 +3378,7 @@ export const translations = {
     extractingStepUser: 'User',
     extractingStepEmployee: 'Employee',
     extractingStatusCreated: 'Created',
+    extractingStatusUpdated: 'Updated',
     extractingStatusExisting: 'Already exists',
     extractingStatusPartial: 'Partially completed',
     extractingStatusSkipped: 'Not selected',
@@ -3415,6 +3434,26 @@ export const translations = {
       'Could not check the driver in the current system',
     extractingErrLocalCreate:
       'Could not create the driver in the current system',
+    extractingErrLocalUpdate:
+      'Could not update the driver in the current system',
+    extractingErrLookup:
+      'Could not look up a record for this number. Try again',
+    extractingUpdateSubmit: 'Update the existing record',
+    extractingUpdateNotice:
+      'In update mode only the identity fields are written, non-empty values only:',
+    extractingUpdateNoticeSuffix:
+      'The residence number, the ERPNext user email and password, and the employment data (company, employment type, department, date of joining, salary, employee number) are never changed',
+    extractingLookupSection: 'Existing record',
+    extractingLookupDescription:
+      'Looked up by the residence number in the publish targets',
+    extractingLookupLoading: 'Looking up a record for this number',
+    extractingLookupNone: 'No record exists for this number',
+    extractingLookupNoneInTarget: 'None',
+    extractingLookupAdminOnly: 'Updating is available to the admin only',
+    extractingLookupErpNotConfigured: 'ERPNext is not configured on the server',
+    extractingLookupDriverId: 'Record id',
+    extractingLookupEmployeeId: 'Employee id',
+    extractingLookupUserId: 'User',
     extractingErrErpRequiredFields: 'Complete the required ERPNext fields',
     extractingErrErpNotConfigured:
       'ERPNext settings are incomplete on the server',

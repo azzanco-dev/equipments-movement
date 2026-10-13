@@ -33,7 +33,38 @@ export interface PublishTargets {
 export type PublishTarget = keyof PublishTargets
 
 export type PublishStatus =
-  'created' | 'existing' | 'partial' | 'skipped' | 'failed'
+  'created' | 'updated' | 'existing' | 'partial' | 'skipped' | 'failed'
+
+/**
+ * `create` (default) never touches an existing record; `update` rewrites the
+ * record matched by the residence number with the reviewed non-empty values.
+ * The publish route grants `update` to `public.is_admin()` only.
+ */
+export type PublishMode = 'create' | 'update'
+export const PUBLISH_MODES = ['create', 'update'] as const
+
+/**
+ * The ONLY fields update mode writes to an existing driver / Employee: the
+ * identity data the OCR extracts (plus the residence number, which stays the
+ * match key and is never written). Employment and account data (email,
+ * password, language, company, employment type, department, date of joining,
+ * salary, employee number, status) are never overwritten. Within this list
+ * only non-empty values are written.
+ */
+export const UPDATE_FIELDS = [
+  'full_name_ar',
+  'full_name_en',
+  'date_of_birth',
+  'residence_expiry_date',
+  'nationality',
+  'occupation',
+  'gender',
+  'mobile_number',
+] as const satisfies readonly ExtractionFieldKey[]
+
+export function isUpdateField(key: ExtractionFieldKey): boolean {
+  return (UPDATE_FIELDS as readonly ExtractionFieldKey[]).includes(key)
+}
 
 export interface TargetPublishResult {
   status: PublishStatus
@@ -78,6 +109,11 @@ export const DATE_FIELDS = [
 ] as const satisfies readonly ExtractionFieldKey[]
 
 const ID_NUMBER_PATTERN = /^\d{5,20}$/
+
+/** The residence number rule shared by the form, the publish and the lookup. */
+export function isValidIdNumber(value: string): boolean {
+  return ID_NUMBER_PATTERN.test(value.trim())
+}
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MOBILE_PATTERN = /^\+?\d{7,15}$/
 const CTC_PATTERN = /^\d+(?:\.\d{1,2})?$/
@@ -152,11 +188,7 @@ export function validateExtractionForm(
     const value = data[key].trim()
     if (value && !errors[key] && !valid(value)) errors[key] = code
   }
-  check(
-    'id_number',
-    (value) => ID_NUMBER_PATTERN.test(value),
-    'invalid_id_number',
-  )
+  check('id_number', isValidIdNumber, 'invalid_id_number')
   check('email', (value) => EMAIL_PATTERN.test(value), 'invalid_email')
   check(
     'mobile_number',

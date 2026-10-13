@@ -1,26 +1,50 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import {
-  configuredFieldName,
+  createErpClient,
+  ErpError,
+  erpConfiguration,
+  findEmployeeByResidence,
+  listQuery,
+  listRows,
+  resourceName,
+  type ErpEmployeeMatch,
+  type ErpRequest,
+} from '@/lib/extracting/erpnext'
+import {
   currentSystemDriverPayload,
+  currentSystemDriverUpdatePayload,
   erpErrorDetails,
   erpEmployeePayload,
+  erpEmployeeUpdatePayload,
   erpUserPayload,
   missingErpFields,
   parsePublishRequest,
   type ExtractionPublishData,
+  type PublishMode,
   type PublishStatus,
   type TargetPublishResult,
 } from '@/lib/extracting/publish'
-import { apiError, requireExtractingAccess } from '@/lib/extracting/server'
+import {
+  apiError,
+  callerIsAdmin,
+  requireExtractingAccess,
+} from '@/lib/extracting/server'
 
 export const runtime = 'nodejs'
 
 const SKIPPED: TargetPublishResult = { status: 'skipped' }
 
+/**
+ * Current system: `create` leaves a driver matched by `id_number` untouched
+ * (`existing`); `update` rewrites its non-empty reviewed columns
+ * (`currentSystemDriverUpdatePayload`) and reports `updated`. Either mode
+ * inserts when no driver matches. RLS decides through the caller's token.
+ */
 async function publishCurrentSystem(
   supabase: SupabaseClient,
   data: ExtractionPublishData,
+  mode: PublishMode,
 ): Promise<TargetPublishResult> {
   const findDriver = () =>
     supabase
@@ -31,7 +55,16 @@ async function publishCurrentSystem(
 
   const { data: existing, error: lookupError } = await findDriver()
   if (lookupError) return { status: 'failed', error: 'local_lookup_failed' }
-  if (existing?.id) return { status: 'existing', id: existing.id }
+  if (existing?.id) {
+    if (mode !== 'update') return { status: 'existing', id: existing.id }
+    const { error: updateError } = await supabase
+      .from('drivers')
+      .update(currentSystemDriverUpdatePayload(data))
+      .eq('id', existing.id)
+    if (updateError)
+      return { status: 'failed', id: existing.id, error: 'local_update_failed' }
+    return { status: 'updated', id: existing.id }
+  }
 
   const { data: created, error: insertError } = await supabase
     .from('drivers')
@@ -45,110 +78,6 @@ async function publishCurrentSystem(
     return { status: 'failed', error: 'local_create_failed' }
   }
   return { status: 'created', id: created.id }
-}
-
-/** A known ERPNext failure whose code the screen can explain. */
-class ErpError extends Error {
-  constructor(readonly code: string) {
-    super(code)
-  }
-}
-
-type ErpResponse = {
-  ok: boolean
-  status: number
-  data?: Record<string, unknown>
-}
-
-function erpConfiguration() {
-  const baseUrl = process.env.ERPNEXT_BASE_URL?.trim().replace(/\/+$/, '')
-  const apiKey = process.env.ERPNEXT_API_KEY?.trim()
-  const apiSecret = process.env.ERPNEXT_API_SECRET?.trim()
-  if (!baseUrl || !apiKey || !apiSecret) return null
-  try {
-    const parsed = new URL(baseUrl)
-    if (parsed.protocol !== 'https:' && parsed.hostname !== 'localhost')
-      return null
-  } catch {
-    return null
-  }
-  return {
-    baseUrl,
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Authorization: `token ${apiKey}:${apiSecret}`,
-    },
-  }
-}
-
-type ErpConfig = NonNullable<ReturnType<typeof erpConfiguration>>
-
-function createErpClient(config: ErpConfig) {
-  return async function erpRequest(
-    path: string,
-    init: RequestInit = {},
-  ): Promise<ErpResponse> {
-    const response = await fetch(`${config.baseUrl}${path}`, {
-      ...init,
-      headers: { ...config.headers, ...init.headers },
-      signal: AbortSignal.timeout(20_000),
-      cache: 'no-store',
-    })
-    const data = (await response.json().catch(() => undefined)) as
-      Record<string, unknown> | undefined
-    return { ok: response.ok, status: response.status, data }
-  }
-}
-
-type ErpRequest = ReturnType<typeof createErpClient>
-
-function resourceName(response: Record<string, unknown> | undefined) {
-  const data = response?.data
-  if (!data || typeof data !== 'object') return null
-  const name = (data as Record<string, unknown>).name
-  return typeof name === 'string' ? name : null
-}
-
-function listRows(response: ErpResponse): Record<string, unknown>[] {
-  const rows = response.data?.data
-  return Array.isArray(rows)
-    ? rows.filter(
-        (row): row is Record<string, unknown> =>
-          !!row && typeof row === 'object',
-      )
-    : []
-}
-
-function listQuery(fields: string[], filters: unknown[], limit: number) {
-  return new URLSearchParams({
-    fields: JSON.stringify(fields),
-    filters: JSON.stringify(filters),
-    limit_page_length: String(limit),
-  }).toString()
-}
-
-async function findEmployeeByResidence(erp: ErpRequest, idNumber: string) {
-  const residenceField = configuredFieldName(
-    process.env.ERPNEXT_RESIDENCE_NUMBER_FIELD,
-    'custom_residence_permit_number',
-  )
-  if (!residenceField) throw new ErpError('erp_invalid_field_mapping')
-  const response = await erp(
-    `/api/resource/Employee?${listQuery(
-      ['name', 'user_id', 'cell_number'],
-      [[residenceField, '=', idNumber]],
-      1,
-    )}`,
-  )
-  if (!response.ok) throw new ErpError('erp_employee_lookup_failed')
-  const row = listRows(response)[0]
-  if (!row || typeof row.name !== 'string') return null
-  return {
-    name: row.name,
-    userId: typeof row.user_id === 'string' ? row.user_id : '',
-    cellNumber: typeof row.cell_number === 'string' ? row.cell_number : '',
-  }
 }
 
 const STANDARD_EMPLOYEE_FIELDS = [
@@ -211,7 +140,11 @@ async function invalidErpReference(
   return index === -1 ? null : checks[index][2]
 }
 
-/** Ensures the ERPNext user exists; returns its id and whether it was new. */
+/**
+ * Ensures the ERPNext user exists; returns its id and whether it was new. An
+ * existing User is never modified in any mode: its email and password stay
+ * as they are.
+ */
 async function ensureErpUser(erp: ErpRequest, data: ExtractionPublishData) {
   const lookup = await erp(
     `/api/resource/User/${encodeURIComponent(data.email)}`,
@@ -237,8 +170,37 @@ async function ensureErpUser(erp: ErpRequest, data: ExtractionPublishData) {
   }
 }
 
+/**
+ * The PUT body for an Employee that already exists. `create` only fills an
+ * empty `user_id` / `cell_number`; `update` also writes every non-empty
+ * reviewed Employee field (`erpEmployeeUpdatePayload`), still setting
+ * `user_id` only when the Employee has none and never touching `status`.
+ */
+async function existingEmployeeUpdate(
+  erp: ErpRequest,
+  data: ExtractionPublishData,
+  employee: ErpEmployeeMatch,
+  userId: string,
+  mode: PublishMode,
+): Promise<{ update: Record<string, string> } | { error: string }> {
+  const update: Record<string, string> = {}
+  if (mode === 'update') {
+    const [availableFields, invalidReference] = await Promise.all([
+      employeeFieldNames(erp),
+      invalidErpReference(erp, data),
+    ])
+    if (invalidReference) return { error: invalidReference }
+    Object.assign(update, erpEmployeeUpdatePayload(data, availableFields))
+  } else if (data.mobile_number && !employee.cellNumber) {
+    update.cell_number = data.mobile_number
+  }
+  if (!employee.userId) update.user_id = userId
+  return { update }
+}
+
 async function publishErpNext(
   data: ExtractionPublishData,
+  mode: PublishMode,
 ): Promise<TargetPublishResult> {
   if (missingErpFields(data).length)
     return { status: 'failed', error: 'erp_required_fields_missing' }
@@ -282,14 +244,19 @@ async function publishErpNext(
     let employeeStatus: PublishStatus = 'existing'
     if (existingEmployee) {
       employeeId = existingEmployee.name
-      const update: Record<string, string> = {}
-      if (!existingEmployee.userId) update.user_id = userId
-      if (data.mobile_number && !existingEmployee.cellNumber)
-        update.cell_number = data.mobile_number
-      if (Object.keys(update).length) {
+      const prepared = await existingEmployeeUpdate(
+        erp,
+        data,
+        existingEmployee,
+        userId,
+        mode,
+      )
+      if ('error' in prepared)
+        return employeeFailed(prepared.error, { employeeId })
+      if (Object.keys(prepared.update).length) {
         const updated = await erp(
           `/api/resource/Employee/${encodeURIComponent(existingEmployee.name)}`,
-          { method: 'PUT', body: JSON.stringify(update) },
+          { method: 'PUT', body: JSON.stringify(prepared.update) },
         )
         if (!updated.ok)
           return employeeFailed('erp_employee_update_failed', {
@@ -297,6 +264,7 @@ async function publishErpNext(
             details: erpErrorDetails(updated.data, updated.status),
           })
       }
+      if (mode === 'update') employeeStatus = 'updated'
     } else {
       const [availableFields, invalidReference] = await Promise.all([
         employeeFieldNames(erp),
@@ -315,11 +283,14 @@ async function publishErpNext(
       employeeStatus = 'created'
     }
 
+    const status: PublishStatus =
+      user.status === 'created' || employeeStatus === 'created'
+        ? 'created'
+        : employeeStatus === 'updated'
+          ? 'updated'
+          : 'existing'
     return {
-      status:
-        user.status === 'created' || employeeStatus === 'created'
-          ? 'created'
-          : 'existing',
+      status,
       userId,
       employeeId,
       steps: { user: user.status, employee: employeeStatus },
@@ -338,14 +309,19 @@ export async function POST(request: Request) {
 
   const parsed = parsePublishRequest(await request.json().catch(() => null))
   if (!parsed) return apiError('invalid_payload', 400)
+  const { data, targets, mode } = parsed
+
+  // Update mode is the admin's alone (`public.is_admin()` with the caller's
+  // token), whatever permission opened the page; decided before any write.
+  if (mode === 'update' && !(await callerIsAdmin(auth.supabase)))
+    return apiError('forbidden', 403)
 
   try {
-    const { data, targets } = parsed
     const [currentSystem, erpnext] = await Promise.all([
       targets.currentSystem
-        ? publishCurrentSystem(auth.supabase, data)
+        ? publishCurrentSystem(auth.supabase, data, mode)
         : SKIPPED,
-      targets.erpnext ? publishErpNext(data) : SKIPPED,
+      targets.erpnext ? publishErpNext(data, mode) : SKIPPED,
     ])
     return NextResponse.json({ results: { currentSystem, erpnext } })
   } catch {

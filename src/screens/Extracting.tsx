@@ -4,6 +4,7 @@ import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { FullPageSpinner } from '@/components/Spinner'
 import { EquipmentTypeLookup } from '@/components/extracting/EquipmentTypeLookup'
+import { ExistingRecordCard } from '@/components/extracting/ExistingRecordCard'
 import { ExtractionFieldsCard } from '@/components/extracting/ExtractionFieldsCard'
 import { ImagePickerCard } from '@/components/extracting/ImagePickerCard'
 import { PublishResultCard } from '@/components/extracting/PublishResultCard'
@@ -44,7 +45,8 @@ const EMPLOYMENT_FIELDS: ExtractionFieldKey[] = [
 function ExtractingWorkspace({ token }: { token: string | undefined }) {
   const { t } = useI18n()
   const extraction = useExtraction(token)
-  const { form, errors, targets, stage, notice, results } = extraction
+  const { form, errors, targets, stage, notice, results, lookup, mode } =
+    extraction
   const showReview = stage === 'review' || stage === 'publishing' || !!results
 
   const submit = (event: FormEvent) => {
@@ -93,13 +95,16 @@ function ExtractingWorkspace({ token }: { token: string | undefined }) {
             targets={targets}
             onChange={extraction.setTarget}
           />
+          <ExistingRecordCard lookup={lookup} targets={targets} />
           <Button
             type="submit"
             variant="primary"
             icon={<Send size={17} aria-hidden="true" />}
             loading={stage === 'publishing'}
           >
-            {t('extractingSubmit')}
+            {t(
+              mode === 'update' ? 'extractingUpdateSubmit' : 'extractingSubmit',
+            )}
           </Button>
         </form>
       ) : null}

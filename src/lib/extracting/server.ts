@@ -44,3 +44,17 @@ export async function requireExtractingAccess(
     return { response: apiError('forbidden', 403) }
   return { supabase }
 }
+
+/**
+ * Whether the caller behind `supabase` (the client returned by
+ * `requireExtractingAccess`, carrying the caller's token) passes
+ * `public.is_admin()`. Anything but `true` (an error, null, another role) is
+ * false. Decides the update ability of the lookup and publish routes,
+ * independently of the `extracting.view` permission.
+ */
+export async function callerIsAdmin(
+  supabase: SupabaseClient,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc('is_admin')
+  return !error && data === true
+}

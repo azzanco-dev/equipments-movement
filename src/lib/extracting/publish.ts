@@ -2,13 +2,18 @@ import {
   DATE_FIELDS,
   ERP_REQUIRED_FIELDS,
   EXTRACTION_FIELDS,
+  PUBLISH_MODES,
+  isUpdateField,
   toIsoDate,
   validateExtractionForm,
+  type ExtractionFieldKey,
   type ExtractionForm,
+  type PublishMode,
   type PublishTargets,
 } from './form'
 
 export type {
+  PublishMode,
   PublishStatus,
   TargetPublishResult,
   PublishTargets as ExtractionPublishTargets,
@@ -27,19 +32,31 @@ export function normalizePublishDate(value: unknown): string {
   return toIsoDate(clean(value))
 }
 
+function parsePublishMode(value: unknown): PublishMode | null {
+  if (value === undefined) return 'create'
+  return (PUBLISH_MODES as readonly unknown[]).includes(value)
+    ? (value as PublishMode)
+    : null
+}
+
 /**
  * Validates the publish request body. ERPNext-only required fields are not
  * checked here: a missing one fails the ERPNext target alone (see
- * `missingErpFields`) so the current system can still be published.
+ * `missingErpFields`) so the current system can still be published. `mode`
+ * is optional and defaults to `create`; the route decides whether the caller
+ * may use `update`, never this parser.
  */
 export function parsePublishRequest(value: unknown): {
   data: ExtractionPublishData
   targets: PublishTargets
+  mode: PublishMode
 } | null {
   if (!value || typeof value !== 'object') return null
   const body = value as Record<string, unknown>
   if (!body.data || typeof body.data !== 'object') return null
   if (!body.targets || typeof body.targets !== 'object') return null
+  const mode = parsePublishMode(body.mode)
+  if (!mode) return null
 
   const source = body.data as Record<string, unknown>
   const targetSource = body.targets as Record<string, unknown>
@@ -67,23 +84,46 @@ export function parsePublishRequest(value: unknown): {
     employee_number: raw.employee_number || raw.id_number,
   } as ExtractionPublishData
   for (const key of DATE_FIELDS) data[key] = toIsoDate(raw[key])
-  return { data, targets }
+  return { data, targets, mode }
 }
 
 export function missingErpFields(data: ExtractionPublishData) {
   return ERP_REQUIRED_FIELDS.filter((key) => !data[key])
 }
 
+/** `drivers` column <- reviewed field; the one mapping for create and update. */
+const DRIVER_COLUMNS: ReadonlyArray<[string, ExtractionFieldKey]> = [
+  ['full_name', 'full_name_ar'],
+  ['name_en', 'full_name_en'],
+  ['id_number', 'id_number'],
+  ['mobile_number', 'mobile_number'],
+  ['nationality', 'nationality'],
+  ['employment_type', 'employment_type'],
+  ['job_title', 'occupation'],
+]
+
 export function currentSystemDriverPayload(data: ExtractionPublishData) {
-  return {
-    full_name: data.full_name_ar,
-    name_en: data.full_name_en || null,
-    id_number: data.id_number,
-    mobile_number: data.mobile_number || null,
-    nationality: data.nationality || null,
-    employment_type: data.employment_type || null,
-    job_title: data.occupation || null,
-  }
+  const payload: Record<string, string | null> = {}
+  for (const [column, key] of DRIVER_COLUMNS)
+    payload[column] =
+      column === 'full_name' || column === 'id_number'
+        ? data[key]
+        : data[key] || null
+  return payload
+}
+
+/**
+ * Update mode: the `DRIVER_COLUMNS` fed by an `UPDATE_FIELDS` identity field
+ * (`full_name`, `name_en`, `mobile_number`, `nationality`, `job_title`) whose
+ * reviewed value is non-empty. `id_number` is the match key and
+ * `employment_type` is employment data: neither is ever written, and an empty
+ * field never clears a stored value.
+ */
+export function currentSystemDriverUpdatePayload(data: ExtractionPublishData) {
+  const update: Record<string, string> = {}
+  for (const [column, key] of DRIVER_COLUMNS)
+    if (isUpdateField(key) && data[key]) update[column] = data[key]
+  return update
 }
 
 export function erpUserPayload(data: ExtractionPublishData) {
@@ -171,38 +211,38 @@ function availableFieldName(
   return !availableFields || availableFields.has(fallback) ? fallback : null
 }
 
-export function erpEmployeePayload(
+/**
+ * Employee field <- value <- the reviewed field it comes from (`null` for a
+ * constant or derived value). Standard fields first, then the custom fields
+ * resolved against the Employee's available field names.
+ */
+function erpEmployeeEntries(
   data: ExtractionPublishData,
   availableFields?: ReadonlySet<string>,
-) {
-  const payload: Record<string, string> = {
-    first_name: data.full_name_ar,
-    user_id: data.email,
-    status: 'Inactive',
-  }
-  const optional: Array<[string, string]> = [
-    ['gender', data.gender],
-    ['date_of_birth', data.date_of_birth],
-    ['date_of_joining', data.date_of_joining],
-    ['company', data.company],
-    ['employment_type', data.employment_type],
-    ['department', data.department],
-    ['designation', data.occupation],
-    ['cell_number', data.mobile_number],
-    ['ctc', data.ctc],
-    ['employee_number', data.employee_number || data.id_number],
-  ]
-  for (const [key, value] of optional) if (value) payload[key] = value
-
-  const nationalityField = availableFieldName(
-    availableFields,
-    process.env.ERPNEXT_NATIONALITY_FIELD,
-    'custom_nationality',
-  )
-  if (nationalityField && data.nationality)
-    payload[nationalityField] = data.nationality
-
-  const customFields: Array<[string | null, string]> = [
+): Array<[string | null, string, ExtractionFieldKey | null]> {
+  return [
+    ['first_name', data.full_name_ar, 'full_name_ar'],
+    ['user_id', data.email, null],
+    ['status', 'Inactive', null],
+    ['gender', data.gender, 'gender'],
+    ['date_of_birth', data.date_of_birth, 'date_of_birth'],
+    ['date_of_joining', data.date_of_joining, 'date_of_joining'],
+    ['company', data.company, 'company'],
+    ['employment_type', data.employment_type, 'employment_type'],
+    ['department', data.department, 'department'],
+    ['designation', data.occupation, 'occupation'],
+    ['cell_number', data.mobile_number, 'mobile_number'],
+    ['ctc', data.ctc, 'ctc'],
+    ['employee_number', data.employee_number || data.id_number, null],
+    [
+      availableFieldName(
+        availableFields,
+        process.env.ERPNEXT_NATIONALITY_FIELD,
+        'custom_nationality',
+      ),
+      data.nationality,
+      'nationality',
+    ],
     [
       availableFieldName(
         availableFields,
@@ -210,6 +250,7 @@ export function erpEmployeePayload(
         'custom_employee_name_en',
       ),
       data.full_name_en,
+      'full_name_en',
     ],
     [
       availableFieldName(
@@ -218,6 +259,7 @@ export function erpEmployeePayload(
         'custom_residence_permit_number',
       ),
       data.id_number,
+      'id_number',
     ],
     [
       availableFieldName(
@@ -226,9 +268,39 @@ export function erpEmployeePayload(
         'custom_rp_valid_upto',
       ),
       data.residence_expiry_date,
+      'residence_expiry_date',
     ],
   ]
-  for (const [field, fieldValue] of customFields)
-    if (field && fieldValue) payload[field] = fieldValue
+}
+
+export function erpEmployeePayload(
+  data: ExtractionPublishData,
+  availableFields?: ReadonlySet<string>,
+) {
+  const payload: Record<string, string> = {}
+  for (const [field, value] of erpEmployeeEntries(data, availableFields))
+    if (field && value) payload[field] = value
   return payload
+}
+
+/**
+ * Update mode: the Employee fields of `erpEmployeePayload` fed by an
+ * `UPDATE_FIELDS` identity field, non-empty only. Never written: `user_id`
+ * (the route sets it only when the Employee has none, as in create mode),
+ * `status`, the residence number (the match key), `employee_number`, and the
+ * employment data (`date_of_joining`, `company`, `employment_type`,
+ * `department`, `ctc`). The User's email and password are never part of an
+ * Employee update.
+ */
+export function erpEmployeeUpdatePayload(
+  data: ExtractionPublishData,
+  availableFields?: ReadonlySet<string>,
+) {
+  const update: Record<string, string> = {}
+  for (const [field, value, source] of erpEmployeeEntries(
+    data,
+    availableFields,
+  ))
+    if (field && source && isUpdateField(source) && value) update[field] = value
+  return update
 }

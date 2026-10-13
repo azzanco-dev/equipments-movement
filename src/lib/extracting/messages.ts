@@ -30,6 +30,9 @@ const ERROR_MESSAGES: Record<string, TranslationKey> = {
   publish_failed: 'extractingErrPublishFailed',
   local_lookup_failed: 'extractingErrLocalLookup',
   local_create_failed: 'extractingErrLocalCreate',
+  local_update_failed: 'extractingErrLocalUpdate',
+  lookup_failed: 'extractingErrLookup',
+  invalid_id_number: 'extractingInvalidIdNumber',
   erp_required_fields_missing: 'extractingErrErpRequiredFields',
   erp_not_configured: 'extractingErrErpNotConfigured',
   erp_invalid_field_mapping: 'extractingErrErpFieldMapping',
@@ -87,6 +90,7 @@ export const FIELD_LABELS: Record<ExtractionFieldKey, TranslationKey> = {
 
 export const STATUS_LABELS: Record<PublishStatus, TranslationKey> = {
   created: 'extractingStatusCreated',
+  updated: 'extractingStatusUpdated',
   existing: 'extractingStatusExisting',
   partial: 'extractingStatusPartial',
   skipped: 'extractingStatusSkipped',
