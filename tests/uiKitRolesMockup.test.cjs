@@ -3,7 +3,7 @@
 // with in-memory sample data, so it must never import Supabase, and all new
 // Arabic copy uses the plain alif (AGENTS.md).
 const assert = require('node:assert/strict')
-const { readFileSync, existsSync } = require('node:fs')
+const { readFileSync, existsSync, readdirSync } = require('node:fs')
 const { join } = require('node:path')
 const test = require('node:test')
 
@@ -30,12 +30,24 @@ test('the mockup never reaches Supabase or the real roles page', () => {
       `${file} has no Supabase import`,
     )
     assert.doesNotMatch(source, /createClient\(/, `${file} opens no client`)
+    // The mockup renders the SAME shared components as the real page
+    // (src/components/roles/ui, no Supabase there either), never the data
+    // containers next to them.
     assert.doesNotMatch(
       source,
-      /components\/roles\//,
-      `${file} does not import the real roles components`,
+      /from ['"]@\/components\/roles\/(?!ui['"])/,
+      `${file} imports only the shared ui layer of the roles components`,
     )
     assert.doesNotMatch(source, /\bfetch\(/, `${file} makes no requests`)
+  }
+  const uiDir = root('src/components/roles/ui')
+  for (const name of readdirSync(uiDir)) {
+    const source = readFileSync(join(uiDir, name), 'utf8')
+    assert.doesNotMatch(
+      source,
+      /from ['"][^'"]*supabase[^'"]*['"]/i,
+      `roles/ui/${name} has no Supabase import`,
+    )
   }
 })
 

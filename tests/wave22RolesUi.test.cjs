@@ -611,28 +611,42 @@ test('the route is registered only in the admin branch, after the fail-closed ch
   )
 })
 
-test('the flag changes only on an explicit click, after the typed confirmation', () => {
-  const dir = path.join(ROOT, 'src')
+const ROLES_DIR = path.join(ROOT, 'src', 'components', 'roles')
+const UI_DIR = path.join(ROLES_DIR, 'ui')
+
+/** Every .ts/.tsx file under `folder`, recursively, as ROOT-relative paths. */
+function sourceFiles(folder) {
   const files = []
-  const walk = (folder) => {
-    for (const entry of fs.readdirSync(folder, { withFileTypes: true })) {
-      const full = path.join(folder, entry.name)
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
       if (entry.isDirectory()) walk(full)
       else if (/\.(ts|tsx)$/.test(entry.name)) files.push(full)
     }
   }
-  walk(dir)
-  const callers = files.filter((file) =>
-    fs.readFileSync(file, 'utf8').includes("'set_roles_system_enabled'"),
+  walk(folder)
+  return files
+    .map((file) => path.relative(ROOT, file).replace(/\\/g, '/'))
+    .sort()
+}
+
+test('the flag changes only on an explicit click, after the typed confirmation', () => {
+  const callers = sourceFiles(path.join(ROOT, 'src')).filter((file) =>
+    read(file).includes("'set_roles_system_enabled'"),
   )
-  assert.deepEqual(
-    callers.map((file) => path.relative(ROOT, file).replace(/\\/g, '/')),
-    ['src/components/roles/RolesActivationSection.tsx'],
+  assert.deepEqual(callers, [
+    'src/components/roles/SystemSettingsContainer.tsx',
+  ])
+  const container = read(
+    'src',
+    'components',
+    'roles',
+    'SystemSettingsContainer.tsx',
   )
-  const panel = read('src', 'components', 'roles', 'RolesActivationSection.tsx')
-  // One call, inside the click handler that re-checks the confirmation.
-  assert.equal(panel.split("'set_roles_system_enabled'").length, 2)
-  const toggle = panel.slice(panel.indexOf('const toggle = async'))
+  // One call, inside the click handler that re-checks the confirmation and
+  // acknowledges the preview by its row count.
+  assert.equal(container.split("'set_roles_system_enabled'").length, 2)
+  const toggle = container.slice(container.indexOf('const toggle = async'))
   assert.ok(toggle.indexOf('set_roles_system_enabled') > 0)
   assert.match(toggle, /if \(next \? !canEnable : !canDisable\) return/)
   assert.match(
@@ -640,15 +654,158 @@ test('the flag changes only on an explicit click, after the typed confirmation',
     /p_expected_preview_rows:\s*next && preview\.state === 'ready' \? preview\.rows\.length : null/,
   )
   assert.match(toggle, /answer\.reason === 'preview_changed'/)
-  assert.match(panel, /onClick=\{\(\) => void toggle\(true\)\}/)
-  assert.match(panel, /onClick=\{\(\) => void toggle\(false\)\}/)
+  assert.match(toggle, /answer\.reason === 'offenders'/)
+  assert.match(container, /canEnable = canEnableRolesSystem\(\{/)
+  assert.match(
+    container,
+    /canDisable =\s*enabled === true && !busy && confirmationMatches\(typed, word\)/,
+  )
+  assert.match(container, /onToggle: \(next\) => void toggle\(next\)/)
+  // The shared dialog presses it only from the two buttons.
+  const dialog = read(
+    'src',
+    'components',
+    'roles',
+    'ui',
+    'SystemSettingsDialog.tsx',
+  )
+  assert.match(dialog, /onClick=\{\(\) => activation\.onToggle\(false\)\}/)
+  assert.match(dialog, /onClick=\{\(\) => activation\.onToggle\(true\)\}/)
+  assert.equal(dialog.split('activation.onToggle(').length, 3)
+  assert.match(dialog, /disabled=\{!activation\.canDisable\}/)
+  assert.match(dialog, /disabled=\{!activation\.canEnable\}/)
   // No native confirm() anywhere on the roles page.
-  for (const file of fs.readdirSync(path.join(dir, 'components', 'roles')))
+  for (const file of sourceFiles(ROLES_DIR))
     assert.doesNotMatch(
-      read('src', 'components', 'roles', file),
+      read(file),
       /window\.confirm|[^.\w]confirm\(\s*['"`]/,
       file,
     )
+})
+
+test('the roles page writes only through the five 0126 functions', () => {
+  const WRITE_RPCS = [
+    'admin_upsert_role',
+    'admin_set_role_permissions',
+    'admin_assign_profile_role',
+    'admin_delete_role',
+    'set_roles_system_enabled',
+  ]
+  const READ_RPCS = [
+    'admin_roles_system_offenders',
+    'admin_roles_system_preview',
+  ]
+  const seen = new Set()
+  for (const file of sourceFiles(ROLES_DIR)) {
+    const source = read(file)
+    for (const [, name] of source.matchAll(/supabase\.rpc\(\s*'(\w+)'/g)) {
+      assert.ok(
+        WRITE_RPCS.includes(name) || READ_RPCS.includes(name),
+        `${file} calls ${name}`,
+      )
+      seen.add(name)
+    }
+    // No direct table writes: the tables are written by the functions only.
+    assert.doesNotMatch(
+      source,
+      /\.from\(\s*'\w+'\s*\)\s*\.(insert|update|upsert|delete)\(/,
+      `${file} writes a table directly`,
+    )
+  }
+  for (const name of WRITE_RPCS) assert.ok(seen.has(name), name)
+  const callersOf = (name) =>
+    sourceFiles(ROLES_DIR).filter((file) => read(file).includes(`'${name}'`))
+  assert.deepEqual(callersOf('admin_delete_role'), [
+    'src/components/roles/RolesSettings.tsx',
+  ])
+  assert.deepEqual(callersOf('admin_upsert_role'), [
+    'src/components/roles/RoleFormContainer.tsx',
+    'src/components/roles/RolesSettings.tsx',
+  ])
+  // The copy of a role's permissions on create reuses the same function.
+  assert.deepEqual(callersOf('admin_set_role_permissions'), [
+    'src/components/roles/RoleFormContainer.tsx',
+    'src/components/roles/RolePermissionsTab.tsx',
+  ])
+  assert.deepEqual(callersOf('admin_assign_profile_role'), [
+    'src/components/roles/RoleUsersTab.tsx',
+    'src/components/roles/SystemSettingsContainer.tsx',
+  ])
+  // The permissions are saved as one whole payload, errors mapped safely.
+  const tab = read('src', 'components', 'roles', 'RolePermissionsTab.tsx')
+  assert.match(tab, /p_permissions: toPermissionsPayload\(draft\)/)
+  assert.match(tab, /rolesRpcError\(error, 'rolePermissionsSaveError'\)/)
+})
+
+test('the shared roles components never reach Supabase; the mockup uses them', () => {
+  const uiFiles = sourceFiles(UI_DIR)
+  assert.ok(uiFiles.length >= 10)
+  for (const file of uiFiles) {
+    const source = read(file)
+    assert.doesNotMatch(
+      source,
+      /from ['"][^'"]*supabase|supabase\./i,
+      `${file} reaches Supabase`,
+    )
+    assert.doesNotMatch(source, /\bfetch\(/, `${file} makes requests`)
+    assert.doesNotMatch(source, /[أإآ]/, `${file} has alif with hamza/madda`)
+  }
+  const mockup = read('src', 'screens', 'ui-kit', 'RolesPageMockup.tsx')
+  assert.match(mockup, /from '@\/components\/roles\/ui'/)
+  for (const component of [
+    'RolesList',
+    'RolePanel',
+    'PermissionsTable',
+    'RoleUsersTable',
+    'AssignUserDialog',
+    'ChangesTable',
+    'RoleFormDialog',
+    'SystemSettingsDialog',
+  ])
+    assert.ok(mockup.includes(`<${component}`), `mockup renders ${component}`)
+  assert.doesNotMatch(mockup, /from ['"][^'"]*supabase|supabase\./i)
+  assert.doesNotMatch(
+    mockup,
+    /from '@\/components\/roles\/(?!ui')/,
+    'the mockup imports only the shared ui layer',
+  )
+  // The real page renders the same components.
+  const page = read('src', 'components', 'roles', 'RolesSettings.tsx')
+  assert.match(page, /<RolesList/)
+  assert.match(page, /<RolePanel/)
+  for (const [file, component] of [
+    ['RolePermissionsTab.tsx', 'PermissionsTable'],
+    ['RoleUsersTab.tsx', 'RoleUsersTable'],
+    ['RoleUsersTab.tsx', 'AssignUserDialog'],
+    ['RoleChangesTab.tsx', 'ChangesTable'],
+    ['RoleFormContainer.tsx', 'RoleFormDialog'],
+    ['SystemSettingsContainer.tsx', 'SystemSettingsDialog'],
+  ])
+    assert.ok(
+      read('src', 'components', 'roles', file).includes(`<${component}`),
+      `${file} renders ${component}`,
+    )
+  // The retired section components are gone.
+  for (const removed of [
+    'RolesListSection.tsx',
+    'RoleAssignmentsSection.tsx',
+    'RolesActivationSection.tsx',
+    'RoleChangesLog.tsx',
+    'RolesSystemBanner.tsx',
+    'RolePermissionsEditor.tsx',
+  ])
+    assert.ok(!fs.existsSync(path.join(ROLES_DIR, removed)), removed)
+})
+
+test('the selected role and tab live in the URL; «خريطة المشاريع» stays hidden', () => {
+  const page = read('src', 'components', 'roles', 'RolesSettings.tsx')
+  assert.match(page, /searchParams\.get\('role'\)/)
+  assert.match(page, /searchParams\.get\('tab'\)/)
+  assert.match(page, /query\.set\('role', next\.role\)/)
+  const tab = read('src', 'components', 'roles', 'RolePermissionsTab.tsx')
+  assert.match(tab, /HIDDEN_GROUPS = new Set\(\['map'\]\)/)
+  assert.match(tab, /COLLAPSED_GROUPS = new Set\(\['purchasing'\]\)/)
+  assert.match(tab, /purchasing: 'permissionGroupLater'/)
 })
 
 // --- Translations ---------------------------------------------------------------
@@ -665,6 +822,21 @@ test('wave-22-roles copy: Arabic and English keys match, no alif with hamza or m
     [...block.matchAll(/^ {4}(\w+):/gm)].map((m) => m[1])
   assert.deepEqual(keysOf(blocks[0][1]), keysOf(blocks[1][1]))
   assert.doesNotMatch(blocks[0][1], /[أإآ]/)
+  // The wave-24 page copy: both languages, the same keys, plain alif, and
+  // every key the roles components use exists.
+  const page = [
+    ...source.matchAll(
+      /\/\/ wave-24-roles-page — start\n([\s\S]*?)\/\/ wave-24-roles-page — end/g,
+    ),
+  ]
+  assert.equal(page.length, 2)
+  assert.deepEqual(keysOf(page[0][1]), keysOf(page[1][1]))
+  assert.ok(keysOf(page[0][1]).length > 60)
+  assert.doesNotMatch(page[0][1], /[أإآ]/)
+  const arKeys = new Set([...source.matchAll(/^ {4}(\w+):/gm)].map((m) => m[1]))
+  for (const file of sourceFiles(ROLES_DIR))
+    for (const [, key] of read(file).matchAll(/\bt\('(\w+)'\)/g))
+      assert.ok(arKeys.has(key), `${file} uses ${key}`)
   const keys = new Set(keysOf(blocks[0][1]))
   const used = [
     ...Object.values(roles.ROLES_ERROR_KEYS),

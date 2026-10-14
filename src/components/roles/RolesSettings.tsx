@@ -2,34 +2,45 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { Settings2 } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import { supabase } from '@/lib/supabase'
 import { rolesPageAccess } from '@/lib/permissions'
-import { rolesSystemEnabledFromValue } from '@/lib/rolesAdmin'
+import { rolesRpcError, rolesSystemEnabledFromValue } from '@/lib/rolesAdmin'
 import type { Permission } from '@/lib/types'
 import { fetchProfileNames } from '@/components/details/profileNames'
 import {
+  Badge,
+  Button,
+  EmptyState,
   ErrorState,
   Notice,
   PageHeader,
   Skeleton,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
+  cn,
   useConfirm,
 } from '@/components/ui'
-import { RolesSystemBanner, type RolesSystemFlag } from './RolesSystemBanner'
-import { RolesListSection } from './RolesListSection'
-import { RoleAssignmentsSection } from './RoleAssignmentsSection'
-import { RolesActivationSection } from './RolesActivationSection'
-import { RoleChangesLog } from './RoleChangesLog'
-import { sortRoles, type RoleRow } from './roleRows'
-
-type RolesTab = 'roles' | 'users' | 'activation' | 'audit'
-const TABS: readonly RolesTab[] = ['roles', 'users', 'activation', 'audit']
+import {
+  roleDescription,
+  roleName,
+  sortRoles,
+  type RoleRow,
+  type RolesSystemFlag,
+} from './roleRows'
+import {
+  ROLE_PANEL_TABS,
+  RolePanel,
+  RolesList,
+  type RoleItem,
+  type RolePanelTab,
+} from './ui'
+import { RolePermissionsTab } from './RolePermissionsTab'
+import { RoleUsersTab } from './RoleUsersTab'
+import { RoleChangesTab } from './RoleChangesTab'
+import { RoleFormContainer } from './RoleFormContainer'
+import { SystemSettingsContainer } from './SystemSettingsContainer'
 
 type RoleQueryRow = Omit<RoleRow, 'user_count' | 'permission_count'> & {
   profile_roles: Array<{ count: number }> | null
@@ -37,18 +48,21 @@ type RoleQueryRow = Omit<RoleRow, 'user_count' | 'permission_count'> & {
 }
 
 /**
- * wave 22B — Settings › «الادوار والصلاحيات» (migration 0126).
+ * Settings › «الادوار والصلاحيات» (migration 0126), on the layout the owner
+ * approved on /ui-kit (2026-10-14): the roles list at the start side, the
+ * selected role's panel (permissions, users, change log) beside it, and
+ * «اعدادات النظام» for the activation flow and the full log. The URL keeps the
+ * selected role (`?role=`) and tab (`?tab=`) so Back works.
  *
- * Admin only, fail closed twice: App.tsx renders it inside the admin branch
- * (after the `profile.role !== 'admin'` check), and the page itself needs a
- * legacy admin who also holds `settings.roles` (`rolesPageAccess`). Every
- * write goes through the admin-only SECURITY DEFINER functions of 0126.
- *
- * The roles system stays INACTIVE until the owner presses the activation
- * button in the «التفعيل» tab; nothing on this page enables it on its own.
+ * Admin only, fail closed twice: App.tsx renders it behind its page gate and
+ * the page itself needs a legacy admin who also holds `settings.roles`
+ * (`rolesPageAccess`). Every write goes through the admin-only SECURITY
+ * DEFINER functions of 0126; the roles system stays INACTIVE until the admin
+ * presses the activation button in «اعدادات النظام» — nothing on this page
+ * enables it on its own.
  */
 export function RolesSettings() {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -59,10 +73,11 @@ export function RolesSettings() {
     permissions.status,
     permissions.permissions,
   )
-  const requestedTab = searchParams.get('tab')
-  const tab: RolesTab = TABS.includes(requestedTab as RolesTab)
-    ? (requestedTab as RolesTab)
-    : 'roles'
+  const roleParam = searchParams.get('role')
+  const tabParam = searchParams.get('tab')
+  const tab: RolePanelTab = ROLE_PANEL_TABS.includes(tabParam as RolePanelTab)
+    ? (tabParam as RolePanelTab)
+    : 'permissions'
 
   const [flag, setFlag] = useState<RolesSystemFlag | null>(null)
   const [flagError, setFlagError] = useState(false)
@@ -70,14 +85,19 @@ export function RolesSettings() {
   const [catalogue, setCatalogue] = useState<Permission[]>([])
   const [baseLoading, setBaseLoading] = useState(true)
   const [baseError, setBaseError] = useState(false)
-  // Bumped after every change so the counts, offenders, preview and audit
-  // are read again.
+  // Bumped after every write so the counts, the tabs, the offenders, the
+  // preview and the audit are read again.
   const [revision, setRevision] = useState(0)
   const [editorDirty, setEditorDirty] = useState(false)
-  const [usersSearchSeed, setUsersSearchSeed] = useState<{
-    term: string
-    seq: number
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<{
+    tone: 'success' | 'danger'
+    text: string
   } | null>(null)
+  const [roleDialog, setRoleDialog] = useState<
+    { mode: 'create' } | { mode: 'edit'; role: RoleRow } | null
+  >(null)
+  const [systemOpen, setSystemOpen] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
 
   const loadFlag = useCallback(async () => {
@@ -168,31 +188,122 @@ export function RolesSettings() {
     return discard
   }, [confirm, editorDirty, t])
 
-  const changeTab = async (next: string) => {
-    if (next === tab || !(await confirmDiscard())) return
-    const query = new URLSearchParams(searchParams.toString())
-    if (next === 'roles') query.delete('tab')
-    else query.set('tab', next)
-    const search = query.toString()
-    router.replace(search ? `${pathname}?${search}` : pathname)
-  }
-
-  const goBack = async () => {
-    if (await confirmDiscard()) router.push('/settings')
-  }
-
   /** After any write: re-read everything and the caller's own permissions. */
   const afterChange = useCallback(() => {
     setRevision((value) => value + 1)
     void permissions.reload()
   }, [permissions])
 
-  const fixOffender = (fullName: string) => {
-    setUsersSearchSeed((current) => ({
-      term: fullName,
-      seq: (current?.seq ?? 0) + 1,
-    }))
-    void changeTab('users')
+  const navigate = (
+    next: { role?: string | null; tab?: RolePanelTab | null },
+    mode: 'push' | 'replace',
+  ) => {
+    const query = new URLSearchParams(searchParams.toString())
+    if (next.role !== undefined) {
+      if (next.role) query.set('role', next.role)
+      else query.delete('role')
+    }
+    if (next.tab !== undefined) {
+      if (next.tab && next.tab !== 'permissions') query.set('tab', next.tab)
+      else query.delete('tab')
+    }
+    const search = query.toString()
+    const url = search ? `${pathname}?${search}` : pathname
+    if (mode === 'push') router.push(url)
+    else router.replace(url)
+  }
+
+  const roleItems: RoleItem[] = useMemo(
+    () =>
+      roles.map((role) => ({
+        key: role.key,
+        name: roleName(lang, role),
+        nameEn: lang === 'ar' ? role.name_en : role.name_ar,
+        description: roleDescription(lang, role),
+        isSystem: role.is_system,
+        isActive: role.is_active,
+        userCount: role.user_count,
+      })),
+    [lang, roles],
+  )
+
+  const selected =
+    roles.find((role) => role.key === roleParam) ?? roles[0] ?? null
+  const selectedItem = selected
+    ? (roleItems.find((item) => item.key === selected.key) ?? null)
+    : null
+  // Below lg the list and the panel alternate: the panel shows once a role
+  // is in the URL, the list otherwise (Back returns to the list).
+  const mobileView: 'list' | 'panel' = roleParam ? 'panel' : 'list'
+
+  const selectRole = async (key: string) => {
+    if (key === roleParam) return
+    if (!(await confirmDiscard())) return
+    navigate({ role: key, tab: null }, 'push')
+  }
+
+  const changeTab = async (next: RolePanelTab) => {
+    if (next === tab || !(await confirmDiscard())) return
+    navigate({ tab: next }, 'replace')
+  }
+
+  const goBack = async () => {
+    if (await confirmDiscard()) router.push('/settings')
+  }
+
+  const toggleActive = async (role: RoleRow) => {
+    if (role.is_system) return
+    setBusy(true)
+    setMessage(null)
+    try {
+      const { error } = await supabase.rpc('admin_upsert_role', {
+        p_key: role.key,
+        p_name_ar: role.name_ar,
+        p_name_en: role.name_en,
+        p_description_ar: role.description_ar,
+        p_description_en: role.description_en,
+        p_is_active: !role.is_active,
+      })
+      if (error) {
+        setMessage({
+          tone: 'danger',
+          text: t(rolesRpcError(error, 'roleSaveError').messageKey),
+        })
+        return
+      }
+      setMessage({ tone: 'success', text: t('rolesToggleActiveDone') })
+      afterChange()
+    } catch {
+      setMessage({ tone: 'danger', text: t('roleSaveError') })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (role: RoleRow) => {
+    if (role.is_system || role.user_count > 0) return
+    setBusy(true)
+    setMessage(null)
+    try {
+      const { error } = await supabase.rpc('admin_delete_role', {
+        p_role_key: role.key,
+      })
+      if (error) {
+        setMessage({
+          tone: 'danger',
+          text: t(rolesRpcError(error).messageKey),
+        })
+        return
+      }
+      setEditorDirty(false)
+      setMessage({ tone: 'success', text: t('rolesDeleted') })
+      navigate({ role: null, tab: null }, 'replace')
+      afterChange()
+    } catch {
+      setMessage({ tone: 'danger', text: t('rolesErrGeneric') })
+    } finally {
+      setBusy(false)
+    }
   }
 
   const header = (
@@ -201,12 +312,25 @@ export function RolesSettings() {
       description={t('rolesSettingsDesc')}
       onBack={() => void goBack()}
       backLabel={t('backToSettings')}
+      actions={
+        access === 'allowed' ? (
+          <Button
+            variant="outline"
+            icon={<Settings2 size={16} aria-hidden="true" />}
+            onClick={() => setSystemOpen(true)}
+          >
+            {t('rolesPageSystemSettings')}
+            {flag && (
+              <Badge size="sm" tone={flag.enabled ? 'success' : 'neutral'}>
+                {flag.enabled
+                  ? t('rolesSystemStatusActive')
+                  : t('rolesSystemStatusInactive')}
+              </Badge>
+            )}
+          </Button>
+        ) : undefined
+      }
     />
-  )
-
-  const activeRoles = useMemo(
-    () => roles.filter((role) => role.is_active),
-    [roles],
   )
 
   if (access === 'loading')
@@ -240,68 +364,137 @@ export function RolesSettings() {
   return (
     <div className="space-y-4">
       {header}
-      <RolesSystemBanner
-        flag={flag}
-        failed={flagError}
-        onRetry={() => void loadFlag()}
-      />
-      {baseError ? (
-        <ErrorState
-          description={t('rolesLoadError')}
-          onRetry={() => {
-            setBaseLoading(true)
-            void loadBase()
-          }}
-        />
-      ) : (
-        <Tabs value={tab} onValueChange={(next) => void changeTab(next)}>
-          <TabsList>
-            <TabsTrigger value="roles">{t('rolesTabRoles')}</TabsTrigger>
-            <TabsTrigger value="users">{t('rolesTabUsers')}</TabsTrigger>
-            <TabsTrigger value="activation">
-              {t('rolesTabActivation')}
-            </TabsTrigger>
-            <TabsTrigger value="audit">{t('rolesTabAudit')}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="roles">
-            <RolesListSection
-              roles={roles}
-              catalogue={catalogue}
-              loading={baseLoading}
-              onChanged={afterChange}
-              onEditorDirtyChange={setEditorDirty}
-              confirmDiscard={confirmDiscard}
-            />
-          </TabsContent>
-          <TabsContent value="users">
-            <RoleAssignmentsSection
-              roles={roles}
-              activeRoles={activeRoles}
-              loadingRoles={baseLoading}
-              searchSeed={usersSearchSeed}
-              revision={revision}
-              onChanged={afterChange}
-            />
-          </TabsContent>
-          <TabsContent value="activation">
-            <RolesActivationSection
-              flag={flag}
-              roles={roles}
-              catalogue={catalogue}
-              revision={revision}
-              onFixOffender={fixOffender}
-              onChanged={afterChange}
-            />
-          </TabsContent>
-          <TabsContent value="audit">
-            <RoleChangesLog
-              roles={roles}
-              catalogue={catalogue}
-              revision={revision}
-            />
-          </TabsContent>
-        </Tabs>
+      {flagError && (
+        <Notice
+          tone="danger"
+          action={
+            <Button size="sm" onClick={() => void loadFlag()}>
+              {t('retry')}
+            </Button>
+          }
+        >
+          {t('rolesSystemStatusLoadError')}
+        </Notice>
       )}
+      {message && (
+        <Notice tone={message.tone} onDismiss={() => setMessage(null)}>
+          {message.text}
+        </Notice>
+      )}
+
+      <div className="overflow-hidden rounded-xl border bg-bg">
+        <div className="lg:grid lg:grid-cols-[300px_minmax(0,1fr)]">
+          <div
+            className={cn(
+              'border-b lg:border-b-0 lg:border-e',
+              mobileView === 'panel' && 'hidden lg:block',
+            )}
+          >
+            <RolesList
+              roles={roleItems}
+              selectedKey={selected?.key ?? null}
+              loading={baseLoading}
+              error={baseError}
+              onRetry={() => {
+                setBaseLoading(true)
+                void loadBase()
+              }}
+              onSelect={(key) => void selectRole(key)}
+              onAdd={() => setRoleDialog({ mode: 'create' })}
+            />
+          </div>
+          <div
+            className={cn(
+              'min-w-0',
+              mobileView === 'list' && 'hidden lg:block',
+            )}
+          >
+            {baseError ? (
+              <ErrorState
+                className="m-4"
+                description={t('rolesLoadError')}
+                onRetry={() => {
+                  setBaseLoading(true)
+                  void loadBase()
+                }}
+              />
+            ) : baseLoading ? (
+              <div className="space-y-3 p-4" aria-busy="true">
+                <Skeleton className="h-8 w-1/2" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-64 w-full" />
+              </div>
+            ) : selected && selectedItem ? (
+              <RolePanel
+                key={selected.key}
+                role={selectedItem}
+                usersCount={selected.user_count}
+                tab={tab}
+                onTabChange={(next) => void changeTab(next)}
+                onBack={() => navigate({ role: null, tab: null }, 'push')}
+                onEdit={() => setRoleDialog({ mode: 'edit', role: selected })}
+                onToggleActive={() => void toggleActive(selected)}
+                onDelete={() => void remove(selected)}
+                busy={busy}
+              >
+                {tab === 'permissions' && (
+                  <RolePermissionsTab
+                    roleKey={selected.key}
+                    catalogue={catalogue}
+                    onSaved={afterChange}
+                    onDirtyChange={setEditorDirty}
+                  />
+                )}
+                {tab === 'users' && (
+                  <RoleUsersTab
+                    role={selected}
+                    roles={roles}
+                    revision={revision}
+                    onChanged={afterChange}
+                  />
+                )}
+                {tab === 'changes' && (
+                  <RoleChangesTab
+                    roleKey={selected.key}
+                    roles={roles}
+                    catalogue={catalogue}
+                    revision={revision}
+                  />
+                )}
+              </RolePanel>
+            ) : (
+              <EmptyState title={t('rolesPanelPick')} className="m-4" />
+            )}
+          </div>
+        </div>
+      </div>
+
+      <RoleFormContainer
+        open={roleDialog !== null}
+        editing={roleDialog?.mode === 'edit' ? roleDialog.role : null}
+        roleItems={roleItems}
+        catalogue={catalogue}
+        onOpenChange={(open) => {
+          if (!open) setRoleDialog(null)
+        }}
+        onChanged={afterChange}
+        onSaved={(roleKey, created) => {
+          setRoleDialog(null)
+          setMessage({ tone: 'success', text: t('rolesSaved') })
+          if (created) navigate({ role: roleKey, tab: null }, 'push')
+        }}
+      />
+      <SystemSettingsContainer
+        open={systemOpen}
+        onOpenChange={setSystemOpen}
+        flag={flag}
+        flagError={flagError}
+        onRetryFlag={() => void loadFlag()}
+        roles={roles}
+        catalogue={catalogue}
+        revision={revision}
+        onChanged={afterChange}
+      />
       {confirmDialog}
     </div>
   )

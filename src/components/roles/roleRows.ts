@@ -50,3 +50,23 @@ export function fill(text: string, values: Record<string, string | number>) {
     key in values ? String(values[key]) : match,
   )
 }
+
+/** `app_settings.roles_system`: the flag with its last change. */
+export interface RolesSystemFlag {
+  enabled: boolean
+  /** `app_settings.updated_at` of the flag row: when it last changed. */
+  updatedAt: string | null
+  updatedByName: string | null
+}
+
+/** The localized description of a role, null when both are empty. */
+export function roleDescription(
+  lang: Language,
+  role: Pick<Role, 'description_ar' | 'description_en'>,
+): string | null {
+  const text =
+    lang === 'ar'
+      ? role.description_ar || role.description_en
+      : role.description_en || role.description_ar
+  return text?.trim() || null
+}
