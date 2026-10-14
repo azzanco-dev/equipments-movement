@@ -276,9 +276,11 @@ test('isEquipmentNew mirrors the 7-day rule and ignores a missing date', () => {
   assert.equal(state.isEquipmentNew(null, now), false)
   assert.equal(state.isEquipmentNew(undefined, now), false)
   assert.equal(state.isEquipmentNew('not a date', now), false)
-  // The state line still appends the mark only to an available unit.
+  // The lib's state line keeps its optional `isNew` parameter, but since the
+  // owner decision of 2026-10-14 no screen passes it: the mark lives next to
+  // the code (`EquipmentNewBadge`, tests/em236NewBadgePlacement.test.cjs).
   const t = (key) => translations.ar[key]
-  assert.equal(state.equipmentStateText(t, 'available', true), 'متاحة · جديدة')
+  assert.equal(state.equipmentStateText(t, 'available'), 'متاحة')
   // "No movement" is no longer "new" anywhere in the mirror.
   const source = read('src/lib/equipmentState.ts')
   assert.ok(!/latest === null/.test(source))
@@ -290,8 +292,10 @@ test('the inquiry derives the mark from created_at, not from the chain', () => {
     source,
     /\.select\('id,code,type,plate_number,chassis_number,created_at'\)/,
   )
-  assert.match(source, /isNew: isEquipmentNew\(row\?\.created_at\)/)
+  // 2026-10-14: derived in the brief, next to the code, from the row's age.
+  assert.match(source, /isNew=\{isEquipmentNew\(equipment\.created_at\)\}/)
   assert.ok(!/isNew: latest === null/.test(source))
+  assert.ok(!/isNew: isEquipmentNew\(row\?\.created_at\)/.test(source))
 })
 
 // --- The equipment list ---------------------------------------------------------

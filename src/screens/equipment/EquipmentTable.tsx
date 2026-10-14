@@ -14,6 +14,7 @@ import type { Equipment } from '@/lib/types'
 import { usesExternalSupplier } from '@/lib/equipmentOwnership'
 import { equipmentStatusBadge, ownershipBadge } from '@/lib/equipmentForm'
 import { EquipmentStateBadge } from '@/components/equipment/EquipmentStateBadge'
+import { EquipmentNewBadge } from '@/components/equipment/EquipmentNewBadge'
 
 /**
  * Pattern for the migrated list screens (equipment first, then drivers,
@@ -85,10 +86,12 @@ export function EquipmentTable({
       sortable: true,
       className: 'font-semibold',
       // EM-236: the «بيانات غير مكتملة» badge (the retired completeness
-      // flag) left the UI; the column stays in the database unused.
+      // flag) left the UI; the column stays in the database unused. The
+      // «جديدة» mark sits here, by the code (owner decision 2026-10-14).
       cell: (row) => (
         <span className="inline-flex items-center gap-2">
           <span dir="ltr">{row.code}</span>
+          <EquipmentNewBadge isNew={row.equipment_is_new} />
           {previousCodeMatchIds?.has(row.id) && (
             <Badge tone="neutral" size="sm">
               {t('previousCodeBadge')}
@@ -120,12 +123,7 @@ export function EquipmentTable({
       key: 'equipment_state',
       header: t('equipmentState'),
       sortable: true,
-      cell: (row) => (
-        <EquipmentStateBadge
-          state={row.equipment_state}
-          isNew={row.equipment_is_new}
-        />
-      ),
+      cell: (row) => <EquipmentStateBadge state={row.equipment_state} />,
     },
     {
       key: 'ownership_status',

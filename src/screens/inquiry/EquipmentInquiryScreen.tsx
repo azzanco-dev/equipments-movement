@@ -49,6 +49,8 @@ import {
   type EquipmentState,
 } from '@/lib/equipmentState'
 import { EquipmentStateBadge } from '@/components/equipment/EquipmentStateBadge'
+import { EquipmentNewBadge } from '@/components/equipment/EquipmentNewBadge'
+import { LtrValue } from '@/components/ui/InfoGrid'
 
 /**
  * `/inquiry`: one search field finds an equipment by code/plate/chassis/type,
@@ -107,16 +109,19 @@ const MOVEMENTS_PAGE_SIZE = 40
  * through `get_last_movement` (SECURITY DEFINER), not the `equipment_state`
  * computed field, because a foreman's RLS hides other people's movements and
  * the computed field would then see only part of the chain. `error` keeps a
- * failed read visible instead of showing a state. `isNew` is the row's age
- * (`isEquipmentNew`, migration 0129), not "no movement".
+ * failed read visible instead of showing a state. The «جديدة» mark is not
+ * part of it: it is the row's age (`isEquipmentNew`, migration 0129) and
+ * sits next to the code in the brief (owner decision 2026-10-14).
  */
-type InquiryState = { state: EquipmentState; isNew: boolean } | 'error' | null
+type InquiryState = { state: EquipmentState } | 'error' | null
 
 /**
- * The brief above the timeline: code, type, and the plate, or the chassis
- * number when the equipment has no plate (owner decision), then the state. Codes, plates and
- * chassis numbers are isolated LTR runs through `InfoGrid`, so they keep the
- * RTL start edge instead of jumping to the left.
+ * The brief above the timeline: code (with the small «جديدة» mark when the
+ * unit was created within the last 7 days), type, and the plate, or the
+ * chassis number when the equipment has no plate (owner decision), then the
+ * state. Codes, plates and chassis numbers are isolated LTR runs (`LtrValue`
+ * / `InfoGrid`), so they keep the RTL start edge instead of jumping to the
+ * left.
  */
 function inquiryBriefItems(
   equipment: InquiryEquipmentRow,
@@ -128,8 +133,12 @@ function inquiryBriefItems(
     {
       key: 'code',
       label: t('equipmentCode'),
-      value: equipment.code,
-      dir: 'ltr',
+      value: (
+        <span className="inline-flex max-w-full items-center gap-2">
+          <LtrValue>{equipment.code}</LtrValue>
+          <EquipmentNewBadge isNew={isEquipmentNew(equipment.created_at)} />
+        </span>
+      ),
     },
     { key: 'type', label: t('equipmentType'), value: equipment.type },
     {
@@ -145,7 +154,7 @@ function inquiryBriefItems(
         state === 'error' ? (
           <span className="text-danger">{t('dataLoadError')}</span>
         ) : state ? (
-          <EquipmentStateBadge state={state.state} isNew={state.isNew} />
+          <EquipmentStateBadge state={state.state} />
         ) : null,
     },
   ]
@@ -355,11 +364,9 @@ export function EquipmentInquiryScreen({
               workshop_purpose: string | null
             }> | null
           )?.[0] ?? null
-        setInquiryState({
-          state: equipmentStateFromMovement(latest),
-          // Migration 0129: «جديدة» is the row's age, not "no movement".
-          isNew: isEquipmentNew(row?.created_at),
-        })
+        // Migration 0129: «جديدة» is the row's age, not "no movement"; the
+        // brief derives it from `created_at` next to the code.
+        setInquiryState({ state: equipmentStateFromMovement(latest) })
       }
       setCodeChangesError(Boolean(codeChangesResult.error))
       setCodeChanges(

@@ -19,6 +19,7 @@ import {
 } from '@/lib/equipmentOwnership'
 import { equipmentStatusBadge } from '@/lib/equipmentForm'
 import { EquipmentStateBadge } from '@/components/equipment/EquipmentStateBadge'
+import { EquipmentNewBadge } from '@/components/equipment/EquipmentNewBadge'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import { Alert } from '@/components/Alert'
@@ -297,12 +298,7 @@ export function EquipmentDetail({
       key: 'equipmentState',
       icon: <Wrench size={16} />,
       label: t('equipmentState'),
-      value: (
-        <EquipmentStateBadge
-          state={equipment.equipment_state}
-          isNew={equipment.equipment_is_new}
-        />
-      ),
+      value: <EquipmentStateBadge state={equipment.equipment_state} />,
     },
   ]
 
@@ -387,6 +383,9 @@ export function EquipmentDetail({
           subtitle={equipment.type}
           badges={
             <>
+              {/* «جديدة» first, right next to the code (owner decision
+                  2026-10-14). */}
+              <EquipmentNewBadge isNew={equipment.equipment_is_new} />
               <Badge tone={statusBadge.tone}>{t(statusBadge.key)}</Badge>
               <Badge tone="neutral">
                 {ownLabel(equipment.ownership_status)}

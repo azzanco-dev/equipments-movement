@@ -8,18 +8,17 @@ import {
 
 /**
  * wave 20 (migration 0125): the one equipment state as the shared `Badge`,
- * e.g. «تعمل», «متاحة · جديدة», «في الورشة · وقوف». The tone comes from
+ * e.g. «تعمل», «متاحة», «في الورشة · وقوف». The tone comes from
  * `equipmentStateTone` (tokens only); an unknown or missing state is a muted
- * dash rather than a guess.
+ * dash rather than a guess. The «جديدة» mark is NOT part of the state since
+ * 2026-10-14 (owner decision): `EquipmentNewBadge` shows it next to the code.
  */
 export function EquipmentStateBadge({
   state,
-  isNew,
   size,
   className,
 }: {
   state: string | null | undefined
-  isNew?: boolean | null
   size?: BadgeSize
   className?: string
 }) {
@@ -28,7 +27,7 @@ export function EquipmentStateBadge({
   if (!parsed) return <span className="text-muted">—</span>
   return (
     <Badge tone={equipmentStateTone(parsed)} size={size} className={className}>
-      {equipmentStateText(t, parsed, isNew)}
+      {equipmentStateText(t, parsed)}
     </Badge>
   )
 }

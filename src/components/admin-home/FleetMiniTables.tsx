@@ -30,6 +30,7 @@ import type {
 } from '@/components/ui'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
+import { EquipmentNewBadge } from '@/components/equipment/EquipmentNewBadge'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import { formatDate } from '@/lib/dateFormat'
@@ -594,10 +595,18 @@ export function FleetMiniTables({
   )
 
   // --- shared columns -----------------------------------------------------
+  // The small «جديدة» mark (created within the last 7 days, migration 0129)
+  // sits next to the code in all three fleet tables, card and expanded
+  // (owner decision 2026-10-14); it renders nothing for an older unit.
   const codeColumn: DataTableColumn<FleetEquipmentRow> = {
     key: 'code',
     header: t('adminHomeColEquipment'),
-    cell: (row) => <span className="font-semibold">{row.code}</span>,
+    cell: (row) => (
+      <span className="inline-flex flex-wrap items-center gap-1">
+        <span className="font-semibold">{row.code}</span>
+        <EquipmentNewBadge isNew={row.isNew} />
+      </span>
+    ),
   }
   const sinceColumn: DataTableColumn<FleetEquipmentRow> = {
     key: 'since',
@@ -704,32 +713,16 @@ export function FleetMiniTables({
   // wave-12: why an available unit left its project (the purpose of its last
   // site exit, migration 0118), so «للصيانة» can be told apart from «انتهاء
   // عمل» at a glance. Nothing for a unit that last left the workshop, one that
-  // never moved or an exit recorded before migration 0111.
-  // wave 20 (migration 0125): a small «جديدة» mark next to the code, in the
-  // card and the expanded table. Since migration 0129 (EM-236) it means the
-  // row was created within the last 7 days, no longer "never moved".
-  const newBadge = (row: FleetEquipmentRow) =>
-    row.isNew ? (
-      <Badge tone="info" size="sm">
-        {t('equipmentStateNew')}
-      </Badge>
-    ) : null
+  // never moved or an exit recorded before migration 0111. The «جديدة» mark
+  // comes with the shared `codeColumn`; the expanded table uses `codeColumn`
+  // itself.
   const availableCodeColumn: DataTableColumn<FleetEquipmentRow> = {
     ...codeColumn,
     cell: (row) => (
       <span className="flex flex-wrap items-center gap-1">
         <span className="font-semibold">{row.code}</span>
-        {newBadge(row)}
+        <EquipmentNewBadge isNew={row.isNew} />
         <ExitPurposeBadge purpose={row.exitPurpose} />
-      </span>
-    ),
-  }
-  const availableExpandedCodeColumn: DataTableColumn<FleetEquipmentRow> = {
-    ...codeColumn,
-    cell: (row) => (
-      <span className="flex flex-wrap items-center gap-1">
-        <span className="font-semibold">{row.code}</span>
-        {newBadge(row)}
       </span>
     ),
   }
@@ -896,7 +889,7 @@ export function FleetMiniTables({
         description={t('adminHomeFleetAvailableDescription')}
         columns={availableColumns}
         expandedColumns={[
-          sortable(availableExpandedCodeColumn),
+          sortable(codeColumn),
           sortable(availableTypeColumn),
           sortable(availableCompanyProjectColumn),
           sortable(exitPurposeColumn),
