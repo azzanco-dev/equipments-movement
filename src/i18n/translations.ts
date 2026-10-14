@@ -1506,6 +1506,7 @@ export const translations = {
 
     // wave6-J3
     movementActions: 'اجراءات الحركة',
+    options: 'خيارات',
     movementEditOpenVisitDriverHint:
       'الزيارة ما زالت مفتوحة، لذلك يسجل تغيير السائق كسجل جديد ويبقى سائق الدخول الاصلي كما هو.',
     movementAdminDriverNotSupported: 'حركات الورشة تسجل بدون سائق.',
@@ -3259,6 +3260,7 @@ export const translations = {
 
     // wave6-J3
     movementActions: 'Movement actions',
+    options: 'Options',
     movementEditOpenVisitDriverHint:
       'The visit is still open, so a driver change is appended as a new record and the original entry driver stays unchanged.',
     movementAdminDriverNotSupported:

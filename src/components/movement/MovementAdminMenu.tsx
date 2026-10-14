@@ -1,12 +1,12 @@
-import { Ellipsis, Pencil, Trash2 } from 'lucide-react'
+import { Pencil, SlidersHorizontal, Trash2 } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  IconButton,
 } from '@/components/ui'
 
 export interface MovementAdminMenuProps {
@@ -36,12 +36,16 @@ export function MovementAdminMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <IconButton
-          label={t('movementActions')}
+        {/* Owner decision 2026-10-14: a labelled «خيارات» button (icon +
+            text, like the other header actions), not a three-dots icon. */}
+        <Button
           variant="outline"
-          icon={<Ellipsis size={16} />}
+          icon={<SlidersHorizontal size={16} aria-hidden="true" />}
+          aria-label={t('movementActions')}
           disabled={busy}
-        />
+        >
+          {t('options')}
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuItem
