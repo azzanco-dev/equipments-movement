@@ -108,7 +108,7 @@ const SCREEN_SECTIONS: SectionDef[] = [
     title: 'نموذج صفحة الادوار والصلاحيات',
     purpose:
       'تقسيم الصفحة: قائمة الادوار في البداية، والدور المختار بجداول صلاحياته ومستخدميه وسجله.',
-    status: 'review',
+    status: 'approved',
     defaultOpen: true,
     element: <RolesPageMockup />,
   },
