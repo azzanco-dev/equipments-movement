@@ -88,7 +88,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-function ButtonsShowcase() {
+export function ButtonsShowcase() {
   const [loading, setLoading] = useState(false)
   const simulateSave = () => {
     setLoading(true)
@@ -158,7 +158,7 @@ function ButtonsShowcase() {
   )
 }
 
-function FieldsShowcase() {
+export function FieldsShowcase() {
   const [search, setSearch] = useState('A-10')
   const [driver, setDriver] = useState('')
   return (
@@ -218,7 +218,7 @@ function FieldsShowcase() {
   )
 }
 
-function BadgesShowcase() {
+export function BadgesShowcase() {
   return (
     <ShowcaseSection
       title="الشارات"

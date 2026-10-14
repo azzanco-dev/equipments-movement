@@ -24,10 +24,36 @@ import { useI18n } from '@/i18n/I18nContext'
 import { useTheme } from '@/theme/ThemeContext'
 import { AuthScreen } from '@/screens/AuthScreen'
 import { FullPageSpinner } from '@/components/Spinner'
-import { ComponentShowcase } from '@/screens/ui-kit/ComponentShowcase'
+import {
+  BadgesShowcase,
+  ButtonsShowcase,
+  FieldsShowcase,
+} from '@/screens/ui-kit/ComponentShowcase'
+import { OverlayShowcase } from '@/screens/ui-kit/OverlayShowcase'
+import { SelectPlaceholderShowcase } from '@/screens/ui-kit/SelectPlaceholderShowcase'
+import { DateAndFloatingShowcase } from '@/screens/ui-kit/DateAndFloatingShowcase'
+import { FeedbackAndFormShowcase } from '@/screens/ui-kit/FeedbackAndFormShowcase'
+import { PhotoGalleryShowcase } from '@/screens/ui-kit/PhotoGalleryShowcase'
+import { LastEntrySummaryShowcase } from '@/screens/ui-kit/LastEntrySummaryShowcase'
+import { ImageCompressionShowcase } from '@/screens/ui-kit/ImageCompressionShowcase'
+import { LightboxShowcase } from '@/screens/ui-kit/LightboxShowcase'
+import { MiniTableShowcase } from '@/screens/ui-kit/MiniTableShowcase'
+import { NoticeShowcase } from '@/screens/ui-kit/NoticeShowcase'
+import { DetailPagesShowcase } from '@/screens/ui-kit/DetailPagesShowcase'
+import { FilterBarShowcase } from '@/screens/ui-kit/FilterBarShowcase'
+import { MultiSelectShowcase } from '@/screens/ui-kit/MultiSelectShowcase'
 import { DataTableShowcase } from '@/screens/ui-kit/DataTableShowcase'
 import { HomeMockupShowcase } from '@/screens/ui-kit/HomeMockupShowcase'
 import { EquipmentInquiryShowcase } from '@/screens/ui-kit/EquipmentInquiryShowcase'
+import { RolesPageMockup } from '@/screens/ui-kit/RolesPageMockup'
+import {
+  UiKitGroup,
+  UiKitIndex,
+  UiKitSection,
+  useActiveSection,
+  type UiKitIndexGroup,
+  type UiKitStatus,
+} from '@/screens/ui-kit/UiKitLayout'
 import {
   PALETTE_DIRECTIONS,
   contrastRatio,
@@ -63,6 +89,213 @@ type Mode = 'light' | 'dark'
 // Approved by the product owner on 2026-09-15.
 const APPROVED_PALETTE: PaletteDirection['id'] = 'current'
 
+// One entry per section of the page. «معتمد» marks only what AGENTS.md
+// records as approved by the owner: the palette and tokens (2026-09-15), the
+// control heights (2026-09-16) and the shared components built on Radix. The
+// rest stays «قيد المراجعة».
+type SectionDef = {
+  id: string
+  title: string
+  purpose: string
+  status: UiKitStatus
+  defaultOpen?: boolean
+  element: ReactNode
+}
+
+const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    id: 'roles-mockup',
+    title: 'نموذج صفحة الادوار والصلاحيات',
+    purpose:
+      'تقسيم الصفحة: قائمة الادوار في البداية، والدور المختار بجداول صلاحياته ومستخدميه وسجله.',
+    status: 'review',
+    defaultOpen: true,
+    element: <RolesPageMockup />,
+  },
+  {
+    id: 'home-mockup',
+    title: 'نموذج الصفحة الرئيسية',
+    purpose: 'بحث موحد عن المعدة فوق كل شيء، وقوائم منفصلة للمشاريع والورشة.',
+    status: 'review',
+    defaultOpen: true,
+    element: <HomeMockupShowcase />,
+  },
+  {
+    id: 'equipment-inquiry',
+    title: 'نموذج استعلام معدة',
+    purpose: 'حقل بحث واحد مع اقتراحات، ثم خط زمني لزيارات المعدة.',
+    status: 'review',
+    defaultOpen: true,
+    element: <EquipmentInquiryShowcase />,
+  },
+]
+
+const COMPONENT_SECTIONS: SectionDef[] = [
+  {
+    id: 'buttons',
+    title: 'الازرار',
+    purpose:
+      'Button و IconButton بالارتفاع المعتمد: 40 على الجوال و36 على الكمبيوتر.',
+    status: 'approved',
+    element: <ButtonsShowcase />,
+  },
+  {
+    id: 'fields',
+    title: 'الحقول',
+    purpose: 'Field و Input و Textarea و SearchInput بنفس ارتفاع الازرار.',
+    status: 'approved',
+    element: <FieldsShowcase />,
+  },
+  {
+    id: 'badges',
+    title: 'الشارات',
+    purpose:
+      'Badge بالالوان الوظيفية المعتمدة، و MovementBadge للدخول والخروج.',
+    status: 'approved',
+    element: <BadgesShowcase />,
+  },
+  {
+    id: 'overlays',
+    title: 'القوائم والنوافذ والتبويبات',
+    purpose: 'Select و Dialog و ConfirmDialog و DropdownMenu و Tabs على Radix.',
+    status: 'approved',
+    element: <OverlayShowcase />,
+  },
+  {
+    id: 'select-placeholder',
+    title: 'نصوص القوائم والتلميح',
+    purpose: 'النصوص الطويلة داخل القوائم وتوحيد لون وحجم التلميح.',
+    status: 'review',
+    element: <SelectPlaceholderShowcase />,
+  },
+  {
+    id: 'date-floating',
+    title: 'التاريخ والعناصر العائمة',
+    purpose: 'Popover و Tooltip و DatePicker و DateRangeFilter.',
+    status: 'approved',
+    element: <DateAndFloatingShowcase />,
+  },
+  {
+    id: 'feedback-form',
+    title: 'عناصر النماذج والحالات',
+    purpose:
+      'Checkbox و Switch و RadioGroup و Toast وحالات التحميل والفراغ والخطا.',
+    status: 'approved',
+    element: <FeedbackAndFormShowcase />,
+  },
+  {
+    id: 'photo-gallery',
+    title: 'معرض صور الحركة',
+    purpose: 'PhotoGallery: حاويات ثابتة بدون قص لصور الحركة.',
+    status: 'review',
+    element: <PhotoGalleryShowcase />,
+  },
+  {
+    id: 'last-entry',
+    title: 'بيانات اخر دخول',
+    purpose: 'ملخص اخر دخول كما يظهر في نموذج الخروج.',
+    status: 'review',
+    element: <LastEntrySummaryShowcase />,
+  },
+  {
+    id: 'image-compression',
+    title: 'مختبر ضغط الصور',
+    purpose: 'تجربة ضغط الصور قبل الرفع ومقارنة الحجم والجودة.',
+    status: 'review',
+    element: <ImageCompressionShowcase />,
+  },
+  {
+    id: 'lightbox',
+    title: 'عارض الصور',
+    purpose: 'Lightbox بملء الشاشة مع التنقل بين الصور.',
+    status: 'review',
+    element: <LightboxShowcase />,
+  },
+  {
+    id: 'mini-table',
+    title: 'الجداول الصغيرة',
+    purpose: 'MiniTable لاخر السجلات في صفحات التفاصيل والرئيسية.',
+    status: 'review',
+    element: <MiniTableShowcase />,
+  },
+  {
+    id: 'notice',
+    title: 'التنبيهات (Notice)',
+    purpose: 'الرسائل داخل الصفحة والنماذج بالالوان الوظيفية.',
+    status: 'review',
+    element: <NoticeShowcase />,
+  },
+  {
+    id: 'detail-pages',
+    title: 'صفحات التفاصيل',
+    purpose: 'نماذج تفاصيل الحركة والمعدة والسائق على المكونات المشتركة.',
+    status: 'review',
+    element: <DetailPagesShowcase />,
+  },
+  {
+    id: 'filter-bar',
+    title: 'شريط الفلاتر',
+    purpose: 'شريط البحث والفلاتر الموحد للقوائم الكبيرة.',
+    status: 'review',
+    element: <FilterBarShowcase />,
+  },
+  {
+    id: 'multi-select',
+    title: 'الاختيار المتعدد',
+    purpose: 'MultiSelect للفلاتر التي تقبل اكثر من قيمة.',
+    status: 'review',
+    element: <MultiSelectShowcase />,
+  },
+  {
+    id: 'data-table',
+    title: 'الجداول (DataTable)',
+    purpose: 'الجدول المشترك: الترتيب داخل عنوان العمود والسحب للتمرير.',
+    status: 'review',
+    element: <DataTableShowcase />,
+  },
+]
+
+const COLOR_SECTION_IDS = {
+  tokens: 'approved-tokens',
+  comparison: 'palette-comparison',
+} as const
+
+const INDEX_GROUPS: UiKitIndexGroup[] = [
+  {
+    id: 'group-screens',
+    title: 'نماذج الشاشات',
+    items: SCREEN_SECTIONS.map(({ id, title }) => ({
+      id,
+      title: title.replace(/^نموذج (صفحة )?/, ''),
+    })),
+  },
+  {
+    id: 'group-components',
+    title: 'المكونات',
+    items: COMPONENT_SECTIONS.map(({ id, title }) => ({ id, title })),
+  },
+  {
+    id: 'group-colors',
+    title: 'الالوان والرموز',
+    items: [
+      { id: COLOR_SECTION_IDS.tokens, title: 'الالوان المعتمدة' },
+      { id: COLOR_SECTION_IDS.comparison, title: 'مقارنة الاتجاهات' },
+    ],
+  },
+]
+
+const ALL_SECTION_IDS = INDEX_GROUPS.flatMap((group) =>
+  group.items.map((item) => item.id),
+)
+
+function renderSections(sections: SectionDef[]) {
+  return sections.map(({ element, ...section }) => (
+    <UiKitSection key={section.id} {...section}>
+      {element}
+    </UiKitSection>
+  ))
+}
+
 function UiKitContent() {
   const [paletteId, setPaletteId] =
     useState<PaletteDirection['id']>(APPROVED_PALETTE)
@@ -71,15 +304,12 @@ function UiKitContent() {
     PALETTE_DIRECTIONS.find((item) => item.id === paletteId) ??
     PALETTE_DIRECTIONS[0]
   const tokens = palette[mode]
+  const activeId = useActiveSection(ALL_SECTION_IDS)
 
   return (
     // The review page is Arabic-first regardless of the interface language.
-    <div
-      dir="rtl"
-      lang="ar"
-      className="mx-auto max-w-[1400px] space-y-6 px-4 py-6 sm:px-6"
-    >
-      <header className="flex flex-wrap items-center justify-between gap-3">
+    <div dir="rtl" lang="ar" className="mx-auto max-w-[1400px] px-4 sm:px-6">
+      <header className="flex flex-wrap items-center justify-between gap-3 py-6">
         <div className="flex items-center gap-3">
           <img
             src="/azzanco-logo.png"
@@ -98,71 +328,125 @@ function UiKitContent() {
         <ThemeToggle />
       </header>
 
-      <ApprovedTokens />
+      {/* Mobile: a sticky chip row under the header. */}
+      <UiKitIndex
+        groups={INDEX_GROUPS}
+        activeId={activeId}
+        variant="chips"
+        className="lg:hidden"
+      />
 
-      <HomeMockupShowcase />
+      <div className="py-6 lg:grid lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-8">
+        {/* Desktop: a sticky index column at the start side. */}
+        <div className="hidden lg:block">
+          <UiKitIndex
+            groups={INDEX_GROUPS}
+            activeId={activeId}
+            variant="side"
+          />
+        </div>
 
-      <EquipmentInquiryShowcase />
-
-      <ComponentShowcase />
-
-      <DataTableShowcase />
-
-      <details className="group space-y-3">
-        <summary className="cursor-pointer text-base font-semibold">
-          مقارنة اتجاهات الالوان (مرجع)
-        </summary>
-        <section aria-labelledby="directions-title" className="mt-3 space-y-3">
-          <h2 id="directions-title" className="sr-only">
-            مقارنة اتجاهات الالوان
-          </h2>
-          <div
-            role="radiogroup"
-            aria-labelledby="directions-title"
-            className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+        <div className="min-w-0 space-y-10">
+          <UiKitGroup
+            id="group-screens"
+            title="نماذج الشاشات"
+            description="نماذج تفاعلية ببيانات تجريبية لاعتماد اتجاه الشاشات قبل بنائها."
           >
-            {PALETTE_DIRECTIONS.map((item) => (
-              <PaletteOption
-                key={item.id}
-                palette={item}
-                selected={item.id === paletteId}
-                onSelect={() => setPaletteId(item.id)}
-              />
-            ))}
-          </div>
-        </section>
+            {renderSections(SCREEN_SECTIONS)}
+          </UiKitGroup>
 
-        <section aria-labelledby="preview-title" className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 id="preview-title" className="text-base font-semibold">
-              معاينة: {palette.name}
-            </h2>
-            <div
-              role="radiogroup"
-              aria-label="وضع العرض"
-              className="inline-flex rounded-lg border border-[var(--border)] p-0.5"
+          <UiKitGroup
+            id="group-components"
+            title="المكونات"
+            description="المكونات المشتركة في src/components/ui؛ تعتمد هنا قبل نقل الشاشات اليها."
+          >
+            {renderSections(COMPONENT_SECTIONS)}
+          </UiKitGroup>
+
+          <UiKitGroup
+            id="group-colors"
+            title="الالوان والرموز"
+            description="الالوان المعتمدة كما هي في src/index.css، ومرجع المقارنة الذي اعتمدت منه."
+          >
+            <UiKitSection
+              id={COLOR_SECTION_IDS.tokens}
+              title="الالوان المعتمدة"
+              purpose="قيم الرموز الحية للوضع الفاتح والداكن."
+              status="approved"
+              defaultOpen
             >
-              {(['light', 'dark'] as const).map((value) => (
-                <button
-                  key={value}
-                  role="radio"
-                  aria-checked={mode === value}
-                  onClick={() => setMode(value)}
-                  className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-[13px] ${
-                    mode === value ? 'nav-active' : 'text-muted'
-                  }`}
-                >
-                  {value === 'light' ? <Sun size={14} /> : <Moon size={14} />}
-                  {value === 'light' ? 'فاتح' : 'داكن'}
-                </button>
-              ))}
-            </div>
-          </div>
-          <PalettePreview tokens={tokens} />
-        </section>
+              <ApprovedTokens />
+            </UiKitSection>
 
-        <ContrastChecks tokens={tokens} mode={mode} />
-      </details>
+            <UiKitSection
+              id={COLOR_SECTION_IDS.comparison}
+              title="مقارنة اتجاهات الالوان (مرجع)"
+              purpose="الاتجاهات الاربعة التي قورنت في 2026-09-15 ومعاينة كل اتجاه."
+              status="approved"
+            >
+              <div className="space-y-3">
+                <section
+                  aria-labelledby="directions-title"
+                  className="space-y-3"
+                >
+                  <h2 id="directions-title" className="sr-only">
+                    مقارنة اتجاهات الالوان
+                  </h2>
+                  <div
+                    role="radiogroup"
+                    aria-labelledby="directions-title"
+                    className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+                  >
+                    {PALETTE_DIRECTIONS.map((item) => (
+                      <PaletteOption
+                        key={item.id}
+                        palette={item}
+                        selected={item.id === paletteId}
+                        onSelect={() => setPaletteId(item.id)}
+                      />
+                    ))}
+                  </div>
+                </section>
+
+                <section aria-labelledby="preview-title" className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 id="preview-title" className="text-base font-semibold">
+                      معاينة: {palette.name}
+                    </h2>
+                    <div
+                      role="radiogroup"
+                      aria-label="وضع العرض"
+                      className="inline-flex rounded-lg border border-[var(--border)] p-0.5"
+                    >
+                      {(['light', 'dark'] as const).map((value) => (
+                        <button
+                          key={value}
+                          role="radio"
+                          aria-checked={mode === value}
+                          onClick={() => setMode(value)}
+                          className={`inline-flex h-7 items-center gap-1.5 rounded-md px-3 text-[13px] ${
+                            mode === value ? 'nav-active' : 'text-muted'
+                          }`}
+                        >
+                          {value === 'light' ? (
+                            <Sun size={14} />
+                          ) : (
+                            <Moon size={14} />
+                          )}
+                          {value === 'light' ? 'فاتح' : 'داكن'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <PalettePreview tokens={tokens} />
+                </section>
+
+                <ContrastChecks tokens={tokens} mode={mode} />
+              </div>
+            </UiKitSection>
+          </UiKitGroup>
+        </div>
+      </div>
     </div>
   )
 }
