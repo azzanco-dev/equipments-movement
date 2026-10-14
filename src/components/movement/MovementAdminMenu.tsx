@@ -40,7 +40,8 @@ export function MovementAdminMenu({
             text, like the other header actions), not a three-dots icon. */}
         <Button
           variant="outline"
-          icon={<SlidersHorizontal size={16} aria-hidden="true" />}
+          size="sm"
+          icon={<SlidersHorizontal size={14} aria-hidden="true" />}
           aria-label={t('movementActions')}
           disabled={busy}
         >
