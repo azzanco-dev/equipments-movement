@@ -12,7 +12,32 @@ import type { TranslationKey } from '@/i18n/translations'
  * the latest movement through `get_last_movement` (the inquiry, which foremen
  * use and whose RLS would hide part of the chain from a computed field);
  * tests/wave20State.test.cjs keeps the two in step.
+ *
+ * The «جديدة» mark is separate from the state. Since migration 0129 (owner
+ * decision 2026-10-14, EM-236) it means the equipment ROW was created within
+ * the last `EQUIPMENT_NEW_DAYS` days (`equipment_new_window()` in SQL, read
+ * by the `equipment_is_new` computed field and `admin_equipment_state.is_new`),
+ * no longer "no movement yet". `isEquipmentNew` mirrors it for the inquiry.
  */
+
+/** Days after its creation during which an equipment is marked «جديدة».
+ *  Mirrors `public.equipment_new_window()` (0129); tests keep the two equal. */
+export const EQUIPMENT_NEW_DAYS = 7
+
+/**
+ * Mirror of `equipment_is_new(equipment)` (0129): the row was created within
+ * `EQUIPMENT_NEW_DAYS` days of `now`. A missing or unreadable `created_at` is
+ * not new.
+ */
+export function isEquipmentNew(
+  createdAt: string | null | undefined,
+  now: number = Date.now(),
+): boolean {
+  if (!createdAt) return false
+  const created = Date.parse(createdAt)
+  if (Number.isNaN(created)) return false
+  return created >= now - EQUIPMENT_NEW_DAYS * 24 * 60 * 60 * 1000
+}
 
 /** The workshop entry purposes, in the order every menu and filter lists
  *  them. */

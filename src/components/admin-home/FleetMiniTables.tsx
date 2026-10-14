@@ -705,8 +705,9 @@ export function FleetMiniTables({
   // site exit, migration 0118), so «للصيانة» can be told apart from «انتهاء
   // عمل» at a glance. Nothing for a unit that last left the workshop, one that
   // never moved or an exit recorded before migration 0111.
-  // wave 20 (migration 0125): a unit that has never moved carries a small
-  // «جديدة» mark next to its code, in the card and the expanded table.
+  // wave 20 (migration 0125): a small «جديدة» mark next to the code, in the
+  // card and the expanded table. Since migration 0129 (EM-236) it means the
+  // row was created within the last 7 days, no longer "never moved".
   const newBadge = (row: FleetEquipmentRow) =>
     row.isNew ? (
       <Badge tone="info" size="sm">

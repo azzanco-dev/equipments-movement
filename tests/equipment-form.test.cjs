@@ -231,7 +231,8 @@ test('the payload drops the plate when the equipment is unnumbered', () => {
   )
   assert.equal(payload.plate_number, null)
   assert.equal(payload.chassis_number, 'CH-1')
-  assert.equal(payload.master_data_complete, true)
+  // EM-236: the retired flag is no longer sent by the form.
+  assert.equal('master_data_complete' in payload, false)
 })
 
 test('a new record defaults to the active status and is in the fleet', () => {
@@ -350,7 +351,7 @@ test('wave 20: the payload never writes the retired operational status', () => {
   assert.equal(form.operationalStatusBadge, undefined)
 })
 
-test('every owner maps to its own label and quick-created rows are flagged', () => {
+test('every owner maps to its own label; the incomplete-data badge is gone', () => {
   assert.equal(form.ownershipBadge('alazani').key, 'ownershipAlazani')
   assert.equal(form.ownershipBadge('takween').key, 'ownershipTakween')
   assert.equal(form.ownershipBadge('third_party_f').key, 'ownershipThirdPartyF')
@@ -362,9 +363,8 @@ test('every owner maps to its own label and quick-created rows are flagged', () 
     form.ownershipBadge('external_supplier').key,
     'ownershipExternalSupplier',
   )
-  assert.equal(form.masterDataBadge(false).key, 'incompleteData')
-  assert.equal(form.masterDataBadge(true), null)
-  assert.equal(form.masterDataBadge(undefined), null)
+  // EM-236: `master_data_complete` and «بيانات غير مكتملة» left the UI.
+  assert.equal(form.masterDataBadge, undefined)
 })
 
 test('a generated QR value is unique and keeps the EQ- prefix', () => {

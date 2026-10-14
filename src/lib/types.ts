@@ -108,14 +108,14 @@ export interface Equipment {
   /** Optional so a row read by an older `select` list keeps compiling; the UI
    *  treats a missing value as `active`, which is the column default. */
   status?: EquipmentStatus
-  master_data_complete?: boolean
   numbering_status?: 'numbered' | 'unnumbered'
   created_at: string
   updated_at: string
   /**
    * wave 20 (migration 0125): PostgREST computed fields, present only when the
    * select names them. The one state derived from the latest movement, and
-   * whether the unit has never moved («جديدة»).
+   * (since migration 0129) whether the row was created within the last 7 days
+   * («جديدة»).
    */
   equipment_state?: EquipmentState | null
   equipment_is_new?: boolean | null

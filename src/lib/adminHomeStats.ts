@@ -528,7 +528,8 @@ export interface FleetEquipmentRow {
    * before migration 0111.
    */
   exitPurpose: ExitPurpose | null
-  /** wave 20 (migration 0125): the unit has never moved («جديدة»). `false`
+  /** «جديدة»: since migration 0129 the row was created within the last 7 days
+   *  (`admin_equipment_state.is_new`; 0125 meant "never moved"). `false`
    *  against an older database that does not return `is_new`. */
   isNew: boolean
 }

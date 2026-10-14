@@ -173,11 +173,29 @@ export const equipmentListConfig: DataListConfig = {
         },
       ],
     },
+    // EM-236 (migration 0129): «جديدة» = the row was created within the last
+    // 7 days, served by the `equipment_is_new` computed field, which PostgREST
+    // filters server-side like a boolean column (`equipment_is_new=eq.true`).
+    // A yes / no select over `eq`; "All" removes the filter.
+    {
+      key: 'equipment_is_new',
+      label: 'equipmentStateNew',
+      type: 'boolean',
+      operators: ['eq'],
+      options: [
+        { value: 'true', label: 'نعم', labelI18n: 'yes' },
+        { value: 'false', label: 'لا', labelI18n: 'no' },
+      ],
+    },
+    // EM-235 (owner decision 2026-10-14): a multi-select, like the drivers'
+    // employment type: the dialog renders `MultiSelect`, emits `in` with the
+    // ticked owners joined by commas, persists in the URL and has no default.
     {
       key: 'ownership_status',
       label: 'ownershipStatus',
       type: 'select',
       operators: ['eq', 'neq', 'in', 'not_in'],
+      multiple: true,
       options: [
         {
           value: 'alazani',

@@ -12,11 +12,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import { RelativeTime } from '@/components/RelativeTime'
 import type { Equipment } from '@/lib/types'
 import { usesExternalSupplier } from '@/lib/equipmentOwnership'
-import {
-  equipmentStatusBadge,
-  masterDataBadge,
-  ownershipBadge,
-} from '@/lib/equipmentForm'
+import { equipmentStatusBadge, ownershipBadge } from '@/lib/equipmentForm'
 import { EquipmentStateBadge } from '@/components/equipment/EquipmentStateBadge'
 
 /**
@@ -88,24 +84,18 @@ export function EquipmentTable({
       header: t('equipmentCode'),
       sortable: true,
       className: 'font-semibold',
-      cell: (row) => {
-        const incomplete = masterDataBadge(row.master_data_complete)
-        return (
-          <span className="inline-flex items-center gap-2">
-            <span dir="ltr">{row.code}</span>
-            {previousCodeMatchIds?.has(row.id) && (
-              <Badge tone="neutral" size="sm">
-                {t('previousCodeBadge')}
-              </Badge>
-            )}
-            {incomplete && (
-              <Badge tone={incomplete.tone} size="sm">
-                {t(incomplete.key)}
-              </Badge>
-            )}
-          </span>
-        )
-      },
+      // EM-236: the «بيانات غير مكتملة» badge (the retired completeness
+      // flag) left the UI; the column stays in the database unused.
+      cell: (row) => (
+        <span className="inline-flex items-center gap-2">
+          <span dir="ltr">{row.code}</span>
+          {previousCodeMatchIds?.has(row.id) && (
+            <Badge tone="neutral" size="sm">
+              {t('previousCodeBadge')}
+            </Badge>
+          )}
+        </span>
+      ),
     },
     {
       key: 'type',
@@ -142,9 +132,6 @@ export function EquipmentTable({
       header: t('ownershipStatus'),
       sortable: true,
       cell: (row) => {
-        const incomplete = masterDataBadge(row.master_data_complete)
-        if (incomplete)
-          return <Badge tone={incomplete.tone}>{t(incomplete.key)}</Badge>
         const badge = ownershipBadge(row.ownership_status)
         const supplier =
           usesExternalSupplier(row.ownership_status) && row.lessor?.name

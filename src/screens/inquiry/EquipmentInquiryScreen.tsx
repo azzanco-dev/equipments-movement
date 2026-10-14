@@ -45,6 +45,7 @@ import { EquipmentLocationCard } from '@/components/afaqy/EquipmentLocationCard'
 import { preferRecordName } from '@/lib/driverDisplayName'
 import {
   equipmentStateFromMovement,
+  isEquipmentNew,
   type EquipmentState,
 } from '@/lib/equipmentState'
 import { EquipmentStateBadge } from '@/components/equipment/EquipmentStateBadge'
@@ -68,6 +69,9 @@ interface InquiryEquipmentRow {
   type: string | null
   plate_number: string | null
   chassis_number: string | null
+  /** Selected by the detail read only (the suggestions do not need it): the
+   *  «جديدة» mark is "created within the last 7 days" (migration 0129). */
+  created_at?: string | null
 }
 
 interface MovementLogTimelineRow {
@@ -103,7 +107,8 @@ const MOVEMENTS_PAGE_SIZE = 40
  * through `get_last_movement` (SECURITY DEFINER), not the `equipment_state`
  * computed field, because a foreman's RLS hides other people's movements and
  * the computed field would then see only part of the chain. `error` keeps a
- * failed read visible instead of showing a state.
+ * failed read visible instead of showing a state. `isNew` is the row's age
+ * (`isEquipmentNew`, migration 0129), not "no movement".
  */
 type InquiryState = { state: EquipmentState; isNew: boolean } | 'error' | null
 
@@ -308,14 +313,15 @@ export function EquipmentInquiryScreen({
       setDetailError(false)
       setDetailMissing(false)
       const signal = startDetailRequest()
-      // The brief row is identity only (code, type, plate or chassis); the
-      // current state and the time since the last movement come from the
-      // timeline summary cards below, so no extra read is needed here.
+      // The brief row is identity (code, type, plate or chassis) plus
+      // `created_at` for the «جديدة» mark (migration 0129); the current state
+      // and the time since the last movement come from the timeline summary
+      // cards below, so no extra read is needed here.
       const [equipmentResult, codeChangesResult, lastMovementResult] =
         await Promise.all([
           supabase
             .from('equipment')
-            .select('id,code,type,plate_number,chassis_number')
+            .select('id,code,type,plate_number,chassis_number,created_at')
             .eq('id', id)
             .abortSignal(signal)
             .maybeSingle(),
@@ -338,6 +344,7 @@ export function EquipmentInquiryScreen({
         ])
       if (signal.aborted) return
       setDetailLoadedId(id)
+      const row = equipmentResult.data as InquiryEquipmentRow | null
       if (lastMovementResult.error) setInquiryState('error')
       else {
         const latest =
@@ -350,7 +357,8 @@ export function EquipmentInquiryScreen({
           )?.[0] ?? null
         setInquiryState({
           state: equipmentStateFromMovement(latest),
-          isNew: latest === null,
+          // Migration 0129: «جديدة» is the row's age, not "no movement".
+          isNew: isEquipmentNew(row?.created_at),
         })
       }
       setCodeChangesError(Boolean(codeChangesResult.error))
@@ -363,7 +371,6 @@ export function EquipmentInquiryScreen({
         setDetailLoading(false)
         return
       }
-      const row = equipmentResult.data as InquiryEquipmentRow | null
       if (!row) {
         setDetailMissing(true)
         setEquipment(null)

@@ -86,7 +86,6 @@ export const translations = {
     markInsideWorkshop: 'تسجيل المعدة داخل الورشة',
     workshopOpeningSaved: 'تم تسجيل المعدة ضمن الرصيد الافتتاحي.',
     workshopOpeningFailed: 'تعذر تسجيل المعدة أو توجد لها حركة ورشة سابقة.',
-    incompleteData: 'بيانات غير مكتملة',
     signInButton: 'دخول',
     signUpButton: 'إنشاء حساب',
     signInSubtitle: 'سجّل دخولك للوصول إلى النظام',
@@ -1809,7 +1808,6 @@ export const translations = {
       'Equipment was added to the workshop opening balance.',
     workshopOpeningFailed:
       'Could not add the equipment, or it already has a workshop movement.',
-    incompleteData: 'Incomplete data',
     signInButton: 'Sign In',
     signUpButton: 'Sign Up',
     signInSubtitle: 'Sign in to access the system',
@@ -3308,7 +3306,7 @@ export const translations = {
     extractingSubtitle:
       'Upload a clear photo, review the data, then choose where to publish',
     extractingNotAuthorized: 'Not authorized',
-    extractingAdminOnly: 'This page requires the "Text extraction page" permission',
+    extractingAdminOnly: 'This page needs the "Text extraction" permission',
     extractingChooseImage: 'Choose the residence permit photo',
     extractingImageHint: 'JPEG, PNG, WEBP — up to 10 MB',
     extractingKilobytes: 'KB',

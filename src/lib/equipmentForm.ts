@@ -379,7 +379,8 @@ export function buildEquipmentPayload(form: EquipmentFormValues) {
     last_maintenance_date: form.last_maintenance_date || null,
     registration_expiry: form.registration_expiry || null,
     insurance_expiry: form.insurance_expiry || null,
-    master_data_complete: true,
+    // EM-236: the completeness flag is retired from the UI (not sent; the
+    // column keeps its database default and stays unused).
   }
 }
 
@@ -448,11 +449,4 @@ export function isFleetEquipment(
   equipment: Pick<Equipment, 'is_active' | 'status'>,
 ): boolean {
   return equipment.is_active && (equipment.status ?? 'active') === 'active'
-}
-
-/** Quick-created equipment stays flagged until an admin reviews it. */
-export function masterDataBadge(
-  complete: boolean | null | undefined,
-): BadgeDescriptor | null {
-  return complete === false ? { tone: 'warning', key: 'incompleteData' } : null
 }
