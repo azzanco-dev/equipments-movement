@@ -5,21 +5,22 @@ import { useI18n } from '@/i18n/I18nContext'
 import { ErrorState } from '@/components/ui/ErrorState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { cn } from '@/components/ui/cn'
-import type { LeafletLocationMapProps } from './LeafletProjectsMap'
+import type { LeafletLocationMapProps } from './LeafletLocationMap'
 
 /*
  * wave 17: one position on a small map (the «الموقع الحالي» card). Leaflet is
- * loaded exactly like `ProjectsMap` does it: a dynamic import of
- * ./LeafletProjectsMap (still the only file that imports Leaflet) started in
- * an effect and cached at module level, so nothing of Leaflet reaches the
- * server or a page that shows no map. A failed download is shown in place
- * with a retry, never as a blank box.
+ * loaded the way the admin-home charts load Recharts
+ * (src/components/charts/lazy.tsx): a dynamic import of ./LeafletLocationMap
+ * (the only file that imports Leaflet) started in an effect and cached at
+ * module level, so nothing of Leaflet reaches the server or a page that shows
+ * no map. A failed download is shown in place with a retry, never as a blank
+ * box.
  */
 let LoadedMap: ComponentType<LeafletLocationMapProps> | null = null
 let pending: Promise<ComponentType<LeafletLocationMapProps>> | null = null
 
 function loadMap() {
-  pending ??= import('./LeafletProjectsMap').then(
+  pending ??= import('./LeafletLocationMap').then(
     (module) => {
       LoadedMap = module.LeafletLocationMap
       return module.LeafletLocationMap

@@ -761,26 +761,13 @@ export const translations = {
     equipmentCodeSavedPartially:
       'تم حفظ الرقم الجديد، لكن تعذر حفظ باقي التعديلات. حاول الحفظ مرة اخرى.',
     // wave-10-code-history — end
-    // wave-14-map — start
-    projectsMapRegionLabel: 'خريطة المشاريع',
-    projectsMapBubbleLabel: '{name}: {count} معدة',
-    projectsMapUnitsCount: '{count} معدة',
-    projectsMapLegendProject: 'مشروع',
-    projectsMapLegendWorkshop: 'الورشة',
-    projectsMapLegendSize: 'حجم الدائرة حسب عدد المعدات',
-    projectsMapUnplaced: 'بدون موقع على الخريطة',
-    projectsMapResetView: 'عرض كل المواقع',
+    // wave-14-map — start (kept for the «الموقع الحالي» map, LocationMap)
     projectsMapZoomIn: 'تكبير',
     projectsMapZoomOut: 'تصغير',
     projectsMapLoading: 'جار تحميل الخريطة',
     projectsMapLoadError: 'تعذر تحميل الخريطة.',
     projectsMapTilesError:
       'تعذر تحميل خلفية الخريطة. المواقع والاعداد ما زالت صحيحة.',
-    projectsMapEmpty: 'لا توجد معدات داخل المشاريع حاليا.',
-    projectsMapNoLocations:
-      'لا يوجد مشروع له موقع على الخريطة. المشاريع بدون موقع مذكورة تحت الخريطة.',
-    projectsMapWheelHint: 'انقر على الخريطة ثم استخدم عجلة الفارة للتكبير',
-    projectsMapTouchHint: 'استخدم اصبعين لتحريك الخريطة',
     // wave-14-map — end
     // wave-15-export — start
     exportButton: 'تصدير',
@@ -2509,26 +2496,13 @@ export const translations = {
     equipmentCodeSavedPartially:
       'The new code was saved, but the other changes were not. Try saving again.',
     // wave-10-code-history — end
-    // wave-14-map — start
-    projectsMapRegionLabel: 'Projects map',
-    projectsMapBubbleLabel: '{name}: {count} units',
-    projectsMapUnitsCount: '{count} units',
-    projectsMapLegendProject: 'Project',
-    projectsMapLegendWorkshop: 'Workshop',
-    projectsMapLegendSize: 'Circle size follows the number of units',
-    projectsMapUnplaced: 'Not on the map (no location)',
-    projectsMapResetView: 'Show all locations',
+    // wave-14-map — start (kept for the «الموقع الحالي» map, LocationMap)
     projectsMapZoomIn: 'Zoom in',
     projectsMapZoomOut: 'Zoom out',
     projectsMapLoading: 'Loading the map',
     projectsMapLoadError: "Couldn't load the map.",
     projectsMapTilesError:
       "The map background couldn't load. The locations and counts are still correct.",
-    projectsMapEmpty: 'No units are inside any project right now.',
-    projectsMapNoLocations:
-      'No project has a location on the map. Projects without one are listed below the map.',
-    projectsMapWheelHint: 'Click the map, then use the mouse wheel to zoom',
-    projectsMapTouchHint: 'Use two fingers to move the map',
     // wave-14-map — end
     // wave-15-export — start
     exportButton: 'Export',

@@ -975,8 +975,27 @@ test('the location card is admin-only and never asks for other roles', () => {
   assert.match(form, /trackerLink\.state === 'ready' &&/)
 
   const map = read('src', 'components', 'map', 'LocationMap.tsx')
-  assert.match(map, /import\('\.\/LeafletProjectsMap'\)/)
-  assert.doesNotMatch(map, /^import [^t].*LeafletProjectsMap/m)
+  assert.match(map, /import\('\.\/LeafletLocationMap'\)/)
+  assert.doesNotMatch(map, /^import [^t].*LeafletLocationMap/m)
+
+  // Leaflet reads `window` when it loads: it must stay inside the lazily
+  // loaded module only, never in a file a server render can reach.
+  const importers = []
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (/\.(ts|tsx)$/.test(entry.name)) {
+        const source = fs.readFileSync(full, 'utf8')
+        if (/from ['"]leaflet['"]|import ['"]leaflet\//.test(source))
+          importers.push(
+            path.relative(path.join(root, 'src'), full).replace(/\\/g, '/'),
+          )
+      }
+    }
+  }
+  walk(path.join(root, 'src'))
+  assert.deepEqual(importers, ['components/map/LeafletLocationMap.tsx'])
 
   for (const file of [
     card,
