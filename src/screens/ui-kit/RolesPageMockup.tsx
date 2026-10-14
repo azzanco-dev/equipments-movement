@@ -918,8 +918,10 @@ function PermissionRow({
         <div className="flex flex-wrap items-center gap-1.5">
           <span
             className={cn(
-              'text-sm font-bold',
-              !granted && !locked && 'text-muted',
+              // Owner note 2026-10-14: smaller, regular weight; only a granted
+              // permission gets a little weight so the eye finds it.
+              'text-[13px]',
+              granted || locked ? 'font-medium' : 'text-muted',
             )}
           >
             {permission.name}
