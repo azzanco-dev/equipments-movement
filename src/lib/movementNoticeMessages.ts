@@ -5,6 +5,12 @@
 // only facts resolved by the database are interpolated. Each message is
 // BILINGUAL: the request line is in Arabic with its English line under it,
 // because some foremen do not read Arabic. Arabic copy uses the plain alif only (project rule).
+//
+// The arrival notice also links to the EXIT form with the unit ready (owner
+// request 2026-10-15). The link is built here from the server-resolved site
+// origin (`appBaseUrl`) and the stored code; no user text ever becomes a link.
+
+import { movementExitUrl } from '@/lib/movementExitLink'
 
 export const MOVEMENT_NOTICE_KINDS = [
   'workshop_arrival',
@@ -22,6 +28,9 @@ export interface MovementNoticeFacts {
   companyNameAr?: string | null
   companyNameEn?: string | null
   senderName?: string | null
+  /** The site origin the arrival notice links to, resolved by the server
+   *  (never by a client). Invalid or absent: the message has no link line. */
+  appBaseUrl?: string | null
 }
 
 const FIELD_MAX_LENGTH = 80
@@ -104,11 +113,14 @@ export function movementNoticeMessage(
   switch (kind) {
     case 'workshop_arrival': {
       const where = place(facts, 'ar')
+      // The EXIT form with this unit ready: the last line of the request.
+      const exitUrl = movementExitUrl(facts.appBaseUrl, facts.equipmentCode)
       return block(
         where ? [...facts1, `📍 ${where}`] : facts1,
         [
           '🔧 وصلت الورشة، الرجاء تسجيل خروجها من مشروعك.',
           'Arrived at the workshop. Please record its exit from your project.',
+          exitUrl ? `🔗 ${exitUrl}` : '',
         ],
         [sender ? `👤 ${sender}` : ''],
       )

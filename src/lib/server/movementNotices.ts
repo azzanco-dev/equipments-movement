@@ -108,9 +108,14 @@ async function completeNotice(
 export async function deliverMovementNotice(
   supabase: SupabaseClient,
   row: MovementNoticeRow,
+  options: {
+    /** The site origin the arrival notice links to (`resolveAppBaseUrl`). */
+    appBaseUrl?: string | null
+  } = {},
 ): Promise<MovementNoticeDelivery> {
   const recipientName = row.recipientName
   try {
+    // The `wa.me` fallback below carries this same text, link included.
     const message = movementNoticeMessage(row.kind, {
       equipmentCode: row.equipmentCode,
       equipmentType: row.equipmentType,
@@ -119,6 +124,7 @@ export async function deliverMovementNotice(
       companyNameAr: row.companyNameAr,
       companyNameEn: row.companyNameEn,
       senderName: row.senderName,
+      appBaseUrl: options.appBaseUrl ?? null,
     })
     const to = normalizeWhatsAppNumber(row.recipientMobile)
     if (!to) {

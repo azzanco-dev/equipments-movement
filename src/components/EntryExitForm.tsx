@@ -43,6 +43,7 @@ import {
 import { sanitizeSearchTerm } from '@/lib/search'
 import { toLatinDigits } from '@/lib/plate'
 import { siteExitEquipmentArgs } from '@/lib/exitEquipmentSearch'
+import { pickLinkedExitEquipment } from '@/lib/movementExitLink'
 import {
   entryEquipmentArgs,
   type EntryEquipmentStateFields,
@@ -127,6 +128,9 @@ interface EntryExitFormProps {
   pageMode?: boolean
   onViewMovement?: (id: string) => void
   onGoHome?: () => void
+  /** An EXIT opened from the «ابلاغ الفورمان» link: the code is searched
+   *  first, and the unit is selected when the search finds exactly it. */
+  initialEquipmentCode?: string | null
 }
 
 export function EntryExitForm({
@@ -137,13 +141,16 @@ export function EntryExitForm({
   pageMode = false,
   onViewMovement,
   onGoHome,
+  initialEquipmentCode = null,
 }: EntryExitFormProps) {
   const { t, lang } = useI18n()
   const { user, profile } = useAuth()
   const permissionState = usePermissions()
 
   const [step, setStep] = useState<'select' | 'details'>('select')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(
+    movementType === 'exit' ? (initialEquipmentCode ?? '') : '',
+  )
   const [ownerFilter, setOwnerFilter] = useState('')
   // The site ENTRY search and the workshop search add the current state of
   // each row; the site EXIT search leaves those fields undefined. `EquipmentStep`
@@ -204,6 +211,11 @@ export function EntryExitForm({
   const equipmentListRef = useRef<HTMLDivElement>(null)
   const quickEquipmentRef = useRef<HTMLDivElement>(null)
   const successRef = useRef<HTMLDivElement>(null)
+  // The linked code still waiting for its first search result; cleared once
+  // that result is in (or the user changed the search), so it acts once only.
+  const linkedCodeRef = useRef<string | null>(
+    movementType === 'exit' ? initialEquipmentCode : null,
+  )
 
   const {
     loadDrivers,
@@ -489,6 +501,20 @@ export function EntryExitForm({
     // Fire async; don't block UI
     checkLastMovement(eq)
   }
+
+  // An EXIT opened from the «ابلاغ الفورمان» link (owner request 2026-10-15):
+  // the search above ran with the linked code, exactly as if the user had
+  // typed it. Exactly one result with that CURRENT code is selected through
+  // the normal handler (get_last_movement, then the save through the API and
+  // the database decide as always); otherwise the list stays for the user.
+  useEffect(() => {
+    const linkedCode = linkedCodeRef.current
+    if (!linkedCode || !open || step !== 'select' || loadingEquipment) return
+    linkedCodeRef.current = null
+    if (search !== linkedCode || equipmentError) return
+    const match = pickLinkedExitEquipment(equipment, linkedCode)
+    if (match) handleSelectEquipment(match)
+  })
 
   const createQuickDriver = async () => {
     const invalid = validateQuickDriverForm(quickDriver)

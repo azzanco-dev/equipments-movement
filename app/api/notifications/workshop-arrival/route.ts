@@ -4,6 +4,7 @@ import {
   noticeRequestErrorStatus,
 } from '@/lib/movementNoticeErrors'
 import { requirePermission } from '@/lib/server/adminRequest'
+import { resolveAppBaseUrl } from '@/lib/server/appBaseUrl'
 import {
   deliverMovementNotice,
   parseMovementNoticeRow,
@@ -86,7 +87,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'failed' }, { status: 500 })
     }
 
-    const delivery = await deliverMovementNotice(supabase, row)
+    // The message links to the EXIT form with the unit ready (owner request
+    // 2026-10-15), on this site's origin or the server's APP_BASE_URL.
+    const delivery = await deliverMovementNotice(supabase, row, {
+      appBaseUrl: resolveAppBaseUrl(request.url),
+    })
     return NextResponse.json(delivery, { status: 200 })
   } catch {
     console.error('Workshop arrival notice request failed', {

@@ -699,6 +699,7 @@ function gateway({ env, respond, abortImmediately = false } = {}) {
       env: env ?? { ULTRAMSG_INSTANCE_ID: 'instance1', ULTRAMSG_TOKEN: TOKEN },
     },
     console: { error: record, warn: record, log: record, info: record },
+    URL,
     URLSearchParams,
     AbortController,
     clearTimeout,
@@ -1110,7 +1111,16 @@ test('the workshop-arrival route authenticates, sends no recipient and hides raw
   assert.equal((route.match(/error\.message/g) ?? []).length, 1)
   assert.match(route, /noticeRequestErrorCode\(error\.message\)/)
   assert.ok(!/console\.error\([^)]*\berror\b[^')]*\)/.test(route))
-  assert.match(route, /deliverMovementNotice\(supabase, row\)/)
+  // The only extra fact is the site origin, resolved on the server (owner
+  // request 2026-10-15: the notice links to the EXIT form).
+  assert.match(
+    route,
+    /deliverMovementNotice\(supabase, row, \{\s+appBaseUrl: resolveAppBaseUrl\(request\.url\),\s+\}\)/,
+  )
+  assert.match(
+    route,
+    /import \{ resolveAppBaseUrl \} from '@\/lib\/server\/appBaseUrl'/,
+  )
   assert.match(route, /export const runtime = 'nodejs'/)
 })
 
@@ -1119,4 +1129,338 @@ test('.env.example lists the gateway variables as placeholders only', () => {
   assert.match(example, /^ULTRAMSG_INSTANCE_ID=instance00000\r?$/m)
   assert.match(example, /^ULTRAMSG_TOKEN=your-ultramsg-token\r?$/m)
   assert.ok(!/NEXT_PUBLIC_ULTRAMSG/.test(example))
+})
+
+// --- The EXIT link in «ابلاغ الفورمان» (owner request 2026-10-15) -----------
+
+const BASE = 'https://em.example.com'
+const LINK_FACTS = {
+  equipmentCode: 'TK-104',
+  equipmentType: 'Excavator',
+  projectNameAr: 'PROJECT-AR',
+  projectNameEn: 'PROJECT-EN',
+  companyNameAr: 'COMPANY-AR',
+  companyNameEn: 'COMPANY-EN',
+  senderName: 'OFFICER',
+}
+
+test('the arrival notice ends its request with the EXIT link for a valid base', () => {
+  const { movementNoticeMessage } = createLoader({ URL })(
+    'movementNoticeMessages',
+  )
+  const message = movementNoticeMessage('workshop_arrival', {
+    ...LINK_FACTS,
+    appBaseUrl: BASE,
+  })
+  const sections = message.split('\n\n')
+  assert.equal(sections.length, 3)
+  const request = sections[1].split('\n')
+  // The existing two lines are unchanged; the link is the last line.
+  assert.deepEqual(request, [
+    '🔧 وصلت الورشة، الرجاء تسجيل خروجها من مشروعك.',
+    'Arrived at the workshop. Please record its exit from your project.',
+    `🔗 ${BASE}/movements/new?type=exit&equipment=TK-104`,
+  ])
+  // The sender section stays last.
+  assert.equal(sections[2], '👤 OFFICER')
+  assert.equal((message.match(/https?:/g) ?? []).length, 1)
+  assert.ok(!/[أإآ]/.test(message))
+  // Otherwise the text is exactly the one without a base.
+  const without = movementNoticeMessage('workshop_arrival', LINK_FACTS)
+  assert.equal(
+    message,
+    without.replace(
+      'your project.\n',
+      `your project.\n🔗 ${BASE}/movements/new?type=exit&equipment=TK-104\n`,
+    ),
+  )
+  // A trailing slash or a path on the base never doubles a slash.
+  for (const base of [`${BASE}/`, `${BASE}/some/path?x=1`]) {
+    assert.ok(
+      movementNoticeMessage('workshop_arrival', {
+        ...LINK_FACTS,
+        appBaseUrl: base,
+      }).includes(`🔗 ${BASE}/movements/new?type=exit&equipment=TK-104`),
+      base,
+    )
+  }
+  // Local development over http is allowed.
+  assert.ok(
+    movementNoticeMessage('workshop_arrival', {
+      ...LINK_FACTS,
+      appBaseUrl: 'http://localhost:3000',
+    }).includes(
+      '🔗 http://localhost:3000/movements/new?type=exit&equipment=TK-104',
+    ),
+  )
+})
+
+test('the arrival notice has no link for an invalid or absent base, and other kinds never link', () => {
+  const { movementNoticeMessage } = createLoader({ URL })(
+    'movementNoticeMessages',
+  )
+  const plain = movementNoticeMessage('workshop_arrival', LINK_FACTS)
+  for (const appBaseUrl of [
+    undefined,
+    null,
+    '',
+    '   ',
+    'not a url',
+    'http://em.example.com',
+    'ftp://em.example.com',
+    'javascript:alert(1)',
+    'https://user:secret@em.example.com',
+  ]) {
+    const message = movementNoticeMessage('workshop_arrival', {
+      ...LINK_FACTS,
+      appBaseUrl,
+    })
+    assert.equal(message, plain, String(appBaseUrl))
+    assert.ok(!/🔗|https?:|javascript:/.test(message), String(appBaseUrl))
+  }
+  // No code, no link.
+  assert.ok(
+    !movementNoticeMessage('workshop_arrival', {
+      ...LINK_FACTS,
+      equipmentCode: '  ',
+      appBaseUrl: BASE,
+    }).includes('🔗'),
+  )
+  for (const kind of ['site_exit', 'workshop_exit']) {
+    const message = movementNoticeMessage(kind, {
+      ...LINK_FACTS,
+      appBaseUrl: BASE,
+    })
+    assert.ok(!/🔗|https?:/.test(message), kind)
+  }
+})
+
+test('the link encodes a code with spaces, Arabic letters or URL characters', () => {
+  const load = createLoader({ URL })
+  const { movementNoticeMessage } = load('movementNoticeMessages')
+  const { movementExitUrl, movementExitPath } = load('movementExitLink')
+  for (const code of ['TK 104 ب', 'معدة-5', 'A&B=1#2?x', 'X/../Y']) {
+    const message = movementNoticeMessage('workshop_arrival', {
+      ...LINK_FACTS,
+      equipmentCode: code,
+      appBaseUrl: BASE,
+    })
+    const line = message.split('\n').find((text) => text.startsWith('🔗 '))
+    assert.ok(line, code)
+    const url = new URL(line.slice('🔗 '.length))
+    assert.equal(url.origin, BASE)
+    assert.equal(url.pathname, '/movements/new')
+    assert.deepEqual([...url.searchParams.keys()], ['type', 'equipment'])
+    assert.equal(url.searchParams.get('type'), 'exit')
+    assert.equal(url.searchParams.get('equipment'), code)
+    assert.ok(!/[\s؀-ۿ]/.test(line.slice('🔗 '.length)), `${code}: encoded`)
+  }
+  assert.equal(
+    movementExitPath('TK 104 ب'),
+    '/movements/new?type=exit&equipment=TK%20104%20%D8%A8',
+  )
+  // A stored code is one line: whitespace runs collapse before encoding.
+  assert.equal(
+    movementExitUrl(BASE, '  TK\n\n104  '),
+    `${BASE}/movements/new?type=exit&equipment=TK%20104`,
+  )
+  assert.equal(movementExitUrl(BASE, null), null)
+  assert.equal(movementExitUrl('http://em.example.com', 'A1'), null)
+})
+
+test('the wa.me fallback carries exactly the sent text, link included', async () => {
+  // The send fails, so the route offers the fallback; the gateway still
+  // received the text, which must equal the fallback's.
+  const { load, calls } = gateway({
+    respond: () => jsonResponse({ error: 'down' }),
+  })
+  const { deliverMovementNotice, parseMovementNoticeRow } = load(
+    'server/movementNotices',
+  )
+  const delivery = await deliverMovementNotice(
+    fakeSupabase(),
+    parseMovementNoticeRow([noticeRow({ equipment_code: 'TK 104 ب' })]),
+    { appBaseUrl: BASE },
+  )
+  assert.equal(delivery.status, 'failed')
+  const fallbackText = decodeURIComponent(
+    delivery.fallbackUrl.split('?text=')[1],
+  )
+  const sentText = new URLSearchParams(calls[0].init.body).get('body')
+  assert.equal(fallbackText, sentText)
+  assert.ok(
+    sentText.includes(
+      `🔗 ${BASE}/movements/new?type=exit&equipment=TK%20104%20%D8%A8`,
+    ),
+  )
+  const { movementNoticeMessage } = load('movementNoticeMessages')
+  assert.equal(
+    sentText,
+    movementNoticeMessage('workshop_arrival', {
+      ...LINK_FACTS,
+      equipmentCode: 'TK 104 ب',
+      appBaseUrl: BASE,
+    }),
+  )
+
+  // Without the option (the automatic notices' path) nothing links.
+  const plain = gateway({ respond: () => jsonResponse({ error: 'down' }) })
+  const plainModule = plain.load('server/movementNotices')
+  const plainDelivery = await plainModule.deliverMovementNotice(
+    fakeSupabase(),
+    plainModule.parseMovementNoticeRow([noticeRow()]),
+  )
+  assert.ok(!decodeURIComponent(plainDelivery.fallbackUrl).includes('🔗'))
+})
+
+test('the site origin is APP_BASE_URL when it is a plain https origin, else the request origin', () => {
+  const { resolveAppBaseUrl, configuredAppBaseUrl } = createLoader({
+    URL,
+    process: { env: {} },
+  })('server/appBaseUrl')
+  const REQUEST = 'https://app.example.com/api/notifications/workshop-arrival'
+  assert.equal(resolveAppBaseUrl(REQUEST), 'https://app.example.com')
+  assert.equal(resolveAppBaseUrl(REQUEST, undefined), 'https://app.example.com')
+  for (const configured of [
+    'https://custom.example.com',
+    'https://custom.example.com/',
+    '  https://custom.example.com  ',
+  ]) {
+    assert.equal(
+      resolveAppBaseUrl(REQUEST, configured),
+      'https://custom.example.com',
+      configured,
+    )
+  }
+  for (const configured of [
+    '',
+    '   ',
+    'custom.example.com',
+    'http://custom.example.com',
+    'https://custom.example.com/app',
+    'https://custom.example.com?x=1',
+    'https://custom.example.com#x',
+    'https://user:pw@custom.example.com',
+    'javascript:alert(1)',
+  ]) {
+    assert.equal(configuredAppBaseUrl(configured), null, configured)
+    assert.equal(
+      resolveAppBaseUrl(REQUEST, configured),
+      'https://app.example.com',
+      configured,
+    )
+  }
+  // Development: the local origin is passed through (the message builder
+  // allows http on localhost only).
+  assert.equal(
+    resolveAppBaseUrl('http://localhost:3000/api/notifications/x'),
+    'http://localhost:3000',
+  )
+  assert.equal(resolveAppBaseUrl('not a url'), null)
+
+  // The default reads the server variable.
+  const fromEnv = createLoader({
+    URL,
+    process: { env: { APP_BASE_URL: 'https://env.example.com' } },
+  })('server/appBaseUrl')
+  assert.equal(fromEnv.resolveAppBaseUrl(REQUEST), 'https://env.example.com')
+
+  const source = read('src', 'lib', 'server', 'appBaseUrl.ts')
+  assert.match(source, /process\.env\.APP_BASE_URL/)
+  assert.ok(!/process\.env\.NEXT_PUBLIC_/.test(source))
+  assert.ok(!/console\./.test(source))
+})
+
+test('the linked EXIT selects only one exact current-code match', () => {
+  const { pickLinkedExitEquipment, equipmentCodeFromLinkParam } = createLoader({
+    URL,
+  })('movementExitLink')
+  const a = { id: '1', code: 'TK-104' }
+  const b = { id: '2', code: 'TK-1040' }
+  // Case and surrounding spaces do not matter: upper(btrim(code)).
+  assert.equal(pickLinkedExitEquipment([b, a], 'TK-104'), a)
+  assert.equal(
+    pickLinkedExitEquipment([{ id: '4', code: ' tk-104 ' }], 'TK-104').id,
+    '4',
+  )
+  assert.equal(pickLinkedExitEquipment([a], '  tk-104 '), a)
+  assert.equal(
+    pickLinkedExitEquipment([{ id: '7', code: 'معدة 5' }], 'معدة 5').id,
+    '7',
+  )
+  // A substring is not a match.
+  assert.equal(pickLinkedExitEquipment([b], 'TK-104'), null)
+  // A previous-code match never selects, even when its code is the one.
+  assert.equal(
+    pickLinkedExitEquipment(
+      [{ id: '5', code: 'TK-104', matched_previous_code: true }],
+      'TK-104',
+    ),
+    null,
+  )
+  assert.equal(
+    pickLinkedExitEquipment(
+      [{ id: '3', code: 'A99', matched_previous_code: true }],
+      'A55',
+    ),
+    null,
+  )
+  // Two exact matches: the user picks.
+  assert.equal(
+    pickLinkedExitEquipment([a, { id: '6', code: 'tk-104' }], 'TK-104'),
+    null,
+  )
+  for (const rows of [[], null, undefined])
+    assert.equal(pickLinkedExitEquipment(rows, 'TK-104'), null)
+  for (const code of ['', '   ', null, undefined])
+    assert.equal(pickLinkedExitEquipment([a], code), null)
+
+  assert.equal(equipmentCodeFromLinkParam(' TK-104 '), 'TK-104')
+  assert.equal(equipmentCodeFromLinkParam('A\n\nB'), 'A B')
+  assert.equal(equipmentCodeFromLinkParam('x'.repeat(200)).length, 80)
+  for (const value of ['', '  ', null, undefined])
+    assert.equal(equipmentCodeFromLinkParam(value), null)
+})
+
+test('the form reads the link only for an EXIT and selects through the normal handler', () => {
+  const screen = read('src', 'screens', 'MovementCreate.tsx')
+  assert.match(
+    screen,
+    /movementType === 'exit'\s+\? equipmentCodeFromLinkParam\(searchParams\.get\(EXIT_LINK_EQUIPMENT_PARAM\)\)\s+: null/,
+  )
+  assert.match(screen, /initialEquipmentCode=\{initialEquipmentCode\}/)
+
+  const form = read('src', 'components', 'EntryExitForm.tsx')
+  // The search box starts with the linked code, so the SAME search runs.
+  assert.match(
+    form,
+    /useState\(\s*movementType === 'exit' \? \(initialEquipmentCode \?\? ''\) : '',?\s*\)/,
+  )
+  // Once, on the first result of that search, through handleSelectEquipment.
+  const effect = form.slice(
+    form.indexOf('const linkedCode = linkedCodeRef.current'),
+    form.indexOf('const createQuickDriver'),
+  )
+  assert.ok(effect.length > 0)
+  assert.match(effect, /linkedCodeRef\.current = null/)
+  assert.match(
+    effect,
+    /if \(search !== linkedCode \|\| equipmentError\) return/,
+  )
+  assert.match(
+    effect,
+    /const match = pickLinkedExitEquipment\(equipment, linkedCode\)\s+if \(match\) handleSelectEquipment\(match\)/,
+  )
+  assert.ok(!/supabase|\.rpc\(|fetch\(/.test(effect), 'no database bypass')
+})
+
+test('signing in from the exit link keeps the foreman on the exit form', () => {
+  const auth = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'screens', 'AuthScreen.tsx'),
+    'utf8',
+  )
+  assert.match(
+    auth,
+    /pathname === '\/movements\/new' \? `\$\{pathname\}\$\{search\}` : '\/dashboard'/,
+  )
 })

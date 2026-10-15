@@ -51,7 +51,13 @@ export function AuthScreen() {
     if (error) {
       setError(t(error))
     } else {
-      router.replace('/dashboard')
+      // A foreman who opened the exit link of a WhatsApp notice while signed
+      // out stays on that form after signing in (owner request 2026-10-15);
+      // every other sign-in lands on the home as before.
+      const { pathname, search } = window.location
+      router.replace(
+        pathname === '/movements/new' ? `${pathname}${search}` : '/dashboard',
+      )
     }
 
     setLoading(false)
