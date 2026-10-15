@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Trash2, Users } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
+import { usersActions } from '@/lib/actionPermissions'
 import { useActiveRoles } from '@/components/roles/useActiveRoles'
 import { roleName } from '@/components/roles/roleRows'
 import type { FilterField } from '@/components/data-list/types'
@@ -77,11 +78,16 @@ const ASSIGNED_ROLE_COLUMN = 'profile_roles.role_key'
 
 export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   const { t, lang } = useI18n()
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, profile } = useAuth()
   // wave 23 (step 3): with the roles system ON the list shows and the dialog
   // assigns the `profile_roles` role; OFF or unknown keeps the legacy role
   // exactly as before. The active roles are read only while ON.
-  const { rolesSystemEnabled } = usePermissions()
+  const permissionState = usePermissions()
+  const { rolesSystemEnabled } = permissionState
+  // wave 24: adding and deleting users follow `users.manage` (the admin
+  // role while the permissions load or after a failed load); the page gate
+  // and the database (0127) require the same key.
+  const canManageUsers = usersActions(permissionState, profile?.role).manage
   const rolesOn = rolesSystemEnabled === true
   const { roles: activeRoles } = useActiveRoles(rolesOn)
   const [users, setUsers] = useState<UserRow[]>([])
@@ -377,7 +383,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
       key: 'actions',
       header: t('actions'),
       cell: (row) =>
-        row.id === currentUser?.id ? null : (
+        row.id === currentUser?.id || !canManageUsers ? null : (
           <IconButton
             size="sm"
             label={t('delete')}
@@ -412,7 +418,11 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
       <PageHeader
         title={t('users')}
         description={t('usersDesc')}
-        actions={<DataListActions primaryAction={addButton} />}
+        actions={
+          canManageUsers ? (
+            <DataListActions primaryAction={addButton} />
+          ) : undefined
+        }
       />
       <DataListToolbar
         config={usersListConfig}

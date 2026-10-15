@@ -2,6 +2,8 @@ import { useEffect, useSyncExternalStore } from 'react'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import { useAuth } from '@/auth/AuthContext'
+import { usePermissions } from '@/auth/PermissionsContext'
+import { canSeeIntegrationsStatus } from '@/lib/actionPermissions'
 import { supabase } from '@/lib/supabase'
 import {
   WHATSAPP_STATUS_POLL_MS,
@@ -11,7 +13,8 @@ import {
 } from '@/lib/whatsappStatus'
 import { Notice, cn } from '@/components/ui'
 
-// wave 12 — the WhatsApp gateway connection status for the admin: a quiet
+// wave 12 — the WhatsApp gateway connection status for the admin (wave 24:
+// for a holder of `settings.integrations`): a quiet
 // line at the bottom of the sidebar, and a compact warning at the top of the
 // admin home on small screens (where the sidebar is hidden) when the gateway
 // is known to be disconnected.
@@ -190,8 +193,12 @@ export function WhatsAppStatusIndicator({ className }: { className?: string }) {
 export function WhatsAppStatusAlert({ className }: { className?: string }) {
   const { t } = useI18n()
   const { profile } = useAuth()
+  const permissionState = usePermissions()
   const view = useWhatsAppStatus()
-  if (profile?.role !== 'admin' || view === 'off') return null
+  // wave 24: `settings.integrations` (the admin role while the permissions
+  // load or after a failed load).
+  if (!canSeeIntegrationsStatus(permissionState, profile?.role)) return null
+  if (view === 'off') return null
   if (!isWhatsAppStatusWarning(view)) return null
   return (
     <Notice

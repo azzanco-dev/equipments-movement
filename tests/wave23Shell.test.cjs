@@ -888,9 +888,11 @@ test('the field home receives its variant from the permission scope', () => {
   assert.match(content, /<HomeScreen\s+movementsScope=\{shell\.homeScope\}/)
   const home = read('src', 'screens', 'HomeScreen.tsx')
   assert.match(home, /movementsScope\?: HomeMovementsScope/)
+  // wave 24: without the prop the home resolves the scope itself (the
+  // permissions once ready, the role meanwhile).
   assert.match(
     home,
-    /const scope = movementsScope \?\? homeMovementsScope\(profile\?\.role\)/,
+    /const scope =\s*movementsScope \?\? resolveHomeMovementsScope\(permissionState, profile\?\.role\)/,
   )
   // Same three values as the home's own type.
   const homeSource = read('src', 'lib', 'homeScope.ts')

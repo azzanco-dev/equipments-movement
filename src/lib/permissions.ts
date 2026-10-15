@@ -5,9 +5,9 @@ import type { CurrentPermission, PermissionScope } from '@/lib/types'
  *
  * These helpers are read by the roles settings page and, since wave 23, the
  * sidebar, the shell selection and the page guards of src/App.tsx (through
- * src/lib/navPermissions.ts). In-screen actions still decide by
- * `profiles.role`. While the roles system is inactive the answer is the
- * frozen legacy mapping, so the app behaves exactly as before.
+ * src/lib/navPermissions.ts) and, since wave 24, the in-screen actions
+ * (src/lib/actionPermissions.ts). While the roles system is inactive the
+ * answer is the frozen legacy mapping, so the app behaves exactly as before.
  *
  * This file has no runtime imports so the node tests can load it directly.
  */

@@ -64,10 +64,12 @@ test('the all-contexts home opens on the workshop tab', () => {
 test('the home picks its list through homeMovementsScope', () => {
   const home = read('src', 'screens', 'HomeScreen.tsx')
   // wave 23: App.tsx passes the scope derived from the home.* permission;
-  // the role decides only when it does not (permissions loading or failed).
+  // wave 24: without the prop the home resolves it itself, from the same
+  // permissions once ready and from the role (homeMovementsScope) only while
+  // they load or after a failed load.
   assert.match(
     home,
-    /const scope = movementsScope \?\? homeMovementsScope\(profile\?\.role\)/,
+    /const scope =\s*movementsScope \?\? resolveHomeMovementsScope\(permissionState, profile\?\.role\)/,
   )
   assert.match(home, /const managerMode = scope === 'all_contexts'/)
   assert.match(
@@ -88,13 +90,15 @@ test('the managers get the embedded admin log, opening on the workshop', () => {
   assert.match(logBranch, /<LogsScreen\s/)
   assert.match(logBranch, /\bembedded\b/)
   assert.match(logBranch, /defaultContext=\{ALL_CONTEXTS_HOME_DEFAULT_TAB\}/)
-  assert.match(logBranch, /classify=\{classify\}/)
+  // wave 24: the classification follows movements.workshop.classify.
+  assert.match(logBranch, /classify=\{canClassify \? classify : undefined\}/)
   assert.match(logBranch, /refreshToken=\{refreshToken\}/)
   assert.match(logBranch, /t\('homeAllMovementsTitle'\)/)
-  // The plain workshop role and the foreman keep their own card, which no
-  // longer classifies (the managers classify on the embedded log).
+  // The plain workshop role and the foreman keep their own card, which does
+  // not classify for them (the managers classify on the embedded log); since
+  // wave 24 it follows the classify key, which neither of them holds.
   assert.match(homeBranch, /workshopMode=\{workshopMode\}/)
-  assert.match(homeBranch, /canClassify=\{false\}/)
+  assert.match(homeBranch, /canClassify=\{canClassify\}/)
   // Classification still goes through the database function.
   assert.match(home, /supabase\.rpc\('classify_workshop_entry'/)
   // The stat cards stay the workshop's.

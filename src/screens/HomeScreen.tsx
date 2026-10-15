@@ -11,6 +11,8 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { useAuth } from '@/auth/AuthContext'
+import { usePermissions } from '@/auth/PermissionsContext'
+import { homeActions } from '@/lib/actionPermissions'
 import { Button } from '@/components/ui'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { StatCard } from '@/components/ui/StatCard'
@@ -22,7 +24,7 @@ import { Card, SectionHeader } from '@/components/ui/Card'
 import { LogsScreen } from '@/screens/admin-home/LogsScreen'
 import {
   ALL_CONTEXTS_HOME_DEFAULT_TAB,
-  homeMovementsScope,
+  resolveHomeMovementsScope,
   type HomeMovementsScope,
 } from '@/lib/homeScope'
 import {
@@ -79,17 +81,29 @@ export function HomeScreen({
    * wave 23 (routing by permissions, step 2): the list this home shows, as
    * src/App.tsx derives it from the home.foreman / home.workshop scope, so a
    * custom role gets the right variant. Omitted while the permissions load
-   * or after a failed load: the home then derives it from the role.
+   * or after a failed load: the home then derives it itself
+   * (`resolveHomeMovementsScope`: the same permissions once ready, the role
+   * meanwhile).
    */
   movementsScope?: HomeMovementsScope
 }) {
   const { t } = useI18n()
   const { user, profile } = useAuth()
+  const permissionState = usePermissions()
   // wave-21-workshop-scope: which movements the home lists. Fails closed: an
-  // unknown role gets the foreman's own-rows list, never a wider one.
-  const scope = movementsScope ?? homeMovementsScope(profile?.role)
+  // unknown role or a user without a home key gets the foreman's own-rows
+  // list, never a wider one.
+  const scope =
+    movementsScope ?? resolveHomeMovementsScope(permissionState, profile?.role)
   const managerMode = scope === 'all_contexts'
   const workshopMode = scope === 'workshop' || managerMode
+  // wave 24: classifying workshop entries follows
+  // `movements.workshop.classify` (the two workshop managers with the
+  // legacy mapping); the role decides only while the permissions load or
+  // after a failed load. `classify_workshop_entry` stays the authority.
+  const canClassify =
+    workshopMode &&
+    homeActions(permissionState, profile?.role).classifyWorkshopEntries
   const name = greetingName(profile?.full_name)
   const parts = greetingParts(t('homeGreeting'), name !== '')
   const greeting = parts ? (
@@ -188,7 +202,7 @@ export function HomeScreen({
         <LogsScreen
           embedded
           defaultContext={ALL_CONTEXTS_HOME_DEFAULT_TAB}
-          classify={classify}
+          classify={canClassify ? classify : undefined}
           onSelectMovement={onSelectMovement}
           refreshToken={refreshToken}
         />
@@ -196,7 +210,7 @@ export function HomeScreen({
     ) : (
       <HomeMovementsCard
         workshopMode={workshopMode}
-        canClassify={false}
+        canClassify={canClassify}
         onSelectMovement={onSelectMovement}
         onClassify={onClassify}
         classifyingId={classifyingId}
@@ -330,15 +344,16 @@ export function HomeScreen({
           )}
 
           {/* The plain `workshop` role never sees the pending-classification
-              list, only the count card above (owner decision, wave 6). */}
-          {managerMode && (
+              list, only the count card above (owner decision, wave 6).
+              wave 24: the list is for the holders of the classify key. */}
+          {canClassify && (
             <PendingClassificationCard
               rows={workshopStats.pending}
               loading={statsFirstLoad}
               refreshing={statsRefreshing}
               error={statsError}
               onRetry={reload}
-              canClassify={managerMode}
+              canClassify={canClassify}
               onClassify={onClassify}
               classifyingId={classifyingId}
               classifyError={classifyError}

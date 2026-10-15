@@ -54,9 +54,10 @@ const PHOTO_SQUARE_COUNT = 3
 export interface MovementDetailSkeletonProps {
   /** Decides the number of detail rows and whether the driver card exists.
    *  The page passes the real context as soon as the movement row arrived,
-   *  and the likeliest one for the signed-in role before that. */
+   *  and the likeliest one for the signed-in user before that. */
   context?: 'site' | 'workshop'
-  /** Admins have the header menu and the "created at" row. */
+  /** The header menu and the "created at" row (`movements.edit_delete`,
+   *  decided by the caller). */
   isAdmin?: boolean
   /** Kept for the callers. It no longer changes the layout: the photo
    *  gallery is the same box with and without its "add photo" square. */

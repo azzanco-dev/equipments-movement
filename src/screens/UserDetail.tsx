@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
+import { usersActions } from '@/lib/actionPermissions'
 import { Alert } from '@/components/Alert'
 import { roleName } from '@/components/roles/roleRows'
 import { useActiveRoles } from '@/components/roles/useActiveRoles'
@@ -126,7 +127,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   const [mobileNotSaved, setMobileNotSaved] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
   const router = useRouter()
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, profile } = useAuth()
   // wave 22B: the user's role in the new roles system (`profile_roles`,
   // migration 0126). Read-only while that system is OFF (it is then managed
   // in Settings › «الادوار والصلاحيات» and changes nothing); since wave 23
@@ -139,7 +140,12 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   } | null>(null)
   // The roles system flag (`app_settings.roles_system`, read once in
   // PermissionsContext); null = unknown, treated like OFF.
-  const { rolesSystemEnabled, reload: reloadPermissions } = usePermissions()
+  const permissionState = usePermissions()
+  const { rolesSystemEnabled, reload: reloadPermissions } = permissionState
+  // wave 24: saving the user follows `users.manage` (the admin role while
+  // the permissions load or after a failed load); the page gate and the
+  // database (0127) require the same key.
+  const canManageUsers = usersActions(permissionState, profile?.role).manage
   const rolesOn = rolesSystemEnabled === true
   const { roles: activeRoles } = useActiveRoles(rolesOn)
   // ON: the role chosen in the form (`roles.key`; '' = no assignment yet).
@@ -966,9 +972,11 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           <Button variant="outline" onClick={handleBack}>
             {t('cancel')}
           </Button>
-          <Button variant="primary" loading={saving} onClick={handleSave}>
-            {t('save')}
-          </Button>
+          {canManageUsers && (
+            <Button variant="primary" loading={saving} onClick={handleSave}>
+              {t('save')}
+            </Button>
+          )}
         </div>
       </div>
       {confirmDialog}

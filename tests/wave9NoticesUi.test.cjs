@@ -439,17 +439,16 @@ test('the panel is offered to workshop roles and the admin on an ENTRY only', ()
   // `workshopMode` is the three workshop roles; since 2026-10-03 the admin
   // also gets the panel in his site ENTRY form. A foreman (supervisor) and a
   // monitor never reach it.
+  // wave 24: both decisions follow the permissions — the panel is for the
+  // holders of movements.notify_foreman (exactly the workshop roles and the
+  // admin with the legacy mapping), the workshop form for a holder of
+  // movements.workshop.create without movements.site.create
+  // (tests/wave24Actions.test.cjs proves the equivalence per role).
+  assert.match(form, /const canNotifyForeman = formActions\.notifyForeman/)
+  assert.match(form, /const workshopMode = formActions\.workshopMode\r?\n/)
   assert.match(
     form,
-    /const canNotifyForeman = workshopMode \|\| profile\?\.role === 'admin'/,
-  )
-  assert.doesNotMatch(
-    form.match(/const canNotifyForeman =[^\r\n]*/)[0],
-    /supervisor|monitor/,
-  )
-  assert.match(
-    form,
-    /const workshopMode =\s+profile\?\.role === 'workshop' \|\|\s+profile\?\.role === 'assistant_workshop_manager' \|\|\s+profile\?\.role === 'workshop_manager'\r?\n/,
+    /const formActions = movementFormActions\(permissionState, profile\?\.role\)/,
   )
   assert.match(
     form,

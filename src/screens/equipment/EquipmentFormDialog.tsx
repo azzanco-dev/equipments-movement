@@ -16,6 +16,8 @@ import {
   type AsyncSearchSelectOption,
 } from '@/components/AsyncSearchSelect'
 import { useAuth } from '@/auth/AuthContext'
+import { usePermissions } from '@/auth/PermissionsContext'
+import { equipmentFormActions } from '@/lib/actionPermissions'
 import {
   AFAQY_UNIT_NAME_MAX,
   loadAfaqyUnits,
@@ -102,8 +104,15 @@ export function EquipmentFormDialog({
 }: EquipmentFormDialogProps) {
   const { t, lang } = useI18n()
   const { profile } = useAuth()
-  // wave 17: the tracker link is admin-only (RLS: `update_equipment`).
-  const isAdmin = profile?.role === 'admin'
+  // wave 24: the Afaqy tracker field (wave 17) follows
+  // `equipment.tracker_link` plus `settings.integrations` (the units list
+  // route), and changing the code of an existing unit follows
+  // `equipment.change_code`; the admin role decides only while the
+  // permissions load or after a failed load. The database and the routes
+  // re-check both.
+  const formActions = equipmentFormActions(usePermissions(), profile?.role)
+  const canLinkTracker = formActions.trackerLink
+  const canChangeCode = formActions.changeCode
   const langRef = useRef(lang)
   langRef.current = lang
   const [form, setForm] = useState<EquipmentFormValues>(EMPTY_EQUIPMENT_FORM)
@@ -166,7 +175,7 @@ export function EquipmentFormDialog({
   // wave 17: read the stored tracker link (admin only). Kept out of the list
   // select, so the list never depends on the link columns.
   useEffect(() => {
-    if (!open || !isAdmin) return
+    if (!open || !canLinkTracker) return
     setTrackerError(null)
     setTrackerNotConfigured(false)
     unitsRef.current = null
@@ -211,7 +220,7 @@ export function EquipmentFormDialog({
     return () => {
       active = false
     }
-  }, [open, equipment, isAdmin])
+  }, [open, equipment, canLinkTracker])
 
   // One units request per dialog session (the route also caches the list for
   // five minutes). The few hundred units are searched in the browser: it is
@@ -310,6 +319,8 @@ export function EquipmentFormDialog({
   // equipment and records the previous code in the history (migration 0114).
   const codeChanged =
     equipment !== null && isEquipmentCodeChanged(equipment.code, form.code)
+  // An existing unit's code is read-only without `equipment.change_code`.
+  const codeLocked = equipment !== null && !canChangeCode
   const suggestedOwner =
     equipment && codeChanged
       ? ownerSuggestedByNewCode(equipment.ownership_status, form.code)
@@ -333,7 +344,7 @@ export function EquipmentFormDialog({
       // wave 17: the three link columns travel only when the admin changed
       // the selection after the stored link was read.
       const trackerChanged =
-        isAdmin &&
+        canLinkTracker &&
         trackerLink.state === 'ready' &&
         trackerUnitId !== (trackerLink.unitId ?? '')
       const trackerFields = !trackerChanged
@@ -436,6 +447,7 @@ export function EquipmentFormDialog({
           label={t('equipmentCode')}
           name="code"
           required
+          hint={codeLocked ? t('equipmentCodeChangeNotAllowed') : undefined}
           error={errors.code && t(errors.code)}
         >
           {(control) => (
@@ -444,6 +456,7 @@ export function EquipmentFormDialog({
               dir="ltr"
               placeholder={t('equipmentCodePlaceholder')}
               value={form.code}
+              readOnly={codeLocked}
               onChange={(event) => updateCode(event.target.value)}
             />
           )}
@@ -789,7 +802,7 @@ export function EquipmentFormDialog({
             />
           )}
         </Field>
-        {isAdmin && (
+        {canLinkTracker && (
           <Field
             label={t('afaqyTrackerUnit')}
             name="tracker_unit_id"

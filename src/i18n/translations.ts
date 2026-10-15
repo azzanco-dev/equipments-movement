@@ -1201,6 +1201,10 @@ export const translations = {
     rolesOffendersFixRole: 'الدور',
     rolesOffendersFixPick: 'اختر دورا',
     // wave-24-roles-page — end
+    // wave-24-actions — start
+    equipmentCodeChangeNotAllowed:
+      'تغيير رقم المعدة يحتاج صلاحية «تغيير رقم المعدة».',
+    // wave-24-actions — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -3053,6 +3057,10 @@ export const translations = {
     rolesOffendersFixRole: 'Role',
     rolesOffendersFixPick: 'Choose a role',
     // wave-24-roles-page — end
+    // wave-24-actions — start
+    equipmentCodeChangeNotAllowed:
+      'Changing the code needs the "Change the equipment code" permission.',
+    // wave-24-actions — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',

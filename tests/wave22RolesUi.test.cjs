@@ -607,7 +607,8 @@ test('the route is registered only in the admin branch, after the fail-closed ch
   const context = read('src', 'auth', 'PermissionsContext.tsx')
   assert.match(
     context,
-    /In-screen actions, API\s+\* routes and Edge Functions still decide by `profiles\.role`/,
+    // wave 24: the in-screen actions follow the permissions too.
+    /Since wave 24 the in-screen\s+\* actions and data decisions too \(src\/lib\/actionPermissions\.ts/,
   )
 })
 

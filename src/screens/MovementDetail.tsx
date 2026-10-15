@@ -4,6 +4,12 @@ import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { Alert } from '@/components/Alert'
 import { useAuth } from '@/auth/AuthContext'
+import { usePermissions } from '@/auth/PermissionsContext'
+import {
+  movementDetailActions,
+  movementSkeletonShape,
+  photoViewerFor,
+} from '@/lib/actionPermissions'
 import {
   LogIn,
   LogOut,
@@ -122,6 +128,10 @@ export function MovementDetail({
 }: MovementDetailProps) {
   const { t, lang } = useI18n()
   const { user, profile } = useAuth()
+  // wave 24: every action below is decided by the permissions
+  // (src/lib/actionPermissions.ts); the role is the fallback only while they
+  // load or after a failed load.
+  const permissionState = usePermissions()
   const { confirm, confirmDialog } = useConfirm()
   const [log, setLog] = useState<EntryExitLog | null>(null)
   const [company, setCompany] = useState<Company | null>(null)
@@ -746,22 +756,16 @@ export function MovementDetail({
   // arrived made the photo box, the linked card and the driver card pop in
   // one after the other.
   if (loading && !error) {
-    const role = profile?.role
     // The context is only known once the movement row arrived; until then the
-    // role gives the likeliest shape (workshop roles work on workshop
+    // permissions give the likeliest shape (a workshop home works on workshop
     // movements, everyone else mostly on site movements).
-    const skeletonContext =
-      log?.movement_context ??
-      (role === 'workshop' ||
-      role === 'assistant_workshop_manager' ||
-      role === 'workshop_manager'
-        ? 'workshop'
-        : 'site')
+    const shape = movementSkeletonShape(permissionState, profile?.role)
+    const skeletonContext = log?.movement_context ?? shape.context
     return (
       <MovementDetailSkeleton
         context={skeletonContext === 'workshop' ? 'workshop' : 'site'}
-        isAdmin={role === 'admin'}
-        canUpload={role !== 'monitor'}
+        isAdmin={shape.adminMenu}
+        canUpload={shape.canUpload}
       />
     )
   }
@@ -779,41 +783,36 @@ export function MovementDetail({
 
   const isEntry = log.movement_type === 'entry'
   const isWorkshopMovement = log.movement_context === 'workshop'
-  // A foreman may correct the contractor code on HIS OWN site ENTRY while the
-  // visit is still open (`linkedLog` is the deterministically paired EXIT).
-  // The same conditions are re-enforced in PostgreSQL by migration 0093.
-  const canEditContractorCode =
-    profile?.role === 'supervisor' &&
-    isEntry &&
-    !isWorkshopMovement &&
-    !linkedLog &&
-    log.supervisor_id === user?.id
-  // Who may act on this movement. Both rules only decide what is shown; they
-  // are enforced in PostgreSQL (migrations 0108 and 0109).
-  const isWorkshopRole =
-    profile?.role === 'workshop' ||
-    profile?.role === 'assistant_workshop_manager' ||
-    profile?.role === 'workshop_manager'
+  // Who may act on this movement (wave 24: by the permissions, see
+  // src/lib/actionPermissions.ts). The rules only decide what is shown; they
+  // are enforced in PostgreSQL (migrations 0093, 0108, 0109, 0127):
+  // - the contractor code: `movements.site.contractor_code`, on the user's
+  //   OWN site ENTRY while the visit is still open (`linkedLog` is the
+  //   deterministically paired EXIT);
+  // - the driver change: `movements.site.driver_change` within its scope;
+  // - adding photos: `movements.photos.manage` within its scope;
+  // - editing / deleting: `movements.edit_delete`.
   const isOwnMovement = log.supervisor_id === user?.id
-  // An admin, the foreman who registered the entry.
-  const canChangeDriver =
-    profile?.role === 'admin' ||
-    (profile?.role === 'supervisor' && isOwnMovement)
-  // An admin, the movement's own recorder, or a workshop role on a workshop
-  // movement. Monitor never uploads.
-  const canAddPhotos =
-    profile?.role === 'admin' ||
-    (profile?.role !== 'monitor' && profile?.role != null && isOwnMovement) ||
-    (isWorkshopRole && isWorkshopMovement)
+  const actions = movementDetailActions(permissionState, profile?.role, {
+    own: isOwnMovement,
+    context: isWorkshopMovement ? 'workshop' : 'site',
+    isEntry,
+    visitOpen: isEntry && !linkedLog,
+  })
+  const canEditContractorCode = actions.editContractorCode
+  const canChangeDriver = actions.changeDriver
+  const canAddPhotos = actions.addPhotos
+  const canEditMovement = actions.editDelete
 
   // The gallery shows the saved photos (or the legacy `photo_url` photo when
   // the movement has no photo rows) followed by the files being uploaded.
-  // Only the uploader or an admin gets the remove button of a photo.
+  // Only the uploader (`movements.photos.manage`) or a holder of
+  // `movements.photos.delete_any` gets the remove button of a photo.
   const galleryItems = detailPhotosToGalleryItems({
     saved: photoItems,
     legacyUrl: photoUrl,
     pending: pendingUploads?.base === photoItems ? pendingUploads.photos : [],
-    viewer: { userId: user?.id, role: profile?.role },
+    viewer: photoViewerFor(actions.photoRemoval, user?.id),
     busy: photoBusy,
     alt: t('photoGalleryMainAlt'),
   })
@@ -1002,7 +1001,7 @@ export function MovementDetail({
       label: t('movementDate'),
       value: formatDate(log.recorded_at),
     },
-    ...(profile?.role === 'admin'
+    ...(canEditMovement
       ? [
           {
             key: 'createdAt',
@@ -1022,7 +1021,7 @@ export function MovementDetail({
         onBack={onBack}
         backLabel={t('backToMovements')}
         actions={
-          profile?.role === 'admin' ? (
+          canEditMovement ? (
             <MovementAdminMenu
               busy={deleteBusy}
               onEdit={() => {
@@ -1521,7 +1520,7 @@ export function MovementDetail({
         </Dialog>
       )}
 
-      {profile?.role === 'admin' && (
+      {canEditMovement && (
         <>
           <MovementEditDialog
             open={detailsEditOpen}

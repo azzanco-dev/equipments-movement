@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { useAuth } from '@/auth/AuthContext'
+import { usePermissions } from '@/auth/PermissionsContext'
+import { movementFormActions } from '@/lib/actionPermissions'
 import { Alert } from '@/components/Alert'
 import { AlertTriangle } from 'lucide-react'
 import type { Driver, Equipment, MovementType, LastMovement } from '@/lib/types'
@@ -138,6 +140,7 @@ export function EntryExitForm({
 }: EntryExitFormProps) {
   const { t, lang } = useI18n()
   const { user, profile } = useAuth()
+  const permissionState = usePermissions()
 
   const [step, setStep] = useState<'select' | 'details'>('select')
   const [search, setSearch] = useState('')
@@ -224,10 +227,12 @@ export function EntryExitForm({
   const { reset: resetPhotoStaging } = photoStaging
 
   const isEntry = movementType === 'entry'
-  const workshopMode =
-    profile?.role === 'workshop' ||
-    profile?.role === 'assistant_workshop_manager' ||
-    profile?.role === 'workshop_manager'
+  // wave 24: which form, which list and which quick-create controls follow
+  // the permissions (src/lib/actionPermissions.ts); the role is the fallback
+  // only while they load or after a failed load. The workshop form is for a
+  // holder of `movements.workshop.create` without `movements.site.create`.
+  const formActions = movementFormActions(permissionState, profile?.role)
+  const workshopMode = formActions.workshopMode
   // A site EXIT may only be registered by the foreman who registered the open
   // ENTRY, or by an admin, so its equipment list is filtered in the database.
   const siteExitMode = !workshopMode && !isEntry
@@ -719,8 +724,9 @@ export function EntryExitForm({
   // officer may notify him instead of phoning. Workshop roles see it in the
   // workshop form, and (owner decision 2026-10-03) an admin sees it in his
   // site form; the server route accepts both. A supervisor never sees it and
-  // a monitor has no movement form at all.
-  const canNotifyForeman = workshopMode || profile?.role === 'admin'
+  // a monitor has no movement form at all. wave 24: the holders of
+  // `movements.notify_foreman` (the workshop roles and the admin).
+  const canNotifyForeman = formActions.notifyForeman
   const notifyForemanMovement =
     canNotifyForeman &&
     isEntry &&
@@ -760,14 +766,17 @@ export function EntryExitForm({
             loadError={equipmentError}
             isEntry={isEntry}
             siteExitMode={siteExitMode}
-            isAdmin={profile?.role === 'admin'}
+            exitAnyVisit={formActions.exitAnyVisit}
             onSelect={handleSelectEquipment}
-            onAddEquipment={() =>
-              setQuickEquipment((value) => ({
-                ...value,
-                open: true,
-                plate: search,
-              }))
+            onAddEquipment={
+              formActions.quickCreateEquipment
+                ? () =>
+                    setQuickEquipment((value) => ({
+                      ...value,
+                      open: true,
+                      plate: search,
+                    }))
+                : undefined
             }
             listRef={equipmentListRef}
             quickCreateSlot={
@@ -793,8 +802,11 @@ export function EntryExitForm({
                   onSelectLessor={setSelectedQuickLessor}
                   loadEquipmentTypes={loadEquipmentTypes}
                   loadLessors={loadLessors}
-                  onCreateLessor={(query) =>
-                    setQuickLessor({ open: true, name: query, error: '' })
+                  onCreateLessor={
+                    formActions.quickCreateLessor
+                      ? (query) =>
+                          setQuickLessor({ open: true, name: query, error: '' })
+                      : undefined
                   }
                   onCancel={() => {
                     setQuickEquipment(EMPTY_QUICK_EQUIPMENT)
@@ -986,12 +998,15 @@ export function EntryExitForm({
                       loadOptions={loadDrivers}
                       placeholder={t('selectDriver')}
                       createLabel={`${t('addNewDriver')} +`}
-                      onCreate={(query) =>
-                        setQuickDriver({
-                          open: true,
-                          fullName: query,
-                          mobile: '',
-                        })
+                      onCreate={
+                        formActions.quickCreateDriver
+                          ? (query) =>
+                              setQuickDriver({
+                                open: true,
+                                fullName: query,
+                                mobile: '',
+                              })
+                          : undefined
                       }
                       alwaysShowCreate
                     />

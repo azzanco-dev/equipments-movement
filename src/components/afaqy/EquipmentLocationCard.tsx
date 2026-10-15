@@ -10,6 +10,8 @@ import {
   Satellite,
 } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
+import { usePermissions } from '@/auth/PermissionsContext'
+import { canViewEquipmentLocation } from '@/lib/actionPermissions'
 import { useI18n } from '@/i18n/I18nContext'
 import { supabase } from '@/lib/supabase'
 import {
@@ -44,13 +46,15 @@ export interface EquipmentLocationCardProps {
 
 /**
  * wave 17 — «الموقع الحالي»: the last position of the equipment's linked
- * Afaqy unit. ADMIN ONLY: for any other role (or no profile) nothing renders
- * and the position route is never requested; the route itself is admin-only
- * as well.
+ * Afaqy unit. Only for a holder of `equipment.location.view` (wave 24; the
+ * admin role while the permissions load or after a failed load): for anyone
+ * else (or no profile) nothing renders and the position route is never
+ * requested; the route itself requires the same permission.
  */
 export function EquipmentLocationCard(props: EquipmentLocationCardProps) {
   const { profile } = useAuth()
-  if (profile?.role !== 'admin') return null
+  const permissionState = usePermissions()
+  if (!canViewEquipmentLocation(permissionState, profile?.role)) return null
   return <LocationCardContent {...props} />
 }
 

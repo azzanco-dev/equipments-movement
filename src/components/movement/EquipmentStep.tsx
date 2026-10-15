@@ -33,9 +33,12 @@ export interface EquipmentStepProps {
   isEntry: boolean
   /** Site EXIT lists only equipment the signed-in foreman may close. */
   siteExitMode: boolean
-  isAdmin: boolean
+  /** The site EXIT list holds every open visit, not only the user's own
+   *  (decided by the caller from the permissions). */
+  exitAnyVisit: boolean
   onSelect: (equipment: Equipment) => void
-  onAddEquipment: () => void
+  /** The «اضافة معدة +» button; omitted when the user may not quick-create. */
+  onAddEquipment?: () => void
   listRef: RefObject<HTMLDivElement>
   /** The inline quick-create panel, rendered under the list. */
   quickCreateSlot?: ReactNode
@@ -52,7 +55,7 @@ export function EquipmentStep({
   loadError,
   isEntry,
   siteExitMode,
-  isAdmin,
+  exitAnyVisit,
   onSelect,
   onAddEquipment,
   listRef,
@@ -137,7 +140,7 @@ export function EquipmentStep({
               className="col-span-full"
               title={t('noEquipmentFound')}
               description={
-                siteExitMode && !isAdmin
+                siteExitMode && !exitAnyVisit
                   ? t('siteExitOwnEquipmentOnly')
                   : undefined
               }
@@ -191,7 +194,7 @@ export function EquipmentStep({
               </button>
             )
           })}
-          {isEntry && (
+          {isEntry && onAddEquipment && (
             <Button
               variant="outline"
               onClick={onAddEquipment}

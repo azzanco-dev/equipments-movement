@@ -49,7 +49,9 @@ export interface QuickEquipmentFormProps {
   onSelectLessor: (option: AsyncSearchSelectOption | null) => void
   loadEquipmentTypes: (query: string) => Promise<AsyncSearchSelectOption[]>
   loadLessors: (query: string) => Promise<AsyncSearchSelectOption[]>
-  onCreateLessor: (query: string) => void
+  /** The «اضافة مورد +» option; omitted when the user may not quick-create
+   *  a supplier (decided by the caller from the permissions). */
+  onCreateLessor?: (query: string) => void
   onCancel: () => void
   onSave: () => void
 }

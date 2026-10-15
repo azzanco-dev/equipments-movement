@@ -292,11 +292,22 @@ test('the header shows the assigned role only with the flag ON and an assignment
     layout,
     /const roleLabel =\s+rolesSystemEnabled === true && assignedRole\s+\? localizedName\(lang, assignedRole\.name_ar, assignedRole\.name_en\)\s+: legacyRoleLabel/,
   )
-  // The legacy label is unchanged.
+  // The legacy label is unchanged (wave 24: a switch over the role).
   assert.match(
     layout,
-    /const legacyRoleLabel =\s+profile\?\.role === 'admin'\s+\? t\('admin'\)/,
+    /const legacyRoleLabel = t\(legacyRoleLabelKey\(profile\?\.role\)\)/,
   )
+  const labels = layout.match(/function legacyRoleLabelKey\([\s\S]*?\n\}/)?.[0]
+  assert.ok(labels, 'the label helper exists')
+  for (const [role, key] of [
+    ['admin', 'admin'],
+    ['workshop', 'workshopOfficer'],
+    ['assistant_workshop_manager', 'assistantWorkshopManager'],
+    ['workshop_manager', 'workshopManager'],
+    ['monitor', 'monitoring'],
+  ])
+    assert.match(labels, new RegExp(`case '${role}':\\s+return '${key}'`), role)
+  assert.match(labels, /default:\s+return 'supervisor'/)
 })
 
 test('the users list: ON reads the assignment and filters by it; OFF keeps the legacy select', () => {

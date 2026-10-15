@@ -35,8 +35,10 @@ import {
  * Readers: the roles settings page (to hide itself without `settings.roles`)
  * and, since wave 23, src/App.tsx through src/lib/navPermissions.ts: the
  * sidebar (step 1) and the shell / home selection plus the admin-shell page
- * guards (step 2); a `reload()` re-renders them. In-screen actions, API
- * routes and Edge Functions still decide by `profiles.role`.
+ * guards (step 2); a `reload()` re-renders them. Since wave 24 the in-screen
+ * actions and data decisions too (src/lib/actionPermissions.ts, with the
+ * role as the fallback while loading or after a failed load), and the API
+ * routes and Edge Functions check the permission server-side.
  *
  * Step 3 (users screens and header) adds two reads beside the permissions:
  * the roles system flag (`app_settings.roles_system`) and the signed-in
