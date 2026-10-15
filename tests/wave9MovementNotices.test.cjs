@@ -1155,10 +1155,13 @@ test('the arrival notice ends its request with the EXIT link for a valid base', 
   const sections = message.split('\n\n')
   assert.equal(sections.length, 3)
   const request = sections[1].split('\n')
-  // The existing two lines are unchanged; the link is the last line.
+  // The existing two lines are unchanged; a short call to action in both
+  // languages, then the link as the last line.
   assert.deepEqual(request, [
     '🔧 وصلت الورشة، الرجاء تسجيل خروجها من مشروعك.',
     'Arrived at the workshop. Please record its exit from your project.',
+    '👇 اضغط الرابط لتسجيل خروج المعدة',
+    'Tap the link to record its exit',
     `🔗 ${BASE}/movements/new?type=exit&equipment=TK-104`,
   ])
   // The sender section stays last.
@@ -1171,7 +1174,7 @@ test('the arrival notice ends its request with the EXIT link for a valid base', 
     message,
     without.replace(
       'your project.\n',
-      `your project.\n🔗 ${BASE}/movements/new?type=exit&equipment=TK-104\n`,
+      `your project.\n👇 اضغط الرابط لتسجيل خروج المعدة\nTap the link to record its exit\n🔗 ${BASE}/movements/new?type=exit&equipment=TK-104\n`,
     ),
   )
   // A trailing slash or a path on the base never doubles a slash.

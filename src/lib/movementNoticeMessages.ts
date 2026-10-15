@@ -120,6 +120,9 @@ export function movementNoticeMessage(
         [
           '🔧 وصلت الورشة، الرجاء تسجيل خروجها من مشروعك.',
           'Arrived at the workshop. Please record its exit from your project.',
+          // A short call to action above the link (owner request 2026-10-15).
+          exitUrl ? '👇 اضغط الرابط لتسجيل خروج المعدة' : '',
+          exitUrl ? 'Tap the link to record its exit' : '',
           exitUrl ? `🔗 ${exitUrl}` : '',
         ],
         [sender ? `👤 ${sender}` : ''],
