@@ -10,6 +10,7 @@ import {
   EXTERNAL_SUPPLIER_EMPLOYMENT_TYPE,
 } from '@/lib/driverExcel'
 import { EXIT_PURPOSE_FILTER_FIELD } from '@/lib/exitPurpose'
+import { SUPPLIER_FILTER_FIELD } from '@/lib/equipmentSupplier'
 import {
   MOVEMENT_COMPANY_PROJECT_SEARCH_FIELDS,
   MOVEMENT_SEARCH_FIELDS,
@@ -563,6 +564,9 @@ export const logsListConfig: DataListConfig = {
         },
       ],
     },
+    // Owner request 2026-10-15: the supplier, offered only while the owner
+    // filter selects «مالك اخر» (migration 0132).
+    SUPPLIER_FILTER_FIELD,
     // Multi-select by id (owner review, 2026-09-29) instead of a name text
     // box. The options come from `useCompanyProjectFilters()` passed as
     // `asyncFields` (server-side search over `companies` / `projects`, 20

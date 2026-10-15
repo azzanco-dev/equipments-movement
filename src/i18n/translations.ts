@@ -1369,6 +1369,10 @@ export const translations = {
     adminHomeOwnerThirdPartyF: 'طرف ثالث F',
     adminHomeOwnerThirdPartyB: 'طرف ثالث B',
     adminHomeOwnerExternal: 'مالك اخر',
+    // Owner request 2026-10-15: the supplier filter of the admin log and the
+    // supplier line under the equipment («مالك اخر» only).
+    supplierFilter: 'المورد',
+    equipmentSupplierLine: 'المورد: {name}',
     adminHomeNow: 'الان',
     adminHomeStateTitle: 'الحالة الان',
     adminHomeStateDescription: 'اين المعدات في هذه اللحظة.',
@@ -3226,6 +3230,8 @@ export const translations = {
     adminHomeOwnerThirdPartyF: 'Third party F',
     adminHomeOwnerThirdPartyB: 'Third party B',
     adminHomeOwnerExternal: 'Other owner',
+    supplierFilter: 'Supplier',
+    equipmentSupplierLine: 'Supplier: {name}',
     adminHomeNow: 'Now',
     adminHomeStateTitle: 'The fleet right now',
     adminHomeStateDescription: 'Where every unit stands at this moment.',

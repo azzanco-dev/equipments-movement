@@ -85,6 +85,21 @@ export type FilterField = {
    * `asyncFields` (company and project on `/logs`).
    */
   multiple?: boolean
+  /**
+   * A dependent filter: the field is offered only while another field's
+   * filter selects a given value (`eq` that value, or `in` a list holding it),
+   * e.g. the supplier only for the owner «مالك اخر». When the condition stops
+   * holding, the dependent filter is dropped from the list (and so from the
+   * URL); see `withoutHiddenFilters` in `./listFilterState`.
+   */
+  visibleWhen?: FilterVisibility
+}
+/** See `FilterField.visibleWhen`. */
+export type FilterVisibility = {
+  /** The key of the controlling filter field. */
+  field: string
+  /** The value that field's filter must select. */
+  includes: string
 }
 export type ListFilter = {
   id: string

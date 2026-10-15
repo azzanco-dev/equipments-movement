@@ -1,3 +1,4 @@
+import { SUPPLIER_FILTER_FIELD } from '@/lib/equipmentSupplier'
 import { saudiDateKey } from '@/lib/saudiTime'
 import { buildSearchFilter } from '@/lib/search'
 import type { Language, TranslationKey } from '@/i18n/translations'
@@ -55,6 +56,14 @@ export const EQUIPMENT_VISITS_VIEW = 'movement_visits'
 export const EQUIPMENT_VISITS_SELECT =
   'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code,equipment_ownership_status,exit_purpose,driver_full_name'
 
+/**
+ * The admin log's visits view (and the workshop managers' embedded log): the
+ * home select plus the supplier name appended by migration 0132, shown under
+ * the equipment for an owner «مالك اخر». The supplier filter itself runs on
+ * `equipment_lessor_id` server-side and needs no selected column.
+ */
+export const EQUIPMENT_VISITS_LOG_SELECT = `${EQUIPMENT_VISITS_SELECT},equipment_lessor_name`
+
 export interface EquipmentVisitRow {
   entry_id: string
   exit_id: string | null
@@ -94,6 +103,12 @@ export interface EquipmentVisitRow {
    * visit. After `withCurrentDrivers` it is the changed driver's record name.
    */
   driver_full_name?: string | null
+  /**
+   * The name of the equipment's supplier (migration 0132), read by the admin
+   * log only (`EQUIPMENT_VISITS_LOG_SELECT`) and shown under the equipment for
+   * an owner «مالك اخر» (`equipmentSupplierLine`).
+   */
+  equipment_lessor_name?: string | null
 }
 
 /** Which visits a table lists; `all` applies no context predicate. */
@@ -267,6 +282,9 @@ export const adminVisitsListConfig: DataListConfig = {
         },
       ],
     },
+    // Owner request 2026-10-15: the supplier, offered only while the owner
+    // filter selects «مالك اخر» (migration 0132).
+    SUPPLIER_FILTER_FIELD,
     ...VISIT_COMPANY_PROJECT_FILTERS,
     {
       key: 'entry_supervisor_id',

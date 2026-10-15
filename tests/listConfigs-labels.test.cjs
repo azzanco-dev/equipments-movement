@@ -92,6 +92,9 @@ const ARABIC_SNAPSHOT = {
       'نوع الحركة',
       'وقت الحركة',
       'المالك',
+      // Owner request 2026-10-15 (migration 0132): the supplier, shown only
+      // with the owner «مالك اخر».
+      'المورد',
       'الشركة',
       'المشروع',
       'الفورمان',

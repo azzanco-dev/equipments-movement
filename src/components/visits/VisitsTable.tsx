@@ -14,6 +14,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui'
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
+import { EquipmentSupplierLine } from '@/components/data-list/EquipmentSupplierLine'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import {
@@ -47,6 +48,7 @@ import {
   loadProfileNames,
 } from '@/lib/exportFields'
 import {
+  EQUIPMENT_VISITS_LOG_SELECT,
   EQUIPMENT_VISITS_SELECT,
   EQUIPMENT_VISITS_VIEW,
   adminVisitsListConfig,
@@ -196,10 +198,14 @@ export function VisitsTable({
     } = {}) => {
       let query = supabase
         .from(EQUIPMENT_VISITS_VIEW)
-        .select(head ? 'entry_id' : EQUIPMENT_VISITS_SELECT, {
-          count: 'exact',
-          head,
-        })
+        .select(
+          head
+            ? 'entry_id'
+            : isLog
+              ? EQUIPMENT_VISITS_LOG_SELECT
+              : EQUIPMENT_VISITS_SELECT,
+          { count: 'exact', head },
+        )
         .order(sortKey, { ascending, nullsFirst: false })
         .order('entry_id', { ascending: false })
       const movementContext = visitContextFilter(context)
@@ -219,6 +225,7 @@ export function VisitsTable({
       ascending,
       context,
       filters,
+      isLog,
       search,
       sortKey,
       supervisorId,
@@ -434,6 +441,9 @@ export function VisitsTable({
                 )}
               </span>
             )}
+          {/* Owner request 2026-10-15: the supplier of an «مالك اخر» unit,
+              as one more muted line (the log only; no column is added). */}
+          {isLog && <EquipmentSupplierLine row={visit} />}
         </span>
       ),
     }

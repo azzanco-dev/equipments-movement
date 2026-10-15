@@ -364,7 +364,7 @@ test('the /logs list and the inquiry timeline select the purpose', () => {
   )
   assert.match(
     logs,
-    /const LIST_SELECT = `\$\{MOVEMENT_LOG_ADMIN_SELECT\},[^`]*exit_purpose`/,
+    /const LIST_SELECT = `\$\{MOVEMENT_LOG_ADMIN_SELECT\},[^`]*exit_purpose[,`]/,
   )
   const inquiry = fs.readFileSync(
     path.join(ROOT, 'src', 'screens', 'inquiry', 'EquipmentInquiryScreen.tsx'),

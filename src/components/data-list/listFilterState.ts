@@ -24,9 +24,57 @@ export function listFiltersFromParam(
   const value: unknown =
     raw === null ? (config.defaultFilters ?? []) : parse(raw)
   if (!Array.isArray(value)) return []
-  return value.filter((filter): filter is ListFilter =>
-    isAllowedFilter(filter, config.filterFields),
+  return withoutHiddenFilters(
+    value.filter((filter): filter is ListFilter =>
+      isAllowedFilter(filter, config.filterFields),
+    ),
+    config.filterFields,
   )
+}
+
+/**
+ * Whether a field is offered for the current filters (`FilterField.
+ * visibleWhen`): always without a rule; with one, only while the controlling
+ * field's filter selects the value, as `eq` that value or `in` a list holding
+ * it. A negative filter (`neq`, `not_in`) never satisfies it.
+ */
+export function isFilterFieldVisible(
+  field: Pick<FilterField, 'visibleWhen'>,
+  filters: Pick<ListFilter, 'field' | 'operator' | 'value'>[],
+): boolean {
+  const rule = field.visibleWhen
+  if (!rule) return true
+  const source = filters.find((filter) => filter.field === rule.field)
+  if (!source) return false
+  if (source.operator === 'eq') return source.value === rule.includes
+  if (source.operator === 'in')
+    return source.value
+      .split(',')
+      .map((entry) => entry.trim())
+      .includes(rule.includes)
+  return false
+}
+
+/**
+ * The filters without the ones whose field is not offered any more (its
+ * `visibleWhen` condition stopped holding), e.g. the supplier once the owner
+ * is no longer «مالك اخر». Repeated until stable, so a chain of dependent
+ * fields is dropped as a whole. Filters on fields outside `fields` are kept
+ * as they are (the allowlist is checked separately).
+ */
+export function withoutHiddenFilters<T extends ListFilter>(
+  filters: T[],
+  fields: Pick<FilterField, 'key' | 'visibleWhen'>[],
+): T[] {
+  let current = filters
+  for (;;) {
+    const next = current.filter((filter) => {
+      const field = fields.find((item) => item.key === filter.field)
+      return !field || isFilterFieldVisible(field, current)
+    })
+    if (next.length === current.length) return current
+    current = next
+  }
 }
 
 /** The `filters` URL value for a new list; `null` removes the parameter. */

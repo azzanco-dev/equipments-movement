@@ -72,6 +72,11 @@ export interface MovementLogSearchRow {
   equipment_ownership_status?: string | null
   /** The row's own site exit purpose (migration 0118); `null` otherwise. */
   exit_purpose?: ExitPurpose | null
+  /**
+   * The name of the equipment's supplier (migration 0132), read by the admin
+   * log only and shown under the equipment for an owner «مالك اخر».
+   */
+  equipment_lessor_name?: string | null
 }
 
 /**

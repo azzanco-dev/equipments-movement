@@ -114,6 +114,7 @@
 - Select only fields needed by the list or selector; avoid `select('*')` for large list queries.
 - Detail pages show only 10–20 recent child records plus a “View All” route; do not embed a full DataList in details.
 - Review query plans and add focused indexes in a new migration when adding common search/filter/sort paths.
+- A filter field may depend on another through `FilterField.visibleWhen` (`{ field, includes }`): it is offered only while the controlling filter selects that value and is dropped from state and URL (`withoutHiddenFilters`) when it stops. First use (owner request 2026-10-15, migration 0132): the «المورد» filter of both `/logs` views (and the workshop managers' embedded copy), a server-side `in` multi-select over `lessors` (`SUPPLIER_FILTER_FIELD` in `src/lib/equipmentSupplier.ts`) shown only while the owner filter selects `external_supplier`; `movement_log_search` and `movement_visits` expose `equipment_lessor_id` / `equipment_lessor_name` (0124 verbatim plus two trailing columns and a `lessors` primary-key LEFT JOIN). The tables show the supplier as a muted line inside the equipment cell for «مالك اخر» units only; no column was added (owner: keep the tables narrow).
 
 ## UI conventions
 

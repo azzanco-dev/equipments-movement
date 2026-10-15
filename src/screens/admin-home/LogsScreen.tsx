@@ -15,6 +15,7 @@ import {
 } from '@/components/ui'
 import type { DataTableColumn } from '@/components/ui'
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
+import { EquipmentSupplierLine } from '@/components/data-list/EquipmentSupplierLine'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import {
@@ -33,6 +34,10 @@ import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDateTime } from '@/lib/dateFormat'
+import {
+  SUPPLIER_FILTER_KEY,
+  lessorFilterOptions,
+} from '@/lib/equipmentSupplier'
 import {
   loadDriverChanges,
   loadDriverMobiles,
@@ -104,7 +109,10 @@ function resolveLogsView(params: QueryReader): LogsView {
 
 // `exit_purpose` (a site exit's purpose) is appended to the view by migration
 // 0118; the table shows it on exit rows and the export writes it.
-const LIST_SELECT = `${MOVEMENT_LOG_ADMIN_SELECT},workshop_purpose,equipment_ownership_status,exit_purpose`
+// `equipment_lessor_name` (migration 0132) is the supplier line under the
+// equipment of an «مالك اخر» unit; the supplier FILTER runs on
+// `equipment_lessor_id` server-side and needs no selected column.
+const LIST_SELECT = `${MOVEMENT_LOG_ADMIN_SELECT},workshop_purpose,equipment_ownership_status,exit_purpose,equipment_lessor_name`
 
 /** Relational selectors show the first/best 20 matches, never more. */
 const FOREMAN_OPTION_LIMIT = 20
@@ -148,11 +156,24 @@ const foremanFilter: FilterBarAsyncField = {
   },
 }
 
+/**
+ * The supplier («المورد», owner request 2026-10-15): a multi-select over
+ * `lessors`, searched server-side 20 at a time, offered by both views only
+ * while the owner filter selects «مالك اخر» (`SUPPLIER_FILTER_FIELD`).
+ */
+const supplierFilter: FilterBarAsyncField = lessorFilterOptions(supabase)
+
 /** Stable across renders, so the bar's controls do not reload on each one. */
-const LOGS_ASYNC_FILTERS = { supervisor_id: foremanFilter }
+const LOGS_ASYNC_FILTERS = {
+  supervisor_id: foremanFilter,
+  [SUPPLIER_FILTER_KEY]: supplierFilter,
+}
 
 /** The visits view filters the ENTRY's recorder with the same search. */
-const VISITS_ASYNC_FILTERS = { entry_supervisor_id: foremanFilter }
+const VISITS_ASYNC_FILTERS = {
+  entry_supervisor_id: foremanFilter,
+  [SUPPLIER_FILTER_KEY]: supplierFilter,
+}
 
 /** The visits view keeps its list state under its own URL prefix. */
 const VISITS_URL_PREFIX = 'v'
@@ -575,8 +596,13 @@ export function LogsScreen({
       header: t('equipmentCodeLabel'),
       sortable: true,
       width: '8rem',
+      // Owner request 2026-10-15: an «مالك اخر» unit also shows its supplier
+      // as one muted line under the code; no column is added.
       cell: (row) => (
-        <span className="font-semibold">{row.equipment_code || '—'}</span>
+        <span className="flex flex-col text-start">
+          <span className="font-semibold">{row.equipment_code || '—'}</span>
+          <EquipmentSupplierLine row={row} />
+        </span>
       ),
     },
     {

@@ -86,6 +86,11 @@ const PROJECTS: AsyncSearchSelectOption[] = [
   { value: 'p2', label: 'مشروع حي الياسمين' },
   { value: 'p3', label: 'مشروع جسر الدمام' },
 ]
+/** Sample suppliers; the field shows only with the owner «مالك اخر». */
+const SUPPLIERS: AsyncSearchSelectOption[] = [
+  { value: 's1', label: 'مؤسسة النخبة لتاجير المعدات' },
+  { value: 's2', label: 'شركة الخليج للمعدات الثقيلة' },
+]
 
 function sampleSearch(
   list: AsyncSearchSelectOption[],
@@ -120,6 +125,7 @@ function DemoPanel({ lang }: { lang: DemoLang }) {
       supervisor_id: { loadOptions: sampleSearch(FOREMEN) },
       company_id: sampleField(COMPANIES),
       project_id: sampleField(PROJECTS),
+      equipment_lessor_id: sampleField(SUPPLIERS),
     }),
     [],
   )

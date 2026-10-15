@@ -26,7 +26,11 @@ import {
 } from '@/lib/saudiTime'
 import { AsyncMultiSelect } from './AsyncMultiSelect'
 import { useListLabel, useOptionLabel } from './labels'
-import { matchingFilterChoice } from './listFilterState'
+import {
+  isFilterFieldVisible,
+  matchingFilterChoice,
+  withoutHiddenFilters,
+} from './listFilterState'
 import type { FilterField, FilterOperator, ListFilter } from './types'
 
 /** Radix reserves '' for "no value", so "any value" needs a sentinel. */
@@ -476,6 +480,8 @@ export interface FilterBarProps {
  *   `AsyncMultiSelect` when `multiple` (emits `in` with the ids)
  * - date field → one `DateRangeFilter` (emits `between` / `gte` / `lte`)
  * - text / number → a debounced text box (`like`)
+ * - a field with `visibleWhen` is rendered only while its condition holds,
+ *   and its filter is dropped by the change that breaks the condition
  *
  * Since the 2026-09-29 owner review this is the body of `FilterDialog`, opened
  * from the toolbar's "Filters" button; lists no longer render it inline.
@@ -504,7 +510,7 @@ export function FilterBar({
     const base = latest.current
     const rest = base.filter((item) => item.field !== field.key)
     const existing = base.find((item) => item.field === field.key)
-    const result = next
+    const changed = next
       ? [
           ...rest,
           {
@@ -514,6 +520,9 @@ export function FilterBar({
           },
         ]
       : rest
+    // A dependent filter (`visibleWhen`) whose condition this change broke is
+    // removed with it, e.g. the supplier when the owner leaves «مالك اخر».
+    const result = withoutHiddenFilters(changed, fields)
     latest.current = result
     onChange(result)
   }
@@ -625,9 +634,15 @@ export function FilterBar({
       </p>
     )
 
+  // A dependent field (`visibleWhen`) is offered only while its condition
+  // holds, e.g. the supplier while the owner filter selects «مالك اخر».
+  const visibleFields = fields.filter((field) =>
+    isFilterFieldVisible(field, filters),
+  )
+
   return (
     <div className={cn('grid gap-3 sm:grid-cols-2', className)}>
-      {fields.map((field) => {
+      {visibleFields.map((field) => {
         const label = fieldLabel(field.label)
         if (field.type === 'date')
           return (
