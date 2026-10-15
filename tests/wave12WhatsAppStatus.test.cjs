@@ -333,7 +333,7 @@ test('the gateway module keeps its rules: no logs, no throw, no public variable'
 
 // --- The route ---------------------------------------------------------------
 
-test('the status route authenticates, requires the admin role and returns only the state', () => {
+test('the status route authenticates, requires settings.integrations and returns only the state', () => {
   const route = read(
     'app',
     'api',
@@ -343,22 +343,20 @@ test('the status route authenticates, requires the admin role and returns only t
   )
   assert.match(route, /export async function GET\(request: Request\)/)
   assert.ok(!/export async function (POST|PUT|PATCH|DELETE)/.test(route))
+  // wave 24: the shared check (the caller's token, has_permission(), fail
+  // closed) decides by the permission key, never by the role.
   assert.match(
     route,
-    /if \(!authorization\?\.startsWith\('Bearer '\)\) \{\s+return reply\(\{ error: 'unauthorized' \}, 401\)/,
+    /const access = await requirePermission\(request, 'settings\.integrations'\)/,
   )
-  assert.match(route, /supabase\.auth\.getClaims\(accessToken\)/)
-  assert.match(route, /Authorization: `Bearer \$\{accessToken\}`/)
-  assert.ok(!/SERVICE_ROLE/i.test(route))
-  // Fail closed: anything but `true` from is_admin() is a 403.
-  assert.match(route, /await supabase\.rpc\('is_admin'\)/)
   assert.match(
     route,
-    /if \(roleError \|\| isAdmin !== true\) \{\s+return reply\(\{ error: 'forbidden' \}, 403\)/,
+    /if \(!access\.ok\) \{\s+return reply\(\s+\{ error: access\.error \},\s+access\.error === 'unauthorized' \? 401 : 403,\s+\)/,
   )
-  // The role is checked before the gateway is asked.
+  assert.ok(!/SERVICE_ROLE|is_admin|requireAdmin|createClient/i.test(route))
+  // The permission is checked before the gateway is asked.
   assert.ok(
-    route.indexOf("rpc('is_admin')") <
+    route.indexOf('requirePermission(') <
       route.indexOf('await getWhatsAppGatewayStatus()'),
   )
   assert.match(

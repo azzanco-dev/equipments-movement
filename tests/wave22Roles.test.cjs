@@ -1034,3 +1034,72 @@ test('0128 adds extracting.view for the admin only, on top of the 0126 mapping',
   )
   assert.ok(!/[أإآ]/.test(sql.replace(/--.*/g, '')))
 })
+
+// --- 0130 ---------------------------------------------------------------------
+
+test('0130 retires map.view: both tables, then the 0128 mapping minus the admin row', () => {
+  const sql = read(fileOf('0130'))
+  assert.ok(FILES.indexOf(fileOf('0130')) > FILES.indexOf(fileOf('0129')))
+  assert.match(sql, /^-- 0130: retire the projects-map permission `map\.view`/)
+  assert.match(sql, /Owner decision 2026-10-14/)
+  // The key existed in the 0126 catalogue, and the grants hang on it with
+  // ON DELETE CASCADE; the explicit role_permissions delete comes first.
+  assert.ok(PERMISSIONS.has('map.view'))
+  assert.match(
+    SQL_0126,
+    /permission_key text NOT NULL REFERENCES public\.permissions\(key\) ON DELETE CASCADE/,
+  )
+  const body = code(sql)
+  assert.match(
+    body,
+    /DELETE FROM public\.role_permissions\s+WHERE permission_key = 'map\.view';/,
+  )
+  assert.match(
+    body,
+    /DELETE FROM public\.permissions\s+WHERE key = 'map\.view';/,
+  )
+  assert.ok(
+    body.indexOf('DELETE FROM public.role_permissions') <
+      body.indexOf('DELETE FROM public.permissions'),
+  )
+  assert.equal((body.match(/DELETE FROM/g) ?? []).length, 2)
+  // The frozen mapping is the 0128 body minus exactly the admin row.
+  const before = code(
+    lastFunction(read(fileOf('0128')), 'legacy_role_permissions'),
+  )
+  const after = code(lastFunction(sql, 'legacy_role_permissions'))
+  const row = "('admin', 'map.view', NULL),"
+  assert.equal(before.split(row).length, 2)
+  assert.ok(!after.includes('map.view'))
+  assert.equal(
+    after.replace(/\s+/g, ' '),
+    before.replace(row, '').replace(/\s+/g, ' '),
+  )
+  assert.match(
+    after,
+    /LANGUAGE sql\s+IMMUTABLE\s+SECURITY INVOKER\s+SET search_path = public, pg_temp/,
+  )
+  // Grants restated; nothing else: no flag, no seed, no audit edit.
+  assert.match(
+    sql,
+    /REVOKE ALL ON FUNCTION public\.legacy_role_permissions\(text\) FROM PUBLIC, anon;/,
+  )
+  assert.match(
+    sql,
+    /GRANT EXECUTE ON FUNCTION public\.legacy_role_permissions\(text\) TO authenticated;/,
+  )
+  // (The COMMENT ON FUNCTION text names the flag; the statements do not.)
+  const statements = body.replace(/COMMENT ON FUNCTION[\s\S]*?';/, '')
+  assert.ok(
+    !/INSERT INTO|UPDATE |app_settings|roles_system|profile_roles|role_changes/.test(
+      statements,
+    ),
+  )
+  assert.equal(
+    (body.match(/CREATE OR REPLACE FUNCTION/g) ?? []).length,
+    1,
+    'only the mapping is recreated',
+  )
+  assert.match(sql, /NOTIFY pgrst, 'reload schema';\s*$/)
+  assert.ok(!/[أإآ]/.test(sql), 'plain alif, header included')
+})

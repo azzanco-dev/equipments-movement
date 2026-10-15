@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { toUnitListItem } from '@/lib/afaqy'
 import { isAfaqyConfigured, listUnits } from '@/lib/server/afaqy'
-import { requireAdmin } from '@/lib/server/adminRequest'
+import { requirePermission } from '@/lib/server/adminRequest'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -23,18 +23,19 @@ function reply(body: Record<string, unknown>, status: number) {
  *           502 { error: 'provider_unavailable' }
  *           500 { error: 'failed' }
  *
- * Admin only (`requireAdmin`: the caller's token, `is_admin()`, fail
- * closed), checked before Afaqy is asked. The list is cached in server
- * memory for five minutes; only the mapped fields leave the server, never
- * the credentials, the token or the provider's text.
+ * Needs the permission `settings.integrations` (wave 24, `requirePermission`:
+ * the caller's token, `has_permission()`, fail closed; the admin only while
+ * the roles system is inactive), checked before Afaqy is asked. The list is
+ * cached in server memory for five minutes; only the mapped fields leave the
+ * server, never the credentials, the token or the provider's text.
  */
 export async function GET(request: Request) {
   try {
-    const admin = await requireAdmin(request)
-    if (!admin.ok) {
+    const access = await requirePermission(request, 'settings.integrations')
+    if (!access.ok) {
       return reply(
-        { error: admin.error },
-        admin.error === 'unauthorized' ? 401 : 403,
+        { error: access.error },
+        access.error === 'unauthorized' ? 401 : 403,
       )
     }
     if (!isAfaqyConfigured()) return reply({ error: 'not_configured' }, 503)

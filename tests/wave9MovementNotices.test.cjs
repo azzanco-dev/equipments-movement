@@ -1084,13 +1084,22 @@ test('the workshop-arrival route authenticates, sends no recipient and hides raw
     'workshop-arrival',
     'route.ts',
   )
+  // wave 24: the shared check (the caller's token, has_permission(), fail
+  // closed) requires «ابلاغ الفورمان» = movements.notify_foreman before the
+  // database function re-checks it.
   assert.match(
     route,
-    /if \(!authorization\?\.startsWith\('Bearer '\)\) \{\s+return NextResponse\.json\(\{ error: 'unauthorized' \}, \{ status: 401 \}\)/,
+    /const access = await requirePermission\(\s*request,\s*'movements\.notify_foreman',?\s*\)/,
   )
-  assert.match(route, /supabase\.auth\.getClaims\(accessToken\)/)
-  assert.match(route, /Authorization: `Bearer \$\{accessToken\}`/)
-  assert.ok(!/SERVICE_ROLE/i.test(route))
+  assert.match(
+    route,
+    /if \(!access\.ok\) \{\s+return NextResponse\.json\(\s+\{ error: access\.error \},\s+\{ status: access\.error === 'unauthorized' \? 401 : 403 \},\s+\)/,
+  )
+  assert.ok(
+    route.indexOf('requirePermission(') <
+      route.indexOf("'request_workshop_arrival_notice'"),
+  )
+  assert.ok(!/SERVICE_ROLE|is_admin|requireAdmin|createClient/i.test(route))
   // The only thing forwarded to the database is the equipment id.
   assert.match(
     route,

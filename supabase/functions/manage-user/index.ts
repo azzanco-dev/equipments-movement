@@ -26,6 +26,9 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    // The caller's own client (anon key + the caller's Authorization header):
+    // it identifies the caller and decides what he may do. The service-role
+    // client is used only for the privileged reads and writes below.
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     })
@@ -37,16 +40,16 @@ Deno.serve(async (req: Request) => {
     } = await userClient.auth.getUser()
     if (userError || !user) return json({ error: 'Unauthorized' }, 401)
 
-    const { data: callerProfile } = await adminClient
-      .from('profiles')
-      .select('role,must_change_password')
-      .eq('id', user.id)
-      .maybeSingle()
     const body = await req.json()
 
     if (body.action === 'change_own_password') {
       // This action exists only for the forced first-login change, so a stolen
       // session cannot silently replace the password of an established account.
+      const { data: callerProfile } = await adminClient
+        .from('profiles')
+        .select('must_change_password')
+        .eq('id', user.id)
+        .maybeSingle()
       if (!callerProfile?.must_change_password)
         return json({ error: 'Password change not required' }, 403)
       const password = String(body.password ?? '')
@@ -65,7 +68,16 @@ Deno.serve(async (req: Request) => {
       return json({ success: true })
     }
 
-    if (callerProfile?.role !== 'admin')
+    // wave 24: every other action needs the permission `users.manage`,
+    // decided by public.has_permission() (migration 0126) evaluated AS THE
+    // CALLER (the user client, never the service role). While the roles
+    // system is inactive the frozen legacy mapping grants it to the admin
+    // only, so nothing changes; once active the assigned role decides. Fail
+    // closed: anything but exactly `true` (an error included) is 403. The
+    // own-role, last-admin and admin-parity rules below are unchanged.
+    const { data: canManageUsers, error: permissionError } =
+      await userClient.rpc('has_permission', { p_key: 'users.manage' })
+    if (permissionError || canManageUsers !== true)
       return json({ error: 'Forbidden' }, 403)
     const userId = String(body.user_id ?? '')
     if (!userId) return json({ error: 'User is required' }, 400)

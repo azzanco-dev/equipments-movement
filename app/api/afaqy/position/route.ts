@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { AFAQY_UNIT_ID_PATTERN } from '@/lib/afaqy'
 import { getUnitPosition, isAfaqyConfigured } from '@/lib/server/afaqy'
-import { requireAdmin } from '@/lib/server/adminRequest'
+import { requirePermission } from '@/lib/server/adminRequest'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -31,17 +31,19 @@ function reply(body: Record<string, unknown>, status: number) {
  *           502 { error: 'provider_unavailable' }
  *           500 { error: 'failed' }
  *
- * Admin only (`requireAdmin`), checked before anything else. The link is
- * read with the caller's token, so RLS decides what the caller may see. Each
- * unit's position is cached in server memory for a minute.
+ * Needs the permission `equipment.location.view` — the key of the «الموقع
+ * الحالي» card (wave 24, `requirePermission`, fail closed), checked before
+ * anything else. The link is read with the caller's token, so RLS decides
+ * what the caller may see. Each unit's position is cached in server memory
+ * for a minute.
  */
 export async function GET(request: Request) {
   try {
-    const admin = await requireAdmin(request)
-    if (!admin.ok) {
+    const access = await requirePermission(request, 'equipment.location.view')
+    if (!access.ok) {
       return reply(
-        { error: admin.error },
-        admin.error === 'unauthorized' ? 401 : 403,
+        { error: access.error },
+        access.error === 'unauthorized' ? 401 : 403,
       )
     }
 
@@ -50,7 +52,7 @@ export async function GET(request: Request) {
       return reply({ error: 'invalid_request' }, 400)
     }
 
-    const { data, error } = await admin.supabase
+    const { data, error } = await access.supabase
       .from('equipment')
       .select('id,tracker_unit_id')
       .eq('id', equipmentId)

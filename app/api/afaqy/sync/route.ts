@@ -8,7 +8,7 @@ import {
   type SyncEquipmentRow,
 } from '@/lib/afaqySync'
 import { isAfaqyConfigured, listUnits } from '@/lib/server/afaqy'
-import { requireAdmin } from '@/lib/server/adminRequest'
+import { requirePermission } from '@/lib/server/adminRequest'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -106,20 +106,21 @@ async function readForce(request: Request): Promise<boolean | null> {
  *           502 { error: 'provider_unavailable' }
  *           500 { error: 'failed' }
  *
- * Admin only (`requireAdmin`), checked before Afaqy is asked. The matching
- * rules are in src/lib/afaqySync.ts. Every write is a plain update of one
- * equipment row WITH THE CALLER'S TOKEN, so the admin-only
- * `update_equipment` RLS policy and the 0122 constraints (one unit per
- * equipment) stay authoritative; a refused write is reported, never hidden.
- * Without `force` an existing different link is never overwritten.
+ * Needs the permission `settings.integrations` (wave 24, `requirePermission`,
+ * fail closed), checked before Afaqy is asked. The matching rules are in
+ * src/lib/afaqySync.ts. Every write is a plain update of one equipment row
+ * WITH THE CALLER'S TOKEN, so the `update_equipment` RLS policy
+ * (`equipment.edit`) and the 0122 constraints (one unit per equipment) stay
+ * authoritative; a refused write is reported, never hidden. Without `force`
+ * an existing different link is never overwritten.
  */
 export async function POST(request: Request) {
   try {
-    const admin = await requireAdmin(request)
-    if (!admin.ok) {
+    const access = await requirePermission(request, 'settings.integrations')
+    if (!access.ok) {
       return reply(
-        { error: admin.error },
-        admin.error === 'unauthorized' ? 401 : 403,
+        { error: access.error },
+        access.error === 'unauthorized' ? 401 : 403,
       )
     }
     const force = await readForce(request)
@@ -134,7 +135,7 @@ export async function POST(request: Request) {
         : reply({ error: 'provider_unavailable' }, 502)
     }
 
-    const supabase = admin.supabase
+    const supabase = access.supabase
     const [equipment, codeChanges] = await Promise.all([
       readAll<SyncEquipmentRow>((from, to) =>
         supabase

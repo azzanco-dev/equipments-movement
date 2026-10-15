@@ -886,15 +886,29 @@ test('the admin check uses the caller token and fails closed', () => {
     /if \(roleError \|\| isAdmin !== true\) \{\s+return \{ ok: false, error: 'forbidden' \}/,
   )
   assert.ok(!/SERVICE_ROLE|service_role/i.test(helper))
+  // wave 24: the permission check shares the token flow and fails closed on
+  // anything but exactly `true` from has_permission(key).
+  assert.match(
+    helper,
+    /export async function requirePermission\(\s+request: Request,\s+key: ServerPermissionKey,\s+\)/,
+  )
+  assert.match(
+    helper,
+    /await supabase\.rpc\(\s+'has_permission',\s+\{ p_key: key \},\s+\)/,
+  )
+  assert.match(
+    helper,
+    /if \(permissionError \|\| allowed !== true\) \{\s+return \{ ok: false, error: 'forbidden' \}/,
+  )
 })
 
-test('every Afaqy route is admin-only, uncached and never leaks provider text', () => {
+test('every Afaqy route needs its permission, is uncached and never leaks provider text', () => {
   const routes = {
-    units: ['GET', 'listUnits('],
-    position: ['GET', 'getUnitPosition('],
-    sync: ['POST', 'listUnits('],
+    units: ['GET', 'listUnits(', 'settings.integrations'],
+    position: ['GET', 'getUnitPosition(', 'equipment.location.view'],
+    sync: ['POST', 'listUnits(', 'settings.integrations'],
   }
-  for (const [name, [method, call]] of Object.entries(routes)) {
+  for (const [name, [method, call, key]] of Object.entries(routes)) {
     const route = read('app', 'api', 'afaqy', name, 'route.ts')
     assert.match(
       route,
@@ -907,11 +921,20 @@ test('every Afaqy route is admin-only, uncached and never leaks provider text', 
       !new RegExp(`export async function (${others.join('|')})`).test(route),
       name,
     )
-    assert.match(route, /const admin = await requireAdmin\(request\)/)
-    // The role is checked first in the handler, before Afaqy or the
+    // wave 24: the route decides by its permission key, never by the role.
+    assert.match(
+      route,
+      new RegExp(
+        `const access = await requirePermission\\(\\s*request,\\s*'${key.replace(/\./g, '\\.')}',?\\s*\\)`,
+      ),
+      name,
+    )
+    assert.ok(!/requireAdmin|is_admin/.test(route), name)
+    assert.match(route, /access\.error === 'unauthorized' \? 401 : 403/, name)
+    // The permission is checked first in the handler, before Afaqy or the
     // database is asked.
     const handler = route.slice(route.indexOf('export async function'))
-    const adminAt = handler.indexOf('requireAdmin(request)')
+    const adminAt = handler.indexOf('requirePermission(')
     assert.ok(adminAt > 0 && adminAt < handler.indexOf(call), name)
     for (const later of [
       "from('equipment')",

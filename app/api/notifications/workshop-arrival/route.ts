@@ -1,9 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import {
   noticeRequestErrorCode,
   noticeRequestErrorStatus,
 } from '@/lib/movementNoticeErrors'
+import { requirePermission } from '@/lib/server/adminRequest'
 import {
   deliverMovementNotice,
   parseMovementNoticeRow,
@@ -13,16 +13,6 @@ export const runtime = 'nodejs'
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-function authenticatedClient(accessToken: string) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !key) throw new Error('Missing Supabase environment variables')
-  return createClient(url, key, {
-    global: { headers: { Authorization: `Bearer ${accessToken}` } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-}
 
 /**
  * wave 9 — "Notify the foreman": a workshop role (or an admin) reports that a
@@ -37,26 +27,25 @@ function authenticatedClient(accessToken: string) {
  *             401 unauthorized   400 invalid     403 forbidden
  *             409 not_on_site    429 recently_sent   500 failed
  *
- * `request_workshop_arrival_notice` (migration 0110) is authoritative: it
- * re-checks the role fail-closed, resolves the recipient from the unit's open
- * site entry (the client never supplies one) and enforces the 10-minute rule.
- * The message text is a fixed server-side template. A failed send is a 200
- * with `status: 'failed'`: the request was logged and may be retried.
+ * The caller needs the permission `movements.notify_foreman` — the key of
+ * «ابلاغ الفورمان» (wave 24, `requirePermission`: the caller's token,
+ * `has_permission()`, fail closed). `request_workshop_arrival_notice`
+ * (migration 0110, keyed by 0127) stays authoritative: it re-checks the same
+ * permission fail-closed, resolves the recipient from the unit's open site
+ * entry (the client never supplies one) and enforces the 10-minute rule. The
+ * message text is a fixed server-side template. A failed send is a 200 with
+ * `status: 'failed'`: the request was logged and may be retried.
  */
 export async function POST(request: Request) {
-  const authorization = request.headers.get('authorization')
-  if (!authorization?.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  }
-
   try {
-    const accessToken = authorization.slice(7)
-    const supabase = authenticatedClient(accessToken)
-    const { data: claimsData, error: authError } =
-      await supabase.auth.getClaims(accessToken)
-    if (authError || !claimsData?.claims.sub) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    const access = await requirePermission(request, 'movements.notify_foreman')
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: access.error },
+        { status: access.error === 'unauthorized' ? 401 : 403 },
+      )
     }
+    const supabase = access.supabase
 
     let body: unknown = null
     try {

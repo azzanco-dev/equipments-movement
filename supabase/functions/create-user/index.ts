@@ -27,7 +27,9 @@ Deno.serve(async (req: Request) => {
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-    // Create client with user's token to check their role
+    // The caller's own client (anon key + the caller's Authorization header):
+    // it identifies the caller and decides what he may do. The service-role
+    // client below is used only for the privileged write.
     const userClient = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: authHeader } },
     })
@@ -43,15 +45,16 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // Check if caller is admin
-    const { data: profile, error: profileError } = await userClient
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle()
+    // wave 24: the caller needs the permission `users.manage`, decided by
+    // public.has_permission() (migration 0126) evaluated AS THE CALLER. While
+    // the roles system is inactive the frozen legacy mapping grants it to the
+    // admin only, so nothing changes; once active the assigned role decides.
+    // Fail closed: anything but exactly `true` (an error included) is 403.
+    const { data: canManageUsers, error: permissionError } =
+      await userClient.rpc('has_permission', { p_key: 'users.manage' })
 
-    if (profileError || !profile || profile.role !== 'admin') {
-      return new Response(JSON.stringify({ error: 'Forbidden — admin only' }), {
+    if (permissionError || canManageUsers !== true) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
