@@ -56,10 +56,12 @@ const select = (values: readonly string[]): FilterOption[] =>
 export const driversListConfig: DataListConfig = {
   id: 'drivers',
   searchPlaceholder: {
-    ar: 'البحث بالاسم او الهوية او الجوال',
-    en: 'Search by name, ID or mobile',
+    ar: 'البحث بالاسم او الهوية او الجوال او الرقم الوظيفي',
+    en: 'Search by name, ID, mobile or employee number',
   },
-  searchFields: [...DRIVER_SEARCH_FIELDS],
+  // EM-237: the list also searches «الرقم الوظيفي» (`drivers.employee_number`,
+  // migration 0131, trigram-indexed); the driver selectors keep the shared set.
+  searchFields: [...DRIVER_SEARCH_FIELDS, 'employee_number'],
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
   filterFields: [
@@ -94,6 +96,12 @@ export const driversListConfig: DataListConfig = {
       type: 'text',
       operators: textOps,
     },
+    {
+      key: 'employee_number',
+      label: 'driverEmployeeNumber',
+      type: 'text',
+      operators: textOps,
+    },
   ],
   // wave-13-drivers (owner decision 2026-10-05): the drivers of external
   // supplier equipment are hidden on a fresh visit. It is an ordinary filter:
@@ -114,6 +122,7 @@ export const driversListConfig: DataListConfig = {
   sortableFields: [
     { key: 'full_name', label: { ar: 'الاسم', en: 'Name' } },
     { key: 'name_en', label: 'driverNameEn' },
+    { key: 'employee_number', label: 'driverEmployeeNumber' },
     { key: 'created_at', label: 'createdAt' },
     {
       key: 'updated_at',

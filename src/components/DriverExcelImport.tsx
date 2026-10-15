@@ -4,11 +4,18 @@ import { supabase } from '@/lib/supabase'
 import { Alert } from '@/components/Alert'
 import { Button, Dialog } from '@/components/ui'
 import {
+  DRIVER_EMPLOYEE_NUMBER_IMPORT_ERROR,
   downloadDriverTemplate,
+  employeeNumberLookupFilter,
+  normalizeEmployeeNumber,
   parseDriverWorkbook,
   type DriverImportRow,
 } from '@/lib/driverExcel'
 import { useI18n } from '@/i18n/I18nContext'
+
+/** A row the import inserts: no error and no duplicate of any kind. */
+const isImportable = (row: DriverImportRow) =>
+  row.errors.length === 0 && !row.duplicate && !row.duplicateEmployeeNumber
 
 export function DriverExcelImport({
   open,
@@ -23,7 +30,7 @@ export function DriverExcelImport({
   const [rows, setRows] = useState<DriverImportRow[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const valid = rows.filter((row) => row.errors.length === 0 && !row.duplicate)
+  const valid = rows.filter(isImportable)
   const chooseFile = async (file?: File) => {
     if (!file) return
     setBusy(true)
@@ -36,7 +43,14 @@ export function DriverExcelImport({
       const mobiles = parsed.flatMap((row) =>
         row.mobile_number ? [row.mobile_number] : [],
       )
-      const [idResult, mobileResult] = await Promise.all([
+      // EM-237: the stored employee numbers that collide with the file's,
+      // compared the way `drivers_employee_number_unique` does (upper/trim).
+      const employeeFilter = employeeNumberLookupFilter(
+        parsed.flatMap((row) =>
+          row.employee_number ? [row.employee_number] : [],
+        ),
+      )
+      const [idResult, mobileResult, employeeResult] = await Promise.all([
         ids.length
           ? supabase.from('drivers').select('id_number').in('id_number', ids)
           : Promise.resolve({ data: [], error: null }),
@@ -46,10 +60,16 @@ export function DriverExcelImport({
               .select('mobile_number')
               .in('mobile_number', mobiles)
           : Promise.resolve({ data: [], error: null }),
+        employeeFilter
+          ? supabase
+              .from('drivers')
+              .select('employee_number')
+              .or(employeeFilter)
+          : Promise.resolve({ data: [], error: null }),
       ])
       // A failed duplicate check must not read as "no duplicates": stop the
       // preview and show an error instead.
-      if (idResult.error || mobileResult.error) {
+      if (idResult.error || mobileResult.error || employeeResult.error) {
         setRows([])
         setError(t('dataLoadError'))
         return
@@ -60,6 +80,13 @@ export function DriverExcelImport({
       const existingMobiles = new Set(
         (mobileResult.data ?? []).map((item) => item.mobile_number),
       )
+      const existingEmployeeNumbers = new Set(
+        (employeeResult.data ?? []).flatMap((item) =>
+          item.employee_number
+            ? [normalizeEmployeeNumber(item.employee_number)]
+            : [],
+        ),
+      )
       setRows(
         parsed.map((row) => ({
           ...row,
@@ -68,6 +95,14 @@ export function DriverExcelImport({
             Boolean(
               (row.id_number && existingIds.has(row.id_number)) ||
               (row.mobile_number && existingMobiles.has(row.mobile_number)),
+            ),
+          duplicateEmployeeNumber:
+            row.duplicateEmployeeNumber ||
+            Boolean(
+              row.employee_number &&
+              existingEmployeeNumbers.has(
+                normalizeEmployeeNumber(row.employee_number),
+              ),
             ),
         })),
       )
@@ -89,6 +124,7 @@ export function DriverExcelImport({
       nationality: row.nationality,
       employment_type: row.employment_type,
       job_title: row.job_title,
+      employee_number: row.employee_number,
     }))
     const { error: insertError } = await supabase
       .from('drivers')
@@ -111,6 +147,18 @@ export function DriverExcelImport({
           .replace('mobile_number غير صالح', 'Invalid mobile number')
           .replace('nationality غير معتمدة', 'Unsupported nationality')
           .replace('employment_type غير معتمد', 'Unsupported employment type')
+          .replace(
+            DRIVER_EMPLOYEE_NUMBER_IMPORT_ERROR,
+            'Invalid employee number',
+          )
+  /** The status cell: errors first, then the duplicate notes, then valid. */
+  const rowStatus = (row: DriverImportRow) => {
+    if (row.errors.length)
+      return row.errors.map(formatError).join(lang === 'ar' ? '، ' : ', ')
+    if (row.duplicateEmployeeNumber) return t('driverEmployeeNumberDuplicate')
+    if (row.duplicate) return t('duplicateSuspected')
+    return t('valid')
+  }
   return (
     <Dialog
       open={open}
@@ -180,7 +228,12 @@ export function DriverExcelImport({
                 {t('invalid')}
               </div>
               <div className="card py-3">
-                <b>{rows.filter((r) => r.duplicate).length}</b>
+                <b>
+                  {
+                    rows.filter((r) => r.duplicate || r.duplicateEmployeeNumber)
+                      .length
+                  }
+                </b>
                 <br />
                 {t('duplicateSuspected')}
               </div>
@@ -197,6 +250,9 @@ export function DriverExcelImport({
                     <th className="table-header p-2">{t('driverNameEn')}</th>
                     <th className="table-header p-2">{t('idNumber')}</th>
                     <th className="table-header p-2">{t('mobileNumber')}</th>
+                    <th className="table-header p-2">
+                      {t('driverEmployeeNumber')}
+                    </th>
                     <th className="table-header p-2">{t('status')}</th>
                   </tr>
                 </thead>
@@ -218,15 +274,10 @@ export function DriverExcelImport({
                       <td className="p-2" dir="ltr">
                         {row.mobile_number || '—'}
                       </td>
-                      <td className="p-2">
-                        {row.errors.length
-                          ? row.errors
-                              .map(formatError)
-                              .join(lang === 'ar' ? '، ' : ', ')
-                          : row.duplicate
-                            ? t('duplicateSuspected')
-                            : t('valid')}
+                      <td className="p-2" dir="ltr">
+                        {row.employee_number || '—'}
                       </td>
+                      <td className="p-2">{rowStatus(row)}</td>
                     </tr>
                   ))}
                 </tbody>

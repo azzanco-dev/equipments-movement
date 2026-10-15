@@ -108,6 +108,14 @@ export function DriversTable({
       cell: (row) => <span dir="ltr">{row.mobile_number ?? '—'}</span>,
     },
     {
+      // EM-237: «الرقم الوظيفي», sorted and searched server-side.
+      key: 'employee_number',
+      header: t('driverEmployeeNumber'),
+      sortable: true,
+      hideBelow: 'sm',
+      cell: (row) => <span dir="ltr">{row.employee_number ?? '—'}</span>,
+    },
+    {
       key: 'nationality',
       header: t('nationality'),
       className: 'text-muted',

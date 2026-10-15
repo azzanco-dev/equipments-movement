@@ -37,6 +37,8 @@ export interface Driver {
   nationality: string | null
   employment_type: string | null
   job_title: string | null
+  /** «الرقم الوظيفي» (EM-237, migration 0131): optional, trimmed, unique. */
+  employee_number: string | null
   created_at: string
   updated_at: string
 }

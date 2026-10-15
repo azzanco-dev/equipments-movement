@@ -288,6 +288,7 @@ const CONCEPTS = {
   idNumber: { ar: 'الهوية', en: 'id' },
   mobile: { ar: 'الجوال', en: 'mobile' },
   contactPerson: { ar: 'جهة الاتصال', en: 'contact person' },
+  employeeNumber: { ar: 'الرقم الوظيفي', en: 'employee number' },
 }
 const COLUMN_CONCEPT = {
   code: 'code',
@@ -315,6 +316,7 @@ const COLUMN_CONCEPT = {
   mobile_number: 'mobile',
   contact_number: 'mobile',
   contact_person_search: 'contactPerson',
+  employee_number: 'employeeNumber',
 }
 
 function mentions(text, concept, lang) {

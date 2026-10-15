@@ -55,6 +55,7 @@ test('fieldErrorsFromZod keeps the first issue per field and {} when valid', () 
     name_en: '',
     id_number: '',
     mobile_number: '',
+    employee_number: '',
   }
   assert.deepEqual(plain(v.fieldErrorsFromZod(schema.safeParse(ok))), {})
   // A blank required name says «مطلوب», never also "too short".
@@ -144,6 +145,7 @@ test('driver form schema: lenient, with the database lengths and formats', () =>
     mobile_number: '',
     nationality: '',
     employment_type: '',
+    employee_number: '',
     job_title: '',
   }
   assert.deepEqual(plain(driver.validateDriverForm(base)), {})

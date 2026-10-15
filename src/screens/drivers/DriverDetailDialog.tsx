@@ -1,5 +1,5 @@
 import { useRouter } from 'next/navigation'
-import { CreditCard, Flag, Phone, Truck, User } from 'lucide-react'
+import { CreditCard, Flag, Hash, Phone, Truck, User } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { buildDriverMovementsHref } from '@/lib/driverEquipment'
 import type { DriverEquipmentItem } from '@/lib/driverEquipment'
@@ -156,6 +156,14 @@ export function DriverDetailDialog({
           label: t('nationality'),
           value: driver.nationality,
         },
+        {
+          // EM-237: «الرقم الوظيفي» (migration 0131).
+          key: 'employeeNumber',
+          icon: <Hash size={16} />,
+          label: t('driverEmployeeNumber'),
+          value: driver.employee_number,
+          dir: 'ltr',
+        },
       ]
     : []
 
@@ -170,8 +178,8 @@ export function DriverDetailDialog({
       size="lg"
     >
       {bodyPending ? (
-        // Mirrors the body below: header, the 2x2 info grid, the section
-        // heading and the table block.
+        // Mirrors the body below: header, the two-column info grid (five
+        // items), the section heading and the table block.
         <div className="space-y-5" aria-busy="true">
           <span className="sr-only" role="status">
             {t('loading')}
@@ -185,7 +193,7 @@ export function DriverDetailDialog({
               <Skeleton variant="text" className="w-28" />
             </div>
           </div>
-          <InfoGridSkeleton count={4} columns={2} withIcon />
+          <InfoGridSkeleton count={5} columns={2} withIcon />
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">

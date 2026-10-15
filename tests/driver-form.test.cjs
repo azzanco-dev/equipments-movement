@@ -141,6 +141,7 @@ test('the payload trims text and turns empty optional fields into null', () => {
       mobile_number: '',
       nationality: '',
       employment_type: '',
+      employee_number: '  E-1001  ',
       job_title: '  سائق  ',
     }),
   )
@@ -151,8 +152,18 @@ test('the payload trims text and turns empty optional fields into null', () => {
     mobile_number: null,
     nationality: null,
     employment_type: null,
+    employee_number: 'E-1001',
     job_title: 'سائق',
   })
+  // EM-237: a blank employee number is sent as null.
+  assert.equal(
+    driverForm.buildDriverPayload({
+      ...driverForm.EMPTY_DRIVER_FORM,
+      full_name: 'احمد',
+      employee_number: '   ',
+    }).employee_number,
+    null,
+  )
 })
 
 test('a record maps onto the form with nulls turned into empty strings', () => {
@@ -166,6 +177,7 @@ test('a record maps onto the form with nulls turned into empty strings', () => {
       nationality: null,
       employment_type: null,
       job_title: null,
+      employee_number: null,
       created_at: '2026-01-01',
       updated_at: '2026-01-02',
     }),
@@ -177,6 +189,7 @@ test('a record maps onto the form with nulls turned into empty strings', () => {
     mobile_number: '0500000000',
     nationality: '',
     employment_type: '',
+    employee_number: '',
     job_title: '',
   })
 })

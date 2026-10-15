@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { TranslationKey } from '@/i18n/translations'
 import { isValidUserMobile, normalizeUserMobileInput } from '@/lib/userMobile'
+import { DRIVER_EMPLOYEE_NUMBER_MAX } from '@/lib/driverEmployeeNumber'
 
 /**
  * Per-field validation messages for one form: the field name maps to the
@@ -272,6 +273,12 @@ export const driverFormSchema = z.object({
   }),
   id_number: idNumber(),
   mobile_number: mobileNumber(),
+  // EM-237: optional «الرقم الوظيفي»; the database trims it and keeps the
+  // uniqueness, which the form maps back to this field on 23505.
+  employee_number: optionalText({
+    max: DRIVER_EMPLOYEE_NUMBER_MAX,
+    lengthKey: 'driverEmployeeNumberTooLong',
+  }),
 })
 
 /** Quick Create driver: the name and a valid mobile are both required. */

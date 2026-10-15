@@ -24,7 +24,7 @@ import { DriverFormDialog } from './DriverFormDialog'
 import { DriversTable } from './DriversTable'
 
 const LIST_SELECT =
-  'id,full_name,name_en,id_number,mobile_number,nationality,employment_type,job_title,created_at,updated_at'
+  'id,full_name,name_en,id_number,mobile_number,nationality,employment_type,job_title,employee_number,created_at,updated_at'
 
 // wave-13-drivers: "all except the external supplier" (the list's default
 // filter) must keep the drivers whose employment type is still empty.

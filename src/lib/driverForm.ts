@@ -20,6 +20,8 @@ export interface DriverFormValues {
   mobile_number: string
   nationality: string
   employment_type: string
+  /** «الرقم الوظيفي» (EM-237): optional, trimmed, unique in the database. */
+  employee_number: string
   job_title: string
 }
 
@@ -30,6 +32,7 @@ export const EMPTY_DRIVER_FORM: DriverFormValues = {
   mobile_number: '',
   nationality: '',
   employment_type: '',
+  employee_number: '',
   job_title: '',
 }
 
@@ -42,6 +45,7 @@ export function driverFormValues(driver: Driver): DriverFormValues {
     mobile_number: driver.mobile_number ?? '',
     nationality: driver.nationality ?? '',
     employment_type: driver.employment_type ?? '',
+    employee_number: driver.employee_number ?? '',
     job_title: driver.job_title ?? '',
   }
 }
@@ -72,15 +76,17 @@ export const DRIVER_FIELD_ORDER = [
   'mobile_number',
   'nationality',
   'employment_type',
+  'employee_number',
   'job_title',
 ] as const
 
 /**
  * Only `full_name` is mandatory for a complete driver record (AGENTS.md);
- * the English name and the id and mobile numbers are validated only when they
- * are filled in. Every rule mirrors a database check: the name lengths
- * (`drivers_full_name_check`, `drivers_name_en_check`) and
- * `drivers_id_number_check` / `drivers_mobile_number_check`.
+ * the English name, the id and mobile numbers and the employee number are
+ * validated only when they are filled in. Every rule mirrors a database
+ * check: the name lengths (`drivers_full_name_check`, `drivers_name_en_check`),
+ * `drivers_id_number_check` / `drivers_mobile_number_check` and the length of
+ * `drivers_employee_number_check` (EM-237, migration 0131).
  */
 export function validateDriverForm(
   form: DriverFormValues,
@@ -147,8 +153,10 @@ export function quickDriverSaveFieldErrors(
 
 /**
  * Database rejections of a driver save, by field: `drivers` is unique on the
- * mobile and the id number, and its checks cover the name lengths, both number
- * formats, and the controlled nationality and employment-type lists.
+ * mobile, the id number and the employee number (`drivers_employee_number_unique`,
+ * migration 0131), and its checks cover the name lengths, both number
+ * formats, the employee number length and the controlled nationality and
+ * employment-type lists.
  */
 export const DRIVER_DATABASE_RULES: readonly DatabaseFieldRule<DriverFormValues>[] =
   [
@@ -163,6 +171,12 @@ export const DRIVER_DATABASE_RULES: readonly DatabaseFieldRule<DriverFormValues>
       match: 'id_number',
       field: 'id_number',
       key: 'driverIdExists',
+    },
+    {
+      on: 'unique',
+      match: 'employee_number',
+      field: 'employee_number',
+      key: 'driverEmployeeNumberExists',
     },
     {
       on: 'check',
@@ -187,6 +201,12 @@ export const DRIVER_DATABASE_RULES: readonly DatabaseFieldRule<DriverFormValues>
       match: 'drivers_mobile_number',
       field: 'mobile_number',
       key: 'mobileNumberFormatInvalid',
+    },
+    {
+      on: 'check',
+      match: 'drivers_employee_number',
+      field: 'employee_number',
+      key: 'driverEmployeeNumberTooLong',
     },
     {
       on: 'check',
@@ -223,6 +243,7 @@ export function buildDriverPayload(form: DriverFormValues) {
     mobile_number: form.mobile_number.trim() || null,
     nationality: form.nationality || null,
     employment_type: form.employment_type || null,
+    employee_number: form.employee_number.trim() || null,
     job_title: form.job_title.trim() || null,
   }
 }

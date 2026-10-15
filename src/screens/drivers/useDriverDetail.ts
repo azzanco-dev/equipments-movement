@@ -48,7 +48,7 @@ export function useDriverDetail(driverId: string | null) {
     const { data, error: fetchError } = await supabase
       .from('drivers')
       .select(
-        'id,full_name,name_en,id_number,mobile_number,nationality,employment_type,job_title,created_at,updated_at',
+        'id,full_name,name_en,id_number,mobile_number,nationality,employment_type,job_title,employee_number,created_at,updated_at',
       )
       .eq('id', driverId)
       .abortSignal(signal)

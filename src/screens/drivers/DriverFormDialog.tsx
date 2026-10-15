@@ -25,6 +25,7 @@ import {
   validateDriverForm,
   type DriverFormValues,
 } from '@/lib/driverForm'
+import { DRIVER_EMPLOYEE_NUMBER_MAX } from '@/lib/driverEmployeeNumber'
 import {
   clearFieldErrors,
   focusFirstError,
@@ -241,16 +242,38 @@ export function DriverFormDialog({
             )}
           </Field>
         </div>
-        <Field label={t('jobTitle')} name="job_title">
-          {(control) => (
-            <Input
-              {...control}
-              placeholder={t('jobTitlePlaceholder')}
-              value={form.job_title}
-              onChange={(event) => update({ job_title: event.target.value })}
-            />
-          )}
-        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          {/* EM-237: optional «الرقم الوظيفي»; trimmed and unique in the
+              database (migration 0131), the violation lands on this field. */}
+          <Field
+            label={t('driverEmployeeNumber')}
+            name="employee_number"
+            error={errors.employee_number && t(errors.employee_number)}
+          >
+            {(control) => (
+              <Input
+                {...control}
+                dir="ltr"
+                maxLength={DRIVER_EMPLOYEE_NUMBER_MAX}
+                placeholder={t('driverEmployeeNumberPlaceholder')}
+                value={form.employee_number}
+                onChange={(event) =>
+                  update({ employee_number: event.target.value })
+                }
+              />
+            )}
+          </Field>
+          <Field label={t('jobTitle')} name="job_title">
+            {(control) => (
+              <Input
+                {...control}
+                placeholder={t('jobTitlePlaceholder')}
+                value={form.job_title}
+                onChange={(event) => update({ job_title: event.target.value })}
+              />
+            )}
+          </Field>
+        </div>
       </div>
     </Dialog>
   )

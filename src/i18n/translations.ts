@@ -1106,6 +1106,14 @@ export const translations = {
     userOpenPage: 'فتح صفحة المستخدم',
     userRoleAssignFailed: 'تم حفظ البيانات لكن تعذر تعيين الدور',
     // wave-23-users — end
+    // wave-24-driver-employee-number — start
+    driverEmployeeNumber: 'الرقم الوظيفي',
+    driverEmployeeNumberPlaceholder: 'مثال: E-1001',
+    driverEmployeeNumberTooLong: 'الرقم الوظيفي يجب الا يزيد عن 30 حرفا',
+    driverEmployeeNumberExists: 'الرقم الوظيفي مستخدم لسائق اخر',
+    driverEmployeeNumberDuplicate:
+      'الرقم الوظيفي مكرر في الملف او مسجل لسائق اخر',
+    // wave-24-driver-employee-number — end
     // wave-24-roles-page — start
     rolesPageSystemSettings: 'اعدادات النظام',
     rolesPageSystemSettingsDesc:
@@ -2944,6 +2952,16 @@ export const translations = {
     userRoleAssignFailed:
       'The record was saved but the role could not be assigned',
     // wave-23-users — end
+    // wave-24-driver-employee-number — start
+    driverEmployeeNumber: 'Employee number',
+    driverEmployeeNumberPlaceholder: 'e.g. E-1001',
+    driverEmployeeNumberTooLong:
+      'The employee number must not exceed 30 characters',
+    driverEmployeeNumberExists:
+      'This employee number is already used by another driver',
+    driverEmployeeNumberDuplicate:
+      'The employee number is repeated in the file or already used by another driver',
+    // wave-24-driver-employee-number — end
     // wave-24-roles-page — start
     rolesPageSystemSettings: 'System settings',
     rolesPageSystemSettingsDesc:
