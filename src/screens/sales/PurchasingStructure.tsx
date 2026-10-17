@@ -17,23 +17,25 @@ import {
 import {
   DECISIONS,
   ENTITIES,
-  GATE_FLOW,
   LIFECYCLE,
   OPEN_QUESTIONS,
   PERMISSIONS,
+  PHASES,
   RELATIONS,
   SAMPLE_PO,
+  WORKFLOW,
   type Entity,
   type EntityField,
   type EntityKind,
   type PermissionRow,
+  type Phase,
   type Relation,
   type SampleLine,
 } from './purchasingModel'
 
 // REVIEW PAGE of the purchasing module structure («PO الموردين») on /sales.
 // Like /ui-kit it is open in development and admin-only in production. It
-// renders the proposed entities, their relations and the PO lifecycle from
+// renders the proposed phases, entities, relations and the PO lifecycle from
 // purchasingModel.ts; nothing here reads or writes the database.
 const OPEN_WITHOUT_SESSION = process.env.NODE_ENV !== 'production'
 
@@ -56,14 +58,23 @@ export function PurchasingStructure() {
 }
 
 const SECTIONS = [
+  { id: 'phases', title: 'المراحل' },
   { id: 'diagram', title: 'مخطط العلاقات' },
   { id: 'entities', title: 'الجداول والحقول' },
   { id: 'lifecycle', title: 'دورة حياة الـ PO' },
-  { id: 'flow', title: 'من البوابة الى الـ PO' },
+  { id: 'flow', title: 'دورة العمل في المرحلة 1' },
   { id: 'permissions', title: 'الصلاحيات والادوار' },
   { id: 'sample', title: 'نموذج PO' },
   { id: 'decisions', title: 'القرارات والاسئلة' },
 ]
+
+function PhaseBadge({ phase }: { phase: Phase }) {
+  return (
+    <Badge tone={phase === 1 ? 'info' : 'neutral'} size="sm">
+      المرحلة {phase}
+    </Badge>
+  )
+}
 
 function PurchasingStructureContent() {
   return (
@@ -71,7 +82,7 @@ function PurchasingStructureContent() {
       <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 sm:px-6">
         <PageHeader
           title="هيكلة المشتريات"
-          description="نموذج للمراجعة: كيانات «PO الموردين» وعلاقاتها ودورة حياتها كما اتفقنا حتى 17 اكتوبر 2026. كل ما هنا بيانات تجريبية ولا شيء يُحفظ."
+          description="نموذج للمراجعة: «PO الموردين» على اربع مراحل، بكياناته وعلاقاته ودورة حياته كما اتفقنا حتى 17 اكتوبر 2026. كل ما هنا بيانات تجريبية ولا شيء يُحفظ."
           actions={<Badge tone="neutral">قيد المراجعة</Badge>}
         />
 
@@ -90,11 +101,63 @@ function PurchasingStructureContent() {
           </ol>
         </nav>
 
+        <section id="phases" className="scroll-mt-16 space-y-3">
+          <SectionHeader
+            as="h2"
+            title="المراحل"
+            description="كل مرحلة تُسلم وتُجرب وحدها. المرحلة 1 تكفي لاصدار POs رسمية مرقمة ومعتمدة؛ تحميلها وارسالها في المرحلة 3."
+          />
+          <ol className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {PHASES.map((phase) => (
+              <li key={phase.phase}>
+                <Card
+                  className={cn(
+                    'h-full space-y-3',
+                    phase.phase === 1 && 'border-info',
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      aria-hidden="true"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-contrast"
+                    >
+                      {phase.phase}
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold">{phase.title}</h3>
+                      <p className="text-xs text-muted">{phase.summary}</p>
+                    </div>
+                  </div>
+                  <ul className="list-disc space-y-1 ps-5 text-sm">
+                    {phase.includes.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                  <dl className="space-y-1 border-t pt-2 text-xs">
+                    <div>
+                      <dt className="inline text-muted">الجداول: </dt>
+                      <dd className="inline">
+                        <bdi dir="ltr" className="font-mono">
+                          {phase.tables}
+                        </bdi>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="inline text-muted">الحالات: </dt>
+                      <dd className="inline">{phase.statuses}</dd>
+                    </div>
+                  </dl>
+                </Card>
+              </li>
+            ))}
+          </ol>
+        </section>
+
         <section id="diagram" className="scroll-mt-16 space-y-3">
           <SectionHeader
             as="h2"
             title="مخطط العلاقات"
-            description="الصف العلوي جداول موجودة اليوم، والصف الاوسط والسفلي جداول جديدة. الخط بين صندوقين يعني ان الثاني يشير الى الاول."
+            description="الصف العلوي جداول موجودة اليوم، والصفان الاوسط والسفلي جداول جديدة مع رقم مرحلتها. الخط بين صندوقين يعني ان الثاني يشير الى الاول."
           />
           <Card padded={false} className="overflow-x-auto p-3 sm:p-4">
             <RelationDiagram />
@@ -127,11 +190,11 @@ function PurchasingStructureContent() {
           <SectionHeader
             as="h2"
             title="دورة حياة الـ PO"
-            description="الحالة تتحرك عبر دوال القاعدة فقط، وكل حركة تُسجل في سجل الاحداث."
+            description="الحالة تتحرك عبر دوال القاعدة فقط، وكل حركة تُسجل في سجل الاحداث. المرحلة 1 اربع حالات؛ «ملغي» في المرحلة 2 و«مرسل» في المرحلة 3."
           />
           <Card className="space-y-4">
             <ol className="flex flex-wrap items-center gap-2">
-              {LIFECYCLE.filter((step) => step.key !== 'cancelled').map(
+              {LIFECYCLE.filter((step) => step.phase === 1).map(
                 (step, index, all) => (
                   <Fragment key={step.key}>
                     <li>
@@ -146,7 +209,8 @@ function PurchasingStructureContent() {
                 ),
               )}
               <li className="ms-2 text-xs text-muted">
-                + <Badge tone="danger">ملغي</Badge> قبل الارسال فقط
+                لاحقا: <Badge tone="danger">ملغي</Badge> (م2)،{' '}
+                <Badge tone="info">مرسل</Badge> (م3)
               </li>
             </ol>
             <div className="overflow-x-auto">
@@ -154,6 +218,9 @@ function PurchasingStructureContent() {
                 <thead>
                   <tr className="border-b text-start text-xs text-muted">
                     <th className="py-2 pe-3 text-start font-medium">الحالة</th>
+                    <th className="py-2 pe-3 text-start font-medium">
+                      المرحلة
+                    </th>
                     <th className="py-2 pe-3 text-start font-medium">
                       من يحركها
                     </th>
@@ -167,6 +234,9 @@ function PurchasingStructureContent() {
                         <Badge tone={step.tone} size="sm">
                           {step.label}
                         </Badge>
+                      </td>
+                      <td className="py-2 pe-3 align-top text-muted">
+                        {step.phase}
                       </td>
                       <td className="py-2 pe-3 align-top text-muted">
                         {step.who}
@@ -183,11 +253,11 @@ function PurchasingStructureContent() {
         <section id="flow" className="scroll-mt-16 space-y-3">
           <SectionHeader
             as="h2"
-            title="من البوابة الى الـ PO"
-            description="لا يتغير شيء في تسجيل الحركات نفسه. المشتريات تعمل على ما تنتجه البوابة."
+            title="دورة العمل في المرحلة 1"
+            description="انشاء يدوي بالكامل من قسم المشتريات. البوابة لا تنشئ شيئا، وطريقة اضافة الـ POs تُناقش بعد اكتمال المرحلة."
           />
           <ol className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {GATE_FLOW.map((step, index) => (
+            {WORKFLOW.map((step, index) => (
               <li key={step.title}>
                 <Card className="h-full space-y-2">
                   <div className="flex items-center gap-2">
@@ -227,7 +297,7 @@ function PurchasingStructureContent() {
           <SectionHeader
             as="h2"
             title="نموذج PO كما سيظهر"
-            description="مثال معتمد لمورد خارجي: ثلاث معدات لنفس العميل والمشروع، احدها انتهى يدويا. شكل المستند المرسل مؤجل بقرارك."
+            description="مثال معتمد لمورد خارجي: ثلاث معدات لنفس العميل والمشروع، احداها انتهت يدويا. الاسعار غير شاملة الضريبة. شكل المستند المرسل يُحدد في المرحلة 3."
           />
           <SamplePoCard />
         </section>
@@ -236,7 +306,7 @@ function PurchasingStructureContent() {
           <SectionHeader
             as="h2"
             title="القرارات المعتمدة والاسئلة المفتوحة"
-            description="القرارات من نقاش 15 و17 اكتوبر 2026. الاسئلة تحتاج جوابك قبل كتابة الترحيل."
+            description="القرارات من نقاش 15 و17 اكتوبر 2026. الاسئلة تحتاج جوابك قبل كتابة ترحيل المرحلة 1."
           />
           <div className="grid gap-4 lg:grid-cols-2">
             <Card className="space-y-2">
@@ -300,7 +370,7 @@ const BOXES: DiagramBox[] = [
     label: 'المورد',
     sub: 'lessors · يُوسّع',
     kind: 'extended',
-    x: 820,
+    x: 800,
     y: 20,
     w: 160,
     h: 50,
@@ -310,7 +380,7 @@ const BOXES: DiagramBox[] = [
     label: 'العميل',
     sub: 'companies',
     kind: 'existing',
-    x: 620,
+    x: 580,
     y: 20,
     w: 160,
     h: 50,
@@ -320,7 +390,7 @@ const BOXES: DiagramBox[] = [
     label: 'المشروع',
     sub: 'projects',
     kind: 'existing',
-    x: 420,
+    x: 360,
     y: 20,
     w: 160,
     h: 50,
@@ -330,17 +400,7 @@ const BOXES: DiagramBox[] = [
     label: 'المعدة',
     sub: 'equipment',
     kind: 'existing',
-    x: 220,
-    y: 20,
-    w: 160,
-    h: 50,
-  },
-  {
-    id: 'entry',
-    label: 'حركة الدخول',
-    sub: 'entry_exit_logs',
-    kind: 'existing',
-    x: 20,
+    x: 140,
     y: 20,
     w: 160,
     h: 50,
@@ -348,7 +408,7 @@ const BOXES: DiagramBox[] = [
   {
     id: 'po',
     label: 'PO المورد',
-    sub: 'supplier_pos',
+    sub: 'supplier_pos · م1',
     kind: 'new',
     x: 600,
     y: 180,
@@ -356,9 +416,9 @@ const BOXES: DiagramBox[] = [
     h: 70,
   },
   {
-    id: 'line',
-    label: 'بند PO (معدة)',
-    sub: 'supplier_po_lines',
+    id: 'po-equipment',
+    label: 'معدات الـ PO',
+    sub: 'supplier_po_equipment · م1',
     kind: 'new',
     x: 180,
     y: 180,
@@ -368,45 +428,44 @@ const BOXES: DiagramBox[] = [
   {
     id: 'events',
     label: 'سجل الاحداث',
-    sub: 'supplier_po_events',
+    sub: 'supplier_po_events · م1',
     kind: 'new',
     x: 800,
     y: 330,
-    w: 160,
+    w: 170,
     h: 60,
   },
   {
     id: 'amend',
     label: 'تعديل معتمد',
-    sub: 'supplier_po_amendments',
+    sub: 'supplier_po_amendments · م2',
     kind: 'new',
-    x: 620,
+    x: 600,
     y: 330,
-    w: 160,
+    w: 180,
     h: 60,
   },
   {
     id: 'sends',
     label: 'الارسال',
-    sub: 'supplier_po_sends',
+    sub: 'supplier_po_sends · م3',
     kind: 'new',
-    x: 440,
+    x: 410,
     y: 330,
-    w: 160,
+    w: 170,
     h: 60,
   },
 ]
 
 const LINKS: DiagramLink[] = [
-  { from: [900, 70], to: [800, 180], label: 'مورد واحد' },
-  { from: [700, 70], to: [740, 180], label: 'عميل واحد' },
-  { from: [500, 70], to: [680, 180], label: 'مشروع واحد' },
-  { from: [300, 70], to: [320, 180], label: 'معدة بعينها' },
-  { from: [100, 70], to: [240, 180], label: 'انشا البند' },
-  { from: [600, 215], to: [460, 215], label: 'PO واحد · عدة بنود' },
-  { from: [700, 250], to: [700, 330] },
-  { from: [820, 250], to: [880, 330] },
-  { from: [640, 250], to: [540, 330] },
+  { from: [880, 70], to: [820, 180], label: 'مورد واحد' },
+  { from: [660, 70], to: [730, 180], label: 'عميل واحد' },
+  { from: [440, 70], to: [650, 180], label: 'مشروع واحد' },
+  { from: [220, 70], to: [300, 180], label: 'معدة بعينها' },
+  { from: [600, 215], to: [460, 215], label: 'PO واحد · عدة معدات' },
+  { from: [690, 250], to: [690, 330] },
+  { from: [830, 250], to: [885, 330] },
+  { from: [630, 250], to: [510, 330] },
 ]
 
 const KIND_STYLE: Record<EntityKind, { fill: string; stroke: string }> = {
@@ -519,7 +578,7 @@ function Legend() {
   const items: { kind: EntityKind; label: string }[] = [
     { kind: 'existing', label: 'جدول موجود، لا يتغير' },
     { kind: 'extended', label: 'جدول موجود، تُضاف له حقول' },
-    { kind: 'new', label: 'جدول جديد' },
+    { kind: 'new', label: 'جدول جديد (م = المرحلة)' },
   ]
   return (
     <ul className="flex flex-wrap gap-4 text-xs text-muted">
@@ -548,6 +607,13 @@ const RELATION_COLUMNS: DataTableColumn<Relation>[] = [
     header: 'العدد',
     cell: (row) => <bdi dir="ltr">{row.cardinality}</bdi>,
     width: '6rem',
+    align: 'center',
+  },
+  {
+    key: 'phase',
+    header: 'المرحلة',
+    cell: (row) => row.phase,
+    width: '5rem',
     align: 'center',
   },
   {
@@ -603,6 +669,7 @@ function EntityCard({ entity }: { entity: Entity }) {
           <Badge tone={badge.tone} size="sm">
             {badge.label}
           </Badge>
+          <PhaseBadge phase={entity.phase} />
           <bdi dir="ltr" className="font-mono text-xs text-muted">
             {entity.table}
           </bdi>
@@ -644,6 +711,13 @@ const PERMISSION_COLUMNS: DataTableColumn<PermissionRow>[] = [
       </span>
     ),
     width: '14rem',
+  },
+  {
+    key: 'phase',
+    header: 'المرحلة',
+    cell: (row) => row.phase,
+    align: 'center',
+    width: '5rem',
   },
   {
     key: 'officer',
@@ -701,7 +775,7 @@ const SAMPLE_LINE_COLUMNS: DataTableColumn<SampleLine>[] = [
   { key: 'unit', header: 'الوحدة', cell: (row) => row.unit },
   {
     key: 'price',
-    header: 'السعر',
+    header: 'السعر (بدون ضريبة)',
     cell: (row) => <bdi dir="ltr">{row.price}</bdi>,
     align: 'end',
   },
@@ -749,8 +823,8 @@ function SamplePoCard() {
         />
       </div>
       <p className={cn('border-t p-3 text-xs text-muted')}>
-        البند الثالث انهاه موظف المشتريات يدويا بعد خروج المعدة؛ البندان الاخران
-        مفتوحان ويستمران على نفس الـ PO.
+        المعدة الثالثة انهاها موظف المشتريات يدويا بعد خروجها من المشروع؛
+        المعدتان الاخريان مفتوحتان وتستمران على نفس الـ PO.
       </p>
     </Card>
   )
