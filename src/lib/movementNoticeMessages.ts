@@ -8,7 +8,19 @@
 //
 // The arrival notice also links to the EXIT form with the unit ready (owner
 // request 2026-10-15). The link is built here from the server-resolved site
-// origin (`appBaseUrl`) and the stored code; no user text ever becomes a link.
+// origin (`appBaseUrl`, APP_BASE_URL only; absent: no link line) and the
+// stored code; no user text ever becomes a link.
+//
+// The equipment code is the one fact a NON-admin can type freely: the workshop
+// quick-create accepts any text as the code (security audit 2026-10-18, lead
+// D-17, fingerprint em:notice-text:equipment-code-from-workshop-quick-create).
+// So in the message BODY the code passes the same kind of allowlist as the
+// sender's name: letters, digits, spaces, `_` and `-` only, at most 30
+// characters (production codes are at most 8 and use `-` alone), `-` when
+// nothing survives. A dot, slash, `@` or `:` can therefore not spell a domain,
+// an address or a path in a text the company number sends, and the cap keeps
+// a free-text code from carrying a message of its own. The LINK keeps the raw
+// code, URL-encoded (`movementExitUrl`), so existing links keep working.
 
 import { movementExitUrl } from '@/lib/movementExitLink'
 
@@ -59,9 +71,23 @@ function firstOf(...values: Array<string | null | undefined>): string {
   return ''
 }
 
+const CODE_MAX_LENGTH = 30
+
+// The code as shown in the message body: the allowlist of the file header.
+// (The link uses the raw code, see `movementExitUrl`.)
+function equipmentCode(facts: MovementNoticeFacts): string {
+  return (
+    clean(facts.equipmentCode)
+      .replace(/[^A-Za-z0-9 _-]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, CODE_MAX_LENGTH) || '-'
+  )
+}
+
 // "CODE (type)", or the code alone when the type is unknown.
 function unit(facts: MovementNoticeFacts): string {
-  const code = clean(facts.equipmentCode) || '-'
+  const code = equipmentCode(facts)
   const type = clean(facts.equipmentType)
   return type ? `${code} (${type})` : code
 }

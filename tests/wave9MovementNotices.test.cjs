@@ -1111,11 +1111,22 @@ test('the workshop-arrival route authenticates, sends no recipient and hides raw
   assert.equal((route.match(/error\.message/g) ?? []).length, 1)
   assert.match(route, /noticeRequestErrorCode\(error\.message\)/)
   assert.ok(!/console\.error\([^)]*\berror\b[^')]*\)/.test(route))
-  // The only extra fact is the site origin, resolved on the server (owner
-  // request 2026-10-15: the notice links to the EXIT form).
+  // The only extra fact is the site origin, resolved on the server from
+  // APP_BASE_URL alone (owner request 2026-10-15: the notice links to the
+  // EXIT form; audit lead D-16: never from the request, whose origin is the
+  // caller's Host header). Unconfigured: one warning without secrets, and the
+  // notice still goes out, without its link.
+  assert.match(route, /const appBaseUrl = resolveAppBaseUrl\(\)/)
+  assert.ok(!/resolveAppBaseUrl\([^)]/.test(route), 'no argument to resolve')
+  const routeCode = route.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
+  assert.ok(!/request\.url|request\.headers|nextUrl|\bhost\b/i.test(routeCode))
   assert.match(
     route,
-    /deliverMovementNotice\(supabase, row, \{\s+appBaseUrl: resolveAppBaseUrl\(request\.url\),\s+\}\)/,
+    /if \(!appBaseUrl\) \{\s+console\.warn\(\s*'APP_BASE_URL not configured; notice sent without link',?\s*\)\s+\}/,
+  )
+  assert.match(
+    route,
+    /deliverMovementNotice\(supabase, row, \{\s+appBaseUrl,\s+\}\)/,
   )
   assert.match(
     route,
@@ -1316,21 +1327,24 @@ test('the wa.me fallback carries exactly the sent text, link included', async ()
   assert.ok(!decodeURIComponent(plainDelivery.fallbackUrl).includes('🔗'))
 })
 
-test('the site origin is APP_BASE_URL when it is a plain https origin, else the request origin', () => {
+test('the site origin is APP_BASE_URL alone: the request origin is never used (D-16)', () => {
   const { resolveAppBaseUrl, configuredAppBaseUrl } = createLoader({
     URL,
     process: { env: {} },
   })('server/appBaseUrl')
-  const REQUEST = 'https://app.example.com/api/notifications/workshop-arrival'
-  assert.equal(resolveAppBaseUrl(REQUEST), 'https://app.example.com')
-  assert.equal(resolveAppBaseUrl(REQUEST, undefined), 'https://app.example.com')
+  // Unconfigured: null, whatever the request looked like. The function takes
+  // no request at all, so a forged Host header has nothing to influence.
+  assert.equal(resolveAppBaseUrl.length, 0)
+  assert.equal(resolveAppBaseUrl(), null)
+  assert.equal(resolveAppBaseUrl(undefined), null)
+  assert.equal(resolveAppBaseUrl(null), null)
   for (const configured of [
     'https://custom.example.com',
     'https://custom.example.com/',
     '  https://custom.example.com  ',
   ]) {
     assert.equal(
-      resolveAppBaseUrl(REQUEST, configured),
+      resolveAppBaseUrl(configured),
       'https://custom.example.com',
       configured,
     )
@@ -1345,33 +1359,141 @@ test('the site origin is APP_BASE_URL when it is a plain https origin, else the 
     'https://custom.example.com#x',
     'https://user:pw@custom.example.com',
     'javascript:alert(1)',
+    // A request URL handed over by mistake is not an origin: no link.
+    'https://app.example.com/api/notifications/workshop-arrival',
   ]) {
     assert.equal(configuredAppBaseUrl(configured), null, configured)
-    assert.equal(
-      resolveAppBaseUrl(REQUEST, configured),
-      'https://app.example.com',
-      configured,
-    )
+    assert.equal(resolveAppBaseUrl(configured), null, configured)
   }
-  // Development: the local origin is passed through (the message builder
-  // allows http on localhost only).
+  // Development: a configured local http origin is allowed (the message
+  // builder allows http on localhost only).
   assert.equal(
-    resolveAppBaseUrl('http://localhost:3000/api/notifications/x'),
+    resolveAppBaseUrl('http://localhost:3000'),
     'http://localhost:3000',
   )
-  assert.equal(resolveAppBaseUrl('not a url'), null)
+  assert.equal(
+    resolveAppBaseUrl('http://127.0.0.1:3000/'),
+    'http://127.0.0.1:3000',
+  )
+  assert.equal(resolveAppBaseUrl('http://localhost:3000/app'), null)
+  assert.equal(resolveAppBaseUrl('http://localhost.example.com'), null)
 
   // The default reads the server variable.
   const fromEnv = createLoader({
     URL,
     process: { env: { APP_BASE_URL: 'https://env.example.com' } },
   })('server/appBaseUrl')
-  assert.equal(fromEnv.resolveAppBaseUrl(REQUEST), 'https://env.example.com')
+  assert.equal(fromEnv.resolveAppBaseUrl(), 'https://env.example.com')
 
   const source = read('src', 'lib', 'server', 'appBaseUrl.ts')
   assert.match(source, /process\.env\.APP_BASE_URL/)
   assert.ok(!/process\.env\.NEXT_PUBLIC_/.test(source))
   assert.ok(!/console\./.test(source))
+  assert.ok(
+    !/\brequest\b|\bheaders\b|\bhost\b/i.test(
+      source.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, ''),
+    ),
+  )
+  // .env.example says the variable is required for the link.
+  const example = read('.env.example')
+  assert.match(example, /APP_BASE_URL=https:\/\/your-domain\.example/)
+  assert.match(example, /REQUIRED for\s*(#\s*)?the exit link/)
+  assert.ok(!/Defaults to the origin of the request/.test(example))
+})
+
+test('a notice links only when a base is configured, and the rest of the text is unchanged', () => {
+  const { movementNoticeMessage } = createLoader({ URL })(
+    'movementNoticeMessages',
+  )
+  const facts = { ...LINK_FACTS, equipmentCode: 'A055' }
+  const without = movementNoticeMessage('workshop_arrival', {
+    ...facts,
+    appBaseUrl: null,
+  })
+  assert.ok(!without.includes('🔗'))
+  assert.ok(!/https?:/.test(without))
+  assert.ok(!without.includes('اضغط الرابط'))
+  assert.equal(without.split('\n\n').length, 3)
+  const withBase = movementNoticeMessage('workshop_arrival', {
+    ...facts,
+    appBaseUrl: 'https://portal.example',
+  })
+  const linkLines = withBase.split('\n').filter((l) => l.startsWith('🔗 '))
+  assert.deepEqual(linkLines, [
+    '🔗 https://portal.example/movements/new?type=exit&equipment=A055',
+  ])
+  // Everything but the three link-related lines is the same text.
+  const linked = withBase
+    .split('\n')
+    .filter(
+      (l) =>
+        !l.startsWith('🔗 ') &&
+        l !== '👇 اضغط الرابط لتسجيل خروج المعدة' &&
+        l !== 'Tap the link to record its exit',
+    )
+    .join('\n')
+  assert.equal(linked, without)
+})
+
+// --- The equipment code in the message body (audit lead D-17) --------------
+
+test('the message body shows a free-text code through the allowlist, the link keeps the raw code', () => {
+  const { movementNoticeMessage } = createLoader({ URL })(
+    'movementNoticeMessages',
+  )
+  const code = 'PAY.EXAMPLE/X 0550000000'
+  const message = movementNoticeMessage('workshop_arrival', {
+    ...LINK_FACTS,
+    equipmentCode: code,
+    appBaseUrl: 'https://portal.example',
+  })
+  const lines = message.split('\n')
+  assert.equal(lines[0], '🚜 PAYEXAMPLEX 0550000000 (Excavator)')
+  assert.ok(!/[./]/.test(lines[0]))
+  // The raw code reaches the link parameter only, URL-encoded.
+  const link = lines.find((l) => l.startsWith('🔗 '))
+  assert.ok(link)
+  assert.equal(
+    new URL(link.slice('🔗 '.length)).searchParams.get('equipment'),
+    code,
+  )
+  // The raw text appears in the link line alone (a dot is unreserved in a
+  // URL, so the encoded parameter still shows it).
+  assert.ok(!/PAY\.EXAMPLE/.test(lines.filter((l) => l !== link).join('\n')))
+  // The same code, without a base: no dot, slash, `@` or `:` outside the
+  // fixed sentences.
+  const plain = movementNoticeMessage('workshop_arrival', {
+    ...LINK_FACTS,
+    equipmentCode: code,
+  })
+  const variable = plain
+    .split('\n')
+    .filter((l) => !/^(🔧|Arrived)/.test(l))
+    .join('\n')
+  assert.ok(!/[./@:]/.test(variable), variable)
+
+  const codeOf = (equipmentCode) =>
+    movementNoticeMessage('site_exit', { equipmentCode }).split('\n')[0]
+  // Dots, slashes, `@`, `:` and anything outside the allowlist drop out;
+  // whitespace collapses; the length is capped at 30; nothing left is `-`.
+  assert.equal(codeOf('A-055'), '🚜 A-055')
+  assert.equal(codeOf('TK_104'), '🚜 TK_104')
+  assert.equal(codeOf('user@evil.example:443/x'), '🚜 userevilexample443x')
+  assert.equal(codeOf('  A \t\n 055  '), '🚜 A 055')
+  assert.equal(codeOf('معدة-5'), '🚜 -5')
+  assert.equal(codeOf('🔗 https://x.y/z'), '🚜 httpsxyz')
+  assert.equal(codeOf('1'.repeat(80)), `🚜 ${'1'.repeat(30)}`)
+  assert.equal(codeOf('...///'), '🚜 -')
+  assert.equal(codeOf('   '), '🚜 -')
+  assert.equal(codeOf(null), '🚜 -')
+  assert.equal(codeOf(undefined), '🚜 -')
+  // The file documents the reason with the audit fingerprint.
+  const source = read('src', 'lib', 'movementNoticeMessages.ts')
+  assert.match(
+    source,
+    /em:notice-text:equipment-code-from-workshop-quick-create/,
+  )
+  assert.match(source, /\[\^A-Za-z0-9 _-\]/)
 })
 
 test('the linked EXIT selects only one exact current-code match', () => {
