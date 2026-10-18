@@ -88,9 +88,15 @@ export async function POST(request: Request) {
     }
 
     // The message links to the EXIT form with the unit ready (owner request
-    // 2026-10-15), on this site's origin or the server's APP_BASE_URL.
+    // 2026-10-15) on the server's APP_BASE_URL only, never on the request's
+    // origin (audit lead D-16: that origin is the caller's Host header).
+    // Unconfigured: the notice goes out without its link line.
+    const appBaseUrl = resolveAppBaseUrl()
+    if (!appBaseUrl) {
+      console.warn('APP_BASE_URL not configured; notice sent without link')
+    }
     const delivery = await deliverMovementNotice(supabase, row, {
-      appBaseUrl: resolveAppBaseUrl(request.url),
+      appBaseUrl,
     })
     return NextResponse.json(delivery, { status: 200 })
   } catch {

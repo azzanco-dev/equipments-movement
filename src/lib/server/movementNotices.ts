@@ -109,7 +109,8 @@ export async function deliverMovementNotice(
   supabase: SupabaseClient,
   row: MovementNoticeRow,
   options: {
-    /** The site origin the arrival notice links to (`resolveAppBaseUrl`). */
+    /** The site origin the arrival notice links to (`resolveAppBaseUrl`:
+     *  APP_BASE_URL only). Absent or `null`: the notice has no link line. */
     appBaseUrl?: string | null
   } = {},
 ): Promise<MovementNoticeDelivery> {
