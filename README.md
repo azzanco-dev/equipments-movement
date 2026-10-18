@@ -22,3 +22,20 @@ the signed-in user's bearer token and therefore still enforces Supabase RLS.
 
 The catch-all App Router page keeps deep links usable while remaining feature
 modules can move to dedicated server/client route boundaries incrementally.
+
+## Edge Functions
+
+`supabase/functions` holds the functions that need the service role, which the
+Next server never has. Each one identifies the caller with the anon-key client
+plus the caller's `Authorization` header and decides by `has_permission()`
+evaluated as the caller; the service role is used only for the privileged
+reads and writes afterwards.
+
+- `create-user`, `manage-user`: user accounts (`users.manage`).
+- `storage-cleanup`: the orphan cleanup of the `log-photos` bucket
+  (`movements.photos.delete_any`), driven from Settings › «تنظيف ملفات الصور».
+  Body `{ dry_run: boolean, older_than_hours?: number }` (default 2, minimum 1);
+  a dry run only counts, a real run removes the unreferenced objects older than
+  that and the expired `pending_movement_photo_batches` rows.
+
+Deploy one with `npx supabase functions deploy <name>` from the project folder.

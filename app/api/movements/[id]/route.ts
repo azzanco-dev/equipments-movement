@@ -1,44 +1,22 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import {
   movementAdminErrorCode,
   movementAdminErrorStatus,
 } from '@/lib/movementErrors'
+import { requirePermission } from '@/lib/server/adminRequest'
 
 export const runtime = 'nodejs'
 
-function client(token: string) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !key) throw new Error('Missing Supabase environment variables')
-  return createClient(url, key, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-}
-
 type RouteContext = { params: Promise<{ id: string }> }
 
-/**
- * Resolves the bearer token and the caller's role. The database functions all
- * re-check the role and fail closed, so this is only a cheap early 403 that
- * also keeps a non-admin from probing whether a movement exists.
- */
-async function authenticateAdmin(request: Request) {
-  const header = request.headers.get('authorization')
-  if (!header?.startsWith('Bearer ')) return { status: 401 as const }
-  const token = header.slice(7)
-  const supabase = client(token)
-  const { data, error } = await supabase.auth.getUser(token)
-  if (error || !data.user) return { status: 401 as const }
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', data.user.id)
-    .maybeSingle()
-  if (profile?.role !== 'admin') return { status: 403 as const }
-  return { status: 200 as const, supabase }
-}
+// Audit run-1 hardening (2026-10-18): both handlers gate on
+// `movements.edit_delete` through the shared `requirePermission` (the
+// caller's token, has_permission() with it, exactly `true`), the same key
+// `admin_update_movement` / `admin_delete_movement` decide by. Before, the
+// route read the legacy admin role from profiles. The database functions re-check the key
+// fail-closed; this is only the cheap early 401/403 that also keeps a caller
+// without the key from probing whether a movement exists. The client that
+// comes back carries the caller's token, so RLS stays authoritative.
 
 /**
  * wave6-J4 — the ONE admin correction of a movement.
@@ -57,12 +35,16 @@ async function authenticateAdmin(request: Request) {
  */
 export async function PATCH(request: Request, context: RouteContext) {
   try {
-    const auth = await authenticateAdmin(request)
-    if (auth.status !== 200)
+    const access = await requirePermission(request, 'movements.edit_delete')
+    if (!access.ok) {
       return NextResponse.json(
-        { error: auth.status === 401 ? 'unauthorized' : 'access_denied' },
-        { status: auth.status },
+        {
+          error:
+            access.error === 'unauthorized' ? 'unauthorized' : 'access_denied',
+        },
+        { status: access.error === 'unauthorized' ? 401 : 403 },
       )
+    }
     const { id } = await context.params
     const body = (await request.json().catch(() => null)) as Record<
       string,
@@ -77,7 +59,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       typeof body[key] === 'string' && body[key] ? (body[key] as string) : null
     const notes = typeof body.notes === 'string' ? body.notes : null
 
-    const { error } = await auth.supabase.rpc('admin_update_movement', {
+    const { error } = await access.supabase.rpc('admin_update_movement', {
       p_movement_id: id,
       p_equipment_id: text('equipment_id'),
       p_supervisor_id: text('supervisor_id'),
@@ -120,15 +102,19 @@ export async function PATCH(request: Request, context: RouteContext) {
  */
 export async function DELETE(request: Request, context: RouteContext) {
   try {
-    const auth = await authenticateAdmin(request)
-    if (auth.status !== 200)
+    const access = await requirePermission(request, 'movements.edit_delete')
+    if (!access.ok) {
       return NextResponse.json(
-        { error: auth.status === 401 ? 'unauthorized' : 'access_denied' },
-        { status: auth.status },
+        {
+          error:
+            access.error === 'unauthorized' ? 'unauthorized' : 'access_denied',
+        },
+        { status: access.error === 'unauthorized' ? 401 : 403 },
       )
+    }
     const { id } = await context.params
 
-    const { data, error } = await auth.supabase.rpc('admin_delete_movement', {
+    const { data, error } = await access.supabase.rpc('admin_delete_movement', {
       p_log_id: id,
     })
     if (error) {
@@ -150,7 +136,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     // object whose rows this call has just removed.
     let cleaned = true
     if (paths.length) {
-      const { error: removeError } = await auth.supabase.storage
+      const { error: removeError } = await access.supabase.storage
         .from('log-photos')
         .remove(paths)
       if (removeError) {

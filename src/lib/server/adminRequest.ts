@@ -25,11 +25,13 @@ export type AdminRequestResult =
  *   settings.integrations    Afaqy units and sync, the WhatsApp gateway state
  *   equipment.location.view  the «الموقع الحالي» card (Afaqy position)
  *   movements.notify_foreman «ابلاغ الفورمان» (the workshop arrival notice)
+ *   movements.edit_delete    the admin correction and delete of a movement
  */
 export type ServerPermissionKey =
   | 'settings.integrations'
   | 'equipment.location.view'
   | 'movements.notify_foreman'
+  | 'movements.edit_delete'
 
 function authenticatedClient(accessToken: string): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
