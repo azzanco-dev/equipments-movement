@@ -873,35 +873,6 @@ export const translations = {
     afaqyLocationMapLabel: 'خريطة الموقع الحالي',
     afaqyRefresh: 'تحديث',
     // wave-17-afaqy — end
-    // audit-storage-cleanup — start
-    storageCleanupTitle: 'تنظيف ملفات الصور',
-    storageCleanupDesc:
-      'حذف ملفات الصور المتبقية في التخزين التي لا ترتبط باي حركة، ودفعات الرفع المنتهية',
-    storageCleanupHint:
-      'افحص اولا ثم نظف. يحذف التنظيف فقط الملفات الاقدم من ساعتين التي لا ترتبط باي حركة او دفعة رفع سارية.',
-    storageCleanupCheck: 'فحص',
-    storageCleanupChecking: 'جار الفحص...',
-    storageCleanupRun: 'تنظيف',
-    storageCleanupRunning: 'جار التنظيف...',
-    storageCleanupTotalObjects: 'اجمالي الملفات',
-    storageCleanupOrphans: 'ملفات بلا ارتباط',
-    storageCleanupOrphanBytes: 'حجمها',
-    storageCleanupFolders: 'مجلدات المستخدمين المتاثرة',
-    storageCleanupExpiredBatches: 'دفعات رفع منتهية',
-    storageCleanupNothing: 'لا توجد ملفات بلا ارتباط ولا دفعات منتهية',
-    storageCleanupConfirmTitle: 'تنظيف التخزين؟',
-    storageCleanupConfirmDesc:
-      'سيتم حذف {objects} ملف ({size}) و{batches} دفعة منتهية نهائيا. لا يمكن التراجع.',
-    storageCleanupDone: 'تم التنظيف',
-    storageCleanupDeletedObjects: 'الملفات المحذوفة',
-    storageCleanupFreed: 'المساحة المحررة',
-    storageCleanupDeletedBatches: 'الدفعات المحذوفة',
-    storageCleanupMegabytes: '{value} ميجابايت',
-    storageCleanupFailed: 'تعذر تنفيذ العملية. حاول مرة اخرى',
-    storageCleanupForbidden: 'ليس لديك صلاحية تنظيف التخزين',
-    storageCleanupPartial:
-      'توقف التنظيف قبل اكتماله. اعد الفحص ثم حاول مرة اخرى',
-    // audit-storage-cleanup — end
     // wave-18-validation — start
     nameLengthInvalid: 'من 2 الى 150 حرفا',
     valueNotInList: 'اختر قيمة من القائمة',
@@ -2765,35 +2736,6 @@ export const translations = {
     afaqyLocationMapLabel: 'Current location map',
     afaqyRefresh: 'Refresh',
     // wave-17-afaqy — end
-    // audit-storage-cleanup — start
-    storageCleanupTitle: 'Photo storage cleanup',
-    storageCleanupDesc:
-      'Remove photo files left in Storage that no movement references, and expired upload batches',
-    storageCleanupHint:
-      'Check first, then clean. Cleaning removes only files older than two hours that no movement or active upload batch references.',
-    storageCleanupCheck: 'Check',
-    storageCleanupChecking: 'Checking...',
-    storageCleanupRun: 'Clean up',
-    storageCleanupRunning: 'Cleaning up...',
-    storageCleanupTotalObjects: 'Total files',
-    storageCleanupOrphans: 'Unreferenced files',
-    storageCleanupOrphanBytes: 'Their size',
-    storageCleanupFolders: 'Affected user folders',
-    storageCleanupExpiredBatches: 'Expired upload batches',
-    storageCleanupNothing: 'No unreferenced files and no expired batches',
-    storageCleanupConfirmTitle: 'Clean up Storage?',
-    storageCleanupConfirmDesc:
-      '{objects} files ({size}) and {batches} expired batches will be deleted permanently. This cannot be undone.',
-    storageCleanupDone: 'Cleanup finished',
-    storageCleanupDeletedObjects: 'Deleted files',
-    storageCleanupFreed: 'Freed space',
-    storageCleanupDeletedBatches: 'Deleted batches',
-    storageCleanupMegabytes: '{value} MB',
-    storageCleanupFailed: 'The operation failed. Try again',
-    storageCleanupForbidden: 'You are not allowed to clean up Storage',
-    storageCleanupPartial:
-      'The cleanup stopped before finishing. Check again, then retry',
-    // audit-storage-cleanup — end
     // wave-18-validation — start
     nameLengthInvalid: 'Use 2 to 150 characters.',
     valueNotInList: 'Choose a value from the list.',

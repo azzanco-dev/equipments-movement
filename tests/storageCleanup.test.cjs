@@ -9,7 +9,8 @@
 // * It never deletes a referenced object (entry_exit_photos.file_path, the
 //   legacy entry_exit_logs.photo_url, an unexpired staging batch), never
 //   touches another bucket, and has a dry-run path that removes nothing.
-// * Settings mounts the card for a holder of the same key only.
+// * There is no Settings UI for it (removed by owner decision 2026-10-18); it is
+//   invoked manually by an admin, dry run first.
 // Source checks only, like the rest of the suite.
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
@@ -171,78 +172,6 @@ test('nothing sensitive is logged', () => {
     )
   }
   assert.ok(!/console\.\w+\([^)]*error\)/.test(code), 'no raw error objects')
-})
-
-test('the Settings card exists for movements.photos.delete_any only and drives the function', () => {
-  const card = read('src', 'components', 'settings', 'StorageCleanupCard.tsx')
-  assert.match(card, /const \{ can \} = usePermissions\(\)/)
-  assert.match(
-    card,
-    /if \(!can\('movements\.photos\.delete_any'\)\) return null/,
-  )
-  assert.match(
-    card,
-    /callEdgeFunction<StorageCleanupReport>\(\s+'storage-cleanup',\s+\{ dry_run: true \},\s+\)/,
-  )
-  assert.match(
-    card,
-    /callEdgeFunction<StorageCleanupResult>\(\s+'storage-cleanup',\s+\{ dry_run: false, older_than_hours: report\.older_than_hours \},\s+\)/,
-  )
-  // The real run waits for a confirmation, and is offered only after a check.
-  assert.match(
-    card,
-    /const confirmed = await confirm\(\{[\s\S]*?tone: 'danger',\s+\}\)\s+if \(!confirmed\) return/,
-  )
-  assert.match(card, /onClick=\{\(\) => void clean\(report\)\}/)
-  assert.ok(card.indexOf('{hasWork ? (') < card.indexOf('void clean(report)'))
-  // Failures are visible, never an empty state.
-  assert.match(card, /<Notice tone="danger" size="compact">\s+\{error\}/)
-  assert.ok(!/supabase\.storage|service_role|SERVICE_ROLE/i.test(card))
-  // Shared components and tokens only.
-  assert.match(card, /from '@\/components\/ui'/)
-  assert.ok(!/#[0-9a-f]{3,6}\b|\b(gray|emerald|red|green|amber)-\d/.test(card))
-})
-
-test('Settings mounts the card once, with a two-line edit', () => {
-  const settings = read('src', 'screens', 'AdminSettings.tsx')
-  assert.equal(
-    (
-      settings.match(
-        /import \{ StorageCleanupCard \} from '@\/components\/settings\/StorageCleanupCard'/g,
-      ) ?? []
-    ).length,
-    1,
-  )
-  assert.equal((settings.match(/<StorageCleanupCard \/>/g) ?? []).length, 1)
-  // On the settings index page, after the section cards.
-  const grid = settings.indexOf(
-    'className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"',
-  )
-  const mount = settings.indexOf('<StorageCleanupCard />')
-  const types = settings.indexOf(
-    'const columns: DataTableColumn<EquipmentTypeRow>[]',
-  )
-  assert.ok(grid > 0 && mount > grid && types > mount)
-})
-
-test('the copy exists in both languages and the Arabic uses the plain alif', () => {
-  const translations = read('src', 'i18n', 'translations.ts')
-  const blocks = [
-    ...translations.matchAll(
-      /\/\/ audit-storage-cleanup — start\n([\s\S]*?)\/\/ audit-storage-cleanup — end/g,
-    ),
-  ].map((m) => m[1])
-  assert.equal(blocks.length, 2, 'one block per language')
-  const keys = (block) =>
-    [...block.matchAll(/^\s+(\w+):/gm)].map((m) => m[1]).sort()
-  assert.deepEqual(keys(blocks[0]), keys(blocks[1]))
-  assert.ok(keys(blocks[0]).length >= 20)
-  assert.ok(!/[أإآ]/.test(blocks[0]), 'no hamza or madda alif in new copy')
-  const card = read('src', 'components', 'settings', 'StorageCleanupCard.tsx')
-  for (const key of [...card.matchAll(/t\('(storageCleanup\w+)'\)/g)].map(
-    (m) => m[1],
-  ))
-    assert.ok(keys(blocks[0]).includes(key), `${key} is translated`)
 })
 
 test('the README lists the function and its deploy command', () => {
