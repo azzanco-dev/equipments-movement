@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { readWorkbookSafely } from '@/lib/safeWorkbook'
 import type { TranslationKey } from '@/i18n/translations'
 import type { Equipment, EquipmentStatus } from '@/lib/types'
 import { parseEquipmentExcel, type EquipmentImportRow } from '@/lib/excel'
@@ -47,7 +48,7 @@ export function parseEquipmentUpdateExcel(
   t: (key: TranslationKey) => string,
 ): EquipmentUpdateRow[] {
   const parsed = parseEquipmentExcel(data, t)
-  const workbook = XLSX.read(data, { type: 'array' })
+  const workbook = readWorkbookSafely(XLSX, data, { type: 'array' })
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
   if (!sheet) throw new Error('missing_sheet')
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {

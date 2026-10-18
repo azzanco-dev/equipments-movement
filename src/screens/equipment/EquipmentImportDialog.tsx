@@ -17,6 +17,7 @@ import {
 import type { DataTableColumn } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { supabase } from '@/lib/supabase'
+import { workbookReadErrorKey } from '@/lib/safeWorkbook'
 import {
   downloadEquipmentTemplate,
   parseEquipmentExcel,
@@ -186,8 +187,8 @@ export function EquipmentImportDialog({
             .map((row) => row._rowNumber),
         ),
       )
-    } catch {
-      setError(t('invalidFile'))
+    } catch (error) {
+      setError(t(workbookReadErrorKey(error, 'invalidFile')))
     }
   }
 

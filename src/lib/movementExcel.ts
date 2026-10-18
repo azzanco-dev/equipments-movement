@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { readWorkbookSafely } from '@/lib/safeWorkbook'
 import type { TranslationKey } from '@/i18n/translations'
 import type { ExcelColumn } from '@/lib/excel'
 import { saudiDateKey } from '@/lib/saudiTime'
@@ -129,7 +130,7 @@ function excelDate(value: unknown): string {
 export async function parseMovementWorkbook(
   file: File,
 ): Promise<ParsedMovementImportRow[]> {
-  const workbook = XLSX.read(await file.arrayBuffer(), {
+  const workbook = readWorkbookSafely(XLSX, await file.arrayBuffer(), {
     type: 'array',
     // Keep Excel dates as serial numbers. Converting them to JavaScript Date
     // objects applies the device timezone and can shift the calendar day.

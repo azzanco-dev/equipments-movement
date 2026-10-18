@@ -3,6 +3,7 @@ import { Download, FileSpreadsheet, Upload } from 'lucide-react'
 import { Alert } from '@/components/Alert'
 import { Dialog } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
+import { workbookReadErrorKey } from '@/lib/safeWorkbook'
 import { useI18n } from '@/i18n/I18nContext'
 import type { Equipment } from '@/lib/types'
 import {
@@ -213,8 +214,8 @@ export function EquipmentExcelUpdate({
             .map((row) => row._rowNumber),
         ),
       )
-    } catch {
-      setError(t('invalidFile'))
+    } catch (error) {
+      setError(t(workbookReadErrorKey(error, 'invalidFile')))
     } finally {
       setBusy(false)
     }

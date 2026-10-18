@@ -31,6 +31,7 @@ import {
 } from '@/lib/search'
 import { unwrapRows } from '@/lib/supabaseResult'
 import { supabase } from '@/lib/supabase'
+import { workbookReadErrorKey } from '@/lib/safeWorkbook'
 
 interface MovementImportRow extends ParsedMovementImportRow {
   equipment_id: string | null
@@ -212,9 +213,12 @@ export function MovementImport() {
       })
       if (error) throw error
       setRows((data as MovementImportRow[]) ?? [])
-    } catch {
+    } catch (error) {
       setRows([])
-      setMessage({ type: 'error', text: t('movementImportReadFailed') })
+      setMessage({
+        type: 'error',
+        text: t(workbookReadErrorKey(error, 'movementImportReadFailed')),
+      })
     } finally {
       setBusy(false)
     }

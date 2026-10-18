@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx'
+import { readWorkbookSafely } from '@/lib/safeWorkbook'
 import type { TranslationKey } from '@/i18n/translations'
 import type {
   EntryExitLog,
@@ -131,7 +132,7 @@ export function parseEquipmentExcel(
   data: ArrayBuffer,
   t: (key: TranslationKey) => string,
 ): EquipmentImportRow[] {
-  const wb = XLSX.read(data, { type: 'array' })
+  const wb = readWorkbookSafely(XLSX, data, { type: 'array' })
   const ws = wb.Sheets[wb.SheetNames[0]]
   const json: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, {
     defval: '',
@@ -432,7 +433,7 @@ export function parseCompaniesExcel(
   data: ArrayBuffer,
   t: (key: TranslationKey) => string,
 ): CompanyImportRow[] {
-  const wb = XLSX.read(data, { type: 'array' })
+  const wb = readWorkbookSafely(XLSX, data, { type: 'array' })
   const ws = wb.Sheets[wb.SheetNames[0]]
   const json: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, {
     defval: '',
@@ -489,7 +490,7 @@ export function parseProjectsExcel(
   data: ArrayBuffer,
   t: (key: TranslationKey) => string,
 ): ProjectImportRow[] {
-  const wb = XLSX.read(data, { type: 'array' })
+  const wb = readWorkbookSafely(XLSX, data, { type: 'array' })
   const ws = wb.Sheets[wb.SheetNames[0]]
   const json: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, {
     defval: '',

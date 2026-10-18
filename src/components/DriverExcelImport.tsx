@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Download, FileSpreadsheet, Upload } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { workbookReadErrorKey } from '@/lib/safeWorkbook'
 import { Alert } from '@/components/Alert'
 import { Button, Dialog } from '@/components/ui'
 import {
@@ -106,8 +107,8 @@ export function DriverExcelImport({
             ),
         })),
       )
-    } catch {
-      setError(t('driverFileReadFailed'))
+    } catch (error) {
+      setError(t(workbookReadErrorKey(error, 'driverFileReadFailed')))
     } finally {
       setBusy(false)
     }
