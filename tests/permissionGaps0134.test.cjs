@@ -75,10 +75,13 @@ function policy(source, name, table) {
 
 const HAMZA_ALIF = /[أإآ]/
 
-test('0134 is the single newest migration, after 0133', () => {
-  assert.equal(migrations[migrations.length - 1], MIGRATION)
+test('0134 is the single 0134 migration, right after 0133', () => {
+  // 0135 followed on the same day, so "newest" is no longer asserted; the
+  // "not redefined before 0134" test below still guards the baselines.
+  const at = migrations.indexOf(MIGRATION)
+  assert.ok(at > 0, 'migration 0134 present')
+  assert.equal(migrations[at - 1], PREVIOUS)
   assert.equal(migrations.filter((file) => /_0134_/.test(file)).length, 1)
-  assert.ok(migrations.includes(PREVIOUS))
 })
 
 test('the 0127 baselines compared below were not redefined before 0134', () => {
