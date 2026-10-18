@@ -59,6 +59,7 @@ import {
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { RelativeTime } from '@/components/RelativeTime'
 import { AfaqySettings } from '@/components/afaqy/AfaqySettings'
+import { StorageCleanupCard } from '@/components/settings/StorageCleanupCard'
 import { rolesSystemEnabledFromValue } from '@/lib/rolesAdmin'
 
 type EquipmentTypeRow = {
@@ -567,6 +568,7 @@ export function AdminSettings() {
             )}
           </button>
         </div>
+        <StorageCleanupCard />
       </div>
     )
 

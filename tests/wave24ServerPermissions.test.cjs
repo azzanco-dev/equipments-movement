@@ -43,17 +43,19 @@ const ROUTE_KEYS = {
   'app/api/afaqy/position/route.ts': 'equipment.location.view',
   'app/api/notifications/whatsapp-status/route.ts': 'settings.integrations',
   'app/api/notifications/workshop-arrival/route.ts': 'movements.notify_foreman',
+  // Audit run-1 hardening (2026-10-18): the admin correction and delete of a
+  // movement decide by the key their database functions re-check.
+  'app/api/movements/[id]/route.ts': 'movements.edit_delete',
 }
 
 /** Routes that may still decide by the admin role, by design. */
 const ADMIN_ONLY_BY_DESIGN = new Set([])
 
-/** The movement API: no requirePermission gate of its own (RLS through the
- *  forwarded token and the database functions decide; it still reads
- *  profiles.role for early 403s, outside wave 24). */
+/** The rest of the movement API: no requirePermission gate of its own (RLS
+ *  through the forwarded token and the database functions decide; it still
+ *  reads profiles.role for early 403s, outside wave 24). */
 const NO_ROUTE_GATE = new Set([
   'app/api/movements/route.ts',
-  'app/api/movements/[id]/route.ts',
   'app/api/movements/[id]/photos/route.ts',
   'app/api/movements/photo-uploads/route.ts',
 ])
@@ -140,12 +142,16 @@ test('every API route decides by its permission key; none by the role', () => {
     )
     assert.match(source, /if \(!access\.ok\) \{/, route)
     assert.match(source, /access\.error === 'unauthorized' \? 401 : 403/, route)
-    // The check is the first thing the handler does.
-    const handler = source.slice(source.indexOf('export async function'))
-    const at = handler.indexOf('requirePermission(')
-    assert.ok(at > 0, route)
-    const work = handler.slice(0, at).replace(/await\s*$/, '')
-    assert.ok(!/await /.test(work), `${route} works before the check`)
+    // The check is the first thing every handler does (the movement route
+    // has two, PATCH and DELETE; each one calls it itself).
+    const handlers = source.split('export async function').slice(1)
+    assert.ok(handlers.length >= 1, route)
+    for (const handler of handlers) {
+      const at = handler.indexOf('requirePermission(')
+      assert.ok(at > 0, route)
+      const work = handler.slice(0, at).replace(/await\s*$/, '')
+      assert.ok(!/await /.test(work), `${route} works before the check`)
+    }
     assert.match(
       source,
       /import \{ requirePermission \} from '@\/lib\/server\/adminRequest'/,
@@ -153,8 +159,8 @@ test('every API route decides by its permission key; none by the role', () => {
     )
     assert.equal(
       (source.match(/requirePermission\(/g) ?? []).length,
-      1,
-      `${route}: exactly one call`,
+      handlers.length,
+      `${route}: exactly one call per handler`,
     )
   }
   assert.deepEqual(

@@ -329,6 +329,8 @@ test('B-8: nothing in the app writes entry_exit_logs.photo_url', () => {
     'src/lib/visitTimeline.ts',
     'src/screens/EntryReportsAll.tsx',
     'src/screens/MovementDetail.tsx',
+    // The orphan cleanup reads the column to keep every legacy object.
+    'supabase/functions/storage-cleanup/index.ts',
   ])
   const mentions = files.filter((file) => /photo_url/.test(read(file)))
   assert.deepEqual(
