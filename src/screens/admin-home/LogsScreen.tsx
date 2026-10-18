@@ -15,6 +15,7 @@ import {
 } from '@/components/ui'
 import type { DataTableColumn } from '@/components/ui'
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
+import { EquipmentIdentifierTag } from '@/components/data-list/EquipmentIdentifierTag'
 import { EquipmentSupplierLine } from '@/components/data-list/EquipmentSupplierLine'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
@@ -598,9 +599,14 @@ export function LogsScreen({
       width: '8rem',
       // Owner request 2026-10-15: an «مالك اخر» unit also shows its supplier
       // as one muted line under the code; no column is added.
+      // Owner request 2026-10-18: the plate (or chassis) as a muted tag beside
+      // the code.
       cell: (row) => (
         <span className="flex flex-col text-start">
-          <span className="font-semibold">{row.equipment_code || '—'}</span>
+          <span className="flex flex-wrap items-baseline gap-x-1.5">
+            <span className="font-semibold">{row.equipment_code || '—'}</span>
+            <EquipmentIdentifierTag row={row} />
+          </span>
           <EquipmentSupplierLine row={row} />
         </span>
       ),

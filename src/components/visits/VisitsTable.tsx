@@ -14,6 +14,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui'
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
+import { EquipmentIdentifierTag } from '@/components/data-list/EquipmentIdentifierTag'
 import { EquipmentSupplierLine } from '@/components/data-list/EquipmentSupplierLine'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
@@ -427,7 +428,11 @@ export function VisitsTable({
       width: '9rem',
       cell: (visit) => (
         <span className="flex flex-col text-start">
-          <span className="font-semibold">{visit.equipment_code ?? '—'}</span>
+          {/* Owner request 2026-10-18: the plate as a muted tag beside the code. */}
+          <span className="flex flex-wrap items-baseline gap-x-1.5">
+            <span className="font-semibold">{visit.equipment_code ?? '—'}</span>
+            <EquipmentIdentifierTag row={visit} />
+          </span>
           {visit.equipment_type && (
             <span className="text-xs text-muted">{visit.equipment_type}</span>
           )}
