@@ -424,3 +424,41 @@ test('the page sends update only for an admin with a matching selected target', 
   })
   assert.equal(publishModeFor(erpError, '2554398733', both), 'create')
 })
+
+// Security audit run-1, E-19 (owner decision 2026-10-18): create mode never
+// binds a login to an existing Employee and never reuses an existing ERPNext
+// User; both stay admin-only through update mode. Source checks on the route.
+test('create mode refuses an existing Employee and an existing ERPNext User', () => {
+  const fs = require('node:fs')
+  const path = require('node:path')
+  const route = fs
+    .readFileSync(
+      path.join(__dirname, '..', 'app', 'api', 'extracting', 'publish', 'route.ts'),
+      'utf8',
+    )
+    .replace(/\r\n/g, '\n')
+  // The Employee refusal comes right after the lookup and before any user or
+  // employee write; it is keyed on mode !== 'update'.
+  const lookup = route.indexOf('await findEmployeeByResidence(erp, data.id_number)')
+  const refuse = route.indexOf("if (existingEmployee && mode !== 'update')")
+  const ensureUser = route.indexOf('await ensureErpUser(erp, data, mode)')
+  assert.ok(lookup > 0 && refuse > lookup && ensureUser > refuse)
+  assert.match(route, /error: 'erp_employee_exists'/)
+  // An existing User is reused only in update mode.
+  assert.match(route, /if \(lookup\.ok\) \{\s*if \(mode !== 'update'\) return \{ exists: true as const \}/)
+  assert.match(route, /error: 'erp_user_exists'/)
+  // Create mode no longer writes cell_number / user_id onto an existing Employee.
+  assert.doesNotMatch(route, /update\.cell_number = data\.mobile_number/)
+  const messages = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'lib', 'extracting', 'messages.ts'),
+    'utf8',
+  )
+  assert.match(messages, /erp_employee_exists: 'extractingErrErpEmployeeExists'/)
+  assert.match(messages, /erp_user_exists: 'extractingErrErpUserExists'/)
+  const translations = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'i18n', 'translations.ts'),
+    'utf8',
+  )
+  for (const key of ['extractingErrErpEmployeeExists', 'extractingErrErpUserExists'])
+    assert.equal((translations.match(new RegExp(`${key}:`, 'g')) ?? []).length, 2, key)
+})

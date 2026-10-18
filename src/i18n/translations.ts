@@ -1791,6 +1791,10 @@ export const translations = {
     extractingErrErpEmployeeCreate: 'تعذر انشاء الموظف في ERPNext',
     extractingErrErpUserConflict:
       'الموظف مرتبط بمستخدم ERPNext مختلف ويحتاج مراجعة',
+    extractingErrErpEmployeeExists:
+      'الموظف موجود في ERPNext؛ الربط او التحديث للادمن من وضع التحديث',
+    extractingErrErpUserExists:
+      'البريد يخص مستخدم ERPNext موجود؛ استخدم بريدا جديدا او راجع الادمن',
     extractingErrErpEmployeeUpdate: 'تعذر تحديث بيانات الموظف في ERPNext',
     extractingErrErpMetadata: 'تعذر قراءة اعدادات موظف ERPNext',
     extractingErrErpReferenceLookup: 'تعذر التحقق من قوائم ERPNext',
@@ -3689,6 +3693,10 @@ export const translations = {
     extractingErrErpEmployeeCreate: 'Could not create the employee in ERPNext',
     extractingErrErpUserConflict:
       'The employee is linked to a different ERPNext user and needs review',
+    extractingErrErpEmployeeExists:
+      'The employee already exists in ERPNext; linking or updating is for the admin in update mode',
+    extractingErrErpUserExists:
+      'The email belongs to an existing ERPNext user; use a new email or ask the admin',
     extractingErrErpEmployeeUpdate: 'Could not update the employee in ERPNext',
     extractingErrErpMetadata: 'Could not read the ERPNext employee settings',
     extractingErrErpReferenceLookup: 'Could not check the ERPNext lists',

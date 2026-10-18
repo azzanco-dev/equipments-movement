@@ -41,6 +41,8 @@ const ERROR_MESSAGES: Record<string, TranslationKey> = {
   erp_user_create_failed: 'extractingErrErpUserCreate',
   erp_employee_create_failed: 'extractingErrErpEmployeeCreate',
   erp_employee_user_conflict: 'extractingErrErpUserConflict',
+  erp_employee_exists: 'extractingErrErpEmployeeExists',
+  erp_user_exists: 'extractingErrErpUserExists',
   erp_employee_update_failed: 'extractingErrErpEmployeeUpdate',
   erp_employee_metadata_failed: 'extractingErrErpMetadata',
   erp_reference_lookup_failed: 'extractingErrErpReferenceLookup',

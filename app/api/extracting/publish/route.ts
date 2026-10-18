@@ -143,17 +143,26 @@ async function invalidErpReference(
 /**
  * Ensures the ERPNext user exists; returns its id and whether it was new. An
  * existing User is never modified in any mode: its email and password stay
- * as they are.
+ * as they are. In `create` mode an existing User is not reused either: the
+ * caller would otherwise bind someone else's ERPNext login to the new
+ * Employee (security audit run-1, owner decision 2026-10-18); only the admin's
+ * `update` mode may link an existing User.
  */
-async function ensureErpUser(erp: ErpRequest, data: ExtractionPublishData) {
+async function ensureErpUser(
+  erp: ErpRequest,
+  data: ExtractionPublishData,
+  mode: PublishMode,
+) {
   const lookup = await erp(
     `/api/resource/User/${encodeURIComponent(data.email)}`,
   )
-  if (lookup.ok)
+  if (lookup.ok) {
+    if (mode !== 'update') return { exists: true as const }
     return {
       userId: resourceName(lookup.data) ?? data.email,
       status: 'existing' as const,
     }
+  }
   if (lookup.status !== 404) throw new ErpError('erp_user_lookup_failed')
 
   const created = await erp('/api/resource/User', {
@@ -171,29 +180,23 @@ async function ensureErpUser(erp: ErpRequest, data: ExtractionPublishData) {
 }
 
 /**
- * The PUT body for an Employee that already exists. `create` only fills an
- * empty `user_id` / `cell_number`; `update` also writes every non-empty
- * reviewed Employee field (`erpEmployeeUpdatePayload`), still setting
- * `user_id` only when the Employee has none and never touching `status`.
+ * The PUT body for an Employee that already exists; reached in `update` mode
+ * only (`create` refuses an existing Employee before any write). It writes
+ * every non-empty reviewed Employee field (`erpEmployeeUpdatePayload`), sets
+ * `user_id` only when the Employee has none and never touches `status`.
  */
 async function existingEmployeeUpdate(
   erp: ErpRequest,
   data: ExtractionPublishData,
   employee: ErpEmployeeMatch,
   userId: string,
-  mode: PublishMode,
 ): Promise<{ update: Record<string, string> } | { error: string }> {
-  const update: Record<string, string> = {}
-  if (mode === 'update') {
-    const [availableFields, invalidReference] = await Promise.all([
-      employeeFieldNames(erp),
-      invalidErpReference(erp, data),
-    ])
-    if (invalidReference) return { error: invalidReference }
-    Object.assign(update, erpEmployeeUpdatePayload(data, availableFields))
-  } else if (data.mobile_number && !employee.cellNumber) {
-    update.cell_number = data.mobile_number
-  }
+  const [availableFields, invalidReference] = await Promise.all([
+    employeeFieldNames(erp),
+    invalidErpReference(erp, data),
+  ])
+  if (invalidReference) return { error: invalidReference }
+  const update = erpEmployeeUpdatePayload(data, availableFields)
   if (!employee.userId) update.user_id = userId
   return { update }
 }
@@ -210,6 +213,16 @@ async function publishErpNext(
 
   try {
     const existingEmployee = await findEmployeeByResidence(erp, data.id_number)
+    // `create` never touches an existing Employee (form contract): it must not
+    // attach a login or a mobile to someone else's record. The admin uses
+    // `update` for that (security audit run-1, owner decision 2026-10-18).
+    if (existingEmployee && mode !== 'update')
+      return {
+        status: 'failed',
+        employeeId: existingEmployee.name,
+        steps: { user: 'skipped', employee: 'failed' },
+        error: 'erp_employee_exists',
+      }
     if (existingEmployee?.userId && existingEmployee.userId !== data.email)
       return {
         status: 'failed',
@@ -218,7 +231,13 @@ async function publishErpNext(
         error: 'erp_employee_user_conflict',
       }
 
-    const user = await ensureErpUser(erp, data)
+    const user = await ensureErpUser(erp, data, mode)
+    if ('exists' in user)
+      return {
+        status: 'failed',
+        steps: { user: 'failed', employee: 'skipped' },
+        error: 'erp_user_exists',
+      }
     if ('failure' in user)
       return {
         status: 'failed',
@@ -249,7 +268,6 @@ async function publishErpNext(
         data,
         existingEmployee,
         userId,
-        mode,
       )
       if ('error' in prepared)
         return employeeFailed(prepared.error, { employeeId })
