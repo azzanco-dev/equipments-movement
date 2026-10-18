@@ -13,6 +13,7 @@ import {
   Warehouse,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { readWorkbookSafely, workbookReadErrorKey } from '@/lib/safeWorkbook'
 import { useI18n } from '@/i18n/I18nContext'
 import {
   Badge,
@@ -288,7 +289,9 @@ export function AdminSettings() {
     let fileParsed = false
     try {
       const XLSX = await import('xlsx')
-      const book = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+      const book = readWorkbookSafely(XLSX, await file.arrayBuffer(), {
+        type: 'array',
+      })
       const sheet = book.Sheets[book.SheetNames[0]]
       const data = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
         defval: '',
@@ -323,8 +326,14 @@ export function AdminSettings() {
       }
       setPage(1)
       await fetchRows()
-    } catch {
-      setError(t(fileParsed ? 'saveFailed' : 'invalidEquipmentTypesFile'))
+    } catch (error) {
+      setError(
+        t(
+          fileParsed
+            ? 'saveFailed'
+            : workbookReadErrorKey(error, 'invalidEquipmentTypesFile'),
+        ),
+      )
     } finally {
       setImporting(false)
       if (fileRef.current) fileRef.current.value = ''

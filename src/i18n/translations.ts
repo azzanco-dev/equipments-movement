@@ -609,6 +609,9 @@ export const translations = {
     importError: 'خطأ في الاستيراد',
     noFileSelected: 'لم يتم اختيار ملف',
     invalidFile: 'ملف غير صالح. يرجى استخدام ملف Excel (.xlsx)',
+    // audit-xlsx-reader — start
+    unsafeWorkbookFile: 'الملف يحتوي محتوى غير امن ولا يمكن استيراده.',
+    // audit-xlsx-reader — end
     selectRowsToImport: 'حدد الصفوف المراد استيرادها',
     selectAll: 'تحديد الكل',
     deselectAll: 'إلغاء التحديد',
@@ -2465,6 +2468,10 @@ export const translations = {
     importError: 'Import error',
     noFileSelected: 'No file selected',
     invalidFile: 'Invalid file. Please use an Excel file (.xlsx)',
+    // audit-xlsx-reader — start
+    unsafeWorkbookFile:
+      'The file contains unsafe content and cannot be imported.',
+    // audit-xlsx-reader — end
     selectRowsToImport: 'Select rows to import',
     selectAll: 'Select All',
     deselectAll: 'Deselect All',

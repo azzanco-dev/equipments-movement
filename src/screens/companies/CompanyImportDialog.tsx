@@ -10,6 +10,7 @@ import { Dialog } from '@/components/ui'
 import { Alert } from '@/components/Alert'
 import { useI18n } from '@/i18n/I18nContext'
 import { supabase } from '@/lib/supabase'
+import { workbookReadErrorKey } from '@/lib/safeWorkbook'
 import {
   parseCompaniesExcel,
   downloadCompanyTemplate,
@@ -97,8 +98,8 @@ export function CompanyImportDialog({
         rows.filter((r) => r._errors.length === 0).map((r) => r._rowNumber),
       )
       setSelectedRows(validIndices)
-    } catch {
-      setImportError(t('invalidFile'))
+    } catch (error) {
+      setImportError(t(workbookReadErrorKey(error, 'invalidFile')))
     }
   }
 
