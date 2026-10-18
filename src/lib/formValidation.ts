@@ -201,9 +201,38 @@ export function plate() {
     .refine((value) => /[0-9]/.test(value), message('plateRequired'))
 }
 
-/** A mandatory equipment code: any non-blank text (dashes, letters, digits). */
+/**
+ * The equipment code rule of migration 0135 (`equipment_code_format_check`,
+ * `quick_create_workshop_equipment`): letters, digits, space, `_` and `-`
+ * only, at most 30 characters. The code opens every WhatsApp notice, so no
+ * other character may reach it.
+ */
+export const EQUIPMENT_CODE_MAX_LENGTH = 30
+export const EQUIPMENT_CODE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 _-]*$/
+
+/** True when a trimmed, non-empty code satisfies the 0135 rule. */
+export function isValidEquipmentCode(value: string): boolean {
+  const trimmed = value.trim()
+  return (
+    trimmed.length > 0 &&
+    trimmed.length <= EQUIPMENT_CODE_MAX_LENGTH &&
+    EQUIPMENT_CODE_PATTERN.test(trimmed)
+  )
+}
+
+/**
+ * A mandatory equipment code: non-blank and within the 0135 rule (letters,
+ * digits, space, `_` and `-`, at most 30 characters).
+ */
 export function code(requiredKey: TranslationKey = 'equipmentCodeRequired') {
-  return z.string().trim().min(1, message(requiredKey))
+  return z
+    .string()
+    .trim()
+    .min(1, message(requiredKey))
+    .refine(
+      (value) => !value || isValidEquipmentCode(value),
+      message('equipmentCodeInvalid'),
+    )
 }
 
 /** Optional four-digit year between `min` and `max`. */
@@ -355,12 +384,12 @@ export function quickEquipmentFormSchema(workshopMode: boolean) {
           path: [path],
           message: key,
         })
-      if (
-        workshopMode &&
-        form.numberingStatus === 'numbered' &&
-        !form.code.trim()
-      )
-        add('code', 'equipmentCodeRequired')
+      if (workshopMode && form.numberingStatus === 'numbered') {
+        if (!form.code.trim()) add('code', 'equipmentCodeRequired')
+        // 0135: the same rule the RPC and equipment_code_format_check apply.
+        else if (!isValidEquipmentCode(form.code))
+          add('code', 'equipmentCodeInvalid')
+      }
       const needsPlate = workshopMode || form.identifierType === 'plate'
       if (needsPlate && !plate().safeParse(form.plate).success)
         add('plate', 'plateRequired')

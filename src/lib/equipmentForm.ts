@@ -223,6 +223,14 @@ export const EQUIPMENT_DATABASE_RULES: readonly DatabaseFieldRule<EquipmentFormV
       field: 'plate_number',
       key: 'plateNumberInvalid',
     },
+    // 0135: the table check on the code format (letters, digits, space, _
+    // and -, at most 30 characters) applies to every write path.
+    {
+      on: 'check',
+      match: 'equipment_code_format_check',
+      field: 'code',
+      key: 'equipmentCodeInvalid',
+    },
     {
       on: 'unique',
       match: 'equipment_plate',
@@ -310,6 +318,20 @@ export const QUICK_EQUIPMENT_DATABASE_RULES: readonly DatabaseFieldRule<QuickEqu
       match: 'equipment code required',
       field: 'code',
       key: 'equipmentCodeRequired',
+    },
+    // 0135: the workshop RPC refuses a code outside the format rule (token
+    // invalid_equipment_code, 22023); the table check is the same rule.
+    {
+      on: 'raised',
+      match: 'invalid_equipment_code',
+      field: 'code',
+      key: 'equipmentCodeInvalid',
+    },
+    {
+      on: 'check',
+      match: 'equipment_code_format_check',
+      field: 'code',
+      key: 'equipmentCodeInvalid',
     },
     {
       on: 'raised',

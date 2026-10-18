@@ -1214,6 +1214,10 @@ export const translations = {
     // audit-0134 — start
     equipmentCodeChangeForbidden: 'لا تملك صلاحية تغيير كود المعدة.',
     // audit-0134 — end
+    // audit-0135 — start
+    equipmentCodeInvalid:
+      'رقم المعدة يقبل حروفا وارقاما وشرطة فقط، بحد اقصى 30 حرفا.',
+    // audit-0135 — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -3089,6 +3093,10 @@ export const translations = {
     equipmentCodeChangeForbidden:
       'You do not have permission to change the equipment code.',
     // audit-0134 — end
+    // audit-0135 — start
+    equipmentCodeInvalid:
+      'The equipment number accepts letters, digits and dashes only, at most 30 characters.',
+    // audit-0135 — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',
