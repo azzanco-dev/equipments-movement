@@ -8,6 +8,7 @@ import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
+import { databaseErrorKind } from '@/lib/formValidation'
 import { companiesListConfig } from '@/lib/listConfigs'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
@@ -100,7 +101,18 @@ export function CompaniesListScreen() {
       .from('companies')
       .delete()
       .eq('id', company.id)
-    if (error) console.error(error)
+    if (error) {
+      // 0134: a company referenced by a movement is refused by the database
+      // (foreign key, ON DELETE RESTRICT); never show the raw error text.
+      setLoadError(
+        t(
+          databaseErrorKind(error) === 'foreignKey'
+            ? 'companyDeleteBlocked'
+            : 'deleteFailed',
+        ),
+      )
+      return
+    }
     fetchCompanies()
   }
 

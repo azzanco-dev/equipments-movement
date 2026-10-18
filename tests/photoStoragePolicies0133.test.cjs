@@ -93,12 +93,16 @@ const PENDING_BRANCH = norm(`EXISTS (
     )`)
 const OWN_FOLDER = '(storage.foldername(name))[1] = auth.uid()::text'
 
-test('0133 is the single newest migration, after 0132', () => {
-  assert.equal(migrations[migrations.length - 1], MIGRATION)
-  assert.equal(migrations.filter((file) => /_0133_/.test(file)).length, 1)
-  assert.ok(
-    migrations.includes('20261015120000_0132_movement_views_lessor.sql'),
+test('0133 is the single 0133 migration, right after 0132', () => {
+  // 0134 (permission gaps) follows it; the "no later migration redefines"
+  // test below guards the 0133 objects from then on.
+  const at = migrations.indexOf(MIGRATION)
+  assert.ok(at > 0, 'present')
+  assert.equal(
+    migrations[at - 1],
+    '20261015120000_0132_movement_views_lessor.sql',
   )
+  assert.equal(migrations.filter((file) => /_0133_/.test(file)).length, 1)
 })
 
 test('the baselines compared below are the latest definitions before 0133', () => {

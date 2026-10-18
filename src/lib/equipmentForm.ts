@@ -209,6 +209,14 @@ export const EQUIPMENT_DATABASE_RULES: readonly DatabaseFieldRule<EquipmentFormV
       field: 'code',
       key: 'equipmentCodeRequired',
     },
+    // 0134: the BEFORE UPDATE OF code trigger refuses a code change without
+    // equipment.change_code (SQLSTATE 42501) on every write path.
+    {
+      on: 'raised',
+      match: 'equipment_code_change_not_allowed',
+      field: 'code',
+      key: 'equipmentCodeChangeForbidden',
+    },
     {
       on: 'raised',
       match: 'invalid_plate_number',

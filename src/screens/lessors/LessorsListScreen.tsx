@@ -8,6 +8,7 @@ import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
+import { databaseErrorKind } from '@/lib/formValidation'
 import { lessorsListConfig } from '@/lib/listConfigs'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
@@ -95,7 +96,18 @@ export function LessorsListScreen() {
       .from('lessors')
       .delete()
       .eq('id', lessor.id)
-    if (error) console.error(error)
+    if (error) {
+      // 0134: a supplier referenced by equipment is refused by the database
+      // (foreign key, ON DELETE RESTRICT); never show the raw error text.
+      setLoadError(
+        t(
+          databaseErrorKind(error) === 'foreignKey'
+            ? 'lessorDeleteBlocked'
+            : 'deleteFailed',
+        ),
+      )
+      return
+    }
     fetchLessors()
   }
 

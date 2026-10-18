@@ -210,6 +210,12 @@ export const translations = {
       'تحقق من الاسم ورقم الهوية والجوال والقوائم المطلوبة.',
     driverIdExists: 'رقم الهوية مستخدم لسائق آخر.',
     driverDeleteBlocked: 'لا يمكن حذف السائق لأنه مرتبط بحركات معدات.',
+    // audit-0134 — start
+    companyDeleteBlocked: 'لا يمكن حذف الشركة لانها مرتبطة بحركات.',
+    projectDeleteBlocked: 'لا يمكن حذف المشروع لانه مرتبط بحركات او معدات.',
+    lessorDeleteBlocked: 'لا يمكن حذف المورد لانه مرتبط بمعدات.',
+    deleteFailed: 'تعذر الحذف. حاول مرة اخرى.',
+    // audit-0134 — end
     idNumber: 'رقم الهوية',
     mobileNumber: 'رقم الجوال',
     nationality: 'الجنسية',
@@ -1205,6 +1211,9 @@ export const translations = {
     equipmentCodeChangeNotAllowed:
       'تغيير رقم المعدة يحتاج صلاحية «تغيير رقم المعدة».',
     // wave-24-actions — end
+    // audit-0134 — start
+    equipmentCodeChangeForbidden: 'لا تملك صلاحية تغيير كود المعدة.',
+    // audit-0134 — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -1313,6 +1322,8 @@ export const translations = {
     movementImportError_no_prior_entry: 'لا توجد دخولية سابقة للمعدة',
     movementImportError_future_date: 'لا يمكن استخدام تاريخ مستقبلي',
     movementImportError_invalid_relation: 'احدى البيانات المرتبطة غير صالحة',
+    movementImportError_supervisor_not_allowed:
+      'تسجيل الحركة باسم مستخدم اخر يحتاج صلاحية تعديل وحذف الحركات',
     movementImportError_import_failed: 'تعذر استيراد الصف',
     noResults: 'لا توجد نتائج',
     showing: 'عرض',
@@ -2043,6 +2054,15 @@ export const translations = {
     driverIdExists: 'This ID number is already used by another driver.',
     driverDeleteBlocked:
       'This driver cannot be deleted because they are linked to movements.',
+    // audit-0134 — start
+    companyDeleteBlocked:
+      'This company cannot be deleted because movements refer to it.',
+    projectDeleteBlocked:
+      'This project cannot be deleted because movements or equipment refer to it.',
+    lessorDeleteBlocked:
+      'This supplier cannot be deleted because equipment refers to it.',
+    deleteFailed: 'Could not delete. Please try again.',
+    // audit-0134 — end
     idNumber: 'ID Number',
     mobileNumber: 'Mobile Number',
     nationality: 'Nationality',
@@ -3065,6 +3085,10 @@ export const translations = {
     equipmentCodeChangeNotAllowed:
       'Changing the code needs the "Change the equipment code" permission.',
     // wave-24-actions — end
+    // audit-0134 — start
+    equipmentCodeChangeForbidden:
+      'You do not have permission to change the equipment code.',
+    // audit-0134 — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',
@@ -3173,6 +3197,8 @@ export const translations = {
       'No prior entry exists for this equipment',
     movementImportError_future_date: 'Future dates are not allowed',
     movementImportError_invalid_relation: 'A related record is invalid',
+    movementImportError_supervisor_not_allowed:
+      'Recording in another user\'s name needs the "Edit and delete movements" permission',
     movementImportError_import_failed: 'Could not import this row',
     noResults: 'No results',
     showing: 'Showing',
