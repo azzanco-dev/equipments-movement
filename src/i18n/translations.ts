@@ -1937,6 +1937,7 @@ export const translations = {
     supplierPoSummaryTotal: 'الاجمالي بدون ضريبة',
     supplierPoSummaryAge: 'منذ البداية',
     supplierPoDaysUnit: 'يوم',
+    currencySar: 'ر.س',
     // purchasing-screens — end
   },
   en: {
@@ -3939,6 +3940,7 @@ export const translations = {
     supplierPoSummaryTotal: 'Total excl. VAT',
     supplierPoSummaryAge: 'Since start',
     supplierPoDaysUnit: 'days',
+    currencySar: 'SAR',
     // purchasing-screens — end
   },
 } as const

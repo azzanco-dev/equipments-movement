@@ -320,11 +320,18 @@ function EquipmentCell({ unit }: { unit: MockEquipment | null }) {
   )
 }
 
+/** An amount excluding VAT with the currency mark after it (owner
+ *  2026-10-19: «اضف رمز الريال»; the text mark «ر.س» until the official
+ *  symbol's artwork is supplied as an SVG). The digits stay an LTR run. */
 function Price({ value }: { value: number }) {
+  const { t } = useI18n()
   return (
-    <bdi dir="ltr" className="tabular-nums">
-      {formatSupplierPoPrice(value)}
-    </bdi>
+    <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+      <bdi dir="ltr" className="tabular-nums">
+        {formatSupplierPoPrice(value)}
+      </bdi>
+      <span className="text-xs font-normal text-muted">{t('currencySar')}</span>
+    </span>
   )
 }
 
@@ -1874,7 +1881,7 @@ function PoPageMockupV2({
               <StatCard
                 className="col-span-2 sm:col-span-1"
                 label={t('supplierPoSummaryTotal')}
-                value={<bdi dir="ltr">{formatSupplierPoPrice(total)}</bdi>}
+                value={<Price value={total} />}
                 icon={<Coins size={18} />}
               />
               <StatCard
