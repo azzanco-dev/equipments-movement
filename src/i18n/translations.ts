@@ -1937,9 +1937,6 @@ export const translations = {
     supplierPoSummaryTotal: 'الاجمالي بدون ضريبة',
     supplierPoSummaryAge: 'منذ البداية',
     supplierPoDaysUnit: 'يوم',
-    supplierPoUnitOwnerTakween: 'تكوين',
-    supplierPoUnitOwnerF: 'الغير F',
-    supplierPoUnitOwnerB: 'شراكة B',
     // purchasing-screens — end
   },
   en: {
@@ -3942,9 +3939,6 @@ export const translations = {
     supplierPoSummaryTotal: 'Total excl. VAT',
     supplierPoSummaryAge: 'Since start',
     supplierPoDaysUnit: 'days',
-    supplierPoUnitOwnerTakween: 'Takween',
-    supplierPoUnitOwnerF: 'Third party F',
-    supplierPoUnitOwnerB: 'Partnership B',
     // purchasing-screens — end
   },
 } as const

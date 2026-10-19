@@ -1480,25 +1480,18 @@ function PoPageMockup({
 //      header. Destructive actions keep their confirmation dialog.
 // Same sample data, same dialogs and the same tokens as the current page.
 
-/** The unit's own supplier or owner, short: the lessor name for «مالك اخر»,
- *  else the owner («العزاني», «تكوين», «الغير F», «شراكة B»). */
-function unitSupplierLabel(
+/** The supplier NAME of a line (owner 2026-10-19: purchasing works with
+ *  suppliers, so the name is what matters): the unit's own supplier when it
+ *  has one («مالك اخر»), else the PO's supplier; an Al-Azani unit shows
+ *  «العزاني». Never the owner category alone. */
+function lineSupplierName(
   unit: MockEquipment | null,
+  po: ReturnType<typeof poRow>,
   t: (key: TranslationKey) => string,
 ): string {
   if (!unit) return '—'
-  switch (unit.ownership) {
-    case 'alazani':
-      return t('supplierPoInternalSupplier')
-    case 'takween':
-      return t('supplierPoUnitOwnerTakween')
-    case 'third_party_f':
-      return t('supplierPoUnitOwnerF')
-    case 'third_party_partnership_b':
-      return t('supplierPoUnitOwnerB')
-    default:
-      return unit.lessor_name?.trim() || t('ownershipExternalSupplier')
-  }
+  if (unit.ownership === 'alazani') return t('supplierPoInternalSupplier')
+  return unit.lessor_name?.trim() || supplierPoSupplierLabel(po, t)
 }
 
 /** The card period behind a line: «from – to», or «from – مفتوح». */
@@ -1707,7 +1700,7 @@ function PoPageMockupV2({
   const sortValue = (line: PoLineRow, key: string): string | number => {
     switch (key) {
       case 'supplier':
-        return unitSupplierLabel(line.unit, t)
+        return lineSupplierName(line.unit, row, t)
       case 'period':
         return line.period_from
       case 'price':
@@ -1752,10 +1745,9 @@ function PoPageMockupV2({
       key: 'supplier',
       header: t('supplierPoSupplier'),
       sortable: true,
+      width: '14rem',
       cell: lineCell((line) => (
-        <span className="block whitespace-normal">
-          {unitSupplierLabel(line.unit, t)}
-        </span>
+        <span className="font-medium">{lineSupplierName(line.unit, row, t)}</span>
       )),
     },
     {
@@ -1868,7 +1860,14 @@ function PoPageMockupV2({
               as="h2"
               identifier={po.po_number}
               identifierLtr
-              subtitle={`${supplier} · ${companyName} · ${projectName}`}
+              subtitle={
+                // The supplier is the name purchasing works with: its own
+                // line, never truncated or mixed with the project.
+                <span className="flex items-center gap-1.5 text-base font-semibold text-fg">
+                  <Building2 size={16} aria-hidden="true" className="text-muted" />
+                  {supplier}
+                </span>
+              }
               badges={<StatusBadge status={po.status} />}
               actions={
                 open ? (
@@ -1882,6 +1881,11 @@ function PoPageMockupV2({
               }
             />
             <dl className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-muted">
+              <HeaderMeta
+                icon={<MapPin size={14} />}
+                label={t('supplierPoCompanyProject')}
+                value={`${companyName} · ${projectName}`}
+              />
               <HeaderMeta
                 icon={<Calendar size={14} />}
                 label={t('supplierPoStartDate')}
@@ -1980,8 +1984,10 @@ function PoPageMockupV2({
                             <EquipmentCell unit={line.unit} />
                             <p className="mt-0.5 text-xs text-muted">
                               {line.unit?.type ?? '—'} ·{' '}
-                              {unitSupplierLabel(line.unit, t)} ·{' '}
-                              <bdi dir="ltr">{periodLabel(line, t)}</bdi>
+                              <span className="font-medium text-fg">
+                                {lineSupplierName(line.unit, row, t)}
+                              </span>{' '}
+                              · <bdi dir="ltr">{periodLabel(line, t)}</bdi>
                             </p>
                             {line.note && (
                               <p className="mt-0.5 text-xs text-muted">{line.note}</p>
