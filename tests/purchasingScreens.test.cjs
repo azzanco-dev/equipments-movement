@@ -151,8 +151,11 @@ test('the mockup renders the three screens and their states with sample data onl
   assert.match(v2, /<StatCard/)
   assert.match(v2, /xl:grid-cols-3/)
   assert.match(v2, /xl:col-span-2/)
-  assert.match(v2, /md:hidden/)
-  assert.match(v2, /hidden p-4 md:block/)
+  // Wide cards, not a table (owner 2026-10-19); sort through a select.
+  assert.doesNotMatch(v2, /<DataTable[\s>]/)
+  assert.match(v2, /rounded-xl border bg-bg p-3 sm:p-4/)
+  assert.match(v2, /aria-label=\{t\('sortBy'\)\}/)
+  assert.match(v2, /lineSupplierName\(line\.unit, row, t\)/)
   assert.match(v2, /sticky bottom-0[^"]*sm:hidden/)
   assert.match(v2, /env\(safe-area-inset-bottom\)/)
   assert.match(v2, /<EventTimeline/)

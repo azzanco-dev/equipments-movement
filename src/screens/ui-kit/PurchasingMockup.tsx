@@ -7,6 +7,8 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  ArrowDown,
+  ArrowUp,
   Building2,
   Calendar,
   CalendarDays,
@@ -1474,7 +1476,9 @@ function PoPageMockup({
 //      with a total line) takes two thirds; the facts («بيانات الامر», a
 //      labelled list with icons) and the activity timeline sit beside it.
 //      On mobile everything stacks in that order;
-//   4. the record list becomes a card list below `md`: no sideways scroll;
+//   4. the record list is a list of WIDE CARDS on every screen (owner
+//      2026-10-19: few lines per PO, rich data per line), sorted through a
+//      «الترتيب» select and a direction button, prices in a fixed end block;
 //   5. on mobile the primary actions sit in a bar at the bottom of the
 //      screen (44 px targets, safe-area padding); desktop keeps them in the
 //      header. Destructive actions keep their confirmation dialog.
@@ -1506,9 +1510,6 @@ function periodLabel(
 }
 
 type PoLineRow = MockLine & { unit: MockEquipment | null }
-/** A table row: a line, or the closing total row (aligned under the price
- *  column, so the total never drifts from the numbers above it). */
-type PoTableRow = { kind: 'line'; line: PoLineRow } | { kind: 'total'; price: number }
 
 function daysSince(dateKey: string): number {
   const start = Date.parse(`${dateKey}T00:00:00+03:00`)
@@ -1718,84 +1719,45 @@ function PoPageMockupV2({
         : String(va).localeCompare(String(vb), lang)
     return sort.direction === 'asc' ? cmp : -cmp
   })
-  const tableRows: PoTableRow[] = [
-    ...sortedLines.map((line): PoTableRow => ({ kind: 'line', line })),
-    { kind: 'total', price: total },
+  // Owner 2026-10-19: the lines are wide CARDS, not a table (few lines per
+  // PO, rich data per line), so the sort is a «الترتيب» select plus a
+  // direction button instead of column headers.
+  const sortOptions = [
+    { value: 'equipment', label: t('supplierPoEquipmentField') },
+    { value: 'supplier', label: t('supplierPoSupplier') },
+    { value: 'period', label: t('equipmentPurchasingPeriod') },
+    { value: 'price', label: t('supplierPoPrice') },
   ]
-  const lineCell = (render: (line: PoLineRow) => ReactNode) => (row: PoTableRow) =>
-    row.kind === 'line' ? render(row.line) : null
-  const columns: DataTableColumn<PoTableRow>[] = [
-    {
-      key: 'equipment',
-      header: t('supplierPoEquipmentField'),
-      sortable: true,
-      // The type sits under the code (no column of its own): the table stays
-      // narrow enough for the two-thirds column without sideways scroll.
-      cell: (row) =>
-        row.kind === 'line' ? (
-          <div className="min-w-0">
-            <EquipmentCell unit={row.line.unit} />
-            <p className="text-xs text-muted">{row.line.unit?.type ?? '—'}</p>
-          </div>
-        ) : (
-          <span className="text-muted">{t('supplierPoSummaryTotal')}</span>
-        ),
-    },
-    {
-      key: 'supplier',
-      header: t('supplierPoSupplier'),
-      sortable: true,
-      width: '14rem',
-      cell: lineCell((line) => (
-        <span className="font-medium">{lineSupplierName(line.unit, row, t)}</span>
-      )),
-    },
-    {
-      key: 'period',
-      header: t('equipmentPurchasingPeriod'),
-      sortable: true,
-      hideBelow: 'lg',
-      cell: lineCell((line) => <bdi dir="ltr">{periodLabel(line, t)}</bdi>),
-    },
-    {
-      key: 'note',
-      header: t('supplierPoLineNote'),
-      hideBelow: 'lg',
-      className: 'text-muted',
-      cell: lineCell((line) => (
-        <span className="block max-w-[14rem] whitespace-normal">
-          {line.note ?? '—'}
-        </span>
-      )),
-    },
-    {
-      key: 'price',
-      header: t('supplierPoPrice'),
-      sortable: true,
-      align: 'end',
-      cell: (row) => (
-        <Price value={row.kind === 'line' ? row.line.price : row.price} />
-      ),
-    },
-    ...(open
-      ? [
-          {
-            key: 'actions',
-            header: t('actions'),
-            align: 'end' as const,
-            width: '4rem',
-            cell: lineCell((line) => (
-              <IconButton
-                size="sm"
-                label={t('supplierPoEditPrice')}
-                icon={<Edit2 size={15} />}
-                onClick={() => setEditing(line)}
-              />
-            )),
-          },
-        ]
-      : []),
-  ]
+  const sortControls = (
+    <div className="flex items-center gap-1.5">
+      <Select
+        size="sm"
+        aria-label={t('sortBy')}
+        className="w-[150px]"
+        value={sort.key}
+        onValueChange={(key) => setSort((current) => ({ ...current, key }))}
+        options={sortOptions}
+      />
+      <IconButton
+        size="sm"
+        variant="outline"
+        label={sort.direction === 'asc' ? t('sortDescending') : t('sortAscending')}
+        icon={
+          sort.direction === 'asc' ? (
+            <ArrowUp size={14} aria-hidden="true" />
+          ) : (
+            <ArrowDown size={14} aria-hidden="true" />
+          )
+        }
+        onClick={() =>
+          setSort((current) => ({
+            ...current,
+            direction: current.direction === 'asc' ? 'desc' : 'asc',
+          }))
+        }
+      />
+    </div>
+  )
 
   const addButton = (
     <Button
@@ -1948,16 +1910,19 @@ function PoPageMockupV2({
                   }
                   description={t('supplierPoEquipmentDesc')}
                   action={
-                    open ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        icon={<Plus size={14} aria-hidden="true" />}
-                        onClick={() => setAddOpen(true)}
-                      >
-                        {t('supplierPoAddEquipment')}
-                      </Button>
-                    ) : undefined
+                    <div className="flex flex-wrap items-center gap-2">
+                      {poLines.length > 1 && sortControls}
+                      {open && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          icon={<Plus size={14} aria-hidden="true" />}
+                          onClick={() => setAddOpen(true)}
+                        >
+                          {t('supplierPoAddEquipment')}
+                        </Button>
+                      )}
+                    </div>
                   }
                 />
               </div>
@@ -1971,62 +1936,77 @@ function PoPageMockupV2({
                 </div>
               ) : (
                 <>
-                  {/* 4. Card list on narrow screens, sortable table from `md`
-                      with the total as its last row. */}
-                  <div className="md:hidden">
-                    <ul className="divide-y px-4 pt-2">
-                      {sortedLines.map((line) => (
-                        <li
-                          key={line.id}
-                          className="flex items-start justify-between gap-3 py-3"
-                        >
-                          <div className="min-w-0">
+                  {/* 4. One wide card per line, the same on every screen:
+                      identity at the start, supplier / period / note in the
+                      middle, the price in a fixed-width end block so prices
+                      line up down the list; the total closes the list in the
+                      same end block. */}
+                  <ul className="space-y-2 p-4 pt-3">
+                    {sortedLines.map((line) => (
+                      <li
+                        key={line.id}
+                        className="rounded-xl border bg-bg p-3 sm:p-4"
+                      >
+                        <div className="flex flex-wrap items-start gap-x-4 gap-y-3 sm:flex-nowrap">
+                          <div className="min-w-0 flex-1 sm:basis-2/5">
                             <EquipmentCell unit={line.unit} />
                             <p className="mt-0.5 text-xs text-muted">
-                              {line.unit?.type ?? '—'} ·{' '}
-                              <span className="font-medium text-fg">
+                              {line.unit?.type ?? '—'}
+                            </p>
+                          </div>
+                          <div className="min-w-0 flex-1 space-y-1 sm:basis-3/5">
+                            <p className="flex items-center gap-1.5 text-sm font-medium">
+                              <Building2
+                                size={14}
+                                aria-hidden="true"
+                                className="shrink-0 text-muted"
+                              />
+                              <span className="min-w-0 break-words">
                                 {lineSupplierName(line.unit, row, t)}
-                              </span>{' '}
-                              · <bdi dir="ltr">{periodLabel(line, t)}</bdi>
+                              </span>
+                            </p>
+                            <p className="flex items-center gap-1.5 text-xs text-muted">
+                              <Calendar size={12} aria-hidden="true" className="shrink-0" />
+                              <bdi dir="ltr">{periodLabel(line, t)}</bdi>
                             </p>
                             {line.note && (
-                              <p className="mt-0.5 text-xs text-muted">{line.note}</p>
+                              <p className="flex items-start gap-1.5 text-xs text-muted">
+                                <StickyNote
+                                  size={12}
+                                  aria-hidden="true"
+                                  className="mt-0.5 shrink-0"
+                                />
+                                <span className="min-w-0 break-words">{line.note}</span>
+                              </p>
                             )}
                           </div>
-                          <div className="flex shrink-0 items-center gap-1.5">
-                            <Price value={line.price} />
+                          <div className="flex w-full items-center justify-between gap-3 border-t pt-3 sm:w-44 sm:shrink-0 sm:flex-col sm:items-end sm:border-t-0 sm:pt-0">
+                            <div className="text-start sm:text-end">
+                              <p className="text-xs text-muted">{t('supplierPoPrice')}</p>
+                              <p className="text-lg font-semibold">
+                                <Price value={line.price} />
+                              </p>
+                            </div>
                             {open && (
-                              <IconButton
-                                label={t('supplierPoEditPrice')}
-                                icon={<Edit2 size={16} />}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                icon={<Edit2 size={14} aria-hidden="true" />}
                                 onClick={() => setEditing(line)}
-                              />
+                              >
+                                {t('supplierPoEditPrice')}
+                              </Button>
                             )}
                           </div>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-sm">
-                      <span className="text-muted">{t('supplierPoSummaryTotal')}</span>
-                      <span className="font-semibold">
-                        <Price value={total} />
-                      </span>
-                    </div>
-                  </div>
-                  <div className="hidden p-4 md:block">
-                    <DataTable
-                      size="md"
-                      columns={columns}
-                      rows={tableRows}
-                      rowKey={(row) => (row.kind === 'line' ? row.line.id : 'total')}
-                      sort={sort}
-                      onSortChange={(key, direction) => setSort({ key, direction })}
-                      rowClassName={(row) =>
-                        row.kind === 'total' ? 'bg-surface font-semibold' : undefined
-                      }
-                      caption={t('supplierPoEquipment')}
-                      stickyHeader={false}
-                    />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-sm sm:px-8">
+                    <span className="text-muted">{t('supplierPoSummaryTotal')}</span>
+                    <span className="text-lg font-semibold">
+                      <Price value={total} />
+                    </span>
                   </div>
                 </>
               )}
