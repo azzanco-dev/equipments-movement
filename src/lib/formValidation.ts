@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { TranslationKey } from '@/i18n/translations'
 import { isValidUserMobile, normalizeUserMobileInput } from '@/lib/userMobile'
 import { DRIVER_EMPLOYEE_NUMBER_MAX } from '@/lib/driverEmployeeNumber'
+import { isValidSupplierPoPrice } from '@/lib/purchasing'
 
 /**
  * Per-field validation messages for one form: the field name maps to the
@@ -538,6 +539,68 @@ export const roleFormSchema = z.object({
     lengthKey: 'roleDescriptionTooLong',
   }),
 })
+
+// --- purchasing-screens (migration 0136) --------------------------------------
+
+/** `supplier_pos.notes` and `supplier_po_equipment.note` length checks. */
+export const SUPPLIER_PO_NOTES_MAX = 1000
+export const SUPPLIER_PO_LINE_NOTE_MAX = 500
+
+/**
+ * «امر شراء جديد» (create_supplier_po): the supplier is optional (empty =
+ * an internal Al-Azani PO), company, project and start date are mandatory,
+ * the notes respect the database length.
+ */
+export const supplierPoFormSchema = z.object({
+  lessor_id: z.string().trim(),
+  company_id: selected('supplierPoCompanyRequired'),
+  project_id: selected('supplierPoProjectRequired'),
+  start_date: selected('supplierPoStartDateRequired'),
+  notes: optionalText({
+    max: SUPPLIER_PO_NOTES_MAX,
+    lengthKey: 'supplierPoNotesTooLong',
+  }),
+})
+
+/**
+ * The price excluding VAT as typed: mandatory, a number of zero or more with
+ * at most two decimals (numeric(12, 2)); for an internal unit (Al-Azani or a
+ * lessor marked is_internal) it must be exactly zero, the rule
+ * add_supplier_po_equipment and update_supplier_po_equipment_price enforce
+ * with `internal_price_must_be_zero`.
+ */
+export function supplierPoPrice(internal: boolean) {
+  return z
+    .string()
+    .trim()
+    .min(1, message('supplierPoPriceRequired'))
+    .refine(
+      (value) => !value || isValidSupplierPoPrice(value),
+      message('supplierPoPriceInvalid'),
+    )
+    .refine(
+      (value) =>
+        !internal || !isValidSupplierPoPrice(value) || Number(value) === 0,
+      message('supplierPoPriceInternalMustBeZero'),
+    )
+}
+
+/** «اضافة معدة» (add_supplier_po_equipment). */
+export function supplierPoLineFormSchema(internal: boolean) {
+  return z.object({
+    equipment_id: selected('supplierPoEquipmentRequired'),
+    price: supplierPoPrice(internal),
+    note: optionalText({
+      max: SUPPLIER_PO_LINE_NOTE_MAX,
+      lengthKey: 'supplierPoLineNoteTooLong',
+    }),
+  })
+}
+
+/** «تعديل السعر» (update_supplier_po_equipment_price). */
+export function supplierPoPriceFormSchema(internal: boolean) {
+  return z.object({ price: supplierPoPrice(internal) })
+}
 
 export interface PostgresLikeError {
   code?: string | null

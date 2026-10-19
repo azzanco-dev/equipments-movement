@@ -46,6 +46,7 @@ import { DataTableShowcase } from '@/screens/ui-kit/DataTableShowcase'
 import { HomeMockupShowcase } from '@/screens/ui-kit/HomeMockupShowcase'
 import { EquipmentInquiryShowcase } from '@/screens/ui-kit/EquipmentInquiryShowcase'
 import { RolesPageMockup } from '@/screens/ui-kit/RolesPageMockup'
+import { PurchasingMockup } from '@/screens/ui-kit/PurchasingMockup'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -103,6 +104,17 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // purchasing-screens (owner decision 2026-10-19): the three purchasing
+    // screens are reviewed here as mockups before they get their routes.
+    id: 'purchasing-mockup',
+    title: 'نماذج شاشات المشتريات',
+    purpose:
+      'قائمة اوامر الشراء وصفحة الامر وكرت المشتريات في صفحة المعدة، ببيانات عينة وبلا اتصال بالقاعدة.',
+    status: 'review',
+    defaultOpen: true,
+    element: <PurchasingMockup />,
+  },
   {
     id: 'roles-mockup',
     title: 'نموذج صفحة الادوار والصلاحيات',

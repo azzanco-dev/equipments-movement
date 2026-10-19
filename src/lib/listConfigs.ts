@@ -624,3 +624,66 @@ export const logsListConfig: DataListConfig = {
     { key: 'equipment_code', label: 'equipmentCode' },
   ],
 }
+
+/**
+ * purchasing-screens (migration 0136): the supplier purchase orders list
+ * («قائمة اوامر الشراء»), over `supplier_pos`. Search is the PO number only;
+ * the allowlisted filters are the status, the supplier (`lessor_id`, an
+ * `in` multi-select searched server-side through `asyncFields`), and the
+ * company and project (the same pattern as `/logs`). Rendered as a MOCKUP on
+ * /ui-kit first (owner decision 2026-10-19); the real `/purchasing` list
+ * will reuse this config as it is.
+ */
+export const supplierPosListConfig: DataListConfig = {
+  id: 'supplierPos',
+  searchPlaceholder: 'supplierPoSearchPlaceholder',
+  searchFields: ['po_number'],
+  defaultSort: 'created_at',
+  defaultDirection: 'desc',
+  filterFields: [
+    {
+      key: 'status',
+      label: 'status',
+      type: 'select',
+      operators: ['eq', 'neq'],
+      options: [
+        { value: 'open', label: 'مفتوح', labelI18n: 'supplierPoStatusOpen' },
+        {
+          value: 'closed',
+          label: 'مغلق',
+          labelI18n: 'supplierPoStatusClosed',
+        },
+      ],
+    },
+    {
+      key: 'lessor_id',
+      label: 'supplierPoSupplier',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'company_id',
+      label: 'company',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'project_id',
+      label: 'project',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+  ],
+  sortableFields: [
+    { key: 'created_at', label: 'supplierPoCreatedAt' },
+    { key: 'po_number', label: 'supplierPoNumber' },
+    { key: 'start_date', label: 'supplierPoStartDate' },
+    { key: 'status', label: 'status' },
+  ],
+}
