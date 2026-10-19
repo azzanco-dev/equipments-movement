@@ -51,6 +51,7 @@ import {
   InfoGridSection,
   Input,
   Notice,
+  RiyalSign,
   SectionHeader,
   Select,
   Skeleton,
@@ -321,9 +322,9 @@ function EquipmentCell({ unit }: { unit: MockEquipment | null }) {
   )
 }
 
-/** An amount excluding VAT with the currency mark after it (owner
- *  2026-10-19: «اضف رمز الريال»; the text mark «ر.س» until the official
- *  symbol's artwork is supplied as an SVG). The digits stay an LTR run. */
+/** An amount excluding VAT with the riyal symbol after it (owner 2026-10-19:
+ *  «اضف رمز الريال» then «ايقون الريال»: the official symbol, `RiyalSign`).
+ *  The digits stay an LTR run; the currency is named for screen readers. */
 function Price({ value }: { value: number }) {
   const { t } = useI18n()
   return (
@@ -331,7 +332,8 @@ function Price({ value }: { value: number }) {
       <bdi dir="ltr" className="tabular-nums">
         {formatSupplierPoPrice(value)}
       </bdi>
-      <span className="text-xs font-normal text-muted">{t('currencySar')}</span>
+      <RiyalSign className="text-muted" size="0.8em" />
+      <span className="sr-only">{t('currencySar')}</span>
     </span>
   )
 }

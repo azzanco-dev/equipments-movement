@@ -108,4 +108,5 @@ export type {
   InfoGridProps,
   InfoGridSectionProps,
 } from './InfoGrid'
+export { RiyalSign } from './RiyalSign'
 export { cn } from './cn'
