@@ -40,6 +40,7 @@ export type NavItemKey =
   | 'projects'
   | 'companies'
   | 'lessors'
+  | 'purchasing'
   | 'drivers'
   | 'users'
   | 'activity'
@@ -82,6 +83,10 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { key: 'projects', requires: [{ key: 'companies_projects.read' }] },
   { key: 'companies', requires: [{ key: 'companies_projects.read' }] },
   { key: 'lessors', requires: [{ key: 'lessors.read' }] },
+  // Purchasing (migration 0136, screens 2026-10-19): the supplier POs. The
+  // key is held by the admin and the custom «المشتريات» role only, so the
+  // frozen legacy menus below are unchanged.
+  { key: 'purchasing', requires: [{ key: 'purchasing.view' }] },
   { key: 'drivers', requires: [{ key: 'drivers.read' }] },
   { key: 'users', requires: [{ key: 'users.manage' }] },
   { key: 'activity', requires: [{ key: 'movements.activity' }] },
@@ -127,6 +132,9 @@ const ADMIN_MENU: readonly VisibleNavItem[] = [
   { key: 'projects' },
   { key: 'companies' },
   { key: 'lessors' },
+  // 2026-10-19: the admin holds purchasing.view in both mappings (0136), so
+  // the fallback menu lists the section too.
+  { key: 'purchasing' },
   { key: 'drivers' },
   { key: 'users' },
   { key: 'activity' },
@@ -278,6 +286,7 @@ export type RoutePage =
   | 'equipment/:id'
   | 'drivers/:id'
   | 'users/:id'
+  | 'purchasing/:id'
   | 'print/export'
 
 type ExtraPage = Exclude<RoutePage, NavItemKey | NavChildKey>
@@ -300,6 +309,7 @@ const PAGE_GATES: Readonly<Record<ExtraPage, readonly NavGate[]>> = {
   'equipment/:id': [{ key: 'equipment.read' }],
   'drivers/:id': [{ key: 'drivers.read' }],
   'users/:id': [{ key: 'users.manage' }],
+  'purchasing/:id': [{ key: 'purchasing.view' }],
   'print/export': [{ key: 'movements.export' }],
 }
 
@@ -346,6 +356,7 @@ export function routePageOf(segments: readonly string[]): RoutePage {
   if (first === 'equipment' && second) return 'equipment/:id'
   if (first === 'drivers' && second) return 'drivers/:id'
   if (first === 'users' && second) return 'users/:id'
+  if (first === 'purchasing' && second) return 'purchasing/:id'
   if (first === 'reports') {
     if (second === 'workshop') return 'reports/workshop'
     if (second === 'equipment') return 'reports/equipment'
@@ -432,6 +443,8 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'equipment/:id',
   'drivers/:id',
   'users/:id',
+  'purchasing',
+  'purchasing/:id',
 ]
 const FIELD_SHELL_PAGES: readonly RoutePage[] = [
   'dashboard',

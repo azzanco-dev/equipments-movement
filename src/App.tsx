@@ -23,6 +23,7 @@ import {
   History,
   BarChart3,
   Search,
+  ShoppingCart,
 } from 'lucide-react'
 import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog'
 import { RouteFallback } from '@/components/RouteFallback'
@@ -171,6 +172,22 @@ const AdminUsers = dynamic(
   () => import('@/screens/AdminUsers').then((module) => module.AdminUsers),
   { loading: listLoading },
 )
+// Purchasing (migration 0136, screens 2026-10-19): the supplier PO list and
+// page, behind the `purchasing.view` gates of src/lib/navPermissions.ts.
+const SupplierPosListScreen = dynamic(
+  () =>
+    import('@/screens/purchasing/SupplierPosListScreen').then(
+      (module) => module.SupplierPosListScreen,
+    ),
+  { loading: listLoading },
+)
+const SupplierPoDetail = dynamic(
+  () =>
+    import('@/screens/purchasing/SupplierPoDetail').then(
+      (module) => module.SupplierPoDetail,
+    ),
+  { loading: screenLoading },
+)
 const UserDetail = dynamic(
   () => import('@/screens/UserDetail').then((module) => module.UserDetail),
   { loading: screenLoading },
@@ -264,6 +281,7 @@ const NAV_PRESENTATION: Record<
   projects: { label: 'projects', icon: <FolderKanban size={18} /> },
   companies: { label: 'companies', icon: <Briefcase size={18} /> },
   lessors: { label: 'lessors', icon: <Building2 size={18} /> },
+  purchasing: { label: 'purchasing', icon: <ShoppingCart size={18} /> },
   drivers: { label: 'drivers', icon: <Contact size={18} /> },
   users: { label: 'users', icon: <Users size={18} /> },
   activity: { label: 'activityLog', icon: <History size={18} /> },
@@ -509,6 +527,21 @@ function AppContent() {
             onViewAllMovements={(code) =>
               router.push(`/logs?q=${encodeURIComponent(code)}`)
             }
+            onOpenPo={
+              shell.pages.has('purchasing/:id')
+                ? (id) => router.push(`/purchasing/${id}`)
+                : undefined
+            }
+          />
+        ) : page === 'purchasing/:id' ? (
+          <SupplierPoDetail
+            poId={detailId}
+            onBack={() => router.push('/purchasing')}
+            onOpenEquipment={
+              canOpenEquipment
+                ? (id) => router.push(`/equipment/${id}`)
+                : undefined
+            }
           />
         ) : page === 'drivers/:id' ? (
           <DriverDetail
@@ -545,6 +578,11 @@ function AppContent() {
             {page === 'projects' && <AdminProjects />}
             {page === 'companies' && <AdminCompanies />}
             {page === 'lessors' && <AdminLessors />}
+            {page === 'purchasing' && (
+              <SupplierPosListScreen
+                onSelectPo={(id) => router.push(`/purchasing/${id}`)}
+              />
+            )}
             {page === 'drivers' && (
               <AdminDrivers
                 onSelectDriver={(id) => router.push(`/drivers/${id}`)}

@@ -553,11 +553,74 @@ test('new Arabic copy uses the plain alif (no أ / إ / آ)', () => {
   )
 })
 
-// --- Not this round ------------------------------------------------------------------
+// --- The real screens (2026-10-19) -----------------------------------------------------
 
-test('no route, nav entry or page gate was added in this round', () => {
+test('the purchasing section, routes and page gates are keyed on purchasing.view', () => {
   const nav = read('src', 'lib', 'navPermissions.ts')
-  assert.doesNotMatch(nav, /purchasing/)
+  assert.match(nav, /\{ key: 'purchasing', requires: \[\{ key: 'purchasing\.view' \}\] \}/)
+  assert.match(nav, /'purchasing\/:id': \[\{ key: 'purchasing\.view' \}\]/)
+  assert.match(nav, /if \(first === 'purchasing' && second\) return 'purchasing\/:id'/)
+  const shellPages = nav.slice(
+    nav.indexOf('const ADMIN_SHELL_PAGES'),
+    nav.indexOf('const FIELD_SHELL_PAGES'),
+  )
+  assert.match(shellPages, /'purchasing',\s+'purchasing\/:id',/)
+  // Only the admin shell: the field homes never list it.
+  const fieldPages = nav.slice(
+    nav.indexOf('const FIELD_SHELL_PAGES'),
+    nav.indexOf('export const SHELL_PAGES'),
+  )
+  assert.doesNotMatch(fieldPages, /purchasing/)
+
   const app = read('src', 'App.tsx')
-  assert.doesNotMatch(app, /purchasing/i)
+  assert.match(app, /purchasing: \{ label: 'purchasing', icon: <ShoppingCart size=\{18\} \/> \}/)
+  assert.match(app, /page === 'purchasing\/:id' \? \(\s+<SupplierPoDetail/)
+  assert.match(app, /\{page === 'purchasing' && \(\s+<SupplierPosListScreen/)
+  assert.match(app, /onOpenPo=\{\s+shell\.pages\.has\('purchasing\/:id'\)/)
+})
+
+test('the real screens read through RLS and write only through the 0136 functions', () => {
+  const data = read('src', 'lib', 'purchasingData.ts')
+  for (const fn of [
+    'create_supplier_po',
+    'add_supplier_po_equipment',
+    'update_supplier_po_equipment_price',
+    'close_supplier_po',
+  ])
+    assert.match(data, new RegExp(`supabase\\.rpc\\('${fn}'`), fn)
+  // No direct insert / update / delete on a purchasing table.
+  assert.doesNotMatch(data, /\.(insert|update|upsert|delete)\(/)
+  for (const file of [
+    ['src', 'screens', 'purchasing', 'SupplierPosListScreen.tsx'],
+    ['src', 'screens', 'purchasing', 'SupplierPoDetail.tsx'],
+    ['src', 'components', 'purchasing', 'EquipmentPurchasingCard.tsx'],
+  ]) {
+    const source = read(...file)
+    assert.doesNotMatch(source, /\.(insert|update|upsert|delete)\(/, file.join('/'))
+    assert.doesNotMatch(source, /\.rpc\(/, `${file.join('/')} calls the lib, not rpc`)
+    assert.match(source, /usePermissions\(\)/, `${file.join('/')} gates by permissions`)
+  }
+  // The dialogs call the lib wrappers and map the tokens to fields.
+  const add = read('src', 'components', 'purchasing', 'AddEquipmentDialog.tsx')
+  assert.match(add, /addSupplierPoEquipment\(/)
+  assert.match(add, /SUPPLIER_PO_LINE_FIELD_RULES/)
+  const create = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
+  assert.match(create, /createSupplierPo\(/)
+  assert.match(create, /SUPPLIER_PO_CREATE_FIELD_RULES/)
+  const edit = read('src', 'components', 'purchasing', 'EditPriceDialog.tsx')
+  assert.match(edit, /updateSupplierPoEquipmentPrice\(/)
+  assert.match(edit, /SUPPLIER_PO_PRICE_FIELD_RULES/)
+  // The equipment page card renders nothing without purchasing.view.
+  const card = read('src', 'components', 'purchasing', 'EquipmentPurchasingCard.tsx')
+  assert.match(card, /const allowed = can\('purchasing\.view'\)/)
+  assert.match(card, /if \(!allowed\) return null/)
+  const detail = read('src', 'screens', 'EquipmentDetail.tsx')
+  assert.match(detail, /<EquipmentPurchasingCard equipmentId=\{equipment\.id\} onOpenPo=\{onOpenPo\} \/>/)
+})
+
+test('the mockup section of /ui-kit still names no route of its own', () => {
+  const mockup = read('src', 'screens', 'ui-kit', 'PurchasingMockup.tsx')
+  assert.doesNotMatch(mockup, /from '@\/lib\/purchasingData'/)
+  // Only comments name the functions there.
+  assert.doesNotMatch(mockup.replace(/^\s*\/\/.*$/gm, ''), /\.rpc\(/)
 })

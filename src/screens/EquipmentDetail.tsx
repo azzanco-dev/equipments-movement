@@ -46,6 +46,7 @@ import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
 import { PreviousCodesLine } from '@/components/inquiry/PreviousCodes'
 import { MovementTypeBadge } from '@/components/movement/ExitPurposeBadge'
 import { EquipmentLocationCard } from '@/components/afaqy/EquipmentLocationCard'
+import { EquipmentPurchasingCard } from '@/components/purchasing/EquipmentPurchasingCard'
 import { embeddedFullName, preferRecordName } from '@/lib/driverDisplayName'
 import {
   EQUIPMENT_CODE_CHANGES_LIMIT,
@@ -59,6 +60,8 @@ interface EquipmentDetailProps {
   onEdit: (eq: Equipment) => void
   onSelectMovement?: (id: string) => void
   onViewAllMovements?: (equipmentCode: string) => void
+  /** Opens a supplier PO from the «المشتريات» card (purchasing.view). */
+  onOpenPo?: (poId: string) => void
 }
 
 /** The latest movements shown on the page; the full history is one "View
@@ -94,6 +97,7 @@ export function EquipmentDetail({
   onEdit,
   onSelectMovement,
   onViewAllMovements,
+  onOpenPo,
 }: EquipmentDetailProps) {
   const { t, lang } = useI18n()
   const [equipment, setEquipment] = useState<Equipment | null>(null)
@@ -427,6 +431,9 @@ export function EquipmentDetail({
         equipmentCode={equipment.code}
         className="p-4"
       />
+
+      {/* Purchasing (2026-10-19): renders nothing without purchasing.view. */}
+      <EquipmentPurchasingCard equipmentId={equipment.id} onOpenPo={onOpenPo} />
 
       <MiniTable
         title={t('movementHistory')}
