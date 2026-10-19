@@ -25,7 +25,8 @@ import {
 } from '@/lib/purchasing'
 import {
   addSupplierPoEquipment,
-  equipmentOptionLoader,
+  equipmentAtProjectOptionLoader,
+  fetchPurchasingUnit,
   isInternalUnit,
   type PurchasingUnit,
 } from '@/lib/purchasingData'
@@ -37,20 +38,26 @@ const EMPTY_FORM: SupplierPoLineFormValues = {
 }
 
 /**
- * «اضافة معدة» on an open PO: the unit (server-side search by code or
- * plate), the price excluding VAT (locked at 0 for an Al-Azani or internal
- * unit) and a note. Saves through `add_supplier_po_equipment`, which creates
- * or reuses the unit's card behind the scenes.
+ * «اضافة معدة» on an open PO: the unit (server-side search, limited to the
+ * units inside the PO's company and project right now — owner rule
+ * 2026-10-19, migration 0137), the price excluding VAT (locked at 0 for an
+ * Al-Azani or internal unit) and a note. Saves through
+ * `add_supplier_po_equipment`, which re-checks the rule and creates or reuses
+ * the unit's card behind the scenes.
  */
 export function AddEquipmentDialog({
   open,
   onOpenChange,
   poId,
+  companyId,
+  projectId,
   onAdded,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   poId: string
+  companyId: string
+  projectId: string
   onAdded: () => void
 }) {
   const { t } = useI18n()
@@ -63,7 +70,10 @@ export function AddEquipmentDialog({
   const [message, setMessage] = useState<TranslationKey | null>(null)
   const [saving, setSaving] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
-  const loader = useMemo(() => equipmentOptionLoader(), [])
+  const loadOptions = useMemo(
+    () => equipmentAtProjectOptionLoader(companyId, projectId),
+    [companyId, projectId],
+  )
   const internal = isInternalUnit(unit)
 
   useEffect(() => {
@@ -148,6 +158,7 @@ export function AddEquipmentDialog({
           label={t('supplierPoEquipmentField')}
           name="equipment_id"
           required
+          hint={t('supplierPoEquipmentAtProjectHint')}
           error={errors.equipment_id && t(errors.equipment_id)}
         >
           {(control) => (
@@ -156,17 +167,18 @@ export function AddEquipmentDialog({
               value={form.equipment_id}
               selectedOption={option}
               placeholder={t('supplierPoEquipmentPlaceholder')}
-              loadOptions={loader.loadOptions}
+              loadOptions={loadOptions}
               onChange={(value, next) => {
-                const picked = value ? loader.unitOf(value) : null
-                setUnit(picked)
-                // An internal unit locks the price at 0 the moment it is
-                // picked; another unit gets the field back empty.
-                update({
-                  equipment_id: value,
-                  price: isInternalUnit(picked) ? '0' : '',
-                })
                 setOption(next)
+                update({ equipment_id: value, price: '' })
+                setUnit(null)
+                if (!value) return
+                // The unit's owner decides the price lock: an internal unit
+                // locks it at 0 the moment it is known.
+                void fetchPurchasingUnit(value).then((picked) => {
+                  setUnit(picked)
+                  if (isInternalUnit(picked)) update({ price: '0' })
+                })
               }}
             />
           )}

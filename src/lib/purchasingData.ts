@@ -8,7 +8,7 @@ import type {
   SupplierPoStatus,
 } from '@/lib/purchasing'
 import { supplierPoSupplierLabel } from '@/lib/purchasing'
-import { buildSearchFilter, EQUIPMENT_SEARCH_FIELDS } from '@/lib/search'
+import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { unwrapRows } from '@/lib/supabaseResult'
 import type { OwnershipStatus } from '@/lib/types'
@@ -76,6 +76,8 @@ export interface EquipmentCardRef {
   equipment_id: string
   period_from: string
   period_to: string | null
+  /** 0137: the site entry that brought the unit (set by the database). */
+  entry_log_id?: string | null
   equipment: PurchasingUnit | null
 }
 
@@ -117,7 +119,7 @@ export const SUPPLIER_PO_LIST_SELECT = `${SUPPLIER_PO_SELECT},supplier_po_equipm
 export const PURCHASING_UNIT_SELECT =
   'id,code,type,plate_number,chassis_number,ownership_status,lessor:lessors(id,name,is_internal)'
 
-export const SUPPLIER_PO_LINE_SELECT = `id,supplier_po_id,equipment_card_id,price,note,created_at,updated_at,card:equipment_cards(id,equipment_id,period_from,period_to,equipment:equipment(${PURCHASING_UNIT_SELECT}))`
+export const SUPPLIER_PO_LINE_SELECT = `id,supplier_po_id,equipment_card_id,price,note,created_at,updated_at,card:equipment_cards(id,equipment_id,period_from,period_to,entry_log_id,equipment:equipment(${PURCHASING_UNIT_SELECT}))`
 
 export const SUPPLIER_PO_EVENT_SELECT =
   'id,supplier_po_id,event_type,payload,actor_id,created_at'
@@ -214,39 +216,70 @@ export function supplierPoEventDetail(
 
 // --- Reads ---------------------------------------------------------------------
 
-/** Server-side searched equipment options for «اضافة معدة»: active units,
- *  first 20 by code; the picked unit is kept so the dialog can lock the price
- *  of an internal one at 0 without a second request. */
-export function equipmentOptionLoader(): {
-  loadOptions: (query: string) => Promise<AsyncSearchSelectOption[]>
-  unitOf: (id: string) => PurchasingUnit | null
-} {
-  const units = new Map<string, PurchasingUnit>()
-  return {
-    loadOptions: async (query) => {
-      let request = supabase
-        .from('equipment')
-        .select(PURCHASING_UNIT_SELECT)
-        .eq('is_active', true)
-        .order('code')
-        .limit(20)
-      const searchFilter = buildSearchFilter(EQUIPMENT_SEARCH_FIELDS, query)
-      if (searchFilter) request = request.or(searchFilter)
-      // PostgREST types a to-one embed as an array; the row carries one lessor.
-      const rows = unwrapRows(
-        (await request) as unknown as { data: PurchasingUnit[] | null; error: unknown },
+/** The open-visit columns the add dialog's search reads. */
+const OPEN_VISIT_SEARCH_FIELDS = [
+  'equipment_code',
+  'equipment_type_search',
+  'equipment_plate_number',
+  'equipment_plate_digits',
+] as const
+
+interface OpenVisitRow {
+  entry_id: string
+  equipment_id: string
+  equipment_code: string
+  equipment_type: string | null
+  equipment_plate_number: string | null
+  entry_at: string
+}
+
+/**
+ * Server-side searched options for «اضافة معدة» (owner rule 2026-10-19,
+ * migration 0137): only the units INSIDE the PO's company and project right
+ * now, i.e. the open site visits of that company and project
+ * (`movement_visits`, RLS of the movements), first 20 by code. The database
+ * re-checks the same rule in `add_supplier_po_equipment`.
+ */
+export function equipmentAtProjectOptionLoader(
+  companyId: string,
+  projectId: string,
+): (query: string) => Promise<AsyncSearchSelectOption[]> {
+  return async (query) => {
+    let request = supabase
+      .from('movement_visits')
+      .select(
+        'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,entry_at',
       )
-      for (const unit of rows) units.set(unit.id, unit)
-      return rows.map((unit) => ({
-        value: unit.id,
-        label: unit.code,
-        description: [unit.type, unit.plate_number ?? unit.chassis_number]
-          .filter(Boolean)
-          .join(' · '),
-      }))
-    },
-    unitOf: (id) => units.get(id) ?? null,
+      .eq('is_open', true)
+      .eq('movement_context', 'site')
+      .eq('company_id', companyId)
+      .eq('project_id', projectId)
+      .order('equipment_code')
+      .limit(20)
+    const searchFilter = buildSearchFilter(OPEN_VISIT_SEARCH_FIELDS, query)
+    if (searchFilter) request = request.or(searchFilter)
+    return unwrapRows<OpenVisitRow>(await request).map((visit) => ({
+      value: visit.equipment_id,
+      label: visit.equipment_code,
+      description: [visit.equipment_type, visit.equipment_plate_number]
+        .filter(Boolean)
+        .join(' · '),
+    }))
   }
+}
+
+/** The unit behind a picked option, with its owner and supplier, so the
+ *  dialog can lock the price of an internal one at 0. */
+export async function fetchPurchasingUnit(
+  equipmentId: string,
+): Promise<PurchasingUnit | null> {
+  const { data, error } = await supabase
+    .from('equipment')
+    .select(PURCHASING_UNIT_SELECT)
+    .eq('id', equipmentId)
+    .maybeSingle()
+  if (error) return null
+  return (data as unknown as PurchasingUnit | null) ?? null
 }
 
 // --- Writes (the four functions of 0136) --------------------------------------------

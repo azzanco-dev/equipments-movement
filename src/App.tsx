@@ -294,6 +294,7 @@ const NAV_CHILD_LABELS: Record<NavChildKey, TranslationKey> = {
   'reports/entries': 'entryReports',
   'reports/equipment': 'equipmentReports',
   'reports/workshop': 'workshopReports',
+  'purchasing/orders': 'supplierPos',
 }
 
 /**
@@ -536,7 +537,7 @@ function AppContent() {
         ) : page === 'purchasing/:id' ? (
           <SupplierPoDetail
             poId={detailId}
-            onBack={() => router.push('/purchasing')}
+            onBack={() => router.push('/purchasing/orders')}
             onOpenEquipment={
               canOpenEquipment
                 ? (id) => router.push(`/equipment/${id}`)
@@ -578,7 +579,7 @@ function AppContent() {
             {page === 'projects' && <AdminProjects />}
             {page === 'companies' && <AdminCompanies />}
             {page === 'lessors' && <AdminLessors />}
-            {page === 'purchasing' && (
+            {page === 'purchasing/orders' && (
               <SupplierPosListScreen
                 onSelectPo={(id) => router.push(`/purchasing/${id}`)}
               />

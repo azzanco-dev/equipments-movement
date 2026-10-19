@@ -77,6 +77,9 @@ export interface SupplierPoDetailProps {
 type SortKey = 'equipment' | 'supplier' | 'period' | 'price'
 type SortDirection = 'asc' | 'desc'
 
+/** The list the page returns to (the «اوامر الشراء» child of «المشتريات»). */
+export const SUPPLIER_POS_PATH = '/purchasing/orders'
+
 /** The card period behind a line: «from – to», or «from – مفتوح». */
 function periodLabel(
   card: { period_from: string; period_to: string | null },
@@ -697,6 +700,8 @@ export function SupplierPoDetail({
         open={addOpen}
         onOpenChange={setAddOpen}
         poId={po.id}
+        companyId={po.company_id}
+        projectId={po.project_id}
         onAdded={() => {
           setAddOpen(false)
           fetchData()

@@ -267,10 +267,14 @@ test('supplierPoLineFormSchema: the unit, a valid price, and zero for an interna
 
 // --- The 0136 token mapping -----------------------------------------------------------
 
-const MIGRATION = '20261018130000_0136_purchasing_supplier_pos.sql'
+const MIGRATIONS = [
+  '20261018130000_0136_purchasing_supplier_pos.sql',
+  // 0137 re-creates add_supplier_po_equipment with one more token.
+  '20261019100000_0137_supplier_po_equipment_at_project.sql',
+]
 
-test('every stable token of migration 0136 is known and mapped', () => {
-  const sql = read('supabase', 'migrations', MIGRATION)
+test('every stable token of migrations 0136 and 0137 is known and mapped', () => {
+  const sql = MIGRATIONS.map((file) => read('supabase', 'migrations', file)).join('\n')
   const raised = new Set(
     [...sql.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g)].map((m) => m[1]),
   )
@@ -422,7 +426,7 @@ test('status badge, event labels and the price format', () => {
     closed: { key: 'supplierPoStatusClosed', tone: 'neutral' },
   })
   // The five event types of the 0136 CHECK.
-  const sql = read('supabase', 'migrations', MIGRATION)
+  const sql = read('supabase', 'migrations', MIGRATIONS[0])
   const check = /event_type IN \(([^)]+)\)/.exec(sql)
   const types = [...check[1].matchAll(/'(\w+)'/g)].map((m) => m[1]).sort()
   assert.deepEqual(
@@ -557,14 +561,21 @@ test('new Arabic copy uses the plain alif (no أ / إ / آ)', () => {
 
 test('the purchasing section, routes and page gates are keyed on purchasing.view', () => {
   const nav = read('src', 'lib', 'navPermissions.ts')
-  assert.match(nav, /\{ key: 'purchasing', requires: \[\{ key: 'purchasing\.view' \}\] \}/)
+  // A parent with its sections (owner 2026-10-19), the PO list first.
+  assert.match(
+    nav.replace(/\s+/g, ' '),
+    /\{ key: 'purchasing', requires: \[\{ key: 'purchasing\.view' \}\], children: \[ \{ key: 'purchasing\/orders', requires: \[\{ key: 'purchasing\.view' \}\] \}, \], \}/,
+  )
   assert.match(nav, /'purchasing\/:id': \[\{ key: 'purchasing\.view' \}\]/)
-  assert.match(nav, /if \(first === 'purchasing' && second\) return 'purchasing\/:id'/)
+  assert.match(
+    nav.replace(/\s+/g, ' '),
+    /if \(!second \|\| second === 'orders'\) return 'purchasing\/orders' return 'purchasing\/:id'/,
+  )
   const shellPages = nav.slice(
     nav.indexOf('const ADMIN_SHELL_PAGES'),
     nav.indexOf('const FIELD_SHELL_PAGES'),
   )
-  assert.match(shellPages, /'purchasing',\s+'purchasing\/:id',/)
+  assert.match(shellPages, /'purchasing',\s+'purchasing\/orders',\s+'purchasing\/:id',/)
   // Only the admin shell: the field homes never list it.
   const fieldPages = nav.slice(
     nav.indexOf('const FIELD_SHELL_PAGES'),
@@ -574,8 +585,9 @@ test('the purchasing section, routes and page gates are keyed on purchasing.view
 
   const app = read('src', 'App.tsx')
   assert.match(app, /purchasing: \{ label: 'purchasing', icon: <ShoppingCart size=\{18\} \/> \}/)
+  assert.match(app, /'purchasing\/orders': 'supplierPos'/)
   assert.match(app, /page === 'purchasing\/:id' \? \(\s+<SupplierPoDetail/)
-  assert.match(app, /\{page === 'purchasing' && \(\s+<SupplierPosListScreen/)
+  assert.match(app, /\{page === 'purchasing\/orders' && \(\s+<SupplierPosListScreen/)
   assert.match(app, /onOpenPo=\{\s+shell\.pages\.has\('purchasing\/:id'\)/)
 })
 
@@ -604,6 +616,17 @@ test('the real screens read through RLS and write only through the 0136 function
   const add = read('src', 'components', 'purchasing', 'AddEquipmentDialog.tsx')
   assert.match(add, /addSupplierPoEquipment\(/)
   assert.match(add, /SUPPLIER_PO_LINE_FIELD_RULES/)
+  // 0137: only the units inside the PO's company and project are offered.
+  assert.match(add, /equipmentAtProjectOptionLoader\(companyId, projectId\)/)
+  const dataLib = read('src', 'lib', 'purchasingData.ts')
+  const loader = dataLib.slice(
+    dataLib.indexOf('export function equipmentAtProjectOptionLoader'),
+  )
+  assert.match(loader, /\.from\('movement_visits'\)/)
+  assert.match(loader, /\.eq\('is_open', true\)/)
+  assert.match(loader, /\.eq\('movement_context', 'site'\)/)
+  assert.match(loader, /\.eq\('company_id', companyId\)/)
+  assert.match(loader, /\.eq\('project_id', projectId\)/)
   const create = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
   assert.match(create, /createSupplierPo\(/)
   assert.match(create, /SUPPLIER_PO_CREATE_FIELD_RULES/)

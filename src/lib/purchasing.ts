@@ -180,6 +180,13 @@ export const SUPPLIER_PO_LINE_FIELD_RULES: readonly DatabaseFieldRule<SupplierPo
       field: 'equipment_id',
       key: 'supplierPoErrorInvalidEquipment',
     },
+    // 0137: the unit must be inside the PO's company and project right now.
+    {
+      on: 'raised',
+      match: 'equipment_not_at_po_project',
+      field: 'equipment_id',
+      key: 'supplierPoErrorNotAtProject',
+    },
   ]
 
 /** Tokens of update_supplier_po_equipment_price that name the price field. */
@@ -214,11 +221,12 @@ export const SUPPLIER_PO_FORM_MESSAGES: Readonly<Record<string, TranslationKey>>
     invalid_line: 'supplierPoErrorInvalidLine', // update price
   }
 
-/** Every stable token of migration 0136 the client maps, for the tests. */
+/** Every stable token of migrations 0136 and 0137 the client maps, for the tests. */
 export const SUPPLIER_PO_ERROR_TOKENS: readonly string[] = [
   'purchasing_manage_required',
   'invalid_po',
   'invalid_equipment',
+  'equipment_not_at_po_project',
   'invalid_lessor',
   'invalid_company',
   'invalid_project',

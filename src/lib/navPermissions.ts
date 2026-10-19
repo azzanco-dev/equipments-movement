@@ -49,7 +49,10 @@ export type NavItemKey =
   | 'settings'
 
 export type NavChildKey =
-  'reports/entries' | 'reports/equipment' | 'reports/workshop'
+  | 'reports/entries'
+  | 'reports/equipment'
+  | 'reports/workshop'
+  | 'purchasing/orders'
 
 /** One permission key, optionally limited to some of its scopes. */
 export interface NavGate {
@@ -83,10 +86,16 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { key: 'projects', requires: [{ key: 'companies_projects.read' }] },
   { key: 'companies', requires: [{ key: 'companies_projects.read' }] },
   { key: 'lessors', requires: [{ key: 'lessors.read' }] },
-  // Purchasing (migration 0136, screens 2026-10-19): the supplier POs. The
-  // key is held by the admin and the custom «المشتريات» role only, so the
-  // frozen legacy menus below are unchanged.
-  { key: 'purchasing', requires: [{ key: 'purchasing.view' }] },
+  // Purchasing (migration 0136, screens 2026-10-19): a parent with its
+  // sections (owner 2026-10-19: «رئيسية وتحتها فرعيات»), the supplier POs
+  // first; the key is held by the admin and the custom «المشتريات» role.
+  {
+    key: 'purchasing',
+    requires: [{ key: 'purchasing.view' }],
+    children: [
+      { key: 'purchasing/orders', requires: [{ key: 'purchasing.view' }] },
+    ],
+  },
   { key: 'drivers', requires: [{ key: 'drivers.read' }] },
   { key: 'users', requires: [{ key: 'users.manage' }] },
   { key: 'activity', requires: [{ key: 'movements.activity' }] },
@@ -134,7 +143,7 @@ const ADMIN_MENU: readonly VisibleNavItem[] = [
   { key: 'lessors' },
   // 2026-10-19: the admin holds purchasing.view in both mappings (0136), so
   // the fallback menu lists the section too.
-  { key: 'purchasing' },
+  { key: 'purchasing', children: ['purchasing/orders'] },
   { key: 'drivers' },
   { key: 'users' },
   { key: 'activity' },
@@ -356,7 +365,12 @@ export function routePageOf(segments: readonly string[]): RoutePage {
   if (first === 'equipment' && second) return 'equipment/:id'
   if (first === 'drivers' && second) return 'drivers/:id'
   if (first === 'users' && second) return 'users/:id'
-  if (first === 'purchasing' && second) return 'purchasing/:id'
+  if (first === 'purchasing') {
+    // /purchasing opens its first section, like /reports; any other second
+    // segment is a PO id.
+    if (!second || second === 'orders') return 'purchasing/orders'
+    return 'purchasing/:id'
+  }
   if (first === 'reports') {
     if (second === 'workshop') return 'reports/workshop'
     if (second === 'equipment') return 'reports/equipment'
@@ -444,6 +458,7 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'drivers/:id',
   'users/:id',
   'purchasing',
+  'purchasing/orders',
   'purchasing/:id',
 ]
 const FIELD_SHELL_PAGES: readonly RoutePage[] = [

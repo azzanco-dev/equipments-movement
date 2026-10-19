@@ -1926,6 +1926,10 @@ export const translations = {
     supplierPoErrorInvalidCompany: 'الشركة المختارة غير موجودة.',
     supplierPoErrorInvalidProject: 'المشروع المختار غير موجود.',
     supplierPoErrorInvalidEquipment: 'المعدة المختارة غير موجودة.',
+    supplierPoErrorNotAtProject:
+      'المعدة ليست داخل شركة الامر ومشروعه حاليا.',
+    supplierPoEquipmentAtProjectHint:
+      'تظهر المعدات الموجودة الان داخل شركة الامر ومشروعه فقط.',
     supplierPoErrorInvalidLine: 'سطر المعدة غير موجود.',
     supplierPoSaveFailed: 'تعذر الحفظ. حاول مرة اخرى.',
     equipmentPurchasingCard: 'المشتريات',
@@ -3927,6 +3931,10 @@ export const translations = {
     supplierPoErrorInvalidCompany: 'The selected company does not exist.',
     supplierPoErrorInvalidProject: 'The selected project does not exist.',
     supplierPoErrorInvalidEquipment: 'The selected equipment does not exist.',
+    supplierPoErrorNotAtProject:
+      "The equipment is not inside the order's company and project right now.",
+    supplierPoEquipmentAtProjectHint:
+      "Only units currently inside the order's company and project are listed.",
     supplierPoErrorInvalidLine: 'The equipment line does not exist.',
     supplierPoSaveFailed: 'Could not save. Please try again.',
     equipmentPurchasingCard: 'Purchasing',

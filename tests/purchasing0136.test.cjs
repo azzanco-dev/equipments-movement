@@ -91,7 +91,6 @@ test('0136 is the single 0136 migration, right after 0135', () => {
   assert.ok(at > 0, 'migration 0136 present')
   assert.equal(migrations[at - 1], PREVIOUS)
   assert.equal(migrations.filter((file) => /_0136_/.test(file)).length, 1)
-  assert.equal(migrations[migrations.length - 1], MIGRATION, 'latest migration')
 })
 
 test('the five purchasing tables exist with RLS, a purchasing.view SELECT policy and no write policy', () => {
