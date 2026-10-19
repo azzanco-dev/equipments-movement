@@ -2001,13 +2001,19 @@ function PoPageMockupV2({
                         </div>
                       </li>
                     ))}
+                    {/* The total is a card too (owner 2026-10-19), with the
+                        amount in the same end block as the prices above. */}
+                    <li className="rounded-xl border bg-surface p-3 sm:p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
+                        <p className="text-sm font-medium">
+                          {t('supplierPoSummaryTotal')}
+                        </p>
+                        <p className="text-lg font-semibold sm:w-44 sm:shrink-0 sm:text-end">
+                          <Price value={total} />
+                        </p>
+                      </div>
+                    </li>
                   </ul>
-                  <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-sm sm:px-8">
-                    <span className="text-muted">{t('supplierPoSummaryTotal')}</span>
-                    <span className="text-lg font-semibold">
-                      <Price value={total} />
-                    </span>
-                  </div>
                 </>
               )}
             </Card>
