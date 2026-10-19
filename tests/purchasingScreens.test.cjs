@@ -116,6 +116,8 @@ test('the mockup renders the three screens and their states with sample data onl
     'PoListMockup',
     'CreatePoDialog',
     'PoPageMockup',
+    'PoPageMockupV2',
+    'EventTimeline',
     'AddEquipmentDialog',
     'EditPriceDialog',
     'EventsList',
@@ -134,11 +136,27 @@ test('the mockup renders the three screens and their states with sample data onl
   assert.match(source, /<InfoGridSection/)
   assert.match(source, /useConfirm\(\)/)
   assert.match(source, /<EquipmentIdentifierTag/)
-  // The permission note above each mockup.
+  // The permission note above each mockup (the PO page twice: the current
+  // page and the proposed detail-page pattern, owner request 2026-10-19).
   assert.equal(
     (source.match(/permission="[^"]*purchasing\.view[^"]*"/g) ?? []).length,
-    3,
+    4,
   )
+  // The proposed pattern: summary strip, two-column body, card list on
+  // narrow screens, bottom action bar on mobile, timeline.
+  const v2 = source.slice(
+    source.indexOf('function PoPageMockupV2('),
+    source.indexOf('function EquipmentPurchasingCardMockup('),
+  )
+  assert.match(v2, /<StatCard/)
+  assert.match(v2, /xl:grid-cols-3/)
+  assert.match(v2, /xl:col-span-2/)
+  assert.match(v2, /md:hidden/)
+  assert.match(v2, /hidden p-4 md:block/)
+  assert.match(v2, /sticky bottom-0[^"]*sm:hidden/)
+  assert.match(v2, /env\(safe-area-inset-bottom\)/)
+  assert.match(v2, /<EventTimeline/)
+  assert.match(v2, /<DescriptionList/)
   // No hardcoded palette colors (tokens only).
   assert.doesNotMatch(
     source,

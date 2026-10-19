@@ -6,7 +6,23 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { Edit2, FileText, Lock, Plus, ShoppingCart } from 'lucide-react'
+import {
+  Activity,
+  Building2,
+  Calendar,
+  CalendarDays,
+  Clock,
+  Coins,
+  Edit2,
+  FileText,
+  Lock,
+  MapPin,
+  Plus,
+  ShoppingCart,
+  StickyNote,
+  Truck,
+  User,
+} from 'lucide-react'
 import {
   AsyncSearchSelect,
   type AsyncSearchSelectOption,
@@ -24,6 +40,7 @@ import {
   Card,
   DataTable,
   DatePicker,
+  DescriptionList,
   DetailHeader,
   Dialog,
   EmptyState,
@@ -36,12 +53,14 @@ import {
   SectionHeader,
   Select,
   Skeleton,
+  StatCard,
   Tabs,
   TabsList,
   TabsTrigger,
   Textarea,
   useConfirm,
   type DataTableColumn,
+  type DescriptionListItem,
   type InfoGridItem,
 } from '@/components/ui'
 import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
@@ -1440,6 +1459,533 @@ function PoPageMockup({
   )
 }
 
+// --- 2b. The PO page, the PROPOSED detail-page pattern ----------------------------
+//
+// Owner request 2026-10-19 («ابغى اعيد اشتغل على صفحات التفاصيل ابتدا من
+// تفاصيل الSPO»): ONE pattern for every detail page, shown here on the SPO
+// page next to the current one so it can be approved on /ui-kit first and
+// then applied to the equipment, driver, movement and user pages:
+//   1. a header card: the identifier with its status, one line of context
+//      (supplier · company · project), a small meta line (start, created
+//      by, closed at) and the actions at the end on desktop;
+//   2. a summary strip of two to four numbers (StatCard) that answers the
+//      first questions before any table;
+//   3. a two-column body from `xl`: the main record list (the PO equipment
+//      with a total line) takes two thirds; the facts («بيانات الامر», a
+//      labelled list with icons) and the activity timeline sit beside it.
+//      On mobile everything stacks in that order;
+//   4. the record list becomes a card list below `md`: no sideways scroll;
+//   5. on mobile the primary actions sit in a bar at the bottom of the
+//      screen (44 px targets, safe-area padding); desktop keeps them in the
+//      header. Destructive actions keep their confirmation dialog.
+// Same sample data, same dialogs and the same tokens as the current page.
+
+function daysSince(dateKey: string): number {
+  const start = Date.parse(`${dateKey}T00:00:00+03:00`)
+  const today = Date.parse(`${saudiDateKey()}T00:00:00+03:00`)
+  if (Number.isNaN(start) || Number.isNaN(today)) return 0
+  return Math.max(0, Math.round((today - start) / 86_400_000))
+}
+
+function HeaderMeta({
+  icon,
+  label,
+  value,
+  ltr,
+}: {
+  icon: ReactNode
+  label: string
+  value: string
+  ltr?: boolean
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span aria-hidden="true" className="shrink-0">
+        {icon}
+      </span>
+      <dt>{label}</dt>
+      <dd className="m-0 font-medium text-fg">
+        {ltr ? <bdi dir="ltr">{value}</bdi> : value}
+      </dd>
+    </div>
+  )
+}
+
+function EventTimeline({ events }: { events: MockEvent[] }) {
+  const { t } = useI18n()
+  const latest = [...events]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, SUPPLIER_PO_EVENTS_LIMIT)
+  if (latest.length === 0)
+    return <p className="text-sm text-muted">{t('supplierPoNoEvents')}</p>
+  return (
+    <ol className="relative ms-1.5 space-y-4 border-s ps-4">
+      {latest.map((event) => (
+        <li key={event.id} className="relative">
+          <span
+            aria-hidden="true"
+            className="absolute -start-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-bg bg-muted"
+          />
+          <p className="text-sm font-medium">
+            {t(SUPPLIER_PO_EVENT_LABEL_KEYS[event.event_type])}
+          </p>
+          {event.detail && (
+            <p className="text-sm text-muted">
+              <bdi dir="ltr">{event.detail}</bdi>
+            </p>
+          )}
+          <p className="mt-0.5 text-xs text-muted">
+            {event.actor_name} ·{' '}
+            <bdi dir="ltr">{formatDateTime(event.created_at, false)}</bdi>
+          </p>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function PoPageMockupV2({
+  pos,
+  lines,
+  events,
+  selectedId,
+  onSelect,
+  onAddLine,
+  onChangePrice,
+  onClose,
+}: {
+  pos: MockPo[]
+  lines: MockLine[]
+  events: MockEvent[]
+  selectedId: string
+  onSelect: (id: string) => void
+  onAddLine: (poId: string, unit: MockEquipment, price: number, note: string) => void
+  onChangePrice: (line: MockLine, price: number) => void
+  onClose: (poId: string) => void
+}) {
+  const { t, lang } = useI18n()
+  const [state, setState] = useState<DemoState>('data')
+  const [addOpen, setAddOpen] = useState(false)
+  const [editing, setEditing] = useState<
+    (MockLine & { unit: MockEquipment | null }) | null
+  >(null)
+  const { confirm, confirmDialog } = useConfirm()
+
+  const po = pos.find((item) => item.id === selectedId) ?? pos[0]
+  const row = poRow(po)
+  const poLines = lines
+    .filter((line) => line.supplier_po_id === po.id)
+    .map((line) => ({ ...line, unit: equipmentById(line.equipment_id) }))
+  const poEvents = events.filter((event) => event.supplier_po_id === po.id)
+  const open = po.status === 'open'
+  const total = poLines.reduce((sum, line) => sum + line.price, 0)
+  const lastEvent = [...poEvents].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at),
+  )[0]
+  const company = companyById(po.company_id)
+  const project = projectById(po.project_id)
+  const companyName = company
+    ? localizedName(lang, company.name_ar, company.name_en)
+    : '—'
+  const projectName = project
+    ? localizedName(lang, project.name_ar, project.name_en)
+    : '—'
+  const supplier = supplierPoSupplierLabel(row, t)
+
+  const closePo = async () => {
+    if (
+      !(await confirm({
+        title: t('supplierPoCloseConfirmTitle'),
+        description: t('supplierPoCloseConfirmDesc'),
+        confirmLabel: t('supplierPoClose'),
+        tone: 'danger',
+      }))
+    )
+      return
+    // In the real screen: `supabase.rpc('close_supplier_po', …)`.
+    onClose(po.id)
+  }
+
+  const facts: DescriptionListItem[] = [
+    {
+      key: 'supplier',
+      icon: <Building2 size={16} />,
+      label: t('supplierPoSupplier'),
+      value: supplier,
+    },
+    {
+      key: 'company',
+      icon: <Building2 size={16} />,
+      label: t('company'),
+      value: companyName,
+    },
+    {
+      key: 'project',
+      icon: <MapPin size={16} />,
+      label: t('project'),
+      value: projectName,
+    },
+    {
+      key: 'start',
+      icon: <Calendar size={16} />,
+      label: t('supplierPoStartDate'),
+      value: formatDate(po.start_date),
+      dir: 'ltr',
+    },
+    {
+      key: 'createdBy',
+      icon: <User size={16} />,
+      label: t('supplierPoCreatedBy'),
+      value: po.created_by_name,
+    },
+    {
+      key: 'createdAt',
+      icon: <Clock size={16} />,
+      label: t('supplierPoCreatedAt'),
+      value: formatDateTime(po.created_at),
+      dir: 'ltr',
+    },
+    ...(po.closed_at
+      ? [
+          {
+            key: 'closedAt',
+            icon: <Lock size={16} />,
+            label: t('supplierPoClosedAt'),
+            value: formatDateTime(po.closed_at),
+            dir: 'ltr' as const,
+          },
+        ]
+      : []),
+    {
+      key: 'notes',
+      icon: <StickyNote size={16} />,
+      label: t('notes'),
+      value: po.notes,
+    },
+  ]
+
+  type LineRow = (typeof poLines)[number]
+  const columns: DataTableColumn<LineRow>[] = [
+    {
+      key: 'equipment',
+      header: t('supplierPoEquipmentField'),
+      cell: (line) => <EquipmentCell unit={line.unit} />,
+    },
+    {
+      key: 'note',
+      header: t('supplierPoLineNote'),
+      className: 'text-muted',
+      cell: (line) => line.note ?? '—',
+    },
+    {
+      key: 'price',
+      header: t('supplierPoPrice'),
+      align: 'end',
+      cell: (line) => <Price value={line.price} />,
+    },
+    ...(open
+      ? [
+          {
+            key: 'actions',
+            header: t('actions'),
+            align: 'end' as const,
+            width: '4rem',
+            cell: (line: LineRow) => (
+              <IconButton
+                size="sm"
+                label={t('supplierPoEditPrice')}
+                icon={<Edit2 size={15} />}
+                onClick={() => setEditing(line)}
+              />
+            ),
+          },
+        ]
+      : []),
+  ]
+
+  const addButton = (
+    <Button
+      variant="primary"
+      size="sm"
+      icon={<Plus size={14} aria-hidden="true" />}
+      onClick={() => setAddOpen(true)}
+    >
+      {t('supplierPoAddEquipment')}
+    </Button>
+  )
+
+  return (
+    <Mockup
+      title="2ب. صفحة امر الشراء — النمط المقترح لصفحات التفاصيل"
+      permission="purchasing.view يعرض الصفحة · purchasing.manage يظهر «اضافة معدة» و«تعديل السعر» و«اغلاق الامر» على الامر المفتوح"
+      controls={
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            size="sm"
+            aria-label="امر الشراء المعروض"
+            className="w-[200px]"
+            value={po.id}
+            onValueChange={onSelect}
+            options={pos.map((item) => ({
+              value: item.id,
+              label: `${item.po_number} · ${t(SUPPLIER_PO_STATUS_BADGE[item.status].key)}`,
+            }))}
+          />
+          <StateTabs
+            value={state}
+            onChange={setState}
+            options={['data', 'loading', 'empty', 'error']}
+          />
+        </div>
+      }
+    >
+      {state === 'loading' ? (
+        <PoPageSkeleton />
+      ) : state === 'error' || state === 'empty' ? (
+        <div className="space-y-4">
+          <BackButton onClick={() => undefined} label={t('supplierPoBackToList')} />
+          {state === 'error' ? (
+            <ErrorState
+              description={t('supplierPoLoadError')}
+              onRetry={() => setState('data')}
+            />
+          ) : (
+            <EmptyState
+              icon={<FileText size={28} aria-hidden="true" />}
+              title={t('supplierPoNotFound')}
+            />
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <BackButton onClick={() => undefined} label={t('supplierPoBackToList')} />
+
+          {/* 1. Header card: identity, context, meta, actions, summary. */}
+          <div className="card space-y-4 p-4">
+            <DetailHeader
+              as="h2"
+              identifier={po.po_number}
+              identifierLtr
+              subtitle={`${supplier} · ${companyName} · ${projectName}`}
+              badges={<StatusBadge status={po.status} />}
+              actions={
+                open ? (
+                  <div className="hidden gap-2 sm:flex">
+                    {addButton}
+                    <Button variant="danger" size="sm" onClick={closePo}>
+                      {t('supplierPoClose')}
+                    </Button>
+                  </div>
+                ) : undefined
+              }
+            />
+            <dl className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-muted">
+              <HeaderMeta
+                icon={<Calendar size={14} />}
+                label={t('supplierPoStartDate')}
+                value={formatDate(po.start_date)}
+                ltr
+              />
+              <HeaderMeta
+                icon={<User size={14} />}
+                label={t('supplierPoCreatedBy')}
+                value={po.created_by_name}
+              />
+              {po.closed_at && (
+                <HeaderMeta
+                  icon={<Lock size={14} />}
+                  label={t('supplierPoClosedAt')}
+                  value={formatDateTime(po.closed_at)}
+                  ltr
+                />
+              )}
+            </dl>
+            {/* 2. Summary strip. */}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <StatCard
+                label={t('supplierPoEquipmentCount')}
+                value={poLines.length}
+                icon={<Truck size={18} />}
+              />
+              <StatCard
+                label={t('supplierPoSummaryTotal')}
+                value={<bdi dir="ltr">{formatSupplierPoPrice(total)}</bdi>}
+                icon={<Coins size={18} />}
+              />
+              <StatCard
+                label={t('supplierPoSummaryAge')}
+                value={daysSince(po.start_date)}
+                hint={t('supplierPoDaysUnit')}
+                icon={<CalendarDays size={18} />}
+              />
+              <StatCard
+                label={t('supplierPoSummaryLastActivity')}
+                value={
+                  lastEvent ? (
+                    <span className="text-lg leading-snug">
+                      {t(SUPPLIER_PO_EVENT_LABEL_KEYS[lastEvent.event_type])}
+                    </span>
+                  ) : (
+                    '—'
+                  )
+                }
+                hint={
+                  lastEvent ? (
+                    <bdi dir="ltr">{formatDateTime(lastEvent.created_at, false)}</bdi>
+                  ) : undefined
+                }
+                icon={<Activity size={18} />}
+              />
+            </div>
+          </div>
+
+          {!open && (
+            <Notice tone="neutral" size="compact" icon={<Lock size={16} />}>
+              {t('supplierPoClosedNotice')}
+            </Notice>
+          )}
+
+          {/* 3. Body: the record list, then the facts and the timeline beside it. */}
+          <div className="grid gap-4 xl:grid-cols-3">
+            <Card padded={false} className="flex min-w-0 flex-col xl:col-span-2">
+              <div className="p-4 pb-0">
+                <SectionHeader
+                  title={
+                    <span className="flex items-center gap-2">
+                      {t('supplierPoEquipment')}
+                      <Badge size="sm">{poLines.length}</Badge>
+                    </span>
+                  }
+                  description={t('supplierPoEquipmentDesc')}
+                  action={
+                    open ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        icon={<Plus size={14} aria-hidden="true" />}
+                        onClick={() => setAddOpen(true)}
+                      >
+                        {t('supplierPoAddEquipment')}
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              </div>
+              {poLines.length === 0 ? (
+                <div className="p-4">
+                  <EmptyState
+                    title={t('supplierPoNoEquipment')}
+                    className="p-6"
+                    action={open ? addButton : undefined}
+                  />
+                </div>
+              ) : (
+                <>
+                  {/* 4. Card list on narrow screens, table from `md`. */}
+                  <ul className="divide-y px-4 pt-2 md:hidden">
+                    {poLines.map((line) => (
+                      <li
+                        key={line.id}
+                        className="flex items-start justify-between gap-3 py-3"
+                      >
+                        <div className="min-w-0">
+                          <EquipmentCell unit={line.unit} />
+                          {line.note && (
+                            <p className="mt-1 text-xs text-muted">{line.note}</p>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <Price value={line.price} />
+                          {open && (
+                            <IconButton
+                              label={t('supplierPoEditPrice')}
+                              icon={<Edit2 size={16} />}
+                              onClick={() => setEditing(line)}
+                            />
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="hidden p-4 md:block">
+                    <DataTable
+                      size="md"
+                      columns={columns}
+                      rows={poLines}
+                      rowKey={(line) => line.id}
+                      caption={t('supplierPoEquipment')}
+                      stickyHeader={false}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-sm">
+                    <span className="text-muted">{t('supplierPoSummaryTotal')}</span>
+                    <span className="font-semibold">
+                      <Price value={total} />
+                    </span>
+                  </div>
+                </>
+              )}
+            </Card>
+
+            <div className="space-y-4">
+              <Card className="space-y-3 p-4">
+                <SectionHeader title={t('supplierPoDetails')} />
+                <DescriptionList items={facts} className="-my-2" />
+              </Card>
+              <Card className="space-y-3 p-4">
+                <SectionHeader
+                  title={t('supplierPoEvents')}
+                  description={t('supplierPoEventsDesc')}
+                />
+                <EventTimeline events={poEvents} />
+              </Card>
+            </div>
+          </div>
+
+          {/* 5. Mobile action bar (fixed to the viewport in the real page). */}
+          {open && (
+            <div
+              className="sticky bottom-0 z-10 -mx-3 -mb-3 flex gap-2 border-t bg-bg p-3 sm:hidden"
+              style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+            >
+              <Button
+                variant="primary"
+                className="h-11 flex-1"
+                icon={<Plus size={16} aria-hidden="true" />}
+                onClick={() => setAddOpen(true)}
+              >
+                {t('supplierPoAddEquipment')}
+              </Button>
+              <Button variant="danger" className="h-11" onClick={closePo}>
+                {t('supplierPoClose')}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+      <AddEquipmentDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        onAdd={(unit, price, note) => {
+          onAddLine(po.id, unit, price, note)
+          setAddOpen(false)
+        }}
+      />
+      <EditPriceDialog
+        line={editing}
+        onOpenChange={(next) => {
+          if (!next) setEditing(null)
+        }}
+        onSave={(line, price) => {
+          onChangePrice(line, price)
+          setEditing(null)
+        }}
+      />
+      {confirmDialog}
+    </Mockup>
+  )
+}
+
 // --- 3. The equipment page card ---------------------------------------------------
 
 function EquipmentPurchasingCardMockup({
@@ -1640,6 +2186,11 @@ export function PurchasingMockup() {
   const [lines, setLines] = useState<MockLine[]>(LINES)
   const [events, setEvents] = useState<MockEvent[]>(EVENTS)
   const [selectedId, setSelectedId] = useState('po1')
+  // Owner request 2026-10-19: the proposed detail-page pattern next to the
+  // current page, to be approved here before it reaches the real routes.
+  const [pageVariant, setPageVariant] = useState<'proposed' | 'current'>(
+    'proposed',
+  )
   const pageRef = useRef<HTMLDivElement>(null)
 
   const addEvent = useCallback(
@@ -1752,17 +2303,47 @@ export function PurchasingMockup() {
         onOpen={openPo}
         onCreate={createPo}
       />
-      <div ref={pageRef} className="scroll-mt-16">
-        <PoPageMockup
-          pos={pos}
-          lines={lines}
-          events={events}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          onAddLine={addLine}
-          onChangePrice={changePrice}
-          onClose={closePo}
-        />
+      <div ref={pageRef} className="scroll-mt-16 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted">
+            نمط صفحة التفاصيل: قارن المقترح بالحالي، ثم يُعتمد النمط ويُطبق
+            على بقية صفحات التفاصيل.
+          </p>
+          <Tabs
+            value={pageVariant}
+            onValueChange={(next) =>
+              setPageVariant(next as 'proposed' | 'current')
+            }
+          >
+            <TabsList variant="segmented" aria-label="نسخة صفحة الامر">
+              <TabsTrigger value="proposed">المقترح</TabsTrigger>
+              <TabsTrigger value="current">الحالي</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+        {pageVariant === 'proposed' ? (
+          <PoPageMockupV2
+            pos={pos}
+            lines={lines}
+            events={events}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onAddLine={addLine}
+            onChangePrice={changePrice}
+            onClose={closePo}
+          />
+        ) : (
+          <PoPageMockup
+            pos={pos}
+            lines={lines}
+            events={events}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onAddLine={addLine}
+            onChangePrice={changePrice}
+            onClose={closePo}
+          />
+        )}
       </div>
       <EquipmentPurchasingCardMockup pos={pos} lines={lines} onOpenPo={openPo} />
       <TokenTable />

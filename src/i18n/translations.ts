@@ -1934,6 +1934,10 @@ export const translations = {
     equipmentPurchasingPeriod: 'الفترة',
     equipmentPurchasingOpenEnd: 'مفتوح',
     equipmentPurchasingLoadError: 'تعذر تحميل بيانات المشتريات.',
+    supplierPoSummaryTotal: 'الاجمالي بدون ضريبة',
+    supplierPoSummaryAge: 'منذ البداية',
+    supplierPoDaysUnit: 'يوم',
+    supplierPoSummaryLastActivity: 'اخر نشاط',
     // purchasing-screens — end
   },
   en: {
@@ -3933,6 +3937,10 @@ export const translations = {
     equipmentPurchasingPeriod: 'Period',
     equipmentPurchasingOpenEnd: 'Open',
     equipmentPurchasingLoadError: 'Could not load the purchasing data.',
+    supplierPoSummaryTotal: 'Total excl. VAT',
+    supplierPoSummaryAge: 'Since start',
+    supplierPoDaysUnit: 'days',
+    supplierPoSummaryLastActivity: 'Last activity',
     // purchasing-screens — end
   },
 } as const
