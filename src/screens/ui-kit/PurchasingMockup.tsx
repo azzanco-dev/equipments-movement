@@ -7,7 +7,6 @@ import {
   type ReactNode,
 } from 'react'
 import {
-  Activity,
   Building2,
   Calendar,
   CalendarDays,
@@ -60,6 +59,7 @@ import {
   Textarea,
   useConfirm,
   type DataTableColumn,
+  type DataTableSort,
   type DescriptionListItem,
   type InfoGridItem,
 } from '@/components/ui'
@@ -1480,6 +1480,43 @@ function PoPageMockup({
 //      header. Destructive actions keep their confirmation dialog.
 // Same sample data, same dialogs and the same tokens as the current page.
 
+/** The unit's own supplier or owner, short: the lessor name for «مالك اخر»,
+ *  else the owner («العزاني», «تكوين», «الغير F», «شراكة B»). */
+function unitSupplierLabel(
+  unit: MockEquipment | null,
+  t: (key: TranslationKey) => string,
+): string {
+  if (!unit) return '—'
+  switch (unit.ownership) {
+    case 'alazani':
+      return t('supplierPoInternalSupplier')
+    case 'takween':
+      return t('supplierPoUnitOwnerTakween')
+    case 'third_party_f':
+      return t('supplierPoUnitOwnerF')
+    case 'third_party_partnership_b':
+      return t('supplierPoUnitOwnerB')
+    default:
+      return unit.lessor_name?.trim() || t('ownershipExternalSupplier')
+  }
+}
+
+/** The card period behind a line: «from – to», or «from – مفتوح». */
+function periodLabel(
+  line: MockLine,
+  t: (key: TranslationKey) => string,
+): string {
+  const to = line.period_to
+    ? formatDate(line.period_to)
+    : t('equipmentPurchasingOpenEnd')
+  return `${formatDate(line.period_from)} – ${to}`
+}
+
+type PoLineRow = MockLine & { unit: MockEquipment | null }
+/** A table row: a line, or the closing total row (aligned under the price
+ *  column, so the total never drifts from the numbers above it). */
+type PoTableRow = { kind: 'line'; line: PoLineRow } | { kind: 'total'; price: number }
+
 function daysSince(dateKey: string): number {
   const start = Date.parse(`${dateKey}T00:00:00+03:00`)
   const today = Date.parse(`${saudiDateKey()}T00:00:00+03:00`)
@@ -1579,9 +1616,10 @@ function PoPageMockupV2({
   const poEvents = events.filter((event) => event.supplier_po_id === po.id)
   const open = po.status === 'open'
   const total = poLines.reduce((sum, line) => sum + line.price, 0)
-  const lastEvent = [...poEvents].sort((a, b) =>
-    b.created_at.localeCompare(a.created_at),
-  )[0]
+  const [sort, setSort] = useState<DataTableSort>({
+    key: 'equipment',
+    direction: 'asc',
+  })
   const company = companyById(po.company_id)
   const project = projectById(po.project_id)
   const companyName = company
@@ -1664,24 +1702,88 @@ function PoPageMockupV2({
     },
   ]
 
-  type LineRow = (typeof poLines)[number]
-  const columns: DataTableColumn<LineRow>[] = [
+  // Sorting stays in the browser: one PO holds a handful of lines (it is
+  // not a major list), so the real page sorts the loaded rows the same way.
+  const sortValue = (line: PoLineRow, key: string): string | number => {
+    switch (key) {
+      case 'supplier':
+        return unitSupplierLabel(line.unit, t)
+      case 'period':
+        return line.period_from
+      case 'price':
+        return line.price
+      default:
+        return line.unit?.code ?? ''
+    }
+  }
+  const sortedLines = [...poLines].sort((a, b) => {
+    const va = sortValue(a, sort.key)
+    const vb = sortValue(b, sort.key)
+    const cmp =
+      typeof va === 'number' && typeof vb === 'number'
+        ? va - vb
+        : String(va).localeCompare(String(vb), lang)
+    return sort.direction === 'asc' ? cmp : -cmp
+  })
+  const tableRows: PoTableRow[] = [
+    ...sortedLines.map((line): PoTableRow => ({ kind: 'line', line })),
+    { kind: 'total', price: total },
+  ]
+  const lineCell = (render: (line: PoLineRow) => ReactNode) => (row: PoTableRow) =>
+    row.kind === 'line' ? render(row.line) : null
+  const columns: DataTableColumn<PoTableRow>[] = [
     {
       key: 'equipment',
       header: t('supplierPoEquipmentField'),
-      cell: (line) => <EquipmentCell unit={line.unit} />,
+      sortable: true,
+      // The type sits under the code (no column of its own): the table stays
+      // narrow enough for the two-thirds column without sideways scroll.
+      cell: (row) =>
+        row.kind === 'line' ? (
+          <div className="min-w-0">
+            <EquipmentCell unit={row.line.unit} />
+            <p className="text-xs text-muted">{row.line.unit?.type ?? '—'}</p>
+          </div>
+        ) : (
+          <span className="text-muted">{t('supplierPoSummaryTotal')}</span>
+        ),
+    },
+    {
+      key: 'supplier',
+      header: t('supplierPoSupplier'),
+      sortable: true,
+      cell: lineCell((line) => (
+        <span className="block whitespace-normal">
+          {unitSupplierLabel(line.unit, t)}
+        </span>
+      )),
+    },
+    {
+      key: 'period',
+      header: t('equipmentPurchasingPeriod'),
+      sortable: true,
+      hideBelow: 'lg',
+      cell: lineCell((line) => <bdi dir="ltr">{periodLabel(line, t)}</bdi>),
     },
     {
       key: 'note',
       header: t('supplierPoLineNote'),
+      hideBelow: 'lg',
       className: 'text-muted',
-      cell: (line) => line.note ?? '—',
+      cell: lineCell((line) => (
+        <span className="block max-w-[14rem] whitespace-normal">
+          {line.note ?? '—'}
+        </span>
+      )),
     },
     {
       key: 'price',
       header: t('supplierPoPrice'),
+      sortable: true,
       align: 'end',
-      cell: (line) => <Price value={line.price} />,
+      cell: (row) => (
+        <Price value={row.kind === 'line' ? row.line.price : row.price} />
+      ),
     },
     ...(open
       ? [
@@ -1690,14 +1792,14 @@ function PoPageMockupV2({
             header: t('actions'),
             align: 'end' as const,
             width: '4rem',
-            cell: (line: LineRow) => (
+            cell: lineCell((line) => (
               <IconButton
                 size="sm"
                 label={t('supplierPoEditPrice')}
                 icon={<Edit2 size={15} />}
                 onClick={() => setEditing(line)}
               />
-            ),
+            )),
           },
         ]
       : []),
@@ -1800,41 +1902,25 @@ function PoPageMockupV2({
                 />
               )}
             </dl>
-            {/* 2. Summary strip. */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {/* 2. Summary strip (owner 2026-10-19: three numbers, no
+                «last activity» card). */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <StatCard
+                className="col-span-2 sm:col-span-1"
+                label={t('supplierPoSummaryTotal')}
+                value={<bdi dir="ltr">{formatSupplierPoPrice(total)}</bdi>}
+                icon={<Coins size={18} />}
+              />
               <StatCard
                 label={t('supplierPoEquipmentCount')}
                 value={poLines.length}
                 icon={<Truck size={18} />}
               />
               <StatCard
-                label={t('supplierPoSummaryTotal')}
-                value={<bdi dir="ltr">{formatSupplierPoPrice(total)}</bdi>}
-                icon={<Coins size={18} />}
-              />
-              <StatCard
                 label={t('supplierPoSummaryAge')}
                 value={daysSince(po.start_date)}
                 hint={t('supplierPoDaysUnit')}
                 icon={<CalendarDays size={18} />}
-              />
-              <StatCard
-                label={t('supplierPoSummaryLastActivity')}
-                value={
-                  lastEvent ? (
-                    <span className="text-lg leading-snug">
-                      {t(SUPPLIER_PO_EVENT_LABEL_KEYS[lastEvent.event_type])}
-                    </span>
-                  ) : (
-                    '—'
-                  )
-                }
-                hint={
-                  lastEvent ? (
-                    <bdi dir="ltr">{formatDateTime(lastEvent.created_at, false)}</bdi>
-                  ) : undefined
-                }
-                icon={<Activity size={18} />}
               />
             </div>
           </div>
@@ -1881,47 +1967,60 @@ function PoPageMockupV2({
                 </div>
               ) : (
                 <>
-                  {/* 4. Card list on narrow screens, table from `md`. */}
-                  <ul className="divide-y px-4 pt-2 md:hidden">
-                    {poLines.map((line) => (
-                      <li
-                        key={line.id}
-                        className="flex items-start justify-between gap-3 py-3"
-                      >
-                        <div className="min-w-0">
-                          <EquipmentCell unit={line.unit} />
-                          {line.note && (
-                            <p className="mt-1 text-xs text-muted">{line.note}</p>
-                          )}
-                        </div>
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          <Price value={line.price} />
-                          {open && (
-                            <IconButton
-                              label={t('supplierPoEditPrice')}
-                              icon={<Edit2 size={16} />}
-                              onClick={() => setEditing(line)}
-                            />
-                          )}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                  {/* 4. Card list on narrow screens, sortable table from `md`
+                      with the total as its last row. */}
+                  <div className="md:hidden">
+                    <ul className="divide-y px-4 pt-2">
+                      {sortedLines.map((line) => (
+                        <li
+                          key={line.id}
+                          className="flex items-start justify-between gap-3 py-3"
+                        >
+                          <div className="min-w-0">
+                            <EquipmentCell unit={line.unit} />
+                            <p className="mt-0.5 text-xs text-muted">
+                              {line.unit?.type ?? '—'} ·{' '}
+                              {unitSupplierLabel(line.unit, t)} ·{' '}
+                              <bdi dir="ltr">{periodLabel(line, t)}</bdi>
+                            </p>
+                            {line.note && (
+                              <p className="mt-0.5 text-xs text-muted">{line.note}</p>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            <Price value={line.price} />
+                            {open && (
+                              <IconButton
+                                label={t('supplierPoEditPrice')}
+                                icon={<Edit2 size={16} />}
+                                onClick={() => setEditing(line)}
+                              />
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-sm">
+                      <span className="text-muted">{t('supplierPoSummaryTotal')}</span>
+                      <span className="font-semibold">
+                        <Price value={total} />
+                      </span>
+                    </div>
+                  </div>
                   <div className="hidden p-4 md:block">
                     <DataTable
                       size="md"
                       columns={columns}
-                      rows={poLines}
-                      rowKey={(line) => line.id}
+                      rows={tableRows}
+                      rowKey={(row) => (row.kind === 'line' ? row.line.id : 'total')}
+                      sort={sort}
+                      onSortChange={(key, direction) => setSort({ key, direction })}
+                      rowClassName={(row) =>
+                        row.kind === 'total' ? 'bg-surface font-semibold' : undefined
+                      }
                       caption={t('supplierPoEquipment')}
                       stickyHeader={false}
                     />
-                  </div>
-                  <div className="flex items-center justify-between gap-3 border-t px-4 py-3 text-sm">
-                    <span className="text-muted">{t('supplierPoSummaryTotal')}</span>
-                    <span className="font-semibold">
-                      <Price value={total} />
-                    </span>
                   </div>
                 </>
               )}

@@ -28,6 +28,15 @@ export interface MockEquipment {
   chassis_number: string | null
   /** `is_internal_equipment(id)`: Al-Azani, or a lessor marked is_internal. */
   internal: boolean
+  /** `equipment.ownership_status`. */
+  ownership:
+    | 'alazani'
+    | 'takween'
+    | 'third_party_f'
+    | 'third_party_partnership_b'
+    | 'external_supplier'
+  /** The unit's own supplier (`equipment.lessor`), external supplier only. */
+  lessor_name: string | null
 }
 
 export interface MockPo {
@@ -99,6 +108,8 @@ export const EQUIPMENT: MockEquipment[] = [
     plate_number: 'ا ب ج 8631',
     chassis_number: null,
     internal: true,
+    ownership: 'alazani',
+    lessor_name: null,
   },
   {
     id: 'e2',
@@ -107,6 +118,8 @@ export const EQUIPMENT: MockEquipment[] = [
     plate_number: null,
     chassis_number: 'CAT0320DXK1234567',
     internal: false,
+    ownership: 'third_party_f',
+    lessor_name: null,
   },
   {
     id: 'e3',
@@ -115,6 +128,8 @@ export const EQUIPMENT: MockEquipment[] = [
     plate_number: 'د ه و 4410',
     chassis_number: null,
     internal: false,
+    ownership: 'third_party_partnership_b',
+    lessor_name: null,
   },
   {
     id: 'e4',
@@ -123,6 +138,8 @@ export const EQUIPMENT: MockEquipment[] = [
     plate_number: 'ر س ص 2278',
     chassis_number: null,
     internal: false,
+    ownership: 'external_supplier',
+    lessor_name: 'مؤسسة النخبة لتاجير المعدات',
   },
   {
     id: 'e5',
@@ -131,6 +148,8 @@ export const EQUIPMENT: MockEquipment[] = [
     plate_number: 'ط ظ ع 9034',
     chassis_number: null,
     internal: true,
+    ownership: 'alazani',
+    lessor_name: null,
   },
   {
     id: 'e6',
@@ -139,6 +158,8 @@ export const EQUIPMENT: MockEquipment[] = [
     plate_number: null,
     chassis_number: 'TKG140H0987654',
     internal: true,
+    ownership: 'takween',
+    lessor_name: null,
   },
 ]
 
