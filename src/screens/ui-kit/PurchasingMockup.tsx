@@ -95,6 +95,7 @@ import {
   SUPPLIER_PO_PRICE_FIELD_RULES,
   SUPPLIER_PO_STATUS_BADGE,
   formatSupplierPoPrice,
+  isValidSupplierPoPrice,
   supplierPoErrorOutcome,
   supplierPoSupplierLabel,
   type SupplierPoFormValues,
@@ -333,6 +334,15 @@ function Price({ value }: { value: number }) {
       <span className="text-xs font-normal text-muted">{t('currencySar')}</span>
     </span>
   )
+}
+
+/** The hint under a price field while typing (owner 2026-10-19): the amount
+ *  as it will be shown, with thousands separators and the currency, so a
+ *  long number stays readable; nothing while the value is not a price yet
+ *  (the validation message covers that on submit). */
+function pricePreview(value: string): ReactNode {
+  if (!isValidSupplierPoPrice(value)) return undefined
+  return <Price value={Number(value.trim())} />
 }
 
 // --- 1. The list ---------------------------------------------------------------------
@@ -933,7 +943,9 @@ function AddEquipmentDialog({
           label={t('supplierPoPrice')}
           name="price"
           required
-          hint={internal ? t('supplierPoPriceInternalLocked') : undefined}
+          hint={
+            internal ? t('supplierPoPriceInternalLocked') : pricePreview(form.price)
+          }
           error={errors.price && t(errors.price)}
         >
           {(control) => (
@@ -1078,7 +1090,9 @@ function EditPriceDialog({
           label={t('supplierPoPrice')}
           name="price"
           required
-          hint={internal ? t('supplierPoPriceInternalLocked') : undefined}
+          hint={
+            internal ? t('supplierPoPriceInternalLocked') : pricePreview(form.price)
+          }
           error={errors.price && t(errors.price)}
         >
           {(control) => (
