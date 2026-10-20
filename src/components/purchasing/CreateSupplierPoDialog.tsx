@@ -520,9 +520,10 @@ export function CreateSupplierPoDialog({
           )}
         </Field>
         {pickedCount > 0 && (
-          <p className="text-xs text-muted">
+          <p className="text-sm text-muted">
             {t('supplierPoSummaryTotal')}:{' '}
             <Price
+              className="text-base font-semibold text-fg"
               value={Object.values(picked).reduce(
                 (sum, line) =>
                   sum + (isValidSupplierPoPrice(line.price) ? Number(line.price) : 0),
