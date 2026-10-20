@@ -294,6 +294,8 @@ const MIGRATIONS = [
   '20261019100000_0137_supplier_po_equipment_at_project.sql',
   // 0138: the party, the optional price, the PO created with its equipment.
   '20261020100000_0138_supplier_po_party_and_optional_price.sql',
+  // 0139: create_supplier_po re-created with is_internal never NULL.
+  '20261020110000_0139_supplier_po_is_internal_default.sql',
 ]
 
 test('every stable token of migrations 0136 to 0138 is known and mapped', () => {
