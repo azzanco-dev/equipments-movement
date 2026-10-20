@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import {
   AsyncSearchSelect,
   type AsyncSearchSelectOption,
@@ -266,6 +266,25 @@ export function CreateSupplierPoDialog({
 
   const hasParty = Boolean(form.lessor_id || form.owner_class)
 
+  /** ArrowDown / ArrowUp in a price field moves to the price field of the
+   *  unit below / above (owner 2026-10-20), so a column of prices is typed
+   *  without the mouse. */
+  const movePriceFocus = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    const inputs = [
+      ...(bodyRef.current?.querySelectorAll<HTMLInputElement>(
+        'input[data-price-input]',
+      ) ?? []),
+    ]
+    const index = inputs.indexOf(event.currentTarget)
+    if (index < 0) return
+    const next = inputs[index + (event.key === 'ArrowDown' ? 1 : -1)]
+    if (!next) return
+    event.preventDefault()
+    next.focus()
+    next.select()
+  }
+
   return (
     <Dialog
       open={open}
@@ -430,15 +449,19 @@ export function CreateSupplierPoDialog({
                           <Input
                             dir="ltr"
                             inputMode="decimal"
-                            placeholder={t('supplierPoPrice')}
+                            placeholder="0.00"
                             aria-label={`${t('supplierPoPrice')} ${visit.equipment_code}`}
                             value={line.price}
                             invalid={Boolean(lineErrors[visit.equipment_id])}
+                            data-price-input=""
                             onChange={(event) =>
                               setLinePrice(visit.equipment_id, event.target.value)
                             }
+                            onKeyDown={movePriceFocus}
                           />
-                          <p className="mt-1 min-h-4 text-xs text-muted">
+                          {/* Under the LTR field, at its own start (left),
+                              like the digits above it (owner 2026-10-20). */}
+                          <p dir="ltr" className="mt-1 min-h-4 text-start text-xs text-muted">
                             {lineErrors[visit.equipment_id] ? (
                               <span className="text-danger">
                                 {t(lineErrors[visit.equipment_id])}
