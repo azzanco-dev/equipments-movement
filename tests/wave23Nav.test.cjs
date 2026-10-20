@@ -105,8 +105,10 @@ const CAPTURED = {
     { key: 'projects' },
     { key: 'companies' },
     { key: 'lessors' },
-    // Purchasing (migration 0136, 2026-10-19) is reachable by URL only for
-    // now (NAV_ENTRIES `hidden`, owner 2026-10-20): not in any menu.
+    // Purchasing (migration 0136; listed since 2026-10-20): the admin holds
+    // purchasing.view in the frozen legacy mapping too, so «المشتريات» is in
+    // the admin menu; no other legacy role has it.
+    { key: 'purchasing', children: ['purchasing/orders'] },
     { key: 'drivers' },
     { key: 'users' },
     { key: 'activity' },
