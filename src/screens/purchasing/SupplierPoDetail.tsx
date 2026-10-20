@@ -295,7 +295,7 @@ export function SupplierPoDetail({
   const projectName = po.project
     ? localizedName(lang, po.project.name_ar, po.project.name_en)
     : '—'
-  const total = supplierPoTotal(lines)
+  const { total, unpriced } = supplierPoTotal(lines)
   const createdByName =
     (po.created_by && actorNames.get(po.created_by)) || '—'
   const codeOf = (equipmentId: string) =>
@@ -309,7 +309,8 @@ export function SupplierPoDetail({
       case 'period':
         return line.card?.period_from ?? ''
       case 'price':
-        return Number(line.price)
+        // Unpriced lines sort before every price.
+        return line.price === null ? -1 : Number(line.price)
       default:
         return line.card?.equipment?.code ?? ''
     }
@@ -460,7 +461,16 @@ export function SupplierPoDetail({
               {supplier}
             </span>
           }
-          badges={<SupplierPoStatusBadge status={po.status} />}
+          badges={
+            <>
+              <SupplierPoStatusBadge status={po.status} />
+              {unpriced > 0 && (
+                <Badge tone="warning">
+                  {t('supplierPoNeedsPrices')} ({unpriced})
+                </Badge>
+              )}
+            </>
+          }
           actions={
             showActions ? (
               <div className="hidden gap-2 sm:flex">
@@ -622,7 +632,11 @@ export function SupplierPoDetail({
                         <div className="text-start sm:text-end">
                           <p className="text-xs text-muted">{t('supplierPoPrice')}</p>
                           <p className="text-lg font-semibold">
-                            <Price value={line.price} />
+                            {line.price === null ? (
+                              <Badge tone="warning">{t('supplierPoNoPrice')}</Badge>
+                            ) : (
+                              <Price value={line.price} />
+                            )}
                           </p>
                         </div>
                         {showActions && (
@@ -642,7 +656,14 @@ export function SupplierPoDetail({
               })}
               <li className="rounded-xl border bg-surface p-3 sm:p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
-                  <p className="text-sm font-medium">{t('supplierPoSummaryTotal')}</p>
+                  <p className="text-sm font-medium">
+                    {t('supplierPoSummaryTotal')}
+                    {unpriced > 0 && (
+                      <span className="ms-2 text-xs font-normal text-muted">
+                        ({unpriced} {t('supplierPoUnpricedTotalNote')})
+                      </span>
+                    )}
+                  </p>
                   <p className="text-lg font-semibold sm:w-44 sm:shrink-0 sm:text-end">
                     <Price value={total} />
                   </p>
@@ -699,9 +720,7 @@ export function SupplierPoDetail({
       <AddEquipmentDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        poId={po.id}
-        companyId={po.company_id}
-        projectId={po.project_id}
+        po={po}
         onAdded={() => {
           setAddOpen(false)
           fetchData()

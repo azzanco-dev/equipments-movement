@@ -5,6 +5,7 @@ import { useListRequest } from '@/components/data-list/useListRequest'
 import { Price } from '@/components/purchasing/Price'
 import { SupplierPoStatusBadge } from '@/components/purchasing/SupplierPoStatusBadge'
 import {
+  Badge,
   Card,
   DataTable,
   EmptyState,
@@ -147,7 +148,14 @@ export function EquipmentPurchasingCard({
       key: 'price',
       header: t('supplierPoPrice'),
       align: 'end',
-      cell: (row) => <Price value={row.price} />,
+      cell: (row) =>
+        row.price === null ? (
+          <Badge tone="warning" size="sm">
+            {t('supplierPoNoPrice')}
+          </Badge>
+        ) : (
+          <Price value={row.price} />
+        ),
     },
   ]
 

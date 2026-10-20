@@ -585,6 +585,7 @@ function PoListMockup({
 
 const EMPTY_PO_FORM: SupplierPoFormValues = {
   lessor_id: '',
+  owner_class: '',
   company_id: '',
   project_id: '',
   start_date: '',
@@ -864,7 +865,7 @@ function AddEquipmentDialog({
   const loadEquipment = useMemo(() => sampleSearch(EQUIPMENT_OPTIONS), [])
 
   const save = () => {
-    const invalid = validateWithSchema(supplierPoLineFormSchema(internal), form)
+    const invalid = validateWithSchema(supplierPoLineFormSchema, form)
     if (hasErrors(invalid)) {
       setErrors(invalid)
       setMessage(null)
@@ -1032,7 +1033,7 @@ function EditPriceDialog({
 
   const save = () => {
     if (!line) return
-    const invalid = validateWithSchema(supplierPoPriceFormSchema(internal), form)
+    const invalid = validateWithSchema(supplierPoPriceFormSchema, form)
     if (hasErrors(invalid)) {
       setErrors(invalid)
       setMessage(null)

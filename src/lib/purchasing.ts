@@ -81,14 +81,78 @@ export function formatSupplierPoPrice(
   }).format(amount)
 }
 
+// --- The party: a lessor or an owner class (0138) ----------------------------------
+
+/** `supplier_pos.owner_class`: the owner classes a PO can be addressed to
+ *  without a lessor row (owner 2026-10-20: no new supplier rows). */
+export type SupplierPoOwnerClass =
+  | 'alazani'
+  | 'takween'
+  | 'third_party_f'
+  | 'third_party_partnership_b'
+
+export const SUPPLIER_PO_OWNER_CLASSES: readonly SupplierPoOwnerClass[] = [
+  'alazani',
+  'takween',
+  'third_party_f',
+  'third_party_partnership_b',
+]
+
+/** Short labels of the owner classes, as the party picker and the PO show them. */
+export const SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS: Readonly<
+  Record<SupplierPoOwnerClass, TranslationKey>
+> = {
+  alazani: 'supplierPoInternalSupplier',
+  takween: 'supplierPoOwnerTakween',
+  third_party_f: 'supplierPoOwnerF',
+  third_party_partnership_b: 'supplierPoOwnerB',
+}
+
+export function isSupplierPoOwnerClass(
+  value: string | null | undefined,
+): value is SupplierPoOwnerClass {
+  return (SUPPLIER_PO_OWNER_CLASSES as readonly string[]).includes(value ?? '')
+}
+
+/** The party picker's option value for an owner class (`class:<key>`); a
+ *  lessor option's value is the lessor id itself. */
+export const SUPPLIER_PO_CLASS_OPTION_PREFIX = 'class:'
+
+export function partyOptionValue(party: {
+  lessor_id: string | null
+  owner_class: string | null
+}): string {
+  if (party.owner_class) return `${SUPPLIER_PO_CLASS_OPTION_PREFIX}${party.owner_class}`
+  return party.lessor_id ?? ''
+}
+
+/** The form's `lessor_id` / `owner_class` pair for a picked option value. */
+export function partyFromOptionValue(value: string): {
+  lessor_id: string
+  owner_class: string
+} {
+  if (value.startsWith(SUPPLIER_PO_CLASS_OPTION_PREFIX))
+    return {
+      lessor_id: '',
+      owner_class: value.slice(SUPPLIER_PO_CLASS_OPTION_PREFIX.length),
+    }
+  return { lessor_id: value, owner_class: '' }
+}
+
 /**
- * The supplier shown for a PO: the lessor's name, or «العزاني» for an
- * internal PO without a lessor (`is_internal` with `lessor_id` NULL).
+ * The party shown for a PO: the owner class's short label, else the
+ * lessor's name, else «العزاني» for a pre-0138 internal PO.
  */
 export function supplierPoSupplierLabel(
-  po: { is_internal: boolean; lessor?: { name: string | null } | null },
+  po: {
+    is_internal: boolean
+    owner_class?: string | null
+    lessor?: { name: string | null } | null
+  },
   t: (key: TranslationKey) => string,
 ): string {
+  if (isSupplierPoOwnerClass(po.owner_class))
+    return t(SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS[po.owner_class])
   const name = po.lessor?.name?.trim()
   if (name) return name
   return po.is_internal ? t('supplierPoInternalSupplier') : '—'
@@ -96,10 +160,11 @@ export function supplierPoSupplierLabel(
 
 // --- The 0136 error tokens --------------------------------------------------------
 
-/** The form values of «امر شراء جديد» (create_supplier_po). */
+/** The form values of «امر شراء جديد» (create_supplier_po). The party is
+ *  one of `lessor_id` / `owner_class` (0138); the picker fills the pair. */
 export interface SupplierPoFormValues {
-  /** Empty = an internal PO (Al-Azani units). */
   lessor_id: string
+  owner_class: string
   company_id: string
   project_id: string
   /** A date key (YYYY-MM-DD). */
@@ -113,9 +178,28 @@ export const SUPPLIER_PO_FIELD_ORDER: readonly (keyof SupplierPoFormValues)[] =
 /** The form values of «اضافة معدة» (add_supplier_po_equipment). */
 export interface SupplierPoLineFormValues {
   equipment_id: string
-  /** As typed; validated by `supplierPoLineFormSchema`. */
+  /** As typed; optional since 0138 (empty = «تحتاج سعر»). */
   price: string
   note: string
+}
+
+/** One unit picked in «امر شراء جديد» (0138: created with the PO). */
+export interface SupplierPoCreateLine {
+  equipment_id: string
+  /** As typed; optional. */
+  price: string
+  note: string
+}
+
+/** The `p_equipment` items of create_supplier_po. */
+export function supplierPoEquipmentPayload(
+  lines: readonly SupplierPoCreateLine[],
+): { equipment_id: string; price: number | null; note: string | null }[] {
+  return lines.map((line) => ({
+    equipment_id: line.equipment_id,
+    price: line.price.trim() ? Number(line.price.trim()) : null,
+    note: line.note.trim() || null,
+  }))
 }
 
 export const SUPPLIER_PO_LINE_FIELD_ORDER: readonly (keyof SupplierPoLineFormValues)[] =
@@ -138,6 +222,25 @@ export const SUPPLIER_PO_CREATE_FIELD_RULES: readonly DatabaseFieldRule<Supplier
       match: 'invalid_lessor',
       field: 'lessor_id',
       key: 'supplierPoErrorInvalidSupplier',
+    },
+    // 0138: the party (the picker's field is lessor_id).
+    {
+      on: 'raised',
+      match: 'party_required',
+      field: 'lessor_id',
+      key: 'supplierPoPartyRequired',
+    },
+    {
+      on: 'raised',
+      match: 'invalid_party',
+      field: 'lessor_id',
+      key: 'supplierPoPartyRequired',
+    },
+    {
+      on: 'raised',
+      match: 'invalid_owner_class',
+      field: 'lessor_id',
+      key: 'supplierPoPartyRequired',
     },
     {
       on: 'raised',
@@ -187,6 +290,13 @@ export const SUPPLIER_PO_LINE_FIELD_RULES: readonly DatabaseFieldRule<SupplierPo
       field: 'equipment_id',
       key: 'supplierPoErrorNotAtProject',
     },
+    // 0138: the unit must belong to the PO's party.
+    {
+      on: 'raised',
+      match: 'equipment_not_of_po_supplier',
+      field: 'equipment_id',
+      key: 'supplierPoErrorNotOfSupplier',
+    },
   ]
 
 /** Tokens of update_supplier_po_equipment_price that name the price field. */
@@ -221,12 +331,16 @@ export const SUPPLIER_PO_FORM_MESSAGES: Readonly<Record<string, TranslationKey>>
     invalid_line: 'supplierPoErrorInvalidLine', // update price
   }
 
-/** Every stable token of migrations 0136 and 0137 the client maps, for the tests. */
+/** Every stable token of migrations 0136–0138 the client maps, for the tests. */
 export const SUPPLIER_PO_ERROR_TOKENS: readonly string[] = [
   'purchasing_manage_required',
   'invalid_po',
   'invalid_equipment',
   'equipment_not_at_po_project',
+  'equipment_not_of_po_supplier',
+  'party_required',
+  'invalid_party',
+  'invalid_owner_class',
   'invalid_lessor',
   'invalid_company',
   'invalid_project',

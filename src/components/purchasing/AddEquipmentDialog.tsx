@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Lock } from 'lucide-react'
 import {
   AsyncSearchSelect,
   type AsyncSearchSelectOption,
@@ -26,9 +25,8 @@ import {
 import {
   addSupplierPoEquipment,
   equipmentAtProjectOptionLoader,
-  fetchPurchasingUnit,
-  isInternalUnit,
-  type PurchasingUnit,
+  supplierPoParty,
+  type SupplierPoRow,
 } from '@/lib/purchasingData'
 
 const EMPTY_FORM: SupplierPoLineFormValues = {
@@ -39,48 +37,45 @@ const EMPTY_FORM: SupplierPoLineFormValues = {
 
 /**
  * «اضافة معدة» on an open PO: the unit (server-side search, limited to the
- * units inside the PO's company and project right now — owner rule
- * 2026-10-19, migration 0137), the price excluding VAT (locked at 0 for an
- * Al-Azani or internal unit) and a note. Saves through
- * `add_supplier_po_equipment`, which re-checks the rule and creates or reuses
- * the unit's card behind the scenes.
+ * PO party's units inside the PO's company and project right now — owner
+ * rules 2026-10-19/20, migrations 0137/0138), an optional price excluding
+ * VAT («تحتاج سعر» while empty) and a note. Saves through
+ * `add_supplier_po_equipment`, which re-checks the rules and creates or
+ * reuses the unit's card behind the scenes.
  */
 export function AddEquipmentDialog({
   open,
   onOpenChange,
-  poId,
-  companyId,
-  projectId,
+  po,
   onAdded,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  poId: string
-  companyId: string
-  projectId: string
+  po: Pick<SupplierPoRow, 'id' | 'lessor_id' | 'owner_class' | 'company_id' | 'project_id'>
   onAdded: () => void
 }) {
   const { t } = useI18n()
   const [form, setForm] = useState<SupplierPoLineFormValues>(EMPTY_FORM)
   const [option, setOption] = useState<AsyncSearchSelectOption | null>(null)
-  const [unit, setUnit] = useState<PurchasingUnit | null>(null)
   const [errors, setErrors] = useState<FieldErrors<SupplierPoLineFormValues>>(
     {},
   )
   const [message, setMessage] = useState<TranslationKey | null>(null)
   const [saving, setSaving] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
+  const party = useMemo(() => supplierPoParty(po), [po])
   const loadOptions = useMemo(
-    () => equipmentAtProjectOptionLoader(companyId, projectId),
-    [companyId, projectId],
+    () =>
+      party
+        ? equipmentAtProjectOptionLoader(party, po.company_id, po.project_id)
+        : async () => [],
+    [party, po.company_id, po.project_id],
   )
-  const internal = isInternalUnit(unit)
 
   useEffect(() => {
     if (!open) return
     setForm(EMPTY_FORM)
     setOption(null)
-    setUnit(null)
     setErrors({})
     setMessage(null)
     setSaving(false)
@@ -97,7 +92,7 @@ export function AddEquipmentDialog({
   }
 
   const save = async () => {
-    const invalid = validateWithSchema(supplierPoLineFormSchema(internal), form)
+    const invalid = validateWithSchema(supplierPoLineFormSchema, form)
     if (hasErrors(invalid)) {
       setErrors(invalid)
       setMessage(null)
@@ -109,9 +104,9 @@ export function AddEquipmentDialog({
     setSaving(true)
     setMessage(null)
     const result = await addSupplierPoEquipment({
-      poId,
+      poId: po.id,
       equipmentId: form.equipment_id,
-      price: Number(form.price),
+      price: form.price.trim() ? Number(form.price.trim()) : null,
       note: form.note,
     })
     setSaving(false)
@@ -170,15 +165,7 @@ export function AddEquipmentDialog({
               loadOptions={loadOptions}
               onChange={(value, next) => {
                 setOption(next)
-                update({ equipment_id: value, price: '' })
-                setUnit(null)
-                if (!value) return
-                // The unit's owner decides the price lock: an internal unit
-                // locks it at 0 the moment it is known.
-                void fetchPurchasingUnit(value).then((picked) => {
-                  setUnit(picked)
-                  if (isInternalUnit(picked)) update({ price: '0' })
-                })
+                update({ equipment_id: value })
               }}
             />
           )}
@@ -186,12 +173,11 @@ export function AddEquipmentDialog({
         <Field
           label={t('supplierPoPrice')}
           name="price"
-          required
           hint={
-            internal ? (
-              t('supplierPoPriceInternalLocked')
-            ) : (
+            form.price.trim() ? (
               <PricePreview value={form.price} />
+            ) : (
+              t('supplierPoNoPrice')
             )
           }
           error={errors.price && t(errors.price)}
@@ -203,11 +189,6 @@ export function AddEquipmentDialog({
               inputMode="decimal"
               placeholder="0.00"
               value={form.price}
-              disabled={internal}
-              readOnly={internal}
-              startIcon={
-                internal ? <Lock size={14} aria-hidden="true" /> : undefined
-              }
               onChange={(event) => update({ price: event.target.value })}
             />
           )}

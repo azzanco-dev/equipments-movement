@@ -547,60 +547,60 @@ export const SUPPLIER_PO_NOTES_MAX = 1000
 export const SUPPLIER_PO_LINE_NOTE_MAX = 500
 
 /**
- * «امر شراء جديد» (create_supplier_po): the supplier is optional (empty =
- * an internal Al-Azani PO), company, project and start date are mandatory,
- * the notes respect the database length.
+ * «امر شراء جديد» (create_supplier_po): the party is a lessor OR an owner
+ * class (0138; the picker fills `lessor_id` / `owner_class`, its errors land
+ * on `lessor_id`), company, project and start date are mandatory, the notes
+ * respect the database length.
  */
-export const supplierPoFormSchema = z.object({
-  lessor_id: z.string().trim(),
-  company_id: selected('supplierPoCompanyRequired'),
-  project_id: selected('supplierPoProjectRequired'),
-  start_date: selected('supplierPoStartDateRequired'),
-  notes: optionalText({
-    max: SUPPLIER_PO_NOTES_MAX,
-    lengthKey: 'supplierPoNotesTooLong',
+export const supplierPoFormSchema = z
+  .object({
+    lessor_id: z.string().trim(),
+    owner_class: z.string().trim(),
+    company_id: selected('supplierPoCompanyRequired'),
+    project_id: selected('supplierPoProjectRequired'),
+    start_date: selected('supplierPoStartDateRequired'),
+    notes: optionalText({
+      max: SUPPLIER_PO_NOTES_MAX,
+      lengthKey: 'supplierPoNotesTooLong',
+    }),
+  })
+  .superRefine((form, context) => {
+    if (!form.lessor_id && !form.owner_class)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['lessor_id'],
+        message: 'supplierPoPartyRequired',
+      })
+  })
+
+/**
+ * The price excluding VAT as typed: a number of zero or more with at most
+ * two decimals (numeric(12, 2)). Optional since 0138 (an empty value = «تحتاج
+ * سعر»); «تعديل السعر» asks for it. No owner-based rule (owner 2026-10-20).
+ */
+export function supplierPoPrice({ required }: { required: boolean }) {
+  const base = z.string().trim()
+  return (required ? base.min(1, message('supplierPoPriceRequired')) : base).refine(
+    (value) => !value || isValidSupplierPoPrice(value),
+    message('supplierPoPriceInvalid'),
+  )
+}
+
+/** «اضافة معدة» (add_supplier_po_equipment); also one line of «امر شراء
+ *  جديد», where `equipment_id` comes from the ticked unit. */
+export const supplierPoLineFormSchema = z.object({
+  equipment_id: selected('supplierPoEquipmentRequired'),
+  price: supplierPoPrice({ required: false }),
+  note: optionalText({
+    max: SUPPLIER_PO_LINE_NOTE_MAX,
+    lengthKey: 'supplierPoLineNoteTooLong',
   }),
 })
 
-/**
- * The price excluding VAT as typed: mandatory, a number of zero or more with
- * at most two decimals (numeric(12, 2)); for an internal unit (Al-Azani or a
- * lessor marked is_internal) it must be exactly zero, the rule
- * add_supplier_po_equipment and update_supplier_po_equipment_price enforce
- * with `internal_price_must_be_zero`.
- */
-export function supplierPoPrice(internal: boolean) {
-  return z
-    .string()
-    .trim()
-    .min(1, message('supplierPoPriceRequired'))
-    .refine(
-      (value) => !value || isValidSupplierPoPrice(value),
-      message('supplierPoPriceInvalid'),
-    )
-    .refine(
-      (value) =>
-        !internal || !isValidSupplierPoPrice(value) || Number(value) === 0,
-      message('supplierPoPriceInternalMustBeZero'),
-    )
-}
-
-/** «اضافة معدة» (add_supplier_po_equipment). */
-export function supplierPoLineFormSchema(internal: boolean) {
-  return z.object({
-    equipment_id: selected('supplierPoEquipmentRequired'),
-    price: supplierPoPrice(internal),
-    note: optionalText({
-      max: SUPPLIER_PO_LINE_NOTE_MAX,
-      lengthKey: 'supplierPoLineNoteTooLong',
-    }),
-  })
-}
-
-/** «تعديل السعر» (update_supplier_po_equipment_price). */
-export function supplierPoPriceFormSchema(internal: boolean) {
-  return z.object({ price: supplierPoPrice(internal) })
-}
+/** «تعديل السعر» (update_supplier_po_equipment_price): the price is given. */
+export const supplierPoPriceFormSchema = z.object({
+  price: supplierPoPrice({ required: true }),
+})
 
 export interface PostgresLikeError {
   code?: string | null

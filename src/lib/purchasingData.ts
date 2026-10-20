@@ -3,11 +3,22 @@ import type { TranslationKey } from '@/i18n/translations'
 import type { CompanyProjectSource } from '@/lib/companyProject'
 import type { PostgresLikeError } from '@/lib/formValidation'
 import type {
+  SupplierPoCreateLine,
   SupplierPoEventType,
   SupplierPoFormValues,
+  SupplierPoOwnerClass,
   SupplierPoStatus,
 } from '@/lib/purchasing'
-import { supplierPoSupplierLabel } from '@/lib/purchasing'
+import {
+  SUPPLIER_PO_CLASS_OPTION_PREFIX,
+  SUPPLIER_PO_OWNER_CLASSES,
+  SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS,
+  isSupplierPoOwnerClass,
+  supplierPoEquipmentPayload,
+  supplierPoSupplierLabel,
+} from '@/lib/purchasing'
+import { localizedName } from '@/lib/localizedName'
+import type { Language } from '@/i18n/translations'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { unwrapRows } from '@/lib/supabaseResult'
@@ -43,6 +54,8 @@ export interface SupplierPoRow {
   id: string
   po_number: string
   lessor_id: string | null
+  /** 0138: the party when it is an owner class, not a lessor row. */
+  owner_class: string | null
   is_internal: boolean
   company_id: string
   project_id: string
@@ -57,6 +70,8 @@ export interface SupplierPoRow {
   project: NamedRef | null
   /** PostgREST count embed: `supplier_po_equipment(count)`. */
   supplier_po_equipment?: { count: number }[] | null
+  /** 0138: the computed column `unpriced_count(supplier_pos)`. */
+  unpriced_count?: number | null
 }
 
 /** The unit behind a line, as the add dialog and the page need it. */
@@ -86,7 +101,8 @@ export interface SupplierPoLineRow {
   id: string
   supplier_po_id: string
   equipment_card_id: string
-  price: number
+  /** NULL since 0138 while the price is still to be entered. */
+  price: number | null
   note: string | null
   created_at: string
   updated_at: string
@@ -111,7 +127,7 @@ export interface EquipmentPurchasingRow extends SupplierPoLineRow {
 
 const NAMED = 'id,name_ar,name_en'
 
-export const SUPPLIER_PO_SELECT = `id,po_number,lessor_id,is_internal,company_id,project_id,start_date,status,closed_at,notes,created_by,created_at,lessor:lessors(id,name),company:companies(${NAMED}),project:projects(${NAMED})`
+export const SUPPLIER_PO_SELECT = `id,po_number,lessor_id,owner_class,is_internal,company_id,project_id,start_date,status,closed_at,notes,created_by,created_at,unpriced_count,lessor:lessors(id,name),company:companies(${NAMED}),project:projects(${NAMED})`
 
 /** The list adds the line count (one embedded count per row). */
 export const SUPPLIER_PO_LIST_SELECT = `${SUPPLIER_PO_SELECT},supplier_po_equipment(count)`
@@ -172,9 +188,31 @@ export function supplierPoCompanyProject(
   }
 }
 
-/** Sum of the line prices, excluding VAT. */
-export function supplierPoTotal(lines: readonly { price: number }[]): number {
-  return lines.reduce((sum, line) => sum + Number(line.price), 0)
+/** Sum of the PRICED lines, excluding VAT, and how many lines have no price. */
+export function supplierPoTotal(
+  lines: readonly { price: number | null }[],
+): { total: number; unpriced: number } {
+  let total = 0
+  let unpriced = 0
+  for (const line of lines) {
+    if (line.price === null || line.price === undefined) unpriced += 1
+    else total += Number(line.price)
+  }
+  return { total, unpriced }
+}
+
+/** The party of a PO as the loaders filter by it. */
+export type SupplierPoParty =
+  | { lessor_id: string; owner_class: null }
+  | { lessor_id: null; owner_class: SupplierPoOwnerClass }
+
+export function supplierPoParty(
+  po: Pick<SupplierPoRow, 'lessor_id' | 'owner_class'>,
+): SupplierPoParty | null {
+  if (isSupplierPoOwnerClass(po.owner_class))
+    return { lessor_id: null, owner_class: po.owner_class }
+  if (po.lessor_id) return { lessor_id: po.lessor_id, owner_class: null }
+  return null
 }
 
 /** The days from the PO start date to today (Saudi calendar days), >= 0. */
@@ -216,7 +254,7 @@ export function supplierPoEventDetail(
 
 // --- Reads ---------------------------------------------------------------------
 
-/** The open-visit columns the add dialog's search reads. */
+/** The open-visit columns the purchasing pickers read. */
 const OPEN_VISIT_SEARCH_FIELDS = [
   'equipment_code',
   'equipment_type_search',
@@ -224,41 +262,138 @@ const OPEN_VISIT_SEARCH_FIELDS = [
   'equipment_plate_digits',
 ] as const
 
-interface OpenVisitRow {
+const OPEN_VISIT_SELECT =
+  'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,entry_at,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en'
+
+/** One open site visit of a party's unit (`movement_visits`). */
+export interface PartyOpenVisit {
   entry_id: string
   equipment_id: string
   equipment_code: string
   equipment_type: string | null
   equipment_plate_number: string | null
   entry_at: string
+  company_id: string
+  company_name_ar: string | null
+  company_name_en: string | null
+  project_id: string
+  project_name_ar: string | null
+  project_name_en: string | null
+}
+
+/** The open site visits of the party's units: the party's lessor, or the
+ *  party's owner class, on `movement_visits` (RLS of the movements). */
+function partyOpenVisits(party: SupplierPoParty) {
+  const base = supabase
+    .from('movement_visits')
+    .select(OPEN_VISIT_SELECT)
+    .eq('is_open', true)
+    .eq('movement_context', 'site')
+  return party.owner_class
+    ? base.eq('equipment_ownership_status', party.owner_class)
+    : base.eq('equipment_lessor_id', party.lessor_id)
 }
 
 /**
- * Server-side searched options for «اضافة معدة» (owner rule 2026-10-19,
- * migration 0137): only the units INSIDE the PO's company and project right
- * now, i.e. the open site visits of that company and project
- * (`movement_visits`, RLS of the movements), first 20 by code. The database
- * re-checks the same rule in `add_supplier_po_equipment`.
+ * The party picker of «امر شراء جديد» (0138): the four fixed owner classes
+ * first (matched by their label), then the lessors by server-side search.
+ */
+export function partyOptionLoader(
+  loadLessors: (query: string) => Promise<AsyncSearchSelectOption[]>,
+  t: (key: TranslationKey) => string,
+): (query: string) => Promise<AsyncSearchSelectOption[]> {
+  const classes: AsyncSearchSelectOption[] = SUPPLIER_PO_OWNER_CLASSES.map(
+    (owner) => ({
+      value: `${SUPPLIER_PO_CLASS_OPTION_PREFIX}${owner}`,
+      label: t(SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS[owner]),
+    }),
+  )
+  return async (query) => {
+    const text = query.trim().toLowerCase()
+    const matching = text
+      ? classes.filter((option) => option.label.toLowerCase().includes(text))
+      : classes
+    const lessors = await loadLessors(query)
+    return [...matching, ...lessors.slice(0, 20 - matching.length)]
+  }
+}
+
+/** The party's open visits, grouped: the companies (and under each, the
+ *  projects) where the party has units right now. One bounded request; a
+ *  party has a handful of open visits. */
+export async function fetchPartyOpenVisits(
+  party: SupplierPoParty,
+): Promise<PartyOpenVisit[]> {
+  const rows = unwrapRows<PartyOpenVisit>(
+    await partyOpenVisits(party).order('equipment_code').limit(200),
+  )
+  return rows
+}
+
+/** Distinct companies of some open visits, as picker options. */
+export function visitCompanyOptions(
+  visits: readonly PartyOpenVisit[],
+  lang: Language,
+): AsyncSearchSelectOption[] {
+  const seen = new Map<string, AsyncSearchSelectOption>()
+  for (const visit of visits)
+    if (!seen.has(visit.company_id))
+      seen.set(visit.company_id, {
+        value: visit.company_id,
+        label: localizedName(lang, visit.company_name_ar, visit.company_name_en),
+      })
+  return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label, lang))
+}
+
+/** Distinct projects of one company among some open visits. */
+export function visitProjectOptions(
+  visits: readonly PartyOpenVisit[],
+  companyId: string,
+  lang: Language,
+): AsyncSearchSelectOption[] {
+  const seen = new Map<string, AsyncSearchSelectOption>()
+  for (const visit of visits)
+    if (visit.company_id === companyId && !seen.has(visit.project_id))
+      seen.set(visit.project_id, {
+        value: visit.project_id,
+        label: localizedName(lang, visit.project_name_ar, visit.project_name_en),
+      })
+  return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label, lang))
+}
+
+/** A static option list as a picker loader (substring match on the label). */
+export function staticOptionLoader(
+  options: readonly AsyncSearchSelectOption[],
+): (query: string) => Promise<AsyncSearchSelectOption[]> {
+  return async (query) => {
+    const text = query.trim().toLowerCase()
+    return (
+      text
+        ? options.filter((option) => option.label.toLowerCase().includes(text))
+        : [...options]
+    ).slice(0, 20)
+  }
+}
+
+/**
+ * «اضافة معدة» (owner rules 2026-10-19/20, migrations 0137/0138): only the
+ * party's units INSIDE the PO's company and project right now, first 20 by
+ * code. The database re-checks both rules in `add_supplier_po_equipment`.
  */
 export function equipmentAtProjectOptionLoader(
+  party: SupplierPoParty,
   companyId: string,
   projectId: string,
 ): (query: string) => Promise<AsyncSearchSelectOption[]> {
   return async (query) => {
-    let request = supabase
-      .from('movement_visits')
-      .select(
-        'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,entry_at',
-      )
-      .eq('is_open', true)
-      .eq('movement_context', 'site')
+    let request = partyOpenVisits(party)
       .eq('company_id', companyId)
       .eq('project_id', projectId)
       .order('equipment_code')
       .limit(20)
     const searchFilter = buildSearchFilter(OPEN_VISIT_SEARCH_FIELDS, query)
     if (searchFilter) request = request.or(searchFilter)
-    return unwrapRows<OpenVisitRow>(await request).map((visit) => ({
+    return unwrapRows<PartyOpenVisit>(await request).map((visit) => ({
       value: visit.equipment_id,
       label: visit.equipment_code,
       description: [visit.equipment_type, visit.equipment_plate_number]
@@ -305,18 +440,21 @@ function asResult<T>(result: {
   return { data: result.data as T, error: null }
 }
 
-/** `create_supplier_po`: returns the new PO id. An empty supplier = an
- *  internal PO (Al-Azani units). */
+/** `create_supplier_po` (0138): the party (a lessor OR an owner class), the
+ *  PO and its equipment in one call; returns the new PO id. */
 export async function createSupplierPo(
   values: SupplierPoFormValues,
+  lines: readonly SupplierPoCreateLine[] = [],
 ): Promise<RpcResult<string>> {
   return asResult<string>(
     await supabase.rpc('create_supplier_po', {
       p_lessor_id: values.lessor_id || null,
+      p_owner_class: values.owner_class || null,
       p_company_id: values.company_id,
       p_project_id: values.project_id,
       p_start_date: values.start_date,
       p_notes: values.notes.trim() || null,
+      p_equipment: supplierPoEquipmentPayload(lines),
     }),
   )
 }
@@ -325,7 +463,8 @@ export async function createSupplierPo(
 export async function addSupplierPoEquipment(input: {
   poId: string
   equipmentId: string
-  price: number
+  /** Optional since 0138 (null = «تحتاج سعر»). */
+  price: number | null
   note: string
 }): Promise<RpcResult<string>> {
   return asResult<string>(

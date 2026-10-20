@@ -107,6 +107,8 @@ export const translations = {
     // Nav
     dashboard: 'الرئيسية',
     logs: 'السجلات',
+    // The sidebar entry of /logs (owner 2026-10-20); the page keeps its title.
+    navLogs: 'الدخوليات',
     reports: 'التقارير',
     entryReports: 'تقارير الدخوليات',
     equipmentReports: 'تقارير المعدات',
@@ -1929,7 +1931,29 @@ export const translations = {
     supplierPoErrorNotAtProject:
       'المعدة ليست داخل شركة الامر ومشروعه حاليا.',
     supplierPoEquipmentAtProjectHint:
-      'تظهر المعدات الموجودة الان داخل شركة الامر ومشروعه فقط.',
+      'تظهر معدات هذه الجهة الموجودة الان داخل شركة الامر ومشروعه فقط.',
+    supplierPoErrorNotOfSupplier: 'المعدة ليست من معدات جهة هذا الامر.',
+    supplierPoParty: 'المورد / المالك',
+    supplierPoPartyPlaceholder: 'اختر المورد او المالك',
+    supplierPoPartyHint:
+      'مورد من القائمة، او احد الملاك الثابتين (العزاني، تكوين، الغير F، شراكة B).',
+    supplierPoPartyRequired: 'اختر المورد او المالك.',
+    supplierPoOwnerTakween: 'تكوين',
+    supplierPoOwnerF: 'الغير F',
+    supplierPoOwnerB: 'شراكة B',
+    supplierPoNeedsPrices: 'تحتاج اسعار',
+    supplierPoNoPrice: 'بلا سعر',
+    supplierPoUnpricedTotalNote: 'بلا سعر',
+    supplierPoCreateEquipment: 'المعدات داخل المشروع',
+    supplierPoCreateEquipmentDesc:
+      'معدات هذه الجهة الموجودة الان داخل المشروع المختار. اختر ما يدخل في الامر واكتب سعره، او اتركه بلا سعر مؤقتا.',
+    supplierPoPickProjectFirst: 'اختر المورد والشركة والمشروع اولا.',
+    supplierPoNoUnitsAtProject: 'لا معدات لهذه الجهة داخل هذا المشروع الان.',
+    supplierPoCompanyPlaceholder: 'الشركات التي للجهة معدات فيها',
+    supplierPoProjectPlaceholder: 'مشاريع الشركة التي للجهة معدات فيها',
+    supplierPoStartDateHint: 'مقترح من اقدم دخول بين المعدات المختارة، ويمكن تعديله.',
+    supplierPoEntryDate: 'تاريخ الدخول',
+    supplierPoSelectedCount: 'المختارة',
     supplierPoErrorInvalidLine: 'سطر المعدة غير موجود.',
     supplierPoSaveFailed: 'تعذر الحفظ. حاول مرة اخرى.',
     equipmentPurchasingCard: 'المشتريات',
@@ -2049,6 +2073,7 @@ export const translations = {
 
     dashboard: 'Dashboard',
     logs: 'Logs',
+    navLogs: 'Entries',
     reports: 'Reports',
     entryReports: 'Entry Reports',
     equipmentReports: 'Equipment Reports',
@@ -3934,7 +3959,29 @@ export const translations = {
     supplierPoErrorNotAtProject:
       "The equipment is not inside the order's company and project right now.",
     supplierPoEquipmentAtProjectHint:
-      "Only units currently inside the order's company and project are listed.",
+      "Only this party's units currently inside the order's company and project are listed.",
+    supplierPoErrorNotOfSupplier: "The equipment does not belong to this order's party.",
+    supplierPoParty: 'Supplier / owner',
+    supplierPoPartyPlaceholder: 'Pick the supplier or owner',
+    supplierPoPartyHint:
+      'A supplier from the list, or one of the fixed owners (Al-Azani, Takween, third party F, partnership B).',
+    supplierPoPartyRequired: 'Pick the supplier or owner.',
+    supplierPoOwnerTakween: 'Takween',
+    supplierPoOwnerF: 'Third party F',
+    supplierPoOwnerB: 'Partnership B',
+    supplierPoNeedsPrices: 'Needs prices',
+    supplierPoNoPrice: 'No price',
+    supplierPoUnpricedTotalNote: 'unpriced',
+    supplierPoCreateEquipment: 'Equipment inside the project',
+    supplierPoCreateEquipmentDesc:
+      "This party's units currently inside the chosen project. Tick the ones on the order and enter a price, or leave it empty for now.",
+    supplierPoPickProjectFirst: 'Pick the party, company and project first.',
+    supplierPoNoUnitsAtProject: 'This party has no units inside this project right now.',
+    supplierPoCompanyPlaceholder: 'Companies where the party has units',
+    supplierPoProjectPlaceholder: "The company's projects where the party has units",
+    supplierPoStartDateHint: 'Suggested from the earliest entry among the picked units; editable.',
+    supplierPoEntryDate: 'Entry date',
+    supplierPoSelectedCount: 'Selected',
     supplierPoErrorInvalidLine: 'The equipment line does not exist.',
     supplierPoSaveFailed: 'Could not save. Please try again.',
     equipmentPurchasingCard: 'Purchasing',

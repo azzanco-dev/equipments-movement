@@ -18,7 +18,6 @@ import {
   type SupplierPoPriceFormValues,
 } from '@/lib/purchasing'
 import {
-  isInternalUnit,
   updateSupplierPoEquipmentPrice,
   type SupplierPoLineRow,
 } from '@/lib/purchasingData'
@@ -47,13 +46,14 @@ export function EditPriceDialog({
   const [saving, setSaving] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
   const unit = line?.card?.equipment ?? null
-  const internal = isInternalUnit(unit)
   const lineId = line?.id ?? null
   const linePrice = line?.price
 
   useEffect(() => {
     if (!lineId) return
-    setForm({ price: linePrice === undefined ? '' : String(linePrice) })
+    setForm({
+      price: linePrice === undefined || linePrice === null ? '' : String(linePrice),
+    })
     setErrors({})
     setMessage(null)
     setSaving(false)
@@ -61,7 +61,7 @@ export function EditPriceDialog({
 
   const save = async () => {
     if (!line) return
-    const invalid = validateWithSchema(supplierPoPriceFormSchema(internal), form)
+    const invalid = validateWithSchema(supplierPoPriceFormSchema, form)
     if (hasErrors(invalid)) {
       setErrors(invalid)
       setMessage(null)
@@ -114,7 +114,8 @@ export function EditPriceDialog({
           <div className="flex items-center justify-between gap-3 rounded-lg border bg-surface px-3 py-2 text-sm">
             <PurchasingUnitCell unit={unit} />
             <span className="text-muted">
-              {t('supplierPoCurrentPrice')}: <Price value={line.price} />
+              {t('supplierPoCurrentPrice')}:{' '}
+              {line.price === null ? t('supplierPoNoPrice') : <Price value={line.price} />}
             </span>
           </div>
         )}
@@ -122,13 +123,7 @@ export function EditPriceDialog({
           label={t('supplierPoPrice')}
           name="price"
           required
-          hint={
-            internal ? (
-              t('supplierPoPriceInternalLocked')
-            ) : (
-              <PricePreview value={form.price} />
-            )
-          }
+          hint={<PricePreview value={form.price} />}
           error={errors.price && t(errors.price)}
         >
           {(control) => (
@@ -136,9 +131,8 @@ export function EditPriceDialog({
               {...control}
               dir="ltr"
               inputMode="decimal"
+              placeholder="0.00"
               value={form.price}
-              disabled={internal}
-              readOnly={internal}
               onChange={(event) => {
                 setForm({ price: event.target.value })
                 setErrors({})

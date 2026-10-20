@@ -172,24 +172,28 @@ test('the mockup renders the three screens and their states with sample data onl
 
 const errors = (schema, values) => plain(v.validateWithSchema(schema, values))
 
-test('supplierPoFormSchema: company, project and start date are mandatory, the supplier is not', () => {
+test('supplierPoFormSchema: a party (lessor or owner class), company, project and start date are mandatory', () => {
   assert.deepEqual(
     errors(v.supplierPoFormSchema, {
       lessor_id: '',
+      owner_class: '',
       company_id: '',
       project_id: '',
       start_date: '',
       notes: '',
     }),
     {
+      lessor_id: 'supplierPoPartyRequired',
       company_id: 'supplierPoCompanyRequired',
       project_id: 'supplierPoProjectRequired',
       start_date: 'supplierPoStartDateRequired',
     },
   )
+  // An owner class is a party of its own (0138: no supplier row needed).
   assert.deepEqual(
     errors(v.supplierPoFormSchema, {
       lessor_id: '',
+      owner_class: 'takween',
       company_id: 'c1',
       project_id: 'p1',
       start_date: '2026-10-19',
@@ -200,6 +204,7 @@ test('supplierPoFormSchema: company, project and start date are mandatory, the s
   assert.deepEqual(
     errors(v.supplierPoFormSchema, {
       lessor_id: 'l1',
+      owner_class: '',
       company_id: 'c1',
       project_id: 'p1',
       start_date: '2026-10-19',
@@ -207,61 +212,77 @@ test('supplierPoFormSchema: company, project and start date are mandatory, the s
     }),
     { notes: 'supplierPoNotesTooLong' },
   )
+  // The picker's values.
+  assert.deepEqual(plain(purchasing.partyFromOptionValue('class:alazani')), {
+    lessor_id: '',
+    owner_class: 'alazani',
+  })
+  assert.deepEqual(plain(purchasing.partyFromOptionValue('l1')), {
+    lessor_id: 'l1',
+    owner_class: '',
+  })
+  assert.equal(
+    purchasing.partyOptionValue({ lessor_id: null, owner_class: 'third_party_f' }),
+    'class:third_party_f',
+  )
+  assert.equal(
+    purchasing.partyOptionValue({ lessor_id: 'l1', owner_class: null }),
+    'l1',
+  )
+  assert.deepEqual(plain(purchasing.SUPPLIER_PO_OWNER_CLASSES), [
+    'alazani',
+    'takween',
+    'third_party_f',
+    'third_party_partnership_b',
+  ])
   assert.equal(v.SUPPLIER_PO_NOTES_MAX, 1000)
   assert.equal(v.SUPPLIER_PO_LINE_NOTE_MAX, 500)
 })
 
-test('supplierPoLineFormSchema: the unit, a valid price, and zero for an internal unit', () => {
-  const external = v.supplierPoLineFormSchema(false)
-  const internal = v.supplierPoLineFormSchema(true)
-  assert.deepEqual(
-    errors(external, { equipment_id: '', price: '', note: '' }),
-    {
-      equipment_id: 'supplierPoEquipmentRequired',
-      price: 'supplierPoPriceRequired',
-    },
-  )
+test('supplierPoLineFormSchema: the unit, and a valid price when one is typed (optional since 0138)', () => {
+  const schema = v.supplierPoLineFormSchema
+  // No owner-based rule and no mandatory price (owner 2026-10-20).
+  assert.deepEqual(errors(schema, { equipment_id: '', price: '', note: '' }), {
+    equipment_id: 'supplierPoEquipmentRequired',
+  })
+  assert.deepEqual(errors(schema, { equipment_id: 'e1', price: '', note: '' }), {})
   for (const price of ['0', '0.00', '1250', '1250.5', '9999999999.99'])
     assert.deepEqual(
-      errors(external, { equipment_id: 'e1', price, note: '' }),
+      errors(schema, { equipment_id: 'e1', price, note: '' }),
       {},
       price,
     )
   for (const price of ['-1', '12.345', 'abc', '1,250', '12345678901'])
     assert.deepEqual(
-      errors(external, { equipment_id: 'e1', price, note: '' }),
+      errors(schema, { equipment_id: 'e1', price, note: '' }),
       { price: 'supplierPoPriceInvalid' },
       price,
     )
-  // An Al-Azani (internal) unit: 0 passes, anything else is refused with the
-  // same message the database raises (internal_price_must_be_zero).
   assert.deepEqual(
-    errors(internal, { equipment_id: 'e1', price: '0', note: '' }),
-    {},
-  )
-  assert.deepEqual(
-    errors(internal, { equipment_id: 'e1', price: '0.00', note: '' }),
-    {},
-  )
-  assert.deepEqual(
-    errors(internal, { equipment_id: 'e1', price: '100', note: '' }),
-    { price: 'supplierPoPriceInternalMustBeZero' },
-  )
-  assert.deepEqual(
-    errors(external, {
+    errors(schema, {
       equipment_id: 'e1',
       price: '10',
       note: 'x'.repeat(501),
     }),
     { note: 'supplierPoLineNoteTooLong' },
   )
-  // «تعديل السعر» uses the same price rule.
-  assert.deepEqual(errors(v.supplierPoPriceFormSchema(true), { price: '5' }), {
-    price: 'supplierPoPriceInternalMustBeZero',
+  // «تعديل السعر» asks for the price.
+  assert.deepEqual(errors(v.supplierPoPriceFormSchema, { price: '' }), {
+    price: 'supplierPoPriceRequired',
   })
+  assert.deepEqual(errors(v.supplierPoPriceFormSchema, { price: '5' }), {})
+  // The create call's payload: an empty price is null, never 0.
   assert.deepEqual(
-    errors(v.supplierPoPriceFormSchema(false), { price: '5' }),
-    {},
+    plain(
+      purchasing.supplierPoEquipmentPayload([
+        { equipment_id: 'e1', price: '', note: '' },
+        { equipment_id: 'e2', price: ' 1250.5 ', note: ' x ' },
+      ]),
+    ),
+    [
+      { equipment_id: 'e1', price: null, note: null },
+      { equipment_id: 'e2', price: 1250.5, note: 'x' },
+    ],
   )
 })
 
@@ -271,9 +292,11 @@ const MIGRATIONS = [
   '20261018130000_0136_purchasing_supplier_pos.sql',
   // 0137 re-creates add_supplier_po_equipment with one more token.
   '20261019100000_0137_supplier_po_equipment_at_project.sql',
+  // 0138: the party, the optional price, the PO created with its equipment.
+  '20261020100000_0138_supplier_po_party_and_optional_price.sql',
 ]
 
-test('every stable token of migrations 0136 and 0137 is known and mapped', () => {
+test('every stable token of migrations 0136 to 0138 is known and mapped', () => {
   const sql = MIGRATIONS.map((file) => read('supabase', 'migrations', file)).join('\n')
   const raised = new Set(
     [...sql.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g)].map((m) => m[1]),
@@ -471,7 +494,13 @@ test('supplierPosListConfig: PO number search, allowlisted filters, standard siz
     'lessor_id',
     'company_id',
     'project_id',
+    // 0138: the computed column, «تحتاج اسعار» = gt 0.
+    'unpriced_count',
   ])
+  assert.match(
+    config.replace(/\s+/g, ' '),
+    /key: 'unpriced_count', label: 'supplierPoNeedsPrices', type: 'select', operators: \['gt'\], options: \[\], choices: \[ \{ key: 'needs_prices', operator: 'gt', value: '0', label: 'supplierPoNeedsPrices', \}, \],/,
+  )
   // No page-size override: the standard 20 / 50 / 100 / 200 / 350 / 500.
   assert.doesNotMatch(config, /pageSizeOptions/)
 })
@@ -632,16 +661,37 @@ test('the real screens read through RLS and write only through the 0136 function
   assert.match(add, /addSupplierPoEquipment\(/)
   assert.match(add, /SUPPLIER_PO_LINE_FIELD_RULES/)
   // 0137: only the units inside the PO's company and project are offered.
-  assert.match(add, /equipmentAtProjectOptionLoader\(companyId, projectId\)/)
+  assert.match(
+    add,
+    /equipmentAtProjectOptionLoader\(party, po\.company_id, po\.project_id\)/,
+  )
   const dataLib = read('src', 'lib', 'purchasingData.ts')
+  // 0138: the party's open site visits (its lessor, or its owner class)...
+  const visitsFn = dataLib.slice(
+    dataLib.indexOf('function partyOpenVisits('),
+    dataLib.indexOf('export function partyOptionLoader('),
+  )
+  assert.match(visitsFn, /\.from\('movement_visits'\)/)
+  assert.match(visitsFn, /\.eq\('is_open', true\)/)
+  assert.match(visitsFn, /\.eq\('movement_context', 'site'\)/)
+  assert.match(visitsFn, /\.eq\('equipment_ownership_status', party\.owner_class\)/)
+  assert.match(visitsFn, /\.eq\('equipment_lessor_id', party\.lessor_id\)/)
+  // ...narrowed to the PO's company and project for «اضافة معدة».
   const loader = dataLib.slice(
     dataLib.indexOf('export function equipmentAtProjectOptionLoader'),
   )
-  assert.match(loader, /\.from\('movement_visits'\)/)
-  assert.match(loader, /\.eq\('is_open', true\)/)
-  assert.match(loader, /\.eq\('movement_context', 'site'\)/)
+  assert.match(loader, /partyOpenVisits\(party\)/)
   assert.match(loader, /\.eq\('company_id', companyId\)/)
   assert.match(loader, /\.eq\('project_id', projectId\)/)
+  // The create dialog: the party first, then only its places and units, the
+  // start date from the earliest entry, everything saved in one call.
+  const createDialog = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
+  assert.match(createDialog, /partyOptionLoader\(loadLessors, t\)/)
+  assert.match(createDialog, /fetchPartyOpenVisits\(current\)/)
+  assert.match(createDialog, /visitCompanyOptions\(visits, lang\)/)
+  assert.match(createDialog, /visitProjectOptions\(visits, form\.company_id, lang\)/)
+  assert.match(createDialog, /createSupplierPo\(form, lines\)/)
+  assert.match(createDialog, /const suggestStartDate = /)
   const create = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
   assert.match(create, /createSupplierPo\(/)
   assert.match(create, /SUPPLIER_PO_CREATE_FIELD_RULES/)

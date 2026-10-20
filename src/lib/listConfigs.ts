@@ -679,6 +679,23 @@ export const supplierPosListConfig: DataListConfig = {
       options: [],
       multiple: true,
     },
+    // 0138: the computed column unpriced_count(supplier_pos); «تحتاج اسعار»
+    // = at least one line without a price.
+    {
+      key: 'unpriced_count',
+      label: 'supplierPoNeedsPrices',
+      type: 'select',
+      operators: ['gt'],
+      options: [],
+      choices: [
+        {
+          key: 'needs_prices',
+          operator: 'gt',
+          value: '0',
+          label: 'supplierPoNeedsPrices',
+        },
+      ],
+    },
   ],
   sortableFields: [
     { key: 'created_at', label: 'supplierPoCreatedAt' },

@@ -11,6 +11,7 @@ import { useListRequest } from '@/components/data-list/useListRequest'
 import { CreateSupplierPoDialog } from '@/components/purchasing/CreateSupplierPoDialog'
 import { SupplierPoStatusBadge } from '@/components/purchasing/SupplierPoStatusBadge'
 import {
+  Badge,
   Button,
   DataTable,
   EmptyState,
@@ -149,7 +150,16 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
       key: 'status',
       header: t('status'),
       sortable: true,
-      cell: (row) => <SupplierPoStatusBadge status={row.status} />,
+      cell: (row) => (
+        <span className="flex flex-wrap items-center gap-1">
+          <SupplierPoStatusBadge status={row.status} />
+          {(row.unpriced_count ?? 0) > 0 && (
+            <Badge tone="warning" size="sm">
+              {t('supplierPoNeedsPrices')} ({row.unpriced_count})
+            </Badge>
+          )}
+        </span>
+      ),
     },
   ]
 
