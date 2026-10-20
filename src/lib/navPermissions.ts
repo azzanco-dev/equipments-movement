@@ -67,6 +67,12 @@ export interface NavEntry<K extends string = NavItemKey> {
   requires: readonly NavGate[]
   /** Sub-entries; the parent is hidden when none of them is visible. */
   children?: readonly NavEntry<NavChildKey>[]
+  /**
+   * Reachable by URL only: never listed in the sidebar and never a landing
+   * section, while its pages still open for whoever passes its gates
+   * (owner 2026-10-20: purchasing goes to production by link only for now).
+   */
+  hidden?: boolean
 }
 
 /**
@@ -89,12 +95,15 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // Purchasing (migration 0136, screens 2026-10-19): a parent with its
   // sections (owner 2026-10-19: «رئيسية وتحتها فرعيات»), the supplier POs
   // first; the key is held by the admin and the custom «المشتريات» role.
+  // Hidden from the sidebar for now (owner 2026-10-20: reachable by its
+  // link only, /purchasing/orders); drop `hidden` to list it.
   {
     key: 'purchasing',
     requires: [{ key: 'purchasing.view' }],
     children: [
       { key: 'purchasing/orders', requires: [{ key: 'purchasing.view' }] },
     ],
+    hidden: true,
   },
   { key: 'drivers', requires: [{ key: 'drivers.read' }] },
   { key: 'users', requires: [{ key: 'users.manage' }] },
@@ -141,9 +150,6 @@ const ADMIN_MENU: readonly VisibleNavItem[] = [
   { key: 'projects' },
   { key: 'companies' },
   { key: 'lessors' },
-  // 2026-10-19: the admin holds purchasing.view in both mappings (0136), so
-  // the fallback menu lists the section too.
-  { key: 'purchasing', children: ['purchasing/orders'] },
   { key: 'drivers' },
   { key: 'users' },
   { key: 'activity' },
@@ -200,7 +206,7 @@ function fromPermissions(
 ): VisibleNavItem[] {
   const items: VisibleNavItem[] = []
   for (const entry of NAV_ENTRIES) {
-    if (!allowed(permissions, entry)) continue
+    if (entry.hidden || !allowed(permissions, entry)) continue
     if (!entry.children) {
       items.push({ key: entry.key })
       continue
@@ -532,7 +538,8 @@ function firstOpenSection(
   permissions: ReadonlyMap<string, PermissionScope>,
 ): RoutePage | undefined {
   for (const entry of NAV_ENTRIES) {
-    if (entry.key === 'dashboard' || !allowed(permissions, entry)) continue
+    if (entry.key === 'dashboard' || entry.hidden || !allowed(permissions, entry))
+      continue
     if (!entry.children) return entry.key
     const child = entry.children.find((item) => allowed(permissions, item))
     if (child) return child.key

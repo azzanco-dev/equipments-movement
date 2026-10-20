@@ -561,11 +561,26 @@ test('new Arabic copy uses the plain alif (no أ / إ / آ)', () => {
 
 test('the purchasing section, routes and page gates are keyed on purchasing.view', () => {
   const nav = read('src', 'lib', 'navPermissions.ts')
-  // A parent with its sections (owner 2026-10-19), the PO list first.
+  // A parent with its sections (owner 2026-10-19), the PO list first; hidden
+  // from the sidebar for now (owner 2026-10-20: by link only).
   assert.match(
     nav.replace(/\s+/g, ' '),
-    /\{ key: 'purchasing', requires: \[\{ key: 'purchasing\.view' \}\], children: \[ \{ key: 'purchasing\/orders', requires: \[\{ key: 'purchasing\.view' \}\] \}, \], \}/,
+    /\{ key: 'purchasing', requires: \[\{ key: 'purchasing\.view' \}\], children: \[ \{ key: 'purchasing\/orders', requires: \[\{ key: 'purchasing\.view' \}\] \}, \], hidden: true, \}/,
   )
+  // The pages open for purchasing.view, the menu never lists them, and the
+  // entry is never a landing section.
+  const navLib = loadLibModule('navPermissions')
+  const state = {
+    status: 'ready',
+    permissions: new Map([['purchasing.view', 'all']]),
+  }
+  assert.ok(navLib.canOpenPage(state.permissions, 'purchasing/orders'))
+  assert.ok(navLib.canOpenPage(state.permissions, 'purchasing/:id'))
+  assert.deepEqual(plain(navLib.visibleNavItems(state, 'x')), [])
+  assert.equal(navLib.planShell(state, 'x').kind, 'none')
+  assert.equal(navLib.routePageOf(['purchasing']), 'purchasing/orders')
+  assert.equal(navLib.routePageOf(['purchasing', 'orders']), 'purchasing/orders')
+  assert.equal(navLib.routePageOf(['purchasing', 'abc']), 'purchasing/:id')
   assert.match(nav, /'purchasing\/:id': \[\{ key: 'purchasing\.view' \}\]/)
   assert.match(
     nav.replace(/\s+/g, ' '),

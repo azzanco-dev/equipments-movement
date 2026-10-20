@@ -610,7 +610,8 @@ test('the landing is the first passing section in menu order', () => {
   // Every section can be the landing, in NAV_ENTRIES order.
   const landings = []
   for (const entry of nav.NAV_ENTRIES) {
-    if (entry.key === 'dashboard') continue
+    // A hidden entry (URL only) is never a landing.
+    if (entry.key === 'dashboard' || entry.hidden) continue
     const gate = (entry.children ?? [entry])[0].requires[0]
     const own = nav.planShell(
       ready([[gate.key, gate.scopes?.[0] ?? 'all']]),
@@ -626,7 +627,6 @@ test('the landing is the first passing section in menu order', () => {
     'projects',
     'projects',
     'lessors',
-    'purchasing/orders',
     'drivers',
     'users',
     'activity',
