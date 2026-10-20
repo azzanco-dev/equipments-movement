@@ -548,7 +548,10 @@ test('every purchasing translation key exists in Arabic and English', () => {
     ar.block,
     /supplierPoErrorCardOverlap:\s*'للمعدة كرت لشركة او مشروع اخر في هذه الفترة\.'/,
   )
-  assert.match(ar.block, /بدون مورد = معدات العزاني/)
+  // Owner 2026-10-20: the party is picked explicitly; the old wording is gone.
+  assert.doesNotMatch(ar.block, /بدون مورد = معدات العزاني/)
+  assert.match(ar.block, /supplierPoOwnerAlazani: 'شركة عبدالله احمد العزاني للمقاولات'/)
+  assert.match(ar.block, /supplierPoOwnerF: 'معدات F'/)
 })
 
 test('new Arabic copy uses the plain alif (no أ / إ / آ)', () => {
