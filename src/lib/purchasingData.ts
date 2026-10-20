@@ -170,7 +170,7 @@ export function lineSupplierName(
   t: (key: TranslationKey) => string,
 ): string {
   if (!unit) return '—'
-  if (unit.ownership_status === 'alazani') return t('supplierPoInternalSupplier')
+  if (unit.ownership_status === 'alazani') return t('supplierPoOwnerAlazani')
   return unit.lessor?.name?.trim() || supplierPoSupplierLabel(po, t)
 }
 

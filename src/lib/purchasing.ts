@@ -102,7 +102,7 @@ export const SUPPLIER_PO_OWNER_CLASSES: readonly SupplierPoOwnerClass[] = [
 export const SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS: Readonly<
   Record<SupplierPoOwnerClass, TranslationKey>
 > = {
-  alazani: 'supplierPoInternalSupplier',
+  alazani: 'supplierPoOwnerAlazani',
   takween: 'supplierPoOwnerTakween',
   third_party_f: 'supplierPoOwnerF',
   third_party_partnership_b: 'supplierPoOwnerB',
