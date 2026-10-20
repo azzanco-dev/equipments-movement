@@ -700,7 +700,7 @@ export const supplierPosListConfig: DataListConfig = {
       operators: ['in'],
       options: [],
       multiple: true,
-      visibleWhen: { field: 'party_class', includes: ['external_supplier'] },
+      visibleWhen: { field: 'party_class', includes: 'external_supplier' },
     },
     {
       key: 'company_id',

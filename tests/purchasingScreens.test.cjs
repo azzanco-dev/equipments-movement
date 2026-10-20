@@ -505,7 +505,7 @@ test('supplierPosListConfig: PO number search, allowlisted filters, standard siz
   ])
   assert.match(
     config.replace(/\s+/g, ' '),
-    /key: 'lessor_id', label: 'supplierPoSupplier', type: 'select', operators: \['in'\], options: \[\], multiple: true, visibleWhen: \{ field: 'party_class', includes: \['external_supplier'\] \},/,
+    /key: 'lessor_id', label: 'supplierPoSupplier', type: 'select', operators: \['in'\], options: \[\], multiple: true, visibleWhen: \{ field: 'party_class', includes: 'external_supplier' \},/,
   )
   for (const owner of [
     'alazani',
