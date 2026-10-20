@@ -655,6 +655,44 @@ export const supplierPosListConfig: DataListConfig = {
         },
       ],
     },
+    // Owner 2026-10-20: «المالك ثم المورد», like the movement log. The owner
+    // is the computed column party_class(supplier_pos) (migration 0140: the
+    // PO's owner class, or external_supplier for a lessor party)...
+    {
+      key: 'party_class',
+      label: 'ownershipStatus',
+      type: 'select',
+      operators: ['eq', 'neq', 'in', 'not_in'],
+      options: [
+        {
+          value: 'alazani',
+          label: 'العزاني',
+          labelI18n: 'adminHomeOwnerAlazani',
+        },
+        {
+          value: 'takween',
+          label: 'تكوين',
+          labelI18n: 'adminHomeOwnerTakween',
+        },
+        {
+          value: 'third_party_f',
+          label: 'طرف ثالث F',
+          labelI18n: 'adminHomeOwnerThirdPartyF',
+        },
+        {
+          value: 'third_party_partnership_b',
+          label: 'طرف ثالث B',
+          labelI18n: 'adminHomeOwnerThirdPartyB',
+        },
+        {
+          value: 'external_supplier',
+          label: 'مالك اخر',
+          labelI18n: 'adminHomeOwnerExternal',
+        },
+      ],
+    },
+    // ...and the supplier, offered only while the owner filter selects
+    // «مالك اخر» (the same rule as SUPPLIER_FILTER_FIELD of the log).
     {
       key: 'lessor_id',
       label: 'supplierPoSupplier',
@@ -662,6 +700,7 @@ export const supplierPosListConfig: DataListConfig = {
       operators: ['in'],
       options: [],
       multiple: true,
+      visibleWhen: { field: 'party_class', includes: ['external_supplier'] },
     },
     {
       key: 'company_id',

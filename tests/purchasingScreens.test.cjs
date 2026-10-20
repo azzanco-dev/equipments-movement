@@ -296,6 +296,8 @@ const MIGRATIONS = [
   '20261020100000_0138_supplier_po_party_and_optional_price.sql',
   // 0139: create_supplier_po re-created with is_internal never NULL.
   '20261020110000_0139_supplier_po_is_internal_default.sql',
+  // 0140: party_class computed column (no token).
+  '20261020120000_0140_supplier_po_party_class.sql',
 ]
 
 test('every stable token of migrations 0136 to 0138 is known and mapped', () => {
@@ -493,12 +495,26 @@ test('supplierPosListConfig: PO number search, allowlisted filters, standard siz
   )
   assert.deepEqual(filterKeys, [
     'status',
+    // 0140: «المالك ثم المورد» like the log (party_class computed column).
+    'party_class',
     'lessor_id',
     'company_id',
     'project_id',
     // 0138: the computed column, «تحتاج اسعار» = gt 0.
     'unpriced_count',
   ])
+  assert.match(
+    config.replace(/\s+/g, ' '),
+    /key: 'lessor_id', label: 'supplierPoSupplier', type: 'select', operators: \['in'\], options: \[\], multiple: true, visibleWhen: \{ field: 'party_class', includes: \['external_supplier'\] \},/,
+  )
+  for (const owner of [
+    'alazani',
+    'takween',
+    'third_party_f',
+    'third_party_partnership_b',
+    'external_supplier',
+  ])
+    assert.match(config, new RegExp(`value: '${owner}',`), owner)
   assert.match(
     config.replace(/\s+/g, ' '),
     /key: 'unpriced_count', label: 'supplierPoNeedsPrices', type: 'select', operators: \['gt'\], options: \[\], choices: \[ \{ key: 'needs_prices', operator: 'gt', value: '0', label: 'supplierPoNeedsPrices', \}, \],/,
