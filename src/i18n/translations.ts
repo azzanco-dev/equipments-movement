@@ -1868,8 +1868,8 @@ export const translations = {
     supplierPoEmptyFiltered: 'لا توجد اوامر شراء تطابق البحث او الفلاتر.',
     supplierPoListLoadError: 'تعذر تحميل اوامر الشراء.',
     supplierPoCreateDesc:
-      'اختر الشركة والمشروع وتاريخ البداية. بدون مورد = معدات العزاني.',
-    supplierPoSupplierHint: 'بدون مورد = معدات العزاني (امر داخلي).',
+      'اختر الجهة ثم الشركة والمشروع، ثم المعدات واسعارها وتاريخ البداية.',
+    supplierPoSupplierHint: 'مورد من القائمة او احد الملاك الثابتين.',
     supplierPoSupplierPlaceholder: 'اختر المورد (اختياري)',
     supplierPoCompanyRequired: 'اختر الشركة.',
     supplierPoProjectRequired: 'اختر المشروع.',
@@ -3895,8 +3895,8 @@ export const translations = {
     supplierPoEmptyFiltered: 'No purchase orders match the search or filters.',
     supplierPoListLoadError: 'Could not load the purchase orders.',
     supplierPoCreateDesc:
-      'Pick the company, the project and the start date. No supplier = Al-Azani equipment.',
-    supplierPoSupplierHint: 'No supplier = Al-Azani equipment (internal PO).',
+      'Pick the party, then the company and project, then the units with their prices and the start date.',
+    supplierPoSupplierHint: 'A supplier from the list or one of the fixed owners.',
     supplierPoSupplierPlaceholder: 'Pick a supplier (optional)',
     supplierPoCompanyRequired: 'Pick the company.',
     supplierPoProjectRequired: 'Pick the project.',
