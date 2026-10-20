@@ -275,7 +275,8 @@ const NAV_PRESENTATION: Record<
   { label: TranslationKey; icon: ReactNode }
 > = {
   dashboard: { label: 'dashboard', icon: <LayoutDashboard size={18} /> },
-  logs: { label: 'logs', icon: <FileText size={18} /> },
+  // Owner 2026-10-20: the sidebar calls the log «الدخوليات».
+  logs: { label: 'navLogs', icon: <FileText size={18} /> },
   inquiry: { label: 'inquiryPageTitle', icon: <Search size={18} /> },
   equipment: { label: 'equipment', icon: <Truck size={18} /> },
   projects: { label: 'projects', icon: <FolderKanban size={18} /> },
