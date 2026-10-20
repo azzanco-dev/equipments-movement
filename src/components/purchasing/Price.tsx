@@ -36,5 +36,6 @@ export function Price({
  */
 export function PricePreview({ value }: { value: string }) {
   if (!isValidSupplierPoPrice(value)) return null
-  return <Price value={Number(value.trim())} />
+  // Bold (owner 2026-10-20), so the formatted amount stands out from the hint.
+  return <Price value={Number(value.trim())} className="font-semibold text-fg" />
 }
