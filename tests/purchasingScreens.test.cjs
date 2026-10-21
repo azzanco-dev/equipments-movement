@@ -517,7 +517,7 @@ test('supplierPosListConfig: PO number search, allowlisted filters, standard siz
     assert.match(config, new RegExp(`value: '${owner}',`), owner)
   assert.match(
     config.replace(/\s+/g, ' '),
-    /key: 'unpriced_count', label: 'supplierPoNeedsPrices', type: 'select', operators: \['gt'\], options: \[\], choices: \[ \{ key: 'needs_prices', operator: 'gt', value: '0', label: 'supplierPoNeedsPrices', \}, \],/,
+    /key: 'unpriced_count', label: 'supplierPoNeedsPrices', type: 'select', operators: \['gt', 'eq'\], options: \[\], choices: \[ \{ key: 'needs_prices', operator: 'gt', value: '0', label: 'yes' \}, \{ key: 'all_priced', operator: 'eq', value: '0', label: 'no' \}, \],/,
   )
   // No page-size override: the standard 20 / 50 / 100 / 200 / 350 / 500.
   assert.doesNotMatch(config, /pageSizeOptions/)
