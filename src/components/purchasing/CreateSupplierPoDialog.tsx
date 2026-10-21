@@ -452,17 +452,20 @@ export function CreateSupplierPoDialog({
             <p className="text-sm font-medium">{t('supplierPoCreateEquipment')}</p>
             <p className="text-xs text-muted">{t('supplierPoCreateEquipmentDesc')}</p>
           </div>
+          {/* The units matter only once a project is chosen: until then the
+              section keeps its hint, whatever the visits request is doing
+              (owner 2026-10-21: no loading flash on picking the owner). */}
           {visitsState === 'error' ? (
             <ErrorState description={t('supplierPoListLoadError')} className="p-4" />
+          ) : !form.project_id ? (
+            <p className="rounded-xl border border-dashed p-3 text-sm text-muted">
+              {t('supplierPoPickProjectFirst')}
+            </p>
           ) : visitsState === 'loading' ? (
             <div className="space-y-2" aria-busy="true">
               <Skeleton className="h-12 w-full rounded-xl" />
               <Skeleton className="h-12 w-full rounded-xl" />
             </div>
-          ) : !form.project_id ? (
-            <p className="rounded-xl border border-dashed p-3 text-sm text-muted">
-              {t('supplierPoPickProjectFirst')}
-            </p>
           ) : unitsAtProject.length === 0 ? (
             <EmptyState title={t('supplierPoNoUnitsAtProject')} className="p-4" />
           ) : (
