@@ -36,6 +36,23 @@
   font-display: swap;
 }
 
+/* Figures in the Arabic interface (owner 2026-10-21): Thmanyah's digits are
+   strongly proportional (a 1 is about half a 0) and the face has no tabular
+   feature, so a column of numbers came out ragged. Roboto's figures are
+   equal-width by default, so the digits and the signs inside numbers are
+   taken from Roboto through this range-limited face, listed FIRST in the
+   Arabic stack; every Arabic letter still falls through to Thmanyah, and
+   the result no longer depends on which fallback font a device has. */
+@font-face {
+  font-family: 'ArabicUiDigits';
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource-variable/roboto@5.2.5/files/roboto-latin-wght-normal.woff2')
+    format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0030-0039, U+002C-002E, U+0025, U+002B, U+003A;
+}
+
 /* Thmanyah Sans remains the Arabic interface font. */
 @font-face {
   font-family: 'Thmanyah';
@@ -44,13 +61,8 @@
   font-weight: 400;
   font-style: normal;
   font-display: swap;
-  /* Arabic, plus the Latin digits and the signs that sit inside numbers
-     (owner 2026-10-21): without them 0-9 fell back to Tajawal / Segoe /
-     Tahoma next to Thmanyah text, with other metrics, so figures looked
-     off-size and stacked rows could collide. Letters stay on the Latin font. */
   unicode-range:
-    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF,
-    U+0030-0039, U+002C-002E, U+0025, U+002B, U+003A;
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
 /* Noto Sans Arabic has conventional dotted final yeh forms in native inputs. */
@@ -71,13 +83,8 @@
   font-weight: 500;
   font-style: normal;
   font-display: swap;
-  /* Arabic, plus the Latin digits and the signs that sit inside numbers
-     (owner 2026-10-21): without them 0-9 fell back to Tajawal / Segoe /
-     Tahoma next to Thmanyah text, with other metrics, so figures looked
-     off-size and stacked rows could collide. Letters stay on the Latin font. */
   unicode-range:
-    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF,
-    U+0030-0039, U+002C-002E, U+0025, U+002B, U+003A;
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 @font-face {
   font-family: 'Thmanyah';
@@ -86,13 +93,8 @@
   font-weight: 700;
   font-style: normal;
   font-display: swap;
-  /* Arabic, plus the Latin digits and the signs that sit inside numbers
-     (owner 2026-10-21): without them 0-9 fell back to Tajawal / Segoe /
-     Tahoma next to Thmanyah text, with other metrics, so figures looked
-     off-size and stacked rows could collide. Letters stay on the Latin font. */
   unicode-range:
-    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF,
-    U+0030-0039, U+002C-002E, U+0025, U+002B, U+003A;
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
 /* Thmanyah Serif Display is reserved for headings. */
@@ -115,7 +117,8 @@
 
 :root {
   --font-primary:
-    'Thmanyah', 'Tajawal', 'Segoe UI', Tahoma, system-ui, sans-serif;
+    'ArabicUiDigits', 'Thmanyah', 'Tajawal', 'Segoe UI', Tahoma, system-ui,
+    sans-serif;
   --font-latin: 'Roboto', 'Segoe UI', Arial, system-ui, sans-serif;
   --font-heading: 'Thmanyah Serif Display', 'Thmanyah', 'Segoe UI', serif;
 }
@@ -312,7 +315,7 @@ body {
   .input {
     @apply h-8 w-full rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors placeholder:text-placeholder;
     border-color: var(--border);
-    font-family: 'NotoArabicInput', 'Segoe UI', Tahoma, system-ui, sans-serif;
+    font-family: 'ArabicUiDigits', 'NotoArabicInput', 'Segoe UI', Tahoma, system-ui, sans-serif;
     line-height: 1.25rem;
   }
   html[lang='en'] .input {
