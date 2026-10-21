@@ -663,6 +663,8 @@ export const supplierPosListConfig: DataListConfig = {
       label: 'ownershipStatus',
       type: 'select',
       operators: ['eq', 'neq', 'in', 'not_in'],
+      // Multi-select like the equipment list's owner filter (owner 2026-10-21).
+      multiple: true,
       options: [
         {
           value: 'alazani',
