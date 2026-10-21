@@ -711,7 +711,15 @@ test('the real screens read through RLS and write only through the 0136 function
   // The create dialog: the party first, then only its places and units, the
   // start date from the earliest entry, everything saved in one call.
   const createDialog = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
-  assert.match(createDialog, /partyOptionLoader\(loadLessors, t\)/)
+  // Owner 2026-10-21: the owner select (four fixed owners + «مورد خارجي»),
+  // then the supplier field sliding in only for an external supplier.
+  assert.match(createDialog, /const EXTERNAL = 'external_supplier'/)
+  assert.match(createDialog, /SUPPLIER_PO_OWNER_CLASSES\.map\(/)
+  assert.match(createDialog, /\{ value: EXTERNAL, label: t\('supplierPoOwnerExternal'\) \}/)
+  assert.match(createDialog, /grid-rows-\[1fr\] opacity-100/)
+  assert.match(createDialog, /grid-rows-\[0fr\] opacity-0/)
+  assert.match(createDialog, /aria-hidden=\{!external\}/)
+  assert.match(createDialog, /disabled=\{!external\}/)
   assert.match(createDialog, /fetchPartyOpenVisits\(current\)/)
   assert.match(createDialog, /visitCompanyOptions\(visits, lang\)/)
   assert.match(createDialog, /visitProjectOptions\(visits, form\.company_id, lang\)/)

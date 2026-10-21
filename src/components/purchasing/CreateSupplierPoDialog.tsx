@@ -15,8 +15,10 @@ import {
   Field,
   Input,
   Notice,
+  Select,
   Skeleton,
   Textarea,
+  cn,
 } from '@/components/ui'
 import { EquipmentIdentifierTag } from '@/components/data-list/EquipmentIdentifierTag'
 import { useI18n } from '@/i18n/I18nContext'
@@ -34,16 +36,17 @@ import {
 import {
   SUPPLIER_PO_CREATE_FIELD_RULES,
   SUPPLIER_PO_FIELD_ORDER,
+  SUPPLIER_PO_OWNER_CLASSES,
+  SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS,
   isValidSupplierPoPrice,
-  partyFromOptionValue,
   supplierPoErrorOutcome,
   type SupplierPoCreateLine,
   type SupplierPoFormValues,
+  type SupplierPoOwnerClass,
 } from '@/lib/purchasing'
 import {
   createSupplierPo,
   fetchPartyOpenVisits,
-  partyOptionLoader,
   staticOptionLoader,
   supplierPoParty,
   visitCompanyOptions,
@@ -62,6 +65,10 @@ const EMPTY_FORM: SupplierPoFormValues = {
 }
 
 type Picked = Record<string, { price: string; note: string }>
+
+/** The owner select: one of the four fixed owners, or «مورد خارجي». */
+const EXTERNAL = 'external_supplier'
+type OwnerChoice = '' | SupplierPoOwnerClass | typeof EXTERNAL
 
 /**
  * «امر شراء جديد» (owner review 2026-10-20): the party first (a supplier
@@ -84,7 +91,19 @@ export function CreateSupplierPoDialog({
   const { t, lang } = useI18n()
   const { loadLessors } = useMovementFormOptions()
   const [form, setForm] = useState<SupplierPoFormValues>(EMPTY_FORM)
-  const [party, setParty] = useState<AsyncSearchSelectOption | null>(null)
+  const [owner, setOwner] = useState<OwnerChoice>('')
+  const [supplier, setSupplier] = useState<AsyncSearchSelectOption | null>(null)
+  const external = owner === EXTERNAL
+  const ownerOptions = useMemo(
+    () => [
+      ...SUPPLIER_PO_OWNER_CLASSES.map((owner) => ({
+        value: owner,
+        label: t(SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS[owner]),
+      })),
+      { value: EXTERNAL, label: t('supplierPoOwnerExternal') },
+    ],
+    [t],
+  )
   const [visits, setVisits] = useState<PartyOpenVisit[]>([])
   const [visitsState, setVisitsState] = useState<'idle' | 'loading' | 'error' | 'ready'>(
     'idle',
@@ -97,10 +116,6 @@ export function CreateSupplierPoDialog({
   const [dateTouched, setDateTouched] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
 
-  const loadParties = useMemo(
-    () => partyOptionLoader(loadLessors, t),
-    [loadLessors, t],
-  )
   const companyOptions = useMemo(
     () => visitCompanyOptions(visits, lang),
     [visits, lang],
@@ -133,7 +148,8 @@ export function CreateSupplierPoDialog({
   useEffect(() => {
     if (!open) return
     setForm({ ...EMPTY_FORM, start_date: saudiDateKey() })
-    setParty(null)
+    setOwner('')
+    setSupplier(null)
     setVisits([])
     setVisitsState('idle')
     setPicked({})
@@ -310,25 +326,28 @@ export function CreateSupplierPoDialog({
             {t(message)}
           </Notice>
         )}
+        {/* The owner first, like the log's owner filter (owner 2026-10-21):
+            the four fixed owners or «مورد خارجي»; the supplier field slides
+            in under it only for an external supplier. */}
         <Field
-          label={t('supplierPoParty')}
+          label={t('ownershipStatus')}
           name="lessor_id"
           required
-          hint={t('supplierPoPartyHint')}
-          error={errors.lessor_id && t(errors.lessor_id)}
+          error={!owner && errors.lessor_id ? t(errors.lessor_id) : undefined}
         >
           {(control) => (
-            <AsyncSearchSelect
+            <Select
               {...control}
-              value={party?.value ?? ''}
-              selectedOption={party}
-              placeholder={t('supplierPoPartyPlaceholder')}
-              loadOptions={loadParties}
-              onChange={(value, option) => {
-                setParty(option)
-                // A new party resets the places and the units.
+              value={owner}
+              placeholder={t('supplierPoOwnerPlaceholder')}
+              options={ownerOptions}
+              onValueChange={(value) => {
+                setOwner(value as OwnerChoice)
+                setSupplier(null)
+                // A new owner resets the party, the places and the units.
                 update({
-                  ...partyFromOptionValue(value),
+                  lessor_id: '',
+                  owner_class: value === EXTERNAL ? '' : value,
                   company_id: '',
                   project_id: '',
                 })
@@ -337,6 +356,45 @@ export function CreateSupplierPoDialog({
             />
           )}
         </Field>
+        <div
+          className={cn(
+            'grid transition-[grid-template-rows,opacity,transform] duration-300 ease-out',
+            external
+              ? 'translate-y-0 grid-rows-[1fr] opacity-100'
+              : 'pointer-events-none -translate-y-1 grid-rows-[0fr] opacity-0',
+          )}
+          aria-hidden={!external}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <Field
+              label={t('supplierPoSupplier')}
+              name="supplier"
+              required
+              error={
+                external && errors.lessor_id
+                  ? t('supplierPoSupplierRequired')
+                  : undefined
+              }
+              className="pb-1"
+            >
+              {(control) => (
+                <AsyncSearchSelect
+                  {...control}
+                  value={form.lessor_id}
+                  selectedOption={supplier}
+                  placeholder={t('supplierPoSupplierPlaceholder')}
+                  loadOptions={loadLessors}
+                  disabled={!external}
+                  onChange={(value, option) => {
+                    setSupplier(option)
+                    update({ lessor_id: value, company_id: '', project_id: '' })
+                    setPicked({})
+                  }}
+                />
+              )}
+            </Field>
+          </div>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
             label={t('company')}
