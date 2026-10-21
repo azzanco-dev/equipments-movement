@@ -155,12 +155,13 @@
 Run checks sequentially because `next build` and `tsc` both use `.next` and can race when run in parallel:
 
 ```powershell
-npm run build
 npm run typecheck
 npm run lint
 npm test
 git diff --check
 ```
+
+- NEVER run `npm run build` (`next build`) in this checkout while the owner's `next dev` is running on port 3000: the build rewrites `.next`, the running dev server then answers 500 on every page and the owner has to restart it (it happened on 2026-10-19 and again with another agent on 2026-10-21). Typecheck, lint and tests are the verification here. When a production build check is really needed, run it in a temporary git worktree with a `node_modules` junction, never in this folder.
 
 For database work also run:
 
