@@ -52,6 +52,15 @@ export const SUPPLIER_PO_EVENTS_LIMIT = 20
 
 // --- Price ----------------------------------------------------------------------
 
+/** Saudi VAT, shown for information only under the totals (owner
+ *  2026-10-21); invoices are issued elsewhere. */
+export const SUPPLIER_PO_VAT_RATE = 0.15
+
+/** An amount excluding VAT with the VAT added, rounded to halalas. */
+export function withVat(amountExclVat: number): number {
+  return Math.round(amountExclVat * (1 + SUPPLIER_PO_VAT_RATE) * 100) / 100
+}
+
 /**
  * `supplier_po_equipment.price` is numeric(12, 2) >= 0, so the form accepts
  * up to ten integer digits and at most two decimals (the same bound the

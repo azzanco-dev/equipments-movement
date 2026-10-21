@@ -4,7 +4,6 @@ import {
   ArrowUp,
   Building2,
   Calendar,
-  CalendarDays,
   Clock,
   Coins,
   Edit2,
@@ -52,20 +51,19 @@ import {
   SUPPLIER_PO_EVENTS_LIMIT,
   supplierPoFormMessage,
   supplierPoSupplierLabel,
+  withVat,
 } from '@/lib/purchasing'
 import {
   SUPPLIER_PO_EVENT_SELECT,
   SUPPLIER_PO_LINE_SELECT,
   SUPPLIER_PO_SELECT,
   closeSupplierPo,
-  daysSinceDateKey,
   lineSupplierName,
   supplierPoTotal,
   type SupplierPoEventRow,
   type SupplierPoLineRow,
   type SupplierPoRow,
 } from '@/lib/purchasingData'
-import { saudiDateKey } from '@/lib/saudiTime'
 import { supabase } from '@/lib/supabase'
 
 export interface SupplierPoDetailProps {
@@ -513,24 +511,28 @@ export function SupplierPoDetail({
             />
           )}
         </dl>
-        {/* 2. Summary strip. */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {/* 2. Summary strip (owner 2026-10-21: no «since start» card; the
+            VAT-inclusive total sits under the total in smaller text). */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <StatCard
-            className="col-span-2 sm:col-span-1"
             label={t('supplierPoSummaryTotal')}
             value={<Price value={total} />}
+            hint={
+              <>
+                {t('supplierPoWithVat')}: <Price value={withVat(total)} />
+              </>
+            }
             icon={<Coins size={18} />}
           />
           <StatCard
             label={t('supplierPoEquipmentCount')}
             value={lines.length}
+            hint={
+              unpriced > 0
+                ? `${unpriced} ${t('supplierPoUnpricedTotalNote')}`
+                : undefined
+            }
             icon={<Truck size={18} />}
-          />
-          <StatCard
-            label={t('supplierPoSummaryAge')}
-            value={daysSinceDateKey(po.start_date, saudiDateKey())}
-            hint={t('supplierPoDaysUnit')}
-            icon={<CalendarDays size={18} />}
           />
         </div>
       </div>
