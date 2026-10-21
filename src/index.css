@@ -44,8 +44,13 @@
   font-weight: 400;
   font-style: normal;
   font-display: swap;
+  /* Arabic, plus the Latin digits and the signs that sit inside numbers
+     (owner 2026-10-21): without them 0-9 fell back to Tajawal / Segoe /
+     Tahoma next to Thmanyah text, with other metrics, so figures looked
+     off-size and stacked rows could collide. Letters stay on the Latin font. */
   unicode-range:
-    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF,
+    U+0030-0039, U+002C-002E, U+0025, U+002B, U+003A;
 }
 
 /* Noto Sans Arabic has conventional dotted final yeh forms in native inputs. */
@@ -66,8 +71,13 @@
   font-weight: 500;
   font-style: normal;
   font-display: swap;
+  /* Arabic, plus the Latin digits and the signs that sit inside numbers
+     (owner 2026-10-21): without them 0-9 fell back to Tajawal / Segoe /
+     Tahoma next to Thmanyah text, with other metrics, so figures looked
+     off-size and stacked rows could collide. Letters stay on the Latin font. */
   unicode-range:
-    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF,
+    U+0030-0039, U+002C-002E, U+0025, U+002B, U+003A;
 }
 @font-face {
   font-family: 'Thmanyah';
@@ -76,8 +86,13 @@
   font-weight: 700;
   font-style: normal;
   font-display: swap;
+  /* Arabic, plus the Latin digits and the signs that sit inside numbers
+     (owner 2026-10-21): without them 0-9 fell back to Tajawal / Segoe /
+     Tahoma next to Thmanyah text, with other metrics, so figures looked
+     off-size and stacked rows could collide. Letters stay on the Latin font. */
   unicode-range:
-    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF,
+    U+0030-0039, U+002C-002E, U+0025, U+002B, U+003A;
 }
 
 /* Thmanyah Serif Display is reserved for headings. */
