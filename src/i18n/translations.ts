@@ -1921,7 +1921,7 @@ export const translations = {
     supplierPoErrorCardOverlap:
       'للمعدة كرت لشركة او مشروع اخر في هذه الفترة.',
     supplierPoErrorAlreadyOnOpenPo:
-      'المعدة موجودة على امر شراء مفتوح اخر.',
+      'المعدة موجودة على امر شراء اخر.',
     supplierPoErrorClosed: 'الامر مغلق ولا يقبل تعديلا.',
     supplierPoErrorManageRequired: 'ليس لديك صلاحية ادارة المشتريات.',
     supplierPoErrorInvalidSupplier: 'المورد المختار غير موجود.',
