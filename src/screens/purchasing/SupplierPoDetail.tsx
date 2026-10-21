@@ -207,8 +207,10 @@ export function SupplierPoDetail({
         .from('supplier_po_events')
         .select(SUPPLIER_PO_EVENT_SELECT)
         .eq('supplier_po_id', poId)
+        // 0141: events of one transaction share created_at; seq keeps their
+        // order (the PO's creation before its lines).
         .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
+        .order('seq', { ascending: false })
         .limit(SUPPLIER_PO_EVENTS_LIMIT)
         .abortSignal(signal),
     ])

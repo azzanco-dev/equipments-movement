@@ -116,6 +116,8 @@ export interface SupplierPoEventRow {
   payload: Record<string, unknown> | null
   actor_id: string | null
   created_at: string
+  /** 0141: insertion order within one created_at. */
+  seq?: number | null
 }
 
 /** One line of the equipment page's purchasing card: the line with its PO. */
@@ -138,7 +140,7 @@ export const PURCHASING_UNIT_SELECT =
 export const SUPPLIER_PO_LINE_SELECT = `id,supplier_po_id,equipment_card_id,price,note,created_at,updated_at,card:equipment_cards(id,equipment_id,period_from,period_to,entry_log_id,equipment:equipment(${PURCHASING_UNIT_SELECT}))`
 
 export const SUPPLIER_PO_EVENT_SELECT =
-  'id,supplier_po_id,event_type,payload,actor_id,created_at'
+  'id,supplier_po_id,event_type,payload,actor_id,created_at,seq'
 
 /** The equipment page shows the unit's lines with their POs, open card first. */
 export const EQUIPMENT_PURCHASING_SELECT = `id,supplier_po_id,equipment_card_id,price,note,created_at,updated_at,card:equipment_cards!inner(id,equipment_id,period_from,period_to,equipment:equipment(${PURCHASING_UNIT_SELECT})),po:supplier_pos(${SUPPLIER_PO_SELECT})`
