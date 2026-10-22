@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus, ShoppingCart } from 'lucide-react'
 import { usePermissions } from '@/auth/PermissionsContext'
+import { RelativeTime } from '@/components/RelativeTime'
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
@@ -21,7 +22,7 @@ import {
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
-import { formatDate, formatDateTime } from '@/lib/dateFormat'
+import { formatDate } from '@/lib/dateFormat'
 import { lessorFilterOptions } from '@/lib/equipmentSupplier'
 import { supplierPosListConfig } from '@/lib/listConfigs'
 import { supplierPoPartyOrFilter, supplierPoSupplierLabel } from '@/lib/purchasing'
@@ -151,14 +152,6 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
       cell: (row) => supplierPoLineCount(row),
     },
     {
-      key: 'updated_at',
-      header: t('supplierPoLastModified'),
-      sortable: true,
-      hideBelow: 'md',
-      className: 'tabular-nums',
-      cell: (row) => (row.updated_at ? formatDateTime(row.updated_at) : '—'),
-    },
-    {
       key: 'status',
       header: t('status'),
       sortable: true,
@@ -172,6 +165,15 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
           )}
         </span>
       ),
+    },
+    // 0146: the same «اخر تعديل» column as the other lists, last.
+    {
+      key: 'updated_at',
+      header: t('updatedAt'),
+      sortable: true,
+      className: 'text-muted',
+      hideBelow: 'md',
+      cell: (row) => <RelativeTime value={row.updated_at ?? row.created_at} />,
     },
   ]
 

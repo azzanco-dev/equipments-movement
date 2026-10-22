@@ -81,11 +81,15 @@ test('the PO list selects, shows and sorts by updated_at', () => {
   // Only the list reads it; the shared select stays as it was.
   assert.doesNotMatch(data, /SUPPLIER_PO_SELECT = `[^`]*updated_at/)
   const config = read('src', 'lib', 'listConfigs.ts')
-  assert.match(config, /\{ key: 'updated_at', label: 'supplierPoLastModified' \}/)
+  // The same sort label as the other lists, last.
+  assert.match(
+    config,
+    /\{ key: 'updated_at', label: \{ ar: 'تاريخ التعديل', en: 'Last updated' \} \},\n  \],\n\}\s*$/,
+  )
+  // The same column as the other lists (t('updatedAt'), RelativeTime), last.
   const screen = read('src', 'screens', 'purchasing', 'SupplierPosListScreen.tsx')
-  assert.match(screen, /key: 'updated_at',\s+header: t\('supplierPoLastModified'\),\s+sortable: true,/)
-  assert.match(screen, /formatDateTime\(row\.updated_at\)/)
-  const translations = read('src', 'i18n', 'translations.ts')
-  assert.match(translations, /supplierPoLastModified: 'اخر تعديل',/)
-  assert.match(translations, /supplierPoLastModified: 'Last modified',/)
+  assert.match(
+    screen,
+    /key: 'updated_at',\s+header: t\('updatedAt'\),\s+sortable: true,\s+className: 'text-muted',\s+hideBelow: 'md',\s+cell: \(row\) => <RelativeTime value=\{row\.updated_at \?\? row\.created_at\} \/>,\s+\},\s+\]/,
+  )
 })

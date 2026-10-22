@@ -739,8 +739,8 @@ export const supplierPosListConfig: DataListConfig = {
     { key: 'created_at', label: 'supplierPoCreatedAt' },
     { key: 'po_number', label: 'supplierPoNumber' },
     { key: 'start_date', label: 'supplierPoStartDate' },
-    // 0146: supplier_pos.updated_at, moved by the PO row and its lines.
-    { key: 'updated_at', label: 'supplierPoLastModified' },
     { key: 'status', label: 'status' },
+    // 0146: supplier_pos.updated_at, moved by the PO row and its lines.
+    { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
   ],
 }

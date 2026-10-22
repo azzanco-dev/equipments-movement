@@ -1880,7 +1880,6 @@ export const translations = {
     supplierPoCreatedBy: 'انشاه',
     supplierPoCreatedAt: 'تاريخ الانشاء',
     supplierPoClosedAt: 'تاريخ الاغلاق',
-    supplierPoLastModified: 'اخر تعديل',
     supplierPoDetails: 'بيانات الامر',
     supplierPoEquipment: 'معدات الـ PO',
     supplierPoEquipmentDesc:
@@ -3927,7 +3926,6 @@ export const translations = {
     supplierPoCreatedBy: 'Created by',
     supplierPoCreatedAt: 'Created on',
     supplierPoClosedAt: 'Closed on',
-    supplierPoLastModified: 'Last modified',
     supplierPoDetails: 'Order details',
     supplierPoEquipment: 'PO equipment',
     supplierPoEquipmentDesc:
