@@ -1910,10 +1910,6 @@ export const translations = {
     supplierPoCurrentPrice: 'السعر الحالي',
     supplierPoClose: 'اغلاق الامر',
     supplierPoActions: 'خيارات الامر',
-    supplierPoPdf: 'تصدير PDF',
-    supplierPoPrintTitle: 'امر شراء',
-    supplierPoPrintMissingDesc:
-      'صفحة الطباعة تفتح من زر تصدير PDF في صفحة امر الشراء، ولا تبقى بعد تحديثها او فتحها من رابط.',
     supplierPoCloseTypeNumber: 'رقم الامر للتاكيد',
     supplierPoCloseTypeNumberHint: 'اكتب رقم الامر كما هو:',
     supplierPoCloseConfirmTitle: 'اغلاق امر الشراء؟',
@@ -3960,10 +3956,6 @@ export const translations = {
     supplierPoCurrentPrice: 'Current price',
     supplierPoClose: 'Close order',
     supplierPoActions: 'Order options',
-    supplierPoPdf: 'Export PDF',
-    supplierPoPrintTitle: 'Purchase order',
-    supplierPoPrintMissingDesc:
-      'The print page opens from the Export PDF button on the order page; it does not survive a reload or a direct link.',
     supplierPoCloseTypeNumber: 'Order number to confirm',
     supplierPoCloseTypeNumberHint: 'Type the order number exactly:',
     supplierPoCloseConfirmTitle: 'Close this purchase order?',
