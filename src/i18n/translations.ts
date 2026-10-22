@@ -1853,7 +1853,7 @@ export const translations = {
     // purchasing-screens — start
     purchasing: 'المشتريات',
     supplierPos: 'اوامر الشراء',
-    supplierPosDesc: 'اوامر شراء الموردين وقيم الايجار بدون ضريبة.',
+    supplierPosDesc: 'اوامر شراء الموردين وقيم الايجار.',
     supplierPoNew: 'امر شراء جديد',
     supplierPoNumber: 'رقم الامر',
     supplierPoSupplier: 'المورد',
@@ -1883,14 +1883,14 @@ export const translations = {
     supplierPoDetails: 'بيانات الامر',
     supplierPoEquipment: 'معدات الـ PO',
     supplierPoEquipmentDesc:
-      'سطر لكل معدة بسعرها بدون ضريبة. كرت المعدة ينشا خلف الكواليس.',
+      'سطر لكل معدة بسعرها. كرت المعدة ينشا خلف الكواليس.',
     supplierPoNoEquipment: 'لم تضف اي معدة الى هذا الامر بعد.',
     supplierPoAddEquipment: 'اضافة معدة',
-    supplierPoAddEquipmentDesc: 'اختر المعدة وادخل قيمة الايجار بدون ضريبة.',
+    supplierPoAddEquipmentDesc: 'اختر المعدة وادخل قيمة الايجار.',
     supplierPoEquipmentField: 'المعدة',
     supplierPoEquipmentPlaceholder: 'ابحث بالكود او اللوحة',
     supplierPoEquipmentRequired: 'اختر المعدة.',
-    supplierPoPrice: 'السعر بدون ضريبة',
+    supplierPoPrice: 'السعر',
     supplierPoPriceRequired: 'ادخل السعر.',
     supplierPoPriceInvalid:
       'السعر رقم من صفر فاكثر، بخانتين عشريتين على الاكثر.',
@@ -3884,7 +3884,7 @@ export const translations = {
     // purchasing-screens — start
     purchasing: 'Purchasing',
     supplierPos: 'Purchase orders',
-    supplierPosDesc: 'Supplier purchase orders and rental prices excluding VAT.',
+    supplierPosDesc: 'Supplier purchase orders and rental prices.',
     supplierPoNew: 'New purchase order',
     supplierPoNumber: 'PO number',
     supplierPoSupplier: 'Supplier',
@@ -3914,15 +3914,15 @@ export const translations = {
     supplierPoDetails: 'Order details',
     supplierPoEquipment: 'PO equipment',
     supplierPoEquipmentDesc:
-      'One line per unit with its price excluding VAT. The equipment card is created behind the scenes.',
+      'One line per unit with its price. The equipment card is created behind the scenes.',
     supplierPoNoEquipment: 'No equipment has been added to this order yet.',
     supplierPoAddEquipment: 'Add equipment',
     supplierPoAddEquipmentDesc:
-      'Pick the unit and enter the rental price excluding VAT.',
+      'Pick the unit and enter the rental price.',
     supplierPoEquipmentField: 'Equipment',
     supplierPoEquipmentPlaceholder: 'Search by code or plate',
     supplierPoEquipmentRequired: 'Pick the equipment.',
-    supplierPoPrice: 'Price excluding VAT',
+    supplierPoPrice: 'Price',
     supplierPoPriceRequired: 'Enter the price.',
     supplierPoPriceInvalid:
       'The price is a number of zero or more, with at most two decimals.',
