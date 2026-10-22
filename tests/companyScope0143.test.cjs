@@ -48,7 +48,7 @@ function policy(name, table) {
 
 // The one rule, as the policies spell it (evaluated once per statement).
 const RULE = (column) =>
-  `(SELECT public.scoped_company_ids()) IS NULL OR ${column} = ANY ((SELECT public.scoped_company_ids()))`
+  `(SELECT public.scoped_company_ids()) IS NULL OR ${column} = ANY ((SELECT public.scoped_company_ids())::uuid[])`
 
 test('0143 is the single 0143 migration, right after 0142', () => {
   const at = migrations.indexOf(MIGRATION)

@@ -132,7 +132,7 @@ CREATE POLICY select_companies ON public.companies
 FOR SELECT TO authenticated
 USING (
   (SELECT public.scoped_company_ids()) IS NULL
-  OR id = ANY ((SELECT public.scoped_company_ids()))
+  OR id = ANY ((SELECT public.scoped_company_ids())::uuid[])
 );
 COMMENT ON POLICY select_companies ON public.companies IS
   '0143: was USING (true) (0009); now the caller''s linked companies, or every company for a caller without links.';
@@ -147,7 +147,7 @@ USING (
   (
     movement_context <> 'site'
     OR (SELECT public.scoped_company_ids()) IS NULL
-    OR company_id = ANY ((SELECT public.scoped_company_ids()))
+    OR company_id = ANY ((SELECT public.scoped_company_ids())::uuid[])
   )
   AND (
     supervisor_id = auth.uid()
@@ -248,7 +248,7 @@ USING (
   (SELECT public.has_permission('purchasing.view'))
   AND (
     (SELECT public.scoped_company_ids()) IS NULL
-    OR company_id = ANY ((SELECT public.scoped_company_ids()))
+    OR company_id = ANY ((SELECT public.scoped_company_ids())::uuid[])
   )
 );
 COMMENT ON POLICY select_supplier_pos ON public.supplier_pos IS
@@ -261,7 +261,7 @@ USING (
   (SELECT public.has_permission('purchasing.view'))
   AND (
     (SELECT public.scoped_company_ids()) IS NULL
-    OR company_id = ANY ((SELECT public.scoped_company_ids()))
+    OR company_id = ANY ((SELECT public.scoped_company_ids())::uuid[])
   )
 );
 COMMENT ON POLICY select_equipment_cards ON public.equipment_cards IS
@@ -278,7 +278,7 @@ USING (
     WHERE p.id = supplier_po_id
       AND (
         (SELECT public.scoped_company_ids()) IS NULL
-        OR p.company_id = ANY ((SELECT public.scoped_company_ids()))
+        OR p.company_id = ANY ((SELECT public.scoped_company_ids())::uuid[])
       )
   )
 );
@@ -296,7 +296,7 @@ USING (
     WHERE p.id = supplier_po_id
       AND (
         (SELECT public.scoped_company_ids()) IS NULL
-        OR p.company_id = ANY ((SELECT public.scoped_company_ids()))
+        OR p.company_id = ANY ((SELECT public.scoped_company_ids())::uuid[])
       )
   )
 );
