@@ -39,21 +39,33 @@ export function useMovementFormOptions({
   // them; a user without links (the admin, the workshop roles) gets every
   // company and project. The links restrict nothing else (migration 0145).
   // Read once through RLS (the user's own rows); a failed read filters
-  // nothing rather than hiding the lists.
+  // nothing rather than hiding the lists. Owner 2026-10-22 (option 2): when
+  // none of his companies is linked to a project yet, the project selector
+  // falls back to every project, so the entry can still be recorded.
   const [assignedCompanyIds, setAssignedCompanyIds] = useState<string[]>([])
+  const [hasLinkedProjects, setHasLinkedProjects] = useState(false)
   useEffect(() => {
     if (!userId) return
     let active = true
-    void supabase
-      .from('profile_companies')
-      .select('company_id')
-      .eq('profile_id', userId)
-      .then(({ data }) => {
-        if (active)
-          setAssignedCompanyIds(
-            (data ?? []).map((row) => row.company_id as string),
-          )
-      })
+    const load = async () => {
+      const { data } = await supabase
+        .from('profile_companies')
+        .select('company_id')
+        .eq('profile_id', userId)
+      const ids = (data ?? []).map((row) => row.company_id as string)
+      let linked = false
+      if (ids.length) {
+        const { count } = await supabase
+          .from('company_projects')
+          .select('project_id', { count: 'exact', head: true })
+          .in('company_id', ids)
+        linked = (count ?? 0) > 0
+      }
+      if (!active) return
+      setAssignedCompanyIds(ids)
+      setHasLinkedProjects(linked)
+    }
+    void load()
     return () => {
       active = false
     }
@@ -109,7 +121,7 @@ export function useMovementFormOptions({
         value: project.id,
         label: localizedName(lang, project.name_ar, project.name_en),
       })
-      if (assignedCompanyIds.length) {
+      if (assignedCompanyIds.length && hasLinkedProjects) {
         // The projects linked to the user's companies (server side, through
         // the company_projects embed; one row per project).
         let linked = supabase
@@ -129,7 +141,7 @@ export function useMovementFormOptions({
       if (searchFilter) request = request.or(searchFilter)
       return unwrapRows(await request).map(toOption)
     },
-    [assignedCompanyIds, lang],
+    [assignedCompanyIds, hasLinkedProjects, lang],
   )
 
   const loadEquipmentTypes = useCallback(

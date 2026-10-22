@@ -112,6 +112,9 @@ test('the entry form filters its company and project selectors by the linked com
   assert.match(hook, /if \(assignedCompanyIds\.length\)\s+request = request\.in\('id', assignedCompanyIds\)/)
   // Projects: those company_projects links to the linked companies, server side.
   assert.match(hook, /\.select\('id,name_ar,name_en,company_projects!inner\(company_id\)'\)\s+\.in\('company_projects\.company_id', assignedCompanyIds\)/)
+  // Owner 2026-10-22 (option 2): no linked project at all = every project.
+  assert.match(hook, /\.from\('company_projects'\)\s+\.select\('project_id', \{ count: 'exact', head: true \}\)\s+\.in\('company_id', ids\)/)
+  assert.match(hook, /if \(assignedCompanyIds\.length && hasLinkedProjects\) \{/)
   // Still at most 20 rows, still searched on the server.
   assert.equal((hook.match(/\.limit\(20\)/g) ?? []).length, 6)
   assert.doesNotMatch(hook, /\.filter\(\(/)

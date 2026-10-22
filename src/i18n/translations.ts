@@ -1261,7 +1261,7 @@ export const translations = {
     foremanProjectRequired: 'يجب تحديد مشروع واحد على الأقل للفورمين.',
     assignedCompanies: 'الشركات المسؤول عنها',
     assignedCompaniesHelp:
-      'في نموذج تسجيل الدخول تظهر للفورمين هذه الشركات فقط والمشاريع المرتبطة بها. اتركها فارغة لعرض كل الشركات والمشاريع.',
+      'في نموذج تسجيل الدخول تظهر للفورمين هذه الشركات فقط والمشاريع المرتبطة بها (وكل المشاريع اذا لم تكن شركاته مرتبطة باي مشروع). اتركها فارغة لعرض كل الشركات والمشاريع.',
     selectCompanies: 'اختر شركة أو أكثر',
     you: 'أنت',
 
@@ -3288,7 +3288,7 @@ export const translations = {
     foremanProjectRequired: 'Select at least one project for the foreman.',
     assignedCompanies: 'Assigned Companies',
     assignedCompaniesHelp:
-      'The entry form offers the foreman only these companies and the projects linked to them. Leave empty to offer every company and project.',
+      'The entry form offers the foreman only these companies and the projects linked to them (every project while none of his companies is linked to one). Leave empty to offer every company and project.',
     selectCompanies: 'Select one or more companies',
     you: 'You',
 
