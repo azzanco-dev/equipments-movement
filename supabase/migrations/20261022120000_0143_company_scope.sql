@@ -7,11 +7,15 @@
 -- it apart from the `companies` permission scope, which no role uses. From
 -- this migration on it is the ONE rule, enforced in PostgreSQL:
 --
---   * `scoped_company_ids()` — the caller's linked companies, or NULL when
---     the caller has none. NULL means UNRESTRICTED: a user without linked
---     companies (the admin, the workshop roles, a monitor) keeps seeing
---     everything, exactly as today. Nothing changes for anybody until the
---     admin links companies to a user.
+--   * `scoped_company_ids()` — the caller's linked companies. Without any
+--     (owner decision 2026-10-22, «الاسناد شرط للظهور للفورمينات والورشة»):
+--       - a FIELD user — a holder of `home.foreman` or `home.workshop` who
+--         does not hold `home.admin` (`company_links_required()`) — gets an
+--         EMPTY array: no company, no project row, no site entry until the
+--         admin links companies to him (workshop rows carry no company and
+--         stay as they are);
+--       - everybody else (the admin, a monitor, a purchasing user) gets NULL
+--         = UNRESTRICTED, exactly as today.
 --   * `company_in_scope(company_id)` — the same rule for one company, for
 --     triggers and functions.
 --   * Where it applies (reads through RLS, so every list, selector, view and
@@ -53,6 +57,27 @@
 -- ===========================================================================
 -- A. The rule
 -- ===========================================================================
+-- The field users: the links are a condition of seeing anything.
+CREATE OR REPLACE FUNCTION public.company_links_required()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT (
+    public.has_permission('home.foreman')
+    OR public.has_permission('home.workshop')
+  )
+  AND NOT public.has_permission('home.admin');
+$$;
+
+COMMENT ON FUNCTION public.company_links_required() IS
+  '0143: true for a field user (a holder of home.foreman or home.workshop without home.admin): without linked companies he sees no company and no project row. False for everybody else: without links they are unrestricted. Never NULL.';
+
+REVOKE ALL ON FUNCTION public.company_links_required() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.company_links_required() TO authenticated;
+
 CREATE OR REPLACE FUNCTION public.scoped_company_ids()
 RETURNS uuid[]
 LANGUAGE sql
@@ -62,16 +87,19 @@ SET search_path = public, pg_temp
 AS $$
   SELECT CASE
     WHEN auth.uid() IS NULL THEN ARRAY[]::uuid[]
-    ELSE (
-      SELECT array_agg(pc.company_id)
-      FROM public.profile_companies pc
-      WHERE pc.profile_id = auth.uid()
+    ELSE COALESCE(
+      (
+        SELECT array_agg(pc.company_id)
+        FROM public.profile_companies pc
+        WHERE pc.profile_id = auth.uid()
+      ),
+      CASE WHEN public.company_links_required() THEN ARRAY[]::uuid[] END
     )
   END;
 $$;
 
 COMMENT ON FUNCTION public.scoped_company_ids() IS
-  '0143: the caller''s linked companies (profile_companies), or NULL when the caller has none = UNRESTRICTED. No session: an empty array (nothing in scope). Policies evaluate it once per statement as (SELECT public.scoped_company_ids()).';
+  '0143: the caller''s linked companies (profile_companies). None: an EMPTY array for a field user (company_links_required: nothing in scope until the admin links companies), NULL = UNRESTRICTED for everybody else. No session: an empty array. Policies evaluate it once per statement as (SELECT public.scoped_company_ids()).';
 
 REVOKE ALL ON FUNCTION public.scoped_company_ids() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.scoped_company_ids() TO authenticated;
@@ -353,4 +381,4 @@ DELETE FROM public.profile_companies pc
 WHERE public.profile_holds_permission(pc.profile_id, 'users.manage');
 
 COMMENT ON TABLE public.profile_companies IS
-  '0058/0143: the companies linked to a user. Since 0143 a user with linked companies sees only those companies'' data (companies, project movements, purchasing) and records project entries for them only; a user without links is unrestricted; a holder of users.manage can never be linked.';
+  '0058/0143: the companies linked to a user. Since 0143 a user with linked companies sees only those companies'' data (companies, project movements, purchasing) and records project entries for them only; a field user (home.foreman / home.workshop) without links sees none of it; every other user without links is unrestricted; a holder of users.manage can never be linked.';

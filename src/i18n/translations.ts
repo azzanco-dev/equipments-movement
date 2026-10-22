@@ -1262,7 +1262,7 @@ export const translations = {
     foremanProjectRequired: 'يجب تحديد مشروع واحد على الأقل للفورمين.',
     assignedCompanies: 'الشركات المسؤول عنها',
     assignedCompaniesHelp:
-      'لا يرى المستخدم الا بيانات هذه الشركات (الحركات والدخوليات واوامر الشراء) ولا يسجل دخول مشروع الا لها. اتركها فارغة ليرى كل الشركات. مدير النظام لا يقيد.',
+      'لا يرى المستخدم الا بيانات هذه الشركات (الحركات والدخوليات واوامر الشراء) ولا يسجل دخول مشروع الا لها. الفورمين والورشة لا يرون اي شركة قبل الاسناد؛ بقية المستخدمين يرون كل الشركات اذا تركت فارغة. مدير النظام لا يقيد.',
     selectCompanies: 'اختر شركة أو أكثر',
     you: 'أنت',
 
@@ -3290,7 +3290,7 @@ export const translations = {
     foremanProjectRequired: 'Select at least one project for the foreman.',
     assignedCompanies: 'Assigned Companies',
     assignedCompaniesHelp:
-      'The user sees only these companies (movements, entries, purchase orders) and records project entries for them only. Leave empty to see every company. The administrator is never restricted.',
+      'The user sees only these companies (movements, entries, purchase orders) and records project entries for them only. Foremen and workshop users see no company until linked; other users see every company when left empty. The administrator is never restricted.',
     selectCompanies: 'Select one or more companies',
     you: 'You',
 

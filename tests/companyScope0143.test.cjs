@@ -57,15 +57,19 @@ test('0143 is the single 0143 migration, right after 0142', () => {
   assert.equal(migrations.filter((file) => /_0143_/.test(file)).length, 1)
 })
 
-test('scoped_company_ids: NULL = unrestricted, no session = nothing', () => {
+test('scoped_company_ids: field users need links, everybody else is unrestricted without them', () => {
+  const required = fn('company_links_required')
+  assert.match(required, /RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp/)
+  assert.match(required, /SELECT \( public\.has_permission\('home\.foreman'\) OR public\.has_permission\('home\.workshop'\) \) AND NOT public\.has_permission\('home\.admin'\);/)
   const scoped = fn('scoped_company_ids')
   assert.match(scoped, /RETURNS uuid\[\] LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp/)
   assert.match(scoped, /WHEN auth\.uid\(\) IS NULL THEN ARRAY\[\]::uuid\[\]/)
-  assert.match(scoped, /SELECT array_agg\(pc\.company_id\) FROM public\.profile_companies pc WHERE pc\.profile_id = auth\.uid\(\)/)
+  // Linked companies; none: an empty array for a field user, NULL otherwise.
+  assert.match(scoped, /ELSE COALESCE\( \( SELECT array_agg\(pc\.company_id\) FROM public\.profile_companies pc WHERE pc\.profile_id = auth\.uid\(\) \), CASE WHEN public\.company_links_required\(\) THEN ARRAY\[\]::uuid\[\] END \)/)
   const inScope = fn('company_in_scope')
   assert.match(inScope, /RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp/)
   assert.match(inScope, /SELECT COALESCE\( \(SELECT s IS NULL OR p_company_id = ANY \(s\) FROM \(SELECT public\.scoped_company_ids\(\) AS s\) AS scope\), false \);/)
-  for (const signature of ['scoped_company_ids()', 'company_in_scope(uuid)', 'profile_holds_permission(uuid, text)']) {
+  for (const signature of ['company_links_required()', 'scoped_company_ids()', 'company_in_scope(uuid)', 'profile_holds_permission(uuid, text)']) {
     const escaped = signature.replace(/[()]/g, '\\$&')
     assert.match(body, new RegExp(`REVOKE ALL ON FUNCTION public\\.${escaped} FROM PUBLIC, anon;`), signature)
     assert.match(body, new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${escaped} TO authenticated;`), signature)
@@ -129,7 +133,7 @@ test('the administrator can never be linked to companies', () => {
   // The only keys the migration names.
   assert.deepEqual(
     [...new Set([...stripped.matchAll(/'([a-z]+\.[a-z_.]+)'/g)].map((m) => m[1]))].sort(),
-    ['movements.read', 'purchasing.view', 'users.manage'],
+    ['home.admin', 'home.foreman', 'home.workshop', 'movements.read', 'purchasing.view', 'users.manage'],
   )
 })
 
@@ -137,6 +141,7 @@ test('0143 touches nothing else', () => {
   assert.doesNotMatch(stripped, /legacy_role_permissions\(p_role|CREATE TABLE|ALTER TABLE|DROP TABLE|INSERT INTO|UPDATE public\./)
   const created = [...stripped.matchAll(/CREATE (?:OR REPLACE )?FUNCTION public\.(\w+)\(/g)].map((m) => m[1])
   assert.deepEqual(created, [
+    'company_links_required',
     'scoped_company_ids',
     'company_in_scope',
     'movement_scope_allows',
