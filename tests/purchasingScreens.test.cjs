@@ -754,3 +754,43 @@ test('the mockup section of /ui-kit still names no route of its own', () => {
   // Only comments name the functions there.
   assert.doesNotMatch(mockup.replace(/^\s*\/\/.*$/gm, ''), /\.rpc\(/)
 })
+
+// --- The PO list: owner OR supplier (owner 2026-10-22) ---------------------------
+
+test('supplierPoPartyOrFilter: the owner and supplier filters are OR-ed in the PO list', () => {
+  const f = (field, operator, value, id = field) => ({ id, field, operator, value })
+  const status = f('status', 'eq', 'open')
+  // Both set: the non-external owners OR the ticked suppliers; the rest
+  // stays for the generic pass.
+  const both = purchasing.supplierPoPartyOrFilter([
+    status,
+    f('party_class', 'in', 'takween,external_supplier'),
+    f('lessor_id', 'in', 'l1,l2'),
+  ])
+  assert.equal(both.clause, 'party_class.in.("takween"),lessor_id.in.("l1","l2")')
+  assert.deepEqual(both.rest, [status])
+  // Only «مالك اخر» ticked: the suppliers alone.
+  assert.equal(
+    purchasing.supplierPoPartyOrFilter([
+      f('party_class', 'in', 'external_supplier'),
+      f('lessor_id', 'in', 'l1'),
+    ]).clause,
+    'lessor_id.in.("l1")',
+  )
+  // One of the two missing (or empty): the generic pass applies them.
+  assert.equal(purchasing.supplierPoPartyOrFilter([f('party_class', 'in', 'takween')]), null)
+  assert.equal(purchasing.supplierPoPartyOrFilter([f('lessor_id', 'in', 'l1')]), null)
+  assert.equal(
+    purchasing.supplierPoPartyOrFilter([f('party_class', 'in', 'takween'), f('lessor_id', 'in', '')]),
+    null,
+  )
+  // A negated owner filter is not rewritten.
+  assert.equal(
+    purchasing.supplierPoPartyOrFilter([f('party_class', 'not_in', 'takween'), f('lessor_id', 'in', 'l1')]),
+    null,
+  )
+  const screen = read('src', 'screens', 'purchasing', 'SupplierPosListScreen.tsx')
+  assert.match(screen, /const partyOr = supplierPoPartyOrFilter\(list\.filters\)/)
+  assert.match(screen, /if \(partyOr\) query = query\.or\(partyOr\.clause\)/)
+  assert.match(screen, /partyOr \? partyOr\.rest : list\.filters/)
+})

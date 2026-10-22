@@ -24,7 +24,7 @@ import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
 import { lessorFilterOptions } from '@/lib/equipmentSupplier'
 import { supplierPosListConfig } from '@/lib/listConfigs'
-import { supplierPoSupplierLabel } from '@/lib/purchasing'
+import { supplierPoPartyOrFilter, supplierPoSupplierLabel } from '@/lib/purchasing'
 import {
   SUPPLIER_PO_LIST_SELECT,
   supplierPoCompanyProject,
@@ -81,9 +81,13 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
       list.search,
     )
     if (searchFilter) query = query.or(searchFilter)
+    // Owner 2026-10-22: owner OR supplier (a second `or` parameter is ANDed
+    // with the search's by PostgREST).
+    const partyOr = supplierPoPartyOrFilter(list.filters)
+    if (partyOr) query = query.or(partyOr.clause)
     query = applyListFilters(
       query,
-      list.filters,
+      partyOr ? partyOr.rest : list.filters,
       new Set(supplierPosListConfig.filterFields.map((field) => field.key)),
     )
     const { data, error, count } = await query.abortSignal(signal)

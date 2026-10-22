@@ -1,4 +1,6 @@
 import type { TranslationKey } from '@/i18n/translations'
+import type { ListFilter } from '@/components/data-list/types'
+import { logicTreeValue } from '@/lib/applyListFilters'
 import type {
   DatabaseFieldRule,
   FieldErrors,
@@ -14,7 +16,8 @@ import type {
  * the price formatting and the mapping of the 0136 error tokens to form
  * fields and messages. Nothing here calls the database.
  *
- * This file has no runtime imports so the node tests can load it directly.
+ * The only runtime import is the pure `@/lib/applyListFilters`, so the node
+ * tests can still load it directly.
  */
 
 // --- Status and events --------------------------------------------------------
@@ -405,4 +408,46 @@ export function supplierPoErrorOutcome<T>(
     if (fieldErrors) return { fieldErrors }
   }
   return { message: supplierPoFormMessage(error) }
+}
+
+// --- The PO list's party filters ---------------------------------------------
+
+/**
+ * Owner 2026-10-22: in the PO list the owner filter and the supplier filter
+ * are OR-ed, not AND-ed — «تكوين + مالك اخر» and then a supplier means every
+ * Takween PO OR an external PO of that supplier (an AND would drop the
+ * Takween POs, which have no lessor). Returns the PostgREST `or` clause and
+ * the filters left for the generic pass, or null while the two filters are
+ * not both set with ticked values (then the generic pass applies them).
+ */
+export function supplierPoPartyOrFilter(
+  filters: readonly ListFilter[],
+): { clause: string; rest: ListFilter[] } | null {
+  const party = filters.find(
+    (filter) =>
+      filter.field === 'party_class' &&
+      (filter.operator === 'in' || filter.operator === 'eq'),
+  )
+  const lessor = filters.find(
+    (filter) => filter.field === 'lessor_id' && filter.operator === 'in',
+  )
+  if (!party || !lessor) return null
+  const split = (value: string) =>
+    value
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+  const owners = split(party.value).filter(
+    (value) => value !== 'external_supplier',
+  )
+  const lessors = split(lessor.value)
+  if (!split(party.value).length || !lessors.length) return null
+  const parts: string[] = []
+  if (owners.length)
+    parts.push(`party_class.in.(${owners.map(logicTreeValue).join(',')})`)
+  parts.push(`lessor_id.in.(${lessors.map(logicTreeValue).join(',')})`)
+  return {
+    clause: parts.join(','),
+    rest: filters.filter((filter) => filter !== party && filter !== lessor),
+  }
 }
