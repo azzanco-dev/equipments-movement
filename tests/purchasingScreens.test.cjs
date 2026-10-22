@@ -831,3 +831,30 @@ test('the PO page closes through a typed order number, from the options menu', (
   assert.equal(matches('SPO260002', 'SPO260001'), false)
   assert.equal(matches('', 'SPO260001'), false)
 })
+
+// --- «تصدير PDF» of a PO (owner 2026-10-22): the print dialog, no page -------------
+
+test('the PO PDF prints a hidden sheet from the PO page itself', () => {
+  const detail = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
+  // No tab, no route: the button mounts the sheet, the sheet prints.
+  assert.doesNotMatch(detail, /window\.open|print\/po|sessionStorage/)
+  assert.match(detail, /onClick=\{\(\) => setPrinting\(true\)\}/)
+  assert.match(detail, /\{printing && \(\s*<SupplierPoPrintSheet/)
+  assert.match(detail, /onDone=\{\(\) => setPrinting\(false\)\}/)
+  const sheet = read('src', 'components', 'purchasing', 'SupplierPoPrintSheet.tsx')
+  assert.doesNotMatch(sheet, /supabase|fetch\(|sessionStorage/)
+  assert.match(sheet, /createPortal\(/)
+  assert.match(sheet, /document\.body,\s*\)/)
+  assert.match(sheet, /className="po-print-sheet print-export hidden /)
+  assert.match(sheet, /window\.addEventListener\('afterprint', finish\)/)
+  assert.match(sheet, /window\.requestAnimationFrame\(\(\) => window\.print\(\)\)/)
+  assert.match(sheet, /@page \{ size: A4 portrait;/)
+  // Only the sheet prints, on paper colors, while it exists.
+  const css = read('src', 'index.css')
+  assert.match(css, /html:has\(\.po-print-sheet\) body > :not\(\.po-print-sheet\) \{\s*display: none !important;/)
+  assert.match(css, /\.po-print-sheet \{\s*display: block !important;/)
+  assert.match(css, /html:has\(\.print-export\) \{/)
+  // No route of its own any more.
+  const navSource = read('src', 'lib', 'navPermissions.ts')
+  assert.doesNotMatch(navSource, /print\/po/)
+})

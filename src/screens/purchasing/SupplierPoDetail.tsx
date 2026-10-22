@@ -7,6 +7,7 @@ import {
   Clock,
   Coins,
   Edit2,
+  FileDown,
   FileText,
   Lock,
   MapPin,
@@ -28,6 +29,7 @@ import { Price } from '@/components/purchasing/Price'
 import { PurchasingUnitCell } from '@/components/purchasing/PurchasingUnitCell'
 import { SupplierPoEventsTimeline } from '@/components/purchasing/SupplierPoEventsTimeline'
 import { SupplierPoOptionsMenu } from '@/components/purchasing/SupplierPoOptionsMenu'
+import { SupplierPoPrintSheet } from '@/components/purchasing/SupplierPoPrintSheet'
 import { SupplierPoStatusBadge } from '@/components/purchasing/SupplierPoStatusBadge'
 import {
   BackButton,
@@ -180,6 +182,9 @@ export function SupplierPoDetail({
   const [editing, setEditing] = useState<SupplierPoLineRow | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [closeOpen, setCloseOpen] = useState(false)
+  // «تصدير PDF»: the hidden print sheet is mounted only while the browser's
+  // print dialog is up (owner 2026-10-22: no tab, no page of the site).
+  const [printing, setPrinting] = useState(false)
   const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({
     key: 'equipment',
     direction: 'asc',
@@ -361,6 +366,18 @@ export function SupplierPoDetail({
     },
   ]
 
+  const pdfButton = (
+    <Button
+      variant="outline"
+      size="sm"
+      icon={<FileDown size={14} aria-hidden="true" />}
+      loading={printing}
+      onClick={() => setPrinting(true)}
+    >
+      {t('supplierPoPdf')}
+    </Button>
+  )
+
   const sortOptions: { value: SortKey; label: string }[] = [
     { value: 'equipment', label: t('supplierPoEquipmentField') },
     { value: 'period', label: t('equipmentPurchasingPeriod') },
@@ -443,16 +460,19 @@ export function SupplierPoDetail({
             </>
           }
           actions={
-            showActions ? (
-              /* Owner 2026-10-22: one «خيارات» menu (edit, close) instead of
-                 a bare close button. */
-              <div className="hidden sm:flex">
-                <SupplierPoOptionsMenu
-                  onEdit={() => setEditOpen(true)}
-                  onClose={() => setCloseOpen(true)}
-                />
-              </div>
-            ) : undefined
+            /* Owner 2026-10-22: «تصدير PDF» for every reader; one «خيارات»
+               menu (edit, close) instead of a bare close button. */
+            <div className="flex gap-2">
+              {pdfButton}
+              {showActions && (
+                <div className="hidden sm:flex">
+                  <SupplierPoOptionsMenu
+                    onEdit={() => setEditOpen(true)}
+                    onClose={() => setCloseOpen(true)}
+                  />
+                </div>
+              )}
+            </div>
           }
         />
         <dl className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-muted">
@@ -705,6 +725,17 @@ export function SupplierPoDetail({
           fetchData()
         }}
       />
+      {printing && (
+        <SupplierPoPrintSheet
+          po={po}
+          lines={sortedLines}
+          supplier={supplier}
+          company={companyName}
+          project={projectName}
+          createdBy={createdByName}
+          onDone={() => setPrinting(false)}
+        />
+      )}
       <CloseSupplierPoDialog
         po={po}
         open={closeOpen}

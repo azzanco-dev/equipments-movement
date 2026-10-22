@@ -661,3 +661,18 @@ textarea::placeholder {
   }
 }
 /* ===== wave-15-export: print page — end ===== */
+
+/* ===== purchasing: PO print sheet — start =====
+   «تصدير PDF» of a supplier PO (owner 2026-10-22) prints from the PO page
+   itself: while the sheet is mounted (portaled to body, hidden on screen) it
+   is the only child of body that prints; it also carries .print-export, so
+   the light tokens above apply. */
+@media print {
+  html:has(.po-print-sheet) body > :not(.po-print-sheet) {
+    display: none !important;
+  }
+  .po-print-sheet {
+    display: block !important;
+  }
+}
+/* ===== purchasing: PO print sheet — end ===== */
