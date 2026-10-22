@@ -223,7 +223,9 @@ test('movements: every workshop role reads both contexts (0098, keys since 0127)
     for (const role of MANAGERS) assert.match(policy, new RegExp(`'${role}'`))
     assert.doesNotMatch(policy, /movement_context/)
   } else {
-    assert.match(file, /_0127_/)
+    // 0143 re-creates the policy with the company rule on top; the scope
+    // CASE underneath is the 0127 one.
+    assert.match(file, /_0127_|_0143_/)
     assert.match(
       policy,
       /CASE \(SELECT public\.permission_scope\('movements\.read'\)\)\s+WHEN 'all' THEN true/,
