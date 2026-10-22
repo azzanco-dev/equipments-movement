@@ -806,3 +806,28 @@ test('supplierPoPartyOrFilter: the owner and supplier filters are OR-ed in the P
   assert.match(screen, /if \(partyOr\) query = query\.or\(partyOr\.clause\)/)
   assert.match(screen, /partyOr \? partyOr\.rest : list\.filters/)
 })
+
+// --- «خيارات» and the close confirmation (owner 2026-10-22) ------------------------
+
+test('the PO page closes through a typed order number, from the options menu', () => {
+  const page = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
+  // No bare close button and no plain confirm any more.
+  assert.doesNotMatch(page, /useConfirm|closeSupplierPo|variant="danger"/)
+  assert.equal((page.match(/<SupplierPoOptionsMenu/g) ?? []).length, 2, 'desktop header + mobile bar')
+  assert.match(page, /<EditSupplierPoDialog/)
+  assert.match(page, /<CloseSupplierPoDialog/)
+  const menu = read('src', 'components', 'purchasing', 'SupplierPoOptionsMenu.tsx')
+  assert.match(menu, /DropdownMenuTrigger asChild/)
+  assert.match(menu, /t\('supplierPoEdit'\)/)
+  assert.match(menu, /tone="danger"[\s\S]*t\('supplierPoClose'\)/)
+  const close = read('src', 'components', 'purchasing', 'CloseSupplierPoDialog.tsx')
+  assert.match(close, /closeSupplierPo\(po\.id\)/)
+  assert.match(close, /disabled=\{!matches\}/)
+  assert.match(close, /if \(!matches \|\| saving\) return/)
+  // The matcher ignores case and spaces, nothing else.
+  const src = close.slice(close.indexOf('export function closeConfirmationMatches'), close.indexOf('/**', close.indexOf('export function closeConfirmationMatches')))
+  const matches = new Function(`${src.replace(/: string/g, '').replace(/\): boolean/, ')').replace('export ', '')}; return closeConfirmationMatches`)()
+  assert.equal(matches(' spo26 0001 ', 'SPO260001'), true)
+  assert.equal(matches('SPO260002', 'SPO260001'), false)
+  assert.equal(matches('', 'SPO260001'), false)
+})

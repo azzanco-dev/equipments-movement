@@ -1909,6 +1909,9 @@ export const translations = {
       'تاريخ البداية والملاحظات فقط. المورد والشركة والمشروع لا تتغير بعد الانشاء.',
     supplierPoCurrentPrice: 'السعر الحالي',
     supplierPoClose: 'اغلاق الامر',
+    supplierPoActions: 'خيارات الامر',
+    supplierPoCloseTypeNumber: 'رقم الامر للتاكيد',
+    supplierPoCloseTypeNumberHint: 'اكتب رقم الامر كما هو:',
     supplierPoCloseConfirmTitle: 'اغلاق امر الشراء؟',
     supplierPoCloseConfirmDesc:
       'بعد الاغلاق لا تضاف معدات ولا تعدل الاسعار، وتبقى السطور للقراءة فقط.',
@@ -3952,6 +3955,9 @@ export const translations = {
       'Start date and notes only. The supplier, company and project do not change after creation.',
     supplierPoCurrentPrice: 'Current price',
     supplierPoClose: 'Close order',
+    supplierPoActions: 'Order options',
+    supplierPoCloseTypeNumber: 'Order number to confirm',
+    supplierPoCloseTypeNumberHint: 'Type the order number exactly:',
     supplierPoCloseConfirmTitle: 'Close this purchase order?',
     supplierPoCloseConfirmDesc:
       'After closing, no equipment can be added and no price changed; the lines stay read-only.',

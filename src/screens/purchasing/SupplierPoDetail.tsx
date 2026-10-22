@@ -21,10 +21,13 @@ import { usePermissions } from '@/auth/PermissionsContext'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { fetchProfileNames } from '@/components/details/profileNames'
 import { AddEquipmentDialog } from '@/components/purchasing/AddEquipmentDialog'
+import { CloseSupplierPoDialog } from '@/components/purchasing/CloseSupplierPoDialog'
 import { EditLineDialog } from '@/components/purchasing/EditLineDialog'
+import { EditSupplierPoDialog } from '@/components/purchasing/EditSupplierPoDialog'
 import { Price } from '@/components/purchasing/Price'
 import { PurchasingUnitCell } from '@/components/purchasing/PurchasingUnitCell'
 import { SupplierPoEventsTimeline } from '@/components/purchasing/SupplierPoEventsTimeline'
+import { SupplierPoOptionsMenu } from '@/components/purchasing/SupplierPoOptionsMenu'
 import { SupplierPoStatusBadge } from '@/components/purchasing/SupplierPoStatusBadge'
 import {
   BackButton,
@@ -41,7 +44,6 @@ import {
   Select,
   Skeleton,
   StatCard,
-  useConfirm,
   type DescriptionListItem,
 } from '@/components/ui'
 import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
@@ -51,7 +53,6 @@ import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import {
   SUPPLIER_PO_EVENTS_LIMIT,
-  supplierPoFormMessage,
   supplierPoSupplierLabel,
   vatOf,
   withVat,
@@ -60,7 +61,6 @@ import {
   SUPPLIER_PO_EVENT_SELECT,
   SUPPLIER_PO_LINE_SELECT,
   SUPPLIER_PO_SELECT,
-  closeSupplierPo,
   supplierPoTotal,
   type SupplierPoEventRow,
   type SupplierPoLineRow,
@@ -176,15 +176,14 @@ export function SupplierPoDetail({
   const [loading, setLoading] = useState(true)
   const [loadedId, setLoadedId] = useState<string | null>(null)
   const [loadError, setLoadError] = useState(false)
-  const [actionError, setActionError] = useState<TranslationKey | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [editing, setEditing] = useState<SupplierPoLineRow | null>(null)
-  const [closing, setClosing] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [closeOpen, setCloseOpen] = useState(false)
   const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({
     key: 'equipment',
     direction: 'asc',
   })
-  const { confirm, confirmDialog } = useConfirm()
   const startRequest = useListRequest()
 
   const fetchData = useCallback(async () => {
@@ -243,28 +242,6 @@ export function SupplierPoDetail({
   useEffect(() => {
     fetchData()
   }, [fetchData])
-
-  const closePo = async () => {
-    if (!po) return
-    if (
-      !(await confirm({
-        title: t('supplierPoCloseConfirmTitle'),
-        description: t('supplierPoCloseConfirmDesc'),
-        confirmLabel: t('supplierPoClose'),
-        tone: 'danger',
-      }))
-    )
-      return
-    setClosing(true)
-    setActionError(null)
-    const result = await closeSupplierPo(po.id)
-    setClosing(false)
-    if (result.error) {
-      setActionError(supplierPoFormMessage(result.error))
-      return
-    }
-    fetchData()
-  }
 
   // Skeleton only while there is nothing to show for this PO yet; a refetch
   // of the PO already on screen keeps the page in place.
@@ -442,11 +419,6 @@ export function SupplierPoDetail({
           {t('supplierPoLoadError')}
         </Notice>
       )}
-      {actionError && (
-        <Notice tone="danger" size="compact">
-          {t(actionError)}
-        </Notice>
-      )}
 
       {/* 1. Header card: identity, the supplier, meta, actions, summary. */}
       <div className="card space-y-4 p-4">
@@ -472,15 +444,13 @@ export function SupplierPoDetail({
           }
           actions={
             showActions ? (
-              <div className="hidden gap-2 sm:flex">
-                <Button
-                  variant="danger"
-                  size="sm"
-                  loading={closing}
-                  onClick={closePo}
-                >
-                  {t('supplierPoClose')}
-                </Button>
+              /* Owner 2026-10-22: one «خيارات» menu (edit, close) instead of
+                 a bare close button. */
+              <div className="hidden sm:flex">
+                <SupplierPoOptionsMenu
+                  onEdit={() => setEditOpen(true)}
+                  onClose={() => setCloseOpen(true)}
+                />
               </div>
             ) : undefined
           }
@@ -696,14 +666,11 @@ export function SupplierPoDetail({
           >
             {t('supplierPoAddEquipment')}
           </Button>
-          <Button
-            variant="danger"
+          <SupplierPoOptionsMenu
             className="h-11"
-            loading={closing}
-            onClick={closePo}
-          >
-            {t('supplierPoClose')}
-          </Button>
+            onEdit={() => setEditOpen(true)}
+            onClose={() => setCloseOpen(true)}
+          />
         </div>
       )}
 
@@ -729,7 +696,24 @@ export function SupplierPoDetail({
           fetchData()
         }}
       />
-      {confirmDialog}
+      <EditSupplierPoDialog
+        po={po}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSaved={() => {
+          setEditOpen(false)
+          fetchData()
+        }}
+      />
+      <CloseSupplierPoDialog
+        po={po}
+        open={closeOpen}
+        onOpenChange={setCloseOpen}
+        onClosed={() => {
+          setCloseOpen(false)
+          fetchData()
+        }}
+      />
     </div>
   )
 }
