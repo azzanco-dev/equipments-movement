@@ -21,7 +21,7 @@ import {
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
-import { formatDate } from '@/lib/dateFormat'
+import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { lessorFilterOptions } from '@/lib/equipmentSupplier'
 import { supplierPosListConfig } from '@/lib/listConfigs'
 import { supplierPoPartyOrFilter, supplierPoSupplierLabel } from '@/lib/purchasing'
@@ -149,6 +149,15 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
       hideBelow: 'sm',
       className: 'tabular-nums',
       cell: (row) => supplierPoLineCount(row),
+    },
+    {
+      key: 'last_modified_at',
+      header: t('supplierPoLastModified'),
+      sortable: true,
+      hideBelow: 'md',
+      className: 'tabular-nums',
+      cell: (row) =>
+        row.last_modified_at ? formatDateTime(row.last_modified_at) : '—',
     },
     {
       key: 'status',

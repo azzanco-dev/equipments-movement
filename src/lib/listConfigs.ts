@@ -739,6 +739,8 @@ export const supplierPosListConfig: DataListConfig = {
     { key: 'created_at', label: 'supplierPoCreatedAt' },
     { key: 'po_number', label: 'supplierPoNumber' },
     { key: 'start_date', label: 'supplierPoStartDate' },
+    // 0146: the computed column last_modified_at(supplier_pos).
+    { key: 'last_modified_at', label: 'supplierPoLastModified' },
     { key: 'status', label: 'status' },
   ],
 }
