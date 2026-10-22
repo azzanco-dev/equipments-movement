@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import type { AsyncSearchSelectOption } from '@/components/AsyncSearchSelect'
@@ -24,9 +24,40 @@ export interface MovementFormOptionLoaders {
  * Server-side searched options for the movement form selectors. Every loader
  * returns at most 20 rows and selects only the columns the option needs, so a
  * selector never loads a full table into the browser.
+ *
+ * `userId` (the signed-in user, passed by the form: the movement components
+ * read no auth context themselves, wave 24) narrows the company and project
+ * selectors to his linked companies; without it nothing is narrowed.
  */
-export function useMovementFormOptions(): MovementFormOptionLoaders {
+export function useMovementFormOptions({
+  userId = null,
+}: { userId?: string | null } = {}): MovementFormOptionLoaders {
   const { lang } = useI18n()
+  // Owner 2026-10-22: the company and project selectors offer only the
+  // companies linked to the user on his page («الشركات المسؤول عنها»,
+  // profile_companies, 0058) and the projects company_projects links to
+  // them; a user without links (the admin, the workshop roles) gets every
+  // company and project. The links restrict nothing else (migration 0145).
+  // Read once through RLS (the user's own rows); a failed read filters
+  // nothing rather than hiding the lists.
+  const [assignedCompanyIds, setAssignedCompanyIds] = useState<string[]>([])
+  useEffect(() => {
+    if (!userId) return
+    let active = true
+    void supabase
+      .from('profile_companies')
+      .select('company_id')
+      .eq('profile_id', userId)
+      .then(({ data }) => {
+        if (active)
+          setAssignedCompanyIds(
+            (data ?? []).map((row) => row.company_id as string),
+          )
+      })
+    return () => {
+      active = false
+    }
+  }, [userId])
 
   const loadDrivers = useCallback(
     async (query: string): Promise<AsyncSearchSelectOption[]> => {
@@ -49,6 +80,8 @@ export function useMovementFormOptions(): MovementFormOptionLoaders {
         .select('id,name_ar,name_en')
         .order('name_ar')
         .limit(20)
+      if (assignedCompanyIds.length)
+        request = request.in('id', assignedCompanyIds)
       const searchFilter = buildSearchFilter(
         COMPANY_PROJECT_SEARCH_FIELDS,
         query,
@@ -59,27 +92,44 @@ export function useMovementFormOptions(): MovementFormOptionLoaders {
         label: localizedName(lang, company.name_ar, company.name_en),
       }))
     },
-    [lang],
+    [assignedCompanyIds, lang],
   )
 
   const loadProjects = useCallback(
     async (query: string): Promise<AsyncSearchSelectOption[]> => {
+      const searchFilter = buildSearchFilter(
+        COMPANY_PROJECT_SEARCH_FIELDS,
+        query,
+      )
+      const toOption = (project: {
+        id: string
+        name_ar: string
+        name_en: string | null
+      }) => ({
+        value: project.id,
+        label: localizedName(lang, project.name_ar, project.name_en),
+      })
+      if (assignedCompanyIds.length) {
+        // The projects linked to the user's companies (server side, through
+        // the company_projects embed; one row per project).
+        let linked = supabase
+          .from('projects')
+          .select('id,name_ar,name_en,company_projects!inner(company_id)')
+          .in('company_projects.company_id', assignedCompanyIds)
+          .order('name_ar')
+          .limit(20)
+        if (searchFilter) linked = linked.or(searchFilter)
+        return unwrapRows(await linked).map(toOption)
+      }
       let request = supabase
         .from('projects')
         .select('id,name_ar,name_en')
         .order('name_ar')
         .limit(20)
-      const searchFilter = buildSearchFilter(
-        COMPANY_PROJECT_SEARCH_FIELDS,
-        query,
-      )
       if (searchFilter) request = request.or(searchFilter)
-      return unwrapRows(await request).map((project) => ({
-        value: project.id,
-        label: localizedName(lang, project.name_ar, project.name_en),
-      }))
+      return unwrapRows(await request).map(toOption)
     },
-    [lang],
+    [assignedCompanyIds, lang],
   )
 
   const loadEquipmentTypes = useCallback(

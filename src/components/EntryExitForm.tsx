@@ -223,7 +223,7 @@ export function EntryExitForm({
     loadProjects,
     loadEquipmentTypes,
     loadLessors,
-  } = useMovementFormOptions()
+  } = useMovementFormOptions({ userId: user?.id ?? null })
 
   const photoErrorMessage = (error: StagedPhotoError) => {
     if (error === 'invalid_type') return t('invalidPhotoType')
