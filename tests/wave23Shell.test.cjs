@@ -630,9 +630,7 @@ test('the landing is the first passing section in menu order', () => {
     'purchasing/orders',
     'drivers',
     'users',
-    'activity',
     'reports/entries',
-    'movement-import',
     'settings',
   ])
 })

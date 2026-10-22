@@ -106,7 +106,9 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   },
   { key: 'drivers', requires: [{ key: 'drivers.read' }] },
   { key: 'users', requires: [{ key: 'users.manage' }] },
-  { key: 'activity', requires: [{ key: 'movements.activity' }] },
+  // Owner 2026-10-22: «سجل النشاط» left the sidebar for a Settings card
+  // (/activity still opens by link for movements.activity).
+  { key: 'activity', requires: [{ key: 'movements.activity' }], hidden: true },
   {
     key: 'reports',
     requires: [{ key: 'reports.view' }],
@@ -125,7 +127,13 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
       },
     ],
   },
-  { key: 'movement-import', requires: [{ key: 'movements.import' }] },
+  // Owner 2026-10-22: the Excel import of movements is no longer needed in
+  // the menu (the page stays reachable by URL for movements.import).
+  {
+    key: 'movement-import',
+    requires: [{ key: 'movements.import' }],
+    hidden: true,
+  },
   {
     key: 'settings',
     requires: [
@@ -154,12 +162,11 @@ const ADMIN_MENU: readonly VisibleNavItem[] = [
   { key: 'purchasing', children: ['purchasing/orders'] },
   { key: 'drivers' },
   { key: 'users' },
-  { key: 'activity' },
+  // 2026-10-22: «سجل النشاط» and the movement import left the menu (owner).
   {
     key: 'reports',
     children: ['reports/entries', 'reports/equipment', 'reports/workshop'],
   },
-  { key: 'movement-import' },
   { key: 'settings' },
 ]
 

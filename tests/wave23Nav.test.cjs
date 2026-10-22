@@ -111,12 +111,12 @@ const CAPTURED = {
     { key: 'purchasing', children: ['purchasing/orders'] },
     { key: 'drivers' },
     { key: 'users' },
-    { key: 'activity' },
+    // 2026-10-22 (owner): «سجل النشاط» and the movement import left the
+    // menu — hidden entries, still open by URL.
     {
       key: 'reports',
       children: ['reports/entries', 'reports/equipment', 'reports/workshop'],
     },
-    { key: 'movement-import' },
     { key: 'settings' },
   ],
   monitor: [{ key: 'dashboard' }, { key: 'logs' }, { key: 'inquiry' }],

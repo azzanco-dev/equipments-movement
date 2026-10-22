@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Trash2,
   Upload,
-  Warehouse,
+  History,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { readWorkbookSafely, workbookReadErrorKey } from '@/lib/safeWorkbook'
@@ -58,6 +58,7 @@ import {
 } from '@/lib/formValidation'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { RelativeTime } from '@/components/RelativeTime'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { AfaqySettings } from '@/components/afaqy/AfaqySettings'
 import { rolesSystemEnabledFromValue } from '@/lib/rolesAdmin'
 
@@ -103,6 +104,8 @@ export function AdminSettings() {
   const showWorkshopOpening = pathname === '/settings/workshop-opening-balance'
   // wave 17: the Afaqy tracker link.
   const showAfaqy = pathname === '/settings/afaqy'
+  // «سجل النشاط» card (owner 2026-10-22): for a holder of movements.activity.
+  const canSeeActivity = usePermissions().can('movements.activity')
   const [rows, setRows] = useState<EquipmentTypeRow[]>([])
   const [total, setTotal] = useState(0)
   const [typesCount, setTypesCount] = useState<number | null>(null)
@@ -495,28 +498,31 @@ export function AdminSettings() {
                 : t('itemsCount').replace('{count}', String(typesCount))}
             </p>
           </button>
-          <button
-            type="button"
-            onClick={() => router.push('/settings/workshop-opening-balance')}
-            className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
-          >
-            <div className="mb-4 flex w-full items-start justify-between gap-3">
-              <span
-                className="flex h-9 w-9 items-center justify-center rounded-lg border"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                <Warehouse size={18} />
-              </span>
-              <ChevronRight
-                size={18}
-                className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip"
-              />
-            </div>
-            <h2 className="font-semibold">{t('workshopOpeningBalance')}</h2>
-            <p className="mt-1 text-sm text-muted">
-              {t('workshopOpeningBalanceDesc')}
-            </p>
-          </button>
+          {/* Owner 2026-10-22: the workshop opening balance card is gone (the
+              page stays at /settings/workshop-opening-balance by link) and
+              «سجل النشاط» moved here from the sidebar. */}
+          {canSeeActivity && (
+            <button
+              type="button"
+              onClick={() => router.push('/activity')}
+              className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
+            >
+              <div className="mb-4 flex w-full items-start justify-between gap-3">
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  <History size={18} />
+                </span>
+                <ChevronRight
+                  size={18}
+                  className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip"
+                />
+              </div>
+              <h2 className="font-semibold">{t('activityLog')}</h2>
+              <p className="mt-1 text-sm text-muted">{t('activityLogDesc')}</p>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => router.push('/settings/afaqy')}
