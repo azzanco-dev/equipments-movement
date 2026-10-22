@@ -72,8 +72,8 @@ export interface SupplierPoRow {
   supplier_po_equipment?: { count: number }[] | null
   /** 0138: the computed column `unpriced_count(supplier_pos)`. */
   unpriced_count?: number | null
-  /** 0146: the computed column `last_modified_at(supplier_pos)`, list only. */
-  last_modified_at?: string | null
+  /** 0146: the PO's latest change (its row or any line), list only. */
+  updated_at?: string | null
 }
 
 /** The unit behind a line, as the add dialog and the page need it. */
@@ -134,7 +134,7 @@ const NAMED = 'id,name_ar,name_en'
 export const SUPPLIER_PO_SELECT = `id,po_number,lessor_id,owner_class,is_internal,company_id,project_id,start_date,status,closed_at,notes,created_by,created_at,unpriced_count,lessor:lessors(id,name),company:companies(${NAMED}),project:projects(${NAMED})`
 
 /** The list adds the line count (one embedded count per row). */
-export const SUPPLIER_PO_LIST_SELECT = `${SUPPLIER_PO_SELECT},last_modified_at,supplier_po_equipment(count)`
+export const SUPPLIER_PO_LIST_SELECT = `${SUPPLIER_PO_SELECT},updated_at,supplier_po_equipment(count)`
 
 export const PURCHASING_UNIT_SELECT =
   'id,code,type,plate_number,chassis_number,ownership_status,lessor:lessors(id,name,is_internal)'

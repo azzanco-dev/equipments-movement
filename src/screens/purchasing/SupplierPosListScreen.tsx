@@ -151,13 +151,12 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
       cell: (row) => supplierPoLineCount(row),
     },
     {
-      key: 'last_modified_at',
+      key: 'updated_at',
       header: t('supplierPoLastModified'),
       sortable: true,
       hideBelow: 'md',
       className: 'tabular-nums',
-      cell: (row) =>
-        row.last_modified_at ? formatDateTime(row.last_modified_at) : '—',
+      cell: (row) => (row.updated_at ? formatDateTime(row.updated_at) : '—'),
     },
     {
       key: 'status',
