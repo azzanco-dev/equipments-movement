@@ -474,8 +474,9 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             email: nextEmail,
             password,
             role: savedRole,
+            // 0143: every role but the administrator may be scoped.
             company_ids:
-              savedRole === 'supervisor'
+              savedRole !== 'admin'
                 ? companies.map((item) => item.value)
                 : [],
           })
@@ -507,7 +508,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 email: nextEmail,
                 role: savedRole,
                 assigned_companies:
-                  savedRole === 'supervisor'
+                  savedRole !== 'admin'
                     ? companies.map((company) => ({
                         id: company.value,
                         name_ar: company.name_ar,
@@ -736,7 +737,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       label: t('createdAt'),
       value: user.created_at ? formatDate(user.created_at) : null,
     },
-    ...(user.role === 'supervisor'
+    ...(user.role !== 'admin'
       ? [
           {
             key: 'assignedCompanies',
@@ -872,7 +873,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                           newRoleKey: value,
                         }),
                         user.role,
-                      ) !== 'supervisor'
+                      ) === 'admin'
                     )
                       setCompanies([])
                   }}
@@ -885,7 +886,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                   onValueChange={(value) => {
                     clearError('role')
                     setRole(value as UserRole)
-                    if (value !== 'supervisor') setCompanies([])
+                    if (value === 'admin') setCompanies([])
                   }}
                   options={roleOptions}
                 />
@@ -950,7 +951,9 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             {t('roleChangeUseAssignment')}
           </Notice>
         )}
-        {legacyRoleToSave === 'supervisor' && (
+        {/* 0143 (company scope): any role but the administrator, who can
+            never be linked (the database refuses it). */}
+        {legacyRoleToSave !== 'admin' && (
           <Field
             label={t('assignedCompanies')}
             hint={t('assignedCompaniesHelp')}

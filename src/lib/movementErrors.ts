@@ -16,6 +16,8 @@ export const MOVEMENT_ERROR_CODES = [
   'invalid_exit_purpose',
   // wave-13-drivers (migration 0120): a site entry needs its driver.
   'site_entry_driver_required',
+  // 0143: a site entry for a company outside the caller's linked companies.
+  'company_not_in_scope',
   'workshop_exit_owner',
   'invalid_sequence',
   'access_denied',
@@ -56,6 +58,8 @@ export function movementErrorCode(message: string): MovementErrorCode {
   if (message.includes('workshop exit must be registered by entry user'))
     return 'workshop_exit_owner'
   if (message.includes('sequence would be invalid')) return 'invalid_sequence'
+  // 0143 (company scope): before the generic role text.
+  if (message.includes('company_not_in_scope')) return 'company_not_in_scope'
   if (
     message.includes('foreman role required') ||
     message.includes('supervisor role required') ||

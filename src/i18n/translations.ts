@@ -103,6 +103,7 @@ export const translations = {
       'إنشاء الحسابات متاح للأدمن فقط. تواصل مع الأدمن لإنشاء حساب.',
     authError: 'حدث خطأ أثناء المصادقة',
     accessDenied: 'ليست لديك صلاحية لتسجيل هذه الحركة.',
+    companyNotInScope: 'هذه الشركة ليست من الشركات المرتبطة بحسابك.',
 
     // Nav
     dashboard: 'الرئيسية',
@@ -1261,7 +1262,7 @@ export const translations = {
     foremanProjectRequired: 'يجب تحديد مشروع واحد على الأقل للفورمين.',
     assignedCompanies: 'الشركات المسؤول عنها',
     assignedCompaniesHelp:
-      'تُحفظ الشركات للفورمين دون تطبيق فلترة تشغيلية حالياً.',
+      'لا يرى المستخدم الا بيانات هذه الشركات (الحركات والدخوليات واوامر الشراء) ولا يسجل دخول مشروع الا لها. اتركها فارغة ليرى كل الشركات. مدير النظام لا يقيد.',
     selectCompanies: 'اختر شركة أو أكثر',
     you: 'أنت',
 
@@ -2091,6 +2092,7 @@ export const translations = {
       'Account creation is admin-only. Contact an admin to create an account.',
     authError: 'Authentication error',
     accessDenied: 'You do not have permission to register this movement.',
+    companyNotInScope: 'This company is not one of the companies linked to your account.',
 
     dashboard: 'Dashboard',
     logs: 'Logs',
@@ -3288,7 +3290,7 @@ export const translations = {
     foremanProjectRequired: 'Select at least one project for the foreman.',
     assignedCompanies: 'Assigned Companies',
     assignedCompaniesHelp:
-      'Company assignments are stored for foremen without operational filtering for now.',
+      'The user sees only these companies (movements, entries, purchase orders) and records project entries for them only. Leave empty to see every company. The administrator is never restricted.',
     selectCompanies: 'Select one or more companies',
     you: 'You',
 
