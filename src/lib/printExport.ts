@@ -234,7 +234,16 @@ export function storePrintPayload(
   id: string,
   payload: PrintExportPayload,
 ): void {
-  const encoded = encodePrintPayload(payload)
+  storePrintPayloadText(storages, id, encodePrintPayload(payload))
+}
+
+/** The encoded form of any print payload (the PO print page stores its own
+ *  shape, `src/lib/printSupplierPo.ts`, through the same storages). */
+export function storePrintPayloadText(
+  storages: readonly (StorageLike | null | undefined)[],
+  id: string,
+  encoded: string,
+): void {
   let stored = false
   for (const storage of storages) {
     if (!storage) continue
@@ -254,7 +263,7 @@ export function storePrintPayload(
  * (React StrictMode runs effects twice in development) still finds it after
  * the stored copies were deleted.
  */
-let lastTaken: { id: string; payload: PrintExportPayload } | null = null
+let lastTaken: { id: string; encoded: string } | null = null
 
 /**
  * Reads the payload from the first storage that holds a valid one and
@@ -267,19 +276,42 @@ export function takePrintPayload(
   )[],
   id: string | null | undefined,
 ): PrintExportPayload | null {
+  return takePrintPayloadText(storages, id, decodePrintPayload)
+}
+
+/**
+ * The generic take: the first stored text `decode` accepts, every stored
+ * copy deleted. `decode` returns null for a text of another shape.
+ */
+export function takePrintPayloadText<T>(
+  storages: readonly (
+    Pick<Storage, 'getItem' | 'removeItem'> | null | undefined
+  )[],
+  id: string | null | undefined,
+  decode: (raw: string | null | undefined) => T | null,
+): T | null {
   if (!isPrintExportId(id)) return null
   const key = printExportStorageKey(id as string)
-  if (lastTaken && lastTaken.id === id) return lastTaken.payload
-  let payload: PrintExportPayload | null = null
+  if (lastTaken && lastTaken.id === id) return decode(lastTaken.encoded)
+  let payload: T | null = null
+  let encoded: string | null = null
   for (const storage of storages) {
     if (!storage) continue
     try {
-      payload ??= decodePrintPayload(storage.getItem(key))
+      if (payload === null) {
+        const raw = storage.getItem(key)
+        const decoded = decode(raw)
+        if (decoded !== null) {
+          payload = decoded
+          encoded = raw
+        }
+      }
       storage.removeItem(key)
     } catch {
       // A storage that cannot be read simply holds nothing.
     }
   }
-  if (payload) lastTaken = { id: id as string, payload }
+  if (payload !== null && encoded !== null)
+    lastTaken = { id: id as string, encoded }
   return payload
 }

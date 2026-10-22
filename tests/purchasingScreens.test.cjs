@@ -831,3 +831,83 @@ test('the PO page closes through a typed order number, from the options menu', (
   assert.equal(matches('SPO260002', 'SPO260001'), false)
   assert.equal(matches('', 'SPO260001'), false)
 })
+
+// --- «تصدير PDF» of a PO (owner 2026-10-22) ------------------------------------------
+
+test('the PO PDF: a validated payload, the /print/po route gated on purchasing.view', () => {
+  const lib = loadLibModule('printSupplierPo')
+  assert.equal(lib.printSupplierPoUrl('abcd1234'), '/print/po?key=abcd1234')
+  const payload = lib.buildSupplierPoPrintPayload({
+    lang: 'ar',
+    poNumber: 'SPO260001',
+    status: 'open',
+    supplier: 'S',
+    company: 'C',
+    project: 'P',
+    startDate: '2026-10-01',
+    createdBy: 'U',
+    createdAt: '2026-10-01T05:00:00.000Z',
+    closedAt: null,
+    notes: null,
+    lines: [
+      { code: 'A1', type: null, plate: null, periodFrom: '2026-10-01', periodTo: null, note: null, price: 1000.5 },
+      { code: 'A2', type: 'T', plate: '1234', periodFrom: null, periodTo: null, note: 'n', price: null },
+    ],
+    now: new Date('2026-10-22T06:00:00Z'),
+  })
+  assert.equal(payload.version, 1)
+  assert.equal(payload.kind, 'supplier_po')
+  assert.equal(payload.generatedAt, '2026-10-22T06:00:00.000Z')
+  const encoded = lib.encodeSupplierPoPrintPayload(payload)
+  assert.deepEqual(plain(lib.decodeSupplierPoPrintPayload(encoded)), plain(payload))
+  assert.deepEqual(plain(lib.supplierPoPrintTotals(payload.lines)), { total: 1000.5, unpriced: 1 })
+  // Another shape (the list export's payload), a tampered line or garbage: null.
+  assert.equal(lib.decodeSupplierPoPrintPayload('{"version":1,"title":"x"}'), null)
+  assert.equal(lib.decodeSupplierPoPrintPayload(encoded.replace('"price":1000.5', '"price":"1000.5"')), null)
+  assert.equal(lib.decodeSupplierPoPrintPayload('not json'), null)
+  assert.equal(lib.decodeSupplierPoPrintPayload(null), null)
+
+  // The generic take hands the PO page's payload back through the same
+  // storages as the list export, and the list export still decodes its own.
+  const print = loadLibModule('printExport')
+  const store = () => {
+    const map = new Map()
+    return {
+      get length() {
+        return map.size
+      },
+      key: (index) => [...map.keys()][index] ?? null,
+      getItem: (key) => map.get(key) ?? null,
+      setItem: (key, value) => map.set(key, value),
+      removeItem: (key) => map.delete(key),
+    }
+  }
+  const own = store()
+  const opener = store()
+  print.storePrintPayloadText([own, opener], 'poid-0001', encoded)
+  assert.equal(print.takePrintPayload([own, opener], 'poid-0001'), null, 'the list export does not render a PO payload')
+  print.storePrintPayloadText([own, opener], 'poid-0002', encoded)
+  const taken = print.takePrintPayloadText([own, opener], 'poid-0002', lib.decodeSupplierPoPrintPayload)
+  assert.equal(taken.poNumber, 'SPO260001')
+  assert.equal(own.length, 0)
+  assert.equal(opener.length, 0)
+
+  // The route and its gate.
+  const navSource = read('src', 'lib', 'navPermissions.ts')
+  assert.match(navSource, /'print\/po': \[\{ key: 'purchasing\.view' \}\]/)
+  assert.match(navSource, /if \(second === 'po'\) return 'print\/po'/)
+  assert.match(navSource, /if \(canOpenPage\(permissions, 'print\/po'\)\) pages\.add\('print\/po'\)/)
+  const app = read('src', 'App.tsx')
+  assert.match(app, /if \(requested === 'print\/po' && shell\.pages\.has\('print\/po'\)\)\s+return <SupplierPoPrint payloadKey=\{searchParams\.get\('key'\)\} \/>/)
+  // The print page fetches nothing and reads the payload once.
+  const page = read('src', 'screens', 'purchasing', 'SupplierPoPrint.tsx')
+  assert.doesNotMatch(page, /supabase|fetch\(/)
+  assert.match(page, /takePrintPayloadText\(\s*payloadStores\(\),\s*payloadKey,\s*decodeSupplierPoPrintPayload,/)
+  assert.match(page, /window\.print\(\)/)
+  // The PO page opens the tab inside the press and stores the payload for it.
+  const detail = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
+  assert.match(detail, /const popup = window\.open\('', '_blank'\)/)
+  assert.match(detail, /storePrintPayloadText\(/)
+  assert.match(detail, /popup\.location\.replace\(\s*new URL\(printSupplierPoUrl\(id\), window\.location\.origin\)/)
+  assert.match(detail, /t\('supplierPoPdf'\)/)
+})

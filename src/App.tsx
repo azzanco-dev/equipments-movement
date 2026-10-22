@@ -260,6 +260,14 @@ const PrintExport = dynamic(
   () => import('@/screens/PrintExport').then((module) => module.PrintExport),
   { loading: screenLoading },
 )
+// The print page of one supplier PO (owner 2026-10-22), chrome-less too.
+const SupplierPoPrint = dynamic(
+  () =>
+    import('@/screens/purchasing/SupplierPoPrint').then(
+      (module) => module.SupplierPoPrint,
+    ),
+  { loading: screenLoading },
+)
 const WorkshopReports = dynamic(
   () =>
     import('@/screens/WorkshopReports').then(
@@ -405,6 +413,8 @@ function AppContent() {
   // and fetches nothing; wave 23 opens it for `movements.export`.
   if (requested === 'print/export' && shell.pages.has('print/export'))
     return <PrintExport payloadKey={searchParams.get('key')} />
+  if (requested === 'print/po' && shell.pages.has('print/po'))
+    return <SupplierPoPrint payloadKey={searchParams.get('key')} />
 
   // Fail closed: the role fallback for an unknown role after a failed load
   // (or, defensively, one still waiting for its permissions).

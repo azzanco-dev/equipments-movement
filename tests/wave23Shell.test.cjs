@@ -685,6 +685,7 @@ const ALL_PAGES = [
     ...nav.SHELL_PAGES.foreman,
     ...nav.SHELL_PAGES.workshop,
     'print/export',
+    'print/po',
   ]),
 ]
 
@@ -724,6 +725,7 @@ test('the gates of the pages outside the sidebar', () => {
     { key: 'movements.workshop.create' },
   ])
   assert.deepEqual(gate('print/export'), [{ key: 'movements.export' }])
+  assert.deepEqual(gate('print/po'), [{ key: 'purchasing.view' }])
   assert.deepEqual(gate('settings/afaqy'), [{ key: 'settings.integrations' }])
   assert.deepEqual(gate('settings/roles'), [{ key: 'settings.roles' }])
   assert.deepEqual(gate('settings/equipment-types'), [
@@ -767,6 +769,8 @@ test('routePageOf reads the URL as the old router did', () => {
   assert.equal(page('/settings/afaqy'), 'settings/afaqy')
   assert.equal(page('/settings/afaqy/x'), 'settings')
   assert.equal(page('/print/export'), 'print/export')
+  assert.equal(page('/print/po'), 'print/po')
+  assert.equal(page('/print/other'), 'dashboard')
   assert.equal(page('/print'), 'dashboard')
   assert.equal(page('/ui-kit'), 'dashboard')
   assert.equal(page('/toString'), 'dashboard')

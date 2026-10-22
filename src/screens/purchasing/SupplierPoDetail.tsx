@@ -7,6 +7,7 @@ import {
   Clock,
   Coins,
   Edit2,
+  FileDown,
   FileText,
   Lock,
   MapPin,
@@ -51,6 +52,12 @@ import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
+import { newPrintExportId, storePrintPayloadText } from '@/lib/printExport'
+import {
+  buildSupplierPoPrintPayload,
+  encodeSupplierPoPrintPayload,
+  printSupplierPoUrl,
+} from '@/lib/printSupplierPo'
 import {
   SUPPLIER_PO_EVENTS_LIMIT,
   supplierPoSupplierLabel,
@@ -180,6 +187,7 @@ export function SupplierPoDetail({
   const [editing, setEditing] = useState<SupplierPoLineRow | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [closeOpen, setCloseOpen] = useState(false)
+  const [exportError, setExportError] = useState<TranslationKey | null>(null)
   const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({
     key: 'equipment',
     direction: 'asc',
@@ -361,6 +369,82 @@ export function SupplierPoDetail({
     },
   ]
 
+  // «تصدير PDF» (owner 2026-10-22): the print tab is opened inside the press
+  // (so it is not blocked as a popup), the payload stored for it in both
+  // session storages, then the tab is pointed at /print/po. No fetch: the
+  // page's own data is the payload.
+  const exportPdf = () => {
+    setExportError(null)
+    const popup = window.open('', '_blank')
+    if (!popup) {
+      setExportError('exportPopupBlocked')
+      return
+    }
+    try {
+      popup.document.title = t('printPreparing')
+      popup.document.body.textContent = t('printPreparing')
+    } catch {
+      // Only a courtesy message; the page itself replaces it.
+    }
+    const payload = buildSupplierPoPrintPayload({
+      lang,
+      poNumber: po.po_number,
+      status: po.status,
+      supplier,
+      company: companyName,
+      project: projectName,
+      startDate: po.start_date,
+      createdBy: createdByName,
+      createdAt: po.created_at,
+      closedAt: po.closed_at ?? null,
+      notes: po.notes ?? null,
+      lines: sortedLines.map((line) => ({
+        code: line.card?.equipment?.code ?? '—',
+        type: line.card?.equipment?.type ?? null,
+        plate: line.card?.equipment?.plate_number ?? null,
+        periodFrom: line.card?.period_from ?? null,
+        periodTo: line.card?.period_to ?? null,
+        note: line.note ?? null,
+        price: line.price === null ? null : Number(line.price),
+      })),
+    })
+    const id = newPrintExportId()
+    const sessionStore = (pick: () => Storage | null | undefined) => {
+      try {
+        return pick() ?? null
+      } catch {
+        return null
+      }
+    }
+    try {
+      storePrintPayloadText(
+        [
+          sessionStore(() => popup.sessionStorage),
+          sessionStore(() => window.sessionStorage),
+        ],
+        id,
+        encodeSupplierPoPrintPayload(payload),
+      )
+      popup.location.replace(
+        new URL(printSupplierPoUrl(id), window.location.origin).toString(),
+      )
+    } catch {
+      popup.close()
+      setExportError('exportPopupBlocked')
+    }
+  }
+
+  const pdfButton = (
+    <Button
+      variant="outline"
+      size="sm"
+      icon={<FileDown size={14} aria-hidden="true" />}
+      onClick={exportPdf}
+    >
+      {t('supplierPoPdf')}
+    </Button>
+  )
+
   const sortOptions: { value: SortKey; label: string }[] = [
     { value: 'equipment', label: t('supplierPoEquipmentField') },
     { value: 'period', label: t('equipmentPurchasingPeriod') },
@@ -419,6 +503,11 @@ export function SupplierPoDetail({
           {t('supplierPoLoadError')}
         </Notice>
       )}
+      {exportError && (
+        <Notice tone="danger" size="compact">
+          {t(exportError)}
+        </Notice>
+      )}
 
       {/* 1. Header card: identity, the supplier, meta, actions, summary. */}
       <div className="card space-y-4 p-4">
@@ -443,16 +532,19 @@ export function SupplierPoDetail({
             </>
           }
           actions={
-            showActions ? (
-              /* Owner 2026-10-22: one «خيارات» menu (edit, close) instead of
-                 a bare close button. */
-              <div className="hidden sm:flex">
-                <SupplierPoOptionsMenu
-                  onEdit={() => setEditOpen(true)}
-                  onClose={() => setCloseOpen(true)}
-                />
-              </div>
-            ) : undefined
+            /* Owner 2026-10-22: «تصدير PDF» for every reader; one «خيارات»
+               menu (edit, close) instead of a bare close button. */
+            <div className="flex gap-2">
+              {pdfButton}
+              {showActions && (
+                <div className="hidden sm:flex">
+                  <SupplierPoOptionsMenu
+                    onEdit={() => setEditOpen(true)}
+                    onClose={() => setCloseOpen(true)}
+                  />
+                </div>
+              )}
+            </div>
           }
         />
         <dl className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-muted">

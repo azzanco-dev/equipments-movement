@@ -305,6 +305,7 @@ export type RoutePage =
   | 'users/:id'
   | 'purchasing/:id'
   | 'print/export'
+  | 'print/po'
 
 type ExtraPage = Exclude<RoutePage, NavItemKey | NavChildKey>
 
@@ -328,6 +329,8 @@ const PAGE_GATES: Readonly<Record<ExtraPage, readonly NavGate[]>> = {
   'users/:id': [{ key: 'users.manage' }],
   'purchasing/:id': [{ key: 'purchasing.view' }],
   'print/export': [{ key: 'movements.export' }],
+  // The PDF of one supplier PO (owner 2026-10-22): anyone who may read it.
+  'print/po': [{ key: 'purchasing.view' }],
 }
 
 /** A gate no permission passes (fail closed for an unknown page). */
@@ -364,8 +367,11 @@ const SETTINGS_SUBPAGES: ReadonlySet<string> = new Set([
  */
 export function routePageOf(segments: readonly string[]): RoutePage {
   const [first = '', second, third] = segments
-  if (first === 'print')
-    return second === 'export' ? 'print/export' : 'dashboard'
+  if (first === 'print') {
+    if (second === 'export') return 'print/export'
+    if (second === 'po') return 'print/po'
+    return 'dashboard'
+  }
   if (first === 'movements') {
     if (second === 'new') return 'movements/new'
     return second ? 'movements/:id' : 'dashboard'
@@ -399,6 +405,7 @@ export function routePageOf(segments: readonly string[]): RoutePage {
 export function navKeyOfPage(page: RoutePage): NavItemKey {
   if (page === 'print/export' || page.startsWith('movements/'))
     return 'dashboard'
+  if (page === 'print/po') return 'purchasing'
   return page.split('/')[0] as NavItemKey
 }
 
@@ -489,7 +496,10 @@ export const SHELL_PAGES: Readonly<Record<HomeShell, readonly RoutePage[]>> = {
 export const LEGACY_SHELL_BY_ROLE: Readonly<
   Record<string, { kind: HomeShell; pages: readonly RoutePage[] }>
 > = {
-  admin: { kind: 'admin', pages: [...ADMIN_SHELL_PAGES, 'print/export'] },
+  admin: {
+    kind: 'admin',
+    pages: [...ADMIN_SHELL_PAGES, 'print/export', 'print/po'],
+  },
   monitor: {
     kind: 'admin',
     pages: ['dashboard', 'logs', 'inquiry', 'movements/:id', 'print/export'],
@@ -518,6 +528,7 @@ function openPages(
   )
   // The print page renders outside the shell, for anyone who may export.
   if (canOpenPage(permissions, 'print/export')) pages.add('print/export')
+  if (canOpenPage(permissions, 'print/po')) pages.add('print/po')
   return pages
 }
 
