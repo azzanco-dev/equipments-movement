@@ -231,6 +231,7 @@ export function supplierPoEventDetail(
   event: Pick<SupplierPoEventRow, 'event_type' | 'payload'>,
   codeOf: (equipmentId: string) => string | null,
   formatPrice: (value: unknown) => string,
+  formatDay: (value: string) => string = (value) => value,
 ): string | null {
   const payload = event.payload ?? {}
   const code =
@@ -240,6 +241,16 @@ export function supplierPoEventDetail(
   switch (event.event_type) {
     case 'created':
       return typeof payload.po_number === 'string' ? payload.po_number : null
+    // 0142: the start date change when there was one (a notes-only change
+    // shows the label alone).
+    case 'updated':
+      return typeof payload.old_start_date === 'string' &&
+        typeof payload.new_start_date === 'string' &&
+        payload.old_start_date !== payload.new_start_date
+        ? `${formatDay(payload.old_start_date)} → ${formatDay(payload.new_start_date)}`
+        : null
+    case 'line_updated':
+      return code
     case 'equipment_added':
       return [code, formatPrice(payload.price)].filter(Boolean).join(' · ')
     case 'price_changed':
@@ -493,6 +504,37 @@ export async function updateSupplierPoEquipmentPrice(input: {
     await supabase.rpc('update_supplier_po_equipment_price', {
       p_line_id: input.lineId,
       p_price: input.price,
+    }),
+  )
+}
+
+/** `update_supplier_po_equipment` (0142): the price (null = unpriced) and
+ *  the note of a line in one call. */
+export async function updateSupplierPoEquipment(input: {
+  lineId: string
+  price: number | null
+  note: string
+}): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('update_supplier_po_equipment', {
+      p_line_id: input.lineId,
+      p_price: input.price,
+      p_note: input.note.trim() || null,
+    }),
+  )
+}
+
+/** `update_supplier_po` (0142): the start date and the notes of an open PO. */
+export async function updateSupplierPo(input: {
+  poId: string
+  startDate: string
+  notes: string
+}): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('update_supplier_po', {
+      p_po_id: input.poId,
+      p_start_date: input.startDate,
+      p_notes: input.notes.trim() || null,
     }),
   )
 }

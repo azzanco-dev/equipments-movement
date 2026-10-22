@@ -21,7 +21,7 @@ import { usePermissions } from '@/auth/PermissionsContext'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { fetchProfileNames } from '@/components/details/profileNames'
 import { AddEquipmentDialog } from '@/components/purchasing/AddEquipmentDialog'
-import { EditPriceDialog } from '@/components/purchasing/EditPriceDialog'
+import { EditLineDialog } from '@/components/purchasing/EditLineDialog'
 import { Price } from '@/components/purchasing/Price'
 import { PurchasingUnitCell } from '@/components/purchasing/PurchasingUnitCell'
 import { SupplierPoEventsTimeline } from '@/components/purchasing/SupplierPoEventsTimeline'
@@ -636,7 +636,7 @@ export function SupplierPoDetail({
                             icon={<Edit2 size={14} aria-hidden="true" />}
                             onClick={() => setEditing(line)}
                           >
-                            {t('supplierPoEditPrice')}
+                            {t('edit')}
                           </Button>
                         )}
                       </div>
@@ -719,7 +719,7 @@ export function SupplierPoDetail({
           fetchData()
         }}
       />
-      <EditPriceDialog
+      <EditLineDialog
         line={editing}
         onOpenChange={(next) => {
           if (!next) setEditing(null)

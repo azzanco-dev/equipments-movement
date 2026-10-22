@@ -602,6 +602,19 @@ export const supplierPoPriceFormSchema = z.object({
   price: supplierPoPrice({ required: true }),
 })
 
+/** «تعديل المعدة» (update_supplier_po_equipment, 0142): the price (optional,
+ *  empty = unpriced) and the note of a line. */
+export const supplierPoLineEditFormSchema = supplierPoLineFormSchema.pick({
+  price: true,
+  note: true,
+})
+
+/** «تعديل الامر» (update_supplier_po, 0142): the start date and the notes. */
+export const supplierPoEditFormSchema = supplierPoFormSchema.innerType().pick({
+  start_date: true,
+  notes: true,
+})
+
 export interface PostgresLikeError {
   code?: string | null
   message?: string | null

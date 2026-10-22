@@ -35,8 +35,10 @@ export const SUPPLIER_PO_STATUS_BADGE: Readonly<
 /** `supplier_po_events.event_type` (the 0136 CHECK list). */
 export type SupplierPoEventType =
   | 'created'
+  | 'updated'
   | 'equipment_added'
   | 'price_changed'
+  | 'line_updated'
   | 'card_changed'
   | 'closed'
 
@@ -44,8 +46,10 @@ export const SUPPLIER_PO_EVENT_LABEL_KEYS: Readonly<
   Record<SupplierPoEventType, TranslationKey>
 > = {
   created: 'supplierPoEventCreated',
+  updated: 'supplierPoEventUpdated',
   equipment_added: 'supplierPoEventEquipmentAdded',
   price_changed: 'supplierPoEventPriceChanged',
+  line_updated: 'supplierPoEventLineUpdated',
   card_changed: 'supplierPoEventCardChanged',
   closed: 'supplierPoEventClosed',
 }
@@ -228,6 +232,26 @@ export interface SupplierPoPriceFormValues {
   price: string
 }
 
+/** The form values of «تعديل المعدة» (update_supplier_po_equipment, 0142):
+ *  the price (empty = «تحتاج تسعير») and the note together. */
+export interface SupplierPoLineEditFormValues {
+  price: string
+  note: string
+}
+
+export const SUPPLIER_PO_LINE_EDIT_FIELD_ORDER: readonly (keyof SupplierPoLineEditFormValues)[] =
+  ['price', 'note']
+
+/** The form values of «تعديل الامر» (update_supplier_po, 0142): the start
+ *  date and the notes; the party, company and project never change. */
+export interface SupplierPoEditFormValues {
+  start_date: string
+  notes: string
+}
+
+export const SUPPLIER_PO_EDIT_FIELD_ORDER: readonly (keyof SupplierPoEditFormValues)[] =
+  ['start_date', 'notes']
+
 /**
  * Tokens of create_supplier_po that name one field of the create form. The
  * stable token is raised as the message (`RAISE EXCEPTION '<token>'`), so
@@ -334,6 +358,40 @@ export const SUPPLIER_PO_PRICE_FIELD_RULES: readonly DatabaseFieldRule<SupplierP
     },
   ]
 
+/** Tokens of update_supplier_po_equipment (0142) that name a field. */
+export const SUPPLIER_PO_LINE_EDIT_FIELD_RULES: readonly DatabaseFieldRule<SupplierPoLineEditFormValues>[] =
+  [
+    {
+      on: 'raised',
+      match: 'invalid_price',
+      field: 'price',
+      key: 'supplierPoPriceInvalid',
+    },
+    {
+      on: 'raised',
+      match: 'invalid_note',
+      field: 'note',
+      key: 'supplierPoLineNoteTooLong',
+    },
+  ]
+
+/** Tokens of update_supplier_po (0142) that name a field. */
+export const SUPPLIER_PO_EDIT_FIELD_RULES: readonly DatabaseFieldRule<SupplierPoEditFormValues>[] =
+  [
+    {
+      on: 'raised',
+      match: 'invalid_start_date',
+      field: 'start_date',
+      key: 'supplierPoStartDateRequired',
+    },
+    {
+      on: 'raised',
+      match: 'invalid_notes',
+      field: 'notes',
+      key: 'supplierPoNotesTooLong',
+    },
+  ]
+
 /**
  * Tokens that belong to no single field: shown as the form-level (or
  * page-level) message. `po_closed` and `purchasing_manage_required` can come
@@ -345,11 +403,11 @@ export const SUPPLIER_PO_FORM_MESSAGES: Readonly<Record<string, TranslationKey>>
     equipment_already_on_open_po: 'supplierPoErrorAlreadyOnOpenPo', // add
     po_closed: 'supplierPoErrorClosed',
     purchasing_manage_required: 'supplierPoErrorManageRequired',
-    invalid_po: 'supplierPoNotFound', // add, close
-    invalid_line: 'supplierPoErrorInvalidLine', // update price
+    invalid_po: 'supplierPoNotFound', // add, close, update (0142)
+    invalid_line: 'supplierPoErrorInvalidLine', // update price / line (0142)
   }
 
-/** Every stable token of migrations 0136–0138 the client maps, for the tests. */
+/** Every stable token of migrations 0136–0142 the client maps, for the tests. */
 export const SUPPLIER_PO_ERROR_TOKENS: readonly string[] = [
   'purchasing_manage_required',
   'invalid_po',
@@ -365,6 +423,8 @@ export const SUPPLIER_PO_ERROR_TOKENS: readonly string[] = [
   'invalid_start_date',
   'invalid_price',
   'invalid_line',
+  'invalid_notes', // 0142 update_supplier_po
+  'invalid_note', // 0142 update_supplier_po_equipment
   'po_closed',
   'internal_price_must_be_zero',
   'card_overlap',

@@ -298,6 +298,8 @@ const MIGRATIONS = [
   '20261020110000_0139_supplier_po_is_internal_default.sql',
   // 0140: party_class computed column (no token).
   '20261020120000_0140_supplier_po_party_class.sql',
+  // 0142: update_supplier_po and update_supplier_po_equipment (two tokens).
+  '20261022100000_0142_supplier_po_update.sql',
 ]
 
 test('every stable token of migrations 0136 to 0138 is known and mapped', () => {
@@ -314,6 +316,8 @@ test('every stable token of migrations 0136 to 0138 is known and mapped', () => 
       ...purchasing.SUPPLIER_PO_CREATE_FIELD_RULES,
       ...purchasing.SUPPLIER_PO_LINE_FIELD_RULES,
       ...purchasing.SUPPLIER_PO_PRICE_FIELD_RULES,
+      ...purchasing.SUPPLIER_PO_LINE_EDIT_FIELD_RULES,
+      ...purchasing.SUPPLIER_PO_EDIT_FIELD_RULES,
     ].map((rule) => rule.match),
   )
   for (const token of raised)
@@ -452,8 +456,9 @@ test('status badge, event labels and the price format', () => {
     open: { key: 'supplierPoStatusOpen', tone: 'success' },
     closed: { key: 'supplierPoStatusClosed', tone: 'neutral' },
   })
-  // The five event types of the 0136 CHECK.
-  const sql = read('supabase', 'migrations', MIGRATIONS[0])
+  // The event types of the CHECK as 0142 re-created it (the 0136 five plus
+  // updated and line_updated).
+  const sql = read('supabase', 'migrations', MIGRATIONS[MIGRATIONS.length - 1])
   const check = /event_type IN \(([^)]+)\)/.exec(sql)
   const types = [...check[1].matchAll(/'(\w+)'/g)].map((m) => m[1]).sort()
   assert.deepEqual(
@@ -737,9 +742,16 @@ test('the real screens read through RLS and write only through the 0136 function
   const create = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
   assert.match(create, /createSupplierPo\(/)
   assert.match(create, /SUPPLIER_PO_CREATE_FIELD_RULES/)
-  const edit = read('src', 'components', 'purchasing', 'EditPriceDialog.tsx')
-  assert.match(edit, /updateSupplierPoEquipmentPrice\(/)
-  assert.match(edit, /SUPPLIER_PO_PRICE_FIELD_RULES/)
+  // 0142: «تعديل المعدة» saves the price and the note in one call...
+  const edit = read('src', 'components', 'purchasing', 'EditLineDialog.tsx')
+  assert.match(edit, /updateSupplierPoEquipment\(/)
+  assert.match(edit, /SUPPLIER_PO_LINE_EDIT_FIELD_RULES/)
+  assert.match(edit, /supplierPoLineEditFormSchema/)
+  // ...and «تعديل الامر» the start date and the notes.
+  const editPo = read('src', 'components', 'purchasing', 'EditSupplierPoDialog.tsx')
+  assert.match(editPo, /updateSupplierPo\(/)
+  assert.match(editPo, /SUPPLIER_PO_EDIT_FIELD_RULES/)
+  assert.match(editPo, /supplierPoEditFormSchema/)
   // The equipment page card renders nothing without purchasing.view.
   const card = read('src', 'components', 'purchasing', 'EquipmentPurchasingCard.tsx')
   assert.match(card, /const allowed = can\('purchasing\.view'\)/)

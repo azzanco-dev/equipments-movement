@@ -1,5 +1,5 @@
 import { useI18n } from '@/i18n/I18nContext'
-import { formatDateTime } from '@/lib/dateFormat'
+import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import {
   SUPPLIER_PO_EVENT_LABEL_KEYS,
   SUPPLIER_PO_EVENTS_LIMIT,
@@ -29,8 +29,12 @@ export function SupplierPoEventsTimeline({
   return (
     <ol className="relative ms-1.5 space-y-4 border-s ps-4">
       {latest.map((event) => {
-        const detail = supplierPoEventDetail(event, codeOf, (value) =>
-          formatSupplierPoPrice(value as number | string | null | undefined),
+        const detail = supplierPoEventDetail(
+          event,
+          codeOf,
+          (value) =>
+            formatSupplierPoPrice(value as number | string | null | undefined),
+          formatDate,
         )
         const actor = event.actor_id ? actorNames.get(event.actor_id) : null
         return (
