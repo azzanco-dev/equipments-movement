@@ -582,7 +582,9 @@ export function FilterBar({
         />
       )
 
-    if (field.options?.length) {
+    // A select with options, or with whole-filter choices only (the PO
+    // list's «تحتاج تسعير» yes / no, 2026-10-22), never a text box.
+    if (field.options?.length || field.choices?.length) {
       // wave-13-drivers: a whole-filter entry ("all except ...") is shown as
       // itself while its filter is active, never as the bare value.
       const choice = matchingFilterChoice(field, filter)
@@ -608,7 +610,7 @@ export function FilterBar({
               value: CHOICE_PREFIX + entry.key,
               label: fieldLabel(entry.label),
             })),
-            ...field.options.map((option) => ({
+            ...(field.options ?? []).map((option) => ({
               value: option.value,
               label: optionLabel(option),
             })),
