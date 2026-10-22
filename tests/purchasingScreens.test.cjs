@@ -685,11 +685,19 @@ test('the real screens read through RLS and write only through the 0136 function
   const add = read('src', 'components', 'purchasing', 'AddEquipmentDialog.tsx')
   assert.match(add, /addSupplierPoEquipment\(/)
   assert.match(add, /SUPPLIER_PO_LINE_FIELD_RULES/)
-  // 0137: only the units inside the PO's company and project are offered.
+  // 0137: only the units inside the PO's company and project are offered;
+  // owner 2026-10-22: never a unit already on the PO.
   assert.match(
     add,
-    /equipmentAtProjectOptionLoader\(party, po\.company_id, po\.project_id\)/,
+    /equipmentAtProjectOptionLoader\(party, po\.company_id, po\.project_id, \{\s*excludeEquipmentIds:/,
   )
+  const poPage = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
+  assert.match(poPage, /excludeEquipmentIds=\{lines\.flatMap\(/)
+  // Owner 2026-10-22: one PO has one party — no supplier on the line cards
+  // or in the sort, and one «اضافة معدة» button (the section's, primary).
+  assert.doesNotMatch(poPage, /lineSupplierName/)
+  assert.match(poPage, /type SortKey = 'equipment' \| 'period' \| 'price'/)
+  assert.equal((poPage.match(/setAddOpen\(true\)/g) ?? []).length, 2, 'section button + mobile bar')
   const dataLib = read('src', 'lib', 'purchasingData.ts')
   // 0138: the party's open site visits (its lessor, or its owner class)...
   const visitsFn = dataLib.slice(
@@ -708,6 +716,7 @@ test('the real screens read through RLS and write only through the 0136 function
   assert.match(loader, /partyOpenVisits\(party\)/)
   assert.match(loader, /\.eq\('company_id', companyId\)/)
   assert.match(loader, /\.eq\('project_id', projectId\)/)
+  assert.match(loader, /\.not\('equipment_id', 'in', /)
   // The create dialog: the party first, then only its places and units, the
   // start date from the earliest entry, everything saved in one call.
   const createDialog = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')

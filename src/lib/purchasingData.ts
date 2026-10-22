@@ -386,13 +386,18 @@ export function equipmentAtProjectOptionLoader(
   party: SupplierPoParty,
   companyId: string,
   projectId: string,
+  options: { excludeEquipmentIds?: readonly string[] } = {},
 ): (query: string) => Promise<AsyncSearchSelectOption[]> {
+  const excluded = options.excludeEquipmentIds ?? []
   return async (query) => {
     let request = partyOpenVisits(party)
       .eq('company_id', companyId)
       .eq('project_id', projectId)
       .order('equipment_code')
       .limit(20)
+    // Units already on the PO are not offered again (owner 2026-10-22).
+    if (excluded.length)
+      request = request.not('equipment_id', 'in', `(${excluded.join(',')})`)
     const searchFilter = buildSearchFilter(OPEN_VISIT_SEARCH_FIELDS, query)
     if (searchFilter) request = request.or(searchFilter)
     return unwrapRows<PartyOpenVisit>(await request).map((visit) => ({

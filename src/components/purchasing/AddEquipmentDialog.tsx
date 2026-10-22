@@ -47,11 +47,15 @@ export function AddEquipmentDialog({
   open,
   onOpenChange,
   po,
+  excludeEquipmentIds = [],
   onAdded,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   po: Pick<SupplierPoRow, 'id' | 'lessor_id' | 'owner_class' | 'company_id' | 'project_id'>
+  /** Units already on the PO (owner 2026-10-22): the search leaves them out
+   *  instead of offering them and failing on `equipment_already_on_open_po`. */
+  excludeEquipmentIds?: readonly string[]
   onAdded: () => void
 }) {
   const { t } = useI18n()
@@ -64,12 +68,17 @@ export function AddEquipmentDialog({
   const [saving, setSaving] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
   const party = useMemo(() => supplierPoParty(po), [po])
+  // The exclusion list is keyed by content so a parent re-render with the
+  // same lines does not rebuild the loader (and refetch).
+  const excludeKey = excludeEquipmentIds.join(',')
   const loadOptions = useMemo(
     () =>
       party
-        ? equipmentAtProjectOptionLoader(party, po.company_id, po.project_id)
+        ? equipmentAtProjectOptionLoader(party, po.company_id, po.project_id, {
+            excludeEquipmentIds: excludeKey ? excludeKey.split(',') : [],
+          })
         : async () => [],
-    [party, po.company_id, po.project_id],
+    [party, po.company_id, po.project_id, excludeKey],
   )
 
   useEffect(() => {

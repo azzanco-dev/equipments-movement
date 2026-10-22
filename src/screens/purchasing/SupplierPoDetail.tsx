@@ -58,7 +58,6 @@ import {
   SUPPLIER_PO_LINE_SELECT,
   SUPPLIER_PO_SELECT,
   closeSupplierPo,
-  lineSupplierName,
   supplierPoTotal,
   type SupplierPoEventRow,
   type SupplierPoLineRow,
@@ -72,7 +71,7 @@ export interface SupplierPoDetailProps {
   onOpenEquipment?: (equipmentId: string) => void
 }
 
-type SortKey = 'equipment' | 'supplier' | 'period' | 'price'
+type SortKey = 'equipment' | 'period' | 'price'
 type SortDirection = 'asc' | 'desc'
 
 /** The list the page returns to (the «اوامر الشراء» child of «المشتريات»). */
@@ -304,8 +303,6 @@ export function SupplierPoDetail({
 
   const sortValue = (line: SupplierPoLineRow): string | number => {
     switch (sort.key) {
-      case 'supplier':
-        return lineSupplierName(line.card?.equipment, po, t)
       case 'period':
         return line.card?.period_from ?? ''
       case 'price':
@@ -386,7 +383,6 @@ export function SupplierPoDetail({
 
   const sortOptions: { value: SortKey; label: string }[] = [
     { value: 'equipment', label: t('supplierPoEquipmentField') },
-    { value: 'supplier', label: t('supplierPoSupplier') },
     { value: 'period', label: t('equipmentPurchasingPeriod') },
     { value: 'price', label: t('supplierPoPrice') },
   ]
@@ -474,7 +470,6 @@ export function SupplierPoDetail({
           actions={
             showActions ? (
               <div className="hidden gap-2 sm:flex">
-                {addButton}
                 <Button
                   variant="danger"
                   size="sm"
@@ -560,16 +555,7 @@ export function SupplierPoDetail({
               action={
                 <div className="flex flex-wrap items-center gap-2">
                   {lines.length > 1 && sortControls}
-                  {showActions && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      icon={<Plus size={14} aria-hidden="true" />}
-                      onClick={() => setAddOpen(true)}
-                    >
-                      {t('supplierPoAddEquipment')}
-                    </Button>
-                  )}
+                  {showActions && addButton}
                 </div>
               }
             />
@@ -604,20 +590,12 @@ export function SupplierPoDetail({
                           <PurchasingUnitCell unit={unit} withType />
                         )}
                       </div>
+                      {/* Owner 2026-10-22: no supplier on the line — the PO has
+                          exactly one party, shown in the header. */}
                       <div className="min-w-0 flex-1 space-y-1 sm:basis-3/5">
-                        <p className="flex items-center gap-1.5 text-sm font-medium">
-                          <Building2
-                            size={14}
-                            aria-hidden="true"
-                            className="shrink-0 text-muted"
-                          />
-                          <span className="min-w-0 break-words">
-                            {lineSupplierName(unit, po, t)}
-                          </span>
-                        </p>
                         {line.card && (
-                          <p className="flex items-center gap-1.5 text-xs text-muted">
-                            <Calendar size={12} aria-hidden="true" className="shrink-0" />
+                          <p className="flex items-center gap-1.5 text-sm text-muted">
+                            <Calendar size={14} aria-hidden="true" className="shrink-0" />
                             <bdi dir="ltr">{periodLabel(line.card, t)}</bdi>
                           </p>
                         )}
@@ -725,6 +703,9 @@ export function SupplierPoDetail({
         open={addOpen}
         onOpenChange={setAddOpen}
         po={po}
+        excludeEquipmentIds={lines.flatMap((line) =>
+          line.card?.equipment?.id ? [line.card.equipment.id] : [],
+        )}
         onAdded={() => {
           setAddOpen(false)
           fetchData()
