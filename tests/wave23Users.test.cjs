@@ -410,7 +410,7 @@ test('the user page: ON uses the assignment select and plan; OFF keeps the legac
   // OFF: today's legacy select and the blocked-change check are intact.
   assert.match(
     page,
-    /value=\{role\}\s+onValueChange=\{\(value\) => \{\s+clearError\('role'\)\s+setRole\(value as UserRole\)\s+if \(value === 'admin'\) setCompanies\(\[\]\)\s+\}\}\s+options=\{roleOptions\}/,
+    /value=\{role\}\s+onValueChange=\{\(value\) => \{\s+clearError\('role'\)\s+setRole\(value as UserRole\)\s+if \(value !== 'supervisor'\) setCompanies\(\[\]\)\s+\}\}\s+options=\{roleOptions\}/,
   )
   assert.match(page, /legacyRoleChangeBlocked\(\{/)
   assert.match(page, /role: 'roleChangeUseAssignment',/)

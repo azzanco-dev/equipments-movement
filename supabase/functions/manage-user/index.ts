@@ -199,9 +199,7 @@ Deno.serve(async (req: Request) => {
         .eq('profile_id', userId)
       if (clearAssignmentsError)
         return json({ error: 'Could not update company assignments' }, 500)
-      // 0143 (company scope): any role but the administrator may be linked
-      // to companies; the database refuses a link to a holder of users.manage.
-      if (role !== 'admin' && companyIds.length > 0) {
+      if (role === 'supervisor' && companyIds.length > 0) {
         const { error: assignmentError } = await adminClient
           .from('profile_companies')
           .insert(
