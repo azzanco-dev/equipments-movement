@@ -56,9 +56,15 @@ export const SUPPLIER_PO_EVENTS_LIMIT = 20
  *  2026-10-21); invoices are issued elsewhere. */
 export const SUPPLIER_PO_VAT_RATE = 0.15
 
-/** An amount excluding VAT with the VAT added, rounded to halalas. */
+/** The VAT on an amount excluding VAT, rounded to halalas. */
+export function vatOf(amountExclVat: number): number {
+  return Math.round(amountExclVat * SUPPLIER_PO_VAT_RATE * 100) / 100
+}
+
+/** An amount excluding VAT with the VAT added (the two summary cards always
+ *  add up: total + vatOf(total)). */
 export function withVat(amountExclVat: number): number {
-  return Math.round(amountExclVat * (1 + SUPPLIER_PO_VAT_RATE) * 100) / 100
+  return Math.round((amountExclVat + vatOf(amountExclVat)) * 100) / 100
 }
 
 /**

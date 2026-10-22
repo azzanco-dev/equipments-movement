@@ -10,7 +10,9 @@ import {
   FileText,
   Lock,
   MapPin,
+  Percent,
   Plus,
+  Receipt,
   StickyNote,
   Truck,
   User,
@@ -51,6 +53,7 @@ import {
   SUPPLIER_PO_EVENTS_LIMIT,
   supplierPoFormMessage,
   supplierPoSupplierLabel,
+  vatOf,
   withVat,
 } from '@/lib/purchasing'
 import {
@@ -125,8 +128,8 @@ function PageSkeleton({ label }: { label: string }) {
           <Skeleton className="h-[26px] w-16 rounded-full" />
         </div>
         <Skeleton variant="text" className="w-56" />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {[0, 1, 2].map((index) => (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((index) => (
             <Skeleton key={index} className="h-[72px] w-full rounded-xl" />
           ))}
         </div>
@@ -508,18 +511,23 @@ export function SupplierPoDetail({
             />
           )}
         </dl>
-        {/* 2. Summary strip (owner 2026-10-21: no «since start» card; the
-            VAT-inclusive total sits under the total in smaller text). */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {/* 2. Summary strip (owner 2026-10-22): the total without VAT, the
+            VAT, the total with VAT, and the unit count. */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
             label={t('supplierPoSummaryTotal')}
             value={<Price value={total} />}
-            hint={
-              <>
-                {t('supplierPoWithVat')}: <Price value={withVat(total)} />
-              </>
-            }
             icon={<Coins size={18} />}
+          />
+          <StatCard
+            label={t('supplierPoSummaryVat')}
+            value={<Price value={vatOf(total)} />}
+            icon={<Percent size={18} />}
+          />
+          <StatCard
+            label={t('supplierPoSummaryTotalWithVat')}
+            value={<Price value={withVat(total)} />}
+            icon={<Receipt size={18} />}
           />
           <StatCard
             label={t('supplierPoEquipmentCount')}
