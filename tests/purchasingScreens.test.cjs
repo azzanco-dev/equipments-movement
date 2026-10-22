@@ -813,13 +813,20 @@ test('the PO page closes through a typed order number, from the options menu', (
   const page = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
   // No bare close button and no plain confirm any more.
   assert.doesNotMatch(page, /useConfirm|closeSupplierPo|variant="danger"/)
-  assert.equal((page.match(/<SupplierPoOptionsMenu/g) ?? []).length, 2, 'desktop header + mobile bar')
+  // One menu element, rendered in the header and in the mobile bar.
+  assert.equal((page.match(/<SupplierPoOptionsMenu/g) ?? []).length, 1)
+  assert.equal((page.match(/\{optionsMenu\(/g) ?? []).length, 2, 'desktop header + mobile bar')
   assert.match(page, /<EditSupplierPoDialog/)
   assert.match(page, /<CloseSupplierPoDialog/)
   const menu = read('src', 'components', 'purchasing', 'SupplierPoOptionsMenu.tsx')
   assert.match(menu, /DropdownMenuTrigger asChild/)
   assert.match(menu, /t\('supplierPoEdit'\)/)
   assert.match(menu, /tone="danger"[\s\S]*t\('supplierPoClose'\)/)
+  // Owner 2026-10-22: «تصدير PDF» is the first item, for every reader; the
+  // management items only with their handlers.
+  assert.ok(menu.indexOf("t('supplierPoPdf')") < menu.indexOf("t('supplierPoEdit')"))
+  assert.match(menu, /const manage = Boolean\(onEdit && onClose\)/)
+  assert.match(page, /onEdit=\{showActions \? \(\) => setEditOpen\(true\) : undefined\}/)
   const close = read('src', 'components', 'purchasing', 'CloseSupplierPoDialog.tsx')
   assert.match(close, /closeSupplierPo\(po\.id\)/)
   assert.match(close, /disabled=\{!matches\}/)
@@ -838,7 +845,8 @@ test('the PO PDF prints a hidden sheet from the PO page itself', () => {
   const detail = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
   // No tab, no route: the button mounts the sheet, the sheet prints.
   assert.doesNotMatch(detail, /window\.open|print\/po|sessionStorage/)
-  assert.match(detail, /onClick=\{\(\) => setPrinting\(true\)\}/)
+  assert.match(detail, /onExport=\{\(\) => setPrinting\(true\)\}/)
+  assert.doesNotMatch(detail, /pdfButton|FileDown/)
   assert.match(detail, /\{printing && \(\s*<SupplierPoPrintSheet/)
   assert.match(detail, /onDone=\{\(\) => setPrinting\(false\)\}/)
   const sheet = read('src', 'components', 'purchasing', 'SupplierPoPrintSheet.tsx')

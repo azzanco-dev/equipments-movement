@@ -7,7 +7,6 @@ import {
   Clock,
   Coins,
   Edit2,
-  FileDown,
   FileText,
   Lock,
   MapPin,
@@ -366,16 +365,16 @@ export function SupplierPoDetail({
     },
   ]
 
-  const pdfButton = (
-    <Button
-      variant="outline"
-      size="sm"
-      icon={<FileDown size={14} aria-hidden="true" />}
-      loading={printing}
-      onClick={() => setPrinting(true)}
-    >
-      {t('supplierPoPdf')}
-    </Button>
+  // «خيارات» (owner 2026-10-22): «تصدير PDF» for every reader, plus edit
+  // and close for a manager while the PO is open.
+  const optionsMenu = (className?: string) => (
+    <SupplierPoOptionsMenu
+      className={className}
+      busy={printing}
+      onExport={() => setPrinting(true)}
+      onEdit={showActions ? () => setEditOpen(true) : undefined}
+      onClose={showActions ? () => setCloseOpen(true) : undefined}
+    />
   )
 
   const sortOptions: { value: SortKey; label: string }[] = [
@@ -460,18 +459,10 @@ export function SupplierPoDetail({
             </>
           }
           actions={
-            /* Owner 2026-10-22: «تصدير PDF» for every reader; one «خيارات»
-               menu (edit, close) instead of a bare close button. */
-            <div className="flex gap-2">
-              {pdfButton}
-              {showActions && (
-                <div className="hidden sm:flex">
-                  <SupplierPoOptionsMenu
-                    onEdit={() => setEditOpen(true)}
-                    onClose={() => setCloseOpen(true)}
-                  />
-                </div>
-              )}
+            /* A manager has the same menu in the mobile bar; a reader keeps
+               it in the header on every size. */
+            <div className={showActions ? 'hidden sm:flex' : 'flex'}>
+              {optionsMenu()}
             </div>
           }
         />
@@ -686,11 +677,7 @@ export function SupplierPoDetail({
           >
             {t('supplierPoAddEquipment')}
           </Button>
-          <SupplierPoOptionsMenu
-            className="h-11"
-            onEdit={() => setEditOpen(true)}
-            onClose={() => setCloseOpen(true)}
-          />
+          {optionsMenu('h-11')}
         </div>
       )}
 
