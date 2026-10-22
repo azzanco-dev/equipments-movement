@@ -1946,7 +1946,7 @@ export const translations = {
     supplierPoOwnerExternal: 'مورد خارجي',
     supplierPoOwnerPlaceholder: 'اختر المالك',
     supplierPoSupplierRequired: 'اختر المورد.',
-    supplierPoNeedsPrices: 'تحتاج اسعار',
+    supplierPoNeedsPrices: 'تحتاج تسعير',
     supplierPoWithVat: 'شامل الضريبة',
     supplierPoNoPrice: 'بلا سعر',
     supplierPoUnpricedTotalNote: 'بلا سعر',
