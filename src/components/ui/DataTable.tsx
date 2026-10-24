@@ -74,6 +74,9 @@ export interface DataTableProps<Row> {
    * CSS, so set next to it, it would lose.
    */
   cellTextClassName?: string
+  /** Extra classes for every body cell, e.g. vertical padding (the supplier
+   *  PO list, owner 2026-10-24). The size's row height stays the minimum. */
+  cellClassName?: string
 }
 
 const sizes: Record<
@@ -311,6 +314,7 @@ export function DataTable<Row>({
   className,
   rowClassName,
   cellTextClassName,
+  cellClassName,
 }: DataTableProps<Row>) {
   const { t } = useI18n()
   const dragScroll = useDragScroll()
@@ -525,6 +529,7 @@ export function DataTable<Row>({
                       'whitespace-nowrap tabular-nums',
                       density.row,
                       bodyCell,
+                      cellClassName,
                       alignText[column.align ?? 'start'],
                       column.hideBelow && hideBelowClass[column.hideBelow],
                       column.className,

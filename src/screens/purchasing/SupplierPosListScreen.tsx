@@ -228,6 +228,8 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
           onRowClick={(row) => onSelectPo(row.id)}
           // Owner 2026-10-24: 13 px rows on this list (headers stay 12 px).
           cellTextClassName="text-[13px]"
+          // Owner 2026-10-24: more air above and below each row's content.
+          cellClassName="py-2"
         />
       )}
       {!loadError && total > 0 && (
