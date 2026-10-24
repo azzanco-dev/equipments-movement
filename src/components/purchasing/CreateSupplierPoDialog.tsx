@@ -66,6 +66,24 @@ const EMPTY_FORM: SupplierPoFormValues = {
 
 type Picked = Record<string, { price: string; note: string }>
 
+/**
+ * «المعدات في المشاريع» (2026-10-24): a new PO for one unit with no PO and
+ * no open PO of its party there. The dialog opens on the unit's party,
+ * company and project with the unit ticked and the start date at its entry;
+ * the user can still change everything.
+ */
+export interface CreateSupplierPoPreset {
+  /** One of the fixed owners, or null for a lessor party. */
+  ownerClass: SupplierPoOwnerClass | null
+  /** The lessor party (id + name for the select), or null for an owner. */
+  lessor: AsyncSearchSelectOption | null
+  companyId: string
+  projectId: string
+  equipmentId: string
+  /** yyyy-mm-dd (Saudi day) of the unit's open entry. */
+  startDate: string
+}
+
 /** The owner select: one of the four fixed owners, or «مورد خارجي». */
 const EXTERNAL = 'external_supplier'
 type OwnerChoice = '' | SupplierPoOwnerClass | typeof EXTERNAL
@@ -83,10 +101,12 @@ export function CreateSupplierPoDialog({
   open,
   onOpenChange,
   onCreated,
+  preset = null,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: (poId: string) => void
+  preset?: CreateSupplierPoPreset | null
 }) {
   const { t, lang } = useI18n()
   const { loadLessors } = useMovementFormOptions()
@@ -147,17 +167,30 @@ export function CreateSupplierPoDialog({
 
   useEffect(() => {
     if (!open) return
-    setForm({ ...EMPTY_FORM, start_date: saudiDateKey() })
-    setOwner('')
-    setSupplier(null)
+    setForm(
+      preset
+        ? {
+            ...EMPTY_FORM,
+            lessor_id: preset.lessor?.value ?? '',
+            owner_class: preset.ownerClass ?? '',
+            company_id: preset.companyId,
+            project_id: preset.projectId,
+            start_date: preset.startDate,
+          }
+        : { ...EMPTY_FORM, start_date: saudiDateKey() },
+    )
+    setOwner(preset ? (preset.ownerClass ?? EXTERNAL) : '')
+    setSupplier(preset?.lessor ?? null)
     setVisits([])
     setVisitsState('idle')
-    setPicked({})
+    setPicked(preset ? { [preset.equipmentId]: { price: '', note: '' } } : {})
     setErrors({})
     setLineErrors({})
     setMessage(null)
     setSaving(false)
     setDateTouched(false)
+    // The preset is read only when the dialog opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   // The party's open visits drive the company, project and unit choices.

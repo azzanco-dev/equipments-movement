@@ -492,7 +492,8 @@ test('supplierPosListConfig: PO number search, allowlisted filters, standard siz
   const source = read('src', 'lib', 'listConfigs.ts')
   const start = source.indexOf('export const supplierPosListConfig')
   assert.ok(start > 0)
-  const config = source.slice(start)
+  const next = source.indexOf('export const', start + 1)
+  const config = source.slice(start, next > 0 ? next : undefined)
   assert.match(config, /id: 'supplierPos'/)
   assert.match(config, /searchFields: \['po_number'\]/)
   const filterKeys = [...config.matchAll(/^\s{6}key: '(\w+)',$/gm)].map(
@@ -620,7 +621,7 @@ test('the purchasing section, routes and page gates are keyed on purchasing.view
   // in the sidebar since 2026-10-20 («اظهر التبويب»).
   assert.match(
     nav.replace(/\s+/g, ' '),
-    /\{ key: 'purchasing', requires: \[\{ key: 'purchasing\.view' \}\], children: \[ \{ key: 'purchasing\/orders', requires: \[\{ key: 'purchasing\.view' \}\] \}, \], \}/,
+    /\{ key: 'purchasing', requires: \[\{ key: 'purchasing\.view' \}\], children: \[ \{ key: 'purchasing\/orders', requires: \[\{ key: 'purchasing\.view' \}\] \}, \/\/[^\n]*?\{ key: 'purchasing\/units', requires: \[\{ key: 'purchasing\.view' \}\] \}, \], \}/,
   )
   // The pages open for purchasing.view, the menu lists the parent with its
   // section, and a purchasing-only user lands on the PO list.
@@ -632,24 +633,27 @@ test('the purchasing section, routes and page gates are keyed on purchasing.view
   assert.ok(navLib.canOpenPage(state.permissions, 'purchasing/orders'))
   assert.ok(navLib.canOpenPage(state.permissions, 'purchasing/:id'))
   assert.deepEqual(plain(navLib.visibleNavItems(state, 'x')), [
-    { key: 'purchasing', children: ['purchasing/orders'] },
+    { key: 'purchasing', children: ['purchasing/orders', 'purchasing/units'] },
   ])
   const plan = navLib.planShell(state, 'x')
   assert.equal(plan.kind, 'admin')
   assert.equal(plan.landing, 'purchasing/orders')
   assert.equal(navLib.routePageOf(['purchasing']), 'purchasing/orders')
   assert.equal(navLib.routePageOf(['purchasing', 'orders']), 'purchasing/orders')
+  // 2026-10-24: «المعدات في المشاريع».
+  assert.equal(navLib.routePageOf(['purchasing', 'units']), 'purchasing/units')
+  assert.ok(navLib.canOpenPage(state.permissions, 'purchasing/units'))
   assert.equal(navLib.routePageOf(['purchasing', 'abc']), 'purchasing/:id')
   assert.match(nav, /'purchasing\/:id': \[\{ key: 'purchasing\.view' \}\]/)
   assert.match(
     nav.replace(/\s+/g, ' '),
-    /if \(!second \|\| second === 'orders'\) return 'purchasing\/orders' return 'purchasing\/:id'/,
+    /if \(!second \|\| second === 'orders'\) return 'purchasing\/orders' if \(second === 'units'\) return 'purchasing\/units' return 'purchasing\/:id'/,
   )
   const shellPages = nav.slice(
     nav.indexOf('const ADMIN_SHELL_PAGES'),
     nav.indexOf('const FIELD_SHELL_PAGES'),
   )
-  assert.match(shellPages, /'purchasing',\s+'purchasing\/orders',\s+'purchasing\/:id',/)
+  assert.match(shellPages, /'purchasing',\s+'purchasing\/orders',\s+'purchasing\/units',\s+'purchasing\/:id',/)
   // Only the admin shell: the field homes never list it.
   const fieldPages = nav.slice(
     nav.indexOf('const FIELD_SHELL_PAGES'),

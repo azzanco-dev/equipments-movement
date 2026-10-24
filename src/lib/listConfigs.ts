@@ -744,3 +744,105 @@ export const supplierPosListConfig: DataListConfig = {
     { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
   ],
 }
+
+/**
+ * «المعدات في المشاريع» (owner 2026-10-24, migration 0147): every unit
+ * inside a project now, over `purchasing_site_units`. Server-side search,
+ * filters and sort like every list; units without a PO first by default.
+ */
+export const siteUnitsListConfig: DataListConfig = {
+  id: 'siteUnits',
+  searchPlaceholder: {
+    ar: 'البحث برقم المعدة او النوع او اللوحة او الشاصي او ترقيم الشركة او المورد او الفورمان',
+    en: 'Search by unit, type, plate, chassis, company number, supplier or foreman',
+  },
+  searchFields: [
+    'equipment_code',
+    'equipment_type_search',
+    'equipment_plate_number',
+    'equipment_chassis_number',
+    'contractor_equipment_code',
+    'equipment_lessor_name',
+    'entry_supervisor_name',
+  ],
+  defaultSort: 'has_po',
+  defaultDirection: 'asc',
+  filterFields: [
+    {
+      key: 'has_po',
+      label: 'siteUnitsPoFilter',
+      type: 'select',
+      operators: ['eq'],
+      options: [
+        { value: 'false', label: 'بلا PO', labelI18n: 'siteUnitsNoPo' },
+        { value: 'true', label: 'عليها PO', labelI18n: 'siteUnitsHasPo' },
+      ],
+    },
+    {
+      key: 'equipment_ownership_status',
+      label: 'ownershipStatus',
+      type: 'select',
+      operators: ['in'],
+      multiple: true,
+      options: [
+        {
+          value: 'alazani',
+          label: 'العزاني',
+          labelI18n: 'adminHomeOwnerAlazani',
+        },
+        {
+          value: 'takween',
+          label: 'تكوين',
+          labelI18n: 'adminHomeOwnerTakween',
+        },
+        {
+          value: 'third_party_f',
+          label: 'طرف ثالث F',
+          labelI18n: 'adminHomeOwnerThirdPartyF',
+        },
+        {
+          value: 'third_party_partnership_b',
+          label: 'طرف ثالث B',
+          labelI18n: 'adminHomeOwnerThirdPartyB',
+        },
+        {
+          value: 'external_supplier',
+          label: 'مالك اخر',
+          labelI18n: 'adminHomeOwnerExternal',
+        },
+      ],
+    },
+    // The supplier, only while the owner filter selects «مالك اخر».
+    SUPPLIER_FILTER_FIELD,
+    {
+      key: 'company_id',
+      label: 'company',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'project_id',
+      label: 'project',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'entry_supervisor_id',
+      label: 'logsColForeman',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+  ],
+  sortableFields: [
+    { key: 'has_po', label: 'siteUnitsSortNoPoFirst' },
+    { key: 'entry_at', label: 'siteUnitsSortEntry' },
+    { key: 'equipment_code', label: 'equipmentCode' },
+    { key: 'equipment_lessor_name', label: 'supplierPoSupplier' },
+  ],
+}

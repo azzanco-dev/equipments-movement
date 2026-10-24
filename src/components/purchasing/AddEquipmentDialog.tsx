@@ -48,6 +48,7 @@ export function AddEquipmentDialog({
   onOpenChange,
   po,
   excludeEquipmentIds = [],
+  initialUnit = null,
   onAdded,
 }: {
   open: boolean
@@ -56,6 +57,9 @@ export function AddEquipmentDialog({
   /** Units already on the PO (owner 2026-10-22): the search leaves them out
    *  instead of offering them and failing on `equipment_already_on_open_po`. */
   excludeEquipmentIds?: readonly string[]
+  /** «المعدات في المشاريع» (2026-10-24): the unit the dialog opens with,
+   *  already chosen; the user adds the optional price and note. */
+  initialUnit?: AsyncSearchSelectOption | null
   onAdded: () => void
 }) {
   const { t } = useI18n()
@@ -83,11 +87,13 @@ export function AddEquipmentDialog({
 
   useEffect(() => {
     if (!open) return
-    setForm(EMPTY_FORM)
-    setOption(null)
+    setForm({ ...EMPTY_FORM, equipment_id: initialUnit?.value ?? '' })
+    setOption(initialUnit)
     setErrors({})
     setMessage(null)
     setSaving(false)
+    // Read only when the dialog opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const update = (patch: Partial<SupplierPoLineFormValues>) => {

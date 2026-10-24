@@ -53,6 +53,7 @@ export type NavChildKey =
   | 'reports/equipment'
   | 'reports/workshop'
   | 'purchasing/orders'
+  | 'purchasing/units'
 
 /** One permission key, optionally limited to some of its scopes. */
 export interface NavGate {
@@ -102,6 +103,8 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     requires: [{ key: 'purchasing.view' }],
     children: [
       { key: 'purchasing/orders', requires: [{ key: 'purchasing.view' }] },
+      // «المعدات في المشاريع» (owner 2026-10-24, migration 0147).
+      { key: 'purchasing/units', requires: [{ key: 'purchasing.view' }] },
     ],
   },
   { key: 'drivers', requires: [{ key: 'drivers.read' }] },
@@ -159,7 +162,7 @@ const ADMIN_MENU: readonly VisibleNavItem[] = [
   { key: 'lessors' },
   // 2026-10-20: the admin holds purchasing.view in both mappings (0136), so
   // the fallback menu lists the section too.
-  { key: 'purchasing', children: ['purchasing/orders'] },
+  { key: 'purchasing', children: ['purchasing/orders', 'purchasing/units'] },
   { key: 'drivers' },
   { key: 'users' },
   // 2026-10-22: «سجل النشاط» and the movement import left the menu (owner).
@@ -384,6 +387,7 @@ export function routePageOf(segments: readonly string[]): RoutePage {
     // /purchasing opens its first section, like /reports; any other second
     // segment is a PO id.
     if (!second || second === 'orders') return 'purchasing/orders'
+    if (second === 'units') return 'purchasing/units'
     return 'purchasing/:id'
   }
   if (first === 'reports') {
@@ -474,6 +478,7 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'users/:id',
   'purchasing',
   'purchasing/orders',
+  'purchasing/units',
   'purchasing/:id',
 ]
 const FIELD_SHELL_PAGES: readonly RoutePage[] = [

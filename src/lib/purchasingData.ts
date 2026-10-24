@@ -123,6 +123,42 @@ export interface SupplierPoEventRow {
 }
 
 /** One line of the equipment page's purchasing card: the line with its PO. */
+/**
+ * One unit inside a project now (migration 0147, `purchasing_site_units`):
+ * its open site visit, the open PO it sits on for that company and project,
+ * else the open PO of its party there that it can join.
+ */
+export interface SiteUnitRow {
+  entry_id: string
+  equipment_id: string
+  equipment_code: string | null
+  equipment_type: string | null
+  equipment_plate_number: string | null
+  equipment_chassis_number: string | null
+  equipment_ownership_status: OwnershipStatus | null
+  equipment_lessor_id: string | null
+  equipment_lessor_name: string | null
+  company_id: string | null
+  company_name_ar: string | null
+  company_name_en: string | null
+  project_id: string | null
+  project_name_ar: string | null
+  project_name_en: string | null
+  entry_supervisor_id: string | null
+  entry_supervisor_name: string | null
+  entry_at: string
+  contractor_equipment_code: string | null
+  supplier_po_id: string | null
+  po_number: string | null
+  has_po: boolean
+  party_po_id: string | null
+  party_po_number: string | null
+}
+
+/** Only what the «المعدات في المشاريع» tiles show and the add needs. */
+export const SITE_UNITS_SELECT =
+  'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,entry_at,contractor_equipment_code,supplier_po_id,po_number,has_po,party_po_id,party_po_number'
+
 export interface EquipmentPurchasingRow extends SupplierPoLineRow {
   po: SupplierPoRow | null
 }

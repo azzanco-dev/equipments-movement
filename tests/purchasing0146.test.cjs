@@ -84,7 +84,7 @@ test('the PO list selects, shows and sorts by updated_at', () => {
   // The same sort label as the other lists, last.
   assert.match(
     config,
-    /\{ key: 'updated_at', label: \{ ar: 'تاريخ التعديل', en: 'Last updated' \} \},\n  \],\n\}\s*$/,
+    /\{ key: 'updated_at', label: \{ ar: 'تاريخ التعديل', en: 'Last updated' \} \},\n  \],\n\}\n\n\/\*\*\n \* «المعدات في المشاريع»/,
   )
   // The same column as the other lists (t('updatedAt'), RelativeTime), the
   // last data column; only the «تفاصيل» button column follows it (2026-10-24).

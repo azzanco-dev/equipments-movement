@@ -181,6 +181,14 @@ const SupplierPosListScreen = dynamic(
     ),
   { loading: listLoading },
 )
+// «المعدات في المشاريع» (owner 2026-10-24, migration 0147).
+const SiteUnitsScreen = dynamic(
+  () =>
+    import('@/screens/purchasing/SiteUnitsScreen').then(
+      (module) => module.SiteUnitsScreen,
+    ),
+  { loading: listLoading },
+)
 const SupplierPoDetail = dynamic(
   () =>
     import('@/screens/purchasing/SupplierPoDetail').then(
@@ -296,6 +304,7 @@ const NAV_CHILD_LABELS: Record<NavChildKey, TranslationKey> = {
   'reports/equipment': 'equipmentReports',
   'reports/workshop': 'workshopReports',
   'purchasing/orders': 'supplierPos',
+  'purchasing/units': 'siteUnits',
 }
 
 /**
@@ -582,6 +591,11 @@ function AppContent() {
             {page === 'lessors' && <AdminLessors />}
             {page === 'purchasing/orders' && (
               <SupplierPosListScreen
+                onSelectPo={(id) => router.push(`/purchasing/${id}`)}
+              />
+            )}
+            {page === 'purchasing/units' && (
+              <SiteUnitsScreen
                 onSelectPo={(id) => router.push(`/purchasing/${id}`)}
               />
             )}

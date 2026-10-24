@@ -108,7 +108,8 @@ const CAPTURED = {
     // Purchasing (migration 0136; listed since 2026-10-20): the admin holds
     // purchasing.view in the frozen legacy mapping too, so «المشتريات» is in
     // the admin menu; no other legacy role has it.
-    { key: 'purchasing', children: ['purchasing/orders'] },
+    // 2026-10-24: «المعدات في المشاريع» joins the purchasing section.
+    { key: 'purchasing', children: ['purchasing/orders', 'purchasing/units'] },
     { key: 'drivers' },
     { key: 'users' },
     // 2026-10-22 (owner): «سجل النشاط» and the movement import left the
