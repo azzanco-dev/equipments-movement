@@ -307,38 +307,10 @@ export function SupplierPoDetail({
     return sort.direction === 'asc' ? cmp : -cmp
   })
 
+  // avoid-ai-design audit (owner 2026-10-24): only what the header does not
+  // already show — the supplier, company / project, start date, creator and
+  // closing time live in the header card.
   const facts: DescriptionListItem[] = [
-    {
-      key: 'supplier',
-      icon: <Building2 size={16} />,
-      label: t('supplierPoSupplier'),
-      value: supplier,
-    },
-    {
-      key: 'company',
-      icon: <Building2 size={16} />,
-      label: t('company'),
-      value: companyName,
-    },
-    {
-      key: 'project',
-      icon: <MapPin size={16} />,
-      label: t('project'),
-      value: projectName,
-    },
-    {
-      key: 'start',
-      icon: <Calendar size={16} />,
-      label: t('supplierPoStartDate'),
-      value: formatDate(po.start_date),
-      dir: 'ltr',
-    },
-    {
-      key: 'createdBy',
-      icon: <User size={16} />,
-      label: t('supplierPoCreatedBy'),
-      value: createdByName,
-    },
     {
       key: 'createdAt',
       icon: <Clock size={16} />,
@@ -346,17 +318,6 @@ export function SupplierPoDetail({
       value: formatDateTime(po.created_at),
       dir: 'ltr',
     },
-    ...(po.closed_at
-      ? [
-          {
-            key: 'closedAt',
-            icon: <Lock size={16} />,
-            label: t('supplierPoClosedAt'),
-            value: formatDateTime(po.closed_at),
-            dir: 'ltr' as const,
-          },
-        ]
-      : []),
     {
       key: 'notes',
       icon: <StickyNote size={16} />,
@@ -534,12 +495,7 @@ export function SupplierPoDetail({
         <Card padded={false} className="flex min-w-0 flex-col xl:col-span-2">
           <div className="p-4 pb-0">
             <SectionHeader
-              title={
-                <span className="flex items-center gap-2">
-                  {t('supplierPoEquipment')}
-                  <Badge size="sm">{lines.length}</Badge>
-                </span>
-              }
+              title={t('supplierPoEquipment')}
               description={t('supplierPoEquipmentDesc')}
               action={
                 <div className="flex flex-wrap items-center gap-2">
