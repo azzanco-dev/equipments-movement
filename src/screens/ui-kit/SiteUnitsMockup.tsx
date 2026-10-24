@@ -1067,15 +1067,25 @@ function TilesDesign() {
               style={tileColors(unit)}
             >
               {/* The code with the plate, or the chassis when there is no
-                  plate, beside it (owner 2026-10-24). */}
-              <div className="flex flex-wrap items-baseline gap-x-2 leading-6">
-                <bdi dir="ltr" className="text-base font-semibold">
-                  {unit.code}
-                </bdi>
-                {(unit.plate || unit.chassis) && (
-                  <bdi dir="ltr" className="text-xs text-muted">
-                    {unit.plate || unit.chassis}
+                  plate, beside it; the company's number for the unit, when
+                  set, right under it with no label (owner 2026-10-24). */}
+              <div>
+                <div className="flex flex-wrap items-baseline gap-x-2 leading-6">
+                  <bdi dir="ltr" className="text-base font-semibold">
+                    {unit.code}
                   </bdi>
+                  {(unit.plate || unit.chassis) && (
+                    <bdi dir="ltr" className="text-xs text-muted">
+                      {unit.plate || unit.chassis}
+                    </bdi>
+                  )}
+                </div>
+                {/* A paragraph in the page's direction, so the number sits
+                    under the code; only the number itself is LTR. */}
+                {unit.contractorCode && (
+                  <p className="text-xs font-medium leading-5">
+                    <bdi dir="ltr">{unit.contractorCode}</bdi>
+                  </p>
                 )}
               </div>
               {/* leading-5: the 16 px line of text-xs cut Arabic marks in a
@@ -1094,7 +1104,6 @@ function TilesDesign() {
                   الفورمان{' '}
                   <span className="font-medium text-fg">{foremanOf(unit)}</span>
                 </p>
-                <CompanyNumber unit={unit} />
               </div>
               <div className="mt-auto">
                 <PoCell unit={unit} compact />
