@@ -342,7 +342,7 @@ export function DataTable<Row>({
   const [expandedKey, setExpandedKey] = useState<string | number | null>(null)
   // The plus / minus column sits before the data columns.
   const spanAll = columns.length + (expandable ? 1 : 0)
-  const chevronCell = 'w-8 pe-0 ps-3 text-muted'
+  const chevronCell = 'w-8 pe-0 ps-3 text-fg'
   const density = sizes[size]
   const bodyCell = cellTextClassName
     ? cn(
@@ -572,9 +572,17 @@ export function DataTable<Row>({
                       >
                         {/* Owner 2026-10-24: + closed, − open. */}
                         {open ? (
-                          <Minus size={16} aria-hidden="true" />
+                          <Minus
+                            size={16}
+                            strokeWidth={1.25}
+                            aria-hidden="true"
+                          />
                         ) : (
-                          <Plus size={16} aria-hidden="true" />
+                          <Plus
+                            size={16}
+                            strokeWidth={1.25}
+                            aria-hidden="true"
+                          />
                         )}
                       </td>
                     )}
