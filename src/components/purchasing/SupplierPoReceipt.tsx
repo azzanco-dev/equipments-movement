@@ -19,11 +19,11 @@ function ReceiptLine({
     <div className={`flex items-baseline gap-2 ${className ?? ''}`}>
       <dt className="shrink-0">
         {label}
-        {hint && <span className="ms-1 text-xs font-normal text-muted">{hint}</span>}
+        {hint && <span className="ms-1 font-normal text-muted">({hint})</span>}
       </dt>
       <span
         aria-hidden="true"
-        className="min-w-4 flex-1 -translate-y-1 border-b border-dotted border-border"
+        className="min-w-4 flex-1 -translate-y-0.5 border-b border-dotted border-border"
       />
       <dd className="m-0 shrink-0">{value}</dd>
     </div>
@@ -50,10 +50,10 @@ export function SupplierPoReceipt({
   return (
     <section
       aria-label={t('supplierPoReceipt')}
-      className="w-full rounded-xl border bg-surface p-4 sm:w-80"
+      className="w-full rounded-xl border bg-surface p-3 sm:w-72"
     >
-      <h3 className="mb-2 text-xs text-muted">{t('supplierPoReceipt')}</h3>
-      <dl className="m-0 space-y-1.5 text-sm text-muted">
+      <h3 className="mb-1.5 text-[11px] text-muted">{t('supplierPoReceipt')}</h3>
+      <dl className="m-0 space-y-1 text-xs text-muted">
         <ReceiptLine
           label={`${t('supplierPoReceiptLines')} (${count})`}
           hint={unpriced > 0 ? `${unpriced} ${t('supplierPoUnpricedTotalNote')}` : undefined}
@@ -64,9 +64,9 @@ export function SupplierPoReceipt({
           value={<Price value={vatOf(total)} className="text-fg" />}
         />
         <ReceiptLine
-          className="mt-2 border-t-2 border-fg pt-2 font-semibold text-fg"
+          className="mt-1.5 border-t-2 border-fg pt-1.5 text-sm font-semibold text-fg"
           label={t('supplierPoSummaryTotalWithVat')}
-          value={<Price value={withVat(total)} className="text-lg" />}
+          value={<Price value={withVat(total)} className="text-base" />}
         />
       </dl>
     </section>
