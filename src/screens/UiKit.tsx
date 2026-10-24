@@ -30,6 +30,7 @@ import {
   FieldsShowcase,
 } from '@/screens/ui-kit/ComponentShowcase'
 import { OverlayShowcase } from '@/screens/ui-kit/OverlayShowcase'
+import { BadgeStylesShowcase } from '@/screens/ui-kit/BadgeStylesShowcase'
 import { SelectPlaceholderShowcase } from '@/screens/ui-kit/SelectPlaceholderShowcase'
 import { DateAndFloatingShowcase } from '@/screens/ui-kit/DateAndFloatingShowcase'
 import { FeedbackAndFormShowcase } from '@/screens/ui-kit/FeedbackAndFormShowcase'
@@ -165,6 +166,15 @@ const COMPONENT_SECTIONS: SectionDef[] = [
       'Badge بالالوان الوظيفية المعتمدة، و MovementBadge للدخول والخروج.',
     status: 'approved',
     element: <BadgesShowcase />,
+  },
+  {
+    // Owner request 2026-10-24: five candidate looks for the shared Badge.
+    id: 'badge-styles',
+    title: 'نماذج شكل الشارة',
+    purpose: 'خمسة اشكال مقترحة للشارة جنب الشكل الحالي، لاختيار واحد يطبق على كل الموقع.',
+    status: 'review',
+    defaultOpen: true,
+    element: <BadgeStylesShowcase />,
   },
   {
     id: 'overlays',
