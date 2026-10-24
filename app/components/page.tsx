@@ -34,6 +34,8 @@ function useVisualViewportPanelFit() {
   useEffect(() => {
     let frame = 0
     let settle: number[] = []
+    /** اخر ارتفاع مرئي عولج عنده الحقل، لنعيد الضبط مرة واحدة عند فتح الكيبورد. */
+    const alignedAt = new WeakMap<HTMLElement, number>()
 
     const naturalHeight = (panel: HTMLElement) => {
       const previous = panel.style.maxHeight
@@ -80,6 +82,14 @@ function useVisualViewportPanelFit() {
       return best
     }
 
+    /** الحقل الى اعلى المساحة المرئية، لتبقى القائمة تحته ممتدة الى الكيبورد. */
+    const alignToTop = (trigger: HTMLElement) => {
+      const viewTop = window.visualViewport?.offsetTop ?? 0
+      const rect = trigger.getBoundingClientRect()
+      const delta = rect.top - (viewTop + 8)
+      if (Math.abs(delta) > 2) window.scrollBy({ top: delta })
+    }
+
     const fit = () => {
       frame = 0
       if (!window.matchMedia(MOBILE_QUERY).matches) return
@@ -89,47 +99,62 @@ function useVisualViewportPanelFit() {
       const viewBottom = viewTop + viewHeight
       const gap = 8
       const edge = 4
-      const minSpace = 176
-      const maxPanel = 320
+      /** اقل مساحة مقبولة تحت الحقل قبل ان ننقل القائمة الى فوقه. */
+      const minBelow = 168
+      const maxPanel = 480
 
       /** يحسب الارتفاع والموضع الراسي داخل المساحة المرئية. */
       const place = (panel: HTMLElement) => {
         const trigger = triggerFor(panel)
-        const rect = trigger?.getBoundingClientRect()
-        const content = naturalHeight(panel)
-        let height: number
-        let top: number
-        if (rect) {
-          const below = viewBottom - (rect.bottom + edge) - gap
-          const above = rect.top - edge - viewTop - gap
-          const openBelow = below >= minSpace || below >= above
-          const space = Math.max(0, openBelow ? below : above)
-          height = Math.min(content, maxPanel, Math.max(minSpace, space))
-          top = openBelow ? rect.bottom + edge : rect.top - edge - height
-        } else {
+
+        if (!trigger) {
           const current = panel.getBoundingClientRect().top
-          height = Math.min(
+          const content = naturalHeight(panel)
+          const height = Math.min(
             content,
             maxPanel,
-            Math.max(minSpace, viewBottom - current - gap),
+            Math.max(160, viewBottom - current - gap),
           )
-          top = Math.min(
+          const top = Math.min(
             Math.max(viewTop + gap, current),
             viewBottom - gap - height,
           )
+          panel.style.maxHeight = `${height}px`
+          panel.style.overflowY = 'auto'
+          return top
         }
+
+        // ١) الحقل الى الاعلى. نعيد الضبط حين يتغير ارتفاع المساحة المرئية
+        //    (اي عند فتح الكيبورد) ثم نتوقف حتى لا نعاند تمرير المستخدم.
+        const heightNow = Math.round(viewHeight)
+        const alignedFor = alignedAt.get(panel)
+        if (alignedFor === undefined || alignedFor !== heightNow) {
+          alignToTop(trigger)
+          alignedAt.set(panel, heightNow)
+        }
+
+        const rect = trigger.getBoundingClientRect()
+        const content = naturalHeight(panel)
+        const below = viewBottom - (rect.bottom + edge) - gap
+        const above = rect.top - edge - viewTop - gap
+        // ٢) الافتراضي تحت الحقل؛ وفوقه فقط حين تضيق المساحة تحته.
+        const openBelow = below >= minBelow || below >= above
+        const space = Math.max(0, openBelow ? below : above)
+        const height = Math.min(content, maxPanel, Math.max(160, space))
+        const top = openBelow ? rect.bottom + edge : rect.top - edge - height
+
         panel.style.maxHeight = `${height}px`
         panel.style.overflowY = 'auto'
-        return { top }
+        return top
       }
 
-      // ١) لوحات Radix: نضبط الازاحة الراسية في غلاف Popper.
+      // لوحات Radix: نضبط الازاحة الراسية في غلاف Popper.
       document
         .querySelectorAll<HTMLElement>('[data-radix-popper-content-wrapper]')
         .forEach((wrapper) => {
           const panel = wrapper.firstElementChild
           if (!(panel instanceof HTMLElement)) return
-          const { top } = place(panel)
+          const top = place(panel)
           const computed = window.getComputedStyle(wrapper).transform
           const matrix3d = computed.match(/matrix3d\(([^)]+)\)/)
           const matrix = computed.match(/matrix\(([^)]+)\)/)
@@ -139,12 +164,12 @@ function useVisualViewportPanelFit() {
           wrapper.style.transform = `translate3d(${tx}px, ${top}px, 0)`
         })
 
-      // ٢) اللوحات التي تُرسم في portal يدوي (AsyncMultiSelect).
+      // اللوحات التي ترسم في portal يدوي (AsyncMultiSelect).
       document
         .querySelectorAll<HTMLElement>('[data-select-portal="true"]')
         .forEach((panel) => {
           if (panel.closest('[data-radix-popper-content-wrapper]')) return
-          const { top } = place(panel)
+          const top = place(panel)
           panel.style.bottom = 'auto'
           panel.style.top = `${top}px`
         })
@@ -153,7 +178,7 @@ function useVisualViewportPanelFit() {
     const schedule = () => {
       if (!frame) frame = window.requestAnimationFrame(fit)
       settle.forEach((id) => window.clearTimeout(id))
-      settle = [window.setTimeout(fit, 80), window.setTimeout(fit, 260)]
+      settle = [window.setTimeout(fit, 50), window.setTimeout(fit, 220)]
     }
 
     const observer = new MutationObserver(schedule)
@@ -175,13 +200,16 @@ function useVisualViewportPanelFit() {
   }, [])
 }
 
-/** على الجوال: تمرير حقل الاختيار الى وسط الشاشة قبل ان يفتح الكيبورد. */
-function centerSelectTrigger(event: ReactPointerEvent<HTMLDivElement>) {
+/** على الجوال: الحقل الى اعلى الشاشة قبل ان يفتح الكيبورد. */
+function alignSelectTrigger(event: ReactPointerEvent<HTMLDivElement>) {
   if (!window.matchMedia(MOBILE_QUERY).matches) return
   const trigger = (event.target as HTMLElement).closest<HTMLElement>(
     'button[aria-haspopup], [role="combobox"]:not(input)',
   )
-  trigger?.scrollIntoView({ block: 'center', inline: 'nearest' })
+  if (!trigger) return
+  const viewTop = window.visualViewport?.offsetTop ?? 0
+  const rect = trigger.getBoundingClientRect()
+  window.scrollBy({ top: rect.top - (viewTop + 8) })
 }
 
 const EQUIPMENT_OPTIONS: UiSelectOption[] = [
@@ -432,7 +460,7 @@ export default function ComponentsPage() {
     <div
       dir="rtl"
       className="min-h-[100dvh] bg-bg text-fg"
-      onPointerDownCapture={centerSelectTrigger}
+      onPointerDownCapture={alignSelectTrigger}
     >
       <div className="mx-auto w-full max-w-5xl space-y-5 p-4 md:p-6">
         <header className="space-y-2">
