@@ -10,7 +10,6 @@ import { useCompanyProjectFilters } from '@/components/data-list/relationFilters
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { CreateSupplierPoDialog } from '@/components/purchasing/CreateSupplierPoDialog'
-import { SupplierPoLinesPanel } from '@/components/purchasing/SupplierPoLinesPanel'
 import { SupplierPoStatusBadge } from '@/components/purchasing/SupplierPoStatusBadge'
 import {
   Badge,
@@ -227,11 +226,6 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
           sort={{ key: list.sort, direction: list.direction }}
           onSortChange={list.setSort}
           onRowClick={(row) => onSelectPo(row.id)}
-          // Owner 2026-10-24 («اوامر · فتح صف»): a row opens to its equipment;
-          // the rest of the row still opens the PO page.
-          expandable={{
-            render: (row) => <SupplierPoLinesPanel poId={row.id} />,
-          }}
         />
       )}
       {!loadError && total > 0 && (

@@ -1,7 +1,5 @@
 import {
-  Fragment,
   useCallback,
-  useId,
   useRef,
   useState,
   type KeyboardEvent,
@@ -9,14 +7,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from 'react'
-import {
-  AlertCircle,
-  ArrowDown,
-  ArrowUp,
-  ChevronDown,
-  ChevronRight,
-  ChevronsUpDown,
-} from 'lucide-react'
+import { AlertCircle, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { cn } from './cn'
 
@@ -76,18 +67,6 @@ export interface DataTableProps<Row> {
   maxHeight?: string
   className?: string
   rowClassName?: (row: Row) => string | undefined
-  /**
-   * Expandable rows (owner 2026-10-24, first used by the supplier PO list): a
-   * toggle at the start of every row opens a full-width panel under it with
-   * `render(row)`; one row is open at a time. The toggle is a nested control,
-   * so it never fires `onRowClick`. `render` runs only for the open row, so a
-   * panel that loads its own data loads it on demand.
-   */
-  expandable?: {
-    render: (row: Row) => ReactNode
-    /** Accessible name of the toggle; defaults to «عرض التفاصيل». */
-    label?: (row: Row) => string
-  }
 }
 
 const sizes: Record<
@@ -324,17 +303,10 @@ export function DataTable<Row>({
   maxHeight,
   className,
   rowClassName,
-  expandable,
 }: DataTableProps<Row>) {
   const { t } = useI18n()
   const dragScroll = useDragScroll()
-  const panelIdPrefix = useId()
-  const [expandedKey, setExpandedKey] = useState<string | number | null>(null)
-  // The toggle column sits before the data columns.
-  const spanAll = columns.length + (expandable ? 1 : 0)
-
   const density = sizes[size]
-  const toggleCellClass = 'w-9 px-1 text-center'
   const hasError = error !== undefined && error !== null && error !== false
   // While a refetch (sort, page, filter) is in flight the current rows stay on
   // screen, dimmed, so column widths do not jump between skeleton and data.
@@ -398,11 +370,6 @@ export function DataTable<Row>({
           className={cn('bg-surface', stickyHeader && 'sticky top-0 z-10')}
         >
           <tr className="border-b">
-            {expandable && (
-              <th scope="col" className={cn(toggleCellClass, density.header)}>
-                <span className="sr-only">{t('dataTableExpandColumn')}</span>
-              </th>
-            )}
             {columns.map((column) => {
               const align = column.align ?? 'start'
               const active = sort?.key === column.key
@@ -470,9 +437,6 @@ export function DataTable<Row>({
           {showSkeleton &&
             Array.from({ length: Math.max(1, loadingRows) }).map((_, index) => (
               <tr key={`skeleton-${index}`} className="border-b last:border-0">
-                {expandable && (
-                  <td className={cn(toggleCellClass, density.row)} />
-                )}
                 {columns.map((column, columnIndex) => (
                   <td
                     key={column.key}
@@ -496,7 +460,7 @@ export function DataTable<Row>({
 
           {hasError && (
             <tr>
-              <td colSpan={spanAll} className="p-0">
+              <td colSpan={columns.length} className="p-0">
                 <div
                   role="alert"
                   className="flex items-start gap-2.5 border-s-4 border-danger bg-danger-soft px-4 py-5 text-sm font-medium text-danger"
@@ -515,7 +479,7 @@ export function DataTable<Row>({
           {isEmpty && (
             <tr>
               <td
-                colSpan={spanAll}
+                colSpan={columns.length}
                 className="px-4 py-10 text-center text-sm text-muted"
               >
                 {empty ?? t('noResults')}
@@ -525,86 +489,35 @@ export function DataTable<Row>({
 
           {!showSkeleton &&
             !hasError &&
-            rows.map((row) => {
-              const key = rowKey(row)
-              const open = Boolean(expandable) && expandedKey === key
-              const panelId = `${panelIdPrefix}-${key}`
-              return (
-                <Fragment key={key}>
-                  <tr
-                    {...rowInteraction(row)}
+            rows.map((row) => (
+              <tr
+                key={rowKey(row)}
+                {...rowInteraction(row)}
+                className={cn(
+                  'border-b transition-colors last:border-0 hover:bg-surface-hover',
+                  refreshing && 'pointer-events-none opacity-60',
+                  onRowClick &&
+                    'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+                  rowClassName?.(row),
+                )}
+              >
+                {columns.map((column) => (
+                  <td
+                    key={column.key}
                     className={cn(
-                      'border-b transition-colors last:border-0 hover:bg-surface-hover',
-                      refreshing && 'pointer-events-none opacity-60',
-                      onRowClick &&
-                        'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
-                      open && 'bg-surface',
-                      rowClassName?.(row),
+                      'whitespace-nowrap tabular-nums',
+                      density.row,
+                      density.cell,
+                      alignText[column.align ?? 'start'],
+                      column.hideBelow && hideBelowClass[column.hideBelow],
+                      column.className,
                     )}
                   >
-                    {expandable && (
-                      <td className={cn(toggleCellClass, density.row)}>
-                        <button
-                          type="button"
-                          aria-expanded={open}
-                          aria-controls={open ? panelId : undefined}
-                          aria-label={
-                            expandable.label?.(row) ??
-                            t(
-                              open
-                                ? 'dataTableCollapseRow'
-                                : 'dataTableExpandRow',
-                            )
-                          }
-                          title={t(
-                            open
-                              ? 'dataTableCollapseRow'
-                              : 'dataTableExpandRow',
-                          )}
-                          onClick={() => setExpandedKey(open ? null : key)}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-hover hover:text-fg"
-                        >
-                          {open ? (
-                            <ChevronDown size={16} aria-hidden="true" />
-                          ) : (
-                            <ChevronRight
-                              size={16}
-                              aria-hidden="true"
-                              className="rtl:rotate-180"
-                            />
-                          )}
-                        </button>
-                      </td>
-                    )}
-                    {columns.map((column) => (
-                      <td
-                        key={column.key}
-                        className={cn(
-                          'whitespace-nowrap tabular-nums',
-                          density.row,
-                          density.cell,
-                          alignText[column.align ?? 'start'],
-                          column.hideBelow && hideBelowClass[column.hideBelow],
-                          column.className,
-                        )}
-                      >
-                        {column.cell(row)}
-                      </td>
-                    ))}
-                  </tr>
-                  {open && expandable && (
-                    <tr
-                      id={panelId}
-                      className="border-b bg-surface last:border-0"
-                    >
-                      <td colSpan={spanAll} className="p-0">
-                        {expandable.render(row)}
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              )
-            })}
+                    {column.cell(row)}
+                  </td>
+                ))}
+              </tr>
+            ))}
         </tbody>
       </table>
     </div>

@@ -257,35 +257,6 @@ export function DataTableShowcase() {
         </p>
       </Block>
 
-      <Block label="صف قابل للفتح (expandable، اول استخدام: قائمة اوامر الشراء)">
-        <div dir={direction} lang={lang}>
-          <DataTable
-            columns={columns}
-            rows={rows.slice(0, 4)}
-            rowKey={(row) => row.id}
-            onRowClick={(row) => setClicked(row.code)}
-            expandable={{
-              render: (row) => (
-                <div className="px-4 py-3 text-sm">
-                  <p className="text-xs text-muted">
-                    {lang === 'ar' ? 'تفاصيل الصف' : 'Row details'}
-                  </p>
-                  <p className="mt-1">
-                    <span className="font-semibold">{row.code}</span> ·{' '}
-                    {row.type[lang]} · {row.owner[lang]}
-                  </p>
-                </div>
-              ),
-            }}
-          />
-        </div>
-        <p className="text-xs text-muted">
-          زر السهم في بداية الصف يفتح لوحة تحته بعرض الجدول، وصف واحد مفتوح في
-          كل مرة. الضغط على باقي الصف يبقى يفتح الصفحة. محتوى اللوحة لا يحمل الا
-          للصف المفتوح.
-        </p>
-      </Block>
-
       <Block label="الحجم الصغير (28 بكسل)">
         <div dir={direction} lang={lang}>
           <DataTable
