@@ -1085,8 +1085,12 @@ function TilesDesign() {
                 <p className="truncate text-xs leading-5 text-muted">
                   {ownerLine(unit)}
                 </p>
-                <p className="truncate text-xs leading-5 text-muted">
-                  {unit.project}
+                {/* Owner 2026-10-24: «الشركة · المشروع» on one line. */}
+                <p
+                  className="truncate text-xs leading-5 text-muted"
+                  title={`${unit.company} · ${unit.project}`}
+                >
+                  {unit.company} · {unit.project}
                 </p>
                 <p className="truncate text-xs leading-5 text-muted">
                   الفورمان{' '}
