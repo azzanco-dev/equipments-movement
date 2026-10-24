@@ -781,6 +781,10 @@ export function LogsScreen({
               onSelectMovement ? (row) => onSelectMovement(row.id) : undefined
             }
             caption={t('logs')}
+            // Owner 2026-10-24: the PO list's look — 13 px rows with 8 px
+            // above and below the content (headers stay 12 px).
+            cellTextClassName="text-[13px]"
+            cellClassName="py-2"
           />
 
           {!loadError && total > 0 && (

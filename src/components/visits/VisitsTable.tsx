@@ -693,6 +693,10 @@ export function VisitsTable({
             // are already 44 px below 768 px, so the phone view of the home is
             // no taller; only desktop rows grow from 40 px.
             size="lg"
+            // Owner 2026-10-24: the admin log's visits take the PO list's look
+            // (13 px rows, 8 px above and below); the home lists keep theirs.
+            cellTextClassName={isLog ? 'text-[13px]' : undefined}
+            cellClassName={isLog ? 'py-2' : undefined}
             columns={columns}
             rows={visits}
             rowKey={(visit) => visit.entry_id}
