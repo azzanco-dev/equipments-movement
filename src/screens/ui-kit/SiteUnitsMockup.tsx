@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { FileText, Plus } from 'lucide-react'
 import {
   Badge,
@@ -265,7 +265,7 @@ function PoCell({ unit, compact = false }: { unit: Unit; compact?: boolean }) {
       variant={compact ? 'outline' : 'primary'}
       icon={<Plus size={13} aria-hidden="true" />}
     >
-      اضافة الى امر شراء
+      اضافة الى PO
     </Button>
   )
 }
@@ -317,7 +317,7 @@ function GroupedDesign() {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted">
-          كل مشروع قسم لحاله، وجنبه كم معدة عليها امر من الكل.
+          كل مشروع قسم لحاله، وجنبه كم معدة عليها PO من الكل.
         </p>
         <OwnerFilter value={owners} onChange={setOwners} />
       </div>
@@ -335,7 +335,7 @@ function GroupedDesign() {
                 <p className="truncate text-xs text-muted">{company}</p>
               </div>
               <Badge tone={covered === rows.length ? 'success' : 'warning'}>
-                {covered} من {rows.length} عليها امر
+                {covered} من {rows.length} عليها PO
               </Badge>
             </header>
             <ul className="divide-y">
@@ -377,20 +377,20 @@ function TodoDesign() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted">
-          الصفحة قائمة شغل: اللي بلا امر فوق وبارزة، واللي عليها امر تحت بهدوء.
+          الصفحة قائمة شغل: اللي بلا PO فوق وبارزة، واللي عليها PO تحت بهدوء.
         </p>
         <OwnerFilter value={owners} onChange={setOwners} />
       </div>
       <section className="space-y-2">
         <h4 className="flex items-center gap-2 text-sm font-semibold">
-          بلا امر شراء
+          بلا PO
           <Badge tone="warning" size="sm">
             {missing.length}
           </Badge>
         </h4>
         {missing.length === 0 ? (
           <p className="rounded-xl border bg-surface px-4 py-6 text-center text-sm text-muted">
-            كل المعدات عليها امر شراء.
+            كل المعدات عليها PO.
           </p>
         ) : (
           <ul className="grid gap-2 md:grid-cols-2">
@@ -413,7 +413,7 @@ function TodoDesign() {
       </section>
       <section className="space-y-2">
         <h4 className="flex items-center gap-2 text-sm font-semibold text-muted">
-          عليها امر شراء
+          عليها PO
           <Badge size="sm">{covered.length}</Badge>
         </h4>
         <ul className="divide-y rounded-xl border bg-bg">
@@ -482,15 +482,15 @@ function TableDesign() {
     },
     {
       key: 'po',
-      header: 'امر الشراء',
+      header: 'PO',
       align: 'end',
       cell: (u) => <PoCell unit={u} compact />,
     },
   ]
   const QUICK: { value: Quick; label: string }[] = [
     { value: 'all', label: 'الكل' },
-    { value: 'missing', label: 'بلا امر' },
-    { value: 'covered', label: 'عليها امر' },
+    { value: 'missing', label: 'بلا PO' },
+    { value: 'covered', label: 'عليها PO' },
   ]
   return (
     <div className="space-y-3">
@@ -622,11 +622,7 @@ function AllCardsDesign() {
         <OwnerFilter value={owners} onChange={setOwners} />
       </div>
       <section className="space-y-2">
-        <SectionTitle
-          title="بلا امر شراء"
-          count={missing.length}
-          tone="warning"
-        />
+        <SectionTitle title="بلا PO" count={missing.length} tone="warning" />
         <ul className="grid gap-2 md:grid-cols-2">
           {missing.map((unit) => (
             <UnitCard key={unit.id} unit={unit} />
@@ -634,11 +630,7 @@ function AllCardsDesign() {
         </ul>
       </section>
       <section className="space-y-2">
-        <SectionTitle
-          title="عليها امر شراء"
-          count={covered.length}
-          tone="success"
-        />
+        <SectionTitle title="عليها PO" count={covered.length} tone="success" />
         <ul className="grid gap-2 md:grid-cols-2">
           {covered.map((unit) => (
             <UnitCard key={unit.id} unit={unit} />
@@ -677,7 +669,7 @@ function ProjectCardsDesign() {
                 <p className="truncate text-xs text-muted">{company}</p>
               </div>
               <span className="text-xs text-muted">
-                {covered} من {rows.length} عليها امر
+                {covered} من {rows.length} عليها PO
               </span>
             </div>
             <ul className="grid gap-2 md:grid-cols-2">
@@ -701,8 +693,8 @@ function SupplierCardsDesign() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted">
-          مقسمة حسب المورد، لان امر الشراء يكون لمورد واحد: تشوف وش ناقص لكل
-          مورد وتسوي امره مرة وحدة.
+          مقسمة حسب المورد، لان الـ PO يكون لمورد واحد: تشوف وش ناقص لكل مورد
+          وتسوي الـ PO حقه مرة وحدة.
         </p>
         <OwnerFilter value={owners} onChange={setOwners} />
       </div>
@@ -718,7 +710,7 @@ function SupplierCardsDesign() {
                 {rows.length} معدة
                 {missing > 0 && (
                   <Badge tone="warning" size="sm">
-                    {missing} بلا امر
+                    {missing} بلا PO
                   </Badge>
                 )}
               </span>
@@ -753,11 +745,7 @@ function TwoColumnsDesign() {
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
         <section className="space-y-2 rounded-xl border bg-surface p-3">
-          <SectionTitle
-            title="بلا امر شراء"
-            count={missing.length}
-            tone="warning"
-          />
+          <SectionTitle title="بلا PO" count={missing.length} tone="warning" />
           <ul className="space-y-2">
             {missing.map((unit) => (
               <UnitCard key={unit.id} unit={unit} />
@@ -766,7 +754,7 @@ function TwoColumnsDesign() {
         </section>
         <section className="space-y-2 rounded-xl border bg-surface p-3">
           <SectionTitle
-            title="عليها امر شراء"
+            title="عليها PO"
             count={covered.length}
             tone="success"
           />
@@ -800,17 +788,13 @@ function BulkDesign() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted">
-          تحدد اكثر من معدة بلا امر وتضيفها مرة وحدة. امر الشراء لمورد وشركة
-          ومشروع واحد، فاول تحديد يقفل الباقي على نفس المجموعة.
+          تحدد اكثر من معدة بلا PO وتضيفها مرة وحدة. الـ PO لمورد وشركة ومشروع
+          واحد، فاول تحديد يقفل الباقي على نفس المجموعة.
         </p>
         <OwnerFilter value={owners} onChange={setOwners} />
       </div>
       <section className="space-y-2">
-        <SectionTitle
-          title="بلا امر شراء"
-          count={missing.length}
-          tone="warning"
-        />
+        <SectionTitle title="بلا PO" count={missing.length} tone="warning" />
         <ul className="grid gap-2 md:grid-cols-2">
           {missing.map((unit) => {
             const blocked =
@@ -834,11 +818,7 @@ function BulkDesign() {
         </ul>
       </section>
       <section className="space-y-2">
-        <SectionTitle
-          title="عليها امر شراء"
-          count={covered.length}
-          tone="success"
-        />
+        <SectionTitle title="عليها PO" count={covered.length} tone="success" />
         <ul className="grid gap-2 md:grid-cols-2">
           {covered.map((unit) => (
             <UnitCard key={unit.id} unit={unit} />
@@ -867,7 +847,7 @@ function BulkDesign() {
               variant="primary"
               icon={<Plus size={13} aria-hidden="true" />}
             >
-              اضافة الى امر شراء
+              اضافة الى PO
             </Button>
           </span>
         </div>
@@ -904,12 +884,12 @@ const SITE_UNITS_CONFIG: DataListConfig = {
   filterFields: [
     {
       key: 'po_state',
-      label: { ar: 'امر الشراء', en: 'Purchase order' },
+      label: { ar: 'PO', en: 'Purchase order' },
       type: 'select',
       operators: ['eq'],
       options: [
-        { value: 'missing', label: 'بلا امر' },
-        { value: 'covered', label: 'عليها امر' },
+        { value: 'missing', label: 'بلا PO' },
+        { value: 'covered', label: 'عليها PO' },
       ],
     },
     {
@@ -946,7 +926,7 @@ const SITE_UNITS_CONFIG: DataListConfig = {
     },
   ],
   sortableFields: [
-    { key: 'po_state', label: { ar: 'بلا امر اول', en: 'Missing PO first' } },
+    { key: 'po_state', label: { ar: 'بلا PO اول', en: 'Missing PO first' } },
     { key: 'since', label: { ar: 'تاريخ الدخول', en: 'Entry date' } },
     { key: 'code', label: { ar: 'رقم المعدة', en: 'Unit code' } },
     {
@@ -998,6 +978,16 @@ function sortValue(unit: Unit, key: string): string {
 
 /* ── 9 · small tiles, with search, filters and sort ─────────────── */
 
+/** Owner 2026-10-24: coloured tiles by PO state — soft amber without a PO,
+ *  soft green with one; the border is a light shade of the same tone. */
+function tileColors(unit: Unit): CSSProperties {
+  const tone = unit.spo ? 'success' : 'warning'
+  return {
+    backgroundColor: `var(--${tone}-soft)`,
+    borderColor: `color-mix(in srgb, var(--${tone}) 30%, transparent)`,
+  }
+}
+
 function TilesDesign() {
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<ListFilter[]>([])
@@ -1044,7 +1034,7 @@ function TilesDesign() {
     <div className="space-y-3">
       <p className="text-xs text-muted">
         مربعات صغيرة، اكثر عدد على الشاشة. فوقها شريط القوائم المعتمد: البحث،
-        والفلاتر (امر الشراء، المالك، الشركة، المشروع، الفورمان)، والترتيب.
+        والفلاتر (PO، المالك، الشركة، المشروع، الفورمان)، والترتيب.
       </p>
       <DataListToolbar
         config={SITE_UNITS_CONFIG}
@@ -1070,7 +1060,8 @@ function TilesDesign() {
           {units.map((unit) => (
             <li
               key={unit.id}
-              className="flex flex-col gap-2 rounded-xl border bg-bg p-3 text-[13px]"
+              className="flex flex-col gap-2 rounded-xl border p-3 text-[13px]"
+              style={tileColors(unit)}
             >
               <div className="flex items-start justify-between gap-2">
                 <bdi dir="ltr" className="text-base font-semibold">
@@ -1078,11 +1069,11 @@ function TilesDesign() {
                 </bdi>
                 {unit.spo ? (
                   <Badge tone="success" size="sm">
-                    عليها امر
+                    عليها PO
                   </Badge>
                 ) : (
                   <Badge tone="warning" size="sm">
-                    بلا امر
+                    بلا PO
                   </Badge>
                 )}
               </div>
@@ -1096,7 +1087,10 @@ function TilesDesign() {
                 </p>
                 <CompanyNumber unit={unit} />
               </div>
-              <div className="mt-auto border-t pt-2">
+              <div
+                className="mt-auto border-t pt-2"
+                style={{ borderColor: tileColors(unit).borderColor }}
+              >
                 <PoCell unit={unit} compact />
               </div>
             </li>
@@ -1114,9 +1108,9 @@ export function SiteUnitsMockup() {
         <h3 className="font-semibold">المعدات في المشاريع</h3>
         <p className="text-xs text-muted">
           قسم جديد تحت «المشتريات»: كل معدة داخل مشروع الحين (دخول مفتوح)، بكل
-          الملاك مع فلتر المالك. آخر الصف رقم امر الشراء المفتوح، او زر «اضافة
-          الى امر شراء» لو مالها. النموذج 4 فكرتك (قائمة الشغل بكل المعدات
-          كبطاقات مع ترقيم الشركة)، و5 الى 9 افكار مبنية عليه. ببيانات عينة.
+          الملاك مع فلتر المالك. آخر الصف رقم الـ PO المفتوح، او زر «اضافة الى
+          PO» لو مالها. النموذج 4 فكرتك (قائمة الشغل بكل المعدات كبطاقات مع
+          ترقيم الشركة)، و5 الى 9 افكار مبنية عليه. ببيانات عينة.
         </p>
       </div>
       <Tabs defaultValue="tiles">
