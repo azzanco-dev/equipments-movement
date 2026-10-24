@@ -182,7 +182,7 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
       header: <span className="sr-only">{t('supplierPoDetailsButton')}</span>,
       align: 'end',
       cell: (row) => (
-        <Button size="sm" variant="outline" onClick={() => onSelectPo(row.id)}>
+        <Button size="sm" variant="primary" onClick={() => onSelectPo(row.id)}>
           {t('supplierPoDetailsButton')}
         </Button>
       ),
