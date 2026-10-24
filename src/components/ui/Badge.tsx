@@ -11,12 +11,13 @@ import { cn } from './cn'
 export type BadgeTone =
   'neutral' | 'entry' | 'exit' | 'success' | 'warning' | 'danger' | 'info'
 
+// «ناعم مربع» (owner pick 2026-10-24 on /ui-kit): a soft fill, no border,
+// slightly rounded corners instead of the pill.
 function toneStyle(tone: BadgeTone): CSSProperties | undefined {
   if (tone === 'neutral') return undefined
   return {
     color: `var(--${tone})`,
     backgroundColor: `var(--${tone}-soft)`,
-    borderColor: `color-mix(in srgb, var(--${tone}) 30%, transparent)`,
   }
 }
 
@@ -24,7 +25,8 @@ export type BadgeSize = 'sm' | 'md'
 
 export interface BadgeProps {
   tone?: BadgeTone
-  /** `sm` is for dense places such as dropdown options and table cells. */
+  /** `sm` is for dense places such as dropdown options and table cells; `md`
+   *  sits between the former md (12 px) and sm (11 px) since 2026-10-24. */
   size?: BadgeSize
   icon?: ReactNode
   className?: string
@@ -41,10 +43,13 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border font-medium',
-        size === 'md' && 'px-2.5 py-0.5 text-xs leading-5',
-        size === 'sm' && 'px-1.5 py-0 text-[11px] leading-4',
-        tone === 'neutral' && 'bg-surface text-fg',
+        'inline-flex shrink-0 items-center gap-1 whitespace-nowrap font-medium',
+        size === 'md' &&
+          'rounded-md px-2 py-0.5 text-[11.5px] leading-[18px]',
+        size === 'sm' && 'rounded px-1.5 py-0 text-[11px] leading-4',
+        // No border any more: a shade darker than the surface so a neutral
+        // badge still shows on a surface card.
+        tone === 'neutral' && 'bg-surface-hover text-fg',
         className,
       )}
       style={toneStyle(tone)}

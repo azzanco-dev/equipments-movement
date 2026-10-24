@@ -42,7 +42,11 @@ const SAMPLES: Sample[] = [
 ]
 
 const STYLES: { id: StyleId; title: string; note: string }[] = [
-  { id: 'current', title: 'الحالي', note: 'حبة بخلفية فاتحة وحد ملون خفيف.' },
+  {
+    id: 'current',
+    title: 'المعتمد',
+    note: 'ناعم مربع (اختيار 2026-10-24) بحجم وسط بين الكبير والصغير السابقين. هذا هو مكون Badge الحقيقي.',
+  },
   {
     id: 'dot',
     title: '1 · نقطة ونص',

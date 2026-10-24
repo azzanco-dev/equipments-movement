@@ -171,8 +171,9 @@ const COMPONENT_SECTIONS: SectionDef[] = [
     // Owner request 2026-10-24: five candidate looks for the shared Badge.
     id: 'badge-styles',
     title: 'نماذج شكل الشارة',
-    purpose: 'خمسة اشكال مقترحة للشارة جنب الشكل الحالي، لاختيار واحد يطبق على كل الموقع.',
-    status: 'review',
+    purpose:
+      'خمسة اشكال مقترحة للشارة. المعتمد 2026-10-24: ناعم مربع بحجم وسط، مطبق على كل الموقع.',
+    status: 'approved',
     defaultOpen: true,
     element: <BadgeStylesShowcase />,
   },
