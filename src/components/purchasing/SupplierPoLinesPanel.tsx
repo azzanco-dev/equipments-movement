@@ -72,16 +72,16 @@ export function SupplierPoLinesPanel({ poId }: { poId: string }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="text-xs text-muted">
-            <th className="pb-1.5 text-start font-normal">
+            <th className="pb-2 text-start font-normal">
               {t('supplierPoEquipmentField')}
             </th>
-            <th className="hidden pb-1.5 text-start font-normal sm:table-cell">
+            <th className="hidden pb-2 text-start font-normal sm:table-cell">
               {t('equipmentType')}
             </th>
-            <th className="hidden pb-1.5 text-start font-normal md:table-cell">
+            <th className="hidden pb-2 text-start font-normal md:table-cell">
               {t('equipmentPurchasingPeriod')}
             </th>
-            <th className="pb-1.5 text-end font-normal">
+            <th className="pb-2 text-end font-normal">
               {t('supplierPoPrice')}
             </th>
           </tr>
@@ -91,13 +91,13 @@ export function SupplierPoLinesPanel({ poId }: { poId: string }) {
             const unit = line.card?.equipment ?? null
             return (
               <tr key={line.id} className="border-t border-border">
-                <td className="py-1.5 pe-3">
+                <td className="py-2.5 pe-3">
                   <PurchasingUnitCell unit={unit} />
                 </td>
-                <td className="hidden py-1.5 pe-3 text-muted sm:table-cell">
+                <td className="hidden py-2.5 pe-3 text-muted sm:table-cell">
                   {unit?.type ?? '—'}
                 </td>
-                <td className="hidden whitespace-nowrap py-1.5 pe-3 text-muted md:table-cell">
+                <td className="hidden whitespace-nowrap py-2.5 pe-3 text-muted md:table-cell">
                   {line.card ? (
                     <bdi dir="ltr">
                       {formatDate(line.card.period_from)} –{' '}
@@ -109,7 +109,7 @@ export function SupplierPoLinesPanel({ poId }: { poId: string }) {
                     '—'
                   )}
                 </td>
-                <td className="py-1.5 text-end">
+                <td className="py-2.5 text-end">
                   {line.price === null ? (
                     <Badge tone="warning" size="sm">
                       {t('supplierPoNoPrice')}
