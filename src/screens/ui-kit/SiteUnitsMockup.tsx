@@ -1081,18 +1081,16 @@ function TilesDesign() {
               {/* leading-5: the 16 px line of text-xs cut Arabic marks in a
                   truncated line (owner 2026-10-24); space-y-1 between lines. */}
               <div className="min-w-0 space-y-1">
-                <p className="truncate text-xs leading-5">{unit.type}</p>
-                <p className="truncate text-xs leading-5 text-muted">
+                <p className="break-words text-xs leading-5">{unit.type}</p>
+                <p className="break-words text-xs leading-5 text-muted">
                   {ownerLine(unit)}
                 </p>
-                {/* Owner 2026-10-24: «الشركة · المشروع» on one line. */}
-                <p
-                  className="truncate text-xs leading-5 text-muted"
-                  title={`${unit.company} · ${unit.project}`}
-                >
+                {/* Owner 2026-10-24: «الشركة · المشروع»; long text wraps
+                    instead of being cut. */}
+                <p className="break-words text-xs leading-5 text-muted">
                   {unit.company} · {unit.project}
                 </p>
-                <p className="truncate text-xs leading-5 text-muted">
+                <p className="break-words text-xs leading-5 text-muted">
                   الفورمان{' '}
                   <span className="font-medium text-fg">{foremanOf(unit)}</span>
                 </p>
