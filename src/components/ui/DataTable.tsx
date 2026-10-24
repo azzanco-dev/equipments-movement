@@ -573,14 +573,14 @@ export function DataTable<Row>({
                         {/* Owner 2026-10-24: + closed, − open. */}
                         {open ? (
                           <Minus
-                            size={16}
-                            strokeWidth={1.25}
+                            size={12}
+                            strokeWidth={1.5}
                             aria-hidden="true"
                           />
                         ) : (
                           <Plus
-                            size={16}
-                            strokeWidth={1.25}
+                            size={12}
+                            strokeWidth={1.5}
                             aria-hidden="true"
                           />
                         )}
