@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowDown,
   ArrowUp,
@@ -92,30 +92,6 @@ function periodLabel(
   return `${formatDate(card.period_from)} – ${to}`
 }
 
-function HeaderMeta({
-  icon,
-  label,
-  value,
-  ltr,
-}: {
-  icon: ReactNode
-  label: string
-  value: string
-  ltr?: boolean
-}) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span aria-hidden="true" className="shrink-0">
-        {icon}
-      </span>
-      <dt>{label}</dt>
-      <dd className="m-0 font-medium text-fg">
-        {ltr ? <bdi dir="ltr">{value}</bdi> : value}
-      </dd>
-    </div>
-  )
-}
-
 function PageSkeleton({ label }: { label: string }) {
   return (
     <div className="space-y-4" aria-busy="true">
@@ -136,15 +112,15 @@ function PageSkeleton({ label }: { label: string }) {
         </div>
       </div>
       <div className="grid gap-4 xl:grid-cols-3">
-        <div className="card space-y-3 p-4 xl:col-span-2">
+        <div className="card space-y-3 p-4 xl:col-start-3 xl:row-start-1">
+          <Skeleton variant="text" className="w-24" />
+          <InfoGridSkeleton count={6} columns={2} withIcon />
+        </div>
+        <div className="card space-y-3 p-4 xl:col-span-2 xl:col-start-1 xl:row-start-1">
           <Skeleton variant="text" className="w-28" />
           {[0, 1, 2].map((index) => (
             <Skeleton key={index} className="h-20 w-full rounded-xl" />
           ))}
-        </div>
-        <div className="card space-y-3 p-4">
-          <Skeleton variant="text" className="w-24" />
-          <InfoGridSkeleton count={6} columns={2} withIcon />
         </div>
       </div>
     </div>
@@ -154,9 +130,10 @@ function PageSkeleton({ label }: { label: string }) {
 /**
  * The supplier PO page (/purchasing/:id), the approved detail-page pattern
  * (2026-10-19): header card (number, status, the SUPPLIER NAME on its own
- * line, meta, actions), the summary strip, the lines as wide cards with a
- * sort select and a total card, the facts and the event timeline beside
- * them from `xl`, and a bottom action bar on mobile. Reads through RLS
+ * line, actions; no meta line since 2026-10-24), the summary strip, the
+ * lines as wide cards with a sort select and a total card, the facts card
+ * (every fact of the PO; above the lines below `xl`) and the event timeline
+ * beside them from `xl`, and a bottom action bar on mobile. Reads through RLS
  * (`purchasing.view`); every write goes through the 0136 functions, which
  * check `purchasing.manage` again.
  */
@@ -307,10 +284,34 @@ export function SupplierPoDetail({
     return sort.direction === 'asc' ? cmp : -cmp
   })
 
-  // avoid-ai-design audit (owner 2026-10-24): only what the header does not
-  // already show — the supplier, company / project, start date, creator and
-  // closing time live in the header card.
+  // Owner 2026-10-24: every fact of the PO lives in this card and the header
+  // has no meta line; the supplier stays in the header only (its own line).
   const facts: DescriptionListItem[] = [
+    {
+      key: 'company',
+      icon: <Building2 size={16} />,
+      label: t('company'),
+      value: companyName,
+    },
+    {
+      key: 'project',
+      icon: <MapPin size={16} />,
+      label: t('project'),
+      value: projectName,
+    },
+    {
+      key: 'start',
+      icon: <Calendar size={16} />,
+      label: t('supplierPoStartDate'),
+      value: formatDate(po.start_date),
+      dir: 'ltr',
+    },
+    {
+      key: 'createdBy',
+      icon: <User size={16} />,
+      label: t('supplierPoCreatedBy'),
+      value: createdByName,
+    },
     {
       key: 'createdAt',
       icon: <Clock size={16} />,
@@ -318,6 +319,17 @@ export function SupplierPoDetail({
       value: formatDateTime(po.created_at),
       dir: 'ltr',
     },
+    ...(po.closed_at
+      ? [
+          {
+            key: 'closedAt',
+            icon: <Lock size={16} />,
+            label: t('supplierPoClosedAt'),
+            value: formatDateTime(po.closed_at),
+            dir: 'ltr' as const,
+          },
+        ]
+      : []),
     {
       key: 'notes',
       icon: <StickyNote size={16} />,
@@ -427,32 +439,6 @@ export function SupplierPoDetail({
             </div>
           }
         />
-        <dl className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-muted">
-          <HeaderMeta
-            icon={<MapPin size={14} />}
-            label={t('supplierPoCompanyProject')}
-            value={`${companyName} · ${projectName}`}
-          />
-          <HeaderMeta
-            icon={<Calendar size={14} />}
-            label={t('supplierPoStartDate')}
-            value={formatDate(po.start_date)}
-            ltr
-          />
-          <HeaderMeta
-            icon={<User size={14} />}
-            label={t('supplierPoCreatedBy')}
-            value={createdByName}
-          />
-          {po.closed_at && (
-            <HeaderMeta
-              icon={<Lock size={14} />}
-              label={t('supplierPoClosedAt')}
-              value={formatDateTime(po.closed_at)}
-              ltr
-            />
-          )}
-        </dl>
         {/* 2. Summary strip (owner 2026-10-22): the total without VAT, the
             VAT, the total with VAT, and the unit count. */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -490,9 +476,20 @@ export function SupplierPoDetail({
         </Notice>
       )}
 
-      {/* 3. Body: the lines, then the facts and the timeline beside them. */}
-      <div className="grid gap-4 xl:grid-cols-3">
-        <Card padded={false} className="flex min-w-0 flex-col xl:col-span-2">
+      {/* 3. Body. Below xl: the facts, the lines, the timeline (owner
+          2026-10-24: the facts above the lines on mobile). From xl: the lines
+          over two columns, the facts and the timeline stacked beside them
+          (the 1fr second row takes the lines' extra height, so the facts and
+          the timeline stay together at the top). */}
+      <div className="grid gap-4 xl:grid-cols-3 xl:grid-rows-[auto_1fr]">
+        <Card className="space-y-3 p-4 xl:col-start-3 xl:row-start-1 xl:self-start">
+          <SectionHeader title={t('supplierPoDetails')} />
+          <DescriptionList items={facts} className="-my-2" />
+        </Card>
+        <Card
+          padded={false}
+          className="flex min-w-0 flex-col xl:col-span-2 xl:col-start-1 xl:row-span-2 xl:row-start-1"
+        >
           <div className="p-4 pb-0">
             <SectionHeader
               title={t('supplierPoEquipment')}
@@ -600,23 +597,17 @@ export function SupplierPoDetail({
           )}
         </Card>
 
-        <div className="space-y-4">
-          <Card className="space-y-3 p-4">
-            <SectionHeader title={t('supplierPoDetails')} />
-            <DescriptionList items={facts} className="-my-2" />
-          </Card>
-          <Card className="space-y-3 p-4">
-            <SectionHeader
-              title={t('supplierPoEvents')}
-              description={t('supplierPoEventsDesc')}
-            />
-            <SupplierPoEventsTimeline
-              events={events}
-              actorNames={actorNames}
-              codeOf={codeOf}
-            />
-          </Card>
-        </div>
+        <Card className="space-y-3 p-4 xl:col-start-3 xl:row-start-2 xl:self-start">
+          <SectionHeader
+            title={t('supplierPoEvents')}
+            description={t('supplierPoEventsDesc')}
+          />
+          <SupplierPoEventsTimeline
+            events={events}
+            actorNames={actorNames}
+            codeOf={codeOf}
+          />
+        </Card>
       </div>
 
       {/* 5. Mobile action bar. */}
