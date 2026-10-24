@@ -6,7 +6,14 @@ import { Badge, type BadgeTone } from '@/components/ui'
 // beside the current one. Sample data only, project tokens only; nothing
 // here changes the real Badge until the owner picks a look.
 
-type StyleId = 'current' | 'dot' | 'soft' | 'outline' | 'pill-dot' | 'text'
+type StyleId =
+  | 'current'
+  | 'current-regular'
+  | 'dot'
+  | 'soft'
+  | 'outline'
+  | 'pill-dot'
+  | 'text'
 
 type Sample = { tone: BadgeTone; label: string; icon?: ReactNode }
 
@@ -46,6 +53,12 @@ const STYLES: { id: StyleId; title: string; note: string }[] = [
     id: 'current',
     title: 'المعتمد',
     note: 'ناعم مربع (اختيار 2026-10-24) بحجم وسط بين الكبير والصغير السابقين. هذا هو مكون Badge الحقيقي.',
+  },
+  {
+    // Owner 2026-10-24: «جرب خلي الخط regular».
+    id: 'current-regular',
+    title: 'المعتمد · خط عادي (تجربة)',
+    note: 'نفس المعتمد بالضبط، بس الخط بوزن عادي (400) بدل المتوسط (500). للمقارنة فقط، الشارة الحقيقية ما تغيرت.',
   },
   {
     id: 'dot',
@@ -108,6 +121,25 @@ function ProposalBadge({
       <Badge tone={tone} size={small ? 'sm' : 'md'} icon={icon}>
         {label}
       </Badge>
+    )
+  if (look === 'current-regular')
+    // The approved Badge's own classes, with font-normal for font-medium.
+    return (
+      <span
+        className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap font-normal ${
+          small
+            ? 'rounded px-1.5 py-0 text-[11px] leading-4'
+            : 'rounded-md px-2 py-0.5 text-[11.5px] leading-[18px]'
+        } ${tone === 'neutral' ? 'bg-surface-hover text-fg' : ''}`}
+        style={
+          tone === 'neutral'
+            ? undefined
+            : { color: toneVar(tone), backgroundColor: softVar(tone) }
+        }
+      >
+        {icon}
+        {label}
+      </span>
     )
   const size = small ? 'text-[11px] leading-4' : 'text-xs leading-5'
   const base = `inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-medium ${size}`
