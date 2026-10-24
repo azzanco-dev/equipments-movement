@@ -31,6 +31,8 @@ type Unit = {
   id: string
   code: string
   plate: string
+  /** Shown instead of the plate when the unit has none (the log tag rule). */
+  chassis?: string
   type: string
   owner: Owner
   /** The supplier's name for «مالك اخر» units. */
@@ -140,7 +142,8 @@ const UNITS: Unit[] = [
     id: '8',
     contractorCode: 'SA-17',
     code: 'U032',
-    plate: '—',
+    plate: '',
+    chassis: 'HHKHZ616KG0001136',
     type: 'WALK BEHIND ROLLER',
     owner: 'external_supplier',
     lessor: 'شركة اركاس العالمية',
@@ -234,7 +237,7 @@ function UnitCell({
           {unit.code}
         </bdi>
         <bdi dir="ltr" className="text-[11px] text-muted">
-          {unit.plate}
+          {unit.plate || unit.chassis}
         </bdi>
       </span>
       {withType && <span className="text-xs text-muted">{unit.type}</span>}
@@ -531,7 +534,7 @@ function TableDesign() {
 function CompanyNumber({ unit }: { unit: Unit }) {
   if (!unit.contractorCode) return null
   return (
-    <p className="text-xs text-muted">
+    <p className="text-xs leading-5 text-muted">
       ترقيم الشركة{' '}
       <bdi dir="ltr" className="font-medium text-fg">
         {unit.contractorCode}
@@ -980,13 +983,11 @@ function sortValue(unit: Unit, key: string): string {
 
 /** Owner 2026-10-24: coloured tiles by PO state — soft amber without a PO,
  *  soft green with one; no card border and no badge (the end of the tile,
- *  the SPO or the add button, already says it). The line above the button
- *  takes a light shade of the same tone. */
+ *  the SPO or the add button, already says it) and no line above the
+ *  button. */
 function tileColors(unit: Unit): CSSProperties {
-  const tone = unit.spo ? 'success' : 'warning'
   return {
-    backgroundColor: `var(--${tone}-soft)`,
-    borderColor: `color-mix(in srgb, var(--${tone}) 30%, transparent)`,
+    backgroundColor: `var(--${unit.spo ? 'success' : 'warning'}-soft)`,
   }
 }
 
@@ -1062,28 +1063,38 @@ function TilesDesign() {
           {units.map((unit) => (
             <li
               key={unit.id}
-              className="flex flex-col gap-2 rounded-xl p-3 text-[13px]"
+              className="flex flex-col gap-3 rounded-xl p-3 text-[13px]"
               style={tileColors(unit)}
             >
-              <div className="flex items-start justify-between gap-2">
+              {/* The code with the plate, or the chassis when there is no
+                  plate, beside it (owner 2026-10-24). */}
+              <div className="flex flex-wrap items-baseline gap-x-2 leading-6">
                 <bdi dir="ltr" className="text-base font-semibold">
                   {unit.code}
                 </bdi>
+                {(unit.plate || unit.chassis) && (
+                  <bdi dir="ltr" className="text-xs text-muted">
+                    {unit.plate || unit.chassis}
+                  </bdi>
+                )}
               </div>
-              <div className="min-w-0 space-y-0.5">
-                <p className="truncate text-xs">{unit.type}</p>
-                <p className="truncate text-xs text-muted">{ownerLine(unit)}</p>
-                <p className="truncate text-xs text-muted">{unit.project}</p>
-                <p className="truncate text-xs text-muted">
+              {/* leading-5: the 16 px line of text-xs cut Arabic marks in a
+                  truncated line (owner 2026-10-24); space-y-1 between lines. */}
+              <div className="min-w-0 space-y-1">
+                <p className="truncate text-xs leading-5">{unit.type}</p>
+                <p className="truncate text-xs leading-5 text-muted">
+                  {ownerLine(unit)}
+                </p>
+                <p className="truncate text-xs leading-5 text-muted">
+                  {unit.project}
+                </p>
+                <p className="truncate text-xs leading-5 text-muted">
                   الفورمان{' '}
                   <span className="font-medium text-fg">{foremanOf(unit)}</span>
                 </p>
                 <CompanyNumber unit={unit} />
               </div>
-              <div
-                className="mt-auto border-t pt-2"
-                style={{ borderColor: tileColors(unit).borderColor }}
-              >
+              <div className="mt-auto">
                 <PoCell unit={unit} compact />
               </div>
             </li>
