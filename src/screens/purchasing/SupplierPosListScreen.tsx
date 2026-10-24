@@ -10,6 +10,7 @@ import { useCompanyProjectFilters } from '@/components/data-list/relationFilters
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { CreateSupplierPoDialog } from '@/components/purchasing/CreateSupplierPoDialog'
+import { SupplierPoLinesPanel } from '@/components/purchasing/SupplierPoLinesPanel'
 import { SupplierPoStatusBadge } from '@/components/purchasing/SupplierPoStatusBadge'
 import {
   Badge,
@@ -175,6 +176,17 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
       hideBelow: 'md',
       cell: (row) => <RelativeTime value={row.updated_at ?? row.created_at} />,
     },
+    // Owner 2026-10-24: the row opens its equipment; this button opens the PO.
+    {
+      key: 'details',
+      header: <span className="sr-only">{t('supplierPoDetailsButton')}</span>,
+      align: 'end',
+      cell: (row) => (
+        <Button size="sm" variant="outline" onClick={() => onSelectPo(row.id)}>
+          {t('supplierPoDetailsButton')}
+        </Button>
+      ),
+    },
   ]
 
   const addButton = canManage ? (
@@ -225,7 +237,11 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
           caption={t('supplierPos')}
           sort={{ key: list.sort, direction: list.direction }}
           onSortChange={list.setSort}
-          onRowClick={(row) => onSelectPo(row.id)}
+          // Owner 2026-10-24 («اوامر · فتح صف»): a click on the row shows its
+          // equipment under it; «تفاصيل» at the end opens the PO page.
+          expandable={{
+            render: (row) => <SupplierPoLinesPanel poId={row.id} />,
+          }}
           // Owner 2026-10-24: 13 px rows on this list (headers stay 12 px).
           cellTextClassName="text-[13px]"
           // Owner 2026-10-24: more air above and below each row's content.

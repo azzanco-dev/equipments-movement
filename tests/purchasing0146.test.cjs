@@ -86,10 +86,11 @@ test('the PO list selects, shows and sorts by updated_at', () => {
     config,
     /\{ key: 'updated_at', label: \{ ar: 'تاريخ التعديل', en: 'Last updated' \} \},\n  \],\n\}\s*$/,
   )
-  // The same column as the other lists (t('updatedAt'), RelativeTime), last.
+  // The same column as the other lists (t('updatedAt'), RelativeTime), the
+  // last data column; only the «تفاصيل» button column follows it (2026-10-24).
   const screen = read('src', 'screens', 'purchasing', 'SupplierPosListScreen.tsx')
   assert.match(
     screen,
-    /key: 'updated_at',\s+header: t\('updatedAt'\),\s+sortable: true,\s+className: 'text-muted',\s+hideBelow: 'md',\s+cell: \(row\) => <RelativeTime value=\{row\.updated_at \?\? row\.created_at\} \/>,\s+\},\s+\]/,
+    /key: 'updated_at',\s+header: t\('updatedAt'\),\s+sortable: true,\s+className: 'text-muted',\s+hideBelow: 'md',\s+cell: \(row\) => <RelativeTime value=\{row\.updated_at \?\? row\.created_at\} \/>,\s+\},\s+\/\/[^\n]*\n\s+\{\s+key: 'details',[\s\S]*?\},\s+\]/,
   )
 })

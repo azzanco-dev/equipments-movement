@@ -1,5 +1,7 @@
 import {
+  Fragment,
   useCallback,
+  useId,
   useRef,
   useState,
   type KeyboardEvent,
@@ -7,7 +9,13 @@ import {
   type PointerEvent,
   type ReactNode,
 } from 'react'
-import { AlertCircle, ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  ChevronsUpDown,
+} from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { cn } from './cn'
 
@@ -77,6 +85,16 @@ export interface DataTableProps<Row> {
   /** Extra classes for every body cell, e.g. vertical padding (the supplier
    *  PO list, owner 2026-10-24). The size's row height stays the minimum. */
   cellClassName?: string
+  /**
+   * Expandable rows (owner 2026-10-24, the supplier PO list): a click (or
+   * Enter / Space) anywhere on a row opens a full-width panel under it with
+   * `render(row)`, and again closes it; one row is open at a time, and a
+   * chevron at the row's start shows the state. The row then no longer calls
+   * `onRowClick`; a screen puts its own link or button in a cell (nested
+   * controls never toggle the row). `render` runs only for the open row, so a
+   * panel that loads its own data loads it on demand.
+   */
+  expandable?: { render: (row: Row) => ReactNode }
 }
 
 const sizes: Record<
@@ -315,9 +333,15 @@ export function DataTable<Row>({
   rowClassName,
   cellTextClassName,
   cellClassName,
+  expandable,
 }: DataTableProps<Row>) {
   const { t } = useI18n()
   const dragScroll = useDragScroll()
+  const panelIdPrefix = useId()
+  const [expandedKey, setExpandedKey] = useState<string | number | null>(null)
+  // The chevron column sits before the data columns.
+  const spanAll = columns.length + (expandable ? 1 : 0)
+  const chevronCell = 'w-8 pe-0 ps-3 text-muted'
   const density = sizes[size]
   const bodyCell = cellTextClassName
     ? cn(
@@ -345,20 +369,28 @@ export function DataTable<Row>({
     )
   }
 
-  const rowInteraction = (row: Row) => {
-    if (!onRowClick) return {}
+  const rowInteraction = (row: Row, key: string | number, panelId: string) => {
+    const activate = expandable
+      ? () => setExpandedKey((current) => (current === key ? null : key))
+      : onRowClick
+        ? () => onRowClick(row)
+        : null
+    if (!activate) return {}
+    const open = expandable ? expandedKey === key : undefined
     return {
       tabIndex: 0,
       role: 'button' as const,
+      'aria-expanded': open,
+      'aria-controls': open ? panelId : undefined,
       onClick: (event: MouseEvent<HTMLTableRowElement>) => {
         if (hitsNestedControl(event.target, event.currentTarget)) return
-        onRowClick(row)
+        activate()
       },
       onKeyDown: (event: KeyboardEvent<HTMLTableRowElement>) => {
         if (event.key !== 'Enter' && event.key !== ' ') return
         if (hitsNestedControl(event.target, event.currentTarget)) return
         event.preventDefault()
-        onRowClick(row)
+        activate()
       },
     }
   }
@@ -391,6 +423,11 @@ export function DataTable<Row>({
           className={cn('bg-surface', stickyHeader && 'sticky top-0 z-10')}
         >
           <tr className="border-b">
+            {expandable && (
+              <th scope="col" className={cn(chevronCell, density.header)}>
+                <span className="sr-only">{t('dataTableExpandColumn')}</span>
+              </th>
+            )}
             {columns.map((column) => {
               const align = column.align ?? 'start'
               const active = sort?.key === column.key
@@ -458,6 +495,7 @@ export function DataTable<Row>({
           {showSkeleton &&
             Array.from({ length: Math.max(1, loadingRows) }).map((_, index) => (
               <tr key={`skeleton-${index}`} className="border-b last:border-0">
+                {expandable && <td className={cn(chevronCell, density.row)} />}
                 {columns.map((column, columnIndex) => (
                   <td
                     key={column.key}
@@ -481,7 +519,7 @@ export function DataTable<Row>({
 
           {hasError && (
             <tr>
-              <td colSpan={columns.length} className="p-0">
+              <td colSpan={spanAll} className="p-0">
                 <div
                   role="alert"
                   className="flex items-start gap-2.5 border-s-4 border-danger bg-danger-soft px-4 py-5 text-sm font-medium text-danger"
@@ -500,7 +538,7 @@ export function DataTable<Row>({
           {isEmpty && (
             <tr>
               <td
-                colSpan={columns.length}
+                colSpan={spanAll}
                 className="px-4 py-10 text-center text-sm text-muted"
               >
                 {empty ?? t('noResults')}
@@ -510,36 +548,67 @@ export function DataTable<Row>({
 
           {!showSkeleton &&
             !hasError &&
-            rows.map((row) => (
-              <tr
-                key={rowKey(row)}
-                {...rowInteraction(row)}
-                className={cn(
-                  'border-b transition-colors last:border-0 hover:bg-surface-hover',
-                  refreshing && 'pointer-events-none opacity-60',
-                  onRowClick &&
-                    'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
-                  rowClassName?.(row),
-                )}
-              >
-                {columns.map((column) => (
-                  <td
-                    key={column.key}
+            rows.map((row) => {
+              const key = rowKey(row)
+              const panelId = `${panelIdPrefix}-${key}`
+              const open = Boolean(expandable) && expandedKey === key
+              return (
+                <Fragment key={key}>
+                  <tr
+                    {...rowInteraction(row, key, panelId)}
                     className={cn(
-                      'whitespace-nowrap tabular-nums',
-                      density.row,
-                      bodyCell,
-                      cellClassName,
-                      alignText[column.align ?? 'start'],
-                      column.hideBelow && hideBelowClass[column.hideBelow],
-                      column.className,
+                      'border-b transition-colors last:border-0 hover:bg-surface-hover',
+                      refreshing && 'pointer-events-none opacity-60',
+                      (onRowClick || expandable) &&
+                        'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+                      open && 'bg-surface',
+                      rowClassName?.(row),
                     )}
                   >
-                    {column.cell(row)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+                    {expandable && (
+                      <td
+                        className={cn(chevronCell, density.row, cellClassName)}
+                      >
+                        <ChevronDown
+                          size={16}
+                          aria-hidden="true"
+                          className={cn(
+                            'transition-transform',
+                            !open && '-rotate-90 rtl:rotate-90',
+                          )}
+                        />
+                      </td>
+                    )}
+                    {columns.map((column) => (
+                      <td
+                        key={column.key}
+                        className={cn(
+                          'whitespace-nowrap tabular-nums',
+                          density.row,
+                          bodyCell,
+                          cellClassName,
+                          alignText[column.align ?? 'start'],
+                          column.hideBelow && hideBelowClass[column.hideBelow],
+                          column.className,
+                        )}
+                      >
+                        {column.cell(row)}
+                      </td>
+                    ))}
+                  </tr>
+                  {open && expandable && (
+                    <tr
+                      id={panelId}
+                      className="border-b bg-surface last:border-0"
+                    >
+                      <td colSpan={spanAll} className="p-0">
+                        {expandable.render(row)}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              )
+            })}
         </tbody>
       </table>
     </div>
