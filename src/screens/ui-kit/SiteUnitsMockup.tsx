@@ -979,7 +979,9 @@ function sortValue(unit: Unit, key: string): string {
 /* ── 9 · small tiles, with search, filters and sort ─────────────── */
 
 /** Owner 2026-10-24: coloured tiles by PO state — soft amber without a PO,
- *  soft green with one; the border is a light shade of the same tone. */
+ *  soft green with one; no card border and no badge (the end of the tile,
+ *  the SPO or the add button, already says it). The line above the button
+ *  takes a light shade of the same tone. */
 function tileColors(unit: Unit): CSSProperties {
   const tone = unit.spo ? 'success' : 'warning'
   return {
@@ -1060,22 +1062,13 @@ function TilesDesign() {
           {units.map((unit) => (
             <li
               key={unit.id}
-              className="flex flex-col gap-2 rounded-xl border p-3 text-[13px]"
+              className="flex flex-col gap-2 rounded-xl p-3 text-[13px]"
               style={tileColors(unit)}
             >
               <div className="flex items-start justify-between gap-2">
                 <bdi dir="ltr" className="text-base font-semibold">
                   {unit.code}
                 </bdi>
-                {unit.spo ? (
-                  <Badge tone="success" size="sm">
-                    عليها PO
-                  </Badge>
-                ) : (
-                  <Badge tone="warning" size="sm">
-                    بلا PO
-                  </Badge>
-                )}
               </div>
               <div className="min-w-0 space-y-0.5">
                 <p className="truncate text-xs">{unit.type}</p>
