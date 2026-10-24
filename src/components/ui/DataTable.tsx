@@ -67,9 +67,6 @@ export interface DataTableProps<Row> {
   maxHeight?: string
   className?: string
   rowClassName?: (row: Row) => string | undefined
-  /** Text size of the header labels; 12 px (`text-xs`) unless a screen asks
-   *  otherwise (the supplier PO list tries 10 px, owner 2026-10-24). */
-  headerTextClassName?: string
 }
 
 const sizes: Record<
@@ -306,7 +303,6 @@ export function DataTable<Row>({
   maxHeight,
   className,
   rowClassName,
-  headerTextClassName = 'text-xs',
 }: DataTableProps<Row>) {
   const { t } = useI18n()
   const dragScroll = useDragScroll()
@@ -397,12 +393,12 @@ export function DataTable<Row>({
                       : undefined
                   }
                   className={cn(
-                    'whitespace-nowrap font-medium',
-                    headerTextClassName,
+                    'whitespace-nowrap text-xs font-medium',
                     density.header,
                     alignText[align],
                     active ? 'text-fg' : 'text-muted',
                     sortable ? 'p-0' : density.cell,
+                    sortable && 'text-xs',
                     column.hideBelow && hideBelowClass[column.hideBelow],
                     column.headerClassName,
                   )}
@@ -419,7 +415,7 @@ export function DataTable<Row>({
                         'group/sort inline-flex w-full items-center gap-1.5 transition-colors hover:bg-surface-hover hover:text-fg',
                         density.header,
                         density.cell,
-                        headerTextClassName,
+                        'text-xs',
                         alignFlex[align],
                       )}
                     >
