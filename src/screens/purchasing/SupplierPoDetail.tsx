@@ -29,6 +29,7 @@ import { PurchasingUnitCell } from '@/components/purchasing/PurchasingUnitCell'
 import { SupplierPoEventsTimeline } from '@/components/purchasing/SupplierPoEventsTimeline'
 import { SupplierPoOptionsMenu } from '@/components/purchasing/SupplierPoOptionsMenu'
 import { SupplierPoPrintSheet } from '@/components/purchasing/SupplierPoPrintSheet'
+import { SupplierPoReceipt } from '@/components/purchasing/SupplierPoReceipt'
 import { SupplierPoStatusBadge } from '@/components/purchasing/SupplierPoStatusBadge'
 import {
   BackButton,
@@ -578,20 +579,14 @@ export function SupplierPoDetail({
                   </li>
                 )
               })}
-              <li className="rounded-xl border bg-surface p-3 sm:p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
-                  <p className="text-sm font-medium">
-                    {t('supplierPoSummaryTotal')}
-                    {unpriced > 0 && (
-                      <span className="ms-2 text-xs font-normal text-muted">
-                        ({unpriced} {t('supplierPoUnpricedTotalNote')})
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-lg font-semibold sm:w-44 sm:shrink-0 sm:text-end">
-                    <Price value={total} />
-                  </p>
-                </div>
+              {/* «خلاصة الامر» (owner 2026-10-24) closes the list, at its end
+                  side, in place of the plain total card. */}
+              <li className="flex justify-end pt-2">
+                <SupplierPoReceipt
+                  count={lines.length}
+                  unpriced={unpriced}
+                  total={total}
+                />
               </li>
             </ul>
           )}
