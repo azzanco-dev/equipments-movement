@@ -48,6 +48,7 @@ import { HomeMockupShowcase } from '@/screens/ui-kit/HomeMockupShowcase'
 import { EquipmentInquiryShowcase } from '@/screens/ui-kit/EquipmentInquiryShowcase'
 import { RolesPageMockup } from '@/screens/ui-kit/RolesPageMockup'
 import { PurchasingMockup } from '@/screens/ui-kit/PurchasingMockup'
+import { SiteUnitsMockup } from '@/screens/ui-kit/SiteUnitsMockup'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -105,6 +106,16 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // Owner request 2026-10-24: a purchasing sub-page, three designs first.
+    id: 'site-units-mockup',
+    title: 'نموذج صفحة المعدات في المشاريع',
+    purpose:
+      'كل معدة داخل مشروع مع رقم امر الشراء المفتوح او زر الاضافة، بثلاث تصاميم ببيانات عينة.',
+    status: 'review',
+    defaultOpen: true,
+    element: <SiteUnitsMockup />,
+  },
   {
     // purchasing-screens (owner decision 2026-10-19): the three purchasing
     // screens are reviewed here as mockups before they get their routes.
