@@ -226,6 +226,8 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
           sort={{ key: list.sort, direction: list.direction }}
           onSortChange={list.setSort}
           onRowClick={(row) => onSelectPo(row.id)}
+          // Owner 2026-10-24: 13 px rows on this list (headers stay 12 px).
+          cellTextClassName="text-[13px]"
         />
       )}
       {!loadError && total > 0 && (

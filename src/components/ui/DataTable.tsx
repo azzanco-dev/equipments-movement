@@ -67,6 +67,13 @@ export interface DataTableProps<Row> {
   maxHeight?: string
   className?: string
   rowClassName?: (row: Row) => string | undefined
+  /**
+   * Text size of the body cells in place of the size's own (14 px for md),
+   * e.g. `text-[13px]` (the supplier PO list, owner 2026-10-24). It REPLACES
+   * the size's text class: an arbitrary size sorts before `text-sm` in the
+   * CSS, so set next to it, it would lose.
+   */
+  cellTextClassName?: string
 }
 
 const sizes: Record<
@@ -303,10 +310,20 @@ export function DataTable<Row>({
   maxHeight,
   className,
   rowClassName,
+  cellTextClassName,
 }: DataTableProps<Row>) {
   const { t } = useI18n()
   const dragScroll = useDragScroll()
   const density = sizes[size]
+  const bodyCell = cellTextClassName
+    ? cn(
+        density.cell
+          .split(' ')
+          .filter((name) => !name.startsWith('text-'))
+          .join(' '),
+        cellTextClassName,
+      )
+    : density.cell
   const hasError = error !== undefined && error !== null && error !== false
   // While a refetch (sort, page, filter) is in flight the current rows stay on
   // screen, dimmed, so column widths do not jump between skeleton and data.
@@ -442,7 +459,7 @@ export function DataTable<Row>({
                     key={column.key}
                     className={cn(
                       density.row,
-                      density.cell,
+                      bodyCell,
                       column.hideBelow && hideBelowClass[column.hideBelow],
                     )}
                   >
@@ -507,7 +524,7 @@ export function DataTable<Row>({
                     className={cn(
                       'whitespace-nowrap tabular-nums',
                       density.row,
-                      density.cell,
+                      bodyCell,
                       alignText[column.align ?? 'start'],
                       column.hideBelow && hideBelowClass[column.hideBelow],
                       column.className,
