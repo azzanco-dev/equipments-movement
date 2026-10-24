@@ -1,6 +1,11 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import {
+  useEffect,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react'
 import { Badge, Field, MultiSelect, Select, cn } from '@/components/ui'
 import type { SelectOption as UiSelectOption } from '@/components/ui'
 import { Select as LegacySelect } from '@/components/Select'
@@ -19,7 +24,165 @@ function delay(ms: number) {
   return new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 }
 
-/* ============================ بيانات تجريبية ============================ */
+/** اصلاح تجريبي **داخل هذه الصفحة فقط**: يُبقي لوحة الاختيار المفتوحة داخل
+ *  المساحة المرئية على الجوال. السبب ان Radix يقيس layout viewport بينما
+ *  الكيبورد يقلّص visualViewport وحده، فتُغطى اللوحة او تنقلب فوق الحقل.
+ *  لا يعدّل هذا الكود اي مكوّن مشترك. */
+const MOBILE_QUERY = '(max-width: 767px)'
+
+function useVisualViewportPanelFit() {
+  useEffect(() => {
+    let frame = 0
+    let settle: number[] = []
+
+    const naturalHeight = (panel: HTMLElement) => {
+      const previous = panel.style.maxHeight
+      panel.style.maxHeight = 'none'
+      const height = panel.scrollHeight
+      panel.style.maxHeight = previous
+      return height
+    }
+
+    /** الزر الذي فتح اللوحة: عبر aria-controls، والا اقرب حقل مفتوح. */
+    const triggerFor = (panel: HTMLElement): HTMLElement | null => {
+      if (panel.id) {
+        const byId = document.querySelector<HTMLElement>(
+          `[aria-controls="${panel.id}"]`,
+        )
+        if (byId) return byId
+      }
+      const active = document.activeElement
+      if (active instanceof HTMLElement) {
+        const owner = active.closest<HTMLElement>(
+          '[aria-haspopup], [role="combobox"]',
+        )
+        if (owner) return owner
+      }
+      const panelRect = panel.getBoundingClientRect()
+      const candidates = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[aria-haspopup][aria-expanded="true"], [role="combobox"][aria-expanded="true"]',
+        ),
+      )
+      let best: HTMLElement | null = null
+      let bestDistance = Number.POSITIVE_INFINITY
+      for (const candidate of candidates) {
+        const rect = candidate.getBoundingClientRect()
+        const distance = Math.min(
+          Math.abs(rect.bottom - panelRect.top),
+          Math.abs(rect.top - panelRect.bottom),
+        )
+        if (distance < bestDistance) {
+          bestDistance = distance
+          best = candidate
+        }
+      }
+      return best
+    }
+
+    const fit = () => {
+      frame = 0
+      if (!window.matchMedia(MOBILE_QUERY).matches) return
+      const visual = window.visualViewport
+      const viewTop = visual?.offsetTop ?? 0
+      const viewHeight = visual?.height ?? window.innerHeight
+      const viewBottom = viewTop + viewHeight
+      const gap = 8
+      const edge = 4
+      const minSpace = 176
+      const maxPanel = 320
+
+      /** يحسب الارتفاع والموضع الراسي داخل المساحة المرئية. */
+      const place = (panel: HTMLElement) => {
+        const trigger = triggerFor(panel)
+        const rect = trigger?.getBoundingClientRect()
+        const content = naturalHeight(panel)
+        let height: number
+        let top: number
+        if (rect) {
+          const below = viewBottom - (rect.bottom + edge) - gap
+          const above = rect.top - edge - viewTop - gap
+          const openBelow = below >= minSpace || below >= above
+          const space = Math.max(0, openBelow ? below : above)
+          height = Math.min(content, maxPanel, Math.max(minSpace, space))
+          top = openBelow ? rect.bottom + edge : rect.top - edge - height
+        } else {
+          const current = panel.getBoundingClientRect().top
+          height = Math.min(
+            content,
+            maxPanel,
+            Math.max(minSpace, viewBottom - current - gap),
+          )
+          top = Math.min(
+            Math.max(viewTop + gap, current),
+            viewBottom - gap - height,
+          )
+        }
+        panel.style.maxHeight = `${height}px`
+        panel.style.overflowY = 'auto'
+        return { top }
+      }
+
+      // ١) لوحات Radix: نضبط الازاحة الراسية في غلاف Popper.
+      document
+        .querySelectorAll<HTMLElement>('[data-radix-popper-content-wrapper]')
+        .forEach((wrapper) => {
+          const panel = wrapper.firstElementChild
+          if (!(panel instanceof HTMLElement)) return
+          const { top } = place(panel)
+          const computed = window.getComputedStyle(wrapper).transform
+          const matrix3d = computed.match(/matrix3d\(([^)]+)\)/)
+          const matrix = computed.match(/matrix\(([^)]+)\)/)
+          let tx = 0
+          if (matrix3d) tx = Number(matrix3d[1].split(',')[12]) || 0
+          else if (matrix) tx = Number(matrix[1].split(',')[4]) || 0
+          wrapper.style.transform = `translate3d(${tx}px, ${top}px, 0)`
+        })
+
+      // ٢) اللوحات التي تُرسم في portal يدوي (AsyncMultiSelect).
+      document
+        .querySelectorAll<HTMLElement>('[data-select-portal="true"]')
+        .forEach((panel) => {
+          if (panel.closest('[data-radix-popper-content-wrapper]')) return
+          const { top } = place(panel)
+          panel.style.bottom = 'auto'
+          panel.style.top = `${top}px`
+        })
+    }
+
+    const schedule = () => {
+      if (!frame) frame = window.requestAnimationFrame(fit)
+      settle.forEach((id) => window.clearTimeout(id))
+      settle = [window.setTimeout(fit, 80), window.setTimeout(fit, 260)]
+    }
+
+    const observer = new MutationObserver(schedule)
+    observer.observe(document.body, { childList: true })
+    const visual = window.visualViewport
+    visual?.addEventListener('resize', schedule)
+    visual?.addEventListener('scroll', schedule)
+    window.addEventListener('resize', schedule)
+    window.addEventListener('scroll', schedule, true)
+    return () => {
+      observer.disconnect()
+      visual?.removeEventListener('resize', schedule)
+      visual?.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
+      window.removeEventListener('scroll', schedule, true)
+      settle.forEach((id) => window.clearTimeout(id))
+      if (frame) window.cancelAnimationFrame(frame)
+    }
+  }, [])
+}
+
+/** على الجوال: تمرير حقل الاختيار الى وسط الشاشة قبل ان يفتح الكيبورد. */
+function centerSelectTrigger(event: ReactPointerEvent<HTMLDivElement>) {
+  if (!window.matchMedia(MOBILE_QUERY).matches) return
+  const trigger = (event.target as HTMLElement).closest<HTMLElement>(
+    'button[aria-haspopup], [role="combobox"]:not(input)',
+  )
+  trigger?.scrollIntoView({ block: 'center', inline: 'nearest' })
+}
 
 const EQUIPMENT_OPTIONS: UiSelectOption[] = [
   { value: 'a282', label: 'A282 — رافعة شوكية JCB' },
@@ -225,6 +388,8 @@ const ANCHORS = [
 /* ================================ الصفحة ================================ */
 
 export default function ComponentsPage() {
+  useVisualViewportPanelFit()
+
   const [emptyValue, setEmptyValue] = useState<string | undefined>(undefined)
   const [equipmentValue, setEquipmentValue] = useState<string | undefined>(
     'tk-dt-32',
@@ -264,7 +429,11 @@ export default function ComponentsPage() {
   const [multiValue, setMultiValue] = useState<SelectOption[]>([])
 
   return (
-    <div dir="rtl" className="min-h-[100dvh] bg-bg text-fg">
+    <div
+      dir="rtl"
+      className="min-h-[100dvh] bg-bg text-fg"
+      onPointerDownCapture={centerSelectTrigger}
+    >
       <div className="mx-auto w-full max-w-5xl space-y-5 p-4 md:p-6">
         <header className="space-y-2">
           <p className="text-xs font-medium text-muted">مرجع تطويري</p>
@@ -273,6 +442,14 @@ export default function ComponentsPage() {
             كل مكون مستخدم في الشاشات، بامثلته المباشرة وخصائصه. البيانات هنا
             تجريبية ولا تُحفظ. نبدا بحقول الاختيار، ثم نضيف بقية الحقول والجداول
             والازرار تدريجيا.
+          </p>
+          <p className="flex items-start gap-2 text-[11px] leading-5 text-muted">
+            <Badge tone="info">جوال</Badge>
+            <span>
+              في هذه الصفحة فقط: قائمة الاختيار تبقى داخل المساحة المرئية وفوق
+              الكيبورد، ويُمرَّر الحقل الى وسط الشاشة قبل فتحه. لا يعدّل هذا
+              السلوك اي مكوّن مشترك في التطبيق.
+            </span>
           </p>
           <nav className="flex flex-wrap gap-2 pt-1">
             {ANCHORS.map(([id, label]) => (
