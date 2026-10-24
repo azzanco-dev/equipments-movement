@@ -12,6 +12,8 @@ import {
   TabsTrigger,
   type DataTableColumn,
 } from '@/components/ui'
+import { DataListToolbar } from '@/components/data-list/DataListToolbar'
+import type { DataListConfig, ListFilter } from '@/components/data-list/types'
 
 // «المعدات في المشاريع» (owner request 2026-10-24): a purchasing sub-page
 // listing every unit inside a project now, with its open SPO at the end of
@@ -874,52 +876,233 @@ function BulkDesign() {
   )
 }
 
-/* ── 9 · small tiles, more on screen ────────────────────────────── */
+/** Sample foremen: the foreman who recorded the open site entry. */
+const FOREMAN_BY_PROJECT: Record<string, string> = {
+  'مشروع طريق الملك خالد - KKR': 'محمد العاقل',
+  الدرعية: 'جلال العزاني',
+  'مركز التنس القدية': 'سالم العمري',
+}
+
+function foremanOf(unit: Unit) {
+  return FOREMAN_BY_PROJECT[unit.project] ?? '—'
+}
+
+function uniqueOptions(values: string[]) {
+  return [...new Set(values)].map((value) => ({ value, label: value }))
+}
+
+/** The page's list config as the real screen would allowlist it. */
+const SITE_UNITS_CONFIG: DataListConfig = {
+  id: 'siteUnitsMockup',
+  searchPlaceholder: {
+    ar: 'البحث برقم المعدة او اللوحة او ترقيم الشركة او المورد او الفورمان',
+    en: 'Search by unit, plate, company number, supplier or foreman',
+  },
+  searchFields: [],
+  defaultSort: 'po_state',
+  defaultDirection: 'asc',
+  filterFields: [
+    {
+      key: 'po_state',
+      label: { ar: 'امر الشراء', en: 'Purchase order' },
+      type: 'select',
+      operators: ['eq'],
+      options: [
+        { value: 'missing', label: 'بلا امر' },
+        { value: 'covered', label: 'عليها امر' },
+      ],
+    },
+    {
+      key: 'owner',
+      label: 'ownershipStatus',
+      type: 'select',
+      operators: ['in'],
+      multiple: true,
+      options: OWNER_OPTIONS,
+    },
+    {
+      key: 'company',
+      label: 'company',
+      type: 'select',
+      operators: ['in'],
+      multiple: true,
+      options: uniqueOptions(UNITS.map((u) => u.company)),
+    },
+    {
+      key: 'project',
+      label: 'project',
+      type: 'select',
+      operators: ['in'],
+      multiple: true,
+      options: uniqueOptions(UNITS.map((u) => u.project)),
+    },
+    {
+      key: 'foreman',
+      label: { ar: 'الفورمان', en: 'Foreman' },
+      type: 'select',
+      operators: ['in'],
+      multiple: true,
+      options: uniqueOptions(UNITS.map(foremanOf)),
+    },
+  ],
+  sortableFields: [
+    { key: 'po_state', label: { ar: 'بلا امر اول', en: 'Missing PO first' } },
+    { key: 'since', label: { ar: 'تاريخ الدخول', en: 'Entry date' } },
+    { key: 'code', label: { ar: 'رقم المعدة', en: 'Unit code' } },
+    {
+      key: 'supplier',
+      label: { ar: 'المالك · المورد', en: 'Owner · supplier' },
+    },
+    { key: 'project', label: { ar: 'المشروع', en: 'Project' } },
+  ],
+}
+
+/** The value a filter field reads from a sample unit. */
+function fieldValue(unit: Unit, field: string): string {
+  switch (field) {
+    case 'po_state':
+      return unit.spo ? 'covered' : 'missing'
+    case 'owner':
+      return unit.owner
+    case 'company':
+      return unit.company
+    case 'project':
+      return unit.project
+    case 'foreman':
+      return foremanOf(unit)
+    default:
+      return ''
+  }
+}
+
+/** dd/mm/yyyy → yyyymmdd, so dates sort as text. */
+function sortableDate(value: string) {
+  const [day, month, year] = value.split('/')
+  return `${year}${month}${day}`
+}
+
+function sortValue(unit: Unit, key: string): string {
+  switch (key) {
+    case 'po_state':
+      return unit.spo ? '1' : '0'
+    case 'since':
+      return sortableDate(unit.since)
+    case 'supplier':
+      return ownerLine(unit)
+    case 'project':
+      return unit.project
+    default:
+      return unit.code
+  }
+}
+
+/* ── 9 · small tiles, with search, filters and sort ─────────────── */
 
 function TilesDesign() {
-  const [owners, setOwners] = useState<string[]>([])
-  const units = missingFirst(useFiltered(owners))
+  const [search, setSearch] = useState('')
+  const [filters, setFilters] = useState<ListFilter[]>([])
+  const [sort, setSort] = useState(SITE_UNITS_CONFIG.defaultSort)
+  const [direction, setDirection] = useState<'asc' | 'desc'>('asc')
+
+  // Sample data only: the real page searches, filters and sorts on the
+  // server like every list, with paging.
+  const units = useMemo(() => {
+    const text = search.trim().toLowerCase()
+    const rows = UNITS.filter((unit) => {
+      if (text) {
+        const haystack = [
+          unit.code,
+          unit.plate,
+          unit.contractorCode ?? '',
+          ownerLine(unit),
+          foremanOf(unit),
+          unit.project,
+          unit.type,
+        ]
+          .join(' ')
+          .toLowerCase()
+        if (!haystack.includes(text)) return false
+      }
+      return filters.every((filter) => {
+        const value = fieldValue(unit, filter.field)
+        return filter.operator === 'in'
+          ? filter.value.split(',').includes(value)
+          : value === filter.value
+      })
+    })
+    const factor = direction === 'asc' ? 1 : -1
+    return rows.sort(
+      (a, b) =>
+        factor *
+        sortValue(a, sort).localeCompare(sortValue(b, sort), 'ar', {
+          numeric: true,
+        }),
+    )
+  }, [direction, filters, search, sort])
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted">
-          مربعات صغيرة، اكثر عدد على الشاشة. حالة الامر فوق كل مربع، والناقص
-          اول.
+      <p className="text-xs text-muted">
+        مربعات صغيرة، اكثر عدد على الشاشة. فوقها شريط القوائم المعتمد: البحث،
+        والفلاتر (امر الشراء، المالك، الشركة، المشروع، الفورمان)، والترتيب.
+      </p>
+      <DataListToolbar
+        config={SITE_UNITS_CONFIG}
+        search={search}
+        onSearch={setSearch}
+        sort={sort}
+        direction={direction}
+        onSort={(field, nextDirection) => {
+          setSort(field)
+          setDirection(nextDirection)
+        }}
+        filterFields={SITE_UNITS_CONFIG.filterFields}
+        filters={filters}
+        onFilters={setFilters}
+      />
+      <p className="text-xs text-muted">{units.length} معدة</p>
+      {units.length === 0 ? (
+        <p className="rounded-xl border bg-surface px-4 py-8 text-center text-sm text-muted">
+          لا توجد معدات مطابقة للبحث او الفلاتر.
         </p>
-        <OwnerFilter value={owners} onChange={setOwners} />
-      </div>
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-        {units.map((unit) => (
-          <li
-            key={unit.id}
-            className="flex flex-col gap-2 rounded-xl border bg-bg p-3 text-[13px]"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <bdi dir="ltr" className="text-base font-semibold">
-                {unit.code}
-              </bdi>
-              {unit.spo ? (
-                <Badge tone="success" size="sm">
-                  عليها امر
-                </Badge>
-              ) : (
-                <Badge tone="warning" size="sm">
-                  بلا امر
-                </Badge>
-              )}
-            </div>
-            <div className="min-w-0 space-y-0.5">
-              <p className="truncate text-xs">{unit.type}</p>
-              <p className="truncate text-xs text-muted">{ownerLine(unit)}</p>
-              <p className="truncate text-xs text-muted">{unit.project}</p>
-              <CompanyNumber unit={unit} />
-            </div>
-            <div className="mt-auto border-t pt-2">
-              <PoCell unit={unit} compact />
-            </div>
-          </li>
-        ))}
-      </ul>
+      ) : (
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+          {units.map((unit) => (
+            <li
+              key={unit.id}
+              className="flex flex-col gap-2 rounded-xl border bg-bg p-3 text-[13px]"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <bdi dir="ltr" className="text-base font-semibold">
+                  {unit.code}
+                </bdi>
+                {unit.spo ? (
+                  <Badge tone="success" size="sm">
+                    عليها امر
+                  </Badge>
+                ) : (
+                  <Badge tone="warning" size="sm">
+                    بلا امر
+                  </Badge>
+                )}
+              </div>
+              <div className="min-w-0 space-y-0.5">
+                <p className="truncate text-xs">{unit.type}</p>
+                <p className="truncate text-xs text-muted">{ownerLine(unit)}</p>
+                <p className="truncate text-xs text-muted">{unit.project}</p>
+                <p className="truncate text-xs text-muted">
+                  الفورمان{' '}
+                  <span className="font-medium text-fg">{foremanOf(unit)}</span>
+                </p>
+                <CompanyNumber unit={unit} />
+              </div>
+              <div className="mt-auto border-t pt-2">
+                <PoCell unit={unit} compact />
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
@@ -936,7 +1119,7 @@ export function SiteUnitsMockup() {
           كبطاقات مع ترقيم الشركة)، و5 الى 9 افكار مبنية عليه. ببيانات عينة.
         </p>
       </div>
-      <Tabs defaultValue="all-cards">
+      <Tabs defaultValue="tiles">
         <TabsList variant="segmented" className="flex-wrap">
           <TabsTrigger value="grouped">1 · حسب المشروع</TabsTrigger>
           <TabsTrigger value="todo">2 · قائمة شغل</TabsTrigger>
@@ -952,7 +1135,7 @@ export function SiteUnitsMockup() {
           </TabsTrigger>
           <TabsTrigger value="two-columns">7 · عمودين</TabsTrigger>
           <TabsTrigger value="bulk">8 · تحديد واضافة جماعية</TabsTrigger>
-          <TabsTrigger value="tiles">9 · مربعات صغيرة</TabsTrigger>
+          <TabsTrigger value="tiles">9 · مربعات صغيرة (المختار)</TabsTrigger>
         </TabsList>
         <TabsContent value="grouped" className="pt-3">
           <GroupedDesign />
