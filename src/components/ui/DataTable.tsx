@@ -13,8 +13,9 @@ import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
-  ChevronDown,
   ChevronsUpDown,
+  Minus,
+  Plus,
 } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { cn } from './cn'
@@ -89,7 +90,7 @@ export interface DataTableProps<Row> {
    * Expandable rows (owner 2026-10-24, the supplier PO list): a click (or
    * Enter / Space) anywhere on a row opens a full-width panel under it with
    * `render(row)`, and again closes it; one row is open at a time, and a
-   * chevron at the row's start shows the state. The row then no longer calls
+   * plus / minus at the row's start shows the state. The row then no longer calls
    * `onRowClick`; a screen puts its own link or button in a cell (nested
    * controls never toggle the row). `render` runs only for the open row, so a
    * panel that loads its own data loads it on demand.
@@ -339,7 +340,7 @@ export function DataTable<Row>({
   const dragScroll = useDragScroll()
   const panelIdPrefix = useId()
   const [expandedKey, setExpandedKey] = useState<string | number | null>(null)
-  // The chevron column sits before the data columns.
+  // The plus / minus column sits before the data columns.
   const spanAll = columns.length + (expandable ? 1 : 0)
   const chevronCell = 'w-8 pe-0 ps-3 text-muted'
   const density = sizes[size]
@@ -569,14 +570,12 @@ export function DataTable<Row>({
                       <td
                         className={cn(chevronCell, density.row, cellClassName)}
                       >
-                        <ChevronDown
-                          size={16}
-                          aria-hidden="true"
-                          className={cn(
-                            'transition-transform',
-                            !open && '-rotate-90 rtl:rotate-90',
-                          )}
-                        />
+                        {/* Owner 2026-10-24: + closed, − open. */}
+                        {open ? (
+                          <Minus size={16} aria-hidden="true" />
+                        ) : (
+                          <Plus size={16} aria-hidden="true" />
+                        )}
                       </td>
                     )}
                     {columns.map((column) => (
