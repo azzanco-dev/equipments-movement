@@ -1096,7 +1096,14 @@ function TilesDesign() {
                     (amber). */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 leading-6">
-                    <bdi dir="ltr" className="text-base font-bold">
+                    <bdi
+                      dir="ltr"
+                      className="text-base font-bold"
+                      // Owner 2026-10-25: bolder than bold. Thmanyah's
+                      // heaviest face is 700, so a thin stroke in the text
+                      // colour thickens letters and digits alike.
+                      style={{ WebkitTextStroke: '0.35px currentColor' }}
+                    >
                       {unit.code}
                     </bdi>
                     {(unit.plate || unit.chassis) && (
