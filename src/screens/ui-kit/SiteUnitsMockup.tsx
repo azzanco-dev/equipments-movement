@@ -1167,6 +1167,274 @@ function TilesDesign() {
   )
 }
 
+/* ── 10 · fancy card treatments (owner 2026-10-25) ───────────────── */
+
+type FancyLook = 'ink' | 'ticket' | 'plate' | 'lift' | 'tinted'
+
+const FANCY_LOOKS: { id: FancyLook; title: string; note: string }[] = [
+  {
+    id: 'ink',
+    title: 'ا · راس حبر',
+    note: 'راس الكرت باللون الاساسي (اسود في الفاتح) فيه الكود، والباقي ابيض. الحالة من الزر فقط.',
+  },
+  {
+    id: 'ticket',
+    title: 'ب · تذكرة',
+    note: 'الكرت مثل تذكرة: خط مثقب، وتحته قسيمة الـ PO بلون الحالة. يناسب ان الكرت «سند» شراء.',
+  },
+  {
+    id: 'plate',
+    title: 'ج · لوحة',
+    note: 'الكود داخل اطار مثل لوحة المعدة، والحالة نقطة ملونة صغيرة في الزاوية. الكرت محايد.',
+  },
+  {
+    id: 'lift',
+    title: 'د · مرفوع',
+    note: 'بلا حدود، بظل خفيف، ويرتفع شوي لما تمر عليه. الحالة نقطة وزر. هادي ومرتب.',
+  },
+  {
+    id: 'tinted',
+    title: 'هـ · راس ملون',
+    note: 'راس الكرت فقط بلون الحالة الفاتح (فيه الكود والزر)، وجسمه ابيض. لون اقل من الحالي.',
+  },
+]
+
+const toneOf = (unit: Unit) => (unit.spo ? 'success' : 'warning')
+
+/** The «+» or the SPO, solid in the state's tone; `round` for the circle. */
+function FancyAction({ unit, round = false }: { unit: Unit; round?: boolean }) {
+  if (unit.spo)
+    return (
+      <button
+        type="button"
+        className="inline-flex h-7 shrink-0 items-center rounded-md px-2 text-xs font-semibold underline-offset-2 hover:underline"
+        style={{
+          backgroundColor: 'var(--success-soft)',
+          color: 'var(--success)',
+        }}
+      >
+        <bdi dir="ltr">{unit.spo}</bdi>
+      </button>
+    )
+  return (
+    <button
+      type="button"
+      aria-label="اضافة الى PO"
+      title="اضافة الى PO"
+      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center transition-opacity hover:opacity-85 ${round ? 'rounded-full' : 'rounded-md'}`}
+      style={{ backgroundColor: 'var(--warning)', color: 'var(--bg)' }}
+    >
+      <Plus size={15} strokeWidth={2.5} aria-hidden="true" />
+    </button>
+  )
+}
+
+function FancyDetails({ unit }: { unit: Unit }) {
+  return (
+    <div className="min-w-0 space-y-1">
+      <p className="break-words text-xs leading-5">{unit.type}</p>
+      <p className="break-words text-xs leading-5 text-muted">
+        {ownerLine(unit)}
+      </p>
+      <p className="break-words text-xs leading-5 text-muted">
+        {unit.company} · {unit.project}
+      </p>
+      <p className="break-words text-xs leading-5 text-muted">
+        الفورمان <span className="font-medium text-fg">{foremanOf(unit)}</span>
+      </p>
+    </div>
+  )
+}
+
+function StateDot({ unit }: { unit: Unit }) {
+  return (
+    <span
+      aria-label={unit.spo ? 'عليها PO' : 'بلا PO'}
+      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+      style={{
+        backgroundColor: `var(--${toneOf(unit)})`,
+        boxShadow: `0 0 0 3px var(--${toneOf(unit)}-soft)`,
+      }}
+    />
+  )
+}
+
+function FancyTile({ look, unit }: { look: FancyLook; unit: Unit }) {
+  const plate = unit.plate || unit.chassis
+  if (look === 'ink')
+    return (
+      <li className="overflow-hidden rounded-xl border bg-bg text-[13px]">
+        <div className="flex items-start justify-between gap-2 bg-fg px-3 py-2.5 text-bg">
+          <div className="min-w-0">
+            <p className="text-base font-bold leading-6">
+              <bdi dir="ltr">{unit.code}</bdi>
+            </p>
+            <p className="text-xs leading-5 opacity-70">
+              <bdi dir="ltr">
+                {plate}
+                {unit.contractorCode ? ` · ${unit.contractorCode}` : ''}
+              </bdi>
+            </p>
+          </div>
+          <FancyAction unit={unit} round />
+        </div>
+        <div className="p-3">
+          <FancyDetails unit={unit} />
+        </div>
+      </li>
+    )
+  if (look === 'ticket')
+    return (
+      <li className="relative rounded-xl border bg-bg text-[13px]">
+        <div className="space-y-2 p-3">
+          <div>
+            <p className="text-lg font-bold leading-6">
+              <bdi dir="ltr">{unit.code}</bdi>
+            </p>
+            <p className="text-xs leading-5 text-muted">
+              <bdi dir="ltr">{plate}</bdi>
+            </p>
+            {unit.contractorCode && (
+              <p className="text-xs font-medium leading-5">
+                <bdi dir="ltr">{unit.contractorCode}</bdi>
+              </p>
+            )}
+          </div>
+          <FancyDetails unit={unit} />
+        </div>
+        {/* The perforation: a dashed line with two half-circle notches. */}
+        <div className="relative mx-3 border-t border-dashed">
+          <span className="absolute -start-[19px] -top-[7px] h-3.5 w-3.5 rounded-full border bg-surface" />
+          <span className="absolute -end-[19px] -top-[7px] h-3.5 w-3.5 rounded-full border bg-surface" />
+        </div>
+        <div
+          className="flex items-center justify-between gap-2 rounded-b-xl px-3 py-2.5"
+          style={{ backgroundColor: `var(--${toneOf(unit)}-soft)` }}
+        >
+          <span
+            className="text-xs font-medium"
+            style={{ color: `var(--${toneOf(unit)})` }}
+          >
+            {unit.spo ? 'عليها PO' : 'بلا PO'}
+          </span>
+          <FancyAction unit={unit} />
+        </div>
+      </li>
+    )
+  if (look === 'plate')
+    return (
+      <li className="flex flex-col gap-3 rounded-xl border bg-bg p-3 text-[13px] shadow-sm">
+        <div className="flex items-start justify-between gap-2">
+          <div className="space-y-1">
+            <bdi
+              dir="ltr"
+              className="inline-block rounded-md border-2 border-fg px-2 text-base font-bold leading-6"
+            >
+              {unit.code}
+            </bdi>
+            <p className="text-xs leading-5 text-muted">
+              <bdi dir="ltr">
+                {plate}
+                {unit.contractorCode ? ` · ${unit.contractorCode}` : ''}
+              </bdi>
+            </p>
+          </div>
+          <StateDot unit={unit} />
+        </div>
+        <FancyDetails unit={unit} />
+        <div className="mt-auto flex justify-end">
+          <FancyAction unit={unit} round />
+        </div>
+      </li>
+    )
+  if (look === 'lift')
+    return (
+      <li className="flex flex-col gap-3 rounded-xl bg-bg p-3 text-[13px] shadow-sm transition motion-safe:hover:-translate-y-0.5 hover:shadow-md">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <StateDot unit={unit} />
+            <div className="min-w-0">
+              <p className="text-base font-bold leading-6">
+                <bdi dir="ltr">{unit.code}</bdi>
+              </p>
+              <p className="text-xs leading-5 text-muted">
+                <bdi dir="ltr">{plate}</bdi>
+              </p>
+            </div>
+          </div>
+          <FancyAction unit={unit} round />
+        </div>
+        {unit.contractorCode && (
+          <p className="-mt-2 text-xs font-medium leading-5">
+            <bdi dir="ltr">{unit.contractorCode}</bdi>
+          </p>
+        )}
+        <FancyDetails unit={unit} />
+      </li>
+    )
+  // tinted
+  return (
+    <li className="overflow-hidden rounded-xl border bg-bg text-[13px]">
+      <div
+        className="flex items-start justify-between gap-2 px-3 py-2.5"
+        style={{ backgroundColor: `var(--${toneOf(unit)}-soft)` }}
+      >
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-baseline gap-x-2 leading-6">
+            <bdi dir="ltr" className="text-base font-bold">
+              {unit.code}
+            </bdi>
+            <bdi dir="ltr" className="text-xs text-muted">
+              {plate}
+            </bdi>
+          </div>
+          {unit.contractorCode && (
+            <p className="text-xs font-medium leading-5">
+              <bdi dir="ltr">{unit.contractorCode}</bdi>
+            </p>
+          )}
+        </div>
+        <FancyAction unit={unit} />
+      </div>
+      <div className="p-3">
+        <FancyDetails unit={unit} />
+      </div>
+    </li>
+  )
+}
+
+function FancyTilesDesign() {
+  const [look, setLook] = useState<FancyLook>('ticket')
+  const units = missingFirst(UNITS).slice(0, 9)
+  const current = FANCY_LOOKS.find((item) => item.id === look)!
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted">
+        خمس معالجات «فانسي» لنفس الكرت ونفس البيانات، بالالوان المعتمدة فقط وبلا
+        تدرجات. الشريط والفلاتر نفسها من النموذج 9.
+      </p>
+      <div className="flex flex-wrap gap-1.5">
+        {FANCY_LOOKS.map((item) => (
+          <Button
+            key={item.id}
+            size="sm"
+            variant={look === item.id ? 'primary' : 'outline'}
+            onClick={() => setLook(item.id)}
+          >
+            {item.title}
+          </Button>
+        ))}
+      </div>
+      <p className="text-xs text-muted">{current.note}</p>
+      <ul className="grid grid-cols-2 gap-3 rounded-xl bg-surface p-3 sm:grid-cols-3">
+        {units.map((unit) => (
+          <FancyTile key={unit.id} look={look} unit={unit} />
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function SiteUnitsMockup() {
   return (
     <section className="card space-y-4">
@@ -1179,7 +1447,7 @@ export function SiteUnitsMockup() {
           ترقيم الشركة)، و5 الى 9 افكار مبنية عليه. ببيانات عينة.
         </p>
       </div>
-      <Tabs defaultValue="tiles">
+      <Tabs defaultValue="fancy">
         <TabsList variant="segmented" className="flex-wrap">
           <TabsTrigger value="grouped">1 · حسب المشروع</TabsTrigger>
           <TabsTrigger value="todo">2 · قائمة شغل</TabsTrigger>
@@ -1196,6 +1464,7 @@ export function SiteUnitsMockup() {
           <TabsTrigger value="two-columns">7 · عمودين</TabsTrigger>
           <TabsTrigger value="bulk">8 · تحديد واضافة جماعية</TabsTrigger>
           <TabsTrigger value="tiles">9 · مربعات صغيرة (المختار)</TabsTrigger>
+          <TabsTrigger value="fancy">10 · تصاميم فانسي للكرت</TabsTrigger>
         </TabsList>
         <TabsContent value="grouped" className="pt-3">
           <GroupedDesign />
@@ -1223,6 +1492,9 @@ export function SiteUnitsMockup() {
         </TabsContent>
         <TabsContent value="tiles" className="pt-3">
           <TilesDesign />
+        </TabsContent>
+        <TabsContent value="fancy" className="pt-3">
+          <FancyTilesDesign />
         </TabsContent>
       </Tabs>
     </section>
