@@ -1096,7 +1096,14 @@ function TilesDesign() {
                     (amber). */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 leading-6">
-                    <bdi dir="ltr" className="text-base font-bold">
+                    <bdi
+                      dir="ltr"
+                      className="text-base font-bold"
+                      // Owner 2026-10-25: the code in Thmanyah Serif
+                      // (the heading font token); inline, because the
+                      // global `*` rule sets the interface font.
+                      style={{ fontFamily: 'var(--font-heading)' }}
+                    >
                       {unit.code}
                     </bdi>
                     {(unit.plate || unit.chassis) && (
