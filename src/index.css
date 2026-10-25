@@ -53,10 +53,22 @@
   unicode-range: U+0030-0039, U+002C-002E, U+0025, U+002B, U+003A;
 }
 
-/* Thmanyah Sans remains the Arabic interface font. */
+/* Thmanyah Sans remains the Arabic interface font. Since 2026-10-25 (owner)
+   it is served from the site itself (public/fonts/thmanyah-sans, the owner's
+   own files) in five weights: 300, 400, 500, 700 and 900 — there is no 600.
+   The faces cover the Arabic ranges only, as before. */
 @font-face {
   font-family: 'Thmanyah';
-  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Regular.woff2')
+  src: url('/fonts/thmanyah-sans/thmanyahsans-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {
+  font-family: 'Thmanyah';
+  src: url('/fonts/thmanyah-sans/thmanyahsans-Regular.woff2')
     format('woff2');
   font-weight: 400;
   font-style: normal;
@@ -78,7 +90,7 @@
 }
 @font-face {
   font-family: 'Thmanyah';
-  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Medium.woff2')
+  src: url('/fonts/thmanyah-sans/thmanyahsans-Medium.woff2')
     format('woff2');
   font-weight: 500;
   font-style: normal;
@@ -88,9 +100,18 @@
 }
 @font-face {
   font-family: 'Thmanyah';
-  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-sans/woff2/thmanyah-sans-Bold.woff2')
+  src: url('/fonts/thmanyah-sans/thmanyahsans-Bold.woff2')
     format('woff2');
   font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {
+  font-family: 'Thmanyah';
+  src: url('/fonts/thmanyah-sans/thmanyahsans-Black.woff2') format('woff2');
+  font-weight: 900;
   font-style: normal;
   font-display: swap;
   unicode-range:
