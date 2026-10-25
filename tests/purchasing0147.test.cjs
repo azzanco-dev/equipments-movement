@@ -84,8 +84,12 @@ test('the page reads the view server-side and adds through the existing dialogs'
   assert.match(screen, /<CreateSupplierPoDialog[\s\S]*?preset=\{target\?\.kind === 'new' \? target\.preset : null\}/)
   // The add needs purchasing.manage; readers see the state only.
   assert.match(screen, /const canManage = can\('purchasing\.manage'\)/)
-  // Tiles: coloured by state, no badge, at most three columns.
-  assert.match(screen, /backgroundColor: `var\(--\$\{row\.has_po \? 'success' : 'warning'\}-soft\)`/)
+  // Tiles: coloured by state with a light border of the same tone
+  // (2026-10-25), no badge, at most three columns.
+  assert.match(screen, /const tone = row\.has_po \? 'success' : 'warning'/)
+  assert.match(screen, /backgroundColor: `var\(--\$\{tone\}-soft\)`/)
+  assert.match(screen, /borderColor: `color-mix\(in srgb, var\(--\$\{tone\}\) 25%, transparent\)`/)
+  assert.match(screen, /className="flex flex-col gap-3 rounded-xl border p-3 text-\[13px\]"/)
   assert.doesNotMatch(screen, /<Badge/)
   assert.match(screen, /grid grid-cols-2 gap-2 sm:grid-cols-3/)
   assert.doesNotMatch(screen, /lg:grid-cols-4|xl:grid-cols-4/)

@@ -52,11 +52,14 @@ const ASYNC_FILTERS = {
   entry_supervisor_id: foremanFilterOptions(supabase),
 }
 
-/** Soft amber without a PO, soft green with one; no border, no badge — the
- *  end of the tile (the SPO or the add button) already says it. */
+/** Soft amber without a PO, soft green with one, with a light border in a
+ *  shade of the same tone (owner 2026-10-25); no badge — the end of the tile
+ *  (the SPO or the add button) already says it. */
 function tileColors(row: SiteUnitRow): CSSProperties {
+  const tone = row.has_po ? 'success' : 'warning'
   return {
-    backgroundColor: `var(--${row.has_po ? 'success' : 'warning'}-soft)`,
+    backgroundColor: `var(--${tone}-soft)`,
+    borderColor: `color-mix(in srgb, var(--${tone}) 25%, transparent)`,
   }
 }
 
@@ -246,7 +249,7 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
             {rows.map((row) => (
               <li
                 key={row.entry_id}
-                className="flex flex-col gap-3 rounded-xl p-3 text-[13px]"
+                className="flex flex-col gap-3 rounded-xl border p-3 text-[13px]"
                 style={tileColors(row)}
               >
                 <div>

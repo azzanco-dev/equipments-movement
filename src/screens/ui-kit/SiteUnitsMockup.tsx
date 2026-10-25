@@ -982,12 +982,14 @@ function sortValue(unit: Unit, key: string): string {
 /* ── 9 · small tiles, with search, filters and sort ─────────────── */
 
 /** Owner 2026-10-24: coloured tiles by PO state — soft amber without a PO,
- *  soft green with one; no card border and no badge (the end of the tile,
- *  the SPO or the add button, already says it) and no line above the
- *  button. */
+ *  soft green with one; no badge (the end of the tile, the SPO or the add
+ *  button, already says it) and no line above the button. 2026-10-25: a
+ *  light border in a shade of the same tone. */
 function tileColors(unit: Unit): CSSProperties {
+  const tone = unit.spo ? 'success' : 'warning'
   return {
-    backgroundColor: `var(--${unit.spo ? 'success' : 'warning'}-soft)`,
+    backgroundColor: `var(--${tone}-soft)`,
+    borderColor: `color-mix(in srgb, var(--${tone}) 25%, transparent)`,
   }
 }
 
@@ -1064,7 +1066,7 @@ function TilesDesign() {
           {units.map((unit) => (
             <li
               key={unit.id}
-              className="flex flex-col gap-3 rounded-xl p-3 text-[13px]"
+              className="flex flex-col gap-3 rounded-xl border p-3 text-[13px]"
               style={tileColors(unit)}
             >
               {/* The code with the plate, or the chassis when there is no
