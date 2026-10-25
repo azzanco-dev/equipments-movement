@@ -1,11 +1,6 @@
 'use client'
 
-import {
-  useEffect,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-} from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Badge, Field, MultiSelect, Select, cn } from '@/components/ui'
 import type { SelectOption as UiSelectOption } from '@/components/ui'
 import { Select as LegacySelect } from '@/components/Select'
@@ -82,12 +77,20 @@ function useVisualViewportPanelFit() {
       return best
     }
 
-    /** الحقل الى اعلى المساحة المرئية، لتبقى القائمة تحته ممتدة الى الكيبورد. */
+    /** الحقل الى اعلى المساحة المرئية، لتبقى القائمة تحته ممتدة الى الكيبورد.
+     *  التمرير ناعم حتى لا يقفز المحتوى، ويُحترم تقليل الحركة. */
     const alignToTop = (trigger: HTMLElement) => {
       const viewTop = window.visualViewport?.offsetTop ?? 0
       const rect = trigger.getBoundingClientRect()
       const delta = rect.top - (viewTop + 8)
-      if (Math.abs(delta) > 2) window.scrollBy({ top: delta })
+      if (Math.abs(delta) < 3) return
+      const reduceMotion = window.matchMedia(
+        '(prefers-reduced-motion: reduce)',
+      ).matches
+      window.scrollTo({
+        top: window.scrollY + delta,
+        behavior: reduceMotion ? 'auto' : 'smooth',
+      })
     }
 
     const fit = () => {
@@ -198,18 +201,6 @@ function useVisualViewportPanelFit() {
       if (frame) window.cancelAnimationFrame(frame)
     }
   }, [])
-}
-
-/** على الجوال: الحقل الى اعلى الشاشة قبل ان يفتح الكيبورد. */
-function alignSelectTrigger(event: ReactPointerEvent<HTMLDivElement>) {
-  if (!window.matchMedia(MOBILE_QUERY).matches) return
-  const trigger = (event.target as HTMLElement).closest<HTMLElement>(
-    'button[aria-haspopup], [role="combobox"]:not(input)',
-  )
-  if (!trigger) return
-  const viewTop = window.visualViewport?.offsetTop ?? 0
-  const rect = trigger.getBoundingClientRect()
-  window.scrollBy({ top: rect.top - (viewTop + 8) })
 }
 
 const EQUIPMENT_OPTIONS: UiSelectOption[] = [
@@ -457,11 +448,7 @@ export default function ComponentsPage() {
   const [multiValue, setMultiValue] = useState<SelectOption[]>([])
 
   return (
-    <div
-      dir="rtl"
-      className="min-h-[100dvh] bg-bg text-fg"
-      onPointerDownCapture={alignSelectTrigger}
-    >
+    <div dir="rtl" className="min-h-[100dvh] bg-bg text-fg">
       <div className="mx-auto w-full max-w-5xl space-y-5 p-4 md:p-6">
         <header className="space-y-2">
           <p className="text-xs font-medium text-muted">مرجع تطويري</p>
