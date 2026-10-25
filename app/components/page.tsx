@@ -24,11 +24,15 @@ function delay(ms: number) {
  *  الكيبورد يقلّص visualViewport وحده، فتُغطى اللوحة او تنقلب فوق الحقل.
  *  لا يعدّل هذا الكود اي مكوّن مشترك. */
 const MOBILE_QUERY = '(max-width: 767px)'
+/** المسافة بين اعلى المساحة المرئية وحافة الحقل بعد التمرير التلقائي. */
+const TOP_OFFSET = 50
 
 function useVisualViewportPanelFit() {
   useEffect(() => {
     let frame = 0
     let settle: number[] = []
+    /** لا نعيد الضبط قبل ان ينتهي التمرير الناعم الحالي. */
+    let alignQuietUntil = 0
     /** اخر ارتفاع مرئي عولج عنده الحقل، لنعيد الضبط مرة واحدة عند فتح الكيبورد. */
     const alignedAt = new WeakMap<HTMLElement, number>()
 
@@ -78,17 +82,21 @@ function useVisualViewportPanelFit() {
     }
 
     /** الحقل الى اعلى المساحة المرئية، لتبقى القائمة تحته ممتدة الى الكيبورد.
-     *  التمرير ناعم حتى لا يقفز المحتوى، ويُحترم تقليل الحركة. */
+     *  نستخدم scrollIntoView لان المتصفح يحسب موضع المساحة المرئية والكيبورد
+     *  بنفسه؛ الحساب اليدوي (scrollY + delta) كان يخطئ على iOS اثناء حركة
+     *  الكيبورد فيقفز بالمستند الى اعلى الصفحة. */
     const alignToTop = (trigger: HTMLElement) => {
       const viewTop = window.visualViewport?.offsetTop ?? 0
       const rect = trigger.getBoundingClientRect()
-      const delta = rect.top - (viewTop + 8)
-      if (Math.abs(delta) < 3) return
+      if (Math.abs(rect.top - (viewTop + TOP_OFFSET)) <= 10) return
       const reduceMotion = window.matchMedia(
         '(prefers-reduced-motion: reduce)',
       ).matches
-      window.scrollTo({
-        top: window.scrollY + delta,
+      trigger.style.scrollMarginTop = `${TOP_OFFSET}px`
+      alignQuietUntil = performance.now() + 700
+      trigger.scrollIntoView({
+        block: 'start',
+        inline: 'nearest',
         behavior: reduceMotion ? 'auto' : 'smooth',
       })
     }
@@ -127,13 +135,16 @@ function useVisualViewportPanelFit() {
           return top
         }
 
-        // ١) الحقل الى الاعلى. نعيد الضبط حين يتغير ارتفاع المساحة المرئية
-        //    (اي عند فتح الكيبورد) ثم نتوقف حتى لا نعاند تمرير المستخدم.
+        // ١) الحقل الى الاعلى. نعيد الضبط عند تغيّر ارتفاع المساحة المرئية
+        //    (اي عند فتح الكيبورد)، ونترك التمرير الناعم يكتمل قبل اي محاولة
+        //    اخرى حتى لا يُعاد تشغيله مع كل حدث تمرير.
         const heightNow = Math.round(viewHeight)
-        const alignedFor = alignedAt.get(panel)
-        if (alignedFor === undefined || alignedFor !== heightNow) {
+        const heightChanged = alignedAt.get(panel) !== heightNow
+        if (heightChanged) alignedAt.set(panel, heightNow)
+        // نضبط مرة عند الفتح ومرة عند تغيّر ارتفاع المساحة (فتح/اغلاق الكيبورد).
+        // لا نضبط عند تمرير المستخدم، ولا نعيد تشغيل الحركة وهي جارية.
+        if (heightChanged && performance.now() > alignQuietUntil) {
           alignToTop(trigger)
-          alignedAt.set(panel, heightNow)
         }
 
         const rect = trigger.getBoundingClientRect()
@@ -144,7 +155,12 @@ function useVisualViewportPanelFit() {
         const openBelow = below >= minBelow || below >= above
         const space = Math.max(0, openBelow ? below : above)
         const height = Math.min(content, maxPanel, Math.max(160, space))
-        const top = openBelow ? rect.bottom + edge : rect.top - edge - height
+        const rawTop = openBelow ? rect.bottom + edge : rect.top - edge - height
+        // حد امان: لا تخرج اللوحة عن المساحة المرئية في اي حال.
+        const top = Math.min(
+          Math.max(viewTop + gap, rawTop),
+          Math.max(viewTop + gap, viewBottom - gap - height),
+        )
 
         panel.style.maxHeight = `${height}px`
         panel.style.overflowY = 'auto'
