@@ -32,7 +32,7 @@ export const SUPPLIER_PO_STATUS_BADGE: Readonly<
   closed: { key: 'supplierPoStatusClosed', tone: 'neutral' },
 }
 
-/** `supplier_po_events.event_type` (the 0136 CHECK list). */
+/** `supplier_po_events.event_type` (the CHECK list as 0149 re-created it). */
 export type SupplierPoEventType =
   | 'created'
   | 'updated'
@@ -40,7 +40,9 @@ export type SupplierPoEventType =
   | 'price_changed'
   | 'line_updated'
   | 'card_changed'
+  | 'equipment_removed'
   | 'closed'
+  | 'reopened'
 
 export const SUPPLIER_PO_EVENT_LABEL_KEYS: Readonly<
   Record<SupplierPoEventType, TranslationKey>
@@ -51,7 +53,10 @@ export const SUPPLIER_PO_EVENT_LABEL_KEYS: Readonly<
   price_changed: 'supplierPoEventPriceChanged',
   line_updated: 'supplierPoEventLineUpdated',
   card_changed: 'supplierPoEventCardChanged',
+  // 0149: the one-off reopening of SPO260001 / SPO260002 (owner 2026-10-25).
+  equipment_removed: 'supplierPoEventEquipmentRemoved',
   closed: 'supplierPoEventClosed',
+  reopened: 'supplierPoEventReopened',
 }
 
 /** The PO page shows the latest events only, never a full list. */

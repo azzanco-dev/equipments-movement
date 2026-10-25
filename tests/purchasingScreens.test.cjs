@@ -458,9 +458,9 @@ test('status badge, event labels and the price format', () => {
     open: { key: 'supplierPoStatusOpen', tone: 'success' },
     closed: { key: 'supplierPoStatusClosed', tone: 'neutral' },
   })
-  // The event types of the CHECK as 0142 re-created it (the 0136 five plus
-  // updated and line_updated).
-  const sql = read('supabase', 'migrations', '20261022100000_0142_supplier_po_update.sql')
+  // The event types of the CHECK as 0149 re-created it (the 0136 five, 0142's
+  // updated and line_updated, 0149's equipment_removed and reopened).
+  const sql = read('supabase', 'migrations', '20261025110000_0149_reopen_spo260001_spo260002.sql')
   const check = /event_type IN \(([^)]+)\)/.exec(sql)
   const types = [...check[1].matchAll(/'(\w+)'/g)].map((m) => m[1]).sort()
   assert.deepEqual(

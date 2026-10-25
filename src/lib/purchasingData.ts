@@ -291,6 +291,14 @@ export function supplierPoEventDetail(
         : null
     case 'line_updated':
       return code
+    // 0149: the line is gone from the page, so the payload carries the code.
+    case 'equipment_removed':
+      return (
+        code ??
+        (typeof payload.equipment_code === 'string'
+          ? payload.equipment_code
+          : null)
+      )
     case 'equipment_added':
       return [code, formatPrice(payload.price)].filter(Boolean).join(' · ')
     case 'price_changed':
