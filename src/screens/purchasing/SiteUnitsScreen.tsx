@@ -19,7 +19,6 @@ import {
 } from '@/components/purchasing/CreateSupplierPoDialog'
 import {
   EmptyState,
-  IconButton,
   ErrorState,
   PageHeader,
   Skeleton,
@@ -370,22 +369,34 @@ export function SiteUnitsScreen({
                       <bdi dir="ltr">{row.po_number}</bdi>
                     </button>
                   ) : (
+                    // Owner 2026-10-25: like «انتقل للحركة», the «+» widens on
+                    // hover or keyboard focus, and its label says what it will
+                    // do: «اضافة الى SPO…» on the party's open PO there, else
+                    // «PO جديد».
                     canManage && (
-                      <IconButton
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0 !rounded-full transition-opacity hover:opacity-85"
-                        label={t('siteUnitsAddToPo')}
-                        style={ADD_BUTTON_STYLE}
-                        icon={
-                          <Plus
-                            size={15}
-                            strokeWidth={2.5}
-                            aria-hidden="true"
-                          />
-                        }
+                      <button
+                        type="button"
                         onClick={() => openAdd(row)}
-                      />
+                        className="group/add inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full px-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                        style={ADD_BUTTON_STYLE}
+                      >
+                        <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-normal opacity-0 group-hover/add:max-w-40 group-hover/add:pe-1 group-hover/add:ps-2 group-hover/add:opacity-100 group-focus-visible/add:max-w-40 group-focus-visible/add:pe-1 group-focus-visible/add:ps-2 group-focus-visible/add:opacity-100 motion-safe:transition-all motion-safe:duration-300 motion-safe:ease-out">
+                          {row.party_po_id ? (
+                            <>
+                              {t('siteUnitsAddTo')}{' '}
+                              <bdi dir="ltr">{row.party_po_number}</bdi>
+                            </>
+                          ) : (
+                            t('siteUnitsNewPo')
+                          )}
+                        </span>
+                        <Plus
+                          size={15}
+                          strokeWidth={2.5}
+                          aria-hidden="true"
+                          className="shrink-0"
+                        />
+                      </button>
                     )
                   )}
                 </div>

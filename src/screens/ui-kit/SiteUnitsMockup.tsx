@@ -44,6 +44,8 @@ type Unit = {
   since: string
   /** The open SPO the unit's card sits on, if any. */
   spo?: string
+  /** Without one: the party's open PO for that company and project. */
+  partyPo?: string
   /** «ترقيم الشركة»: the client company's own number for the unit on the
    *  open site entry (`contractor_equipment_code`), when the foreman set it. */
   contractorCode?: string
@@ -86,6 +88,7 @@ const UNITS: Unit[] = [
   },
   {
     id: '3',
+    partyPo: 'SPO260046',
     code: 'U251',
     plate: '7712-KSA',
     type: 'WATER TANKER',
@@ -201,6 +204,7 @@ const UNITS: Unit[] = [
   },
   {
     id: '13',
+    partyPo: 'SPO260037',
     contractorCode: 'BY-311',
     code: 'U290',
     plate: '2277-NHY',
@@ -1216,14 +1220,27 @@ function FancyAction({ unit }: { unit: Unit }) {
       </button>
     )
   return (
+    // Owner 2026-10-25: widens on hover or focus, saying what it will do.
     <button
       type="button"
-      aria-label="اضافة الى PO"
-      title="اضافة الى PO"
-      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-opacity hover:opacity-85"
+      className="group/add inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full px-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
       style={{ backgroundColor: 'var(--warning)', color: 'var(--bg)' }}
     >
-      <Plus size={15} strokeWidth={2.5} aria-hidden="true" />
+      <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-normal opacity-0 group-hover/add:max-w-40 group-hover/add:pe-1 group-hover/add:ps-2 group-hover/add:opacity-100 group-focus-visible/add:max-w-40 group-focus-visible/add:pe-1 group-focus-visible/add:ps-2 group-focus-visible/add:opacity-100 motion-safe:transition-all motion-safe:duration-300 motion-safe:ease-out">
+        {unit.partyPo ? (
+          <>
+            اضافة الى <bdi dir="ltr">{unit.partyPo}</bdi>
+          </>
+        ) : (
+          'PO جديد'
+        )}
+      </span>
+      <Plus
+        size={15}
+        strokeWidth={2.5}
+        aria-hidden="true"
+        className="shrink-0"
+      />
     </button>
   )
 }

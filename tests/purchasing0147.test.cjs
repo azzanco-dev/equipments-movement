@@ -93,7 +93,11 @@ test('the page reads the view server-side and adds through the existing dialogs'
   assert.match(screen, /style=\{\{ backgroundColor: `var\(--\$\{toneOf\(row\)\}-soft\)` \}\}/)
   assert.match(screen, /rounded-full px-2\.5 text-xs font-semibold/)
   // `!` because the shared button's rounded-lg wins over a plain rounded-full.
-  assert.match(screen, /className="shrink-0 !rounded-full transition-opacity hover:opacity-85"/)
+  // 2026-10-25: the «+» widens on hover / focus and says what it will do.
+  assert.match(screen, /group-hover\/add:max-w-40/)
+  assert.match(screen, /group-focus-visible\/add:max-w-40/)
+  assert.match(screen, /\{row\.party_po_id \? \(\s+<>\s+\{t\('siteUnitsAddTo'\)\}/)
+  assert.match(screen, /t\('siteUnitsNewPo'\)/)
   assert.doesNotMatch(screen, /<Badge/)
   assert.match(screen, /grid grid-cols-2 gap-4 sm:grid-cols-3/)
   assert.doesNotMatch(screen, /bg-surface p-3 sm:grid-cols-3/)
