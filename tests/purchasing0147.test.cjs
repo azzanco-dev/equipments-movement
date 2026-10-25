@@ -92,10 +92,18 @@ test('the page reads the view server-side and adds through the existing dialogs'
   assert.match(screen, /<div className="mx-3 mt-auto border-t border-dashed" \/>/)
   assert.match(screen, /style=\{\{ backgroundColor: `var\(--\$\{toneOf\(row\)\}-soft\)` \}\}/)
   assert.match(screen, /rounded-full px-2\.5 text-xs font-semibold/)
-  assert.match(screen, /className="shrink-0 rounded-full transition-opacity hover:opacity-85"/)
+  // `!` because the shared button's rounded-lg wins over a plain rounded-full.
+  assert.match(screen, /className="shrink-0 !rounded-full transition-opacity hover:opacity-85"/)
   assert.doesNotMatch(screen, /<Badge/)
-  assert.match(screen, /grid grid-cols-2 gap-3 rounded-xl bg-surface p-3 sm:grid-cols-3/)
+  assert.match(screen, /grid grid-cols-2 gap-4 sm:grid-cols-3/)
+  assert.doesNotMatch(screen, /bg-surface p-3 sm:grid-cols-3/)
   assert.doesNotMatch(screen, /lg:grid-cols-4|xl:grid-cols-4/)
+  // 2026-10-25: a button at the end of the code's row to the unit's entry
+  // movement, only when the shell can open the movement page.
+  assert.match(screen, /onSelectMovement\?: \(movementId: string\) => void/)
+  assert.match(screen, /\{onSelectMovement && \(\s+<IconButton[\s\S]*?label=\{t\('siteUnitsOpenMovement'\)\}[\s\S]*?onClick=\{\(\) => onSelectMovement\(row\.entry_id\)\}/)
+  const app = read('src', 'App.tsx')
+  assert.match(app, /onSelectMovement=\{\s+shell\.pages\.has\('movements\/:id'\) \? openMovement : undefined\s+\}/)
 })
 
 test('the dialogs take the preset only when they open', () => {

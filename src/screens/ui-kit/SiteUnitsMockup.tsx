@@ -1,5 +1,5 @@
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
-import { FileText, Plus } from 'lucide-react'
+import { ArrowUpRight, FileText, Plus } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -1289,9 +1289,35 @@ function FancyTile({ look, unit }: { look: FancyLook; unit: Unit }) {
       <li className="relative rounded-xl border bg-bg text-[13px]">
         <div className="space-y-2 p-3">
           <div>
-            <p className="text-lg font-bold leading-6">
-              <bdi dir="ltr">{unit.code}</bdi>
-            </p>
+            {/* Owner 2026-10-25: a button to the movement at the end of
+
+                the code's row. */}
+
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-lg font-bold leading-6">
+                <bdi dir="ltr">{unit.code}</bdi>
+              </p>
+
+              <IconButton
+                size="sm"
+
+                variant="ghost"
+
+                className="shrink-0 !rounded-full bg-surface-hover text-fg transition-opacity hover:opacity-85"
+
+                label="فتح حركة الدخول"
+
+                icon={
+                  <ArrowUpRight
+                    size={16}
+
+                    aria-hidden="true"
+
+                    className="rtl:-scale-x-100"
+                  />
+                }
+              />
+            </div>
             <p className="text-xs leading-5 text-muted">
               <bdi dir="ltr">{plate}</bdi>
             </p>
@@ -1425,7 +1451,7 @@ function FancyTilesDesign() {
         ))}
       </div>
       <p className="text-xs text-muted">{current.note}</p>
-      <ul className="grid grid-cols-2 gap-3 rounded-xl bg-surface p-3 sm:grid-cols-3">
+      <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {units.map((unit) => (
           <FancyTile key={unit.id} look={look} unit={unit} />
         ))}

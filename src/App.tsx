@@ -597,6 +597,9 @@ function AppContent() {
             {page === 'purchasing/units' && (
               <SiteUnitsScreen
                 onSelectPo={(id) => router.push(`/purchasing/${id}`)}
+                onSelectMovement={
+                  shell.pages.has('movements/:id') ? openMovement : undefined
+                }
               />
             )}
             {page === 'drivers' && (

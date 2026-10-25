@@ -5,7 +5,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react'
-import { Plus } from 'lucide-react'
+import { ArrowUpRight, Plus } from 'lucide-react'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
@@ -44,6 +44,9 @@ import { supabase } from '@/lib/supabase'
 
 export interface SiteUnitsScreenProps {
   onSelectPo: (poId: string) => void
+  /** Opens the unit's open entry (/movements/:id); omitted when the shell
+   *  cannot open the movement page, and the button is not shown. */
+  onSelectMovement?: (movementId: string) => void
 }
 
 /** Stable across renders, so the bar's controls do not reload on each one. */
@@ -85,7 +88,10 @@ type AddTarget =
  * (`add_supplier_po_equipment`), else opens a new PO with the unit ticked;
  * the database re-checks every rule. The add needs `purchasing.manage`.
  */
-export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
+export function SiteUnitsScreen({
+  onSelectPo,
+  onSelectMovement,
+}: SiteUnitsScreenProps) {
   const { t, lang } = useI18n()
   const { can } = usePermissions()
   const canManage = can('purchasing.manage')
@@ -230,10 +236,7 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
       {loadError ? (
         <ErrorState description={t('siteUnitsLoadError')} onRetry={fetchRows} />
       ) : loading && rows.length === 0 ? (
-        <ul
-          className="grid grid-cols-2 gap-3 rounded-xl bg-surface p-3 sm:grid-cols-3"
-          aria-busy="true"
-        >
+        <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3" aria-busy="true">
           {Array.from({ length: 6 }, (_, index) => (
             <li key={index}>
               <Skeleton className="h-56 w-full rounded-xl" />
@@ -252,9 +255,10 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
           {/* Owner 2026-10-25: the «تذكرة» design approved on /ui-kit — the
               unit on top, a dashed perforation, and a stub in the state's
               tone holding the state and the SPO or the «+». At most three
-              columns, on the surface so the white tickets stand out. */}
+              columns, a 16 px gap and no side padding, so the tickets line
+              up with the toolbar (owner 2026-10-25). */}
           <ul
-            className={`grid grid-cols-2 gap-3 rounded-xl bg-surface p-3 sm:grid-cols-3 ${
+            className={`grid grid-cols-2 gap-4 sm:grid-cols-3 ${
               loading ? 'pointer-events-none opacity-60' : ''
             }`}
           >
@@ -266,9 +270,30 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
                 <div className="space-y-2 p-3">
                   <div>
                     {/* RTL paragraphs, so the LTR numbers sit at the start. */}
-                    <p className="text-lg font-bold leading-6">
-                      <bdi dir="ltr">{row.equipment_code ?? '—'}</bdi>
-                    </p>
+                    {/* Owner 2026-10-25: at the end of the code's row, a
+                        button to the unit's entry movement — round like the
+                        «+», filled with the surface-hover grey. */}
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-lg font-bold leading-6">
+                        <bdi dir="ltr">{row.equipment_code ?? '—'}</bdi>
+                      </p>
+                      {onSelectMovement && (
+                        <IconButton
+                          size="sm"
+                          variant="ghost"
+                          className="shrink-0 !rounded-full bg-surface-hover text-fg transition-opacity hover:opacity-85"
+                          label={t('siteUnitsOpenMovement')}
+                          icon={
+                            <ArrowUpRight
+                              size={16}
+                              aria-hidden="true"
+                              className="rtl:-scale-x-100"
+                            />
+                          }
+                          onClick={() => onSelectMovement(row.entry_id)}
+                        />
+                      )}
+                    </div>
                     {(row.equipment_plate_number ||
                       row.equipment_chassis_number) && (
                       <p className="text-xs leading-5 text-muted">
@@ -341,7 +366,7 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
                       <IconButton
                         size="sm"
                         variant="outline"
-                        className="shrink-0 rounded-full transition-opacity hover:opacity-85"
+                        className="shrink-0 !rounded-full transition-opacity hover:opacity-85"
                         label={t('siteUnitsAddToPo')}
                         style={ADD_BUTTON_STYLE}
                         icon={
