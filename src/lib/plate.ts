@@ -74,6 +74,18 @@ export function normalizePlateNumber(value: string): string {
   return digits || letters
 }
 
+/**
+ * A stored plate for display (owner 2026-10-25, «المعدات في المشاريع»): the
+ * digits, a space, then the letters one by one — `1128-XVV` reads
+ * `1128 X V V`. Anything not in the stored digits-letters form is returned
+ * as it is.
+ */
+export function formatPlateForDisplay(value: string): string {
+  const match = /^\s*(\d+)\s*-\s*([A-Za-z]+)\s*$/.exec(value)
+  if (!match) return value.trim()
+  return `${match[1]} ${match[2].toUpperCase().split('').join(' ')}`
+}
+
 // Search helpers. People search equipment by its code or by the plate DIGITS,
 // so a search term is never split into plate letters: doing that made a term
 // such as "a341" match every plate containing the letter A.

@@ -17,12 +17,7 @@ import {
   CreateSupplierPoDialog,
   type CreateSupplierPoPreset,
 } from '@/components/purchasing/CreateSupplierPoDialog'
-import {
-  EmptyState,
-  ErrorState,
-  PageHeader,
-  Skeleton,
-} from '@/components/ui'
+import { EmptyState, ErrorState, PageHeader, Skeleton } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import {
@@ -32,6 +27,7 @@ import {
 import { foremanFilterOptions } from '@/lib/foremanFilter'
 import { siteUnitsListConfig } from '@/lib/listConfigs'
 import { localizedName } from '@/lib/localizedName'
+import { formatPlateForDisplay } from '@/lib/plate'
 import {
   isSupplierPoOwnerClass,
   SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS,
@@ -296,26 +292,33 @@ export function SiteUnitsScreen({
                         </button>
                       )}
                     </div>
-                    {(row.equipment_plate_number ||
-                      row.equipment_chassis_number) && (
-                      <p className="text-xs leading-5 text-muted">
-                        <bdi dir="ltr">
-                          {row.equipment_plate_number ||
-                            row.equipment_chassis_number}
-                        </bdi>
-                      </p>
-                    )}
-                    {/* The company's number, with no label. */}
-                    {/* A dash without a company number keeps every ticket's
-                        lines level (owner 2026-10-25). */}
-                    <p className="text-xs font-medium leading-5">
+                    {/* Owner 2026-10-25: the plate as «1128 X V V» (or the chassis),
+                        a dot, then the company's number (a dash when there is none). */}
+                    <p className="text-xs leading-5 text-muted">
+                      {(row.equipment_plate_number ||
+                        row.equipment_chassis_number) && (
+                        <>
+                          <bdi dir="ltr">
+                            {row.equipment_plate_number
+                              ? formatPlateForDisplay(
+                                  row.equipment_plate_number,
+                                )
+                              : row.equipment_chassis_number}
+                          </bdi>
+                          {' · '}
+                        </>
+                      )}
                       {row.contractor_equipment_code ? (
-                        <bdi dir="ltr">{row.contractor_equipment_code}</bdi>
+                        <bdi dir="ltr" className="font-medium text-fg">
+                          {row.contractor_equipment_code}
+                        </bdi>
                       ) : (
-                        <span className="text-muted">—</span>
+                        '—'
                       )}
                     </p>
                   </div>
+                  {/* The spacer under the unit's identity (owner 2026-10-25). */}
+                  <div className="border-t" />
                   {/* leading-5: text-xs's 16 px line cut Arabic marks; long
                       text wraps instead of being cut. */}
                   <div className="min-w-0 space-y-1">

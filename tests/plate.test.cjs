@@ -20,6 +20,7 @@ function loadPlate() {
 
 const {
   extractPlateSearchParts,
+  formatPlateForDisplay,
   normalizePlateNumber,
   plateDigitsSearchTerm,
   toLatinDigits,
@@ -83,4 +84,13 @@ test('search terms only probe plate digits when they are digits only', () => {
 test('toLatinDigits converts digits and leaves letters untouched', () => {
   assert.equal(toLatinDigits('A٣٤١'), 'A341')
   assert.equal(toLatinDigits('حفار 12'), 'حفار 12')
+})
+
+test('a stored plate displays as digits then spaced letters', () => {
+  // Owner 2026-10-25 («المعدات في المشاريع»): 1128-XVV reads «1128 X V V».
+  assert.equal(formatPlateForDisplay('1128-XVV'), '1128 X V V')
+  assert.equal(formatPlateForDisplay('7712-ksa'), '7712 K S A')
+  // Anything else (a chassis, a legacy value) is shown as it is.
+  assert.equal(formatPlateForDisplay('HHKHZ616KG0001136'), 'HHKHZ616KG0001136')
+  assert.equal(formatPlateForDisplay('16504464'), '16504464')
 })
