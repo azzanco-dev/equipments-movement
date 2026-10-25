@@ -52,34 +52,21 @@ const ASYNC_FILTERS = {
   entry_supervisor_id: foremanFilterOptions(supabase),
 }
 
-/** Soft amber without a PO, soft green with one, with a light border in a
- *  shade of the same tone (owner 2026-10-25); no badge — the end of the tile
- *  (the SPO or the add button) already says it. */
-function tileColors(row: SiteUnitRow): CSSProperties {
-  const tone = row.has_po ? 'success' : 'warning'
-  return {
-    backgroundColor: `var(--${tone}-soft)`,
-    borderColor: `color-mix(in srgb, var(--${tone}) 25%, transparent)`,
-  }
-}
+/** The tone of a ticket's stub: amber without a PO, green with one. */
+const toneOf = (row: SiteUnitRow) => (row.has_po ? 'success' : 'warning')
 
-/** The «+» on a tile without a PO: solid amber with the page colour for
- *  the sign (owner 2026-10-25: the outlined one looked washed out). In the
- *  light theme that is white on amber, in the dark theme dark on a lighter
- *  amber; tokens only. */
+/** The «+» on a ticket without a PO: solid amber, fully round, with the page
+ *  colour for the sign (white in the light theme). Tokens only. */
 const ADD_BUTTON_STYLE: CSSProperties = {
   color: 'var(--bg)',
   borderColor: 'var(--warning)',
   backgroundColor: 'var(--warning)',
 }
 
-/** The SPO on a tile with a PO: the green of the tile, on the page
- *  background, at the end of the code's row like the «+» (owner
- *  2026-10-25). Tokens only. */
+/** The SPO on a ticket with a PO: a round green pill that opens the PO. */
 const SPO_BUTTON_STYLE: CSSProperties = {
   color: 'var(--success)',
-  borderColor: 'color-mix(in srgb, var(--success) 45%, transparent)',
-  backgroundColor: 'var(--bg)',
+  backgroundColor: 'var(--success-soft)',
 }
 
 /** The add target: the party's open PO there, else a new PO for the unit. */
@@ -243,10 +230,13 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
       {loadError ? (
         <ErrorState description={t('siteUnitsLoadError')} onRetry={fetchRows} />
       ) : loading && rows.length === 0 ? (
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-busy="true">
+        <ul
+          className="grid grid-cols-2 gap-3 rounded-xl bg-surface p-3 sm:grid-cols-3"
+          aria-busy="true"
+        >
           {Array.from({ length: 6 }, (_, index) => (
             <li key={index}>
-              <Skeleton className="h-44 w-full rounded-xl" />
+              <Skeleton className="h-56 w-full rounded-xl" />
             </li>
           ))}
         </ul>
@@ -259,56 +249,100 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
           <p className="text-xs text-muted">
             {total} {t('siteUnitsCount')}
           </p>
+          {/* Owner 2026-10-25: the «تذكرة» design approved on /ui-kit — the
+              unit on top, a dashed perforation, and a stub in the state's
+              tone holding the state and the SPO or the «+». At most three
+              columns, on the surface so the white tickets stand out. */}
           <ul
-            className={`grid grid-cols-2 gap-2 sm:grid-cols-3 ${
+            className={`grid grid-cols-2 gap-3 rounded-xl bg-surface p-3 sm:grid-cols-3 ${
               loading ? 'pointer-events-none opacity-60' : ''
             }`}
           >
-            {/* At most three columns (owner 2026-10-24). */}
             {rows.map((row) => (
               <li
                 key={row.entry_id}
-                className="flex flex-col gap-3 rounded-xl border p-3 text-[13px]"
-                style={tileColors(row)}
+                className="flex flex-col rounded-xl border bg-bg text-[13px]"
               >
-                <div>
-                  {/* Owner 2026-10-25: the code in bold; at the end of its
-                      row the SPO (green) or the add, an icon-only «+»
-                      (amber), or «بلا PO» for a reader. */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 leading-6">
-                      <bdi
-                        dir="ltr"
-                        // Owner 2026-10-25: weight 700, no stroke.
-                        className="text-base font-bold"
-                      >
-                        {row.equipment_code ?? '—'}
-                      </bdi>
-                      {(row.equipment_plate_number ||
-                        row.equipment_chassis_number) && (
-                        <bdi dir="ltr" className="text-xs text-muted">
+                <div className="space-y-2 p-3">
+                  <div>
+                    {/* RTL paragraphs, so the LTR numbers sit at the start. */}
+                    <p className="text-lg font-bold leading-6">
+                      <bdi dir="ltr">{row.equipment_code ?? '—'}</bdi>
+                    </p>
+                    {(row.equipment_plate_number ||
+                      row.equipment_chassis_number) && (
+                      <p className="text-xs leading-5 text-muted">
+                        <bdi dir="ltr">
                           {row.equipment_plate_number ||
                             row.equipment_chassis_number}
                         </bdi>
+                      </p>
+                    )}
+                    {/* The company's number, when set, with no label. */}
+                    {row.contractor_equipment_code && (
+                      <p className="text-xs font-medium leading-5">
+                        <bdi dir="ltr">{row.contractor_equipment_code}</bdi>
+                      </p>
+                    )}
+                  </div>
+                  {/* leading-5: text-xs's 16 px line cut Arabic marks; long
+                      text wraps instead of being cut. */}
+                  <div className="min-w-0 space-y-1">
+                    <p className="break-words text-xs leading-5">
+                      {row.equipment_type ?? '—'}
+                    </p>
+                    <p className="break-words text-xs leading-5 text-muted">
+                      {ownerLine(row)}
+                    </p>
+                    <p className="break-words text-xs leading-5 text-muted">
+                      {localizedName(
+                        lang,
+                        row.company_name_ar,
+                        row.company_name_en,
+                      )}{' '}
+                      ·{' '}
+                      {localizedName(
+                        lang,
+                        row.project_name_ar,
+                        row.project_name_en,
                       )}
-                    </div>
-                    {row.supplier_po_id ? (
-                      <button
-                        type="button"
-                        onClick={() => onSelectPo(row.supplier_po_id!)}
-                        className="inline-flex h-7 shrink-0 items-center rounded-md border px-2 text-xs font-semibold underline-offset-2 hover:underline"
-                        style={SPO_BUTTON_STYLE}
-                      >
-                        <bdi dir="ltr">{row.po_number}</bdi>
-                      </button>
-                    ) : canManage ? (
+                    </p>
+                    <p className="break-words text-xs leading-5 text-muted">
+                      {t('logsColForeman')}{' '}
+                      <span className="font-medium text-fg">
+                        {row.entry_supervisor_name ?? '—'}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                {/* The perforation (no side notches). */}
+                <div className="mx-3 mt-auto border-t border-dashed" />
+                <div
+                  className="flex items-center justify-between gap-2 rounded-b-xl px-3 py-2.5"
+                  style={{ backgroundColor: `var(--${toneOf(row)}-soft)` }}
+                >
+                  <span
+                    className="text-xs font-medium"
+                    style={{ color: `var(--${toneOf(row)})` }}
+                  >
+                    {row.has_po ? t('siteUnitsHasPo') : t('siteUnitsNoPo')}
+                  </span>
+                  {row.supplier_po_id ? (
+                    <button
+                      type="button"
+                      onClick={() => onSelectPo(row.supplier_po_id!)}
+                      className="inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs font-semibold underline-offset-2 hover:underline"
+                      style={SPO_BUTTON_STYLE}
+                    >
+                      <bdi dir="ltr">{row.po_number}</bdi>
+                    </button>
+                  ) : (
+                    canManage && (
                       <IconButton
                         size="sm"
                         variant="outline"
-                        className="shrink-0 transition-opacity hover:opacity-85"
+                        className="shrink-0 rounded-full transition-opacity hover:opacity-85"
                         label={t('siteUnitsAddToPo')}
-                        // Owner 2026-10-25: the add carries the tile's amber (it shows only
-                        // on units without a PO).
                         style={ADD_BUTTON_STYLE}
                         icon={
                           <Plus
@@ -319,48 +353,8 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
                         }
                         onClick={() => openAdd(row)}
                       />
-                    ) : (
-                      <span className="shrink-0 text-xs leading-6 text-muted">
-                        {t('siteUnitsNoPo')}
-                      </span>
-                    )}
-                  </div>
-                  {/* The company's number, when set, under the code with
-                      no label (owner 2026-10-24). */}
-                  {row.contractor_equipment_code && (
-                    <p className="text-xs font-medium leading-5">
-                      <bdi dir="ltr">{row.contractor_equipment_code}</bdi>
-                    </p>
+                    )
                   )}
-                </div>
-                {/* leading-5: text-xs's 16 px line cut Arabic marks; long
-                    text wraps instead of being cut (owner 2026-10-24). */}
-                <div className="min-w-0 space-y-1">
-                  <p className="break-words text-xs leading-5">
-                    {row.equipment_type ?? '—'}
-                  </p>
-                  <p className="break-words text-xs leading-5 text-muted">
-                    {ownerLine(row)}
-                  </p>
-                  <p className="break-words text-xs leading-5 text-muted">
-                    {localizedName(
-                      lang,
-                      row.company_name_ar,
-                      row.company_name_en,
-                    )}{' '}
-                    ·{' '}
-                    {localizedName(
-                      lang,
-                      row.project_name_ar,
-                      row.project_name_en,
-                    )}
-                  </p>
-                  <p className="break-words text-xs leading-5 text-muted">
-                    {t('logsColForeman')}{' '}
-                    <span className="font-medium text-fg">
-                      {row.entry_supervisor_name ?? '—'}
-                    </span>
-                  </p>
                 </div>
               </li>
             ))}

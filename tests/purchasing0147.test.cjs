@@ -84,14 +84,17 @@ test('the page reads the view server-side and adds through the existing dialogs'
   assert.match(screen, /<CreateSupplierPoDialog[\s\S]*?preset=\{target\?\.kind === 'new' \? target\.preset : null\}/)
   // The add needs purchasing.manage; readers see the state only.
   assert.match(screen, /const canManage = can\('purchasing\.manage'\)/)
-  // Tiles: coloured by state with a light border of the same tone
-  // (2026-10-25), no badge, at most three columns.
-  assert.match(screen, /const tone = row\.has_po \? 'success' : 'warning'/)
-  assert.match(screen, /backgroundColor: `var\(--\$\{tone\}-soft\)`/)
-  assert.match(screen, /borderColor: `color-mix\(in srgb, var\(--\$\{tone\}\) 25%, transparent\)`/)
-  assert.match(screen, /className="flex flex-col gap-3 rounded-xl border p-3 text-\[13px\]"/)
+  // Tickets (owner 2026-10-25, the «تذكرة» design of /ui-kit): white
+  // ticket, dashed perforation with no side notches, a stub in the state's
+  // tone with the round SPO or «+»; no badge; at most three columns.
+  assert.match(screen, /const toneOf = \(row: SiteUnitRow\) => \(row\.has_po \? 'success' : 'warning'\)/)
+  assert.match(screen, /className="flex flex-col rounded-xl border bg-bg text-\[13px\]"/)
+  assert.match(screen, /<div className="mx-3 mt-auto border-t border-dashed" \/>/)
+  assert.match(screen, /style=\{\{ backgroundColor: `var\(--\$\{toneOf\(row\)\}-soft\)` \}\}/)
+  assert.match(screen, /rounded-full px-2\.5 text-xs font-semibold/)
+  assert.match(screen, /className="shrink-0 rounded-full transition-opacity hover:opacity-85"/)
   assert.doesNotMatch(screen, /<Badge/)
-  assert.match(screen, /grid grid-cols-2 gap-2 sm:grid-cols-3/)
+  assert.match(screen, /grid grid-cols-2 gap-3 rounded-xl bg-surface p-3 sm:grid-cols-3/)
   assert.doesNotMatch(screen, /lg:grid-cols-4|xl:grid-cols-4/)
 })
 
