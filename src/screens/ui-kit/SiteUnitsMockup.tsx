@@ -879,8 +879,8 @@ function uniqueOptions(values: string[]) {
 const SITE_UNITS_CONFIG: DataListConfig = {
   id: 'siteUnitsMockup',
   searchPlaceholder: {
-    ar: 'البحث برقم المعدة او اللوحة او ترقيم الشركة او المورد او الفورمان',
-    en: 'Search by unit, plate, company number, supplier or foreman',
+    ar: 'البحث برقم المعدة او اللوحة او ترقيم الشركة',
+    en: 'Search by unit, plate or company number',
   },
   searchFields: [],
   defaultSort: 'po_state',
@@ -1028,10 +1028,8 @@ function TilesDesign() {
         const haystack = [
           unit.code,
           unit.plate,
+          unit.chassis ?? '',
           unit.contractorCode ?? '',
-          ownerLine(unit),
-          foremanOf(unit),
-          unit.project,
           unit.type,
         ]
           .join(' ')

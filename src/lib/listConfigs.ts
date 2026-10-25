@@ -753,17 +753,16 @@ export const supplierPosListConfig: DataListConfig = {
 export const siteUnitsListConfig: DataListConfig = {
   id: 'siteUnits',
   searchPlaceholder: {
-    ar: 'البحث برقم المعدة او النوع او اللوحة او الشاصي او ترقيم الشركة او المورد او الفورمان',
-    en: 'Search by unit, type, plate, chassis, company number, supplier or foreman',
+    ar: 'البحث برقم المعدة او النوع او اللوحة او الشاصي او ترقيم الشركة',
+    en: 'Search by unit, type, plate, chassis or company number',
   },
+  // Owner 2026-10-25: the supplier and the foreman are filters, not search.
   searchFields: [
     'equipment_code',
     'equipment_type_search',
     'equipment_plate_number',
     'equipment_chassis_number',
     'contractor_equipment_code',
-    'equipment_lessor_name',
-    'entry_supervisor_name',
   ],
   defaultSort: 'has_po',
   defaultDirection: 'asc',
