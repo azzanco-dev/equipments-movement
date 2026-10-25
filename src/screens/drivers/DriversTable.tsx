@@ -10,6 +10,7 @@ import {
 import type { DataTableColumn } from '@/components/ui'
 import { RelativeTime } from '@/components/RelativeTime'
 import { useI18n } from '@/i18n/I18nContext'
+import { buildDriverDialogHref } from '@/lib/driverEquipment'
 import type { Driver } from '@/lib/types'
 
 /** Same pattern as `screens/equipment/EquipmentTable.tsx` (see the comment
@@ -179,6 +180,9 @@ export function DriversTable({
       sort={{ key: sort, direction }}
       onSortChange={onSortChange}
       onRowClick={(row) => onOpen(row.id)}
+      // The detail is a dialog opened by `?driver=` on the list.
+      rowHref={(row) => buildDriverDialogHref(row.id)}
+      rowLinkColumn="full_name"
       empty={t('noDrivers')}
     />
   )

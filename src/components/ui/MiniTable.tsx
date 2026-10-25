@@ -27,6 +27,8 @@ export interface MiniTableProps<Row> {
   error?: ReactNode
   empty?: ReactNode
   onRowClick?: (row: Row) => void
+  /** The row's page, for a new tab (see `DataTable`'s `rowHref`). */
+  rowHref?: (row: Row) => string | null | undefined
   className?: string
 }
 
@@ -52,6 +54,7 @@ export function MiniTable<Row>({
   error,
   empty,
   onRowClick,
+  rowHref,
   className,
 }: MiniTableProps<Row>) {
   const { t } = useI18n()
@@ -100,6 +103,7 @@ export function MiniTable<Row>({
           error={error}
           empty={empty}
           onRowClick={onRowClick}
+          rowHref={rowHref}
           size="md"
           stickyHeader={false}
           caption={typeof title === 'string' ? title : undefined}

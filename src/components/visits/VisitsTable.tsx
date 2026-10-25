@@ -705,6 +705,8 @@ export function VisitsTable({
                 ? (visit) => onSelectMovement(visit.entry_id)
                 : undefined
             }
+            rowHref={(visit) => `/movements/${visit.entry_id}`}
+            rowLinkColumn="equipment_code"
             sort={{ key: sortKey, direction: ascending ? 'asc' : 'desc' }}
             onSortChange={(key, direction) => list.setSort(key, direction)}
             loading={loading}

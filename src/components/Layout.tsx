@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { type HTMLAttributes, type ReactNode } from 'react'
 import { useI18n } from '@/i18n/I18nContext'
 import {
   Sun,
@@ -18,6 +18,7 @@ import type { TranslationKey } from '@/i18n/translations'
 import { localizedName } from '@/lib/localizedName'
 import { useEffect, useState } from 'react'
 import {
+  AppLink,
   Button,
   ConfirmDialog,
   DropdownMenu,
@@ -33,6 +34,31 @@ import {
   WhatsAppStatusIndicator,
   useWhatsAppStatusPolling,
 } from '@/components/WhatsAppGatewayStatus'
+
+/** A menu entry: a real link to its page (owner 2026-10-25, right click ›
+ *  new tab and Ctrl click), or a button for a parent that only expands. The
+ *  entry's own handler runs on a plain click only. */
+function NavControl({
+  href,
+  onActivate,
+  ...props
+}: HTMLAttributes<HTMLElement> & { href?: string; onActivate: () => void }) {
+  if (!href)
+    return (
+      <button
+        type="button"
+        onClick={onActivate}
+        {...(props as HTMLAttributes<HTMLButtonElement>)}
+      />
+    )
+  return (
+    <AppLink
+      href={href}
+      onNavigate={onActivate}
+      {...(props as HTMLAttributes<HTMLAnchorElement>)}
+    />
+  )
+}
 
 interface LayoutProps {
   children: ReactNode
@@ -135,9 +161,12 @@ export function Layout({
                 icon={mobileOpen ? <X size={20} /> : <Menu size={20} />}
               />
             )}
-            <button
+            {/* Owner 2026-10-25: the logo and the menu entries are real
+                links, so right click › new tab and Ctrl click work. */}
+            <AppLink
+              href="/dashboard"
               className="flex items-center gap-2 cursor-pointer"
-              onClick={() => {
+              onNavigate={() => {
                 if (isCurrentPage('dashboard')) return
                 setPendingPage('dashboard')
                 onNavigate('dashboard')
@@ -157,7 +186,7 @@ export function Layout({
                   {t('appSubtitle')}
                 </p>
               </div>
-            </button>
+            </AppLink>
           </div>
 
           <div className="hidden items-center gap-1.5 sm:flex">
@@ -261,13 +290,14 @@ export function Layout({
                       expandedNavItems[item.key] ?? hasActiveChild
                     return (
                       <>
-                        <button
+                        <NavControl
                           key={item.key}
+                          href={item.children ? undefined : `/${item.key}`}
                           aria-current={
                             activePage === item.key ? 'page' : undefined
                           }
                           aria-expanded={item.children ? expanded : undefined}
-                          onClick={() => {
+                          onActivate={() => {
                             if (item.children) {
                               setExpandedNavItems((current) => ({
                                 ...current,
@@ -293,17 +323,18 @@ export function Layout({
                               className={`ms-auto transition-transform ${expanded ? 'rotate-180' : ''}`}
                             />
                           )}
-                        </button>
+                        </NavControl>
                         {item.children && expanded && (
                           <div className="ms-9 mt-1 space-y-0.5 border-s border-[var(--border)] ps-2">
                             {item.children.map((child) => (
-                              <button
+                              <NavControl
                                 key={child.key}
+                                href={`/${child.key}`}
                                 className={`block w-full rounded px-2 py-1.5 text-start text-xs ${pathname.startsWith(`/${child.key}`) ? 'font-semibold text-fg' : 'text-muted hover:text-fg'}`}
-                                onClick={() => onNavigate(child.key)}
+                                onActivate={() => onNavigate(child.key)}
                               >
                                 {child.label}
-                              </button>
+                              </NavControl>
                             ))}
                           </div>
                         )}
@@ -346,10 +377,11 @@ export function Layout({
                         expandedNavItems[item.key] ?? hasActiveChild
                       return (
                         <>
-                          <button
+                          <NavControl
                             key={item.key}
+                            href={item.children ? undefined : `/${item.key}`}
                             aria-expanded={item.children ? expanded : undefined}
-                            onClick={() => {
+                            onActivate={() => {
                               if (item.children) {
                                 setExpandedNavItems((current) => ({
                                   ...current,
@@ -376,20 +408,21 @@ export function Layout({
                                 className={`ms-auto transition-transform ${expanded ? 'rotate-180' : ''}`}
                               />
                             )}
-                          </button>
+                          </NavControl>
                           {item.children && expanded && (
                             <div className="ms-9 mt-1 space-y-0.5 border-s border-[var(--border)] ps-2">
                               {item.children.map((child) => (
-                                <button
+                                <NavControl
                                   key={child.key}
+                                  href={`/${child.key}`}
                                   className={`block w-full rounded px-2 py-1.5 text-start text-xs ${pathname.startsWith(`/${child.key}`) ? 'font-semibold text-fg' : 'text-muted'}`}
-                                  onClick={() => {
+                                  onActivate={() => {
                                     setMobileOpen(false)
                                     onNavigate(child.key)
                                   }}
                                 >
                                   {child.label}
-                                </button>
+                                </NavControl>
                               ))}
                             </div>
                           )}

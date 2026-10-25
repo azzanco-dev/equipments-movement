@@ -105,7 +105,9 @@ test('the page reads the view server-side and adds through the existing dialogs'
   // 2026-10-25: a button at the end of the code's row to the unit's entry
   // movement, only when the shell can open the movement page.
   assert.match(screen, /onSelectMovement\?: \(movementId: string\) => void/)
-  assert.match(screen, /\{onSelectMovement && \(\s+<button\s+type="button"\s+onClick=\{\(\) => onSelectMovement\(row\.entry_id\)\}/)
+  // 2026-10-25: real links (right click › new tab, Ctrl click).
+  assert.match(screen, /\{onSelectMovement && \(\s+<AppLink\s+href=\{`\/movements\/\$\{row\.entry_id\}`\}\s+onNavigate=\{\(\) => onSelectMovement\(row\.entry_id\)\}/)
+  assert.match(screen, /<AppLink\s+href=\{`\/purchasing\/\$\{row\.supplier_po_id\}`\}/)
   // 2026-10-25 trial: it widens on hover / focus to show its label, and the
   // motion runs only when the device allows motion.
   assert.match(screen, /group-hover\/move:max-w-32/)

@@ -18,7 +18,13 @@ import {
   CreateSupplierPoDialog,
   type CreateSupplierPoPreset,
 } from '@/components/purchasing/CreateSupplierPoDialog'
-import { EmptyState, ErrorState, PageHeader, Skeleton } from '@/components/ui'
+import {
+  AppLink,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  Skeleton,
+} from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import {
@@ -301,10 +307,12 @@ export function SiteUnitsScreen({
                       {/* Owner 2026-10-25 (a trial): a round arrow that widens
                           on hover or keyboard focus to show «انتقل للحركة»;
                           the motion only runs when the device allows it. */}
+                      {/* A real link (owner 2026-10-25): right click › new
+                          tab and Ctrl click work. */}
                       {onSelectMovement && (
-                        <button
-                          type="button"
-                          onClick={() => onSelectMovement(row.entry_id)}
+                        <AppLink
+                          href={`/movements/${row.entry_id}`}
+                          onNavigate={() => onSelectMovement(row.entry_id)}
                           className="group/move inline-flex h-7 shrink-0 items-center rounded-full bg-surface-hover px-1.5 text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
                         >
                           <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-normal opacity-0 group-hover/move:max-w-32 group-hover/move:pe-1 group-hover/move:ps-2 group-hover/move:opacity-100 group-focus-visible/move:max-w-32 group-focus-visible/move:pe-1 group-focus-visible/move:ps-2 group-focus-visible/move:opacity-100 motion-safe:transition-all motion-safe:duration-300 motion-safe:ease-out">
@@ -315,7 +323,7 @@ export function SiteUnitsScreen({
                             aria-hidden="true"
                             className="shrink-0 rtl:-scale-x-100"
                           />
-                        </button>
+                        </AppLink>
                       )}
                     </div>
                     {/* Owner 2026-10-25: the type under the code, with the
@@ -392,14 +400,14 @@ export function SiteUnitsScreen({
                     {row.has_po ? t('siteUnitsPoNumber') : t('siteUnitsNoPo')}
                   </span>
                   {row.supplier_po_id ? (
-                    <button
-                      type="button"
-                      onClick={() => onSelectPo(row.supplier_po_id!)}
+                    <AppLink
+                      href={`/purchasing/${row.supplier_po_id}`}
+                      onNavigate={() => onSelectPo(row.supplier_po_id!)}
                       className="inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs font-semibold underline-offset-2 hover:underline"
                       style={SPO_BUTTON_STYLE}
                     >
                       <bdi dir="ltr">{row.po_number}</bdi>
-                    </button>
+                    </AppLink>
                   ) : (
                     // Owner 2026-10-25: like «انتقل للحركة», the «+» widens on
                     // hover or keyboard focus, and its label says what it will

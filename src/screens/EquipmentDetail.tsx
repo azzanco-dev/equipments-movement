@@ -458,6 +458,7 @@ export function EquipmentDetail({
         onRowClick={
           onSelectMovement ? (log) => onSelectMovement(log.id) : undefined
         }
+        rowHref={(log) => `/movements/${log.id}`}
         empty={t('noMovements')}
       />
     </div>

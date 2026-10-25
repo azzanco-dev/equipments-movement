@@ -270,6 +270,7 @@ export function DriverDetailDialog({
                 onRowClick={(item) =>
                   router.push(`/equipment/${item.equipmentId}`)
                 }
+                rowHref={(item) => `/equipment/${item.equipmentId}`}
               />
             )}
           </div>

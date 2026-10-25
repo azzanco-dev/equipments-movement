@@ -31,6 +31,7 @@ function loadDataTable() {
     'lucide-react': {},
     '@/i18n/I18nContext': {},
     './cn': { cn: () => '' },
+    './AppLink': {},
   }
   vm.runInNewContext(
     code,

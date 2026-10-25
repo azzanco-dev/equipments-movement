@@ -7,6 +7,8 @@ export type {
   ButtonVariant,
   IconButtonProps,
 } from './Button'
+export { AppLink, isPlainLeftClick, openInNewTab } from './AppLink'
+export type { AppLinkProps } from './AppLink'
 export { Input, Textarea, SearchInput } from './Input'
 export type { InputProps, SearchInputProps, TextareaProps } from './Input'
 export { Field } from './Field'

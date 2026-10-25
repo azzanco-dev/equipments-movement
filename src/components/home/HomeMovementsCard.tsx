@@ -402,6 +402,7 @@ function MovementLogTab({
             rows={logs}
             rowKey={(log) => log.id}
             onRowClick={(log) => onSelectMovement(log.id)}
+            rowHref={(log) => `/movements/${log.id}`}
             loading={loading}
             loadingRows={5}
             empty={t('noLogs')}

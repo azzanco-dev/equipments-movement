@@ -454,6 +454,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
           sort={{ key: list.sort, direction: list.direction }}
           onSortChange={list.setSort}
           onRowClick={(row) => onSelectUser(row.id)}
+          rowHref={(row) => `/users/${row.id}`}
           empty={t('noUsers')}
         />
       )}

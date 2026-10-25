@@ -18,6 +18,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
+import { AppLink, isPlainLeftClick, openInNewTab } from './AppLink'
 import { cn } from './cn'
 
 export type DataTableSortDirection = 'asc' | 'desc'
@@ -56,6 +57,17 @@ export interface DataTableProps<Row> {
   rowKey: (row: Row) => string | number
   /** Makes rows clickable with Enter/Space keyboard access. */
   onRowClick?: (row: Row) => void
+  /**
+   * The page a clickable row opens, as an app path (owner 2026-10-25, «click
+   * يمين … new tab او ctrl»). With it, Ctrl / Cmd / Shift and middle clicks
+   * on the row open that page in a new tab, and the `rowLinkColumn` cell is a
+   * real link, so right click › open in new tab works there. A plain click
+   * still calls `onRowClick`. Ignored without `onRowClick`.
+   */
+  rowHref?: (row: Row) => string | null | undefined
+  /** The column whose cell holds the row's link; the first one by default.
+   *  Its cell must hold no control of its own (a link cannot nest one). */
+  rowLinkColumn?: string
   /** Current sort, owned by the caller (URL state in the list system). */
   sort?: DataTableSort | null
   /** Called with the requested key and direction; the caller refetches. */
@@ -320,6 +332,8 @@ export function DataTable<Row>({
   rows,
   rowKey,
   onRowClick,
+  rowHref,
+  rowLinkColumn,
   sort,
   onSortChange,
   loading = false,
@@ -370,7 +384,12 @@ export function DataTable<Row>({
     )
   }
 
+  const hrefOf = (row: Row) =>
+    !expandable && onRowClick ? (rowHref?.(row) ?? null) : null
+  const linkColumn = rowLinkColumn ?? columns[0]?.key
+
   const rowInteraction = (row: Row, key: string | number, panelId: string) => {
+    const href = hrefOf(row)
     const activate = expandable
       ? () => setExpandedKey((current) => (current === key ? null : key))
       : onRowClick
@@ -385,8 +404,25 @@ export function DataTable<Row>({
       'aria-controls': open ? panelId : undefined,
       onClick: (event: MouseEvent<HTMLTableRowElement>) => {
         if (hitsNestedControl(event.target, event.currentTarget)) return
+        if (href && !isPlainLeftClick(event)) {
+          openInNewTab(href)
+          return
+        }
         activate()
       },
+      // The middle button: a new tab, as on a link (the link cell opens it
+      // natively, so it is skipped here). No autoscroll on mouse down.
+      ...(href && {
+        onMouseDown: (event: MouseEvent<HTMLTableRowElement>) => {
+          if (event.button === 1) event.preventDefault()
+        },
+        onAuxClick: (event: MouseEvent<HTMLTableRowElement>) => {
+          if (event.button !== 1) return
+          if (hitsNestedControl(event.target, event.currentTarget)) return
+          event.preventDefault()
+          openInNewTab(href)
+        },
+      }),
       onKeyDown: (event: KeyboardEvent<HTMLTableRowElement>) => {
         if (event.key !== 'Enter' && event.key !== ' ') return
         if (hitsNestedControl(event.target, event.currentTarget)) return
@@ -586,22 +622,40 @@ export function DataTable<Row>({
                         )}
                       </td>
                     )}
-                    {columns.map((column) => (
-                      <td
-                        key={column.key}
-                        className={cn(
-                          'whitespace-nowrap tabular-nums',
-                          density.row,
-                          bodyCell,
-                          cellClassName,
-                          alignText[column.align ?? 'start'],
-                          column.hideBelow && hideBelowClass[column.hideBelow],
-                          column.className,
-                        )}
-                      >
-                        {column.cell(row)}
-                      </td>
-                    ))}
+                    {columns.map((column) => {
+                      const href =
+                        column.key === linkColumn ? hrefOf(row) : null
+                      return (
+                        <td
+                          key={column.key}
+                          className={cn(
+                            'whitespace-nowrap tabular-nums',
+                            density.row,
+                            bodyCell,
+                            cellClassName,
+                            alignText[column.align ?? 'start'],
+                            column.hideBelow &&
+                              hideBelowClass[column.hideBelow],
+                            column.className,
+                          )}
+                        >
+                          {href ? (
+                            // `contents`: the cell keeps its own layout; the
+                            // row keeps the keyboard focus.
+                            <AppLink
+                              href={href}
+                              tabIndex={-1}
+                              className="contents"
+                              onNavigate={() => onRowClick?.(row)}
+                            >
+                              {column.cell(row)}
+                            </AppLink>
+                          ) : (
+                            column.cell(row)
+                          )}
+                        </td>
+                      )
+                    })}
                   </tr>
                   {open && expandable && (
                     <tr

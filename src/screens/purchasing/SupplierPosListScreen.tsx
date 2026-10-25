@@ -13,6 +13,7 @@ import { CreateSupplierPoDialog } from '@/components/purchasing/CreateSupplierPo
 import { SupplierPoLinesPanel } from '@/components/purchasing/SupplierPoLinesPanel'
 import { SupplierPoStatusBadge } from '@/components/purchasing/SupplierPoStatusBadge'
 import {
+  AppLink,
   Badge,
   Button,
   DataTable,
@@ -182,8 +183,14 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
       header: <span className="sr-only">{t('supplierPoDetailsButton')}</span>,
       align: 'end',
       cell: (row) => (
-        <Button size="sm" variant="primary" onClick={() => onSelectPo(row.id)}>
-          {t('supplierPoDetailsButton')}
+        // A real link (owner 2026-10-25): right click › new tab, Ctrl click.
+        <Button size="sm" variant="primary" asChild>
+          <AppLink
+            href={`/purchasing/${row.id}`}
+            onNavigate={() => onSelectPo(row.id)}
+          >
+            {t('supplierPoDetailsButton')}
+          </AppLink>
         </Button>
       ),
     },

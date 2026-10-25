@@ -196,6 +196,7 @@ export function EquipmentTable({
       sort={{ key: sort, direction }}
       onSortChange={onSortChange}
       onRowClick={(row) => onOpen(row.id)}
+      rowHref={(row) => `/equipment/${row.id}`}
       empty={t('noEquipment')}
     />
   )

@@ -780,6 +780,8 @@ export function LogsScreen({
             onRowClick={
               onSelectMovement ? (row) => onSelectMovement(row.id) : undefined
             }
+            rowHref={(row) => `/movements/${row.id}`}
+            rowLinkColumn="equipment_code"
             caption={t('logs')}
             // Owner 2026-10-24: the PO list's look — 13 px rows with 8 px
             // above and below the content (headers stay 12 px).
