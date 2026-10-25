@@ -303,12 +303,16 @@ export function SiteUnitsScreen({
                         </bdi>
                       </p>
                     )}
-                    {/* The company's number, when set, with no label. */}
-                    {row.contractor_equipment_code && (
-                      <p className="text-xs font-medium leading-5">
+                    {/* The company's number, with no label. */}
+                    {/* A dash without a company number keeps every ticket's
+                        lines level (owner 2026-10-25). */}
+                    <p className="text-xs font-medium leading-5">
+                      {row.contractor_equipment_code ? (
                         <bdi dir="ltr">{row.contractor_equipment_code}</bdi>
-                      </p>
-                    )}
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </p>
                   </div>
                   {/* leading-5: text-xs's 16 px line cut Arabic marks; long
                       text wraps instead of being cut. */}
@@ -350,7 +354,8 @@ export function SiteUnitsScreen({
                     className="text-xs font-medium"
                     style={{ color: `var(--${toneOf(row)})` }}
                   >
-                    {row.has_po ? t('siteUnitsHasPo') : t('siteUnitsNoPo')}
+                    {/* Owner 2026-10-25: «رقم PO» beside the SPO pill. */}
+                    {row.has_po ? t('siteUnitsPoNumber') : t('siteUnitsNoPo')}
                   </span>
                   {row.supplier_po_id ? (
                     <button

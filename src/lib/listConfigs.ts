@@ -774,7 +774,7 @@ export const siteUnitsListConfig: DataListConfig = {
       type: 'select',
       operators: ['eq'],
       options: [
-        { value: 'false', label: 'بلا PO', labelI18n: 'siteUnitsNoPo' },
+        { value: 'false', label: 'بدون PO', labelI18n: 'siteUnitsNoPo' },
         { value: 'true', label: 'عليها PO', labelI18n: 'siteUnitsHasPo' },
       ],
     },

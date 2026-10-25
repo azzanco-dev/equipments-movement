@@ -381,13 +381,13 @@ function TodoDesign() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted">
-          الصفحة قائمة شغل: اللي بلا PO فوق وبارزة، واللي عليها PO تحت بهدوء.
+          الصفحة قائمة شغل: اللي بدون PO فوق وبارزة، واللي عليها PO تحت بهدوء.
         </p>
         <OwnerFilter value={owners} onChange={setOwners} />
       </div>
       <section className="space-y-2">
         <h4 className="flex items-center gap-2 text-sm font-semibold">
-          بلا PO
+          بدون PO
           <Badge tone="warning" size="sm">
             {missing.length}
           </Badge>
@@ -493,7 +493,7 @@ function TableDesign() {
   ]
   const QUICK: { value: Quick; label: string }[] = [
     { value: 'all', label: 'الكل' },
-    { value: 'missing', label: 'بلا PO' },
+    { value: 'missing', label: 'بدون PO' },
     { value: 'covered', label: 'عليها PO' },
   ]
   return (
@@ -626,7 +626,7 @@ function AllCardsDesign() {
         <OwnerFilter value={owners} onChange={setOwners} />
       </div>
       <section className="space-y-2">
-        <SectionTitle title="بلا PO" count={missing.length} tone="warning" />
+        <SectionTitle title="بدون PO" count={missing.length} tone="warning" />
         <ul className="grid gap-2 md:grid-cols-2">
           {missing.map((unit) => (
             <UnitCard key={unit.id} unit={unit} />
@@ -714,7 +714,7 @@ function SupplierCardsDesign() {
                 {rows.length} معدة
                 {missing > 0 && (
                   <Badge tone="warning" size="sm">
-                    {missing} بلا PO
+                    {missing} بدون PO
                   </Badge>
                 )}
               </span>
@@ -749,7 +749,7 @@ function TwoColumnsDesign() {
       </div>
       <div className="grid gap-3 lg:grid-cols-2">
         <section className="space-y-2 rounded-xl border bg-surface p-3">
-          <SectionTitle title="بلا PO" count={missing.length} tone="warning" />
+          <SectionTitle title="بدون PO" count={missing.length} tone="warning" />
           <ul className="space-y-2">
             {missing.map((unit) => (
               <UnitCard key={unit.id} unit={unit} />
@@ -792,13 +792,13 @@ function BulkDesign() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted">
-          تحدد اكثر من معدة بلا PO وتضيفها مرة وحدة. الـ PO لمورد وشركة ومشروع
+          تحدد اكثر من معدة بدون PO وتضيفها مرة وحدة. الـ PO لمورد وشركة ومشروع
           واحد، فاول تحديد يقفل الباقي على نفس المجموعة.
         </p>
         <OwnerFilter value={owners} onChange={setOwners} />
       </div>
       <section className="space-y-2">
-        <SectionTitle title="بلا PO" count={missing.length} tone="warning" />
+        <SectionTitle title="بدون PO" count={missing.length} tone="warning" />
         <ul className="grid gap-2 md:grid-cols-2">
           {missing.map((unit) => {
             const blocked =
@@ -892,7 +892,7 @@ const SITE_UNITS_CONFIG: DataListConfig = {
       type: 'select',
       operators: ['eq'],
       options: [
-        { value: 'missing', label: 'بلا PO' },
+        { value: 'missing', label: 'بدون PO' },
         { value: 'covered', label: 'عليها PO' },
       ],
     },
@@ -930,7 +930,7 @@ const SITE_UNITS_CONFIG: DataListConfig = {
     },
   ],
   sortableFields: [
-    { key: 'po_state', label: { ar: 'بلا PO اول', en: 'Missing PO first' } },
+    { key: 'po_state', label: { ar: 'بدون PO اول', en: 'Missing PO first' } },
     { key: 'since', label: { ar: 'تاريخ الدخول', en: 'Entry date' } },
     { key: 'code', label: { ar: 'رقم المعدة', en: 'Unit code' } },
     {
@@ -1250,7 +1250,7 @@ function FancyDetails({ unit }: { unit: Unit }) {
 function StateDot({ unit }: { unit: Unit }) {
   return (
     <span
-      aria-label={unit.spo ? 'عليها PO' : 'بلا PO'}
+      aria-label={unit.spo ? 'عليها PO' : 'بدون PO'}
       className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
       style={{
         backgroundColor: `var(--${toneOf(unit)})`,
@@ -1321,11 +1321,13 @@ function FancyTile({ look, unit }: { look: FancyLook; unit: Unit }) {
             <p className="text-xs leading-5 text-muted">
               <bdi dir="ltr">{plate}</bdi>
             </p>
-            {unit.contractorCode && (
-              <p className="text-xs font-medium leading-5">
+            <p className="text-xs font-medium leading-5">
+              {unit.contractorCode ? (
                 <bdi dir="ltr">{unit.contractorCode}</bdi>
-              </p>
-            )}
+              ) : (
+                <span className="text-muted">—</span>
+              )}
+            </p>
           </div>
           <FancyDetails unit={unit} />
         </div>
@@ -1340,7 +1342,7 @@ function FancyTile({ look, unit }: { look: FancyLook; unit: Unit }) {
             className="text-xs font-medium"
             style={{ color: `var(--${toneOf(unit)})` }}
           >
-            {unit.spo ? 'عليها PO' : 'بلا PO'}
+            {unit.spo ? 'رقم PO' : 'بدون PO'}
           </span>
           <FancyAction unit={unit} />
         </div>
