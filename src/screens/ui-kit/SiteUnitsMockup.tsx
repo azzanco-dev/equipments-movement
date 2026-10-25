@@ -1201,13 +1201,14 @@ const FANCY_LOOKS: { id: FancyLook; title: string; note: string }[] = [
 
 const toneOf = (unit: Unit) => (unit.spo ? 'success' : 'warning')
 
-/** The «+» or the SPO, solid in the state's tone; `round` for the circle. */
-function FancyAction({ unit, round = false }: { unit: Unit; round?: boolean }) {
+/** The «+» or the SPO, in the state's tone, fully rounded (owner
+ *  2026-10-25). */
+function FancyAction({ unit }: { unit: Unit }) {
   if (unit.spo)
     return (
       <button
         type="button"
-        className="inline-flex h-7 shrink-0 items-center rounded-md px-2 text-xs font-semibold underline-offset-2 hover:underline"
+        className="inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs font-semibold underline-offset-2 hover:underline"
         style={{
           backgroundColor: 'var(--success-soft)',
           color: 'var(--success)',
@@ -1221,7 +1222,7 @@ function FancyAction({ unit, round = false }: { unit: Unit; round?: boolean }) {
       type="button"
       aria-label="اضافة الى PO"
       title="اضافة الى PO"
-      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center transition-opacity hover:opacity-85 ${round ? 'rounded-full' : 'rounded-md'}`}
+      className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-opacity hover:opacity-85"
       style={{ backgroundColor: 'var(--warning)', color: 'var(--bg)' }}
     >
       <Plus size={15} strokeWidth={2.5} aria-hidden="true" />
@@ -1276,7 +1277,7 @@ function FancyTile({ look, unit }: { look: FancyLook; unit: Unit }) {
               </bdi>
             </p>
           </div>
-          <FancyAction unit={unit} round />
+          <FancyAction unit={unit} />
         </div>
         <div className="p-3">
           <FancyDetails unit={unit} />
@@ -1302,11 +1303,9 @@ function FancyTile({ look, unit }: { look: FancyLook; unit: Unit }) {
           </div>
           <FancyDetails unit={unit} />
         </div>
-        {/* The perforation: a dashed line with two half-circle notches. */}
-        <div className="relative mx-3 border-t border-dashed">
-          <span className="absolute -start-[19px] -top-[7px] h-3.5 w-3.5 rounded-full border bg-surface" />
-          <span className="absolute -end-[19px] -top-[7px] h-3.5 w-3.5 rounded-full border bg-surface" />
-        </div>
+        {/* The perforation: a dashed line (owner 2026-10-25: no side
+            notches). */}
+        <div className="mx-3 border-t border-dashed" />
         <div
           className="flex items-center justify-between gap-2 rounded-b-xl px-3 py-2.5"
           style={{ backgroundColor: `var(--${toneOf(unit)}-soft)` }}
@@ -1343,7 +1342,7 @@ function FancyTile({ look, unit }: { look: FancyLook; unit: Unit }) {
         </div>
         <FancyDetails unit={unit} />
         <div className="mt-auto flex justify-end">
-          <FancyAction unit={unit} round />
+          <FancyAction unit={unit} />
         </div>
       </li>
     )
@@ -1362,7 +1361,7 @@ function FancyTile({ look, unit }: { look: FancyLook; unit: Unit }) {
               </p>
             </div>
           </div>
-          <FancyAction unit={unit} round />
+          <FancyAction unit={unit} />
         </div>
         {unit.contractorCode && (
           <p className="-mt-2 text-xs font-medium leading-5">
