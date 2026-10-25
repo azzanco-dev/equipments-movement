@@ -386,6 +386,37 @@ export function equipmentFormActions(
   )
 }
 
+export interface EquipmentListActions {
+  /** «اضافة معدة» (`equipment.create`, policy insert_equipment). */
+  create: boolean
+  /** The edit buttons and the `?edit=` link (`equipment.edit`, policy
+   *  update_equipment). Without it the update matches no row. */
+  edit: boolean
+  /** The Excel import and update (`equipment.import`). */
+  importRows: boolean
+}
+
+export function equipmentListActions(
+  state: ActionPermissionState,
+  role: LegacyRole,
+): EquipmentListActions {
+  return decideByPermissions(
+    state,
+    role,
+    (permissions) => ({
+      create: permissions.has('equipment.create'),
+      edit: permissions.has('equipment.edit'),
+      importRows: permissions.has('equipment.import'),
+    }),
+    // Before the roles system the equipment screens were the admin's only.
+    (legacyRole) => ({
+      create: legacyRole === 'admin',
+      edit: legacyRole === 'admin',
+      importRows: legacyRole === 'admin',
+    }),
+  )
+}
+
 export interface UsersActions {
   /** Adding, editing and saving users (`users.manage`). */
   manage: boolean

@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
+import { useAuth } from '@/auth/AuthContext'
+import { usePermissions } from '@/auth/PermissionsContext'
+import { equipmentListActions } from '@/lib/actionPermissions'
 import {
   Building2,
   Calendar,
@@ -100,6 +103,9 @@ export function EquipmentDetail({
   onOpenPo,
 }: EquipmentDetailProps) {
   const { t, lang } = useI18n()
+  const { profile } = useAuth()
+  // The edit button follows `equipment.edit`, as on the list.
+  const canEdit = equipmentListActions(usePermissions(), profile?.role).edit
   const [equipment, setEquipment] = useState<Equipment | null>(null)
   const [logs, setLogs] = useState<RecentMovementRow[]>([])
   const [codeChanges, setCodeChanges] = useState<EquipmentCodeChange[]>([])
@@ -397,14 +403,16 @@ export function EquipmentDetail({
             </>
           }
           actions={
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<Edit2 size={14} />}
-              onClick={() => onEdit(equipment)}
-            >
-              {t('editEquipment')}
-            </Button>
+            canEdit ? (
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<Edit2 size={14} />}
+                onClick={() => onEdit(equipment)}
+              >
+                {t('editEquipment')}
+              </Button>
+            ) : undefined
           }
         />
         <PreviousCodesLine

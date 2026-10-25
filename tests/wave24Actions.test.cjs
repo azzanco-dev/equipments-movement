@@ -315,6 +315,11 @@ for (const role of ROLES) {
       trackerLink: expected,
       changeCode: expected,
     })
+    assert.deepEqual(plain(actions.equipmentListActions(state, role)), {
+      create: expected,
+      edit: expected,
+      importRows: expected,
+    })
     assert.deepEqual(plain(actions.usersActions(state, role)), {
       manage: expected,
     })
@@ -368,6 +373,11 @@ test('while loading or after a failed load the role decides', () => {
       assert.deepEqual(plain(actions.equipmentFormActions(state, role)), {
         trackerLink: adminOnly,
         changeCode: adminOnly,
+      })
+      assert.deepEqual(plain(actions.equipmentListActions(state, role)), {
+        create: adminOnly,
+        edit: adminOnly,
+        importRows: adminOnly,
       })
       assert.equal(actions.usersActions(state, role).manage, adminOnly)
       assert.equal(actions.canSeeIntegrationsStatus(state, role), adminOnly)
@@ -610,5 +620,33 @@ test('the new copy exists in Arabic and English, without hamza', () => {
       ) ?? []
     ).length,
     2,
+  )
+})
+
+test('equipment add / edit / import follow their own keys once ready', () => {
+  const keys = (...names) => names.map((name) => [name, null])
+  // The purchasing role of 2026-10-25 reads equipment without editing it:
+  // no edit button, so no save the update policy silently refuses.
+  assert.deepEqual(
+    plain(
+      actions.equipmentListActions(
+        ready(keys('equipment.read', 'equipment.location.view')),
+        'monitor',
+      ),
+    ),
+    { create: false, edit: false, importRows: false },
+  )
+  assert.deepEqual(
+    plain(
+      actions.equipmentListActions(
+        ready(keys('equipment.read', 'equipment.edit')),
+        'monitor',
+      ),
+    ),
+    { create: false, edit: true, importRows: false },
+  )
+  assert.deepEqual(
+    plain(actions.equipmentListActions(ready(keys('equipment.create')), 'admin')),
+    { create: true, edit: false, importRows: false },
   )
 })

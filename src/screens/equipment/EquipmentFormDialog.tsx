@@ -88,6 +88,9 @@ function isTrackerUnitTaken(error: {
   )
 }
 
+/** Thrown when an update matched no row (see handleSave). */
+const EQUIPMENT_NOT_UPDATED = 'equipment_not_updated'
+
 export interface EquipmentFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -381,13 +384,23 @@ export function EquipmentFormDialog({
         codeSaved = true
         payload.code = newCode
       }
-      const { error: saveError } = equipment
-        ? await supabase
-            .from('equipment')
-            .update(payload)
-            .eq('id', equipment.id)
-        : await supabase.from('equipment').insert(payload)
-      if (saveError) throw saveError
+      if (equipment) {
+        // Without `equipment.edit` the update policy matches no row and
+        // PostgREST answers 204 with no error, so the returned rows are read:
+        // an empty answer is a refusal, never a silent success.
+        const { data: updated, error: saveError } = await supabase
+          .from('equipment')
+          .update(payload)
+          .eq('id', equipment.id)
+          .select('id')
+        if (saveError) throw saveError
+        if (!updated?.length) throw { code: EQUIPMENT_NOT_UPDATED }
+      } else {
+        const { error: saveError } = await supabase
+          .from('equipment')
+          .insert(payload)
+        if (saveError) throw saveError
+      }
       onOpenChange(false)
       onSaved()
     } catch (err) {
@@ -415,6 +428,14 @@ export function EquipmentFormDialog({
         focusFirstError(attributed, EQUIPMENT_FIELD_ORDER, {
           root: bodyRef.current,
         })
+      } else if (
+        saveError.code === EQUIPMENT_NOT_UPDATED ||
+        saveError.code === '42501'
+      ) {
+        // The row policies (equipment.edit / equipment.create) refused it.
+        setError(
+          t(equipment ? 'equipmentEditNotAllowed' : 'equipmentCreateNotAllowed'),
+        )
       } else {
         setError(t('saveFailed'))
       }

@@ -46,7 +46,8 @@ export interface EquipmentTableProps {
   direction: 'asc' | 'desc'
   onSortChange: (key: string, direction: 'asc' | 'desc') => void
   onOpen: (id: string) => void
-  onEdit: (equipment: Equipment) => void
+  /** Omitted without `equipment.edit`: the row shows no edit button. */
+  onEdit?: (equipment: Equipment) => void
   /** Rendered in the empty state, e.g. the "add equipment" button. */
   emptyAction?: ReactNode
   /** Rows the search found through a previous code (EM-196). */
@@ -157,13 +158,15 @@ export function EquipmentTable({
       header: t('actions'),
       cell: (row) => (
         <span className="flex items-center gap-1">
-          <IconButton
-            size="sm"
-            label={t('edit')}
-            title={t('edit')}
-            icon={<Edit2 size={15} />}
-            onClick={() => onEdit(row)}
-          />
+          {onEdit && (
+            <IconButton
+              size="sm"
+              label={t('edit')}
+              title={t('edit')}
+              icon={<Edit2 size={15} />}
+              onClick={() => onEdit(row)}
+            />
+          )}
           <ChevronRight
             size={15}
             aria-hidden="true"

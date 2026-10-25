@@ -1224,6 +1224,12 @@ export const translations = {
     equipmentCodeInvalid:
       'رقم المعدة يقبل حروفا وارقاما وشرطة فقط، بحد اقصى 30 حرفا.',
     // audit-0135 — end
+    // equipment-save-refused — start
+    equipmentEditNotAllowed:
+      'لم يحفظ التعديل: تعديل المعدات يحتاج صلاحية «تعديل المعدات». اطلب من مدير النظام اضافتها لدورك.',
+    equipmentCreateNotAllowed:
+      'لم تحفظ المعدة: الاضافة تحتاج صلاحية «اضافة معدة». اطلب من مدير النظام اضافتها لدورك.',
+    // equipment-save-refused — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -3270,6 +3276,12 @@ export const translations = {
     equipmentCodeInvalid:
       'The equipment number accepts letters, digits and dashes only, at most 30 characters.',
     // audit-0135 — end
+    // equipment-save-refused — start
+    equipmentEditNotAllowed:
+      'The change was not saved: editing equipment needs the "Edit equipment" permission. Ask the system admin to add it to your role.',
+    equipmentCreateNotAllowed:
+      'The equipment was not saved: adding needs the "Add equipment" permission. Ask the system admin to add it to your role.',
+    // equipment-save-refused — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',

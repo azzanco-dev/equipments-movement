@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { useAuth } from '@/auth/AuthContext'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { FileSpreadsheet, Plus, Upload } from 'lucide-react'
 import { Button, PageHeader } from '@/components/ui'
 import { DataListActions } from '@/components/data-list/DataListActions'
@@ -9,6 +11,7 @@ import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { EquipmentExcelUpdate } from '@/components/EquipmentExcelUpdate'
 import { useI18n } from '@/i18n/I18nContext'
+import { equipmentListActions } from '@/lib/actionPermissions'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { equipmentListConfig } from '@/lib/listConfigs'
 import { toLatinDigits } from '@/lib/plate'
@@ -41,6 +44,12 @@ export function EquipmentListScreen({
   onSelectEquipment,
 }: EquipmentListScreenProps = {}) {
   const { t } = useI18n()
+  const { profile } = useAuth()
+  // Add, edit and the Excel import follow equipment.create / .edit /
+  // .import (the row policies re-check them); the admin role decides only
+  // while the permissions load or after a failed load.
+  const actions = equipmentListActions(usePermissions(), profile?.role)
+  const canEdit = actions.edit
   const editId = useSearchParams().get('edit')
   const list = useDataListState(equipmentListConfig)
   const [equipment, setEquipment] = useState<Equipment[]>([])
@@ -157,9 +166,17 @@ export function EquipmentListScreen({
     setFormOpen(true)
   }, [])
 
-  // `?edit=<id>` deep link (e.g. from the equipment detail screen).
+  // `?edit=<id>` deep link (e.g. from the equipment detail screen). Without
+  // `equipment.edit` the link is dropped instead of opening a form whose save
+  // the database refuses.
   useEffect(() => {
     if (!editId) return
+    if (!canEdit) {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('edit')
+      window.history.replaceState(null, '', `${url.pathname}${url.search}`)
+      return
+    }
     const controller = new AbortController()
     void (async () => {
       const { data, error } = await supabase
@@ -178,9 +195,9 @@ export function EquipmentListScreen({
       window.history.replaceState(null, '', `${url.pathname}${url.search}`)
     })()
     return () => controller.abort()
-  }, [editId, openEdit, t])
+  }, [editId, canEdit, openEdit, t])
 
-  const addButton = (
+  const addButton = actions.create ? (
     <Button
       variant="primary"
       icon={<Plus size={16} aria-hidden="true" />}
@@ -188,7 +205,7 @@ export function EquipmentListScreen({
     >
       {t('addEquipment')}
     </Button>
-  )
+  ) : undefined
 
   return (
     <div ref={listTopRef} className="scroll-mt-20 space-y-4">
@@ -198,7 +215,8 @@ export function EquipmentListScreen({
         actions={
           <DataListActions
             menuActions={
-              <>
+              actions.importRows ? (
+                <>
                 <Button
                   variant="ghost"
                   icon={<FileSpreadsheet size={16} aria-hidden="true" />}
@@ -214,6 +232,7 @@ export function EquipmentListScreen({
                   {t('importExcel')}
                 </Button>
               </>
+              ) : undefined
             }
             primaryAction={addButton}
           />
@@ -240,7 +259,7 @@ export function EquipmentListScreen({
         direction={list.direction}
         onSortChange={list.setSort}
         onOpen={(id) => onSelectEquipment?.(id)}
-        onEdit={openEdit}
+        onEdit={canEdit ? openEdit : undefined}
         emptyAction={addButton}
         previousCodeMatchIds={previousCodeIds}
       />
