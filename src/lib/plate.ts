@@ -76,14 +76,16 @@ export function normalizePlateNumber(value: string): string {
 
 /**
  * A stored plate for display (owner 2026-10-25, «المعدات في المشاريع»): the
- * digits, a space, then the letters one by one — `1128-XVV` reads
- * `1128 X V V`. Anything not in the stored digits-letters form is returned
- * as it is.
+ * digits, then the letters upper-cased — `1128-XVV` gives `1128` and `XVV`,
+ * which the screen spaces with letter-spacing, not with spaces. Null when
+ * the value is not in the stored digits-letters form.
  */
-export function formatPlateForDisplay(value: string): string {
+export function splitPlateForDisplay(
+  value: string,
+): { digits: string; letters: string } | null {
   const match = /^\s*(\d+)\s*-\s*([A-Za-z]+)\s*$/.exec(value)
-  if (!match) return value.trim()
-  return `${match[1]} ${match[2].toUpperCase().split('').join(' ')}`
+  if (!match) return null
+  return { digits: match[1], letters: match[2].toUpperCase() }
 }
 
 // Search helpers. People search equipment by its code or by the plate DIGITS,

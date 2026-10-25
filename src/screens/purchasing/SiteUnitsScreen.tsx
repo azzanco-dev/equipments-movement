@@ -27,7 +27,7 @@ import {
 import { foremanFilterOptions } from '@/lib/foremanFilter'
 import { siteUnitsListConfig } from '@/lib/listConfigs'
 import { localizedName } from '@/lib/localizedName'
-import { formatPlateForDisplay } from '@/lib/plate'
+import { splitPlateForDisplay } from '@/lib/plate'
 import {
   isSupplierPoOwnerClass,
   SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS,
@@ -36,6 +36,26 @@ import { SITE_UNITS_SELECT, type SiteUnitRow } from '@/lib/purchasingData'
 import { saudiDateKey } from '@/lib/saudiTime'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
+
+/** The plate's digits, then its letters spaced by letter-spacing (owner
+ *  2026-10-25); the negative end margin drops the space after the last
+ *  letter. A plate not in the stored form, or the chassis, shows as it is. */
+function PlateOrChassis({
+  plate,
+  chassis,
+}: {
+  plate: string | null
+  chassis: string | null
+}) {
+  const parts = plate ? splitPlateForDisplay(plate) : null
+  if (!parts) return <>{plate?.trim() || chassis}</>
+  return (
+    <>
+      {parts.digits}{' '}
+      <span className="-me-[0.15em] tracking-[0.15em]">{parts.letters}</span>
+    </>
+  )
+}
 
 export interface SiteUnitsScreenProps {
   onSelectPo: (poId: string) => void
@@ -292,18 +312,19 @@ export function SiteUnitsScreen({
                         </button>
                       )}
                     </div>
-                    {/* Owner 2026-10-25: the plate as «1128 X V V» (or the chassis),
-                        a dot, then the company's number (a dash when there is none). */}
+                    {/* Owner 2026-10-25: the plate as «1128 XVV» with the
+                        letters spaced by letter-spacing (or the chassis), a
+                        dot, then the company's number (a dash when there is
+                        none). */}
                     <p className="text-xs leading-5 text-muted">
                       {(row.equipment_plate_number ||
                         row.equipment_chassis_number) && (
                         <>
                           <bdi dir="ltr">
-                            {row.equipment_plate_number
-                              ? formatPlateForDisplay(
-                                  row.equipment_plate_number,
-                                )
-                              : row.equipment_chassis_number}
+                            <PlateOrChassis
+                              plate={row.equipment_plate_number}
+                              chassis={row.equipment_chassis_number}
+                            />
                           </bdi>
                           {' · '}
                         </>

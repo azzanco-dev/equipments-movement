@@ -14,7 +14,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
-import { formatPlateForDisplay } from '@/lib/plate'
+import { splitPlateForDisplay } from '@/lib/plate'
 import type { DataListConfig, ListFilter } from '@/components/data-list/types'
 
 // «المعدات في المشاريع» (owner request 2026-10-24): a purchasing sub-page
@@ -1330,11 +1330,21 @@ function FancyTile({ look, unit }: { look: FancyLook; unit: Unit }) {
                 />
               </button>
             </div>
-            {/* Owner 2026-10-25: plate «1128 X V V» · company number, and
-                a spacer under the identity. */}
+            {/* Owner 2026-10-25: plate «1128 XVV» (letters spaced by
+                letter-spacing) · company number, and a spacer under the
+                identity. */}
             <p className="text-xs leading-5 text-muted">
               <bdi dir="ltr">
-                {unit.plate ? formatPlateForDisplay(unit.plate) : plate}
+                {(() => {
+                  const parts = unit.plate ? splitPlateForDisplay(unit.plate) : null
+                  return parts ? (
+                    <>
+                      {parts.digits} <span className="-me-[0.15em] tracking-[0.15em]">{parts.letters}</span>
+                    </>
+                  ) : (
+                    plate
+                  )
+                })()}
               </bdi>
               {' · '}
               {unit.contractorCode ? (
