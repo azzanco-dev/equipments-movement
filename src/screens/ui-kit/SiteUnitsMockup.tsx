@@ -1246,10 +1246,17 @@ function FancyAction({ unit }: { unit: Unit }) {
   )
 }
 
-function FancyDetails({ unit }: { unit: Unit }) {
+function FancyDetails({
+  unit,
+  withType = true,
+}: {
+  unit: Unit
+  /** The ticket shows the type under the code instead. */
+  withType?: boolean
+}) {
   return (
     <div className="min-w-0 space-y-1">
-      <p className="break-words text-xs leading-5">{unit.type}</p>
+      {withType && <p className="break-words text-xs leading-5">{unit.type}</p>}
       <p className="break-words text-xs leading-5 text-muted">
         {ownerLine(unit)}
       </p>
@@ -1330,6 +1337,8 @@ function FancyTile({ look, unit }: { look: FancyLook; unit: Unit }) {
                 />
               </button>
             </div>
+            {/* Owner 2026-10-25: the type under the code. */}
+            <p className="break-words leading-5">{unit.type}</p>
             {/* Owner 2026-10-25: plate «1128 XVV» (letters spaced by
                 letter-spacing) · company number, and a spacer under the
                 identity. */}
@@ -1357,7 +1366,7 @@ function FancyTile({ look, unit }: { look: FancyLook; unit: Unit }) {
             </p>
           </div>
           <div className="border-t" />
-          <FancyDetails unit={unit} />
+          <FancyDetails unit={unit} withType={false} />
         </div>
         {/* The perforation: a dashed line (owner 2026-10-25: no side
             notches). */}

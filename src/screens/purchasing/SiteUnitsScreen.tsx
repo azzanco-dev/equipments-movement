@@ -312,6 +312,11 @@ export function SiteUnitsScreen({
                         </button>
                       )}
                     </div>
+                    {/* Owner 2026-10-25: the type under the code, with the
+                        unit's identity above the spacer. */}
+                    <p className="break-words leading-5">
+                      {row.equipment_type ?? '—'}
+                    </p>
                     {/* Owner 2026-10-25: the plate as «1128 XVV» with the
                         letters spaced by letter-spacing (or the chassis), a
                         dot, then the company's number (a dash when there is
@@ -343,9 +348,6 @@ export function SiteUnitsScreen({
                   {/* leading-5: text-xs's 16 px line cut Arabic marks; long
                       text wraps instead of being cut. */}
                   <div className="min-w-0 space-y-1">
-                    <p className="break-words text-xs leading-5">
-                      {row.equipment_type ?? '—'}
-                    </p>
                     <p className="break-words text-xs leading-5 text-muted">
                       {ownerLine(row)}
                     </p>
