@@ -277,21 +277,24 @@ export function SiteUnitsScreen({
                       <p className="text-lg font-bold leading-6">
                         <bdi dir="ltr">{row.equipment_code ?? '—'}</bdi>
                       </p>
+                      {/* Owner 2026-10-25 (a trial): a round arrow that widens
+                          on hover or keyboard focus to show «انتقل للحركة»;
+                          the motion only runs when the device allows it. */}
                       {onSelectMovement && (
-                        <IconButton
-                          size="sm"
-                          variant="ghost"
-                          className="shrink-0 !rounded-full bg-surface-hover text-fg transition-opacity hover:opacity-85"
-                          label={t('siteUnitsOpenMovement')}
-                          icon={
-                            <ArrowUpRight
-                              size={16}
-                              aria-hidden="true"
-                              className="rtl:-scale-x-100"
-                            />
-                          }
+                        <button
+                          type="button"
                           onClick={() => onSelectMovement(row.entry_id)}
-                        />
+                          className="group/move inline-flex h-7 shrink-0 items-center rounded-full bg-surface-hover px-1.5 text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                        >
+                          <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 group-hover/move:max-w-32 group-hover/move:px-1 group-hover/move:opacity-100 group-focus-visible/move:max-w-32 group-focus-visible/move:px-1 group-focus-visible/move:opacity-100 motion-safe:transition-all motion-safe:duration-300 motion-safe:ease-out">
+                            {t('siteUnitsOpenMovement')}
+                          </span>
+                          <ArrowUpRight
+                            size={16}
+                            aria-hidden="true"
+                            className="shrink-0 rtl:-scale-x-100"
+                          />
+                        </button>
                       )}
                     </div>
                     {(row.equipment_plate_number ||

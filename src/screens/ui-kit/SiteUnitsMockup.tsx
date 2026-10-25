@@ -1298,25 +1298,21 @@ function FancyTile({ look, unit }: { look: FancyLook; unit: Unit }) {
                 <bdi dir="ltr">{unit.code}</bdi>
               </p>
 
-              <IconButton
-                size="sm"
-
-                variant="ghost"
-
-                className="shrink-0 !rounded-full bg-surface-hover text-fg transition-opacity hover:opacity-85"
-
-                label="فتح حركة الدخول"
-
-                icon={
-                  <ArrowUpRight
-                    size={16}
-
-                    aria-hidden="true"
-
-                    className="rtl:-scale-x-100"
-                  />
-                }
-              />
+              {/* Owner 2026-10-25 (a trial): widens on hover or focus to show
+                  «انتقل للحركة»; the motion runs only when the device allows it. */}
+              <button
+                type="button"
+                className="group/move inline-flex h-7 shrink-0 items-center rounded-full bg-surface-hover px-1.5 text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 group-hover/move:max-w-32 group-hover/move:px-1 group-hover/move:opacity-100 group-focus-visible/move:max-w-32 group-focus-visible/move:px-1 group-focus-visible/move:opacity-100 motion-safe:transition-all motion-safe:duration-300 motion-safe:ease-out">
+                  انتقل للحركة
+                </span>
+                <ArrowUpRight
+                  size={16}
+                  aria-hidden="true"
+                  className="shrink-0 rtl:-scale-x-100"
+                />
+              </button>
             </div>
             <p className="text-xs leading-5 text-muted">
               <bdi dir="ltr">{plate}</bdi>
