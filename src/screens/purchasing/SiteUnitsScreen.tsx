@@ -224,7 +224,7 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
       {loadError ? (
         <ErrorState description={t('siteUnitsLoadError')} onRetry={fetchRows} />
       ) : loading && rows.length === 0 ? (
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-busy="true">
+        <ul className="grid grid-cols-2 gap-2" aria-busy="true">
           {Array.from({ length: 6 }, (_, index) => (
             <li key={index}>
               <Skeleton className="h-44 w-full rounded-xl" />
@@ -241,11 +241,11 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
             {total} {t('siteUnitsCount')}
           </p>
           <ul
-            className={`grid grid-cols-2 gap-2 sm:grid-cols-3 ${
+            className={`grid grid-cols-2 gap-2 ${
               loading ? 'pointer-events-none opacity-60' : ''
             }`}
           >
-            {/* At most three columns (owner 2026-10-24). */}
+            {/* Two columns (owner 2026-10-25; it was three). */}
             {rows.map((row) => (
               <li
                 key={row.entry_id}

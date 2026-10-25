@@ -1061,8 +1061,8 @@ function TilesDesign() {
           لا توجد معدات مطابقة للبحث او الفلاتر.
         </p>
       ) : (
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {/* Owner 2026-10-24: at most three columns. */}
+        <ul className="grid grid-cols-2 gap-2">
+          {/* Owner 2026-10-25: two columns (it was three). */}
           {units.map((unit) => (
             <li
               key={unit.id}
