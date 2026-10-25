@@ -277,8 +277,8 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
                     <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 leading-6">
                       <bdi
                         dir="ltr"
-                        // Owner 2026-10-25: weight 600.
-                        className="text-base font-semibold"
+                        // Owner 2026-10-25: weight 700, no stroke.
+                        className="text-base font-bold"
                       >
                         {row.equipment_code ?? '—'}
                       </bdi>
