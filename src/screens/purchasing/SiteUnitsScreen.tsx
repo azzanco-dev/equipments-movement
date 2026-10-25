@@ -277,11 +277,8 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
                     <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 leading-6">
                       <bdi
                         dir="ltr"
-                        className="text-base font-bold"
-                        // Owner 2026-10-25: bolder than bold. Thmanyah's
-                        // heaviest face is 700, so a thin stroke in the text
-                        // colour thickens letters and digits alike.
-                        style={{ WebkitTextStroke: '0.35px currentColor' }}
+                        // Owner 2026-10-25: weight 600.
+                        className="text-base font-semibold"
                       >
                         {row.equipment_code ?? '—'}
                       </bdi>
