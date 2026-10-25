@@ -5,7 +5,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react'
-import { FileText, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
@@ -68,6 +68,15 @@ function tileColors(row: SiteUnitRow): CSSProperties {
 const ADD_BUTTON_STYLE: CSSProperties = {
   color: 'var(--warning)',
   borderColor: 'color-mix(in srgb, var(--warning) 45%, transparent)',
+  backgroundColor: 'var(--bg)',
+}
+
+/** The SPO on a tile with a PO: the green of the tile, on the page
+ *  background, at the end of the code's row like the «+» (owner
+ *  2026-10-25). Tokens only. */
+const SPO_BUTTON_STYLE: CSSProperties = {
+  color: 'var(--success)',
+  borderColor: 'color-mix(in srgb, var(--success) 45%, transparent)',
   backgroundColor: 'var(--bg)',
 }
 
@@ -261,8 +270,9 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
                 style={tileColors(row)}
               >
                 <div>
-                  {/* Owner 2026-10-25: the code in bold, and the add as an
-                      icon-only «+» at the end of the code's row. */}
+                  {/* Owner 2026-10-25: the code in bold; at the end of its
+                      row the SPO (green) or the add, an icon-only «+»
+                      (amber), or «بلا PO» for a reader. */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 leading-6">
                       <bdi dir="ltr" className="text-base font-bold">
@@ -276,7 +286,16 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
                         </bdi>
                       )}
                     </div>
-                    {!row.supplier_po_id && canManage && (
+                    {row.supplier_po_id ? (
+                      <button
+                        type="button"
+                        onClick={() => onSelectPo(row.supplier_po_id!)}
+                        className="inline-flex h-7 shrink-0 items-center rounded-md border px-2 text-xs font-semibold underline-offset-2 hover:underline"
+                        style={SPO_BUTTON_STYLE}
+                      >
+                        <bdi dir="ltr">{row.po_number}</bdi>
+                      </button>
+                    ) : canManage ? (
                       <IconButton
                         size="sm"
                         variant="outline"
@@ -288,6 +307,10 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
                         icon={<Plus size={14} aria-hidden="true" />}
                         onClick={() => openAdd(row)}
                       />
+                    ) : (
+                      <span className="shrink-0 text-xs leading-6 text-muted">
+                        {t('siteUnitsNoPo')}
+                      </span>
                     )}
                   </div>
                   {/* The company's number, when set, under the code with
@@ -327,31 +350,6 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
                     </span>
                   </p>
                 </div>
-                {/* The SPO stays at the tile's end; a reader without
-                    purchasing.manage sees «بلا PO» there. */}
-                {(row.supplier_po_id || !canManage) && (
-                  <div className="mt-auto">
-                    {row.supplier_po_id ? (
-                      <button
-                        type="button"
-                        onClick={() => onSelectPo(row.supplier_po_id!)}
-                        className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[13px] font-semibold underline-offset-2 hover:bg-surface-hover hover:underline"
-                      >
-                        <FileText
-                          size={13}
-                          strokeWidth={1.5}
-                          aria-hidden="true"
-                          className="text-muted"
-                        />
-                        <bdi dir="ltr">{row.po_number}</bdi>
-                      </button>
-                    ) : (
-                      <span className="text-xs text-muted">
-                        {t('siteUnitsNoPo')}
-                      </span>
-                    )}
-                  </div>
-                )}
               </li>
             ))}
           </ul>

@@ -1002,6 +1002,15 @@ const ADD_BUTTON_STYLE: CSSProperties = {
   backgroundColor: 'var(--bg)',
 }
 
+/** The SPO on a tile with a PO: the green of the tile, on the page
+ *  background, at the end of the code's row like the «+» (owner
+ *  2026-10-25). Tokens only. */
+const SPO_BUTTON_STYLE: CSSProperties = {
+  color: 'var(--success)',
+  borderColor: 'color-mix(in srgb, var(--success) 45%, transparent)',
+  backgroundColor: 'var(--bg)',
+}
+
 function TilesDesign() {
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<ListFilter[]>([])
@@ -1082,8 +1091,9 @@ function TilesDesign() {
                   plate, beside it; the company's number for the unit, when
                   set, right under it with no label (owner 2026-10-24). */}
               <div>
-                {/* Owner 2026-10-25: the code in bold, and the add as an
-                    icon-only «+» at the end of the code's row. */}
+                {/* Owner 2026-10-25: the code in bold; at the end of its
+                    row the SPO (green) or the add, an icon-only «+»
+                    (amber). */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 leading-6">
                     <bdi dir="ltr" className="text-base font-bold">
@@ -1095,7 +1105,15 @@ function TilesDesign() {
                       </bdi>
                     )}
                   </div>
-                  {!unit.spo && (
+                  {unit.spo ? (
+                    <button
+                      type="button"
+                      className="inline-flex h-7 shrink-0 items-center rounded-md border px-2 text-xs font-semibold underline-offset-2 hover:underline"
+                      style={SPO_BUTTON_STYLE}
+                    >
+                      <bdi dir="ltr">{unit.spo}</bdi>
+                    </button>
+                  ) : (
                     <IconButton
                       size="sm"
                       variant="outline"
@@ -1133,11 +1151,6 @@ function TilesDesign() {
                   <span className="font-medium text-fg">{foremanOf(unit)}</span>
                 </p>
               </div>
-              {unit.spo && (
-                <div className="mt-auto">
-                  <PoCell unit={unit} compact />
-                </div>
-              )}
             </li>
           ))}
         </ul>
