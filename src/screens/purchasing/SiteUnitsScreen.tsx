@@ -12,6 +12,7 @@ import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
+import { useRefetchOnReturn } from '@/components/data-list/useRefetchOnReturn'
 import { AddEquipmentDialog } from '@/components/purchasing/AddEquipmentDialog'
 import {
   CreateSupplierPoDialog,
@@ -165,6 +166,8 @@ export function SiteUnitsScreen({
   useEffect(() => {
     fetchRows()
   }, [fetchRows])
+  // A PO added in another tab shows when the user comes back.
+  useRefetchOnReturn(fetchRows)
 
   const filtered = Boolean(list.search.trim()) || list.filters.length > 0
 
