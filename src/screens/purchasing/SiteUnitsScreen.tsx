@@ -18,8 +18,8 @@ import {
   type CreateSupplierPoPreset,
 } from '@/components/purchasing/CreateSupplierPoDialog'
 import {
-  Button,
   EmptyState,
+  IconButton,
   ErrorState,
   PageHeader,
   Skeleton,
@@ -61,6 +61,14 @@ function tileColors(row: SiteUnitRow): CSSProperties {
     backgroundColor: `var(--${tone}-soft)`,
     borderColor: `color-mix(in srgb, var(--${tone}) 25%, transparent)`,
   }
+}
+
+/** The «+» on a tile without a PO: the amber of the tile, on the page
+ *  background so it stands out (owner 2026-10-25). Tokens only. */
+const ADD_BUTTON_STYLE: CSSProperties = {
+  color: 'var(--warning)',
+  borderColor: 'color-mix(in srgb, var(--warning) 45%, transparent)',
+  backgroundColor: 'var(--bg)',
 }
 
 /** The add target: the party's open PO there, else a new PO for the unit. */
@@ -253,16 +261,33 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
                 style={tileColors(row)}
               >
                 <div>
-                  <div className="flex flex-wrap items-baseline gap-x-2 leading-6">
-                    <bdi dir="ltr" className="text-base font-semibold">
-                      {row.equipment_code ?? '—'}
-                    </bdi>
-                    {(row.equipment_plate_number ||
-                      row.equipment_chassis_number) && (
-                      <bdi dir="ltr" className="text-xs text-muted">
-                        {row.equipment_plate_number ||
-                          row.equipment_chassis_number}
+                  {/* Owner 2026-10-25: the code in bold, and the add as an
+                      icon-only «+» at the end of the code's row. */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 leading-6">
+                      <bdi dir="ltr" className="text-base font-bold">
+                        {row.equipment_code ?? '—'}
                       </bdi>
+                      {(row.equipment_plate_number ||
+                        row.equipment_chassis_number) && (
+                        <bdi dir="ltr" className="text-xs text-muted">
+                          {row.equipment_plate_number ||
+                            row.equipment_chassis_number}
+                        </bdi>
+                      )}
+                    </div>
+                    {!row.supplier_po_id && canManage && (
+                      <IconButton
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        label={t('siteUnitsAddToPo')}
+                        // Owner 2026-10-25: the add carries the tile's amber (it shows only
+                        // on units without a PO).
+                        style={ADD_BUTTON_STYLE}
+                        icon={<Plus size={14} aria-hidden="true" />}
+                        onClick={() => openAdd(row)}
+                      />
                     )}
                   </div>
                   {/* The company's number, when set, under the code with
@@ -302,36 +327,31 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
                     </span>
                   </p>
                 </div>
-                <div className="mt-auto">
-                  {row.supplier_po_id ? (
-                    <button
-                      type="button"
-                      onClick={() => onSelectPo(row.supplier_po_id!)}
-                      className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[13px] font-semibold underline-offset-2 hover:bg-surface-hover hover:underline"
-                    >
-                      <FileText
-                        size={13}
-                        strokeWidth={1.5}
-                        aria-hidden="true"
-                        className="text-muted"
-                      />
-                      <bdi dir="ltr">{row.po_number}</bdi>
-                    </button>
-                  ) : canManage ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      icon={<Plus size={13} aria-hidden="true" />}
-                      onClick={() => openAdd(row)}
-                    >
-                      {t('siteUnitsAddToPo')}
-                    </Button>
-                  ) : (
-                    <span className="text-xs text-muted">
-                      {t('siteUnitsNoPo')}
-                    </span>
-                  )}
-                </div>
+                {/* The SPO stays at the tile's end; a reader without
+                    purchasing.manage sees «بلا PO» there. */}
+                {(row.supplier_po_id || !canManage) && (
+                  <div className="mt-auto">
+                    {row.supplier_po_id ? (
+                      <button
+                        type="button"
+                        onClick={() => onSelectPo(row.supplier_po_id!)}
+                        className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[13px] font-semibold underline-offset-2 hover:bg-surface-hover hover:underline"
+                      >
+                        <FileText
+                          size={13}
+                          strokeWidth={1.5}
+                          aria-hidden="true"
+                          className="text-muted"
+                        />
+                        <bdi dir="ltr">{row.po_number}</bdi>
+                      </button>
+                    ) : (
+                      <span className="text-xs text-muted">
+                        {t('siteUnitsNoPo')}
+                      </span>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>

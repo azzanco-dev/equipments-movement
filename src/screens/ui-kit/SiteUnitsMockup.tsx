@@ -5,6 +5,7 @@ import {
   Button,
   Checkbox,
   DataTable,
+  IconButton,
   MultiSelect,
   Tabs,
   TabsContent,
@@ -993,6 +994,14 @@ function tileColors(unit: Unit): CSSProperties {
   }
 }
 
+/** The «+» on a tile without a PO: the amber of the tile, on the page
+ *  background so it stands out (owner 2026-10-25). Tokens only. */
+const ADD_BUTTON_STYLE: CSSProperties = {
+  color: 'var(--warning)',
+  borderColor: 'color-mix(in srgb, var(--warning) 45%, transparent)',
+  backgroundColor: 'var(--bg)',
+}
+
 function TilesDesign() {
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<ListFilter[]>([])
@@ -1073,14 +1082,30 @@ function TilesDesign() {
                   plate, beside it; the company's number for the unit, when
                   set, right under it with no label (owner 2026-10-24). */}
               <div>
-                <div className="flex flex-wrap items-baseline gap-x-2 leading-6">
-                  <bdi dir="ltr" className="text-base font-semibold">
-                    {unit.code}
-                  </bdi>
-                  {(unit.plate || unit.chassis) && (
-                    <bdi dir="ltr" className="text-xs text-muted">
-                      {unit.plate || unit.chassis}
+                {/* Owner 2026-10-25: the code in bold, and the add as an
+                    icon-only «+» at the end of the code's row. */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 leading-6">
+                    <bdi dir="ltr" className="text-base font-bold">
+                      {unit.code}
                     </bdi>
+                    {(unit.plate || unit.chassis) && (
+                      <bdi dir="ltr" className="text-xs text-muted">
+                        {unit.plate || unit.chassis}
+                      </bdi>
+                    )}
+                  </div>
+                  {!unit.spo && (
+                    <IconButton
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      label="اضافة الى PO"
+                      // Owner 2026-10-25: the add carries the tile's amber (it shows only
+                      // on units without a PO).
+                      style={ADD_BUTTON_STYLE}
+                      icon={<Plus size={14} aria-hidden="true" />}
+                    />
                   )}
                 </div>
                 {/* A paragraph in the page's direction, so the number sits
@@ -1108,9 +1133,11 @@ function TilesDesign() {
                   <span className="font-medium text-fg">{foremanOf(unit)}</span>
                 </p>
               </div>
-              <div className="mt-auto">
-                <PoCell unit={unit} compact />
-              </div>
+              {unit.spo && (
+                <div className="mt-auto">
+                  <PoCell unit={unit} compact />
+                </div>
+              )}
             </li>
           ))}
         </ul>
