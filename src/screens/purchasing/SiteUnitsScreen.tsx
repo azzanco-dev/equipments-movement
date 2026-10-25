@@ -221,6 +221,9 @@ export function SiteUnitsScreen({
           : null,
         company_id: existing.company_id ?? '',
         project_id: existing.project_id ?? '',
+        // 0148: the view offers a party PO only when its start date is the
+        // unit's entry day, so that day is the PO's start date.
+        start_date: saudiDateKey(existing.entry_at),
       },
     [existing],
   )
@@ -398,7 +401,8 @@ export function SiteUnitsScreen({
                     // Owner 2026-10-25: like «انتقل للحركة», the «+» widens on
                     // hover or keyboard focus, and its label says what it will
                     // do: «اضافة الى SPO…» on the party's open PO there, else
-                    // «PO جديد».
+                    // «PO جديد». 0148: the view gives `party_po_id` only for a
+                    // PO whose start date is this unit's entry day.
                     canManage && (
                       <button
                         type="button"

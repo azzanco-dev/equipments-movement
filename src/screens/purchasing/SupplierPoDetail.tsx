@@ -647,6 +647,7 @@ export function SupplierPoDetail({
       />
       <EditSupplierPoDialog
         po={po}
+        hasLines={lines.length > 0}
         open={editOpen}
         onOpenChange={setEditOpen}
         onSaved={() => {

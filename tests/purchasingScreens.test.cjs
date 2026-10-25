@@ -300,6 +300,8 @@ const MIGRATIONS = [
   '20261020120000_0140_supplier_po_party_class.sql',
   // 0142: update_supplier_po and update_supplier_po_equipment (two tokens).
   '20261022100000_0142_supplier_po_update.sql',
+  // 0148: the same entry day (entry_date_mismatch, po_start_date_locked).
+  '20261025100000_0148_supplier_po_same_entry_day.sql',
 ]
 
 test('every stable token of migrations 0136 to 0138 is known and mapped', () => {
@@ -458,7 +460,7 @@ test('status badge, event labels and the price format', () => {
   })
   // The event types of the CHECK as 0142 re-created it (the 0136 five plus
   // updated and line_updated).
-  const sql = read('supabase', 'migrations', MIGRATIONS[MIGRATIONS.length - 1])
+  const sql = read('supabase', 'migrations', '20261022100000_0142_supplier_po_update.sql')
   const check = /event_type IN \(([^)]+)\)/.exec(sql)
   const types = [...check[1].matchAll(/'(\w+)'/g)].map((m) => m[1]).sort()
   assert.deepEqual(
@@ -742,7 +744,8 @@ test('the real screens read through RLS and write only through the 0136 function
   assert.match(createDialog, /visitCompanyOptions\(visits, lang\)/)
   assert.match(createDialog, /visitProjectOptions\(visits, form\.company_id, lang\)/)
   assert.match(createDialog, /createSupplierPo\(form, lines\)/)
-  assert.match(createDialog, /const suggestStartDate = /)
+  // 0148: the start date follows the entry day of the ticked units.
+  assert.match(createDialog, /const pickedDay = useMemo\(/)
   const create = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
   assert.match(create, /createSupplierPo\(/)
   assert.match(create, /SUPPLIER_PO_CREATE_FIELD_RULES/)

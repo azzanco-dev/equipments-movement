@@ -37,8 +37,9 @@ const EMPTY_FORM: SupplierPoLineFormValues = {
 
 /**
  * «اضافة معدة» on an open PO: the unit (server-side search, limited to the
- * PO party's units inside the PO's company and project right now — owner
- * rules 2026-10-19/20, migrations 0137/0138), an optional price excluding
+ * PO party's units inside the PO's company and project right now that
+ * entered on the PO's start date — owner rules 2026-10-19/20/25, migrations
+ * 0137/0138/0148), an optional price excluding
  * VAT («تحتاج سعر» while empty) and a note. Saves through
  * `add_supplier_po_equipment`, which re-checks the rules and creates or
  * reuses the unit's card behind the scenes.
@@ -53,7 +54,10 @@ export function AddEquipmentDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  po: Pick<SupplierPoRow, 'id' | 'lessor_id' | 'owner_class' | 'company_id' | 'project_id'>
+  po: Pick<
+    SupplierPoRow,
+    'id' | 'lessor_id' | 'owner_class' | 'company_id' | 'project_id' | 'start_date'
+  >
   /** Units already on the PO (owner 2026-10-22): the search leaves them out
    *  instead of offering them and failing on `equipment_already_on_open_po`. */
   excludeEquipmentIds?: readonly string[]
@@ -80,9 +84,10 @@ export function AddEquipmentDialog({
       party
         ? equipmentAtProjectOptionLoader(party, po.company_id, po.project_id, {
             excludeEquipmentIds: excludeKey ? excludeKey.split(',') : [],
+            entryDay: po.start_date,
           })
         : async () => [],
-    [party, po.company_id, po.project_id, excludeKey],
+    [party, po.company_id, po.project_id, po.start_date, excludeKey],
   )
 
   useEffect(() => {
@@ -168,7 +173,7 @@ export function AddEquipmentDialog({
           label={t('supplierPoEquipmentField')}
           name="equipment_id"
           required
-          hint={t('supplierPoEquipmentAtProjectHint')}
+          hint={t('supplierPoEquipmentSameDayHint')}
           error={errors.equipment_id && t(errors.equipment_id)}
         >
           {(control) => (

@@ -31,14 +31,22 @@ import { updateSupplierPo, type SupplierPoRow } from '@/lib/purchasingData'
  * notes of an open PO; the party, company and project never change (the
  * cards and lines depend on them). Saves through `update_supplier_po`,
  * which records the old and new values as the event `updated`.
+ *
+ * 0148 (owner 2026-10-25): every unit of one PO entered on the same day,
+ * the start date, so while the PO has lines the start date is locked (the
+ * database refuses a change with `po_start_date_locked`); only the notes
+ * stay editable.
  */
 export function EditSupplierPoDialog({
   po,
+  hasLines,
   open,
   onOpenChange,
   onSaved,
 }: {
   po: Pick<SupplierPoRow, 'id' | 'po_number' | 'start_date' | 'notes'>
+  /** The PO has equipment lines: the start date is their entry day. */
+  hasLines: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   onSaved: () => void
@@ -139,11 +147,13 @@ export function EditSupplierPoDialog({
           label={t('supplierPoStartDate')}
           name="start_date"
           required
+          hint={hasLines ? t('supplierPoStartDateLockedHint') : undefined}
           error={errors.start_date && t(errors.start_date)}
         >
           {(control) => (
             <DatePicker
               {...control}
+              disabled={hasLines}
               value={form.start_date}
               onChange={(value) => update({ start_date: value })}
             />

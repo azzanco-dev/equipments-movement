@@ -17,7 +17,9 @@ import {
   supplierPoEquipmentPayload,
   supplierPoSupplierLabel,
 } from '@/lib/purchasing'
+import { addDaysToDateKey } from '@/lib/calendar'
 import { localizedName } from '@/lib/localizedName'
+import { saudiDateKey, saudiDayStart } from '@/lib/saudiTime'
 import type { Language } from '@/i18n/translations'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
@@ -426,24 +428,37 @@ export function staticOptionLoader(
   }
 }
 
+/** 0148 (owner 2026-10-25): the Saudi day a unit entered, as a date key —
+ *  every unit of one PO entered on the same day, the PO's start date. */
+export function visitEntryDay(visit: Pick<PartyOpenVisit, 'entry_at'>): string {
+  return saudiDateKey(visit.entry_at)
+}
+
 /**
- * «اضافة معدة» (owner rules 2026-10-19/20, migrations 0137/0138): only the
- * party's units INSIDE the PO's company and project right now, first 20 by
- * code. The database re-checks both rules in `add_supplier_po_equipment`.
+ * «اضافة معدة» (owner rules 2026-10-19/20/25, migrations 0137/0138/0148):
+ * only the party's units INSIDE the PO's company and project right now that
+ * entered on the PO's start date (a Saudi day), first 20 by code. The
+ * database re-checks every rule in `add_supplier_po_equipment`.
  */
 export function equipmentAtProjectOptionLoader(
   party: SupplierPoParty,
   companyId: string,
   projectId: string,
-  options: { excludeEquipmentIds?: readonly string[] } = {},
+  options: { excludeEquipmentIds?: readonly string[]; entryDay?: string } = {},
 ): (query: string) => Promise<AsyncSearchSelectOption[]> {
   const excluded = options.excludeEquipmentIds ?? []
+  const nextDay = options.entryDay ? addDaysToDateKey(options.entryDay, 1) : null
   return async (query) => {
     let request = partyOpenVisits(party)
       .eq('company_id', companyId)
       .eq('project_id', projectId)
       .order('equipment_code')
       .limit(20)
+    // 0148: only the units that entered on the PO's start date.
+    if (options.entryDay && nextDay)
+      request = request
+        .gte('entry_at', saudiDayStart(options.entryDay))
+        .lt('entry_at', saudiDayStart(nextDay))
     // Units already on the PO are not offered again (owner 2026-10-22).
     if (excluded.length)
       request = request.not('equipment_id', 'in', `(${excluded.join(',')})`)

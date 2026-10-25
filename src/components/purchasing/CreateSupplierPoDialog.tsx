@@ -50,6 +50,7 @@ import {
   staticOptionLoader,
   supplierPoParty,
   visitCompanyOptions,
+  visitEntryDay,
   visitProjectOptions,
   type PartyOpenVisit,
 } from '@/lib/purchasingData'
@@ -92,8 +93,10 @@ type OwnerChoice = '' | SupplierPoOwnerClass | typeof EXTERNAL
  * «امر شراء جديد» (owner review 2026-10-20): the party first (a supplier
  * from the list or one of the fixed owners), then only the companies and
  * projects where that party has units right now, then those units ticked
- * with an optional price each, the start date suggested from the earliest
- * entry among the ticked units, and notes. Saved in ONE call
+ * with an optional price each, and notes. 0148 (owner 2026-10-25): every
+ * unit of one PO entered on the same Saudi day, the start date — once a unit
+ * is ticked only the units of its entry day stay selectable and the start
+ * date is that day (locked while units are ticked). Saved in ONE call
  * (`create_supplier_po` with `p_equipment`): the PO and its lines, or
  * nothing.
  */
@@ -133,7 +136,6 @@ export function CreateSupplierPoDialog({
   const [lineErrors, setLineErrors] = useState<Record<string, TranslationKey>>({})
   const [message, setMessage] = useState<TranslationKey | null>(null)
   const [saving, setSaving] = useState(false)
-  const [dateTouched, setDateTouched] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
 
   const companyOptions = useMemo(
@@ -164,6 +166,12 @@ export function CreateSupplierPoDialog({
     [visits, form.company_id, form.project_id],
   )
   const pickedCount = Object.keys(picked).length
+  /** 0148: the entry day of the ticked units (they all share it), or null
+   *  while none is ticked. */
+  const pickedDay = useMemo(() => {
+    const first = unitsAtProject.find((visit) => picked[visit.equipment_id])
+    return first ? visitEntryDay(first) : null
+  }, [unitsAtProject, picked])
 
   useEffect(() => {
     if (!open) return
@@ -188,7 +196,6 @@ export function CreateSupplierPoDialog({
     setLineErrors({})
     setMessage(null)
     setSaving(false)
-    setDateTouched(false)
     // The preset is read only when the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -234,23 +241,22 @@ export function CreateSupplierPoDialog({
     )
   }
 
-  /** The start date follows the earliest entry of the ticked units until the
-   *  user edits it by hand. */
-  const suggestStartDate = (next: Picked) => {
-    if (dateTouched) return
-    const dates = unitsAtProject
-      .filter((visit) => next[visit.equipment_id])
-      .map((visit) => saudiDateKey(visit.entry_at))
-    if (dates.length === 0) return
-    update({ start_date: dates.sort()[0] })
-  }
+  // 0148: the start date is the entry day of the ticked units.
+  useEffect(() => {
+    if (!pickedDay) return
+    setForm((current) =>
+      current.start_date === pickedDay
+        ? current
+        : { ...current, start_date: pickedDay },
+    )
+    setErrors((current) => clearFieldErrors(current, ['start_date']))
+  }, [pickedDay])
 
   const toggle = (visit: PartyOpenVisit, checked: boolean) => {
     setPicked((current) => {
       const next = { ...current }
       if (checked) next[visit.equipment_id] = { price: '', note: '' }
       else delete next[visit.equipment_id]
-      suggestStartDate(next)
       return next
     })
     setLineErrors((current) => {
@@ -506,6 +512,10 @@ export function CreateSupplierPoDialog({
               {unitsAtProject.map((visit) => {
                 const line = picked[visit.equipment_id]
                 const id = `po-unit-${visit.equipment_id}`
+                // 0148: once a unit is ticked, a unit of another entry day
+                // cannot join this PO.
+                const otherDay =
+                  !line && pickedDay !== null && visitEntryDay(visit) !== pickedDay
                 return (
                   <li
                     key={visit.equipment_id}
@@ -514,11 +524,15 @@ export function CreateSupplierPoDialog({
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                       <label
                         htmlFor={id}
-                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"
+                        className={cn(
+                          'flex min-w-0 flex-1 items-center gap-3',
+                          otherDay ? 'cursor-not-allowed text-muted' : 'cursor-pointer',
+                        )}
                       >
                         <Checkbox
                           id={id}
                           checked={Boolean(line)}
+                          disabled={otherDay}
                           onCheckedChange={(checked) => toggle(visit, checked === true)}
                         />
                         <span className="flex min-w-0 flex-col text-start">
@@ -535,6 +549,7 @@ export function CreateSupplierPoDialog({
                           <span className="text-xs text-muted">
                             {visit.equipment_type ?? '—'} · {t('supplierPoEntryDate')}{' '}
                             <bdi dir="ltr">{formatDate(visit.entry_at)}</bdi>
+                            {otherDay && <> · {t('supplierPoOtherEntryDay')}</>}
                           </span>
                         </span>
                       </label>
@@ -585,17 +600,17 @@ export function CreateSupplierPoDialog({
           label={t('supplierPoStartDate')}
           name="start_date"
           required
-          hint={t('supplierPoStartDateHint')}
+          hint={t(
+            pickedDay ? 'supplierPoStartDateFollowsEntry' : 'supplierPoStartDateHint',
+          )}
           error={errors.start_date && t(errors.start_date)}
         >
           {(control) => (
             <DatePicker
               {...control}
+              disabled={pickedDay !== null}
               value={form.start_date}
-              onChange={(value) => {
-                setDateTouched(true)
-                update({ start_date: value })
-              }}
+              onChange={(value) => update({ start_date: value })}
             />
           )}
         </Field>

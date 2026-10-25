@@ -302,6 +302,13 @@ export const SUPPLIER_PO_CREATE_FIELD_RULES: readonly DatabaseFieldRule<Supplier
       field: 'start_date',
       key: 'supplierPoStartDateRequired',
     },
+    // 0148: every unit of one PO entered on its start date (a Saudi day).
+    {
+      on: 'raised',
+      match: 'entry_date_mismatch',
+      field: 'start_date',
+      key: 'supplierPoErrorEntryDateMismatch',
+    },
   ]
 
 /** Tokens of add_supplier_po_equipment that name a field of the line form. */
@@ -338,6 +345,13 @@ export const SUPPLIER_PO_LINE_FIELD_RULES: readonly DatabaseFieldRule<SupplierPo
       match: 'equipment_not_of_po_supplier',
       field: 'equipment_id',
       key: 'supplierPoErrorNotOfSupplier',
+    },
+    // 0148: the unit must have entered on the PO's start date.
+    {
+      on: 'raised',
+      match: 'entry_date_mismatch',
+      field: 'equipment_id',
+      key: 'supplierPoErrorEntryDateMismatch',
     },
   ]
 
@@ -390,6 +404,13 @@ export const SUPPLIER_PO_EDIT_FIELD_RULES: readonly DatabaseFieldRule<SupplierPo
       field: 'notes',
       key: 'supplierPoNotesTooLong',
     },
+    // 0148: while the PO has lines, its start date is their entry day.
+    {
+      on: 'raised',
+      match: 'po_start_date_locked',
+      field: 'start_date',
+      key: 'supplierPoErrorStartDateLocked',
+    },
   ]
 
 /**
@@ -407,7 +428,7 @@ export const SUPPLIER_PO_FORM_MESSAGES: Readonly<Record<string, TranslationKey>>
     invalid_line: 'supplierPoErrorInvalidLine', // update price / line (0142)
   }
 
-/** Every stable token of migrations 0136–0142 the client maps, for the tests. */
+/** Every stable token of migrations 0136–0148 the client maps, for the tests. */
 export const SUPPLIER_PO_ERROR_TOKENS: readonly string[] = [
   'purchasing_manage_required',
   'invalid_po',
@@ -429,6 +450,8 @@ export const SUPPLIER_PO_ERROR_TOKENS: readonly string[] = [
   'internal_price_must_be_zero',
   'card_overlap',
   'equipment_already_on_open_po',
+  'entry_date_mismatch', // 0148 add_supplier_po_equipment (and create)
+  'po_start_date_locked', // 0148 update_supplier_po
 ]
 
 function errorText(error: PostgresLikeError): string {

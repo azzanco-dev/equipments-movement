@@ -1998,7 +1998,18 @@ export const translations = {
     supplierPoNoUnitsAtProject: 'لا معدات لهذه الجهة داخل هذا المشروع الان.',
     supplierPoCompanyPlaceholder: 'الشركات التي للجهة معدات فيها',
     supplierPoProjectPlaceholder: 'مشاريع الشركة التي للجهة معدات فيها',
-    supplierPoStartDateHint: 'مقترح من اقدم دخول بين المعدات المختارة.',
+    supplierPoStartDateHint: 'عند اختيار معدة يصبح تاريخ البداية يوم دخولها.',
+    // 0148 (owner 2026-10-25): every unit of one PO entered on the same day.
+    supplierPoStartDateFollowsEntry:
+      'يوم دخول المعدات المختارة. كل معدات الامر دخلت في نفس اليوم.',
+    supplierPoOtherEntryDay: 'دخلت في يوم اخر',
+    supplierPoEquipmentSameDayHint:
+      'تظهر معدات هذه الجهة الموجودة الان داخل شركة الامر ومشروعه والتي دخلت في تاريخ بداية الامر فقط.',
+    supplierPoStartDateLockedHint: 'مقفل ما دام في الامر معدات: هو يوم دخولها.',
+    supplierPoErrorEntryDateMismatch:
+      'المعدة دخلت المشروع في يوم غير تاريخ بداية الامر. كل معدات الامر يجب ان تكون دخلت في نفس اليوم.',
+    supplierPoErrorStartDateLocked:
+      'تاريخ البداية هو يوم دخول معدات الامر ولا يتغير ما دام فيه معدات.',
     supplierPoEntryDate: 'تاريخ الدخول',
     supplierPoSelectedCount: 'المختارة',
     supplierPoErrorInvalidLine: 'سطر المعدة غير موجود.',
@@ -4072,7 +4083,18 @@ export const translations = {
     supplierPoNoUnitsAtProject: 'This party has no units inside this project right now.',
     supplierPoCompanyPlaceholder: 'Companies where the party has units',
     supplierPoProjectPlaceholder: "The company's projects where the party has units",
-    supplierPoStartDateHint: 'Suggested from the earliest entry among the picked units.',
+    supplierPoStartDateHint: 'Once a unit is ticked, the start date becomes its entry day.',
+    // 0148 (owner 2026-10-25): every unit of one PO entered on the same day.
+    supplierPoStartDateFollowsEntry:
+      'The entry day of the ticked units. All units of one order entered on the same day.',
+    supplierPoOtherEntryDay: 'Entered on another day',
+    supplierPoEquipmentSameDayHint:
+      "Only this party's units currently inside the order's company and project that entered on the order start date are listed.",
+    supplierPoStartDateLockedHint: 'Locked while the order has equipment: it is their entry day.',
+    supplierPoErrorEntryDateMismatch:
+      'The equipment entered the project on a day other than the order start date. All units of one order must have entered on the same day.',
+    supplierPoErrorStartDateLocked:
+      "The start date is the entry day of the order's equipment and cannot change while the order has equipment.",
     supplierPoEntryDate: 'Entry date',
     supplierPoSelectedCount: 'Selected',
     supplierPoErrorInvalidLine: 'The equipment line does not exist.',
