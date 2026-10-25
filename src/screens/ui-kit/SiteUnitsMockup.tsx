@@ -1302,7 +1302,7 @@ function FancyTile({ look, unit }: { look: FancyLook; unit: Unit }) {
                 type="button"
                 className="group/move inline-flex h-7 shrink-0 items-center rounded-full bg-surface-hover px-1.5 text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
               >
-                <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 group-hover/move:max-w-32 group-hover/move:px-1 group-hover/move:opacity-100 group-focus-visible/move:max-w-32 group-focus-visible/move:px-1 group-focus-visible/move:opacity-100 motion-safe:transition-all motion-safe:duration-300 motion-safe:ease-out">
+                <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-normal opacity-0 group-hover/move:max-w-32 group-hover/move:px-1 group-hover/move:opacity-100 group-focus-visible/move:max-w-32 group-focus-visible/move:px-1 group-focus-visible/move:opacity-100 motion-safe:transition-all motion-safe:duration-300 motion-safe:ease-out">
                   انتقل للحركة
                 </span>
                 <ArrowUpRight
