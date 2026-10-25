@@ -63,12 +63,14 @@ function tileColors(row: SiteUnitRow): CSSProperties {
   }
 }
 
-/** The «+» on a tile without a PO: the amber of the tile, on the page
- *  background so it stands out (owner 2026-10-25). Tokens only. */
+/** The «+» on a tile without a PO: solid amber with the page colour for
+ *  the sign (owner 2026-10-25: the outlined one looked washed out). In the
+ *  light theme that is white on amber, in the dark theme dark on a lighter
+ *  amber; tokens only. */
 const ADD_BUTTON_STYLE: CSSProperties = {
-  color: 'var(--warning)',
-  borderColor: 'color-mix(in srgb, var(--warning) 45%, transparent)',
-  backgroundColor: 'var(--bg)',
+  color: 'var(--bg)',
+  borderColor: 'var(--warning)',
+  backgroundColor: 'var(--warning)',
 }
 
 /** The SPO on a tile with a PO: the green of the tile, on the page
@@ -303,12 +305,18 @@ export function SiteUnitsScreen({ onSelectPo }: SiteUnitsScreenProps) {
                       <IconButton
                         size="sm"
                         variant="outline"
-                        className="shrink-0"
+                        className="shrink-0 transition-opacity hover:opacity-85"
                         label={t('siteUnitsAddToPo')}
                         // Owner 2026-10-25: the add carries the tile's amber (it shows only
                         // on units without a PO).
                         style={ADD_BUTTON_STYLE}
-                        icon={<Plus size={14} aria-hidden="true" />}
+                        icon={
+                          <Plus
+                            size={15}
+                            strokeWidth={2.5}
+                            aria-hidden="true"
+                          />
+                        }
                         onClick={() => openAdd(row)}
                       />
                     ) : (
