@@ -2,7 +2,6 @@ import { useCallback, useState, type ReactNode } from 'react'
 import { Loader2, Radio, SignalZero, Wifi, WifiOff } from 'lucide-react'
 import {
   MiniTable,
-  MiniTableGrid,
   Notice,
   StatCard,
   type DataTableColumn,
@@ -200,7 +199,10 @@ function AfaqySectionContent({ onSelectEquipment }: AfaqySectionProps) {
               />
             ))}
           </div>
-          <MiniTableGrid>
+          {/* Owner 2026-10-26 «مط الجدولين»: the two tables share the
+              full width, half each, instead of two thirds of a 3-column
+              grid. */}
+          <div className="grid gap-4 md:grid-cols-2">
             {LISTS.map(({ key, title, description, withSignal }) => {
               const rows = stats.lists[key]
               const open = expanded.has(key)
@@ -244,7 +246,7 @@ function AfaqySectionContent({ onSelectEquipment }: AfaqySectionProps) {
                 />
               )
             })}
-          </MiniTableGrid>
+          </div>
           <p className="text-xs text-muted">
             {t('afaqyHomeUpdated')}{' '}
             <bdi dir="ltr">{formatDateTime(stats.generatedAt, false)}</bdi>
