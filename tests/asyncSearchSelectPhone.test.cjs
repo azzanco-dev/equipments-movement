@@ -75,7 +75,7 @@ test('switched on in the movement entry form only', () => {
     assert.match(
       form,
       new RegExp(
-        `\\{\\.\\.\\.control\\}\\s+phoneInline\\s+value=\\{${anchor}\\}`,
+        `\\{\\.\\.\\.control\\}\\s+phoneInline\\s+size="md"\\s+value=\\{${anchor}\\}`,
       ),
       anchor,
     )
@@ -95,4 +95,14 @@ test('switched on in the movement entry form only', () => {
     'components/EntryExitForm.tsx',
     'components/movement/QuickEquipmentForm.tsx',
   ])
+})
+
+test('the entry form fields take the owner field height (40 / 36 px)', () => {
+  assert.match(select, /md: 'h-10 md:h-9',/)
+  assert.match(select, /legacy: 'h-8',/)
+  assert.match(select, /size = 'legacy',/)
+  const form = read('src', 'components', 'EntryExitForm.tsx')
+  assert.equal((form.match(/phoneInline\s+size="md"/g) ?? []).length, 3)
+  const quick = read('src', 'components', 'movement', 'QuickEquipmentForm.tsx')
+  assert.equal((quick.match(/phoneInline\s+size="md"/g) ?? []).length, 2)
 })

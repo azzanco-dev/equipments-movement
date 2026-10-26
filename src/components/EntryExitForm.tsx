@@ -951,6 +951,7 @@ export function EntryExitForm({
                       <AsyncSearchSelect
                         {...control}
                         phoneInline
+                        size="md"
                         value={selectedCompanyId}
                         selectedOption={selectedCompany}
                         onChange={(value, option) => {
@@ -974,6 +975,7 @@ export function EntryExitForm({
                       <AsyncSearchSelect
                         {...control}
                         phoneInline
+                        size="md"
                         value={selectedProjectId}
                         selectedOption={selectedProject}
                         onChange={(value, option) => {
@@ -1017,6 +1019,7 @@ export function EntryExitForm({
                     <AsyncSearchSelect
                       {...control}
                       phoneInline
+                      size="md"
                       value={driverId}
                       selectedOption={selectedDriver}
                       onChange={(value, option) => {

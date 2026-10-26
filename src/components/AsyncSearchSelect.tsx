@@ -71,6 +71,18 @@ interface AsyncSearchSelectProps {
    * Larger screens keep the popover.
    */
   phoneInline?: boolean
+  /**
+   * The field's height: `legacy` keeps the original 32 px of the older
+   * screens; `md` is the approved control height of the shared Select and
+   * Input (40 px on a phone, 36 px from 768 px) — owner 2026-10-26 on the
+   * entry form: «انسخ الارتفاع حق حقل الملاك».
+   */
+  size?: 'legacy' | 'md'
+}
+
+const FIELD_HEIGHT: Record<'legacy' | 'md', string> = {
+  legacy: 'h-8',
+  md: 'h-10 md:h-9',
 }
 
 /** Between the field and its list (phone mode). */
@@ -109,6 +121,7 @@ export function AsyncSearchSelect({
   id,
   invalid,
   phoneInline = false,
+  size = 'legacy',
   ...aria
 }: AsyncSearchSelectProps) {
   const { t } = useI18n()
@@ -352,7 +365,8 @@ export function AsyncSearchSelect({
             }
           }}
           className={cn(
-            'flex h-8 w-full cursor-text items-center gap-2 rounded-lg border bg-transparent px-3 transition-colors',
+            'flex w-full cursor-text items-center gap-2 rounded-lg border bg-transparent px-3 transition-colors',
+            FIELD_HEIGHT[size],
             disabled && 'cursor-not-allowed opacity-60',
           )}
           style={{
@@ -464,7 +478,10 @@ export function AsyncSearchSelect({
             disabled={disabled}
             aria-invalid={invalid || undefined}
             {...aria}
-            className="flex h-8 w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors focus:border-black disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-white"
+            className={cn(
+              'flex w-full items-center justify-between gap-2 rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors focus:border-black disabled:cursor-not-allowed disabled:opacity-60 dark:focus:border-white',
+              FIELD_HEIGHT[size],
+            )}
             // Inline, so it wins over the focus utilities; the danger colour
             // is what `aria-invalid` shows on every other control.
             style={{
