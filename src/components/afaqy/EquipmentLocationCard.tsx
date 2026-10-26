@@ -193,7 +193,7 @@ function LocationCardContent({
         {isPositionStale(position) && (
           <Notice tone="warning" size="compact">
             {/* Owner 2026-10-26: the notice says how old the signal is
-                («اخر اشارة منذ 7 شهور، …»). */}
+                («اخر اشارة منذ 7 شهور.»). */}
             {signal
               ? t('afaqyLocationStaleSince').replace(
                   '{elapsed}',
