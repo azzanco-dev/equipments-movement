@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
-import { Field, type FieldControlProps } from '@/components/ui'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ChevronDown, Search } from 'lucide-react'
+import { Field, cn, type FieldControlProps } from '@/components/ui'
 
 // «حقل بحث للجوال» (owner 2026-10-26), step by step. The owner's brief:
 //   1. a press on the field opens it and focuses its search box;
@@ -8,10 +8,12 @@ import { Field, type FieldControlProps } from '@/components/ui'
 //      in the room down to the keyboard;
 //   3. when the user scrolls down and the list starts to be covered, the list
 //      shows above the field.
-// Step now (owner: «الغ القائمة الان»): the press only moves the field to
-// 150 px from the top of the visible area — no list. The readout shows the
-// distances live. Sample page only; AsyncSearchSelect and the screens are
-// untouched.
+// Steps so far (owner 2026-10-26): no list yet («الغ القائمة الان»); the
+// field is a search box, so a press focuses it and the phone's keyboard opens
+// natively («الان لما اضغط افتح الكيبورد»); on focus the field moves to 150 px
+// from the top of the visible area, and again when the keyboard changes the
+// visible height. The readout shows the distances live. Sample page only;
+// AsyncSearchSelect and the screens are untouched.
 
 /** The field's distance from the top of the visible area after a press. */
 const TOP_OFFSET = 150
@@ -34,7 +36,10 @@ function PressToTopField({
   placeholder: string
   onMetrics: (metrics: Metrics) => void
 }) {
-  const fieldRef = useRef<HTMLButtonElement>(null)
+  const fieldRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [query, setQuery] = useState('')
+  const [focused, setFocused] = useState(false)
 
   // The readout follows every scroll and every change of the visible area
   // (the keyboard), in the event itself.
@@ -64,7 +69,7 @@ function PressToTopField({
   }, [onMetrics])
 
   /** The browser does the arithmetic of the visible area itself. */
-  const bringToTop = () => {
+  const bringToTop = useCallback(() => {
     const field = fieldRef.current
     if (!field) return
     field.style.scrollMarginTop = `${TOP_OFFSET}px`
@@ -76,24 +81,68 @@ function PressToTopField({
       inline: 'nearest',
       behavior: reduceMotion ? 'auto' : 'smooth',
     })
-  }
+  }, [])
+
+  // While the box has the focus: when the keyboard opens (or closes, or
+  // changes), the visible height changes, and the field goes back to 150 px
+  // in the new visible area. No timers: the event says when.
+  useEffect(() => {
+    if (!focused) return
+    const view = window.visualViewport
+    if (!view) return
+    let height = Math.round(view.height)
+    const onResize = () => {
+      const now = Math.round(view.height)
+      if (now === height) return
+      height = now
+      bringToTop()
+    }
+    view.addEventListener('resize', onResize)
+    return () => view.removeEventListener('resize', onResize)
+  }, [focused, bringToTop])
 
   return (
-    <button
+    <div
       ref={fieldRef}
-      id={control?.id}
-      type="button"
-      aria-describedby={control?.['aria-describedby']}
-      onClick={bringToTop}
-      className="flex h-10 w-full items-center justify-between gap-2 rounded-lg border bg-bg px-3 text-base outline-none transition-colors focus-visible:border-fg md:h-9 md:text-sm"
+      // A press anywhere on the box focuses the search (its own keyboard).
+      onPointerDown={(event) => {
+        if (event.target !== inputRef.current) {
+          event.preventDefault()
+          inputRef.current?.focus()
+        }
+      }}
+      className={cn(
+        'flex h-10 w-full cursor-text items-center gap-2 rounded-lg border bg-bg px-3 transition-colors md:h-9',
+        focused && 'border-fg',
+      )}
     >
-      <span className="min-w-0 truncate text-muted">{placeholder}</span>
+      <Search size={15} aria-hidden="true" className="shrink-0 text-muted" />
+      <input
+        ref={inputRef}
+        id={control?.id}
+        type="search"
+        enterKeyHint="search"
+        autoComplete="off"
+        aria-describedby={control?.['aria-describedby']}
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        onFocus={() => {
+          setFocused(true)
+          bringToTop()
+        }}
+        onBlur={() => setFocused(false)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') inputRef.current?.blur()
+        }}
+        placeholder={placeholder}
+        className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted md:text-sm [&::-webkit-search-cancel-button]:hidden"
+      />
       <ChevronDown
         size={16}
         aria-hidden="true"
         className="shrink-0 text-muted"
       />
-    </button>
+    </div>
   )
 }
 
@@ -123,8 +172,8 @@ export function MobileSearchFieldShowcase() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted">
-        الخطوة الحالية: الضغط على الحقل يرفعه الى 150 بكسل من اعلى الشاشة، بلا
-        قائمة.
+        الخطوة الحالية: الضغط على الحقل يفتح الكيبورد ويرفع الحقل الى 150 بكسل
+        من اعلى الشاشة، ويعيده اليها اذا تغير مكان الكيبورد. بلا قائمة.
       </p>
 
       <div className="flex min-h-[70vh] flex-col justify-center">
