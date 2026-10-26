@@ -8,6 +8,8 @@ import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import { FullPageSpinner } from '@/components/Spinner'
 import { Layout } from '@/components/Layout'
+import { TabTitleProvider, useTabTitleRecord } from '@/components/TabTitle'
+import { tabTitle } from '@/lib/pageTitle'
 import { AuthScreen } from '@/screens/AuthScreen'
 import {
   LayoutDashboard,
@@ -355,6 +357,16 @@ function AppContent() {
   // without home.admin.
   const page: RoutePage = shell.pages.has(requested) ? requested : shell.landing
 
+  // The browser tab's title follows the page (owner 2026-10-25); a detail
+  // page adds its record through useTabTitle. Signed out: the app's name.
+  const tabTitleRecord = useTabTitleRecord()
+  const documentTitle = profile
+    ? tabTitle(page, t, tabTitleRecord, movementType)
+    : t('tabAppName')
+  useEffect(() => {
+    if (documentTitle) document.title = documentTitle
+  }, [documentTitle])
+
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
   }, [pathname])
@@ -637,5 +649,9 @@ function AppContent() {
 }
 
 export default function App() {
-  return <AppContent />
+  return (
+    <TabTitleProvider>
+      <AppContent />
+    </TabTitleProvider>
+  )
 }

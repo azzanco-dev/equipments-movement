@@ -10,6 +10,7 @@ import { AsyncMultiSelect } from '@/components/AsyncMultiSelect'
 import { PasswordInput } from '@/components/PasswordInput'
 import type { SelectOption } from '@/components/Select'
 import { useI18n } from '@/i18n/I18nContext'
+import { useTabTitle } from '@/components/TabTitle'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import { buildSearchFilter, COMPANY_PROJECT_SEARCH_FIELDS } from '@/lib/search'
@@ -84,6 +85,8 @@ function formSnapshot(
 export function UserDetail({ userId, onBack }: UserDetailProps) {
   const { t, lang } = useI18n()
   const [user, setUser] = useState<Profile | null>(null)
+  // The tab reads «name · المستخدمون» (owner 2026-10-25).
+  useTabTitle(user?.full_name)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)

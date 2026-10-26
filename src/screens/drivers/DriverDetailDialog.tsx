@@ -1,6 +1,7 @@
 import { useRouter } from 'next/navigation'
 import { CreditCard, Flag, Hash, Phone, Truck, User } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
+import { useTabTitle } from '@/components/TabTitle'
 import { buildDriverMovementsHref } from '@/lib/driverEquipment'
 import type { DriverEquipmentItem } from '@/lib/driverEquipment'
 import { formatDate } from '@/lib/dateFormat'
@@ -64,6 +65,8 @@ export function DriverDetailDialog({
     equipmentError,
     refetchEquipment,
   } = useDriverDetail(driverId)
+  // While open, the tab reads «name · السائقون» (owner 2026-10-25).
+  useTabTitle(open ? driver?.full_name : null)
   // One placeholder for the whole body until the driver AND the first answer
   // of the equipment section are in, so the centred dialog is sized once
   // instead of growing when each part arrives. A failed driver load shows its

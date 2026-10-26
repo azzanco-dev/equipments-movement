@@ -50,6 +50,7 @@ import {
 } from '@/components/ui'
 import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
 import { useI18n } from '@/i18n/I18nContext'
+import { useTabTitle } from '@/components/TabTitle'
 import type { TranslationKey } from '@/i18n/translations'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
@@ -147,6 +148,8 @@ export function SupplierPoDetail({
   const { can } = usePermissions()
   const canManage = can('purchasing.manage')
   const [po, setPo] = useState<SupplierPoRow | null>(null)
+  // The tab reads «SPO260046 · اوامر الشراء» (owner 2026-10-25).
+  useTabTitle(po?.po_number)
   const [lines, setLines] = useState<SupplierPoLineRow[]>([])
   const [events, setEvents] = useState<SupplierPoEventRow[]>([])
   const [actorNames, setActorNames] = useState<ReadonlyMap<string, string>>(

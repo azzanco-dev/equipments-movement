@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
+import { useTabTitle } from '@/components/TabTitle'
 import { Alert } from '@/components/Alert'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
@@ -134,6 +135,12 @@ export function MovementDetail({
   const permissionState = usePermissions()
   const { confirm, confirmDialog } = useConfirm()
   const [log, setLog] = useState<EntryExitLog | null>(null)
+  // The tab reads «A291 دخول · الحركات» (owner 2026-10-25).
+  useTabTitle(
+    log?.equipment?.code
+      ? `${log.equipment.code} ${t(log.movement_type === 'exit' ? 'exit' : 'entry')}`
+      : null,
+  )
   const [company, setCompany] = useState<Company | null>(null)
   const [project, setProject] = useState<Project | null>(null)
   const [linkedLog, setLinkedLog] = useState<EntryExitLog | null>(null)

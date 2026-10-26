@@ -6,6 +6,9 @@ export const translations = {
   ar: {
     // App
     appName: 'إدارة المعدات الثقيلة',
+    // The browser tab's title (owner 2026-10-25).
+    tabAppName: 'حركة المعدات',
+    tabMovements: 'الحركات',
     appSubtitle: 'نظام تتبع دخول وخروج المعدات',
 
     // Auth
@@ -2030,6 +2033,8 @@ export const translations = {
   },
   en: {
     appName: 'Heavy Equipment Management',
+    tabAppName: 'Equipment movement',
+    tabMovements: 'Movements',
     appSubtitle: 'Equipment entry & exit tracking system',
 
     signIn: 'Sign In',

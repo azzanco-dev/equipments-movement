@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
+import { useTabTitle } from '@/components/TabTitle'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { equipmentListActions } from '@/lib/actionPermissions'
@@ -107,6 +108,8 @@ export function EquipmentDetail({
   // The edit button follows `equipment.edit`, as on the list.
   const canEdit = equipmentListActions(usePermissions(), profile?.role).edit
   const [equipment, setEquipment] = useState<Equipment | null>(null)
+  // The tab reads «A291 · المعدات» (owner 2026-10-25).
+  useTabTitle(equipment?.code)
   const [logs, setLogs] = useState<RecentMovementRow[]>([])
   const [codeChanges, setCodeChanges] = useState<EquipmentCodeChange[]>([])
   const [codeChangesError, setCodeChangesError] = useState(false)
