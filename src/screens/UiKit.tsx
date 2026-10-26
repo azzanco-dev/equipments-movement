@@ -49,6 +49,7 @@ import { EquipmentInquiryShowcase } from '@/screens/ui-kit/EquipmentInquiryShowc
 import { RolesPageMockup } from '@/screens/ui-kit/RolesPageMockup'
 import { PurchasingMockup } from '@/screens/ui-kit/PurchasingMockup'
 import { SiteUnitsMockup } from '@/screens/ui-kit/SiteUnitsMockup'
+import { MobileSearchFieldShowcase } from '@/screens/ui-kit/MobileSearchFieldShowcase'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -106,6 +107,17 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // Owner 2026-10-26: the /components keyboard trials' idea, built as a
+    // field that places its own floating list.
+    id: 'mobile-search-field',
+    title: 'حقل بحث للجوال',
+    purpose:
+      'الحقل يرتفع الى اعلى الشاشة وقائمته تحته دائما، فوق الكيبورد ولا تغطي الحقل. جربه من الجوال.',
+    status: 'review',
+    defaultOpen: true,
+    element: <MobileSearchFieldShowcase />,
+  },
   {
     // Owner request 2026-10-24: a purchasing sub-page, three designs first.
     id: 'site-units-mockup',
