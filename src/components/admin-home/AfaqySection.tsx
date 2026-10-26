@@ -83,12 +83,29 @@ const SIGNAL_CARDS: CardDef[] = [
 const LISTS: {
   key: keyof AfaqyStats['lists']
   title: TranslationKey
+  /** What the table means (owner 2026-10-26: «اضف وصف»). */
+  description: TranslationKey
   withSignal: boolean
 }[] = [
-  { key: 'offline', title: 'afaqyHomeOfflineList', withSignal: true },
-  { key: 'noFix', title: 'afaqyHomeNoFixList', withSignal: true },
+  {
+    key: 'offline',
+    title: 'afaqyHomeOfflineList',
+    description: 'afaqyHomeOfflineListDesc',
+    withSignal: true,
+  },
+  {
+    key: 'noFix',
+    title: 'afaqyHomeNoFixList',
+    description: 'afaqyHomeNoFixListDesc',
+    withSignal: true,
+  },
   // Owner 2026-10-26: «اظهر المعدات بدون اشارة».
-  { key: 'noSignal', title: 'afaqyHomeNoSignalList', withSignal: false },
+  {
+    key: 'noSignal',
+    title: 'afaqyHomeNoSignalList',
+    description: 'afaqyHomeNoSignalListDesc',
+    withSignal: false,
+  },
 ]
 
 /** Rows a mini table shows until «عرض الكل», as on the fleet's. */
@@ -204,17 +221,25 @@ function AfaqySectionContent({ onSelectEquipment }: AfaqySectionProps) {
             ))}
           </div>
           <MiniTableGrid>
-            {LISTS.map(({ key, title, withSignal }) => {
+            {LISTS.map(({ key, title, description, withSignal }) => {
               const rows = stats.lists[key]
               const open = expanded.has(key)
               return (
                 <MiniTable
                   key={key}
                   title={t(title)}
-                  description={t('afaqyHomeListCount').replace(
-                    '{count}',
-                    String(stats.listTotals[key]),
-                  )}
+                  description={
+                    <>
+                      <span className="font-medium text-fg">
+                        {t('afaqyHomeListCount').replace(
+                          '{count}',
+                          String(stats.listTotals[key]),
+                        )}
+                      </span>
+                      {' · '}
+                      {t(description)}
+                    </>
+                  }
                   columns={
                     withSignal
                       ? [codeColumn, typeColumn, signalColumn]

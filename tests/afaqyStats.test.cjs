@@ -79,8 +79,8 @@ test('connected, not connected, no satellites, no signal', () => {
   ]
   const links = [
     link(1, { minutes: 5 }), // connected
-    link(2, { minutes: 30 }), // connected: exactly the limit
-    link(3, { minutes: 31, satellites: 0 }), // not connected, no satellites
+    link(2, { minutes: 24 * 60 }), // connected: exactly the limit
+    link(3, { minutes: 24 * 60 + 1, satellites: 0 }), // not connected
     link(4), // never sent a message
     // 5 is linked but Afaqy no longer knows it
     link(7, { minutes: 2, satellites: null }), // connected, count unknown
@@ -91,7 +91,12 @@ test('connected, not connected, no satellites, no signal', () => {
   assert.deepEqual(stats.connection, { online: 3, offline: 1, none: 2 })
   assert.equal(stats.noFix, 2)
   assert.deepEqual(stats.lists.offline, [
-    { id: 'e3', code: 'A103', type: 'حفار', lastSignal: minutesAgo(31) },
+    {
+      id: 'e3',
+      code: 'A103',
+      type: 'حفار',
+      lastSignal: minutesAgo(24 * 60 + 1),
+    },
   ])
   assert.deepEqual(ids(stats.lists.noFix), ['e3', 'e7'])
   assert.deepEqual(ids(stats.lists.noSignal), ['e4', 'e5'])
@@ -101,7 +106,7 @@ test('connected, not connected, no satellites, no signal', () => {
 
 test('lists are sorted by code and capped', () => {
   const fleet = Array.from({ length: 40 }, (_, i) => eq(40 - i, 'working'))
-  const links = fleet.map((_, i) => link(40 - i, { minutes: 90 }))
+  const links = fleet.map((_, i) => link(40 - i, { minutes: 2 * 24 * 60 }))
   const stats = plain(buildAfaqyStats(fleet, links, NOW))
   assert.equal(stats.connection.offline, 40)
   assert.equal(stats.lists.offline.length, 30)
@@ -189,21 +194,23 @@ test('the last signal in full words', () => {
 
 test('the tables: not connected, no satellites, no signal', () => {
   const card = read('src', 'components', 'admin-home', 'AfaqySection.tsx')
-  assert.match(
-    card,
-    /\{ key: 'offline', title: 'afaqyHomeOfflineList', withSignal: true \}/,
-  )
-  assert.match(
-    card,
-    /\{ key: 'noFix', title: 'afaqyHomeNoFixList', withSignal: true \}/,
-  )
-  assert.match(
-    card,
-    /\{ key: 'noSignal', title: 'afaqyHomeNoSignalList', withSignal: false \}/,
-  )
+  for (const [key, title, description, withSignal] of [
+    ['offline', 'afaqyHomeOfflineList', 'afaqyHomeOfflineListDesc', true],
+    ['noFix', 'afaqyHomeNoFixList', 'afaqyHomeNoFixListDesc', true],
+    ['noSignal', 'afaqyHomeNoSignalList', 'afaqyHomeNoSignalListDesc', false],
+  ])
+    assert.match(
+      card,
+      new RegExp(
+        `key: '${key}',\\s+title: '${title}',\\s+description: '${description}',\\s+withSignal: ${withSignal},`,
+      ),
+      key,
+    )
   assert.match(card, /elapsedInWords\(row\.lastSignal, lang\)/)
   const stats = read('src', 'lib', 'afaqyStats.ts')
-  assert.match(stats, /export const AFAQY_ONLINE_MS = 30 \* 60 \* 1000/)
+  // Owner 2026-10-26: «خليها 24 ساعة».
+  assert.match(stats, /export const AFAQY_ONLINE_MS = 24 \* 60 \* 60 \* 1000/)
+  assert.match(card, /description: 'afaqyHomeOfflineListDesc'/)
   const server = read('src', 'lib', 'server', 'afaqy.ts')
   assert.match(server, /export async function listUnitLinks\(\)/)
   assert.match(server, /const link = mapAfaqyLink\(row\)/)

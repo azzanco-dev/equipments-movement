@@ -878,9 +878,9 @@ export const translations = {
     afaqyHomeNoSignal: 'بدون اشارة',
     afaqyHomeNoSignalHint: 'لم ترسل اي رسالة',
     afaqyHomeOnline: 'متصلة',
-    afaqyHomeOnlineHint: 'وصلت منها رسالة خلال 30 دقيقة',
+    afaqyHomeOnlineHint: 'وصلت منها رسالة خلال 24 ساعة',
     afaqyHomeOffline: 'غير متصلة',
-    afaqyHomeOfflineHint: 'لا رسالة منذ اكثر من 30 دقيقة',
+    afaqyHomeOfflineHint: 'لا رسالة منذ اكثر من 24 ساعة',
     afaqyHomeNoFix: 'بدون اقمار',
     afaqyHomeNoFixHint: 'لا يلتقط الجهاز اي قمر',
     afaqyHomeOfflineList: 'غير متصلة',
@@ -888,6 +888,12 @@ export const translations = {
     afaqyHomeNoSignalList: 'بدون اشارة',
     afaqyHomeNone: 'لا يوجد',
     afaqyHomeListCount: '{count} معدة',
+    afaqyHomeOfflineListDesc:
+      'لم تصل منها رسالة منذ اكثر من 24 ساعة: قد تكون طافية او بلا تغطية، او الجهاز او الشريحة متوقفة.',
+    afaqyHomeNoFixListDesc:
+      'الجهاز لا يلتقط اي قمر فلا يعرف موقعه: غالبا تحت سقف، او الهوائي مفصول او تالف.',
+    afaqyHomeNoSignalListDesc:
+      'لا توجد لها رسالة مسجلة في افاقي، او الجهاز المربوط بها لم يعد موجودا فيه.',
     afaqyHomeUpdated: 'محدثة',
     afaqyHomeFetching: 'جار جلب البيانات من افاقي…',
     afaqySpeed: 'السرعة',
@@ -2945,9 +2951,9 @@ export const translations = {
     afaqyHomeNoSignal: 'No signal',
     afaqyHomeNoSignalHint: 'Never sent a message',
     afaqyHomeOnline: 'Connected',
-    afaqyHomeOnlineHint: 'A message within 30 minutes',
+    afaqyHomeOnlineHint: 'A message within 24 hours',
     afaqyHomeOffline: 'Not connected',
-    afaqyHomeOfflineHint: 'No message for over 30 minutes',
+    afaqyHomeOfflineHint: 'No message for over 24 hours',
     afaqyHomeNoFix: 'No satellites',
     afaqyHomeNoFixHint: 'The tracker sees no satellite',
     afaqyHomeOfflineList: 'Not connected',
@@ -2955,6 +2961,12 @@ export const translations = {
     afaqyHomeNoSignalList: 'No signal',
     afaqyHomeNone: 'None',
     afaqyHomeListCount: '{count} units',
+    afaqyHomeOfflineListDesc:
+      'No message for over 24 hours: switched off, out of coverage, or the tracker or its SIM stopped.',
+    afaqyHomeNoFixListDesc:
+      'The tracker sees no satellite, so it does not know where it is: often under a roof, or the antenna is off or broken.',
+    afaqyHomeNoSignalListDesc:
+      'Afaqy has no message for it, or the linked tracker no longer exists there.',
     afaqyHomeUpdated: 'Updated',
     afaqyHomeFetching: 'Fetching the data from Afaqy…',
     afaqySpeed: 'Speed',

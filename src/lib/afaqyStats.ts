@@ -9,14 +9,15 @@
 // probe of the account, 2026-10-26):
 //   * connection: Afaqy's live state is not in the data, so it is
 //     approximated from the last message («ابنيها بالتقريب من وقت اخر
-//     رسالة»): connected when one arrived within the last 30 minutes;
+//     رسالة»): connected when one arrived within the last 24 hours
+//     (owner, same day: «خليها 24 ساعة»; it was 30 minutes);
 //   * satellite: the last known satellite count (`chPrams.sat`), as Afaqy
 //     shows it; «بدون اقمار» when it is 0 or unknown.
 
 import type { AfaqyUnitLink } from '@/lib/afaqy'
 
 /** A unit is «متصلة» when its last message is at most this old. */
-export const AFAQY_ONLINE_MS = 30 * 60 * 1000
+export const AFAQY_ONLINE_MS = 24 * 60 * 60 * 1000
 /** Each list carries at most this many units. */
 export const AFAQY_STATS_LIST_MAX = 30
 
@@ -54,7 +55,7 @@ export interface AfaqyStats {
   fleet: number
   /** Linked to an Afaqy unit. */
   linked: number
-  /** Of the linked: connected (a message in the last 30 minutes), not
+  /** Of the linked: connected (a message in the last 24 hours), not
    *  connected, and none (never sent a message, or Afaqy no longer knows the
    *  unit). */
   connection: { online: number; offline: number; none: number }
