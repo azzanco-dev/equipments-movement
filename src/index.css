@@ -340,11 +340,9 @@ body {
     border-color: var(--border);
     /* Owner 2026-10-26: Thmanyah Sans in inputs too (was Noto Sans Arabic). */
     font-family: 'ArabicUiDigits', 'Thmanyah', 'Segoe UI', Tahoma, system-ui, sans-serif;
-    /* 24 px, not the old 20 px: Thmanyah's ع was cut by the shorter line
-       box (owner 2026-10-26, «العين ينأكل جزء منها»). A length, not a factor:
-       the 13 px placeholder inherits it as is (a factor would shrink to
-       ~19.5 px on it and still cut «النوع»). The field's height is fixed by
-       h-*, so it does not grow. */
+    /* 24 px, not the old 20 px, so the typed text keeps room for Thmanyah's
+       deep ع and final ي. The field's height is fixed by h-*, so it does not
+       grow. The placeholder does not take it (see `input::placeholder`). */
     line-height: 1.5rem;
   }
   html[lang='en'] .input {
@@ -482,14 +480,21 @@ a:focus-visible,
 
 /* Same placeholder color and size everywhere, including native inputs
    outside the shared `.input` class (e.g. inline search boxes in legacy
-   dropdowns). Only font-size is overridden here: line-height keeps
-   inheriting from the field itself, so the placeholder stays vertically
-   centered and the field height never changes. Family is left to inherit. */
+   dropdowns). Family is left to inherit.
+   Chrome's own stylesheet gives an input's placeholder
+   `line-height: initial !important` and `overflow: hidden`, so its box is
+   only the font's normal height — Thmanyah keeps 3 px below the baseline
+   at 13 px while «الشاصي» reaches 7 px and «النوع» 4 px — and the bottom of
+   ع and the dots of final ي were cut (owner 2026-10-26, «العين والياء
+   ماكولين»). The line-height cannot be overridden, so the box lets them
+   show below it; the width still clips. */
 input::placeholder,
 textarea::placeholder {
   color: var(--placeholder);
   font-style: normal;
   font-size: 0.8125rem; /* 13px, smaller than the 14px typed-text size */
+  overflow-x: clip;
+  overflow-y: visible;
 }
 
 /* Single-line truncation that keeps Arabic descenders (final ي, ج ح خ ع غ,
