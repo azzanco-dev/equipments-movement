@@ -175,7 +175,7 @@ function Readout({ metrics }: { metrics: Metrics | null }) {
     ['scrollY', metrics?.scrollY],
   ]
   return (
-    <div className="mb-2 grid gap-1 rounded-lg border bg-surface px-3 py-2 text-xs text-muted">
+    <div className="mt-2 grid gap-1 rounded-lg border bg-surface px-3 py-2 text-xs text-muted">
       {rows.map(([label, number]) => (
         <div key={label} className="flex items-center justify-between gap-2">
           <span>{label}</span>
@@ -209,7 +209,6 @@ export function MobileSearchFieldShowcase() {
 
       <div className="flex min-h-[70vh] flex-col justify-center">
         <div className="mx-auto w-full max-w-sm">
-          <Readout metrics={first} />
           <Field label="المعدة">
             {(control) => (
               <PressToTopField
@@ -219,11 +218,11 @@ export function MobileSearchFieldShowcase() {
               />
             )}
           </Field>
+          <Readout metrics={first} />
         </div>
       </div>
 
       <div className="mx-auto w-full max-w-sm">
-        <Readout metrics={second} />
         <Field label="السائق">
           {(control) => (
             <PressToTopField
@@ -233,6 +232,7 @@ export function MobileSearchFieldShowcase() {
             />
           )}
         </Field>
+        <Readout metrics={second} />
       </div>
       {/* Room after the last field, so it too can reach the top. */}
       <div aria-hidden="true" className="h-[70vh]" />
