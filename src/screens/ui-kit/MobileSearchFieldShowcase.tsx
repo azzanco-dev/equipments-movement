@@ -9,12 +9,12 @@ import { Field, type FieldControlProps } from '@/components/ui'
 //   3. when the user scrolls down and the list starts to be covered, the list
 //      shows above the field.
 // Step now (owner: «الغ القائمة الان»): the press only moves the field to
-// 100 px from the top of the visible area — no list. The readout shows the
+// 150 px from the top of the visible area — no list. The readout shows the
 // distances live. Sample page only; AsyncSearchSelect and the screens are
 // untouched.
 
 /** The field's distance from the top of the visible area after a press. */
-const TOP_OFFSET = 100
+const TOP_OFFSET = 150
 
 type Metrics = { top: number; bottom: number }
 
@@ -123,7 +123,7 @@ export function MobileSearchFieldShowcase() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted">
-        الخطوة الحالية: الضغط على الحقل يرفعه الى 100 بكسل من اعلى الشاشة، بلا
+        الخطوة الحالية: الضغط على الحقل يرفعه الى 150 بكسل من اعلى الشاشة، بلا
         قائمة.
       </p>
 
