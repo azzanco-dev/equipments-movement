@@ -5,7 +5,6 @@ import {
   useRef,
   useState,
 } from 'react'
-import { createPortal } from 'react-dom'
 import { ChevronDown, Search } from 'lucide-react'
 import { Field, cn, type FieldControlProps } from '@/components/ui'
 import { floatingPanel } from '@/components/ui/popover'
@@ -17,8 +16,10 @@ import { floatingPanel } from '@/components/ui/popover'
 //   * the search box IS the field: a press focuses it and the phone opens
 //     its keyboard; the page is never scrolled by code — the phone lifts the
 //     focused field itself when the keyboard opens;
-//   * the list is `position: absolute` in the page under the field, so it
-//     moves with the page natively (no code on each scroll to move it);
+//   * the list hangs from the field in the layout (`position: absolute`,
+//     `top: 100%` of a box around the field, 2 px gap): it is always right
+//     under the field and moves with the page natively; its place is never
+//     measured (in page coordinates it landed far below on his phone);
 //   * its height is the room left down to the keyboard (max 320), and it
 //     flips above the field when the room below is short and above is
 //     larger (Base UI's collision avoidance); both are re-read when the page
@@ -26,7 +27,7 @@ import { floatingPanel } from '@/components/ui/popover'
 // Sample page only; AsyncSearchSelect and the screens are untouched.
 
 /** Between the field and its list. */
-const EDGE = 4
+const EDGE = 2
 /** The list stays this far from the keyboard (or the screen's edge). */
 const SCREEN_GAP = 8
 const LIST_MAX = 320
@@ -65,11 +66,10 @@ function geometry() {
   }
   const view = window.visualViewport
   const fixedTop = probe.getBoundingClientRect().top
-  const fixedLeft = probe.getBoundingClientRect().left
   const offset = view?.offsetTop ?? 0
   const height = view?.height ?? window.innerHeight
   const top = fixedTop + offset
-  return { fixedTop, fixedLeft, offset, height, top, bottom: top + height }
+  return { fixedTop, offset, height, top, bottom: top + height }
 }
 
 const TYPES = [
@@ -88,10 +88,6 @@ const SAMPLE = Array.from({ length: 30 }, (_, index) => ({
 
 type ListBox = {
   side: 'below' | 'above'
-  /** Page coordinates of the field's edge the list hangs from. */
-  top: number
-  left: number
-  width: number
   maxHeight: number
 }
 
@@ -120,14 +116,8 @@ function SearchField({
     const below = area.bottom - rect.bottom - EDGE - SCREEN_GAP
     const above = rect.top - area.top - EDGE - SCREEN_GAP
     const side = below < FLIP_BELOW && above > below ? 'above' : 'below'
-    // Page coordinates: the rect in the layout viewport's terms, plus the
-    // page's scroll.
-    const toPageY = (y: number) => y - area.fixedTop + window.scrollY
     const next: ListBox = {
       side,
-      top: toPageY(side === 'below' ? rect.bottom + EDGE : rect.top - EDGE),
-      left: rect.left - area.fixedLeft + window.scrollX,
-      width: rect.width,
       maxHeight: Math.max(
         LIST_MIN,
         Math.min(LIST_MAX, side === 'below' ? below : above),
@@ -136,9 +126,6 @@ function SearchField({
     setBox((prev) =>
       prev &&
       prev.side === next.side &&
-      Math.abs(prev.top - next.top) < 0.5 &&
-      Math.abs(prev.left - next.left) < 0.5 &&
-      prev.width === next.width &&
       Math.abs(prev.maxHeight - next.maxHeight) < 0.5
         ? prev
         : next,
@@ -146,8 +133,8 @@ function SearchField({
   }, [])
 
   // While open, the side and the height are re-read on every page scroll
-  // and every change of the visible area (the keyboard). The list's
-  // position itself follows the page with no code: it is in the page.
+  // and every change of the visible area (the keyboard). The list's place
+  // is never measured: it hangs from the field in the layout.
   useLayoutEffect(() => {
     if (!open) return
     place()
@@ -205,7 +192,9 @@ function SearchField({
     : SAMPLE
 
   return (
-    <>
+    // The list hangs from this box (owner 2026-10-26: measured in page
+    // coordinates it landed far below the field on his phone).
+    <div className="relative">
       <div
         ref={fieldRef}
         // A press anywhere on the box focuses the search (its own keyboard).
@@ -249,51 +238,49 @@ function SearchField({
           )}
         />
       </div>
-      {open &&
-        box &&
-        createPortal(
-          <div
-            role="listbox"
-            // The search keeps the focus (and the keyboard stays) while the
-            // list is pressed or scrolled.
-            onPointerDown={(event) => event.preventDefault()}
-            onMouseDown={(event) => event.preventDefault()}
-            className={cn(floatingPanel, 'absolute flex flex-col !p-0')}
-            style={{
-              top: box.top,
-              left: box.left,
-              width: box.width,
-              maxHeight: box.maxHeight,
-              transform: box.side === 'above' ? 'translateY(-100%)' : undefined,
-            }}
-          >
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-              {results.length === 0 ? (
-                <p className="px-3 py-5 text-center text-sm text-muted">
-                  لا نتائج
-                </p>
-              ) : (
-                results.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="option"
-                    aria-selected={false}
-                    onClick={() => {
-                      setQuery(option.label)
-                      inputRef.current?.blur()
-                    }}
-                    className="block w-full px-3.5 py-2.5 text-start text-sm hover:bg-surface-hover"
-                  >
-                    {option.label}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>,
-          document.body,
-        )}
-    </>
+      {open && box && (
+        <div
+          role="listbox"
+          // The search keeps the focus (and the keyboard stays) while the
+          // list is pressed or scrolled.
+          onPointerDown={(event) => event.preventDefault()}
+          onMouseDown={(event) => event.preventDefault()}
+          className={cn(
+            floatingPanel,
+            'absolute inset-x-0 flex flex-col !p-0',
+            box.side === 'below' ? 'top-full' : 'bottom-full',
+          )}
+          style={{
+            maxHeight: box.maxHeight,
+            [box.side === 'below' ? 'marginTop' : 'marginBottom']: EDGE,
+          }}
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {results.length === 0 ? (
+              <p className="px-3 py-5 text-center text-sm text-muted">
+                لا نتائج
+              </p>
+            ) : (
+              results.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={false}
+                  onClick={() => {
+                    setQuery(option.label)
+                    inputRef.current?.blur()
+                  }}
+                  className="block w-full px-3.5 py-2.5 text-start text-sm hover:bg-surface-hover"
+                >
+                  {option.label}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
