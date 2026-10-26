@@ -1,15 +1,5 @@
 import { useCallback, useState, type ReactNode } from 'react'
-import {
-  Clock3,
-  Loader2,
-  Navigation,
-  PowerOff,
-  Radio,
-  SignalZero,
-  Timer,
-  Wifi,
-  WifiOff,
-} from 'lucide-react'
+import { Clock3, Loader2, Radio, SignalZero, Wifi, WifiOff } from 'lucide-react'
 import {
   MiniTable,
   MiniTableGrid,
@@ -76,29 +66,6 @@ const SIGNAL_CARDS: CardDef[] = [
     value: (stats) => stats.signal.none,
     accent: 'neutral',
     icon: <SignalZero size={ICON_SIZE} />,
-  },
-]
-
-/** What the units heard in the last hour do now. */
-const NOW_CARDS: CardDef[] = [
-  {
-    label: 'afaqyHomeMoving',
-    value: (stats) => stats.now.moving,
-    accent: 'success',
-    icon: <Navigation size={ICON_SIZE} />,
-  },
-  {
-    label: 'afaqyHomeIdling',
-    hint: 'afaqyHomeIdlingHint',
-    value: (stats) => stats.now.idling,
-    accent: 'warning',
-    icon: <Timer size={ICON_SIZE} />,
-  },
-  {
-    label: 'afaqyHomeOff',
-    value: (stats) => stats.now.off,
-    accent: 'neutral',
-    icon: <PowerOff size={ICON_SIZE} />,
   },
 ]
 
@@ -228,21 +195,6 @@ function AfaqySectionContent({ onSelectEquipment }: AfaqySectionProps) {
                 icon={card.icon}
               />
             ))}
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium">{t('afaqyHomeNowTitle')}</h3>
-            <div className="grid grid-cols-3 gap-3">
-              {NOW_CARDS.map((card) => (
-                <StatCard
-                  key={card.label}
-                  label={t(card.label)}
-                  value={card.value(stats)}
-                  hint={card.hint ? t(card.hint) : undefined}
-                  accent={card.accent}
-                  icon={card.icon}
-                />
-              ))}
-            </div>
           </div>
           <MiniTableGrid>
             {LISTS.map(({ key, title, withSignal }) => {
