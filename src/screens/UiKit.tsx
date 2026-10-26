@@ -50,6 +50,7 @@ import { RolesPageMockup } from '@/screens/ui-kit/RolesPageMockup'
 import { PurchasingMockup } from '@/screens/ui-kit/PurchasingMockup'
 import { SiteUnitsMockup } from '@/screens/ui-kit/SiteUnitsMockup'
 import { MobileSearchFieldShowcase } from '@/screens/ui-kit/MobileSearchFieldShowcase'
+import { InquiryRedesignMockup } from '@/screens/ui-kit/InquiryRedesignMockup'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -107,6 +108,18 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // Owner 2026-10-26: «صفحة الاستعلام ابغى تحسين جذري لها», then «ابدا
+    // بالنموذج في /ui-kit مع شريط النشاط» and «اضف الوان وحيوية اكثر … مو
+    // مشكلة لو تضيف gradient خفيف».
+    id: 'inquiry-redesign',
+    title: 'نموذج صفحة الاستعلام الجديدة',
+    purpose:
+      'وين المعدة الحين، ارقام السنة، شريط نشاط 12 شهر، وسجل زيارات مختصر، ببيانات عينة.',
+    status: 'review',
+    defaultOpen: true,
+    element: <InquiryRedesignMockup />,
+  },
   {
     // Owner 2026-10-26: the /components keyboard trials' idea; behaviour
     // APPROVED the same day («خلاص اعتمد هذا السلوك») after the lift trials.
