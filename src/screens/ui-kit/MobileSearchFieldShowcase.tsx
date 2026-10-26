@@ -13,8 +13,9 @@ import { floatingPanel } from '@/components/ui/popover'
 // Done so far: the field is a search box, so a press focuses it and the
 // phone's keyboard opens natively; on focus the field moves to 100 px from
 // the top of the visible area, and again when the keyboard changes the
-// visible height; the list opens under it (2 px), as tall as the room down
-// to the keyboard less 16 px. Step 3 comes next. Sample page only;
+// visible height; the list opens in the slot under the field's resting
+// place (2 px), as tall as the room down to the keyboard less 16 px, pinned
+// to the screen (a page scroll does not move it). Step 3 comes next. Sample page only;
 // AsyncSearchSelect and the screens are untouched.
 
 /** The field's distance from the top of the visible area after a press. */
@@ -101,18 +102,27 @@ function PressToTopField({
   const [focused, setFocused] = useState(false)
   const [box, setBox] = useState<ListBox | null>(null)
 
-  /** One measure for the readout and the list: the field's place in the
-   *  visible area, and the list under it down to the keyboard. */
-  const measure = useCallback(() => {
+  /**
+   * The list's place, pinned to the SCREEN, not to the page (owner
+   * 2026-10-26: «ما ابغى القائمة متفاعلة مع السكرول، خليها ثابتة»): the slot
+   * under the field's resting place (100 px from the top of the visible
+   * area), down to the keyboard less 16 px. Set on focus and when the
+   * keyboard changes the visible area; a scroll of the page never moves it.
+   */
+  const placeList = useCallback(() => {
     const field = fieldRef.current
     if (!field) return
     const rect = field.getBoundingClientRect()
     const area = geometry()
-    const room = area.bottom - (rect.bottom + EDGE) - KEYBOARD_GAP
-    const height = Math.max(LIST_MIN, Math.round(room))
-    // `position: fixed` counts from the layout viewport's top.
+    const slotTop = TOP_OFFSET + rect.height + EDGE
+    const height = Math.max(
+      LIST_MIN,
+      Math.round(area.height - slotTop - KEYBOARD_GAP),
+    )
+    // `position: fixed` counts from the layout viewport's top, and the
+    // visible area starts offsetTop below it.
     const next: ListBox = {
-      top: rect.bottom + EDGE - area.fixedTop,
+      top: area.offset + slotTop,
       left: rect.left,
       width: rect.width,
       height,
@@ -126,20 +136,28 @@ function PressToTopField({
         ? prev
         : next,
     )
+  }, [])
+
+  /** The readout: the field's place in the visible area, live. */
+  const measure = useCallback(() => {
+    const field = fieldRef.current
+    if (!field) return
+    const rect = field.getBoundingClientRect()
+    const area = geometry()
     onMetrics({
       top: Math.round(rect.top - area.top),
       bottom: Math.round(area.bottom - rect.bottom),
-      list: focused ? height : null,
+      list: focused && box ? box.height : null,
       rectTop: Math.round(rect.top),
       fixedTop: Math.round(area.fixedTop),
       viewTop: Math.round(area.offset),
       viewHeight: Math.round(area.height),
       scrollY: Math.round(window.scrollY),
     })
-  }, [onMetrics, focused])
+  }, [onMetrics, focused, box])
 
-  // Every scroll and every change of the visible area (the keyboard), in the
-  // event itself.
+  // The readout: every scroll and every change of the visible area (the
+  // keyboard), in the event itself.
   useEffect(() => {
     measure()
     const view = window.visualViewport
@@ -183,10 +201,19 @@ function PressToTopField({
       if (now === height) return
       height = now
       bringToTop()
+      placeList()
     }
+    // The visible area itself may pan over the page (a phone with the
+    // keyboard open): the list goes with it, so it stays still on screen.
+    const onPan = () => placeList()
+    placeList()
     view.addEventListener('resize', onResize)
-    return () => view.removeEventListener('resize', onResize)
-  }, [focused, bringToTop])
+    view.addEventListener('scroll', onPan)
+    return () => {
+      view.removeEventListener('resize', onResize)
+      view.removeEventListener('scroll', onPan)
+    }
+  }, [focused, bringToTop, placeList])
 
   const q = query.trim().toLowerCase()
   const results = q
