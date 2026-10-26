@@ -70,9 +70,12 @@ function unit(n, { minutes, speed = 0, ignition = null } = {}) {
 const eq = (n, state, linked = true) => ({
   id: `e${n}`,
   code: `A${100 + n}`,
+  type: 'حفار',
   trackerUnitId: linked ? hex(n) : null,
   state,
 })
+/** The rows of a list, reduced to their ids. */
+const ids = (rows) => rows.map((row) => row.id)
 
 test('coverage and signal age', () => {
   const fleet = [
@@ -94,12 +97,18 @@ test('coverage and signal age', () => {
   assert.equal(stats.fleet, 6)
   assert.equal(stats.linked, 5)
   assert.deepEqual(stats.signal, { recent: 1, stale: 1, silent: 1, none: 2 })
-  assert.deepEqual(stats.lists.silent, [{ id: 'e3', code: 'A103' }])
-  // The linked units with no position, or unknown to Afaqy.
-  assert.deepEqual(stats.lists.noSignal, [
-    { id: 'e4', code: 'A104' },
-    { id: 'e5', code: 'A105' },
+  assert.deepEqual(stats.lists.silent, [
+    {
+      id: 'e3',
+      code: 'A103',
+      type: 'حفار',
+      lastSignal: minutesAgo(60 * 30),
+      speedKmh: 0,
+    },
   ])
+  // The linked units with no position, or unknown to Afaqy.
+  assert.deepEqual(ids(stats.lists.noSignal), ['e4', 'e5'])
+  assert.equal(stats.lists.noSignal[0].lastSignal, null)
   assert.equal(stats.listTotals.noSignal, 2)
 })
 
@@ -122,9 +131,10 @@ test('what the recently heard units do now, and the mismatches', () => {
   ]
   const stats = plain(buildAfaqyStats(fleet, units, NOW))
   assert.deepEqual(stats.now, { moving: 2, idling: 1, off: 2 })
-  assert.deepEqual(stats.lists.workshopRunning, [{ id: 'e2', code: 'A102' }])
-  assert.deepEqual(stats.lists.availableMoving, [{ id: 'e3', code: 'A103' }])
-  assert.deepEqual(stats.lists.idling, [{ id: 'e2', code: 'A102' }])
+  assert.deepEqual(ids(stats.lists.workshopRunning), ['e2'])
+  assert.deepEqual(ids(stats.lists.availableMoving), ['e3'])
+  assert.equal(stats.lists.availableMoving[0].speedKmh, 40)
+  assert.deepEqual(ids(stats.lists.idling), ['e2'])
 })
 
 test('lists are sorted by code and capped', () => {

@@ -41,13 +41,19 @@ const WORKSHOP_STATES: ReadonlySet<string> = new Set([
 export interface FleetEquipment {
   id: string
   code: string
+  type: string | null
   trackerUnitId: string | null
   state: ProgramEquipmentState | null
 }
 
+/** One row of the section's mini tables. */
 export interface AfaqyStatsUnit {
   id: string
   code: string
+  type: string | null
+  /** The time of the last signal (ISO), null when there is none. */
+  lastSignal: string | null
+  speedKmh: number | null
 }
 
 export interface AfaqyStats {
@@ -116,7 +122,13 @@ export function buildAfaqyStats(
     const unit = unitsById.get(equipment.trackerUnitId)
     const seen = unit ? lastSignalTime(unit.position) : null
     const seenMs = seen ? Date.parse(seen) : Number.NaN
-    const entry = { id: equipment.id, code: equipment.code }
+    const entry: AfaqyStatsUnit = {
+      id: equipment.id,
+      code: equipment.code,
+      type: equipment.type,
+      lastSignal: seen,
+      speedKmh: unit?.position?.speedKmh ?? null,
+    }
     if (!unit || !Number.isFinite(seenMs)) {
       signal.none += 1
       noSignal.push(entry)

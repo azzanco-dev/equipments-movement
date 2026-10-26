@@ -1,4 +1,4 @@
-import { useCallback, type ReactNode } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import {
   Clock3,
   Loader2,
@@ -10,7 +10,14 @@ import {
   Wifi,
   WifiOff,
 } from 'lucide-react'
-import { AppLink, Notice, StatCard } from '@/components/ui'
+import {
+  MiniTable,
+  MiniTableGrid,
+  Notice,
+  StatCard,
+  type DataTableColumn,
+} from '@/components/ui'
+import { RelativeTime } from '@/components/RelativeTime'
 import type { StatCardAccent } from '@/components/ui/StatCard'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
@@ -95,14 +102,24 @@ const NOW_CARDS: CardDef[] = [
   },
 ]
 
-const LISTS: { key: keyof AfaqyStats['lists']; title: TranslationKey }[] = [
-  { key: 'workshopRunning', title: 'afaqyHomeWorkshopRunning' },
-  { key: 'availableMoving', title: 'afaqyHomeAvailableMoving' },
-  { key: 'idling', title: 'afaqyHomeIdlingList' },
-  { key: 'silent', title: 'afaqyHomeSilentList' },
+/** The mini tables (owner 2026-10-26: «ابغى الجداول المصغرة»), like the
+ *  fleet's: code and type, plus the speed or the last signal where it says
+ *  something. */
+const LISTS: {
+  key: keyof AfaqyStats['lists']
+  title: TranslationKey
+  extra: 'speed' | 'signal' | null
+}[] = [
+  { key: 'workshopRunning', title: 'afaqyHomeWorkshopRunning', extra: 'speed' },
+  { key: 'availableMoving', title: 'afaqyHomeAvailableMoving', extra: 'speed' },
+  { key: 'idling', title: 'afaqyHomeIdlingList', extra: 'signal' },
+  { key: 'silent', title: 'afaqyHomeSilentList', extra: 'signal' },
   // Owner 2026-10-26: «اظهر المعدات بدون اشارة».
-  { key: 'noSignal', title: 'afaqyHomeNoSignalList' },
+  { key: 'noSignal', title: 'afaqyHomeNoSignalList', extra: null },
 ]
+
+/** Rows a mini table shows until «عرض الكل», as on the fleet's. */
+const MINI_ROWS = 7
 
 export interface AfaqySectionProps {
   onSelectEquipment?: (id: string) => void
@@ -138,19 +155,48 @@ function AfaqySectionContent({ onSelectEquipment }: AfaqySectionProps) {
   const { data, loading, failed, retry } = useAdminHomeSection(load)
   const stats = data?.kind === 'ok' ? data.stats : null
 
-  const unitLink = (unit: AfaqyStatsUnit) => (
-    <li key={unit.id}>
-      <AppLink
-        href={`/equipment/${unit.id}`}
-        onNavigate={
-          onSelectEquipment ? () => onSelectEquipment(unit.id) : undefined
+  // «عرض الكل» opens a table to every row it holds (at most 30).
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
+
+  const codeColumn: DataTableColumn<AfaqyStatsUnit> = {
+    key: 'code',
+    header: t('equipmentCode'),
+    cell: (row) => (
+      <bdi dir="ltr" className="font-semibold">
+        {row.code}
+      </bdi>
+    ),
+  }
+  const typeColumn: DataTableColumn<AfaqyStatsUnit> = {
+    key: 'type',
+    header: t('equipmentType'),
+    cell: (row) => row.type ?? '—',
+  }
+  const extraColumn = (
+    extra: 'speed' | 'signal',
+  ): DataTableColumn<AfaqyStatsUnit> =>
+    extra === 'speed'
+      ? {
+          key: 'speed',
+          header: t('afaqySpeed'),
+          cell: (row) =>
+            row.speedKmh === null ? (
+              '—'
+            ) : (
+              <bdi dir="ltr">
+                {t('afaqySpeedValue').replace(
+                  '{speed}',
+                  String(Math.round(row.speedKmh)),
+                )}
+              </bdi>
+            ),
         }
-        className="inline-flex h-7 items-center rounded-md bg-surface-hover px-2.5 text-xs font-semibold hover:underline"
-      >
-        <bdi dir="ltr">{unit.code}</bdi>
-      </AppLink>
-    </li>
-  )
+      : {
+          key: 'signal',
+          header: t('afaqyLastSignal'),
+          cell: (row) =>
+            row.lastSignal ? <RelativeTime value={row.lastSignal} /> : '—',
+        }
 
   // Owner 2026-10-26: «اضف حاجة تدل على انه البيانات يتم جلبها». The
   // first load says so in the body; a later one (a retry) beside the title,
@@ -208,28 +254,43 @@ function AfaqySectionContent({ onSelectEquipment }: AfaqySectionProps) {
               ))}
             </div>
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {LISTS.map(({ key, title }) => {
-              const units = stats.lists[key]
+          <MiniTableGrid>
+            {LISTS.map(({ key, title, extra }) => {
+              const rows = stats.lists[key]
+              const open = expanded.has(key)
               return (
-                <section key={key} className="rounded-lg border p-3">
-                  <h3 className="mb-2 text-sm font-medium">
-                    {t(title)}{' '}
-                    <span className="text-muted">
-                      ({stats.listTotals[key]})
-                    </span>
-                  </h3>
-                  {units.length === 0 ? (
-                    <p className="text-xs text-muted">{t('afaqyHomeNone')}</p>
-                  ) : (
-                    <ul className="flex flex-wrap gap-1.5">
-                      {units.map(unitLink)}
-                    </ul>
+                <MiniTable
+                  key={key}
+                  title={t(title)}
+                  description={t('afaqyHomeListCount').replace(
+                    '{count}',
+                    String(stats.listTotals[key]),
                   )}
-                </section>
+                  columns={
+                    extra
+                      ? [codeColumn, typeColumn, extraColumn(extra)]
+                      : [codeColumn, typeColumn]
+                  }
+                  rows={rows}
+                  rowKey={(row) => row.id}
+                  maxRows={open ? rows.length : MINI_ROWS}
+                  onViewAll={
+                    !open && rows.length > MINI_ROWS
+                      ? () =>
+                          setExpanded((current) => new Set(current).add(key))
+                      : undefined
+                  }
+                  onRowClick={
+                    onSelectEquipment
+                      ? (row) => onSelectEquipment(row.id)
+                      : undefined
+                  }
+                  rowHref={(row) => `/equipment/${row.id}`}
+                  empty={t('afaqyHomeNone')}
+                />
               )
             })}
-          </div>
+          </MiniTableGrid>
           <p className="text-xs text-muted">
             {t('afaqyHomeUpdated')}{' '}
             <bdi dir="ltr">{formatDateTime(stats.generatedAt, false)}</bdi>

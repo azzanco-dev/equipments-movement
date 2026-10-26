@@ -27,6 +27,7 @@ function reply(body: Record<string, unknown>, status: number) {
 type FleetRow = {
   id: string
   code: string | null
+  type: string | null
   tracker_unit_id: string | null
   equipment_state: ProgramEquipmentState | null
 }
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
     for (let page = 0; page < FLEET_MAX_PAGES; page += 1) {
       const { data, error } = await access.supabase
         .from('equipment')
-        .select('id,code,tracker_unit_id,equipment_state')
+        .select('id,code,type,tracker_unit_id,equipment_state')
         .eq('is_active', true)
         .eq('status', 'active')
         .in('ownership_status', AFAQY_STATS_OWNERS)
@@ -79,6 +80,7 @@ export async function GET(request: Request) {
         fleet.push({
           id: row.id,
           code: row.code ?? '—',
+          type: row.type,
           trackerUnitId:
             row.tracker_unit_id &&
             AFAQY_UNIT_ID_PATTERN.test(row.tracker_unit_id)
