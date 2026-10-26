@@ -142,8 +142,16 @@ function SearchField({
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const [box, setBox] = useState<ListBox | null>(null)
 
   const touchStart = useRef<{ x: number; y: number } | null>(null)
+  /** True while the field rises after a tap: the list stays under it with
+   *  the height it opened with (owner 2026-10-26, his screen recording: the
+   *  keyboard shrank the room under the field mid-way, the list flipped
+   *  above the field and back — the jump). */
+  const lifting = useRef(false)
+  /** The latest `place`, for the end of the lift. */
+  const placeRef = useRef<() => void>(() => undefined)
 
   /** A tap on a phone: the hidden box takes the focus where the field will
    *  rest, our one scroll brings the field there, then the field takes the
@@ -163,6 +171,9 @@ function SearchField({
     holder.style.height = `${rect.height}px`
     holder.value = ''
     holder.focus({ preventScroll: true })
+    lifting.current = true
+    // A fresh list under the field (not the side of an earlier opening).
+    setBox(null)
     setOpen(true)
 
     field.style.scrollMarginTop = `${LIFT_TO}px`
@@ -188,6 +199,9 @@ function SearchField({
         window.requestAnimationFrame(settle)
         return
       }
+      // Arrived: the list's side and height are read once, now.
+      lifting.current = false
+      placeRef.current()
       if (document.activeElement !== holder) return
       if (holder.value) setQuery(holder.value)
       input.focus({ preventScroll: true })
@@ -215,7 +229,6 @@ function SearchField({
     return () =>
       document.removeEventListener('pointerdown', onPointerDown, true)
   }, [open, close])
-  const [box, setBox] = useState<ListBox | null>(null)
 
   /** Where the list hangs and how tall it may be, from the room left between
    *  the field and the keyboard (or the screen's edges). */
@@ -226,6 +239,17 @@ function SearchField({
     const area = geometry()
     const below = area.bottom - rect.bottom - EDGE - SCREEN_GAP
     const above = rect.top - area.top - EDGE - SCREEN_GAP
+    if (lifting.current) {
+      // Rising: under the field, with the height it opened with.
+      setBox(
+        (prev) =>
+          prev ?? {
+            side: 'below',
+            maxHeight: Math.max(LIST_MIN, Math.min(LIST_MAX, below)),
+          },
+      )
+      return
+    }
     const side = below < FLIP_BELOW && above > below ? 'above' : 'below'
     const next: ListBox = {
       side,
@@ -242,6 +266,7 @@ function SearchField({
         : next,
     )
   }, [])
+  placeRef.current = place
 
   // While open, the side and the height are re-read on every page scroll
   // and every change of the visible area (the keyboard). The list's place
