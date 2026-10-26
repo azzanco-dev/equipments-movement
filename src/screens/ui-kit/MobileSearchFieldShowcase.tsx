@@ -1,37 +1,44 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Search } from 'lucide-react'
 import { Field, cn, type FieldControlProps } from '@/components/ui'
 import { floatingPanel } from '@/components/ui/popover'
 
-// «حقل بحث للجوال» (owner 2026-10-26), step by step. The owner's brief:
-//   1. a press on the field opens it and focuses its search box;
-//   2. the page scrolls so the field sits near the top and its list under it,
-//      in the room down to the keyboard;
-//   3. when the user scrolls down and the list starts to be covered, the list
-//      shows above the field.
-// Done so far: the field is a search box, so a press focuses it and the
-// phone's keyboard opens natively; on focus the field moves to 100 px from
-// the top of the visible area, and again when the keyboard changes the
-// visible height; the list opens in the slot under the field's resting
-// place (2 px), as tall as the room down to the keyboard less 16 px, pinned
-// to the screen (a page scroll does not move it). Step 3 comes next. Sample page only;
-// AsyncSearchSelect and the screens are untouched.
+// «حقل بحث للجوال» (owner 2026-10-26). After the trials (a forced scroll to
+// 100 px, then a list pinned to the screen) jumped on his phone, he pointed
+// at shadcn's combobox (Base UI) — smooth, no odd jumps — and chose «نجرب
+// طريقتهم». So this field follows Base UI's way:
+//   * the search box IS the field: a press focuses it and the phone opens
+//     its keyboard; the page is never scrolled by code — the phone lifts the
+//     focused field itself when the keyboard opens;
+//   * the list is `position: absolute` in the page under the field, so it
+//     moves with the page natively (no code on each scroll to move it);
+//   * its height is the room left down to the keyboard (max 320), and it
+//     flips above the field when the room below is short and above is
+//     larger (Base UI's collision avoidance); both are re-read when the page
+//     scrolls or the keyboard changes the visible area.
+// Sample page only; AsyncSearchSelect and the screens are untouched.
 
-/** The field's distance from the top of the visible area after a press. */
-const TOP_OFFSET = 100
 /** Between the field and its list. */
-const EDGE = 2
-/** The list ends this far above the keyboard: the field-to-keyboard room
- *  less 16 px in all (owner 2026-10-26: room 426 → list about 410). */
-const KEYBOARD_GAP = 14
+const EDGE = 4
+/** The list stays this far from the keyboard (or the screen's edge). */
+const SCREEN_GAP = 8
+const LIST_MAX = 320
+/** The list never gets shorter than this, even with little room. */
 const LIST_MIN = 120
+/** Below this much room under the field, the list may open above it. */
+const FLIP_BELOW = 160
 
 type Metrics = {
   top: number
   bottom: number
-  list: number | null
-  /** The raw readings behind the distances. */
+  list: string | null
   rectTop: number
   fixedTop: number
   viewTop: number
@@ -43,12 +50,10 @@ let probe: HTMLDivElement | null = null
 
 /**
  * The visible area in getBoundingClientRect's coordinates, whatever a phone
- * measures from (owner 2026-10-26: on his phone rect.top already counts from
- * the visible area, so subtracting visualViewport.offsetTop again gave a
- * negative distance). A `position: fixed` probe at top 0 marks where the
- * layout viewport's top is in those coordinates — 0 on most browsers, minus
- * the visible area's offset where rects follow the visible area — and the
- * visible area starts offsetTop below it either way.
+ * measures from (owner 2026-10-26: on his phone rect.top counts from the
+ * visible area). A `position: fixed` probe at top 0 marks the layout
+ * viewport's top in those coordinates; the visible area starts offsetTop
+ * below it.
  */
 function geometry() {
   if (!probe) {
@@ -60,15 +65,11 @@ function geometry() {
   }
   const view = window.visualViewport
   const fixedTop = probe.getBoundingClientRect().top
-  const top = fixedTop + (view?.offsetTop ?? 0)
+  const fixedLeft = probe.getBoundingClientRect().left
+  const offset = view?.offsetTop ?? 0
   const height = view?.height ?? window.innerHeight
-  return {
-    fixedTop,
-    top,
-    bottom: top + height,
-    height,
-    offset: view?.offsetTop ?? 0,
-  }
+  const top = fixedTop + offset
+  return { fixedTop, fixedLeft, offset, height, top, bottom: top + height }
 }
 
 const TYPES = [
@@ -85,9 +86,16 @@ const SAMPLE = Array.from({ length: 30 }, (_, index) => ({
   label: `${['A', 'TK', 'F', 'B'][index % 4]}${120 + index * 7} — ${TYPES[index % TYPES.length]}`,
 }))
 
-type ListBox = { top: number; left: number; width: number; height: number }
+type ListBox = {
+  side: 'below' | 'above'
+  /** Page coordinates of the field's edge the list hangs from. */
+  top: number
+  left: number
+  width: number
+  maxHeight: number
+}
 
-function PressToTopField({
+function SearchField({
   control,
   placeholder,
   onMetrics,
@@ -99,121 +107,97 @@ function PressToTopField({
   const fieldRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
-  const [focused, setFocused] = useState(false)
+  const [open, setOpen] = useState(false)
   const [box, setBox] = useState<ListBox | null>(null)
 
-  /**
-   * The list's place, pinned to the SCREEN, not to the page (owner
-   * 2026-10-26: «ما ابغى القائمة متفاعلة مع السكرول، خليها ثابتة»): the slot
-   * under the field's resting place (100 px from the top of the visible
-   * area), down to the keyboard less 16 px. Set on focus and when the
-   * keyboard changes the visible area; a scroll of the page never moves it.
-   */
-  const placeList = useCallback(() => {
+  /** Where the list hangs and how tall it may be, from the room left between
+   *  the field and the keyboard (or the screen's edges). */
+  const place = useCallback(() => {
     const field = fieldRef.current
     if (!field) return
     const rect = field.getBoundingClientRect()
     const area = geometry()
-    const slotTop = TOP_OFFSET + rect.height + EDGE
-    const height = Math.max(
-      LIST_MIN,
-      Math.round(area.height - slotTop - KEYBOARD_GAP),
-    )
-    // `position: fixed` counts from the layout viewport's top, and the
-    // visible area starts offsetTop below it.
+    const below = area.bottom - rect.bottom - EDGE - SCREEN_GAP
+    const above = rect.top - area.top - EDGE - SCREEN_GAP
+    const side = below < FLIP_BELOW && above > below ? 'above' : 'below'
+    // Page coordinates: the rect in the layout viewport's terms, plus the
+    // page's scroll.
+    const toPageY = (y: number) => y - area.fixedTop + window.scrollY
     const next: ListBox = {
-      top: area.offset + slotTop,
-      left: rect.left,
+      side,
+      top: toPageY(side === 'below' ? rect.bottom + EDGE : rect.top - EDGE),
+      left: rect.left - area.fixedLeft + window.scrollX,
       width: rect.width,
-      height,
+      maxHeight: Math.max(
+        LIST_MIN,
+        Math.min(LIST_MAX, side === 'below' ? below : above),
+      ),
     }
     setBox((prev) =>
       prev &&
+      prev.side === next.side &&
       Math.abs(prev.top - next.top) < 0.5 &&
       Math.abs(prev.left - next.left) < 0.5 &&
       prev.width === next.width &&
-      prev.height === next.height
+      Math.abs(prev.maxHeight - next.maxHeight) < 0.5
         ? prev
         : next,
     )
   }, [])
 
-  /** The readout: the field's place in the visible area, live. */
-  const measure = useCallback(() => {
-    const field = fieldRef.current
-    if (!field) return
-    const rect = field.getBoundingClientRect()
-    const area = geometry()
-    onMetrics({
-      top: Math.round(rect.top - area.top),
-      bottom: Math.round(area.bottom - rect.bottom),
-      list: focused && box ? box.height : null,
-      rectTop: Math.round(rect.top),
-      fixedTop: Math.round(area.fixedTop),
-      viewTop: Math.round(area.offset),
-      viewHeight: Math.round(area.height),
-      scrollY: Math.round(window.scrollY),
-    })
-  }, [onMetrics, focused, box])
-
-  // The readout: every scroll and every change of the visible area (the
-  // keyboard), in the event itself.
-  useEffect(() => {
-    measure()
+  // While open, the side and the height are re-read on every page scroll
+  // and every change of the visible area (the keyboard). The list's
+  // position itself follows the page with no code: it is in the page.
+  useLayoutEffect(() => {
+    if (!open) return
+    place()
     const view = window.visualViewport
-    view?.addEventListener('resize', measure)
-    view?.addEventListener('scroll', measure)
-    window.addEventListener('resize', measure)
-    window.addEventListener('scroll', measure, { capture: true, passive: true })
+    view?.addEventListener('resize', place)
+    view?.addEventListener('scroll', place)
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, { capture: true, passive: true })
     return () => {
-      view?.removeEventListener('resize', measure)
-      view?.removeEventListener('scroll', measure)
-      window.removeEventListener('resize', measure)
-      window.removeEventListener('scroll', measure, { capture: true })
+      view?.removeEventListener('resize', place)
+      view?.removeEventListener('scroll', place)
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, { capture: true })
     }
-  }, [measure])
+  }, [open, place])
 
-  /** The browser does the arithmetic of the visible area itself. */
-  const bringToTop = useCallback(() => {
-    const field = fieldRef.current
-    if (!field) return
-    field.style.scrollMarginTop = `${TOP_OFFSET}px`
-    const reduceMotion = window.matchMedia(
-      '(prefers-reduced-motion: reduce)',
-    ).matches
-    field.scrollIntoView({
-      block: 'start',
-      inline: 'nearest',
-      behavior: reduceMotion ? 'auto' : 'smooth',
-    })
-  }, [])
-
-  // While the box has the focus: when the keyboard opens (or closes, or
-  // changes), the visible height changes, and the field goes back to 100 px
-  // in the new visible area. No timers: the event says when.
+  // The readout, live on every scroll and visible-area change.
   useEffect(() => {
-    if (!focused) return
+    const update = () => {
+      const field = fieldRef.current
+      if (!field) return
+      const rect = field.getBoundingClientRect()
+      const area = geometry()
+      onMetrics({
+        top: Math.round(rect.top - area.top),
+        bottom: Math.round(area.bottom - rect.bottom),
+        list:
+          open && box
+            ? `${Math.round(box.maxHeight)}px ${box.side === 'below' ? 'تحت' : 'فوق'}`
+            : null,
+        rectTop: Math.round(rect.top),
+        fixedTop: Math.round(area.fixedTop),
+        viewTop: Math.round(area.offset),
+        viewHeight: Math.round(area.height),
+        scrollY: Math.round(window.scrollY),
+      })
+    }
+    update()
     const view = window.visualViewport
-    if (!view) return
-    let height = Math.round(view.height)
-    const onResize = () => {
-      const now = Math.round(view.height)
-      if (now === height) return
-      height = now
-      bringToTop()
-      placeList()
-    }
-    // The visible area itself may pan over the page (a phone with the
-    // keyboard open): the list goes with it, so it stays still on screen.
-    const onPan = () => placeList()
-    placeList()
-    view.addEventListener('resize', onResize)
-    view.addEventListener('scroll', onPan)
+    view?.addEventListener('resize', update)
+    view?.addEventListener('scroll', update)
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, { capture: true, passive: true })
     return () => {
-      view.removeEventListener('resize', onResize)
-      view.removeEventListener('scroll', onPan)
+      view?.removeEventListener('resize', update)
+      view?.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, { capture: true })
     }
-  }, [focused, bringToTop, placeList])
+  }, [onMetrics, open, box])
 
   const q = query.trim().toLowerCase()
   const results = q
@@ -233,7 +217,7 @@ function PressToTopField({
         }}
         className={cn(
           'flex h-10 w-full cursor-text items-center gap-2 rounded-lg border bg-bg px-3 transition-colors md:h-9',
-          focused && 'border-fg',
+          open && 'border-fg',
         )}
       >
         <Search size={15} aria-hidden="true" className="shrink-0 text-muted" />
@@ -241,17 +225,15 @@ function PressToTopField({
           ref={inputRef}
           id={control?.id}
           type="search"
+          role="combobox"
           enterKeyHint="search"
           autoComplete="off"
           aria-describedby={control?.['aria-describedby']}
-          aria-expanded={focused}
+          aria-expanded={open}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          onFocus={() => {
-            setFocused(true)
-            bringToTop()
-          }}
-          onBlur={() => setFocused(false)}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setOpen(false)}
           onKeyDown={(event) => {
             if (event.key === 'Escape') inputRef.current?.blur()
           }}
@@ -263,11 +245,11 @@ function PressToTopField({
           aria-hidden="true"
           className={cn(
             'shrink-0 text-muted transition-transform',
-            focused && 'rotate-180',
+            open && 'rotate-180',
           )}
         />
       </div>
-      {focused &&
+      {open &&
         box &&
         createPortal(
           <div
@@ -276,17 +258,15 @@ function PressToTopField({
             // list is pressed or scrolled.
             onPointerDown={(event) => event.preventDefault()}
             onMouseDown={(event) => event.preventDefault()}
-            className={cn(floatingPanel, 'fixed flex flex-col !p-0')}
+            className={cn(floatingPanel, 'absolute flex flex-col !p-0')}
             style={{
               top: box.top,
               left: box.left,
               width: box.width,
-              height: box.height,
+              maxHeight: box.maxHeight,
+              transform: box.side === 'above' ? 'translateY(-100%)' : undefined,
             }}
           >
-            <p className="shrink-0 border-b px-3 py-1.5 text-[11px] text-muted">
-              ارتفاع القائمة <bdi className="text-fg">{box.height}px</bdi>
-            </p>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               {results.length === 0 ? (
                 <p className="px-3 py-5 text-center text-sm text-muted">
@@ -318,10 +298,16 @@ function PressToTopField({
 }
 
 function Readout({ metrics }: { metrics: Metrics | null }) {
-  const rows: [string, number | null | undefined][] = [
-    ['المسافة بين الحقل واعلى الشاشة', metrics?.top],
-    ['المسافة بين الحقل والكيبورد', metrics?.bottom],
-    ['ارتفاع القائمة', metrics?.list],
+  const rows: [string, string | undefined][] = [
+    [
+      'المسافة بين الحقل واعلى الشاشة',
+      metrics ? `${metrics.top}px` : undefined,
+    ],
+    [
+      'المسافة بين الحقل والكيبورد',
+      metrics ? `${metrics.bottom}px` : undefined,
+    ],
+    ['القائمة', metrics?.list ?? undefined],
   ]
   // The raw readings, to see where a wrong distance comes from.
   const raw: [string, number | undefined][] = [
@@ -333,12 +319,10 @@ function Readout({ metrics }: { metrics: Metrics | null }) {
   ]
   return (
     <div className="mt-2 grid gap-1 rounded-lg border bg-surface px-3 py-2 text-xs text-muted">
-      {rows.map(([label, number]) => (
+      {rows.map(([label, value]) => (
         <div key={label} className="flex items-center justify-between gap-2">
           <span>{label}</span>
-          <bdi className="font-medium text-fg">
-            {number === undefined || number === null ? '—' : `${number}px`}
-          </bdi>
+          <bdi className="font-medium text-fg">{value ?? '—'}</bdi>
         </div>
       ))}
       <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 border-t pt-1 text-[11px]">
@@ -360,16 +344,16 @@ export function MobileSearchFieldShowcase() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted">
-        الخطوة الحالية: الضغط على الحقل يفتح الكيبورد ويرفع الحقل الى 100 بكسل
-        من اعلى الشاشة، والقائمة تحته بارتفاع المسافة الى الكيبورد ناقص 16 بكسل.
-        الانتقال فوق الحقل عند التمرير في الخطوة التالية.
+        بطريقة Base UI (combobox في shadcn): الضغط يفتح الكيبورد والجوال يرفع
+        الحقل بنفسه، والقائمة جزء من الصفحة تحت الحقل بارتفاع المساحة الى
+        الكيبورد، وتنتقل فوقه اذا ضاق المكان تحته.
       </p>
 
       <div className="flex min-h-[70vh] flex-col justify-center">
         <div className="mx-auto w-full max-w-sm">
           <Field label="المعدة">
             {(control) => (
-              <PressToTopField
+              <SearchField
                 control={control}
                 placeholder="اختر معدة"
                 onMetrics={setFirst}
@@ -383,7 +367,7 @@ export function MobileSearchFieldShowcase() {
       <div className="mx-auto w-full max-w-sm">
         <Field label="السائق">
           {(control) => (
-            <PressToTopField
+            <SearchField
               control={control}
               placeholder="اختر سائقا"
               onMetrics={setSecond}
@@ -392,7 +376,7 @@ export function MobileSearchFieldShowcase() {
         </Field>
         <Readout metrics={second} />
       </div>
-      {/* Room after the last field, so it too can reach the top. */}
+      {/* Room after the last field, so the phone can lift it too. */}
       <div aria-hidden="true" className="h-[70vh]" />
     </div>
   )

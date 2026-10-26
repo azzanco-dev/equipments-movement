@@ -113,7 +113,7 @@ const SCREEN_SECTIONS: SectionDef[] = [
     id: 'mobile-search-field',
     title: 'حقل بحث للجوال',
     purpose:
-      'خطوة بخطوة: الضغط على الحقل يفتح الكيبورد ويرفعه الى 100 بكسل من اعلى الشاشة، والقائمة تحته حتى الكيبورد. جربه من الجوال.',
+      'بطريقة Base UI: الضغط يفتح الكيبورد والجوال يرفع الحقل بنفسه، والقائمة تحته حتى الكيبورد او فوقه اذا ضاق المكان. جربه من الجوال.',
     status: 'review',
     defaultOpen: true,
     element: <MobileSearchFieldShowcase />,
