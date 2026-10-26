@@ -1,6 +1,7 @@
 import { useCallback, type ReactNode } from 'react'
 import {
   Clock3,
+  Loader2,
   Navigation,
   PowerOff,
   Radio,
@@ -151,16 +152,32 @@ function AfaqySectionContent({ onSelectEquipment }: AfaqySectionProps) {
     </li>
   )
 
+  // Owner 2026-10-26: «اضف حاجة تدل على انه البيانات يتم جلبها». The
+  // first load says so in the body; a later one (a retry) beside the title,
+  // over the figures it is replacing.
+  const fetching = (
+    <span
+      role="status"
+      className="inline-flex items-center gap-1.5 text-xs text-muted"
+    >
+      <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+      {t('afaqyHomeFetching')}
+    </span>
+  )
+
   return (
     <AdminHomeSection
       title={t('afaqyHomeTitle')}
       description={t('afaqyHomeDescription')}
-      loading={loading && data === null}
+      action={loading && data !== null ? fetching : undefined}
       failed={failed}
       onRetry={retry}
-      skeletonClassName="h-48 w-full"
     >
-      {data?.kind === 'not_configured' ? (
+      {loading && data === null ? (
+        <div className="flex h-40 items-center justify-center rounded-lg border border-dashed">
+          {fetching}
+        </div>
+      ) : data?.kind === 'not_configured' ? (
         <Notice tone="neutral">{t('afaqyStatusNotConfigured')}</Notice>
       ) : stats ? (
         <div className="space-y-4" aria-busy={loading || undefined}>
