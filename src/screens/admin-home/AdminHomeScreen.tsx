@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { LogIn, LogOut } from 'lucide-react'
 import { Button, PageHeader } from '@/components/ui'
+import { AfaqySection } from '@/components/admin-home/AfaqySection'
 import { AvailabilitySection } from '@/components/admin-home/AvailabilitySection'
 import { EntriesFlowSection } from '@/components/admin-home/EntriesFlowSection'
 import { FleetDonutSection } from '@/components/admin-home/FleetDonutSection'
@@ -112,6 +113,9 @@ export function AdminHomeScreen({
           }
         />
         <FleetStateSection onSelectEquipment={onSelectEquipment} />
+        {/* Owner 2026-10-26: the Afaqy tracker figures of the fleet, right
+            under its state in the program (location-view permission). */}
+        <AfaqySection onSelectEquipment={onSelectEquipment} />
         {/* Its former neighbour "معدات بلا حركة" is now the "متاحة" mini table
           under the state cards, so the availability table takes the full
           width. */}

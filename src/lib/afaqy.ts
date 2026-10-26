@@ -12,9 +12,12 @@
 // Some units have no `last_update`, one had no `lastloc`: both mean "no
 // position yet", never an error.
 
+import type { AfaqyStats } from '@/lib/afaqyStats'
+
 export const AFAQY_UNITS_ENDPOINT = '/api/afaqy/units'
 export const AFAQY_SYNC_ENDPOINT = '/api/afaqy/sync'
 export const AFAQY_POSITION_ENDPOINT = '/api/afaqy/position'
+export const AFAQY_STATS_ENDPOINT = '/api/afaqy/stats'
 
 /** The Afaqy unit id: a 24-hex (MongoDB ObjectId) string. Mirrors the
  *  `equipment_tracker_unit_id_format` check of migration 0122. */
@@ -609,6 +612,34 @@ export async function loadAfaqyUnits(
     fetchImpl,
   )
   return answer && parseUnitsResponse(answer.status, answer.body)
+}
+
+/** «افاقي» on the admin home (owner 2026-10-26): the answer of
+ *  `GET /api/afaqy/stats` (src/lib/afaqyStats.ts builds it). */
+export type AfaqyStatsAnswer =
+  | { kind: 'ok'; stats: AfaqyStats }
+  | { kind: 'not_configured' }
+  | { kind: 'error' }
+
+export async function loadAfaqyStats(
+  client: SessionClient,
+  signal?: AbortSignal,
+  fetchImpl: AfaqyFetch = defaultFetch,
+): Promise<AfaqyStatsAnswer | null> {
+  const answer = await requestRoute(
+    client,
+    AFAQY_STATS_ENDPOINT,
+    'GET',
+    undefined,
+    signal,
+    fetchImpl,
+  )
+  if (!answer) return null
+  if (answer.status === 503) return { kind: 'not_configured' }
+  const body = asRecord(answer.body)
+  const stats = body && asRecord(body.stats)
+  if (answer.status !== 200 || !stats) return { kind: 'error' }
+  return { kind: 'ok', stats: stats as unknown as AfaqyStats }
 }
 
 export async function runAfaqySync(
