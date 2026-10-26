@@ -14,8 +14,17 @@ import { floatingPanel } from '@/components/ui/popover'
 // at shadcn's combobox (Base UI) — smooth, no odd jumps — and chose «نجرب
 // طريقتهم». So this field follows Base UI's way:
 //   * the search box IS the field: a press focuses it and the phone opens
-//     its keyboard; the page is never scrolled by code — the phone lifts the
-//     focused field itself when the keyboard opens;
+//     its keyboard;
+//   * the lift without jumps (owner 2026-10-26: «حل لرفع الحقل لفوق بدون
+//     مشاكل ونقزات»): the jumps came from two movers — the phone scrolls to
+//     a newly focused box while our code scrolled too. So on a tap on a
+//     phone, a hidden box placed exactly where the field will rest (100 px
+//     from the top) takes the focus in the tap: the keyboard opens and, the
+//     focused box being already in view high up, the phone does not scroll.
+//     One smooth scroll of ours brings the field to that place; when it has
+//     stopped, the focus moves to the field (the keyboard stays open, what
+//     was typed meanwhile is carried over). With a mouse, or a field
+//     already high, the field just takes the focus;
 //   * the list hangs from the field in the layout (`position: absolute`,
 //     `top: 100%` of a box around the field, 2 px gap): it is always right
 //     under the field and moves with the page natively; its place is never
@@ -35,6 +44,34 @@ const LIST_MAX = 320
 const LIST_MIN = 120
 /** Below this much room under the field, the list may open above it. */
 const FLIP_BELOW = 160
+/** Where the field rests after a tap on a phone: this far from the top of
+ *  the visible area. */
+const LIFT_TO = 100
+/** A touch that moved more than this is a scroll, not a tap. */
+const TAP_SLOP = 10
+
+let proxy: HTMLInputElement | null = null
+
+/** The hidden box that holds the focus (and the keyboard) while the field
+ *  is on its way up. Focusable, so neither hidden nor display: none. */
+function focusProxy() {
+  if (!proxy) {
+    proxy = document.createElement('input')
+    proxy.type = 'text'
+    proxy.tabIndex = -1
+    proxy.setAttribute('aria-hidden', 'true')
+    proxy.autocomplete = 'off'
+    proxy.style.cssText =
+      'position:fixed;opacity:0;font-size:16px;caret-color:transparent;' +
+      'border:0;padding:0;margin:0;pointer-events:none;top:-100px;left:0;width:1px;height:1px'
+    document.body.appendChild(proxy)
+  }
+  return proxy
+}
+
+function isPhone() {
+  return window.matchMedia('(max-width: 767px)').matches
+}
 
 type Metrics = {
   top: number
@@ -105,6 +142,60 @@ function SearchField({
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
+
+  /** A tap on a phone: the hidden box takes the focus where the field will
+   *  rest, our one scroll brings the field there, then the field takes the
+   *  focus back. */
+  const liftAndFocus = useCallback(() => {
+    const field = fieldRef.current
+    const input = inputRef.current
+    if (!field || !input) return
+    const rect = field.getBoundingClientRect()
+    const area = geometry()
+    const holder = focusProxy()
+    // `position: fixed` counts from the layout viewport's top; the visible
+    // area starts offsetTop below it.
+    holder.style.top = `${area.offset + LIFT_TO}px`
+    holder.style.left = `${rect.left}px`
+    holder.style.width = `${rect.width}px`
+    holder.style.height = `${rect.height}px`
+    holder.value = ''
+    holder.focus({ preventScroll: true })
+    setOpen(true)
+
+    field.style.scrollMarginTop = `${LIFT_TO}px`
+    const reduceMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)',
+    ).matches
+    field.scrollIntoView({
+      block: 'start',
+      inline: 'nearest',
+      behavior: reduceMotion ? 'auto' : 'smooth',
+    })
+
+    // The field has arrived when it has not moved for three frames (or after
+    // a second at most); then it takes the focus, with what was typed.
+    let last = Number.NaN
+    let still = 0
+    const started = performance.now()
+    const settle = () => {
+      const top = field.getBoundingClientRect().top
+      still = Math.abs(top - last) < 0.5 ? still + 1 : 0
+      last = top
+      if (still < 3 && performance.now() - started < 1000) {
+        window.requestAnimationFrame(settle)
+        return
+      }
+      if (document.activeElement !== holder) return
+      if (holder.value) setQuery(holder.value)
+      input.focus({ preventScroll: true })
+      holder.value = ''
+      holder.style.top = '-100px'
+    }
+    window.requestAnimationFrame(settle)
+  }, [])
 
   /** Closes the list and puts the keyboard away. */
   const close = useCallback(() => {
@@ -219,10 +310,38 @@ function SearchField({
         ref={fieldRef}
         // A press anywhere on the box focuses the search (its own keyboard).
         onPointerDown={(event) => {
+          if (event.pointerType === 'touch') return
           if (event.target !== inputRef.current) {
             event.preventDefault()
             inputRef.current?.focus()
           }
+        }}
+        // A tap on a phone: lifted without the phone's own scroll (see
+        // liftAndFocus). A touch that moved is a scroll and is left alone;
+        // a field already high, or already focused, just takes the focus.
+        onTouchStart={(event) => {
+          const touch = event.touches[0]
+          touchStart.current = touch
+            ? { x: touch.clientX, y: touch.clientY }
+            : null
+        }}
+        onTouchEnd={(event) => {
+          const start = touchStart.current
+          const touch = event.changedTouches[0]
+          touchStart.current = null
+          if (!start || !touch) return
+          if (
+            Math.abs(touch.clientX - start.x) > TAP_SLOP ||
+            Math.abs(touch.clientY - start.y) > TAP_SLOP
+          )
+            return
+          if (!isPhone() || document.activeElement === inputRef.current) return
+          const field = fieldRef.current
+          if (!field) return
+          event.preventDefault()
+          const distance = field.getBoundingClientRect().top - geometry().top
+          if (distance > LIFT_TO + 8) liftAndFocus()
+          else inputRef.current?.focus()
         }}
         className={cn(
           'flex h-10 w-full cursor-text items-center gap-2 rounded-lg border bg-bg px-3 transition-colors md:h-9',
@@ -356,9 +475,9 @@ export function MobileSearchFieldShowcase() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted">
-        بطريقة Base UI (combobox في shadcn): الضغط يفتح الكيبورد والجوال يرفع
-        الحقل بنفسه، والقائمة جزء من الصفحة تحت الحقل بارتفاع المساحة الى
-        الكيبورد، وتنتقل فوقه اذا ضاق المكان تحته.
+        الضغط يفتح الكيبورد فورا، ويرفع الحقل الى 100 بكسل من اعلى الشاشة بحركة
+        واحدة منا فقط (الجوال لا يحرك الصفحة)، والقائمة تحته حتى الكيبورد، وتبقى
+        مع «تم».
       </p>
 
       <div className="flex min-h-[70vh] flex-col justify-center">
