@@ -95,6 +95,12 @@ test('coverage and signal age', () => {
   assert.equal(stats.linked, 5)
   assert.deepEqual(stats.signal, { recent: 1, stale: 1, silent: 1, none: 2 })
   assert.deepEqual(stats.lists.silent, [{ id: 'e3', code: 'A103' }])
+  // The linked units with no position, or unknown to Afaqy.
+  assert.deepEqual(stats.lists.noSignal, [
+    { id: 'e4', code: 'A104' },
+    { id: 'e5', code: 'A105' },
+  ])
+  assert.equal(stats.listTotals.noSignal, 2)
 })
 
 test('what the recently heard units do now, and the mismatches', () => {

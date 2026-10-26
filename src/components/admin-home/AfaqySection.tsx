@@ -99,6 +99,8 @@ const LISTS: { key: keyof AfaqyStats['lists']; title: TranslationKey }[] = [
   { key: 'availableMoving', title: 'afaqyHomeAvailableMoving' },
   { key: 'idling', title: 'afaqyHomeIdlingList' },
   { key: 'silent', title: 'afaqyHomeSilentList' },
+  // Owner 2026-10-26: «اظهر المعدات بدون اشارة».
+  { key: 'noSignal', title: 'afaqyHomeNoSignalList' },
 ]
 
 export interface AfaqySectionProps {

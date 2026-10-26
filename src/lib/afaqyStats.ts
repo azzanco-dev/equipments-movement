@@ -69,6 +69,8 @@ export interface AfaqyStats {
     idling: AfaqyStatsUnit[]
     /** No signal for more than a day. */
     silent: AfaqyStatsUnit[]
+    /** Linked, but no position at all (or Afaqy no longer knows the unit). */
+    noSignal: AfaqyStatsUnit[]
   }
   /** The full count of each list (a list shows at most
    *  AFAQY_STATS_LIST_MAX units). */
@@ -105,6 +107,7 @@ export function buildAfaqyStats(
   const availableMoving: AfaqyStatsUnit[] = []
   const idling: AfaqyStatsUnit[] = []
   const silent: AfaqyStatsUnit[] = []
+  const noSignal: AfaqyStatsUnit[] = []
   let linked = 0
 
   for (const equipment of fleet) {
@@ -113,11 +116,12 @@ export function buildAfaqyStats(
     const unit = unitsById.get(equipment.trackerUnitId)
     const seen = unit ? lastSignalTime(unit.position) : null
     const seenMs = seen ? Date.parse(seen) : Number.NaN
+    const entry = { id: equipment.id, code: equipment.code }
     if (!unit || !Number.isFinite(seenMs)) {
       signal.none += 1
+      noSignal.push(entry)
       continue
     }
-    const entry = { id: equipment.id, code: equipment.code }
     const age = nowMs - seenMs
     if (age > AFAQY_SILENT_MS) {
       signal.silent += 1
@@ -152,12 +156,14 @@ export function buildAfaqyStats(
       availableMoving: availableMoving.length,
       idling: idling.length,
       silent: silent.length,
+      noSignal: noSignal.length,
     },
     lists: {
       workshopRunning: finish(workshopRunning),
       availableMoving: finish(availableMoving),
       idling: finish(idling),
       silent: finish(silent),
+      noSignal: finish(noSignal),
     },
     generatedAt: new Date(nowMs).toISOString(),
   }
