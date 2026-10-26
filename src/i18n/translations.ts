@@ -868,6 +868,7 @@ export const translations = {
     afaqyLocationNoPosition: 'لم ترسل الوحدة موقعا بعد',
     afaqyLocationLoadError: 'تعذر تحميل الموقع الحالي',
     afaqyLocationStale: 'اخر اشارة منذ اكثر من ساعة، قد لا يكون الموقع حاليا',
+    afaqyLocationStaleSince: 'اخر اشارة منذ {elapsed}، قد لا يكون الموقع حاليا',
     afaqyLastSignal: 'اخر اشارة',
     // «افاقي» on the admin home (owner 2026-10-26).
     afaqyHomeTitle: 'بيانات التتبع في افاقي',
@@ -2934,6 +2935,8 @@ export const translations = {
     afaqyLocationLoadError: 'Could not load the current location',
     afaqyLocationStale:
       'The last signal is more than an hour old; the location may be out of date',
+    afaqyLocationStaleSince:
+      'The last signal was {elapsed} ago; the location may be out of date',
     afaqyLastSignal: 'Last signal',
     afaqyHomeTitle: 'Tracking data in Afaqy',
     afaqyHomeDescription:

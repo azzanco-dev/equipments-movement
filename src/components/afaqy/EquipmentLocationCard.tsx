@@ -13,6 +13,7 @@ import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { canViewEquipmentLocation } from '@/lib/actionPermissions'
 import { useI18n } from '@/i18n/I18nContext'
+import { elapsedInWords } from '@/lib/elapsedWords'
 import { supabase } from '@/lib/supabase'
 import {
   formatSaudiDateTime,
@@ -65,7 +66,7 @@ function LocationCardContent({
   equipmentCode,
   className,
 }: EquipmentLocationCardProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const [view, setView] = useState<View>({ kind: 'loading' })
   const [refreshing, setRefreshing] = useState(false)
   const controllerRef = useRef<AbortController | null>(null)
@@ -191,7 +192,14 @@ function LocationCardContent({
       <div className="space-y-3">
         {isPositionStale(position) && (
           <Notice tone="warning" size="compact">
-            {t('afaqyLocationStale')}
+            {/* Owner 2026-10-26: the notice says how old the signal is
+                («اخر اشارة منذ 7 شهور، …»). */}
+            {signal
+              ? t('afaqyLocationStaleSince').replace(
+                  '{elapsed}',
+                  elapsedInWords(signal, lang) ?? '',
+                )
+              : t('afaqyLocationStale')}
           </Notice>
         )}
         <InfoGrid items={items} columns={2} />
