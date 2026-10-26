@@ -704,7 +704,7 @@ function NowPanel({
     if (open.entry?.supervisor_name)
       people.push({
         icon: <UserCheck size={13} />,
-        label: 'مسجل الدخول',
+        label: 'مسؤول الحركة',
         value: open.entry.supervisor_name,
       })
   } else if (last) {
@@ -792,6 +792,16 @@ function Header({
               <bdi dir="ltr">{unit.chassis}</bdi>
             )}
           </p>
+          {/* An external supplier's unit names its supplier under the
+              identity (owner 2026-10-26: «اضف اسم المورد لو لمورد
+              خارجي»). */}
+          {unit.supplier && (
+            <p className="mt-1 flex items-center gap-1.5 text-sm">
+              <Building2 size={14} aria-hidden="true" className="text-muted" />
+              <span className="text-muted">المورد</span>
+              <span className="font-semibold">{unit.supplier}</span>
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
@@ -1279,12 +1289,15 @@ function StayTile({
       </div>
 
       <dl
-        className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-xl p-3 sm:grid-cols-4"
+        className={cn(
+          'mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-xl p-3',
+          site ? 'sm:grid-cols-4' : 'sm:grid-cols-3',
+        )}
         style={ON_FILL}
       >
         <StayFact icon={<LogIn size={11} />} label="الدخول">
           {entry ? (
-            <button type="button" className="text-start underline-offset-4 hover:underline">
+            <button type="button" className="text-start underline underline-offset-4 hover:decoration-2">
               {formatDate(entry.recorded_at)}
             </button>
           ) : (
@@ -1294,7 +1307,7 @@ function StayTile({
         <StayFact icon={<LogOut size={11} />} label="الخروج">
           {exit ? (
             <span className="inline-flex flex-wrap items-center gap-1">
-              <button type="button" className="text-start underline-offset-4 hover:underline">
+              <button type="button" className="text-start underline underline-offset-4 hover:decoration-2">
                 {formatDate(exit.recorded_at)}
               </button>
               {site && <ExitPurposeBadge purpose={exit.exit_purpose} />}
@@ -1305,22 +1318,21 @@ function StayTile({
             '—'
           )}
         </StayFact>
+        {/* A workshop stay shows who is responsible for the movement only,
+            not who recorded its exit (owner 2026-10-26: «مسجل خروج الورشة
+            مايحتاج، مسؤول الحركة خليه»). */}
         <StayFact
           icon={<UserCheck size={11} />}
-          label={site ? 'الفورمان' : 'مسجل الدخول'}
+          label={site ? 'الفورمان' : 'مسؤول الحركة'}
         >
           {entry?.supervisor_name ?? '—'}
         </StayFact>
-        {site ? (
+        {site && (
           <StayFact icon={<User size={11} />} label="السائق">
             {entryDriver ?? '—'}
             {exitDriver && exitDriver !== entryDriver && (
               <span className="block text-xs text-muted">عند الخروج: {exitDriver}</span>
             )}
-          </StayFact>
-        ) : (
-          <StayFact icon={<LogOut size={11} />} label="مسجل الخروج">
-            {exit?.supervisor_name ?? '—'}
           </StayFact>
         )}
       </dl>
