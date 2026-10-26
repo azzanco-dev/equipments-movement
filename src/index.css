@@ -77,17 +77,6 @@
     U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
-/* Noto Sans Arabic has conventional dotted final yeh forms in native inputs. */
-@font-face {
-  font-family: 'NotoArabicInput';
-  src: url('https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-arabic@5.2.5/files/noto-sans-arabic-arabic-400-normal.woff2')
-    format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-  unicode-range:
-    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
-}
 @font-face {
   font-family: 'Thmanyah';
   src: url('/fonts/thmanyah-sans/thmanyahsans-Medium.woff2')
@@ -118,18 +107,20 @@
     U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
-/* Thmanyah Serif Display is reserved for headings. */
+/* Thmanyah Serif Text is reserved for headings (owner 2026-10-26, was Serif
+   Display from a CDN): served from the site itself, the owner's own files
+   (public/fonts/thmanyah-serif-text), in the two weights headings use. */
 @font-face {
-  font-family: 'Thmanyah Serif Display';
-  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-serif-display/woff2/thmanyah-serif-display-Medium.woff2')
+  font-family: 'Thmanyah Serif Text';
+  src: url('/fonts/thmanyah-serif-text/thmanyahseriftext-Medium.woff2')
     format('woff2');
   font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Thmanyah Serif Display';
-  src: url('https://cdn.jsdelivr.net/gh/engdawood/thmanyah-font-web@4266a9d/fonts/thmanyah-serif-display/woff2/thmanyah-serif-display-Bold.woff2')
+  font-family: 'Thmanyah Serif Text';
+  src: url('/fonts/thmanyah-serif-text/thmanyahseriftext-Bold.woff2')
     format('woff2');
   font-weight: 700;
   font-style: normal;
@@ -141,7 +132,7 @@
     'ArabicUiDigits', 'Thmanyah', 'Tajawal', 'Segoe UI', Tahoma, system-ui,
     sans-serif;
   --font-latin: 'Roboto', 'Segoe UI', Arial, system-ui, sans-serif;
-  --font-heading: 'Thmanyah Serif Display', 'Thmanyah', 'Segoe UI', serif;
+  --font-heading: 'Thmanyah Serif Text', 'Thmanyah', 'Segoe UI', serif;
 }
 
 * {
@@ -336,7 +327,8 @@ body {
   .input {
     @apply h-8 w-full rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors placeholder:text-placeholder;
     border-color: var(--border);
-    font-family: 'ArabicUiDigits', 'NotoArabicInput', 'Segoe UI', Tahoma, system-ui, sans-serif;
+    /* Owner 2026-10-26: Thmanyah Sans in inputs too (was Noto Sans Arabic). */
+    font-family: 'ArabicUiDigits', 'Thmanyah', 'Segoe UI', Tahoma, system-ui, sans-serif;
     line-height: 1.25rem;
   }
   html[lang='en'] .input {
