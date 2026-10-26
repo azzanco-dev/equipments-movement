@@ -288,9 +288,10 @@ test('isEquipmentNew mirrors the 7-day rule and ignores a missing date', () => {
 
 test('the inquiry derives the mark from created_at, not from the chain', () => {
   const source = read('src/screens/inquiry/EquipmentInquiryScreen.tsx')
+  // 2026-10-26 (inquiry redesign): the owner and its supplier follow.
   assert.match(
     source,
-    /\.select\('id,code,type,plate_number,chassis_number,created_at'\)/,
+    /'id,code,type,plate_number,chassis_number,created_at,ownership_status,lessor:lessors\(id,name\)'/,
   )
   // 2026-10-14: derived in the brief, next to the code, from the row's age.
   assert.match(source, /isNew=\{isEquipmentNew\(equipment\.created_at\)\}/)

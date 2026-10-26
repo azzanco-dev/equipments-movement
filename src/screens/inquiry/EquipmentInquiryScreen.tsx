@@ -2,32 +2,42 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Search } from 'lucide-react'
+import { Building2, Calendar, ExternalLink, Hash, Tag } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { localizedName } from '@/lib/localizedName'
 import { useListRequest } from '@/components/data-list/useListRequest'
+import { usePermissions } from '@/auth/PermissionsContext'
 import {
+  AppLink,
   Button,
-  Card,
   EmptyState,
   ErrorState,
   InfoGrid,
-  PageHeader,
-  SectionHeader,
   Skeleton,
+  cn,
   type InfoGridItem,
 } from '@/components/ui'
-import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
+import type { EquipmentSuggestion } from '@/components/inquiry/EquipmentSuggestSearch'
+import { InquirySearch } from '@/components/inquiry/InquirySearch'
+import { InquiryPlate } from '@/components/inquiry/InquiryPlate'
+import { InquiryNow, type InquiryNowPo } from '@/components/inquiry/InquiryNow'
+import { InquiryYearNumbers, InquiryYearRings } from '@/components/inquiry/InquiryYear'
+import { InquiryJourney } from '@/components/inquiry/InquiryJourney'
 import {
-  EquipmentSuggestSearch,
-  type EquipmentSuggestion,
-} from '@/components/inquiry/EquipmentSuggestSearch'
-import { EquipmentTimeline } from '@/components/inquiry/EquipmentTimeline'
-import type { TimelineMovement } from '@/lib/visitTimeline'
+  INQUIRY_SURFACE,
+  InquiryCardTitle,
+  inquiryRise,
+} from '@/components/inquiry/inquiryStyle'
+import { buildEquipmentVisits, type TimelineMovement } from '@/lib/visitTimeline'
+import {
+  inquiryYearDays,
+  inquiryYearMonths,
+  inquiryYearStart,
+  summarizeInquiryYear,
+} from '@/lib/inquiryYear'
 import {
   buildEquipmentSuggestFilter,
-  inquiryBriefIdentifier,
   parseEquipmentIdParam,
 } from '@/lib/equipmentInquiry'
 import { toLatinDigits } from '@/lib/plate'
@@ -51,18 +61,24 @@ import {
 import { EquipmentStateBadge } from '@/components/equipment/EquipmentStateBadge'
 import { EquipmentNewBadge } from '@/components/equipment/EquipmentNewBadge'
 import { LtrValue } from '@/components/ui/InfoGrid'
+import { formatDate } from '@/lib/dateFormat'
+import { ownershipBadge } from '@/lib/equipmentForm'
+import type { OwnershipStatus } from '@/lib/types'
 
 /**
- * `/inquiry`: one search field finds an equipment by code/plate/chassis/type,
- * the product owner picks exactly one, and the page shows where it is right
- * now plus its full movement history as a timeline of visits. Every
- * signed-in role can open it — `entry_exit_logs` RLS decides which movement
- * rows come back, so a foreman only ever sees his own site visits and a
- * workshop role only ever sees workshop visits, exactly as everywhere else.
+ * `/inquiry` (redesigned 2026-10-26 on the owner's word, «طيب الحين طبق على
+ * الصفحة», after the /ui-kit mockup «نموذج صفحة الاستعلام الجديدة»): the
+ * page opens like the home of an AI assistant — a question, one line and a
+ * big field in the middle, with the reader's recent units — and the answer
+ * rises in: the unit with its one state and, for an external supplier's
+ * unit, the supplier; «الحين» (where it is now, since when, the foreman,
+ * driver and PO); the numbers and a ring per month of the last 12 months;
+ * the facts and the (admin) location beside «الرحلة», every stay in full.
  *
- * Reviewed on `/ui-kit` as `EquipmentInquiryShowcase`; this screen keeps the
- * same `EquipmentSuggestSearch` / `EquipmentTimeline` components and swaps
- * the sample data for real Supabase reads.
+ * Every signed-in role can open it — `entry_exit_logs` RLS decides which
+ * movement rows come back, so a foreman only ever sees his own site visits
+ * and a workshop role only workshop visits, exactly as everywhere else; the
+ * state itself comes from `get_last_movement`.
  */
 
 interface InquiryEquipmentRow {
@@ -74,6 +90,8 @@ interface InquiryEquipmentRow {
   /** Selected by the detail read only (the suggestions do not need it): the
    *  «جديدة» mark is "created within the last 7 days" (migration 0129). */
   created_at?: string | null
+  ownership_status?: OwnershipStatus | null
+  lessor?: { id: string; name: string | null } | null
 }
 
 interface MovementLogTimelineRow {
@@ -103,6 +121,41 @@ const SUGGEST_DEBOUNCE_MS = 300
 // stand-alone "exit without entry" segment until "show more" pulls in the
 // entry that actually opened it — a display nuance, not a data error.
 const MOVEMENTS_PAGE_SIZE = 40
+// The last 12 months of one unit: a bound, not a page (a unit moves a few
+// times a month).
+const YEAR_MOVEMENTS_LIMIT = 1000
+
+const TIMELINE_SELECT =
+  'id,movement_type,movement_context,workshop_purpose,recorded_at,company_name_ar,company_name_en,project_name_ar,project_name_en,supervisor_name,driver_name,exit_purpose,driver_full_name'
+
+/** The reader's recent units, in this browser only (a convenience). */
+const RECENT_KEY = 'inquiry:recent'
+const RECENT_LIMIT = 5
+type RecentUnit = { id: string; code: string; type: string | null }
+
+function readRecent(): RecentUnit[] {
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(RECENT_KEY) ?? '[]')
+    return Array.isArray(parsed)
+      ? parsed
+          .filter(
+            (item): item is RecentUnit =>
+              typeof item?.id === 'string' && typeof item?.code === 'string',
+          )
+          .slice(0, RECENT_LIMIT)
+      : []
+  } catch {
+    return []
+  }
+}
+
+function writeRecent(units: RecentUnit[]) {
+  try {
+    window.localStorage.setItem(RECENT_KEY, JSON.stringify(units))
+  } catch {
+    // Private windows and blocked storage simply keep no history.
+  }
+}
 
 /**
  * wave 20 (migration 0125): the one equipment state of the brief. It is read
@@ -111,89 +164,61 @@ const MOVEMENTS_PAGE_SIZE = 40
  * the computed field would then see only part of the chain. `error` keeps a
  * failed read visible instead of showing a state. The «جديدة» mark is not
  * part of it: it is the row's age (`isEquipmentNew`, migration 0129) and
- * sits next to the code in the brief (owner decision 2026-10-14).
+ * sits next to the code (owner decision 2026-10-14).
  */
 type InquiryState = { state: EquipmentState } | 'error' | null
 
-/**
- * The brief above the timeline: code (with the small «جديدة» mark when the
- * unit was created within the last 7 days), type, and the plate, or the
- * chassis number when the equipment has no plate (owner decision), then the
- * state. Codes, plates and chassis numbers are isolated LTR runs (`LtrValue`
- * / `InfoGrid`), so they keep the RTL start edge instead of jumping to the
- * left.
- */
-function inquiryBriefItems(
-  equipment: InquiryEquipmentRow,
-  state: InquiryState,
-  t: ReturnType<typeof useI18n>['t'],
-): InfoGridItem[] {
-  const identifier = inquiryBriefIdentifier(equipment)
-  return [
-    {
-      key: 'code',
-      label: t('equipmentCode'),
-      value: (
-        <span className="inline-flex max-w-full items-center gap-2">
-          <LtrValue>{equipment.code}</LtrValue>
-          <EquipmentNewBadge isNew={isEquipmentNew(equipment.created_at)} />
-        </span>
-      ),
-    },
-    { key: 'type', label: t('equipmentType'), value: equipment.type },
-    {
-      key: identifier.kind,
-      label: t(identifier.kind === 'plate' ? 'plateNumber' : 'chassisNumber'),
-      value: identifier.value,
-      dir: 'ltr',
-    },
-    {
-      key: 'equipmentState',
-      label: t('equipmentState'),
-      value:
-        state === 'error' ? (
-          <span className="text-danger">{t('dataLoadError')}</span>
-        ) : state ? (
-          <EquipmentStateBadge state={state.state} />
-        ) : null,
-    },
-  ]
+function toTimelineMovement(
+  row: MovementLogTimelineRow,
+  lang: 'ar' | 'en',
+): TimelineMovement {
+  return {
+    id: row.id,
+    movement_context: row.movement_context,
+    movement_type: row.movement_type,
+    recorded_at: row.recorded_at,
+    company_name: localizedName(lang, row.company_name_ar, row.company_name_en),
+    project_name: localizedName(lang, row.project_name_ar, row.project_name_en),
+    workshop_purpose: row.workshop_purpose,
+    exit_purpose: row.exit_purpose ?? null,
+    supervisor_name: row.supervisor_name,
+    // wave 19: the driver record's current name, else the snapshot.
+    driver_name: preferRecordName(row.driver_full_name, row.driver_name),
+  }
 }
 
-/** Placeholder shaped like `EquipmentTimeline`: the two summary cards, the
- *  filter tabs and a few visit cards on the timeline rule. */
-function TimelineSkeleton() {
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2">
-        <Skeleton className="h-[86px] w-full" />
-        <Skeleton className="h-[86px] w-full" />
-      </div>
-      <Skeleton className="h-9 w-56 max-w-full" />
-      <div className="space-y-3">
-        {[0, 1, 2].map((index) => (
-          <div key={index} className="border-s ps-5">
-            <Skeleton className="h-40 w-full" />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/** The ONE placeholder of the selected equipment: brief row plus timeline,
- *  shown until both the equipment and its movements have answered. */
-function InquiryResultSkeleton({ label }: { label: string }) {
+/** While the answer is fetched: «نبحث عن …» and the shape of the answer. */
+function InquiryThinking({ code }: { code: string }) {
+  const { t } = useI18n()
   return (
     <div className="space-y-4" aria-busy="true">
-      <span className="sr-only" role="status">
-        {label}
-      </span>
-      {/* Same box as the brief, without the surface fill the bars use. */}
-      <div className="rounded-lg border px-3 py-2.5">
-        <InfoGridSkeleton count={3} />
+      <p
+        className="flex items-center justify-center gap-1.5 text-sm text-muted"
+        role="status"
+      >
+        {t('inquiryLooking')}
+        {code && (
+          <bdi dir="ltr" className="font-semibold text-fg">
+            {code}
+          </bdi>
+        )}
+        <span className="flex gap-1" aria-hidden="true">
+          {[0, 1, 2].map((index) => (
+            <span
+              key={index}
+              className="inq-dot h-1.5 w-1.5 rounded-full bg-fg"
+              style={{ animationDelay: `${index * 160}ms` }}
+            />
+          ))}
+        </span>
+      </p>
+      <Skeleton className="h-36 w-full rounded-2xl" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((index) => (
+          <Skeleton key={index} className="h-24 w-full rounded-2xl" />
+        ))}
       </div>
-      <TimelineSkeleton />
+      <Skeleton className="h-40 w-full rounded-2xl" />
     </div>
   )
 }
@@ -208,16 +233,25 @@ export function EquipmentInquiryScreen({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const permissions = usePermissions()
+  const permissionsReady = permissions.status === 'ready'
+  const canSeePurchasing = permissionsReady && permissions.can('purchasing.view')
+  const canOpenEquipment = permissionsReady && permissions.can('equipment.read')
 
   const startSuggestRequest = useListRequest()
   const startDetailRequest = useListRequest()
   const startMovementsRequest = useListRequest()
+  const startYearRequest = useListRequest()
+  const startPoRequest = useListRequest()
 
   const equipmentId = parseEquipmentIdParam(searchParams.get('equipment'))
 
   const [query, setQuery] = useState('')
   const [suggestions, setSuggestions] = useState<EquipmentSuggestion[]>([])
   const [suggestLoading, setSuggestLoading] = useState(false)
+  const [recent, setRecent] = useState<RecentUnit[]>([])
+  // Fixed per answer so durations do not drift while reading it.
+  const [now, setNow] = useState(() => Date.now())
 
   const [equipment, setEquipment] = useState<InquiryEquipmentRow | null>(null)
   const [inquiryState, setInquiryState] = useState<InquiryState>(null)
@@ -239,6 +273,16 @@ export function EquipmentInquiryScreen({
   const [movementsLoadedId, setMovementsLoadedId] = useState<string | null>(
     null,
   )
+
+  // The last 12 months (plus the movement just before them, for a stay
+  // already open when the window starts).
+  const [yearMovements, setYearMovements] = useState<MovementLogTimelineRow[]>([])
+  const [yearError, setYearError] = useState(false)
+  const [yearLoadedId, setYearLoadedId] = useState<string | null>(null)
+
+  const [po, setPo] = useState<InquiryNowPo>(undefined)
+
+  useEffect(() => setRecent(readRecent()), [])
 
   const selectMovement = useCallback(
     (id: string) => {
@@ -322,19 +366,20 @@ export function EquipmentInquiryScreen({
       setDetailError(false)
       setDetailMissing(false)
       const signal = startDetailRequest()
-      // The brief row is identity (code, type, plate or chassis) plus
-      // `created_at` for the «جديدة» mark (migration 0129); the current state
-      // and the time since the last movement come from the timeline summary
-      // cards below, so no extra read is needed here.
+      // Identity, `created_at` for the «جديدة» mark (migration 0129) and the
+      // owner with its supplier for the facts; the state comes from
+      // `get_last_movement`, the rest from the movements.
       const [equipmentResult, codeChangesResult, lastMovementResult] =
         await Promise.all([
           supabase
             .from('equipment')
-            .select('id,code,type,plate_number,chassis_number,created_at')
+            .select(
+              'id,code,type,plate_number,chassis_number,created_at,ownership_status,lessor:lessors(id,name)',
+            )
             .eq('id', id)
             .abortSignal(signal)
             .maybeSingle(),
-          // Previous codes (EM-196) for the «ارقام سابقة» line under the brief.
+          // Previous codes (EM-196) for the facts.
           supabase
             .from('equipment_code_changes')
             .select(EQUIPMENT_CODE_CHANGE_SELECT)
@@ -365,7 +410,7 @@ export function EquipmentInquiryScreen({
             }> | null
           )?.[0] ?? null
         // Migration 0129: «جديدة» is the row's age, not "no movement"; the
-        // brief derives it from `created_at` next to the code.
+        // header derives it from `created_at` next to the code.
         setInquiryState({ state: equipmentStateFromMovement(latest) })
       }
       setCodeChangesError(Boolean(codeChangesResult.error))
@@ -387,6 +432,12 @@ export function EquipmentInquiryScreen({
       setEquipment(row)
       setQuery(row.code)
       setDetailLoading(false)
+      const next = [
+        { id: row.id, code: row.code, type: row.type },
+        ...readRecent().filter((item) => item.id !== row.id),
+      ].slice(0, RECENT_LIMIT)
+      writeRecent(next)
+      setRecent(next)
     },
     [startDetailRequest],
   )
@@ -401,9 +452,7 @@ export function EquipmentInquiryScreen({
       const signal = startMovementsRequest()
       const { data, error } = await supabase
         .from('movement_log_search')
-        .select(
-          'id,movement_type,movement_context,workshop_purpose,recorded_at,company_name_ar,company_name_en,project_name_ar,project_name_en,supervisor_name,driver_name,exit_purpose,driver_full_name',
-        )
+        .select(TIMELINE_SELECT)
         .eq('equipment_id', id)
         .order('recorded_at', { ascending: false })
         .order('id', { ascending: false })
@@ -426,6 +475,81 @@ export function EquipmentInquiryScreen({
     [startMovementsRequest],
   )
 
+  // --- The last 12 months -----------------------------------------------
+
+  const fetchYear = useCallback(
+    async (id: string, at: number) => {
+      const signal = startYearRequest()
+      const start = new Date(inquiryYearStart(at)).toISOString()
+      const [inside, before] = await Promise.all([
+        supabase
+          .from('movement_log_search')
+          .select(TIMELINE_SELECT)
+          .eq('equipment_id', id)
+          .gte('recorded_at', start)
+          .order('recorded_at', { ascending: true })
+          .order('id', { ascending: true })
+          .limit(YEAR_MOVEMENTS_LIMIT)
+          .abortSignal(signal),
+        // The movement just before the window: an entry still open then.
+        supabase
+          .from('movement_log_search')
+          .select(TIMELINE_SELECT)
+          .eq('equipment_id', id)
+          .lt('recorded_at', start)
+          .order('recorded_at', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(1)
+          .abortSignal(signal),
+      ])
+      if (signal.aborted) return
+      setYearLoadedId(id)
+      if (inside.error || before.error) {
+        setYearError(true)
+        setYearMovements([])
+        return
+      }
+      setYearError(false)
+      setYearMovements([
+        ...((before.data as MovementLogTimelineRow[] | null) ?? []),
+        ...((inside.data as MovementLogTimelineRow[] | null) ?? []),
+      ])
+    },
+    [startYearRequest],
+  )
+
+  // --- The PO of the open project visit (purchasing readers only) -------
+
+  useEffect(() => {
+    if (!equipmentId || !canSeePurchasing) {
+      setPo(undefined)
+      return
+    }
+    setPo(undefined)
+    let active = true
+    const signal = startPoRequest()
+    void supabase
+      .from('purchasing_site_units')
+      .select('supplier_po_id,po_number')
+      .eq('equipment_id', equipmentId)
+      .limit(1)
+      .abortSignal(signal)
+      .then(({ data, error }) => {
+        if (!active || signal.aborted) return
+        // A failed read hides the chip rather than claiming «بدون PO».
+        if (error) return setPo(undefined)
+        const row = (data as { supplier_po_id: string | null; po_number: string | null }[] | null)?.[0]
+        setPo(
+          row?.supplier_po_id && row.po_number
+            ? { id: row.supplier_po_id, number: row.po_number }
+            : null,
+        )
+      })
+    return () => {
+      active = false
+    }
+  }, [canSeePurchasing, equipmentId, startPoRequest])
+
   useEffect(() => {
     if (!equipmentId) {
       setEquipment(null)
@@ -435,18 +559,25 @@ export function EquipmentInquiryScreen({
       setHasMoreMovements(false)
       setDetailError(false)
       setDetailMissing(false)
+      setYearMovements([])
+      setYearError(false)
       // Picking the same equipment again must start pending, not blank.
       setDetailLoadedId(null)
       setMovementsLoadedId(null)
+      setYearLoadedId(null)
       return
     }
+    const at = Date.now()
+    setNow(at)
     void fetchDetail(equipmentId)
     setMovements([])
     setMovementsOffset(0)
     setHasMoreMovements(false)
     void fetchMovements(equipmentId, 0, false)
-    // fetchDetail/fetchMovements are stable (their own deps never change
-    // across the component's life), so equipmentId alone drives this reload.
+    void fetchYear(equipmentId, at)
+    // fetchDetail/fetchMovements/fetchYear are stable (their own deps never
+    // change across the component's life), so equipmentId alone drives this
+    // reload.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [equipmentId])
 
@@ -462,6 +593,10 @@ export function EquipmentInquiryScreen({
   const retryMovements = useCallback(() => {
     if (equipmentId) void fetchMovements(equipmentId, 0, false)
   }, [equipmentId, fetchMovements])
+
+  const retryYear = useCallback(() => {
+    if (equipmentId) void fetchYear(equipmentId, now)
+  }, [equipmentId, fetchYear, now])
 
   const clearSelection = useCallback(() => {
     setEquipmentParam(null)
@@ -479,7 +614,7 @@ export function EquipmentInquiryScreen({
 
   // Derived, not raised by an effect: the very first render for a new
   // `equipmentId` is already pending, so there is no blank frame and no
-  // second placeholder. Both reads must have answered for THIS id; a failed
+  // second placeholder. Every read must have answered for THIS id; a failed
   // or missing equipment is reported without waiting for the movements.
   const detailPending =
     Boolean(equipmentId) && (detailLoading || detailLoadedId !== equipmentId)
@@ -488,146 +623,292 @@ export function EquipmentInquiryScreen({
     (Boolean(equipmentId) &&
       !detailError &&
       !detailMissing &&
-      movementsLoadedId !== equipmentId)
+      (movementsLoadedId !== equipmentId || yearLoadedId !== equipmentId))
 
-  const timelineMovements = useMemo<TimelineMovement[]>(
-    () =>
-      movements.map((row) => ({
-        id: row.id,
-        movement_context: row.movement_context,
-        movement_type: row.movement_type,
-        recorded_at: row.recorded_at,
-        company_name: localizedName(
-          lang,
-          row.company_name_ar,
-          row.company_name_en,
-        ),
-        project_name: localizedName(
-          lang,
-          row.project_name_ar,
-          row.project_name_en,
-        ),
-        workshop_purpose: row.workshop_purpose,
-        exit_purpose: row.exit_purpose ?? null,
-        supervisor_name: row.supervisor_name,
-        // wave 19: the driver record's current name, else the snapshot.
-        driver_name: preferRecordName(row.driver_full_name, row.driver_name),
-      })),
+  const visits = useMemo(
+    () => buildEquipmentVisits(movements.map((row) => toTimelineMovement(row, lang))),
     [movements, lang],
   )
+  const createdAt = equipment?.created_at ? Date.parse(equipment.created_at) : Number.NaN
+  const year = useMemo(() => {
+    const yearVisits = buildEquipmentVisits(
+      yearMovements.map((row) => toTimelineMovement(row, lang)),
+    )
+    const days = inquiryYearDays(yearVisits, createdAt, now)
+    return { days, months: inquiryYearMonths(days), summary: summarizeInquiryYear(days) }
+  }, [yearMovements, lang, createdAt, now])
+
+  const hero = !equipmentId
+  const state = inquiryState && inquiryState !== 'error' ? inquiryState.state : null
+  const supplierName =
+    equipment?.ownership_status === 'external_supplier' ? equipment.lessor?.name : null
+
+  const facts: InfoGridItem[] = equipment
+    ? [
+        {
+          key: 'owner',
+          icon: <Tag size={15} aria-hidden="true" />,
+          label: t('ownershipStatus'),
+          value: equipment.ownership_status
+            ? t(ownershipBadge(equipment.ownership_status).key)
+            : null,
+        },
+        ...(supplierName
+          ? [
+              {
+                key: 'supplier',
+                icon: <Building2 size={15} aria-hidden="true" />,
+                label: t('inquirySupplier'),
+                value: supplierName,
+              },
+            ]
+          : []),
+        {
+          key: 'plate',
+          icon: <Hash size={15} aria-hidden="true" />,
+          label: t('plateNumber'),
+          value: equipment.plate_number ? (
+            <InquiryPlate plate={equipment.plate_number} chassis={null} />
+          ) : null,
+        },
+        {
+          key: 'chassis',
+          icon: <Hash size={15} aria-hidden="true" />,
+          label: t('chassisNumber'),
+          value: equipment.chassis_number,
+          dir: 'ltr',
+        },
+        {
+          key: 'created',
+          icon: <Calendar size={15} aria-hidden="true" />,
+          label: t('inquiryCreatedAt'),
+          value: equipment.created_at ? formatDate(equipment.created_at) : null,
+          dir: 'ltr',
+        },
+      ]
+    : []
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title={t('inquiryPageTitle')}
-        description={t('inquiryPageDescription')}
+    <div className="min-h-[70vh] rounded-3xl bg-surface px-3 py-6 sm:px-6">
+      <h1 className="sr-only">{t('inquiryPageTitle')}</h1>
+      {/* The page's start (owner 2026-10-26: «نفس واجهات الAI الرئيسية الي
+          يكون الحقل في النص، وفيه وصف بسيط»): the space above the field and
+          the question fold away when a unit is shown. */}
+      <div
+        aria-hidden="true"
+        style={{
+          height: hero ? 'clamp(40px, 14vh, 140px)' : 0,
+          transition: 'height 600ms cubic-bezier(.2,.8,.2,1)',
+        }}
       />
-
-      <Card className="space-y-4">
-        <SectionHeader
-          title={t('searchEquipmentAnyField')}
-          action={
-            equipmentId && (
-              <Button size="sm" variant="outline" onClick={clearSelection}>
-                {t('inquiryChangeEquipment')}
-              </Button>
-            )
-          }
-        />
-
-        {/* `dir="auto"` on the input only: Latin codes and plate digits are
-            typed LTR, while the Arabic placeholder and the icons keep the
-            page's RTL start edge. */}
-        <div className="max-w-xl">
-          <EquipmentSuggestSearch
-            query={query}
-            onQueryChange={setQuery}
-            suggestions={suggestions}
-            loading={suggestLoading}
-            onPick={pickSuggestion}
-            placeholder={t('searchEquipmentAnyField')}
-            inputDir="auto"
-          />
+      <div
+        className="grid transition-[grid-template-rows,opacity] duration-500"
+        style={{ gridTemplateRows: hero ? '1fr' : '0fr', opacity: hero ? 1 : 0 }}
+        aria-hidden={!hero}
+      >
+        <div className="overflow-hidden">
+          <div className="space-y-2 pb-6 text-center">
+            <h2
+              className="text-2xl font-bold sm:text-3xl"
+              style={{ fontFamily: 'var(--font-heading)' }}
+            >
+              {t('inquiryHeroTitle')}
+            </h2>
+            <p className="text-sm text-muted">{t('inquiryHeroDescription')}</p>
+          </div>
         </div>
+      </div>
 
-        {!equipmentId ? (
-          <EmptyState
-            icon={<Search size={28} aria-hidden="true" />}
-            title={t('inquiryEmptyTitle')}
-            description={t('inquiryEmptyDescription')}
-          />
-        ) : resultPending ? (
-          <InquiryResultSkeleton label={t('loading')} />
-        ) : detailError ? (
-          <ErrorState onRetry={retryDetail} />
-        ) : detailMissing ? (
-          <EmptyState
-            title={t('inquiryEquipmentNotFound')}
-            action={
-              <Button size="sm" variant="outline" onClick={clearSelection}>
-                {t('inquiryChangeEquipment')}
-              </Button>
-            }
-          />
-        ) : equipment ? (
-          <div className="space-y-4">
-            {/* Identity only: code, type, and the plate — or the chassis
-                number when the equipment has no plate. The current state,
-                the time since the last movement, and the latest visit's
-                company/project/foreman all live in the timeline below. */}
-            <div className="space-y-2 rounded-lg border bg-surface px-3 py-2.5">
-              <InfoGrid items={inquiryBriefItems(equipment, inquiryState, t)} />
-              <PreviousCodesLine
-                changes={codeChanges}
-                currentCode={equipment.code}
-                error={codeChangesError}
+      <div
+        className="mx-auto transition-[max-width] duration-500"
+        style={{ maxWidth: hero ? 640 : 520 }}
+      >
+        <InquirySearch
+          query={query}
+          onQueryChange={setQuery}
+          suggestions={suggestions}
+          loading={suggestLoading}
+          onPick={pickSuggestion}
+          big={hero}
+        />
+      </div>
+
+      {hero && recent.length > 0 && (
+        <div
+          className="inq-rise mx-auto mt-5 max-w-2xl space-y-2 text-center"
+          style={inquiryRise(2)}
+        >
+          <p className="text-xs text-muted">{t('inquiryRecent')}</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {recent.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setQuery(item.code)
+                  setEquipmentParam(item.id)
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-bg px-3 py-1.5 text-sm shadow-sm transition-transform hover:-translate-y-0.5"
+              >
+                <bdi dir="ltr" className="font-semibold">
+                  {item.code}
+                </bdi>
+                {item.type && <span className="text-xs text-muted">{item.type}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {equipmentId && (
+        <div className="mx-auto mt-6 max-w-6xl space-y-4">
+          {resultPending ? (
+            <InquiryThinking code={query} />
+          ) : detailError ? (
+            <div className={cn(INQUIRY_SURFACE, 'p-4')}>
+              <ErrorState onRetry={retryDetail} />
+            </div>
+          ) : detailMissing ? (
+            <div className={cn(INQUIRY_SURFACE, 'p-4')}>
+              <EmptyState
+                title={t('inquiryEquipmentNotFound')}
+                action={
+                  <Button size="sm" variant="outline" onClick={clearSelection}>
+                    {t('inquiryChangeEquipment')}
+                  </Button>
+                }
               />
             </div>
-
-            {/* wave 17: admin only (the card renders nothing for any other
-                role and never requests the position then). */}
-            <EquipmentLocationCard
-              equipmentId={equipment.id}
-              equipmentCode={equipment.code}
-              className="p-4"
-            />
-
-            {movementsError ? (
-              <ErrorState onRetry={retryMovements} />
-            ) : movementsLoading ? (
-              // Only a retry after a failed movements read gets here; the
-              // first load is covered by the single placeholder above.
-              <div aria-busy="true">
-                <span className="sr-only" role="status">
-                  {t('loading')}
-                </span>
-                <TimelineSkeleton />
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <EquipmentTimeline
-                  movements={timelineMovements}
-                  onSelectMovement={selectMovement}
-                />
-                {hasMoreMovements && (
-                  <div className="flex justify-center">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={loadMoreMovements}
-                      disabled={movementsLoadingMore}
-                    >
-                      {movementsLoadingMore
-                        ? t('loading')
-                        : t('inquiryShowMoreVisits')}
+          ) : equipment ? (
+            <>
+              <section
+                className={cn(INQUIRY_SURFACE, 'inq-rise space-y-4 p-4')}
+                style={inquiryRise(0)}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="inline-flex items-center gap-2 text-2xl font-bold leading-none">
+                        <LtrValue>{equipment.code}</LtrValue>
+                        <EquipmentNewBadge isNew={isEquipmentNew(equipment.created_at)} />
+                      </h2>
+                      {inquiryState === 'error' ? (
+                        <span className="text-sm text-danger">{t('dataLoadError')}</span>
+                      ) : (
+                        <EquipmentStateBadge state={state} />
+                      )}
+                    </div>
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm text-muted">
+                      <span className="font-medium text-fg">{equipment.type || '—'}</span>
+                      <span aria-hidden="true">·</span>
+                      <InquiryPlate
+                        plate={equipment.plate_number}
+                        chassis={equipment.chassis_number}
+                      />
+                    </p>
+                    {/* An external supplier's unit names its supplier (owner
+                        2026-10-26: «اضف اسم المورد لو لمورد خارجي»). */}
+                    {supplierName && (
+                      <p className="mt-1 flex items-center gap-1.5 text-sm">
+                        <Building2 size={14} aria-hidden="true" className="text-muted" />
+                        <span className="text-muted">{t('inquirySupplier')}</span>
+                        <span className="font-semibold">{supplierName}</span>
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {canOpenEquipment && (
+                      <Button asChild size="sm" variant="outline">
+                        <AppLink href={`/equipment/${equipment.id}`}>
+                          <ExternalLink size={14} aria-hidden="true" />
+                          {t('inquiryEquipmentPage')}
+                        </AppLink>
+                      </Button>
+                    )}
+                    <Button size="sm" variant="ghost" onClick={clearSelection}>
+                      {t('inquiryAnotherUnit')}
                     </Button>
                   </div>
-                )}
+                </div>
+                <InquiryNow visits={visits} state={state} po={po} now={now} />
+              </section>
+
+              {yearError ? (
+                <div className={cn(INQUIRY_SURFACE, 'p-4')}>
+                  <ErrorState description={t('inquiryYearLoadError')} onRetry={retryYear} />
+                </div>
+              ) : year.summary.visitCount > 0 ? (
+                <>
+                  <InquiryYearNumbers summary={year.summary} index={1} />
+                  <InquiryYearRings days={year.days} months={year.months} index={5} />
+                </>
+              ) : null}
+
+              {/* Below xl: the facts, the location, the journey. From xl the
+                  journey spans two columns beside them; the facts sit above
+                  the location (owner: «جدول بيانات المعدة فوق الموقع
+                  الحالي»). */}
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                <div className="space-y-4 xl:col-start-3 xl:row-start-1">
+                  <section
+                    className={cn(INQUIRY_SURFACE, 'inq-rise space-y-2 p-4')}
+                    style={inquiryRise(6)}
+                  >
+                    <InquiryCardTitle icon={<Tag size={14} />}>{t('inquiryFacts')}</InquiryCardTitle>
+                    <InfoGrid items={facts} columns={2} />
+                    <PreviousCodesLine
+                      changes={codeChanges}
+                      currentCode={equipment.code}
+                      error={codeChangesError}
+                    />
+                  </section>
+                  {/* wave 17: admin only (the card renders nothing for any
+                      other role and never requests the position then). */}
+                  <EquipmentLocationCard
+                    equipmentId={equipment.id}
+                    equipmentCode={equipment.code}
+                    className={cn(INQUIRY_SURFACE, 'border-0 p-4')}
+                  />
+                </div>
+                <div className="xl:col-span-2 xl:col-start-1 xl:row-start-1">
+                  {movementsError ? (
+                    <div className={cn(INQUIRY_SURFACE, 'p-4')}>
+                      <ErrorState onRetry={retryMovements} />
+                    </div>
+                  ) : movementsLoading ? (
+                    // Only a retry after a failed movements read gets here;
+                    // the first load is covered by «نبحث عن» above.
+                    <Skeleton className="h-60 w-full rounded-2xl" />
+                  ) : (
+                    <InquiryJourney
+                      visits={visits}
+                      now={now}
+                      index={7}
+                      onSelectMovement={selectMovement}
+                      footer={
+                        hasMoreMovements && (
+                          <div className="mt-4 flex justify-center">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={loadMoreMovements}
+                              disabled={movementsLoadingMore}
+                            >
+                              {movementsLoadingMore
+                                ? t('loading')
+                                : t('inquiryShowMoreVisits')}
+                            </Button>
+                          </div>
+                        )
+                      }
+                    />
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-        ) : null}
-      </Card>
+            </>
+          ) : null}
+        </div>
+      )}
     </div>
   )
 }

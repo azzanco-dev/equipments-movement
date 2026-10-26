@@ -112,11 +112,13 @@ const SCREEN_SECTIONS: SectionDef[] = [
     // Owner 2026-10-26: «صفحة الاستعلام ابغى تحسين جذري لها», then «ابدا
     // بالنموذج في /ui-kit مع شريط النشاط» and «اضف الوان وحيوية اكثر … مو
     // مشكلة لو تضيف gradient خفيف».
+    // Applied to /inquiry the same day («طيب الحين طبق على الصفحة»), with
+    // the month rings for the year («اختار مبدئيا الحلقات»).
     id: 'inquiry-redesign',
     title: 'نموذج صفحة الاستعلام الجديدة',
     purpose:
-      'وين المعدة الحين، ارقام السنة، شريط نشاط 12 شهر، وسجل زيارات مختصر، ببيانات عينة.',
-    status: 'review',
+      'بداية مثل واجهات الAI، الحين، ارقام السنة بستة اشكال للمقارنة (المطبق: الحلقات)، والرحلة كاملة، ببيانات عينة.',
+    status: 'approved',
     defaultOpen: true,
     element: <InquiryRedesignMockup />,
   },

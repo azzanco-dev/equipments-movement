@@ -765,3 +765,65 @@ textarea::placeholder {
   }
 }
 /* ===== purchasing: PO print sheet — end ===== */
+
+/* Inquiry page motion (owner 2026-10-26, «لما تجي النتايج تجي
+   بانيميشن»): the answer rises in block by block, the share bars grow from
+   the start edge, the month rings draw in and the «نبحث عن» dots pulse.
+   Nothing moves for a reader who asked for reduced motion. */
+@keyframes inq-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes inq-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes inq-ring {
+  from {
+    stroke-dasharray: 0 400;
+  }
+}
+@keyframes inq-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+.inq-rise {
+  animation: inq-rise 560ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.inq-grow {
+  animation: inq-grow 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: right;
+}
+[dir='ltr'] .inq-grow {
+  transform-origin: left;
+}
+.inq-ring {
+  animation: inq-ring 1000ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.inq-dot {
+  animation: inq-dot 1.2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .inq-rise,
+  .inq-grow,
+  .inq-ring,
+  .inq-dot {
+    animation: none;
+  }
+}
