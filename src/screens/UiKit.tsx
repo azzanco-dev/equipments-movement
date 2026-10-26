@@ -108,13 +108,13 @@ type SectionDef = {
 
 const SCREEN_SECTIONS: SectionDef[] = [
   {
-    // Owner 2026-10-26: the /components keyboard trials' idea, built as a
-    // field that places its own floating list.
+    // Owner 2026-10-26: the /components keyboard trials' idea; behaviour
+    // APPROVED the same day («خلاص اعتمد هذا السلوك») after the lift trials.
     id: 'mobile-search-field',
     title: 'حقل بحث للجوال',
     purpose:
-      'بطريقة Base UI: الضغط يفتح الكيبورد والجوال يرفع الحقل بنفسه، والقائمة تحته حتى الكيبورد او فوقه اذا ضاق المكان. جربه من الجوال.',
-    status: 'review',
+      'بطريقة Base UI: الضغط يفتح الكيبورد والجوال يرفع الحقل بنفسه، والقائمة تحته حتى الكيبورد او فوقه اذا ضاق المكان، وتبقى مع «تم».',
+    status: 'approved',
     defaultOpen: true,
     element: <MobileSearchFieldShowcase />,
   },

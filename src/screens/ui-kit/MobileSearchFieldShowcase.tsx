@@ -24,7 +24,12 @@ import { floatingPanel } from '@/components/ui/popover'
 //     flips above the field when the room below is short and above is
 //     larger (Base UI's collision avoidance); both are re-read when the page
 //     scrolls or the keyboard changes the visible area.
-// Sample page only; AsyncSearchSelect and the screens are untouched.
+//   * the list closes on a press outside, a choice or Escape — not on the
+//     keyboard's «تم» (iPhone).
+// APPROVED by the owner on 2026-10-26 («خلاص اعتمد هذا السلوك»), after he
+// dropped the 100 px lift («شيل ال100بكسل»: every scroll by code jumped on
+// the iPhone). Sample page only; AsyncSearchSelect and the screens are not
+// migrated yet (each on his go).
 
 /** Between the field and its list. */
 const EDGE = 2
