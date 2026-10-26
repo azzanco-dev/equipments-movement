@@ -340,10 +340,12 @@ body {
     border-color: var(--border);
     /* Owner 2026-10-26: Thmanyah Sans in inputs too (was Noto Sans Arabic). */
     font-family: 'ArabicUiDigits', 'Thmanyah', 'Segoe UI', Tahoma, system-ui, sans-serif;
-    /* 1.5, not a fixed 20 px: Thmanyah's tall letters (the head of ع) were
-       cut by the shorter line box (owner 2026-10-26, «العين ينأكل جزء منها»).
-       The field's height is fixed by h-*, so it does not grow. */
-    line-height: 1.5;
+    /* 24 px, not the old 20 px: Thmanyah's ع was cut by the shorter line
+       box (owner 2026-10-26, «العين ينأكل جزء منها»). A length, not a factor:
+       the 13 px placeholder inherits it as is (a factor would shrink to
+       ~19.5 px on it and still cut «النوع»). The field's height is fixed by
+       h-*, so it does not grow. */
+    line-height: 1.5rem;
   }
   html[lang='en'] .input {
     font-family: var(--font-latin);
