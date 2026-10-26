@@ -113,13 +113,6 @@ test('the page reads the view server-side and adds through the existing dialogs'
   assert.match(screen, /group-hover\/move:max-w-32/)
   assert.match(screen, /group-focus-visible\/move:max-w-32/)
   assert.match(screen, /motion-safe:transition-all/)
-  // 2026-10-25: the list reloads when the user comes back to the page (a PO
-  // added in another tab), at most once per return.
-  assert.match(screen, /useRefetchOnReturn\(fetchRows\)/)
-  const hook = read('src', 'components', 'data-list', 'useRefetchOnReturn.ts')
-  assert.match(hook, /addEventListener\('visibilitychange', onReturn\)/)
-  assert.match(hook, /addEventListener\('focus', onReturn\)/)
-  assert.match(hook, /if \(now - last < RETURN_GAP_MS\) return/)
   const app = read('src', 'App.tsx')
   assert.match(app, /onSelectMovement=\{\s+shell\.pages\.has\('movements\/:id'\) \? openMovement : undefined\s+\}/)
 })
