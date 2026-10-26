@@ -14,8 +14,11 @@ import { floatingPanel } from '@/components/ui/popover'
 // at shadcn's combobox (Base UI) — smooth, no odd jumps — and chose «نجرب
 // طريقتهم». So this field follows Base UI's way:
 //   * the search box IS the field: a press focuses it and the phone opens
-//     its keyboard; the page is never scrolled by code — the phone lifts the
-//     focused field itself when the keyboard opens;
+//     its keyboard; the phone lifts the focused field itself when the
+//     keyboard opens; ONCE the keyboard is up, the field is lifted a little
+//     more, to 100 px from the top of the visible area, for a taller list
+//     (owner 2026-10-26: «نرفع الحقل فوق شوي … ولسى فيه مساحة فوق») — one
+//     smooth scroll after the phone's own, never during it;
 //   * the list hangs from the field in the layout (`position: absolute`,
 //     `top: 100%` of a box around the field, 2 px gap): it is always right
 //     under the field and moves with the page natively; its place is never
@@ -35,6 +38,11 @@ const LIST_MAX = 320
 const LIST_MIN = 120
 /** Below this much room under the field, the list may open above it. */
 const FLIP_BELOW = 160
+/** Where the field rests once the keyboard is up: this far from the top
+ *  of the visible area. */
+const LIFT_TO = 100
+/** The visible area this much shorter than the window = a keyboard is up. */
+const KEYBOARD_MIN = 150
 
 type Metrics = {
   top: number
@@ -150,6 +158,40 @@ function SearchField({
       window.removeEventListener('scroll', place, { capture: true })
     }
   }, [open, place])
+
+  /** The field up to LIFT_TO from the top of the visible area, when it sits
+   *  lower (never pushed down). */
+  const lift = useCallback(() => {
+    const field = fieldRef.current
+    if (!field) return
+    const distance = field.getBoundingClientRect().top - geometry().top
+    const delta = distance - LIFT_TO
+    if (delta <= 4) return
+    const reduceMotion = window.matchMedia(
+      '(prefers-reduced-motion: reduce)',
+    ).matches
+    window.scrollBy({ top: delta, behavior: reduceMotion ? 'auto' : 'smooth' })
+  }, [])
+
+  // Once the keyboard is up — its own resize of the visible area, after the
+  // phone has done its own scroll — lift the field. If the keyboard was
+  // already up (another field had the focus), lift at once.
+  useEffect(() => {
+    if (!open) return
+    const view = window.visualViewport
+    if (!view) return
+    const keyboardUp = () => window.innerHeight - view.height > KEYBOARD_MIN
+    if (keyboardUp()) lift()
+    let height = Math.round(view.height)
+    const onResize = () => {
+      const now = Math.round(view.height)
+      const shrank = now < height
+      height = now
+      if (shrank && keyboardUp()) lift()
+    }
+    view.addEventListener('resize', onResize)
+    return () => view.removeEventListener('resize', onResize)
+  }, [open, lift])
 
   // The readout, live on every scroll and visible-area change.
   useEffect(() => {
