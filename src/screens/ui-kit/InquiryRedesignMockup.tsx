@@ -21,7 +21,7 @@ import {
   ParkingCircle,
   Search,
   Tag,
-  Truck,
+  CircleDashed,
   User,
   UserCheck,
   Wrench,
@@ -41,7 +41,7 @@ import {
 import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
 import { EquipmentStateBadge } from '@/components/equipment/EquipmentStateBadge'
 import { EquipmentNewBadge } from '@/components/equipment/EquipmentNewBadge'
-import { formatDate, formatDateTime } from '@/lib/dateFormat'
+import { formatDate } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
 import { splitPlateForDisplay } from '@/lib/plate'
 import {
@@ -51,7 +51,6 @@ import {
 import {
   buildEquipmentVisits,
   buildTimelineItems,
-  msToDays,
   visitDurationMs,
   type EquipmentPresence,
   type EquipmentVisit,
@@ -284,92 +283,75 @@ function presence(visits: EquipmentVisit[]): EquipmentPresence {
   return open.context === 'site' ? 'inside_site' : 'inside_workshop'
 }
 
-/** Days of `[from, to)` that fall inside the window. */
-function overlapDays(
-  from: number,
-  to: number,
-  windowStart: number,
-  windowEnd: number,
-): number {
-  const start = Math.max(from, windowStart)
-  const end = Math.min(to, windowEnd)
-  return end > start ? (end - start) / DAY_MS : 0
-}
-
-interface YearSummary {
-  siteDays: number
-  workshopDays: number
-  outsideDays: number
-  visitCount: number
-  /** Share of the counted days spent in a project. */
-  siteShare: number
-}
-
-/** The last 12 months, from the unit's creation when it is younger. */
-function summarizeYear(
-  visits: EquipmentVisit[],
-  createdAt: number,
-  now: number,
-): YearSummary {
-  const windowStart = Math.max(now - YEAR_DAYS * DAY_MS, createdAt)
-  let site = 0
-  let workshop = 0
-  let count = 0
-  for (const visit of visits) {
-    if (!visit.startedAt) continue
-    const from = Date.parse(visit.startedAt)
-    const to = visit.endedAt ? Date.parse(visit.endedAt) : now
-    const days = overlapDays(from, to, windowStart, now)
-    if (days <= 0) continue
-    count += 1
-    if (visit.context === 'site') site += days
-    else workshop += days
-  }
-  const total = Math.max(0, (now - windowStart) / DAY_MS)
-  const outside = Math.max(0, total - site - workshop)
-  return {
-    siteDays: Math.round(site),
-    workshopDays: Math.round(workshop),
-    outsideDays: Math.round(outside),
-    visitCount: count,
-    siteShare: total > 0 ? Math.round((site / total) * 100) : 0,
-  }
-}
-
 // --- Colour, motion and small pieces ------------------------------------------------
 
-type Colors = { fill: string; stroke: string }
+/** `fill` is the light tile, `tint` the icon circle, `stroke` the icon. */
+type Colors = { fill: string; tint: string; stroke: string }
 
-/** One colour per state (owner 2026-10-26: «كل لون يرمز لحالة معينة»). The
- *  fills are the light chart shades, read with `--chart-text`. */
-const STATE_COLORS = {
-  site: { fill: 'var(--chart-1)', stroke: 'var(--chart-stroke-1)' },
-  maintenance: { fill: 'var(--chart-2)', stroke: 'var(--chart-stroke-2)' },
-  parking: { fill: 'var(--chart-3)', stroke: 'var(--chart-stroke-3)' },
-  out_of_service: { fill: 'var(--danger-soft)', stroke: 'var(--danger)' },
-  outside: { fill: 'var(--chart-4)', stroke: 'var(--chart-stroke-4)' },
-} satisfies Record<string, Colors>
-
-const STATE_LEGEND: { key: keyof typeof STATE_COLORS; label: string }[] = [
-  { key: 'site', label: 'مشروع' },
-  { key: 'maintenance', label: 'صيانة' },
-  { key: 'parking', label: 'وقوف' },
-  { key: 'out_of_service', label: 'خارج الخدمة' },
-  { key: 'outside', label: 'على الطريق' },
-]
-
-function visitColors(visit: EquipmentVisit): Colors {
-  if (visit.context === 'site') return STATE_COLORS.site
-  const purpose = visit.entry?.workshop_purpose
-  if (purpose === 'parking') return STATE_COLORS.parking
-  if (purpose === 'out_of_service') return STATE_COLORS.out_of_service
-  return STATE_COLORS.maintenance
+/** A chart shade lightened toward the page (owner 2026-10-26: «فتّح
+ *  الالوان»). */
+function light(token: string): string {
+  return `color-mix(in srgb, ${token} 55%, var(--bg))`
 }
 
-/** The colour of where the unit is now: its open visit's, else outside. */
+/** One colour per state (owner 2026-10-26: «كل لون يرمز لحالة معينة»).
+ *  The grey is a general state, not "on the road": the unit may be at a
+ *  site that never recorded it («مو شرط انها على الطريق … خليها حالة
+ *  عامة»). */
+const STATE_COLORS = {
+  site: {
+    fill: light('var(--chart-1)'),
+    tint: 'var(--chart-1)',
+    stroke: 'var(--chart-stroke-1)',
+  },
+  maintenance: {
+    fill: light('var(--chart-2)'),
+    tint: 'var(--chart-2)',
+    stroke: 'var(--chart-stroke-2)',
+  },
+  parking: {
+    fill: light('var(--chart-3)'),
+    tint: 'var(--chart-3)',
+    stroke: 'var(--chart-stroke-3)',
+  },
+  out_of_service: {
+    fill: 'var(--danger-soft)',
+    tint: light('var(--danger)'),
+    stroke: 'var(--danger)',
+  },
+  unrecorded: {
+    fill: light('var(--chart-4)'),
+    tint: 'var(--chart-4)',
+    stroke: 'var(--chart-stroke-4)',
+  },
+} satisfies Record<string, Colors>
+
+type StateKey = keyof typeof STATE_COLORS
+
+const STATE_LABEL: Record<StateKey, string> = {
+  site: 'مشروع',
+  maintenance: 'صيانة',
+  parking: 'وقوف',
+  out_of_service: 'خارج الخدمة',
+  unrecorded: 'بدون تسجيل',
+}
+
+function visitStateKey(visit: EquipmentVisit): StateKey {
+  if (visit.context === 'site') return 'site'
+  const purpose = visit.entry?.workshop_purpose
+  if (purpose === 'parking') return 'parking'
+  if (purpose === 'out_of_service') return 'out_of_service'
+  return 'maintenance'
+}
+
+function visitColors(visit: EquipmentVisit): Colors {
+  return STATE_COLORS[visitStateKey(visit)]
+}
+
+/** The colour of where the unit is now: its open visit's, else unrecorded. */
 function presenceColors(visits: EquipmentVisit[]): Colors {
   const open = visits.find((visit) => visit.open)
-  return open ? visitColors(open) : STATE_COLORS.outside
+  return open ? visitColors(open) : STATE_COLORS.unrecorded
 }
 
 /** Surfaces have no border (owner: «الحدود مش كويسة»): the page colour on
@@ -378,21 +360,21 @@ const SURFACE = 'rounded-2xl bg-bg shadow-sm'
 
 /** A translucent page-colour chip that reads on any state fill. */
 const ON_FILL: CSSProperties = {
-  backgroundColor: 'color-mix(in srgb, var(--bg) 60%, transparent)',
+  backgroundColor: 'color-mix(in srgb, var(--bg) 65%, transparent)',
 }
 
 /** Mockup-only motion (owner: «لما تجي النتايج تجي بانيميشن»). */
 const MOTION_CSS = `
-@keyframes inq-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes inq-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 @keyframes inq-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-@keyframes inq-drive { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes inq-pop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: none; } }
 @keyframes inq-dot { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
 .inq-rise { animation: inq-rise 560ms cubic-bezier(.2,.8,.2,1) both; }
 .inq-grow { animation: inq-grow 900ms cubic-bezier(.2,.8,.2,1) both; transform-origin: right; }
-.inq-drive { animation: inq-drive 1100ms cubic-bezier(.2,.8,.2,1) both; }
+.inq-pop { animation: inq-pop 420ms cubic-bezier(.2,.8,.2,1) both; }
 .inq-dot { animation: inq-dot 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .inq-rise, .inq-grow, .inq-drive, .inq-dot { animation: none; }
+  .inq-rise, .inq-grow, .inq-pop, .inq-dot { animation: none; }
 }
 `
 
@@ -433,13 +415,13 @@ function PlateText({ plate }: { plate: string }) {
   )
 }
 
-/** A round tile in the strong colour with the icon in the page colour. */
+/** A round tile in a state's tint with the icon in its strong colour. */
 function IconTile({
   colors,
   size = 32,
   children,
 }: {
-  colors: { stroke: string }
+  colors: Pick<Colors, 'tint' | 'stroke'>
   size?: number
   children: ReactNode
 }) {
@@ -450,8 +432,8 @@ function IconTile({
       style={{
         width: size,
         height: size,
-        backgroundColor: colors.stroke,
-        color: 'var(--bg)',
+        backgroundColor: colors.tint,
+        color: colors.stroke,
       }}
     >
       {children}
@@ -459,16 +441,17 @@ function IconTile({
   )
 }
 
-function visitIcon(visit: EquipmentVisit, size: number): ReactNode {
-  const purpose = visit.entry?.workshop_purpose
+function stateIcon(key: StateKey, size: number): ReactNode {
   const Icon =
-    visit.context === 'site'
+    key === 'site'
       ? MapPin
-      : purpose === 'parking'
+      : key === 'parking'
         ? ParkingCircle
-        : purpose === 'out_of_service'
+        : key === 'out_of_service'
           ? Ban
-          : Wrench
+          : key === 'maintenance'
+            ? Wrench
+            : CircleDashed
   return <Icon size={size} />
 }
 
@@ -476,21 +459,6 @@ function visitTitle(visit: EquipmentVisit): string {
   if (visit.context === 'workshop') return 'الورشة'
   const movement = visit.entry ?? visit.exit
   return movement?.project_name ?? 'مشروع'
-}
-
-function visitPurposeLabel(visit: EquipmentVisit): string | null {
-  if (visit.context !== 'workshop') return null
-  const purpose = visit.entry?.workshop_purpose
-  if (purpose === 'parking') return 'وقوف'
-  if (purpose === 'out_of_service') return 'خارج الخدمة'
-  if (purpose === 'maintenance') return 'صيانة'
-  return null
-}
-
-function visitRange(visit: EquipmentVisit): string {
-  const from = visit.startedAt ? formatDate(visit.startedAt) : '—'
-  const to = visit.open ? 'الان' : visit.endedAt ? formatDate(visit.endedAt) : '—'
-  return `${from} ← ${to}`
 }
 
 function CardTitle({ icon, children }: { icon: ReactNode; children: ReactNode }) {
@@ -504,22 +472,6 @@ function CardTitle({ icon, children }: { icon: ReactNode; children: ReactNode })
       </span>
       {children}
     </h3>
-  )
-}
-
-/** The road: the grey of «خارج» drawn as asphalt with a dashed centre line
- *  (owner: «الحالة الرمادية ابغى شي ابداعي»). */
-function RoadMarking({ inset = 12 }: { inset?: number }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="pointer-events-none absolute top-1/2 -translate-y-1/2 border-t-2 border-dashed"
-      style={{
-        insetInlineStart: inset,
-        insetInlineEnd: inset,
-        borderColor: 'color-mix(in srgb, var(--bg) 85%, transparent)',
-      }}
-    />
   )
 }
 
@@ -567,14 +519,10 @@ function InquirySearch({
       <div
         className={cn(
           'flex items-center gap-3 rounded-2xl bg-bg pe-2 ps-4 shadow-md transition-[height] duration-500',
-          big ? 'h-16' : 'h-12',
+          big ? 'h-14' : 'h-11',
         )}
       >
-        <Search
-          size={big ? 22 : 18}
-          aria-hidden="true"
-          className="shrink-0 text-muted"
-        />
+        <Search size={big ? 20 : 17} aria-hidden="true" className="shrink-0 text-muted" />
         <input
           value={query}
           onChange={(event) => {
@@ -603,10 +551,7 @@ function InquirySearch({
           aria-expanded={listOpen}
           aria-autocomplete="list"
           autoComplete="off"
-          className={cn(
-            'h-full min-w-0 flex-1 bg-transparent outline-none placeholder:text-placeholder',
-            big ? 'text-lg' : 'text-base',
-          )}
+          className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-placeholder"
         />
         <button
           type="button"
@@ -615,10 +560,10 @@ function InquirySearch({
           aria-label="اعرض المعدة"
           className={cn(
             'flex shrink-0 items-center justify-center rounded-xl bg-primary text-primary-contrast transition-opacity disabled:opacity-25',
-            big ? 'h-11 w-11' : 'h-9 w-9',
+            big ? 'h-10 w-10' : 'h-8 w-8',
           )}
         >
-          <ArrowLeft size={18} aria-hidden="true" />
+          <ArrowLeft size={17} aria-hidden="true" />
         </button>
       </div>
       {listOpen && (
@@ -635,7 +580,7 @@ function InquirySearch({
                 onMouseEnter={() => setActive(index)}
                 onClick={() => choose(unit)}
                 className={cn(
-                  'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start',
+                  'flex w-full items-center gap-3 rounded-xl px-3 py-2 text-start text-sm',
                   index === active && 'bg-surface-hover',
                 )}
               >
@@ -643,17 +588,14 @@ function InquirySearch({
                   aria-hidden="true"
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{
-                    backgroundColor: presenceColors(
-                      buildEquipmentVisits(unit.movements),
-                    ).stroke,
+                    backgroundColor: presenceColors(buildEquipmentVisits(unit.movements))
+                      .stroke,
                   }}
                 />
                 <bdi dir="ltr" className="font-semibold">
                   {unit.code}
                 </bdi>
-                <span className="min-w-0 flex-1 truncate-safe text-sm text-muted">
-                  {unit.type}
-                </span>
+                <span className="min-w-0 flex-1 truncate-safe text-muted">{unit.type}</span>
                 <span className="shrink-0 text-xs text-muted">
                   {unit.plate ? (
                     <PlateText plate={unit.plate} />
@@ -687,18 +629,18 @@ function Thinking({ code }: { code: string }) {
           ))}
         </span>
       </p>
-      <Skeleton className="h-40 w-full rounded-2xl" />
+      <Skeleton className="h-36 w-full rounded-2xl" />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[0, 1, 2, 3].map((index) => (
-          <Skeleton key={index} className="h-28 w-full rounded-2xl" />
+          <Skeleton key={index} className="h-24 w-full rounded-2xl" />
         ))}
       </div>
-      <Skeleton className="h-24 w-full rounded-2xl" />
+      <Skeleton className="h-40 w-full rounded-2xl" />
     </div>
   )
 }
 
-// --- The answer: header, now, numbers, the year -----------------------------------------
+// --- The answer: header, now, numbers ---------------------------------------------------
 
 function NowPanel({
   unit,
@@ -714,8 +656,7 @@ function NowPanel({
   const open = visits.find((visit) => visit.open) ?? null
   const last = visits[0] ?? null
 
-  let tone: Colors = STATE_COLORS.outside
-  let icon: ReactNode = <Truck size={20} />
+  let key: StateKey = 'unrecorded'
   let title: ReactNode
   let place: ReactNode = null
   let since: string | null = null
@@ -723,8 +664,7 @@ function NowPanel({
   let extra: ReactNode = null
 
   if (where === 'inside_site' && open) {
-    tone = visitColors(open)
-    icon = visitIcon(open, 20)
+    key = 'site'
     title = (
       <>
         داخل <span className="font-bold">{open.entry?.project_name}</span>
@@ -734,91 +674,84 @@ function NowPanel({
     since = open.startedAt
     if (open.entry?.supervisor_name)
       people.push({
-        icon: <UserCheck size={14} />,
+        icon: <UserCheck size={13} />,
         label: 'الفورمان',
         value: open.entry.supervisor_name,
       })
     if (open.entry?.driver_name)
       people.push({
-        icon: <User size={14} />,
+        icon: <User size={13} />,
         label: 'السائق',
         value: open.entry.driver_name,
       })
     extra = (
       <span
-        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
         style={ON_FILL}
       >
-        <FileText size={13} aria-hidden="true" />
+        <FileText size={12} aria-hidden="true" />
         {unit.po ? <bdi dir="ltr">{unit.po}</bdi> : 'بدون PO'}
       </span>
     )
   } else if (where === 'inside_workshop' && open) {
-    tone = visitColors(open)
-    icon = visitIcon(open, 20)
+    key = visitStateKey(open)
     title = (
       <>
-        في <span className="font-bold">الورشة</span>
-        {visitPurposeLabel(open) && <> · {visitPurposeLabel(open)}</>}
+        في <span className="font-bold">الورشة</span> · {STATE_LABEL[key]}
       </>
     )
     since = open.startedAt
     if (open.entry?.supervisor_name)
       people.push({
-        icon: <UserCheck size={14} />,
+        icon: <UserCheck size={13} />,
         label: 'مسجل الدخول',
         value: open.entry.supervisor_name,
       })
   } else if (last) {
-    title = <span className="font-bold">على الطريق</span>
+    title = <span className="font-bold">بدون تسجيل</span>
     since = last.endedAt
-    place = `خرجت من ${visitTitle(last)}، وما دخلت مشروع ولا الورشة بعدها.`
+    place = `اخر حركة مسجلة: خروج من ${visitTitle(last)}.`
   } else {
     title = <span className="font-bold">لا توجد حركات بعد</span>
-    place = 'لم تدخل اي مشروع ولا الورشة منذ اضافتها.'
+    place = 'لم تسجل لها اي حركة منذ اضافتها.'
   }
 
+  const tone = STATE_COLORS[key]
   const sinceMs = since ? Date.parse(since) : null
   return (
-    <div
-      className="relative overflow-hidden rounded-2xl p-4 sm:p-5"
-      style={{ backgroundColor: tone.fill, color: 'var(--chart-text)' }}
-    >
-      {tone === STATE_COLORS.outside && <RoadMarking inset={0} />}
-      <div className="relative flex flex-wrap items-start gap-3">
-        <IconTile colors={tone} size={48}>
-          {icon}
+    <div className="rounded-2xl p-4" style={{ backgroundColor: tone.fill }}>
+      <div className="flex flex-wrap items-start gap-3">
+        <IconTile colors={tone} size={42}>
+          {stateIcon(key, 19)}
         </IconTile>
-        <div className="min-w-0 flex-1 space-y-1">
-          <p className="text-xs font-semibold opacity-80">الحين</p>
-          <p className="text-xl leading-snug">{title}</p>
-          {place && <p className="text-sm opacity-80">{place}</p>}
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <p className="text-xs font-semibold text-muted">الحين</p>
+          <p className="text-lg leading-snug">{title}</p>
+          {place && <p className="text-sm text-muted">{place}</p>}
           {sinceMs !== null && (
             <p className="text-sm">
               منذ{' '}
-              <span className="font-bold">
+              <span className="font-semibold">
                 {formatElapsedDuration(now - sinceMs, t, lang)}
               </span>
-              <span className="opacity-70"> · {formatDate(since!)}</span>
+              <span className="text-muted"> · {formatDate(since!)}</span>
             </p>
           )}
         </div>
-        {extra && (
-          <div className="basis-full ps-[60px] sm:basis-auto sm:ps-0">{extra}</div>
-        )}
+        {extra && <div className="basis-full ps-[54px] sm:basis-auto sm:ps-0">{extra}</div>}
       </div>
       {people.length > 0 && (
-        <div className="relative mt-4 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           {people.map((person) => (
             <span
               key={person.label}
-              className="inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1.5 text-sm"
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs"
               style={ON_FILL}
             >
-              <span aria-hidden="true" className="opacity-70">
+              <span aria-hidden="true" className="text-muted">
                 {person.icon}
               </span>
-              <span className="opacity-70">{person.label}</span>
+              <span className="text-muted">{person.label}</span>
               <span className="truncate-safe font-semibold">{person.value}</span>
             </span>
           ))}
@@ -840,17 +773,17 @@ function Header({
   onAnother: () => void
 }) {
   return (
-    <section className={cn(SURFACE, 'inq-rise space-y-4 p-4 sm:p-5')} style={rise(0)}>
+    <section className={cn(SURFACE, 'inq-rise space-y-4 p-4')} style={rise(0)}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-3xl font-bold leading-none">
+            <h2 className="text-2xl font-bold leading-none">
               <bdi dir="ltr">{unit.code}</bdi>
             </h2>
             <EquipmentStateBadge state={unitState(unit)} />
             <EquipmentNewBadge isNew={unit.createdDaysAgo <= 7} />
           </div>
-          <p className="mt-2 flex flex-wrap items-center gap-x-2 text-sm text-muted">
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm text-muted">
             <span className="font-medium text-fg">{unit.type}</span>
             <span aria-hidden="true">·</span>
             {unit.plate ? (
@@ -898,25 +831,21 @@ function StatTile({
   const shown = useCountUp(value)
   return (
     <div
-      className={cn('inq-rise rounded-2xl p-4', !colors && SURFACE)}
-      style={{
-        ...rise(index),
-        ...(colors
-          ? { backgroundColor: colors.fill, color: 'var(--chart-text)' }
-          : null),
-      }}
+      className={cn('inq-rise rounded-2xl p-3.5', !colors && SURFACE)}
+      style={{ ...rise(index), ...(colors ? { backgroundColor: colors.fill } : null) }}
     >
       <div className="flex items-center gap-2">
-        <IconTile colors={colors ?? { stroke: 'var(--primary)' }} size={30}>
+        <IconTile
+          colors={colors ?? { tint: 'var(--surface-hover)', stroke: 'var(--fg)' }}
+          size={26}
+        >
           {icon}
         </IconTile>
-        <span className="truncate-safe text-xs font-medium opacity-80">
-          {label}
-        </span>
+        <span className="truncate-safe text-xs text-muted">{label}</span>
       </div>
-      <p className="mt-3 text-4xl font-bold leading-none tabular-nums">{shown}</p>
+      <p className="mt-2.5 text-2xl font-bold leading-none tabular-nums">{shown}</p>
       {share !== undefined && colors && (
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full" style={ON_FILL}>
+        <div className="mt-2.5 h-1 overflow-hidden rounded-full" style={ON_FILL}>
           <div
             className="inq-grow h-full rounded-full"
             style={{
@@ -927,7 +856,7 @@ function StatTile({
           />
         </div>
       )}
-      {hint && <p className="mt-2 text-xs opacity-80">{hint}</p>}
+      {hint && <p className="mt-1.5 text-xs text-muted">{hint}</p>}
     </div>
   )
 }
@@ -941,15 +870,26 @@ function YearNumbers({
   createdAt: number
   now: number
 }) {
-  const year = summarizeYear(visits, createdAt, now)
-  const counted = year.siteDays + year.workshopDays + year.outsideDays
-  const share = (days: number) => (counted > 0 ? days / counted : 0)
+  // The same calendar days as the day calendar, so the numbers always
+  // match its counts.
+  const days = yearDays(visits, createdAt, now).filter((cell) => cell.state !== 'before')
+  const daysOf = (...keys: StateKey[]) =>
+    days.filter((cell) => keys.includes(cell.state as StateKey)).length
+  const counted = days.length
+  const share = (count: number) => (counted > 0 ? count / counted : 0)
+  const year = {
+    siteDays: daysOf('site'),
+    workshopDays: daysOf('maintenance', 'parking', 'out_of_service'),
+    outsideDays: daysOf('unrecorded'),
+    visitCount: new Set(days.map((cell) => cell.visit?.key).filter(Boolean)).size,
+    siteShare: Math.round(share(daysOf('site')) * 100),
+  }
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <StatTile
         index={1}
         colors={STATE_COLORS.site}
-        icon={<MapPin size={15} />}
+        icon={<MapPin size={13} />}
         label="ايام في المشاريع"
         value={year.siteDays}
         hint={`${year.siteShare}% من السنة`}
@@ -958,24 +898,24 @@ function YearNumbers({
       <StatTile
         index={2}
         colors={STATE_COLORS.maintenance}
-        icon={<Wrench size={15} />}
+        icon={<Wrench size={13} />}
         label="ايام في الورشة"
         value={year.workshopDays}
         share={share(year.workshopDays)}
       />
       <StatTile
         index={3}
-        colors={STATE_COLORS.outside}
-        icon={<Truck size={15} />}
-        label="ايام على الطريق"
+        colors={STATE_COLORS.unrecorded}
+        icon={<CircleDashed size={13} />}
+        label="ايام بدون تسجيل"
         value={year.outsideDays}
         share={share(year.outsideDays)}
       />
-      {/* A count, not a place: monochrome. */}
+      {/* A count, not a place: neutral. */}
       <StatTile
         index={4}
         colors={null}
-        icon={<History size={15} />}
+        icon={<History size={13} />}
         label="الزيارات"
         value={year.visitCount}
         hint="خلال 12 شهر"
@@ -984,37 +924,49 @@ function YearNumbers({
   )
 }
 
-function Legend() {
-  return (
-    <ul className="flex flex-wrap items-center gap-1.5 text-xs">
-      {STATE_LEGEND.map((item) => {
-        const colors = STATE_COLORS[item.key]
-        return (
-          <li
-            key={item.key}
-            className="relative inline-flex items-center gap-1.5 overflow-hidden rounded-full px-2.5 py-1"
-            style={{ backgroundColor: colors.fill, color: 'var(--chart-text)' }}
-          >
-            <span
-              aria-hidden="true"
-              className="relative h-2 w-2 rounded-full"
-              style={{ backgroundColor: colors.stroke }}
-            />
-            <span className="relative">{item.label}</span>
-          </li>
-        )
-      })}
-    </ul>
-  )
+// --- The year as days ------------------------------------------------------------------
+
+const SAUDI_OFFSET_MS = 3 * 60 * 60 * 1000
+
+/** Days since the epoch of an instant's Saudi calendar day. */
+function saudiDay(ms: number): number {
+  return Math.floor((ms + SAUDI_OFFSET_MS) / DAY_MS)
+}
+
+type DayCell = { day: number; state: StateKey | 'before'; visit: EquipmentVisit | null }
+
+/** Every Saudi day of the last 12 months with the state it was in: the
+ *  latest stay covering it, else «بدون تسجيل», or nothing before the unit
+ *  was added. */
+function yearDays(visits: EquipmentVisit[], createdAt: number, now: number): DayCell[] {
+  const today = saudiDay(now)
+  const first = today - (YEAR_DAYS - 1)
+  const created = saudiDay(createdAt)
+  const cells: DayCell[] = []
+  for (let day = first; day <= today; day += 1)
+    cells.push({ day, state: day < created ? 'before' : 'unrecorded', visit: null })
+  // Oldest first, so a later stay on the same day wins.
+  for (const visit of [...visits].reverse()) {
+    if (!visit.startedAt) continue
+    const from = Math.max(saudiDay(Date.parse(visit.startedAt)), first)
+    const to = Math.min(visit.endedAt ? saudiDay(Date.parse(visit.endedAt)) : today, today)
+    for (let day = from; day <= to; day += 1) {
+      const cell = cells[day - first]
+      cell.state = visitStateKey(visit)
+      cell.visit = visit
+    }
+  }
+  return cells
 }
 
 /**
- * The last 12 months as a road (owner 2026-10-26, «مع شريط النشاط»): the
- * oldest day at the start edge, today at the end edge; every stay is a pill
- * in its state's colour, and the time outside is the bare road between them.
- * A pill opens its visit in the timeline below.
+ * The last 12 months as a calendar of days (owner 2026-10-26: «اخر 12 شهر
+ * فكرته حلوة لكن تنفيذه مو افضل شي»): one small square per day, a column
+ * per week (Sunday on top), the oldest week at the start edge, coloured by
+ * the state of that day; the legend counts the days of each state. A day of
+ * a stay opens that stay in the timeline below.
  */
-function YearRoad({
+function YearCalendar({
   visits,
   createdAt,
   now,
@@ -1026,93 +978,114 @@ function YearRoad({
   onSelectVisit: (key: string) => void
 }) {
   const { lang } = useI18n()
-  const windowStart = now - YEAR_DAYS * DAY_MS
-  const span = now - windowStart
-  const pct = (ms: number) => ((ms - windowStart) / span) * 100
-
-  const segments = visits
-    .filter((visit) => visit.startedAt)
-    .map((visit) => ({
-      visit,
-      from: Math.max(Date.parse(visit.startedAt!), windowStart),
-      to: Math.min(visit.endedAt ? Date.parse(visit.endedAt) : now, now),
-    }))
-    .filter((segment) => segment.to > segment.from)
-  const blankUntil = createdAt > windowStart ? pct(createdAt) : 0
-
-  const ticks: { key: string; at: number; label: string }[] = []
-  const cursor = new Date(windowStart)
-  cursor.setUTCDate(1)
-  cursor.setUTCHours(0, 0, 0, 0)
+  const cells = yearDays(visits, createdAt, now)
+  // Sunday-first weeks: blank cells before the first day of the window.
+  const lead = new Date(cells[0].day * DAY_MS).getUTCDay()
+  const columns = Math.ceil((lead + cells.length) / 7)
   const monthFormat = new Intl.DateTimeFormat(
     lang === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-GB',
     { month: 'short' },
   )
-  while (cursor.getTime() <= now) {
-    if (cursor.getTime() >= windowStart)
-      ticks.push({
-        key: cursor.toISOString(),
-        at: pct(cursor.getTime()),
-        label: monthFormat.format(cursor),
-      })
-    cursor.setUTCMonth(cursor.getUTCMonth() + 1)
+  const months = cells
+    .map((cell, index) => ({ cell, index }))
+    .filter(({ cell, index }) => index === 0 || new Date(cell.day * DAY_MS).getUTCDate() === 1)
+    .map(({ cell, index }) => ({
+      key: cell.day,
+      column: Math.floor((lead + index) / 7),
+      label: monthFormat.format(new Date(cell.day * DAY_MS)),
+    }))
+    // A month starting in the window's first week would collide with it.
+    .filter((month, index, all) => index === 0 || month.column - all[index - 1].column >= 3)
+
+  const counts = new Map<StateKey, number>()
+  for (const cell of cells)
+    if (cell.state !== 'before') counts.set(cell.state, (counts.get(cell.state) ?? 0) + 1)
+  const legend = (Object.keys(STATE_COLORS) as StateKey[]).filter((key) => counts.get(key))
+
+  const grid: CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+    columnGap: 'clamp(1px, 0.35vw, 3px)',
   }
 
   return (
-    <section className={cn(SURFACE, 'inq-rise space-y-3 p-4 sm:p-5')} style={rise(5)}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <CardTitle icon={<Calendar size={14} />}>اخر 12 شهر</CardTitle>
-        <Legend />
-      </div>
-      <div
-        className="relative h-12 rounded-full p-1.5"
-        style={{ backgroundColor: STATE_COLORS.outside.fill }}
-      >
-        <RoadMarking inset={14} />
-        <div className="relative h-full">
-          {blankUntil > 0 && (
-            <div
-              className="absolute inset-y-0 start-0 rounded-full bg-surface"
-              style={{ width: `${blankUntil}%` }}
-              title="قبل اضافة المعدة"
-            />
-          )}
-          {segments.map(({ visit, from, to }, index) => {
-            const colors = visitColors(visit)
-            const label = `${visitTitle(visit)} · ${visitRange(visit)} · ${msToDays(to - from)} يوم`
+    <section className={cn(SURFACE, 'inq-rise space-y-3 p-4')} style={rise(5)}>
+      <CardTitle icon={<Calendar size={14} />}>اخر 12 شهر، يوم بيوم</CardTitle>
+      <div className="mx-auto max-w-[900px] space-y-1.5">
+        <div style={grid} className="h-4 text-[11px] text-muted" aria-hidden="true">
+          {months.map((month) => (
+            <span
+              key={month.key}
+              className="whitespace-nowrap"
+              style={{ gridColumn: `${month.column + 1} / span 3` }}
+            >
+              {month.label}
+            </span>
+          ))}
+        </div>
+        <div
+          style={{
+            ...grid,
+            gridTemplateRows: 'repeat(7, auto)',
+            gridAutoFlow: 'column',
+            rowGap: 'clamp(1px, 0.35vw, 3px)',
+          }}
+          role="img"
+          aria-label={legend
+            .map((key) => `${STATE_LABEL[key]} ${counts.get(key)} يوم`)
+            .join('، ')}
+        >
+          {Array.from({ length: lead }, (_, index) => (
+            <span key={`lead-${index}`} />
+          ))}
+          {cells.map((cell, index) => {
+            const colors = cell.state === 'before' ? null : STATE_COLORS[cell.state]
+            const date = formatDate(new Date(cell.day * DAY_MS))
+            const visit = cell.visit
             return (
-              <button
-                key={visit.key}
-                type="button"
-                title={label}
-                aria-label={label}
-                onClick={() => onSelectVisit(visit.key)}
-                className="inq-grow absolute inset-y-0 min-w-[6px] rounded-full transition-transform hover:scale-y-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              <span
+                key={cell.day}
+                title={
+                  cell.state === 'before'
+                    ? `${date} · قبل اضافة المعدة`
+                    : `${date} · ${visit ? `${visitTitle(visit)} · ` : ''}${STATE_LABEL[cell.state]}`
+                }
+                onClick={visit ? () => onSelectVisit(visit.key) : undefined}
+                className={cn(
+                  'inq-pop aspect-square rounded-[2px] sm:rounded-[3px]',
+                  visit && 'cursor-pointer hover:opacity-70',
+                )}
                 style={{
-                  insetInlineStart: `${pct(from)}%`,
-                  width: `max(6px, calc(${pct(to) - pct(from)}% - 3px))`,
-                  backgroundColor: colors.stroke,
-                  animationDelay: `${400 + index * 90}ms`,
+                  backgroundColor: colors ? colors.stroke : 'var(--surface)',
+                  opacity: colors && cell.state === 'unrecorded' ? 0.35 : undefined,
+                  animationDelay: `${300 + Math.floor((lead + index) / 7) * 14}ms`,
                 }}
               />
             )
           })}
         </div>
       </div>
-      <div className="relative h-4 text-[11px] text-muted" aria-hidden="true">
-        {ticks.map((tick, index) => (
-          <span
-            key={tick.key}
-            className={cn(
-              'absolute top-0 translate-x-1/2 whitespace-nowrap',
-              index % 2 === 1 && 'hidden sm:inline',
-            )}
-            style={{ insetInlineStart: `${tick.at}%` }}
+      <ul className="flex flex-wrap items-center gap-1.5 text-xs">
+        {legend.map((key) => (
+          <li
+            key={key}
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"
+            style={{ backgroundColor: STATE_COLORS[key].fill }}
           >
-            {tick.label}
-          </span>
+            <span
+              aria-hidden="true"
+              className="h-2.5 w-2.5 rounded-[3px]"
+              style={{
+                backgroundColor: STATE_COLORS[key].stroke,
+                opacity: key === 'unrecorded' ? 0.35 : undefined,
+              }}
+            />
+            {STATE_LABEL[key]}
+            <span className="font-bold tabular-nums">{counts.get(key)}</span>
+            <span className="text-muted">يوم</span>
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   )
 }
@@ -1121,12 +1094,12 @@ function YearRoad({
 
 function FactsCard({ unit, now, index }: { unit: DemoUnit; now: number; index: number }) {
   const items: DescriptionListItem[] = [
-    { key: 'owner', icon: <Tag size={16} />, label: 'المالك', value: unit.owner },
+    { key: 'owner', icon: <Tag size={15} />, label: 'المالك', value: unit.owner },
     ...(unit.supplier
       ? [
           {
             key: 'supplier',
-            icon: <Building2 size={16} />,
+            icon: <Building2 size={15} />,
             label: 'المورد',
             value: unit.supplier,
           },
@@ -1134,20 +1107,20 @@ function FactsCard({ unit, now, index }: { unit: DemoUnit; now: number; index: n
       : []),
     {
       key: 'plate',
-      icon: <Hash size={16} />,
+      icon: <Hash size={15} />,
       label: 'رقم اللوحة',
       value: unit.plate ? <PlateText plate={unit.plate} /> : null,
     },
     {
       key: 'chassis',
-      icon: <Hash size={16} />,
+      icon: <Hash size={15} />,
       label: 'رقم الشاصي',
       value: unit.chassis,
       dir: 'ltr',
     },
     {
       key: 'companyNumber',
-      icon: <Hash size={16} />,
+      icon: <Hash size={15} />,
       label: 'رقم المعدة لدى الشركة',
       value: unit.companyNumber,
       dir: 'ltr',
@@ -1156,7 +1129,7 @@ function FactsCard({ unit, now, index }: { unit: DemoUnit; now: number; index: n
       ? [
           {
             key: 'previous',
-            icon: <History size={16} />,
+            icon: <History size={15} />,
             label: 'ارقام سابقة',
             value: unit.previousCodes.join('، '),
             dir: 'ltr' as const,
@@ -1165,14 +1138,14 @@ function FactsCard({ unit, now, index }: { unit: DemoUnit; now: number; index: n
       : []),
     {
       key: 'created',
-      icon: <Calendar size={16} />,
+      icon: <Calendar size={15} />,
       label: 'تاريخ الاضافة',
       value: formatDate(new Date(now - unit.createdDaysAgo * DAY_MS)),
       dir: 'ltr',
     },
   ]
   return (
-    <section className={cn(SURFACE, 'inq-rise p-4 sm:p-5')} style={rise(index)}>
+    <section className={cn(SURFACE, 'inq-rise p-4 text-sm')} style={rise(index)}>
       <CardTitle icon={<Tag size={14} />}>بيانات المعدة</CardTitle>
       {/* Two columns while the card spans the page, one beside the timeline. */}
       <DescriptionList items={items} columns={2} className="mt-1 xl:grid-cols-1" />
@@ -1184,7 +1157,7 @@ function FactsCard({ unit, now, index }: { unit: DemoUnit; now: number; index: n
 function LocationCard({ index }: { index: number }) {
   const [shown, setShown] = useState(false)
   return (
-    <section className={cn(SURFACE, 'inq-rise space-y-3 p-4 sm:p-5')} style={rise(index)}>
+    <section className={cn(SURFACE, 'inq-rise space-y-3 p-4')} style={rise(index)}>
       <div className="flex items-center justify-between gap-2">
         <div className="space-y-1">
           <CardTitle icon={<Navigation size={14} />}>الموقع الحالي</CardTitle>
@@ -1204,7 +1177,7 @@ function LocationCard({ index }: { index: number }) {
       </div>
       <div
         className={cn(
-          'h-44 items-center justify-center rounded-xl bg-surface text-sm text-muted xl:flex',
+          'h-40 items-center justify-center rounded-xl bg-surface text-sm text-muted xl:flex',
           shown ? 'flex' : 'hidden',
         )}
       >
@@ -1218,212 +1191,196 @@ function LocationCard({ index }: { index: number }) {
   )
 }
 
+/** One fact of a stay, as a small label over its value. */
+function StayFact({
+  icon,
+  label,
+  children,
+}: {
+  icon: ReactNode
+  label: string
+  children: ReactNode
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="flex items-center gap-1 text-[11px] text-muted">
+        <span aria-hidden="true">{icon}</span>
+        {label}
+      </dt>
+      <dd className="m-0 mt-0.5 min-w-0 break-words text-sm font-medium">{children}</dd>
+    </div>
+  )
+}
+
 /** One stay as a tile in its state's colour (owner: «تلون المربعات بحيث
- *  كل لون يرمز لحالة معينة»). */
-function VisitTile({
+ *  كل لون يرمز لحالة معينة»), with everything about it in view (owner:
+ *  «الحركة تحتاج معلومات اكثر»). */
+function StayTile({
   visit,
   now,
-  expanded,
-  onToggle,
+  highlighted,
 }: {
   visit: EquipmentVisit
   now: number
-  expanded: boolean
-  onToggle: () => void
+  highlighted: boolean
 }) {
   const { t, lang } = useI18n()
-  const colors = visitColors(visit)
+  const key = visitStateKey(visit)
+  const colors = STATE_COLORS[key]
   const duration = visitDurationMs(visit, now)
   const entry = visit.entry
   const exit = visit.exit
-  const company = visit.context === 'site' ? (entry ?? exit)?.company_name : null
-  const driver = exit?.driver_name || entry?.driver_name || null
-  const purpose = visitPurposeLabel(visit)
-  const details: { key: string; icon: ReactNode; label: string; value: ReactNode }[] = []
-  if (entry)
-    details.push({
-      key: 'entry',
-      icon: <LogIn size={14} />,
-      label: 'الدخول',
-      value: (
-        <button type="button" className="underline underline-offset-4">
-          {formatDateTime(entry.recorded_at)}
-        </button>
-      ),
-    })
-  if (exit)
-    details.push({
-      key: 'exit',
-      icon: <LogOut size={14} />,
-      label: 'الخروج',
-      value: (
-        <span className="inline-flex flex-wrap items-center gap-1.5">
-          <button type="button" className="underline underline-offset-4">
-            {formatDateTime(exit.recorded_at)}
-          </button>
-          {visit.context === 'site' && <ExitPurposeBadge purpose={exit.exit_purpose} />}
-        </span>
-      ),
-    })
-  if (entry?.supervisor_name)
-    details.push({
-      key: 'foreman',
-      icon: <UserCheck size={14} />,
-      label: visit.context === 'site' ? 'الفورمان' : 'مسجل الدخول',
-      value: entry.supervisor_name,
-    })
-  if (visit.context === 'site' && driver)
-    details.push({ key: 'driver', icon: <User size={14} />, label: 'السائق', value: driver })
+  const site = visit.context === 'site'
+  const company = site ? (entry ?? exit)?.company_name : null
+  const entryDriver = entry?.driver_name ?? null
+  const exitDriver = exit?.driver_name ?? null
 
   return (
-    <div
+    <article
       id={`visit-${visit.key}`}
-      className="min-w-0 flex-1 scroll-mt-24 rounded-2xl transition-shadow"
+      className="min-w-0 flex-1 scroll-mt-24 rounded-2xl p-3.5 transition-shadow sm:p-4"
       style={{
         backgroundColor: colors.fill,
-        color: 'var(--chart-text)',
-        boxShadow: expanded ? `0 0 0 2px ${colors.stroke}` : undefined,
+        boxShadow: highlighted ? `0 0 0 2px ${colors.stroke}` : undefined,
       }}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={expanded}
-        className="flex w-full items-start gap-3 p-3.5 text-start sm:p-4"
-      >
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-1.5">
-            <span className="text-base font-bold">{visitTitle(visit)}</span>
-            {purpose && (
-              <span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={ON_FILL}>
-                {purpose}
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h4 className="text-sm font-bold">{visitTitle(visit)}</h4>
+            {!site && (
+              <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={ON_FILL}>
+                {STATE_LABEL[key]}
               </span>
             )}
             {visit.open && (
               <span
-                className="rounded-full px-2 py-0.5 text-xs font-bold"
-                style={{ backgroundColor: colors.stroke, color: 'var(--bg)' }}
+                className="rounded-full px-2 py-0.5 text-[11px] font-bold"
+                style={{ backgroundColor: colors.tint, color: colors.stroke }}
               >
                 الحين
               </span>
             )}
-          </span>
-          {company && (
-            <span className="mt-0.5 block truncate-safe text-sm opacity-80">{company}</span>
-          )}
-          <span className="mt-1 block text-xs opacity-75">
-            <bdi dir="ltr">{visit.startedAt ? formatDate(visit.startedAt) : '—'}</bdi>
-            {' ← '}
-            {visit.open ? (
-              'الان'
-            ) : (
-              <bdi dir="ltr">{visit.endedAt ? formatDate(visit.endedAt) : '—'}</bdi>
-            )}
-          </span>
-        </span>
-        <span className="shrink-0 text-end">
-          <span className="block text-lg font-bold leading-tight">
-            {duration !== null ? formatElapsedDuration(duration, t, lang) : '—'}
-          </span>
-        </span>
-      </button>
-      {expanded && details.length > 0 && (
-        <div className="flex flex-wrap gap-2 px-3.5 pb-3.5 sm:px-4 sm:pb-4">
-          {details.map((detail) => (
-            <span
-              key={detail.key}
-              className="inline-flex max-w-full items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm"
-              style={ON_FILL}
-            >
-              <span aria-hidden="true" className="opacity-70">
-                {detail.icon}
-              </span>
-              <span className="opacity-70">{detail.label}</span>
-              <span className="min-w-0 font-semibold">{detail.value}</span>
-            </span>
-          ))}
+          </div>
+          {company && <p className="mt-0.5 truncate-safe text-xs text-muted">{company}</p>}
         </div>
-      )}
-    </div>
+        <div className="shrink-0 text-end">
+          <p className="text-sm font-bold">
+            {duration !== null ? formatElapsedDuration(duration, t, lang) : '—'}
+          </p>
+          <p className="text-[11px] text-muted">{visit.open ? 'حتى الان' : 'المدة'}</p>
+        </div>
+      </div>
+
+      <dl
+        className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-xl p-3 sm:grid-cols-4"
+        style={ON_FILL}
+      >
+        <StayFact icon={<LogIn size={11} />} label="الدخول">
+          {entry ? (
+            <button type="button" className="text-start underline-offset-4 hover:underline">
+              {formatDate(entry.recorded_at)}
+            </button>
+          ) : (
+            '—'
+          )}
+        </StayFact>
+        <StayFact icon={<LogOut size={11} />} label="الخروج">
+          {exit ? (
+            <span className="inline-flex flex-wrap items-center gap-1">
+              <button type="button" className="text-start underline-offset-4 hover:underline">
+                {formatDate(exit.recorded_at)}
+              </button>
+              {site && <ExitPurposeBadge purpose={exit.exit_purpose} />}
+            </span>
+          ) : visit.open ? (
+            <span className="text-muted">ما زالت داخل</span>
+          ) : (
+            '—'
+          )}
+        </StayFact>
+        <StayFact
+          icon={<UserCheck size={11} />}
+          label={site ? 'الفورمان' : 'مسجل الدخول'}
+        >
+          {entry?.supervisor_name ?? '—'}
+        </StayFact>
+        {site ? (
+          <StayFact icon={<User size={11} />} label="السائق">
+            {entryDriver ?? '—'}
+            {exitDriver && exitDriver !== entryDriver && (
+              <span className="block text-xs text-muted">عند الخروج: {exitDriver}</span>
+            )}
+          </StayFact>
+        ) : (
+          <StayFact icon={<LogOut size={11} />} label="مسجل الخروج">
+            {exit?.supervisor_name ?? '—'}
+          </StayFact>
+        )}
+      </dl>
+    </article>
   )
 }
 
-/** The time outside as a stretch of road with a truck driving in. */
-function RoadTile({ gap }: { gap: OutsideGap }) {
+/** The days with no recorded stay, a general state (owner: «مو شرط انها
+ *  على الطريق، ممكن تكون في الموقع لكن ماتسجلت»). */
+function UnrecordedTile({ gap }: { gap: OutsideGap }) {
   return (
     <div
-      className="relative flex h-11 min-w-0 flex-1 items-center overflow-hidden rounded-full px-3"
-      style={{ backgroundColor: STATE_COLORS.outside.fill, color: 'var(--chart-text)' }}
+      className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl px-3.5 py-2.5 text-xs"
+      style={{ backgroundColor: STATE_COLORS.unrecorded.fill }}
     >
-      <RoadMarking inset={12} />
-      <span
-        className="inq-drive relative flex h-7 w-7 items-center justify-center rounded-full"
-        style={{ backgroundColor: STATE_COLORS.outside.stroke, color: 'var(--bg)' }}
-        aria-hidden="true"
-      >
-        <Truck size={14} />
+      <span className="font-semibold">بدون تسجيل</span>
+      <span className="text-muted">
+        {gap.open ? 'منذ' : ''} {gap.days} يوم
       </span>
-      <span
-        className="relative ms-auto rounded-full px-3 py-1 text-xs font-semibold"
-        style={{ backgroundColor: 'var(--bg)', color: 'var(--fg)' }}
-      >
-        {gap.open ? 'على الطريق منذ' : 'على الطريق'} {gap.days} يوم
+      <span className="ms-auto text-muted">
+        <bdi dir="ltr">{formatDate(`${gap.startDayKey}T12:00:00Z`)}</bdi>
+        {gap.endDayKey && (
+          <>
+            {' ← '}
+            <bdi dir="ltr">{formatDate(`${gap.endDayKey}T12:00:00Z`)}</bdi>
+          </>
+        )}
       </span>
     </div>
   )
 }
 
-type VisitFilter = 'all' | 'site' | 'workshop'
-
+/** Every stay and every unrecorded stretch, newest first, on one rail. */
 function Timeline({
   visits,
   now,
-  expandedKey,
-  onToggle,
+  highlightedKey,
   index,
 }: {
   visits: EquipmentVisit[]
   now: number
-  expandedKey: string | null
-  onToggle: (key: string) => void
+  highlightedKey: string | null
   index: number
 }) {
-  const [filter, setFilter] = useState<VisitFilter>('all')
-  const items = buildTimelineItems(visits, now).filter((item) =>
-    filter === 'all' ? true : item.kind === 'visit' && item.visit.context === filter,
-  )
-  const count = (context: VisitFilter) =>
-    context === 'all'
-      ? visits.length
-      : visits.filter((visit) => visit.context === context).length
-
+  const items = buildTimelineItems(visits, now)
   return (
-    <section className={cn(SURFACE, 'inq-rise p-4 sm:p-5')} style={rise(index)}>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+    <section className={cn(SURFACE, 'inq-rise p-4')} style={rise(index)}>
+      <div className="mb-4 flex items-center justify-between gap-2">
         <CardTitle icon={<History size={14} />}>الرحلة</CardTitle>
-        <Tabs value={filter} onValueChange={(next) => setFilter(next as VisitFilter)}>
-          <TabsList variant="segmented" aria-label="نوع الزيارات">
-            <TabsTrigger value="all">الكل {count('all')}</TabsTrigger>
-            <TabsTrigger value="site">المشاريع {count('site')}</TabsTrigger>
-            <TabsTrigger value="workshop">الورشة {count('workshop')}</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <span className="text-xs text-muted">{visits.length} زيارة</span>
       </div>
       {visits.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl bg-surface px-4 py-10 text-center">
-          <IconTile colors={STATE_COLORS.outside} size={44}>
-            <Truck size={20} />
+          <IconTile colors={STATE_COLORS.unrecorded} size={40}>
+            <CircleDashed size={18} />
           </IconTile>
-          <p className="font-semibold">الرحلة لم تبدا بعد</p>
-          <p className="text-sm text-muted">اول دخول للمعدة الى مشروع او الورشة يظهر هنا.</p>
+          <p className="text-sm font-semibold">الرحلة لم تبدا بعد</p>
+          <p className="text-xs text-muted">اول دخول للمعدة الى مشروع او الورشة يظهر هنا.</p>
         </div>
       ) : (
         <ol className="relative">
           {/* The rail behind the stops. */}
           <span
             aria-hidden="true"
-            className="absolute bottom-6 top-6 w-0.5 rounded-full bg-surface-hover"
-            style={{ insetInlineStart: 19 }}
+            className="absolute bottom-5 top-5 w-0.5 rounded-full bg-surface-hover"
+            style={{ insetInlineStart: 15 }}
           />
           {items.map((item, position) => (
             <li
@@ -1433,28 +1390,25 @@ function Timeline({
             >
               {item.kind === 'visit' ? (
                 <>
-                  <span className="relative mt-3">
-                    <IconTile colors={visitColors(item.visit)} size={40}>
-                      {visitIcon(item.visit, 18)}
+                  <span className="relative mt-3.5">
+                    <IconTile colors={visitColors(item.visit)} size={32}>
+                      {stateIcon(visitStateKey(item.visit), 15)}
                     </IconTile>
                   </span>
-                  <VisitTile
+                  <StayTile
                     visit={item.visit}
                     now={now}
-                    expanded={expandedKey === item.visit.key}
-                    onToggle={() => onToggle(item.visit.key)}
+                    highlighted={highlightedKey === item.visit.key}
                   />
                 </>
               ) : (
                 <>
-                  <span className="relative flex h-11 w-10 shrink-0 items-center justify-center">
-                    <span
-                      aria-hidden="true"
-                      className="h-3 w-3 rounded-full"
-                      style={{ backgroundColor: STATE_COLORS.outside.stroke }}
-                    />
+                  <span className="relative flex h-9 w-8 shrink-0 items-center justify-center">
+                    <IconTile colors={STATE_COLORS.unrecorded} size={20}>
+                      <CircleDashed size={11} />
+                    </IconTile>
                   </span>
-                  <RoadTile gap={item.gap} />
+                  <UnrecordedTile gap={item.gap} />
                 </>
               )}
             </li>
@@ -1485,7 +1439,7 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
   const [unitId, setUnitId] = useState<string | null>(null)
   const [run, setRun] = useState(0)
   const [recent, setRecent] = useState<string[]>(['u-f118', 'u-b044', 'u-a291'])
-  const [expandedKey, setExpandedKey] = useState<string | null>(null)
+  const [highlightedKey, setHighlightedKey] = useState<string | null>(null)
 
   const unit = units.find((item) => item.id === unitId) ?? null
   const visits = useMemo(
@@ -1501,7 +1455,7 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
 
   const pick = (picked: DemoUnit) => {
     setUnitId(picked.id)
-    setExpandedKey(null)
+    setHighlightedKey(null)
     setRecent((current) =>
       [picked.id, ...current.filter((id) => id !== picked.id)].slice(0, 5),
     )
@@ -1510,7 +1464,7 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
   }
 
   const selectVisit = (key: string) => {
-    setExpandedKey(key)
+    setHighlightedKey(key)
     window.requestAnimationFrame(() =>
       document
         .getElementById(`visit-${key}`)
@@ -1531,7 +1485,7 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
         <div>
           <h3 className="text-sm font-semibold">صفحة الاستعلام — التصميم الجديد</h3>
           <p className="text-xs text-muted">
-            بيانات عينة: A291 في مشروع، F118 في الورشة، B044 على الطريق، U214
+            بيانات عينة: A291 في مشروع، F118 في الورشة، B044 بدون تسجيل، U214
             جديدة. الموقع الحالي للمسؤول فقط.
           </p>
         </div>
@@ -1557,7 +1511,7 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
         </div>
       </div>
 
-      <div className="relative min-h-[620px] rounded-2xl bg-surface px-3 py-6 sm:px-6">
+      <div className="relative min-h-[600px] rounded-2xl bg-surface px-3 py-6 sm:px-6">
         {/* The space above the field shrinks away when the answer comes. */}
         <div
           aria-hidden="true"
@@ -1571,14 +1525,14 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
           style={{ gridTemplateRows: hero ? '1fr' : '0fr', opacity: hero ? 1 : 0 }}
         >
           <div className="overflow-hidden">
-            <div className="space-y-2 pb-7 text-center">
+            <div className="space-y-2 pb-6 text-center">
               <h2
-                className="text-3xl font-bold sm:text-4xl"
+                className="text-2xl font-bold sm:text-3xl"
                 style={{ fontFamily: 'var(--font-heading)' }}
               >
                 وين المعدة؟
               </h2>
-              <p className="text-muted">
+              <p className="text-sm text-muted">
                 اكتب الكود او اللوحة، ونوريك وين هي الحين ووين قضت سنتها.
               </p>
             </div>
@@ -1587,7 +1541,7 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
 
         <div
           className="mx-auto transition-[max-width] duration-500"
-          style={{ maxWidth: hero ? 672 : 560 }}
+          style={{ maxWidth: hero ? 640 : 520 }}
         >
           <InquirySearch
             key={`${unitId ?? 'none'}-${hero}`}
@@ -1607,15 +1561,14 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
                   key={item.id}
                   type="button"
                   onClick={() => pick(item)}
-                  className="inline-flex items-center gap-2 rounded-full bg-bg px-3.5 py-2 text-sm shadow-sm transition-transform hover:-translate-y-0.5"
+                  className="inline-flex items-center gap-2 rounded-full bg-bg px-3 py-1.5 text-sm shadow-sm transition-transform hover:-translate-y-0.5"
                 >
                   <span
                     aria-hidden="true"
-                    className="h-2.5 w-2.5 rounded-full"
+                    className="h-2 w-2 rounded-full"
                     style={{
-                      backgroundColor: presenceColors(
-                        buildEquipmentVisits(item.movements),
-                      ).stroke,
+                      backgroundColor: presenceColors(buildEquipmentVisits(item.movements))
+                        .stroke,
                     }}
                   />
                   <bdi dir="ltr" className="font-semibold">
@@ -1651,7 +1604,7 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
                 {visits.length > 0 && (
                   <>
                     <YearNumbers visits={visits} createdAt={createdAt} now={now} />
-                    <YearRoad
+                    <YearCalendar
                       visits={visits}
                       createdAt={createdAt}
                       now={now}
@@ -1660,23 +1613,22 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
                   </>
                 )}
                 {/* Below xl: facts, location, timeline. From xl the
-                    timeline spans two columns beside them. */}
+                    timeline spans two columns beside them; the facts sit
+                    above the location (owner: «جدول بيانات المعدة فوق
+                    الموقع الحالي»). */}
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
                   <div className="space-y-4 xl:col-start-3 xl:row-start-1">
+                    <FactsCard unit={unit} now={now} index={6} />
                     {viewer === 'admin' && unit.movements.length > 0 && (
-                      <LocationCard index={6} />
+                      <LocationCard index={7} />
                     )}
-                    <FactsCard unit={unit} now={now} index={7} />
                   </div>
                   <div className="xl:col-span-2 xl:col-start-1 xl:row-start-1">
                     <Timeline
                       visits={visits}
                       now={now}
                       index={8}
-                      expandedKey={expandedKey}
-                      onToggle={(key) =>
-                        setExpandedKey((current) => (current === key ? null : key))
-                      }
+                      highlightedKey={highlightedKey}
                     />
                   </div>
                 </div>
@@ -1686,7 +1638,7 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
         )}
       </div>
       <p className="text-xs text-muted">
-        اضغط على اي جزء من شريط السنة ليفتح زيارته في الرحلة.
+        اضغط على اي يوم ملون في التقويم ليبرز زيارته في الرحلة.
       </p>
     </section>
   )
