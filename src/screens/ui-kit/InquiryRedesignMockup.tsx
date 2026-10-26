@@ -378,32 +378,32 @@ function presenceColors(visits: EquipmentVisit[]): {
   return open ? visitColors(open) : OUTSIDE_COLORS
 }
 
-/** A soft wash of a colour into the page background (owner 2026-10-26:
- *  «اضف الوان وحيوية اكثر … مو مشكلة لو تضيف gradient خفيف»). */
-function wash(fill: string, angle = 135, stop = 60): string {
-  return `linear-gradient(${angle}deg, ${fill} 0%, var(--bg) ${stop}%)`
-}
+/**
+ * Two flat looks to compare (owner 2026-10-26: the gradients «مو طبيعي
+ * سوء القريديانت» were dropped). Colour means one thing only, where the
+ * unit is: projects green, maintenance amber, standby blue, out of service
+ * light red, outside grey.
+ *   * calm: white cards; only «الحين» is filled with the place's colour.
+ *   * bold: the header card is filled with it, and so are the day tiles.
+ */
+type Look = 'calm' | 'bold'
 
-/** A light top-to-bottom sheen on a fill, for the activity strip. */
-function sheen(fill: string): string {
-  return `linear-gradient(180deg, color-mix(in srgb, ${fill} 55%, var(--bg)) 0%, ${fill} 100%)`
-}
-
-/** A small heading with its coloured icon tile. */
+/** A small heading with a neutral icon circle. */
 function CardTitle({
-  colors,
   icon,
   children,
 }: {
-  colors: { stroke: string }
   icon: ReactNode
   children: ReactNode
 }) {
   return (
     <h3 className="flex items-center gap-2 text-sm font-semibold">
-      <IconTile colors={colors} size={26}>
+      <span
+        aria-hidden="true"
+        className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-hover text-muted"
+      >
         {icon}
-      </IconTile>
+      </span>
       {children}
     </h3>
   )
@@ -529,15 +529,9 @@ function StartView({
     .map((id) => units.find((unit) => unit.id === id))
     .filter((unit): unit is DemoUnit => Boolean(unit))
   return (
-    <div
-      className="card mx-auto max-w-2xl space-y-5 px-4 py-8 text-center sm:px-8 sm:py-10"
-      style={{
-        backgroundImage:
-          'linear-gradient(160deg, var(--chart-3) 0%, var(--bg) 50%, var(--chart-1) 100%)',
-      }}
-    >
+    <div className="card mx-auto max-w-2xl space-y-5 px-4 py-8 text-center sm:px-8 sm:py-10">
       <span className="mx-auto flex w-fit">
-        <IconTile colors={{ stroke: 'var(--chart-stroke-3)' }} size={52}>
+        <IconTile colors={{ stroke: 'var(--primary)' }} size={52}>
           <Search size={24} />
         </IconTile>
       </span>
@@ -589,10 +583,12 @@ function NowPanel({
   unit,
   visits,
   now,
+  look,
 }: {
   unit: DemoUnit
   visits: EquipmentVisit[]
   now: number
+  look: Look
 }) {
   const { t, lang } = useI18n()
   const where = presence(visits)
@@ -666,14 +662,16 @@ function NowPanel({
   }
 
   const sinceMs = since ? Date.parse(since) : null
+  // calm: this is THE coloured block of the page, filled flat. bold: the
+  // header around it is already filled, so it stands out in white.
+  const filled = look === 'calm'
   return (
     <div
-      className="rounded-xl border bg-bg p-3 shadow-sm sm:p-4"
+      className={cn('rounded-xl border p-3 sm:p-4', !filled && 'bg-bg')}
       style={
         {
           borderColor: tone.stroke,
-          borderInlineStartWidth: 4,
-          backgroundImage: `linear-gradient(to left, ${tone.fill} 0%, var(--bg) 85%)`,
+          backgroundColor: filled ? tone.fill : undefined,
         } as CSSProperties
       }
     >
@@ -682,11 +680,21 @@ function NowPanel({
           {icon}
         </IconTile>
         <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="text-xs font-semibold" style={{ color: tone.stroke }}>
+          <p
+            className="text-xs font-semibold"
+            style={{ color: filled ? 'var(--chart-text)' : tone.stroke }}
+          >
             الحين
           </p>
           <p className="text-lg leading-snug">{title}</p>
-          {place && <p className="text-sm text-muted">{place}</p>}
+          {place && (
+            <p
+              className="text-sm"
+              style={{ color: filled ? 'var(--chart-text)' : 'var(--muted)' }}
+            >
+              {place}
+            </p>
+          )}
           {sinceMs !== null && (
             <p className="text-sm">
               منذ{' '}
@@ -789,12 +797,7 @@ function ActivityStrip({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <CardTitle
-          colors={{ stroke: 'var(--chart-stroke-6)' }}
-          icon={<Calendar size={14} />}
-        >
-          نشاط اخر 12 شهر
-        </CardTitle>
+        <CardTitle icon={<Calendar size={14} />}>نشاط اخر 12 شهر</CardTitle>
         <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
           {legend.map((item) => (
             <li key={item.label} className="flex items-center gap-1.5">
@@ -809,17 +812,13 @@ function ActivityStrip({
         </ul>
       </div>
       <div
-        className="relative h-10 overflow-hidden rounded-xl border shadow-inner"
-        style={{ backgroundImage: sheen('var(--chart-4)') }}
+        className="relative h-10 overflow-hidden rounded-lg border"
+        style={{ backgroundColor: 'var(--chart-4)' }}
       >
         {blankUntil > 0 && (
           <div
-            className="absolute inset-y-0 start-0 bg-bg"
-            style={{
-              width: `${blankUntil}%`,
-              backgroundImage:
-                'repeating-linear-gradient(135deg, var(--border) 0 1px, transparent 1px 6px)',
-            }}
+            className="absolute inset-y-0 start-0 border-e border-dashed bg-surface"
+            style={{ width: `${blankUntil}%` }}
             title="قبل اضافة المعدة"
           />
         )}
@@ -838,9 +837,8 @@ function ActivityStrip({
               style={{
                 insetInlineStart: `${pct(from)}%`,
                 width: `${pct(to) - pct(from)}%`,
-                backgroundImage: sheen(colors.fill),
+                backgroundColor: colors.fill,
                 borderColor: colors.stroke,
-                boxShadow: `inset 0 -3px 0 ${colors.stroke}`,
               }}
             />
           )
@@ -872,9 +870,9 @@ function ActivityStrip({
   )
 }
 
-/** A coloured number tile for this review (a candidate look, not the shared
- *  `StatCard`): a soft wash of its colour, the number in the strong colour,
- *  and, for the day counts, a thin bar of its share of the year. */
+/** A number tile for this review (a candidate look, not the shared
+ *  `StatCard`): the number in its place's colour and, for the day counts, a
+ *  thin bar of its share of the year. calm: white; bold: filled flat. */
 function StatTile({
   colors,
   icon,
@@ -882,6 +880,7 @@ function StatTile({
   value,
   hint,
   share,
+  look,
 }: {
   colors: { fill: string; stroke: string }
   icon: ReactNode
@@ -889,28 +888,39 @@ function StatTile({
   value: number
   hint?: string
   share?: number
+  look: Look
 }) {
+  const filled = look === 'bold'
   return (
     <div
-      className="rounded-xl border bg-bg p-3 shadow-sm"
-      style={{ backgroundImage: wash(colors.fill, 160, 80) }}
+      className={cn('rounded-xl border p-3', !filled && 'bg-bg')}
+      style={
+        filled
+          ? { backgroundColor: colors.fill, borderColor: colors.stroke }
+          : undefined
+      }
     >
       <div className="flex items-center gap-2">
         <IconTile colors={colors} size={28}>
           {icon}
         </IconTile>
-        <span className="truncate-safe text-xs text-muted">{label}</span>
+        <span
+          className="truncate-safe text-xs"
+          style={{ color: filled ? 'var(--chart-text)' : 'var(--muted)' }}
+        >
+          {label}
+        </span>
       </div>
       <p
         className="mt-2 text-3xl font-bold leading-none tabular-nums"
-        style={{ color: colors.stroke }}
+        style={{ color: filled ? 'var(--chart-text)' : colors.stroke }}
       >
         {value}
       </p>
       {share !== undefined ? (
         <div
           className="mt-2.5 h-1.5 overflow-hidden rounded-full"
-          style={{ backgroundColor: 'var(--surface-hover)' }}
+          style={{ backgroundColor: filled ? 'var(--bg)' : 'var(--surface-hover)' }}
           aria-hidden="true"
         >
           <div
@@ -922,7 +932,14 @@ function StatTile({
           />
         </div>
       ) : null}
-      {hint && <p className="mt-1.5 text-xs text-muted">{hint}</p>}
+      {hint && (
+        <p
+          className="mt-1.5 text-xs"
+          style={{ color: filled ? 'var(--chart-text)' : 'var(--muted)' }}
+        >
+          {hint}
+        </p>
+      )}
     </div>
   )
 }
@@ -933,22 +950,29 @@ function HeaderCard({
   now,
   onSelectVisit,
   onChange,
+  look,
 }: {
   unit: DemoUnit
   visits: EquipmentVisit[]
   now: number
   onSelectVisit: (key: string) => void
   onChange: () => void
+  look: Look
 }) {
   const createdAt = now - unit.createdDaysAgo * DAY_MS
   const year = summarizeYear(visits, createdAt, now)
   const hasHistory = visits.length > 0
   const counted = year.siteDays + year.workshopDays + year.outsideDays
   const share = (days: number) => (counted > 0 ? days / counted : 0)
+  const place = presenceColors(visits)
   return (
     <div
       className="card space-y-4 p-4"
-      style={{ backgroundImage: wash(presenceColors(visits).fill, 160, 45) }}
+      style={
+        look === 'bold'
+          ? { backgroundColor: place.fill, borderColor: place.stroke }
+          : undefined
+      }
     >
       <DetailHeader
         as="h2"
@@ -987,12 +1011,13 @@ function HeaderCard({
         }
       />
 
-      <NowPanel unit={unit} visits={visits} now={now} />
+      <NowPanel unit={unit} visits={visits} now={now} look={look} />
 
       {hasHistory && (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <StatTile
+              look={look}
               colors={{ fill: 'var(--chart-1)', stroke: 'var(--chart-stroke-1)' }}
               icon={<MapPin size={15} />}
               label="ايام في المشاريع"
@@ -1001,6 +1026,7 @@ function HeaderCard({
               share={share(year.siteDays)}
             />
             <StatTile
+              look={look}
               colors={{ fill: 'var(--chart-2)', stroke: 'var(--chart-stroke-2)' }}
               icon={<Wrench size={15} />}
               label="ايام في الورشة"
@@ -1008,26 +1034,35 @@ function HeaderCard({
               share={share(year.workshopDays)}
             />
             <StatTile
+              look={look}
               colors={OUTSIDE_COLORS}
               icon={<Truck size={15} />}
               label="ايام خارج"
               value={year.outsideDays}
               share={share(year.outsideDays)}
             />
+            {/* A count, not a place: monochrome. */}
             <StatTile
-              colors={{ fill: 'var(--chart-5)', stroke: 'var(--chart-stroke-5)' }}
+              look="calm"
+              colors={{ fill: 'var(--bg)', stroke: 'var(--primary)' }}
               icon={<History size={15} />}
               label="الزيارات"
               value={year.visitCount}
               hint="خلال 12 شهر"
             />
           </div>
-          <ActivityStrip
-            visits={visits}
-            createdAt={createdAt}
-            now={now}
-            onSelectVisit={onSelectVisit}
-          />
+          {/* On the filled header the strip gets its own white box, or its
+              green would vanish into the card's. */}
+          <div
+            className={cn(look === 'bold' && 'rounded-xl border bg-bg p-3')}
+          >
+            <ActivityStrip
+              visits={visits}
+              createdAt={createdAt}
+              now={now}
+              onSelectVisit={onSelectVisit}
+            />
+          </div>
         </>
       )}
     </div>
@@ -1089,16 +1124,8 @@ function FactsCard({ unit, now }: { unit: DemoUnit; now: number }) {
     },
   ]
   return (
-    <div
-      className="card p-4"
-      style={{ backgroundImage: wash('var(--chart-5)', 180, 30) }}
-    >
-      <CardTitle
-        colors={{ stroke: 'var(--chart-stroke-5)' }}
-        icon={<Tag size={14} />}
-      >
-        بيانات المعدة
-      </CardTitle>
+    <div className="card p-4">
+      <CardTitle icon={<Tag size={14} />}>بيانات المعدة</CardTitle>
       {/* Two columns while the card spans the page, one beside the visits. */}
       <DescriptionList items={items} columns={2} className="mt-1 xl:grid-cols-1" />
     </div>
@@ -1110,18 +1137,10 @@ function FactsCard({ unit, now }: { unit: DemoUnit; now: number }) {
 function LocationCard() {
   const [shown, setShown] = useState(false)
   return (
-    <div
-      className="card space-y-3 p-4"
-      style={{ backgroundImage: wash('var(--chart-3)', 180, 30) }}
-    >
+    <div className="card space-y-3 p-4">
       <div className="flex items-center justify-between gap-2">
         <div className="space-y-1">
-          <CardTitle
-            colors={{ stroke: 'var(--chart-stroke-3)' }}
-            icon={<Navigation size={14} />}
-          >
-            الموقع الحالي
-          </CardTitle>
+          <CardTitle icon={<Navigation size={14} />}>الموقع الحالي</CardTitle>
           <p className="text-xs text-muted">
             اخر اشارة منذ 20 ث · السرعة 0 كم/س · المحرك يعمل
           </p>
@@ -1139,13 +1158,9 @@ function LocationCard() {
       </div>
       <div
         className={cn(
-          'h-44 items-center justify-center rounded-lg border text-muted xl:flex',
+          'h-44 items-center justify-center rounded-lg border bg-surface text-muted xl:flex',
           shown ? 'flex' : 'hidden',
         )}
-        style={{
-          backgroundImage:
-            'linear-gradient(135deg, var(--chart-6) 0%, var(--chart-3) 100%)',
-        }}
       >
         <span className="flex items-center gap-2 text-sm">
           <MapPin size={16} aria-hidden="true" />
@@ -1232,9 +1247,7 @@ function VisitRow({
       className="scroll-mt-24 overflow-hidden rounded-lg border-s-4"
       style={{
         borderInlineStartColor: colors.stroke,
-        backgroundImage: expanded
-          ? `linear-gradient(to left, ${colors.fill} 0%, var(--bg) 70%)`
-          : undefined,
+        backgroundColor: expanded ? 'var(--surface-hover)' : undefined,
       }}
     >
       <button
@@ -1353,12 +1366,7 @@ function VisitList({
   return (
     <div className="card p-4">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <CardTitle
-          colors={{ stroke: 'var(--chart-stroke-1)' }}
-          icon={<History size={14} />}
-        >
-          سجل الزيارات
-        </CardTitle>
+        <CardTitle icon={<History size={14} />}>سجل الزيارات</CardTitle>
         <Tabs value={filter} onValueChange={(next) => setFilter(next as VisitFilter)}>
           <TabsList variant="segmented" aria-label="نوع الزيارات">
             <TabsTrigger value="all">الكل {count('all')}</TabsTrigger>
@@ -1446,6 +1454,7 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
   const units = useMemo(() => sampleUnits(now), [now])
   const [state, setState] = useState<DemoState>('data')
   const [viewer, setViewer] = useState<Viewer>('admin')
+  const [look, setLook] = useState<Look>('calm')
   const [unitId, setUnitId] = useState(units[0].id)
   const [recent, setRecent] = useState<string[]>(['u-f118', 'u-b044'])
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
@@ -1483,6 +1492,12 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Tabs value={look} onValueChange={(next) => setLook(next as Look)}>
+            <TabsList variant="segmented" aria-label="الشكل">
+              <TabsTrigger value="calm">ا · هادئة</TabsTrigger>
+              <TabsTrigger value="bold">ب · جريئة</TabsTrigger>
+            </TabsList>
+          </Tabs>
           <Select
             size="sm"
             aria-label="المعدة المعروضة"
@@ -1548,6 +1563,7 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
                     now={now}
                     onSelectVisit={selectVisit}
                     onChange={() => setState('start')}
+                    look={look}
                   />
                   {/* Below xl: facts, location, visits. From xl the visits
                       span two columns beside the facts and the location. */}
