@@ -935,6 +935,15 @@ function saudiDay(ms: number): number {
 
 type DayCell = { day: number; state: StateKey | 'before'; visit: EquipmentVisit | null }
 
+/** A day square's colour: a stay's strong colour, the light grey of
+ *  «بدون تسجيل» (owner: «خلي الرمادي في اخر 12 شهر افتح»), or the frame
+ *  colour before the unit was added. */
+function dayColor(state: DayCell['state']): string {
+  if (state === 'before') return 'var(--surface)'
+  if (state === 'unrecorded') return STATE_COLORS.unrecorded.fill
+  return STATE_COLORS[state].stroke
+}
+
 /** Every Saudi day of the last 12 months with the state it was in: the
  *  latest stay covering it, else «بدون تسجيل», or nothing before the unit
  *  was added. */
@@ -1039,7 +1048,6 @@ function YearCalendar({
             <span key={`lead-${index}`} />
           ))}
           {cells.map((cell, index) => {
-            const colors = cell.state === 'before' ? null : STATE_COLORS[cell.state]
             const date = formatDate(new Date(cell.day * DAY_MS))
             const visit = cell.visit
             return (
@@ -1056,8 +1064,7 @@ function YearCalendar({
                   visit && 'cursor-pointer hover:opacity-70',
                 )}
                 style={{
-                  backgroundColor: colors ? colors.stroke : 'var(--surface)',
-                  opacity: colors && cell.state === 'unrecorded' ? 0.35 : undefined,
+                  backgroundColor: dayColor(cell.state),
                   animationDelay: `${300 + Math.floor((lead + index) / 7) * 14}ms`,
                 }}
               />
@@ -1076,8 +1083,7 @@ function YearCalendar({
               aria-hidden="true"
               className="h-2.5 w-2.5 rounded-[3px]"
               style={{
-                backgroundColor: STATE_COLORS[key].stroke,
-                opacity: key === 'unrecorded' ? 0.35 : undefined,
+                backgroundColor: dayColor(key),
               }}
             />
             {STATE_LABEL[key]}
