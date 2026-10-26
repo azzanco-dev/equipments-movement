@@ -10,7 +10,8 @@
 //   * connection: Afaqy's live state is not in the data, so it is
 //     approximated from the last message («ابنيها بالتقريب من وقت اخر
 //     رسالة»): connected when one arrived within the last 30 minutes;
-//   * satellite: `vLoc` of the last message — whether it carried a GPS fix.
+//   * satellite: the last known satellite count (`chPrams.sat`), as Afaqy
+//     shows it; «بدون اقمار» when it is 0 or unknown.
 
 import type { AfaqyUnitLink } from '@/lib/afaqy'
 
@@ -57,7 +58,8 @@ export interface AfaqyStats {
    *  connected, and none (never sent a message, or Afaqy no longer knows the
    *  unit). */
   connection: { online: number; offline: number; none: number }
-  /** Of the linked that sent a message: the last one had no GPS fix. */
+  /** Of the linked that sent a message: no satellites (the last known
+   *  count is 0 or unknown), as Afaqy shows «no satellite». */
   noFix: number
   lists: Record<ListKey, AfaqyStatsUnit[]>
   /** The full count of each list (a list shows at most
@@ -108,7 +110,7 @@ export function buildAfaqyStats(
       connection.offline += 1
       offline.push(entry)
     }
-    if (link?.gpsValid === false) noFix.push(entry)
+    if (!link?.satellites) noFix.push(entry)
   }
 
   return {

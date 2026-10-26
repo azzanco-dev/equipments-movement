@@ -49,11 +49,11 @@ const minutesAgo = (minutes) =>
 const hex = (n) => n.toString(16).padStart(24, '0')
 
 /** A link state as the server maps it (`mapAfaqyLink`). */
-function link(n, { minutes, gps = true } = {}) {
+function link(n, { minutes, satellites = 9 } = {}) {
   return {
     unitId: hex(n),
     lastMessageAt: minutes === undefined ? null : minutesAgo(minutes),
-    gpsValid: minutes === undefined ? null : gps,
+    satellites: minutes === undefined ? null : satellites,
   }
 }
 
@@ -80,10 +80,10 @@ test('connected, not connected, no satellites, no signal', () => {
   const links = [
     link(1, { minutes: 5 }), // connected
     link(2, { minutes: 30 }), // connected: exactly the limit
-    link(3, { minutes: 31, gps: false }), // not connected, no satellites
+    link(3, { minutes: 31, satellites: 0 }), // not connected, no satellites
     link(4), // never sent a message
     // 5 is linked but Afaqy no longer knows it
-    link(7, { minutes: 2, gps: false }), // connected, no satellites
+    link(7, { minutes: 2, satellites: null }), // connected, count unknown
   ]
   const stats = plain(buildAfaqyStats(fleet, links, NOW))
   assert.equal(stats.fleet, 7)
@@ -110,35 +110,34 @@ test('lists are sorted by code and capped', () => {
   assert.equal(stats.lists.offline[1].code, 'A102')
 })
 
-test('the link DTO: last message with or without a position, vLoc', () => {
+test('the link DTO: last message with or without a position, satellites', () => {
   const { mapAfaqyLink } = createLoader()('afaqy')
   const id = hex(9)
   const dts = NOW - 38 * 60 * 1000
-  // A command reply: no position, no GPS fix, still a message.
+  const at = new Date(dts).toISOString()
+  // A025: the last message had no fix (vLoc 0) yet 12 satellites are known.
   assert.deepEqual(
     plain(
       mapAfaqyLink({
         _id: id,
-        last_update: { dts, dtt: dts, vLoc: 0, vCon: 1 },
+        last_update: { dts, vLoc: 0, chPrams: { sat: { v: 12, cdt: dts } } },
       }),
     ),
-    { unitId: id, lastMessageAt: new Date(dts).toISOString(), gpsValid: false },
+    { unitId: id, lastMessageAt: at, satellites: 12 },
   )
+  // Falls back to prms.sat; the device time when there is no server time.
   assert.deepEqual(
-    plain(mapAfaqyLink({ _id: id, last_update: { dtt: dts, vLoc: 1 } })),
-    { unitId: id, lastMessageAt: new Date(dts).toISOString(), gpsValid: true },
+    plain(
+      mapAfaqyLink({ _id: id, last_update: { dtt: dts, prms: { sat: 0 } } }),
+    ),
+    { unitId: id, lastMessageAt: at, satellites: 0 },
   )
   assert.deepEqual(plain(mapAfaqyLink({ _id: id })), {
     unitId: id,
     lastMessageAt: null,
-    gpsValid: null,
+    satellites: null,
   })
   assert.equal(mapAfaqyLink({ _id: 'bad' }), null)
-  // The position route's DTO does not carry it.
-  assert.doesNotMatch(
-    read('src', 'lib', 'afaqy.ts'),
-    /gpsValid\??: .*\n\s+position:/,
-  )
 })
 
 test('the route: permission first, the fleet only, cached Afaqy units', () => {

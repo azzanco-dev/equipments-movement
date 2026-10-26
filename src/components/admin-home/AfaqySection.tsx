@@ -40,7 +40,7 @@ interface CardDef {
 
 /** Coverage, then Afaqy's two states (owner 2026-10-26: «في افاقي فيه
  *  connection state و satellite»): connected or not (approximated from the
- *  last message), and the last message without a GPS fix. */
+ *  last message), and no satellites (the last known count is 0). */
 const SIGNAL_CARDS: CardDef[] = [
   {
     label: 'afaqyHomeLinked',
