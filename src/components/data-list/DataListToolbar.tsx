@@ -168,9 +168,13 @@ export function DataListToolbar({
               <ChevronDown size={14} />
             </button>
             {open === 'sort' && (
+              // On a phone the sort button sits near the start edge, so the
+              // box hangs from its start side and opens inward; from `sm`
+              // it keeps hanging from the end side (owner 2026-10-26: it
+              // ran off the screen on the phone).
               <div
                 data-list-popover="true"
-                className="absolute end-0 top-[calc(100%+8px)] z-40 min-w-[230px] rounded-xl border py-2 shadow-xl"
+                className="absolute start-0 top-[calc(100%+8px)] z-40 min-w-[230px] rounded-xl border py-2 shadow-xl sm:start-auto sm:end-0"
                 style={{
                   background: 'var(--bg)',
                   borderColor: 'var(--border)',
