@@ -104,6 +104,26 @@ function SearchField({
   const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  /** Closes the list and puts the keyboard away. */
+  const close = useCallback(() => {
+    setOpen(false)
+    inputRef.current?.blur()
+  }, [])
+
+  // The list is not tied to the keyboard (owner 2026-10-26: on the iPhone
+  // the keyboard's «تم» hid it): it closes on a press outside the field and
+  // its list, on a choice, or on Escape — not when the search loses focus.
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (!wrapRef.current?.contains(event.target as Node)) close()
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () =>
+      document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [open, close])
   const [box, setBox] = useState<ListBox | null>(null)
 
   /** Where the list hangs and how tall it may be, from the room left between
@@ -194,7 +214,7 @@ function SearchField({
   return (
     // The list hangs from this box (owner 2026-10-26: measured in page
     // coordinates it landed far below the field on his phone).
-    <div className="relative">
+    <div ref={wrapRef} className="relative">
       <div
         ref={fieldRef}
         // A press anywhere on the box focuses the search (its own keyboard).
@@ -222,9 +242,14 @@ function SearchField({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
+          // The keyboard's «تم» / «Done» blurs with nothing after it: the list
+          // stays. Focus moving to another control (Tab) closes it.
+          onBlur={(event) => {
+            const next = event.relatedTarget as Node | null
+            if (next && !wrapRef.current?.contains(next)) setOpen(false)
+          }}
           onKeyDown={(event) => {
-            if (event.key === 'Escape') inputRef.current?.blur()
+            if (event.key === 'Escape') close()
           }}
           placeholder={placeholder}
           className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted md:text-sm [&::-webkit-search-cancel-button]:hidden"
@@ -269,7 +294,7 @@ function SearchField({
                   aria-selected={false}
                   onClick={() => {
                     setQuery(option.label)
-                    inputRef.current?.blur()
+                    close()
                   }}
                   className="block w-full px-3.5 py-2.5 text-start text-sm hover:bg-surface-hover"
                 >
