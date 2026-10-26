@@ -369,12 +369,16 @@ const MOTION_CSS = `
 @keyframes inq-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 @keyframes inq-pop { from { opacity: 0; transform: scale(.4); } to { opacity: 1; transform: none; } }
 @keyframes inq-dot { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+@keyframes inq-grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes inq-ring { from { stroke-dasharray: 0 400; } }
 .inq-rise { animation: inq-rise 560ms cubic-bezier(.2,.8,.2,1) both; }
 .inq-grow { animation: inq-grow 900ms cubic-bezier(.2,.8,.2,1) both; transform-origin: right; }
+.inq-grow-y { animation: inq-grow-y 800ms cubic-bezier(.2,.8,.2,1) both; transform-origin: bottom; }
+.inq-ring { animation: inq-ring 1000ms cubic-bezier(.2,.8,.2,1) both; }
 .inq-pop { animation: inq-pop 420ms cubic-bezier(.2,.8,.2,1) both; }
 .inq-dot { animation: inq-dot 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .inq-rise, .inq-grow, .inq-pop, .inq-dot { animation: none; }
+  .inq-rise, .inq-grow, .inq-grow-y, .inq-ring, .inq-pop, .inq-dot { animation: none; }
 }
 `
 
@@ -978,12 +982,502 @@ function yearDays(visits: EquipmentVisit[], createdAt: number, now: number): Day
   return cells
 }
 
+/** The order states stack in, bottom (or start) first. */
+const STATE_ORDER: StateKey[] = [
+  'site',
+  'maintenance',
+  'parking',
+  'out_of_service',
+  'unrecorded',
+]
+
+interface MonthGroup {
+  key: string
+  label: string
+  year: number
+  /** 0-based. */
+  month: number
+  daysInMonth: number
+  /** Index in `cells` of the month's first day inside the window. */
+  start: number
+  cells: DayCell[]
+  counts: Record<StateKey, number>
+}
+
+/** The window's days grouped by calendar month (13 months: the window
+ *  starts and ends inside one). */
+function monthGroups(cells: DayCell[], lang: string): MonthGroup[] {
+  const format = new Intl.DateTimeFormat(
+    lang === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-GB',
+    { month: 'short' },
+  )
+  const groups: MonthGroup[] = []
+  cells.forEach((cell, index) => {
+    const date = new Date(cell.day * DAY_MS)
+    const key = `${date.getUTCFullYear()}-${date.getUTCMonth()}`
+    let group = groups[groups.length - 1]
+    if (!group || group.key !== key) {
+      group = {
+        key,
+        label: format.format(date),
+        year: date.getUTCFullYear(),
+        month: date.getUTCMonth(),
+        daysInMonth: new Date(
+          Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0),
+        ).getUTCDate(),
+        start: index,
+        cells: [],
+        counts: {
+          site: 0,
+          maintenance: 0,
+          parking: 0,
+          out_of_service: 0,
+          unrecorded: 0,
+        },
+      }
+      groups.push(group)
+    }
+    group.cells.push(cell)
+    if (cell.state !== 'before') group.counts[cell.state] += 1
+  })
+  return groups
+}
+
+function cellTitle(cell: DayCell): string {
+  const date = formatDate(new Date(cell.day * DAY_MS))
+  if (cell.state === 'before') return `${date} · قبل اضافة المعدة`
+  return `${date} · ${cell.visit ? `${visitTitle(cell.visit)} · ` : ''}${STATE_LABEL[cell.state]}`
+}
+
+/** The current view: a square per day, a column per week. */
+function DaySquares({
+  cells,
+  months,
+  onSelectVisit,
+}: {
+  cells: DayCell[]
+  months: MonthGroup[]
+  onSelectVisit: (key: string) => void
+}) {
+  // Sunday-first weeks: blank cells before the first day of the window.
+  const lead = new Date(cells[0].day * DAY_MS).getUTCDay()
+  const columns = Math.ceil((lead + cells.length) / 7)
+  const labels = months
+    .map((month) => ({ ...month, column: Math.floor((lead + month.start) / 7) }))
+    // A month starting in the window's first weeks would collide with it.
+    .filter((month, index, all) => index === 0 || month.column - all[index - 1].column >= 3)
+  const grid: CSSProperties = {
+    display: 'grid',
+    gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+    columnGap: 'clamp(1px, 0.35vw, 3px)',
+  }
+  return (
+    <div className="mx-auto max-w-[900px] space-y-1.5">
+      <div style={grid} className="h-4 text-[11px] text-muted" aria-hidden="true">
+        {labels.map((month) => (
+          <span
+            key={month.key}
+            className="whitespace-nowrap"
+            style={{ gridColumn: `${month.column + 1} / span 3` }}
+          >
+            {month.label}
+          </span>
+        ))}
+      </div>
+      <div
+        style={{
+          ...grid,
+          gridTemplateRows: 'repeat(7, auto)',
+          gridAutoFlow: 'column',
+          rowGap: 'clamp(1px, 0.35vw, 3px)',
+        }}
+      >
+        {Array.from({ length: lead }, (_, index) => (
+          <span key={`lead-${index}`} />
+        ))}
+        {cells.map((cell, index) => (
+          <span
+            key={cell.day}
+            title={cellTitle(cell)}
+            onClick={cell.visit ? () => onSelectVisit(cell.visit!.key) : undefined}
+            className={cn(
+              'inq-pop aspect-square rounded-[2px] sm:rounded-[3px]',
+              cell.visit && 'cursor-pointer hover:opacity-70',
+            )}
+            style={{
+              backgroundColor: dayColor(cell.state),
+              animationDelay: `${300 + Math.floor((lead + index) / 7) * 14}ms`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** 1. A column per month, split by the days of each state; a part month
+ *  (the window's first and last) is a shorter column. */
+function MonthBars({ months }: { months: MonthGroup[] }) {
+  return (
+    <div className="mx-auto flex h-52 max-w-[900px] items-end gap-1 sm:gap-2.5">
+      {months.map((month, index) => {
+        const recorded = STATE_ORDER.reduce((sum, key) => sum + month.counts[key], 0)
+        return (
+          <div
+            key={month.key}
+            className="flex h-full min-w-0 flex-1 flex-col items-center gap-1.5"
+          >
+            <span className="h-4 text-[11px] font-bold tabular-nums">
+              {month.counts.site || ''}
+            </span>
+            <div className="flex w-full max-w-10 flex-1 flex-col justify-end overflow-hidden rounded-lg bg-surface">
+              <div
+                className="inq-grow-y flex w-full flex-col-reverse gap-[2px]"
+                style={{
+                  height: `${(recorded / month.daysInMonth) * 100}%`,
+                  animationDelay: `${250 + index * 60}ms`,
+                }}
+              >
+                {STATE_ORDER.filter((key) => month.counts[key]).map((key) => (
+                  <div
+                    key={key}
+                    title={`${month.label} · ${STATE_LABEL[key]} ${month.counts[key]} يوم`}
+                    className="w-full first:rounded-b-lg last:rounded-t-[4px]"
+                    style={{
+                      height: `${(month.counts[key] / recorded) * 100}%`,
+                      backgroundColor: dayColor(key),
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            <span
+              className={cn(
+                'whitespace-nowrap text-[11px] text-muted',
+                index % 2 === 1 && 'invisible sm:visible',
+              )}
+            >
+              {month.label}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+type Run = { state: DayCell['state']; visit: EquipmentVisit | null; start: number; end: number }
+
+/** Consecutive days of the same state and stay. */
+function runsOf(cells: DayCell[]): Run[] {
+  const runs: Run[] = []
+  cells.forEach((cell, index) => {
+    const last = runs[runs.length - 1]
+    if (last && last.state === cell.state && last.visit === cell.visit) last.end = index
+    else runs.push({ state: cell.state, visit: cell.visit, start: index, end: index })
+  })
+  return runs
+}
+
+/** 2. One strip of the year, every stay a block as long as it lasted, named
+ *  when there is room. */
+function YearStrip({
+  cells,
+  months,
+  onSelectVisit,
+}: {
+  cells: DayCell[]
+  months: MonthGroup[]
+  onSelectVisit: (key: string) => void
+}) {
+  const pct = (index: number) => (index / cells.length) * 100
+  return (
+    <div className="space-y-1.5">
+      <div className="relative h-14 overflow-hidden rounded-xl bg-surface">
+        {runsOf(cells).map((run, index) => {
+          if (run.state === 'before') return null
+          const days = run.end - run.start + 1
+          const strong = run.state !== 'unrecorded'
+          const name = run.visit ? visitTitle(run.visit) : STATE_LABEL[run.state]
+          return (
+            <div
+              key={`${run.start}`}
+              title={`${name} · ${days} يوم`}
+              onClick={run.visit ? () => onSelectVisit(run.visit!.key) : undefined}
+              className={cn(
+                'inq-grow absolute inset-y-0 flex flex-col justify-center overflow-hidden px-2',
+                run.visit && 'cursor-pointer hover:brightness-95',
+              )}
+              style={{
+                insetInlineStart: `${pct(run.start)}%`,
+                width: `${pct(days)}%`,
+                backgroundColor: dayColor(run.state),
+                color: strong ? 'var(--bg)' : 'var(--muted)',
+                boxShadow: 'inset -2px 0 0 var(--bg)',
+                animationDelay: `${300 + index * 80}ms`,
+              }}
+            >
+              {days >= 28 && (
+                <>
+                  <span className="truncate-safe text-xs font-semibold">{name}</span>
+                  <span className="text-[11px] opacity-80">{days} يوم</span>
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div className="relative h-4 text-[11px] text-muted" aria-hidden="true">
+        {months
+          // A part month of a few days at the window's start would sit on
+          // the next month's name.
+          .filter((month, index, all) => {
+            const next = all[index + 1]
+            return !next || next.start - month.start >= 10
+          })
+          .map((month, index) => (
+            <span
+              key={month.key}
+              className={cn(
+                'absolute top-0 whitespace-nowrap',
+                index % 2 === 1 && 'hidden sm:inline',
+              )}
+              style={{ insetInlineStart: `${pct(month.start)}%` }}
+            >
+              {month.label}
+            </span>
+          ))}
+      </div>
+    </div>
+  )
+}
+
+/** A ring split into parts; `total` is the full circle. */
+function Ring({
+  parts,
+  total,
+  size,
+  thickness,
+  delay,
+  children,
+}: {
+  parts: { key: string; value: number; color: string; title: string }[]
+  total: number
+  size: number
+  thickness: number
+  delay: number
+  children?: ReactNode
+}) {
+  const radius = 50 - thickness / 2
+  const circumference = 2 * Math.PI * radius
+  let offset = 0
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg viewBox="0 0 100 100" width={size} height={size} className="-rotate-90">
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          fill="none"
+          stroke="var(--surface)"
+          strokeWidth={thickness}
+        />
+        {parts.map((part) => {
+          const length = total > 0 ? (part.value / total) * circumference : 0
+          const circle = (
+            <circle
+              key={part.key}
+              cx="50"
+              cy="50"
+              r={radius}
+              fill="none"
+              stroke={part.color}
+              strokeWidth={thickness}
+              strokeDasharray={`${length} ${circumference - length}`}
+              strokeDashoffset={-offset}
+              className="inq-ring"
+              style={{ animationDelay: `${delay}ms` }}
+            >
+              <title>{part.title}</title>
+            </circle>
+          )
+          offset += length
+          return circle
+        })}
+      </svg>
+      {children && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** 3. A small ring per month, the project days in its middle. */
+function MonthRings({ months }: { months: MonthGroup[] }) {
+  return (
+    <div className="grid grid-cols-4 gap-x-2 gap-y-4 sm:grid-cols-7 xl:grid-cols-[repeat(13,minmax(0,1fr))]">
+      {months.map((month, index) => (
+        <div key={month.key} className="flex flex-col items-center gap-1.5">
+          <Ring
+            size={58}
+            thickness={13}
+            total={month.daysInMonth}
+            delay={250 + index * 60}
+            parts={STATE_ORDER.filter((key) => month.counts[key]).map((key) => ({
+              key,
+              value: month.counts[key],
+              color: dayColor(key),
+              title: `${month.label} · ${STATE_LABEL[key]} ${month.counts[key]} يوم`,
+            }))}
+          >
+            <span className="text-xs font-bold tabular-nums">{month.counts.site}</span>
+          </Ring>
+          <span className="whitespace-nowrap text-[11px] text-muted">{month.label}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** 4. One ring for the whole year, with the share of each state. */
+function YearRing({ cells }: { cells: DayCell[] }) {
+  const counts = STATE_ORDER.map((key) => ({
+    key,
+    value: cells.filter((cell) => cell.state === key).length,
+  })).filter((part) => part.value > 0)
+  const total = counts.reduce((sum, part) => sum + part.value, 0)
+  const percent = (value: number) => (total > 0 ? Math.round((value / total) * 100) : 0)
+  const site = counts.find((part) => part.key === 'site')?.value ?? 0
+  return (
+    <div className="mx-auto flex max-w-xl flex-col items-center gap-6 sm:flex-row">
+      <Ring
+        size={176}
+        thickness={14}
+        total={total}
+        delay={250}
+        parts={counts.map((part) => ({
+          key: part.key,
+          value: part.value,
+          color: dayColor(part.key),
+          title: `${STATE_LABEL[part.key]} ${part.value} يوم`,
+        }))}
+      >
+        <span className="text-3xl font-bold tabular-nums">{percent(site)}%</span>
+        <span className="text-xs text-muted">في المشاريع</span>
+      </Ring>
+      <ul className="w-full flex-1 space-y-2.5">
+        {counts.map((part) => (
+          <li key={part.key} className="space-y-1">
+            <div className="flex items-center gap-2 text-sm">
+              <span
+                aria-hidden="true"
+                className="h-2.5 w-2.5 rounded-[3px]"
+                style={{ backgroundColor: dayColor(part.key) }}
+              />
+              <span>{STATE_LABEL[part.key]}</span>
+              <span className="ms-auto font-bold tabular-nums">{part.value} يوم</span>
+              <span className="w-10 text-end text-xs text-muted tabular-nums">
+                {percent(part.value)}%
+              </span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-surface">
+              <div
+                className="inq-grow h-full rounded-full"
+                style={{
+                  width: `${percent(part.value)}%`,
+                  backgroundColor: dayColor(part.key),
+                  animationDelay: '300ms',
+                }}
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+const WEEKDAY_INITIALS = ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س']
+
+/** 5. A small month calendar per month, Sunday first, as on a wall. */
+function MonthCalendars({
+  cells,
+  months,
+  onSelectVisit,
+}: {
+  cells: DayCell[]
+  months: MonthGroup[]
+  onSelectVisit: (key: string) => void
+}) {
+  const byDay = new Map(cells.map((cell) => [cell.day, cell]))
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      {months.map((month, index) => {
+        const firstDay = Date.UTC(month.year, month.month, 1) / DAY_MS
+        const lead = new Date(firstDay * DAY_MS).getUTCDay()
+        return (
+          <div
+            key={month.key}
+            className="inq-rise rounded-xl bg-surface p-2.5"
+            style={{ animationDelay: `${250 + index * 50}ms` }}
+          >
+            <p className="mb-1.5 flex items-baseline justify-between text-xs">
+              <span className="font-semibold">{month.label}</span>
+              <span className="text-[11px] text-muted tabular-nums">{month.year}</span>
+            </p>
+            <div className="grid grid-cols-7 gap-[3px] text-center text-[9px] text-muted">
+              {WEEKDAY_INITIALS.map((initial) => (
+                <span key={initial}>{initial}</span>
+              ))}
+              {Array.from({ length: lead }, (_, blank) => (
+                <span key={`b${blank}`} />
+              ))}
+              {Array.from({ length: month.daysInMonth }, (_, offset) => {
+                const cell = byDay.get(firstDay + offset)
+                return (
+                  <span
+                    key={offset}
+                    title={cell ? cellTitle(cell) : undefined}
+                    onClick={cell?.visit ? () => onSelectVisit(cell.visit!.key) : undefined}
+                    className={cn(
+                      'aspect-square rounded-[3px]',
+                      cell?.visit && 'cursor-pointer hover:opacity-70',
+                    )}
+                    style={{
+                      backgroundColor: cell ? dayColor(cell.state) : 'transparent',
+                      outline: cell ? undefined : '1px dashed var(--border)',
+                      outlineOffset: -1,
+                    }}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+type YearViewKind = 'squares' | 'bars' | 'strip' | 'rings' | 'ring' | 'calendar'
+
+const YEAR_VIEWS: { value: YearViewKind; label: string }[] = [
+  { value: 'squares', label: 'المربعات' },
+  { value: 'bars', label: '1 · اعمدة' },
+  { value: 'strip', label: '2 · شريط' },
+  { value: 'rings', label: '3 · حلقات' },
+  { value: 'ring', label: '4 · حلقة السنة' },
+  { value: 'calendar', label: '5 · تقويم' },
+]
+
 /**
- * The last 12 months as a calendar of days (owner 2026-10-26: «اخر 12 شهر
- * فكرته حلوة لكن تنفيذه مو افضل شي»): one small square per day, a column
- * per week (Sunday on top), the oldest week at the start edge, coloured by
- * the state of that day; the legend counts the days of each state. A day of
- * a stay opens that stay in the timeline below.
+ * The last 12 months (owner 2026-10-26: «اخر 12 شهر فكرته حلوة لكن تنفيذه
+ * مو افضل شي», then «ايش بدائل المربعات … كلها سويها بشوف»): the same days
+ * in six views to compare — the day squares, a column per month, one strip
+ * of stays, a ring per month, one ring for the year, and wall calendars. A
+ * day or a stay opens its visit in the timeline below.
  */
 function YearCalendar({
   visits,
@@ -997,111 +1491,68 @@ function YearCalendar({
   onSelectVisit: (key: string) => void
 }) {
   const { lang } = useI18n()
+  const [view, setView] = useState<YearViewKind>('squares')
   const cells = yearDays(visits, createdAt, now)
-  // Sunday-first weeks: blank cells before the first day of the window.
-  const lead = new Date(cells[0].day * DAY_MS).getUTCDay()
-  const columns = Math.ceil((lead + cells.length) / 7)
-  const monthFormat = new Intl.DateTimeFormat(
-    lang === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-GB',
-    { month: 'short' },
-  )
-  const months = cells
-    .map((cell, index) => ({ cell, index }))
-    .filter(({ cell, index }) => index === 0 || new Date(cell.day * DAY_MS).getUTCDate() === 1)
-    .map(({ cell, index }) => ({
-      key: cell.day,
-      column: Math.floor((lead + index) / 7),
-      label: monthFormat.format(new Date(cell.day * DAY_MS)),
-    }))
-    // A month starting in the window's first week would collide with it.
-    .filter((month, index, all) => index === 0 || month.column - all[index - 1].column >= 3)
+  const months = monthGroups(cells, lang)
 
   const counts = new Map<StateKey, number>()
   for (const cell of cells)
     if (cell.state !== 'before') counts.set(cell.state, (counts.get(cell.state) ?? 0) + 1)
-  const legend = (Object.keys(STATE_COLORS) as StateKey[]).filter((key) => counts.get(key))
-
-  const grid: CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-    columnGap: 'clamp(1px, 0.35vw, 3px)',
-  }
+  const legend = STATE_ORDER.filter((key) => counts.get(key))
 
   return (
-    <section className={cn(SURFACE, 'inq-rise space-y-3 p-4')} style={rise(5)}>
-      <CardTitle icon={<Calendar size={14} />}>اخر 12 شهر، يوم بيوم</CardTitle>
-      <div className="mx-auto max-w-[900px] space-y-1.5">
-        <div style={grid} className="h-4 text-[11px] text-muted" aria-hidden="true">
-          {months.map((month) => (
-            <span
-              key={month.key}
-              className="whitespace-nowrap"
-              style={{ gridColumn: `${month.column + 1} / span 3` }}
-            >
-              {month.label}
-            </span>
-          ))}
-        </div>
-        <div
-          style={{
-            ...grid,
-            gridTemplateRows: 'repeat(7, auto)',
-            gridAutoFlow: 'column',
-            rowGap: 'clamp(1px, 0.35vw, 3px)',
-          }}
-          role="img"
-          aria-label={legend
-            .map((key) => `${STATE_LABEL[key]} ${counts.get(key)} يوم`)
-            .join('، ')}
-        >
-          {Array.from({ length: lead }, (_, index) => (
-            <span key={`lead-${index}`} />
-          ))}
-          {cells.map((cell, index) => {
-            const date = formatDate(new Date(cell.day * DAY_MS))
-            const visit = cell.visit
-            return (
-              <span
-                key={cell.day}
-                title={
-                  cell.state === 'before'
-                    ? `${date} · قبل اضافة المعدة`
-                    : `${date} · ${visit ? `${visitTitle(visit)} · ` : ''}${STATE_LABEL[cell.state]}`
-                }
-                onClick={visit ? () => onSelectVisit(visit.key) : undefined}
-                className={cn(
-                  'inq-pop aspect-square rounded-[2px] sm:rounded-[3px]',
-                  visit && 'cursor-pointer hover:opacity-70',
-                )}
-                style={{
-                  backgroundColor: dayColor(cell.state),
-                  animationDelay: `${300 + Math.floor((lead + index) / 7) * 14}ms`,
-                }}
-              />
-            )
-          })}
+    <section className={cn(SURFACE, 'inq-rise space-y-4 p-4')} style={rise(5)}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <CardTitle icon={<Calendar size={14} />}>اخر 12 شهر</CardTitle>
+        <div className="-mx-1 max-w-full overflow-x-auto px-1">
+          <Tabs value={view} onValueChange={(next) => setView(next as YearViewKind)}>
+            <TabsList variant="segmented" aria-label="شكل السنة">
+              {YEAR_VIEWS.map((option) => (
+                <TabsTrigger key={option.value} value={option.value}>
+                  {option.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
       </div>
-      <ul className="flex flex-wrap items-center gap-1.5 text-xs">
-        {legend.map((key) => (
-          <li
-            key={key}
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"
-            style={{ backgroundColor: STATE_COLORS[key].fill }}
-          >
-            <span
-              aria-hidden="true"
-              className="h-2.5 w-2.5 rounded-[3px]"
-              style={{
-                backgroundColor: dayColor(key),
-              }}
-            />
-            {STATE_LABEL[key]}
-            <span className="font-bold tabular-nums">{counts.get(key)}</span>
-            <span className="text-muted">يوم</span>
-          </li>
-        ))}
-      </ul>
+      <p className="sr-only">
+        {legend.map((key) => `${STATE_LABEL[key]} ${counts.get(key)} يوم`).join('، ')}
+      </p>
+      <div key={view} aria-hidden="true">
+        {view === 'squares' && (
+          <DaySquares cells={cells} months={months} onSelectVisit={onSelectVisit} />
+        )}
+        {view === 'bars' && <MonthBars months={months} />}
+        {view === 'strip' && (
+          <YearStrip cells={cells} months={months} onSelectVisit={onSelectVisit} />
+        )}
+        {view === 'rings' && <MonthRings months={months} />}
+        {view === 'ring' && <YearRing cells={cells} />}
+        {view === 'calendar' && (
+          <MonthCalendars cells={cells} months={months} onSelectVisit={onSelectVisit} />
+        )}
+      </div>
+      {view !== 'ring' && (
+        <ul className="flex flex-wrap items-center gap-1.5 text-xs">
+          {legend.map((key) => (
+            <li
+              key={key}
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"
+              style={{ backgroundColor: STATE_COLORS[key].fill }}
+            >
+              <span
+                aria-hidden="true"
+                className="h-2.5 w-2.5 rounded-[3px]"
+                style={{ backgroundColor: dayColor(key) }}
+              />
+              {STATE_LABEL[key]}
+              <span className="font-bold tabular-nums">{counts.get(key)}</span>
+              <span className="text-muted">يوم</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }
