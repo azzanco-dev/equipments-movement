@@ -181,3 +181,35 @@ test('the card: gated on the location permission, on the admin home', () => {
     /<AfaqySection onSelectEquipment=\{onSelectEquipment\} \/>/,
   )
 })
+
+test('the last signal in full words', () => {
+  const { elapsedInWords } = createLoader()('elapsedWords')
+  const at = (seconds) => new Date(NOW - seconds * 1000).toISOString()
+  const day = 86_400
+  assert.equal(elapsedInWords(at(60), 'ar', NOW), 'دقيقة')
+  assert.equal(elapsedInWords(at(2 * 3600), 'ar', NOW), 'ساعتين')
+  assert.equal(elapsedInWords(at(5 * day), 'ar', NOW), '5 ايام')
+  assert.equal(elapsedInWords(at(7 * 30 * day), 'ar', NOW), '7 شهور')
+  assert.equal(elapsedInWords(at(2 * 365 * day), 'ar', NOW), 'سنتين')
+  assert.equal(elapsedInWords(at(12 * 365 * day), 'ar', NOW), '12 سنة')
+  assert.equal(elapsedInWords(at(3 * 30 * day), 'en', NOW), '3 months')
+  assert.equal(elapsedInWords(at(365 * day), 'en', NOW), '1 year')
+  assert.equal(elapsedInWords('not a date', 'ar', NOW), null)
+})
+
+test('only the silent and no-signal tables are shown', () => {
+  const card = read('src', 'components', 'admin-home', 'AfaqySection.tsx')
+  assert.match(
+    card,
+    /\{ key: 'silent', title: 'afaqyHomeSilentList', withSignal: true \}/,
+  )
+  assert.match(
+    card,
+    /\{ key: 'noSignal', title: 'afaqyHomeNoSignalList', withSignal: false \}/,
+  )
+  assert.doesNotMatch(
+    card,
+    /workshopRunning|availableMoving|afaqyHomeIdlingList/,
+  )
+  assert.match(card, /elapsedInWords\(row\.lastSignal, lang\)/)
+})

@@ -17,7 +17,6 @@ import {
   StatCard,
   type DataTableColumn,
 } from '@/components/ui'
-import { RelativeTime } from '@/components/RelativeTime'
 import type { StatCardAccent } from '@/components/ui/StatCard'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
@@ -27,6 +26,7 @@ import { canViewEquipmentLocation } from '@/lib/actionPermissions'
 import { loadAfaqyStats, type AfaqyStatsAnswer } from '@/lib/afaqy'
 import type { AfaqyStats, AfaqyStatsUnit } from '@/lib/afaqyStats'
 import { formatDateTime } from '@/lib/dateFormat'
+import { elapsedInWords } from '@/lib/elapsedWords'
 import { supabase } from '@/lib/supabase'
 import { AdminHomeSection } from './AdminHomeSection'
 import { useAdminHomeSection } from './useAdminHomeSection'
@@ -103,19 +103,17 @@ const NOW_CARDS: CardDef[] = [
 ]
 
 /** The mini tables (owner 2026-10-26: «ابغى الجداول المصغرة»), like the
- *  fleet's: code and type, plus the speed or the last signal where it says
- *  something. */
+ *  fleet's: code and type, plus the last signal in full words. The owner
+ *  dropped «في الورشة والمحرك يعمل», «خارجة وتتحرك» and «شغالة وواقفة» the
+ *  same day; these two stay. */
 const LISTS: {
   key: keyof AfaqyStats['lists']
   title: TranslationKey
-  extra: 'speed' | 'signal' | null
+  withSignal: boolean
 }[] = [
-  { key: 'workshopRunning', title: 'afaqyHomeWorkshopRunning', extra: 'speed' },
-  { key: 'availableMoving', title: 'afaqyHomeAvailableMoving', extra: 'speed' },
-  { key: 'idling', title: 'afaqyHomeIdlingList', extra: 'signal' },
-  { key: 'silent', title: 'afaqyHomeSilentList', extra: 'signal' },
+  { key: 'silent', title: 'afaqyHomeSilentList', withSignal: true },
   // Owner 2026-10-26: «اظهر المعدات بدون اشارة».
-  { key: 'noSignal', title: 'afaqyHomeNoSignalList', extra: null },
+  { key: 'noSignal', title: 'afaqyHomeNoSignalList', withSignal: false },
 ]
 
 /** Rows a mini table shows until «عرض الكل», as on the fleet's. */
@@ -143,7 +141,7 @@ export function AfaqySection(props: AfaqySectionProps) {
 }
 
 function AfaqySectionContent({ onSelectEquipment }: AfaqySectionProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const load = useCallback(async (signal: AbortSignal) => {
     const answer: AfaqyStatsAnswer | null = await loadAfaqyStats(
       supabase,
@@ -172,31 +170,23 @@ function AfaqySectionContent({ onSelectEquipment }: AfaqySectionProps) {
     header: t('equipmentType'),
     cell: (row) => row.type ?? '—',
   }
-  const extraColumn = (
-    extra: 'speed' | 'signal',
-  ): DataTableColumn<AfaqyStatsUnit> =>
-    extra === 'speed'
-      ? {
-          key: 'speed',
-          header: t('afaqySpeed'),
-          cell: (row) =>
-            row.speedKmh === null ? (
-              '—'
-            ) : (
-              <bdi dir="ltr">
-                {t('afaqySpeedValue').replace(
-                  '{speed}',
-                  String(Math.round(row.speedKmh)),
-                )}
-              </bdi>
-            ),
-        }
-      : {
-          key: 'signal',
-          header: t('afaqyLastSignal'),
-          cell: (row) =>
-            row.lastSignal ? <RelativeTime value={row.lastSignal} /> : '—',
-        }
+  // Owner 2026-10-26: the last signal in full words («7 شهور», «سنتين»),
+  // the exact time on hover.
+  const signalColumn: DataTableColumn<AfaqyStatsUnit> = {
+    key: 'signal',
+    header: t('afaqyLastSignal'),
+    cell: (row) =>
+      row.lastSignal ? (
+        <time
+          dateTime={row.lastSignal}
+          title={formatDateTime(row.lastSignal, false)}
+        >
+          {elapsedInWords(row.lastSignal, lang) ?? '—'}
+        </time>
+      ) : (
+        '—'
+      ),
+  }
 
   // Owner 2026-10-26: «اضف حاجة تدل على انه البيانات يتم جلبها». The
   // first load says so in the body; a later one (a retry) beside the title,
@@ -255,7 +245,7 @@ function AfaqySectionContent({ onSelectEquipment }: AfaqySectionProps) {
             </div>
           </div>
           <MiniTableGrid>
-            {LISTS.map(({ key, title, extra }) => {
+            {LISTS.map(({ key, title, withSignal }) => {
               const rows = stats.lists[key]
               const open = expanded.has(key)
               return (
@@ -267,8 +257,8 @@ function AfaqySectionContent({ onSelectEquipment }: AfaqySectionProps) {
                     String(stats.listTotals[key]),
                   )}
                   columns={
-                    extra
-                      ? [codeColumn, typeColumn, extraColumn(extra)]
+                    withSignal
+                      ? [codeColumn, typeColumn, signalColumn]
                       : [codeColumn, typeColumn]
                   }
                   rows={rows}
