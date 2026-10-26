@@ -191,6 +191,7 @@ export const QuickEquipmentForm = forwardRef<
             {(control) => (
               <AsyncSearchSelect
                 {...control}
+                phoneInline
                 value={value.type}
                 selectedOption={
                   value.type ? { value: value.type, label: value.type } : null
@@ -211,6 +212,7 @@ export const QuickEquipmentForm = forwardRef<
             {(control) => (
               <AsyncSearchSelect
                 {...control}
+                phoneInline
                 value={value.lessorId}
                 selectedOption={selectedLessor}
                 onChange={(lessorId, option) => {
