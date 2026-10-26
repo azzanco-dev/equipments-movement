@@ -202,15 +202,10 @@ export function mapAfaqyUnit(raw: unknown): AfaqyUnit | null {
  *   * `lastMessageAt`: the last message Afaqy received from the device
  *     (`last_update.dts`, else `dtt`), with or without a position — Afaqy's
  *     «connection state» is approximated from it.
- *   * `satellites`: the last known satellite count, Afaqy's «satellite»
- *     state (owner's checks 2026-10-26: A025 green with 12 although its last
- *     message had `vLoc` 0, A291 «5», A082 «no satellite» at 0) —
- *     `last_update.chPrams.sat.v`, else `prms.sat`; null when unknown.
  */
 export interface AfaqyUnitLink {
   unitId: string
   lastMessageAt: string | null
-  satellites: number | null
 }
 
 export function mapAfaqyLink(raw: unknown): AfaqyUnitLink | null {
@@ -220,18 +215,11 @@ export function mapAfaqyLink(raw: unknown): AfaqyUnitLink | null {
   if (typeof unitId !== 'string' || !AFAQY_UNIT_ID_PATTERN.test(unitId))
     return null
   const update = asRecord(unit.last_update)
-  const changed = asRecord(asRecord(update?.chPrams)?.sat)
-  const satellites =
-    finiteNumber(changed?.v) ?? finiteNumber(asRecord(update?.prms)?.sat)
   return {
     unitId,
     lastMessageAt: update
       ? (epochToIso(update.dts) ?? epochToIso(update.dtt))
       : null,
-    satellites:
-      satellites !== null && satellites >= 0 && Number.isInteger(satellites)
-        ? satellites
-        : null,
   }
 }
 

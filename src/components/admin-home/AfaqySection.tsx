@@ -1,12 +1,5 @@
 import { useCallback, useState, type ReactNode } from 'react'
-import {
-  Loader2,
-  Radio,
-  SatelliteDish,
-  SignalZero,
-  Wifi,
-  WifiOff,
-} from 'lucide-react'
+import { Loader2, Radio, SignalZero, Wifi, WifiOff } from 'lucide-react'
 import {
   MiniTable,
   MiniTableGrid,
@@ -38,9 +31,9 @@ interface CardDef {
   icon: ReactNode
 }
 
-/** Coverage, then Afaqy's two states (owner 2026-10-26: «في افاقي فيه
- *  connection state و satellite»): connected or not (approximated from the
- *  last message), and no satellites (the last known count is 0). */
+/** Coverage, then Afaqy's connection state (owner 2026-10-26: «في افاقي
+ *  فيه connection state»): connected or not (approximated from the
+ *  last message). */
 const SIGNAL_CARDS: CardDef[] = [
   {
     label: 'afaqyHomeLinked',
@@ -61,13 +54,6 @@ const SIGNAL_CARDS: CardDef[] = [
     value: (stats) => stats.connection.offline,
     accent: 'danger',
     icon: <WifiOff size={ICON_SIZE} />,
-  },
-  {
-    label: 'afaqyHomeNoFix',
-    hint: 'afaqyHomeNoFixHint',
-    value: (stats) => stats.noFix,
-    accent: 'warning',
-    icon: <SatelliteDish size={ICON_SIZE} />,
   },
   {
     label: 'afaqyHomeNoSignal',
@@ -91,12 +77,6 @@ const LISTS: {
     key: 'offline',
     title: 'afaqyHomeOfflineList',
     description: 'afaqyHomeOfflineListDesc',
-    withSignal: true,
-  },
-  {
-    key: 'noFix',
-    title: 'afaqyHomeNoFixList',
-    description: 'afaqyHomeNoFixListDesc',
     withSignal: true,
   },
   // Owner 2026-10-26: «اظهر المعدات بدون اشارة».
@@ -208,7 +188,7 @@ function AfaqySectionContent({ onSelectEquipment }: AfaqySectionProps) {
         <Notice tone="neutral">{t('afaqyStatusNotConfigured')}</Notice>
       ) : stats ? (
         <div className="space-y-4" aria-busy={loading || undefined}>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {SIGNAL_CARDS.map((card) => (
               <StatCard
                 key={card.label}

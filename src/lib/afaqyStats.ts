@@ -4,15 +4,13 @@
 // fleet with the Afaqy link states and hands the result here; the section
 // only draws it.
 //
-// Aligned with Afaqy's own two states (owner, same day: «في افاقي فيه
-// connection state و satellite»), as far as the units list allows (read-only
-// probe of the account, 2026-10-26):
-//   * connection: Afaqy's live state is not in the data, so it is
-//     approximated from the last message («ابنيها بالتقريب من وقت اخر
-//     رسالة»): connected when one arrived within the last 24 hours
-//     (owner, same day: «خليها 24 ساعة»; it was 30 minutes);
-//   * satellite: the last known satellite count (`chPrams.sat`), as Afaqy
-//     shows it; «بدون اقمار» when it is 0 or unknown.
+// Afaqy's connection state, as far as the units list allows (read-only
+// probe of the account, 2026-10-26): the live state is not in the data, so
+// it is approximated from the last message («ابنيها بالتقريب من وقت اخر
+// رسالة»): connected when one arrived within the last 24 hours (owner, same
+// day: «خليها 24 ساعة»; it was 30 minutes). The satellite state was shown
+// for a while and dropped («بدون اقمار ماتهمني، يهمني اخر اشارة لها»): a
+// unit whose last message is old is «غير متصلة» whatever its satellites.
 
 import type { AfaqyUnitLink } from '@/lib/afaqy'
 
@@ -48,7 +46,7 @@ export interface AfaqyStatsUnit {
   lastSignal: string | null
 }
 
-type ListKey = 'offline' | 'noFix' | 'noSignal'
+type ListKey = 'offline' | 'noSignal'
 
 export interface AfaqyStats {
   /** The fleet the figures cover. */
@@ -59,9 +57,6 @@ export interface AfaqyStats {
    *  connected, and none (never sent a message, or Afaqy no longer knows the
    *  unit). */
   connection: { online: number; offline: number; none: number }
-  /** Of the linked that sent a message: no satellites (the last known
-   *  count is 0 or unknown), as Afaqy shows «no satellite». */
-  noFix: number
   lists: Record<ListKey, AfaqyStatsUnit[]>
   /** The full count of each list (a list shows at most
    *  AFAQY_STATS_LIST_MAX units). */
@@ -85,7 +80,6 @@ export function buildAfaqyStats(
   const linksById = new Map(links.map((link) => [link.unitId, link]))
   const connection = { online: 0, offline: 0, none: 0 }
   const offline: AfaqyStatsUnit[] = []
-  const noFix: AfaqyStatsUnit[] = []
   const noSignal: AfaqyStatsUnit[] = []
   let linked = 0
 
@@ -111,22 +105,18 @@ export function buildAfaqyStats(
       connection.offline += 1
       offline.push(entry)
     }
-    if (!link?.satellites) noFix.push(entry)
   }
 
   return {
     fleet: fleet.length,
     linked,
     connection,
-    noFix: noFix.length,
     listTotals: {
       offline: offline.length,
-      noFix: noFix.length,
       noSignal: noSignal.length,
     },
     lists: {
       offline: finish(offline),
-      noFix: finish(noFix),
       noSignal: finish(noSignal),
     },
     generatedAt: new Date(nowMs).toISOString(),

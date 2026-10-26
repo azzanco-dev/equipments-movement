@@ -49,11 +49,10 @@ const minutesAgo = (minutes) =>
 const hex = (n) => n.toString(16).padStart(24, '0')
 
 /** A link state as the server maps it (`mapAfaqyLink`). */
-function link(n, { minutes, satellites = 9 } = {}) {
+function link(n, { minutes } = {}) {
   return {
     unitId: hex(n),
     lastMessageAt: minutes === undefined ? null : minutesAgo(minutes),
-    satellites: minutes === undefined ? null : satellites,
   }
 }
 
@@ -67,7 +66,7 @@ const eq = (n, state, linked = true) => ({
 /** The rows of a list, reduced to their ids. */
 const ids = (rows) => rows.map((row) => row.id)
 
-test('connected, not connected, no satellites, no signal', () => {
+test('connected, not connected, no signal', () => {
   const fleet = [
     eq(1, 'working'),
     eq(2, 'working'),
@@ -80,16 +79,15 @@ test('connected, not connected, no satellites, no signal', () => {
   const links = [
     link(1, { minutes: 5 }), // connected
     link(2, { minutes: 24 * 60 }), // connected: exactly the limit
-    link(3, { minutes: 24 * 60 + 1, satellites: 0 }), // not connected
+    link(3, { minutes: 24 * 60 + 1 }), // not connected
     link(4), // never sent a message
     // 5 is linked but Afaqy no longer knows it
-    link(7, { minutes: 2, satellites: null }), // connected, count unknown
+    link(7, { minutes: 2 }), // connected
   ]
   const stats = plain(buildAfaqyStats(fleet, links, NOW))
   assert.equal(stats.fleet, 7)
   assert.equal(stats.linked, 6)
   assert.deepEqual(stats.connection, { online: 3, offline: 1, none: 2 })
-  assert.equal(stats.noFix, 2)
   assert.deepEqual(stats.lists.offline, [
     {
       id: 'e3',
@@ -98,10 +96,11 @@ test('connected, not connected, no satellites, no signal', () => {
       lastSignal: minutesAgo(24 * 60 + 1),
     },
   ])
-  assert.deepEqual(ids(stats.lists.noFix), ['e3', 'e7'])
   assert.deepEqual(ids(stats.lists.noSignal), ['e4', 'e5'])
   assert.equal(stats.lists.noSignal[0].lastSignal, null)
-  assert.deepEqual(stats.listTotals, { offline: 1, noFix: 2, noSignal: 2 })
+  assert.deepEqual(stats.listTotals, { offline: 1, noSignal: 2 })
+  // The satellite state is no longer shown (owner 2026-10-26).
+  assert.equal('noFix' in stats, false)
 })
 
 test('lists are sorted by code and capped', () => {
@@ -115,32 +114,24 @@ test('lists are sorted by code and capped', () => {
   assert.equal(stats.lists.offline[1].code, 'A102')
 })
 
-test('the link DTO: last message with or without a position, satellites', () => {
+test('the link DTO: the last message, with or without a position', () => {
   const { mapAfaqyLink } = createLoader()('afaqy')
   const id = hex(9)
   const dts = NOW - 38 * 60 * 1000
   const at = new Date(dts).toISOString()
-  // A025: the last message had no fix (vLoc 0) yet 12 satellites are known.
+  // A command reply: no position, still a message.
   assert.deepEqual(
-    plain(
-      mapAfaqyLink({
-        _id: id,
-        last_update: { dts, vLoc: 0, chPrams: { sat: { v: 12, cdt: dts } } },
-      }),
-    ),
-    { unitId: id, lastMessageAt: at, satellites: 12 },
+    plain(mapAfaqyLink({ _id: id, last_update: { dts, vLoc: 0 } })),
+    { unitId: id, lastMessageAt: at },
   )
-  // Falls back to prms.sat; the device time when there is no server time.
+  // The device time when there is no server time.
   assert.deepEqual(
-    plain(
-      mapAfaqyLink({ _id: id, last_update: { dtt: dts, prms: { sat: 0 } } }),
-    ),
-    { unitId: id, lastMessageAt: at, satellites: 0 },
+    plain(mapAfaqyLink({ _id: id, last_update: { dtt: dts } })),
+    { unitId: id, lastMessageAt: at },
   )
   assert.deepEqual(plain(mapAfaqyLink({ _id: id })), {
     unitId: id,
     lastMessageAt: null,
-    satellites: null,
   })
   assert.equal(mapAfaqyLink({ _id: 'bad' }), null)
 })
@@ -192,11 +183,10 @@ test('the last signal in full words', () => {
   assert.equal(elapsedInWords('not a date', 'ar', NOW), null)
 })
 
-test('the tables: not connected, no satellites, no signal', () => {
+test('the tables: not connected, no signal', () => {
   const card = read('src', 'components', 'admin-home', 'AfaqySection.tsx')
   for (const [key, title, description, withSignal] of [
     ['offline', 'afaqyHomeOfflineList', 'afaqyHomeOfflineListDesc', true],
-    ['noFix', 'afaqyHomeNoFixList', 'afaqyHomeNoFixListDesc', true],
     ['noSignal', 'afaqyHomeNoSignalList', 'afaqyHomeNoSignalListDesc', false],
   ])
     assert.match(
@@ -210,6 +200,7 @@ test('the tables: not connected, no satellites, no signal', () => {
   const stats = read('src', 'lib', 'afaqyStats.ts')
   // Owner 2026-10-26: «خليها 24 ساعة».
   assert.match(stats, /export const AFAQY_ONLINE_MS = 24 \* 60 \* 60 \* 1000/)
+  assert.doesNotMatch(card, /noFix|SatelliteDish/)
   assert.match(card, /description: 'afaqyHomeOfflineListDesc'/)
   const server = read('src', 'lib', 'server', 'afaqy.ts')
   assert.match(server, /export async function listUnitLinks\(\)/)
