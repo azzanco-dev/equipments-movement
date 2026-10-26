@@ -6,11 +6,10 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  ArrowLeft,
   Ban,
   Building2,
   Calendar,
-  ChevronDown,
-  Clock,
   ExternalLink,
   FileText,
   Hash,
@@ -29,25 +28,16 @@ import {
 } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import {
-  Badge,
   Button,
   DescriptionList,
-  DetailHeader,
-  EmptyState,
   ErrorState,
-  Select,
   Skeleton,
   Tabs,
   TabsList,
   TabsTrigger,
-  WorkshopPurposeBadge,
   cn,
   type DescriptionListItem,
 } from '@/components/ui'
-import {
-  EquipmentSuggestSearch,
-  type EquipmentSuggestion,
-} from '@/components/inquiry/EquipmentSuggestSearch'
 import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
 import { EquipmentStateBadge } from '@/components/equipment/EquipmentStateBadge'
 import { EquipmentNewBadge } from '@/components/equipment/EquipmentNewBadge'
@@ -72,16 +62,20 @@ import {
 
 // Review of the inquiry page redesign (owner 2026-10-26: «صفحة الاستعلام
 // ابغى تحسين جذري لها», then «ابدا بالنموذج في /ui-kit مع شريط النشاط»).
-// Sample data only, no database reads. It follows the approved detail-page
-// pattern of the supplier PO page: a header card (identity, the one state,
-// "now", the summary strip and the year's activity strip), then the facts
-// and the location beside a compact visit list.
+// Sample data only, no database reads.
+//
+// Second round, same day: the gradients and the coloured borders are gone
+// («مو طبيعي سوء القريديانت», «الحدود مش كويسة حتى الحدود الجانبية»). The
+// page opens like the home of an AI assistant — one big field in the middle
+// with a short line under the question — and the answer rises in with
+// motion; the timeline gives every state its own colour and draws the time
+// outside as a road («الحالة الرمادية ابغى شي ابداعي»).
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const YEAR_DAYS = 365
 
-type DemoState = 'data' | 'loading' | 'start' | 'error'
 type Viewer = 'admin' | 'other'
+type Phase = 'hero' | 'loading' | 'result'
 
 interface DemoUnit {
   id: string
@@ -342,7 +336,91 @@ function summarizeYear(
   }
 }
 
-// --- Small pieces -------------------------------------------------------------
+// --- Colour, motion and small pieces ------------------------------------------------
+
+type Colors = { fill: string; stroke: string }
+
+/** One colour per state (owner 2026-10-26: «كل لون يرمز لحالة معينة»). The
+ *  fills are the light chart shades, read with `--chart-text`. */
+const STATE_COLORS = {
+  site: { fill: 'var(--chart-1)', stroke: 'var(--chart-stroke-1)' },
+  maintenance: { fill: 'var(--chart-2)', stroke: 'var(--chart-stroke-2)' },
+  parking: { fill: 'var(--chart-3)', stroke: 'var(--chart-stroke-3)' },
+  out_of_service: { fill: 'var(--danger-soft)', stroke: 'var(--danger)' },
+  outside: { fill: 'var(--chart-4)', stroke: 'var(--chart-stroke-4)' },
+} satisfies Record<string, Colors>
+
+const STATE_LEGEND: { key: keyof typeof STATE_COLORS; label: string }[] = [
+  { key: 'site', label: 'مشروع' },
+  { key: 'maintenance', label: 'صيانة' },
+  { key: 'parking', label: 'وقوف' },
+  { key: 'out_of_service', label: 'خارج الخدمة' },
+  { key: 'outside', label: 'على الطريق' },
+]
+
+function visitColors(visit: EquipmentVisit): Colors {
+  if (visit.context === 'site') return STATE_COLORS.site
+  const purpose = visit.entry?.workshop_purpose
+  if (purpose === 'parking') return STATE_COLORS.parking
+  if (purpose === 'out_of_service') return STATE_COLORS.out_of_service
+  return STATE_COLORS.maintenance
+}
+
+/** The colour of where the unit is now: its open visit's, else outside. */
+function presenceColors(visits: EquipmentVisit[]): Colors {
+  const open = visits.find((visit) => visit.open)
+  return open ? visitColors(open) : STATE_COLORS.outside
+}
+
+/** Surfaces have no border (owner: «الحدود مش كويسة»): the page colour on
+ *  the frame, with a soft shadow. */
+const SURFACE = 'rounded-2xl bg-bg shadow-sm'
+
+/** A translucent page-colour chip that reads on any state fill. */
+const ON_FILL: CSSProperties = {
+  backgroundColor: 'color-mix(in srgb, var(--bg) 60%, transparent)',
+}
+
+/** Mockup-only motion (owner: «لما تجي النتايج تجي بانيميشن»). */
+const MOTION_CSS = `
+@keyframes inq-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes inq-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes inq-drive { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes inq-dot { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+.inq-rise { animation: inq-rise 560ms cubic-bezier(.2,.8,.2,1) both; }
+.inq-grow { animation: inq-grow 900ms cubic-bezier(.2,.8,.2,1) both; transform-origin: right; }
+.inq-drive { animation: inq-drive 1100ms cubic-bezier(.2,.8,.2,1) both; }
+.inq-dot { animation: inq-dot 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .inq-rise, .inq-grow, .inq-drive, .inq-dot { animation: none; }
+}
+`
+
+/** The stagger of the n-th block of the answer. */
+function rise(index: number): CSSProperties {
+  return { animationDelay: `${Math.min(index, 14) * 70}ms` }
+}
+
+/** Counts a number up from zero when the answer arrives. */
+function useCountUp(value: number, duration = 900): number {
+  const [shown, setShown] = useState(0)
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setShown(value)
+      return
+    }
+    let frame = 0
+    const start = performance.now()
+    const tick = (time: number) => {
+      const progress = Math.min(1, (time - start) / duration)
+      setShown(Math.round(value * (1 - Math.pow(1 - progress, 3))))
+      if (progress < 1) frame = requestAnimationFrame(tick)
+    }
+    frame = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frame)
+  }, [value, duration])
+  return shown
+}
 
 function PlateText({ plate }: { plate: string }) {
   const parts = splitPlateForDisplay(plate)
@@ -352,60 +430,6 @@ function PlateText({ plate }: { plate: string }) {
       {parts.digits}{' '}
       <span className="-me-[0.15em] tracking-[0.15em]">{parts.letters}</span>
     </bdi>
-  )
-}
-
-/** The colour pair of a visit: projects green, the workshop by purpose. */
-function visitColors(visit: EquipmentVisit): { fill: string; stroke: string } {
-  if (visit.context === 'site')
-    return { fill: 'var(--chart-1)', stroke: 'var(--chart-stroke-1)' }
-  const purpose = visit.entry?.workshop_purpose
-  if (purpose === 'parking')
-    return { fill: 'var(--chart-3)', stroke: 'var(--chart-stroke-3)' }
-  if (purpose === 'out_of_service')
-    return { fill: 'var(--danger-soft)', stroke: 'var(--danger)' }
-  return { fill: 'var(--chart-2)', stroke: 'var(--chart-stroke-2)' }
-}
-
-const OUTSIDE_COLORS = { fill: 'var(--chart-4)', stroke: 'var(--chart-stroke-4)' }
-
-/** The colour of where the unit is now: its open visit's, else outside. */
-function presenceColors(visits: EquipmentVisit[]): {
-  fill: string
-  stroke: string
-} {
-  const open = visits.find((visit) => visit.open)
-  return open ? visitColors(open) : OUTSIDE_COLORS
-}
-
-/**
- * Two flat looks to compare (owner 2026-10-26: the gradients «مو طبيعي
- * سوء القريديانت» were dropped). Colour means one thing only, where the
- * unit is: projects green, maintenance amber, standby blue, out of service
- * light red, outside grey.
- *   * calm: white cards; only «الحين» is filled with the place's colour.
- *   * bold: the header card is filled with it, and so are the day tiles.
- */
-type Look = 'calm' | 'bold'
-
-/** A small heading with a neutral icon circle. */
-function CardTitle({
-  icon,
-  children,
-}: {
-  icon: ReactNode
-  children: ReactNode
-}) {
-  return (
-    <h3 className="flex items-center gap-2 text-sm font-semibold">
-      <span
-        aria-hidden="true"
-        className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-hover text-muted"
-      >
-        {icon}
-      </span>
-      {children}
-    </h3>
   )
 }
 
@@ -422,7 +446,7 @@ function IconTile({
   return (
     <span
       aria-hidden="true"
-      className="flex shrink-0 items-center justify-center rounded-full shadow-sm"
+      className="flex shrink-0 items-center justify-center rounded-full"
       style={{
         width: size,
         height: size,
@@ -435,8 +459,7 @@ function IconTile({
   )
 }
 
-function VisitIcon({ visit }: { visit: EquipmentVisit }) {
-  const colors = visitColors(visit)
+function visitIcon(visit: EquipmentVisit, size: number): ReactNode {
   const purpose = visit.entry?.workshop_purpose
   const Icon =
     visit.context === 'site'
@@ -446,15 +469,7 @@ function VisitIcon({ visit }: { visit: EquipmentVisit }) {
         : purpose === 'out_of_service'
           ? Ban
           : Wrench
-  return (
-    <span
-      aria-hidden="true"
-      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-      style={{ backgroundColor: colors.fill, color: colors.stroke }}
-    >
-      <Icon size={15} />
-    </span>
-  )
+  return <Icon size={size} />
 }
 
 function visitTitle(visit: EquipmentVisit): string {
@@ -463,101 +478,170 @@ function visitTitle(visit: EquipmentVisit): string {
   return movement?.project_name ?? 'مشروع'
 }
 
+function visitPurposeLabel(visit: EquipmentVisit): string | null {
+  if (visit.context !== 'workshop') return null
+  const purpose = visit.entry?.workshop_purpose
+  if (purpose === 'parking') return 'وقوف'
+  if (purpose === 'out_of_service') return 'خارج الخدمة'
+  if (purpose === 'maintenance') return 'صيانة'
+  return null
+}
+
 function visitRange(visit: EquipmentVisit): string {
   const from = visit.startedAt ? formatDate(visit.startedAt) : '—'
   const to = visit.open ? 'الان' : visit.endedAt ? formatDate(visit.endedAt) : '—'
   return `${from} ← ${to}`
 }
 
-// --- Start view (before a unit is chosen) -------------------------------------
-
-function SearchField({
-  units,
-  onPick,
-  initial = '',
-}: {
-  units: DemoUnit[]
-  onPick: (id: string) => void
-  initial?: string
-}) {
-  const [query, setQuery] = useState(initial)
-  const term = query.trim().toLowerCase()
-  const suggestions: EquipmentSuggestion[] =
-    term.length < 1
-      ? []
-      : units
-          .filter((unit) =>
-            [unit.code, unit.type, unit.plate, unit.chassis, ...unit.previousCodes]
-              .filter(Boolean)
-              .some((value) => value!.toLowerCase().includes(term)),
-          )
-          .map((unit) => ({
-            id: unit.id,
-            code: unit.code,
-            type_name: unit.type,
-            plate_number: unit.plate,
-            chassis_number: unit.chassis,
-            matched_previous_code:
-              !unit.code.toLowerCase().includes(term) &&
-              unit.previousCodes.some((code) => code.toLowerCase().includes(term)),
-          }))
+function CardTitle({ icon, children }: { icon: ReactNode; children: ReactNode }) {
   return (
-    <EquipmentSuggestSearch
-      query={query}
-      onQueryChange={setQuery}
-      suggestions={suggestions}
-      onPick={(suggestion) => {
-        setQuery(suggestion.code)
-        onPick(suggestion.id)
+    <h3 className="flex items-center gap-2 text-sm font-semibold">
+      <span
+        aria-hidden="true"
+        className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-hover text-muted"
+      >
+        {icon}
+      </span>
+      {children}
+    </h3>
+  )
+}
+
+/** The road: the grey of «خارج» drawn as asphalt with a dashed centre line
+ *  (owner: «الحالة الرمادية ابغى شي ابداعي»). */
+function RoadMarking({ inset = 12 }: { inset?: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute top-1/2 -translate-y-1/2 border-t-2 border-dashed"
+      style={{
+        insetInlineStart: inset,
+        insetInlineEnd: inset,
+        borderColor: 'color-mix(in srgb, var(--bg) 85%, transparent)',
       }}
-      placeholder="الكود او اللوحة او الشاصي او النوع"
-      inputDir="auto"
     />
   )
 }
 
-function StartView({
+// --- The search (the start of the page) -----------------------------------------------
+
+function matchUnits(units: DemoUnit[], query: string): DemoUnit[] {
+  const term = query.trim().toLowerCase()
+  if (!term) return []
+  return units.filter((unit) =>
+    [unit.code, unit.type, unit.plate, unit.chassis, ...unit.previousCodes]
+      .filter((value): value is string => Boolean(value))
+      .some((value) => value.toLowerCase().includes(term)),
+  )
+}
+
+/**
+ * The one field of the page, AI-home style: big and rounded with a round
+ * send button while nothing is chosen, smaller once the answer is shown.
+ */
+function InquirySearch({
   units,
-  recent,
+  big,
+  initial,
   onPick,
 }: {
   units: DemoUnit[]
-  recent: string[]
-  onPick: (id: string) => void
+  big: boolean
+  initial: string
+  onPick: (unit: DemoUnit) => void
 }) {
-  const recentUnits = recent
-    .map((id) => units.find((unit) => unit.id === id))
-    .filter((unit): unit is DemoUnit => Boolean(unit))
+  const [query, setQuery] = useState(initial)
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(0)
+  const matches = matchUnits(units, query)
+  const listOpen = open && matches.length > 0
+
+  const choose = (unit: DemoUnit) => {
+    setQuery(unit.code)
+    setOpen(false)
+    onPick(unit)
+  }
+
   return (
-    <div className="card mx-auto max-w-2xl space-y-5 px-4 py-8 text-center sm:px-8 sm:py-10">
-      <span className="mx-auto flex w-fit">
-        <IconTile colors={{ stroke: 'var(--primary)' }} size={52}>
-          <Search size={24} />
-        </IconTile>
-      </span>
-      <div className="space-y-1">
-        <h3 className="text-lg font-semibold">ابحث عن معدة</h3>
-        <p className="text-sm text-muted">
-          اعرف وين المعدة الحين، ووين اشتغلت خلال السنة.
-        </p>
+    <div className="relative w-full">
+      <div
+        className={cn(
+          'flex items-center gap-3 rounded-2xl bg-bg pe-2 ps-4 shadow-md transition-[height] duration-500',
+          big ? 'h-16' : 'h-12',
+        )}
+      >
+        <Search
+          size={big ? 22 : 18}
+          aria-hidden="true"
+          className="shrink-0 text-muted"
+        />
+        <input
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value)
+            setOpen(true)
+            setActive(0)
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown') {
+              event.preventDefault()
+              setActive((index) => Math.min(index + 1, matches.length - 1))
+            } else if (event.key === 'ArrowUp') {
+              event.preventDefault()
+              setActive((index) => Math.max(index - 1, 0))
+            } else if (event.key === 'Enter' && matches[active]) {
+              event.preventDefault()
+              choose(matches[active])
+            } else if (event.key === 'Escape') setOpen(false)
+          }}
+          placeholder="الكود او اللوحة او الشاصي او النوع"
+          dir={query ? 'auto' : undefined}
+          role="combobox"
+          aria-label="ابحث عن معدة"
+          aria-expanded={listOpen}
+          aria-autocomplete="list"
+          autoComplete="off"
+          className={cn(
+            'h-full min-w-0 flex-1 bg-transparent outline-none placeholder:text-placeholder',
+            big ? 'text-lg' : 'text-base',
+          )}
+        />
+        <button
+          type="button"
+          onClick={() => matches[0] && choose(matches[0])}
+          disabled={matches.length === 0}
+          aria-label="اعرض المعدة"
+          className={cn(
+            'flex shrink-0 items-center justify-center rounded-xl bg-primary text-primary-contrast transition-opacity disabled:opacity-25',
+            big ? 'h-11 w-11' : 'h-9 w-9',
+          )}
+        >
+          <ArrowLeft size={18} aria-hidden="true" />
+        </button>
       </div>
-      <div className="text-start">
-        <SearchField units={units} onPick={onPick} />
-      </div>
-      {recentUnits.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs text-muted">اخر استعلاماتك</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            {recentUnits.map((unit) => (
+      {listOpen && (
+        <ul
+          role="listbox"
+          className="inq-rise absolute inset-x-0 top-full z-30 mt-2 space-y-0.5 rounded-2xl bg-bg p-1.5 shadow-xl"
+          style={{ animationDuration: '220ms' }}
+        >
+          {matches.map((unit, index) => (
+            <li key={unit.id} role="option" aria-selected={index === active}>
               <button
-                key={unit.id}
                 type="button"
-                onClick={() => onPick(unit.id)}
-                className="inline-flex items-center gap-2 rounded-full border bg-bg px-3 py-1.5 text-sm shadow-sm transition-colors hover:bg-surface-hover"
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setActive(index)}
+                onClick={() => choose(unit)}
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start',
+                  index === active && 'bg-surface-hover',
+                )}
               >
                 <span
                   aria-hidden="true"
-                  className="h-2 w-2 rounded-full"
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
                   style={{
                     backgroundColor: presenceColors(
                       buildEquipmentVisits(unit.movements),
@@ -567,36 +651,71 @@ function StartView({
                 <bdi dir="ltr" className="font-semibold">
                   {unit.code}
                 </bdi>
-                <span className="text-xs text-muted">{unit.type}</span>
+                <span className="min-w-0 flex-1 truncate-safe text-sm text-muted">
+                  {unit.type}
+                </span>
+                <span className="shrink-0 text-xs text-muted">
+                  {unit.plate ? (
+                    <PlateText plate={unit.plate} />
+                  ) : (
+                    <bdi dir="ltr">{unit.chassis}</bdi>
+                  )}
+                </span>
               </button>
-            ))}
-          </div>
-        </div>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
 }
 
-// --- Header: identity, now, summary, activity -----------------------------------
+/** While the answer is fetched: the AI-style «looking» line and the shape
+ *  of the answer. */
+function Thinking({ code }: { code: string }) {
+  return (
+    <div className="mx-auto max-w-5xl space-y-4" aria-busy="true">
+      <p className="flex items-center justify-center gap-1.5 text-sm text-muted" role="status">
+        نبحث عن <bdi dir="ltr" className="font-semibold text-fg">{code}</bdi>
+        <span className="flex gap-1" aria-hidden="true">
+          {[0, 1, 2].map((index) => (
+            <span
+              key={index}
+              className="inq-dot h-1.5 w-1.5 rounded-full bg-fg"
+              style={{ animationDelay: `${index * 160}ms` }}
+            />
+          ))}
+        </span>
+      </p>
+      <Skeleton className="h-40 w-full rounded-2xl" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((index) => (
+          <Skeleton key={index} className="h-28 w-full rounded-2xl" />
+        ))}
+      </div>
+      <Skeleton className="h-24 w-full rounded-2xl" />
+    </div>
+  )
+}
+
+// --- The answer: header, now, numbers, the year -----------------------------------------
 
 function NowPanel({
   unit,
   visits,
   now,
-  look,
 }: {
   unit: DemoUnit
   visits: EquipmentVisit[]
   now: number
-  look: Look
 }) {
   const { t, lang } = useI18n()
   const where = presence(visits)
   const open = visits.find((visit) => visit.open) ?? null
   const last = visits[0] ?? null
 
-  let icon: ReactNode
-  let tone: { fill: string; stroke: string }
+  let tone: Colors = STATE_COLORS.outside
+  let icon: ReactNode = <Truck size={20} />
   let title: ReactNode
   let place: ReactNode = null
   let since: string | null = null
@@ -605,7 +724,7 @@ function NowPanel({
 
   if (where === 'inside_site' && open) {
     tone = visitColors(open)
-    icon = <MapPin size={18} />
+    icon = visitIcon(open, 20)
     title = (
       <>
         داخل <span className="font-bold">{open.entry?.project_name}</span>
@@ -625,23 +744,25 @@ function NowPanel({
         label: 'السائق',
         value: open.entry.driver_name,
       })
-    extra = unit.po ? (
-      <span className="inline-flex items-center gap-1.5 rounded-full border bg-bg px-2.5 py-1 text-xs font-semibold">
-        <FileText size={13} aria-hidden="true" className="text-muted" />
-        <bdi dir="ltr">{unit.po}</bdi>
+    extra = (
+      <span
+        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+        style={ON_FILL}
+      >
+        <FileText size={13} aria-hidden="true" />
+        {unit.po ? <bdi dir="ltr">{unit.po}</bdi> : 'بدون PO'}
       </span>
-    ) : (
-      <Badge tone="warning" size="sm">
-        بدون PO
-      </Badge>
     )
   } else if (where === 'inside_workshop' && open) {
     tone = visitColors(open)
-    icon = <Wrench size={18} />
-    title = <span className="font-bold">في الورشة</span>
+    icon = visitIcon(open, 20)
+    title = (
+      <>
+        في <span className="font-bold">الورشة</span>
+        {visitPurposeLabel(open) && <> · {visitPurposeLabel(open)}</>}
+      </>
+    )
     since = open.startedAt
-    if (open.entry?.workshop_purpose)
-      extra = <WorkshopPurposeBadge purpose={open.entry.workshop_purpose} />
     if (open.entry?.supervisor_name)
       people.push({
         icon: <UserCheck size={14} />,
@@ -649,95 +770,251 @@ function NowPanel({
         value: open.entry.supervisor_name,
       })
   } else if (last) {
-    tone = { fill: 'var(--chart-4)', stroke: 'var(--chart-stroke-4)' }
-    icon = <Truck size={18} />
-    title = <span className="font-bold">خارج المشاريع والورشة</span>
+    title = <span className="font-bold">على الطريق</span>
     since = last.endedAt
-    place = `اخر مكان: ${visitTitle(last)}`
+    place = `خرجت من ${visitTitle(last)}، وما دخلت مشروع ولا الورشة بعدها.`
   } else {
-    tone = { fill: 'var(--chart-4)', stroke: 'var(--chart-stroke-4)' }
-    icon = <Truck size={18} />
     title = <span className="font-bold">لا توجد حركات بعد</span>
     place = 'لم تدخل اي مشروع ولا الورشة منذ اضافتها.'
   }
 
   const sinceMs = since ? Date.parse(since) : null
-  // calm: this is THE coloured block of the page, filled flat. bold: the
-  // header around it is already filled, so it stands out in white.
-  const filled = look === 'calm'
   return (
     <div
-      className={cn('rounded-xl border p-3 sm:p-4', !filled && 'bg-bg')}
-      style={
-        {
-          borderColor: tone.stroke,
-          backgroundColor: filled ? tone.fill : undefined,
-        } as CSSProperties
-      }
+      className="relative overflow-hidden rounded-2xl p-4 sm:p-5"
+      style={{ backgroundColor: tone.fill, color: 'var(--chart-text)' }}
     >
-      <div className="flex flex-wrap items-start gap-3">
-        <IconTile colors={tone} size={44}>
+      {tone === STATE_COLORS.outside && <RoadMarking inset={0} />}
+      <div className="relative flex flex-wrap items-start gap-3">
+        <IconTile colors={tone} size={48}>
           {icon}
         </IconTile>
-        <div className="min-w-0 flex-1 space-y-0.5">
-          <p
-            className="text-xs font-semibold"
-            style={{ color: filled ? 'var(--chart-text)' : tone.stroke }}
-          >
-            الحين
-          </p>
-          <p className="text-lg leading-snug">{title}</p>
-          {place && (
-            <p
-              className="text-sm"
-              style={{ color: filled ? 'var(--chart-text)' : 'var(--muted)' }}
-            >
-              {place}
-            </p>
-          )}
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="text-xs font-semibold opacity-80">الحين</p>
+          <p className="text-xl leading-snug">{title}</p>
+          {place && <p className="text-sm opacity-80">{place}</p>}
           {sinceMs !== null && (
             <p className="text-sm">
               منذ{' '}
-              <span className="font-semibold">
+              <span className="font-bold">
                 {formatElapsedDuration(now - sinceMs, t, lang)}
               </span>
-              <span className="text-muted"> · {formatDate(since!)}</span>
+              <span className="opacity-70"> · {formatDate(since!)}</span>
             </p>
           )}
         </div>
-        {/* Under the text on a phone, so it never squeezes the place name. */}
         {extra && (
-          <div className="basis-full ps-14 sm:basis-auto sm:shrink-0 sm:ps-0">
-            {extra}
-          </div>
+          <div className="basis-full ps-[60px] sm:basis-auto sm:ps-0">{extra}</div>
         )}
       </div>
       {people.length > 0 && (
-        <dl className="mt-3 grid gap-x-6 gap-y-1 border-t pt-3 text-sm sm:grid-cols-2">
+        <div className="relative mt-4 flex flex-wrap gap-2">
           {people.map((person) => (
-            <div key={person.label} className="flex items-center gap-2">
-              <span aria-hidden="true" className="text-muted">
+            <span
+              key={person.label}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1.5 text-sm"
+              style={ON_FILL}
+            >
+              <span aria-hidden="true" className="opacity-70">
                 {person.icon}
               </span>
-              <dt className="text-muted">{person.label}:</dt>
-              <dd className="m-0 min-w-0 truncate-safe font-medium">
-                {person.value}
-              </dd>
-            </div>
+              <span className="opacity-70">{person.label}</span>
+              <span className="truncate-safe font-semibold">{person.value}</span>
+            </span>
           ))}
-        </dl>
+        </div>
       )}
     </div>
   )
 }
 
+function Header({
+  unit,
+  visits,
+  now,
+  onAnother,
+}: {
+  unit: DemoUnit
+  visits: EquipmentVisit[]
+  now: number
+  onAnother: () => void
+}) {
+  return (
+    <section className={cn(SURFACE, 'inq-rise space-y-4 p-4 sm:p-5')} style={rise(0)}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-3xl font-bold leading-none">
+              <bdi dir="ltr">{unit.code}</bdi>
+            </h2>
+            <EquipmentStateBadge state={unitState(unit)} />
+            <EquipmentNewBadge isNew={unit.createdDaysAgo <= 7} />
+          </div>
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 text-sm text-muted">
+            <span className="font-medium text-fg">{unit.type}</span>
+            <span aria-hidden="true">·</span>
+            {unit.plate ? (
+              <PlateText plate={unit.plate} />
+            ) : (
+              <bdi dir="ltr">{unit.chassis}</bdi>
+            )}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            icon={<ExternalLink size={14} aria-hidden="true" />}
+          >
+            صفحة المعدة
+          </Button>
+          <Button size="sm" variant="ghost" onClick={onAnother}>
+            معدة اخرى
+          </Button>
+        </div>
+      </div>
+      <NowPanel unit={unit} visits={visits} now={now} />
+    </section>
+  )
+}
+
+function StatTile({
+  colors,
+  icon,
+  label,
+  value,
+  hint,
+  share,
+  index,
+}: {
+  colors: Colors | null
+  icon: ReactNode
+  label: string
+  value: number
+  hint?: string
+  share?: number
+  index: number
+}) {
+  const shown = useCountUp(value)
+  return (
+    <div
+      className={cn('inq-rise rounded-2xl p-4', !colors && SURFACE)}
+      style={{
+        ...rise(index),
+        ...(colors
+          ? { backgroundColor: colors.fill, color: 'var(--chart-text)' }
+          : null),
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <IconTile colors={colors ?? { stroke: 'var(--primary)' }} size={30}>
+          {icon}
+        </IconTile>
+        <span className="truncate-safe text-xs font-medium opacity-80">
+          {label}
+        </span>
+      </div>
+      <p className="mt-3 text-4xl font-bold leading-none tabular-nums">{shown}</p>
+      {share !== undefined && colors && (
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full" style={ON_FILL}>
+          <div
+            className="inq-grow h-full rounded-full"
+            style={{
+              width: `${Math.round(share * 100)}%`,
+              backgroundColor: colors.stroke,
+              animationDelay: rise(index).animationDelay,
+            }}
+          />
+        </div>
+      )}
+      {hint && <p className="mt-2 text-xs opacity-80">{hint}</p>}
+    </div>
+  )
+}
+
+function YearNumbers({
+  visits,
+  createdAt,
+  now,
+}: {
+  visits: EquipmentVisit[]
+  createdAt: number
+  now: number
+}) {
+  const year = summarizeYear(visits, createdAt, now)
+  const counted = year.siteDays + year.workshopDays + year.outsideDays
+  const share = (days: number) => (counted > 0 ? days / counted : 0)
+  return (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <StatTile
+        index={1}
+        colors={STATE_COLORS.site}
+        icon={<MapPin size={15} />}
+        label="ايام في المشاريع"
+        value={year.siteDays}
+        hint={`${year.siteShare}% من السنة`}
+        share={share(year.siteDays)}
+      />
+      <StatTile
+        index={2}
+        colors={STATE_COLORS.maintenance}
+        icon={<Wrench size={15} />}
+        label="ايام في الورشة"
+        value={year.workshopDays}
+        share={share(year.workshopDays)}
+      />
+      <StatTile
+        index={3}
+        colors={STATE_COLORS.outside}
+        icon={<Truck size={15} />}
+        label="ايام على الطريق"
+        value={year.outsideDays}
+        share={share(year.outsideDays)}
+      />
+      {/* A count, not a place: monochrome. */}
+      <StatTile
+        index={4}
+        colors={null}
+        icon={<History size={15} />}
+        label="الزيارات"
+        value={year.visitCount}
+        hint="خلال 12 شهر"
+      />
+    </div>
+  )
+}
+
+function Legend() {
+  return (
+    <ul className="flex flex-wrap items-center gap-1.5 text-xs">
+      {STATE_LEGEND.map((item) => {
+        const colors = STATE_COLORS[item.key]
+        return (
+          <li
+            key={item.key}
+            className="relative inline-flex items-center gap-1.5 overflow-hidden rounded-full px-2.5 py-1"
+            style={{ backgroundColor: colors.fill, color: 'var(--chart-text)' }}
+          >
+            <span
+              aria-hidden="true"
+              className="relative h-2 w-2 rounded-full"
+              style={{ backgroundColor: colors.stroke }}
+            />
+            <span className="relative">{item.label}</span>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 /**
- * The last 12 months as one bar (owner 2026-10-26, «مع شريط النشاط»): the
- * oldest day at the start edge, today at the end edge; projects green, the
- * workshop by its purpose, outside grey, and the time before the unit was
- * added left blank. A segment is a button that opens its visit below.
+ * The last 12 months as a road (owner 2026-10-26, «مع شريط النشاط»): the
+ * oldest day at the start edge, today at the end edge; every stay is a pill
+ * in its state's colour, and the time outside is the bare road between them.
+ * A pill opens its visit in the timeline below.
  */
-function ActivityStrip({
+function YearRoad({
   visits,
   createdAt,
   now,
@@ -748,26 +1025,21 @@ function ActivityStrip({
   now: number
   onSelectVisit: (key: string) => void
 }) {
-  const { t, lang } = useI18n()
+  const { lang } = useI18n()
   const windowStart = now - YEAR_DAYS * DAY_MS
   const span = now - windowStart
   const pct = (ms: number) => ((ms - windowStart) / span) * 100
 
   const segments = visits
     .filter((visit) => visit.startedAt)
-    .map((visit) => {
-      const from = Math.max(Date.parse(visit.startedAt!), windowStart)
-      const to = Math.min(
-        visit.endedAt ? Date.parse(visit.endedAt) : now,
-        now,
-      )
-      return { visit, from, to }
-    })
+    .map((visit) => ({
+      visit,
+      from: Math.max(Date.parse(visit.startedAt!), windowStart),
+      to: Math.min(visit.endedAt ? Date.parse(visit.endedAt) : now, now),
+    }))
     .filter((segment) => segment.to > segment.from)
-
   const blankUntil = createdAt > windowStart ? pct(createdAt) : 0
 
-  // One tick per month start inside the window.
   const ticks: { key: string; at: number; label: string }[] = []
   const cursor = new Date(windowStart)
   cursor.setUTCDate(1)
@@ -786,70 +1058,53 @@ function ActivityStrip({
     cursor.setUTCMonth(cursor.getUTCMonth() + 1)
   }
 
-  const legend = [
-    { label: 'مشروع', fill: 'var(--chart-1)', stroke: 'var(--chart-stroke-1)' },
-    { label: 'صيانة', fill: 'var(--chart-2)', stroke: 'var(--chart-stroke-2)' },
-    { label: 'وقوف', fill: 'var(--chart-3)', stroke: 'var(--chart-stroke-3)' },
-    { label: 'خارج الخدمة', fill: 'var(--danger-soft)', stroke: 'var(--danger)' },
-    { label: 'خارج', fill: 'var(--chart-4)', stroke: 'var(--chart-stroke-4)' },
-  ]
-
   return (
-    <div className="space-y-2">
+    <section className={cn(SURFACE, 'inq-rise space-y-3 p-4 sm:p-5')} style={rise(5)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <CardTitle icon={<Calendar size={14} />}>نشاط اخر 12 شهر</CardTitle>
-        <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-          {legend.map((item) => (
-            <li key={item.label} className="flex items-center gap-1.5">
-              <span
-                aria-hidden="true"
-                className="h-2.5 w-2.5 rounded-sm border"
-                style={{ backgroundColor: item.fill, borderColor: item.stroke }}
-              />
-              {item.label}
-            </li>
-          ))}
-        </ul>
+        <CardTitle icon={<Calendar size={14} />}>اخر 12 شهر</CardTitle>
+        <Legend />
       </div>
       <div
-        className="relative h-10 overflow-hidden rounded-lg border"
-        style={{ backgroundColor: 'var(--chart-4)' }}
+        className="relative h-12 rounded-full p-1.5"
+        style={{ backgroundColor: STATE_COLORS.outside.fill }}
       >
-        {blankUntil > 0 && (
-          <div
-            className="absolute inset-y-0 start-0 border-e border-dashed bg-surface"
-            style={{ width: `${blankUntil}%` }}
-            title="قبل اضافة المعدة"
-          />
-        )}
-        {segments.map(({ visit, from, to }) => {
-          const colors = visitColors(visit)
-          const days = msToDays(to - from)
-          const label = `${visitTitle(visit)} · ${visitRange(visit)} · ${days} يوم`
-          return (
-            <button
-              key={visit.key}
-              type="button"
-              title={label}
-              aria-label={label}
-              onClick={() => onSelectVisit(visit.key)}
-              className="absolute inset-y-0 min-w-[3px] border-x transition-opacity hover:opacity-80 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-              style={{
-                insetInlineStart: `${pct(from)}%`,
-                width: `${pct(to) - pct(from)}%`,
-                backgroundColor: colors.fill,
-                borderColor: colors.stroke,
-              }}
+        <RoadMarking inset={14} />
+        <div className="relative h-full">
+          {blankUntil > 0 && (
+            <div
+              className="absolute inset-y-0 start-0 rounded-full bg-surface"
+              style={{ width: `${blankUntil}%` }}
+              title="قبل اضافة المعدة"
             />
-          )
-        })}
+          )}
+          {segments.map(({ visit, from, to }, index) => {
+            const colors = visitColors(visit)
+            const label = `${visitTitle(visit)} · ${visitRange(visit)} · ${msToDays(to - from)} يوم`
+            return (
+              <button
+                key={visit.key}
+                type="button"
+                title={label}
+                aria-label={label}
+                onClick={() => onSelectVisit(visit.key)}
+                className="inq-grow absolute inset-y-0 min-w-[6px] rounded-full transition-transform hover:scale-y-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                style={{
+                  insetInlineStart: `${pct(from)}%`,
+                  width: `max(6px, calc(${pct(to) - pct(from)}% - 3px))`,
+                  backgroundColor: colors.stroke,
+                  animationDelay: `${400 + index * 90}ms`,
+                }}
+              />
+            )
+          })}
+        </div>
       </div>
       <div className="relative h-4 text-[11px] text-muted" aria-hidden="true">
         {ticks.map((tick, index) => (
           <span
             key={tick.key}
             className={cn(
-              'absolute top-0 -translate-x-1/2 whitespace-nowrap rtl:translate-x-1/2',
+              'absolute top-0 translate-x-1/2 whitespace-nowrap',
               index % 2 === 1 && 'hidden sm:inline',
             )}
             style={{ insetInlineStart: `${tick.at}%` }}
@@ -858,220 +1113,13 @@ function ActivityStrip({
           </span>
         ))}
       </div>
-      <p className="sr-only">
-        {segments
-          .map(
-            ({ visit, from, to }) =>
-              `${visitTitle(visit)} ${msToDays(to - from)} ${t('days')}`,
-          )
-          .join('، ')}
-      </p>
-    </div>
+    </section>
   )
 }
 
-/** A number tile for this review (a candidate look, not the shared
- *  `StatCard`): the number in its place's colour and, for the day counts, a
- *  thin bar of its share of the year. calm: white; bold: filled flat. */
-function StatTile({
-  colors,
-  icon,
-  label,
-  value,
-  hint,
-  share,
-  look,
-}: {
-  colors: { fill: string; stroke: string }
-  icon: ReactNode
-  label: string
-  value: number
-  hint?: string
-  share?: number
-  look: Look
-}) {
-  const filled = look === 'bold'
-  return (
-    <div
-      className={cn('rounded-xl border p-3', !filled && 'bg-bg')}
-      style={
-        filled
-          ? { backgroundColor: colors.fill, borderColor: colors.stroke }
-          : undefined
-      }
-    >
-      <div className="flex items-center gap-2">
-        <IconTile colors={colors} size={28}>
-          {icon}
-        </IconTile>
-        <span
-          className="truncate-safe text-xs"
-          style={{ color: filled ? 'var(--chart-text)' : 'var(--muted)' }}
-        >
-          {label}
-        </span>
-      </div>
-      <p
-        className="mt-2 text-3xl font-bold leading-none tabular-nums"
-        style={{ color: filled ? 'var(--chart-text)' : colors.stroke }}
-      >
-        {value}
-      </p>
-      {share !== undefined ? (
-        <div
-          className="mt-2.5 h-1.5 overflow-hidden rounded-full"
-          style={{ backgroundColor: filled ? 'var(--bg)' : 'var(--surface-hover)' }}
-          aria-hidden="true"
-        >
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${Math.round(share * 100)}%`,
-              backgroundColor: colors.stroke,
-            }}
-          />
-        </div>
-      ) : null}
-      {hint && (
-        <p
-          className="mt-1.5 text-xs"
-          style={{ color: filled ? 'var(--chart-text)' : 'var(--muted)' }}
-        >
-          {hint}
-        </p>
-      )}
-    </div>
-  )
-}
+// --- The answer: facts, location, timeline -----------------------------------------------
 
-function HeaderCard({
-  unit,
-  visits,
-  now,
-  onSelectVisit,
-  onChange,
-  look,
-}: {
-  unit: DemoUnit
-  visits: EquipmentVisit[]
-  now: number
-  onSelectVisit: (key: string) => void
-  onChange: () => void
-  look: Look
-}) {
-  const createdAt = now - unit.createdDaysAgo * DAY_MS
-  const year = summarizeYear(visits, createdAt, now)
-  const hasHistory = visits.length > 0
-  const counted = year.siteDays + year.workshopDays + year.outsideDays
-  const share = (days: number) => (counted > 0 ? days / counted : 0)
-  const place = presenceColors(visits)
-  return (
-    <div
-      className="card space-y-4 p-4"
-      style={
-        look === 'bold'
-          ? { backgroundColor: place.fill, borderColor: place.stroke }
-          : undefined
-      }
-    >
-      <DetailHeader
-        as="h2"
-        identifier={unit.code}
-        identifierLtr
-        badges={
-          <>
-            <EquipmentStateBadge state={unitState(unit)} />
-            <EquipmentNewBadge isNew={unit.createdDaysAgo <= 7} />
-          </>
-        }
-        subtitle={
-          <span className="flex flex-wrap items-center gap-x-2 text-sm">
-            <span className="font-medium text-fg">{unit.type}</span>
-            <span aria-hidden="true">·</span>
-            {unit.plate ? (
-              <PlateText plate={unit.plate} />
-            ) : (
-              <bdi dir="ltr">{unit.chassis}</bdi>
-            )}
-          </span>
-        }
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              icon={<ExternalLink size={14} aria-hidden="true" />}
-            >
-              صفحة المعدة
-            </Button>
-            <Button size="sm" variant="ghost" onClick={onChange}>
-              معدة اخرى
-            </Button>
-          </div>
-        }
-      />
-
-      <NowPanel unit={unit} visits={visits} now={now} look={look} />
-
-      {hasHistory && (
-        <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatTile
-              look={look}
-              colors={{ fill: 'var(--chart-1)', stroke: 'var(--chart-stroke-1)' }}
-              icon={<MapPin size={15} />}
-              label="ايام في المشاريع"
-              value={year.siteDays}
-              hint={`${year.siteShare}% من السنة`}
-              share={share(year.siteDays)}
-            />
-            <StatTile
-              look={look}
-              colors={{ fill: 'var(--chart-2)', stroke: 'var(--chart-stroke-2)' }}
-              icon={<Wrench size={15} />}
-              label="ايام في الورشة"
-              value={year.workshopDays}
-              share={share(year.workshopDays)}
-            />
-            <StatTile
-              look={look}
-              colors={OUTSIDE_COLORS}
-              icon={<Truck size={15} />}
-              label="ايام خارج"
-              value={year.outsideDays}
-              share={share(year.outsideDays)}
-            />
-            {/* A count, not a place: monochrome. */}
-            <StatTile
-              look="calm"
-              colors={{ fill: 'var(--bg)', stroke: 'var(--primary)' }}
-              icon={<History size={15} />}
-              label="الزيارات"
-              value={year.visitCount}
-              hint="خلال 12 شهر"
-            />
-          </div>
-          {/* On the filled header the strip gets its own white box, or its
-              green would vanish into the card's. */}
-          <div
-            className={cn(look === 'bold' && 'rounded-xl border bg-bg p-3')}
-          >
-            <ActivityStrip
-              visits={visits}
-              createdAt={createdAt}
-              now={now}
-              onSelectVisit={onSelectVisit}
-            />
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
-// --- Body: facts, location, visits ---------------------------------------------
-
-function FactsCard({ unit, now }: { unit: DemoUnit; now: number }) {
+function FactsCard({ unit, now, index }: { unit: DemoUnit; now: number; index: number }) {
   const items: DescriptionListItem[] = [
     { key: 'owner', icon: <Tag size={16} />, label: 'المالك', value: unit.owner },
     ...(unit.supplier
@@ -1124,20 +1172,19 @@ function FactsCard({ unit, now }: { unit: DemoUnit; now: number }) {
     },
   ]
   return (
-    <div className="card p-4">
+    <section className={cn(SURFACE, 'inq-rise p-4 sm:p-5')} style={rise(index)}>
       <CardTitle icon={<Tag size={14} />}>بيانات المعدة</CardTitle>
-      {/* Two columns while the card spans the page, one beside the visits. */}
+      {/* Two columns while the card spans the page, one beside the timeline. */}
       <DescriptionList items={items} columns={2} className="mt-1 xl:grid-cols-1" />
-    </div>
+    </section>
   )
 }
 
-/** Admin only, as today (`equipment.location.view`). Smaller than the live
- *  card, and folded on a phone until asked for. */
-function LocationCard() {
+/** Admin only, as today (`equipment.location.view`). Folded on a phone. */
+function LocationCard({ index }: { index: number }) {
   const [shown, setShown] = useState(false)
   return (
-    <div className="card space-y-3 p-4">
+    <section className={cn(SURFACE, 'inq-rise space-y-3 p-4 sm:p-5')} style={rise(index)}>
       <div className="flex items-center justify-between gap-2">
         <div className="space-y-1">
           <CardTitle icon={<Navigation size={14} />}>الموقع الحالي</CardTitle>
@@ -1149,36 +1196,31 @@ function LocationCard() {
           size="sm"
           variant="outline"
           className="xl:hidden"
-          icon={<Navigation size={14} aria-hidden="true" />}
           onClick={() => setShown((value) => !value)}
           aria-expanded={shown}
         >
-          {shown ? 'اخفاء الخريطة' : 'عرض الخريطة'}
+          {shown ? 'اخفاء' : 'الخريطة'}
         </Button>
       </div>
       <div
         className={cn(
-          'h-44 items-center justify-center rounded-lg border bg-surface text-muted xl:flex',
+          'h-44 items-center justify-center rounded-xl bg-surface text-sm text-muted xl:flex',
           shown ? 'flex' : 'hidden',
         )}
       >
-        <span className="flex items-center gap-2 text-sm">
-          <MapPin size={16} aria-hidden="true" />
-          خريطة مصغرة
-        </span>
+        <MapPin size={16} aria-hidden="true" className="me-2" />
+        خريطة مصغرة
       </div>
-      <Button
-        size="sm"
-        variant="ghost"
-        icon={<ExternalLink size={14} aria-hidden="true" />}
-      >
+      <Button size="sm" variant="ghost" icon={<ExternalLink size={14} aria-hidden="true" />}>
         فتح في خرائط قوقل
       </Button>
-    </div>
+    </section>
   )
 }
 
-function VisitRow({
+/** One stay as a tile in its state's colour (owner: «تلون المربعات بحيث
+ *  كل لون يرمز لحالة معينة»). */
+function VisitTile({
   visit,
   now,
   expanded,
@@ -1190,183 +1232,175 @@ function VisitRow({
   onToggle: () => void
 }) {
   const { t, lang } = useI18n()
+  const colors = visitColors(visit)
   const duration = visitDurationMs(visit, now)
   const entry = visit.entry
   const exit = visit.exit
   const company = visit.context === 'site' ? (entry ?? exit)?.company_name : null
   const driver = exit?.driver_name || entry?.driver_name || null
-  const colors = visitColors(visit)
-  const details: DescriptionListItem[] = [
-    {
+  const purpose = visitPurposeLabel(visit)
+  const details: { key: string; icon: ReactNode; label: string; value: ReactNode }[] = []
+  if (entry)
+    details.push({
       key: 'entry',
-      icon: <LogIn size={15} />,
+      icon: <LogIn size={14} />,
       label: 'الدخول',
-      value: entry ? (
+      value: (
         <button type="button" className="underline underline-offset-4">
           {formatDateTime(entry.recorded_at)}
         </button>
-      ) : null,
-    },
-    {
+      ),
+    })
+  if (exit)
+    details.push({
       key: 'exit',
-      icon: <LogOut size={15} />,
+      icon: <LogOut size={14} />,
       label: 'الخروج',
-      value: exit ? (
-        <span className="flex flex-wrap items-center gap-1.5">
+      value: (
+        <span className="inline-flex flex-wrap items-center gap-1.5">
           <button type="button" className="underline underline-offset-4">
             {formatDateTime(exit.recorded_at)}
           </button>
-          {visit.context === 'site' && (
-            <ExitPurposeBadge purpose={exit.exit_purpose} />
-          )}
+          {visit.context === 'site' && <ExitPurposeBadge purpose={exit.exit_purpose} />}
         </span>
-      ) : visit.open ? (
-        'ما زالت داخل'
-      ) : null,
-    },
-    {
+      ),
+    })
+  if (entry?.supervisor_name)
+    details.push({
       key: 'foreman',
-      icon: <UserCheck size={15} />,
+      icon: <UserCheck size={14} />,
       label: visit.context === 'site' ? 'الفورمان' : 'مسجل الدخول',
-      value: entry?.supervisor_name,
-    },
-    ...(visit.context === 'site'
-      ? [
-          {
-            key: 'driver',
-            icon: <User size={15} />,
-            label: 'السائق',
-            value: driver,
-          },
-        ]
-      : []),
-  ]
+      value: entry.supervisor_name,
+    })
+  if (visit.context === 'site' && driver)
+    details.push({ key: 'driver', icon: <User size={14} />, label: 'السائق', value: driver })
+
   return (
-    <li
+    <div
       id={`visit-${visit.key}`}
-      className="scroll-mt-24 overflow-hidden rounded-lg border-s-4"
+      className="min-w-0 flex-1 scroll-mt-24 rounded-2xl transition-shadow"
       style={{
-        borderInlineStartColor: colors.stroke,
-        backgroundColor: expanded ? 'var(--surface-hover)' : undefined,
+        backgroundColor: colors.fill,
+        color: 'var(--chart-text)',
+        boxShadow: expanded ? `0 0 0 2px ${colors.stroke}` : undefined,
       }}
     >
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="flex w-full items-center gap-3 px-2 py-2.5 text-start transition-colors hover:bg-surface-hover sm:px-3"
+        className="flex w-full items-start gap-3 p-3.5 text-start sm:p-4"
       >
-        <VisitIcon visit={visit} />
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-1.5">
-            <span className="font-semibold">{visitTitle(visit)}</span>
-            {visit.context === 'workshop' && entry?.workshop_purpose && (
-              <WorkshopPurposeBadge purpose={entry.workshop_purpose} />
+            <span className="text-base font-bold">{visitTitle(visit)}</span>
+            {purpose && (
+              <span className="rounded-full px-2 py-0.5 text-xs font-semibold" style={ON_FILL}>
+                {purpose}
+              </span>
             )}
             {visit.open && (
-              <Badge tone="success" size="sm">
-                ما زالت داخل
-              </Badge>
-            )}
-          </span>
-          {company && (
-            <span className="mt-0.5 block truncate-safe text-xs text-muted">
-              {company}
-            </span>
-          )}
-          <span className="mt-0.5 block text-xs text-muted">
-            <span className="whitespace-nowrap">
-              <bdi dir="ltr">
-                {visit.startedAt ? formatDate(visit.startedAt) : '—'}
-              </bdi>
-              {' ← '}
-              {visit.open ? (
-                'الان'
-              ) : (
-                <bdi dir="ltr">
-                  {visit.endedAt ? formatDate(visit.endedAt) : '—'}
-                </bdi>
-              )}
-            </span>
-            {duration !== null && (
               <span
-                className="ms-1.5 whitespace-nowrap font-bold sm:hidden"
-                style={{ color: colors.stroke }}
+                className="rounded-full px-2 py-0.5 text-xs font-bold"
+                style={{ backgroundColor: colors.stroke, color: 'var(--bg)' }}
               >
-                · {formatElapsedDuration(duration, t, lang)}
+                الحين
               </span>
             )}
           </span>
+          {company && (
+            <span className="mt-0.5 block truncate-safe text-sm opacity-80">{company}</span>
+          )}
+          <span className="mt-1 block text-xs opacity-75">
+            <bdi dir="ltr">{visit.startedAt ? formatDate(visit.startedAt) : '—'}</bdi>
+            {' ← '}
+            {visit.open ? (
+              'الان'
+            ) : (
+              <bdi dir="ltr">{visit.endedAt ? formatDate(visit.endedAt) : '—'}</bdi>
+            )}
+          </span>
         </span>
-        {/* On a phone the duration joins the dates line instead. */}
-        <span className="hidden w-32 shrink-0 justify-end sm:flex">
-          <span
-            className="rounded-full px-2.5 py-1 text-xs font-bold tabular-nums"
-            style={{ backgroundColor: colors.fill, color: 'var(--chart-text)' }}
-          >
+        <span className="shrink-0 text-end">
+          <span className="block text-lg font-bold leading-tight">
             {duration !== null ? formatElapsedDuration(duration, t, lang) : '—'}
           </span>
         </span>
-        <ChevronDown
-          size={16}
-          aria-hidden="true"
-          className={cn(
-            'shrink-0 text-muted transition-transform',
-            expanded && 'rotate-180',
-          )}
-        />
       </button>
-      {expanded && (
-        <div className="pb-2 ps-11 pe-2 sm:ps-14">
-          <DescriptionList items={details} columns={2} />
+      {expanded && details.length > 0 && (
+        <div className="flex flex-wrap gap-2 px-3.5 pb-3.5 sm:px-4 sm:pb-4">
+          {details.map((detail) => (
+            <span
+              key={detail.key}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm"
+              style={ON_FILL}
+            >
+              <span aria-hidden="true" className="opacity-70">
+                {detail.icon}
+              </span>
+              <span className="opacity-70">{detail.label}</span>
+              <span className="min-w-0 font-semibold">{detail.value}</span>
+            </span>
+          ))}
         </div>
       )}
-    </li>
+    </div>
   )
 }
 
-function GapRow({ gap }: { gap: OutsideGap }) {
+/** The time outside as a stretch of road with a truck driving in. */
+function RoadTile({ gap }: { gap: OutsideGap }) {
   return (
-    <li className="flex items-center gap-2 px-2 py-1 text-xs text-muted sm:px-3">
-      <span aria-hidden="true" className="h-px flex-1 border-t border-dashed" />
-      <span>
-        {gap.open ? 'خارج منذ' : 'خارج'} {gap.days} يوم
+    <div
+      className="relative flex h-11 min-w-0 flex-1 items-center overflow-hidden rounded-full px-3"
+      style={{ backgroundColor: STATE_COLORS.outside.fill, color: 'var(--chart-text)' }}
+    >
+      <RoadMarking inset={12} />
+      <span
+        className="inq-drive relative flex h-7 w-7 items-center justify-center rounded-full"
+        style={{ backgroundColor: STATE_COLORS.outside.stroke, color: 'var(--bg)' }}
+        aria-hidden="true"
+      >
+        <Truck size={14} />
       </span>
-      <span aria-hidden="true" className="h-px flex-1 border-t border-dashed" />
-    </li>
+      <span
+        className="relative ms-auto rounded-full px-3 py-1 text-xs font-semibold"
+        style={{ backgroundColor: 'var(--bg)', color: 'var(--fg)' }}
+      >
+        {gap.open ? 'على الطريق منذ' : 'على الطريق'} {gap.days} يوم
+      </span>
+    </div>
   )
 }
 
 type VisitFilter = 'all' | 'site' | 'workshop'
 
-function VisitList({
+function Timeline({
   visits,
   now,
   expandedKey,
   onToggle,
+  index,
 }: {
   visits: EquipmentVisit[]
   now: number
   expandedKey: string | null
   onToggle: (key: string) => void
+  index: number
 }) {
   const [filter, setFilter] = useState<VisitFilter>('all')
   const items = buildTimelineItems(visits, now).filter((item) =>
-    filter === 'all'
-      ? true
-      : item.kind === 'visit' && item.visit.context === filter,
+    filter === 'all' ? true : item.kind === 'visit' && item.visit.context === filter,
   )
   const count = (context: VisitFilter) =>
     context === 'all'
       ? visits.length
       : visits.filter((visit) => visit.context === context).length
 
-  // A year heading before the first item of each year.
-  let lastYear = ''
   return (
-    <div className="card p-4">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <CardTitle icon={<History size={14} />}>سجل الزيارات</CardTitle>
+    <section className={cn(SURFACE, 'inq-rise p-4 sm:p-5')} style={rise(index)}>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <CardTitle icon={<History size={14} />}>الرحلة</CardTitle>
         <Tabs value={filter} onValueChange={(next) => setFilter(next as VisitFilter)}>
           <TabsList variant="segmented" aria-label="نوع الزيارات">
             <TabsTrigger value="all">الكل {count('all')}</TabsTrigger>
@@ -1376,69 +1410,62 @@ function VisitList({
         </Tabs>
       </div>
       {visits.length === 0 ? (
-        <EmptyState
-          icon={<History size={24} aria-hidden="true" />}
-          title="لا توجد زيارات بعد"
-          description="اول دخول للمعدة الى مشروع او الورشة يظهر هنا."
-        />
-      ) : (
-        <ul className="space-y-0.5">
-          {items.map((item) => {
-            const year = item.sortAt.slice(0, 4)
-            const heading =
-              year !== lastYear ? (
-                <li
-                  key={`year-${year}-${item.key}`}
-                  className="px-2 pb-1 pt-3 text-xs font-semibold text-muted first:pt-0 sm:px-3"
-                >
-                  {year}
-                </li>
-              ) : null
-            lastYear = year
-            return [
-              heading,
-              item.kind === 'visit' ? (
-                <VisitRow
-                  key={item.key}
-                  visit={item.visit}
-                  now={now}
-                  expanded={expandedKey === item.visit.key}
-                  onToggle={() => onToggle(item.visit.key)}
-                />
-              ) : (
-                <GapRow key={item.key} gap={item.gap} />
-              ),
-            ]
-          })}
-        </ul>
-      )}
-    </div>
-  )
-}
-
-function InquirySkeleton() {
-  return (
-    <div className="space-y-4" aria-busy="true">
-      <div className="card space-y-4 p-4">
-        <Skeleton className="h-7 w-40" />
-        <Skeleton className="h-24 w-full" />
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {[0, 1, 2, 3].map((index) => (
-            <Skeleton key={index} className="h-[74px] w-full" />
-          ))}
+        <div className="flex flex-col items-center gap-2 rounded-2xl bg-surface px-4 py-10 text-center">
+          <IconTile colors={STATE_COLORS.outside} size={44}>
+            <Truck size={20} />
+          </IconTile>
+          <p className="font-semibold">الرحلة لم تبدا بعد</p>
+          <p className="text-sm text-muted">اول دخول للمعدة الى مشروع او الورشة يظهر هنا.</p>
         </div>
-        <Skeleton className="h-9 w-full" />
-      </div>
-      <div className="card space-y-2 p-4">
-        {[0, 1, 2, 3].map((index) => (
-          <Skeleton key={index} className="h-12 w-full" />
-        ))}
-      </div>
-    </div>
+      ) : (
+        <ol className="relative">
+          {/* The rail behind the stops. */}
+          <span
+            aria-hidden="true"
+            className="absolute bottom-6 top-6 w-0.5 rounded-full bg-surface-hover"
+            style={{ insetInlineStart: 19 }}
+          />
+          {items.map((item, position) => (
+            <li
+              key={item.key}
+              className="inq-rise relative flex items-start gap-3 pb-3 last:pb-0"
+              style={rise(index + 1 + position)}
+            >
+              {item.kind === 'visit' ? (
+                <>
+                  <span className="relative mt-3">
+                    <IconTile colors={visitColors(item.visit)} size={40}>
+                      {visitIcon(item.visit, 18)}
+                    </IconTile>
+                  </span>
+                  <VisitTile
+                    visit={item.visit}
+                    now={now}
+                    expanded={expandedKey === item.visit.key}
+                    onToggle={() => onToggle(item.visit.key)}
+                  />
+                </>
+              ) : (
+                <>
+                  <span className="relative flex h-11 w-10 shrink-0 items-center justify-center">
+                    <span
+                      aria-hidden="true"
+                      className="h-3 w-3 rounded-full"
+                      style={{ backgroundColor: STATE_COLORS.outside.stroke }}
+                    />
+                  </span>
+                  <RoadTile gap={item.gap} />
+                </>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   )
 }
 
-// --- The mockup ------------------------------------------------------------------
+// --- The mockup ---------------------------------------------------------------------------
 
 export function InquiryRedesignMockup() {
   // Taken once after mounting (the server render has no "now" of the
@@ -1446,30 +1473,40 @@ export function InquiryRedesignMockup() {
   // durations do not drift while reviewing.
   const [now, setNow] = useState<number | null>(null)
   useEffect(() => setNow(Date.now()), [])
-  if (now === null) return <InquirySkeleton />
+  if (now === null) return <Skeleton className="h-[560px] w-full rounded-2xl" />
   return <InquiryRedesignMockupAt now={now} />
 }
 
 function InquiryRedesignMockupAt({ now }: { now: number }) {
   const units = useMemo(() => sampleUnits(now), [now])
-  const [state, setState] = useState<DemoState>('data')
+  const [phase, setPhase] = useState<Phase>('hero')
+  const [failed, setFailed] = useState(false)
   const [viewer, setViewer] = useState<Viewer>('admin')
-  const [look, setLook] = useState<Look>('calm')
-  const [unitId, setUnitId] = useState(units[0].id)
-  const [recent, setRecent] = useState<string[]>(['u-f118', 'u-b044'])
+  const [unitId, setUnitId] = useState<string | null>(null)
+  const [run, setRun] = useState(0)
+  const [recent, setRecent] = useState<string[]>(['u-f118', 'u-b044', 'u-a291'])
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
 
-  const unit = units.find((item) => item.id === unitId) ?? units[0]
+  const unit = units.find((item) => item.id === unitId) ?? null
   const visits = useMemo(
-    () => buildEquipmentVisits(unit.movements),
+    () => (unit ? buildEquipmentVisits(unit.movements) : []),
     [unit],
   )
 
-  const pick = (id: string) => {
-    setUnitId(id)
+  useEffect(() => {
+    if (phase !== 'loading') return
+    const timer = window.setTimeout(() => setPhase('result'), 900)
+    return () => window.clearTimeout(timer)
+  }, [phase, run])
+
+  const pick = (picked: DemoUnit) => {
+    setUnitId(picked.id)
     setExpandedKey(null)
-    setRecent((current) => [id, ...current.filter((item) => item !== id)].slice(0, 6))
-    setState('data')
+    setRecent((current) =>
+      [picked.id, ...current.filter((id) => id !== picked.id)].slice(0, 5),
+    )
+    setRun((value) => value + 1)
+    setPhase('loading')
   }
 
   const selectVisit = (key: string) => {
@@ -1481,119 +1518,175 @@ function InquiryRedesignMockupAt({ now }: { now: number }) {
     )
   }
 
+  const hero = phase === 'hero'
+  const createdAt = unit ? now - unit.createdDaysAgo * DAY_MS : now
+  const recentUnits = recent
+    .map((id) => units.find((item) => item.id === id))
+    .filter((item): item is DemoUnit => Boolean(item))
+
   return (
     <section className="space-y-3">
+      <style>{MOTION_CSS}</style>
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h3 className="text-sm font-semibold">صفحة الاستعلام — التصميم الجديد</h3>
           <p className="text-xs text-muted">
-            بيانات عينة. الموقع الحالي للمسؤول فقط كما هو اليوم
-            (equipment.location.view).
+            بيانات عينة: A291 في مشروع، F118 في الورشة، B044 على الطريق، U214
+            جديدة. الموقع الحالي للمسؤول فقط.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Tabs value={look} onValueChange={(next) => setLook(next as Look)}>
-            <TabsList variant="segmented" aria-label="الشكل">
-              <TabsTrigger value="calm">ا · هادئة</TabsTrigger>
-              <TabsTrigger value="bold">ب · جريئة</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Select
-            size="sm"
-            aria-label="المعدة المعروضة"
-            className="w-[210px]"
-            value={unit.id}
-            onValueChange={pick}
-            options={units.map((item) => ({
-              value: item.id,
-              label: `${item.code} · ${
-                item.movements.length === 0
-                  ? 'بدون حركات'
-                  : presence(buildEquipmentVisits(item.movements)) === 'inside_site'
-                    ? 'في مشروع'
-                    : presence(buildEquipmentVisits(item.movements)) ===
-                        'inside_workshop'
-                      ? 'في الورشة'
-                      : 'خارج'
-              }`,
-            }))}
-          />
           <Tabs value={viewer} onValueChange={(next) => setViewer(next as Viewer)}>
             <TabsList variant="segmented" aria-label="المستخدم">
               <TabsTrigger value="admin">مسؤول</TabsTrigger>
               <TabsTrigger value="other">غيره</TabsTrigger>
             </TabsList>
           </Tabs>
-          <Tabs value={state} onValueChange={(next) => setState(next as DemoState)}>
+          <Tabs
+            value={failed ? 'error' : 'ok'}
+            onValueChange={(next) => setFailed(next === 'error')}
+          >
             <TabsList variant="segmented" aria-label="حالة المعاينة">
-              <TabsTrigger value="start">قبل البحث</TabsTrigger>
-              <TabsTrigger value="data">بيانات</TabsTrigger>
-              <TabsTrigger value="loading">تحميل</TabsTrigger>
+              <TabsTrigger value="ok">عادي</TabsTrigger>
               <TabsTrigger value="error">خطا</TabsTrigger>
             </TabsList>
           </Tabs>
+          <Button size="sm" variant="outline" onClick={() => setPhase('hero')}>
+            من البداية
+          </Button>
         </div>
       </div>
 
-      <div className="rounded-xl border bg-surface p-3 sm:p-4">
-        <div className="space-y-4">
-          <h2 className="text-2xl font-bold">استعلام معدة</h2>
+      <div className="relative min-h-[620px] rounded-2xl bg-surface px-3 py-6 sm:px-6">
+        {/* The space above the field shrinks away when the answer comes. */}
+        <div
+          aria-hidden="true"
+          style={{
+            height: hero ? 'clamp(48px, 16vh, 150px)' : 0,
+            transition: 'height 600ms cubic-bezier(.2,.8,.2,1)',
+          }}
+        />
+        <div
+          className="grid transition-[grid-template-rows,opacity] duration-500"
+          style={{ gridTemplateRows: hero ? '1fr' : '0fr', opacity: hero ? 1 : 0 }}
+        >
+          <div className="overflow-hidden">
+            <div className="space-y-2 pb-7 text-center">
+              <h2
+                className="text-3xl font-bold sm:text-4xl"
+                style={{ fontFamily: 'var(--font-heading)' }}
+              >
+                وين المعدة؟
+              </h2>
+              <p className="text-muted">
+                اكتب الكود او اللوحة، ونوريك وين هي الحين ووين قضت سنتها.
+              </p>
+            </div>
+          </div>
+        </div>
 
-          {state === 'start' ? (
-            <StartView units={units} recent={recent} onPick={pick} />
-          ) : (
-            <>
-              <div className="max-w-xl">
-                <SearchField
-                  key={unit.id}
-                  units={units}
-                  onPick={pick}
-                  initial={unit.code}
-                />
-              </div>
-              {state === 'loading' ? (
-                <InquirySkeleton />
-              ) : state === 'error' ? (
-                <ErrorState onRetry={() => setState('data')} />
-              ) : (
-                <>
-                  <HeaderCard
-                    unit={unit}
-                    visits={visits}
-                    now={now}
-                    onSelectVisit={selectVisit}
-                    onChange={() => setState('start')}
-                    look={look}
+        <div
+          className="mx-auto transition-[max-width] duration-500"
+          style={{ maxWidth: hero ? 672 : 560 }}
+        >
+          <InquirySearch
+            key={`${unitId ?? 'none'}-${hero}`}
+            units={units}
+            big={hero}
+            initial={hero ? '' : (unit?.code ?? '')}
+            onPick={pick}
+          />
+        </div>
+
+        {hero && recentUnits.length > 0 && (
+          <div className="inq-rise mx-auto mt-5 max-w-2xl space-y-2 text-center" style={rise(2)}>
+            <p className="text-xs text-muted">اخر استعلاماتك</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {recentUnits.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => pick(item)}
+                  className="inline-flex items-center gap-2 rounded-full bg-bg px-3.5 py-2 text-sm shadow-sm transition-transform hover:-translate-y-0.5"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{
+                      backgroundColor: presenceColors(
+                        buildEquipmentVisits(item.movements),
+                      ).stroke,
+                    }}
                   />
-                  {/* Below xl: facts, location, visits. From xl the visits
-                      span two columns beside the facts and the location. */}
-                  <div className="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:grid-rows-[auto_1fr]">
-                    <div className="space-y-4 xl:col-start-3 xl:row-span-2">
-                      {viewer === 'admin' && unit.movements.length > 0 && (
-                        <LocationCard />
-                      )}
-                      <FactsCard unit={unit} now={now} />
-                    </div>
-                    <div className="xl:col-span-2 xl:col-start-1 xl:row-span-2 xl:row-start-1">
-                      <VisitList
-                        visits={visits}
-                        now={now}
-                        expandedKey={expandedKey}
-                        onToggle={(key) =>
-                          setExpandedKey((current) => (current === key ? null : key))
-                        }
-                      />
-                    </div>
+                  <bdi dir="ltr" className="font-semibold">
+                    {item.code}
+                  </bdi>
+                  <span className="text-xs text-muted">{item.type}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {phase === 'loading' && unit && (
+          <div className="mt-6">
+            <Thinking code={unit.code} />
+          </div>
+        )}
+
+        {phase === 'result' && unit && (
+          <div key={run} className="mx-auto mt-6 max-w-6xl space-y-4">
+            {failed ? (
+              <div className={cn(SURFACE, 'inq-rise p-4')}>
+                <ErrorState onRetry={() => setFailed(false)} />
+              </div>
+            ) : (
+              <>
+                <Header
+                  unit={unit}
+                  visits={visits}
+                  now={now}
+                  onAnother={() => setPhase('hero')}
+                />
+                {visits.length > 0 && (
+                  <>
+                    <YearNumbers visits={visits} createdAt={createdAt} now={now} />
+                    <YearRoad
+                      visits={visits}
+                      createdAt={createdAt}
+                      now={now}
+                      onSelectVisit={selectVisit}
+                    />
+                  </>
+                )}
+                {/* Below xl: facts, location, timeline. From xl the
+                    timeline spans two columns beside them. */}
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                  <div className="space-y-4 xl:col-start-3 xl:row-start-1">
+                    {viewer === 'admin' && unit.movements.length > 0 && (
+                      <LocationCard index={6} />
+                    )}
+                    <FactsCard unit={unit} now={now} index={7} />
                   </div>
-                </>
-              )}
-            </>
-          )}
-        </div>
+                  <div className="xl:col-span-2 xl:col-start-1 xl:row-start-1">
+                    <Timeline
+                      visits={visits}
+                      now={now}
+                      index={8}
+                      expandedKey={expandedKey}
+                      onToggle={(key) =>
+                        setExpandedKey((current) => (current === key ? null : key))
+                      }
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
-      <p className="flex items-center gap-1.5 text-xs text-muted">
-        <Clock size={12} aria-hidden="true" />
-        اضغط على اي جزء من شريط النشاط ليفتح زيارته في السجل.
+      <p className="text-xs text-muted">
+        اضغط على اي جزء من شريط السنة ليفتح زيارته في الرحلة.
       </p>
     </section>
   )
