@@ -107,6 +107,52 @@
     U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
+/* The same Thmanyah files for the text typed in a one-line field (owner
+   2026-10-26: «حتى النص الي ينكتب»). Chrome clips that text to the font's
+   declared height whatever the line-height, and Thmanyah declares 0.216 em
+   below the baseline while the tail of ع and the dots of a final ي reach
+   0.516 em, so they were cut. These faces declare 0.6 em below and add the
+   same 0.384 em above, so the glyphs keep their place in the field. */
+@font-face {
+  font-family: 'ThmanyahField';
+  src: url('/fonts/thmanyah-sans/thmanyahsans-Regular.woff2')
+    format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  ascent-override: 127.5%;
+  descent-override: 60%;
+  line-gap-override: 0%;
+  unicode-range:
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {
+  font-family: 'ThmanyahField';
+  src: url('/fonts/thmanyah-sans/thmanyahsans-Medium.woff2')
+    format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+  ascent-override: 127.5%;
+  descent-override: 60%;
+  line-gap-override: 0%;
+  unicode-range:
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+@font-face {
+  font-family: 'ThmanyahField';
+  src: url('/fonts/thmanyah-sans/thmanyahsans-Bold.woff2')
+    format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  ascent-override: 127.5%;
+  descent-override: 60%;
+  line-gap-override: 0%;
+  unicode-range:
+    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+
 /* Thmanyah Serif Text is reserved for headings (owner 2026-10-26, was Serif
    Display from a CDN): served from the site itself, the owner's own files
    (public/fonts/thmanyah-serif-text), in the two weights headings use. */
@@ -133,10 +179,18 @@
     sans-serif;
   --font-latin: 'Roboto', 'Segoe UI', Arial, system-ui, sans-serif;
   --font-heading: 'Thmanyah Serif Text', 'Thmanyah', 'Segoe UI', serif;
+  --font-field:
+    'ArabicUiDigits', 'ThmanyahField', 'Thmanyah', 'Segoe UI', Tahoma,
+    system-ui, sans-serif;
 }
 
 * {
   font-family: var(--font-primary);
+}
+
+/* One-line fields take the faces that keep ع and a final ي whole. */
+input {
+  font-family: var(--font-field);
 }
 
 h1 {
@@ -339,10 +393,11 @@ body {
     @apply h-8 w-full rounded-lg border bg-transparent px-3 py-0 text-sm outline-none transition-colors placeholder:text-placeholder;
     border-color: var(--border);
     /* Owner 2026-10-26: Thmanyah Sans in inputs too (was Noto Sans Arabic). */
-    font-family: 'ArabicUiDigits', 'Thmanyah', 'Segoe UI', Tahoma, system-ui, sans-serif;
-    /* 24 px, not the old 20 px, so the typed text keeps room for Thmanyah's
-       deep ع and final ي. The field's height is fixed by h-*, so it does not
-       grow. The placeholder does not take it (see `input::placeholder`). */
+    font-family: var(--font-field);
+    /* 24 px, not the old 20 px. The field's height is fixed by h-*, so it
+       does not grow. Neither this nor any line-height keeps Thmanyah's ع
+       whole in Chrome: the `ThmanyahField` faces do, and the placeholder has
+       its own rule (see `input::placeholder`). */
     line-height: 1.5rem;
   }
   html[lang='en'] .input {
