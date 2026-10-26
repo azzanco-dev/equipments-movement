@@ -143,6 +143,13 @@ h1 {
   font-family: var(--font-heading);
 }
 
+/* Everything inside a main heading takes the heading's font (owner
+   2026-10-26: «اهلا، الاسم … خليهم كلهم خط واحد»); without this the `*`
+   rule above gave the name in the greeting the body font. */
+h1 * {
+  font-family: inherit;
+}
+
 h2,
 h3,
 h4,
@@ -163,6 +170,10 @@ html[lang='en'] [lang='ar'] * {
 }
 html[lang='en'] [lang='ar'] h1 {
   font-family: var(--font-heading);
+}
+html[lang='en'] h1 *,
+html[lang='en'] [lang='ar'] h1 * {
+  font-family: inherit;
 }
 
 body {

@@ -52,12 +52,14 @@ export function AdminHomeScreen({
   const { profile } = useAuth()
   const name = greetingName(profile?.full_name)
   const parts = greetingParts(t('homeGreeting'), name !== '')
+  // Owner 2026-10-26: the greeting and the name in one font (the heading's,
+  // through `h1 *` in index.css), larger than other page titles.
   const greeting = parts ? (
-    <>
+    <span className="text-[30px] leading-tight sm:text-[36px]">
       {parts.before}
       <bdi>{name}</bdi>
       {parts.after}
-    </>
+    </span>
   ) : null
   const pathname = usePathname()
   const params = useSearchParams()
