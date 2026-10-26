@@ -10,15 +10,25 @@ import { Field, cn, type FieldControlProps } from '@/components/ui'
 //      shows above the field.
 // Steps so far (owner 2026-10-26): no list yet («الغ القائمة الان»); the
 // field is a search box, so a press focuses it and the phone's keyboard opens
-// natively («الان لما اضغط افتح الكيبورد»); on focus the field moves to 150 px
+// natively («الان لما اضغط افتح الكيبورد»); on focus the field moves to 100 px
 // from the top of the visible area, and again when the keyboard changes the
 // visible height. The readout shows the distances live. Sample page only;
 // AsyncSearchSelect and the screens are untouched.
 
 /** The field's distance from the top of the visible area after a press. */
-const TOP_OFFSET = 150
+const TOP_OFFSET = 100
 
-type Metrics = { top: number; bottom: number }
+type Metrics = {
+  top: number
+  bottom: number
+  /** The raw readings behind the two distances (owner 2026-10-26: the
+   *  distance went negative on the phone with the keyboard open). */
+  rectTop: number
+  viewTop: number
+  viewHeight: number
+  innerHeight: number
+  scrollY: number
+}
 
 /** The visible area in the coordinates getBoundingClientRect uses. */
 function visibleArea() {
@@ -52,6 +62,11 @@ function PressToTopField({
       onMetrics({
         top: Math.round(rect.top - area.top),
         bottom: Math.round(area.bottom - rect.bottom),
+        rectTop: Math.round(rect.top),
+        viewTop: Math.round(area.top),
+        viewHeight: Math.round(area.bottom - area.top),
+        innerHeight: window.innerHeight,
+        scrollY: Math.round(window.scrollY),
       })
     }
     update()
@@ -84,7 +99,7 @@ function PressToTopField({
   }, [])
 
   // While the box has the focus: when the keyboard opens (or closes, or
-  // changes), the visible height changes, and the field goes back to 150 px
+  // changes), the visible height changes, and the field goes back to 100 px
   // in the new visible area. No timers: the event says when.
   useEffect(() => {
     if (!focused) return
@@ -151,6 +166,14 @@ function Readout({ metrics }: { metrics: Metrics | null }) {
     ['المسافة بين الحقل واعلى الشاشة', metrics?.top],
     ['المسافة بين الحقل واسفل الشاشة او الكيبورد', metrics?.bottom],
   ]
+  // The raw readings, to see where a wrong distance comes from.
+  const raw: [string, number | undefined][] = [
+    ['rect.top', metrics?.rectTop],
+    ['visualViewport.offsetTop', metrics?.viewTop],
+    ['visualViewport.height', metrics?.viewHeight],
+    ['innerHeight', metrics?.innerHeight],
+    ['scrollY', metrics?.scrollY],
+  ]
   return (
     <div className="mb-2 grid gap-1 rounded-lg border bg-surface px-3 py-2 text-xs text-muted">
       {rows.map(([label, number]) => (
@@ -161,6 +184,14 @@ function Readout({ metrics }: { metrics: Metrics | null }) {
           </bdi>
         </div>
       ))}
+      <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 border-t pt-1 text-[11px]">
+        {raw.map(([label, number]) => (
+          <div key={label} className="flex items-center justify-between gap-2">
+            <bdi dir="ltr">{label}</bdi>
+            <bdi className="text-fg">{number ?? '—'}</bdi>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -172,7 +203,7 @@ export function MobileSearchFieldShowcase() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted">
-        الخطوة الحالية: الضغط على الحقل يفتح الكيبورد ويرفع الحقل الى 150 بكسل
+        الخطوة الحالية: الضغط على الحقل يفتح الكيبورد ويرفع الحقل الى 100 بكسل
         من اعلى الشاشة، ويعيده اليها اذا تغير مكان الكيبورد. بلا قائمة.
       </p>
 
