@@ -872,7 +872,7 @@ export const translations = {
     // «افاقي» on the admin home (owner 2026-10-26).
     afaqyHomeTitle: 'افاقي',
     afaqyHomeDescription:
-      'اخر اشارة من اجهزة التتبع للمعدات النشطة في البرنامج، تتحدث كل 5 دقائق.',
+      'اخر اشارة من اجهزة التتبع لمعدات العزاني و F النشطة في البرنامج، تتحدث كل 5 دقائق.',
     afaqyHomeLinked: 'مربوطة بجهاز تتبع',
     afaqyHomeRecent: 'اشارة حديثة',
     afaqyHomeRecentHint: 'خلال اخر ساعة',
@@ -2944,7 +2944,7 @@ export const translations = {
     afaqyLastSignal: 'Last signal',
     afaqyHomeTitle: 'Afaqy',
     afaqyHomeDescription:
-      'The last tracker signal of the active equipment in the program, refreshed every 5 minutes.',
+      'The last tracker signal of the active Al-Azani and F equipment in the program, refreshed every 5 minutes.',
     afaqyHomeLinked: 'Linked to a tracker',
     afaqyHomeRecent: 'Recent signal',
     afaqyHomeRecentHint: 'Within the last hour',

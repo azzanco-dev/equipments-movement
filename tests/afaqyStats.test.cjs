@@ -148,6 +148,12 @@ test('the route: permission first, the fleet only, cached Afaqy units', () => {
   )
   assert.match(route, /\.eq\('is_active', true\)/)
   assert.match(route, /\.eq\('status', 'active'\)/)
+  // Owner 2026-10-26: Al-Azani and third-party F only.
+  assert.match(
+    route,
+    /const AFAQY_STATS_OWNERS = \['alazani', 'third_party_f'\]/,
+  )
+  assert.match(route, /\.in\('ownership_status', AFAQY_STATS_OWNERS\)/)
   assert.match(route, /listUnits\(\)/)
   assert.match(route, /buildAfaqyStats\(/)
   assert.match(route, /'Cache-Control': 'no-store'/)

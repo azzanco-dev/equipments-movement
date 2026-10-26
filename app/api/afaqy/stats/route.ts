@@ -16,6 +16,9 @@ const NO_STORE = { 'Cache-Control': 'no-store' }
 const FLEET_PAGE = 1000
 /** Pages of the fleet at most: far above any real fleet. */
 const FLEET_MAX_PAGES = 20
+/** The owners the figures cover (owner 2026-10-26: «خلنا على معدات العزاني
+ *  ومعدات F»). */
+const AFAQY_STATS_OWNERS = ['alazani', 'third_party_f']
 
 function reply(body: Record<string, unknown>, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE })
@@ -30,7 +33,8 @@ type FleetRow = {
 
 /**
  * «افاقي» on the admin home (owner 2026-10-26): Afaqy figures for the
- * program's fleet — the active equipment (`is_active AND status = 'active'`).
+ * program's fleet — the active equipment (`is_active AND status = 'active'`)
+ * of Al-Azani and third-party F only.
  *
  * Request:  GET /api/afaqy/stats with `Authorization: Bearer <token>`.
  * Response: 200 { stats: AfaqyStats } (src/lib/afaqyStats.ts)
@@ -61,6 +65,7 @@ export async function GET(request: Request) {
         .select('id,code,tracker_unit_id,equipment_state')
         .eq('is_active', true)
         .eq('status', 'active')
+        .in('ownership_status', AFAQY_STATS_OWNERS)
         .order('id', { ascending: true })
         .range(page * FLEET_PAGE, (page + 1) * FLEET_PAGE - 1)
       if (error) {
