@@ -27,8 +27,9 @@ export interface InfoGridItem {
 export interface InfoGridProps {
   items: InfoGridItem[]
   /** 2 columns from `sm` up; pass 3 (the default) to also widen to 3 from
-   *  `lg`. One column stacks on mobile either way. */
-  columns?: 2 | 3
+   *  `lg`, or 1 to keep every pair stacked at every width. One column
+   *  stacks on mobile either way. */
+  columns?: 1 | 2 | 3
   className?: string
 }
 
@@ -77,7 +78,8 @@ export function InfoGrid({ items, columns = 3, className }: InfoGridProps) {
   return (
     <dl
       className={cn(
-        'grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2',
+        'grid grid-cols-1 gap-x-6 gap-y-3',
+        columns !== 1 && 'sm:grid-cols-2',
         columns === 3 && 'lg:grid-cols-3',
         className,
       )}

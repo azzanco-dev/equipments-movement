@@ -645,24 +645,24 @@ export function EquipmentInquiryScreen({
 
   const facts: InfoGridItem[] = equipment
     ? [
-        {
-          key: 'owner',
-          icon: <Tag size={15} aria-hidden="true" />,
-          label: t('ownershipStatus'),
-          value: equipment.ownership_status
-            ? t(ownershipBadge(equipment.ownership_status).key)
-            : null,
-        },
-        ...(supplierName
-          ? [
-              {
-                key: 'supplier',
-                icon: <Building2 size={15} aria-hidden="true" />,
-                label: t('inquirySupplier'),
-                value: supplierName,
-              },
-            ]
-          : []),
+        // An external supplier's unit names the supplier in place of «مالك
+        // اخر» (owner 2026-10-26: «اذا كان مالك اخر مايحتاج تحط مالك اخر،
+        // حط المورد مباشرة»); without a supplier the owner stays.
+        supplierName
+          ? {
+              key: 'supplier',
+              icon: <Building2 size={15} aria-hidden="true" />,
+              label: t('inquirySupplier'),
+              value: supplierName,
+            }
+          : {
+              key: 'owner',
+              icon: <Tag size={15} aria-hidden="true" />,
+              label: t('ownershipStatus'),
+              value: equipment.ownership_status
+                ? t(ownershipBadge(equipment.ownership_status).key)
+                : null,
+            },
         {
           key: 'plate',
           icon: <Hash size={15} aria-hidden="true" />,
@@ -855,7 +855,9 @@ export function EquipmentInquiryScreen({
                     style={inquiryRise(6)}
                   >
                     <InquiryCardTitle icon={<Tag size={14} />}>{t('inquiryFacts')}</InquiryCardTitle>
-                    <InfoGrid items={facts} columns={2} />
+                    {/* One pair under the other at every width (owner
+                        2026-10-26: «بيانات المعدة خليها فوق بعض»). */}
+                    <InfoGrid items={facts} columns={1} />
                     <PreviousCodesLine
                       changes={codeChanges}
                       currentCode={equipment.code}
