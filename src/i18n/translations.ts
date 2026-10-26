@@ -872,7 +872,7 @@ export const translations = {
     // «افاقي» on the admin home (owner 2026-10-26).
     afaqyHomeTitle: 'بيانات التتبع في افاقي',
     afaqyHomeDescription:
-      'حالة اجهزة التتبع المركبة على المعدات: الاشارة والحركة والمعدات التي تحتاج متابعة.',
+      'حالة اجهزة تتبع المركبات: الاشارة والحركة والمعدات التي تحتاج متابعة.',
     afaqyHomeLinked: 'مربوطة بجهاز تتبع',
     afaqyHomeRecent: 'اشارة حديثة',
     afaqyHomeRecentHint: 'خلال اخر ساعة',
@@ -2944,7 +2944,7 @@ export const translations = {
     afaqyLastSignal: 'Last signal',
     afaqyHomeTitle: 'Tracking data in Afaqy',
     afaqyHomeDescription:
-      'The state of the trackers fitted on the equipment: signal, movement and the units that need a look.',
+      'The state of the vehicle trackers: signal, movement and the units that need a look.',
     afaqyHomeLinked: 'Linked to a tracker',
     afaqyHomeRecent: 'Recent signal',
     afaqyHomeRecentHint: 'Within the last hour',
