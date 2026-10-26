@@ -195,6 +195,39 @@ export function mapAfaqyUnit(raw: unknown): AfaqyUnit | null {
   return dto
 }
 
+/**
+ * A unit's link state for the admin home's figures (owner 2026-10-26,
+ * probe of the account): kept apart from `AfaqyUnit`, which the position
+ * route returns, so nothing new leaves the server there.
+ *   * `lastMessageAt`: the last message Afaqy received from the device
+ *     (`last_update.dts`, else `dtt`), with or without a position — Afaqy's
+ *     «connection state» is approximated from it.
+ *   * `gpsValid`: `last_update.vLoc` (1 / 0), Afaqy's «satellite» state:
+ *     whether the last message carried a valid GPS fix.
+ */
+export interface AfaqyUnitLink {
+  unitId: string
+  lastMessageAt: string | null
+  gpsValid: boolean | null
+}
+
+export function mapAfaqyLink(raw: unknown): AfaqyUnitLink | null {
+  const unit = asRecord(raw)
+  if (!unit) return null
+  const unitId = unit._id
+  if (typeof unitId !== 'string' || !AFAQY_UNIT_ID_PATTERN.test(unitId))
+    return null
+  const update = asRecord(unit.last_update)
+  const vLoc = update ? finiteNumber(update.vLoc) : null
+  return {
+    unitId,
+    lastMessageAt: update
+      ? (epochToIso(update.dts) ?? epochToIso(update.dtt))
+      : null,
+    gpsValid: vLoc === 1 ? true : vLoc === 0 ? false : null,
+  }
+}
+
 /** The time of the last signal: when Afaqy received it, else the device
  *  time. */
 export function lastSignalTime(position: AfaqyPosition | null): string | null {

@@ -1,23 +1,21 @@
-// «افاقي» on the admin home (owner 2026-10-26: «في الرئيسية حق الادمن ابغى
-// استعرض بيانات احصائية للمعدات في افاقي … خلينا على المعدات الي في البرنامج
-// مضافة»). Pure: the server route joins the program's fleet with the Afaqy
-// units and hands the result here; the card only draws it.
+// «بيانات التتبع في افاقي» on the admin home (owner 2026-10-26: «في
+// الرئيسية حق الادمن ابغى استعرض بيانات احصائية للمعدات في افاقي … خلينا على
+// المعدات الي في البرنامج مضافة»). Pure: the server route joins the program's
+// fleet with the Afaqy link states and hands the result here; the section
+// only draws it.
 //
-// Afaqy gives the LAST signal of each unit only (position, speed, ignition,
-// time), so every figure is a snapshot of now, not a history.
+// Aligned with Afaqy's own two states (owner, same day: «في افاقي فيه
+// connection state و satellite»), as far as the units list allows (read-only
+// probe of the account, 2026-10-26):
+//   * connection: Afaqy's live state is not in the data, so it is
+//     approximated from the last message («ابنيها بالتقريب من وقت اخر
+//     رسالة»): connected when one arrived within the last 30 minutes;
+//   * satellite: `vLoc` of the last message — whether it carried a GPS fix.
 
-import {
-  AFAQY_STALE_AFTER_MS,
-  lastSignalTime,
-  type AfaqyUnit,
-} from '@/lib/afaqy'
+import type { AfaqyUnitLink } from '@/lib/afaqy'
 
-/** A signal older than this is «قديمة» (the location card's stale mark). */
-export const AFAQY_RECENT_MS = AFAQY_STALE_AFTER_MS
-/** A signal older than this is «منقطعة». */
-export const AFAQY_SILENT_MS = 24 * 60 * 60 * 1000
-/** Above this speed (km/h) a unit is moving. */
-export const AFAQY_MOVING_KMH = 5
+/** A unit is «متصلة» when its last message is at most this old. */
+export const AFAQY_ONLINE_MS = 30 * 60 * 1000
 /** Each list carries at most this many units. */
 export const AFAQY_STATS_LIST_MAX = 30
 
@@ -29,13 +27,6 @@ export type ProgramEquipmentState =
   | 'parking'
   | 'out_of_service'
   | 'unclassified'
-
-const WORKSHOP_STATES: ReadonlySet<string> = new Set([
-  'maintenance',
-  'parking',
-  'out_of_service',
-  'unclassified',
-])
 
 /** One active unit of the fleet (is_active AND status = 'active'). */
 export interface FleetEquipment {
@@ -51,47 +42,29 @@ export interface AfaqyStatsUnit {
   id: string
   code: string
   type: string | null
-  /** The time of the last signal (ISO), null when there is none. */
+  /** The time of the last message (ISO), null when there is none. */
   lastSignal: string | null
-  speedKmh: number | null
 }
 
+type ListKey = 'offline' | 'noFix' | 'noSignal'
+
 export interface AfaqyStats {
-  /** The fleet: active equipment of the program. */
+  /** The fleet the figures cover. */
   fleet: number
   /** Linked to an Afaqy unit. */
   linked: number
-  /** Of the linked, by the age of the last signal. A linked unit Afaqy no
-   *  longer knows, or one that never sent a position, is `none`. */
-  signal: { recent: number; stale: number; silent: number; none: number }
-  /** Of the units with a RECENT signal: what they do now. */
-  now: { moving: number; idling: number; off: number }
-  lists: {
-    /** In the workshop in the program, but the engine runs (moving or not). */
-    workshopRunning: AfaqyStatsUnit[]
-    /** Out (available) in the program, but moving. */
-    availableMoving: AfaqyStatsUnit[]
-    /** Engine on, standing still. */
-    idling: AfaqyStatsUnit[]
-    /** No signal for more than a day. */
-    silent: AfaqyStatsUnit[]
-    /** Linked, but no position at all (or Afaqy no longer knows the unit). */
-    noSignal: AfaqyStatsUnit[]
-  }
+  /** Of the linked: connected (a message in the last 30 minutes), not
+   *  connected, and none (never sent a message, or Afaqy no longer knows the
+   *  unit). */
+  connection: { online: number; offline: number; none: number }
+  /** Of the linked that sent a message: the last one had no GPS fix. */
+  noFix: number
+  lists: Record<ListKey, AfaqyStatsUnit[]>
   /** The full count of each list (a list shows at most
    *  AFAQY_STATS_LIST_MAX units). */
-  listTotals: Record<keyof AfaqyStats['lists'], number>
+  listTotals: Record<ListKey, number>
   /** When the figures were made (ISO). */
   generatedAt: string
-}
-
-type Activity = 'moving' | 'idling' | 'off'
-
-function activityOf(unit: AfaqyUnit): Activity {
-  const position = unit.position
-  if (!position) return 'off'
-  if ((position.speedKmh ?? 0) > AFAQY_MOVING_KMH) return 'moving'
-  return position.ignitionOn === true ? 'idling' : 'off'
 }
 
 const byCode = (a: AfaqyStatsUnit, b: AfaqyStatsUnit) =>
@@ -103,78 +76,54 @@ function finish(list: AfaqyStatsUnit[]): AfaqyStatsUnit[] {
 
 export function buildAfaqyStats(
   fleet: readonly FleetEquipment[],
-  units: readonly AfaqyUnit[],
+  links: readonly AfaqyUnitLink[],
   nowMs: number = Date.now(),
 ): AfaqyStats {
-  const unitsById = new Map(units.map((unit) => [unit.unitId, unit]))
-  const signal = { recent: 0, stale: 0, silent: 0, none: 0 }
-  const now = { moving: 0, idling: 0, off: 0 }
-  const workshopRunning: AfaqyStatsUnit[] = []
-  const availableMoving: AfaqyStatsUnit[] = []
-  const idling: AfaqyStatsUnit[] = []
-  const silent: AfaqyStatsUnit[] = []
+  const linksById = new Map(links.map((link) => [link.unitId, link]))
+  const connection = { online: 0, offline: 0, none: 0 }
+  const offline: AfaqyStatsUnit[] = []
+  const noFix: AfaqyStatsUnit[] = []
   const noSignal: AfaqyStatsUnit[] = []
   let linked = 0
 
   for (const equipment of fleet) {
     if (!equipment.trackerUnitId) continue
     linked += 1
-    const unit = unitsById.get(equipment.trackerUnitId)
-    const seen = unit ? lastSignalTime(unit.position) : null
-    const seenMs = seen ? Date.parse(seen) : Number.NaN
+    const link = linksById.get(equipment.trackerUnitId)
+    const lastSignal = link?.lastMessageAt ?? null
+    const lastMs = lastSignal ? Date.parse(lastSignal) : Number.NaN
     const entry: AfaqyStatsUnit = {
       id: equipment.id,
       code: equipment.code,
       type: equipment.type,
-      lastSignal: seen,
-      speedKmh: unit?.position?.speedKmh ?? null,
+      lastSignal,
     }
-    if (!unit || !Number.isFinite(seenMs)) {
-      signal.none += 1
+    if (!Number.isFinite(lastMs)) {
+      connection.none += 1
       noSignal.push(entry)
       continue
     }
-    const age = nowMs - seenMs
-    if (age > AFAQY_SILENT_MS) {
-      signal.silent += 1
-      silent.push(entry)
-      continue
+    if (nowMs - lastMs <= AFAQY_ONLINE_MS) connection.online += 1
+    else {
+      connection.offline += 1
+      offline.push(entry)
     }
-    if (age > AFAQY_RECENT_MS) {
-      signal.stale += 1
-      continue
-    }
-    signal.recent += 1
-    const activity = activityOf(unit)
-    now[activity] += 1
-    if (activity === 'idling') idling.push(entry)
-    if (
-      equipment.state &&
-      WORKSHOP_STATES.has(equipment.state) &&
-      activity !== 'off'
-    )
-      workshopRunning.push(entry)
-    if (equipment.state === 'available' && activity === 'moving')
-      availableMoving.push(entry)
+    if (link?.gpsValid === false) noFix.push(entry)
   }
 
   return {
     fleet: fleet.length,
     linked,
-    signal,
-    now,
+    connection,
+    noFix: noFix.length,
     listTotals: {
-      workshopRunning: workshopRunning.length,
-      availableMoving: availableMoving.length,
-      idling: idling.length,
-      silent: silent.length,
+      offline: offline.length,
+      noFix: noFix.length,
       noSignal: noSignal.length,
     },
     lists: {
-      workshopRunning: finish(workshopRunning),
-      availableMoving: finish(availableMoving),
-      idling: finish(idling),
-      silent: finish(silent),
+      offline: finish(offline),
+      noFix: finish(noFix),
       noSignal: finish(noSignal),
     },
     generatedAt: new Date(nowMs).toISOString(),

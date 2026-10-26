@@ -48,22 +48,12 @@ const minutesAgo = (minutes) =>
   new Date(NOW - minutes * 60 * 1000).toISOString()
 const hex = (n) => n.toString(16).padStart(24, '0')
 
-function unit(n, { minutes, speed = 0, ignition = null } = {}) {
+/** A link state as the server maps it (`mapAfaqyLink`). */
+function link(n, { minutes, gps = true } = {}) {
   return {
     unitId: hex(n),
-    name: `U${n}`,
-    position:
-      minutes === undefined
-        ? null
-        : {
-            lat: 24.7,
-            lng: 46.7,
-            speedKmh: speed,
-            heading: 0,
-            ignitionOn: ignition,
-            deviceTime: minutesAgo(minutes),
-            serverTime: minutesAgo(minutes),
-          },
+    lastMessageAt: minutes === undefined ? null : minutesAgo(minutes),
+    gpsValid: minutes === undefined ? null : gps,
   }
 }
 
@@ -77,7 +67,7 @@ const eq = (n, state, linked = true) => ({
 /** The rows of a list, reduced to their ids. */
 const ids = (rows) => rows.map((row) => row.id)
 
-test('coverage and signal age', () => {
+test('connected, not connected, no satellites, no signal', () => {
   const fleet = [
     eq(1, 'working'),
     eq(2, 'working'),
@@ -85,69 +75,70 @@ test('coverage and signal age', () => {
     eq(4, 'available'),
     eq(5, 'working'),
     eq(6, 'available', false),
+    eq(7, 'working'),
   ]
-  const units = [
-    unit(1, { minutes: 5 }),
-    unit(2, { minutes: 120 }),
-    unit(3, { minutes: 60 * 30 }),
-    unit(4), // never sent a position
+  const links = [
+    link(1, { minutes: 5 }), // connected
+    link(2, { minutes: 30 }), // connected: exactly the limit
+    link(3, { minutes: 31, gps: false }), // not connected, no satellites
+    link(4), // never sent a message
     // 5 is linked but Afaqy no longer knows it
+    link(7, { minutes: 2, gps: false }), // connected, no satellites
   ]
-  const stats = plain(buildAfaqyStats(fleet, units, NOW))
-  assert.equal(stats.fleet, 6)
-  assert.equal(stats.linked, 5)
-  assert.deepEqual(stats.signal, { recent: 1, stale: 1, silent: 1, none: 2 })
-  assert.deepEqual(stats.lists.silent, [
-    {
-      id: 'e3',
-      code: 'A103',
-      type: 'حفار',
-      lastSignal: minutesAgo(60 * 30),
-      speedKmh: 0,
-    },
+  const stats = plain(buildAfaqyStats(fleet, links, NOW))
+  assert.equal(stats.fleet, 7)
+  assert.equal(stats.linked, 6)
+  assert.deepEqual(stats.connection, { online: 3, offline: 1, none: 2 })
+  assert.equal(stats.noFix, 2)
+  assert.deepEqual(stats.lists.offline, [
+    { id: 'e3', code: 'A103', type: 'حفار', lastSignal: minutesAgo(31) },
   ])
-  // The linked units with no position, or unknown to Afaqy.
+  assert.deepEqual(ids(stats.lists.noFix), ['e3', 'e7'])
   assert.deepEqual(ids(stats.lists.noSignal), ['e4', 'e5'])
   assert.equal(stats.lists.noSignal[0].lastSignal, null)
-  assert.equal(stats.listTotals.noSignal, 2)
-})
-
-test('what the recently heard units do now, and the mismatches', () => {
-  const fleet = [
-    eq(1, 'working'),
-    eq(2, 'maintenance'),
-    eq(3, 'available'),
-    eq(4, 'out_of_service'),
-    eq(5, 'available'),
-    eq(6, 'working'),
-  ]
-  const units = [
-    unit(1, { minutes: 1, speed: 30, ignition: true }), // moving on site
-    unit(2, { minutes: 1, speed: 0, ignition: true }), // idling in the workshop
-    unit(3, { minutes: 1, speed: 40, ignition: true }), // out, moving
-    unit(4, { minutes: 1, speed: 0, ignition: false }), // workshop, off
-    unit(5, { minutes: 1, speed: 3, ignition: null }), // slow, unknown: off
-    unit(6, { minutes: 90, speed: 50, ignition: true }), // stale: not «now»
-  ]
-  const stats = plain(buildAfaqyStats(fleet, units, NOW))
-  assert.deepEqual(stats.now, { moving: 2, idling: 1, off: 2 })
-  assert.deepEqual(ids(stats.lists.workshopRunning), ['e2'])
-  assert.deepEqual(ids(stats.lists.availableMoving), ['e3'])
-  assert.equal(stats.lists.availableMoving[0].speedKmh, 40)
-  assert.deepEqual(ids(stats.lists.idling), ['e2'])
+  assert.deepEqual(stats.listTotals, { offline: 1, noFix: 2, noSignal: 2 })
 })
 
 test('lists are sorted by code and capped', () => {
   const fleet = Array.from({ length: 40 }, (_, i) => eq(40 - i, 'working'))
-  const units = fleet.map((_, i) =>
-    unit(40 - i, { minutes: 1, speed: 0, ignition: true }),
+  const links = fleet.map((_, i) => link(40 - i, { minutes: 90 }))
+  const stats = plain(buildAfaqyStats(fleet, links, NOW))
+  assert.equal(stats.connection.offline, 40)
+  assert.equal(stats.lists.offline.length, 30)
+  assert.equal(stats.listTotals.offline, 40)
+  assert.equal(stats.lists.offline[0].code, 'A101')
+  assert.equal(stats.lists.offline[1].code, 'A102')
+})
+
+test('the link DTO: last message with or without a position, vLoc', () => {
+  const { mapAfaqyLink } = createLoader()('afaqy')
+  const id = hex(9)
+  const dts = NOW - 38 * 60 * 1000
+  // A command reply: no position, no GPS fix, still a message.
+  assert.deepEqual(
+    plain(
+      mapAfaqyLink({
+        _id: id,
+        last_update: { dts, dtt: dts, vLoc: 0, vCon: 1 },
+      }),
+    ),
+    { unitId: id, lastMessageAt: new Date(dts).toISOString(), gpsValid: false },
   )
-  const stats = plain(buildAfaqyStats(fleet, units, NOW))
-  assert.equal(stats.now.idling, 40)
-  assert.equal(stats.lists.idling.length, 30)
-  assert.equal(stats.listTotals.idling, 40)
-  assert.equal(stats.lists.idling[0].code, 'A101')
-  assert.equal(stats.lists.idling[1].code, 'A102')
+  assert.deepEqual(
+    plain(mapAfaqyLink({ _id: id, last_update: { dtt: dts, vLoc: 1 } })),
+    { unitId: id, lastMessageAt: new Date(dts).toISOString(), gpsValid: true },
+  )
+  assert.deepEqual(plain(mapAfaqyLink({ _id: id })), {
+    unitId: id,
+    lastMessageAt: null,
+    gpsValid: null,
+  })
+  assert.equal(mapAfaqyLink({ _id: 'bad' }), null)
+  // The position route's DTO does not carry it.
+  assert.doesNotMatch(
+    read('src', 'lib', 'afaqy.ts'),
+    /gpsValid\??: .*\n\s+position:/,
+  )
 })
 
 test('the route: permission first, the fleet only, cached Afaqy units', () => {
@@ -164,7 +155,7 @@ test('the route: permission first, the fleet only, cached Afaqy units', () => {
     /const AFAQY_STATS_OWNERS = \['alazani', 'third_party_f'\]/,
   )
   assert.match(route, /\.in\('ownership_status', AFAQY_STATS_OWNERS\)/)
-  assert.match(route, /listUnits\(\)/)
+  assert.match(route, /listUnitLinks\(\)/)
   assert.match(route, /buildAfaqyStats\(/)
   assert.match(route, /'Cache-Control': 'no-store'/)
 })
@@ -197,19 +188,24 @@ test('the last signal in full words', () => {
   assert.equal(elapsedInWords('not a date', 'ar', NOW), null)
 })
 
-test('only the silent and no-signal tables are shown', () => {
+test('the tables: not connected, no satellites, no signal', () => {
   const card = read('src', 'components', 'admin-home', 'AfaqySection.tsx')
   assert.match(
     card,
-    /\{ key: 'silent', title: 'afaqyHomeSilentList', withSignal: true \}/,
+    /\{ key: 'offline', title: 'afaqyHomeOfflineList', withSignal: true \}/,
+  )
+  assert.match(
+    card,
+    /\{ key: 'noFix', title: 'afaqyHomeNoFixList', withSignal: true \}/,
   )
   assert.match(
     card,
     /\{ key: 'noSignal', title: 'afaqyHomeNoSignalList', withSignal: false \}/,
   )
-  assert.doesNotMatch(
-    card,
-    /workshopRunning|availableMoving|afaqyHomeIdlingList/,
-  )
   assert.match(card, /elapsedInWords\(row\.lastSignal, lang\)/)
+  const stats = read('src', 'lib', 'afaqyStats.ts')
+  assert.match(stats, /export const AFAQY_ONLINE_MS = 30 \* 60 \* 1000/)
+  const server = read('src', 'lib', 'server', 'afaqy.ts')
+  assert.match(server, /export async function listUnitLinks\(\)/)
+  assert.match(server, /const link = mapAfaqyLink\(row\)/)
 })

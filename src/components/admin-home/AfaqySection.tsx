@@ -1,5 +1,12 @@
 import { useCallback, useState, type ReactNode } from 'react'
-import { Clock3, Loader2, Radio, SignalZero, Wifi, WifiOff } from 'lucide-react'
+import {
+  Loader2,
+  Radio,
+  SatelliteDish,
+  SignalZero,
+  Wifi,
+  WifiOff,
+} from 'lucide-react'
 import {
   MiniTable,
   MiniTableGrid,
@@ -31,7 +38,9 @@ interface CardDef {
   icon: ReactNode
 }
 
-/** Coverage and the age of the last signal. */
+/** Coverage, then Afaqy's two states (owner 2026-10-26: «في افاقي فيه
+ *  connection state و satellite»): connected or not (approximated from the
+ *  last message), and the last message without a GPS fix. */
 const SIGNAL_CARDS: CardDef[] = [
   {
     label: 'afaqyHomeLinked',
@@ -40,45 +49,44 @@ const SIGNAL_CARDS: CardDef[] = [
     icon: <Radio size={ICON_SIZE} />,
   },
   {
-    label: 'afaqyHomeRecent',
-    hint: 'afaqyHomeRecentHint',
-    value: (stats) => stats.signal.recent,
+    label: 'afaqyHomeOnline',
+    hint: 'afaqyHomeOnlineHint',
+    value: (stats) => stats.connection.online,
     accent: 'success',
     icon: <Wifi size={ICON_SIZE} />,
   },
   {
-    label: 'afaqyHomeStale',
-    hint: 'afaqyHomeStaleHint',
-    value: (stats) => stats.signal.stale,
-    accent: 'warning',
-    icon: <Clock3 size={ICON_SIZE} />,
-  },
-  {
-    label: 'afaqyHomeSilent',
-    hint: 'afaqyHomeSilentHint',
-    value: (stats) => stats.signal.silent,
+    label: 'afaqyHomeOffline',
+    hint: 'afaqyHomeOfflineHint',
+    value: (stats) => stats.connection.offline,
     accent: 'danger',
     icon: <WifiOff size={ICON_SIZE} />,
   },
   {
+    label: 'afaqyHomeNoFix',
+    hint: 'afaqyHomeNoFixHint',
+    value: (stats) => stats.noFix,
+    accent: 'warning',
+    icon: <SatelliteDish size={ICON_SIZE} />,
+  },
+  {
     label: 'afaqyHomeNoSignal',
     hint: 'afaqyHomeNoSignalHint',
-    value: (stats) => stats.signal.none,
+    value: (stats) => stats.connection.none,
     accent: 'neutral',
     icon: <SignalZero size={ICON_SIZE} />,
   },
 ]
 
 /** The mini tables (owner 2026-10-26: «ابغى الجداول المصغرة»), like the
- *  fleet's: code and type, plus the last signal in full words. The owner
- *  dropped «في الورشة والمحرك يعمل», «خارجة وتتحرك» and «شغالة وواقفة» the
- *  same day; these two stay. */
+ *  fleet's: code and type, plus the last message in full words. */
 const LISTS: {
   key: keyof AfaqyStats['lists']
   title: TranslationKey
   withSignal: boolean
 }[] = [
-  { key: 'silent', title: 'afaqyHomeSilentList', withSignal: true },
+  { key: 'offline', title: 'afaqyHomeOfflineList', withSignal: true },
+  { key: 'noFix', title: 'afaqyHomeNoFixList', withSignal: true },
   // Owner 2026-10-26: «اظهر المعدات بدون اشارة».
   { key: 'noSignal', title: 'afaqyHomeNoSignalList', withSignal: false },
 ]
@@ -91,14 +99,13 @@ export interface AfaqySectionProps {
 }
 
 /**
- * «افاقي» on the admin home (owner 2026-10-26: «ابغى استعرض بيانات احصائية
- * للمعدات في افاقي … خلينا على المعدات الي في البرنامج مضافة»): for the
- * program's active fleet, how many units are linked to a tracker, how fresh
- * their last signal is, what the units heard in the last hour do now, and
- * the units worth a look (engine running in the workshop, moving while out,
- * idling, silent for a day). Afaqy gives the last signal only, so this is a
- * snapshot. Shown with `equipment.location.view` (the «الموقع الحالي» key;
- * the admin role while the permissions load); the route checks it again.
+ * «بيانات التتبع في افاقي» on the admin home (owner 2026-10-26): for the
+ * program's active Al-Azani and F fleet, how many units are linked to a
+ * tracker, how many are connected (a message in the last 30 minutes) or
+ * not, whose last message had no GPS fix, and which never sent anything —
+ * with the units of each in a mini table. Shown with
+ * `equipment.location.view` (the «الموقع الحالي» key; the admin role while
+ * the permissions load); the route checks it again.
  */
 export function AfaqySection(props: AfaqySectionProps) {
   const { profile } = useAuth()

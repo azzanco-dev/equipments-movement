@@ -5,7 +5,7 @@ import {
   type FleetEquipment,
   type ProgramEquipmentState,
 } from '@/lib/afaqyStats'
-import { isAfaqyConfigured, listUnits } from '@/lib/server/afaqy'
+import { isAfaqyConfigured, listUnitLinks } from '@/lib/server/afaqy'
 import { requirePermission } from '@/lib/server/adminRequest'
 
 export const runtime = 'nodejs'
@@ -46,7 +46,8 @@ type FleetRow = {
  *
  * Needs `equipment.location.view`, the key of the «الموقع الحالي» card,
  * checked first. The fleet is read with the caller's token (RLS decides);
- * the Afaqy units come from the five-minute server cache of `listUnits`.
+ * the Afaqy link states (last message, GPS fix) come with the five-minute
+ * server cache of the unit list (`listUnitLinks`).
  * Only counts and equipment codes leave the server.
  */
 export async function GET(request: Request) {
@@ -93,14 +94,14 @@ export async function GET(request: Request) {
     }
 
     if (!isAfaqyConfigured()) return reply({ error: 'not_configured' }, 503)
-    const units = await listUnits()
-    if (!units.ok) {
-      console.error('Afaqy stats request failed', { code: units.error })
-      return units.error === 'not_configured'
+    const links = await listUnitLinks()
+    if (!links.ok) {
+      console.error('Afaqy stats request failed', { code: links.error })
+      return links.error === 'not_configured'
         ? reply({ error: 'not_configured' }, 503)
         : reply({ error: 'provider_unavailable' }, 502)
     }
-    return reply({ stats: buildAfaqyStats(fleet, units.value) }, 200)
+    return reply({ stats: buildAfaqyStats(fleet, links.value) }, 200)
   } catch {
     console.error('Afaqy stats request failed', { code: 'route_threw' })
     return reply({ error: 'failed' }, 500)

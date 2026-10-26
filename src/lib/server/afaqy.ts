@@ -26,9 +26,11 @@
 
 import {
   AFAQY_UNIT_ID_PATTERN,
+  mapAfaqyLink,
   mapAfaqyUnit,
   tokenRefreshAt,
   type AfaqyUnit,
+  type AfaqyUnitLink,
 } from '@/lib/afaqy'
 
 export type AfaqyErrorCode =
@@ -234,12 +236,20 @@ function mapUnits(rows: unknown[]): AfaqyUnit[] {
     .filter((unit): unit is AfaqyUnit => unit !== null)
 }
 
+/**
+ * The link states (last message, GPS fix) of the last full read, by unit id,
+ * for the admin home's figures. Read from the same pages as the unit list,
+ * so they cost no extra request, and never sent by the position route.
+ */
+let latestLinks = new Map<string, AfaqyUnitLink>()
+
 /** Every unit of the account with its last position, uncached. */
 export async function fetchAllUnits(): Promise<AfaqyResult<AfaqyUnit[]>> {
   try {
     const config = afaqyConfig()
     if (!config) return failure('not_configured')
     const units: AfaqyUnit[] = []
+    const links = new Map<string, AfaqyUnitLink>()
     for (let page = 0; page < MAX_PAGES; page += 1) {
       const result = await authorizedData(config, '/units/lists', {
         offset: page * PAGE_SIZE,
@@ -250,8 +260,13 @@ export async function fetchAllUnits(): Promise<AfaqyResult<AfaqyUnit[]>> {
       if (!result.ok) return failure(result.error)
       if (!Array.isArray(result.value)) return failure('provider_error')
       units.push(...mapUnits(result.value))
+      for (const row of result.value) {
+        const link = mapAfaqyLink(row)
+        if (link) links.set(link.unitId, link)
+      }
       if (result.value.length < PAGE_SIZE) {
         const unique = new Map(units.map((unit) => [unit.unitId, unit]))
+        latestLinks = links
         return { ok: true, value: [...unique.values()] }
       }
     }
@@ -293,6 +308,14 @@ export function listUnits(
   })
   pendingUnits = request
   return request
+}
+
+/** The link states of every unit, from the cached unit list (owner
+ *  2026-10-26, the admin home's «بيانات التتبع في افاقي»). Never rejects. */
+export async function listUnitLinks(): Promise<AfaqyResult<AfaqyUnitLink[]>> {
+  const units = await listUnits()
+  if (!units.ok) return units
+  return { ok: true, value: [...latestLinks.values()] }
 }
 
 function pruneCachedPositions(now: number) {
