@@ -870,7 +870,7 @@ export const translations = {
     afaqyLocationStale: 'اخر اشارة منذ اكثر من ساعة، قد لا يكون الموقع حاليا',
     afaqyLastSignal: 'اخر اشارة',
     // «افاقي» on the admin home (owner 2026-10-26).
-    afaqyHomeTitle: 'افاقي',
+    afaqyHomeTitle: 'بيانات التتبع في افاقي',
     afaqyHomeDescription:
       'اخر اشارة من اجهزة التتبع لمعدات العزاني و F النشطة في البرنامج، تتحدث كل 5 دقائق.',
     afaqyHomeLinked: 'مربوطة بجهاز تتبع',
@@ -2942,7 +2942,7 @@ export const translations = {
     afaqyLocationStale:
       'The last signal is more than an hour old; the location may be out of date',
     afaqyLastSignal: 'Last signal',
-    afaqyHomeTitle: 'Afaqy',
+    afaqyHomeTitle: 'Tracking data in Afaqy',
     afaqyHomeDescription:
       'The last tracker signal of the active Al-Azani and F equipment in the program, refreshed every 5 minutes.',
     afaqyHomeLinked: 'Linked to a tracker',
