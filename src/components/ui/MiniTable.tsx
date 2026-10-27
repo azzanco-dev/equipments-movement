@@ -29,6 +29,9 @@ export interface MiniTableProps<Row> {
   onRowClick?: (row: Row) => void
   /** The row's page, for a new tab (see `DataTable`'s `rowHref`). */
   rowHref?: (row: Row) => string | null | undefined
+  /** «عرض الكل» stays beside the title and description instead of wrapping
+   *  under a long description (see `SectionHeader`). */
+  actionBesideText?: boolean
   className?: string
 }
 
@@ -55,6 +58,7 @@ export function MiniTable<Row>({
   empty,
   onRowClick,
   rowHref,
+  actionBesideText = false,
   className,
 }: MiniTableProps<Row>) {
   const { t } = useI18n()
@@ -90,6 +94,7 @@ export function MiniTable<Row>({
           title={title}
           description={description}
           action={action}
+          actionBesideText={actionBesideText}
         />
         {toolbar && <div className="mt-3">{toolbar}</div>}
       </div>

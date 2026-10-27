@@ -36,6 +36,9 @@ export interface SectionHeaderProps {
   action?: ReactNode
   /** Heading level, so pages keep a correct heading outline. */
   as?: 'h2' | 'h3' | 'h4'
+  /** Keeps the action on the text's row however long the description is,
+   *  instead of wrapping it onto a row of its own. */
+  actionBesideText?: boolean
   className?: string
 }
 
@@ -45,16 +48,18 @@ export function SectionHeader({
   description,
   action,
   as: Heading = 'h3',
+  actionBesideText = false,
   className,
 }: SectionHeaderProps) {
   return (
     <div
       className={cn(
-        'flex flex-wrap items-start justify-between gap-x-3 gap-y-2',
+        'flex items-start justify-between gap-x-3 gap-y-2',
+        !actionBesideText && 'flex-wrap',
         className,
       )}
     >
-      <div className="min-w-0">
+      <div className={cn('min-w-0', actionBesideText && 'flex-1')}>
         <Heading className="text-sm font-semibold text-fg">{title}</Heading>
         {description && (
           <p className="mt-0.5 text-xs text-muted">{description}</p>

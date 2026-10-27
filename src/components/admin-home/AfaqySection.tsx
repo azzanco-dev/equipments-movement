@@ -242,6 +242,9 @@ function AfaqySectionContent({ onSelectEquipment }: AfaqySectionProps) {
                       : undefined
                   }
                   rowHref={(row) => `/equipment/${row.id}`}
+                  // Owner 2026-10-27: «عرض الكل» beside the texts above,
+                  // not on a row of its own under the long description.
+                  actionBesideText
                   empty={t('afaqyHomeNone')}
                 />
               )
