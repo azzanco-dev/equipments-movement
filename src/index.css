@@ -861,31 +861,6 @@ textarea::placeholder {
   }
 }
 
-/* What the glass field blurs (owner 2026-10-27: «مو واضح التاثير», the
-   colour shapes «مش حلوة», then «جرب الوهج الملون خلف حقل البحث»): one wide
-   soft glow behind the field, the page's blue on the left and its green on
-   the right, with no edges anywhere. Decorative only. */
-.inquiry-glass-glow {
-  position: absolute;
-  inset: -30px -24px;
-  z-index: -1;
-  pointer-events: none;
-  border-radius: 9999px;
-  background-image:
-    radial-gradient(
-      ellipse 55% 75% at 25% 50%,
-      color-mix(in srgb, var(--chart-stroke-3) 70%, transparent),
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 55% 75% at 75% 50%,
-      color-mix(in srgb, var(--chart-stroke-1) 65%, transparent),
-      transparent 70%
-    );
-  filter: blur(18px);
-  opacity: 0.85;
-}
-
 /* Tried and set aside the same day: one warm glow from the middle, around
    the search field (amber at its heart turning violet). Swap the class on
    the page's frame to use it. */
