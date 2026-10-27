@@ -113,8 +113,14 @@ test('the screen: AI-style start, rings, journey in full, no filter', () => {
   const screen = read('src', 'screens', 'inquiry', 'EquipmentInquiryScreen.tsx')
   assert.match(screen, /<InquirySearch[\s\S]*?big=\{hero\}/)
   assert.match(screen, /t\('inquiryHeroTitle'\)/)
-  // The month rings were chosen for now («اختار مبدئيا الحلقات»).
-  assert.match(screen, /<InquiryYearRings days=\{year\.days\} months=\{year\.months\}/)
+  // The strip, after the rings (owner 2026-10-27: «غير اخر 12 شهر لشريط»);
+  // a stay on it opens its tile in the history.
+  assert.match(
+    screen,
+    /<InquiryYearStrip\s+days=\{year\.days\}\s+months=\{year\.months\}\s+index=\{5\}\s+onSelectVisit=\{selectVisit\}/,
+  )
+  assert.doesNotMatch(screen, /<InquiryYearRings/)
+  assert.match(screen, /getElementById\(inquiryVisitAnchor\(key\)\)/)
   // The last 12 months are read for the window plus the movement before it.
   assert.match(screen, /\.gte\('recorded_at', start\)/)
   assert.match(screen, /\.lt\('recorded_at', start\)[\s\S]*?\.limit\(1\)/)

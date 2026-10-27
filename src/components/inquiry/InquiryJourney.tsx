@@ -77,10 +77,13 @@ function MovementDay({
 function StayTile({
   visit,
   now,
+  highlighted,
   onSelectMovement,
 }: {
   visit: EquipmentVisit
   now: number
+  /** Ringed when the 12-month strip opened it. */
+  highlighted: boolean
   onSelectMovement: (id: string) => void
 }) {
   const { t, lang } = useI18n()
@@ -99,8 +102,12 @@ function StayTile({
 
   return (
     <article
-      className="min-w-0 flex-1 rounded-2xl p-3.5 sm:p-4"
-      style={{ backgroundColor: colors.fill }}
+      id={inquiryVisitAnchor(visit.key)}
+      className="min-w-0 flex-1 scroll-mt-24 rounded-2xl p-3.5 transition-shadow sm:p-4"
+      style={{
+        backgroundColor: colors.fill,
+        boxShadow: highlighted ? `0 0 0 2px ${colors.stroke}` : undefined,
+      }}
     >
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
@@ -210,10 +217,16 @@ function UnrecordedTile({ gap }: { gap: OutsideGap }) {
  * «الرحلة» (owner 2026-10-26): every stay and every unrecorded stretch,
  * newest first, on one rail; no project/workshop filter («بدون فلتر»).
  */
+/** The element id of a stay's tile, for the strip to scroll to. */
+export function inquiryVisitAnchor(key: string): string {
+  return `inquiry-visit-${key.replace(/[^A-Za-z0-9_-]/g, '-')}`
+}
+
 export function InquiryJourney({
   visits,
   now,
   index,
+  highlightedKey = null,
   onSelectMovement,
   footer,
 }: {
@@ -221,6 +234,7 @@ export function InquiryJourney({
   visits: EquipmentVisit[]
   now: number
   index: number
+  highlightedKey?: string | null
   onSelectMovement: (id: string) => void
   /** «عرض المزيد» under the stays. */
   footer?: ReactNode
@@ -270,6 +284,7 @@ export function InquiryJourney({
                   <StayTile
                     visit={item.visit}
                     now={now}
+                    highlighted={highlightedKey === item.visit.key}
                     onSelectMovement={onSelectMovement}
                   />
                 </>

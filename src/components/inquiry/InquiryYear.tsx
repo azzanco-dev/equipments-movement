@@ -191,6 +191,169 @@ function Ring({
   )
 }
 
+type Run = { state: InquiryDay['state']; visit: InquiryDay['visit']; start: number; end: number }
+
+/** Consecutive days of the same state and stay. */
+function runsOf(days: InquiryDay[]): Run[] {
+  const runs: Run[] = []
+  days.forEach((day, position) => {
+    const last = runs[runs.length - 1]
+    if (last && last.state === day.state && last.visit === day.visit) last.end = position
+    else runs.push({ state: day.state, visit: day.visit, start: position, end: position })
+  })
+  return runs
+}
+
+/** The legend under a year view: each state with its days. */
+function YearLegend({ days }: { days: InquiryDay[] }) {
+  const { t } = useI18n()
+  const counts = new Map<string, number>()
+  for (const day of days)
+    if (day.state !== 'before') counts.set(day.state, (counts.get(day.state) ?? 0) + 1)
+  return (
+    <ul className="flex flex-wrap items-center gap-1.5 text-xs">
+      {INQUIRY_STATE_ORDER.filter((key) => counts.get(key)).map((key) => (
+        <li
+          key={key}
+          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"
+          style={{ backgroundColor: INQUIRY_STATE_COLORS[key].fill }}
+        >
+          <span
+            aria-hidden="true"
+            className="h-2.5 w-2.5 rounded-[3px]"
+            style={{ backgroundColor: inquiryDayColor(key) }}
+          />
+          {t(INQUIRY_STATE_LABEL[key])}
+          <span className="font-bold tabular-nums">{counts.get(key)}</span>
+          <span className="text-muted">{t('days')}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/**
+ * The last 12 months as one strip (owner 2026-10-27: «غير اخر 12 شهر
+ * لشريط», after the rings): the oldest day at the start edge, today at the
+ * end edge, every stay a block as long as it lasted in its state's colour,
+ * named with its days when it lasted four weeks or more; «بدون تسجيل» light
+ * grey; the time before the unit was added left bare. A stay opens its tile
+ * in the visit history below.
+ */
+export function InquiryYearStrip({
+  days,
+  months,
+  index,
+  onSelectVisit,
+}: {
+  days: InquiryDay[]
+  months: InquiryMonth[]
+  index: number
+  onSelectVisit: (key: string) => void
+}) {
+  const { t, lang } = useI18n()
+  const format = new Intl.DateTimeFormat(
+    lang === 'ar' ? 'ar-SA-u-ca-gregory-nu-latn' : 'en-GB',
+    { month: 'short', timeZone: 'UTC' },
+  )
+  const pct = (position: number) => (position / days.length) * 100
+  const starts = new Map<string, number>()
+  days.forEach((day, position) => {
+    const date = new Date(day.day * 86_400_000)
+    const key = `${date.getUTCFullYear()}-${date.getUTCMonth()}`
+    if (!starts.has(key)) starts.set(key, position)
+  })
+  const labels = months
+    .map((month) => ({ month, start: starts.get(month.key) ?? 0 }))
+    // A part month of a few days at the window's start would sit on the
+    // next month's name.
+    .filter((item, position, all) => {
+      const next = all[position + 1]
+      return !next || next.start - item.start >= 10
+    })
+
+  return (
+    <section
+      className={cn(INQUIRY_SURFACE, 'inq-rise space-y-3 p-4')}
+      style={inquiryRise(index)}
+    >
+      <InquiryCardTitle icon={<Calendar size={14} />}>
+        {t('inquiryLast12Months')}
+      </InquiryCardTitle>
+      <div className="space-y-1.5">
+        <div className="relative h-14 overflow-hidden rounded-xl bg-surface">
+          {runsOf(days).map((run, position) => {
+            if (run.state === 'before') return null
+            const length = run.end - run.start + 1
+            const strong = run.state !== 'unrecorded'
+            const visit = run.visit
+            const name = visit
+              ? visit.context === 'site'
+                ? (visit.entry ?? visit.exit)?.project_name || t('inquiryStateSite')
+                : `${t('workshopLocation')} · ${t(INQUIRY_STATE_LABEL[run.state])}`
+              : t(INQUIRY_STATE_LABEL[run.state])
+            const label = `${name} · ${length} ${t('days')}`
+            const style = {
+              insetInlineStart: `${pct(run.start)}%`,
+              width: `${pct(length)}%`,
+              backgroundColor: inquiryDayColor(run.state),
+              color: strong ? 'var(--bg)' : 'var(--muted)',
+              boxShadow: 'inset -2px 0 0 var(--bg)',
+              animationDelay: `${300 + position * 80}ms`,
+            }
+            const body =
+              length >= 28 ? (
+                <>
+                  <span className="truncate-safe text-xs font-semibold">{name}</span>
+                  <span className="text-[11px] opacity-80">
+                    {length} {t('days')}
+                  </span>
+                </>
+              ) : null
+            const classes =
+              'inq-grow absolute inset-y-0 flex flex-col justify-center overflow-hidden px-2 text-start'
+            return visit ? (
+              <button
+                key={run.start}
+                type="button"
+                title={label}
+                aria-label={label}
+                onClick={() => onSelectVisit(visit.key)}
+                className={cn(
+                  classes,
+                  'hover:brightness-95 focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                )}
+                style={style}
+              >
+                {body}
+              </button>
+            ) : (
+              <div key={run.start} title={label} className={classes} style={style}>
+                {body}
+              </div>
+            )
+          })}
+        </div>
+        <div className="relative h-4 text-[11px] text-muted" aria-hidden="true">
+          {labels.map(({ month, start }, position) => (
+            <span
+              key={month.key}
+              className={cn(
+                'absolute top-0 whitespace-nowrap',
+                position % 2 === 1 && 'hidden sm:inline',
+              )}
+              style={{ insetInlineStart: `${pct(start)}%` }}
+            >
+              {format.format(new Date(Date.UTC(month.year, month.month, 1)))}
+            </span>
+          ))}
+        </div>
+      </div>
+      <YearLegend days={days} />
+    </section>
+  )
+}
+
 /**
  * The last 12 months as a ring per month (owner 2026-10-26, chosen among
  * six views on /ui-kit: «اختار مبدئيا الحلقات»): the month's days in the

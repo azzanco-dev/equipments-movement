@@ -22,8 +22,11 @@ import type { EquipmentSuggestion } from '@/components/inquiry/EquipmentSuggestS
 import { InquirySearch } from '@/components/inquiry/InquirySearch'
 import { InquiryPlate } from '@/components/inquiry/InquiryPlate'
 import { InquiryNow, type InquiryNowPo } from '@/components/inquiry/InquiryNow'
-import { InquiryYearNumbers, InquiryYearRings } from '@/components/inquiry/InquiryYear'
-import { InquiryJourney } from '@/components/inquiry/InquiryJourney'
+import { InquiryYearNumbers, InquiryYearStrip } from '@/components/inquiry/InquiryYear'
+import {
+  InquiryJourney,
+  inquiryVisitAnchor,
+} from '@/components/inquiry/InquiryJourney'
 import {
   INQUIRY_SURFACE,
   InquiryCardTitle,
@@ -286,6 +289,8 @@ export function EquipmentInquiryScreen({
   const [yearLoadedId, setYearLoadedId] = useState<string | null>(null)
 
   const [po, setPo] = useState<InquiryNowPo>(undefined)
+  // The stay the 12-month strip opened in the history.
+  const [highlightedKey, setHighlightedKey] = useState<string | null>(null)
 
   useEffect(() => setRecent(readRecent()), [])
 
@@ -639,6 +644,15 @@ export function EquipmentInquiryScreen({
     setSuggestions([])
   }, [setEquipmentParam])
 
+  const selectVisit = useCallback((key: string) => {
+    setHighlightedKey(key)
+    window.requestAnimationFrame(() =>
+      document
+        .getElementById(inquiryVisitAnchor(key))
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+    )
+  }, [])
+
   const pickSuggestion = useCallback(
     (suggestion: EquipmentSuggestion) => {
       setQuery(suggestion.code)
@@ -893,7 +907,14 @@ export function EquipmentInquiryScreen({
               ) : year.summary.visitCount > 0 ? (
                 <>
                   <InquiryYearNumbers summary={year.summary} index={1} />
-                  <InquiryYearRings days={year.days} months={year.months} index={5} />
+                  {/* The strip (owner 2026-10-27: «غير اخر 12 شهر لشريط»);
+                      `InquiryYearRings` stays beside it in InquiryYear. */}
+                  <InquiryYearStrip
+                    days={year.days}
+                    months={year.months}
+                    index={5}
+                    onSelectVisit={selectVisit}
+                  />
                 </>
               ) : null}
 
@@ -939,6 +960,7 @@ export function EquipmentInquiryScreen({
                       visits={visits}
                       now={now}
                       index={7}
+                      highlightedKey={highlightedKey}
                       onSelectMovement={selectMovement}
                       footer={
                         hasMoreMovements && (
