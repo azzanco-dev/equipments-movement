@@ -38,19 +38,38 @@
 
 /* Figures in the Arabic interface (owner 2026-10-21): Thmanyah's digits are
    strongly proportional (a 1 is about half a 0) and the face has no tabular
-   feature, so a column of numbers came out ragged. Roboto's figures are
-   equal-width by default, so the digits and the signs inside numbers are
-   taken from Roboto through this range-limited face, listed FIRST in the
-   Arabic stack; every Arabic letter still falls through to Thmanyah, and
-   the result no longer depends on which fallback font a device has. */
+   feature, so a column of numbers came out ragged. The digits and the signs
+   inside numbers come from a range-limited face listed FIRST in the Arabic
+   stack; every Arabic letter still falls through to Thmanyah. It was
+   Roboto; since 2026-10-27 it is Inter (owner: «Inter»), the same face as
+   the Latin letters below, so a code such as A291 reads in one face. Inter's
+   figures are proportional by default: `:root` turns its equal-width
+   figures on (`font-variant-numeric: tabular-nums`). */
 @font-face {
   font-family: 'ArabicUiDigits';
-  src: url('https://cdn.jsdelivr.net/npm/@fontsource-variable/roboto@5.2.5/files/roboto-latin-wght-normal.woff2')
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource-variable/inter@5.2.5/files/inter-latin-wght-normal.woff2')
     format('woff2');
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
   unicode-range: U+0030-0039, U+002C-002E, U+0025, U+002B, U+003A;
+}
+
+/* Latin letters in the Arabic interface (owner 2026-10-27: «هل اقدر اخلي
+   الخطوط الانجليزية في حال اللغة العربية يكون لها خط مختلف عن ثمانية؟» ›
+   «Inter»): Thmanyah's faces cover the Arabic ranges only, so codes, plates
+   and Latin names fell to whatever the device had (Segoe UI, the Apple
+   face, …). This face takes the printable Basic Latin range (not the space,
+   which stays Thmanyah's in Arabic text) right after Thmanyah. The English
+   interface keeps Roboto. */
+@font-face {
+  font-family: 'InterLatin';
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource-variable/inter@5.2.5/files/inter-latin-wght-normal.woff2')
+    format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0021-007E;
 }
 
 /* Thmanyah Sans remains the Arabic interface font. Since 2026-10-25 (owner)
@@ -175,13 +194,16 @@
 
 :root {
   --font-primary:
-    'ArabicUiDigits', 'Thmanyah', 'Tajawal', 'Segoe UI', Tahoma, system-ui,
-    sans-serif;
+    'ArabicUiDigits', 'Thmanyah', 'InterLatin', 'Tajawal', 'Segoe UI', Tahoma,
+    system-ui, sans-serif;
   --font-latin: 'Roboto', 'Segoe UI', Arial, system-ui, sans-serif;
   --font-heading: 'Thmanyah Serif Text', 'Thmanyah', 'Segoe UI', serif;
   --font-field:
-    'ArabicUiDigits', 'ThmanyahField', 'Thmanyah', 'Segoe UI', Tahoma,
-    system-ui, sans-serif;
+    'ArabicUiDigits', 'ThmanyahField', 'Thmanyah', 'InterLatin', 'Segoe UI',
+    Tahoma, system-ui, sans-serif;
+  /* Inter's figures equal-width, so number columns line up (Roboto's were
+     by default; Thmanyah has no such feature and ignores it). */
+  font-variant-numeric: tabular-nums;
 }
 
 * {
