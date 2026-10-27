@@ -768,25 +768,11 @@ textarea::placeholder {
 
 /* Inquiry page background (owner 2026-10-27: «تقدر تسوي gradient للخلفية
    حق الصفحة؟»): the one gradient of the page, behind everything; the cards
-   on it stay flat.
-   In use: one glow from the middle, around the search field (owner: «سوي
-   واحد ثاني من النص يكون التدرج»), warm (owner: «غير الالوان» › «دافي»):
-   the light amber chart shade in its heart turning violet and fading into
-   the surface. */
+   on it stay flat. In use: the two glows at the top corners, blue on the
+   start side and green on the end side — the one the owner kept («هذا
+   احفظه على جنب») and came back to after trying the middle («لا خلاص ارجع
+   للي قلت لك احفظها»). */
 .inquiry-page-bg {
-  background-image: radial-gradient(
-    ellipse 70% 60% at 50% 30%,
-    color-mix(in srgb, var(--chart-2) 90%, var(--chart-stroke-2)) 0%,
-    color-mix(in srgb, var(--chart-5) 85%, var(--chart-stroke-5)) 40%,
-    transparent 75%
-  );
-  background-repeat: no-repeat;
-}
-
-/* Kept aside (owner: «هذا احفظه على جنب»): two glows at the top corners,
-   blue on the start side and green on the end side. Swap the class on the
-   page's frame to bring it back. */
-.inquiry-page-bg--corners {
   background-image:
     radial-gradient(
       ellipse 80% 55% at 85% 0%,
@@ -798,6 +784,19 @@ textarea::placeholder {
       color-mix(in srgb, var(--chart-1) 85%, var(--chart-stroke-1)),
       transparent 70%
     );
+  background-repeat: no-repeat;
+}
+
+/* Tried and set aside the same day: one warm glow from the middle, around
+   the search field (amber at its heart turning violet). Swap the class on
+   the page's frame to use it. */
+.inquiry-page-bg--middle {
+  background-image: radial-gradient(
+    ellipse 70% 60% at 50% 30%,
+    color-mix(in srgb, var(--chart-2) 90%, var(--chart-stroke-2)) 0%,
+    color-mix(in srgb, var(--chart-5) 85%, var(--chart-stroke-5)) 40%,
+    transparent 75%
+  );
   background-repeat: no-repeat;
 }
 
