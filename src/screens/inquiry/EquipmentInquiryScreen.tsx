@@ -820,6 +820,9 @@ export function EquipmentInquiryScreen({
         className="relative z-10 mx-auto transition-[max-width] duration-500"
         style={{ maxWidth: hero ? 640 : 520 }}
       >
+        {/* A soft colour glow behind the glass field, so its blur shows
+            (owner 2026-10-27: «جرب الوهج الملون خلف حقل البحث»). */}
+        <span aria-hidden="true" className="inquiry-glass-glow" />
         <InquirySearch
           query={query}
           onQueryChange={setQuery}
