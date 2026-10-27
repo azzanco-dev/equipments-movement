@@ -54,8 +54,8 @@ const ROUTE_KEYS = {
 const ADMIN_ONLY_BY_DESIGN = new Set([])
 
 /** The rest of the movement API: no requirePermission gate of its own (RLS
- *  through the forwarded token and the database functions decide; it still
- *  reads profiles.role for early 403s, outside wave 24). */
+ *  through the forwarded token and the database functions decide); its
+ *  early 403s ask has_permission (roles stage 2, 2026-10-27). */
 const NO_ROUTE_GATE = new Set([
   'app/api/movements/route.ts',
   'app/api/movements/[id]/photos/route.ts',
@@ -124,11 +124,13 @@ test('every API route decides by its permission key; none by the role', () => {
     )
     const key = ROUTE_KEYS[route]
     if (!key) {
-      // The movement API (outside wave 24) still reads profiles.role for its
-      // cheap early 403s; its database functions and RLS re-check fail
-      // closed. It has no requirePermission gate of its own.
+      // The movement API has no requirePermission gate of its own. Since the
+      // roles stage 2 (owner 2026-10-27) its early 403s ask has_permission
+      // for the key the database re-checks, never profiles.role.
       assert.ok(NO_ROUTE_GATE.has(route), `${route} is listed`)
-      assert.ok(!/requirePermission|has_permission/.test(source), route)
+      assert.ok(!/requirePermission/.test(source), route)
+      assert.ok(!/select\('role'\)|\.role\b/.test(source), `${route} reads the role`)
+      assert.match(source, /rpc\('has_permission', \{/, route)
       continue
     }
     assert.ok(

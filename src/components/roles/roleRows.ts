@@ -20,12 +20,15 @@ const SYSTEM_ROLE_ORDER = [
   'monitor',
 ]
 
-/** System roles first in their usual order, then custom roles by creation. */
+/**
+ * The six original roles first in their usual order, then the others by
+ * creation. By key, not `is_system`: since migration 0151 only the admin
+ * role is a locked system role, and the five others keep their place.
+ */
 export function sortRoles<
   T extends Pick<Role, 'key' | 'is_system' | 'created_at'>,
 >(rows: ReadonlyArray<T>): T[] {
   const rank = (row: T) => {
-    if (!row.is_system) return SYSTEM_ROLE_ORDER.length + 1
     const index = SYSTEM_ROLE_ORDER.indexOf(row.key)
     return index === -1 ? SYSTEM_ROLE_ORDER.length : index
   }

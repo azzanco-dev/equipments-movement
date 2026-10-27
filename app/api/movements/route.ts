@@ -222,22 +222,18 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', userId)
-      .maybeSingle()
-    if (
-      !profile ||
-      (movementContext === 'workshop'
-        ? ![
-            'admin',
-            'workshop',
-            'assistant_workshop_manager',
-            'workshop_manager',
-          ].includes(profile.role)
-        : !['admin', 'supervisor'].includes(profile.role))
-    ) {
+    // The assigned role decides (owner 2026-10-27, roles stage 2): the
+    // context's create key, the one the database re-checks
+    // (enforce_movement_sequence). In the legacy mapping it is held by
+    // exactly the roles this route used to list: admin and the foreman for
+    // a project, admin and the three workshop roles for the workshop.
+    const { data: allowed } = await supabase.rpc('has_permission', {
+      p_key:
+        movementContext === 'workshop'
+          ? 'movements.workshop.create'
+          : 'movements.site.create',
+    })
+    if (allowed !== true) {
       return NextResponse.json({ error: 'access_denied' }, { status: 403 })
     }
 

@@ -26,10 +26,18 @@ async function authenticate(request: Request) {
   if (error || !data.user) return null
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('id')
     .eq('id', data.user.id)
     .maybeSingle()
-  return profile ? { supabase, user: data.user, role: profile.role } : null
+  if (!profile) return null
+  // The assigned role decides (owner 2026-10-27, roles stage 2): the
+  // legacy role blocked `monitor` here; `movements.photos.manage` is
+  // the key the database re-checks (can_write_movement_photos), held by
+  // every role but the monitor in the legacy mapping.
+  const { data: allowed } = await supabase.rpc('has_permission', {
+    p_key: 'movements.photos.manage',
+  })
+  return { supabase, user: data.user, canManagePhotos: allowed === true }
 }
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -56,7 +64,7 @@ async function addPhotos(request: Request, context: RouteContext) {
   const auth = await authenticate(request)
   if (!auth)
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  if (auth.role === 'monitor')
+  if (!auth.canManagePhotos)
     return NextResponse.json({ error: 'access_denied' }, { status: 403 })
   const { id } = await context.params
   const { data: movement } = await auth.supabase
@@ -303,7 +311,7 @@ async function deletePhoto(request: Request, context: RouteContext) {
   const auth = await authenticate(request)
   if (!auth)
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  if (auth.role === 'monitor')
+  if (!auth.canManagePhotos)
     return NextResponse.json({ error: 'access_denied' }, { status: 403 })
   const { id } = await context.params
   const body = (await request.json().catch(() => null)) as {

@@ -29,12 +29,14 @@ const fn = (name) => {
   return body.slice(open, body.indexOf('$$;', open + 5))
 }
 
-test('0150 is the newest migration', () => {
+test('0150 follows 0149', () => {
   const files = fs
     .readdirSync(path.join(root, 'supabase', 'migrations'))
     .filter((file) => file.endsWith('.sql'))
     .sort()
-  assert.equal(files.at(-1), MIGRATION)
+  const index = files.indexOf(MIGRATION)
+  assert.ok(index > 0)
+  assert.match(files[index - 1], /_0149_/)
 })
 
 test('the guards abort unless the system is on and the admin parity holds', () => {
