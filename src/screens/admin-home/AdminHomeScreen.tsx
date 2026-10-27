@@ -7,7 +7,6 @@ import { AvailabilitySection } from '@/components/admin-home/AvailabilitySection
 import { EntriesFlowSection } from '@/components/admin-home/EntriesFlowSection'
 import { FleetDonutSection } from '@/components/admin-home/FleetDonutSection'
 import { FleetStateSection } from '@/components/admin-home/FleetStateSection'
-import { ForemanActivitySection } from '@/components/admin-home/ForemanActivitySection'
 import { WhatsAppStatusAlert } from '@/components/WhatsAppGatewayStatus'
 import { useI18n } from '@/i18n/I18nContext'
 import { useAuth } from '@/auth/AuthContext'
@@ -29,9 +28,10 @@ export interface AdminHomeScreenProps {
  * Order follows the owner's third review (2026-09-22), revised by the
  * approved design of 2026-09-30: the fleet's state right now across the full
  * width, with its mini tables under the cards (inside sites, in the workshop,
- * available, latest entries, latest added equipment — "متاحة" replaced the
- * standalone "معدات بلا حركة" section), then "التوفر حسب النوع", the two
- * donuts, the entries chart and the per-foreman activity cards.
+ * available — "متاحة" replaced the standalone "معدات بلا حركة" section), then
+ * "التوفر حسب النوع", the two donuts and the entries chart. Owner 2026-10-27
+ * removed the per-foreman activity section and the «اخر الدخوليات» and «اخر
+ * المعدات المضافة» tables.
  *
  * There is no page-level owner filter any more (owner review, same session):
  * the owner is a dimension each section answers for itself. The sections that
@@ -129,7 +129,6 @@ export function AdminHomeScreen({
           showExits={showExits}
           onShowExitsChange={setShowExits}
         />
-        <ForemanActivitySection />
       </div>
     </>
   )

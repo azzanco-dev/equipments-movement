@@ -102,8 +102,6 @@ export const FLEET_EXPORT_FILE_NAMES: Record<FleetMiniTableId, string> = {
   inside: 'inside-sites',
   workshop: 'in-workshop',
   available: 'available-equipment',
-  entries: 'latest-entries',
-  added: 'latest-equipment',
 }
 
 function companyProject(

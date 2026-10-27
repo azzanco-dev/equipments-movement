@@ -7,7 +7,6 @@ import {
   type ReactNode,
 } from 'react'
 import { flushSync } from 'react-dom'
-import { useRouter } from 'next/navigation'
 import { FileSpreadsheet } from 'lucide-react'
 import {
   Badge,
@@ -15,7 +14,6 @@ import {
   Card,
   DataTable,
   MiniTable,
-  MiniTableGrid,
   SectionHeader,
   Tabs,
   TabsList,
@@ -37,17 +35,12 @@ import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import {
   fetchFleetEquipment,
-  fetchLatestEntries,
-  fetchLatestEquipment,
   fetchMovementRecorderNames,
 } from '@/lib/adminHomeData'
 import {
   collectAllPages,
   FLEET_EXPORT_FILE_NAMES,
   fleetEquipmentExcelColumns,
-  latestEntriesExcelColumns,
-  latestEntryCompany,
-  latestEquipmentExcelColumns,
   type FleetExportLabels,
 } from '@/lib/adminHomeExport'
 import {
@@ -64,8 +57,6 @@ import {
   type FleetJumpTarget,
   type FleetMiniTableId,
   type FleetSortKey,
-  type LatestEntryRow,
-  type LatestEquipmentRow,
   type WorkshopPurposeFilter,
 } from '@/lib/adminHomeStats'
 import type { ExcelColumn } from '@/lib/excel'
@@ -164,8 +155,11 @@ interface FleetTableProps<Row> {
    *  total is `count(*) OVER ()` and costs nothing extra). */
   showCount?: boolean
   excelColumns: (labels: FleetExportLabels) => ExcelColumn<Row>[]
-  /** The card's position in `MiniTableGrid`, in source order. */
+  /** The card's position in the grid, in source order. */
   gridIndex: number
+  /** Takes the whole grid row even collapsed (owner 2026-10-27: «متاحة»
+   *  under the two other tables, across the full width). */
+  fullRow?: boolean
   /**
    * wave-16-sort: the expanded table's starting sort, which must be the
    * database's default order (latest movement first). Given only for the
@@ -174,10 +168,9 @@ interface FleetTableProps<Row> {
   defaultSort?: DataTableSort
 }
 
-// `MiniTableGrid` is one column on phones, two from `md` and three from `xl`
-// (Tailwind's default 768 / 1280 px breakpoints).
+// The grid is one column on phones and two equal columns from `md`
+// (Tailwind's default 768 px breakpoint; owner 2026-10-27).
 const GRID_QUERIES = [
-  { query: '(min-width: 1280px)', columns: 3 },
   { query: '(min-width: 768px)', columns: 2 },
 ] as const
 
@@ -260,6 +253,7 @@ function FleetTable<Row>({
   showCount = false,
   excelColumns,
   gridIndex,
+  fullRow = false,
   defaultSort,
 }: FleetTableProps<Row>) {
   const { t, lang } = useI18n()
@@ -393,7 +387,7 @@ function FleetTable<Row>({
       }}
       className={cn(
         'min-w-0 scroll-mt-20 rounded-xl outline-none transition-shadow duration-300',
-        expanded && 'md:col-span-2 xl:col-span-3',
+        (expanded || fullRow) && 'md:col-span-2',
         highlighted && 'ring-2 ring-ring ring-offset-2 ring-offset-bg',
       )}
     >
@@ -493,14 +487,14 @@ export interface FleetMiniTablesProps {
 
 /**
  * The mini tables under the fleet state cards (owner-approved design,
- * 2026-09-30): inside sites, in the workshop (with purpose chips), available,
- * the latest entries and the latest added equipment. Three across on desktop,
- * one on a phone.
+ * 2026-09-30): inside sites, in the workshop (with purpose chips) and
+ * available. Owner 2026-10-27: the latest entries and the latest added
+ * equipment are gone; inside and workshop sit in two equal columns and
+ * available spans the full row under them (one column on a phone).
  *
- * Everything is server-side: the three state tables read
- * `get_admin_fleet_equipment` (migration 0107), the latest entries read
- * `movement_log_search` and the latest equipment reads `equipment`, each
- * limited to 7 rows collapsed and paginated by 20 expanded. Every table loads
+ * Everything is server-side: the three tables read
+ * `get_admin_fleet_equipment` (migration 0107), each limited to 7 rows
+ * collapsed and paginated by 20 expanded. Every table loads
  * on its own and shows its own failure, so one broken table never blanks the
  * others or the cards above them.
  */
@@ -510,7 +504,6 @@ export function FleetMiniTables({
   onSelectEquipment,
 }: FleetMiniTablesProps) {
   const { t, lang } = useI18n()
-  const router = useRouter()
   const ownerLabel = useOwnerLabel()
   const [purpose, setPurpose] = useState<WorkshopPurposeFilter>('all')
   const [highlighted, setHighlighted] = useState<FleetMiniTableId | null>(null)
@@ -575,17 +568,6 @@ export function FleetMiniTables({
     },
     [owners],
   )
-  const loadEntries = useCallback<LoadPage<LatestEntryRow>>(
-    (page, pageSize, count, signal) =>
-      fetchLatestEntries({ owners, page, pageSize, count }, signal),
-    [owners],
-  )
-  const loadAdded = useCallback<LoadPage<LatestEquipmentRow>>(
-    (page, pageSize, count, signal) =>
-      fetchLatestEquipment({ owners, page, pageSize, count }, signal),
-    [owners],
-  )
-
   const openEquipment = onSelectEquipment
     ? (row: { id: string }) => onSelectEquipment(row.id)
     : undefined
@@ -666,7 +648,13 @@ export function FleetMiniTables({
         <Badge tone="neutral">{t('adminHomeUnclassified')}</Badge>
       ),
   }
-  const workshopColumns = [codeColumn, purposeColumn, sinceColumn]
+  // Owner 2026-10-27: the type in the workshop card too, on every width.
+  const workshopColumns = [
+    codeColumn,
+    { ...typeColumn, hideBelow: undefined },
+    purposeColumn,
+    sinceColumn,
+  ]
   const purposeChips = (
     <Tabs
       value={purpose}
@@ -760,79 +748,8 @@ export function FleetMiniTables({
         : companyProjectColumn.cell(row),
   }
 
-  // --- 4. latest entries --------------------------------------------------
-  const entryColumns: DataTableColumn<LatestEntryRow>[] = [
-    {
-      key: 'code',
-      header: t('adminHomeColEquipment'),
-      cell: (row) => (
-        <span className="font-semibold">{row.equipmentCode || '—'}</span>
-      ),
-    },
-    {
-      key: 'company',
-      header: t('company'),
-      cell: (row) =>
-        row.context === 'workshop' ? (
-          <span className="text-muted">{t('workshopContext')}</span>
-        ) : (
-          latestEntryCompany(row, lang, t) || '—'
-        ),
-    },
-    {
-      key: 'foreman',
-      header: t('adminHomeColForeman'),
-      cell: (row) => row.foreman ?? t('adminHomeUnknown'),
-    },
-    {
-      key: 'date',
-      header: t('adminHomeColMovementDate'),
-      align: 'end',
-      width: '6.5rem',
-      cell: (row) => date(row.recordedAt),
-    },
-  ]
-  const entryExpandedColumns: DataTableColumn<LatestEntryRow>[] = [
-    ...entryColumns.slice(0, 3),
-    {
-      key: 'type',
-      header: t('adminHomeColType'),
-      hideBelow: 'md',
-      cell: (row) => row.equipmentType,
-    },
-    {
-      key: 'owner',
-      header: t('adminHomeColOwner'),
-      hideBelow: 'lg',
-      cell: (row) => ownerLabel(row.owner),
-    },
-    entryColumns[3],
-  ]
-
-  // --- 5. latest added equipment ------------------------------------------
-  const addedColumns: DataTableColumn<LatestEquipmentRow>[] = [
-    {
-      key: 'code',
-      header: t('adminHomeColEquipment'),
-      cell: (row) => <span className="font-semibold">{row.code}</span>,
-    },
-    { key: 'type', header: t('adminHomeColType'), cell: (row) => row.type },
-    {
-      key: 'owner',
-      header: t('adminHomeColOwner'),
-      cell: (row) => ownerLabel(row.owner),
-    },
-    {
-      key: 'added',
-      header: t('adminHomeColAddedAt'),
-      align: 'end',
-      width: '6.5rem',
-      cell: (row) => date(row.createdAt),
-    },
-  ]
-
   return (
-    <MiniTableGrid>
+    <div className="grid gap-4 md:grid-cols-2">
       <FleetTable
         table="inside"
         gridIndex={0}
@@ -885,6 +802,7 @@ export function FleetMiniTables({
       <FleetTable
         table="available"
         gridIndex={2}
+        fullRow
         title={t('adminHomeAvailable')}
         description={t('adminHomeFleetAvailableDescription')}
         columns={availableColumns}
@@ -908,37 +826,6 @@ export function FleetMiniTables({
           fleetEquipmentExcelColumns('available', labels)
         }
       />
-      <FleetTable
-        table="entries"
-        gridIndex={3}
-        title={t('adminHomeFleetEntriesTitle')}
-        description={t('adminHomeFleetEntriesDescription')}
-        columns={entryColumns}
-        expandedColumns={entryExpandedColumns}
-        loadPage={loadEntries}
-        filterKey={ownersKey}
-        rowKey={(row) => row.id}
-        // Both admin and monitor can open a movement's detail page.
-        onRowClick={(row) => router.push(`/movements/${row.id}`)}
-        empty={t('adminHomeFleetEntriesEmpty')}
-        highlighted={highlighted === 'entries'}
-        excelColumns={latestEntriesExcelColumns}
-      />
-      <FleetTable
-        table="added"
-        gridIndex={4}
-        title={t('adminHomeFleetAddedTitle')}
-        description={t('adminHomeFleetAddedDescription')}
-        columns={addedColumns}
-        expandedColumns={addedColumns}
-        loadPage={loadAdded}
-        filterKey={ownersKey}
-        rowKey={(row) => row.id}
-        onRowClick={openEquipment}
-        empty={t('adminHomeFleetAddedEmpty')}
-        highlighted={highlighted === 'added'}
-        excelColumns={latestEquipmentExcelColumns}
-      />
-    </MiniTableGrid>
+    </div>
   )
 }

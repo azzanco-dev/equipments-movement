@@ -424,7 +424,9 @@ test('every state card jumps to the mini table that lists its units', () => {
     purpose: 'unclassified',
   })
   assert.deepEqual(target('available'), { table: 'available' })
-  assert.deepEqual(target('total'), { table: 'added' })
+  // Owner 2026-10-27: the latest added table is gone; the total jumps to
+  // the first table.
+  assert.deepEqual(target('total'), { table: 'inside' })
   // Every card has a table, and every jump target is a real mini table.
   for (const state of admin.FLEET_DRILL_STATES) {
     const jump = admin.fleetJumpTarget(state)
@@ -687,7 +689,6 @@ test('the latest-equipment export carries the added date as a date cell', () => 
     'adminHomeColAddedAt',
   ])
   assert.equal(columns[3].type, 'date')
-  assert.equal(exporter.FLEET_EXPORT_FILE_NAMES.added, 'latest-equipment')
 })
 
 test('parseForemanRecentMovements groups rows and keeps database order', () => {

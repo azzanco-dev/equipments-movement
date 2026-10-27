@@ -447,14 +447,9 @@ export function fleetEquipmentRpcArgs(params: {
   }
 }
 
-/** The five mini tables, in drawing order. */
-export const FLEET_MINI_TABLES = [
-  'inside',
-  'workshop',
-  'available',
-  'entries',
-  'added',
-] as const
+/** The three mini tables, in drawing order (owner 2026-10-27 removed the
+ *  latest entries and the latest added equipment). */
+export const FLEET_MINI_TABLES = ['inside', 'workshop', 'available'] as const
 export type FleetMiniTableId = (typeof FLEET_MINI_TABLES)[number]
 
 /** The DOM id of a mini table, which the state cards point at with
@@ -473,7 +468,7 @@ export interface FleetJumpTarget {
  * Where a state card jumps (owner-approved design, 2026-09-30): each card
  * scrolls to the mini table that lists its units, and the five workshop cards
  * also pick the matching chip. The total has no single state, so it jumps to
- * the latest added equipment.
+ * the first table (the latest added equipment until owner 2026-10-27).
  */
 export function fleetJumpTarget(state: FleetDrillState): FleetJumpTarget {
   switch (state) {
@@ -492,7 +487,7 @@ export function fleetJumpTarget(state: FleetDrillState): FleetJumpTarget {
     case 'available':
       return { table: 'available' }
     default:
-      return { table: 'added' }
+      return { table: 'inside' }
   }
 }
 

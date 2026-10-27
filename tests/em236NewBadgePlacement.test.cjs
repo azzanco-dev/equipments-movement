@@ -100,7 +100,7 @@ test('the fleet tables share one code column and have no local badge', () => {
   )
   // The inside-sites and workshop tables build on the same column.
   assert.match(source, /const insideColumns = \[codeColumn,/)
-  assert.match(source, /const workshopColumns = \[codeColumn,/)
+  assert.match(source, /const workshopColumns = \[\s*codeColumn,/)
 })
 
 test('the inquiry no longer carries isNew in its state object', () => {
