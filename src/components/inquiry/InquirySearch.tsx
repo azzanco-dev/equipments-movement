@@ -134,8 +134,10 @@ export function InquirySearch({
                   onMouseDown={(event) => event.preventDefault()}
                   onMouseEnter={() => setActive(index)}
                   onClick={() => choose(suggestion)}
+                  // Taller rows (owner 2026-10-27: «زيد الارتفاع حق المعدة في
+                  // قائمة اختيار المعدات في الاستعلام»).
                   className={cn(
-                    'flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-sm',
+                    'flex min-h-12 cursor-pointer items-center gap-3 rounded-xl px-3 py-3 text-sm',
                     index === active && 'bg-surface-hover',
                   )}
                 >
