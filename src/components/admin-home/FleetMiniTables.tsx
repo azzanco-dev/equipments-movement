@@ -353,6 +353,18 @@ function FleetTable<Row>({
     }
   }
 
+  // Owner 2026-10-27: a serial number on each row of the mini card (its
+  // rows are the first page, so the position is the number).
+  const cardRows = data?.rows ?? []
+  const numberColumn: DataTableColumn<Row> = {
+    key: 'rowNumber',
+    header: '#',
+    width: '2.5rem',
+    cell: (row) => (
+      <span className="text-muted tabular-nums">{cardRows.indexOf(row) + 1}</span>
+    ),
+  }
+
   const summary =
     showCount && data && !failed
       ? `${description} · ${t('adminHomeFleetCount').replace('{count}', String(total))}`
@@ -461,7 +473,7 @@ function FleetTable<Row>({
           className="h-full"
           title={title}
           description={summary}
-          columns={columns}
+          columns={[numberColumn, ...columns]}
           rows={data?.rows ?? []}
           rowKey={rowKey}
           maxRows={FLEET_MINI_ROWS}
@@ -724,11 +736,6 @@ export function FleetMiniTables({
         <span className="text-muted">—</span>
       ),
   }
-  const availableColumns = [
-    availableCodeColumn,
-    availableTypeColumn,
-    lastExitColumn,
-  ]
   const foremanColumn: DataTableColumn<ForemanRow> = {
     key: 'foreman',
     header: t('adminHomeColForeman'),
@@ -747,6 +754,14 @@ export function FleetMiniTables({
         ? t('adminHomeLastSiteWorkshop')
         : companyProjectColumn.cell(row),
   }
+  // Owner 2026-10-27: the last project in the card too (it spans the full
+  // row now), on every width.
+  const availableColumns: DataTableColumn<ForemanRow>[] = [
+    availableCodeColumn,
+    availableTypeColumn,
+    { ...availableCompanyProjectColumn, hideBelow: undefined },
+    lastExitColumn,
+  ]
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
