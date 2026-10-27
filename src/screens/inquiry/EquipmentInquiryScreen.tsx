@@ -817,7 +817,7 @@ export function EquipmentInquiryScreen({
       </div>
 
       <div
-        className="relative z-10 mx-auto transition-[max-width] duration-500"
+        className="mx-auto transition-[max-width] duration-500"
         style={{ maxWidth: hero ? 640 : 520 }}
       >
         <InquirySearch
