@@ -2,8 +2,10 @@ import { useId, useState } from 'react'
 import { ArrowLeft, ArrowRight, Search } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { Badge, Spinner, cn } from '@/components/ui'
+import { equipmentStateText, parseEquipmentState } from '@/lib/equipmentState'
 import type { EquipmentSuggestion } from './EquipmentSuggestSearch'
 import { InquiryPlate } from './InquiryPlate'
+import { InquiryStateDot } from './inquiryStyle'
 
 export interface InquirySearchProps {
   query: string
@@ -39,6 +41,10 @@ export function InquirySearch({
   const showList = open && query.trim().length > 0
   const activeId = suggestions[active] ? `${listId}-${suggestions[active].id}` : undefined
   const Send = lang === 'ar' ? ArrowLeft : ArrowRight
+  const stateLabel = (value: unknown) => {
+    const parsed = parseEquipmentState(value)
+    return parsed ? equipmentStateText(t, parsed) : null
+  }
 
   const choose = (suggestion: EquipmentSuggestion | undefined) => {
     if (!suggestion) return
@@ -141,6 +147,10 @@ export function InquirySearch({
                     index === active && 'bg-surface-hover',
                   )}
                 >
+                  <InquiryStateDot
+                    state={suggestion.equipment_state}
+                    label={stateLabel(suggestion.equipment_state)}
+                  />
                   <bdi dir="ltr" className="font-semibold">
                     {suggestion.code}
                   </bdi>

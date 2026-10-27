@@ -126,6 +126,12 @@ test('the screen: AI-style start, rings, journey in full, no filter', () => {
   assert.match(screen, /if \(!equipmentId \|\| !canSeePurchasing\)/)
   // The supplier of an external unit.
   assert.match(screen, /ownership_status === 'external_supplier' \? equipment\.lessor\?\.name/)
+  // 2026-10-27: the state dot of each suggestion and recent unit, and the
+  // page title above the field once the answer shows.
+  assert.match(screen, /\.select\('id,code,type,plate_number,chassis_number,equipment_state'\)/)
+  assert.match(screen, /\.select\('id,equipment_state'\)\s+\.in\('id', recentIds\.split\(','\)\)/)
+  assert.match(screen, /hero \? 'sr-only' : 'inq-rise mb-3 text-center/)
+  assert.match(read('src', 'components', 'inquiry', 'InquirySearch.tsx'), /<InquiryStateDot/)
 
   const journey = read('src', 'components', 'inquiry', 'InquiryJourney.tsx')
   assert.doesNotMatch(journey, /TabsTrigger|aria-expanded/)

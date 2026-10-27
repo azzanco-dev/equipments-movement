@@ -25,6 +25,9 @@ export interface EquipmentSuggestion {
   /** The query matched a previous code of this unit, not its current code
    *  (EM-196); the row shows a small neutral «رقم سابق» badge. */
   matched_previous_code?: boolean
+  /** The derived state (`equipment_state` computed field) for the new
+   *  inquiry's coloured dot; the old showcase ignores it. */
+  equipment_state?: string | null
 }
 
 export interface EquipmentSuggestSearchProps {

@@ -67,6 +67,42 @@ export function inquiryDayColor(state: InquiryStateKey | 'before'): string {
   return INQUIRY_STATE_COLORS[state].stroke
 }
 
+/** The page's state of a derived equipment state: working = a project, the
+ *  workshop states by purpose (unclassified counts as maintenance), and
+ *  available = «بدون تسجيل»; null for an unknown value. */
+export function inquiryKeyOfEquipmentState(state: unknown): InquiryStateKey | null {
+  if (state === 'working') return 'site'
+  if (state === 'maintenance' || state === 'unclassified') return 'maintenance'
+  if (state === 'parking' || state === 'out_of_service') return state
+  if (state === 'available') return 'unrecorded'
+  return null
+}
+
+/**
+ * The small dot of a unit's state beside its code (in the suggestions and
+ * the recent searches), named for screen readers; nothing for an unknown
+ * state.
+ */
+export function InquiryStateDot({
+  state,
+  label,
+}: {
+  state: unknown
+  label: string | null
+}) {
+  const key = inquiryKeyOfEquipmentState(state)
+  if (!key) return null
+  return (
+    <span
+      role="img"
+      aria-label={label ?? undefined}
+      title={label ?? undefined}
+      className="h-2.5 w-2.5 shrink-0 rounded-full"
+      style={{ backgroundColor: INQUIRY_STATE_COLORS[key].stroke }}
+    />
+  )
+}
+
 export function inquiryStateIcon(key: InquiryStateKey, size: number): ReactNode {
   const Icon =
     key === 'site'

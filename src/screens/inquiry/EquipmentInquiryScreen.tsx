@@ -27,6 +27,7 @@ import { InquiryJourney } from '@/components/inquiry/InquiryJourney'
 import {
   INQUIRY_SURFACE,
   InquiryCardTitle,
+  InquiryStateDot,
   inquiryRise,
 } from '@/components/inquiry/inquiryStyle'
 import { buildEquipmentVisits, type TimelineMovement } from '@/lib/visitTimeline'
@@ -55,7 +56,9 @@ import { EquipmentLocationCard } from '@/components/afaqy/EquipmentLocationCard'
 import { preferRecordName } from '@/lib/driverDisplayName'
 import {
   equipmentStateFromMovement,
+  equipmentStateText,
   isEquipmentNew,
+  parseEquipmentState,
   type EquipmentState,
 } from '@/lib/equipmentState'
 import { EquipmentStateBadge } from '@/components/equipment/EquipmentStateBadge'
@@ -92,6 +95,8 @@ interface InquiryEquipmentRow {
   created_at?: string | null
   ownership_status?: OwnershipStatus | null
   lessor?: { id: string; name: string | null } | null
+  /** The suggestions' dot only. */
+  equipment_state?: string | null
 }
 
 interface MovementLogTimelineRow {
@@ -284,6 +289,32 @@ export function EquipmentInquiryScreen({
 
   useEffect(() => setRecent(readRecent()), [])
 
+  // The recent units' current states, for their dots: one bounded read
+  // whenever the start shows (a failed read only drops the dots).
+  const [recentStates, setRecentStates] = useState<Map<string, string>>(new Map())
+  const recentIds = recent.map((item) => item.id).join(',')
+  useEffect(() => {
+    if (equipmentId || !recentIds) return
+    let active = true
+    void supabase
+      .from('equipment')
+      .select('id,equipment_state')
+      .in('id', recentIds.split(','))
+      .then(({ data, error }) => {
+        if (!active || error) return
+        setRecentStates(
+          new Map(
+            ((data as { id: string; equipment_state: string | null }[] | null) ?? [])
+              .filter((row) => row.equipment_state)
+              .map((row) => [row.id, row.equipment_state as string]),
+          ),
+        )
+      })
+    return () => {
+      active = false
+    }
+  }, [equipmentId, recentIds])
+
   const selectMovement = useCallback(
     (id: string) => {
       if (onSelectMovement) onSelectMovement(id)
@@ -324,9 +355,12 @@ export function EquipmentInquiryScreen({
       const previous = await fetchPreviousCodeMatchIds(supabase, term, signal)
       if (!active || signal.aborted) return
       const previousPart = previousCodeOrPart(previous.ids)
+      // `equipment_state` (computed field, SECURITY INVOKER) colours the
+      // dot beside each code (owner 2026-10-27, «اضفها»): from the
+      // movements this reader may see, as on the equipment list.
       const { data, error } = await supabase
         .from('equipment')
-        .select('id,code,type,plate_number,chassis_number')
+        .select('id,code,type,plate_number,chassis_number,equipment_state')
         .or(previousPart ? `${filter},${previousPart}` : filter)
         .order('code')
         .limit(SUGGEST_LIMIT)
@@ -348,6 +382,7 @@ export function EquipmentInquiryScreen({
               chassis_number: row.chassis_number,
               matched_previous_code:
                 previousIds.has(row.id) && !codeMatchesTerm(row.code, term),
+              equipment_state: row.equipment_state ?? null,
             })),
       )
       setSuggestLoading(false)
@@ -690,7 +725,18 @@ export function EquipmentInquiryScreen({
 
   return (
     <div className="min-h-[70vh] rounded-3xl bg-surface px-3 py-6 sm:px-6">
-      <h1 className="sr-only">{t('inquiryPageTitle')}</h1>
+      {/* The page's name: for screen readers while the start's question
+          shows, above the field once the answer is below it (owner
+          2026-10-27: «اضف عنوان الصفحة فوق حقل البحث لما تكون النتائج في
+          الاسفل»). */}
+      <h1
+        className={cn(
+          hero ? 'sr-only' : 'inq-rise mb-3 text-center text-xl font-bold sm:text-2xl',
+        )}
+        style={hero ? undefined : { fontFamily: 'var(--font-heading)' }}
+      >
+        {t('inquiryPageTitle')}
+      </h1>
       {/* The page's start (owner 2026-10-26: «نفس واجهات الAI الرئيسية الي
           يكون الحقل في النص، وفيه وصف بسيط»): the space above the field and
           the question fold away when a unit is shown. */}
@@ -750,6 +796,13 @@ export function EquipmentInquiryScreen({
                 }}
                 className="inline-flex items-center gap-2 rounded-full bg-bg px-3 py-1.5 text-sm shadow-sm transition-transform hover:-translate-y-0.5"
               >
+                <InquiryStateDot
+                  state={recentStates.get(item.id)}
+                  label={(() => {
+                    const parsed = parseEquipmentState(recentStates.get(item.id))
+                    return parsed ? equipmentStateText(t, parsed) : null
+                  })()}
+                />
                 <bdi dir="ltr" className="font-semibold">
                   {item.code}
                 </bdi>
