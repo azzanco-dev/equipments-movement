@@ -120,12 +120,16 @@ export function inquiryStateIcon(key: InquiryStateKey, size: number): ReactNode 
 /** Borderless surface with a soft shadow. */
 export const INQUIRY_SURFACE = 'rounded-2xl bg-bg shadow-sm'
 
-/** A box or pill inside a filled card: a lighter shade of that card's own
- *  colour (owner 2026-10-27: «المربعات الي داخل المربعات الملونة … نخليها
- *  الدرجة … الافتح من نفس الكارد الاب»; it was a translucent white that
- *  read as grey). */
-export function inquiryInnerFill(colors: Pick<InquiryColors, 'fill'>): CSSProperties {
-  return { backgroundColor: `color-mix(in srgb, ${colors.fill} 40%, var(--bg))` }
+/** A box or pill inside a filled card: a darker shade of that card's own
+ *  colour — its fill with 15% of its strong colour (owner 2026-10-27, «لو
+ *  صارت اغمق؟», after a lighter shade, `color-mix(in srgb, fill 40%,
+ *  var(--bg))`, from «المربعات الي داخل المربعات الملونة … الدرجة الاغمق او
+ *  الافتح من نفس الكارد الاب»; it was a translucent white that read as
+ *  grey). */
+export function inquiryInnerFill(
+  colors: Pick<InquiryColors, 'fill' | 'stroke'>,
+): CSSProperties {
+  return { backgroundColor: `color-mix(in srgb, ${colors.fill} 85%, ${colors.stroke})` }
 }
 
 /** The stagger of the n-th block of the answer (`.inq-rise`). */
