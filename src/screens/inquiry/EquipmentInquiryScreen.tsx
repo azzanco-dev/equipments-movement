@@ -792,7 +792,7 @@ export function EquipmentInquiryScreen({
     : []
 
   return (
-    <div className="min-h-[70vh] rounded-3xl bg-surface px-3 py-6 sm:px-6">
+    <div className="inquiry-page-bg min-h-[70vh] rounded-3xl bg-surface px-3 py-6 sm:px-6">
       {/* The page's name: for screen readers while the start's question
           shows, above the field once the answer is below it (owner
           2026-10-27: «اضف عنوان الصفحة فوق حقل البحث لما تكون النتائج في

@@ -163,7 +163,7 @@ test('the screen: AI-style start, rings, journey in full, no filter', () => {
   assert.doesNotMatch(journey, /exit\?\.supervisor_name \?\?/)
 })
 
-test('the look: flat state colours, no gradient, reduced motion respected', () => {
+test('the look: flat cards, one soft page wash, reduced motion respected', () => {
   const style = read('src', 'components', 'inquiry', 'inquiryStyle.tsx')
   for (const file of [
     style,
@@ -173,6 +173,13 @@ test('the look: flat state colours, no gradient, reduced motion respected', () =
     read('src', 'screens', 'inquiry', 'EquipmentInquiryScreen.tsx'),
   ])
     assert.doesNotMatch(file, /linear-gradient|radial-gradient/)
+  // The one gradient is the page background, in the stylesheet (owner
+  // 2026-10-27: «تقدر تسوي gradient للخلفية حق الصفحة؟»).
+  assert.match(
+    read('src', 'screens', 'inquiry', 'EquipmentInquiryScreen.tsx'),
+    /className="inquiry-page-bg /,
+  )
+  assert.match(read('src', 'index.css'), /\.inquiry-page-bg \{\s+background-image:\s+radial-gradient\(/)
   assert.match(style, /unrecorded: \{\s+fill: light\('var\(--chart-4\)'\)/)
   const css = read('src', 'index.css')
   assert.match(

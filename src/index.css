@@ -766,6 +766,25 @@ textarea::placeholder {
 }
 /* ===== purchasing: PO print sheet — end ===== */
 
+/* Inquiry page background (owner 2026-10-27: «تقدر تسوي gradient للخلفية
+   حق الصفحة؟»): the one gradient of the page, behind everything — a soft
+   wash of the blue and green chart shades at the top that fades into the
+   surface; the cards on it stay flat. */
+.inquiry-page-bg {
+  background-image:
+    radial-gradient(
+      ellipse 80% 55% at 85% 0%,
+      color-mix(in srgb, var(--chart-3) 55%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 10% 5%,
+      color-mix(in srgb, var(--chart-1) 45%, transparent),
+      transparent 70%
+    );
+  background-repeat: no-repeat;
+}
+
 /* Inquiry page motion (owner 2026-10-26, «لما تجي النتايج تجي
    بانيميشن»): the answer rises in block by block, the share bars grow from
    the start edge, the month rings draw in and the «نبحث عن» dots pulse.
