@@ -861,6 +861,59 @@ textarea::placeholder {
   }
 }
 
+/* What the glass field blurs (owner 2026-10-27: «مو واضح التاثير» — over a
+   plain background frosted glass shows nothing): three soft colour shapes
+   behind the field, partly under it — the glass blurs the part beneath, the
+   rest shows plainly around it — drifting slowly. Decorative only. */
+.inquiry-glass-backdrop {
+  position: absolute;
+  inset: -28px -12px;
+  z-index: -1;
+  pointer-events: none;
+}
+.inquiry-blob {
+  position: absolute;
+  border-radius: 9999px;
+  opacity: 0.75;
+  animation: inq-float 9s ease-in-out infinite alternate;
+}
+.inquiry-blob--blue {
+  inset-inline-start: 6%;
+  top: 0;
+  width: 110px;
+  height: 110px;
+  background-color: var(--chart-stroke-3);
+}
+.inquiry-blob--green {
+  inset-inline-start: 46%;
+  top: 34%;
+  width: 90px;
+  height: 90px;
+  background-color: var(--chart-stroke-1);
+  animation-delay: -3s;
+}
+.inquiry-blob--violet {
+  inset-inline-end: 8%;
+  bottom: 0;
+  width: 76px;
+  height: 76px;
+  background-color: var(--chart-stroke-5);
+  animation-delay: -6s;
+}
+@keyframes inq-float {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(18px, -10px) scale(1.12);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inquiry-blob {
+    animation: none;
+  }
+}
+
 /* Tried and set aside the same day: one warm glow from the middle, around
    the search field (amber at its heart turning violet). Swap the class on
    the page's frame to use it. */
