@@ -56,7 +56,9 @@ export function InquirySearch({
     <div className="relative w-full">
       <div
         className={cn(
-          'flex items-center gap-3 rounded-2xl bg-bg pe-2 ps-4 shadow-md transition-[height] duration-500',
+          // Frosted glass, as on iOS (owner 2026-10-27: «حط خانة البحث تأثير
+          // زجاجي نفس تبع IOS»): `.inquiry-glass` in src/index.css.
+          'inquiry-glass flex items-center gap-3 rounded-2xl pe-2 ps-4 transition-[height] duration-500',
           big ? 'h-14' : 'h-11',
         )}
       >
@@ -113,7 +115,7 @@ export function InquirySearch({
       </div>
       {showList && (
         <div
-          className="inq-rise absolute inset-x-0 top-full z-30 mt-2 max-h-80 overflow-y-auto rounded-2xl bg-bg p-1.5 shadow-xl"
+          className="inquiry-glass inquiry-glass--strong inq-rise absolute inset-x-0 top-full z-30 mt-2 max-h-80 overflow-y-auto rounded-2xl p-1.5"
           style={{ animationDuration: '220ms' }}
         >
           {loading ? (

@@ -828,6 +828,31 @@ textarea::placeholder {
   opacity: 0.22;
 }
 
+/* Frosted glass for the inquiry's search field (owner 2026-10-27: «حط خانة
+   البحث تأثير زجاجي نفس تبع IOS»): the page colour at 55% over a strong
+   blur that also lifts the colours behind it (the page glows and grain),
+   a fine light rim drawn as an inset shadow (no border) and a soft drop
+   shadow. The suggestion list under it is the same glass, more opaque so
+   its rows stay readable over the answer. Browsers without backdrop
+   filters get the plain, nearly opaque surface. */
+.inquiry-glass {
+  background-color: color-mix(in srgb, var(--bg) 55%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--bg) 70%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--bg) 90%, transparent),
+    0 10px 30px -12px rgb(0 0 0 / 0.25);
+}
+.inquiry-glass--strong {
+  background-color: color-mix(in srgb, var(--bg) 78%, transparent);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .inquiry-glass {
+    background-color: color-mix(in srgb, var(--bg) 94%, transparent);
+  }
+}
+
 /* Tried and set aside the same day: one warm glow from the middle, around
    the search field (amber at its heart turning violet). Swap the class on
    the page's frame to use it. */
