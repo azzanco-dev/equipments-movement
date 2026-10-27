@@ -2,11 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Roboto is applied only when the interface language is English: one
-   variable file covers every weight. */
+/* The English interface's font: Inter since 2026-10-27 (owner: «استبدله
+   بخط Inter»; it was Roboto), the same file as the Latin letters and
+   digits of the Arabic interface, so both languages share one face and one
+   download. One variable file covers every weight. */
 @font-face {
-  font-family: 'Roboto';
-  src: url('https://cdn.jsdelivr.net/npm/@fontsource-variable/roboto@5.2.5/files/roboto-latin-wght-normal.woff2')
+  font-family: 'Inter';
+  src: url('https://cdn.jsdelivr.net/npm/@fontsource-variable/inter@5.2.5/files/inter-latin-wght-normal.woff2')
     format('woff2');
   font-weight: 100 900;
   font-style: normal;
@@ -38,7 +40,7 @@
    and Latin names fell to whatever the device had (Segoe UI, the Apple
    face, …). This face takes the printable Basic Latin range (not the space,
    which stays Thmanyah's in Arabic text) right after Thmanyah. The English
-   interface keeps Roboto. */
+   interface uses the same file as 'Inter'. */
 @font-face {
   font-family: 'InterLatin';
   src: url('https://cdn.jsdelivr.net/npm/@fontsource-variable/inter@5.2.5/files/inter-latin-wght-normal.woff2')
@@ -156,13 +158,13 @@
   --font-primary:
     'ArabicUiDigits', 'Thmanyah', 'InterLatin', 'Segoe UI', Tahoma, system-ui,
     sans-serif;
-  --font-latin: 'Roboto', 'Segoe UI', Arial, system-ui, sans-serif;
+  --font-latin: 'Inter', 'Segoe UI', Arial, system-ui, sans-serif;
   --font-heading: 'Thmanyah Serif Text', 'Thmanyah', 'Segoe UI', serif;
   --font-field:
     'ArabicUiDigits', 'ThmanyahField', 'Thmanyah', 'InterLatin', 'Segoe UI',
     Tahoma, system-ui, sans-serif;
-  /* Inter's figures equal-width, so number columns line up (Roboto's were
-     by default; Thmanyah has no such feature and ignores it). */
+  /* Inter's figures equal-width, so number columns line up (Thmanyah has
+     no such feature and ignores it). */
   font-variant-numeric: tabular-nums;
 }
 
