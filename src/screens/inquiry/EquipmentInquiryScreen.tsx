@@ -810,7 +810,7 @@ export function EquipmentInquiryScreen({
           الاسفل»). */}
       <h1
         className={cn(
-          hero ? 'sr-only' : 'inq-rise mb-3 text-center text-xl font-bold sm:text-2xl',
+          hero ? 'sr-only' : 'inq-rise mb-3 text-center mt-6 text-xl font-bold sm:mt-10 sm:text-2xl',
         )}
         style={hero ? undefined : { fontFamily: 'var(--font-heading)' }}
       >
