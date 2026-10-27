@@ -97,8 +97,10 @@ test('the client keeps no trace of the scope: no token, no admin-only field chan
   assert.doesNotMatch(read('src', 'lib', 'movementSaveErrors.ts'), /company_not_in_scope/)
   assert.doesNotMatch(read('src', 'i18n', 'translations.ts'), /companyNotInScope/)
   const page = read('src', 'screens', 'UserDetail.tsx')
-  assert.match(page, /\{legacyRoleToSave === 'supervisor' && \(\s*<Field\s+label=\{t\('assignedCompanies'\)\}/)
-  assert.match(read('supabase', 'functions', 'manage-user', 'index.ts'), /if \(role === 'supervisor' && companyIds\.length > 0\) \{/)
+  // Roles stage 3 (2026-10-27): the field follows the role's permission
+  // (`companiesApply`, tests/roles0152.test.cjs), still with no scope token.
+  assert.match(page, /\{companiesApply && \(\s*<Field\s+label=\{t\('assignedCompanies'\)\}/)
+  assert.match(read('supabase', 'functions', 'manage-user', 'index.ts'), /if \(companyIds\.length > 0\) \{/)
 })
 
 test('the entry form filters its company and project selectors by the linked companies', () => {

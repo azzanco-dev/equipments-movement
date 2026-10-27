@@ -156,10 +156,12 @@ Deno.serve(async (req: Request) => {
             400,
           )
         if (targetProfile.role === 'admin') {
+          // The admins by their assigned role (roles stage 3), which is what
+          // is_admin() reads since migration 0150.
           const { count, error: countError } = await adminClient
-            .from('profiles')
-            .select('id', { count: 'exact', head: true })
-            .eq('role', 'admin')
+            .from('profile_roles')
+            .select('profile_id', { count: 'exact', head: true })
+            .eq('role_key', 'admin')
           if (countError) return json({ error: 'Could not verify admins' }, 500)
           if ((count ?? 0) <= 1)
             return json(
@@ -199,7 +201,12 @@ Deno.serve(async (req: Request) => {
         .eq('profile_id', userId)
       if (clearAssignmentsError)
         return json({ error: 'Could not update company assignments' }, 500)
-      if (role === 'supervisor' && companyIds.length > 0) {
+      // Roles stage 3 (owner 2026-10-27): every role that records project
+      // movements may carry companies, so the screen decides when the field
+      // applies and sends an empty list otherwise (it was the legacy
+      // `supervisor` only). The links filter the entry form's selectors
+      // only; they grant nothing.
+      if (companyIds.length > 0) {
         const { error: assignmentError } = await adminClient
           .from('profile_companies')
           .insert(

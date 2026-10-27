@@ -6,6 +6,7 @@ import { usersActions } from '@/lib/actionPermissions'
 import { Alert } from '@/components/Alert'
 import { roleName } from '@/components/roles/roleRows'
 import { useActiveRoles } from '@/components/roles/useActiveRoles'
+import { foremanRoleKeys, isForemanRoleKey } from '@/lib/rolePermissionHolders'
 import { AsyncMultiSelect } from '@/components/AsyncMultiSelect'
 import { PasswordInput } from '@/components/PasswordInput'
 import type { SelectOption } from '@/components/Select'
@@ -151,6 +152,28 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   const canManageUsers = usersActions(permissionState, profile?.role).manage
   const rolesOn = rolesSystemEnabled === true
   const { roles: activeRoles } = useActiveRoles(rolesOn)
+  // Roles stage 3 (owner 2026-10-27): «الشركات المسؤول عنها» belongs to every
+  // role that records project movements (the admin aside), not only the
+  // legacy foreman. Until the roles are read, or when they cannot be, the
+  // legacy rule applies.
+  const [foremanKeys, setForemanKeys] = useState<ReadonlySet<string> | null>(
+    null,
+  )
+  useEffect(() => {
+    if (!rolesOn) return
+    let active = true
+    foremanRoleKeys(supabase).then(
+      (keys) => {
+        if (active) setForemanKeys(new Set(keys))
+      },
+      () => {
+        if (active) setForemanKeys(null)
+      },
+    )
+    return () => {
+      active = false
+    }
+  }, [rolesOn])
   // ON: the role chosen in the form (`roles.key`; '' = no assignment yet).
   const [assignedRoleKey, setAssignedRoleKey] = useState('')
   const systemRoleLoaded =
@@ -194,6 +217,19 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   // plan's result while ON (the companies field follows it).
   const legacyRoleToSave =
     rolesOn && user ? legacyRoleAfter(rolePlan, user.role) : role
+  // Whether a role carries «الشركات المسؤول عنها»: by the permission while
+  // ON (the roles read), the legacy foreman otherwise.
+  const companiesFor = (roleKey: string | null | undefined, legacy: UserRole) =>
+    rolesOn && foremanKeys && systemRoleLoaded
+      ? isForemanRoleKey(roleKey, foremanKeys)
+      : legacy === 'supervisor'
+  const companiesApply = companiesFor(
+    assignedRoleKey || savedAssignedKey,
+    legacyRoleToSave,
+  )
+  const savedCompaniesApply = user
+    ? companiesFor(savedAssignedKey, user.role)
+    : false
 
   const roleOptions = [
     { value: 'supervisor', label: t('supervisor') },
@@ -477,10 +513,9 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             email: nextEmail,
             password,
             role: savedRole,
-            company_ids:
-              savedRole === 'supervisor'
-                ? companies.map((item) => item.value)
-                : [],
+            company_ids: companiesApply
+              ? companies.map((item) => item.value)
+              : [],
           })
         } catch (cause) {
           // Nothing was written: the number is not attempted either, and
@@ -510,7 +545,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 email: nextEmail,
                 role: savedRole,
                 assigned_companies:
-                  savedRole === 'supervisor'
+                  companiesApply
                     ? companies.map((company) => ({
                         id: company.value,
                         name_ar: company.name_ar,
@@ -739,7 +774,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       label: t('createdAt'),
       value: user.created_at ? formatDate(user.created_at) : null,
     },
-    ...(user.role === 'supervisor'
+    ...(savedCompaniesApply
       ? [
           {
             key: 'assignedCompanies',
@@ -868,14 +903,17 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                     setAssignedRoleKey(value)
                     if (
                       user &&
-                      legacyRoleAfter(
-                        planRoleChange({
-                          currentLegacy: user.role,
-                          currentAssigned: systemRole?.roleKey ?? null,
-                          newRoleKey: value,
-                        }),
-                        user.role,
-                      ) !== 'supervisor'
+                      !companiesFor(
+                        value,
+                        legacyRoleAfter(
+                          planRoleChange({
+                            currentLegacy: user.role,
+                            currentAssigned: systemRole?.roleKey ?? null,
+                            newRoleKey: value,
+                          }),
+                          user.role,
+                        ),
+                      )
                     )
                       setCompanies([])
                   }}
@@ -953,7 +991,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             {t('roleChangeUseAssignment')}
           </Notice>
         )}
-        {legacyRoleToSave === 'supervisor' && (
+        {companiesApply && (
           <Field
             label={t('assignedCompanies')}
             hint={t('assignedCompaniesHelp')}

@@ -14,6 +14,7 @@ import {
   WorkshopPurposeBadge,
 } from '@/components/ui'
 import type { DataTableColumn } from '@/components/ui'
+import { foremanRoleKeys } from '@/lib/rolePermissionHolders'
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
 import { EquipmentIdentifierTag } from '@/components/data-list/EquipmentIdentifierTag'
 import { EquipmentSupplierLine } from '@/components/data-list/EquipmentSupplierLine'
@@ -125,10 +126,14 @@ const FOREMAN_OPTION_LIMIT = 20
  */
 const foremanFilter: FilterBarAsyncField = {
   loadOptions: async (query) => {
+    // The users whose assigned role records project movements
+    // (`foremanRoleKeys`, roles stage 3), not the legacy `supervisor` name.
+    const roleKeys = await foremanRoleKeys(supabase)
+    if (!roleKeys.length) return []
     let request = supabase
       .from('profile_names')
       .select('id,full_name')
-      .eq('role', 'supervisor')
+      .in('role', roleKeys)
       .order('full_name')
       .order('id')
       .limit(FOREMAN_OPTION_LIMIT)

@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AsyncSearchSelectOption } from '@/components/AsyncSearchSelect'
 import { sanitizeSearchTerm } from '@/lib/search'
 import { unwrapRows } from '@/lib/supabaseResult'
+import { foremanRoleKeys } from '@/lib/rolePermissionHolders'
 
 /** Relational selectors show the first/best 20 matches, never more. */
 export const FOREMAN_FILTER_LIMIT = 20
@@ -27,10 +28,15 @@ export function foremanFilterOptions(client: SupabaseClient) {
   })
   return {
     loadOptions: async (query: string) => {
+      // The foremen are the users whose assigned role records project
+      // movements (`foremanRoleKeys`; migration 0152 made `role` the
+      // assignment), not the legacy `supervisor` name.
+      const roleKeys = await foremanRoleKeys(client)
+      if (!roleKeys.length) return []
       let request = client
         .from('profile_names')
         .select('id,full_name')
-        .eq('role', 'supervisor')
+        .in('role', roleKeys)
         .order('full_name')
         .order('id')
         .limit(FOREMAN_FILTER_LIMIT)

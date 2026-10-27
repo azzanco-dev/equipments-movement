@@ -355,7 +355,9 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     {
       key: 'role',
       header: t('role'),
-      sortable: true,
+      // ON: the column shows the assigned role, but sorting could only order
+      // by the legacy profiles.role, so it is not offered (roles stage 3).
+      sortable: !rolesOn,
       cell: (row) => {
         // ON: the assigned role's name; a user without assignment, and the
         // OFF state, show the legacy badge as before.

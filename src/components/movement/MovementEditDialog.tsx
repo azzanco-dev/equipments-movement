@@ -11,6 +11,7 @@ import {
   sanitizeSearchTerm,
 } from '@/lib/search'
 import { unwrapRows } from '@/lib/supabaseResult'
+import { roleKeysHolding } from '@/lib/rolePermissionHolders'
 import { localizedName } from '@/lib/localizedName'
 import type { Company, EntryExitLog, Project } from '@/lib/types'
 import {
@@ -43,13 +44,6 @@ import {
   Textarea,
 } from '@/components/ui'
 
-const SITE_RECORDER_ROLES = ['admin', 'supervisor']
-const WORKSHOP_RECORDER_ROLES = [
-  'admin',
-  'workshop',
-  'assistant_workshop_manager',
-  'workshop_manager',
-]
 
 export interface MovementEditDialogProps {
   open: boolean
@@ -207,10 +201,19 @@ export function MovementEditDialog({
   const loadSupervisors = useCallback(
     async (query: string) => {
       const term = sanitizeSearchTerm(query)
+      // The users whose assigned role may record this context (roles stage
+      // 3, owner 2026-10-27); for the original roles that is the admin and
+      // the foreman for a project, the admin and the three workshop roles
+      // for the workshop, as the role lists here were.
+      const roleKeys = await roleKeysHolding(
+        supabase,
+        site ? 'movements.site.create' : 'movements.workshop.create',
+      )
+      if (!roleKeys.length) return []
       let request = supabase
-        .from('profiles')
+        .from('profile_names')
         .select('id,full_name')
-        .in('role', site ? SITE_RECORDER_ROLES : WORKSHOP_RECORDER_ROLES)
+        .in('role', roleKeys)
         .order('full_name')
         .limit(20)
       if (term) request = request.ilike('full_name', `%${term}%`)
