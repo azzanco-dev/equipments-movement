@@ -25,6 +25,8 @@ export interface TimelineMovement {
    *  `work_completed`; `null` for every other row and older exits. */
   exit_purpose?: string | null
   supervisor_name?: string | null
+  /** «ترقيم الشركة» of a project movement (an exit inherits its entry's). */
+  contractor_equipment_code?: string | null
   /** Snapshot name; legacy rows carry only this, with no driver record. */
   driver_name?: string | null
   photo_count?: number | null

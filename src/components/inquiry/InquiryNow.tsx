@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Clock, User, UserCheck } from 'lucide-react'
+import { Clock, Hash, User, UserCheck } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
@@ -74,6 +74,13 @@ export function InquiryNow({
         icon: <User size={13} />,
         label: t('inquiryDriver'),
         value: open.entry.driver_name,
+      })
+    // «ترقيم الشركة» in this project (owner 2026-10-27).
+    if (open.entry?.contractor_equipment_code)
+      people.push({
+        icon: <Hash size={13} />,
+        label: t('companyNumber'),
+        value: open.entry.contractor_equipment_code,
       })
   } else if (open) {
     key = visitStateKey(open)

@@ -62,6 +62,7 @@ import {
   type EquipmentCodeChange,
 } from '@/lib/equipmentCodeHistory'
 import { PreviousCodesLine } from '@/components/inquiry/PreviousCodes'
+import { fetchCompanyNumberMatches } from '@/lib/companyNumberSearch'
 import { EquipmentLocationCard } from '@/components/afaqy/EquipmentLocationCard'
 import { preferRecordName } from '@/lib/driverDisplayName'
 import {
@@ -121,6 +122,8 @@ interface MovementLogTimelineRow {
   project_name_ar: string | null
   project_name_en: string | null
   supervisor_name: string | null
+  /** «ترقيم الشركة» of a project movement. */
+  contractor_equipment_code?: string | null
   driver_name: string | null
   /** The driver record's current name (appended by migration 0124). */
   driver_full_name?: string | null
@@ -142,7 +145,7 @@ const MOVEMENTS_PAGE_SIZE = 40
 const YEAR_MOVEMENTS_LIMIT = 1000
 
 const TIMELINE_SELECT =
-  'id,movement_type,movement_context,workshop_purpose,recorded_at,company_name_ar,company_name_en,project_name_ar,project_name_en,supervisor_name,driver_name,exit_purpose,driver_full_name'
+  'id,movement_type,movement_context,workshop_purpose,recorded_at,company_name_ar,company_name_en,project_name_ar,project_name_en,supervisor_name,contractor_equipment_code,driver_name,exit_purpose,driver_full_name'
 
 /** The reader's recent units, in this browser only (a convenience). */
 const RECENT_KEY = 'inquiry:recent'
@@ -198,6 +201,7 @@ function toTimelineMovement(
     workshop_purpose: row.workshop_purpose,
     exit_purpose: row.exit_purpose ?? null,
     supervisor_name: row.supervisor_name,
+    contractor_equipment_code: row.contractor_equipment_code ?? null,
     // wave 19: the driver record's current name, else the snapshot.
     driver_name: preferRecordName(row.driver_full_name, row.driver_name),
   }
@@ -338,9 +342,17 @@ export function EquipmentInquiryScreen({
       // A previous code (EM-196) still finds the same unit: the ids whose
       // old code matches join the existing filter as one more `or` part.
       const term = toLatinDigits(sanitizeSearchTerm(query))
-      const previous = await fetchPreviousCodeMatchIds(supabase, term, signal)
+      // «ترقيم الشركة» of the latest project movement finds the unit too
+      // (owner 2026-10-27, «خليه ترقيم اخر حركة مشروع»); a failed lookup
+      // only drops those matches.
+      const [previous, company] = await Promise.all([
+        fetchPreviousCodeMatchIds(supabase, term, signal),
+        fetchCompanyNumberMatches(supabase, term, signal),
+      ])
       if (!active || signal.aborted) return
-      const previousPart = previousCodeOrPart(previous.ids)
+      const previousPart = previousCodeOrPart([
+        ...new Set([...previous.ids, ...company.matches.keys()]),
+      ])
       // `equipment_state` (computed field, SECURITY INVOKER) colours the
       // dot beside each code (owner 2026-10-27, «اضفها»): from the
       // movements this reader may see, as on the equipment list.
@@ -368,6 +380,9 @@ export function EquipmentInquiryScreen({
               chassis_number: row.chassis_number,
               matched_previous_code:
                 previousIds.has(row.id) && !codeMatchesTerm(row.code, term),
+              matched_company_number: codeMatchesTerm(row.code, term)
+                ? null
+                : (company.matches.get(row.id) ?? null),
               equipment_state: row.equipment_state ?? null,
             })),
       )
@@ -712,6 +727,13 @@ export function EquipmentInquiryScreen({
   const state = inquiryState && inquiryState !== 'error' ? inquiryState.state : null
   const supplierName =
     equipment?.ownership_status === 'external_supplier' ? equipment.lessor?.name : null
+  // «ترقيم الشركة» of the latest project movement (owner 2026-10-27: «خليه
+  // ترقيم اخر حركة مشروع، اعرضه»).
+  const latestSiteVisit = visits.find((visit) => visit.context === 'site') ?? null
+  const companyNumber =
+    latestSiteVisit?.exit?.contractor_equipment_code ||
+    latestSiteVisit?.entry?.contractor_equipment_code ||
+    null
 
   const facts: InfoGridItem[] = equipment
     ? [
@@ -746,6 +768,13 @@ export function EquipmentInquiryScreen({
           icon: <Hash size={15} aria-hidden="true" />,
           label: t('chassisNumber'),
           value: equipment.chassis_number,
+          dir: 'ltr',
+        },
+        {
+          key: 'companyNumber',
+          icon: <Hash size={15} aria-hidden="true" />,
+          label: t('companyNumber'),
+          value: companyNumber,
           dir: 'ltr',
         },
         {

@@ -28,6 +28,10 @@ export interface EquipmentSuggestion {
   /** The derived state (`equipment_state` computed field) for the new
    *  inquiry's coloured dot; the old showcase ignores it. */
   equipment_state?: string | null
+  /** The query matched the company number of the unit's latest project
+   *  movement (owner 2026-10-27), not its code: that number, shown in the
+   *  new inquiry's row. */
+  matched_company_number?: string | null
 }
 
 export interface EquipmentSuggestSearchProps {

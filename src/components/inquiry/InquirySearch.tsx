@@ -159,6 +159,12 @@ export function InquirySearch({
                       {t('previousCodeBadge')}
                     </Badge>
                   )}
+                  {suggestion.matched_company_number && (
+                    <Badge tone="neutral" size="sm">
+                      {t('companyNumber')}:{' '}
+                      <bdi dir="ltr">{suggestion.matched_company_number}</bdi>
+                    </Badge>
+                  )}
                   <span className="min-w-0 flex-1 truncate-safe text-muted">
                     {suggestion.type_name || '—'}
                   </span>
