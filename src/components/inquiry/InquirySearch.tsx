@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, Search } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { Badge, Spinner, cn } from '@/components/ui'
@@ -36,6 +36,7 @@ export function InquirySearch({
 }: InquirySearchProps) {
   const { t, lang } = useI18n()
   const listId = useId()
+  const wrapRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const showList = open && query.trim().length > 0
@@ -46,6 +47,18 @@ export function InquirySearch({
     return parsed ? equipmentStateText(t, parsed) : null
   }
 
+  // The list closes on a press outside it, as the approved mobile search
+  // field does — not on the keyboard's «تم», which only blurs the field
+  // (owner 2026-10-27: «زر الصح في الكيبورد في صفحة الاستعلام يخفي القائمة»).
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (!wrapRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
+  }, [open])
+
   const choose = (suggestion: EquipmentSuggestion | undefined) => {
     if (!suggestion) return
     setOpen(false)
@@ -53,7 +66,7 @@ export function InquirySearch({
   }
 
   return (
-    <div className="relative w-full">
+    <div ref={wrapRef} className="relative w-full">
       <div
         className={cn(
           'flex items-center gap-3 rounded-2xl bg-bg pe-2 ps-4 shadow-md transition-[height] duration-500',
@@ -71,7 +84,12 @@ export function InquirySearch({
           }}
           onFocus={() => setOpen(true)}
           onClick={() => setOpen(true)}
-          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          // The keyboard's «تم» blurs with nothing after it: the list stays.
+          // Focus moving to another control (Tab) closes it.
+          onBlur={(event) => {
+            const next = event.relatedTarget as Node | null
+            if (next && !wrapRef.current?.contains(next)) setOpen(false)
+          }}
           onKeyDown={(event) => {
             if (event.key === 'ArrowDown') {
               event.preventDefault()
