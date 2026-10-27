@@ -776,12 +776,12 @@ textarea::placeholder {
   background-image:
     radial-gradient(
       ellipse 80% 55% at 85% 0%,
-      color-mix(in srgb, var(--chart-3) 90%, var(--chart-stroke-3)),
+      color-mix(in srgb, var(--chart-3) 70%, var(--chart-stroke-3)),
       transparent 70%
     ),
     radial-gradient(
       ellipse 70% 50% at 10% 5%,
-      color-mix(in srgb, var(--chart-1) 85%, var(--chart-stroke-1)),
+      color-mix(in srgb, var(--chart-1) 65%, var(--chart-stroke-1)),
       transparent 70%
     );
   background-repeat: no-repeat;
