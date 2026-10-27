@@ -776,12 +776,12 @@ textarea::placeholder {
   background-image:
     radial-gradient(
       ellipse 80% 55% at 85% 0%,
-      color-mix(in srgb, var(--chart-3) 70%, var(--chart-stroke-3)),
+      color-mix(in srgb, var(--chart-3) 55%, transparent),
       transparent 70%
     ),
     radial-gradient(
       ellipse 70% 50% at 10% 5%,
-      color-mix(in srgb, var(--chart-1) 65%, var(--chart-stroke-1)),
+      color-mix(in srgb, var(--chart-1) 45%, transparent),
       transparent 70%
     );
   background-repeat: no-repeat;
@@ -803,7 +803,7 @@ textarea::placeholder {
   pointer-events: none;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
   background-size: 180px 180px;
-  opacity: 0.12;
+  opacity: 0.22;
 }
 
 /* Tried and set aside the same day: one warm glow from the middle, around
