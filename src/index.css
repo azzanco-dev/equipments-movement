@@ -2,36 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Roboto variable font is applied only when the interface language is English. */
+/* Roboto is applied only when the interface language is English: one
+   variable file covers every weight. */
 @font-face {
   font-family: 'Roboto';
   src: url('https://cdn.jsdelivr.net/npm/@fontsource-variable/roboto@5.2.5/files/roboto-latin-wght-normal.woff2')
     format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Roboto';
-  src: url('https://cdn.jsdelivr.net/npm/@fontsource-variable/roboto@5.2.5/files/roboto-latin-wght-normal.woff2')
-    format('woff2');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Roboto';
-  src: url('https://cdn.jsdelivr.net/npm/@fontsource-variable/roboto@5.2.5/files/roboto-latin-wght-normal.woff2')
-    format('woff2');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Roboto';
-  src: url('https://cdn.jsdelivr.net/npm/@fontsource-variable/roboto@5.2.5/files/roboto-latin-wght-normal.woff2')
-    format('woff2');
-  font-weight: 700;
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
@@ -74,17 +51,9 @@
 
 /* Thmanyah Sans remains the Arabic interface font. Since 2026-10-25 (owner)
    it is served from the site itself (public/fonts/thmanyah-sans, the owner's
-   own files) in five weights: 300, 400, 500, 700 and 900 — there is no 600.
-   The faces cover the Arabic ranges only, as before. */
-@font-face {
-  font-family: 'Thmanyah';
-  src: url('/fonts/thmanyah-sans/thmanyahsans-Light.woff2') format('woff2');
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-  unicode-range:
-    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
-}
+   own files) in the three weights the interface uses: 400, 500 and 700
+   (a 600 takes the 700). Light 300 and Black 900 were dropped on 2026-10-27,
+   nothing asked for them. The faces cover the Arabic ranges only. */
 @font-face {
   font-family: 'Thmanyah';
   src: url('/fonts/thmanyah-sans/thmanyahsans-Regular.woff2')
@@ -111,15 +80,6 @@
   src: url('/fonts/thmanyah-sans/thmanyahsans-Bold.woff2')
     format('woff2');
   font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-  unicode-range:
-    U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
-}
-@font-face {
-  font-family: 'Thmanyah';
-  src: url('/fonts/thmanyah-sans/thmanyahsans-Black.woff2') format('woff2');
-  font-weight: 900;
   font-style: normal;
   font-display: swap;
   unicode-range:
@@ -194,8 +154,8 @@
 
 :root {
   --font-primary:
-    'ArabicUiDigits', 'Thmanyah', 'InterLatin', 'Tajawal', 'Segoe UI', Tahoma,
-    system-ui, sans-serif;
+    'ArabicUiDigits', 'Thmanyah', 'InterLatin', 'Segoe UI', Tahoma, system-ui,
+    sans-serif;
   --font-latin: 'Roboto', 'Segoe UI', Arial, system-ui, sans-serif;
   --font-heading: 'Thmanyah Serif Text', 'Thmanyah', 'Segoe UI', serif;
   --font-field:

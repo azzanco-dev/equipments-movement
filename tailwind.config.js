@@ -5,8 +5,11 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Thmanyah', 'Manrope', 'Tajawal', 'system-ui', 'sans-serif'],
-        latin: ['Manrope', 'Segoe UI', 'system-ui', 'sans-serif'],
+        // The stacks themselves live in src/index.css (--font-primary).
+        sans: ['var(--font-primary)'],
+        // Latin-only text (permission keys) in the Arabic interface: Inter, as
+        // every Latin letter there. The English interface overrides it.
+        latin: ['InterLatin', 'Segoe UI', 'system-ui', 'sans-serif'],
       },
       // Colors come from the approved tokens in src/index.css so light and
       // dark themes switch automatically. Opacity modifiers (bg-primary/10)
