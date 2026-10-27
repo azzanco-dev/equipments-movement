@@ -1,7 +1,7 @@
-// The inquiry page's last 12 months (owner 2026-10-26, approved on /ui-kit
-// «نموذج صفحة الاستعلام الجديدة», the month rings chosen for now): every
-// Saudi calendar day of the window in the state the unit was in, and the
-// days grouped by calendar month. Pure and import-free (type imports only),
+// The inquiry page's year (owner 2026-10-26, approved on /ui-kit «نموذج
+// صفحة الاستعلام الجديدة»; a calendar year since 2026-10-27, «المفروض
+// بالسنة»): every Saudi calendar day of the chosen year in the state the
+// unit was in, and the days grouped by calendar month. Pure and import-free (type imports only),
 // so tests/inquiryYear.test.cjs loads it directly.
 
 import type { EquipmentVisit } from './visitTimeline'
@@ -25,8 +25,6 @@ export const INQUIRY_STATE_ORDER: readonly InquiryStateKey[] = [
   'unrecorded',
 ]
 
-export const INQUIRY_YEAR_DAYS = 365
-
 const DAY_MS = 24 * 60 * 60 * 1000
 const SAUDI_OFFSET_MS = 3 * 60 * 60 * 1000
 
@@ -35,10 +33,44 @@ export function saudiDay(ms: number): number {
   return Math.floor((ms + SAUDI_OFFSET_MS) / DAY_MS)
 }
 
-/** The first instant of the window: the Saudi midnight 364 days before
- *  today's, so the window is exactly 365 Saudi days ending today. */
-export function inquiryYearStart(now: number): number {
-  return (saudiDay(now) - (INQUIRY_YEAR_DAYS - 1)) * DAY_MS - SAUDI_OFFSET_MS
+/** The Saudi calendar year of an instant. */
+export function saudiYear(ms: number): number {
+  return new Date(saudiDay(ms) * DAY_MS).getUTCFullYear()
+}
+
+export interface InquiryYearRange {
+  /** Saudi day index of 1 January. */
+  firstDay: number
+  /** Saudi day index of 31 December. */
+  lastDay: number
+  /** The instants to read the year's movements between: Saudi midnight of
+   *  1 January, and the Saudi midnight after the year's last day or today,
+   *  whichever comes first. */
+  startMs: number
+  endMs: number
+}
+
+/** A calendar year in Saudi time (owner 2026-10-27: «المفروض بالسنة»). */
+export function inquiryYearRange(year: number, now: number): InquiryYearRange {
+  const firstDay = Date.UTC(year, 0, 1) / DAY_MS
+  const lastDay = Date.UTC(year, 11, 31) / DAY_MS
+  const readUntil = Math.min(lastDay, saudiDay(now))
+  return {
+    firstDay,
+    lastDay,
+    startMs: firstDay * DAY_MS - SAUDI_OFFSET_MS,
+    endMs: (readUntil + 1) * DAY_MS - SAUDI_OFFSET_MS,
+  }
+}
+
+/** The years a reader may pick, newest first: from this year back to the
+ *  unit's first year (its first movement or its creation, the earlier). */
+export function inquiryYearChoices(firstYear: number | null, now: number): number[] {
+  const current = saudiYear(now)
+  const from = firstYear !== null && firstYear <= current ? firstYear : current
+  const years: number[] = []
+  for (let year = current; year >= from; year -= 1) years.push(year)
+  return years
 }
 
 /** The state of a stay: a project, else the workshop by its purpose (an
@@ -54,29 +86,35 @@ export function visitStateKey(visit: EquipmentVisit): InquiryStateKey {
 export interface InquiryDay {
   /** Days since the epoch of the Saudi calendar day. */
   day: number
-  /** `before`: the unit did not exist yet. */
-  state: InquiryStateKey | 'before'
+  /** `before`: the unit did not exist yet; `future`: after today. */
+  state: InquiryStateKey | 'before' | 'future'
   visit: EquipmentVisit | null
 }
 
 /**
- * Every Saudi day of the last 12 months with the state it was in: the
- * latest stay covering it, else «بدون تسجيل», or `before` until the unit
- * was added. A stay counts on its entry day, its exit day and every day
- * between (an open stay through today); a lone legacy exit has no start and
- * colours nothing.
+ * Every Saudi day of a calendar year with the state it was in: the latest
+ * stay covering it, else «بدون تسجيل», `before` until the unit was added,
+ * `future` after today. A stay counts on its entry day, its exit day and
+ * every day between (an open stay through today); a lone legacy exit has no
+ * start and colours nothing.
  */
 export function inquiryYearDays(
   visits: readonly EquipmentVisit[],
   createdAt: number,
   now: number,
+  year: number,
 ): InquiryDay[] {
+  const { firstDay, lastDay } = inquiryYearRange(year, now)
   const today = saudiDay(now)
-  const first = today - (INQUIRY_YEAR_DAYS - 1)
-  const created = Number.isFinite(createdAt) ? saudiDay(createdAt) : first
+  const created = Number.isFinite(createdAt) ? saudiDay(createdAt) : firstDay
   const days: InquiryDay[] = []
-  for (let day = first; day <= today; day += 1)
-    days.push({ day, state: day < created ? 'before' : 'unrecorded', visit: null })
+  for (let day = firstDay; day <= lastDay; day += 1)
+    days.push({
+      day,
+      state: day > today ? 'future' : day < created ? 'before' : 'unrecorded',
+      visit: null,
+    })
+  const last = Math.min(lastDay, today)
   // `buildEquipmentVisits` is newest first: walk oldest first so a later
   // stay on the same day wins.
   for (const visit of [...visits].reverse()) {
@@ -84,11 +122,11 @@ export function inquiryYearDays(
     const start = Date.parse(visit.startedAt)
     if (Number.isNaN(start)) continue
     const end = visit.endedAt ? Date.parse(visit.endedAt) : now
-    const from = Math.max(saudiDay(start), first)
-    const to = Math.min(Number.isNaN(end) ? today : saudiDay(end), today)
+    const from = Math.max(saudiDay(start), firstDay)
+    const to = Math.min(Number.isNaN(end) ? today : saudiDay(end), last)
     for (let day = from; day <= to; day += 1) {
-      days[day - first].state = visitStateKey(visit)
-      days[day - first].visit = visit
+      days[day - firstDay].state = visitStateKey(visit)
+      days[day - firstDay].visit = visit
     }
   }
   return days
@@ -110,8 +148,7 @@ function emptyCounts(): Record<InquiryStateKey, number> {
   return { site: 0, maintenance: 0, parking: 0, out_of_service: 0, unrecorded: 0 }
 }
 
-/** The window's days by calendar month, oldest first (13 months: the
- *  window starts and ends inside one). */
+/** The year's days by calendar month, January first. */
 export function inquiryYearMonths(days: readonly InquiryDay[]): InquiryMonth[] {
   const months: InquiryMonth[] = []
   for (const day of days) {
@@ -132,7 +169,7 @@ export function inquiryYearMonths(days: readonly InquiryDay[]): InquiryMonth[] {
       months.push(group)
     }
     group.days.push(day)
-    if (day.state !== 'before') group.counts[day.state] += 1
+    if (day.state !== 'before' && day.state !== 'future') group.counts[day.state] += 1
   }
   return months
 }
@@ -158,7 +195,7 @@ export function summarizeInquiryYear(days: readonly InquiryDay[]): InquiryYearSu
   const visits = new Set<string>()
   let counted = 0
   for (const day of days) {
-    if (day.state === 'before') continue
+    if (day.state === 'before' || day.state === 'future') continue
     counted += 1
     counts[day.state] += 1
     if (day.visit) visits.add(day.visit.key)

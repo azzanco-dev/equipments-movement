@@ -60,9 +60,9 @@ export const INQUIRY_STATE_LABEL: Record<InquiryStateKey, TranslationKey> = {
 
 /** A day's or a ring part's colour: a stay's strong colour, the light grey
  *  of «بدون تسجيل» (owner: «خلي الرمادي في اخر 12 شهر افتح»), or the frame
- *  colour before the unit existed. */
-export function inquiryDayColor(state: InquiryStateKey | 'before'): string {
-  if (state === 'before') return 'var(--surface)'
+ *  colour before the unit existed and after today. */
+export function inquiryDayColor(state: InquiryStateKey | 'before' | 'future'): string {
+  if (state === 'before' || state === 'future') return 'var(--surface)'
   if (state === 'unrecorded') return INQUIRY_STATE_COLORS.unrecorded.fill
   return INQUIRY_STATE_COLORS[state].stroke
 }

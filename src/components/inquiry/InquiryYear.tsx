@@ -79,9 +79,11 @@ function YearTile({
  *  rings so they always match. */
 export function InquiryYearNumbers({
   summary,
+  year,
   index,
 }: {
   summary: InquiryYearSummary
+  year: number
   index: number
 }) {
   const { t } = useI18n()
@@ -119,7 +121,7 @@ export function InquiryYearNumbers({
         icon={<History size={13} />}
         label={t('inquiryVisits')}
         value={summary.visitCount}
-        hint={t('inquiryWithin12Months')}
+        hint={t('inquiryWithinYear').replace('{year}', String(year))}
       />
     </div>
   )
@@ -209,7 +211,8 @@ function YearLegend({ days }: { days: InquiryDay[] }) {
   const { t } = useI18n()
   const counts = new Map<string, number>()
   for (const day of days)
-    if (day.state !== 'before') counts.set(day.state, (counts.get(day.state) ?? 0) + 1)
+    if (day.state !== 'before' && day.state !== 'future')
+      counts.set(day.state, (counts.get(day.state) ?? 0) + 1)
   return (
     <ul className="flex flex-wrap items-center gap-1.5 text-xs">
       {INQUIRY_STATE_ORDER.filter((key) => counts.get(key)).map((key) => (
@@ -233,12 +236,12 @@ function YearLegend({ days }: { days: InquiryDay[] }) {
 }
 
 /**
- * The last 12 months as one strip (owner 2026-10-27: «غير اخر 12 شهر
- * لشريط», after the rings): the oldest day at the start edge, today at the
+ * The chosen year as one strip (owner 2026-10-27: «غير اخر 12 شهر لشريط»,
+ * then «المفروض بالسنة»): 1 January at the start edge, 31 December at the
  * end edge, every stay a block as long as it lasted in its state's colour,
  * named with its days when it lasted four weeks or more; «بدون تسجيل» light
- * grey; the time before the unit was added left bare. A stay opens its tile
- * in the visit history below.
+ * grey; the days before the unit was added and after today left bare. A
+ * stay opens its tile in the visit history below.
  */
 export function InquiryYearStrip({
   days,
@@ -265,25 +268,17 @@ export function InquiryYearStrip({
   })
   const labels = months
     .map((month) => ({ month, start: starts.get(month.key) ?? 0 }))
-    // A part month of a few days at the window's start would sit on the
-    // next month's name.
-    .filter((item, position, all) => {
-      const next = all[position + 1]
-      return !next || next.start - item.start >= 10
-    })
 
   return (
     <section
       className={cn(INQUIRY_SURFACE, 'inq-rise space-y-3 p-4')}
       style={inquiryRise(index)}
     >
-      <InquiryCardTitle icon={<Calendar size={14} />}>
-        {t('inquiryLast12Months')}
-      </InquiryCardTitle>
+      <InquiryCardTitle icon={<Calendar size={14} />}>{t('inquiryTimeline')}</InquiryCardTitle>
       <div className="space-y-1.5">
         <div className="relative h-14 overflow-hidden rounded-xl bg-surface">
           {runsOf(days).map((run, position) => {
-            if (run.state === 'before') return null
+            if (run.state === 'before' || run.state === 'future') return null
             const length = run.end - run.start + 1
             const strong = run.state !== 'unrecorded'
             const visit = run.visit
@@ -377,7 +372,8 @@ export function InquiryYearRings({
   )
   const counts = new Map<string, number>()
   for (const day of days)
-    if (day.state !== 'before') counts.set(day.state, (counts.get(day.state) ?? 0) + 1)
+    if (day.state !== 'before' && day.state !== 'future')
+      counts.set(day.state, (counts.get(day.state) ?? 0) + 1)
   const legend = INQUIRY_STATE_ORDER.filter((key) => counts.get(key))
   const summary = legend
     .map((key) => `${t(INQUIRY_STATE_LABEL[key])} ${counts.get(key)} ${t('days')}`)
@@ -388,9 +384,7 @@ export function InquiryYearRings({
       className={cn(INQUIRY_SURFACE, 'inq-rise space-y-4 p-4')}
       style={inquiryRise(index)}
     >
-      <InquiryCardTitle icon={<Calendar size={14} />}>
-        {t('inquiryLast12Months')}
-      </InquiryCardTitle>
+      <InquiryCardTitle icon={<Calendar size={14} />}>{t('inquiryTimeline')}</InquiryCardTitle>
       <p className="sr-only">{summary}</p>
       <div className="grid grid-cols-4 gap-x-2 gap-y-4 sm:grid-cols-7 xl:grid-cols-[repeat(13,minmax(0,1fr))]">
         {months.map((month, position) => {

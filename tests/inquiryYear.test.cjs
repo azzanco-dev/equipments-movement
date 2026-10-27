@@ -46,14 +46,29 @@ const move = (context, type, date, extra = {}) => ({
   ...extra,
 })
 
-test('the window is 365 Saudi days ending today', () => {
-  const start = year.inquiryYearStart(NOW)
+test('a calendar year in Saudi time, with the days after today', () => {
+  const range = year.inquiryYearRange(2026, NOW)
   // Saudi midnight = 21:00 UTC the day before.
-  assert.equal(new Date(start).toISOString(), '2025-10-26T21:00:00.000Z')
-  const days = year.inquiryYearDays([], NaN, NOW)
+  assert.equal(new Date(range.startMs).toISOString(), '2025-12-31T21:00:00.000Z')
+  // The year is read up to the end of today (the Saudi midnight after it).
+  assert.equal(new Date(range.endMs).toISOString(), '2026-10-26T21:00:00.000Z')
+  const days = year.inquiryYearDays([], NaN, NOW, 2026)
   assert.equal(days.length, 365)
-  assert.equal(days[364].day, year.saudiDay(NOW))
-  assert.ok(days.every((day) => day.state === 'unrecorded'))
+  assert.equal(days[0].day, year.saudiDay(Date.parse(saudi('2026-01-01'))))
+  const today = days.findIndex((day) => day.day === year.saudiDay(NOW))
+  assert.ok(days.slice(0, today + 1).every((day) => day.state === 'unrecorded'))
+  assert.ok(days.slice(today + 1).every((day) => day.state === 'future'))
+  // A past year is read whole.
+  const past = year.inquiryYearRange(2025, NOW)
+  assert.equal(new Date(past.endMs).toISOString(), '2025-12-31T21:00:00.000Z')
+  assert.equal(year.inquiryYearDays([], NaN, NOW, 2024).length, 366)
+  assert.equal(year.saudiYear(Date.parse('2025-12-31T21:30:00Z')), 2026)
+})
+
+test('the years to pick: this year back to the first year of the unit', () => {
+  assert.deepEqual(plain(year.inquiryYearChoices(2024, NOW)), [2026, 2025, 2024])
+  assert.deepEqual(plain(year.inquiryYearChoices(null, NOW)), [2026])
+  assert.deepEqual(plain(year.inquiryYearChoices(2030, NOW)), [2026])
 })
 
 test('stays colour their days, later stays win, before creation stays blank', () => {
@@ -64,11 +79,11 @@ test('stays colour their days, later stays win, before creation stays blank', ()
     move('workshop', 'exit', '2026-01-25'),
     move('workshop', 'entry', '2026-10-20', { workshop_purpose: 'out_of_service' }),
   ])
-  const created = Date.parse('2025-12-01T00:00:00Z')
-  const days = year.inquiryYearDays(visits, created, NOW)
+  const created = Date.parse('2026-01-05T00:00:00Z')
+  const days = year.inquiryYearDays(visits, created, NOW, 2026)
   const at = (date) => days.find((day) => day.day === year.saudiDay(Date.parse(saudi(date))))
-  assert.equal(at('2025-11-30').state, 'before')
-  assert.equal(at('2025-12-05').state, 'unrecorded')
+  assert.equal(at('2026-01-04').state, 'before')
+  assert.equal(at('2026-01-06').state, 'unrecorded')
   assert.equal(at('2026-01-10').state, 'site')
   assert.equal(at('2026-01-19').state, 'site')
   // The exit day of the project is the entry day of the workshop: the
@@ -76,8 +91,9 @@ test('stays colour their days, later stays win, before creation stays blank', ()
   assert.equal(at('2026-01-20').state, 'parking')
   assert.equal(at('2026-01-25').state, 'parking')
   assert.equal(at('2026-01-26').state, 'unrecorded')
-  // An open stay runs through today.
+  // An open stay runs through today, and no further.
   assert.equal(at('2026-10-26').state, 'out_of_service')
+  assert.equal(at('2026-10-27').state, 'future')
 
   const summary = plain(year.summarizeInquiryYear(days))
   assert.equal(summary.siteDays, 10)
@@ -85,28 +101,26 @@ test('stays colour their days, later stays win, before creation stays blank', ()
   assert.equal(summary.counts.out_of_service, 7)
   assert.equal(summary.workshopDays, 13)
   assert.equal(summary.visitCount, 3)
+  // Only the days from creation through today count.
+  assert.equal(summary.counted, year.saudiDay(NOW) - year.saudiDay(created) + 1)
   assert.equal(summary.counted, summary.siteDays + summary.workshopDays + summary.unrecordedDays)
 })
 
-test('a stay open before the window starts colours from its first day', () => {
+test('a stay open before the year starts colours from 1 January', () => {
   const visits = timeline.buildEquipmentVisits([move('site', 'entry', '2024-11-24')])
-  const days = year.inquiryYearDays(visits, Date.parse('2024-01-01'), NOW)
-  assert.ok(days.every((day) => day.state === 'site'))
+  const days = year.inquiryYearDays(visits, Date.parse('2024-01-01'), NOW, 2026)
+  assert.ok(days.every((day) => day.state === 'site' || day.state === 'future'))
   assert.equal(year.summarizeInquiryYear(days).siteShare, 100)
 })
 
-test('the days group into 13 calendar months with their counts', () => {
-  const days = year.inquiryYearDays([], NaN, NOW)
+test('the year groups into 12 calendar months with their counts', () => {
+  const days = year.inquiryYearDays([], NaN, NOW, 2026)
   const months = plain(year.inquiryYearMonths(days))
-  assert.equal(months.length, 13)
-  assert.deepEqual([months[0].year, months[0].month, months[0].days.length], [2025, 9, 5])
-  assert.deepEqual([months[12].year, months[12].month, months[12].days.length], [2026, 9, 26])
-  assert.equal(months[1].daysInMonth, 30)
-  assert.equal(months[1].counts.unrecorded, 30)
-  assert.equal(
-    months.reduce((sum, month) => sum + month.days.length, 0),
-    365,
-  )
+  assert.equal(months.length, 12)
+  assert.deepEqual([months[0].year, months[0].month, months[0].days.length], [2026, 0, 31])
+  assert.equal(months[9].counts.unrecorded, 26)
+  assert.equal(months[11].counts.unrecorded, 0)
+  assert.equal(months.reduce((sum, month) => sum + month.days.length, 0), 365)
 })
 
 test('the screen: AI-style start, rings, journey in full, no filter', () => {
@@ -117,12 +131,12 @@ test('the screen: AI-style start, rings, journey in full, no filter', () => {
   // a stay on it opens its tile in the history.
   assert.match(
     screen,
-    /<InquiryYearStrip\s+days=\{year\.days\}\s+months=\{year\.months\}\s+index=\{5\}\s+onSelectVisit=\{selectVisit\}/,
+    /<InquiryYearStrip\s+days=\{year\.days\}\s+months=\{year\.months\}\s+index=\{\d+\}\s+onSelectVisit=\{selectVisit\}/,
   )
   assert.doesNotMatch(screen, /<InquiryYearRings/)
   assert.match(screen, /getElementById\(inquiryVisitAnchor\(key\)\)/)
-  // The last 12 months are read for the window plus the movement before it.
-  assert.match(screen, /\.gte\('recorded_at', start\)/)
+  // The chosen year is read for its days plus the movement before it.
+  assert.match(screen, /\.gte\('recorded_at', start\)\s+\.lt\('recorded_at', end\)/)
   assert.match(screen, /\.lt\('recorded_at', start\)[\s\S]*?\.limit\(1\)/)
   // Recent units: this browser only, and storage failures are swallowed.
   assert.match(screen, /const RECENT_KEY = 'inquiry:recent'/)
@@ -175,7 +189,8 @@ test('the new Arabic keys exist in both languages, without hamza', () => {
     'inquiryJourney',
     'inquiryStateUnrecorded',
     'inquiryMovementOwner',
-    'inquiryLast12Months',
+    'inquiryActivityIn',
+    'inquiryTimeline',
   ]) {
     const values = [...source.matchAll(new RegExp(`\\n\\s+${key}: '([^']*)'`, 'g'))]
     assert.equal(values.length, 2, key)

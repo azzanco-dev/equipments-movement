@@ -15,6 +15,9 @@ import {
   ErrorState,
   InfoGrid,
   Skeleton,
+  Tabs,
+  TabsList,
+  TabsTrigger,
   cn,
   type InfoGridItem,
 } from '@/components/ui'
@@ -35,9 +38,11 @@ import {
 } from '@/components/inquiry/inquiryStyle'
 import { buildEquipmentVisits, type TimelineMovement } from '@/lib/visitTimeline'
 import {
+  inquiryYearChoices,
   inquiryYearDays,
   inquiryYearMonths,
-  inquiryYearStart,
+  inquiryYearRange,
+  saudiYear,
   summarizeInquiryYear,
 } from '@/lib/inquiryYear'
 import {
@@ -78,7 +83,8 @@ import type { OwnershipStatus } from '@/lib/types'
  * big field in the middle, with the reader's recent units — and the answer
  * rises in: the unit with its one state and, for an external supplier's
  * unit, the supplier; «الحين» (where it is now, since when, the foreman,
- * driver and PO); the numbers and a ring per month of the last 12 months;
+ * driver and PO); the chosen calendar year (this year first): its numbers
+ * and one strip of its stays;
  * the facts and the (admin) location beside «الرحلة», every stay in full.
  *
  * Every signed-in role can open it — `entry_exit_logs` RLS decides which
@@ -129,7 +135,7 @@ const SUGGEST_DEBOUNCE_MS = 300
 // stand-alone "exit without entry" segment until "show more" pulls in the
 // entry that actually opened it — a display nuance, not a data error.
 const MOVEMENTS_PAGE_SIZE = 40
-// The last 12 months of one unit: a bound, not a page (a unit moves a few
+// One calendar year of one unit: a bound, not a page (a unit moves a few
 // times a month).
 const YEAR_MOVEMENTS_LIMIT = 1000
 
@@ -286,7 +292,14 @@ export function EquipmentInquiryScreen({
   // already open when the window starts).
   const [yearMovements, setYearMovements] = useState<MovementLogTimelineRow[]>([])
   const [yearError, setYearError] = useState(false)
+  // The unit the first year read answered for (the answer waits on it) and
+  // the `unit:year` the shown year belongs to (a picked year loads alone).
   const [yearLoadedId, setYearLoadedId] = useState<string | null>(null)
+  const [yearLoadedFor, setYearLoadedFor] = useState<string | null>(null)
+  // A calendar year (owner 2026-10-27: «المفروض بالسنة»), this year first.
+  const [selectedYear, setSelectedYear] = useState(() => saudiYear(Date.now()))
+  // The year of the unit's first movement, for the year picker.
+  const [firstMovementYear, setFirstMovementYear] = useState<number | null>(null)
 
   const [po, setPo] = useState<InquiryNowPo>(undefined)
   // The stay the 12-month strip opened in the history.
@@ -515,18 +528,21 @@ export function EquipmentInquiryScreen({
     [startMovementsRequest],
   )
 
-  // --- The last 12 months -----------------------------------------------
+  // --- The chosen calendar year -----------------------------------------
 
   const fetchYear = useCallback(
-    async (id: string, at: number) => {
+    async (id: string, at: number, year: number, withFirst: boolean) => {
       const signal = startYearRequest()
-      const start = new Date(inquiryYearStart(at)).toISOString()
-      const [inside, before] = await Promise.all([
+      const range = inquiryYearRange(year, at)
+      const start = new Date(range.startMs).toISOString()
+      const end = new Date(range.endMs).toISOString()
+      const [inside, before, first] = await Promise.all([
         supabase
           .from('movement_log_search')
           .select(TIMELINE_SELECT)
           .eq('equipment_id', id)
           .gte('recorded_at', start)
+          .lt('recorded_at', end)
           .order('recorded_at', { ascending: true })
           .order('id', { ascending: true })
           .limit(YEAR_MOVEMENTS_LIMIT)
@@ -541,9 +557,25 @@ export function EquipmentInquiryScreen({
           .order('id', { ascending: false })
           .limit(1)
           .abortSignal(signal),
+        // The unit's first movement, once per unit, for the year picker.
+        withFirst
+          ? supabase
+              .from('movement_log_search')
+              .select('recorded_at')
+              .eq('equipment_id', id)
+              .order('recorded_at', { ascending: true })
+              .order('id', { ascending: true })
+              .limit(1)
+              .abortSignal(signal)
+          : null,
       ])
       if (signal.aborted) return
       setYearLoadedId(id)
+      setYearLoadedFor(`${id}:${year}`)
+      if (first) {
+        const firstAt = (first.data as { recorded_at: string }[] | null)?.[0]?.recorded_at
+        setFirstMovementYear(firstAt && !first.error ? saudiYear(Date.parse(firstAt)) : null)
+      }
       if (inside.error || before.error) {
         setYearError(true)
         setYearMovements([])
@@ -605,16 +637,20 @@ export function EquipmentInquiryScreen({
       setDetailLoadedId(null)
       setMovementsLoadedId(null)
       setYearLoadedId(null)
+      setYearLoadedFor(null)
+      setFirstMovementYear(null)
       return
     }
     const at = Date.now()
+    const thisYear = saudiYear(at)
     setNow(at)
+    setSelectedYear(thisYear)
     void fetchDetail(equipmentId)
     setMovements([])
     setMovementsOffset(0)
     setHasMoreMovements(false)
     void fetchMovements(equipmentId, 0, false)
-    void fetchYear(equipmentId, at)
+    void fetchYear(equipmentId, at, thisYear, true)
     // fetchDetail/fetchMovements/fetchYear are stable (their own deps never
     // change across the component's life), so equipmentId alone drives this
     // reload.
@@ -635,8 +671,16 @@ export function EquipmentInquiryScreen({
   }, [equipmentId, fetchMovements])
 
   const retryYear = useCallback(() => {
-    if (equipmentId) void fetchYear(equipmentId, now)
-  }, [equipmentId, fetchYear, now])
+    if (equipmentId) void fetchYear(equipmentId, now, selectedYear, false)
+  }, [equipmentId, fetchYear, now, selectedYear])
+
+  const pickYear = useCallback(
+    (year: number) => {
+      setSelectedYear(year)
+      if (equipmentId) void fetchYear(equipmentId, now, year, false)
+    },
+    [equipmentId, fetchYear, now],
+  )
 
   const clearSelection = useCallback(() => {
     setEquipmentParam(null)
@@ -683,9 +727,19 @@ export function EquipmentInquiryScreen({
     const yearVisits = buildEquipmentVisits(
       yearMovements.map((row) => toTimelineMovement(row, lang)),
     )
-    const days = inquiryYearDays(yearVisits, createdAt, now)
+    const days = inquiryYearDays(yearVisits, createdAt, now, selectedYear)
     return { days, months: inquiryYearMonths(days), summary: summarizeInquiryYear(days) }
-  }, [yearMovements, lang, createdAt, now])
+  }, [yearMovements, lang, createdAt, now, selectedYear])
+  // From this year back to the unit's first year: its first movement or its
+  // creation, the earlier.
+  const createdYear = Number.isFinite(createdAt) ? saudiYear(createdAt) : null
+  const yearChoices = inquiryYearChoices(
+    firstMovementYear !== null && createdYear !== null
+      ? Math.min(firstMovementYear, createdYear)
+      : (firstMovementYear ?? createdYear),
+    now,
+  )
+  const yearLoading = Boolean(equipmentId) && yearLoadedFor !== `${equipmentId}:${selectedYear}`
 
   const hero = !equipmentId
   const state = inquiryState && inquiryState !== 'error' ? inquiryState.state : null
@@ -900,23 +954,70 @@ export function EquipmentInquiryScreen({
                 <InquiryNow visits={visits} state={state} po={po} now={now} />
               </section>
 
-              {yearError ? (
-                <div className={cn(INQUIRY_SURFACE, 'p-4')}>
-                  <ErrorState description={t('inquiryYearLoadError')} onRetry={retryYear} />
-                </div>
-              ) : year.summary.visitCount > 0 ? (
+              {visits.length > 0 && (
                 <>
-                  <InquiryYearNumbers summary={year.summary} index={1} />
-                  {/* The strip (owner 2026-10-27: «غير اخر 12 شهر لشريط»);
-                      `InquiryYearRings` stays beside it in InquiryYear. */}
-                  <InquiryYearStrip
-                    days={year.days}
-                    months={year.months}
-                    index={5}
-                    onSelectVisit={selectVisit}
-                  />
+                  {/* The calendar year (owner 2026-10-27: «المفروض بالسنة»,
+                      «طبقه»): this year from 1 January, any earlier year of
+                      the unit by the picker. */}
+                  <div
+                    className="inq-rise flex flex-wrap items-center justify-between gap-2 px-1 pt-2"
+                    style={inquiryRise(1)}
+                  >
+                    <h3 className="text-base font-semibold">
+                      {t('inquiryActivityIn').replace('{year}', String(selectedYear))}
+                    </h3>
+                    {yearChoices.length > 1 && (
+                      <div className="-mx-1 max-w-full overflow-x-auto px-1">
+                        <Tabs
+                          value={String(selectedYear)}
+                          onValueChange={(value) => pickYear(Number(value))}
+                        >
+                          <TabsList variant="segmented" aria-label={t('inquiryYearPicker')}>
+                            {yearChoices.map((choice) => (
+                              <TabsTrigger key={choice} value={String(choice)}>
+                                <span className="tabular-nums">{choice}</span>
+                              </TabsTrigger>
+                            ))}
+                          </TabsList>
+                        </Tabs>
+                      </div>
+                    )}
+                  </div>
+                  {yearError ? (
+                    <div className={cn(INQUIRY_SURFACE, 'p-4')}>
+                      <ErrorState description={t('inquiryYearLoadError')} onRetry={retryYear} />
+                    </div>
+                  ) : yearLoading ? (
+                    <div className="space-y-4" aria-busy="true">
+                      <span className="sr-only" role="status">
+                        {t('inquiryYearLoadingLabel')}
+                      </span>
+                      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                        {[0, 1, 2, 3].map((index) => (
+                          <Skeleton key={index} className="h-24 w-full rounded-2xl" />
+                        ))}
+                      </div>
+                      <Skeleton className="h-36 w-full rounded-2xl" />
+                    </div>
+                  ) : (
+                    <div key={selectedYear} className="space-y-4">
+                      <InquiryYearNumbers
+                        summary={year.summary}
+                        year={selectedYear}
+                        index={2}
+                      />
+                      {/* The strip (owner 2026-10-27: «غير اخر 12 شهر
+                          لشريط»); `InquiryYearRings` stays in InquiryYear. */}
+                      <InquiryYearStrip
+                        days={year.days}
+                        months={year.months}
+                        index={6}
+                        onSelectVisit={selectVisit}
+                      />
+                    </div>
+                  )}
                 </>
-              ) : null}
+              )}
 
               {/* Below xl: the facts, the location, the journey. From xl the
                   journey spans two columns beside them; the facts sit above
