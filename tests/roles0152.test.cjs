@@ -101,7 +101,9 @@ test('the companies of a user follow the role permission', () => {
   const fn = read('supabase', 'functions', 'manage-user', 'index.ts')
   assert.match(fn, /if \(companyIds\.length > 0\) \{/)
   assert.doesNotMatch(fn, /role === 'supervisor'/)
-  assert.match(fn, /\.from\('profile_roles'\)\s+\.select\('profile_id', \{ count: 'exact', head: true \}\)\s+\.eq\('role_key', 'admin'\)/)
+  // The last-admin count moved into admin_assign_profile_role (0153,
+  // roles stage 4c-1): manage-user no longer changes the role at all.
+  assert.doesNotMatch(fn, /\.eq\('role', 'admin'\)/)
 })
 
 test('the users list does not sort by the hidden legacy role', () => {

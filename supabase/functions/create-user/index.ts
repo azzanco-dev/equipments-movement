@@ -60,13 +60,17 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // Parse request body
-    const { email, password, full_name, role } = await req.json()
+    // Parse request body. Roles stage 4c (owner 2026-10-27): the new user's
+    // ONE role is `role_key` (any active role of the roles page), assigned
+    // below through admin_assign_profile_role as the caller. `role` is the
+    // name the screens used before and is accepted as the same key.
+    const { email, password, full_name, role_key, role } = await req.json()
+    const roleKey = String(role_key ?? role ?? '').trim()
 
-    if (!email || !password || !full_name || !role) {
+    if (!email || !password || !full_name || !roleKey) {
       return new Response(
         JSON.stringify({
-          error: 'Missing required fields: email, password, full_name, role',
+          error: 'Missing required fields: email, password, full_name, role_key',
         }),
         {
           status: 400,
@@ -95,20 +99,22 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    if (
-      ![
-        'admin',
-        'supervisor',
-        'workshop',
-        'assistant_workshop_manager',
-        'workshop_manager',
-        'monitor',
-      ].includes(role)
-    ) {
-      return new Response(JSON.stringify({ error: 'Invalid role' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    // The role must exist and be active before an account is created for it
+    // (the assignment below re-checks it). Read as the caller: every
+    // signed-in user may read `roles` (0126).
+    const { data: targetRole, error: roleError } = await userClient
+      .from('roles')
+      .select('key,is_active')
+      .eq('key', roleKey)
+      .maybeSingle()
+    if (roleError || !targetRole || targetRole.is_active !== true) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid role', code: 'invalid_role' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      )
     }
 
     // Use service role client to create the new user
@@ -120,9 +126,10 @@ Deno.serve(async (req: Request) => {
         password,
         email_confirm: true,
         user_metadata: { full_name },
-        // Only the service role can write app_metadata; handle_new_user reads
-        // the role from here, never from user-editable user_metadata.
-        app_metadata: { role, admin_created: true },
+        // Only the service role can write app_metadata. The legacy
+        // profiles.role gets the narrowest placeholder (`monitor`) until it
+        // is dropped; the role that decides is the assignment below.
+        app_metadata: { role: 'monitor', admin_created: true },
       })
 
     if (createError) {
@@ -145,10 +152,22 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    // The new user's role, as the caller (admin and settings.roles are
+    // re-checked by the database). A failure never undoes the account: the
+    // screen says the role was not assigned and it is set on the user page;
+    // until then the user holds nothing (or the placeholder's read-only
+    // monitor role while the 0126 sync trigger still exists).
+    const { error: assignError } = await userClient.rpc(
+      'admin_assign_profile_role',
+      { p_profile_id: authData.user.id, p_role_key: roleKey },
+    )
+    if (assignError) console.error('create-user role assignment failed')
+
     return new Response(
       JSON.stringify({
         message: 'User created successfully',
         user: { id: authData.user.id, email: authData.user.email },
+        role_assigned: !assignError,
       }),
       {
         status: 201,

@@ -236,11 +236,10 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   async function handleSave() {
     if (createdUserId) return
     setFormError(null)
-    // ON: the account is created with the legacy role derived from the chosen
-    // role (`legacyRoleFor`: a system role is itself, a custom role gives a
-    // new user `monitor`); a custom role is then assigned in a second step.
-    // The roles-system select is shown only once the active roles loaded;
-    // until then (or after a failed load) the legacy select and form.role apply.
+    // The role select of the roles system once the active roles loaded; until
+    // then (or after a failed load) the legacy select (its values are role
+    // keys too). The form schema still checks a legacy value, so the chosen
+    // role is validated through `legacyRoleFor`; nothing writes it.
     const chosenRole = assignedRoleOptions ? roleKey : form.role
     const legacyRole = assignedRoleOptions
       ? legacyRoleFor(chosenRole, null)
@@ -253,38 +252,27 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     }
     setSaving(true)
     try {
-      const result = await callEdgeFunction<{ user: { id: string } }>(
-        'create-user',
-        {
-          email: form.email.trim(),
-          password: form.password,
-          full_name: form.full_name.trim(),
-          role: legacyRole,
-        },
-      )
-      if (rolesOn && !isSystemRoleKey(chosenRole)) {
-        // The user now exists with the derived legacy role (and, through the
-        // 0126 trigger, that role as assignment). A failure here is never
-        // reported as a failed creation: the role can be set on his page.
-        let assigned = false
-        try {
-          const { error: assignError } = await supabase.rpc(
-            'admin_assign_profile_role',
-            { p_profile_id: result.user.id, p_role_key: chosenRole },
-          )
-          assigned = !assignError
-        } catch {
-          assigned = false
+      // Roles stage 4c (owner 2026-10-27): create-user assigns the chosen
+      // role itself (admin_assign_profile_role as the caller); the legacy
+      // profiles.role is no longer chosen here. A failed assignment never
+      // undoes the account: the role is then set on the user's page.
+      const result = await callEdgeFunction<{
+        user: { id: string }
+        role_assigned?: boolean
+      }>('create-user', {
+        email: form.email.trim(),
+        password: form.password,
+        full_name: form.full_name.trim(),
+        role_key: chosenRole,
+      })
+      if (result.role_assigned === false) {
+        setCreatedUserId(result.user.id)
+        const partial: FieldErrors<UserFormValues> = {
+          role: 'userCreatedRoleNotAssigned',
         }
-        if (!assigned) {
-          setCreatedUserId(result.user.id)
-          const partial: FieldErrors<UserFormValues> = {
-            role: 'userCreatedRoleNotAssigned',
-          }
-          setErrors(partial)
-          focusFirstError(partial, USER_FIELD_ORDER, { root: bodyRef.current })
-          return
-        }
+        setErrors(partial)
+        focusFirstError(partial, USER_FIELD_ORDER, { root: bodyRef.current })
+        return
       }
       setModalOpen(false)
       onSelectUser(result.user.id)

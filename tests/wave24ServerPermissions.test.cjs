@@ -285,11 +285,15 @@ test('the Edge Functions require users.manage as the caller, never through the s
           forbiddenAt,
         'the service-role client is created after the check',
       )
-      assert.match(source, /app_metadata: \{ role, admin_created: true \}/)
+      // Roles stage 4c-1: a placeholder legacy role, the chosen role assigned
+      // as the caller.
+      assert.match(source, /app_metadata: \{ role: 'monitor', admin_created: true \}/)
+      assert.match(source, /userClient\.rpc\(\s+'admin_assign_profile_role'/)
     } else {
-      // Kept rules: own role, last admin, the forced own password change.
-      assert.match(source, /code: 'own_role'/)
-      assert.match(source, /code: 'last_admin'/)
+      // Kept rule: the forced own password change. Own role and last admin
+      // moved into admin_assign_profile_role (0153); the role is never
+      // written here since roles stage 4c-1.
+      assert.doesNotMatch(source, /code: 'own_role'|code: 'last_admin'/)
       assert.ok(
         source.indexOf("body.action === 'change_own_password'") < forbiddenAt,
       )
@@ -300,10 +304,8 @@ test('the Edge Functions require users.manage as the caller, never through the s
         /\.select\('must_change_password'\)\s+\.eq\('id', user\.id\)/,
       )
     }
-    // The six legacy roles stay the allowlist of the account role.
-    assert.match(
-      source,
-      /'assistant_workshop_manager',\s+'workshop_manager',\s+'monitor',\s+\]\.includes\(role\)/,
-    )
+    // Roles stage 4c-1: no allowlist of the six legacy roles any more; the
+    // role is any active role (create-user) or not handled (manage-user).
+    assert.doesNotMatch(source, /\]\.includes\(role\)/)
   }
 })

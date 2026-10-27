@@ -984,12 +984,8 @@ test('after 0127 no live policy or function tests a role name, except by design'
   for (const [name, text] of functions)
     if (!BY_DESIGN.has(name))
       assert.ok(!ROLE_TEST.test(code(text)), `${name} still tests a role`)
-  // The six roles of the Edge Functions and the account form stay the
-  // allowlist of admin_set_user_role.
-  assert.match(
-    code(functions.get('admin_set_user_role')),
-    /IF p_role NOT IN \(/,
-  )
+  // Roles stage 4c-1 (0154): the legacy role writer is gone.
+  assert.equal(functions.has('admin_set_user_role'), false)
   assert.deepEqual([...WORKSHOP_ROLES].sort(), [
     'assistant_workshop_manager',
     'workshop',

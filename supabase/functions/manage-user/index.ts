@@ -73,8 +73,9 @@ Deno.serve(async (req: Request) => {
     // CALLER (the user client, never the service role). While the roles
     // system is inactive the frozen legacy mapping grants it to the admin
     // only, so nothing changes; once active the assigned role decides. Fail
-    // closed: anything but exactly `true` (an error included) is 403. The
-    // own-role, last-admin and admin-parity rules below are unchanged.
+    // closed: anything but exactly `true` (an error included) is 403. Since
+    // roles stage 4c the role is not changed here (own-role and last-admin
+    // live in admin_assign_profile_role, migration 0153).
     const { data: canManageUsers, error: permissionError } =
       await userClient.rpc('has_permission', { p_key: 'users.manage' })
     if (permissionError || canManageUsers !== true)
@@ -122,7 +123,6 @@ Deno.serve(async (req: Request) => {
       const fullName = String(body.full_name ?? '').trim()
       const email = String(body.email ?? '').trim()
       const password = String(body.password ?? '')
-      const role = String(body.role ?? '')
       const companyIds = Array.isArray(body.company_ids)
         ? [...new Set(body.company_ids.map(String))]
         : []
@@ -130,46 +130,17 @@ Deno.serve(async (req: Request) => {
         return json({ error: 'Name and email are required' }, 400)
       if (password && password.length < 8)
         return json({ error: 'Password must be at least 8 characters' }, 400)
-      if (
-        ![
-          'admin',
-          'supervisor',
-          'workshop',
-          'assistant_workshop_manager',
-          'workshop_manager',
-          'monitor',
-        ].includes(role)
-      )
-        return json({ error: 'Invalid role' }, 400)
-
+      // Roles stage 4c (owner 2026-10-27): the role is never changed here;
+      // the screens change it with admin_assign_profile_role, which keeps
+      // the last admin and an admin's own role (migration 0153). A `role`
+      // sent by an older screen is ignored.
       const { data: targetProfile, error: targetError } = await adminClient
         .from('profiles')
-        .select('role')
+        .select('id')
         .eq('id', userId)
         .maybeSingle()
       if (targetError || !targetProfile)
         return json({ error: 'User not found' }, 404)
-      if (targetProfile.role !== role) {
-        if (userId === user.id)
-          return json(
-            { error: 'You cannot change your own role', code: 'own_role' },
-            400,
-          )
-        if (targetProfile.role === 'admin') {
-          // The admins by their assigned role (roles stage 3), which is what
-          // is_admin() reads since migration 0150.
-          const { count, error: countError } = await adminClient
-            .from('profile_roles')
-            .select('profile_id', { count: 'exact', head: true })
-            .eq('role_key', 'admin')
-          if (countError) return json({ error: 'Could not verify admins' }, 500)
-          if ((count ?? 0) <= 1)
-            return json(
-              { error: 'At least one admin is required', code: 'last_admin' },
-              400,
-            )
-        }
-      }
 
       const authAttributes: {
         email: string
@@ -186,9 +157,8 @@ Deno.serve(async (req: Request) => {
 
       const profileUpdate: {
         full_name: string
-        role: string
         must_change_password?: boolean
-      } = { full_name: fullName, role }
+      } = { full_name: fullName }
       if (password) profileUpdate.must_change_password = true
       const { error: profileError } = await adminClient
         .from('profiles')

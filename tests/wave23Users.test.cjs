@@ -255,14 +255,10 @@ test('the users list: ON reads the assignment and filters by it; OFF keeps the l
     list,
     /filter\.field === 'role'\s+\? \{ \.\.\.filter, field: ASSIGNED_ROLE_COLUMN \}/,
   )
-  // Creation: the derived legacy role, then the custom assignment.
-  assert.match(list, /legacyRoleFor\(chosenRole, null\)/)
-  assert.match(list, /role: legacyRole,/)
-  assert.match(list, /if \(rolesOn && !isSystemRoleKey\(chosenRole\)\)/)
-  assert.match(
-    list,
-    /supabase\.rpc\(\s*'admin_assign_profile_role',\s*\{ p_profile_id: result\.user\.id, p_role_key: chosenRole \},/,
-  )
+  // Creation (roles stage 4c-1): create-user receives the chosen role key
+  // and assigns it itself; the screen only reads whether it was assigned.
+  assert.match(list, /role_key: chosenRole,/)
+  assert.match(list, /if \(result\.role_assigned === false\) \{/)
   // A failed assignment is a role-field message, never a failed creation,
   // and the dialog cannot create the user twice.
   assert.match(list, /role: 'userCreatedRoleNotAssigned'/)
