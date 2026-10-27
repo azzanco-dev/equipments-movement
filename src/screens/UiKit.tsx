@@ -51,6 +51,7 @@ import { PurchasingMockup } from '@/screens/ui-kit/PurchasingMockup'
 import { SiteUnitsMockup } from '@/screens/ui-kit/SiteUnitsMockup'
 import { MobileSearchFieldShowcase } from '@/screens/ui-kit/MobileSearchFieldShowcase'
 import { InquiryRedesignMockup } from '@/screens/ui-kit/InquiryRedesignMockup'
+import { InquiryAllStatesShowcase } from '@/screens/ui-kit/InquiryAllStatesShowcase'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -108,6 +109,16 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // Owner 2026-10-27: «في ui-kit سوي معدة فيها جميع الحالات عشان اشوفها».
+    id: 'inquiry-all-states',
+    title: 'نموذج الاستعلام بكل الحالات',
+    purpose:
+      'معدة عينة مرت في 2026 بكل الحالات، على مكونات صفحة الاستعلام الحقيقية، مع اختيار وين هي الحين.',
+    status: 'review',
+    defaultOpen: true,
+    element: <InquiryAllStatesShowcase />,
+  },
   {
     // Owner 2026-10-26: «صفحة الاستعلام ابغى تحسين جذري لها», then «ابدا
     // بالنموذج في /ui-kit مع شريط النشاط» and «اضف الوان وحيوية اكثر … مو

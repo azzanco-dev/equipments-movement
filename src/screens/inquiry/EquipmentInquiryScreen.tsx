@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Building2, Calendar, ExternalLink, Hash, Search, Tag } from 'lucide-react'
+import { Building2, Calendar, ExternalLink, Hash, Tag } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { localizedName } from '@/lib/localizedName'
@@ -25,6 +25,7 @@ import type { EquipmentSuggestion } from '@/components/inquiry/EquipmentSuggestS
 import { InquirySearch } from '@/components/inquiry/InquirySearch'
 import { InquiryPlate } from '@/components/inquiry/InquiryPlate'
 import { InquiryNow } from '@/components/inquiry/InquiryNow'
+import { InquiryThinking } from '@/components/inquiry/InquiryThinking'
 import { InquiryPoCard, type InquiryPo } from '@/components/inquiry/InquiryPoCard'
 import { InquiryYearNumbers, InquiryYearStrip } from '@/components/inquiry/InquiryYear'
 import {
@@ -200,51 +201,6 @@ function toTimelineMovement(
     // wave 19: the driver record's current name, else the snapshot.
     driver_name: preferRecordName(row.driver_full_name, row.driver_name),
   }
-}
-
-/** While the answer is fetched: «نبحث عن …» and the shape of the answer. */
-function InquiryThinking({ code }: { code: string }) {
-  const { t } = useI18n()
-  return (
-    <div className="space-y-4" aria-busy="true">
-      {/* An animated search mark (owner 2026-10-27: «"نبحث عن ..." ابغاه
-          يكون ايقونة انيماشن شكل اجمل»): a magnifier circling over a soft
-          pulsing halo, the unit's code under it. */}
-      <div className="flex flex-col items-center gap-3 py-2" role="status">
-        <span aria-hidden="true" className="relative flex h-16 w-16 items-center justify-center">
-          <span
-            className="inq-halo absolute inset-0 rounded-full"
-            style={{ backgroundColor: 'var(--chart-3)' }}
-          />
-          <span
-            className="inq-halo absolute inset-0 rounded-full"
-            style={{ backgroundColor: 'var(--chart-3)', animationDelay: '900ms' }}
-          />
-          <span
-            className="relative flex h-12 w-12 items-center justify-center rounded-full bg-bg shadow-md"
-            style={{ color: 'var(--chart-stroke-3)' }}
-          >
-            <Search size={20} strokeWidth={2.4} className="inq-seek" />
-          </span>
-        </span>
-        <p className="flex items-center gap-1.5 text-sm text-muted">
-          {t('inquiryLooking')}
-          {code && (
-            <bdi dir="ltr" className="font-semibold text-fg">
-              {code}
-            </bdi>
-          )}
-        </p>
-      </div>
-      <Skeleton className="h-36 w-full rounded-2xl" />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[0, 1, 2, 3].map((index) => (
-          <Skeleton key={index} className="h-24 w-full rounded-2xl" />
-        ))}
-      </div>
-      <Skeleton className="h-40 w-full rounded-2xl" />
-    </div>
-  )
 }
 
 export function EquipmentInquiryScreen({
