@@ -52,7 +52,6 @@ import { SiteUnitsMockup } from '@/screens/ui-kit/SiteUnitsMockup'
 import { MobileSearchFieldShowcase } from '@/screens/ui-kit/MobileSearchFieldShowcase'
 import { InquiryRedesignMockup } from '@/screens/ui-kit/InquiryRedesignMockup'
 import { InquiryAllStatesShowcase } from '@/screens/ui-kit/InquiryAllStatesShowcase'
-import { CraneLoaderShowcase } from '@/screens/ui-kit/CraneLoaderShowcase'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -110,17 +109,6 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
-  {
-    // Owner 2026-10-27: «ابغا اغيره لكرين ايكون مثلا، متحرك» › «سويه في
-    // ui-kit».
-    id: 'crane-loader',
-    title: 'نموذج شاشة التحميل بالكرين',
-    purpose:
-      'كرين متحرك بدل مؤشر التحميل عند فتح الموقع: العربة تمشي على الذراع والخطاف ينزل ويطلع والحمل يتمايل.',
-    status: 'review',
-    defaultOpen: true,
-    element: <CraneLoaderShowcase />,
-  },
   {
     // Owner 2026-10-27: «في ui-kit سوي معدة فيها جميع الحالات عشان اشوفها».
     id: 'inquiry-all-states',
