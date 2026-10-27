@@ -820,14 +820,6 @@ export function EquipmentInquiryScreen({
         className="relative z-10 mx-auto transition-[max-width] duration-500"
         style={{ maxWidth: hero ? 640 : 520 }}
       >
-        {/* Soft colour shapes behind the glass field, so its blur has
-            something to show (owner 2026-10-27: «مو واضح التاثير»); they
-            drift slowly, still under reduced motion. */}
-        <span aria-hidden="true" className="inquiry-glass-backdrop">
-          <span className="inquiry-blob inquiry-blob--blue" />
-          <span className="inquiry-blob inquiry-blob--green" />
-          <span className="inquiry-blob inquiry-blob--violet" />
-        </span>
         <InquirySearch
           query={query}
           onQueryChange={setQuery}
