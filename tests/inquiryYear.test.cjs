@@ -152,7 +152,11 @@ test('the screen: AI-style start, rings, journey in full, no filter', () => {
   assert.match(screen, /ownership_status === 'external_supplier' \? equipment\.lessor\?\.name/)
   // 2026-10-27: the state dot of each suggestion and recent unit, and the
   // page title above the field once the answer shows.
-  assert.match(screen, /\.select\('id,code,type,plate_number,chassis_number,equipment_state'\)/)
+  assert.match(screen, /SUGGEST_SELECT = 'id,code,type,plate_number,chassis_number,equipment_state'/)
+  // The code matches show after one read; the other matches join later.
+  assert.match(screen, /\.select\(SUGGEST_SELECT\)\s+\.or\(filter\)/)
+  assert.match(screen, /\.select\(SUGGEST_SELECT\)\s+\.in\('id', extraIds\)/)
+  assert.match(screen, /term\.length >= COMPANY_NUMBER_MIN_LENGTH/)
   assert.match(screen, /\.select\('id,equipment_state'\)\s+\.in\('id', recentIds\.split\(','\)\)/)
   assert.match(screen, /hero \? 'sr-only' : 'inq-rise mb-3 text-center/)
   assert.match(read('src', 'components', 'inquiry', 'InquirySearch.tsx'), /<InquiryStateDot/)

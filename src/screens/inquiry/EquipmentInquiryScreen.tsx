@@ -58,7 +58,6 @@ import {
   EQUIPMENT_CODE_CHANGE_SELECT,
   codeMatchesTerm,
   fetchPreviousCodeMatchIds,
-  previousCodeOrPart,
   type EquipmentCodeChange,
 } from '@/lib/equipmentCodeHistory'
 import { PreviousCodesLine } from '@/components/inquiry/PreviousCodes'
@@ -133,6 +132,10 @@ interface MovementLogTimelineRow {
 
 const SUGGEST_LIMIT = 20
 const SUGGEST_DEBOUNCE_MS = 300
+const SUGGEST_SELECT = 'id,code,type,plate_number,chassis_number,equipment_state'
+/** «ترقيم الشركة» is searched from this many characters on (its trigram
+ *  index needs three; a shorter term would scan the movements). */
+const COMPANY_NUMBER_MIN_LENGTH = 3
 // One page of RAW movement rows, not visits: a closed visit is 2 rows, an
 // open one or a legacy lone exit is 1. 40 rows comfortably covers "the most
 // recent 20 visits" for the common case while staying a bounded range fetch
@@ -339,52 +342,81 @@ export function EquipmentInquiryScreen({
     setSuggestLoading(true)
     const timer = window.setTimeout(async () => {
       const signal = startSuggestRequest()
-      // A previous code (EM-196) still finds the same unit: the ids whose
-      // old code matches join the existing filter as one more `or` part.
       const term = toLatinDigits(sanitizeSearchTerm(query))
-      // «ترقيم الشركة» of the latest project movement finds the unit too
-      // (owner 2026-10-27, «خليه ترقيم اخر حركة مشروع»); a failed lookup
-      // only drops those matches.
-      const [previous, company] = await Promise.all([
-        fetchPreviousCodeMatchIds(supabase, term, signal),
-        fetchCompanyNumberMatches(supabase, term, signal),
-      ])
-      if (!active || signal.aborted) return
-      const previousPart = previousCodeOrPart([
-        ...new Set([...previous.ids, ...company.matches.keys()]),
-      ])
+      // Speed (owner 2026-10-27, «ليش البحث بطيء شوي؟»): the code / plate
+      // matches show after ONE read; the units found by another way join
+      // the list when their lookups end, under the rows already shown.
       // `equipment_state` (computed field, SECURITY INVOKER) colours the
       // dot beside each code (owner 2026-10-27, «اضفها»): from the
       // movements this reader may see, as on the equipment list.
-      const { data, error } = await supabase
+      const direct = supabase
         .from('equipment')
-        .select('id,code,type,plate_number,chassis_number,equipment_state')
-        .or(previousPart ? `${filter},${previousPart}` : filter)
+        .select(SUGGEST_SELECT)
+        .or(filter)
         .order('code')
         .limit(SUGGEST_LIMIT)
         .abortSignal(signal)
+      // A previous code (EM-196) still finds the same unit, and so does the
+      // «ترقيم الشركة» of its latest project movement (owner 2026-10-27,
+      // «خليه ترقيم اخر حركة مشروع») from three characters on — shorter,
+      // the lookup cannot use its index. A failed lookup only drops its
+      // matches.
+      const lookups = Promise.all([
+        fetchPreviousCodeMatchIds(supabase, term, signal),
+        term.length >= COMPANY_NUMBER_MIN_LENGTH
+          ? fetchCompanyNumberMatches(supabase, term, signal)
+          : Promise.resolve({ matches: new Map<string, string>(), error: false }),
+      ])
+      const toSuggestion = (
+        row: InquiryEquipmentRow,
+        previousIds: ReadonlySet<string>,
+        companyMatches: ReadonlyMap<string, string>,
+      ): EquipmentSuggestion => ({
+        id: row.id,
+        code: row.code,
+        type_name: row.type,
+        plate_number: row.plate_number,
+        chassis_number: row.chassis_number,
+        matched_previous_code: previousIds.has(row.id) && !codeMatchesTerm(row.code, term),
+        matched_company_number: codeMatchesTerm(row.code, term)
+          ? null
+          : (companyMatches.get(row.id) ?? null),
+        equipment_state: row.equipment_state ?? null,
+      })
+
+      const { data, error } = await direct
       if (!active || signal.aborted) return
-      const rows = (data as InquiryEquipmentRow[] | null) ?? []
+      const directRows = error ? [] : ((data as InquiryEquipmentRow[] | null) ?? [])
+      if (directRows.length > 0) {
+        setSuggestions(directRows.map((row) => toSuggestion(row, new Set(), new Map())))
+        setSuggestLoading(false)
+      }
+
+      const [previous, company] = await lookups
+      if (!active || signal.aborted) return
+      const directIds = new Set(directRows.map((row) => row.id))
+      const extraIds = [...new Set([...previous.ids, ...company.matches.keys()])]
+        .filter((id) => !directIds.has(id))
+        .slice(0, Math.max(SUGGEST_LIMIT - directRows.length, 0))
+      let extraRows: InquiryEquipmentRow[] = []
+      if (extraIds.length > 0) {
+        const extra = await supabase
+          .from('equipment')
+          .select(SUGGEST_SELECT)
+          .in('id', extraIds)
+          .order('code')
+          .abortSignal(signal)
+        if (!active || signal.aborted) return
+        extraRows = extra.error ? [] : ((extra.data as InquiryEquipmentRow[] | null) ?? [])
+      }
       const previousIds = new Set(previous.ids)
-      // A failed previous-code lookup only drops the «رقم سابق» matches; the
-      // current-code matches still show (a load failure is never shown as
-      // "no results" when there are rows to show).
+      // A failed lookup only drops its own matches; the code matches stay
+      // (a load failure is never shown as "no results" when there are rows
+      // to show).
       setSuggestions(
-        error
-          ? []
-          : rows.map((row) => ({
-              id: row.id,
-              code: row.code,
-              type_name: row.type,
-              plate_number: row.plate_number,
-              chassis_number: row.chassis_number,
-              matched_previous_code:
-                previousIds.has(row.id) && !codeMatchesTerm(row.code, term),
-              matched_company_number: codeMatchesTerm(row.code, term)
-                ? null
-                : (company.matches.get(row.id) ?? null),
-              equipment_state: row.equipment_state ?? null,
-            })),
+        [...directRows, ...extraRows].map((row) =>
+          toSuggestion(row, previousIds, company.matches),
+        ),
       )
       setSuggestLoading(false)
     }, SUGGEST_DEBOUNCE_MS)
