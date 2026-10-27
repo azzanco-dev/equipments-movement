@@ -785,6 +785,25 @@ textarea::placeholder {
       transparent 70%
     );
   background-repeat: no-repeat;
+  /* The grain layer below sits between this background and the content. */
+  position: relative;
+  isolation: isolate;
+}
+
+/* Grain over the background (owner 2026-10-27: «تقدر تضيف له grain؟»): a
+   fine grey fractal noise drawn by an inline SVG at a low opacity — darker
+   specks on the light theme, lighter ones on the dark — under the page's
+   content and never catching a click. */
+.inquiry-page-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
+  background-size: 180px 180px;
+  opacity: 0.12;
 }
 
 /* Tried and set aside the same day: one warm glow from the middle, around
