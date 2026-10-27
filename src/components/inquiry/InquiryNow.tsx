@@ -149,9 +149,8 @@ export function InquiryNow({
   const tone = INQUIRY_STATE_COLORS[key]
   const sinceMs = since ? Date.parse(since) : Number.NaN
   // Four levels (owner 2026-10-27: «حسن المسافات فيه والهايوريكي»): the
-  // label with the PO chip, the place as the card's heading with its
-  // company, since when, then the people in one box of label-over-value
-  // pairs.
+  // label with the PO chip, the place with its company, since when, then
+  // the people.
   return (
     <div className="rounded-2xl p-4 sm:p-5" style={{ backgroundColor: tone.fill }}>
       <div className="flex items-center justify-between gap-3">
@@ -181,23 +180,24 @@ export function InquiryNow({
         </p>
       )}
 
+      {/* The people as small pills in one row (owner 2026-10-27: «حق مسؤول
+          الحركة كان حلو» — back from a box of pairs). */}
       {people.length > 0 && (
-        <dl
-          className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 rounded-xl p-3 sm:grid-cols-2"
-          style={INQUIRY_ON_FILL}
-        >
+        <div className="mt-4 flex flex-wrap gap-2">
           {people.map((person) => (
-            <div key={person.label} className="min-w-0">
-              <dt className="flex items-center gap-1.5 text-xs text-muted">
-                <span aria-hidden="true">{person.icon}</span>
-                {person.label}
-              </dt>
-              <dd className="m-0 mt-1 min-w-0 truncate-safe text-sm font-semibold">
-                {person.value}
-              </dd>
-            </div>
+            <span
+              key={person.label}
+              className="inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs"
+              style={INQUIRY_ON_FILL}
+            >
+              <span aria-hidden="true" className="text-muted">
+                {person.icon}
+              </span>
+              <span className="text-muted">{person.label}</span>
+              <span className="truncate-safe font-semibold">{person.value}</span>
+            </span>
           ))}
-        </dl>
+        </div>
       )}
     </div>
   )
