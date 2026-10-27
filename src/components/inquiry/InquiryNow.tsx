@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { FileText, User, UserCheck } from 'lucide-react'
+import { Clock, FileText, User, UserCheck } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { AppLink } from '@/components/ui'
 import { formatDate } from '@/lib/dateFormat'
@@ -148,48 +148,56 @@ export function InquiryNow({
 
   const tone = INQUIRY_STATE_COLORS[key]
   const sinceMs = since ? Date.parse(since) : Number.NaN
+  // Four levels (owner 2026-10-27: «حسن المسافات فيه والهايوريكي»): the
+  // label with the PO chip, the place as the card's heading with its
+  // company, since when, then the people in one box of label-over-value
+  // pairs.
   return (
-    <div className="rounded-2xl p-4" style={{ backgroundColor: tone.fill }}>
-      <div className="flex flex-wrap items-start gap-3">
-        <InquiryIconTile colors={tone} size={42}>
-          {inquiryStateIcon(key, 19)}
-        </InquiryIconTile>
-        <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="text-xs font-semibold text-muted">{t('inquiryNow')}</p>
-          <p className="text-lg leading-snug">{title}</p>
-          {place && <p className="text-sm text-muted">{place}</p>}
-          {since && !Number.isNaN(sinceMs) && (
-            <p className="text-sm">
-              {t('inquirySince')}{' '}
-              <span className="font-semibold">
-                {formatElapsedDuration(now - sinceMs, t, lang)}
-              </span>
-              <span className="text-muted">
-                {' · '}
-                <bdi dir="ltr">{formatDate(since)}</bdi>
-              </span>
-            </p>
-          )}
+    <div className="rounded-2xl p-4 sm:p-5" style={{ backgroundColor: tone.fill }}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <InquiryIconTile colors={tone} size={34}>
+            {inquiryStateIcon(key, 16)}
+          </InquiryIconTile>
+          <p className="text-sm font-semibold text-muted">{t('inquiryNow')}</p>
         </div>
-        {/* Under the text on a phone, so it never squeezes the place. */}
-        {extra && <div className="basis-full ps-[54px] sm:basis-auto sm:ps-0">{extra}</div>}
+        {extra && <div className="shrink-0">{extra}</div>}
       </div>
+
+      <div className="mt-4 space-y-1">
+        <p className="text-xl leading-snug sm:text-2xl">{title}</p>
+        {place && <p className="text-sm text-muted">{place}</p>}
+      </div>
+
+      {since && !Number.isNaN(sinceMs) && (
+        <p className="mt-3 flex flex-wrap items-center gap-x-1.5 text-sm">
+          <Clock size={14} aria-hidden="true" className="text-muted" />
+          <span className="text-muted">{t('inquirySince')}</span>
+          <span className="font-semibold">{formatElapsedDuration(now - sinceMs, t, lang)}</span>
+          <span className="text-muted">
+            {'· '}
+            <bdi dir="ltr">{formatDate(since)}</bdi>
+          </span>
+        </p>
+      )}
+
       {people.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <dl
+          className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 rounded-xl p-3 sm:grid-cols-2"
+          style={INQUIRY_ON_FILL}
+        >
           {people.map((person) => (
-            <span
-              key={person.label}
-              className="inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs"
-              style={INQUIRY_ON_FILL}
-            >
-              <span aria-hidden="true" className="text-muted">
-                {person.icon}
-              </span>
-              <span className="text-muted">{person.label}</span>
-              <span className="truncate-safe font-semibold">{person.value}</span>
-            </span>
+            <div key={person.label} className="min-w-0">
+              <dt className="flex items-center gap-1.5 text-xs text-muted">
+                <span aria-hidden="true">{person.icon}</span>
+                {person.label}
+              </dt>
+              <dd className="m-0 mt-1 min-w-0 truncate-safe text-sm font-semibold">
+                {person.value}
+              </dd>
+            </div>
           ))}
-        </div>
+        </dl>
       )}
     </div>
   )
