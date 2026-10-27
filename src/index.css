@@ -788,6 +788,67 @@ textarea::placeholder {
 }
 /* ===== purchasing: PO print sheet — end ===== */
 
+/* The crane loader (owner 2026-10-27: «ابغا اغيره لكرين ايكون مثلا،
+   متحرك»; on /ui-kit first): the trolley runs along the jib, the cable
+   lowers the hook and load and raises them again, and the load sways from
+   the trolley. Still under reduced motion. */
+@keyframes crane-trolley {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(32px);
+  }
+}
+@keyframes crane-cable {
+  from {
+    transform: scaleY(1);
+  }
+  to {
+    transform: scaleY(1.5);
+  }
+}
+@keyframes crane-hook {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(13px);
+  }
+}
+@keyframes crane-swing {
+  from {
+    transform: rotate(-4deg);
+  }
+  to {
+    transform: rotate(4deg);
+  }
+}
+.crane-trolley {
+  animation: crane-trolley 2.6s ease-in-out infinite alternate;
+}
+.crane-cable {
+  transform-box: fill-box;
+  transform-origin: top;
+  animation: crane-cable 1.7s ease-in-out infinite alternate;
+}
+.crane-hook {
+  animation: crane-hook 1.7s ease-in-out infinite alternate;
+}
+.crane-swing {
+  transform-box: view-box;
+  transform-origin: 65px 33px;
+  animation: crane-swing 1.3s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .crane-trolley,
+  .crane-cable,
+  .crane-hook,
+  .crane-swing {
+    animation: none;
+  }
+}
+
 /* Inquiry page background (owner 2026-10-27: «تقدر تسوي gradient للخلفية
    حق الصفحة؟»): the one gradient of the page, behind everything; the cards
    on it stay flat. In use: the two glows at the top corners, blue on the
