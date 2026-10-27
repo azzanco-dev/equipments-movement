@@ -9,13 +9,13 @@ import {
   type InquiryYearSummary,
 } from '@/lib/inquiryYear'
 import {
-  INQUIRY_ON_FILL,
   INQUIRY_STATE_COLORS,
   INQUIRY_STATE_LABEL,
   INQUIRY_SURFACE,
   InquiryCardTitle,
   InquiryIconTile,
   inquiryDayColor,
+  inquiryInnerFill,
   inquiryRise,
   useCountUp,
   type InquiryColors,
@@ -59,7 +59,7 @@ function YearTile({
       </div>
       <p className="mt-2.5 text-2xl font-bold leading-none tabular-nums">{shown}</p>
       {share !== undefined && colors && (
-        <div className="mt-2.5 h-1 overflow-hidden rounded-full" style={INQUIRY_ON_FILL}>
+        <div className="mt-2.5 h-1 overflow-hidden rounded-full" style={inquiryInnerFill(colors)}>
           <div
             className="inq-grow h-full rounded-full"
             style={{

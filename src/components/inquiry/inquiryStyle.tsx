@@ -120,9 +120,12 @@ export function inquiryStateIcon(key: InquiryStateKey, size: number): ReactNode 
 /** Borderless surface with a soft shadow. */
 export const INQUIRY_SURFACE = 'rounded-2xl bg-bg shadow-sm'
 
-/** A translucent page-colour chip that reads on any state fill. */
-export const INQUIRY_ON_FILL: CSSProperties = {
-  backgroundColor: 'color-mix(in srgb, var(--bg) 65%, transparent)',
+/** A box or pill inside a filled card: a lighter shade of that card's own
+ *  colour (owner 2026-10-27: «المربعات الي داخل المربعات الملونة … نخليها
+ *  الدرجة … الافتح من نفس الكارد الاب»; it was a translucent white that
+ *  read as grey). */
+export function inquiryInnerFill(colors: Pick<InquiryColors, 'fill'>): CSSProperties {
+  return { backgroundColor: `color-mix(in srgb, ${colors.fill} 40%, var(--bg))` }
 }
 
 /** The stagger of the n-th block of the answer (`.inq-rise`). */

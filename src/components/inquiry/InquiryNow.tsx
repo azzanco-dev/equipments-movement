@@ -7,10 +7,10 @@ import type { EquipmentState } from '@/lib/equipmentState'
 import type { EquipmentVisit } from '@/lib/visitTimeline'
 import { visitStateKey, type InquiryStateKey } from '@/lib/inquiryYear'
 import {
-  INQUIRY_ON_FILL,
   INQUIRY_STATE_COLORS,
   INQUIRY_STATE_LABEL,
   InquiryIconTile,
+  inquiryInnerFill,
   inquiryStateIcon,
 } from './inquiryStyle'
 
@@ -160,7 +160,7 @@ export function InquiryNow({
             <span
               key={person.label}
               className="inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs"
-              style={INQUIRY_ON_FILL}
+              style={inquiryInnerFill(tone)}
             >
               <span aria-hidden="true" className="text-muted">
                 {person.icon}

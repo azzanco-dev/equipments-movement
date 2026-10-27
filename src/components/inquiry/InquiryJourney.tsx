@@ -14,12 +14,12 @@ import {
 } from '@/lib/visitTimeline'
 import { visitStateKey } from '@/lib/inquiryYear'
 import {
-  INQUIRY_ON_FILL,
   INQUIRY_STATE_COLORS,
   INQUIRY_STATE_LABEL,
   INQUIRY_SURFACE,
   InquiryCardTitle,
   InquiryIconTile,
+  inquiryInnerFill,
   inquiryRise,
   inquiryStateIcon,
 } from './inquiryStyle'
@@ -116,7 +116,7 @@ function StayTile({
             {!site && (
               <span
                 className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                style={INQUIRY_ON_FILL}
+                style={inquiryInnerFill(colors)}
               >
                 {t(INQUIRY_STATE_LABEL[key])}
               </span>
@@ -147,7 +147,7 @@ function StayTile({
           'mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-xl p-3',
           site ? 'sm:grid-cols-4' : 'sm:grid-cols-3',
         )}
-        style={INQUIRY_ON_FILL}
+        style={inquiryInnerFill(colors)}
       >
         <StayFact icon={<LogIn size={11} />} label={t('inquiryEntry')}>
           {entry ? <MovementDay movement={entry} onSelectMovement={onSelectMovement} /> : '—'}
