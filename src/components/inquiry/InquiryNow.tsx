@@ -58,7 +58,7 @@ export function InquiryNow({
     title = (
       <>
         {t('inquiryInside')}{' '}
-        <span className="font-bold">{open.entry?.project_name || t('inquiryStateSite')}</span>
+        <span className="font-bold">{open.entry?.project_name || t('project')}</span>
       </>
     )
     place = open.entry?.company_name
@@ -101,7 +101,7 @@ export function InquiryNow({
     key = 'site'
     title = (
       <>
-        {t('inquiryInside')} <span className="font-bold">{t('inquiryStateSite')}</span>
+        {t('inquiryInside')} <span className="font-bold">{t('project')}</span>
       </>
     )
   } else if (hiddenKey) {
@@ -119,7 +119,7 @@ export function InquiryNow({
       '{place}',
       last.context === 'workshop'
         ? t('workshopLocation')
-        : (last.entry ?? last.exit)?.project_name || t('inquiryStateSite'),
+        : (last.entry ?? last.exit)?.project_name || t('project'),
     )
   } else {
     title = <span className="font-bold">{t('inquiryNoMovementsYet')}</span>

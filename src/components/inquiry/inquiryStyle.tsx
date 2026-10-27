@@ -51,6 +51,8 @@ export const INQUIRY_STATE_COLORS: Record<InquiryStateKey, InquiryColors> = {
 }
 
 export const INQUIRY_STATE_LABEL: Record<InquiryStateKey, TranslationKey> = {
+  // «تعمل», as the state badge says (owner 2026-10-27: «وحد النصوص تبع
+  // قائمة تعمل» › «تعمل»).
   site: 'inquiryStateSite',
   maintenance: 'inquiryStateMaintenance',
   parking: 'inquiryStateParking',

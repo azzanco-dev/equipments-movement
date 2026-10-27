@@ -94,7 +94,7 @@ function StayTile({
   const exit = visit.exit
   const site = visit.context === 'site'
   const title = site
-    ? (entry ?? exit)?.project_name || t('inquiryStateSite')
+    ? (entry ?? exit)?.project_name || t('project')
     : t('workshopLocation')
   const company = site ? (entry ?? exit)?.company_name : null
   const entryDriver = entry?.driver_name || null
