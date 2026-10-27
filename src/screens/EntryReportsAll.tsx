@@ -352,14 +352,17 @@ export function EntryReportsAll({
   )
 }
 
-function ReportRelationFilter({
+export function ReportRelationFilter({
   filterKey,
   value,
   onChange,
+  placeholder,
 }: {
   filterKey: string
   value: string
   onChange: (value: string) => void
+  /** Overrides the label derived from `filterKey`. */
+  placeholder?: string
 }) {
   const { t } = useI18n()
   const table =
@@ -432,7 +435,7 @@ function ReportRelationFilter({
       }
       onChange={(next) => onChange(next)}
       loadOptions={loadOptions}
-      placeholder={t(labelKey as TranslationKey)}
+      placeholder={placeholder ?? t(labelKey as TranslationKey)}
       className="min-w-36"
     />
   )

@@ -8,6 +8,7 @@ import { ReportListSkeleton } from '@/components/ReportListSkeleton'
 import { MovementLogCard } from '@/components/MovementLogCard'
 import { DatePicker } from '@/components/DatePicker'
 import { OwnerContextFilter } from '@/components/OwnerContextFilter'
+import { ReportRelationFilter } from '@/screens/EntryReportsAll'
 import { parseReportOwners, serializeReportOwners } from '@/lib/reportFilters'
 import {
   MOVEMENT_LOG_SEARCH_VIEW,
@@ -75,6 +76,10 @@ export function WorkshopReports({
         purpose === 'out_of_service'
       )
         query = query.eq('workshop_purpose', purpose)
+      // Who recorded the movement (EM-141, owner 16 September: the foreman
+      // is a filter, not search), as in the entry report and /logs.
+      const recordedBy = params.get('supervisor_id')
+      if (recordedBy) query = query.eq('supervisor_id', recordedBy)
       if (isDateKey(from)) query = query.gte('recorded_at', saudiDayStart(from))
       if (isDateKey(to)) query = query.lte('recorded_at', saudiDayEnd(to))
       // Owner filter, applied in PostgREST on the view's own
@@ -168,6 +173,12 @@ export function WorkshopReports({
             </option>
           ))}
         </select>
+        <ReportRelationFilter
+          filterKey="supervisor_id"
+          value={params.get('supervisor_id') ?? ''}
+          onChange={(value) => setParam('supervisor_id', value)}
+          placeholder={t('inquiryMovementOwner')}
+        />
         {/* Workshop movements only, so no context tabs. */}
         <OwnerContextFilter
           owners={parseReportOwners(params.get('owners'))}
