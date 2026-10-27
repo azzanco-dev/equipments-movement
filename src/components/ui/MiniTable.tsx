@@ -32,6 +32,9 @@ export interface MiniTableProps<Row> {
   /** «عرض الكل» stays beside the title and description instead of wrapping
    *  under a long description (see `SectionHeader`). */
   actionBesideText?: boolean
+  /** «عرض الكل» on a light grey fill instead of a bare ghost button (owner
+   *  2026-10-27, the admin home). */
+  viewAllFilled?: boolean
   className?: string
 }
 
@@ -59,6 +62,7 @@ export function MiniTable<Row>({
   onRowClick,
   rowHref,
   actionBesideText = false,
+  viewAllFilled = false,
   className,
 }: MiniTableProps<Row>) {
   const { t } = useI18n()
@@ -77,12 +81,21 @@ export function MiniTable<Row>({
     ),
   }))
 
+  // `!` so the fill wins over the ghost variant's own hover background.
+  const viewAllClass = viewAllFilled
+    ? '!bg-surface-hover hover:!bg-border'
+    : undefined
   const action = viewAllHref ? (
-    <Button asChild size="sm" variant="ghost">
+    <Button asChild size="sm" variant="ghost" className={viewAllClass}>
       <a href={viewAllHref}>{t('viewAll')}</a>
     </Button>
   ) : onViewAll ? (
-    <Button size="sm" variant="ghost" onClick={onViewAll}>
+    <Button
+      size="sm"
+      variant="ghost"
+      className={viewAllClass}
+      onClick={onViewAll}
+    >
       {t('viewAll')}
     </Button>
   ) : undefined

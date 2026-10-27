@@ -478,6 +478,7 @@ function FleetTable<Row>({
           rowKey={rowKey}
           maxRows={FLEET_MINI_ROWS}
           onViewAll={expand}
+          viewAllFilled
           toolbar={toolbar}
           loading={loading && !data}
           error={error}

@@ -245,6 +245,7 @@ function AfaqySectionContent({ onSelectEquipment }: AfaqySectionProps) {
                   // Owner 2026-10-27: «عرض الكل» beside the texts above,
                   // not on a row of its own under the long description.
                   actionBesideText
+                  viewAllFilled
                   empty={t('afaqyHomeNone')}
                 />
               )
