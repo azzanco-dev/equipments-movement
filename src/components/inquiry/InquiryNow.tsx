@@ -165,7 +165,7 @@ export function InquiryNow({
       </div>
 
       <div className="mt-4 space-y-1">
-        <p className="text-xl leading-snug sm:text-2xl">{title}</p>
+        <p className="text-base leading-snug">{title}</p>
         {place && <p className="text-sm text-muted">{place}</p>}
       </div>
 
