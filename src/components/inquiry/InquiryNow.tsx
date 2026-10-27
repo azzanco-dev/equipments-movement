@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
-import { Clock, FileText, User, UserCheck } from 'lucide-react'
+import { Clock, User, UserCheck } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
-import { AppLink } from '@/components/ui'
 import { formatDate } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
 import type { EquipmentState } from '@/lib/equipmentState'
@@ -15,10 +14,6 @@ import {
   inquiryStateIcon,
 } from './inquiryStyle'
 
-/** The PO of the unit's open project visit, when the reader may see it:
- *  `undefined` hides the chip, `null` says «بدون PO». */
-export type InquiryNowPo = { id: string; number: string } | null | undefined
-
 /** The workshop state of `get_last_movement`, for a reader whose access
  *  hides the open visit itself. */
 function stateKeyOf(state: EquipmentState | null): InquiryStateKey | null {
@@ -31,7 +26,7 @@ function stateKeyOf(state: EquipmentState | null): InquiryStateKey | null {
 /**
  * «الحين» (owner 2026-10-26): where the unit is now, filled with that
  * state's light colour — the project and company, since when, the foreman
- * and driver and the PO chip; the workshop with its purpose and who is
+ * and driver (no PO badge: owner 2026-10-27, «شيل بادج الPO»); the workshop with its purpose and who is
  * responsible for the movement; else «بدون تسجيل» with the last recorded
  * exit. The open visit comes from the visible movements; when the reader's
  * access hides it, the state of the latest movement (`state`) still names
@@ -40,13 +35,11 @@ function stateKeyOf(state: EquipmentState | null): InquiryStateKey | null {
 export function InquiryNow({
   visits,
   state,
-  po,
   now,
 }: {
   /** Newest first, as `buildEquipmentVisits` returns them. */
   visits: EquipmentVisit[]
   state: EquipmentState | null
-  po: InquiryNowPo
   now: number
 }) {
   const { t, lang } = useI18n()
@@ -58,7 +51,6 @@ export function InquiryNow({
   let place: ReactNode = null
   let since: string | null = null
   const people: { icon: ReactNode; label: string; value: string }[] = []
-  let extra: ReactNode = null
 
   const hiddenKey = open ? null : stateKeyOf(state)
   if (open && open.context === 'site') {
@@ -83,25 +75,6 @@ export function InquiryNow({
         label: t('inquiryDriver'),
         value: open.entry.driver_name,
       })
-    if (po !== undefined)
-      extra = po ? (
-        <AppLink
-          href={`/purchasing/${po.id}`}
-          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold hover:underline"
-          style={INQUIRY_ON_FILL}
-        >
-          <FileText size={12} aria-hidden="true" />
-          <bdi dir="ltr">{po.number}</bdi>
-        </AppLink>
-      ) : (
-        <span
-          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold"
-          style={INQUIRY_ON_FILL}
-        >
-          <FileText size={12} aria-hidden="true" />
-          {t('inquiryNoPo')}
-        </span>
-      )
   } else if (open) {
     key = visitStateKey(open)
     title = (
@@ -153,14 +126,13 @@ export function InquiryNow({
   // the people.
   return (
     <div className="rounded-2xl p-4 sm:p-5" style={{ backgroundColor: tone.fill }}>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <InquiryIconTile colors={tone} size={34}>
             {inquiryStateIcon(key, 16)}
           </InquiryIconTile>
           <p className="text-sm font-semibold text-muted">{t('inquiryNow')}</p>
         </div>
-        {extra && <div className="shrink-0">{extra}</div>}
       </div>
 
       <div className="mt-4 space-y-1">

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Building2, Calendar, ExternalLink, Hash, Tag } from 'lucide-react'
+import { Building2, Calendar, ExternalLink, Hash, Search, Tag } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { localizedName } from '@/lib/localizedName'
@@ -24,7 +24,8 @@ import {
 import type { EquipmentSuggestion } from '@/components/inquiry/EquipmentSuggestSearch'
 import { InquirySearch } from '@/components/inquiry/InquirySearch'
 import { InquiryPlate } from '@/components/inquiry/InquiryPlate'
-import { InquiryNow, type InquiryNowPo } from '@/components/inquiry/InquiryNow'
+import { InquiryNow } from '@/components/inquiry/InquiryNow'
+import { InquiryPoCard, type InquiryPo } from '@/components/inquiry/InquiryPoCard'
 import { InquiryYearNumbers, InquiryYearStrip } from '@/components/inquiry/InquiryYear'
 import {
   InquiryJourney,
@@ -83,7 +84,7 @@ import type { OwnershipStatus } from '@/lib/types'
  * big field in the middle, with the reader's recent units — and the answer
  * rises in: the unit with its one state and, for an external supplier's
  * unit, the supplier; «الحين» (where it is now, since when, the foreman,
- * driver and PO); the chosen calendar year (this year first): its numbers
+ * driver); the chosen calendar year (this year first): its numbers
  * and one strip of its stays;
  * the facts and the (admin) location beside «الرحلة», every stay in full.
  *
@@ -206,26 +207,35 @@ function InquiryThinking({ code }: { code: string }) {
   const { t } = useI18n()
   return (
     <div className="space-y-4" aria-busy="true">
-      <p
-        className="flex items-center justify-center gap-1.5 text-sm text-muted"
-        role="status"
-      >
-        {t('inquiryLooking')}
-        {code && (
-          <bdi dir="ltr" className="font-semibold text-fg">
-            {code}
-          </bdi>
-        )}
-        <span className="flex gap-1" aria-hidden="true">
-          {[0, 1, 2].map((index) => (
-            <span
-              key={index}
-              className="inq-dot h-1.5 w-1.5 rounded-full bg-fg"
-              style={{ animationDelay: `${index * 160}ms` }}
-            />
-          ))}
+      {/* An animated search mark (owner 2026-10-27: «"نبحث عن ..." ابغاه
+          يكون ايقونة انيماشن شكل اجمل»): a magnifier circling over a soft
+          pulsing halo, the unit's code under it. */}
+      <div className="flex flex-col items-center gap-3 py-2" role="status">
+        <span aria-hidden="true" className="relative flex h-16 w-16 items-center justify-center">
+          <span
+            className="inq-halo absolute inset-0 rounded-full"
+            style={{ backgroundColor: 'var(--chart-3)' }}
+          />
+          <span
+            className="inq-halo absolute inset-0 rounded-full"
+            style={{ backgroundColor: 'var(--chart-3)', animationDelay: '900ms' }}
+          />
+          <span
+            className="relative flex h-12 w-12 items-center justify-center rounded-full bg-bg shadow-md"
+            style={{ color: 'var(--chart-stroke-3)' }}
+          >
+            <Search size={20} strokeWidth={2.4} className="inq-seek" />
+          </span>
         </span>
-      </p>
+        <p className="flex items-center gap-1.5 text-sm text-muted">
+          {t('inquiryLooking')}
+          {code && (
+            <bdi dir="ltr" className="font-semibold text-fg">
+              {code}
+            </bdi>
+          )}
+        </p>
+      </div>
       <Skeleton className="h-36 w-full rounded-2xl" />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[0, 1, 2, 3].map((index) => (
@@ -249,8 +259,8 @@ export function EquipmentInquiryScreen({
   const searchParams = useSearchParams()
   const permissions = usePermissions()
   const permissionsReady = permissions.status === 'ready'
-  const canSeePurchasing = permissionsReady && permissions.can('purchasing.view')
   const canOpenEquipment = permissionsReady && permissions.can('equipment.read')
+  const canSeePurchasing = permissionsReady && permissions.can('purchasing.view')
 
   const startSuggestRequest = useListRequest()
   const startDetailRequest = useListRequest()
@@ -301,9 +311,11 @@ export function EquipmentInquiryScreen({
   // The year of the unit's first movement, for the year picker.
   const [firstMovementYear, setFirstMovementYear] = useState<number | null>(null)
 
-  const [po, setPo] = useState<InquiryNowPo>(undefined)
   // The stay the 12-month strip opened in the history.
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null)
+  // The PO card under the facts: `undefined` hides it (no purchasing
+  // access, a failed read, or the unit is not inside a project).
+  const [po, setPo] = useState<InquiryPo | undefined>(undefined)
 
   useEffect(() => setRecent(readRecent()), [])
 
@@ -593,11 +605,8 @@ export function EquipmentInquiryScreen({
   // --- The PO of the open project visit (purchasing readers only) -------
 
   useEffect(() => {
-    if (!equipmentId || !canSeePurchasing) {
-      setPo(undefined)
-      return
-    }
     setPo(undefined)
+    if (!equipmentId || !canSeePurchasing) return
     let active = true
     const signal = startPoRequest()
     void supabase
@@ -607,12 +616,14 @@ export function EquipmentInquiryScreen({
       .limit(1)
       .abortSignal(signal)
       .then(({ data, error }) => {
-        if (!active || signal.aborted) return
-        // A failed read hides the chip rather than claiming «بدون PO».
-        if (error) return setPo(undefined)
-        const row = (data as { supplier_po_id: string | null; po_number: string | null }[] | null)?.[0]
+        if (!active || signal.aborted || error) return
+        // No row: the unit is not inside a project, so no card.
+        const row = (
+          data as { supplier_po_id: string | null; po_number: string | null }[] | null
+        )?.[0]
+        if (!row) return
         setPo(
-          row?.supplier_po_id && row.po_number
+          row.supplier_po_id && row.po_number
             ? { id: row.supplier_po_id, number: row.po_number }
             : null,
         )
@@ -951,7 +962,7 @@ export function EquipmentInquiryScreen({
                     </Button>
                   </div>
                 </div>
-                <InquiryNow visits={visits} state={state} po={po} now={now} />
+                <InquiryNow visits={visits} state={state} now={now} />
               </section>
 
               {visits.length > 0 && (
@@ -1039,6 +1050,10 @@ export function EquipmentInquiryScreen({
                       error={codeChangesError}
                     />
                   </section>
+                  {/* The PO in a small card of its own under the facts
+                      (owner 2026-10-27: «خليه في كرت مصغر يسار تحت بيانات
+                      المعدة»). */}
+                  {po !== undefined && <InquiryPoCard po={po} index={7} />}
                   {/* wave 17: admin only (the card renders nothing for any
                       other role and never requests the position then). */}
                   <EquipmentLocationCard

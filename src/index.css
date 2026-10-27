@@ -819,6 +819,41 @@ textarea::placeholder {
   background-repeat: no-repeat;
 }
 
+/* The inquiry's searching mark (owner 2026-10-27): the magnifier circles a
+   small loop as if looking around, upright all the way, while two soft
+   halos swell and fade behind it in turn. Still for a reader who asked for
+   reduced motion. */
+@keyframes inq-seek {
+  from {
+    transform: rotate(0deg) translateX(4px) rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg) translateX(4px) rotate(-360deg);
+  }
+}
+@keyframes inq-halo {
+  0% {
+    opacity: 0.7;
+    transform: scale(0.75);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.45);
+  }
+}
+.inq-seek {
+  animation: inq-seek 1.6s linear infinite;
+}
+.inq-halo {
+  animation: inq-halo 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .inq-seek,
+  .inq-halo {
+    animation: none;
+  }
+}
+
 /* Inquiry page motion (owner 2026-10-26, «لما تجي النتايج تجي
    بانيميشن»): the answer rises in block by block, the share bars grow from
    the start edge, the month rings draw in and the «نبحث عن» dots pulse.

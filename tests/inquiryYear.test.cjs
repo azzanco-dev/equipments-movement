@@ -141,9 +141,13 @@ test('the screen: AI-style start, rings, journey in full, no filter', () => {
   // Recent units: this browser only, and storage failures are swallowed.
   assert.match(screen, /const RECENT_KEY = 'inquiry:recent'/)
   assert.match(screen, /try \{\s+window\.localStorage\.setItem/)
-  // The PO chip only for purchasing readers.
+  // The PO left the status card for a small card under the facts (owner
+  // 2026-10-27: «شيل بادج الPO», «خليه في كرت مصغر يسار تحت بيانات
+  // المعدة»), for purchasing readers, while the unit is inside a project.
+  assert.doesNotMatch(read('src', 'components', 'inquiry', 'InquiryNow.tsx'), /inquiryNoPo|\/purchasing\//)
   assert.match(screen, /permissions\.can\('purchasing\.view'\)/)
-  assert.match(screen, /if \(!equipmentId \|\| !canSeePurchasing\)/)
+  assert.match(screen, /if \(!equipmentId \|\| !canSeePurchasing\) return/)
+  assert.match(screen, /<\/section>\s+\{\/\*[\s\S]*?\*\/\}\s+\{po !== undefined && <InquiryPoCard po=\{po\}/)
   // The supplier of an external unit.
   assert.match(screen, /ownership_status === 'external_supplier' \? equipment\.lessor\?\.name/)
   // 2026-10-27: the state dot of each suggestion and recent unit, and the
