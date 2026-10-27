@@ -757,7 +757,7 @@ textarea::placeholder {
    احفظه على جنب») and came back to after trying the middle («لا خلاص ارجع
    للي قلت لك احفظها»). */
 .inquiry-page-bg {
-  background-image:
+  --inq-glows:
     radial-gradient(
       ellipse 80% 55% at 85% 0%,
       color-mix(in srgb, var(--chart-3) 55%, transparent),
@@ -768,6 +768,7 @@ textarea::placeholder {
       color-mix(in srgb, var(--chart-1) 45%, transparent),
       transparent 70%
     );
+  background-image: var(--inq-glows);
   background-repeat: no-repeat;
   /* The grain layer below sits between this background and the content. */
   position: relative;
@@ -788,6 +789,21 @@ textarea::placeholder {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%25' height='100%25' filter='url(%23g)'/></svg>");
   background-size: 180px 180px;
   opacity: 0.22;
+}
+
+/* Once the answer shows, the wash stays at the top only (owner 2026-10-27:
+   «لما تظهر النتايج خليه فوق بس، يعني يبدا يختفي من بعد الوضع الحالي»): a
+   layer of the page's own surface colour, painted over the glows, fades in
+   from the bottom of the unit's card with «الوضع الحالي»
+   (`--inq-wash-end`, measured by the screen) over 220px. */
+.inquiry-page-bg--top {
+  background-image:
+    linear-gradient(
+      to bottom,
+      transparent var(--inq-wash-end, 640px),
+      var(--surface) calc(var(--inq-wash-end, 640px) + 220px)
+    ),
+    var(--inq-glows);
 }
 
 /* Tried and set aside the same day: one warm glow from the middle, around

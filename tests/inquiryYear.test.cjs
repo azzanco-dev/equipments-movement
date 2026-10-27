@@ -183,11 +183,17 @@ test('the look: flat cards, one soft page wash, reduced motion respected', () =>
     assert.doesNotMatch(file, /linear-gradient|radial-gradient/)
   // The one gradient is the page background, in the stylesheet (owner
   // 2026-10-27: «تقدر تسوي gradient للخلفية حق الصفحة؟»).
+  const screen = read('src', 'screens', 'inquiry', 'EquipmentInquiryScreen.tsx')
+  assert.match(screen, /'inquiry-page-bg min-h-\[70vh\]/)
+  // With an answer it stays at the top, fading out under «الوضع الحالي».
+  assert.match(screen, /!hero && 'inquiry-page-bg--top'/)
+  assert.match(screen, /'--inq-wash-end': `\$\{washEnd\}px`/)
+  const wash = read('src', 'index.css')
+  assert.match(wash, /\.inquiry-page-bg \{\s+--inq-glows:\s+radial-gradient\(/)
   assert.match(
-    read('src', 'screens', 'inquiry', 'EquipmentInquiryScreen.tsx'),
-    /className="inquiry-page-bg /,
+    wash,
+    /\.inquiry-page-bg--top \{\s+background-image:\s+linear-gradient\(\s+to bottom,\s+transparent var\(--inq-wash-end, 640px\),\s+var\(--surface\) calc\(var\(--inq-wash-end, 640px\) \+ 220px\)\s+\),\s+var\(--inq-glows\);/,
   )
-  assert.match(read('src', 'index.css'), /\.inquiry-page-bg \{\s+background-image:\s+radial-gradient\(/)
   assert.match(style, /unrecorded: \{\s+fill: light\('var\(--chart-4\)'\)/)
   const css = read('src', 'index.css')
   assert.match(

@@ -1,6 +1,14 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Building2, Calendar, ExternalLink, Hash, Tag } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -756,6 +764,38 @@ export function EquipmentInquiryScreen({
   const yearLoading = Boolean(equipmentId) && yearLoadedFor !== `${equipmentId}:${selectedYear}`
 
   const hero = !equipmentId
+
+  // The page wash ends under the unit's card with «الوضع الحالي» (owner
+  // 2026-10-27: «خليه فوق بس، يعني يبدا يختفي من بعد الوضع الحالي»): its
+  // bottom, measured from the page frame (offsets ignore the rise
+  // animation's transform), feeds `--inq-wash-end` in src/index.css.
+  const pageRef = useRef<HTMLDivElement>(null)
+  const headRef = useRef<HTMLElement>(null)
+  const [washEnd, setWashEnd] = useState<number | null>(null)
+  const headShown = Boolean(equipment) && !hero
+  useLayoutEffect(() => {
+    const page = pageRef.current
+    const head = headRef.current
+    if (!headShown || !page || !head) {
+      setWashEnd(null)
+      return
+    }
+    const measure = () => {
+      let top = 0
+      let node: HTMLElement | null = head
+      while (node && node !== page) {
+        top += node.offsetTop
+        node = node.offsetParent as HTMLElement | null
+      }
+      setWashEnd(node === page ? top + head.offsetHeight : null)
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(head)
+    observer.observe(page)
+    return () => observer.disconnect()
+  }, [headShown])
+
   const state = inquiryState && inquiryState !== 'error' ? inquiryState.state : null
   const supplierName =
     equipment?.ownership_status === 'external_supplier' ? equipment.lessor?.name : null
@@ -807,7 +847,18 @@ export function EquipmentInquiryScreen({
     : []
 
   return (
-    <div className="inquiry-page-bg min-h-[70vh] rounded-3xl bg-surface px-3 py-6 sm:px-6">
+    <div
+      ref={pageRef}
+      className={cn(
+        'inquiry-page-bg min-h-[70vh] rounded-3xl bg-surface px-3 py-6 sm:px-6',
+        !hero && 'inquiry-page-bg--top',
+      )}
+      style={
+        washEnd === null
+          ? undefined
+          : ({ '--inq-wash-end': `${washEnd}px` } as CSSProperties)
+      }
+    >
       {/* The page's name: for screen readers while the start's question
           shows, above the field once the answer is below it (owner
           2026-10-27: «اضف عنوان الصفحة فوق حقل البحث لما تكون النتائج في
@@ -918,6 +969,7 @@ export function EquipmentInquiryScreen({
           ) : equipment ? (
             <>
               <section
+                ref={headRef}
                 className={cn(INQUIRY_SURFACE, 'inq-rise space-y-4 p-4')}
                 style={inquiryRise(0)}
               >
