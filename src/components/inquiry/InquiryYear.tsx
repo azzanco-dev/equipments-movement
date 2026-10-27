@@ -284,7 +284,7 @@ export function InquiryYearStrip({
             const visit = run.visit
             const name = visit
               ? visit.context === 'site'
-                ? (visit.entry ?? visit.exit)?.project_name || t('project')
+                ? (visit.entry ?? visit.exit)?.project_name || t('inquiryStateSite')
                 : `${t('workshopLocation')} · ${t(INQUIRY_STATE_LABEL[run.state])}`
               : t(INQUIRY_STATE_LABEL[run.state])
             const label = `${name} · ${length} ${t('days')}`
