@@ -286,28 +286,15 @@ test('PermissionsContext reads the flag and the own assignment once, apart from 
   assert.match(ctx, /const reload = useCallback\(\(\) => load\(userId\)/)
 })
 
-test('the header shows the assigned role only with the flag ON and an assignment', () => {
+test('the header shows the assigned role, nothing while it is unknown', () => {
+  // Roles stage 4a: the roles system is permanently ON, so the label is the
+  // assigned role's name; the legacy-role label fallback is gone.
   const layout = read('src', 'components', 'Layout.tsx')
   assert.match(
     layout,
-    /const roleLabel =\s+rolesSystemEnabled === true && assignedRole\s+\? localizedName\(lang, assignedRole\.name_ar, assignedRole\.name_en\)\s+: legacyRoleLabel/,
+    /const roleLabel = assignedRole\s+\? localizedName\(lang, assignedRole\.name_ar, assignedRole\.name_en\)\s+: null/,
   )
-  // The legacy label is unchanged (wave 24: a switch over the role).
-  assert.match(
-    layout,
-    /const legacyRoleLabel = t\(legacyRoleLabelKey\(profile\?\.role\)\)/,
-  )
-  const labels = layout.match(/function legacyRoleLabelKey\([\s\S]*?\n\}/)?.[0]
-  assert.ok(labels, 'the label helper exists')
-  for (const [role, key] of [
-    ['admin', 'admin'],
-    ['workshop', 'workshopOfficer'],
-    ['assistant_workshop_manager', 'assistantWorkshopManager'],
-    ['workshop_manager', 'workshopManager'],
-    ['monitor', 'monitoring'],
-  ])
-    assert.match(labels, new RegExp(`case '${role}':\\s+return '${key}'`), role)
-  assert.match(labels, /default:\s+return 'supervisor'/)
+  assert.doesNotMatch(layout, /legacyRoleLabel|profile\??\.role/)
 })
 
 test('the users list: ON reads the assignment and filters by it; OFF keeps the legacy select', () => {

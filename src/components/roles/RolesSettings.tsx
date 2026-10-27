@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Settings2 } from 'lucide-react'
-import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import { supabase } from '@/lib/supabase'
@@ -66,13 +65,8 @@ export function RolesSettings() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const { profile } = useAuth()
   const permissions = usePermissions()
-  const access = rolesPageAccess(
-    profile?.role,
-    permissions.status,
-    permissions.permissions,
-  )
+  const access = rolesPageAccess(permissions.status, permissions.permissions)
   const roleParam = searchParams.get('role')
   const tabParam = searchParams.get('tab')
   const tab: RolePanelTab = ROLE_PANEL_TABS.includes(tabParam as RolePanelTab)

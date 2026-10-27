@@ -1269,6 +1269,8 @@ export const translations = {
     serverTemporaryError: 'حدث خطا مؤقت في الخادم. حاول مرة اخرى',
     profileLoadError:
       'تعذر تحميل بيانات حسابك. تحقق من الانترنت ثم حاول مرة اخرى',
+    permissionsLoadError:
+      'تعذر تحميل صلاحيات حسابك. تحقق من الانترنت ثم حاول مرة اخرى',
     retry: 'اعادة المحاولة',
     accountRoleUnavailable:
       'حسابك لا يملك صلاحية لاستخدام النظام. تواصل مع مدير النظام.',
@@ -3412,6 +3414,8 @@ export const translations = {
     serverTemporaryError: 'A temporary server error occurred. Try again.',
     profileLoadError:
       'Could not load your account. Check your connection and try again.',
+    permissionsLoadError:
+      'Could not load your account permissions. Check your connection and try again.',
     retry: 'Retry',
     accountRoleUnavailable:
       'Your account does not have access to this system. Contact your administrator.',

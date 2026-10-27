@@ -559,28 +559,24 @@ test('current_permissions rows become a map; malformed rows are dropped', () => 
   assert.equal(permissions.permissionScopeOf('ready', map, 'nope'), null)
 })
 
-test('the roles page is admin only and fails closed', () => {
+test('the roles page needs settings.roles and fails closed', () => {
+  // Roles stage 4a: the legacy-admin role check is gone; settings.roles is an
+  // admin-only key (0126 `admin_only`), so the same users pass.
   const withKey = new Map([['settings.roles', 'all']])
   const without = new Map([['movements.read', 'all']])
   const access = permissions.rolesPageAccess
-  assert.equal(access('admin', 'ready', withKey), 'allowed')
-  assert.equal(access('admin', 'ready', without), 'denied')
-  assert.equal(access('admin', 'loading', withKey), 'loading')
-  assert.equal(access('admin', 'error', withKey), 'error')
-  for (const role of [
-    'monitor',
-    'supervisor',
-    'workshop',
-    'assistant_workshop_manager',
-    'workshop_manager',
-    'purchasing',
-    'Admin',
-    '',
-    null,
-    undefined,
-  ])
-    for (const status of ['ready', 'loading', 'error'])
-      assert.equal(access(role, status, withKey), 'denied', `${role} ${status}`)
+  assert.equal(access.length, 2)
+  assert.equal(access('ready', withKey), 'allowed')
+  assert.equal(access('ready', without), 'denied')
+  assert.equal(access('ready', new Map()), 'denied')
+  assert.equal(access('loading', withKey), 'loading')
+  assert.equal(access('error', withKey), 'error')
+  const roles0126 = read(
+    'supabase',
+    'migrations',
+    '20261011130000_0126_roles_and_permissions.sql',
+  )
+  assert.match(roles0126, /admin_only.*\(users\.manage, settings\.roles\)/)
 })
 
 test('the route is registered only in the admin branch, after the fail-closed check', () => {
@@ -596,13 +592,17 @@ test('the route is registered only in the admin branch, after the fail-closed ch
   // App.tsx reads the permissions once, through usePermissions(), for the
   // sidebar and the shell (tests/wave23Nav.test.cjs, wave23Shell.test.cjs).
   assert.doesNotMatch(app, /current_permissions|has_permission/)
-  assert.equal(app.split('usePermissions()').length, 2, 'read once')
-  assert.match(
-    app,
-    /visibleNavItems\(\s*permissionState,\s*profile\.role,\s*shell\.pages,?\s*\)/,
-  )
+  const content = app.slice(app.indexOf('function AppContent()'))
+  assert.equal(content.split('usePermissions()').length, 2, 'read once')
+  // The movement-detail chunk fallback reads them for its skeleton shape.
+  assert.match(app, /const shape = movementSkeletonShape\(usePermissions\(\)\)/)
+  assert.match(app, /visibleNavItems\(permissionState, shell\.pages\)/)
   const page = read('src', 'components', 'roles', 'RolesSettings.tsx')
-  assert.match(page, /rolesPageAccess\(\s*profile\?\.role,/)
+  assert.match(
+    page,
+    /rolesPageAccess\(permissions\.status, permissions\.permissions\)/,
+  )
+  assert.doesNotMatch(page, /profile\??\.role/)
   assert.match(page, /if \(access !== 'allowed'\)/)
   const context = read('src', 'auth', 'PermissionsContext.tsx')
   assert.match(

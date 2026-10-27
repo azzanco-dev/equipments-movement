@@ -144,7 +144,7 @@ export function EntryExitForm({
   initialEquipmentCode = null,
 }: EntryExitFormProps) {
   const { t, lang } = useI18n()
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   const permissionState = usePermissions()
 
   const [step, setStep] = useState<'select' | 'details'>('select')
@@ -243,7 +243,7 @@ export function EntryExitForm({
   // the permissions (src/lib/actionPermissions.ts); the role is the fallback
   // only while they load or after a failed load. The workshop form is for a
   // holder of `movements.workshop.create` without `movements.site.create`.
-  const formActions = movementFormActions(permissionState, profile?.role)
+  const formActions = movementFormActions(permissionState)
   const workshopMode = formActions.workshopMode
   // A site EXIT may only be registered by the foreman who registered the open
   // ENTRY, or by an admin, so its equipment list is filtered in the database.

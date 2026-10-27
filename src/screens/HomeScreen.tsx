@@ -82,8 +82,8 @@ export function HomeScreen({
    * src/App.tsx derives it from the home.foreman / home.workshop scope, so a
    * custom role gets the right variant. Omitted while the permissions load
    * or after a failed load: the home then derives it itself
-   * (`resolveHomeMovementsScope`: the same permissions once ready, the role
-   * meanwhile).
+   * (`resolveHomeMovementsScope`: the same permissions once ready, the
+   * narrowest list meanwhile).
    */
   movementsScope?: HomeMovementsScope
 }) {
@@ -93,17 +93,15 @@ export function HomeScreen({
   // wave-21-workshop-scope: which movements the home lists. Fails closed: an
   // unknown role or a user without a home key gets the foreman's own-rows
   // list, never a wider one.
-  const scope =
-    movementsScope ?? resolveHomeMovementsScope(permissionState, profile?.role)
+  const scope = movementsScope ?? resolveHomeMovementsScope(permissionState)
   const managerMode = scope === 'all_contexts'
   const workshopMode = scope === 'workshop' || managerMode
   // wave 24: classifying workshop entries follows
   // `movements.workshop.classify` (the two workshop managers with the
-  // legacy mapping); the role decides only while the permissions load or
-  // after a failed load. `classify_workshop_entry` stays the authority.
+  // legacy mapping); nobody while the permissions load or after a failed
+  // load. `classify_workshop_entry` stays the authority.
   const canClassify =
-    workshopMode &&
-    homeActions(permissionState, profile?.role).classifyWorkshopEntries
+    workshopMode && homeActions(permissionState).classifyWorkshopEntries
   const name = greetingName(profile?.full_name)
   const parts = greetingParts(t('homeGreeting'), name !== '')
   const greeting = parts ? (

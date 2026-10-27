@@ -9,7 +9,6 @@ import {
   RefreshCw,
   Satellite,
 } from 'lucide-react'
-import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { canViewEquipmentLocation } from '@/lib/actionPermissions'
 import { useI18n } from '@/i18n/I18nContext'
@@ -47,15 +46,14 @@ export interface EquipmentLocationCardProps {
 
 /**
  * wave 17 — «الموقع الحالي»: the last position of the equipment's linked
- * Afaqy unit. Only for a holder of `equipment.location.view` (wave 24; the
- * admin role while the permissions load or after a failed load): for anyone
+ * Afaqy unit. Only for a holder of `equipment.location.view` (wave 24;
+ * nobody while the permissions load or after a failed load): for anyone
  * else (or no profile) nothing renders and the position route is never
  * requested; the route itself requires the same permission.
  */
 export function EquipmentLocationCard(props: EquipmentLocationCardProps) {
-  const { profile } = useAuth()
   const permissionState = usePermissions()
-  if (!canViewEquipmentLocation(permissionState, profile?.role)) return null
+  if (!canViewEquipmentLocation(permissionState)) return null
   return <LocationCardContent {...props} />
 }
 

@@ -131,7 +131,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   const [mobileNotSaved, setMobileNotSaved] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
   const router = useRouter()
-  const { user: currentUser, profile } = useAuth()
+  const { user: currentUser } = useAuth()
   // wave 22B: the user's role in the new roles system (`profile_roles`,
   // migration 0126). Read-only while that system is OFF (it is then managed
   // in Settings › «الادوار والصلاحيات» and changes nothing); since wave 23
@@ -146,10 +146,10 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   // PermissionsContext); null = unknown, treated like OFF.
   const permissionState = usePermissions()
   const { rolesSystemEnabled, reload: reloadPermissions } = permissionState
-  // wave 24: saving the user follows `users.manage` (the admin role while
-  // the permissions load or after a failed load); the page gate and the
+  // wave 24: saving the user follows `users.manage` (nobody while the
+  // permissions load or after a failed load); the page gate and the
   // database (0127) require the same key.
-  const canManageUsers = usersActions(permissionState, profile?.role).manage
+  const canManageUsers = usersActions(permissionState).manage
   const rolesOn = rolesSystemEnabled === true
   const { roles: activeRoles } = useActiveRoles(rolesOn)
   // Roles stage 3 (owner 2026-10-27): «الشركات المسؤول عنها» belongs to every

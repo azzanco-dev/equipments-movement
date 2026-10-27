@@ -78,16 +78,16 @@ const ASSIGNED_ROLE_COLUMN = 'profile_roles.role_key'
 
 export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   const { t, lang } = useI18n()
-  const { user: currentUser, profile } = useAuth()
+  const { user: currentUser } = useAuth()
   // wave 23 (step 3): with the roles system ON the list shows and the dialog
   // assigns the `profile_roles` role; OFF or unknown keeps the legacy role
   // exactly as before. The active roles are read only while ON.
   const permissionState = usePermissions()
   const { rolesSystemEnabled } = permissionState
-  // wave 24: adding and deleting users follow `users.manage` (the admin
-  // role while the permissions load or after a failed load); the page gate
-  // and the database (0127) require the same key.
-  const canManageUsers = usersActions(permissionState, profile?.role).manage
+  // wave 24: adding and deleting users follow `users.manage` (nobody
+  // while the permissions load or after a failed load); the page gate and
+  // the database (0127) require the same key.
+  const canManageUsers = usersActions(permissionState).manage
   const rolesOn = rolesSystemEnabled === true
   const { roles: activeRoles } = useActiveRoles(rolesOn)
   const [users, setUsers] = useState<UserRow[]>([])

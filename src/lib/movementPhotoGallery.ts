@@ -68,19 +68,27 @@ export interface SavedPhotoLike {
   uploaded_by: string | null
 }
 
+/**
+ * Which saved photos the viewer may remove, decided from the permissions by
+ * `movementDetailActions` (src/lib/actionPermissions.ts):
+ * `movements.photos.delete_any` = 'any', `movements.photos.manage` = 'own'
+ * (his own uploads), neither = 'none' (roles stage 4a: no role is read).
+ */
+export type PhotoRemoval = 'any' | 'own' | 'none'
+
 export interface PhotoViewer {
   userId: string | null | undefined
-  role: string | null | undefined
+  removal: PhotoRemoval
 }
 
-/** Only the photo's uploader or an admin sees the delete button, never the
- * read-only monitor. Display rule only: the API and RLS enforce it. */
+/** Any photo for 'any', the viewer's own uploads for 'own', none for
+ * 'none'. Display rule only: the API and RLS enforce it. */
 export function canRemoveSavedPhoto(
   photo: Pick<SavedPhotoLike, 'uploaded_by'>,
   viewer: PhotoViewer,
 ): boolean {
-  if (viewer.role === 'monitor') return false
-  if (viewer.role === 'admin') return true
+  if (viewer.removal === 'none') return false
+  if (viewer.removal === 'any') return true
   return Boolean(viewer.userId) && photo.uploaded_by === viewer.userId
 }
 

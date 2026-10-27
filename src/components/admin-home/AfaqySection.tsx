@@ -7,7 +7,6 @@ import {
   type DataTableColumn,
 } from '@/components/ui'
 import type { StatCardAccent } from '@/components/ui/StatCard'
-import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
@@ -100,13 +99,12 @@ export interface AfaqySectionProps {
  * tracker, how many are connected (a message in the last 30 minutes) or
  * not, whose last message had no GPS fix, and which never sent anything —
  * with the units of each in a mini table. Shown with
- * `equipment.location.view` (the «الموقع الحالي» key; the admin role while
- * the permissions load); the route checks it again.
+ * `equipment.location.view` (the «الموقع الحالي» key; nothing while the
+ * permissions load); the route checks it again.
  */
 export function AfaqySection(props: AfaqySectionProps) {
-  const { profile } = useAuth()
   const permissionState = usePermissions()
-  if (!canViewEquipmentLocation(permissionState, profile?.role)) return null
+  if (!canViewEquipmentLocation(permissionState)) return null
   return <AfaqySectionContent {...props} />
 }
 

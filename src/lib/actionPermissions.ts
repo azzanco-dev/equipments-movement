@@ -1,6 +1,6 @@
 import type { PermissionScope } from '@/lib/types'
 import type { PermissionsStatus } from '@/lib/permissions'
-import type { PhotoViewer } from '@/lib/movementPhotoGallery'
+import type { PhotoRemoval, PhotoViewer } from '@/lib/movementPhotoGallery'
 
 /**
  * wave 24 (actions by permissions) — the in-screen action and data decisions
@@ -8,13 +8,14 @@ import type { PhotoViewer } from '@/lib/movementPhotoGallery'
  * `current_permissions()` (migration 0126) through `usePermissions()`.
  *
  * Every decision here is a pure function of
- *   (the permission state, the legacy role, the facts of the row)
+ *   (the permission state, the facts of the row)
  * so tests/wave24Actions.test.cjs can prove that, with the frozen legacy
- * mapping of the six roles (the roles system OFF), every answer equals the
- * role rule it replaces. Those old rules are kept VERBATIM in this file as the
- * `legacy*` functions: they are the fallback while the permissions load or
- * after a failed load (`status` 'loading' or 'error'), exactly today's
- * behaviour then, and nothing else ever reads them.
+ * mapping of the six roles, every answer equals the role rule it replaced.
+ *
+ * Roles stage 4a (2026-10-27): no decision reads `profiles.role` any more.
+ * Until the permissions are 'ready' (while they load, or after a failed
+ * load) every decision is the permission rule over an EMPTY map, so nothing
+ * is granted (fail closed); once ready the answers are unchanged.
  *
  * Presentation only: every action is re-checked in PostgreSQL / the API
  * routes, which stay authoritative. Scope rules are mirrored for display:
@@ -31,32 +32,25 @@ export interface ActionPermissionState {
   permissions: ReadonlyMap<string, PermissionScope>
 }
 
-export type LegacyRole = string | null | undefined
+const NOTHING_GRANTED: ReadonlyMap<string, PermissionScope> = new Map()
 
-export const WORKSHOP_ROLES: readonly string[] = [
-  'workshop',
-  'assistant_workshop_manager',
-  'workshop_manager',
-]
-
-export function isWorkshopRole(role: LegacyRole): boolean {
-  return typeof role === 'string' && WORKSHOP_ROLES.includes(role)
+/** The granted permissions: the loaded map once 'ready', else none. */
+export function grantedPermissions(
+  state: ActionPermissionState,
+): ReadonlyMap<string, PermissionScope> {
+  return state.status === 'ready' ? state.permissions : NOTHING_GRANTED
 }
 
 /**
- * THE fallback switch: the permissions answer once they are 'ready'; while
- * they load or after a failed load the legacy role rule answers, exactly as
- * the screens did before wave 24.
+ * THE switch: the permissions answer once they are 'ready'; while they load
+ * or after a failed load the same rule answers over an empty map, so nothing
+ * is granted (roles stage 4a: no role fallback).
  */
 export function decideByPermissions<T>(
   state: ActionPermissionState,
-  role: LegacyRole,
   byPermissions: (permissions: ReadonlyMap<string, PermissionScope>) => T,
-  byRole: (role: LegacyRole) => T,
 ): T {
-  return state.status === 'ready'
-    ? byPermissions(state.permissions)
-    : byRole(role)
+  return byPermissions(grantedPermissions(state))
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +93,7 @@ export interface MovementDetailFacts extends MovementRowFacts {
   visitOpen: boolean
 }
 
-export type PhotoRemoval = 'any' | 'own' | 'none'
+export type { PhotoRemoval }
 
 export interface MovementDetailActions {
   /** The «خيارات» menu (edit / delete) and the admin-only detail rows. */
@@ -142,59 +136,24 @@ export function movementDetailActionsFromPermissions(
   }
 }
 
-/** The pre-wave-24 role rules of MovementDetail, verbatim. FALLBACK ONLY. */
-export function legacyMovementDetailActions(
-  role: LegacyRole,
-  facts: MovementDetailFacts,
-): MovementDetailActions {
-  return {
-    editDelete: role === 'admin',
-    changeDriver: role === 'admin' || (role === 'supervisor' && facts.own),
-    editContractorCode:
-      role === 'supervisor' &&
-      facts.isEntry &&
-      facts.context === 'site' &&
-      facts.visitOpen &&
-      facts.own,
-    addPhotos:
-      role === 'admin' ||
-      (role !== 'monitor' && role != null && facts.own) ||
-      (isWorkshopRole(role) && facts.context === 'workshop'),
-    // canRemoveSavedPhoto (src/lib/movementPhotoGallery.ts): monitor never,
-    // admin always, anybody else his own uploads.
-    photoRemoval:
-      role === 'monitor' ? 'none' : role === 'admin' ? 'any' : 'own',
-  }
-}
-
 export function movementDetailActions(
   state: ActionPermissionState,
-  role: LegacyRole,
   facts: MovementDetailFacts,
 ): MovementDetailActions {
-  return decideByPermissions(
-    state,
-    role,
-    (permissions) => movementDetailActionsFromPermissions(permissions, facts),
-    (legacyRole) => legacyMovementDetailActions(legacyRole, facts),
+  return decideByPermissions(state, (permissions) =>
+    movementDetailActionsFromPermissions(permissions, facts),
   )
 }
 
 /**
  * The viewer `canRemoveSavedPhoto` (src/lib/movementPhotoGallery.ts) expects:
- * its `role` field is that function's three-way switch — 'monitor' removes
- * nothing, 'admin' removes any photo, anything else removes own uploads — so
- * the decided removal is encoded on it; no profile role is read.
+ * the decided removal ('any' / 'own' / 'none') and the signed-in user.
  */
 export function photoViewerFor(
   removal: PhotoRemoval,
   userId: string | null | undefined,
 ): PhotoViewer {
-  return {
-    userId,
-    role:
-      removal === 'any' ? 'admin' : removal === 'none' ? 'monitor' : 'uploader',
-  }
+  return { userId, removal }
 }
 
 export interface MovementSkeletonShape {
@@ -216,27 +175,11 @@ export function movementSkeletonShapeFromPermissions(
   }
 }
 
-/** The pre-wave-24 skeleton guesses of MovementDetail. FALLBACK ONLY. */
-export function legacyMovementSkeletonShape(
-  role: LegacyRole,
-): MovementSkeletonShape {
-  return {
-    context: isWorkshopRole(role) ? 'workshop' : 'site',
-    adminMenu: role === 'admin',
-    canUpload: role !== 'monitor',
-  }
-}
-
+/** Until the permissions are ready: the neutral site shape, no actions. */
 export function movementSkeletonShape(
   state: ActionPermissionState,
-  role: LegacyRole,
 ): MovementSkeletonShape {
-  return decideByPermissions(
-    state,
-    role,
-    movementSkeletonShapeFromPermissions,
-    legacyMovementSkeletonShape,
-  )
+  return decideByPermissions(state, movementSkeletonShapeFromPermissions)
 }
 
 // ---------------------------------------------------------------------------
@@ -284,35 +227,10 @@ export function movementFormActionsFromPermissions(
   }
 }
 
-/** The pre-wave-24 role rules of EntryExitForm, verbatim. FALLBACK ONLY. */
-export function legacyMovementFormActions(
-  role: LegacyRole,
-): MovementFormActions {
-  const workshopMode = isWorkshopRole(role)
-  return {
-    workshopMode,
-    exitAnyVisit: role === 'admin',
-    notifyForeman: workshopMode || role === 'admin',
-    // The quick-create controls had no role check: everybody who could open
-    // the form saw them (the database functions decide). The form opens only
-    // for a create key (`pageGate('movements/new')`), so a monitor never
-    // reaches them.
-    quickCreateEquipment: true,
-    quickCreateDriver: true,
-    quickCreateLessor: true,
-  }
-}
-
 export function movementFormActions(
   state: ActionPermissionState,
-  role: LegacyRole,
 ): MovementFormActions {
-  return decideByPermissions(
-    state,
-    role,
-    movementFormActionsFromPermissions,
-    legacyMovementFormActions,
-  )
+  return decideByPermissions(state, movementFormActionsFromPermissions)
 }
 
 // ---------------------------------------------------------------------------
@@ -332,28 +250,12 @@ export function homeActionsFromPermissions(
   }
 }
 
-/** Pre-wave-24: the two workshop managers classified. FALLBACK ONLY. */
-export function legacyHomeActions(role: LegacyRole): HomeActions {
-  return {
-    classifyWorkshopEntries:
-      role === 'workshop_manager' || role === 'assistant_workshop_manager',
-  }
-}
-
-export function homeActions(
-  state: ActionPermissionState,
-  role: LegacyRole,
-): HomeActions {
-  return decideByPermissions(
-    state,
-    role,
-    homeActionsFromPermissions,
-    legacyHomeActions,
-  )
+export function homeActions(state: ActionPermissionState): HomeActions {
+  return decideByPermissions(state, homeActionsFromPermissions)
 }
 
 // ---------------------------------------------------------------------------
-// Admin screens and cards: one key each, the admin role as the fallback
+// Admin screens and cards: one key each
 // ---------------------------------------------------------------------------
 
 export interface EquipmentFormActions {
@@ -365,25 +267,15 @@ export interface EquipmentFormActions {
 
 export function equipmentFormActions(
   state: ActionPermissionState,
-  role: LegacyRole,
 ): EquipmentFormActions {
-  return decideByPermissions(
-    state,
-    role,
-    (permissions) => ({
-      // The field also lists the Afaqy units, which /api/afaqy/units serves
-      // for `settings.integrations` only.
-      trackerLink:
-        permissions.has('equipment.tracker_link') &&
-        permissions.has('settings.integrations'),
-      changeCode: permissions.has('equipment.change_code'),
-    }),
-    // Pre-wave-24: `isAdmin` guarded both.
-    (legacyRole) => ({
-      trackerLink: legacyRole === 'admin',
-      changeCode: legacyRole === 'admin',
-    }),
-  )
+  return decideByPermissions(state, (permissions) => ({
+    // The field also lists the Afaqy units, which /api/afaqy/units serves
+    // for `settings.integrations` only.
+    trackerLink:
+      permissions.has('equipment.tracker_link') &&
+      permissions.has('settings.integrations'),
+    changeCode: permissions.has('equipment.change_code'),
+  }))
 }
 
 export interface EquipmentListActions {
@@ -398,23 +290,12 @@ export interface EquipmentListActions {
 
 export function equipmentListActions(
   state: ActionPermissionState,
-  role: LegacyRole,
 ): EquipmentListActions {
-  return decideByPermissions(
-    state,
-    role,
-    (permissions) => ({
-      create: permissions.has('equipment.create'),
-      edit: permissions.has('equipment.edit'),
-      importRows: permissions.has('equipment.import'),
-    }),
-    // Before the roles system the equipment screens were the admin's only.
-    (legacyRole) => ({
-      create: legacyRole === 'admin',
-      edit: legacyRole === 'admin',
-      importRows: legacyRole === 'admin',
-    }),
-  )
+  return decideByPermissions(state, (permissions) => ({
+    create: permissions.has('equipment.create'),
+    edit: permissions.has('equipment.edit'),
+    importRows: permissions.has('equipment.import'),
+  }))
 }
 
 export interface UsersActions {
@@ -422,41 +303,26 @@ export interface UsersActions {
   manage: boolean
 }
 
-export function usersActions(
-  state: ActionPermissionState,
-  role: LegacyRole,
-): UsersActions {
-  return decideByPermissions(
-    state,
-    role,
-    (permissions) => ({ manage: permissions.has('users.manage') }),
-    // Pre-wave-24: the users screens were reachable by the admin only.
-    (legacyRole) => ({ manage: legacyRole === 'admin' }),
-  )
+export function usersActions(state: ActionPermissionState): UsersActions {
+  return decideByPermissions(state, (permissions) => ({
+    manage: permissions.has('users.manage'),
+  }))
 }
 
 /** The WhatsApp gateway status (sidebar indicator, polling, home alert). */
 export function canSeeIntegrationsStatus(
   state: ActionPermissionState,
-  role: LegacyRole,
 ): boolean {
-  return decideByPermissions(
-    state,
-    role,
-    (permissions) => permissions.has('settings.integrations'),
-    (legacyRole) => legacyRole === 'admin',
+  return decideByPermissions(state, (permissions) =>
+    permissions.has('settings.integrations'),
   )
 }
 
 /** The «الموقع الحالي» card (Afaqy position). */
 export function canViewEquipmentLocation(
   state: ActionPermissionState,
-  role: LegacyRole,
 ): boolean {
-  return decideByPermissions(
-    state,
-    role,
-    (permissions) => permissions.has('equipment.location.view'),
-    (legacyRole) => legacyRole === 'admin',
+  return decideByPermissions(state, (permissions) =>
+    permissions.has('equipment.location.view'),
   )
 }

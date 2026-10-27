@@ -381,10 +381,10 @@ test('the client polls for the admin only, every five minutes while visible', ()
   const lib = read('src', 'lib', 'whatsappStatus.ts')
   assert.match(lib, /WHATSAPP_STATUS_POLL_MS = 5 \* 60 \* 1000/)
   // wave 24: the holders of settings.integrations (the admin with the
-  // legacy mapping; the admin role while the permissions load or failed).
+  // legacy mapping; nobody while the permissions load or failed, stage 4a).
   assert.match(
     layout,
-    /const showWhatsAppStatus =\s+canSeeIntegrationsStatus\(permissionState, profile\?\.role\) &&\s+navItems\.length > 0/,
+    /const showWhatsAppStatus =\s+canSeeIntegrationsStatus\(permissionState\) && navItems\.length > 0/,
   )
   assert.match(layout, /useWhatsAppStatusPolling\(showWhatsAppStatus\)/)
   assert.equal(
@@ -405,7 +405,7 @@ test('the client polls for the admin only, every five minutes while visible', ()
   // The home alert: admin only, warnings only, small screens only.
   assert.match(
     component,
-    /if \(!canSeeIntegrationsStatus\(permissionState, profile\?\.role\)\) return null\s+if \(view === 'off'\) return null\s+if \(!isWhatsAppStatusWarning\(view\)\) return null/,
+    /if \(!canSeeIntegrationsStatus\(permissionState\)\) return null\s+if \(view === 'off'\) return null\s+if \(!isWhatsAppStatusWarning\(view\)\) return null/,
   )
   assert.match(component, /cn\('lg:hidden', className\)/)
   // Tokens only.

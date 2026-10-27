@@ -128,10 +128,10 @@ export function MovementDetail({
   onNavigateMovement,
 }: MovementDetailProps) {
   const { t, lang } = useI18n()
-  const { user, profile } = useAuth()
+  const { user } = useAuth()
   // wave 24: every action below is decided by the permissions
-  // (src/lib/actionPermissions.ts); the role is the fallback only while they
-  // load or after a failed load.
+  // (src/lib/actionPermissions.ts); nothing is granted while they load or
+  // after a failed load (roles stage 4a: no role fallback).
   const permissionState = usePermissions()
   const { confirm, confirmDialog } = useConfirm()
   const [log, setLog] = useState<EntryExitLog | null>(null)
@@ -766,7 +766,7 @@ export function MovementDetail({
     // The context is only known once the movement row arrived; until then the
     // permissions give the likeliest shape (a workshop home works on workshop
     // movements, everyone else mostly on site movements).
-    const shape = movementSkeletonShape(permissionState, profile?.role)
+    const shape = movementSkeletonShape(permissionState)
     const skeletonContext = log?.movement_context ?? shape.context
     return (
       <MovementDetailSkeleton
@@ -800,7 +800,7 @@ export function MovementDetail({
   // - adding photos: `movements.photos.manage` within its scope;
   // - editing / deleting: `movements.edit_delete`.
   const isOwnMovement = log.supervisor_id === user?.id
-  const actions = movementDetailActions(permissionState, profile?.role, {
+  const actions = movementDetailActions(permissionState, {
     own: isOwnMovement,
     context: isWorkshopMovement ? 'workshop' : 'site',
     isEntry,

@@ -970,9 +970,9 @@ test('the location card is admin-only and never asks for other roles', () => {
   const card = read('src', 'components', 'afaqy', 'EquipmentLocationCard.tsx')
   assert.match(
     card,
-    // wave 24: equipment.location.view (the admin role while the
-    // permissions load or after a failed load).
-    /if \(!canViewEquipmentLocation\(permissionState, profile\?\.role\)\) return null\s+return <LocationCardContent \{\.\.\.props\} \/>/,
+    // wave 24: equipment.location.view (nobody while the permissions load
+    // or after a failed load, roles stage 4a).
+    /if \(!canViewEquipmentLocation\(permissionState\)\) return null\s+return <LocationCardContent \{\.\.\.props\} \/>/,
   )
   // The request lives in the inner component only.
   assert.ok(
@@ -992,10 +992,10 @@ test('the location card is admin-only and never asks for other roles', () => {
 
   const form = read('src', 'screens', 'equipment', 'EquipmentFormDialog.tsx')
   // wave 24: equipment.tracker_link plus settings.integrations (the units
-  // route), the admin role while the permissions load or after a failed load.
+  // route); nobody while the permissions load or after a failed load.
   assert.match(
     form,
-    /const formActions = equipmentFormActions\(usePermissions\(\), profile\?\.role\)/,
+    /const formActions = equipmentFormActions\(usePermissions\(\)\)/,
   )
   assert.match(form, /const canLinkTracker = formActions\.trackerLink/)
   assert.match(

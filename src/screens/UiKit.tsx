@@ -20,6 +20,8 @@ import {
   Wrench,
 } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
+import { usePermissions } from '@/auth/PermissionsContext'
+import { rolesPageAccess } from '@/lib/permissions'
 import { useI18n } from '@/i18n/I18nContext'
 import { useTheme } from '@/theme/ThemeContext'
 import { AuthScreen } from '@/screens/AuthScreen'
@@ -70,19 +72,28 @@ import {
 // Review page for design-system decisions. It is open in development so the
 // product owner and Claude can review without a session; production requires
 // an admin. All preview content is sample data.
+// Roles stage 4a: «admin» is the permission `settings.roles` (an admin-only
+// key, 0126), not `profiles.role`; fail closed while it loads or failed.
 const OPEN_WITHOUT_SESSION = process.env.NODE_ENV !== 'production'
 
 export function UiKit() {
   const { profile, loading } = useAuth()
+  const permissions = usePermissions()
   const { t } = useI18n()
   if (!OPEN_WITHOUT_SESSION) {
     if (loading) return <FullPageSpinner />
     if (!profile) return <AuthScreen />
-    if (profile.role !== 'admin')
+    const access = rolesPageAccess(permissions.status, permissions.permissions)
+    if (access === 'loading') return <FullPageSpinner />
+    if (access !== 'allowed')
       return (
         <div className="flex min-h-[100dvh] items-center justify-center p-4">
           <p className="card max-w-md text-center">
-            {t('userPermissionError')}
+            {t(
+              access === 'error'
+                ? 'permissionsLoadError'
+                : 'userPermissionError',
+            )}
           </p>
         </div>
       )

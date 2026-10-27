@@ -6,10 +6,10 @@ import type { PermissionScope } from '@/lib/types'
  *
  * The sidebar / mobile drawer of `src/components/Layout.tsx` is built from the
  * user's PERMISSIONS (`current_permissions()`, migration 0126, loaded by
- * `usePermissions()`), not from `profiles.role`. `role` is ONLY the fallback
- * used while the permissions load or when they failed to load, so the menu
- * never flashes empty and a failed load changes nothing (RLS still protects
- * the data behind every page).
+ * `usePermissions()`), not from `profiles.role`. Roles stage 4a (2026-10-27):
+ * there is no role fallback any more; until the permissions are 'ready' the
+ * menu is empty and the shell waits ('pending') or shows the load error
+ * ('unavailable').
  *
  * Step 2 (below `visibleNavItems`) moved the shell selection and the page
  * guards of src/App.tsx onto the same gates (`planShell`, `pageGate`).
@@ -24,10 +24,9 @@ import type { PermissionScope } from '@/lib/types'
  * 2026-10-13: a user whose permissions open any admin-shell section gets the
  * admin shell with just those sections).
  *
- * With the roles system OFF, `current_permissions()` answers from the frozen
- * `legacy_role_permissions(profiles.role)` mapping, and the menu built here is
- * exactly the role-based menu of before (tests/wave23Nav.test.cjs proves it
- * for the six roles).
+ * With the frozen `legacy_role_permissions` mapping of the six roles, the menu
+ * built here is exactly the role-based menu of before (tests/wave23Nav.test.cjs
+ * proves it for the six roles).
  *
  * This file has no runtime imports so the node tests can load it directly.
  */
@@ -152,43 +151,6 @@ export interface VisibleNavItem {
   children?: NavChildKey[]
 }
 
-const ADMIN_MENU: readonly VisibleNavItem[] = [
-  { key: 'dashboard' },
-  { key: 'logs' },
-  { key: 'inquiry' },
-  { key: 'equipment' },
-  { key: 'projects' },
-  { key: 'companies' },
-  { key: 'lessors' },
-  // 2026-10-20: the admin holds purchasing.view in both mappings (0136), so
-  // the fallback menu lists the section too.
-  { key: 'purchasing', children: ['purchasing/orders', 'purchasing/units'] },
-  { key: 'drivers' },
-  { key: 'users' },
-  // 2026-10-22: «سجل النشاط» and the movement import left the menu (owner).
-  {
-    key: 'reports',
-    children: ['reports/entries', 'reports/equipment', 'reports/workshop'],
-  },
-  { key: 'settings' },
-]
-
-/**
- * FALLBACK ONLY: the role-based menu as it was before wave 23, used while the
- * permissions load or after their load failed. The foreman and workshop roles
- * had no sidebar; an unknown role gets none (fail closed).
- */
-export const LEGACY_NAV_BY_ROLE: Readonly<
-  Record<string, readonly VisibleNavItem[]>
-> = {
-  admin: ADMIN_MENU,
-  monitor: [{ key: 'dashboard' }, { key: 'logs' }, { key: 'inquiry' }],
-  supervisor: [],
-  workshop: [],
-  assistant_workshop_manager: [],
-  workshop_manager: [],
-}
-
 export interface NavPermissionState {
   status: PermissionsStatus
   permissions: ReadonlyMap<string, PermissionScope>
@@ -235,8 +197,7 @@ function fromPermissions(
  * The sidebar entries for this user, in menu order.
  *
  * - permissions `ready`: decided by the permission keys (NAV_ENTRIES);
- * - `loading` / `error`: the legacy role-based menu (`role` is only this
- *   fallback; a missing or unknown role gets nothing);
+ * - `loading` / `error`: nothing (roles stage 4a: no role fallback);
  * - `routable`, when given, drops entries the current shell cannot open.
  *
  * Only the admin shell calls this (the field homes pass no entries). A menu
@@ -246,18 +207,10 @@ function fromPermissions(
  */
 export function visibleNavItems(
   state: NavPermissionState,
-  role: string | null | undefined,
   routable?: ReadonlySet<string>,
 ): VisibleNavItem[] {
   const base =
-    state.status === 'ready'
-      ? fromPermissions(state.permissions)
-      : (role && Object.prototype.hasOwnProperty.call(LEGACY_NAV_BY_ROLE, role)
-          ? LEGACY_NAV_BY_ROLE[role]
-          : []
-        ).map((item) =>
-          item.children ? { ...item, children: [...item.children] } : item,
-        )
+    state.status === 'ready' ? fromPermissions(state.permissions) : []
 
   const items = routable
     ? base.flatMap((item): VisibleNavItem[] => {
@@ -292,12 +245,9 @@ export function visibleNavItems(
 //   nothing       -> 'none'     the no-permissions page (fail closed)
 //
 // Precedence admin > foreman > workshop > sections. While the permissions
-// load, or after their load failed, the decision is the role-based routing of
-// before (LEGACY_SHELL_BY_ROLE, captured from src/App.tsx at 8f17f53), so a
-// legacy user never sees a flash and a failed load changes nothing.
-//
-// Only the shell and its page guards moved. In-screen actions, data hooks,
-// API routes and Edge Functions still decide by the role.
+// load the shell waits ('pending', the bootstrap spinner); after their load
+// failed it is 'unavailable' (the load-error page with a retry). Roles stage
+// 4a (2026-10-27) removed the role-based fallback routing of before.
 
 /** Every page src/App.tsx can route to. `:id` stands for any detail id. */
 export type RoutePage =
@@ -419,9 +369,9 @@ export type ShellKind =
   | 'workshop'
   /** Permissions loaded and they open nothing: the no-permissions page. */
   | 'none'
-  /** Fallback only: an unknown role after a failed load (as before). */
+  /** The permissions failed to load: the load-error page with a retry. */
   | 'unavailable'
-  /** Fallback only: an unknown role while the permissions load. */
+  /** The permissions are loading: the bootstrap spinner. */
   | 'pending'
 
 /** Same values as HomeMovementsScope (src/lib/homeScope.ts). */
@@ -429,12 +379,9 @@ export type ShellHomeScope = 'all_contexts' | 'workshop' | 'own_site'
 
 export interface ShellPlan {
   kind: ShellKind
-  /** 'permissions' once loaded; 'role' while loading or after a failure. */
-  source: 'permissions' | 'role'
-  /**
-   * The field home's movement list, from the home.* scope. Undefined in the
-   * role fallback, where HomeScreen keeps deriving it from the role.
-   */
+  /** 'permissions' once loaded; 'status' while loading or after a failure. */
+  source: 'permissions' | 'status'
+  /** The field home's movement list, from the home.* scope (field homes). */
   homeScope?: ShellHomeScope
   /**
    * The page a URL the shell does not open lands on: the shell's home
@@ -493,25 +440,6 @@ export const SHELL_PAGES: Readonly<Record<HomeShell, readonly RoutePage[]>> = {
   workshop: FIELD_SHELL_PAGES,
 }
 
-/**
- * FALLBACK ONLY: the role-based routing of src/App.tsx at 8f17f53 — the
- * shell of each legacy role and the pages it rendered (the print page sits
- * outside every shell; it was admin and monitor only).
- */
-export const LEGACY_SHELL_BY_ROLE: Readonly<
-  Record<string, { kind: HomeShell; pages: readonly RoutePage[] }>
-> = {
-  admin: { kind: 'admin', pages: [...ADMIN_SHELL_PAGES, 'print/export'] },
-  monitor: {
-    kind: 'admin',
-    pages: ['dashboard', 'logs', 'inquiry', 'movements/:id', 'print/export'],
-  },
-  supervisor: { kind: 'foreman', pages: FIELD_SHELL_PAGES },
-  workshop: { kind: 'workshop', pages: FIELD_SHELL_PAGES },
-  assistant_workshop_manager: { kind: 'workshop', pages: FIELD_SHELL_PAGES },
-  workshop_manager: { kind: 'workshop', pages: FIELD_SHELL_PAGES },
-}
-
 /** True when ANY gate of `page` passes (an empty list always passes). */
 export function canOpenPage(
   permissions: ReadonlyMap<string, PermissionScope>,
@@ -567,33 +495,18 @@ function firstOpenSection(
  * - permissions `ready`: home.admin > home.foreman > home.workshop, else the
  *   admin shell without its dashboard when any sidebar section passes
  *   (landing on the first one), else 'none';
- * - `loading` / `error`: LEGACY_SHELL_BY_ROLE (`role` is only this
- *   fallback). An unknown role waits ('pending') while loading and gets the
- *   role-unavailable page of before after a failure.
+ * - `loading`: 'pending' (src/App.tsx keeps the bootstrap spinner);
+ * - `error`: 'unavailable' (the load-error page with a retry).
+ * Neither opens any page (roles stage 4a: no role fallback).
  */
-export function planShell(
-  state: NavPermissionState,
-  role: string | null | undefined,
-): ShellPlan {
-  if (state.status !== 'ready') {
-    const legacy =
-      role && Object.prototype.hasOwnProperty.call(LEGACY_SHELL_BY_ROLE, role)
-        ? LEGACY_SHELL_BY_ROLE[role]
-        : null
-    if (!legacy)
-      return {
-        kind: state.status === 'loading' ? 'pending' : 'unavailable',
-        source: 'role',
-        landing: 'dashboard',
-        pages: new Set(),
-      }
+export function planShell(state: NavPermissionState): ShellPlan {
+  if (state.status !== 'ready')
     return {
-      kind: legacy.kind,
-      source: 'role',
+      kind: state.status === 'loading' ? 'pending' : 'unavailable',
+      source: 'status',
       landing: 'dashboard',
-      pages: new Set(legacy.pages),
+      pages: new Set(),
     }
-  }
 
   const permissions = state.permissions
   if (permissions.has('home.admin'))

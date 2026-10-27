@@ -40,6 +40,7 @@ import {
   type RoutePage,
   type ShellPlan,
 } from '@/lib/navPermissions'
+import { movementSkeletonShape } from '@/lib/actionPermissions'
 import type { TranslationKey } from '@/i18n/translations'
 
 // What `<main>` shows while a screen's code downloads. These render inside the
@@ -52,22 +53,19 @@ const listLoading = () => <RouteFallback variant="list" />
 const movementDetailLoading = () => <MovementDetailFallback />
 
 /**
- * The movement detail page's own skeleton, with the same role-based shape the
- * page picks before its movement row arrives, so the chunk fallback and the
- * page's first frame are the same picture.
+ * The movement detail page's own skeleton, with the same permission-based
+ * shape the page picks before its movement row arrives
+ * (`movementSkeletonShape`; the neutral site shape until the permissions are
+ * ready), so the chunk fallback and the page's first frame are the same
+ * picture.
  */
 function MovementDetailFallback() {
-  const { profile } = useAuth()
-  const role = profile?.role
-  const workshopRole =
-    role === 'workshop' ||
-    role === 'assistant_workshop_manager' ||
-    role === 'workshop_manager'
+  const shape = movementSkeletonShape(usePermissions())
   return (
     <MovementDetailSkeleton
-      context={workshopRole ? 'workshop' : 'site'}
-      isAdmin={role === 'admin'}
-      canUpload={role !== 'monitor'}
+      context={shape.context}
+      isAdmin={shape.adminMenu}
+      canUpload={shape.canUpload}
     />
   )
 }
@@ -227,7 +225,7 @@ const AdminSettings = dynamic(
 )
 // wave 22B: Settings › «الادوار والصلاحيات». Rendered only in the admin
 // shell, behind the `settings.roles` page gate (wave 23); the page itself
-// still also requires the legacy admin role (rolesPageAccess).
+// checks `settings.roles` again (rolesPageAccess).
 const RolesSettings = dynamic(
   () =>
     import('@/components/roles/RolesSettings').then(
@@ -333,9 +331,10 @@ function AppContent() {
     useAuth()
   const { t } = useI18n()
   // wave 23: the shell, its page guards and the sidebar follow the
-  // permissions (re-evaluated when the roles page calls reload()). The role
-  // is only the fallback while they load or after a failed load; see
-  // planShell in src/lib/navPermissions.ts.
+  // permissions (re-evaluated when the roles page calls reload()). Roles
+  // stage 4a: no role fallback; while they load the bootstrap spinner stays
+  // up and a failed load shows the load-error page with a retry (planShell
+  // in src/lib/navPermissions.ts).
   const permissionState = usePermissions()
   const router = useRouter()
   const pathname = usePathname()
@@ -345,11 +344,14 @@ function AppContent() {
   // The id of a detail page (/movements/:id, /equipment/:id, ...).
   const detailId = segments[1] ?? ''
 
-  const role = profile?.role
-  const { status: permissionStatus, permissions } = permissionState
+  const {
+    status: permissionStatus,
+    permissions,
+    reload: reloadPermissions,
+  } = permissionState
   const shell = useMemo(
-    () => planShell({ status: permissionStatus, permissions }, role),
-    [permissionStatus, permissions, role],
+    () => planShell({ status: permissionStatus, permissions }),
+    [permissionStatus, permissions],
   )
   const requested = routePageOf(segments)
   // A page this user may not open renders the shell's landing page: its home,
@@ -400,9 +402,9 @@ function AppContent() {
     if (landingRedirect) router.replace(landingRedirect)
   }, [landingRedirect, router])
 
-  // Full-screen loader for the auth bootstrap only. For an account whose
-  // role the fallback does not know, that includes its permissions, instead
-  // of flashing the role-unavailable page before its shell.
+  // Full-screen loader for the auth bootstrap, which includes the
+  // permissions (roles stage 4a: every account waits for them, nothing is
+  // decided from the role meanwhile).
   const waitingForPermissions =
     Boolean(profile) && !profileLoadError && shell.kind === 'pending'
   if (loading || waitingForPermissions) return <FullPageSpinner />
@@ -427,19 +429,25 @@ function AppContent() {
   if (requested === 'print/export' && shell.pages.has('print/export'))
     return <PrintExport payloadKey={searchParams.get('key')} />
 
-  // Fail closed: the role fallback for an unknown role after a failed load
-  // (or, defensively, one still waiting for its permissions).
+  // Fail closed: the permissions failed to load (or, defensively, are still
+  // loading). Nothing is guessed from the role; the user retries or signs
+  // out.
   if (shell.kind === 'unavailable' || shell.kind === 'pending')
     return (
       <div className="flex min-h-[100dvh] items-center justify-center p-4">
         <div className="card w-full max-w-md space-y-4 text-center">
-          <p>{t('accountRoleUnavailable')}</p>
-          <button
-            className="btn-primary mx-auto"
-            onClick={() => void signOut()}
-          >
-            {t('signOut')}
-          </button>
+          <p>{t('permissionsLoadError')}</p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button
+              className="btn-primary"
+              onClick={() => void reloadPermissions()}
+            >
+              {t('retry')}
+            </button>
+            <button className="btn-outline" onClick={() => void signOut()}>
+              {t('signOut')}
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -452,8 +460,7 @@ function AppContent() {
 
   // The foreman and workshop homes, which never have a sidebar (whatever
   // other keys the user holds). `movementsScope` comes from the home.*
-  // permission scope (undefined in the role fallback: HomeScreen then reads
-  // the role, as before).
+  // permission scope.
   if (shell.kind === 'foreman' || shell.kind === 'workshop')
     return (
       <>
@@ -491,9 +498,8 @@ function AppContent() {
       </>
     )
 
-  // The admin shell: home.admin (the admin and monitor roles in the fallback),
-  // or any admin-shell section without a home, with the dashboard closed and
-  // the landing on the first section. Each page renders only when its gate
+  // The admin shell: home.admin, or any admin-shell section without a home,
+  // with the dashboard closed and the landing on the first section. Each page renders only when its gate
   // passes; AdminHomeScreen only for 'dashboard', which opens with home.admin
   // alone. Every other kind returned above; the compiler checks it, so
   // nothing falls through.
@@ -501,19 +507,17 @@ function AppContent() {
   void adminShell
   // The sidebar lists the sections the permissions pass; the routable set is
   // the shell's open pages, so the menu and the guards agree.
-  const navItems = visibleNavItems(
-    permissionState,
-    profile.role,
-    shell.pages,
-  ).map((item) => ({
-    key: item.key,
-    label: t(NAV_PRESENTATION[item.key].label),
-    icon: NAV_PRESENTATION[item.key].icon,
-    children: item.children?.map((child) => ({
-      key: child,
-      label: t(NAV_CHILD_LABELS[child]),
-    })),
-  }))
+  const navItems = visibleNavItems(permissionState, shell.pages).map(
+    (item) => ({
+      key: item.key,
+      label: t(NAV_PRESENTATION[item.key].label),
+      icon: NAV_PRESENTATION[item.key].icon,
+      children: item.children?.map((child) => ({
+        key: child,
+        label: t(NAV_CHILD_LABELS[child]),
+      })),
+    }),
+  )
   const canOpenEquipment = shell.pages.has('equipment/:id')
   const canCreateMovement = shell.pages.has('movements/new')
 

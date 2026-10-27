@@ -180,33 +180,35 @@ const detailItems = (overrides) =>
       saved: SAVED,
       legacyUrl: null,
       pending: [],
-      viewer: { userId: 'user-1', role: 'supervisor' },
+      viewer: { userId: 'user-1', removal: 'own' },
       busy: false,
       alt: 'Photo',
       ...overrides,
     }),
   )
 
-test('only the uploader or an admin may remove a saved photo, never monitor', () => {
+test('the decided removal: any photo, own uploads, or none', () => {
+  // Roles stage 4a: the viewer carries the removal decided from the
+  // permissions (movements.photos.delete_any / .manage), never a role.
   const photo = { uploaded_by: 'user-1' }
   assert.equal(
-    canRemoveSavedPhoto(photo, { userId: 'user-1', role: 'supervisor' }),
+    canRemoveSavedPhoto(photo, { userId: 'user-1', removal: 'own' }),
     true,
   )
   assert.equal(
-    canRemoveSavedPhoto(photo, { userId: 'user-2', role: 'workshop_manager' }),
+    canRemoveSavedPhoto(photo, { userId: 'user-2', removal: 'own' }),
     false,
   )
   assert.equal(
-    canRemoveSavedPhoto(photo, { userId: 'user-2', role: 'admin' }),
+    canRemoveSavedPhoto(photo, { userId: 'user-2', removal: 'any' }),
     true,
   )
   assert.equal(
-    canRemoveSavedPhoto(photo, { userId: 'user-1', role: 'monitor' }),
+    canRemoveSavedPhoto(photo, { userId: 'user-1', removal: 'none' }),
     false,
   )
   assert.equal(
-    canRemoveSavedPhoto(photo, { userId: undefined, role: undefined }),
+    canRemoveSavedPhoto(photo, { userId: undefined, removal: 'own' }),
     false,
   )
 })
@@ -231,7 +233,7 @@ test('detail gallery items: saved photos keep order and a per-photo remove switc
     [false, false],
   )
   assert.deepEqual(
-    detailItems({ viewer: { userId: 'x', role: 'admin' } }).map(
+    detailItems({ viewer: { userId: 'x', removal: 'any' } }).map(
       (item) => item.removable,
     ),
     [true, true],
@@ -243,7 +245,7 @@ test('detail gallery items: the legacy photo_url photo is a non-removable fallba
   const legacy = detailItems({
     saved: [],
     legacyUrl: 'https://signed/legacy',
-    viewer: { userId: 'x', role: 'admin' },
+    viewer: { userId: 'x', removal: 'any' },
   })
   assert.equal(legacy.length, 1)
   assert.equal(legacy[0].id, LEGACY_PHOTO_ID)

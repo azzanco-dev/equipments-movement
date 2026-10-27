@@ -23,8 +23,8 @@ export interface MovementAdminMenuProps {
  * correction dialog and the delete.
  *
  * Rendered by `MovementDetail` only for a holder of `movements.edit_delete`
- * (wave 24; the admin role while the permissions load or after a failed
- * load); the database functions behind both items (`admin_update_movement`,
+ * (wave 24; nobody while the permissions load or after a failed load);
+ * the database functions behind both items (`admin_update_movement`,
  * migration 0105, and `admin_delete_movement`, migrations 0104/0105, keyed
  * by 0127) re-check it and fail closed, so hiding the menu is presentation,
  * never the permission.

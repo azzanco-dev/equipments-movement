@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { FileSpreadsheet, Plus, Upload } from 'lucide-react'
 import { Button, PageHeader } from '@/components/ui'
@@ -44,11 +43,10 @@ export function EquipmentListScreen({
   onSelectEquipment,
 }: EquipmentListScreenProps = {}) {
   const { t } = useI18n()
-  const { profile } = useAuth()
   // Add, edit and the Excel import follow equipment.create / .edit /
-  // .import (the row policies re-check them); the admin role decides only
-  // while the permissions load or after a failed load.
-  const actions = equipmentListActions(usePermissions(), profile?.role)
+  // .import (the row policies re-check them); nothing is granted while the
+  // permissions load or after a failed load.
+  const actions = equipmentListActions(usePermissions())
   const canEdit = actions.edit
   const editId = useSearchParams().get('edit')
   const list = useDataListState(equipmentListConfig)

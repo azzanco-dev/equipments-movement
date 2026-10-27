@@ -1,6 +1,8 @@
 import { Fragment } from 'react'
 import { ArrowLeft, Check, Minus } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
+import { usePermissions } from '@/auth/PermissionsContext'
+import { rolesPageAccess } from '@/lib/permissions'
 import { useI18n } from '@/i18n/I18nContext'
 import { AuthScreen } from '@/screens/AuthScreen'
 import { FullPageSpinner } from '@/components/Spinner'
@@ -37,19 +39,30 @@ import {
 // Like /ui-kit it is open in development and admin-only in production. It
 // renders the proposed phases, entities, relations and the PO lifecycle from
 // purchasingModel.ts; nothing here reads or writes the database.
+// Roles stage 4a: «admin-only» is the permission `settings.roles` (an
+// admin-only key, 0126), as on /ui-kit, not `profiles.role`; not
+// `purchasing.view`, which the custom «المشتريات» role also holds. Fail
+// closed while it loads or failed.
 const OPEN_WITHOUT_SESSION = process.env.NODE_ENV !== 'production'
 
 export function PurchasingStructure() {
   const { profile, loading } = useAuth()
+  const permissions = usePermissions()
   const { t } = useI18n()
   if (!OPEN_WITHOUT_SESSION) {
     if (loading) return <FullPageSpinner />
     if (!profile) return <AuthScreen />
-    if (profile.role !== 'admin')
+    const access = rolesPageAccess(permissions.status, permissions.permissions)
+    if (access === 'loading') return <FullPageSpinner />
+    if (access !== 'allowed')
       return (
         <div className="flex min-h-[100dvh] items-center justify-center p-4">
           <p className="card max-w-md text-center">
-            {t('userPermissionError')}
+            {t(
+              access === 'error'
+                ? 'permissionsLoadError'
+                : 'userPermissionError',
+            )}
           </p>
         </div>
       )

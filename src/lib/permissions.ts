@@ -56,17 +56,16 @@ export function permissionScopeOf(
 export type RolesPageAccess = 'allowed' | 'loading' | 'denied' | 'error'
 
 /**
- * Who may open Settings › «الادوار والصلاحيات». Fail closed: only a legacy
- * admin (the same rule the admin interface routing applies) who also holds
- * `settings.roles` in the current mode. A missing or unknown role is denied
- * before the permissions are even consulted.
+ * Who may open Settings › «الادوار والصلاحيات»: a holder of `settings.roles`.
+ * Fail closed: nothing is allowed while the permissions load or after a
+ * failed load. Roles stage 4a (2026-10-27) dropped the legacy-admin role
+ * check; `settings.roles` is an admin-only key (0126 `admin_only`), so the
+ * same users pass.
  */
 export function rolesPageAccess(
-  role: string | null | undefined,
   status: PermissionsStatus,
   map: ReadonlyMap<string, PermissionScope>,
 ): RolesPageAccess {
-  if (role !== 'admin') return 'denied'
   if (status === 'loading') return 'loading'
   if (status === 'error') return 'error'
   return map.has('settings.roles') ? 'allowed' : 'denied'

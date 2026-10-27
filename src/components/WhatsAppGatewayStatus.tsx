@@ -1,7 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
-import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { canSeeIntegrationsStatus } from '@/lib/actionPermissions'
 import { supabase } from '@/lib/supabase'
@@ -192,12 +191,11 @@ export function WhatsAppStatusIndicator({ className }: { className?: string }) {
  */
 export function WhatsAppStatusAlert({ className }: { className?: string }) {
   const { t } = useI18n()
-  const { profile } = useAuth()
   const permissionState = usePermissions()
   const view = useWhatsAppStatus()
-  // wave 24: `settings.integrations` (the admin role while the permissions
-  // load or after a failed load).
-  if (!canSeeIntegrationsStatus(permissionState, profile?.role)) return null
+  // wave 24: `settings.integrations` (nobody while the permissions load
+  // or after a failed load).
+  if (!canSeeIntegrationsStatus(permissionState)) return null
   if (view === 'off') return null
   if (!isWhatsAppStatusWarning(view)) return null
   return (

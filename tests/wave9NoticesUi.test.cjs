@@ -448,7 +448,7 @@ test('the panel is offered to workshop roles and the admin on an ENTRY only', ()
   assert.match(form, /const workshopMode = formActions\.workshopMode\r?\n/)
   assert.match(
     form,
-    /const formActions = movementFormActions\(permissionState, profile\?\.role\)/,
+    /const formActions = movementFormActions\(permissionState\)/,
   )
   assert.match(
     form,

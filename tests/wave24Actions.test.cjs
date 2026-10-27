@@ -1,13 +1,13 @@
 // wave 24 (actions by permissions) — the in-screen action and data decisions
 // that used to compare `profiles.role` now read the permissions
-// (src/lib/actionPermissions.ts, src/lib/homeScope.ts), with the role as the
-// fallback ONLY while the permissions load or after a failed load.
+// (src/lib/actionPermissions.ts, src/lib/homeScope.ts).
 //
-// With the roles system OFF, current_permissions() answers from the frozen
-// legacy_role_permissions(profiles.role) mapping, so for each of the six roles
-// every decision must be IDENTICAL to the role rule it replaces. Those rules
-// are transcribed below from the screens at d68a08d (`before*`), independent
-// of the `legacy*` copies kept in actionPermissions.ts.
+// With the frozen legacy_role_permissions mapping, for each of the six roles
+// every READY decision must be IDENTICAL to the role rule it replaced. Those
+// rules are transcribed below from the screens at d68a08d (`before*`).
+//
+// Roles stage 4a (2026-10-27): there is no role fallback any more. While the
+// permissions load or after a failed load nothing is granted (fail closed).
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -182,14 +182,21 @@ function beforeHome(role) {
 // EquipmentLocationCard, Layout + WhatsAppStatusAlert, the users screens
 // reachable by the admin only).
 const beforeAdminOnly = (role) => role === 'admin'
+// canRemoveSavedPhoto at d68a08d: monitor never, admin always, anybody else
+// his own uploads.
+function beforeCanRemove(role, userId, photo) {
+  if (role === 'monitor') return false
+  if (role === 'admin') return true
+  return Boolean(userId) && photo.uploaded_by === userId
+}
 
 // The home as HomeScreen derives it now (no prop from App.tsx).
-function homeNow(state, role) {
-  const scope = homeScope.resolveHomeMovementsScope(state, role)
+function homeNow(state) {
+  const scope = homeScope.resolveHomeMovementsScope(state)
   const managerMode = scope === 'all_contexts'
   const workshopMode = scope === 'workshop' || managerMode
   const canClassify =
-    workshopMode && actions.homeActions(state, role).classifyWorkshopEntries
+    workshopMode && actions.homeActions(state).classifyWorkshopEntries
   return {
     scope,
     logClassify: managerMode && canClassify,
@@ -235,13 +242,13 @@ test('every key the decisions read is in the permission catalogue', () => {
   assert.ok(!CATALOGUE.has('map.view'), 'map.view was retired by 0130')
 })
 
-// --- Roles system OFF: identical to the role rules ---------------------------
+// --- Ready with the legacy mapping: identical to the role rules -------------
 
 for (const role of ROLES) {
   test(`${role}: the movement detail decisions are unchanged`, () => {
     const state = legacyState(role)
     for (const row of ROWS) {
-      const now = actions.movementDetailActions(state, role, row)
+      const now = actions.movementDetailActions(state, row)
       assert.deepEqual(
         pick(now, [
           'editDelete',
@@ -254,28 +261,24 @@ for (const role of ROLES) {
       )
     }
     // Photo removal: the decided viewer gives the same remove buttons as the
-    // old viewer { userId, role } through canRemoveSavedPhoto.
-    const removal = actions.movementDetailActions(
-      state,
-      role,
-      ROWS[0],
-    ).photoRemoval
+    // old role rule of canRemoveSavedPhoto.
+    const removal = actions.movementDetailActions(state, ROWS[0]).photoRemoval
     const viewer = actions.photoViewerFor(removal, ME)
     for (const photo of PHOTOS)
       assert.equal(
         gallery.canRemoveSavedPhoto(photo, viewer),
-        gallery.canRemoveSavedPhoto(photo, { userId: ME, role }),
+        beforeCanRemove(role, ME, photo),
         JSON.stringify(photo),
       )
     assert.deepEqual(
-      plain(actions.movementSkeletonShape(state, role)),
+      plain(actions.movementSkeletonShape(state)),
       beforeSkeleton(role),
     )
   })
 
   test(`${role}: the movement form decisions are unchanged`, () => {
     const state = legacyState(role)
-    const now = actions.movementFormActions(state, role)
+    const now = actions.movementFormActions(state)
     assert.deepEqual(
       pick(now, ['workshopMode', 'exitAnyVisit', 'notifyForeman']),
       beforeForm(role),
@@ -298,111 +301,116 @@ for (const role of ROLES) {
   })
 
   test(`${role}: the field home decisions are unchanged`, () => {
-    assert.deepEqual(homeNow(legacyState(role), role), beforeHome(role))
+    assert.deepEqual(homeNow(legacyState(role)), beforeHome(role))
     // App.tsx's scope (planShell) and the home's own agree.
-    const plan = nav.planShell(legacyState(role), role)
+    const plan = nav.planShell(legacyState(role))
     if (plan.homeScope)
       assert.equal(
         plan.homeScope,
-        homeScope.resolveHomeMovementsScope(legacyState(role), role),
+        homeScope.resolveHomeMovementsScope(legacyState(role)),
       )
   })
 
   test(`${role}: the admin-only cards and fields are unchanged`, () => {
     const state = legacyState(role)
     const expected = beforeAdminOnly(role)
-    assert.deepEqual(plain(actions.equipmentFormActions(state, role)), {
+    assert.deepEqual(plain(actions.equipmentFormActions(state)), {
       trackerLink: expected,
       changeCode: expected,
     })
-    assert.deepEqual(plain(actions.equipmentListActions(state, role)), {
+    assert.deepEqual(plain(actions.equipmentListActions(state)), {
       create: expected,
       edit: expected,
       importRows: expected,
     })
-    assert.deepEqual(plain(actions.usersActions(state, role)), {
+    assert.deepEqual(plain(actions.usersActions(state)), {
       manage: expected,
     })
-    assert.equal(actions.canSeeIntegrationsStatus(state, role), expected)
-    assert.equal(actions.canViewEquipmentLocation(state, role), expected)
+    assert.equal(actions.canSeeIntegrationsStatus(state), expected)
+    assert.equal(actions.canViewEquipmentLocation(state), expected)
   })
 }
 
-// --- Loading / failed load: the role rule, exactly today's behaviour --------
+// --- Loading / failed load: nothing is granted (roles stage 4a) -------------
 
-test('while loading or after a failed load the role decides', () => {
-  for (const state of [LOADING, FAILED])
-    for (const role of [...ROLES, null, undefined, 'unknown_role']) {
-      for (const row of ROWS)
-        assert.deepEqual(
-          pick(actions.movementDetailActions(state, role, row), [
-            'editDelete',
-            'changeDriver',
-            'editContractorCode',
-            'addPhotos',
-          ]),
-          beforeMovementDetail(role, row),
-        )
-      const removal = actions.movementDetailActions(
-        state,
-        role,
-        ROWS[0],
-      ).photoRemoval
-      for (const photo of PHOTOS)
-        assert.equal(
-          gallery.canRemoveSavedPhoto(
-            photo,
-            actions.photoViewerFor(removal, ME),
+const NOTHING_DETAIL = {
+  editDelete: false,
+  changeDriver: false,
+  editContractorCode: false,
+  addPhotos: false,
+  photoRemoval: 'none',
+}
+
+test('while loading or after a failed load nothing is granted', () => {
+  // Even a state that (wrongly) carries a full map: only 'ready' counts.
+  const full = LEGACY.get('admin')
+  for (const state of [
+    LOADING,
+    FAILED,
+    { status: 'loading', permissions: full },
+    { status: 'error', permissions: full },
+  ]) {
+    for (const row of ROWS)
+      assert.deepEqual(
+        plain(actions.movementDetailActions(state, row)),
+        NOTHING_DETAIL,
+      )
+    for (const photo of PHOTOS)
+      assert.equal(
+        gallery.canRemoveSavedPhoto(
+          photo,
+          actions.photoViewerFor(
+            actions.movementDetailActions(state, ROWS[0]).photoRemoval,
+            ME,
           ),
-          gallery.canRemoveSavedPhoto(photo, { userId: ME, role }),
-        )
-      assert.deepEqual(
-        plain(actions.movementSkeletonShape(state, role)),
-        beforeSkeleton(role),
+        ),
+        false,
       )
-      const form = actions.movementFormActions(state, role)
-      assert.deepEqual(
-        pick(form, ['workshopMode', 'exitAnyVisit', 'notifyForeman']),
-        beforeForm(role),
-      )
-      assert.equal(form.quickCreateEquipment, true)
-      assert.equal(form.quickCreateDriver, true)
-      assert.equal(form.quickCreateLessor, true)
-      assert.deepEqual(homeNow(state, role), beforeHome(role))
-      const adminOnly = beforeAdminOnly(role)
-      assert.deepEqual(plain(actions.equipmentFormActions(state, role)), {
-        trackerLink: adminOnly,
-        changeCode: adminOnly,
-      })
-      assert.deepEqual(plain(actions.equipmentListActions(state, role)), {
-        create: adminOnly,
-        edit: adminOnly,
-        importRows: adminOnly,
-      })
-      assert.equal(actions.usersActions(state, role).manage, adminOnly)
-      assert.equal(actions.canSeeIntegrationsStatus(state, role), adminOnly)
-      assert.equal(actions.canViewEquipmentLocation(state, role), adminOnly)
-    }
+    // The skeleton: the neutral site shape without any action.
+    assert.deepEqual(plain(actions.movementSkeletonShape(state)), {
+      context: 'site',
+      adminMenu: false,
+      canUpload: false,
+    })
+    assert.deepEqual(plain(actions.movementFormActions(state)), {
+      workshopMode: false,
+      exitAnyVisit: false,
+      notifyForeman: false,
+      quickCreateEquipment: false,
+      quickCreateDriver: false,
+      quickCreateLessor: false,
+    })
+    // The narrowest home list, no classification.
+    assert.deepEqual(homeNow(state), {
+      scope: 'own_site',
+      logClassify: false,
+      pendingList: false,
+      cardClassify: false,
+    })
+    assert.deepEqual(plain(actions.equipmentFormActions(state)), {
+      trackerLink: false,
+      changeCode: false,
+    })
+    assert.deepEqual(plain(actions.equipmentListActions(state)), {
+      create: false,
+      edit: false,
+      importRows: false,
+    })
+    assert.equal(actions.usersActions(state).manage, false)
+    assert.equal(actions.canSeeIntegrationsStatus(state), false)
+    assert.equal(actions.canViewEquipmentLocation(state), false)
+  }
 })
 
-test('once ready the permissions decide, whatever the legacy role says', () => {
+test('once ready the permissions decide; an empty role gets nothing', () => {
   // An admin profile whose (custom) role holds nothing gets nothing.
   const empty = ready([])
-  const detail = actions.movementDetailActions(empty, 'admin', ROWS[0])
-  assert.deepEqual(plain(detail), {
-    editDelete: false,
-    changeDriver: false,
-    editContractorCode: false,
-    addPhotos: false,
-    photoRemoval: 'none',
-  })
-  assert.equal(actions.usersActions(empty, 'admin').manage, false)
-  assert.equal(actions.canSeeIntegrationsStatus(empty, 'admin'), false)
-  assert.equal(actions.canViewEquipmentLocation(empty, 'admin'), false)
-  assert.equal(
-    homeScope.resolveHomeMovementsScope(empty, 'workshop_manager'),
-    'own_site',
-  )
+  const detail = actions.movementDetailActions(empty, ROWS[0])
+  assert.deepEqual(plain(detail), NOTHING_DETAIL)
+  assert.equal(actions.usersActions(empty).manage, false)
+  assert.equal(actions.canSeeIntegrationsStatus(empty), false)
+  assert.equal(actions.canViewEquipmentLocation(empty), false)
+  assert.equal(homeScope.resolveHomeMovementsScope(empty), 'own_site')
 })
 
 // --- Custom roles ------------------------------------------------------------
@@ -420,28 +428,22 @@ test('custom role foreman_lead (0126 seed): its scopes widen the foreman', () =>
   const othersWorkshopEntry = { ...othersSiteEntry, context: 'workshop' }
   const ownSiteEntry = { ...othersSiteEntry, own: true }
 
-  const other = actions.movementDetailActions(
-    state,
-    'supervisor',
-    othersSiteEntry,
-  )
+  const other = actions.movementDetailActions(state, othersSiteEntry)
   assert.equal(other.changeDriver, true) // driver_change scope all
   assert.equal(other.addPhotos, true) // photos.manage scope site
   assert.equal(other.editContractorCode, false) // own entries only
   assert.equal(other.editDelete, false)
   assert.equal(other.photoRemoval, 'own')
   assert.equal(
-    actions.movementDetailActions(state, 'supervisor', othersWorkshopEntry)
-      .addPhotos,
+    actions.movementDetailActions(state, othersWorkshopEntry).addPhotos,
     false,
   )
   assert.equal(
-    actions.movementDetailActions(state, 'supervisor', ownSiteEntry)
-      .editContractorCode,
+    actions.movementDetailActions(state, ownSiteEntry).editContractorCode,
     true,
   )
 
-  const form = actions.movementFormActions(state, 'supervisor')
+  const form = actions.movementFormActions(state)
   assert.equal(form.workshopMode, false)
   assert.equal(form.exitAnyVisit, true) // site.create scope all
   assert.equal(form.notifyForeman, false)
@@ -449,15 +451,15 @@ test('custom role foreman_lead (0126 seed): its scopes widen the foreman', () =>
   assert.equal(form.quickCreateDriver, true)
   assert.equal(form.quickCreateLessor, true)
 
-  assert.deepEqual(homeNow(state, 'supervisor'), {
+  assert.deepEqual(homeNow(state), {
     scope: 'own_site',
     logClassify: false,
     pendingList: false,
     cardClassify: false,
   })
-  assert.equal(actions.canViewEquipmentLocation(state, 'supervisor'), true)
-  assert.equal(actions.canSeeIntegrationsStatus(state, 'supervisor'), false)
-  assert.deepEqual(plain(actions.equipmentFormActions(state, 'supervisor')), {
+  assert.equal(actions.canViewEquipmentLocation(state), true)
+  assert.equal(actions.canSeeIntegrationsStatus(state), false)
+  assert.deepEqual(plain(actions.equipmentFormActions(state)), {
     trackerLink: false,
     changeCode: false,
   })
@@ -471,13 +473,13 @@ test('a custom workshop role with the classify key classifies on its own card', 
     ['movements.photos.manage', 'workshop'],
     ['equipment.quick_create', 'site'],
   ])
-  assert.deepEqual(homeNow(state, 'workshop'), {
+  assert.deepEqual(homeNow(state), {
     scope: 'workshop',
     logClassify: false,
     pendingList: true,
     cardClassify: true,
   })
-  const form = actions.movementFormActions(state, 'workshop')
+  const form = actions.movementFormActions(state)
   assert.equal(form.workshopMode, true)
   // Its quick-create scope is the site's: no button in the workshop form.
   assert.equal(form.quickCreateEquipment, false)
@@ -508,10 +510,13 @@ const SCREENS = {
   'src/screens/AdminUsers.tsx': 'usersActions',
   'src/screens/UserDetail.tsx': 'usersActions',
   'src/screens/equipment/EquipmentFormDialog.tsx': 'equipmentFormActions',
+  'src/screens/equipment/EquipmentListScreen.tsx': 'equipmentListActions',
+  'src/screens/EquipmentDetail.tsx': 'equipmentListActions',
   'src/components/EntryExitForm.tsx': 'movementFormActions',
   'src/components/Layout.tsx': 'canSeeIntegrationsStatus',
   'src/components/WhatsAppGatewayStatus.tsx': 'canSeeIntegrationsStatus',
   'src/components/afaqy/EquipmentLocationCard.tsx': 'canViewEquipmentLocation',
+  'src/components/admin-home/AfaqySection.tsx': 'canViewEquipmentLocation',
 }
 
 test('the screens decide through actionPermissions, never by comparing the role', () => {
@@ -533,18 +538,9 @@ test('the screens decide through actionPermissions, never by comparing the role'
       /(?<![\w.])role\s*[!=]==?\s*'(admin|supervisor|workshop|assistant_workshop_manager|workshop_manager|monitor)'/,
       file,
     )
-    // The role is only handed to the deciding helper as its fallback.
-    for (const match of source.matchAll(/profile\??\.role/g)) {
-      const line = source.slice(
-        source.lastIndexOf('\n', match.index) + 1,
-        source.indexOf('\n', match.index),
-      )
-      assert.match(
-        line,
-        /(Actions|Shape|Scope|canSee\w+|canView\w+|legacyRoleLabelKey)\(\s*(permissionState|usePermissions\(\))?,?\s*profile\?\.role/,
-        `${file}: ${line.trim()}`,
-      )
-    }
+    // Roles stage 4a: the signed-in user's role is not read at all, not
+    // even as a fallback handed to the deciding helper.
+    assert.doesNotMatch(source, /profile\??\.role\b/, file)
   }
 })
 
@@ -563,19 +559,23 @@ test('the props-driven movement components read no role', () => {
   assert.match(quick, /onCreateLessor\?: \(query: string\) => void/)
 })
 
-test('the legacy rules are read only through the fallback switch', () => {
+test('roles stage 4a: one switch, no legacy role rule left', () => {
   const lib = read('src', 'lib', 'actionPermissions.ts')
   assert.match(
     lib,
-    /return state\.status === 'ready'\s+\? byPermissions\(state\.permissions\)\s+: byRole\(role\)/,
+    /return state\.status === 'ready' \? state\.permissions : NOTHING_GRANTED/,
   )
-  const legacyNames = [...lib.matchAll(/export function (legacy\w+)/g)].map(
-    (match) => match[1],
+  assert.match(lib, /return byPermissions\(grantedPermissions\(state\)\)/)
+  assert.doesNotMatch(lib, /export function legacy\w+/)
+  assert.doesNotMatch(lib, /\bbyRole\b|\bLegacyRole\b|\bisWorkshopRole\b/)
+  const scope = read('src', 'lib', 'homeScope.ts')
+  assert.doesNotMatch(scope, /export function homeMovementsScope\(/)
+  assert.match(
+    scope,
+    /\? homeMovementsScopeFromPermissions\(state\.permissions\)\s+: 'own_site'/,
   )
-  assert.ok(legacyNames.length >= 4)
-  const sources = Object.keys(SCREENS).map((file) => read(...file.split('/')))
-  for (const name of legacyNames)
-    for (const source of sources) assert.ok(!source.includes(name), name)
+  const gallery = read('src', 'lib', 'movementPhotoGallery.ts')
+  assert.doesNotMatch(gallery, /viewer\.role/)
 })
 
 test('the movement form wires each decision', () => {
@@ -631,7 +631,6 @@ test('equipment add / edit / import follow their own keys once ready', () => {
     plain(
       actions.equipmentListActions(
         ready(keys('equipment.read', 'equipment.location.view')),
-        'monitor',
       ),
     ),
     { create: false, edit: false, importRows: false },
@@ -640,13 +639,12 @@ test('equipment add / edit / import follow their own keys once ready', () => {
     plain(
       actions.equipmentListActions(
         ready(keys('equipment.read', 'equipment.edit')),
-        'monitor',
       ),
     ),
     { create: false, edit: true, importRows: false },
   )
   assert.deepEqual(
-    plain(actions.equipmentListActions(ready(keys('equipment.create')), 'admin')),
+    plain(actions.equipmentListActions(ready(keys('equipment.create')))),
     { create: true, edit: false, importRows: false },
   )
 })

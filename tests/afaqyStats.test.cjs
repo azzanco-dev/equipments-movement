@@ -157,10 +157,7 @@ test('the route: permission first, the fleet only, cached Afaqy units', () => {
 
 test('the card: gated on the location permission, on the admin home', () => {
   const card = read('src', 'components', 'admin-home', 'AfaqySection.tsx')
-  assert.match(
-    card,
-    /canViewEquipmentLocation\(permissionState, profile\?\.role\)/,
-  )
+  assert.match(card, /canViewEquipmentLocation\(permissionState\)/)
   const home = read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx')
   assert.match(
     home,

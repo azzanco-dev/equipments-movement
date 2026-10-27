@@ -6,8 +6,11 @@
 // With the roles system OFF, current_permissions() answers from the frozen
 // legacy_role_permissions(profiles.role) mapping, so for each of the six roles
 // the shell and every rendered screen must be IDENTICAL to the role-based
-// router of src/App.tsx at 8f17f53 (transcribed below as `before`). While the
-// permissions load or after a failed load the role-based router is kept.
+// router of src/App.tsx at 8f17f53 (transcribed below as `before`).
+//
+// Roles stage 4a (2026-10-27): no role-based fallback router any more. While
+// the permissions load the shell is 'pending' (the bootstrap spinner); after a
+// failed load it is 'unavailable' (the load-error page with a retry).
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -244,8 +247,8 @@ const NEW_ADMIN_SCREEN = {
   'settings/afaqy': 'AdminSettings',
 }
 
-function after(state, role, url) {
-  const shell = nav.planShell(state, role)
+function after(state, url) {
+  const shell = nav.planShell(state)
   const segments = url.split('/').filter(Boolean)
   const requested = nav.routePageOf(segments)
   const page = shell.pages.has(requested) ? requested : shell.landing
@@ -282,11 +285,19 @@ function after(state, role, url) {
 }
 
 /** The sidebar App.tsx shows: built for the admin shell only. */
-function menu(state, role) {
-  const shell = nav.planShell(state, role)
+function menu(state) {
+  const shell = nav.planShell(state)
   return shell.kind === 'admin'
-    ? plain(nav.visibleNavItems(state, role, shell.pages))
+    ? plain(nav.visibleNavItems(state, shell.pages))
     : []
+}
+
+/** The field home's list by role at 8f17f53 (wave-21 homeMovementsScope). */
+function beforeHomeScope(role) {
+  if (role === 'workshop_manager' || role === 'assistant_workshop_manager')
+    return 'all_contexts'
+  if (role === 'workshop') return 'workshop'
+  return 'own_site'
 }
 
 const URLS = [
@@ -353,7 +364,7 @@ for (const role of ROLES) {
   test(`roles OFF: ${role} gets today's shell and pages`, () => {
     const differences = []
     for (const url of URLS) {
-      const now = after(ready(LEGACY.get(role)), role, url)
+      const now = after(ready(LEGACY.get(role)), url)
       const then = before(role, url)
       if (KNOWN_DIFFERENCES.has(`${role} ${url}`)) {
         differences.push(`${role} ${url}`)
@@ -367,43 +378,46 @@ for (const role of ROLES) {
       if (known.startsWith(`${role} `)) assert.ok(differences.includes(known))
   })
 
-  test(`loading / failed permissions: ${role} keeps the role-based router`, () => {
-    for (const state of [LOADING, FAILED])
-      for (const url of URLS)
-        assert.deepEqual(after(state, role, url), before(role, url), url)
+  test(`loading / failed permissions: ${role} waits, then the load error`, () => {
+    // Roles stage 4a: nothing is guessed from the role, every URL.
+    for (const url of URLS) {
+      assert.deepEqual(after(LOADING, url), { shell: 'pending' }, url)
+      assert.deepEqual(after(FAILED, url), { shell: 'unavailable' }, url)
+    }
   })
 
   test(`roles OFF: ${role} gets the same home variant`, () => {
-    const plan = nav.planShell(ready(LEGACY.get(role)), role)
+    const plan = nav.planShell(ready(LEGACY.get(role)))
     if (plan.kind === 'foreman' || plan.kind === 'workshop')
-      assert.equal(plan.homeScope, homeScope.homeMovementsScope(role))
+      assert.equal(plan.homeScope, beforeHomeScope(role))
     else assert.equal(plan.homeScope, undefined)
-    // The fallback passes nothing: HomeScreen reads the role, as before.
-    assert.equal(nav.planShell(LOADING, role).homeScope, undefined)
+    // The home resolves the same list from the same permissions.
+    if (plan.homeScope)
+      assert.equal(
+        homeScope.resolveHomeMovementsScope(ready(LEGACY.get(role))),
+        plan.homeScope,
+      )
+    // Not ready: no home at all.
+    assert.equal(nav.planShell(LOADING).homeScope, undefined)
   })
 
   test(`roles OFF: ${role} lands on its home`, () => {
     // The six roles hold a home.* key, so the sections rule never applies.
     for (const state of [ready(LEGACY.get(role)), LOADING, FAILED])
-      assert.equal(nav.planShell(state, role).landing, 'dashboard')
+      assert.equal(nav.planShell(state).landing, 'dashboard')
   })
 }
 
-test('the role fallback table is the 8f17f53 router', () => {
-  for (const role of ROLES) {
-    const legacy = nav.LEGACY_SHELL_BY_ROLE[role]
-    const pages = new Set(legacy.pages)
-    for (const url of URLS) {
-      const then = before(role, url)
-      const requested = nav.routePageOf(url.split('/').filter(Boolean))
-      // A page is in the table exactly when the old router rendered it
-      // rather than the role's home.
-      if (requested === 'dashboard') continue
-      const home = before(role, '/dashboard')
-      const opened = then.screen !== home.screen || then.shell !== home.shell
-      assert.equal(pages.has(requested), opened, `${role} ${url}`)
-    }
-  }
+test('roles stage 4a: no role fallback router is left', () => {
+  assert.equal(nav.LEGACY_SHELL_BY_ROLE, undefined)
+  assert.equal(nav.LEGACY_NAV_BY_ROLE, undefined)
+  assert.equal(homeScope.homeMovementsScope, undefined)
+  const source = read('src', 'lib', 'navPermissions.ts')
+  assert.match(
+    source,
+    /export function planShell\(state: NavPermissionState\): ShellPlan/,
+  )
+  assert.doesNotMatch(source, /source: 'role'/)
 })
 
 // --- Custom roles and fail closed ---------------------------------------------
@@ -413,19 +427,13 @@ test('home.admin + movements.read: dashboard and logs only', () => {
     ['home.admin', 'all'],
     ['movements.read', 'all'],
   ])
-  const plan = nav.planShell(state, 'purchasing')
+  const plan = nav.planShell(state)
   assert.equal(plan.kind, 'admin')
   assert.equal(plan.landing, 'dashboard')
   assert.deepEqual(sorted(plan.pages), ['dashboard', 'logs', 'movements/:id'])
-  assert.deepEqual(menu(state, 'purchasing'), [
-    { key: 'dashboard' },
-    { key: 'logs' },
-  ])
-  assert.equal(after(state, 'x', '/logs').screen, 'Logs')
-  assert.equal(
-    after(state, 'x', '/movements/m1').screen,
-    'MovementDetail(back)',
-  )
+  assert.deepEqual(menu(state), [{ key: 'dashboard' }, { key: 'logs' }])
+  assert.equal(after(state, '/logs').screen, 'Logs')
+  assert.equal(after(state, '/movements/m1').screen, 'MovementDetail(back)')
   for (const url of [
     '/equipment',
     '/equipment/e1',
@@ -436,31 +444,38 @@ test('home.admin + movements.read: dashboard and logs only', () => {
     '/reports/workshop',
     '/inquiry',
   ])
-    assert.deepEqual(after(state, 'x', url), {
+    assert.deepEqual(after(state, url), {
       shell: 'admin',
       active: 'dashboard',
       screen: 'AdminHome(-,-)',
     })
   // The print page needs movements.export.
-  assert.equal(after(state, 'x', '/print/export').screen, 'AdminHome(-,-)')
+  assert.equal(after(state, '/print/export').screen, 'AdminHome(-,-)')
 })
 
-test('no permissions: the no-permissions page, whatever the role', () => {
-  for (const role of [...ROLES, 'purchasing', '', null, undefined, 'toString'])
-    for (const url of URLS)
-      assert.deepEqual(after(ready([]), role, url), { shell: 'none' })
+test('no permissions: the no-permissions page', () => {
+  for (const url of URLS)
+    assert.deepEqual(after(ready([]), url), { shell: 'none' })
 })
 
-test('an unknown role waits while loading, is unavailable after a failure', () => {
-  for (const role of ['purchasing', '', null, undefined, 'toString', 'Admin']) {
-    assert.equal(nav.planShell(LOADING, role).kind, 'pending')
-    assert.equal(nav.planShell(FAILED, role).kind, 'unavailable')
-    assert.equal(nav.planShell(FAILED, role).pages.size, 0)
+test('everyone waits while loading and is unavailable after a failure', () => {
+  // Even a state that (wrongly) carries the admin's map: only 'ready' counts.
+  for (const permissions of [new Map(), LEGACY.get('admin')]) {
+    const loading = nav.planShell({ status: 'loading', permissions })
+    const failed = nav.planShell({ status: 'error', permissions })
+    assert.equal(loading.kind, 'pending')
+    assert.equal(failed.kind, 'unavailable')
+    for (const plan of [loading, failed]) {
+      assert.equal(plan.source, 'status')
+      assert.equal(plan.pages.size, 0)
+      assert.equal(plan.landing, 'dashboard')
+      assert.equal(plan.homeScope, undefined)
+    }
   }
 })
 
 test('precedence admin > foreman > workshop, and the home variants', () => {
-  const kind = (entries) => nav.planShell(ready(entries), 'x')
+  const kind = (entries) => nav.planShell(ready(entries))
   assert.equal(
     kind([
       ['home.admin', 'all'],
@@ -496,18 +511,18 @@ test('the dashboard entry requires exactly home.admin', () => {
 
 test('equipment.read alone: the admin shell with «المعدات» only', () => {
   const state = ready([['equipment.read', 'all']])
-  const plan = nav.planShell(state, 'x')
+  const plan = nav.planShell(state)
   assert.equal(plan.kind, 'admin')
   assert.equal(plan.source, 'permissions')
   assert.equal(plan.landing, 'equipment')
   assert.deepEqual(sorted(plan.pages), ['equipment', 'equipment/:id'])
-  assert.deepEqual(menu(state, 'x'), [{ key: 'equipment' }])
-  assert.deepEqual(after(state, 'x', '/equipment'), {
+  assert.deepEqual(menu(state), [{ key: 'equipment' }])
+  assert.deepEqual(after(state, '/equipment'), {
     shell: 'admin',
     active: 'equipment',
     screen: 'AdminEquipment',
   })
-  assert.deepEqual(after(state, 'x', '/equipment/e1'), {
+  assert.deepEqual(after(state, '/equipment/e1'), {
     shell: 'admin',
     active: 'equipment',
     screen: 'EquipmentDetail',
@@ -526,7 +541,7 @@ test('equipment.read alone: the admin shell with «المعدات» only', () =>
     '/unknown',
   ])
     assert.deepEqual(
-      after(state, 'x', url),
+      after(state, url),
       { shell: 'admin', redirect: '/equipment' },
       url,
     )
@@ -536,16 +551,13 @@ test('equipment.read alone: the admin shell with «المعدات» only', () =>
 
 test('movements.read scope all alone lands on the log', () => {
   const state = ready([['movements.read', 'all']])
-  const plan = nav.planShell(state, 'x')
+  const plan = nav.planShell(state)
   assert.equal(plan.kind, 'admin')
   assert.equal(plan.landing, 'logs')
   assert.deepEqual(sorted(plan.pages), ['logs', 'movements/:id'])
-  assert.deepEqual(menu(state, 'x'), [{ key: 'logs' }])
-  assert.equal(
-    after(state, 'x', '/movements/m1').screen,
-    'MovementDetail(back)',
-  )
-  assert.deepEqual(after(state, 'x', '/equipment'), {
+  assert.deepEqual(menu(state), [{ key: 'logs' }])
+  assert.equal(after(state, '/movements/m1').screen, 'MovementDetail(back)')
+  assert.deepEqual(after(state, '/equipment'), {
     shell: 'admin',
     redirect: '/logs',
   })
@@ -554,12 +566,12 @@ test('movements.read scope all alone lands on the log', () => {
     ['movements.read', 'all'],
     ['movements.export', 'all'],
   ])
-  assert.deepEqual(sorted(nav.planShell(exporting, 'x').pages), [
+  assert.deepEqual(sorted(nav.planShell(exporting).pages), [
     'logs',
     'movements/:id',
     'print/export',
   ])
-  assert.deepEqual(after(exporting, 'x', '/print/export'), {
+  assert.deepEqual(after(exporting, '/print/export'), {
     shell: 'print',
     screen: 'PrintExport',
   })
@@ -567,29 +579,26 @@ test('movements.read scope all alone lands on the log', () => {
 
 test('reports.view scope workshop alone lands on the workshop report', () => {
   const state = ready([['reports.view', 'workshop']])
-  const plan = nav.planShell(state, 'x')
+  const plan = nav.planShell(state)
   assert.equal(plan.kind, 'admin')
   assert.equal(plan.landing, 'reports/workshop')
   assert.deepEqual(sorted(plan.pages), ['reports', 'reports/workshop'])
-  assert.deepEqual(menu(state, 'x'), [
+  assert.deepEqual(menu(state), [
     { key: 'reports', children: ['reports/workshop'] },
   ])
-  assert.deepEqual(after(state, 'x', '/reports/workshop'), {
+  assert.deepEqual(after(state, '/reports/workshop'), {
     shell: 'admin',
     active: 'reports',
     screen: 'WorkshopReports',
   })
   // /reports asks for the entries report, which this scope does not open.
-  assert.deepEqual(after(state, 'x', '/reports'), {
+  assert.deepEqual(after(state, '/reports'), {
     shell: 'admin',
     redirect: '/reports/workshop',
   })
   // A reports.view scope no child accepts opens no section at all.
   for (const scope of ['own', 'companies'])
-    assert.equal(
-      nav.planShell(ready([['reports.view', scope]]), 'x').kind,
-      'none',
-    )
+    assert.equal(nav.planShell(ready([['reports.view', scope]])).kind, 'none')
 })
 
 test('the landing is the first passing section in menu order', () => {
@@ -597,26 +606,23 @@ test('the landing is the first passing section in menu order', () => {
     ['drivers.read', 'all'],
     ['inquiry.view', 'all'],
   ])
-  const plan = nav.planShell(state, 'x')
+  const plan = nav.planShell(state)
   assert.equal(plan.kind, 'admin')
   assert.equal(plan.landing, 'inquiry')
-  assert.deepEqual(menu(state, 'x'), [{ key: 'inquiry' }, { key: 'drivers' }])
+  assert.deepEqual(menu(state), [{ key: 'inquiry' }, { key: 'drivers' }])
   assert.deepEqual(sorted(plan.pages), ['drivers', 'drivers/:id', 'inquiry'])
-  assert.deepEqual(after(state, 'x', '/'), {
+  assert.deepEqual(after(state, '/'), {
     shell: 'admin',
     redirect: '/inquiry',
   })
-  assert.equal(after(state, 'x', '/drivers/d1').screen, 'DriverDetail')
+  assert.equal(after(state, '/drivers/d1').screen, 'DriverDetail')
   // Every section can be the landing, in NAV_ENTRIES order.
   const landings = []
   for (const entry of nav.NAV_ENTRIES) {
     // A hidden entry (URL only) is never a landing.
     if (entry.key === 'dashboard' || entry.hidden) continue
     const gate = (entry.children ?? [entry])[0].requires[0]
-    const own = nav.planShell(
-      ready([[gate.key, gate.scopes?.[0] ?? 'all']]),
-      'x',
-    )
+    const own = nav.planShell(ready([[gate.key, gate.scopes?.[0] ?? 'all']]))
     assert.equal(own.kind, 'admin', entry.key)
     landings.push(own.landing)
   }
@@ -644,10 +650,10 @@ test('a key that opens no section is still the no-permissions page', () => {
     [['movements.export', 'all']],
     [['movements.site.create', 'all']],
   ]) {
-    const plan = nav.planShell(ready(entries), 'x')
+    const plan = nav.planShell(ready(entries))
     assert.equal(plan.kind, 'none', JSON.stringify(entries))
     assert.equal(plan.pages.size, 0)
-    assert.deepEqual(after(ready(entries), 'x', '/logs'), { shell: 'none' })
+    assert.deepEqual(after(ready(entries), '/logs'), { shell: 'none' })
   }
 })
 
@@ -657,12 +663,12 @@ test('a field home keeps precedence over the sections, with no sidebar', () => {
     ['equipment.read', 'all'],
     ['inquiry.view', 'all'],
   ])
-  const plan = nav.planShell(state, 'x')
+  const plan = nav.planShell(state)
   assert.equal(plan.kind, 'foreman')
   assert.equal(plan.landing, 'dashboard')
   assert.deepEqual(sorted(plan.pages), ['dashboard', 'inquiry'])
-  assert.deepEqual(menu(state, 'x'), [])
-  assert.deepEqual(after(state, 'x', '/equipment'), {
+  assert.deepEqual(menu(state), [])
+  assert.deepEqual(after(state, '/equipment'), {
     shell: 'foreman',
     active: 'dashboard',
     screen: 'Home',
@@ -671,8 +677,8 @@ test('a field home keeps precedence over the sections, with no sidebar', () => {
     ['home.workshop', 'workshop'],
     ['reports.view', 'all'],
   ])
-  assert.equal(nav.planShell(workshop, 'x').kind, 'workshop')
-  assert.deepEqual(menu(workshop, 'x'), [])
+  assert.equal(nav.planShell(workshop).kind, 'workshop')
+  assert.deepEqual(menu(workshop), [])
 })
 
 // --- The gate table -----------------------------------------------------------
@@ -742,7 +748,6 @@ test('the gates of the pages outside the sidebar', () => {
       ['home.admin', 'all'],
       ['settings.integrations', 'all'],
     ]),
-    'x',
   )
   assert.deepEqual(sorted(afaqy.pages), [
     'dashboard',
@@ -778,7 +783,7 @@ const content = APP.slice(APP.indexOf('function AppContent()'))
 test('App.tsx picks the shell with planShell and guards with its pages', () => {
   assert.match(
     content,
-    /planShell\(\{ status: permissionStatus, permissions \}, role\)/,
+    /planShell\(\{ status: permissionStatus, permissions \}\)/,
   )
   assert.match(content, /const requested = routePageOf\(segments\)/)
   assert.match(
@@ -806,6 +811,24 @@ test('App.tsx picks the shell with planShell and guards with its pages', () => {
     content,
     /<NoPermissionsPage onSignOut=\{\(\) => void signOut\(\)\} \/>/,
   )
+  // Roles stage 4a: the failed load shows the load error with a retry
+  // (reload of the permissions) and sign-out, never a role-based guess.
+  const unavailable = content.slice(
+    content.indexOf(
+      "if (shell.kind === 'unavailable' || shell.kind === 'pending')",
+    ),
+    content.indexOf("if (shell.kind === 'none')"),
+  )
+  assert.match(unavailable, /t\('permissionsLoadError'\)/)
+  assert.match(unavailable, /onClick=\{\(\) => void reloadPermissions\(\)\}/)
+  assert.match(unavailable, /onClick=\{\(\) => void signOut\(\)\}/)
+  assert.match(content, /reload: reloadPermissions,/)
+  // Every account waits for its permissions on the bootstrap spinner.
+  assert.match(
+    content,
+    /const waitingForPermissions =\s*Boolean\(profile\) && !profileLoadError && shell\.kind === 'pending'/,
+  )
+  assert.doesNotMatch(content, /profile\??\.role/)
 })
 
 test('App.tsx replaces a URL the dashboard-less admin shell does not open', () => {
@@ -889,10 +912,10 @@ test('the field home receives its variant from the permission scope', () => {
   const home = read('src', 'screens', 'HomeScreen.tsx')
   assert.match(home, /movementsScope\?: HomeMovementsScope/)
   // wave 24: without the prop the home resolves the scope itself (the
-  // permissions once ready, the role meanwhile).
+  // permissions once ready, the narrowest list meanwhile; stage 4a).
   assert.match(
     home,
-    /const scope =\s*movementsScope \?\? resolveHomeMovementsScope\(permissionState, profile\?\.role\)/,
+    /const scope =\s*movementsScope \?\? resolveHomeMovementsScope\(permissionState\)/,
   )
   // Same three values as the home's own type.
   const homeSource = read('src', 'lib', 'homeScope.ts')

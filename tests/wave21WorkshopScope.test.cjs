@@ -32,25 +32,41 @@ const MANAGERS = ['workshop_manager', 'assistant_workshop_manager']
 // Role gating
 // ---------------------------------------------------------------------------
 
-test('only the two workshop managers get the all-contexts home', () => {
-  for (const role of MANAGERS)
-    assert.equal(scope.homeMovementsScope(role), 'all_contexts')
-  assert.equal(scope.homeMovementsScope('workshop'), 'workshop')
-  assert.equal(scope.homeMovementsScope('supervisor'), 'own_site')
+// Roles stage 4a: the home list follows the home.* permission only (the
+// two workshop managers hold home.workshop scope all in the legacy mapping,
+// the workshop role scope workshop; tests/wave23Shell.test.cjs proves the
+// six roles); the role variant is gone.
+const ready = (entries) => ({ status: 'ready', permissions: new Map(entries) })
+
+test('only home.workshop scope all gets the all-contexts home', () => {
+  assert.equal(MANAGERS.length, 2)
+  assert.equal(scope.homeMovementsScope, undefined)
+  const resolve = scope.resolveHomeMovementsScope
+  assert.equal(resolve(ready([['home.workshop', 'all']])), 'all_contexts')
+  assert.equal(resolve(ready([['home.workshop', 'workshop']])), 'workshop')
+  assert.equal(resolve(ready([['home.foreman', 'own']])), 'own_site')
+  // home.foreman wins over home.workshop (planShell's precedence).
+  assert.equal(
+    resolve(
+      ready([
+        ['home.foreman', 'all'],
+        ['home.workshop', 'all'],
+      ]),
+    ),
+    'own_site',
+  )
 })
 
-test('an unknown or missing role fails closed onto the narrowest list', () => {
-  for (const role of [
-    undefined,
-    null,
-    '',
-    'admin ',
-    'Workshop_Manager',
-    'manager',
-    'monitor',
-    'admin',
-  ])
-    assert.equal(scope.homeMovementsScope(role), 'own_site', String(role))
+test('no home key, loading or a failed load fails closed onto the narrowest list', () => {
+  const resolve = scope.resolveHomeMovementsScope
+  assert.equal(resolve(ready([])), 'own_site')
+  assert.equal(resolve(ready([['home.admin', 'all']])), 'own_site')
+  for (const status of ['loading', 'error'])
+    assert.equal(
+      resolve({ status, permissions: new Map([['home.workshop', 'all']]) }),
+      'own_site',
+      status,
+    )
 })
 
 test('the all-contexts home opens on the workshop tab', () => {
@@ -65,11 +81,10 @@ test('the home picks its list through homeMovementsScope', () => {
   const home = read('src', 'screens', 'HomeScreen.tsx')
   // wave 23: App.tsx passes the scope derived from the home.* permission;
   // wave 24: without the prop the home resolves it itself, from the same
-  // permissions once ready and from the role (homeMovementsScope) only while
-  // they load or after a failed load.
+  // permissions once ready, the narrowest list meanwhile (roles stage 4a).
   assert.match(
     home,
-    /const scope =\s*movementsScope \?\? resolveHomeMovementsScope\(permissionState, profile\?\.role\)/,
+    /const scope = movementsScope \?\? resolveHomeMovementsScope\(permissionState\)/,
   )
   assert.match(home, /const managerMode = scope === 'all_contexts'/)
   assert.match(

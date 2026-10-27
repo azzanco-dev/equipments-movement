@@ -634,10 +634,10 @@ test('the purchasing section, routes and page gates are keyed on purchasing.view
   }
   assert.ok(navLib.canOpenPage(state.permissions, 'purchasing/orders'))
   assert.ok(navLib.canOpenPage(state.permissions, 'purchasing/:id'))
-  assert.deepEqual(plain(navLib.visibleNavItems(state, 'x')), [
+  assert.deepEqual(plain(navLib.visibleNavItems(state)), [
     { key: 'purchasing', children: ['purchasing/orders', 'purchasing/units'] },
   ])
-  const plan = navLib.planShell(state, 'x')
+  const plan = navLib.planShell(state)
   assert.equal(plan.kind, 'admin')
   assert.equal(plan.landing, 'purchasing/orders')
   assert.equal(navLib.routePageOf(['purchasing']), 'purchasing/orders')

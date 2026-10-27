@@ -15,7 +15,6 @@ import {
   AsyncSearchSelect,
   type AsyncSearchSelectOption,
 } from '@/components/AsyncSearchSelect'
-import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { equipmentFormActions } from '@/lib/actionPermissions'
 import {
@@ -106,14 +105,13 @@ export function EquipmentFormDialog({
   onSaved,
 }: EquipmentFormDialogProps) {
   const { t, lang } = useI18n()
-  const { profile } = useAuth()
   // wave 24: the Afaqy tracker field (wave 17) follows
   // `equipment.tracker_link` plus `settings.integrations` (the units list
   // route), and changing the code of an existing unit follows
-  // `equipment.change_code`; the admin role decides only while the
-  // permissions load or after a failed load. The database and the routes
+  // `equipment.change_code`; nothing is granted while the permissions
+  // load or after a failed load. The database and the routes
   // re-check both.
-  const formActions = equipmentFormActions(usePermissions(), profile?.role)
+  const formActions = equipmentFormActions(usePermissions())
   const canLinkTracker = formActions.trackerLink
   const canChangeCode = formActions.changeCode
   const langRef = useRef(lang)

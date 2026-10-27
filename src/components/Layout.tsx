@@ -14,7 +14,6 @@ import { useTheme } from '@/theme/ThemeContext'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { canSeeIntegrationsStatus } from '@/lib/actionPermissions'
-import type { TranslationKey } from '@/i18n/translations'
 import { localizedName } from '@/lib/localizedName'
 import { useEffect, useState } from 'react'
 import {
@@ -110,24 +109,21 @@ export function Layout({
     return () => document.removeEventListener('keydown', close)
   }, [mobileOpen])
 
-  const legacyRoleLabel = t(legacyRoleLabelKey(profile?.role))
-  // wave 23 (step 3): with the roles system ON the label under the name is
-  // the assigned role's name; the legacy label stays the fallback while the
-  // flag or the assignment load, after a failed load, with the flag OFF or
-  // unknown, and without an assignment.
+  // wave 23 (step 3): the label under the name is the assigned role's name.
+  // Roles stage 4a: the roles system is permanently ON, so there is no
+  // legacy-role label any more; nothing shows while the assignment loads or
+  // after a failed read.
   const permissionState = usePermissions()
-  const { rolesSystemEnabled, assignedRole } = permissionState
-  const roleLabel =
-    rolesSystemEnabled === true && assignedRole
-      ? localizedName(lang, assignedRole.name_ar, assignedRole.name_en)
-      : legacyRoleLabel
+  const { assignedRole } = permissionState
+  const roleLabel = assignedRole
+    ? localizedName(lang, assignedRole.name_ar, assignedRole.name_en)
+    : null
 
   // wave 12: the WhatsApp gateway status is polled for the admin only.
   // wave 24: for a holder of `settings.integrations` (the status route's
-  // permission); the admin role while the permissions load or failed.
+  // permission); nobody while the permissions load or failed.
   const showWhatsAppStatus =
-    canSeeIntegrationsStatus(permissionState, profile?.role) &&
-    navItems.length > 0
+    canSeeIntegrationsStatus(permissionState) && navItems.length > 0
   useWhatsAppStatusPolling(showWhatsAppStatus)
 
   return (
@@ -458,23 +454,4 @@ export function Layout({
       />
     </div>
   )
-}
-
-/** The legacy role's label under the name (the roles system OFF, or no
- *  assignment): a label of the role itself, not a permission decision. */
-function legacyRoleLabelKey(role: string | null | undefined): TranslationKey {
-  switch (role) {
-    case 'admin':
-      return 'admin'
-    case 'workshop':
-      return 'workshopOfficer'
-    case 'assistant_workshop_manager':
-      return 'assistantWorkshopManager'
-    case 'workshop_manager':
-      return 'workshopManager'
-    case 'monitor':
-      return 'monitoring'
-    default:
-      return 'supervisor'
-  }
 }
