@@ -55,24 +55,13 @@ export type RoleChangeStep =
   { kind: 'changeLegacy'; to: UserRole } | { kind: 'assign'; roleKey: string }
 
 /**
- * The ordered steps that move a user to `newRoleKey` while the flag is ON:
- *
- * 1. `changeLegacy(to)` when `legacyRoleFor(...)` differs from the current
- *    legacy role AND the trigger accepts the change (to or from admin, no
- *    assignment yet, or the assignment still equals the current legacy role).
- *    Otherwise the legacy change is skipped — the database would refuse it —
- *    and the user keeps the legacy role he has.
- * 2. `assign(newRoleKey)` when the assignment after step 1 still differs from
- *    `newRoleKey`. After a legacy change the trigger has already synced the
- *    assignment to the new legacy role, so a system target needs no assign
- *    and a custom target still does.
- *
- * Choosing `admin` is a legacy change to admin only (parity: the trigger
- * assigns the admin role). Nothing changes → no step.
- *
- * `isSystemRole` (the `roles.is_system` flag) is accepted for callers that
- * have it, but a role is treated as a system role exactly when its key is a
- * legacy value: only those keys may be written to `profiles.role`.
+ * The steps that move a user to `newRoleKey`. Since roles stage 4b (owner
+ * 2026-10-27, migration 0153) a role is changed through the assignment
+ * alone: one `assign(newRoleKey)` step when it differs from the current
+ * assignment, never a legacy change (`profiles.role` is no longer written
+ * by the user screens and nothing reads it). Nothing changes → no step.
+ * `currentLegacy` and `isSystemRole` are accepted for the callers' shape
+ * and ignored.
  */
 export function planRoleChange(input: {
   currentLegacy: UserRole
@@ -81,23 +70,9 @@ export function planRoleChange(input: {
   newRoleKey: string
   isSystemRole?: boolean
 }): RoleChangeStep[] {
-  const steps: RoleChangeStep[] = []
-  const targetLegacy = legacyRoleFor(input.newRoleKey, input.currentLegacy)
-  let assigned = input.currentAssigned
-  if (targetLegacy !== input.currentLegacy) {
-    const accepted =
-      targetLegacy === 'admin' ||
-      input.currentLegacy === 'admin' ||
-      input.currentAssigned === null ||
-      input.currentAssigned === input.currentLegacy
-    if (accepted) {
-      steps.push({ kind: 'changeLegacy', to: targetLegacy })
-      assigned = targetLegacy
-    }
-  }
-  if (assigned !== input.newRoleKey)
-    steps.push({ kind: 'assign', roleKey: input.newRoleKey })
-  return steps
+  return input.currentAssigned === input.newRoleKey
+    ? []
+    : [{ kind: 'assign', roleKey: input.newRoleKey }]
 }
 
 /** The legacy role the user carries once the plan ran. */
@@ -152,6 +127,7 @@ export function assignedRoleFromEmbed(value: unknown): AssignedRole | null {
 export const ASSIGN_ROLE_FIELD_CODES: ReadonlySet<string> = new Set([
   'admin_role_mismatch',
   'cannot_change_own_admin',
+  'last_admin',
   'role_inactive',
   'role_not_found',
 ])

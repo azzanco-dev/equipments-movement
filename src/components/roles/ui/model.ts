@@ -48,8 +48,10 @@ export interface PermissionGroupItem {
 export interface RoleUserItem {
   id: string
   name: string
-  legacyLabel: string
-  legacyTone: BadgeTone
+  /** The legacy role badge; the live roles page no longer passes it
+   *  (roles stage 4b), the /ui-kit mockup still does. */
+  legacyLabel?: string
+  legacyTone?: BadgeTone
   /** Formatted date of the assignment, null when unknown. */
   since: string | null
 }

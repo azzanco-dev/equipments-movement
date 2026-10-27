@@ -1011,6 +1011,7 @@ export const translations = {
     rolesErrCannotChangeOwnAdmin: 'لا يمكنك نزع دور الادمن عن حسابك',
     rolesErrAdminMismatch:
       'دور الادمن يعين فقط لمن دوره الحالي ادمن، ومن دوره الحالي ادمن يبقى عليه. غيّر الدور الحالي من صفحة المستخدم اولا',
+    rolesErrLastAdmin: 'يجب ان يبقى مدير نظام واحد على الاقل',
     rolesErrGeneric: 'تعذر تنفيذ العملية، حاول مرة اخرى',
     permissionGroupHome: 'اللوحات',
     permissionGroupMovements: 'الحركات',
@@ -3142,6 +3143,7 @@ export const translations = {
       'You cannot take the admin role away from your own account',
     rolesErrAdminMismatch:
       'The admin role goes only to users whose current role is admin, and they keep it. Change the current role on the user page first',
+    rolesErrLastAdmin: 'At least one admin is required',
     rolesErrGeneric: 'The operation failed; try again',
     permissionGroupHome: 'Home pages',
     permissionGroupMovements: 'Movements',

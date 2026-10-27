@@ -6,9 +6,8 @@ import { supabase } from '@/lib/supabase'
 import { buildSearchFilter } from '@/lib/search'
 import { usersListConfig } from '@/lib/listConfigs'
 import { formatDate } from '@/lib/dateFormat'
-import { roleBadge } from '@/lib/userForm'
 import { rolesRpcError } from '@/lib/rolesAdmin'
-import type { ProfileRole, UserRole } from '@/lib/types'
+import type { ProfileRole } from '@/lib/types'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { fill, roleName, type RoleRow } from './roleRows'
 import {
@@ -21,7 +20,7 @@ import {
 /** One role rarely has more than a handful of users; this is a safety cap. */
 const USERS_LIMIT = 200
 
-type ProfileLite = { id: string; full_name: string; role: UserRole }
+type ProfileLite = { id: string; full_name: string }
 
 /**
  * The «المستخدمون» tab of one role: the `profile_roles` rows of the role with
@@ -71,7 +70,7 @@ export function RoleUsersTab({
     if (assignments.length > 0) {
       const result = await supabase
         .from('profiles')
-        .select('id,full_name,role')
+        .select('id,full_name')
         .in(
           'id',
           assignments.map((row) => row.profile_id),
@@ -89,18 +88,16 @@ export function RoleUsersTab({
     setUsers(
       assignments.map((row) => {
         const profile = byId.get(row.profile_id)
-        const badge = roleBadge(profile?.role as UserRole)
+        // Roles stage 4b: no legacy role badge; the role IS the assignment.
         return {
           id: row.profile_id,
           name: profile?.full_name ?? '—',
-          legacyLabel: t(badge.key),
-          legacyTone: badge.tone,
           since: formatDate(row.assigned_at),
         }
       }),
     )
     setLoading(false)
-  }, [role.key, startRequest, t])
+  }, [role.key, startRequest])
 
   useEffect(() => {
     void load()
@@ -109,17 +106,13 @@ export function RoleUsersTab({
   const loadCandidates = async (query: string): Promise<AssignCandidate[]> => {
     let request = supabase
       .from('profiles')
-      .select('id,full_name,role')
+      .select('id,full_name')
       .order('full_name', { ascending: true })
       .limit(20)
     const filter = buildSearchFilter(usersListConfig.searchFields, query)
     if (filter) request = request.or(filter)
-    // Admin parity (0126): only a legacy admin may hold «ادمن», and a legacy
-    // admin holds nothing else.
-    request =
-      role.key === 'admin'
-        ? request.eq('role', 'admin')
-        : request.neq('role', 'admin')
+    // Roles stage 4b (migration 0153): any user may be given any role; the
+    // database keeps the last admin and refuses an admin's own demotion.
     const { data, error: queryError } = await request
     if (queryError) throw new Error(t('roleAssignLoadError'))
     const profiles = (data as ProfileLite[]) ?? []
@@ -154,9 +147,7 @@ export function RoleUsersTab({
           label: profile.full_name,
           description: currentRoleName
             ? fill(t('roleAssignCurrentRole'), { role: currentRoleName })
-            : fill(t('roleAssignNoRoleYet'), {
-                legacy: t(roleBadge(profile.role).key),
-              }),
+            : t('roleUsersNoRole'),
           currentRoleName,
         }
       })

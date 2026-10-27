@@ -307,6 +307,8 @@ export const ROLES_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
   role_inactive: 'rolesErrRoleInactive',
   cannot_change_own_admin: 'rolesErrCannotChangeOwnAdmin',
   admin_role_mismatch: 'rolesErrAdminMismatch',
+  // 0153: the last admin keeps the admin role.
+  last_admin: 'rolesErrLastAdmin',
   // Raised by the profiles trigger, not by a roles function (user screens).
   roles_system_active_use_assignment: 'roleChangeUseAssignment',
 }

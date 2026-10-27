@@ -105,106 +105,33 @@ test('legacyRoleFor: a custom role keeps the legacy role, except admin → monit
 const plan = (currentLegacy, currentAssigned, newRoleKey) =>
   plain(planRoleChange({ currentLegacy, currentAssigned, newRoleKey }))
 
-test('plan: system → system with an aligned assignment is a legacy change only', () => {
-  assert.deepEqual(plan('supervisor', 'supervisor', 'workshop'), [
-    { kind: 'changeLegacy', to: 'workshop' },
-  ])
-  assert.deepEqual(plan('monitor', 'monitor', 'workshop_manager'), [
-    { kind: 'changeLegacy', to: 'workshop_manager' },
-  ])
-  // No assignment yet: the trigger inserts it, so still legacy only.
-  assert.deepEqual(plan('supervisor', null, 'workshop'), [
-    { kind: 'changeLegacy', to: 'workshop' },
-  ])
-})
-
-test('plan: system → system with a customised assignment skips the refused legacy change', () => {
-  // The trigger refuses (neither role is admin, assignment ≠ old legacy).
-  assert.deepEqual(plan('supervisor', 'foreman_lead', 'workshop'), [
-    { kind: 'assign', roleKey: 'workshop' },
-  ])
-  assert.deepEqual(plan('supervisor', 'monitor', 'workshop'), [
-    { kind: 'assign', roleKey: 'workshop' },
-  ])
-  // Back to the legacy role itself: assign only, nothing legacy to change.
-  assert.deepEqual(plan('supervisor', 'foreman_lead', 'supervisor'), [
-    { kind: 'assign', roleKey: 'supervisor' },
-  ])
-})
-
-test('plan: non-admin → custom keeps the legacy role and assigns', () => {
-  for (const current of SYSTEM.filter((key) => key !== 'admin'))
-    assert.deepEqual(plan(current, current, 'foreman_lead'), [
-      { kind: 'assign', roleKey: 'foreman_lead' },
-    ])
-  // Already customised: assign only as well.
-  assert.deepEqual(plan('supervisor', 'purchasing', 'foreman_lead'), [
-    { kind: 'assign', roleKey: 'foreman_lead' },
-  ])
-})
-
-test('plan: admin → custom is legacy to monitor, then the assign', () => {
-  assert.deepEqual(plan('admin', 'admin', 'equipment_officer'), [
-    { kind: 'changeLegacy', to: 'monitor' },
-    { kind: 'assign', roleKey: 'equipment_officer' },
-  ])
-})
-
-test('plan: → admin is a legacy change to admin only (parity)', () => {
-  assert.deepEqual(plan('supervisor', 'supervisor', 'admin'), [
-    { kind: 'changeLegacy', to: 'admin' },
-  ])
-  // Even from a customised assignment: a change TO admin is accepted by the
-  // trigger, which then assigns the admin role itself.
-  assert.deepEqual(plan('supervisor', 'foreman_lead', 'admin'), [
-    { kind: 'changeLegacy', to: 'admin' },
-  ])
-  assert.deepEqual(plan('monitor', null, 'admin'), [
-    { kind: 'changeLegacy', to: 'admin' },
-  ])
-  // A legacy admin without the admin assignment (an offender): assign only.
-  assert.deepEqual(plan('admin', 'purchasing', 'admin'), [
-    { kind: 'assign', roleKey: 'admin' },
-  ])
-})
-
-test('plan: admin → system role is a legacy change only', () => {
-  for (const target of SYSTEM.filter((key) => key !== 'admin'))
-    assert.deepEqual(plan('admin', 'admin', target), [
-      { kind: 'changeLegacy', to: target },
-    ])
-})
-
-test('plan: the same role again changes nothing', () => {
-  for (const key of SYSTEM) assert.deepEqual(plan(key, key, key), [])
-  assert.deepEqual(plan('supervisor', 'foreman_lead', 'foreman_lead'), [])
-  assert.deepEqual(plan('monitor', 'purchasing', 'purchasing'), [])
-})
-
-test('plan: a user without assignment who keeps his legacy role gets it assigned', () => {
-  assert.deepEqual(plan('supervisor', null, 'supervisor'), [
-    { kind: 'assign', roleKey: 'supervisor' },
-  ])
-})
-
-test('plan: the legacy role never becomes admin for a custom role, and admin never keeps a custom role', () => {
+// Roles stage 4b (owner 2026-10-27, migration 0153): a role is changed
+// through the assignment alone; the legacy role is never written.
+test('plan: any change is one assign step, never a legacy change', () => {
   for (const current of SYSTEM)
     for (const assigned of [...SYSTEM, 'foreman_lead', null])
-      for (const target of ['foreman_lead', 'purchasing']) {
+      for (const target of [...SYSTEM, 'foreman_lead', 'purchasing']) {
         const steps = plan(current, assigned, target)
-        const legacy = legacyRoleAfter(steps, current)
-        assert.notEqual(legacy, 'admin', `${current}/${assigned} → ${target}`)
-        // Already assigned: nothing to do — unless the legacy role is still
-        // admin (an offender state): it must go to monitor, and the trigger
-        // then syncs the assignment to monitor, so the role is assigned again.
-        if (assigned === target && current !== 'admin')
-          assert.deepEqual(steps, [])
-        else
-          assert.deepEqual(steps[steps.length - 1], {
-            kind: 'assign',
-            roleKey: target,
-          })
+        assert.ok(
+          steps.every((step) => step.kind === 'assign'),
+          `${current}/${assigned} → ${target}`,
+        )
+        assert.equal(legacyRoleAfter(steps, current), current)
+        if (assigned === target) assert.deepEqual(steps, [])
+        else assert.deepEqual(steps, [{ kind: 'assign', roleKey: target }])
       }
+})
+
+test('plan: to and from admin is an assign like any other', () => {
+  assert.deepEqual(plan('supervisor', 'supervisor', 'admin'), [
+    { kind: 'assign', roleKey: 'admin' },
+  ])
+  assert.deepEqual(plan('admin', 'admin', 'equipment_officer'), [
+    { kind: 'assign', roleKey: 'equipment_officer' },
+  ])
+  assert.deepEqual(plan('monitor', null, 'admin'), [
+    { kind: 'assign', roleKey: 'admin' },
+  ])
 })
 
 test('legacyRoleAfter reads the plan', () => {
@@ -248,6 +175,7 @@ test('the assign codes that belong under the role field', () => {
   assert.deepEqual([...lib.ASSIGN_ROLE_FIELD_CODES].sort(), [
     'admin_role_mismatch',
     'cannot_change_own_admin',
+    'last_admin',
     'role_inactive',
     'role_not_found',
   ])
