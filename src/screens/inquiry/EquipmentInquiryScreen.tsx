@@ -727,13 +727,6 @@ export function EquipmentInquiryScreen({
   const state = inquiryState && inquiryState !== 'error' ? inquiryState.state : null
   const supplierName =
     equipment?.ownership_status === 'external_supplier' ? equipment.lessor?.name : null
-  // «ترقيم الشركة» of the latest project movement (owner 2026-10-27: «خليه
-  // ترقيم اخر حركة مشروع، اعرضه»).
-  const latestSiteVisit = visits.find((visit) => visit.context === 'site') ?? null
-  const companyNumber =
-    latestSiteVisit?.exit?.contractor_equipment_code ||
-    latestSiteVisit?.entry?.contractor_equipment_code ||
-    null
 
   const facts: InfoGridItem[] = equipment
     ? [
@@ -770,13 +763,7 @@ export function EquipmentInquiryScreen({
           value: equipment.chassis_number,
           dir: 'ltr',
         },
-        {
-          key: 'companyNumber',
-          icon: <Hash size={15} aria-hidden="true" />,
-          label: t('companyNumber'),
-          value: companyNumber,
-          dir: 'ltr',
-        },
+
         {
           key: 'created',
           icon: <Calendar size={15} aria-hidden="true" />,

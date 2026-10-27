@@ -70,7 +70,9 @@ test('the screen joins the matches and shows the number', () => {
   assert.match(screen, /fetchCompanyNumberMatches\(supabase, term, signal\)/)
   assert.match(screen, /\.\.\.previous\.ids, \.\.\.company\.matches\.keys\(\)/)
   assert.match(screen, /supervisor_name,contractor_equipment_code,driver_name,exit_purpose,driver_full_name'/)
-  assert.match(screen, /key: 'companyNumber',/)
+  // On the movements only, never in the facts (owner 2026-10-27).
+  assert.doesNotMatch(screen, /key: 'companyNumber'/)
+  assert.match(read('src', 'components', 'inquiry', 'InquiryJourney.tsx'), /label=\{t\('companyNumber'\)\}/)
   const lib = read('src', 'lib', 'companyNumberSearch.ts')
   assert.match(lib, /\.eq\('movement_context', 'site'\)\s+\.ilike\('contractor_equipment_code'/)
   assert.match(read('src', 'components', 'inquiry', 'InquirySearch.tsx'), /suggestion\.matched_company_number/)

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { CircleDashed, History, LogIn, LogOut, User, UserCheck } from 'lucide-react'
+import { CircleDashed, Hash, History, LogIn, LogOut, User, UserCheck } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { AppLink, cn } from '@/components/ui'
 import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
@@ -145,7 +145,7 @@ function StayTile({
       <dl
         className={cn(
           'mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-xl p-3',
-          site ? 'sm:grid-cols-4' : 'sm:grid-cols-3',
+          site ? 'sm:grid-cols-5' : 'sm:grid-cols-3',
         )}
         style={inquiryInnerFill(colors)}
       >
@@ -170,6 +170,17 @@ function StayTile({
         >
           {(entry ?? exit)?.supervisor_name || '—'}
         </StayFact>
+        {/* «ترقيم الشركة» lives on the movements only (owner 2026-10-27:
+            «ترقيم الشركة مايكون في بيانات المعدة، يكون في الحركات فقط»). */}
+        {site && (
+          <StayFact icon={<Hash size={11} />} label={t('companyNumber')}>
+            {(entry ?? exit)?.contractor_equipment_code ? (
+              <bdi dir="ltr">{(entry ?? exit)!.contractor_equipment_code}</bdi>
+            ) : (
+              '—'
+            )}
+          </StayFact>
+        )}
         {site && (
           <StayFact icon={<User size={11} />} label={t('inquiryDriver')}>
             {entryDriver ?? exitDriver ?? '—'}
