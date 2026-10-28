@@ -45,7 +45,7 @@
 
 ## Movement invariants
 
-- Valid sequence per equipment is strictly `ENTRY → EXIT → ENTRY → EXIT`. Since migration 0043 it is ONE chain per equipment across both movement contexts (`site` and `workshop`): a unit inside a site cannot enter the workshop until its site exit exists. An EXIT closes an ENTRY of its own context; only an admin may record an exit whose context differs from the open entry's (migration 0108).
+- Valid sequence per equipment is strictly `ENTRY → EXIT → ENTRY → EXIT`. Since migration 0043 it is ONE chain per equipment across both movement contexts (`site` and `workshop`): a unit inside a site cannot enter the workshop until its site exit exists. An EXIT closes an ENTRY of its own context: since migration 0155 (owner 2026-10-28, EM-210, «سياق الخروج حسب سياق الدخول») `enforce_movement_sequence` sets every EXIT's `movement_context` to the context of the entry it closes, before the per-context checks (a caller without that context's create key keeps `exit_equipment_in_workshop` / `exit_equipment_on_site`); the 0108 admin cross-context exit is gone (a read-only count on 2026-10-28 found none stored), and `movements.exit_cross_context` now only exempts a site exit from the foreman-owner rule and widens the exit list.
 - Every function that reads or changes the chain serialises on the sequence trigger's advisory key, `hashtextextended(equipment_id::text, 0)`, taking the row lock first when it locks a movement row.
 - Reject `ENTRY → ENTRY`, `EXIT → EXIT`, and `EXIT` without a preceding valid `ENTRY`.
 - Ordering is deterministic by `(recorded_at, id)`, including historical insertion and identical timestamps.
