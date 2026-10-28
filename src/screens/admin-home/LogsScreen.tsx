@@ -34,6 +34,7 @@ import { MovementTypeBadge } from '@/components/movement/ExitPurposeBadge'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDateTime } from '@/lib/dateFormat'
 import {
@@ -194,6 +195,8 @@ type LogRow = MovementLogSearchRow
 export interface LogsClassify {
   onClassify: (logId: string, purpose: string) => void
   classifyingId: string | null
+  /** A failed classification, shown above the log (null = none). */
+  error?: string | null
 }
 
 export interface LogsScreenProps {
@@ -211,6 +214,13 @@ export interface LogsScreenProps {
   defaultContext?: LogsTab
   /** Classification of workshop entries on the workshop tab of the log. */
   classify?: LogsClassify
+  /**
+   * The `/logs` page has no embedding home to classify for it: with this set
+   * (src/App.tsx, for a holder of `movements.workshop.classify`) the screen
+   * classifies by itself through `classify_workshop_entry` and refetches.
+   * Ignored when `classify` is given.
+   */
+  selfClassify?: boolean
   /** Bumped by the embedding screen after a mutation so both views refetch. */
   refreshToken?: number
 }
@@ -242,8 +252,9 @@ export function LogsScreen({
   onSelectMovement,
   embedded = false,
   defaultContext = 'site',
-  classify,
-  refreshToken = 0,
+  classify: classifyProp,
+  selfClassify = false,
+  refreshToken: refreshTokenProp = 0,
 }: LogsScreenProps) {
   // Company and project are multi-selects searched server-side over every
   // company and project (admin and monitor), in both views; the foreman
@@ -258,6 +269,41 @@ export function LogsScreen({
     [relationFilters],
   )
   const { t, lang } = useI18n()
+  // The Excel export is for the holders of `movements.export` only.
+  const canExport = usePermissions().can('movements.export')
+  // The page's own classification (`selfClassify`): the same RPC as the
+  // field home, then both views refetch.
+  const [ownRefresh, setOwnRefresh] = useState(0)
+  const [ownClassifyingId, setOwnClassifyingId] = useState<string | null>(null)
+  const [ownClassifyError, setOwnClassifyError] = useState<string | null>(null)
+  const ownClassify = useMemo<LogsClassify | undefined>(
+    () =>
+      selfClassify
+        ? {
+            classifyingId: ownClassifyingId,
+            error: ownClassifyError,
+            onClassify: (logId, purpose) => {
+              void (async () => {
+                setOwnClassifyingId(logId)
+                setOwnClassifyError(null)
+                const { error } = await supabase.rpc(
+                  'classify_workshop_entry',
+                  { p_entry_log_id: logId, p_purpose: purpose },
+                )
+                setOwnClassifyingId(null)
+                if (error) {
+                  setOwnClassifyError(t('workshopClassificationFailed'))
+                  return
+                }
+                setOwnRefresh((value) => value + 1)
+              })()
+            },
+          }
+        : undefined,
+    [selfClassify, ownClassifyingId, ownClassifyError, t],
+  )
+  const classify = classifyProp ?? ownClassify
+  const refreshToken = refreshTokenProp + ownRefresh
   const pathname = usePathname()
   const params = useSearchParams()
   const requestedTab = params.get('context')
@@ -732,16 +778,18 @@ export function LogsScreen({
                 asyncFields={logsAsyncFilters}
               />
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => void openExport()}
-              loading={exportPreparing}
-              disabled={exportPreparing || loadError}
-            >
-              <Download size={14} aria-hidden="true" />
-              {t('exportButton')}
-            </Button>
+            {canExport && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void openExport()}
+                loading={exportPreparing}
+                disabled={exportPreparing || loadError}
+              >
+                <Download size={14} aria-hidden="true" />
+                {t('exportButton')}
+              </Button>
+            )}
           </div>
 
           {movementExcel && (
@@ -759,6 +807,12 @@ export function LogsScreen({
               collectRows={collectLogs}
               onExported={onExported}
             />
+          )}
+
+          {classify?.error && (
+            <Notice tone="danger" size="compact">
+              {classify.error}
+            </Notice>
           )}
 
           {exportNote && (

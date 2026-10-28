@@ -98,9 +98,13 @@ test('the home picks its list through homeMovementsScope', () => {
 test('the managers get the embedded admin log, opening on the workshop', () => {
   const home = read('src', 'screens', 'HomeScreen.tsx')
   const managers = home.match(
-    /scope === 'all_contexts' \|\|\s+scope === 'site_all' \|\|\s+scope === 'workshop_all' \? \(([\s\S]*?)\) : \(\s*<HomeMovementsCard([\s\S]*?)\/>/,
+    /const movements = embeddedLog \? \(([\s\S]*?)\) : \(\s*<HomeMovementsCard([\s\S]*?)\/>/,
   )
   assert.ok(managers, 'one branch per scope')
+  assert.match(
+    home,
+    /const embeddedLog =\s+managerMode \|\| scope === 'site_all' \|\| scope === 'workshop_all'/,
+  )
   const [, logBranch, homeBranch] = managers
   assert.match(logBranch, /<LogsScreen\s/)
   assert.match(logBranch, /\bembedded\b/)
@@ -109,7 +113,13 @@ test('the managers get the embedded admin log, opening on the workshop', () => {
     /defaultContext=\{\s*scope === 'site_all' \? 'site' : ALL_CONTEXTS_HOME_DEFAULT_TAB\s*\}/,
   )
   // wave 24: the classification follows movements.workshop.classify.
-  assert.match(logBranch, /classify=\{canClassify \? classify : undefined\}/)
+  // 2026-10-28: the embedded log classifies for every holder of the key on
+  // a home with that log (the managers as before, a wider foreman home too).
+  assert.match(logBranch, /classify=\{logClassify \? classify : undefined\}/)
+  assert.match(
+    home,
+    /const logClassify = holdsClassify && \(workshopMode \|\| embeddedLog\)/,
+  )
   assert.match(logBranch, /refreshToken=\{refreshToken\}/)
   assert.match(logBranch, /t\('homeAllMovementsTitle'\)/)
   // The plain workshop role and the foreman keep their own card, which does
@@ -151,12 +161,20 @@ test('/logs keeps opening on the projects tab for admin and monitor', () => {
   )
   assert.match(logs, /const TABS: LogsTab\[\] = \['site', 'workshop', 'all'\]/)
   // The admin-shell route (the admin and monitor roles and, since 2026-10-13,
-  // anyone whose sections include the log) passes none of the embedding props.
+  // anyone whose sections include the log) passes none of the embedding
+  // props; since 2026-10-28 it classifies by itself for a holder of the
+  // classify key WITHOUT home.admin (the admin and the monitor keep it as
+  // before).
   const app = read('src', 'App.tsx')
-  const routes = app.match(/<LogsScreen[^>]*\/>/g)
-  assert.ok(routes && routes.length >= 1)
-  for (const route of routes)
-    assert.equal(route, '<LogsScreen onSelectMovement={openMovement} />')
+  const routes = app.match(/<LogsScreen[\s\S]*?\/>/g)
+  assert.ok(routes && routes.length === 1)
+  const route = routes[0]
+  assert.match(route, /onSelectMovement=\{openMovement\}/)
+  assert.doesNotMatch(route, /\bembedded\b|defaultContext|classify=/)
+  assert.match(
+    route,
+    /selfClassify=\{\s*permissions\.has\('movements\.workshop\.classify'\) &&\s*!permissions\.has\('home\.admin'\)\s*\}/,
+  )
 })
 
 test('the embedded log keeps the admin filters, visits view and export', () => {

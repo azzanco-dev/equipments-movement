@@ -260,9 +260,13 @@ test('scopes and any-of gates', () => {
   const base = [['home.admin', 'all']]
   const keys = (entries) =>
     plain(nav.visibleNavItems(ready(new Map([...base, ...entries]))))
-  // the log needs a site/workshop/all read scope, not "own" or "companies"
+  // the log needs a site/workshop/all/companies read scope, not "own"
+  // (2026-10-28: `companies` reads the rows of the user's companies)
   assert.deepEqual(keys([['movements.read', 'own']]), [])
-  assert.deepEqual(keys([['movements.read', 'companies']]), [])
+  assert.deepEqual(keys([['movements.read', 'companies']]), [
+    { key: 'dashboard' },
+    { key: 'logs' },
+  ])
   assert.deepEqual(keys([['movements.read', 'workshop']]), [
     { key: 'dashboard' },
     { key: 'logs' },
@@ -276,6 +280,25 @@ test('scopes and any-of gates', () => {
     { key: 'dashboard' },
     { key: 'reports', children: ['reports/entries'] },
   ])
+  // the equipment report also needs movements.read all (its RPC checks it)
+  assert.deepEqual(keys([['reports.view', 'all']]), [
+    { key: 'dashboard' },
+    { key: 'reports', children: ['reports/entries', 'reports/workshop'] },
+  ])
+  assert.deepEqual(
+    keys([
+      ['reports.view', 'all'],
+      ['movements.read', 'all'],
+    ]),
+    [
+      { key: 'dashboard' },
+      { key: 'logs' },
+      {
+        key: 'reports',
+        children: ['reports/entries', 'reports/equipment', 'reports/workshop'],
+      },
+    ],
+  )
   // settings: any of its three keys
   for (const key of [
     'settings.equipment_types',

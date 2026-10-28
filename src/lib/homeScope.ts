@@ -15,7 +15,8 @@ import type { PermissionsStatus } from '@/lib/permissions'
  * - `workshop`: the plain `workshop` role, workshop movements only (unchanged).
  * - `site_all` (owner 2026-10-28, «سويت دور رئيس الفورمين وعطيته عرض جميع
  *   الحركات، لكن لسى مايعرض الا حركاتي»): a foreman home whose
- *   `movements.read` scope is wider than his own rows (`all` or `site`)
+ *   `movements.read` scope is wider than his own rows (`all`, `site` or,
+ *   since 2026-10-28, `companies`)
  *   gets the admin log embedded, opening on «المشاريع»; RLS still decides
  *   which rows come back.
  * - `workshop_all` (owner 2026-10-28, «لما احط له حركات الورشة فقط، يرجع
@@ -50,7 +51,9 @@ export function homeMovementsScopeFromPermissions(
 ): HomeMovementsScope {
   if (permissions.has('home.foreman')) {
     const read = permissions.get('movements.read')
-    if (read === 'all' || read === 'site') return 'site_all'
+    // `companies` (2026-10-28): RLS returns the rows of his companies.
+    if (read === 'all' || read === 'site' || read === 'companies')
+      return 'site_all'
     if (read === 'workshop') return 'workshop_all'
     return 'own_site'
   }

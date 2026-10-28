@@ -642,10 +642,10 @@ test('the landing is the first passing section in menu order', () => {
 })
 
 test('a key that opens no section is still the no-permissions page', () => {
-  // The log needs a site / workshop / all read scope, as in the sidebar.
+  // The log needs a site / workshop / all / companies read scope, as in the
+  // sidebar (`companies` opens it since 2026-10-28).
   for (const entries of [
     [['movements.read', 'own']],
-    [['movements.read', 'companies']],
     [['users.read', 'all']],
     [['movements.export', 'all']],
     [['movements.site.create', 'all']],
@@ -834,7 +834,7 @@ test('App.tsx picks the shell with planShell and guards with its pages', () => {
 test('App.tsx replaces a URL the dashboard-less admin shell does not open', () => {
   assert.match(
     content,
-    /const landingRedirect =\s*profile && shell\.landing !== 'dashboard' && !shell\.pages\.has\(requested\)\s*\? `\/\$\{shell\.landing\}`\s*: null/,
+    /const landingRedirect =\s*profile && !shell\.pages\.has\(requested\)\s*\? shell\.externalLanding\s*\? shell\.externalLanding\s*: shell\.landing !== 'dashboard'\s*\? `\/\$\{shell\.landing\}`\s*: null\s*: null/,
   )
   assert.match(
     content,
@@ -852,7 +852,7 @@ test('App.tsx replaces a URL the dashboard-less admin shell does not open', () =
   // The admin home chunk is warmed only for a shell that has it.
   assert.match(
     APP,
-    /if \(kind === 'admin'\) return landing === 'dashboard' \? 'admin-home' : null/,
+    /if \(kind === 'admin'\)\s+return landing === 'dashboard' && !externalLanding \? 'admin-home' : null/,
   )
 })
 

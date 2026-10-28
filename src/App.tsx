@@ -79,9 +79,14 @@ function MovementDetailFallback() {
 const LANDING_HINT_KEY = 'em.landing-hint'
 type LandingHint = 'admin-home' | 'home'
 
-function landingHintForShell({ kind, landing }: ShellPlan): LandingHint | null {
+function landingHintForShell({
+  kind,
+  landing,
+  externalLanding,
+}: ShellPlan): LandingHint | null {
   // The admin shell without home.admin lands on a section, not the home.
-  if (kind === 'admin') return landing === 'dashboard' ? 'admin-home' : null
+  if (kind === 'admin')
+    return landing === 'dashboard' && !externalLanding ? 'admin-home' : null
   if (kind === 'foreman' || kind === 'workshop') return 'home'
   return null
 }
@@ -394,9 +399,15 @@ function AppContent() {
   // The admin shell without home.admin has no dashboard: a URL it does not
   // open (including /dashboard, where the header logo points) lands on its
   // first open section, and the URL is replaced so it matches the page.
+  // A user whose permissions open nothing in this router but the
+  // identity-extraction page lands there (`externalLanding`, 2026-10-28).
   const landingRedirect =
-    profile && shell.landing !== 'dashboard' && !shell.pages.has(requested)
-      ? `/${shell.landing}`
+    profile && !shell.pages.has(requested)
+      ? shell.externalLanding
+        ? shell.externalLanding
+        : shell.landing !== 'dashboard'
+          ? `/${shell.landing}`
+          : null
       : null
   useEffect(() => {
     if (landingRedirect) router.replace(landingRedirect)
@@ -472,6 +483,13 @@ function AppContent() {
           {page === 'movements/new' ? (
             <MovementCreate
               movementType={movementType}
+              // 2026-10-28: on the workshop home the shell decides the form:
+              // the workshop form for a holder of movements.workshop.create,
+              // even when he also holds movements.site.create.
+              workshopForm={
+                shell.kind === 'workshop' &&
+                permissions.has('movements.workshop.create')
+              }
               onClose={backToDashboard}
               onViewMovement={openMovement}
               onGoHome={backToDashboard}
@@ -551,8 +569,10 @@ function AppContent() {
               router.push(`/equipment?edit=${encodeURIComponent(equipment.id)}`)
             }
             onSelectMovement={openMovement}
-            onViewAllMovements={(code) =>
-              router.push(`/logs?q=${encodeURIComponent(code)}`)
+            onViewAllMovements={
+              shell.pages.has('logs')
+                ? (code) => router.push(`/logs?q=${encodeURIComponent(code)}`)
+                : undefined
             }
             onOpenPo={
               shell.pages.has('purchasing/:id')
@@ -593,7 +613,18 @@ function AppContent() {
                 }
               />
             )}
-            {page === 'logs' && <LogsScreen onSelectMovement={openMovement} />}
+            {page === 'logs' && (
+              <LogsScreen
+                onSelectMovement={openMovement}
+                // 2026-10-28: a holder of movements.workshop.classify without
+                // a home (a custom role in this shell) classifies here. The
+                // home.admin holders keep the /logs of before.
+                selfClassify={
+                  permissions.has('movements.workshop.classify') &&
+                  !permissions.has('home.admin')
+                }
+              />
+            )}
             {page === 'inquiry' && (
               <EquipmentInquiryScreen onSelectMovement={openMovement} />
             )}

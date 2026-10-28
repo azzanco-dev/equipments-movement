@@ -131,6 +131,12 @@ interface EntryExitFormProps {
   /** An EXIT opened from the «ابلاغ الفورمان» link: the code is searched
    *  first, and the unit is selected when the search finds exactly it. */
   initialEquipmentCode?: string | null
+  /**
+   * The workshop home asks for the workshop form (2026-10-28: the shell
+   * decides): it is used whenever the user holds
+   * `movements.workshop.create`, even together with `movements.site.create`.
+   */
+  forceWorkshopForm?: boolean
 }
 
 export function EntryExitForm({
@@ -142,6 +148,7 @@ export function EntryExitForm({
   onViewMovement,
   onGoHome,
   initialEquipmentCode = null,
+  forceWorkshopForm = false,
 }: EntryExitFormProps) {
   const { t, lang } = useI18n()
   const { user } = useAuth()
@@ -244,7 +251,18 @@ export function EntryExitForm({
   // only while they load or after a failed load. The workshop form is for a
   // holder of `movements.workshop.create` without `movements.site.create`.
   const formActions = movementFormActions(permissionState)
-  const workshopMode = formActions.workshopMode
+  // On the workshop home the shell decides (`forceWorkshopForm`): the
+  // workshop form for any holder of `movements.workshop.create`.
+  const forcedWorkshopForm =
+    forceWorkshopForm && permissionState.can('movements.workshop.create')
+  const workshopMode = forcedWorkshopForm || formActions.workshopMode
+  // The quick equipment of the form's context: the same rule as
+  // movementFormActions, for the workshop form when the shell forced it.
+  const quickEquipmentScope = permissionState.scope('equipment.quick_create')
+  const quickCreateEquipment =
+    forcedWorkshopForm && !formActions.workshopMode
+      ? quickEquipmentScope === 'all' || quickEquipmentScope === 'workshop'
+      : formActions.quickCreateEquipment
   // A site EXIT may only be registered by the foreman who registered the open
   // ENTRY, or by an admin, so its equipment list is filtered in the database.
   const siteExitMode = !workshopMode && !isEntry
@@ -795,7 +813,7 @@ export function EntryExitForm({
             exitAnyVisit={formActions.exitAnyVisit}
             onSelect={handleSelectEquipment}
             onAddEquipment={
-              formActions.quickCreateEquipment
+              quickCreateEquipment
                 ? () =>
                     setQuickEquipment((value) => ({
                       ...value,

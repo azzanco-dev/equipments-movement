@@ -11,8 +11,11 @@ export function MovementCreate({
   onClose,
   onViewMovement,
   onGoHome,
+  workshopForm = false,
 }: {
   movementType: MovementType
+  /** The workshop form whatever else the user holds (the workshop home). */
+  workshopForm?: boolean
   onClose: () => void
   onViewMovement: (id: string) => void
   onGoHome: () => void
@@ -31,6 +34,7 @@ export function MovementCreate({
       movementType={movementType}
       pageMode
       initialEquipmentCode={initialEquipmentCode}
+      forceWorkshopForm={workshopForm}
       onClose={onClose}
       onSaved={() => undefined}
       onViewMovement={onViewMovement}

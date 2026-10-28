@@ -96,12 +96,23 @@ export function HomeScreen({
   const scope = movementsScope ?? resolveHomeMovementsScope(permissionState)
   const managerMode = scope === 'all_contexts'
   const workshopMode = scope === 'workshop' || managerMode
+  // The homes that embed the admin log instead of their own list.
+  const embeddedLog =
+    managerMode || scope === 'site_all' || scope === 'workshop_all'
   // wave 24: classifying workshop entries follows
   // `movements.workshop.classify` (the two workshop managers with the
   // legacy mapping); nobody while the permissions load or after a failed
   // load. `classify_workshop_entry` stays the authority.
-  const canClassify =
-    workshopMode && homeActions(permissionState).classifyWorkshopEntries
+  const holdsClassify = homeActions(permissionState).classifyWorkshopEntries
+  const canClassify = workshopMode && holdsClassify
+  // 2026-10-28: a foreman home with the embedded log (`site_all` /
+  // `workshop_all`) classifies from the log's workshop tab too when its role
+  // holds the key; the workshop homes are unchanged.
+  const logClassify = holdsClassify && (workshopMode || embeddedLog)
+  // The inquiry entry point follows `inquiry.view` (every workshop role holds
+  // it with the legacy mapping). The plain foreman home keeps none (owner
+  // decision 2026-09-22); a foreman home with the embedded log shows it.
+  const canInquire = permissionState.can('inquiry.view')
   const name = greetingName(profile?.full_name)
   const parts = greetingParts(t('homeGreeting'), name !== '')
   const greeting = parts ? (
@@ -189,40 +200,43 @@ export function HomeScreen({
   // its filter dialog, its visits/log views and its export — with the
   // classification of workshop entries kept on the workshop tab. The plain
   // `workshop` role and the foreman keep their own lists.
+  // The workshop homes show a failed classification on the pending card; a
+  // foreman home has no such card, so its log shows it.
   const classify = useMemo(
-    () => ({ onClassify, classifyingId }),
-    [onClassify, classifyingId],
+    () => ({
+      onClassify,
+      classifyingId,
+      error: workshopMode ? null : classifyError,
+    }),
+    [onClassify, classifyingId, workshopMode, classifyError],
   )
   // A foreman home allowed to read more than its own rows (`site_all` /
   // `workshop_all`, owner 2026-10-28) embeds the same log, opening on
   // «المشاريع» or «الورشة».
-  const movements =
-    scope === 'all_contexts' ||
-    scope === 'site_all' ||
-    scope === 'workshop_all' ? (
-      <Card className="space-y-3">
-        <SectionHeader as="h2" title={t('homeAllMovementsTitle')} />
-        <LogsScreen
-          embedded
-          defaultContext={
-            scope === 'site_all' ? 'site' : ALL_CONTEXTS_HOME_DEFAULT_TAB
-          }
-          // `workshop_all` opens on the workshop like the managers' home.
-          classify={canClassify ? classify : undefined}
-          onSelectMovement={onSelectMovement}
-          refreshToken={refreshToken}
-        />
-      </Card>
-    ) : (
-      <HomeMovementsCard
-        workshopMode={workshopMode}
-        canClassify={canClassify}
+  const movements = embeddedLog ? (
+    <Card className="space-y-3">
+      <SectionHeader as="h2" title={t('homeAllMovementsTitle')} />
+      <LogsScreen
+        embedded
+        defaultContext={
+          scope === 'site_all' ? 'site' : ALL_CONTEXTS_HOME_DEFAULT_TAB
+        }
+        // `workshop_all` opens on the workshop like the managers' home.
+        classify={logClassify ? classify : undefined}
         onSelectMovement={onSelectMovement}
-        onClassify={onClassify}
-        classifyingId={classifyingId}
         refreshToken={refreshToken}
       />
-    )
+    </Card>
+  ) : (
+    <HomeMovementsCard
+      workshopMode={workshopMode}
+      canClassify={canClassify}
+      onSelectMovement={onSelectMovement}
+      onClassify={onClassify}
+      classifyingId={classifyingId}
+      refreshToken={refreshToken}
+    />
+  )
 
   // Same 64 px big-button style for both homes (owner decision, wave 6): the
   // two primary actions always lead the page.
@@ -280,7 +294,7 @@ export function HomeScreen({
           {/* The equipment inquiry entry point is workshop-only: the
               foreman does not need it on the home (owner decision,
               2026-09-22). */}
-          <InquiryCard />
+          {canInquire && <InquiryCard />}
 
           {/* State next: equipment counts right now, before the pending
               queue and the actions that act on them. Mobile layout (owner
@@ -370,6 +384,8 @@ export function HomeScreen({
         </>
       ) : (
         <>
+          {embeddedLog && canInquire && <InquiryCard />}
+
           {statsError ? (
             <ErrorState onRetry={reload} />
           ) : (

@@ -59,6 +59,11 @@ export interface NavGate {
   key: string
   /** Accepted scopes; omitted = any granted scope. */
   scopes?: readonly PermissionScope[]
+  /**
+   * Further gates that must ALL pass too (an AND inside this one gate), for
+   * a page whose database function checks more than one key.
+   */
+  with?: readonly NavGate[]
 }
 
 export interface NavEntry<K extends string = NavItemKey> {
@@ -85,7 +90,14 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   { key: 'dashboard', requires: [{ key: 'home.admin' }] },
   {
     key: 'logs',
-    requires: [{ key: 'movements.read', scopes: ['all', 'site', 'workshop'] }],
+    // 2026-10-28: the `companies` scope reads the rows of the user's
+    // companies (RLS), so it opens the log too.
+    requires: [
+      {
+        key: 'movements.read',
+        scopes: ['all', 'site', 'workshop', 'companies'],
+      },
+    ],
   },
   { key: 'inquiry', requires: [{ key: 'inquiry.view' }] },
   { key: 'equipment', requires: [{ key: 'equipment.read' }] },
@@ -121,7 +133,15 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
       },
       {
         key: 'reports/equipment',
-        requires: [{ key: 'reports.view', scopes: ['all'] }],
+        // get_equipment_attention_report also requires movements.read all
+        // (2026-10-28), so the page opens only with both.
+        requires: [
+          {
+            key: 'reports.view',
+            scopes: ['all'],
+            with: [{ key: 'movements.read', scopes: ['all'] }],
+          },
+        ],
       },
       {
         key: 'reports/workshop',
@@ -162,7 +182,8 @@ function passes(
 ): boolean {
   const scope = permissions.get(gate.key)
   if (!scope) return false
-  return !gate.scopes || gate.scopes.includes(scope)
+  if (gate.scopes && !gate.scopes.includes(scope)) return false
+  return (gate.with ?? []).every((other) => passes(permissions, other))
 }
 
 function allowed(
@@ -396,6 +417,12 @@ export interface ShellPlan {
   landing: RoutePage
   /** The pages that render; any other URL renders `landing`. */
   pages: ReadonlySet<RoutePage>
+  /**
+   * A page OUTSIDE this router to land on instead (2026-10-28): the
+   * identity-extraction page (`/extracting`, its own Next route) for a user
+   * whose permissions open nothing else. src/App.tsx replaces the URL.
+   */
+  externalLanding?: '/extracting'
 }
 
 type HomeShell = 'admin' | 'foreman' | 'workshop'
@@ -479,18 +506,26 @@ function fieldPages(
 /**
  * The first sidebar SECTION (every entry but the dashboard) the permissions
  * pass, in menu order; for a parent with children, its first passing child.
- * Undefined when no section passes.
+ * The entries listed in the sidebar come first; only when none of them
+ * passes, the first passing HIDDEN entry (2026-10-28: a role holding only
+ * `movements.activity` or `movements.import` lands on that page instead of
+ * the no-permissions page). Undefined when no section passes.
  */
 function firstOpenSection(
   permissions: ReadonlyMap<string, PermissionScope>,
 ): RoutePage | undefined {
-  for (const entry of NAV_ENTRIES) {
-    if (entry.key === 'dashboard' || entry.hidden || !allowed(permissions, entry))
-      continue
-    if (!entry.children) return entry.key
-    const child = entry.children.find((item) => allowed(permissions, item))
-    if (child) return child.key
-  }
+  for (const hidden of [false, true])
+    for (const entry of NAV_ENTRIES) {
+      if (
+        entry.key === 'dashboard' ||
+        Boolean(entry.hidden) !== hidden ||
+        !allowed(permissions, entry)
+      )
+        continue
+      if (!entry.children) return entry.key
+      const child = entry.children.find((item) => allowed(permissions, item))
+      if (child) return child.key
+    }
   return undefined
 }
 
@@ -522,16 +557,16 @@ export function planShell(state: NavPermissionState): ShellPlan {
       pages: openPages(permissions, ADMIN_SHELL_PAGES),
     }
   // The foreman home lists the user's own site movements, unless his
-  // movements.read scope is wider (all / site / workshop): then the log
-  // embedded (owner 2026-10-28, «رئيس الفورمين … مايشوف غير حقه»). The same rule as
-  // homeMovementsScopeFromPermissions in src/lib/homeScope.ts.
+  // movements.read scope is wider (all / site / companies / workshop): then
+  // the log embedded (owner 2026-10-28, «رئيس الفورمين … مايشوف غير حقه»).
+  // The same rule as homeMovementsScopeFromPermissions in src/lib/homeScope.ts.
   if (permissions.has('home.foreman')) {
     const read = permissions.get('movements.read')
     return {
       kind: 'foreman',
       source: 'permissions',
       homeScope:
-        read === 'all' || read === 'site'
+        read === 'all' || read === 'site' || read === 'companies'
           ? 'site_all'
           : read === 'workshop'
             ? 'workshop_all'
@@ -553,6 +588,16 @@ export function planShell(state: NavPermissionState): ShellPlan {
   // The dashboard is gated on home.admin, so openPages leaves it out and the
   // user lands on the first open section instead.
   const landing = firstOpenSection(permissions)
+  // Nothing in this router, but the identity-extraction page (its own Next
+  // route, gated on extracting.view): land there.
+  if (!landing && permissions.has('extracting.view'))
+    return {
+      kind: 'admin',
+      source: 'permissions',
+      landing: 'dashboard',
+      pages: openPages(permissions, ADMIN_SHELL_PAGES),
+      externalLanding: '/extracting',
+    }
   if (!landing)
     return {
       kind: 'none',

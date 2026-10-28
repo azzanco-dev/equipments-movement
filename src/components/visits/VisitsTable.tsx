@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
+import { usePermissions } from '@/auth/PermissionsContext'
 import {
   Badge,
   Button,
@@ -152,6 +153,8 @@ export function VisitsTable({
   urlPrefix = 'v',
 }: VisitsTableProps) {
   const { t, lang } = useI18n()
+  // The Excel export is for the holders of `movements.export` only.
+  const canExport = usePermissions().can('movements.export')
   const isLog = variant === 'log'
   // The home's site list is the foreman's; the workshop home has no filters.
   const config = isLog
@@ -624,18 +627,20 @@ export function VisitsTable({
               asyncFields={asyncFields}
             />
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setExportNote(undefined)
-              setExportOpen(true)
-            }}
-            disabled={loadError}
-          >
-            <Download size={14} aria-hidden="true" />
-            {t('exportButton')}
-          </Button>
+          {canExport && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setExportNote(undefined)
+                setExportOpen(true)
+              }}
+              disabled={loadError}
+            >
+              <Download size={14} aria-hidden="true" />
+              {t('exportButton')}
+            </Button>
+          )}
           <ExportDialog<EquipmentVisitRow>
             open={exportOpen}
             onOpenChange={setExportOpen}

@@ -27,6 +27,8 @@ test('a foreman home follows the movements.read scope', () => {
   assert.equal(scopeOf([['home.foreman', 'own'], ['movements.read', 'all']]), 'site_all')
   // «لما احط له حركات الورشة فقط، يرجع يجيب حركاته فقط» (2026-10-28).
   assert.equal(scopeOf([['home.foreman', 'own'], ['movements.read', 'workshop']]), 'workshop_all')
+  // `companies` reads the rows of his companies (RLS): the embedded log too.
+  assert.equal(scopeOf([['home.foreman', 'own'], ['movements.read', 'companies']]), 'site_all')
 })
 
 test('the workshop homes and the fallback are unchanged', () => {
@@ -59,6 +61,7 @@ test('the shell gives the foreman home the same list as homeScope', () => {
     [['home.foreman', 'own'], ['movements.read', 'site']],
     [['home.foreman', 'own'], ['movements.read', 'workshop']],
     [['home.foreman', 'all'], ['movements.read', 'all']],
+    [['home.foreman', 'own'], ['movements.read', 'companies']],
     [['home.foreman', 'own']],
     [['home.workshop', 'all']],
     [['home.workshop', 'workshop']],

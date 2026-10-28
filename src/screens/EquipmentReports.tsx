@@ -3,6 +3,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle, ArrowLeft, Clock3, MapPin, Search } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
+import { usePermissions } from '@/auth/PermissionsContext'
+import { planShell } from '@/lib/navPermissions'
 import { PageHeader } from '@/components/PageHeader'
 import { Skeleton } from '@/components/ui'
 import { ReportListSkeleton } from '@/components/ReportListSkeleton'
@@ -42,6 +44,13 @@ type ReportData = {
 export function EquipmentReports() {
   const { t, lang } = useI18n()
   const router = useRouter()
+  // «عرض التفاصيل» opens the equipment page only where this user's shell
+  // opens it (equipment.read); otherwise the card has no button (2026-10-28).
+  const { status, permissions } = usePermissions()
+  const canOpenEquipment = useMemo(
+    () => planShell({ status, permissions }).pages.has('equipment/:id'),
+    [status, permissions],
+  )
   const params = useSearchParams()
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -195,7 +204,11 @@ export function EquipmentReports() {
             <EquipmentAttentionCard
               key={row.equipment_id}
               row={row}
-              onOpen={() => router.push(`/equipment/${row.equipment_id}`)}
+              onOpen={
+                canOpenEquipment
+                  ? () => router.push(`/equipment/${row.equipment_id}`)
+                  : undefined
+              }
             />
           ))}
         </div>
@@ -232,7 +245,8 @@ function EquipmentAttentionCard({
   onOpen,
 }: {
   row: ReportRow
-  onOpen: () => void
+  /** Omitted when the equipment page does not open for this user. */
+  onOpen?: () => void
 }) {
   const { t, lang } = useI18n()
   const config = {
@@ -309,10 +323,12 @@ function EquipmentAttentionCard({
           {t('equipmentReportNoMovementDesc')}
         </p>
       )}
-      <button className="btn-outline mt-4 w-full" onClick={onOpen}>
-        <ArrowLeft size={15} />
-        {t('viewDetails')}
-      </button>
+      {onOpen && (
+        <button className="btn-outline mt-4 w-full" onClick={onOpen}>
+          <ArrowLeft size={15} />
+          {t('viewDetails')}
+        </button>
+      )}
     </article>
   )
 }

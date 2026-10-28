@@ -59,6 +59,7 @@ import {
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { RelativeTime } from '@/components/RelativeTime'
 import { usePermissions } from '@/auth/PermissionsContext'
+import { canOpenPage, type RoutePage } from '@/lib/navPermissions'
 import { AfaqySettings } from '@/components/afaqy/AfaqySettings'
 import { rolesSystemEnabledFromValue } from '@/lib/rolesAdmin'
 
@@ -104,8 +105,14 @@ export function AdminSettings() {
   const showWorkshopOpening = pathname === '/settings/workshop-opening-balance'
   // wave 17: the Afaqy tracker link.
   const showAfaqy = pathname === '/settings/afaqy'
-  // «سجل النشاط» card (owner 2026-10-22): for a holder of movements.activity.
-  const canSeeActivity = usePermissions().can('movements.activity')
+  // Each hub card follows the gate of the page it opens (pageGate in
+  // src/lib/navPermissions.ts, 2026-10-28), so a card never leads to a page
+  // that sends the user back; «سجل النشاط» (owner 2026-10-22) is the
+  // `activity` page, movements.activity.
+  const { status: permissionStatus, permissions } = usePermissions()
+  const opens = (page: RoutePage) =>
+    permissionStatus === 'ready' && canOpenPage(permissions, page)
+  const canSeeActivity = opens('activity')
   const [rows, setRows] = useState<EquipmentTypeRow[]>([])
   const [total, setTotal] = useState(0)
   const [typesCount, setTypesCount] = useState<number | null>(null)
@@ -473,31 +480,35 @@ export function AdminSettings() {
       <div className="space-y-4">
         <PageHeader title={t('settings')} description={t('settingsDesc')} />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <button
-            type="button"
-            onClick={() => router.push('/settings/equipment-types')}
-            className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
-          >
-            <div className="mb-4 flex w-full items-start justify-between gap-3">
-              <span
-                className="flex h-9 w-9 items-center justify-center rounded-lg border"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                <List size={18} />
-              </span>
-              <ChevronRight
-                size={18}
-                className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip"
-              />
-            </div>
-            <h2 className="font-semibold">{t('equipmentTypes')}</h2>
-            <p className="mt-1 text-sm text-muted">{t('equipmentTypesDesc')}</p>
-            <p className="mt-auto pt-4 text-xs text-muted">
-              {typesCount === null
-                ? t('loading')
-                : t('itemsCount').replace('{count}', String(typesCount))}
-            </p>
-          </button>
+          {opens('settings/equipment-types') && (
+            <button
+              type="button"
+              onClick={() => router.push('/settings/equipment-types')}
+              className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
+            >
+              <div className="mb-4 flex w-full items-start justify-between gap-3">
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  <List size={18} />
+                </span>
+                <ChevronRight
+                  size={18}
+                  className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip"
+                />
+              </div>
+              <h2 className="font-semibold">{t('equipmentTypes')}</h2>
+              <p className="mt-1 text-sm text-muted">
+                {t('equipmentTypesDesc')}
+              </p>
+              <p className="mt-auto pt-4 text-xs text-muted">
+                {typesCount === null
+                  ? t('loading')
+                  : t('itemsCount').replace('{count}', String(typesCount))}
+              </p>
+            </button>
+          )}
           {/* Owner 2026-10-22: the workshop opening balance card is gone (the
               page stays at /settings/workshop-opening-balance by link) and
               «سجل النشاط» moved here from the sidebar. */}
@@ -523,55 +534,63 @@ export function AdminSettings() {
               <p className="mt-1 text-sm text-muted">{t('activityLogDesc')}</p>
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => router.push('/settings/afaqy')}
-            className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
-          >
-            <div className="mb-4 flex w-full items-start justify-between gap-3">
-              <span
-                className="flex h-9 w-9 items-center justify-center rounded-lg border"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                <Satellite size={18} />
-              </span>
-              <ChevronRight
-                size={18}
-                className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip"
-              />
-            </div>
-            <h2 className="font-semibold">{t('afaqySettingsTitle')}</h2>
-            <p className="mt-1 text-sm text-muted">{t('afaqySettingsDesc')}</p>
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push('/settings/roles')}
-            className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
-          >
-            <div className="mb-4 flex w-full items-start justify-between gap-3">
-              <span
-                className="flex h-9 w-9 items-center justify-center rounded-lg border"
-                style={{ borderColor: 'var(--border)' }}
-              >
-                <ShieldCheck size={18} />
-              </span>
-              <ChevronRight
-                size={18}
-                className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip"
-              />
-            </div>
-            <h2 className="font-semibold">{t('rolesSettingsTitle')}</h2>
-            <p className="mt-1 text-sm text-muted">{t('rolesSettingsDesc')}</p>
-            {rolesSystemEnabled !== null && (
-              <span className="mt-auto pt-4">
-                <Badge tone={rolesSystemEnabled ? 'success' : 'warning'}>
-                  {rolesSystemEnabled
-                    ? t('rolesSystemStatusActive')
-                    : t('rolesSystemStatusInactive')}
-                </Badge>
-              </span>
-            )}
-          </button>
+          {opens('settings/afaqy') && (
+            <button
+              type="button"
+              onClick={() => router.push('/settings/afaqy')}
+              className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
+            >
+              <div className="mb-4 flex w-full items-start justify-between gap-3">
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  <Satellite size={18} />
+                </span>
+                <ChevronRight
+                  size={18}
+                  className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip"
+                />
+              </div>
+              <h2 className="font-semibold">{t('afaqySettingsTitle')}</h2>
+              <p className="mt-1 text-sm text-muted">
+                {t('afaqySettingsDesc')}
+              </p>
+            </button>
+          )}
+          {opens('settings/roles') && (
+            <button
+              type="button"
+              onClick={() => router.push('/settings/roles')}
+              className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
+            >
+              <div className="mb-4 flex w-full items-start justify-between gap-3">
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  <ShieldCheck size={18} />
+                </span>
+                <ChevronRight
+                  size={18}
+                  className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip"
+                />
+              </div>
+              <h2 className="font-semibold">{t('rolesSettingsTitle')}</h2>
+              <p className="mt-1 text-sm text-muted">
+                {t('rolesSettingsDesc')}
+              </p>
+              {rolesSystemEnabled !== null && (
+                <span className="mt-auto pt-4">
+                  <Badge tone={rolesSystemEnabled ? 'success' : 'warning'}>
+                    {rolesSystemEnabled
+                      ? t('rolesSystemStatusActive')
+                      : t('rolesSystemStatusInactive')}
+                  </Badge>
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </div>
     )

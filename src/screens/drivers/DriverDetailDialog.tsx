@@ -1,6 +1,9 @@
+import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { CreditCard, Flag, Hash, Phone, Truck, User } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
+import { usePermissions } from '@/auth/PermissionsContext'
+import { planShell } from '@/lib/navPermissions'
 import { useTabTitle } from '@/components/TabTitle'
 import { buildDriverMovementsHref } from '@/lib/driverEquipment'
 import type { DriverEquipmentItem } from '@/lib/driverEquipment'
@@ -55,6 +58,15 @@ export function DriverDetailDialog({
 }: DriverDetailDialogProps) {
   const { t } = useI18n()
   const router = useRouter()
+  // The links open the log and the equipment page only where this user's
+  // shell opens them (2026-10-28); otherwise they are left out.
+  const { status, permissions } = usePermissions()
+  const shellPages = useMemo(
+    () => planShell({ status, permissions }).pages,
+    [status, permissions],
+  )
+  const canOpenLogs = shellPages.has('logs')
+  const canOpenEquipment = shellPages.has('equipment/:id')
   const {
     driver,
     loading,
@@ -240,15 +252,17 @@ export function DriverDetailDialog({
               title={t('relatedEquipment')}
               description={t('relatedEquipmentDesc')}
               action={
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    router.push(buildDriverMovementsHref(driver.full_name))
-                  }
-                >
-                  {t('viewAll')}
-                </Button>
+                canOpenLogs ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      router.push(buildDriverMovementsHref(driver.full_name))
+                    }
+                  >
+                    {t('viewAll')}
+                  </Button>
+                ) : undefined
               }
             />
             {equipmentError ? (
@@ -270,9 +284,12 @@ export function DriverDetailDialog({
                 rowKey={(item) => item.equipmentId}
                 loading={equipmentLoading}
                 loadingRows={4}
-                onRowClick={(item) =>
-                  router.push(`/equipment/${item.equipmentId}`)
+                onRowClick={
+                  canOpenEquipment
+                    ? (item) => router.push(`/equipment/${item.equipmentId}`)
+                    : undefined
                 }
+                // Only used with onRowClick, so it follows canOpenEquipment.
                 rowHref={(item) => `/equipment/${item.equipmentId}`}
               />
             )}

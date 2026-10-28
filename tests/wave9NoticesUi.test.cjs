@@ -445,7 +445,11 @@ test('the panel is offered to workshop roles and the admin on an ENTRY only', ()
   // movements.workshop.create without movements.site.create
   // (tests/wave24Actions.test.cjs proves the equivalence per role).
   assert.match(form, /const canNotifyForeman = formActions\.notifyForeman/)
-  assert.match(form, /const workshopMode = formActions\.workshopMode\r?\n/)
+  // 2026-10-28: or the workshop form the workshop home forces.
+  assert.match(
+    form,
+    /const workshopMode = forcedWorkshopForm \|\| formActions\.workshopMode\r?\n/,
+  )
   assert.match(
     form,
     /const formActions = movementFormActions\(permissionState\)/,

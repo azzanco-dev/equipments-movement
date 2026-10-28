@@ -195,11 +195,16 @@ function homeNow(state) {
   const scope = homeScope.resolveHomeMovementsScope(state)
   const managerMode = scope === 'all_contexts'
   const workshopMode = scope === 'workshop' || managerMode
-  const canClassify =
-    workshopMode && actions.homeActions(state).classifyWorkshopEntries
+  const embeddedLog =
+    managerMode || scope === 'site_all' || scope === 'workshop_all'
+  const holdsClassify = actions.homeActions(state).classifyWorkshopEntries
+  const canClassify = workshopMode && holdsClassify
   return {
     scope,
-    logClassify: managerMode && canClassify,
+    // 2026-10-28: the embedded log classifies for a holder of the key (the
+    // managers, and a wider foreman home of a custom role).
+    logClassify:
+      embeddedLog && holdsClassify && (workshopMode || embeddedLog),
     pendingList: canClassify,
     cardClassify: !managerMode && canClassify,
   }
@@ -582,10 +587,20 @@ test('roles stage 4a: one switch, no legacy role rule left', () => {
 
 test('the movement form wires each decision', () => {
   const form = read('src', 'components', 'EntryExitForm.tsx')
-  assert.match(form, /const workshopMode = formActions\.workshopMode/)
+  // 2026-10-28: the workshop home may force the workshop form
+  // (`forceWorkshopForm`, tests/permissionFixes1028.test.cjs); otherwise the
+  // decision of movementFormActions.
+  assert.match(
+    form,
+    /const workshopMode = forcedWorkshopForm \|\| formActions\.workshopMode/,
+  )
   assert.match(form, /const canNotifyForeman = formActions\.notifyForeman/)
   assert.match(form, /exitAnyVisit=\{formActions\.exitAnyVisit\}/)
-  assert.match(form, /formActions\.quickCreateEquipment\s*\?/)
+  assert.match(
+    form,
+    /forcedWorkshopForm && !formActions\.workshopMode\s*\?[\s\S]*?: formActions\.quickCreateEquipment/,
+  )
+  assert.match(form, /quickCreateEquipment\s*\?\s*\(\) =>/)
   assert.match(form, /formActions\.quickCreateLessor\s*\?/)
   assert.match(form, /formActions\.quickCreateDriver\s*\?/)
 })

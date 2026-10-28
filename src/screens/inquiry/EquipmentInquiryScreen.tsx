@@ -16,6 +16,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import { localizedName } from '@/lib/localizedName'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { usePermissions } from '@/auth/PermissionsContext'
+import { planShell } from '@/lib/navPermissions'
 import {
   AppLink,
   Button,
@@ -231,8 +232,25 @@ export function EquipmentInquiryScreen({
   const searchParams = useSearchParams()
   const permissions = usePermissions()
   const permissionsReady = permissions.status === 'ready'
-  const canOpenEquipment = permissionsReady && permissions.can('equipment.read')
-  const canSeePurchasing = permissionsReady && permissions.can('purchasing.view')
+  // The equipment page and the PO page are linked only where this user's
+  // shell opens them (2026-10-28): a field home opens neither, so its
+  // inquiry shows no «صفحة المعدة» and no PO card even with the keys.
+  const shellPages = useMemo(
+    () =>
+      planShell({
+        status: permissions.status,
+        permissions: permissions.permissions,
+      }).pages,
+    [permissions.status, permissions.permissions],
+  )
+  const canOpenEquipment =
+    permissionsReady &&
+    permissions.can('equipment.read') &&
+    shellPages.has('equipment/:id')
+  const canSeePurchasing =
+    permissionsReady &&
+    permissions.can('purchasing.view') &&
+    shellPages.has('purchasing/:id')
 
   const startSuggestRequest = useListRequest()
   const startDetailRequest = useListRequest()

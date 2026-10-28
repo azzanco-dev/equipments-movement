@@ -30,6 +30,7 @@ import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
 import { EquipmentNewBadge } from '@/components/equipment/EquipmentNewBadge'
 import { useI18n } from '@/i18n/I18nContext'
+import { usePermissions } from '@/auth/PermissionsContext'
 import type { TranslationKey } from '@/i18n/translations'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
@@ -257,6 +258,9 @@ function FleetTable<Row>({
   defaultSort,
 }: FleetTableProps<Row>) {
   const { t, lang } = useI18n()
+  // The Excel export is for the holders of `movements.export` (the admin and
+  // the monitor with the legacy mapping), like the log's export.
+  const canExport = usePermissions().can('movements.export')
   const ownerLabel = useOwnerLabel()
   const wrapper = useRef<HTMLDivElement>(null)
   const [expanded, setExpanded] = useState(false)
@@ -411,16 +415,18 @@ function FleetTable<Row>({
               description={summary}
               action={
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    loading={exporting}
-                    disabled={loading || failed || total === 0}
-                    onClick={() => void runExport()}
-                    icon={<FileSpreadsheet size={14} aria-hidden="true" />}
-                  >
-                    {t('exportExcel')}
-                  </Button>
+                  {canExport && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      loading={exporting}
+                      disabled={loading || failed || total === 0}
+                      onClick={() => void runExport()}
+                      icon={<FileSpreadsheet size={14} aria-hidden="true" />}
+                    >
+                      {t('exportExcel')}
+                    </Button>
+                  )}
                   <Button size="sm" variant="ghost" onClick={collapse}>
                     {t('adminHomeCollapse')}
                   </Button>
