@@ -23,17 +23,21 @@ export function Price({
   className?: string
 }) {
   const { t } = useI18n()
+  // The amount and the riyal never break apart; the unit drops under them
+  // when a narrow box (a stat card on a phone) has no room for it.
   return (
     <span
-      className={`inline-flex items-baseline gap-1 whitespace-nowrap ${className ?? ''}`}
+      className={`inline-flex flex-wrap items-baseline gap-x-1 ${className ?? ''}`}
     >
-      <bdi dir="ltr" className="tabular-nums">
-        {formatSupplierPoPrice(value)}
-      </bdi>
-      <RiyalSign className="text-muted" size="0.8em" />
-      <span className="sr-only">{t('currencySar')}</span>
+      <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+        <bdi dir="ltr" className="tabular-nums">
+          {formatSupplierPoPrice(value)}
+        </bdi>
+        <RiyalSign className="text-muted" size="0.8em" />
+        <span className="sr-only">{t('currencySar')}</span>
+      </span>
       {unit && (
-        <span className="text-[0.75em] font-normal text-muted">
+        <span className="whitespace-nowrap text-[0.75em] font-normal text-muted">
           {t(SUPPLIER_PO_PER_UNIT_KEYS[unit])}
         </span>
       )}

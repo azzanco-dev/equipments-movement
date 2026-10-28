@@ -17,7 +17,10 @@ function ReceiptLine({
 }) {
   return (
     <div className={`flex items-baseline gap-2 ${className ?? ''}`}>
-      <dt className="shrink-0">
+      {/* The label wraps when the amount needs the room (owner 2026-10-28:
+          the text left the box once the amounts carried their unit); the
+          amount never breaks. */}
+      <dt className="min-w-0">
         {label}
         {hint && <span className="ms-1 font-normal text-muted">({hint})</span>}
       </dt>
@@ -52,7 +55,7 @@ export function SupplierPoReceipt({
   return (
     <section
       aria-label={t('supplierPoReceipt')}
-      className="w-full rounded-xl border bg-surface p-3 sm:w-72"
+      className="w-full rounded-xl border bg-surface p-3 sm:w-80"
     >
       <h3 className="mb-2.5 text-[11px] text-muted">{t('supplierPoReceipt')}</h3>
       <dl className="m-0 space-y-2.5 text-xs text-muted">
