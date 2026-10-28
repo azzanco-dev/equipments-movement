@@ -463,7 +463,12 @@ export function formatVisitCreatedAgo(
   if (!createdAt) return null
   const created = Date.parse(createdAt)
   if (Number.isNaN(created)) return null
-  return formatVisitDuration(Math.max(0, (now - created) / 60000), lang)
+  const text = formatVisitDuration(Math.max(0, (now - created) / 60000), lang)
+  // After «منذ» the Arabic dual takes its genitive form: «منذ يومين», not
+  // «منذ يومان».
+  if (lang !== 'ar' || !text) return text
+  const dual = Object.values(ARABIC_UNITS).find((forms) => forms[1] === text)
+  return dual ? `${text.slice(0, -2)}ين` : text
 }
 
 // ============ VISITS EXPORT ============

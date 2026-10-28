@@ -130,7 +130,11 @@ test('the creation age uses the duration words', () => {
     visits.formatVisitDuration(3 * 24 * 60 + 120, 'ar'),
   )
   assert.equal(ago('2026-10-25T10:00:00Z'), '3 ايام')
-  assert.equal(ago('2026-10-28T10:00:00Z'), 'ساعتان')
+  // After «منذ» the dual is genitive: «منذ ساعتين», «منذ يومين».
+  assert.equal(ago('2026-10-28T10:00:00Z'), 'ساعتين')
+  assert.equal(ago('2026-10-26T11:00:00Z'), 'يومين')
+  assert.equal(ago('2026-10-28T11:58:00Z'), 'دقيقتين')
+  assert.equal(ago('2026-10-27T11:00:00Z'), 'يوم')
   assert.equal(ago('2026-10-28T11:55:00Z', 'en'), '5 minutes')
   // A creation time slightly ahead of the device clock is "0 minutes".
   assert.equal(ago('2026-10-28T12:01:00Z'), '0 دقيقة')
