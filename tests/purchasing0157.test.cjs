@@ -217,9 +217,14 @@ test('the screens send, edit and show the unit', () => {
   for (const file of [
     ['src', 'screens', 'purchasing', 'SupplierPoDetail.tsx'],
     ['src', 'components', 'purchasing', 'SupplierPoPrintSheet.tsx'],
-    ['src', 'components', 'purchasing', 'SupplierPoLinesPanel.tsx'],
   ])
     assert.match(read(...file), /unit=\{supplierPoRateUnitOf\(line\.rate_unit\)\}/, file.join('/'))
+  // The PO list's opened row: the unit in its own column (owner 2026-10-28).
+  const panel = read('src', 'components', 'purchasing', 'SupplierPoLinesPanel.tsx')
+  assert.ok(panel.includes("{t('supplierPoRateUnit')}"))
+  assert.ok(
+    panel.includes('{t(SUPPLIER_PO_RATE_UNIT_LABEL_KEYS[supplierPoRateUnitOf(line.rate_unit)])}'),
+  )
   assert.match(
     read('src', 'components', 'purchasing', 'EquipmentPurchasingCard.tsx'),
     /unit=\{supplierPoRateUnitOf\(row\.rate_unit\)\}/,

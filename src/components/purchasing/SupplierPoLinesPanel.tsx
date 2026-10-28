@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { Badge, Skeleton } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
-import { supplierPoRateUnitOf } from '@/lib/purchasing'
+import {
+  SUPPLIER_PO_RATE_UNIT_LABEL_KEYS,
+  supplierPoRateUnitOf,
+} from '@/lib/purchasing'
 import {
   SUPPLIER_PO_LINE_SELECT,
   type SupplierPoLineRow,
@@ -18,8 +21,9 @@ const PANEL = 'sticky start-0 max-w-[min(48rem,calc(100vw-3rem))] px-4 py-3'
 
 /**
  * The equipment of one PO inside its opened row in the PO list (owner
- * 2026-10-24, the «اوامر · فتح صف» idea of app/po-test): unit, type, period
- * and price, unpriced lines marked. Loads the PO's lines when it mounts, i.e.
+ * 2026-10-24, the «اوامر · فتح صف» idea of app/po-test): unit, type, period,
+ * the price unit (owner 2026-10-28: its own column, so an unpriced line shows
+ * it too) and price, unpriced lines marked. Loads the PO's lines when it mounts, i.e.
  * only for the row that is open; a PO holds a handful of lines.
  */
 export function SupplierPoLinesPanel({ poId }: { poId: string }) {
@@ -82,6 +86,9 @@ export function SupplierPoLinesPanel({ poId }: { poId: string }) {
             <th className="hidden pb-2 text-start font-normal md:table-cell">
               {t('equipmentPurchasingPeriod')}
             </th>
+            <th className="pb-2 pe-3 text-start font-normal">
+              {t('supplierPoRateUnit')}
+            </th>
             <th className="pb-2 text-end font-normal">
               {t('supplierPoPrice')}
             </th>
@@ -110,13 +117,16 @@ export function SupplierPoLinesPanel({ poId }: { poId: string }) {
                     '—'
                   )}
                 </td>
+                <td className="whitespace-nowrap py-2.5 pe-3 text-muted">
+                  {t(SUPPLIER_PO_RATE_UNIT_LABEL_KEYS[supplierPoRateUnitOf(line.rate_unit)])}
+                </td>
                 <td className="py-2.5 text-end">
                   {line.price === null ? (
                     <Badge tone="warning" size="sm">
                       {t('supplierPoNoPrice')}
                     </Badge>
                   ) : (
-                    <Price value={line.price} unit={supplierPoRateUnitOf(line.rate_unit)} />
+                    <Price value={line.price} />
                   )}
                 </td>
               </tr>
