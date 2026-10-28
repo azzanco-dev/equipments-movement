@@ -126,10 +126,10 @@ Deno.serve(async (req: Request) => {
         password,
         email_confirm: true,
         user_metadata: { full_name },
-        // Only the service role can write app_metadata. The legacy
-        // profiles.role gets the narrowest placeholder (`monitor`) until it
-        // is dropped; the role that decides is the assignment below.
-        app_metadata: { role: 'monitor', admin_created: true },
+        // Only the service role can write app_metadata. No role is sent
+        // (roles stage 4c-2: migration 0156 drops profiles.role); the role
+        // that decides is the assignment below.
+        app_metadata: { admin_created: true },
       })
 
     if (createError) {
@@ -155,8 +155,7 @@ Deno.serve(async (req: Request) => {
     // The new user's role, as the caller (admin and settings.roles are
     // re-checked by the database). A failure never undoes the account: the
     // screen says the role was not assigned and it is set on the user page;
-    // until then the user holds nothing (or the placeholder's read-only
-    // monitor role while the 0126 sync trigger still exists).
+    // until then the user holds nothing (fail closed).
     const { error: assignError } = await userClient.rpc(
       'admin_assign_profile_role',
       { p_profile_id: authData.user.id, p_role_key: roleKey },

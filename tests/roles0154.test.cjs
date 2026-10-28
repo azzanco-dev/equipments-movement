@@ -41,7 +41,8 @@ test('create-user assigns the chosen role as the caller', () => {
   const fn = read('supabase', 'functions', 'create-user', 'index.ts')
   assert.match(fn, /const roleKey = String\(role_key \?\? role \?\? ''\)\.trim\(\)/)
   assert.match(fn, /\.from\('roles'\)\s+\.select\('key,is_active'\)\s+\.eq\('key', roleKey\)/)
-  assert.match(fn, /app_metadata: \{ role: 'monitor', admin_created: true \}/)
+  // Roles stage 4c-2 (0156): no role in app_metadata any more.
+  assert.match(fn, /app_metadata: \{ admin_created: true \}/)
   assert.match(
     fn,
     /await userClient\.rpc\(\s+'admin_assign_profile_role',\s+\{ p_profile_id: authData\.user\.id, p_role_key: roleKey \},?\s+\)/,
@@ -57,7 +58,7 @@ test('manage-user never writes the role', () => {
 
 test('the add-user screen sends the role key and reports a failed assignment', () => {
   const screen = read('src', 'screens', 'AdminUsers.tsx')
-  assert.match(screen, /role_key: chosenRole,/)
+  assert.match(screen, /role_key: form\.role,/)
   assert.match(screen, /if \(result\.role_assigned === false\) \{/)
   assert.doesNotMatch(screen, /'admin_assign_profile_role'/)
 })

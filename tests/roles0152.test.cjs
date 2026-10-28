@@ -94,7 +94,10 @@ test('no picker lists a legacy role name any more', () => {
 
 test('the companies of a user follow the role permission', () => {
   const page = read('src', 'screens', 'UserDetail.tsx')
-  assert.match(page, /rolesOn && foremanKeys && systemRoleLoaded\s+\? isForemanRoleKey\(roleKey, foremanKeys\)\s+: legacy === 'supervisor'/)
+  // Roles stage 4c-2 (0156): no legacy fallback; until the roles are read
+  // the field stays shown for the foreman role and a user with companies.
+  assert.match(page, /foremanKeys && systemRoleLoaded\s+\? isForemanRoleKey\(roleKey, foremanKeys\)\s+: roleKey === 'supervisor' \|\|\s+\(user\?\.assigned_companies\?\.length \?\? 0\) > 0/)
+  assert.doesNotMatch(page, /legacy === 'supervisor'/)
   assert.match(page, /company_ids: companiesApply/)
   assert.match(page, /\{companiesApply && \(/)
   assert.match(page, /\.\.\.\(savedCompaniesApply/)
@@ -108,5 +111,11 @@ test('the companies of a user follow the role permission', () => {
 
 test('the users list does not sort by the hidden legacy role', () => {
   const list = read('src', 'screens', 'AdminUsers.tsx')
-  assert.match(list, /sortable: !rolesOn,/)
+  // Roles stage 4c-2 (0156): the role column is never sortable and the
+  // list config offers no role sort (the column no longer exists).
+  assert.match(list, /sortable: false,/)
+  const configs = read('src', 'lib', 'listConfigs.ts')
+  const users = configs.slice(configs.indexOf('export const usersListConfig'))
+  const sortable = users.slice(users.indexOf('sortableFields'), users.indexOf(']', users.indexOf('sortableFields')))
+  assert.doesNotMatch(sortable, /key: 'role'/)
 })

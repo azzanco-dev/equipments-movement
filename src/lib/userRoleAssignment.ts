@@ -1,22 +1,17 @@
 import type { UserRole } from '@/lib/types'
 
 /**
- * wave 23 (routing by permissions, step 3) — pure rules of the users screens
- * while the roles system (migration 0126) is ON: the user forms show and
- * assign ONE role, the `profile_roles` assignment, and derive the legacy
- * `profiles.role` from it. No runtime import, so node tests can load it.
+ * Pure rules of the users screens for a user's ONE role, the `profile_roles`
+ * assignment (wave 23, step 3; roles stages 4b–4c-2). No runtime import, so
+ * node tests can load it.
  *
- * Why the legacy role still exists: `profiles.role` is NOT NULL and still
- * drives `is_admin()`, the Edge Functions and the in-screen logic until the
- * later steps. The database keeps the two in step with the
- * `sync_profile_role_assignment` trigger (0126): while the flag is ON a
- * legacy change is copied into the assignment only when the assignment still
- * equals the old legacy role, or when the change is to or from admin (admin
- * parity); any other legacy change is REFUSED, and `admin_assign_profile_role`
- * refuses an admin assignment unless the legacy role is admin.
+ * Since roles stage 4c-2 (migration 0156) the legacy `profiles.role` no
+ * longer exists: a role is chosen as a `roles.key` and changed through
+ * `admin_assign_profile_role` alone (0153), which keeps the last admin and
+ * refuses an admin's own demotion.
  */
 
-/** The six system roles: `roles.is_system` rows, equal to the legacy values. */
+/** The six original roles (the 0126 seed); their badges keep their tones. */
 export const SYSTEM_ROLE_KEYS: readonly UserRole[] = [
   'admin',
   'supervisor',
@@ -26,62 +21,24 @@ export const SYSTEM_ROLE_KEYS: readonly UserRole[] = [
   'monitor',
 ]
 
-/** The narrowest legacy role; what a custom role falls back to. */
-export const NARROWEST_LEGACY_ROLE: UserRole = 'monitor'
-
 export function isSystemRoleKey(key: string): key is UserRole {
   return (SYSTEM_ROLE_KEYS as readonly string[]).includes(key)
 }
 
-/**
- * The legacy role a user must carry for the chosen assignment:
- * - a system role → that same key (the two stay aligned);
- * - a custom role → the current legacy role is kept, except `admin`, which
- *   becomes `monitor`: a custom role must never leave someone with the legacy
- *   admin role (admin parity) and must never grant it. A NEW user (no current
- *   legacy role) with a custom role gets `monitor` as well.
- */
-export function legacyRoleFor(
-  newRoleKey: string,
-  currentLegacyRole: UserRole | null,
-): UserRole {
-  if (isSystemRoleKey(newRoleKey)) return newRoleKey
-  if (currentLegacyRole === null || currentLegacyRole === 'admin')
-    return NARROWEST_LEGACY_ROLE
-  return currentLegacyRole
-}
-
-export type RoleChangeStep =
-  { kind: 'changeLegacy'; to: UserRole } | { kind: 'assign'; roleKey: string }
+export type RoleChangeStep = { kind: 'assign'; roleKey: string }
 
 /**
- * The steps that move a user to `newRoleKey`. Since roles stage 4b (owner
- * 2026-10-27, migration 0153) a role is changed through the assignment
- * alone: one `assign(newRoleKey)` step when it differs from the current
- * assignment, never a legacy change (`profiles.role` is no longer written
- * by the user screens and nothing reads it). Nothing changes → no step.
- * `currentLegacy` and `isSystemRole` are accepted for the callers' shape
- * and ignored.
+ * The steps that move a user to `newRoleKey`: one `assign(newRoleKey)` step
+ * when it differs from the current assignment, none otherwise.
  */
 export function planRoleChange(input: {
-  currentLegacy: UserRole
   /** `profile_roles.role_key`, null when the user has no assignment. */
   currentAssigned: string | null
   newRoleKey: string
-  isSystemRole?: boolean
 }): RoleChangeStep[] {
   return input.currentAssigned === input.newRoleKey
     ? []
     : [{ kind: 'assign', roleKey: input.newRoleKey }]
-}
-
-/** The legacy role the user carries once the plan ran. */
-export function legacyRoleAfter(
-  plan: ReadonlyArray<RoleChangeStep>,
-  currentLegacy: UserRole,
-): UserRole {
-  for (const step of plan) if (step.kind === 'changeLegacy') return step.to
-  return currentLegacy
 }
 
 /** A user's assignment with the names of its role, as the screens show it. */

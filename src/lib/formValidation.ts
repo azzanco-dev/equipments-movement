@@ -441,7 +441,11 @@ const emailField = requiredText('emailRequired').refine(
   message('invalidUserEmail'),
 )
 
-/** Add user: name, email and an initial password of at least 8 characters. */
+/**
+ * Add user: name, email, an initial password of at least 8 characters and
+ * the chosen role key (roles stage 4c-2: a `roles.key`, not a legacy value;
+ * create-user checks that the role exists and is active).
+ */
 export const userFormSchema = z.object({
   full_name: requiredText('fullNameRequired'),
   email: emailField,
@@ -449,16 +453,20 @@ export const userFormSchema = z.object({
     .string()
     .min(1, message('passwordRequired'))
     .min(PASSWORD_MIN_LENGTH, message('passwordMinLength')),
+  role: requiredText('userRoleRequired'),
 })
 
 /**
  * Edit user: the password is optional (blank keeps the current one), and the
  * optional mobile number follows `admin_set_user_mobile` (8 to 15 digits, an
- * optional `+`; spaces and dashes are typing aids it removes).
+ * optional `+`; spaces and dashes are typing aids it removes). The role is
+ * a role key; blank keeps the user's assignment as it is (a user without
+ * one, or whose role could not be read, can still be saved).
  */
 export const userEditFormSchema = z.object({
   full_name: requiredText('fullNameRequired'),
   email: emailField,
+  role: z.string(),
   password: z
     .string()
     .refine(

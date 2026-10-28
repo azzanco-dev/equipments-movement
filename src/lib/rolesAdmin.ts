@@ -4,9 +4,6 @@ import type {
   PermissionScope,
   RoleChange,
   RolePermission,
-  RolesSystemOffender,
-  RolesSystemToggleResult,
-  UserRole,
 } from '@/lib/types'
 import { PERMISSION_SCOPES, isPermissionScope } from '@/lib/permissions'
 import { ROLE_KEY_FORMAT } from '@/lib/formValidation'
@@ -376,152 +373,18 @@ export function rolesRpcError(
   }
 }
 
-// --- Activation -------------------------------------------------------------
+// --- The roles system flag ----------------------------------------------------
 
-export const OFFENDER_REASON_KEYS: Record<
-  RolesSystemOffender['reason'],
-  TranslationKey
-> = {
-  no_role: 'rolesOffenderNoRole',
-  unknown_role: 'rolesOffenderUnknownRole',
-  inactive_role: 'rolesOffenderInactiveRole',
-  admin_mismatch: 'rolesOffenderAdminMismatch',
-}
-
-export function offenderReasonKey(reason: string): TranslationKey {
-  return (
-    OFFENDER_REASON_KEYS[reason as RolesSystemOffender['reason']] ??
-    'rolesOffenderUnknownRole'
-  )
-}
-
-/** `app_settings.roles_system.value`: enabled only for a literal `true`. */
+/** `app_settings.roles_system.value`: enabled only for a literal `true`. Since
+ *  0150 it is on for good; since roles stage 4c-2 (migration 0156) the
+ *  activation helpers (blockers, preview, confirmation word) are gone with
+ *  the legacy role they compared against. */
 export function rolesSystemEnabledFromValue(value: unknown): boolean {
   return (
     typeof value === 'object' &&
     value !== null &&
     (value as { enabled?: unknown }).enabled === true
   )
-}
-
-/** A defensive read of the `set_roles_system_enabled` answer. */
-export function parseToggleResult(data: unknown): RolesSystemToggleResult {
-  const value = (data ?? {}) as Partial<RolesSystemToggleResult>
-  return {
-    enabled: value.enabled === true,
-    changed: value.changed === true,
-    offenders: Array.isArray(value.offenders) ? value.offenders : [],
-    reason:
-      value.reason === 'offenders' || value.reason === 'preview_changed'
-        ? value.reason
-        : null,
-    preview_rows:
-      typeof value.preview_rows === 'number' ? value.preview_rows : null,
-  }
-}
-
-/**
- * Mirrors the `sync_profile_role_assignment` trigger (0126): while the roles
- * system is ON, changing a user's legacy role (`profiles.role`) is refused
- * with `roles_system_active_use_assignment` when neither role is admin and the
- * user's assignment was customised (differs from the old legacy role). The
- * user page checks it first so the `manage-user` Edge Function, which writes
- * the login details before the profile, is not called for a doomed change.
- * An unknown flag (null) is not blocked here; the database still decides.
- */
-export function legacyRoleChangeBlocked(input: {
-  rolesSystemEnabled: boolean | null
-  oldRole: string
-  newRole: string
-  /** `profile_roles.role_key`, null when the user has no assignment. */
-  assignedRoleKey: string | null
-}): boolean {
-  return (
-    input.rolesSystemEnabled === true &&
-    input.newRole !== input.oldRole &&
-    input.newRole !== 'admin' &&
-    input.oldRole !== 'admin' &&
-    input.assignedRoleKey !== null &&
-    input.assignedRoleKey !== input.oldRole
-  )
-}
-
-/** The typed confirmation matches the word (surrounding spaces ignored). */
-export function confirmationMatches(typed: string, word: string): boolean {
-  return typed.replace(/\s+/g, ' ').trim() === word.trim()
-}
-
-/**
- * Whether the enable button may be pressed: the offenders and the preview
- * were loaded (the preview row count is what the admin acknowledges), there
- * is no offender, the system is not already enabled, nothing is running, and
- * the confirmation word was typed. Never true by default.
- */
-export function canEnableRolesSystem(input: {
-  enabled: boolean | null
-  offendersLoaded: boolean
-  offenderCount: number
-  previewLoaded: boolean
-  typed: string
-  word: string
-  busy: boolean
-}): boolean {
-  return (
-    input.enabled === false &&
-    input.offendersLoaded &&
-    input.offenderCount === 0 &&
-    input.previewLoaded &&
-    !input.busy &&
-    confirmationMatches(input.typed, input.word)
-  )
-}
-
-/** One row of `admin_roles_system_preview()`. */
-export interface RolesSystemPreviewRow {
-  profile_id: string
-  full_name: string
-  legacy_role: UserRole | string
-  role_key: string | null
-  permission_key: string
-  legacy_scope: PermissionScope | null
-  active_scope: PermissionScope | null
-  change: 'gained' | 'lost' | 'scope_changed'
-}
-
-export interface RolesSystemPreviewUser {
-  profile_id: string
-  full_name: string
-  legacy_role: string
-  role_key: string | null
-  gained: RolesSystemPreviewRow[]
-  lost: RolesSystemPreviewRow[]
-  scope_changed: RolesSystemPreviewRow[]
-}
-
-/** The preview grouped by user, in the order the function returned. */
-export function groupPreviewByUser(
-  rows: ReadonlyArray<RolesSystemPreviewRow>,
-): RolesSystemPreviewUser[] {
-  const users = new Map<string, RolesSystemPreviewUser>()
-  for (const row of rows) {
-    let user = users.get(row.profile_id)
-    if (!user) {
-      user = {
-        profile_id: row.profile_id,
-        full_name: row.full_name,
-        legacy_role: row.legacy_role,
-        role_key: row.role_key,
-        gained: [],
-        lost: [],
-        scope_changed: [],
-      }
-      users.set(row.profile_id, user)
-    }
-    if (row.change === 'gained') user.gained.push(row)
-    else if (row.change === 'lost') user.lost.push(row)
-    else if (row.change === 'scope_changed') user.scope_changed.push(row)
-  }
-  return Array.from(users.values())
 }
 
 // --- Audit ----------------------------------------------------------------------

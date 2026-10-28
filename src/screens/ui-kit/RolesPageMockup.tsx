@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Settings2 } from 'lucide-react'
 import { Badge, Button, EmptyState, cn } from '@/components/ui'
-import { roleBadge } from '@/lib/userForm'
 import {
   AssignUserDialog,
   ChangesTable,
@@ -362,8 +361,6 @@ function MockUsersTab({
     .map((user) => ({
       id: user.id,
       name: user.name,
-      legacyLabel: LEGACY_ROLE_LABELS[user.legacyRole],
-      legacyTone: roleBadge(user.legacyRole).tone,
       since: user.since || null,
     }))
   const nameOf = (key: string) =>
@@ -428,22 +425,12 @@ function MockSystemSettings({
   changes: ChangeItem[]
   roleName: (key: string | null) => string
 }) {
-  const [typed, setTyped] = useState('')
   const [all, setAll] = useState(false)
-  const [result, setResult] = useState<{
-    tone: 'info'
-    text: string
-  } | null>(null)
-  const word = SYSTEM_STATE.confirmationWord
   return (
     <SystemSettingsDialog
       open={open}
       onOpenChange={(next) => {
-        if (!next) {
-          setTyped('')
-          setResult(null)
-          setAll(false)
-        }
+        if (!next) setAll(false)
         onOpenChange(next)
       }}
       status={{
@@ -452,28 +439,6 @@ function MockSystemSettings({
         updatedAt: SYSTEM_STATE.enabledAt,
         updatedByName: SYSTEM_STATE.enabledBy,
       }}
-      activation={{
-        word,
-        typed,
-        onTypedChange: (value) => {
-          setTyped(value)
-          setResult(null)
-        },
-        busy: false,
-        canEnable: false,
-        canDisable: typed.trim() === word,
-        // The mockup stops nothing; the real page calls
-        // set_roles_system_enabled from SystemSettingsContainer.
-        onToggle: () =>
-          setResult({
-            tone: 'info',
-            text: 'في النموذج لا يوقف شيء فعليا؛ في الصفحة الحقيقية يستدعى set_roles_system_enabled.',
-          }),
-        result,
-        onDismissResult: () => setResult(null),
-      }}
-      offenders={{ state: 'ready', rows: [] }}
-      preview={{ state: 'ready', rows: [] }}
       log={{
         rows: all ? changes : changes.slice(0, 10),
         canShowAll: !all && changes.length > 10,

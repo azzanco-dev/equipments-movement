@@ -3,7 +3,6 @@ import { UserPlus } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import {
-  Badge,
   Button,
   DataTable,
   Dialog,
@@ -39,21 +38,6 @@ export function RoleUsersTable({
   const { t } = useI18n()
   const columns: DataTableColumn<RoleUserItem>[] = [
     { key: 'name', header: t('roleUsersColUser'), cell: (row) => row.name },
-    // The legacy role column only when the rows carry it (the /ui-kit
-    // mockup); the live page has none since roles stage 4b.
-    ...(users.some((row) => row.legacyLabel)
-      ? [
-          {
-            key: 'legacy',
-            header: t('roleUsersColLegacy'),
-            cell: (row: RoleUserItem) => (
-              <Badge size="sm" tone={row.legacyTone}>
-                {row.legacyLabel}
-              </Badge>
-            ),
-          },
-        ]
-      : []),
     {
       key: 'since',
       header: t('roleUsersColSince'),

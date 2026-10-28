@@ -1,5 +1,10 @@
 import type { EquipmentState } from '@/lib/equipmentState'
 
+/**
+ * The keys of the six original roles (the 0126 seed of `public.roles`).
+ * Since roles stage 4c-2 (migration 0156) it is no column of any table: a
+ * user's role is his `profile_roles.role_key`, which may be any role key.
+ */
 export type UserRole =
   | 'admin'
   | 'supervisor'
@@ -47,7 +52,12 @@ export interface Profile {
   id: string
   full_name: string
   email?: string
-  role: UserRole
+  /**
+   * @deprecated Roles stage 4c-2 (migration 0156) dropped `profiles.role`;
+   * nothing selects or reads it. Kept optional only so the extracting
+   * screen (owned separately) still compiles; it is always undefined.
+   */
+  role?: string
   assigned_companies?: Array<{ id: string; name_ar: string; name_en: string }>
   must_change_password: boolean
   created_at: string
@@ -255,10 +265,10 @@ export interface MovementDriverChange {
 }
 
 /**
- * wave 22A (migrations 0126/0127): roles and permissions, shipped INACTIVE.
- * While `app_settings.roles_system.enabled` is false, `current_permissions()`
- * answers from the frozen legacy mapping of `profiles.role`; when true, from
- * `profile_roles` -> active `roles` -> `role_permissions`.
+ * wave 22A (migrations 0126/0127): roles and permissions. Since 0150 the
+ * system is on for good and `current_permissions()` answers from
+ * `profile_roles` -> active `roles` -> `role_permissions` only; 0156
+ * dropped the legacy `profiles.role`.
  */
 export type PermissionScope = 'all' | 'site' | 'workshop' | 'companies' | 'own'
 
@@ -341,30 +351,4 @@ export interface RoleChange {
   profile_id: string | null
   old_value: unknown
   new_value: unknown
-}
-
-/** One user that blocks activation (`admin_roles_system_offenders()`). */
-export interface RolesSystemOffender {
-  profile_id: string
-  full_name: string
-  legacy_role: UserRole
-  role_key: string | null
-  reason: 'no_role' | 'unknown_role' | 'inactive_role' | 'admin_mismatch'
-}
-
-/**
- * Result of `set_roles_system_enabled(p_enabled, p_expected_preview_rows)`.
- * Enabling needs `p_expected_preview_rows` = the row count of the
- * `admin_roles_system_preview()` the admin reviewed; disabling passes null.
- * `reason` is null on success, 'offenders' (see `offenders`) or
- * 'preview_changed' (`preview_rows` is the current count) when refused.
- * `reason` and `preview_rows` are optional here only so older readers keep
- * compiling; the database always sends both.
- */
-export interface RolesSystemToggleResult {
-  enabled: boolean
-  changed: boolean
-  offenders: RolesSystemOffender[]
-  reason?: 'offenders' | 'preview_changed' | null
-  preview_rows?: number | null
 }

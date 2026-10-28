@@ -23,7 +23,6 @@ export {
 } from './RoleFormDialog'
 export {
   SystemSettingsDialog,
-  type ActivationControls,
   type SystemSettingsDialogProps,
   type SystemStatus,
 } from './SystemSettingsDialog'

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { usersActions } from '@/lib/actionPermissions'
@@ -17,13 +16,12 @@ import { localizedName } from '@/lib/localizedName'
 import { buildSearchFilter, COMPANY_PROJECT_SEARCH_FIELDS } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
-import type { Profile, ProfileContact, UserRole } from '@/lib/types'
+import type { Profile, ProfileContact } from '@/lib/types'
 import { normalizeUserMobileInput, userMobileErrorCode } from '@/lib/userMobile'
-import { legacyRoleChangeBlocked, rolesRpcError } from '@/lib/rolesAdmin'
+import { rolesRpcError } from '@/lib/rolesAdmin'
 import {
   ASSIGN_ROLE_FIELD_CODES,
   assignedRoleFromEmbed,
-  legacyRoleAfter,
   planRoleChange,
   type AssignedRole,
 } from '@/lib/userRoleAssignment'
@@ -67,18 +65,18 @@ interface UserDetailProps {
  *  language at render time instead of needing a reload of the user. */
 type CompanyOption = SelectOption & { name_ar: string; name_en: string }
 
+/** The record fields `manage-user` saves; the role is the assignment, which
+ *  is tracked apart (`assignmentChanged`). */
 function formSnapshot(
   fullName: string,
   email: string,
   password: string,
-  role: UserRole,
   companies: SelectOption[],
 ) {
   return JSON.stringify({
     fullName,
     email,
     password,
-    role,
     companyIds: companies.map((company) => company.value).sort(),
   })
 }
@@ -102,7 +100,6 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState<UserRole>('supervisor')
   const [companies, setCompanies] = useState<CompanyOption[]>([])
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
   // wave 9 — the mobile number (migration 0110). It is read and written apart
@@ -130,37 +127,29 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   // The rest of the record was saved but the number was not.
   const [mobileNotSaved, setMobileNotSaved] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
-  const router = useRouter()
   const { user: currentUser } = useAuth()
-  // wave 22B: the user's role in the new roles system (`profile_roles`,
-  // migration 0126). Read-only while that system is OFF (it is then managed
-  // in Settings › «الادوار والصلاحيات» and changes nothing); since wave 23
-  // (step 3) it is THE role of the form while the system is ON.
+  // The user's ONE role, his `profile_roles` assignment (migration 0126;
+  // since roles stage 4c-2, migration 0156, there is no other).
   const [systemRole, setSystemRole] = useState<{
     userId: string
     state: 'loaded' | 'failed'
     roleKey: string | null
     name: { name_ar: string; name_en: string } | null
   } | null>(null)
-  // The roles system flag (`app_settings.roles_system`, read once in
-  // PermissionsContext); null = unknown, treated like OFF.
   const permissionState = usePermissions()
-  const { rolesSystemEnabled, reload: reloadPermissions } = permissionState
+  const { reload: reloadPermissions } = permissionState
   // wave 24: saving the user follows `users.manage` (nobody while the
   // permissions load or after a failed load); the page gate and the
   // database (0127) require the same key.
   const canManageUsers = usersActions(permissionState).manage
-  const rolesOn = rolesSystemEnabled === true
-  const { roles: activeRoles } = useActiveRoles(rolesOn)
+  const { roles: activeRoles } = useActiveRoles(true)
   // Roles stage 3 (owner 2026-10-27): «الشركات المسؤول عنها» belongs to every
-  // role that records project movements (the admin aside), not only the
-  // legacy foreman. Until the roles are read, or when they cannot be, the
-  // legacy rule applies.
+  // role that records project movements (the admin aside). Until the roles
+  // are read, or when they cannot be, see `companiesFor`.
   const [foremanKeys, setForemanKeys] = useState<ReadonlySet<string> | null>(
     null,
   )
   useEffect(() => {
-    if (!rolesOn) return
     let active = true
     foremanRoleKeys(supabase).then(
       (keys) => {
@@ -173,21 +162,20 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     return () => {
       active = false
     }
-  }, [rolesOn])
-  // ON: the role chosen in the form (`roles.key`; '' = no assignment yet).
+  }, [])
+  // The role chosen in the form (`roles.key`; '' = no assignment yet).
   const [assignedRoleKey, setAssignedRoleKey] = useState('')
   const systemRoleLoaded =
     systemRole?.userId === userId && systemRole.state === 'loaded'
   const savedAssignedKey = systemRoleLoaded ? (systemRole.roleKey ?? '') : ''
   const assignmentChanged =
-    rolesOn &&
     systemRoleLoaded &&
     assignedRoleKey !== '' &&
     assignedRoleKey !== savedAssignedKey
 
   const currentSnapshot = useMemo(
-    () => formSnapshot(fullName, email, password, role, companies),
-    [companies, email, fullName, password, role],
+    () => formSnapshot(fullName, email, password, companies),
+    [companies, email, fullName, password],
   )
   const mainChanged =
     savedSnapshot !== null && currentSnapshot !== savedSnapshot
@@ -199,51 +187,33 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     mobileState === 'loaded' && normalizeUserMobileInput(mobile) !== savedMobile
   const hasUnsavedChanges = mainChanged || mobileChanged || assignmentChanged
 
-  // ON: the steps a save runs for the role (`planRoleChange`): a legacy
-  // change through `manage-user` when the database accepts it, then the
-  // assignment through `admin_assign_profile_role` when still needed.
+  // The steps a save runs for the role (`planRoleChange`): the assignment
+  // through `admin_assign_profile_role` when it changed.
   const rolePlan = useMemo(
     () =>
-      user && rolesOn && systemRoleLoaded && assignedRoleKey
+      systemRoleLoaded && assignedRoleKey
         ? planRoleChange({
-            currentLegacy: user.role,
             currentAssigned: systemRole.roleKey,
             newRoleKey: assignedRoleKey,
           })
         : [],
-    [assignedRoleKey, rolesOn, systemRole, systemRoleLoaded, user],
+    [assignedRoleKey, systemRole, systemRoleLoaded],
   )
-  // The legacy role the save writes: the form's own select while OFF, the
-  // plan's result while ON (the companies field follows it).
-  const legacyRoleToSave =
-    rolesOn && user ? legacyRoleAfter(rolePlan, user.role) : role
-  // Whether a role carries «الشركات المسؤول عنها»: by the permission while
-  // ON (the roles read), the legacy foreman otherwise.
-  const companiesFor = (roleKey: string | null | undefined, legacy: UserRole) =>
-    rolesOn && foremanKeys && systemRoleLoaded
+  // Whether a role carries «الشركات المسؤول عنها»: by the permission once the
+  // foreman roles and the user's assignment are read. Until then (or when
+  // they cannot be read) the field stays shown for the original foreman role
+  // and for a user who already has companies, so a save never clears them
+  // unseen.
+  const companiesFor = (roleKey: string | null | undefined) =>
+    foremanKeys && systemRoleLoaded
       ? isForemanRoleKey(roleKey, foremanKeys)
-      : legacy === 'supervisor'
-  const companiesApply = companiesFor(
-    assignedRoleKey || savedAssignedKey,
-    legacyRoleToSave,
-  )
-  const savedCompaniesApply = user
-    ? companiesFor(savedAssignedKey, user.role)
-    : false
+      : roleKey === 'supervisor' ||
+        (user?.assigned_companies?.length ?? 0) > 0
+  const companiesApply = companiesFor(assignedRoleKey || savedAssignedKey)
+  const savedCompaniesApply = user ? companiesFor(savedAssignedKey) : false
 
-  const roleOptions = [
-    { value: 'supervisor', label: t('supervisor') },
-    { value: 'workshop', label: t('workshopOfficer') },
-    {
-      value: 'assistant_workshop_manager',
-      label: t('assistantWorkshopManager'),
-    },
-    { value: 'workshop_manager', label: t('workshopManager') },
-    { value: 'monitor', label: t('monitoring') },
-    { value: 'admin', label: t('admin') },
-  ]
-  // ON: the active roles; the current assignment stays visible (disabled)
-  // when it is inactive or unknown, as on the roles page.
+  // The active roles; the current assignment stays visible (disabled) when
+  // it is inactive or unknown, as on the roles page.
   const assignedRoleOptions = useMemo(() => {
     const options: UiSelectOption[] = (activeRoles ?? []).map((candidate) => ({
       value: candidate.key,
@@ -299,7 +269,6 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
         setLoadedUserId(userId)
         setFullName(loadedUser.full_name)
         setEmail(loadedUser.email ?? '')
-        setRole(loadedUser.role)
         const assignedCompanies = (loadedUser.assigned_companies ?? []).map(
           (company): CompanyOption => ({
             value: company.id,
@@ -315,7 +284,6 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             loadedUser.full_name,
             loadedUser.email ?? '',
             '',
-            loadedUser.role,
             assignedCompanies,
           ),
         )
@@ -459,7 +427,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     const invalid = validateUserEditForm({
       full_name: fullName,
       email,
-      role: legacyRoleToSave,
+      role: assignedRoleKey,
       password,
       mobile_number: mobileChanged ? mobile : '',
     })
@@ -468,40 +436,17 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       focusFirstError(invalid, USER_EDIT_FIELD_ORDER)
       return
     }
-    // wave 22B: while the roles system is active, a customised assignment is
-    // changed on the roles page; the database refuses the legacy change, and
-    // checking first keeps the Edge Function from writing anything.
-    if (
-      user &&
-      systemRole?.userId === userId &&
-      legacyRoleChangeBlocked({
-        rolesSystemEnabled,
-        oldRole: user.role,
-        newRole: role,
-        assignedRoleKey: systemRole.roleKey,
-      })
-    ) {
-      const blocked: FieldErrors<UserEditFormValues> = {
-        role: 'roleChangeUseAssignment',
-      }
-      setFieldErrors(blocked)
-      focusFirstError(blocked, USER_EDIT_FIELD_ORDER)
-      return
-    }
     setFieldErrors({})
     const nextMobile = normalizeUserMobileInput(mobile)
-    // wave 23 (ON): the role steps planned above, run in order.
-    const legacyStep = rolePlan.some((step) => step.kind === 'changeLegacy')
+    // The role step planned above (the assignment, when it changed).
     const assignStep = rolePlan.find((step) => step.kind === 'assign')
-    const savedRole = legacyRoleToSave
     setSaving(true)
     try {
       // 1. The record itself, through the Edge Function as before. Skipped
       //    only when the mobile number and/or the assignment alone changed,
       //    so correcting a number (or assigning a role) does not rewrite the
       //    login details and company assignments.
-      const saveMain =
-        mainChanged || legacyStep || (!mobileChanged && !assignStep)
+      const saveMain = mainChanged || (!mobileChanged && !assignStep)
       if (saveMain) {
         const nextFullName = fullName.trim()
         const nextEmail = email.trim()
@@ -512,7 +457,6 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             full_name: nextFullName,
             email: nextEmail,
             password,
-            role: savedRole,
             company_ids: companiesApply
               ? companies.map((item) => item.value)
               : [],
@@ -534,7 +478,6 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
         setFullName(nextFullName)
         setEmail(nextEmail)
         setPassword('')
-        if (rolesOn) setRole(savedRole)
         // The summary above the form shows the saved record, so it follows
         // every field the update just wrote.
         setUser((current) =>
@@ -543,7 +486,6 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 ...current,
                 full_name: nextFullName,
                 email: nextEmail,
-                role: savedRole,
                 assigned_companies:
                   companiesApply
                     ? companies.map((company) => ({
@@ -555,17 +497,12 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
               }
             : current,
         )
-        setSavedSnapshot(
-          formSnapshot(nextFullName, nextEmail, '', savedRole, companies),
-        )
-        // A legacy change is copied into the assignment by the 0126 trigger
-        // (the plan only includes changes the trigger accepts).
-        if (legacyStep) applyAssignment(savedRole)
+        setSavedSnapshot(formSnapshot(nextFullName, nextEmail, '', companies))
       }
 
-      // 1b. ON: the assignment, when the plan still needs it. The record
-      //     above is saved and said to be saved; a refusal goes under the
-      //     role (the 0126 codes) or, unknown, as a form-level message.
+      // 1b. The assignment, when the plan needs it. The record above is
+      //     saved and said to be saved; a refusal goes under the role (the
+      //     0126/0153 codes) or, unknown, as a form-level message.
       if (assignStep) {
         let failure: {
           message?: string | null
@@ -651,19 +588,6 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     if (currentUser?.id === userId) void reloadPermissions()
   }
 
-  async function openRolesPage() {
-    if (
-      hasUnsavedChanges &&
-      !(await confirm({
-        title: t('unsavedChanges'),
-        description: t('dialogDescUnsavedChanges'),
-        tone: 'danger',
-      }))
-    )
-      return
-    router.push('/settings/roles?tab=users')
-  }
-
   async function handleBack() {
     if (
       hasUnsavedChanges &&
@@ -693,14 +617,13 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       </div>
     )
 
-  const legacyRoleLabel = (value: UserRole) =>
-    roleOptions.find((option) => option.value === value)?.label ?? value
-  // ON: the saved assignment's name (the legacy label until it is read, or
-  // for a user without assignment); OFF: the legacy role as before.
-  const savedRoleLabel =
-    rolesOn && systemRoleLoaded && systemRole.name
+  // The saved assignment's name; «بدون دور» for a user without one; nothing
+  // until it is read (or when it could not be read).
+  const savedRoleLabel = !systemRoleLoaded
+    ? null
+    : systemRole.name
       ? roleName(lang, systemRole.name)
-      : legacyRoleLabel(user.role)
+      : t('roleUsersNoRole')
 
   // Saved values only (`user`), never the unsaved form state below.
   const accountItems: InfoGridItem[] = [
@@ -710,7 +633,18 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       value: user.email,
       dir: 'ltr',
     },
-    { key: 'role', label: t('role'), value: savedRoleLabel },
+    {
+      key: 'role',
+      label: t('role'),
+      value:
+        systemRole?.userId === userId && systemRole.state === 'failed' ? (
+          <span className="font-normal text-danger">
+            {t('userNewSystemRoleLoadError')}
+          </span>
+        ) : (
+          savedRoleLabel
+        ),
+    },
     {
       key: 'mobile',
       label: t('mobileNumber'),
@@ -735,40 +669,6 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
               ),
             }),
     },
-    // OFF: the read-only line of the new system's role. ON: redundant, the
-    // role above IS the assignment.
-    ...(rolesOn
-      ? []
-      : [
-          {
-            key: 'newSystemRole',
-            label: t('userNewSystemRole'),
-            value: (
-              <span className="flex flex-wrap items-center gap-2">
-                {systemRole?.userId !== userId ? (
-                  <Skeleton variant="text" className="h-4 w-24" />
-                ) : systemRole.state === 'failed' ? (
-                  <span className="font-normal text-danger">
-                    {t('userNewSystemRoleLoadError')}
-                  </span>
-                ) : systemRole.name ? (
-                  <span>
-                    {localizedName(
-                      lang,
-                      systemRole.name.name_ar,
-                      systemRole.name.name_en,
-                    )}
-                  </span>
-                ) : (
-                  <Badge tone="danger">{t('roleUsersNoRole')}</Badge>
-                )}
-                <Button size="sm" variant="ghost" onClick={openRolesPage}>
-                  {t('userNewSystemRoleManage')}
-                </Button>
-              </span>
-            ),
-          } satisfies InfoGridItem,
-        ]),
     {
       key: 'createdAt',
       label: t('createdAt'),
@@ -805,7 +705,9 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           subtitle={t('userDetails')}
           badges={
             <>
-              <Badge tone="neutral">{savedRoleLabel}</Badge>
+              {savedRoleLabel && (
+                <Badge tone="neutral">{savedRoleLabel}</Badge>
+              )}
               {user.must_change_password && (
                 <Badge tone="warning">{t('mustChangePassword')}</Badge>
               )}
@@ -886,52 +788,24 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           <Field
             label={t('role')}
             name="role"
-            hint={rolesOn ? t('userRoleManagedInSettings') : undefined}
+            hint={t('userRoleManagedInSettings')}
             error={fieldError('role')}
           >
-            {(control) =>
-              rolesOn ? (
-                // ON: the roles-system assignment (the legacy select is
-                // hidden; the legacy role is derived on save).
-                <Select
-                  {...control}
-                  value={assignedRoleKey || undefined}
-                  placeholder={t('roleUsersNoRole')}
-                  disabled={!systemRoleLoaded || !activeRoles}
-                  onValueChange={(value) => {
-                    clearError('role')
-                    setAssignedRoleKey(value)
-                    if (
-                      user &&
-                      !companiesFor(
-                        value,
-                        legacyRoleAfter(
-                          planRoleChange({
-                            currentLegacy: user.role,
-                            currentAssigned: systemRole?.roleKey ?? null,
-                            newRoleKey: value,
-                          }),
-                          user.role,
-                        ),
-                      )
-                    )
-                      setCompanies([])
-                  }}
-                  options={assignedRoleOptions}
-                />
-              ) : (
-                <Select
-                  {...control}
-                  value={role}
-                  onValueChange={(value) => {
-                    clearError('role')
-                    setRole(value as UserRole)
-                    if (value !== 'supervisor') setCompanies([])
-                  }}
-                  options={roleOptions}
-                />
-              )
-            }
+            {(control) => (
+              // The `profile_roles` assignment, the user's one role.
+              <Select
+                {...control}
+                value={assignedRoleKey || undefined}
+                placeholder={t('roleUsersNoRole')}
+                disabled={!systemRoleLoaded || !activeRoles}
+                onValueChange={(value) => {
+                  clearError('role')
+                  setAssignedRoleKey(value)
+                  if (!companiesFor(value)) setCompanies([])
+                }}
+                options={assignedRoleOptions}
+              />
+            )}
           </Field>
           <Field
             label={t('temporaryPassword')}
@@ -979,18 +853,6 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             )}
           </Field>
         </div>
-        {fieldErrors.role === 'roleChangeUseAssignment' && (
-          <Notice
-            tone="warning"
-            action={
-              <Button size="sm" onClick={openRolesPage}>
-                {t('userNewSystemRoleManage')}
-              </Button>
-            }
-          >
-            {t('roleChangeUseAssignment')}
-          </Notice>
-        )}
         {companiesApply && (
           <Field
             label={t('assignedCompanies')}

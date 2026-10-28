@@ -487,7 +487,6 @@ export function RolesSettings() {
         roles={roles}
         catalogue={catalogue}
         revision={revision}
-        onChanged={afterChange}
       />
       {confirmDialog}
     </div>

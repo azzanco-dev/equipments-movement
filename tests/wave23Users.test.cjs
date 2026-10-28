@@ -1,8 +1,7 @@
 // wave 23 (routing by permissions, step 3) — the users list, the user page
-// and the header while the roles system (0126) is ON: ONE role in the UI, the
-// `profile_roles` assignment, with the legacy `profiles.role` derived from it
-// (src/lib/userRoleAssignment.ts). With the flag OFF or unknown the screens
-// keep the legacy role exactly as before.
+// and the header: ONE role in the UI, the `profile_roles` assignment
+// (src/lib/userRoleAssignment.ts). Since roles stage 4c-2 (migration 0156)
+// the legacy `profiles.role` is gone and there is no OFF mode.
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -36,7 +35,7 @@ function loadLib(name) {
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null))
 
 const lib = loadLib('userRoleAssignment')
-const { legacyRoleFor, planRoleChange, legacyRoleAfter } = lib
+const { planRoleChange } = lib
 
 const SYSTEM = [
   'admin',
@@ -74,76 +73,44 @@ test('the system roles of 0126 are exactly the six legacy roles', () => {
   for (const key of SYSTEM) assert.equal(lib.isSystemRoleKey(key), true)
   assert.equal(lib.isSystemRoleKey('foreman_lead'), false)
   assert.equal(lib.isSystemRoleKey(''), false)
-  assert.equal(lib.NARROWEST_LEGACY_ROLE, 'monitor')
 })
 
-// --- legacyRoleFor -----------------------------------------------------------
+// --- No legacy role is derived any more ---------------------------------------
 
-test('legacyRoleFor: a system role is its own legacy role', () => {
-  for (const key of SYSTEM)
-    for (const current of [...SYSTEM, null])
-      assert.equal(legacyRoleFor(key, current), key, `${key} from ${current}`)
-})
-
-test('legacyRoleFor: a custom role keeps the legacy role, except admin → monitor', () => {
-  for (const custom of ['foreman_lead', 'equipment_officer', 'purchasing'])
-    for (const current of SYSTEM)
-      assert.equal(
-        legacyRoleFor(custom, current),
-        current === 'admin' ? 'monitor' : current,
-        `${custom} from ${current}`,
-      )
-  // A new user (no legacy role yet) with a custom role gets the narrowest.
-  assert.equal(legacyRoleFor('foreman_lead', null), 'monitor')
-  // Never admin.
-  for (const current of [...SYSTEM, null])
-    assert.notEqual(legacyRoleFor('purchasing', current), 'admin')
+// Roles stage 4c-2 (migration 0156): profiles.role is dropped, so the
+// helpers that derived it from the assignment are gone.
+test('the legacy-role helpers are gone', () => {
+  assert.equal(lib.legacyRoleFor, undefined)
+  assert.equal(lib.legacyRoleAfter, undefined)
+  assert.equal(lib.NARROWEST_LEGACY_ROLE, undefined)
+  const source = read('src', 'lib', 'userRoleAssignment.ts')
+  assert.doesNotMatch(source, /changeLegacy|currentLegacy|legacyRole/)
 })
 
 // --- planRoleChange ------------------------------------------------------------
 
-const plan = (currentLegacy, currentAssigned, newRoleKey) =>
-  plain(planRoleChange({ currentLegacy, currentAssigned, newRoleKey }))
+const plan = (currentAssigned, newRoleKey) =>
+  plain(planRoleChange({ currentAssigned, newRoleKey }))
 
 // Roles stage 4b (owner 2026-10-27, migration 0153): a role is changed
-// through the assignment alone; the legacy role is never written.
-test('plan: any change is one assign step, never a legacy change', () => {
-  for (const current of SYSTEM)
-    for (const assigned of [...SYSTEM, 'foreman_lead', null])
-      for (const target of [...SYSTEM, 'foreman_lead', 'purchasing']) {
-        const steps = plan(current, assigned, target)
-        assert.ok(
-          steps.every((step) => step.kind === 'assign'),
-          `${current}/${assigned} → ${target}`,
-        )
-        assert.equal(legacyRoleAfter(steps, current), current)
-        if (assigned === target) assert.deepEqual(steps, [])
-        else assert.deepEqual(steps, [{ kind: 'assign', roleKey: target }])
-      }
+// through the assignment alone.
+test('plan: any change is one assign step', () => {
+  for (const assigned of [...SYSTEM, 'foreman_lead', null])
+    for (const target of [...SYSTEM, 'foreman_lead', 'purchasing']) {
+      const steps = plan(assigned, target)
+      if (assigned === target) assert.deepEqual(steps, [])
+      else assert.deepEqual(steps, [{ kind: 'assign', roleKey: target }])
+    }
 })
 
 test('plan: to and from admin is an assign like any other', () => {
-  assert.deepEqual(plan('supervisor', 'supervisor', 'admin'), [
+  assert.deepEqual(plan('supervisor', 'admin'), [
     { kind: 'assign', roleKey: 'admin' },
   ])
-  assert.deepEqual(plan('admin', 'admin', 'equipment_officer'), [
+  assert.deepEqual(plan('admin', 'equipment_officer'), [
     { kind: 'assign', roleKey: 'equipment_officer' },
   ])
-  assert.deepEqual(plan('monitor', null, 'admin'), [
-    { kind: 'assign', roleKey: 'admin' },
-  ])
-})
-
-test('legacyRoleAfter reads the plan', () => {
-  assert.equal(
-    legacyRoleAfter([{ kind: 'changeLegacy', to: 'monitor' }], 'admin'),
-    'monitor',
-  )
-  assert.equal(
-    legacyRoleAfter([{ kind: 'assign', roleKey: 'x' }], 'supervisor'),
-    'supervisor',
-  )
-  assert.equal(legacyRoleAfter([], 'workshop'), 'workshop')
+  assert.deepEqual(plan(null, 'admin'), [{ kind: 'assign', roleKey: 'admin' }])
 })
 
 // --- The embed reader -------------------------------------------------------------
@@ -225,9 +192,10 @@ test('the header shows the assigned role, nothing while it is unknown', () => {
   assert.doesNotMatch(layout, /legacyRoleLabel|profile\??\.role/)
 })
 
-test('the users list: ON reads the assignment and filters by it; OFF keeps the legacy select', () => {
+test('the users list reads the assignment and filters by it', () => {
   const list = read('src', 'screens', 'AdminUsers.tsx')
-  assert.match(list, /const rolesOn = rolesSystemEnabled === true/)
+  // Roles stage 4c-2 (0156): no OFF mode and no legacy column.
+  assert.doesNotMatch(list, /rolesOn|rolesSystemEnabled|legacyRole|row\.role\b/)
   assert.match(
     list,
     // `!profile_id` names the FK: profile_roles also points at profiles
@@ -241,15 +209,18 @@ test('the users list: ON reads the assignment and filters by it; OFF keeps the l
   )
   assert.ok(!/'profile_roles\(role_key/.test(list))
   assert.ok(!/'profile_roles!inner\(/.test(list))
-  // OFF: exactly the previous select.
-  assert.match(list, /: 'id,full_name,role,must_change_password,created_at'/)
-  // ON: the role column shows the assignment, the legacy badge otherwise.
-  assert.match(list, /if \(rolesOn && row\.assignedRole\)/)
+  // The select names no role column.
   assert.match(
     list,
-    /const badge = roleBadge\(row\.role\)\s+return <Badge tone=\{badge\.tone\}>\{t\(badge\.key\)\}<\/Badge>/,
+    /const columns = `id,full_name,must_change_password,created_at,\$\{filtersAssignment \? ASSIGNMENT_EMBED_INNER : ASSIGNMENT_EMBED\}`/,
   )
-  // The role filter maps to the assignment column while ON.
+  // The role column shows the assignment, «بدون دور» without one.
+  assert.match(list, /if \(row\.assignedRole\)/)
+  assert.match(
+    list,
+    /return <Badge tone="danger">\{t\('roleUsersNoRole'\)\}<\/Badge>/,
+  )
+  // The role filter maps to the assignment column.
   assert.match(list, /const ASSIGNED_ROLE_COLUMN = 'profile_roles\.role_key'/)
   assert.match(
     list,
@@ -257,48 +228,53 @@ test('the users list: ON reads the assignment and filters by it; OFF keeps the l
   )
   // Creation (roles stage 4c-1): create-user receives the chosen role key
   // and assigns it itself; the screen only reads whether it was assigned.
-  assert.match(list, /role_key: chosenRole,/)
+  assert.match(list, /role_key: form\.role,/)
   assert.match(list, /if \(result\.role_assigned === false\) \{/)
   // A failed assignment is a role-field message, never a failed creation,
   // and the dialog cannot create the user twice.
   assert.match(list, /role: 'userCreatedRoleNotAssigned'/)
   assert.match(list, /if \(createdUserId\) return/)
   assert.match(list, /\{t\('userOpenPage'\)\}/)
-  // OFF: the legacy options and today's select.
-  assert.match(list, /const legacyRoleOptions = USER_ROLES\.map/)
+  // One select: the active roles, the six original keys until they load.
+  assert.match(list, /const roleOptions = activeRoles\s+\?/)
+  assert.match(list, /: USER_ROLES\.map\(\(value\) => \(\{/)
   assert.match(
     list,
-    /value=\{form\.role\}\s+disabled=\{Boolean\(createdUserId\)\}\s+onValueChange=\{\(value\) =>\s+update\(\{ role: value as UserRole \}\)/,
+    /value=\{form\.role\}\s+disabled=\{Boolean\(createdUserId\)\}\s+onValueChange=\{\(value\) => update\(\{ role: value \}\)\}/,
   )
+  assert.match(list, /const invalid = validateUserForm\(form\)/)
 })
 
-test('the user page: ON uses the assignment select and plan; OFF keeps the legacy select and the blocked-change check', () => {
+test('the user page uses the assignment select and plan only', () => {
   const page = read('src', 'screens', 'UserDetail.tsx')
-  assert.match(page, /const rolesOn = rolesSystemEnabled === true/)
-  assert.match(
+  // Roles stage 4c-2 (0156): no OFF mode, no legacy role, nothing about the
+  // role sent to manage-user.
+  assert.doesNotMatch(
     page,
-    /const \{ roles: activeRoles \} = useActiveRoles\(rolesOn\)/,
+    /rolesOn|legacyRole|legacyRoleChangeBlocked|user\.role\b|loadedUser\.role\b|setRole\(|role: savedRole|'newSystemRole'|roleChangeUseAssignment/,
   )
+  assert.match(page, /const \{ roles: activeRoles \} = useActiveRoles\(true\)/)
   // The assignment is read as before and feeds the select.
   assert.match(
     page,
     /\.from\('profile_roles'\)\s+\.select\('role_key,roles\(name_ar,name_en\)'\)\s+\.eq\('profile_id', userId\)\s+\.maybeSingle\(\)/,
   )
   assert.match(page, /setAssignedRoleKey\(assigned\?\.key \?\? ''\)/)
-  // The plan decides the legacy role and the assign step.
+  // The plan decides the assign step.
   assert.match(
     page,
-    /planRoleChange\(\{\s+currentLegacy: user\.role,\s+currentAssigned: systemRole\.roleKey,\s+newRoleKey: assignedRoleKey,\s+\}\)/,
+    /planRoleChange\(\{\s+currentAssigned: systemRole\.roleKey,\s+newRoleKey: assignedRoleKey,\s+\}\)/,
   )
-  assert.match(
-    page,
-    /const legacyRoleToSave =\s+rolesOn && user \? legacyRoleAfter\(rolePlan, user\.role\) : role/,
-  )
-  assert.match(page, /role: savedRole,/)
   assert.match(
     page,
     /supabase\.rpc\(\s*'admin_assign_profile_role',\s*\{ p_profile_id: userId, p_role_key: assignStep\.roleKey \},/,
   )
+  // manage-user receives the record only.
+  const update = page.slice(
+    page.indexOf("action: 'update'"),
+    page.indexOf('company_ids:', page.indexOf("action: 'update'")),
+  )
+  assert.doesNotMatch(update, /\brole\b/)
   // The record is saved first; the assignment after it.
   assert.ok(
     page.indexOf("action: 'update'") <
@@ -310,26 +286,11 @@ test('the user page: ON uses the assignment select and plan; OFF keeps the legac
     page,
     /if \(mapped\.code && ASSIGN_ROLE_FIELD_CODES\.has\(mapped\.code\)\)/,
   )
-  // ON: the roles-system select (the legacy select hidden) with the note.
-  assert.match(page, /rolesOn \? \(/)
+  // The one select, with the note.
   assert.match(page, /value=\{assignedRoleKey \|\| undefined\}/)
   assert.match(page, /options=\{assignedRoleOptions\}/)
-  assert.match(
-    page,
-    /hint=\{rolesOn \? t\('userRoleManagedInSettings'\) : undefined\}/,
-  )
-  // OFF: today's legacy select and the blocked-change check are intact.
-  assert.match(
-    page,
-    /value=\{role\}\s+onValueChange=\{\(value\) => \{\s+clearError\('role'\)\s+setRole\(value as UserRole\)\s+if \(value !== 'supervisor'\) setCompanies\(\[\]\)\s+\}\}\s+options=\{roleOptions\}/,
-  )
-  assert.match(page, /legacyRoleChangeBlocked\(\{/)
-  assert.match(page, /role: 'roleChangeUseAssignment',/)
-  // The read-only "new system role" line exists only while OFF.
-  assert.match(
-    page,
-    /\.\.\.\(rolesOn\s+\? \[\]\s+: \[\s+\{\s+key: 'newSystemRole'/,
-  )
+  assert.match(page, /hint=\{t\('userRoleManagedInSettings'\)\}/)
+  assert.match(page, /role: assignedRoleKey,/)
   // The flag is no longer read by the page itself.
   assert.doesNotMatch(page, /\.from\('app_settings'\)/)
 })

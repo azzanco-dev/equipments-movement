@@ -1,5 +1,4 @@
 import type { TranslationKey } from '@/i18n/translations'
-import type { BadgeTone } from '@/components/ui'
 import type { Permission, PermissionScope } from '@/lib/types'
 import type { PermissionSelection } from '@/lib/rolesAdmin'
 
@@ -48,10 +47,6 @@ export interface PermissionGroupItem {
 export interface RoleUserItem {
   id: string
   name: string
-  /** The legacy role badge; the live roles page no longer passes it
-   *  (roles stage 4b), the /ui-kit mockup still does. */
-  legacyLabel?: string
-  legacyTone?: BadgeTone
   /** Formatted date of the assignment, null when unknown. */
   since: string | null
 }
@@ -71,26 +66,6 @@ export interface AssignCandidate {
   label: string
   description?: string
   currentRoleName: string | null
-}
-
-/** A row of the activation blockers (`admin_roles_system_offenders()`). */
-export interface OffenderItem {
-  id: string
-  name: string
-  legacyLabel: string
-  roleLabel: string
-  reasonLabel: string
-}
-
-/** One user of the activation preview (`admin_roles_system_preview()`). */
-export interface PreviewUserItem {
-  id: string
-  name: string
-  legacyLabel: string
-  roleLabel: string
-  gained: string[]
-  lost: string[]
-  scopeChanged: string[]
 }
 
 export type Loaded<T> =

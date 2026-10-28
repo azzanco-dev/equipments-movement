@@ -370,85 +370,29 @@ test('the DETAIL of a permission error names the row', () => {
   )
 })
 
-// --- Activation ----------------------------------------------------------------
+// --- Activation (retired) ----------------------------------------------------
 
-test('offender reasons and audit actions have labels', () => {
-  for (const reason of [
-    'no_role',
-    'unknown_role',
-    'inactive_role',
-    'admin_mismatch',
+// Roles stage 4c-2 (migration 0156): the system is on for good and the
+// legacy role is gone, so the activation helpers (blockers, preview, the
+// typed confirmation, the toggle answer) are gone with it.
+test('audit actions have labels; the activation helpers are gone', () => {
+  for (const name of [
+    'OFFENDER_REASON_KEYS',
+    'offenderReasonKey',
+    'groupPreviewByUser',
+    'canEnableRolesSystem',
+    'confirmationMatches',
+    'parseToggleResult',
+    'legacyRoleChangeBlocked',
   ])
-    assert.ok(roles.OFFENDER_REASON_KEYS[reason], reason)
-  assert.equal(roles.offenderReasonKey('no_role'), 'rolesOffenderNoRole')
-  assert.equal(roles.offenderReasonKey('???'), 'rolesOffenderUnknownRole')
+    assert.equal(roles[name], undefined, name)
   const actions = /CHECK \(action IN \(([\s\S]*?)\)\)/.exec(SQL_0126)
   assert.ok(actions)
   for (const [, action] of actions[1].matchAll(/'(\w+)'/g))
     assert.ok(roles.ROLE_CHANGE_ACTION_KEYS[action], action)
 })
 
-test('the preview is grouped per user into gained, lost and scope changes', () => {
-  const row = (profile, key, change, legacy, active) => ({
-    profile_id: profile,
-    full_name: profile.toUpperCase(),
-    legacy_role: 'supervisor',
-    role_key: 'foreman_lead',
-    permission_key: key,
-    legacy_scope: legacy,
-    active_scope: active,
-    change,
-  })
-  const users = plain(
-    roles.groupPreviewByUser([
-      row('b', 'map.view', 'gained', null, 'all'),
-      row('b', 'movements.read', 'scope_changed', 'own', 'site'),
-      row('a', 'home.foreman', 'lost', 'own', null),
-      row('b', 'reports.view', 'gained', null, 'site'),
-    ]),
-  )
-  assert.deepEqual(
-    users.map((user) => user.profile_id),
-    ['b', 'a'],
-  )
-  assert.deepEqual(
-    users[0].gained.map((r) => r.permission_key),
-    ['map.view', 'reports.view'],
-  )
-  assert.equal(users[0].scope_changed.length, 1)
-  assert.equal(users[0].lost.length, 0)
-  assert.equal(users[1].lost[0].permission_key, 'home.foreman')
-})
-
-test('enabling needs zero offenders and the typed word; nothing enables by default', () => {
-  const base = {
-    enabled: false,
-    offendersLoaded: true,
-    offenderCount: 0,
-    previewLoaded: true,
-    typed: 'تفعيل',
-    word: 'تفعيل',
-    busy: false,
-  }
-  assert.equal(roles.canEnableRolesSystem(base), true)
-  assert.equal(roles.canEnableRolesSystem({ ...base, typed: '' }), false)
-  assert.equal(roles.canEnableRolesSystem({ ...base, typed: 'تفعيل ' }), true)
-  assert.equal(roles.canEnableRolesSystem({ ...base, typed: 'تعطيل' }), false)
-  assert.equal(roles.canEnableRolesSystem({ ...base, offenderCount: 1 }), false)
-  assert.equal(
-    roles.canEnableRolesSystem({ ...base, offendersLoaded: false }),
-    false,
-  )
-  assert.equal(roles.canEnableRolesSystem({ ...base, enabled: null }), false)
-  assert.equal(roles.canEnableRolesSystem({ ...base, enabled: true }), false)
-  assert.equal(roles.canEnableRolesSystem({ ...base, busy: true }), false)
-  assert.equal(
-    roles.canEnableRolesSystem({ ...base, previewLoaded: false }),
-    false,
-  )
-})
-
-test('the flag and the toggle answer are read defensively', () => {
+test('the flag is read defensively', () => {
   assert.equal(roles.rolesSystemEnabledFromValue({ enabled: true }), true)
   for (const value of [
     { enabled: 'true' },
@@ -459,40 +403,6 @@ test('the flag and the toggle answer are read defensively', () => {
     {},
   ])
     assert.equal(roles.rolesSystemEnabledFromValue(value), false)
-  assert.deepEqual(plain(roles.parseToggleResult(null)), {
-    enabled: false,
-    changed: false,
-    offenders: [],
-    reason: null,
-    preview_rows: null,
-  })
-  assert.deepEqual(
-    plain(
-      roles.parseToggleResult({
-        enabled: false,
-        changed: false,
-        reason: 'preview_changed',
-        offenders: [],
-        preview_rows: 12,
-      }),
-    ),
-    {
-      enabled: false,
-      changed: false,
-      offenders: [],
-      reason: 'preview_changed',
-      preview_rows: 12,
-    },
-  )
-  assert.equal(roles.parseToggleResult({ reason: 'whatever' }).reason, null)
-  const refused = plain(
-    roles.parseToggleResult({
-      enabled: false,
-      changed: false,
-      offenders: [{ profile_id: 'x', reason: 'no_role' }],
-    }),
-  )
-  assert.equal(refused.offenders.length, 1)
 })
 
 test('audit values are reduced to labels, never shown as raw JSON', () => {
@@ -631,38 +541,24 @@ function sourceFiles(folder) {
     .sort()
 }
 
-test('the flag changes only on an explicit click, after the typed confirmation', () => {
-  const callers = sourceFiles(path.join(ROOT, 'src')).filter((file) =>
-    read(file).includes("'set_roles_system_enabled'"),
-  )
-  assert.deepEqual(callers, [
-    'src/components/roles/SystemSettingsContainer.tsx',
-  ])
+test('nothing in the interface changes the flag', () => {
+  // Roles stage 4c-2 (0156): «اعدادات النظام» shows the state and the log
+  // only; no screen calls set_roles_system_enabled or the dropped
+  // activation functions any more.
+  for (const file of sourceFiles(path.join(ROOT, 'src')))
+    assert.doesNotMatch(
+      read(file),
+      /'(set_roles_system_enabled|admin_roles_system_offenders|admin_roles_system_preview)'/,
+      file,
+    )
   const container = read(
     'src',
     'components',
     'roles',
     'SystemSettingsContainer.tsx',
   )
-  // One call, inside the click handler that re-checks the confirmation and
-  // acknowledges the preview by its row count.
-  assert.equal(container.split("'set_roles_system_enabled'").length, 2)
-  const toggle = container.slice(container.indexOf('const toggle = async'))
-  assert.ok(toggle.indexOf('set_roles_system_enabled') > 0)
-  assert.match(toggle, /if \(next \? !canEnable : !canDisable\) return/)
-  assert.match(
-    toggle,
-    /p_expected_preview_rows:\s*next && preview\.state === 'ready' \? preview\.rows\.length : null/,
-  )
-  assert.match(toggle, /answer\.reason === 'preview_changed'/)
-  assert.match(toggle, /answer\.reason === 'offenders'/)
-  assert.match(container, /canEnable = canEnableRolesSystem\(\{/)
-  assert.match(
-    container,
-    /canDisable =\s*enabled === true && !busy && confirmationMatches\(typed, word\)/,
-  )
-  assert.match(container, /onToggle: \(next\) => void toggle\(next\)/)
-  // The shared dialog presses it only from the two buttons.
+  assert.doesNotMatch(container, /supabase/)
+  assert.match(container, /<SystemSettingsDialog/)
   const dialog = read(
     'src',
     'components',
@@ -670,11 +566,8 @@ test('the flag changes only on an explicit click, after the typed confirmation',
     'ui',
     'SystemSettingsDialog.tsx',
   )
-  assert.match(dialog, /onClick=\{\(\) => activation\.onToggle\(false\)\}/)
-  assert.match(dialog, /onClick=\{\(\) => activation\.onToggle\(true\)\}/)
-  assert.equal(dialog.split('activation.onToggle(').length, 3)
-  assert.match(dialog, /disabled=\{!activation\.canDisable\}/)
-  assert.match(dialog, /disabled=\{!activation\.canEnable\}/)
+  assert.doesNotMatch(dialog, /activation[.:?]|offenders[.:?]|preview[.:?]|onToggle/)
+  assert.match(dialog, /<ChangesTable/)
   // No native confirm() anywhere on the roles page.
   for (const file of sourceFiles(ROLES_DIR))
     assert.doesNotMatch(
@@ -684,26 +577,18 @@ test('the flag changes only on an explicit click, after the typed confirmation',
     )
 })
 
-test('the roles page writes only through the five 0126 functions', () => {
+test('the roles page writes only through the four 0126 functions', () => {
   const WRITE_RPCS = [
     'admin_upsert_role',
     'admin_set_role_permissions',
     'admin_assign_profile_role',
     'admin_delete_role',
-    'set_roles_system_enabled',
-  ]
-  const READ_RPCS = [
-    'admin_roles_system_offenders',
-    'admin_roles_system_preview',
   ]
   const seen = new Set()
   for (const file of sourceFiles(ROLES_DIR)) {
     const source = read(file)
     for (const [, name] of source.matchAll(/supabase\.rpc\(\s*'(\w+)'/g)) {
-      assert.ok(
-        WRITE_RPCS.includes(name) || READ_RPCS.includes(name),
-        `${file} calls ${name}`,
-      )
+      assert.ok(WRITE_RPCS.includes(name), `${file} calls ${name}`)
       seen.add(name)
     }
     // No direct table writes: the tables are written by the functions only.
@@ -730,7 +615,6 @@ test('the roles page writes only through the five 0126 functions', () => {
   ])
   assert.deepEqual(callersOf('admin_assign_profile_role'), [
     'src/components/roles/RoleUsersTab.tsx',
-    'src/components/roles/SystemSettingsContainer.tsx',
   ])
   // The permissions are saved as one whole payload, errors mapped safely.
   const tab = read('src', 'components', 'roles', 'RolePermissionsTab.tsx')
@@ -841,7 +725,6 @@ test('wave-22-roles copy: Arabic and English keys match, no alif with hamza or m
   const keys = new Set(keysOf(blocks[0][1]))
   const used = [
     ...Object.values(roles.ROLES_ERROR_KEYS),
-    ...Object.values(roles.OFFENDER_REASON_KEYS),
     ...Object.values(roles.ROLE_CHANGE_ACTION_KEYS),
     ...Object.values(roles.SCOPE_LABEL_KEYS),
     ...Object.values(roles.PERMISSION_GROUP_LABEL_KEYS),
@@ -849,29 +732,14 @@ test('wave-22-roles copy: Arabic and English keys match, no alif with hamza or m
   for (const key of used) assert.ok(keys.has(key), key)
 })
 
-test('a legacy role change is blocked only as the 0126 trigger refuses it', () => {
-  const base = {
-    rolesSystemEnabled: true,
-    oldRole: 'supervisor',
-    newRole: 'monitor',
-    assignedRoleKey: 'foreman_lead',
-  }
-  const blocked = (patch) =>
-    roles.legacyRoleChangeBlocked({ ...base, ...patch })
-  assert.equal(blocked({}), true)
-  assert.equal(blocked({ rolesSystemEnabled: false }), false)
-  assert.equal(blocked({ rolesSystemEnabled: null }), false)
-  assert.equal(blocked({ assignedRoleKey: 'supervisor' }), false) // not customised
-  assert.equal(blocked({ assignedRoleKey: null }), false)
-  assert.equal(blocked({ newRole: 'admin' }), false) // admin parity follows
-  assert.equal(blocked({ oldRole: 'admin', assignedRoleKey: 'admin' }), false)
-  assert.equal(blocked({ newRole: 'supervisor' }), false) // no change
+test('no legacy role change is checked or mapped any more', () => {
+  // Roles stage 4c-2 (0156): the 0126 sync trigger is gone (0154) and so is
+  // profiles.role; the user page never sends a role to manage-user.
+  assert.equal(roles.legacyRoleChangeBlocked, undefined)
   const userForm = loadLibModule('userForm')
-  assert.deepEqual(
-    plain(
-      userForm.userEditServerFieldErrors('roles_system_active_use_assignment'),
-    ),
-    { role: 'roleChangeUseAssignment' },
+  assert.equal(
+    userForm.userEditServerFieldErrors('roles_system_active_use_assignment'),
+    null,
   )
 })
 

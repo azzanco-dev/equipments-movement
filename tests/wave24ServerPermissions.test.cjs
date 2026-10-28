@@ -285,9 +285,9 @@ test('the Edge Functions require users.manage as the caller, never through the s
           forbiddenAt,
         'the service-role client is created after the check',
       )
-      // Roles stage 4c-1: a placeholder legacy role, the chosen role assigned
-      // as the caller.
-      assert.match(source, /app_metadata: \{ role: 'monitor', admin_created: true \}/)
+      // Roles stage 4c-2 (0156): no role in app_metadata; the chosen role is
+      // assigned as the caller.
+      assert.match(source, /app_metadata: \{ admin_created: true \}/)
       assert.match(source, /userClient\.rpc\(\s+'admin_assign_profile_role'/)
     } else {
       // Kept rule: the forced own password change. Own role and last admin

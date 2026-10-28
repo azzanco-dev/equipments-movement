@@ -92,7 +92,7 @@ Deno.serve(async (req: Request) => {
         adminClient.auth.admin.getUserById(userId),
         adminClient
           .from('profiles')
-          .select('id,full_name,role,created_at,must_change_password')
+          .select('id,full_name,created_at,must_change_password')
           .eq('id', userId)
           .maybeSingle(),
         adminClient

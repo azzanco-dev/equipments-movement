@@ -41,7 +41,6 @@ import { localizedName } from '@/lib/localizedName'
 import {
   assignedRoleFromEmbed,
   isSystemRoleKey,
-  legacyRoleFor,
   type AssignedRole,
 } from '@/lib/userRoleAssignment'
 import {
@@ -59,16 +58,16 @@ import {
   hasErrors,
   type FieldErrors,
 } from '@/lib/formValidation'
-import type { Profile, UserRole } from '@/lib/types'
+import type { Profile } from '@/lib/types'
 
 interface AdminUsersProps {
   onSelectUser: (id: string) => void
 }
 
-/** A list row: the profile plus, with the roles system ON, its assignment. */
+/** A list row: the profile plus its assignment (null when it has none). */
 type UserRow = Profile & { assignedRole: AssignedRole | null }
 
-/** The embedded assignment, read with the profile when the flag is ON. */
+/** The embedded assignment, read with the profile. */
 const ASSIGNMENT_EMBED =
   'profile_roles!profile_id(role_key,roles(name_ar,name_en))'
 /** The same embed as an inner join, for a filter on the assigned role. */
@@ -79,17 +78,14 @@ const ASSIGNED_ROLE_COLUMN = 'profile_roles.role_key'
 export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   const { t, lang } = useI18n()
   const { user: currentUser } = useAuth()
-  // wave 23 (step 3): with the roles system ON the list shows and the dialog
-  // assigns the `profile_roles` role; OFF or unknown keeps the legacy role
-  // exactly as before. The active roles are read only while ON.
+  // The list shows and the dialog assigns the `profile_roles` role (roles
+  // stage 4c-2, migration 0156: the legacy profiles.role is gone).
   const permissionState = usePermissions()
-  const { rolesSystemEnabled } = permissionState
   // wave 24: adding and deleting users follow `users.manage` (nobody
   // while the permissions load or after a failed load); the page gate and
   // the database (0127) require the same key.
   const canManageUsers = usersActions(permissionState).manage
-  const rolesOn = rolesSystemEnabled === true
-  const { roles: activeRoles } = useActiveRoles(rolesOn)
+  const { roles: activeRoles } = useActiveRoles(true)
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -100,9 +96,6 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [errors, setErrors] = useState<FieldErrors<UserFormValues>>({})
-  // The assigned role chosen in the dialog while the roles system is ON
-  // (`roles.key`); `form.role` keeps the legacy role for the OFF dialog.
-  const [roleKey, setRoleKey] = useState<string>(EMPTY_USER_FORM.role)
   // Set when `create-user` succeeded but the custom role could not be
   // assigned: the user exists, so the dialog must not create him again.
   const [createdUserId, setCreatedUserId] = useState<string | null>(null)
@@ -122,23 +115,19 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     const signal = startListRequest()
     setLoading(true)
     setLoadError(null)
-    // With the roles system ON the role filter applies to the assignment
-    // (`profile_roles.role_key`); an inner join is needed for PostgREST to
-    // filter the parent rows by it, so it is used only while such a filter is
-    // active (otherwise users without an assignment would disappear).
-    const filters = rolesOn
-      ? list.filters.map((filter) =>
-          filter.field === 'role'
-            ? { ...filter, field: ASSIGNED_ROLE_COLUMN }
-            : filter,
-        )
-      : list.filters
+    // The role filter applies to the assignment (`profile_roles.role_key`);
+    // an inner join is needed for PostgREST to filter the parent rows by it,
+    // so it is used only while such a filter is active (otherwise users
+    // without an assignment would disappear).
+    const filters = list.filters.map((filter) =>
+      filter.field === 'role'
+        ? { ...filter, field: ASSIGNED_ROLE_COLUMN }
+        : filter,
+    )
     const filtersAssignment = filters.some(
       (filter) => filter.field === ASSIGNED_ROLE_COLUMN,
     )
-    const columns = rolesOn
-      ? `id,full_name,role,must_change_password,created_at,${filtersAssignment ? ASSIGNMENT_EMBED_INNER : ASSIGNMENT_EMBED}`
-      : 'id,full_name,role,must_change_password,created_at'
+    const columns = `id,full_name,must_change_password,created_at,${filtersAssignment ? ASSIGNMENT_EMBED_INNER : ASSIGNMENT_EMBED}`
     let query = supabase
       .from('profiles')
       .select(columns, { count: 'exact' })
@@ -155,7 +144,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
       filters,
       new Set([
         ...usersListConfig.filterFields.map((field) => field.key),
-        ...(rolesOn ? [ASSIGNED_ROLE_COLUMN] : []),
+        ASSIGNED_ROLE_COLUMN,
       ]),
     )
     const { data, error, count } = await query.abortSignal(signal)
@@ -168,7 +157,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     setUsers(
       rows.map(({ profile_roles, ...profile }) => ({
         ...profile,
-        assignedRole: rolesOn ? assignedRoleFromEmbed(profile_roles) : null,
+        assignedRole: assignedRoleFromEmbed(profile_roles),
       })),
     )
     setTotal(count ?? 0)
@@ -181,7 +170,6 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     list.pageSize,
     list.search,
     list.sort,
-    rolesOn,
     t,
   ])
 
@@ -189,26 +177,25 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     fetchUsers()
   }, [fetchUsers])
 
-  const legacyRoleOptions = USER_ROLES.map((value) => ({
-    value,
-    label: t(roleBadge(value).key),
-  }))
-  // ON: the active roles, system roles first (`useActiveRoles`). Until they
-  // load, or when they could not be read, the legacy roles — every one of
-  // them is an active system role — keep the dialog usable.
-  const assignedRoleOptions = rolesOn && activeRoles
-  const roleOptions = assignedRoleOptions
-    ? assignedRoleOptions.map((role) => ({
+  // The active roles, the original ones first (`useActiveRoles`). Until they
+  // load, or when they could not be read, the six original roles (their
+  // values are role keys too) keep the dialog usable; create-user checks
+  // that the chosen role exists and is active.
+  const roleOptions = activeRoles
+    ? activeRoles.map((role) => ({
         value: role.key,
         label: roleName(lang, role),
       }))
-    : legacyRoleOptions
+    : USER_ROLES.map((value) => ({
+        value,
+        label: t(roleBadge(value).key),
+      }))
 
-  // The role filter: the assigned roles while ON (runtime labels in the
-  // active language), today's legacy options otherwise.
+  // The role filter: the active roles (runtime labels in the active
+  // language) once read, the six original roles until then.
   const filterFields = useMemo<FilterField[]>(
     () =>
-      rolesOn && activeRoles
+      activeRoles
         ? usersListConfig.filterFields.map((field) =>
             field.key === 'role'
               ? {
@@ -221,12 +208,11 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
               : field,
           )
         : usersListConfig.filterFields,
-    [activeRoles, lang, rolesOn],
+    [activeRoles, lang],
   )
 
   function openAdd() {
     setForm(EMPTY_USER_FORM)
-    setRoleKey(EMPTY_USER_FORM.role)
     setCreatedUserId(null)
     setFormError(null)
     setErrors({})
@@ -236,15 +222,9 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   async function handleSave() {
     if (createdUserId) return
     setFormError(null)
-    // The role select of the roles system once the active roles loaded; until
-    // then (or after a failed load) the legacy select (its values are role
-    // keys too). The form schema still checks a legacy value, so the chosen
-    // role is validated through `legacyRoleFor`; nothing writes it.
-    const chosenRole = assignedRoleOptions ? roleKey : form.role
-    const legacyRole = assignedRoleOptions
-      ? legacyRoleFor(chosenRole, null)
-      : form.role
-    const invalid = validateUserForm({ ...form, role: legacyRole })
+    // The chosen role key is checked like the other fields (present); the
+    // Edge Function checks that it exists and is active.
+    const invalid = validateUserForm(form)
     if (hasErrors(invalid)) {
       setErrors(invalid)
       focusFirstError(invalid, USER_FIELD_ORDER, { root: bodyRef.current })
@@ -253,9 +233,9 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     setSaving(true)
     try {
       // Roles stage 4c (owner 2026-10-27): create-user assigns the chosen
-      // role itself (admin_assign_profile_role as the caller); the legacy
-      // profiles.role is no longer chosen here. A failed assignment never
-      // undoes the account: the role is then set on the user's page.
+      // role itself (admin_assign_profile_role as the caller). A failed
+      // assignment never undoes the account: the role is then set on the
+      // user's page.
       const result = await callEdgeFunction<{
         user: { id: string }
         role_assigned?: boolean
@@ -263,7 +243,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
         email: form.email.trim(),
         password: form.password,
         full_name: form.full_name.trim(),
-        role_key: chosenRole,
+        role_key: form.role,
       })
       if (result.role_assigned === false) {
         setCreatedUserId(result.user.id)
@@ -343,13 +323,12 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
     {
       key: 'role',
       header: t('role'),
-      // ON: the column shows the assigned role, but sorting could only order
-      // by the legacy profiles.role, so it is not offered (roles stage 3).
-      sortable: !rolesOn,
+      // The column shows the assigned role, an embed the users cannot be
+      // sorted by, so it is not sortable (roles stage 3).
+      sortable: false,
       cell: (row) => {
-        // ON: the assigned role's name; a user without assignment, and the
-        // OFF state, show the legacy badge as before.
-        if (rolesOn && row.assignedRole)
+        // The assigned role's name; a user without assignment holds nothing.
+        if (row.assignedRole)
           return (
             <Badge
               tone={
@@ -365,8 +344,7 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
               )}
             </Badge>
           )
-        const badge = roleBadge(row.role)
-        return <Badge tone={badge.tone}>{t(badge.key)}</Badge>
+        return <Badge tone="danger">{t('roleUsersNoRole')}</Badge>
       },
     },
     {
@@ -545,31 +523,18 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
           <Field
             label={t('role')}
             name="role"
-            hint={rolesOn ? t('userRoleManagedInSettings') : undefined}
+            hint={t('userRoleManagedInSettings')}
             error={errors.role && t(errors.role)}
           >
-            {(control) =>
-              assignedRoleOptions ? (
-                <Select
-                  {...control}
-                  value={roleKey}
-                  disabled={Boolean(createdUserId)}
-                  onValueChange={(value) => {
-                    setRoleKey(value)
-                    setErrors((current) => clearFieldErrors(current, ['role']))
-                  }}
-                  options={roleOptions}
-                />
-              ) : (
-                <Select
-                  {...control}
-                  value={form.role}
-                  disabled={Boolean(createdUserId)}
-                  onValueChange={(value) => update({ role: value as UserRole })}
-                  options={roleOptions}
-                />
-              )
-            }
+            {(control) => (
+              <Select
+                {...control}
+                value={form.role}
+                disabled={Boolean(createdUserId)}
+                onValueChange={(value) => update({ role: value })}
+                options={roleOptions}
+              />
+            )}
           </Field>
         </div>
       </Dialog>

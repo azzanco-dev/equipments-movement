@@ -18,9 +18,11 @@ export interface BadgeDescriptor {
 }
 
 /**
- * Every assignable role, in the order shown in the add-user role select.
- * Roles are assigned only through the `create-user` Edge Function and the
- * admin-only database functions (AGENTS.md); this list only drives the UI.
+ * The six original roles, in the order the add-user role select shows them
+ * until the active roles of the roles page are read (or when they cannot
+ * be). Their values are role keys (`roles.key`). Roles are assigned only
+ * through the `create-user` Edge Function and the admin-only database
+ * functions (AGENTS.md); this list only drives the UI.
  */
 export const USER_ROLES: UserRole[] = [
   'supervisor',
@@ -31,12 +33,12 @@ export const USER_ROLES: UserRole[] = [
   'admin',
 ]
 
-/** Values held by the add-user dialog. */
+/** Values held by the add-user dialog; `role` is the chosen role key. */
 export interface UserFormValues {
   full_name: string
   email: string
   password: string
-  role: UserRole
+  role: string
 }
 
 export const EMPTY_USER_FORM: UserFormValues = {
@@ -60,7 +62,8 @@ export { PASSWORD_MIN_LENGTH }
 /**
  * The same three rules the dialog enforced before (name, email, and password
  * present; a plausible email; a password of at least 8 characters), reported
- * per field instead of as one message (`userFormSchema`).
+ * per field instead of as one message, plus a chosen role key
+ * (`userFormSchema`).
  */
 export function validateUserForm(
   form: UserFormValues,
@@ -68,11 +71,14 @@ export function validateUserForm(
   return validateWithSchema(userFormSchema, form)
 }
 
-/** Values held by the edit form of the user detail page. */
+/**
+ * Values held by the edit form of the user detail page. `role` is the
+ * chosen role key; '' keeps the user's assignment as it is.
+ */
 export interface UserEditFormValues {
   full_name: string
   email: string
-  role: UserRole
+  role: string
   password: string
   mobile_number: string
 }
@@ -121,10 +127,6 @@ export function userEditServerFieldErrors(
 ): FieldErrors<UserEditFormValues> | null {
   if (serverCode === 'own_role') return { role: 'cannotChangeOwnRole' }
   if (serverCode === 'last_admin') return { role: 'lastAdminRequired' }
-  // wave 22B: the roles system is active and the user has a customised
-  // assignment (0126 trigger); the role is changed on the roles page.
-  if (serverCode === 'roles_system_active_use_assignment')
-    return { role: 'roleChangeUseAssignment' }
   return null
 }
 
@@ -141,10 +143,16 @@ const ROLE_BADGES: Record<UserRole, BadgeDescriptor> = {
 }
 
 /**
- * Single mapping from a role to its shared `Badge` (AGENTS.md: no ad hoc
- * palette colors). An unrecognized value never falls back to an existing
- * role's label — client-side role handling must fail closed.
+ * Single mapping from one of the six original role keys to its shared
+ * `Badge` (AGENTS.md: no ad hoc palette colors). Any other key (a custom
+ * role) never falls back to an existing role's label — client-side role
+ * handling must fail closed.
  */
-export function roleBadge(role: UserRole): BadgeDescriptor {
-  return ROLE_BADGES[role] ?? { tone: 'neutral', key: 'unknownRole' }
+export function roleBadge(roleKey: string): BadgeDescriptor {
+  return (
+    (ROLE_BADGES as Partial<Record<string, BadgeDescriptor>>)[roleKey] ?? {
+      tone: 'neutral',
+      key: 'unknownRole',
+    }
+  )
 }

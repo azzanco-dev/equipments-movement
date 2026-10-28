@@ -29,8 +29,8 @@ import {
  * `current_permissions()` (migration 0126) and re-loaded on demand (`reload`,
  * called by the roles page after an admin change).
  *
- * While the roles system is inactive the database answers from the frozen
- * legacy mapping of `profiles.role`, so this is exactly today's access.
+ * The database answers from the user's assigned role (`profile_roles`) only
+ * since 0150; the legacy `profiles.role` was dropped by 0156.
  *
  * Readers: the roles settings page (to hide itself without `settings.roles`)
  * and, since wave 23, src/App.tsx through src/lib/navPermissions.ts: the

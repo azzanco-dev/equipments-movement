@@ -438,9 +438,10 @@ export const usersListConfig: DataListConfig = {
       ],
     },
   ],
+  // No `role` sort: the role is the `profile_roles` assignment, an embed the
+  // users cannot be ordered by (roles stage 4c-2 dropped profiles.role).
   sortableFields: [
     { key: 'full_name', label: { ar: 'الاسم', en: 'Name' } },
-    { key: 'role', label: 'role' },
     { key: 'created_at', label: 'createdAt' },
   ],
 }
