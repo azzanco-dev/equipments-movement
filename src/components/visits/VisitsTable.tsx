@@ -36,6 +36,7 @@ import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
 import { exitPurposeLabelKey } from '@/lib/exitPurpose'
 import type { ExportScope } from '@/lib/exportOptions'
+import { formatSaudiDateTime } from '@/lib/printExport'
 import {
   previousCodeSearchTerm,
   resolvePreviousCodeIds,
@@ -58,6 +59,7 @@ import {
   distinctDriverIds,
   distinctEquipmentIds,
   foremanVisitsListConfig,
+  formatVisitCreatedAgo,
   formatVisitDuration,
   siteEntryIds,
   visitContextFilter,
@@ -579,11 +581,40 @@ export function VisitsTable({
         </span>
       ),
     }
+    // Owner 2026-10-28: «الانشاء», the LAST column, «بنفس نمط مدة الزيارة»:
+    // the same 12 px muted text at the end, as the time since the ENTRY was
+    // registered (`entry_created_at`, migration 0159), with the exact Saudi
+    // date-time on hover. Not sortable.
+    const createdAt: DataTableColumn<EquipmentVisitRow> = {
+      key: 'entry_created_at',
+      header: t('visitCreatedAt'),
+      align: 'end',
+      cell: (visit) => {
+        const ago = formatVisitCreatedAgo(visit.entry_created_at, lang)
+        return (
+          <span
+            className="text-xs text-muted"
+            title={formatSaudiDateTime(visit.entry_created_at) || undefined}
+          >
+            {ago ? t('visitCreatedAgo').replace('{duration}', ago) : '—'}
+          </span>
+        )
+      },
+    }
 
     if (context === 'workshop')
       return isLog
-        ? [equipment, state, purpose, foreman, entryAt, exitAt, duration]
-        : [equipment, state, purpose, entryAt, exitAt, duration]
+        ? [
+            equipment,
+            state,
+            purpose,
+            foreman,
+            entryAt,
+            exitAt,
+            duration,
+            createdAt,
+          ]
+        : [equipment, state, purpose, entryAt, exitAt, duration, createdAt]
     if (context === 'site')
       return isLog
         ? [
@@ -595,8 +626,17 @@ export function VisitsTable({
             entryAt,
             exitAt,
             duration,
+            createdAt,
           ]
-        : [equipment, state, companyProject, entryAt, exitAt, duration]
+        : [
+            equipment,
+            state,
+            companyProject,
+            entryAt,
+            exitAt,
+            duration,
+            createdAt,
+          ]
     return [
       equipment,
       state,
@@ -606,6 +646,7 @@ export function VisitsTable({
       entryAt,
       exitAt,
       duration,
+      createdAt,
     ]
   }, [context, isLog, t, lang, onSelectMovement])
 

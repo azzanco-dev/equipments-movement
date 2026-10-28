@@ -51,10 +51,11 @@ export const EQUIPMENT_VISITS_VIEW = 'movement_visits'
  * `contractor_equipment_code` was appended to the view by migration 0106, so
  * that migration must be applied before this select is shipped. The same
  * holds for `exit_purpose`, appended by migration 0118, and for
- * `driver_full_name`, appended by migration 0124 (wave 19).
+ * `driver_full_name`, appended by migration 0124 (wave 19), and for
+ * `entry_created_at`, appended by migration 0159.
  */
 export const EQUIPMENT_VISITS_SELECT =
-  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code,equipment_ownership_status,exit_purpose,driver_full_name'
+  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code,equipment_ownership_status,exit_purpose,driver_full_name,entry_created_at'
 
 /**
  * The admin log's visits view (and the workshop managers' embedded log): the
@@ -109,6 +110,12 @@ export interface EquipmentVisitRow {
    * an owner «مالك اخر» (`equipmentSupplierLine`).
    */
   equipment_lessor_name?: string | null
+  /**
+   * When the ENTRY was registered in the system (`entry_exit_logs.created_at`,
+   * migration 0159), as opposed to `entry_at`, the movement's own date. The
+   * «الانشاء» column, shown in the duration's style (owner 2026-10-28).
+   */
+  entry_created_at?: string | null
 }
 
 /** Which visits a table lists; `all` applies no context predicate. */
@@ -441,6 +448,24 @@ export function formatVisitDuration(
   return lang === 'ar' ? arabicUnit(count, unit) : englishUnit(count, unit)
 }
 
+/**
+ * How long ago a visit's ENTRY was created, in the words of
+ * `formatVisitDuration` (the «الانشاء» column, owner 2026-10-28: «بنفس نمط مدة
+ * الزيارة»): «3 ايام», «ساعتان». The caller wraps it as «منذ …». A creation
+ * time slightly ahead of this device's clock reads as 0 minutes; `null` for a
+ * missing or unparseable time, so the caller renders its own placeholder.
+ */
+export function formatVisitCreatedAgo(
+  createdAt: string | null | undefined,
+  lang: Language,
+  now: number = Date.now(),
+): string | null {
+  if (!createdAt) return null
+  const created = Date.parse(createdAt)
+  if (Number.isNaN(created)) return null
+  return formatVisitDuration(Math.max(0, (now - created) / 60000), lang)
+}
+
 // ============ VISITS EXPORT ============
 //
 // The columns of the admin log's visits export. Pure, like the movement
@@ -745,6 +770,16 @@ export function visitExportColumns(
       header: t('visitDuration'),
       width: 14,
       value: (row) => formatVisitDuration(row.duration_minutes, lang) ?? '',
+    },
+    {
+      // Last, like the table (owner 2026-10-28): when the ENTRY was
+      // registered in the system (migration 0159), as an exact instant.
+      key: 'created_at',
+      group: recording,
+      header: t('visitCreatedAt'),
+      width: 18,
+      type: 'date',
+      value: (row) => row.entry_created_at ?? null,
     },
   ]
 }

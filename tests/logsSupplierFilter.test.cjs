@@ -597,6 +597,8 @@ test('the line sits inside the equipment cell; no table column is added', () => 
       'entry_at',
       'exit_at',
       'duration_minutes',
+      // Owner 2026-10-28 (migration 0159): «الانشاء», the last column.
+      'entry_created_at',
     ],
   )
   const visitEquipment = visits.slice(

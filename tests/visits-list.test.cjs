@@ -419,7 +419,8 @@ test('the visits export writes plain text, the company number and Saudi dates', 
   assert.equal(cell('[driverName]'), '')
   assert.equal(cell('[visitDuration]'), '3 hours')
   const dates = columns.filter((column) => column.type === 'date')
-  assert.equal(dates.length, 2)
+  // Entry, exit and, since 0159, the entry's creation time («الانشاء»).
+  assert.equal(dates.length, 3)
 })
 
 test('the export carries owner and supplier right after the equipment columns', () => {
