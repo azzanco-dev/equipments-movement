@@ -77,6 +77,23 @@ async function updateEquipment(
   }
 }
 
+/**
+ * Every write of the sync is an equipment update with the caller's token,
+ * which the `update_equipment` RLS policy allows only with `equipment.edit`.
+ * Without it every link would fail one by one, so the route refuses up front
+ * with the same answer as the gate. Exactly `true` passes.
+ */
+async function canEditEquipment(supabase: SupabaseClient): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('has_permission', {
+      p_key: 'equipment.edit',
+    })
+    return !error && data === true
+  } catch {
+    return false
+  }
+}
+
 async function readForce(request: Request): Promise<boolean | null> {
   try {
     const text = await request.text()
@@ -107,7 +124,9 @@ async function readForce(request: Request): Promise<boolean | null> {
  *           500 { error: 'failed' }
  *
  * Needs the permission `settings.integrations` (wave 24, `requirePermission`,
- * fail closed), checked before Afaqy is asked. The matching rules are in
+ * fail closed) AND `equipment.edit` (every write needs it), both checked
+ * before Afaqy is asked; either one missing is the same 403 `forbidden`.
+ * The matching rules are in
  * src/lib/afaqySync.ts. Every write is a plain update of one equipment row
  * WITH THE CALLER'S TOKEN, so the `update_equipment` RLS policy
  * (`equipment.edit`) and the 0122 constraints (one unit per equipment) stay
@@ -123,6 +142,8 @@ export async function POST(request: Request) {
         access.error === 'unauthorized' ? 401 : 403,
       )
     }
+    if (!(await canEditEquipment(access.supabase)))
+      return reply({ error: 'forbidden' }, 403)
     const force = await readForce(request)
     if (force === null) return reply({ error: 'invalid_request' }, 400)
     if (!isAfaqyConfigured()) return reply({ error: 'not_configured' }, 503)

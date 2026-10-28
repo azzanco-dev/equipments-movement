@@ -14,7 +14,6 @@ import {
 } from '@/lib/rolesAdmin'
 import type { Permission, RolePermission } from '@/lib/types'
 import type { Language } from '@/i18n/translations'
-import type { TranslationKey } from '@/i18n/translations'
 import { fill } from './roleRows'
 import {
   PermissionsTable,
@@ -24,22 +23,16 @@ import {
   type PermissionsSaveOutcome,
 } from './ui'
 
-/** `map.view` («خريطة المشاريع») stays in the catalogue until a later
- *  migration retires it; the table never shows it (a role keeping it keeps it). */
-const HIDDEN_GROUPS = new Set(['map'])
-/** The reserved purchasing keys open collapsed under «لاحقاً». */
-const COLLAPSED_GROUPS = new Set(['purchasing'])
-const GROUP_LABEL_OVERRIDES: Record<string, TranslationKey> = {
-  purchasing: 'permissionGroupLater',
-}
-
+/**
+ * Every group of the catalogue, labelled and open like the others: purchasing
+ * is live since 2026-10-19 (it opened collapsed under «لاحقا» while it was
+ * reserved), and `map.view` left the catalogue with migration 0130.
+ */
 export function toPermissionItems(
   catalogue: Permission[],
   lang: Language,
 ): { permissions: PermissionItem[]; groups: PermissionGroupItem[] } {
-  const groups = groupPermissions(catalogue).filter(
-    (group) => !HIDDEN_GROUPS.has(group.key),
-  )
+  const groups = groupPermissions(catalogue)
   return {
     permissions: groups.flatMap((group) =>
       group.permissions.map((permission) => ({
@@ -57,7 +50,7 @@ export function toPermissionItems(
     groups: groups.map((group) => ({
       key: group.key,
       name: '',
-      collapsed: COLLAPSED_GROUPS.has(group.key),
+      collapsed: false,
     })),
   }
 }
@@ -87,9 +80,7 @@ export function RolePermissionsTab({
     return {
       permissions: items.permissions,
       groups: items.groups.map((group) => {
-        const key =
-          GROUP_LABEL_OVERRIDES[group.key] ??
-          PERMISSION_GROUP_LABEL_KEYS[group.key]
+        const key = PERMISSION_GROUP_LABEL_KEYS[group.key]
         return { ...group, name: key ? t(key) : group.key }
       }),
     }

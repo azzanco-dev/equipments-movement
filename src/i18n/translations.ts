@@ -1190,7 +1190,6 @@ export const translations = {
     rolePermissionsRequiresMissing: 'تحتاج: {names} (غير ممنوحة)',
     rolePermissionsSavedShort: 'تم الحفظ',
     rolePermissionsUndo: 'تراجع',
-    permissionGroupLater: 'لاحقاً',
     roleUsersOfRole: 'مستخدمو دور {name}',
     roleUsersOneRoleNote: '{count} بهذا الدور. لكل مستخدم دور واحد فقط.',
     roleUsersAssign: 'اسناد مستخدم',
@@ -1238,6 +1237,34 @@ export const translations = {
     rolesOffendersFixDesc: 'يحتاج كل مستخدم دورا نشطا صالحا قبل التفعيل.',
     rolesOffendersFixRole: 'الدور',
     rolesOffendersFixPick: 'اختر دورا',
+    rolePermissionsWarnInquiryNeedsRead:
+      'الاستعلام لن يعرض حالة المعدة ولا حركاتها بدون «{names}». اضفها.',
+    rolePermissionsWarnCreateNeedsRead:
+      'لن يستطيع فتح الحركة التي يسجلها بدون «{names}». اضفها.',
+    rolePermissionsWarnForemanHomeNeedsRead:
+      'لوحة الفورمان لن تعرض حركاته بدون «{names}». اضفها.',
+    rolePermissionsWarnWorkshopHomeNeedsRead:
+      'لوحة الورشة لن تعرض حركات الورشة بدون «{names}». اضفها بنطاق «الورشة» او «الكل».',
+    rolePermissionsWarnHomeShadowed:
+      'لن تعمل: «{names}» تتقدم عليها ويفتح المستخدم تلك اللوحة فقط، فتضيع ميزات هذه اللوحة. اترك لوحة واحدة.',
+    rolePermissionsWarnNoWayInFromFieldHome:
+      'صفحتها في القائمة الجانبية فقط، ولا مدخل لها من «{names}». احذفها او احذف تلك اللوحة.',
+    rolePermissionsWarnSiteReportNeedsRead:
+      'تقرير الدخوليات يظهر ناقصا: اجعل نطاق «{names}» «المشاريع» او «الكل».',
+    rolePermissionsWarnWorkshopReportNeedsRead:
+      'تقرير الورشة يظهر فارغا او ناقصا: اجعل نطاق «{names}» «الورشة» او «الكل».',
+    rolePermissionsWarnAdminHomeNeedsReadAll:
+      'حالات الاسطول وارقام لوحة الادمن تظهر ناقصة او خاطئة: اجعل نطاق «{names}» «الكل».',
+    rolePermissionsWarnDeleteNeedsPhotos:
+      'حذف الحركة يترك صور المستخدمين الاخرين: اضف «{names}».',
+    rolePermissionsWarnTrackerNeedsIntegrations:
+      'حقل افاقي لا يظهر في نموذج المعدة بدون «{names}». اضفها.',
+    rolePermissionsWarnIntegrationsNeedsEdit:
+      'مزامنة «ربط افاقي» ترفض بدون «{names}». اضفها.',
+    rolePermissionsWarnNeedsSiteCreate:
+      'لا تعمل بدون «{names}»: تظهر في نموذج حركة المشروع فقط. اضفها.',
+    rolePermissionsWarnNeedsEquipmentQuickCreate:
+      'لا تعمل بدون «{names}»: تظهر داخل انشاء المعدة السريع فقط. اضفها.',
     // wave-24-roles-page — end
     // wave-24-actions — start
     equipmentCodeChangeNotAllowed:
@@ -3346,7 +3373,6 @@ export const translations = {
     rolePermissionsRequiresMissing: 'Needs: {names} (not granted)',
     rolePermissionsSavedShort: 'Saved',
     rolePermissionsUndo: 'Undo',
-    permissionGroupLater: 'Later',
     roleUsersOfRole: 'Users of the role {name}',
     roleUsersOneRoleNote:
       '{count} with this role. Each user has exactly one role.',
@@ -3398,6 +3424,34 @@ export const translations = {
       'Every user needs a valid active role before activation.',
     rolesOffendersFixRole: 'Role',
     rolesOffendersFixPick: 'Choose a role',
+    rolePermissionsWarnInquiryNeedsRead:
+      'The inquiry shows neither the state nor the movements of a unit without “{names}”. Add it.',
+    rolePermissionsWarnCreateNeedsRead:
+      'The user cannot open the movements he records without “{names}”. Add it.',
+    rolePermissionsWarnForemanHomeNeedsRead:
+      'The foreman home lists none of his movements without “{names}”. Add it.',
+    rolePermissionsWarnWorkshopHomeNeedsRead:
+      'The workshop home lists no workshop movement without “{names}”. Add it with the “Workshop” or “All” scope.',
+    rolePermissionsWarnHomeShadowed:
+      'Does not apply: “{names}” comes first and the user gets that home only, so this home’s features are lost. Keep one home.',
+    rolePermissionsWarnNoWayInFromFieldHome:
+      'Its pages are in the sidebar only, with no way in from “{names}”. Remove it or remove that home.',
+    rolePermissionsWarnSiteReportNeedsRead:
+      'The entries report is incomplete: set the scope of “{names}” to “Projects” or “All”.',
+    rolePermissionsWarnWorkshopReportNeedsRead:
+      'The workshop report is empty or incomplete: set the scope of “{names}” to “Workshop” or “All”.',
+    rolePermissionsWarnAdminHomeNeedsReadAll:
+      'The admin home’s fleet states and figures are incomplete or wrong: set the scope of “{names}” to “All”.',
+    rolePermissionsWarnDeleteNeedsPhotos:
+      'Deleting a movement leaves other users’ photos behind: add “{names}”.',
+    rolePermissionsWarnTrackerNeedsIntegrations:
+      'The Afaqy field does not show in the equipment form without “{names}”. Add it.',
+    rolePermissionsWarnIntegrationsNeedsEdit:
+      'The “Afaqy link” sync is refused without “{names}”. Add it.',
+    rolePermissionsWarnNeedsSiteCreate:
+      'Does not work without “{names}”: it shows in the project movement form only. Add it.',
+    rolePermissionsWarnNeedsEquipmentQuickCreate:
+      'Does not work without “{names}”: it shows inside the equipment quick create only. Add it.',
     // wave-24-roles-page — end
     // wave-24-actions — start
     equipmentCodeChangeNotAllowed:

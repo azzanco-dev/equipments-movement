@@ -682,15 +682,29 @@ test('the shared roles components never reach Supabase; the mockup uses them', (
     assert.ok(!fs.existsSync(path.join(ROLES_DIR, removed)), removed)
 })
 
-test('the selected role and tab live in the URL; «خريطة المشاريع» stays hidden', () => {
+test('the selected role and tab live in the URL; purchasing shows like the other groups', () => {
   const page = read('src', 'components', 'roles', 'RolesSettings.tsx')
   assert.match(page, /searchParams\.get\('role'\)/)
   assert.match(page, /searchParams\.get\('tab'\)/)
   assert.match(page, /query\.set\('role', next\.role\)/)
+  // Purchasing is live (2026-10-19): no «لاحقا» label, not collapsed;
+  // map.view left the catalogue with 0130, so nothing is hidden either.
   const tab = read('src', 'components', 'roles', 'RolePermissionsTab.tsx')
-  assert.match(tab, /HIDDEN_GROUPS = new Set\(\['map'\]\)/)
-  assert.match(tab, /COLLAPSED_GROUPS = new Set\(\['purchasing'\]\)/)
-  assert.match(tab, /purchasing: 'permissionGroupLater'/)
+  assert.doesNotMatch(
+    tab,
+    /HIDDEN_GROUPS|COLLAPSED_GROUPS|GROUP_LABEL_OVERRIDES|permissionGroupLater/,
+  )
+  assert.match(tab, /const groups = groupPermissions\(catalogue\)\n/)
+  assert.match(tab, /collapsed: false/)
+  assert.match(tab, /const key = PERMISSION_GROUP_LABEL_KEYS\[group\.key\]/)
+  assert.equal(
+    roles.PERMISSION_GROUP_LABEL_KEYS.purchasing,
+    'permissionGroupPurchasing',
+  )
+  assert.doesNotMatch(
+    read('src', 'i18n', 'translations.ts'),
+    /permissionGroupLater/,
+  )
 })
 
 // --- Translations ---------------------------------------------------------------
@@ -743,32 +757,375 @@ test('no legacy role change is checked or mapped any more', () => {
   )
 })
 
-test('reports.view all hints that the equipment report needs movements.read all', () => {
-  assert.deepEqual(
-    plain(
-      roles.selectionScopeHints({
-        'reports.view': 'all',
-        'movements.read': 'site',
-      }),
+// --- Warnings: combinations that save but will not work ---------------------
+
+/** key -> [message, ...] of selectionWarnings. */
+const warned = (selection) =>
+  Object.fromEntries(
+    Object.entries(plain(roles.selectionWarnings(selection))).map(
+      ([key, list]) => [key, list.map((warning) => warning.message)],
     ),
-    { 'reports.view': 'rolePermissionsHintReportsNeedReadAll' },
   )
+/** The full warnings (message + the keys it names). */
+const warnings = (selection) => plain(roles.selectionWarnings(selection))
+
+test('the old selectionScopeHints is replaced by selectionWarnings', () => {
+  assert.equal(roles.selectionScopeHints, undefined)
+  assert.equal(typeof roles.selectionWarnings, 'function')
+  assert.deepEqual(warnings({}), {})
+})
+
+test('warning 1: the inquiry needs movements.read', () => {
+  assert.deepEqual(warnings({ 'inquiry.view': null }), {
+    'inquiry.view': [
+      {
+        message: 'rolePermissionsWarnInquiryNeedsRead',
+        keys: ['movements.read'],
+      },
+    ],
+  })
   assert.deepEqual(
-    plain(
-      roles.selectionScopeHints({
-        'reports.view': 'all',
-        'movements.read': 'all',
-      }),
-    ),
+    warned({ 'inquiry.view': null, 'movements.read': 'own' }),
     {},
   )
+})
+
+test('warning 2: recording without movements.read cannot open the movement', () => {
   assert.deepEqual(
-    plain(
-      roles.selectionScopeHints({
-        'reports.view': 'site',
-        'movements.read': 'site',
-      }),
-    ),
+    warned({
+      'movements.site.create': 'own',
+      'movements.workshop.create': null,
+      'movements.photos.manage': 'own',
+    }),
+    {
+      'movements.site.create': ['rolePermissionsWarnCreateNeedsRead'],
+      'movements.workshop.create': ['rolePermissionsWarnCreateNeedsRead'],
+    },
+  )
+  assert.deepEqual(
+    warned({
+      'movements.site.create': 'own',
+      'movements.workshop.create': null,
+      'movements.photos.manage': 'own',
+      'movements.read': 'own',
+    }),
     {},
+  )
+})
+
+test('warning 3: a field home without movements.read lists nothing', () => {
+  const foreman = {
+    'home.foreman': 'own',
+    'movements.site.create': 'own',
+    'movements.photos.manage': 'own',
+  }
+  assert.deepEqual(warned(foreman)['home.foreman'], [
+    'rolePermissionsWarnForemanHomeNeedsRead',
+  ])
+  assert.deepEqual(warned({ ...foreman, 'movements.read': 'own' }), {})
+  const workshop = {
+    'home.workshop': 'workshop',
+    'movements.workshop.create': null,
+    'movements.photos.manage': 'workshop',
+  }
+  assert.deepEqual(warned(workshop)['home.workshop'], [
+    'rolePermissionsWarnWorkshopHomeNeedsRead',
+  ])
+  assert.deepEqual(warned({ ...workshop, 'movements.read': 'workshop' }), {})
+})
+
+test('warning 4: only one home applies (admin > foreman > workshop)', () => {
+  const base = {
+    'movements.read': 'all',
+    'movements.site.create': 'own',
+    'movements.workshop.create': null,
+    'movements.photos.manage': 'all',
+  }
+  assert.deepEqual(
+    warnings({
+      ...base,
+      'home.foreman': 'own',
+      'home.workshop': 'workshop',
+    }),
+    {
+      'home.workshop': [
+        {
+          message: 'rolePermissionsWarnHomeShadowed',
+          keys: ['home.foreman'],
+        },
+      ],
+    },
+  )
+  assert.deepEqual(
+    warned({
+      ...base,
+      'home.admin': null,
+      'home.foreman': 'own',
+      'home.workshop': 'all',
+    }),
+    {
+      'home.foreman': ['rolePermissionsWarnHomeShadowed'],
+      'home.workshop': ['rolePermissionsWarnHomeShadowed'],
+    },
+  )
+  assert.equal(
+    warnings({ ...base, 'home.admin': null, 'home.workshop': 'all' })[
+      'home.workshop'
+    ][0].keys[0],
+    'home.admin',
+  )
+  assert.deepEqual(warned({ ...base, 'home.foreman': 'own' }), {})
+  assert.deepEqual(warned({ ...base, 'home.workshop': 'all' }), {})
+})
+
+test('warning 5: admin-shell pages have no way in from a field home', () => {
+  // Derived from navPermissions: the gates of the admin-shell pages that
+  // the field shell cannot render (users.read is no page gate; the logs'
+  // movements.read is embedded in a wide field home).
+  assert.deepEqual([...roles.ADMIN_SHELL_ONLY_KEYS].sort(), [
+    'companies_projects.read',
+    'drivers.read',
+    'equipment.read',
+    'lessors.read',
+    'movements.activity',
+    'movements.import',
+    'purchasing.view',
+    'reports.view',
+    'settings.equipment_types',
+    'settings.integrations',
+    'settings.roles',
+    'users.manage',
+  ])
+  const field = {
+    'home.workshop': 'all',
+    'movements.read': 'all',
+    'movements.workshop.create': null,
+    'movements.photos.manage': 'workshop',
+    'equipment.edit': null,
+  }
+  const pages = {
+    'reports.view': 'all',
+    'equipment.read': null,
+    'purchasing.view': null,
+    'settings.integrations': null,
+    // Field-shell keys: no warning.
+    'inquiry.view': null,
+    'movements.export': null,
+    'users.read': 'workshop',
+  }
+  const result = warnings({ ...field, ...pages })
+  assert.deepEqual(Object.keys(result).sort(), [
+    'equipment.read',
+    'purchasing.view',
+    'reports.view',
+    'settings.integrations',
+  ])
+  for (const list of Object.values(result))
+    assert.deepEqual(list, [
+      {
+        message: 'rolePermissionsWarnNoWayInFromFieldHome',
+        keys: ['home.workshop'],
+      },
+    ])
+  // The foreman home is named when both field homes are ticked.
+  assert.deepEqual(
+    warnings({
+      ...field,
+      'home.foreman': 'own',
+      'movements.site.create': 'own',
+      'equipment.read': null,
+    })['equipment.read'],
+    [
+      {
+        message: 'rolePermissionsWarnNoWayInFromFieldHome',
+        keys: ['home.foreman'],
+      },
+    ],
+  )
+  // The admin shell (home.admin) or no home at all: the sidebar opens them.
+  const shell = { ...pages, 'movements.read': 'all', 'equipment.edit': null }
+  assert.deepEqual(warned({ ...shell, 'home.admin': null }), {})
+  assert.deepEqual(warned(shell), {})
+})
+
+test('warning 6: a report wider than movements.read is incomplete', () => {
+  const report = (reports, read) =>
+    warned({ 'reports.view': reports, 'movements.read': read })['reports.view']
+  assert.deepEqual(report('all', 'site'), [
+    'rolePermissionsHintReportsNeedReadAll',
+  ])
+  assert.deepEqual(report('all', 'workshop'), [
+    'rolePermissionsHintReportsNeedReadAll',
+  ])
+  assert.deepEqual(report('site', 'workshop'), [
+    'rolePermissionsWarnSiteReportNeedsRead',
+  ])
+  assert.deepEqual(report('site', 'own'), [
+    'rolePermissionsWarnSiteReportNeedsRead',
+  ])
+  assert.deepEqual(report('workshop', 'site'), [
+    'rolePermissionsWarnWorkshopReportNeedsRead',
+  ])
+  assert.deepEqual(report('workshop', 'companies'), [
+    'rolePermissionsWarnWorkshopReportNeedsRead',
+  ])
+  for (const [reports, read] of [
+    ['all', 'all'],
+    ['site', 'site'],
+    ['site', 'all'],
+    ['workshop', 'workshop'],
+    ['workshop', 'all'],
+  ])
+    assert.equal(report(reports, read), undefined, `${reports}/${read}`)
+  // A missing movements.read is the blocking requirement, not a warning.
+  assert.deepEqual(warned({ 'reports.view': 'all' }), {})
+})
+
+test('warning 7: the admin home needs movements.read all', () => {
+  assert.deepEqual(
+    warnings({ 'home.admin': null, 'movements.read': 'site' }),
+    {
+      'home.admin': [
+        {
+          message: 'rolePermissionsWarnAdminHomeNeedsReadAll',
+          keys: ['movements.read'],
+        },
+      ],
+    },
+  )
+  assert.deepEqual(warned({ 'home.admin': null, 'movements.read': 'all' }), {})
+})
+
+test('warning 8: deleting movements needs the right to remove any photo', () => {
+  const base = { 'movements.read': 'all', 'movements.edit_delete': null }
+  assert.deepEqual(warnings(base), {
+    'movements.edit_delete': [
+      {
+        message: 'rolePermissionsWarnDeleteNeedsPhotos',
+        keys: ['movements.photos.delete_any'],
+      },
+    ],
+  })
+  assert.deepEqual(
+    warned({
+      ...base,
+      'movements.photos.manage': 'all',
+      'movements.photos.delete_any': null,
+    }),
+    {},
+  )
+})
+
+test('warnings 9 and 10: Afaqy needs integrations and equipment.edit together', () => {
+  assert.deepEqual(
+    warnings({
+      'equipment.read': null,
+      'equipment.edit': null,
+      'equipment.tracker_link': null,
+    }),
+    {
+      'equipment.tracker_link': [
+        {
+          message: 'rolePermissionsWarnTrackerNeedsIntegrations',
+          keys: ['settings.integrations'],
+        },
+      ],
+    },
+  )
+  assert.deepEqual(warnings({ 'settings.integrations': null }), {
+    'settings.integrations': [
+      {
+        message: 'rolePermissionsWarnIntegrationsNeedsEdit',
+        keys: ['equipment.edit'],
+      },
+    ],
+  })
+  assert.deepEqual(
+    warned({
+      'equipment.read': null,
+      'equipment.edit': null,
+      'equipment.tracker_link': null,
+      'settings.integrations': null,
+    }),
+    {},
+  )
+})
+
+test('warning 11: quick actions that live inside another form', () => {
+  assert.deepEqual(
+    warned({
+      'drivers.quick_create': null,
+      'movements.site.contractor_code': null,
+      'lessors.quick_create': null,
+    }),
+    {
+      'drivers.quick_create': ['rolePermissionsWarnNeedsSiteCreate'],
+      'movements.site.contractor_code': ['rolePermissionsWarnNeedsSiteCreate'],
+      'lessors.quick_create': ['rolePermissionsWarnNeedsEquipmentQuickCreate'],
+    },
+  )
+  assert.deepEqual(
+    warned({
+      'movements.read': 'own',
+      'movements.site.create': 'own',
+      'movements.photos.manage': 'own',
+      'drivers.quick_create': null,
+      'movements.site.contractor_code': null,
+      'equipment.quick_create': 'site',
+      'lessors.quick_create': null,
+    }),
+    {},
+  )
+})
+
+test('the six original roles trigger no warning', () => {
+  const selections = seededSelections()
+  for (const role of [
+    'admin',
+    'supervisor',
+    'workshop',
+    'assistant_workshop_manager',
+    'workshop_manager',
+    'monitor',
+  ]) {
+    assert.ok(selections.has(role), role)
+    assert.deepEqual(warnings(selections.get(role)), {}, role)
+  }
+})
+
+test('every warning message is a roles-page key in both languages, with {names} when it names keys', () => {
+  const source = read('src', 'i18n', 'translations.ts')
+  const page = [
+    ...source.matchAll(
+      /\/\/ wave-24-roles-page — start\n([\s\S]*?)\/\/ wave-24-roles-page — end/g,
+    ),
+  ]
+  const messages = new Set(
+    [...roles.selectionWarnings.toString().matchAll(/'(rolePermissions\w+)'/g)].map(
+      (m) => m[1],
+    ),
+  )
+  assert.ok(messages.size >= 14)
+  for (const message of messages) {
+    if (message === 'rolePermissionsHintReportsNeedReadAll') continue
+    for (const [, block] of page) {
+      const entry = new RegExp(`^ {4}${message}:\\n? *'([^']*)'`, 'm').exec(
+        block,
+      )
+      assert.ok(entry, message)
+      assert.match(entry[1], /\{names\}/, message)
+    }
+  }
+  // The row renders every warning with the permission names filled in.
+  const table = read('src', 'components', 'roles', 'ui', 'PermissionsTable.tsx')
+  assert.match(table, /const warnings = useMemo\(\(\) => selectionWarnings\(draft\), \[draft\]\)/)
+  assert.match(
+    table,
+    /fill\(t\(warning\.message\), \{\s+names: warning\.keys\.map\(nameOf\)\.join\('، '\),/,
+  )
+  // Warnings never block the save: only the problems do.
+  assert.match(
+    table,
+    /disabled=\{changes\.length === 0 \|\| visibleProblems\.length > 0\}/,
   )
 })

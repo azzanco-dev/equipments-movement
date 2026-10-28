@@ -177,6 +177,26 @@ test('every API route decides by its permission key; none by the role', () => {
   )
 })
 
+test('the Afaqy sync also requires equipment.edit, before Afaqy is asked', () => {
+  // Every write of the sync is an equipment update under the caller's RLS
+  // (`equipment.edit`); without the key it would fail row by row, so the
+  // route refuses up front with the same 403 as its gate.
+  const source = read('app', 'api', 'afaqy', 'sync', 'route.ts')
+  assert.match(
+    source,
+    /async function canEditEquipment\(supabase: SupabaseClient\): Promise<boolean> \{\s+try \{\s+const \{ data, error \} = await supabase\.rpc\('has_permission', \{\s+p_key: 'equipment\.edit',\s+\}\)\s+return !error && data === true/,
+  )
+  const handler = source.slice(source.indexOf('export async function POST'))
+  const gate = handler.indexOf("requirePermission(request, 'settings.integrations')")
+  const second = handler.indexOf(
+    "if (!(await canEditEquipment(access.supabase)))\n      return reply({ error: 'forbidden' }, 403)",
+  )
+  assert.ok(gate > 0 && second > gate, 'after the gate')
+  assert.ok(second < handler.indexOf('await readForce(request)'))
+  assert.ok(second < handler.indexOf('listUnits('), 'before Afaqy is asked')
+  assert.equal((source.match(/canEditEquipment\(/g) ?? []).length, 2)
+})
+
 test('the route keys are catalogue keys that 0130 did not retire', () => {
   const migrations = path.join(ROOT, 'supabase', 'migrations')
   const files = fs

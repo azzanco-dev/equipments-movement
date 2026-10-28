@@ -1,14 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, ChevronDown, Info, Lock } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  Info,
+  Lock,
+} from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import type { PermissionScope } from '@/lib/types'
 import {
   selectionProblems,
-  selectionScopeHints,
+  selectionWarnings,
   selectionsEqual,
   setPermissionScope,
   tickPermission,
+  type SelectionWarning,
 } from '@/lib/rolesAdmin'
 import {
   Badge,
@@ -132,7 +139,8 @@ export function PermissionsTable({
   // Problems of hidden keys (not in the table) cannot be fixed here and the
   // database keeps them as they are; only visible rows block the save.
   const visibleProblems = Object.keys(problems).filter((key) => byKey.has(key))
-  const scopeHints = useMemo(() => selectionScopeHints(draft), [draft])
+  // Non-blocking: combinations that save but will not work as they suggest.
+  const warnings = useMemo(() => selectionWarnings(draft), [draft])
 
   const flashKeys = (keys: string[]) => {
     if (keys.length === 0) return
@@ -329,7 +337,8 @@ export function PermissionsTable({
                         ? undefined
                         : problems[permission.key]
                     }
-                    scopeHint={scopeHints[permission.key]}
+                    // The locked admin role holds every key by design.
+                    warnings={locked ? undefined : warnings[permission.key]}
                     rowError={rowErrors[permission.key]}
                     onToggle={(on) => toggle(permission.key, on)}
                     onScope={(scope) => setScope(permission.key, scope)}
@@ -396,7 +405,7 @@ function PermissionRow({
   saving,
   flashed,
   problem,
-  scopeHint,
+  warnings,
   rowError,
   onToggle,
   onScope,
@@ -408,7 +417,7 @@ function PermissionRow({
   saving: boolean
   flashed: boolean
   problem?: TranslationKey
-  scopeHint?: TranslationKey
+  warnings?: SelectionWarning[]
   rowError?: string
   onToggle: (on: boolean) => void
   onScope: (scope: PermissionScope) => void
@@ -498,17 +507,33 @@ function PermissionRow({
               </Badge>
             )
           )}
-          {scopeHint && (
-            <Badge size="sm" tone="warning">
-              {t(scopeHint)}
-            </Badge>
-          )}
           {error && (
             <Badge size="sm" tone="danger">
               {error}
             </Badge>
           )}
         </div>
+        {granted && warnings && warnings.length > 0 && (
+          <ul className="mt-1 space-y-0.5">
+            {warnings.map((warning) => (
+              <li
+                key={warning.message}
+                className="flex items-start gap-1 text-xs leading-relaxed text-warning"
+              >
+                <AlertTriangle
+                  size={13}
+                  aria-hidden="true"
+                  className="mt-0.5 shrink-0"
+                />
+                <span>
+                  {fill(t(warning.message), {
+                    names: warning.keys.map(nameOf).join('، '),
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <div role="cell" className="col-start-2 sm:col-start-3">
         {granted && permission.scopes.length > 1 && (
