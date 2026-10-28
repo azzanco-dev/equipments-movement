@@ -3,7 +3,10 @@ import { usePermissions } from '@/auth/PermissionsContext'
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { Price } from '@/components/purchasing/Price'
-import { SupplierPoStatusBadge } from '@/components/purchasing/SupplierPoStatusBadge'
+import {
+  SupplierPoApprovalBadge,
+  SupplierPoStatusBadge,
+} from '@/components/purchasing/SupplierPoStatusBadge'
 import {
   Badge,
   Card,
@@ -104,6 +107,8 @@ export function EquipmentPurchasingCard({
               </bdi>
             )}
             <SupplierPoStatusBadge status={row.po.status} size="sm" />
+            {/* 0160: draft or approved, as on the PO list. */}
+            <SupplierPoApprovalBadge po={row.po} list size="sm" />
           </span>
         ) : (
           <span className="text-muted">—</span>

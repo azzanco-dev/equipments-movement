@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowDown,
   ArrowUp,
+  BadgeCheck,
   Building2,
   Calendar,
   Clock,
@@ -17,10 +18,12 @@ import {
   Truck,
   User,
 } from 'lucide-react'
+import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { fetchProfileNames } from '@/components/details/profileNames'
 import { AddEquipmentDialog } from '@/components/purchasing/AddEquipmentDialog'
+import { ApproveSupplierPoDialog } from '@/components/purchasing/ApproveSupplierPoDialog'
 import { CloseSupplierPoDialog } from '@/components/purchasing/CloseSupplierPoDialog'
 import { EditLineDialog } from '@/components/purchasing/EditLineDialog'
 import { EditSupplierPoDialog } from '@/components/purchasing/EditSupplierPoDialog'
@@ -30,7 +33,10 @@ import { SupplierPoEventsTimeline } from '@/components/purchasing/SupplierPoEven
 import { SupplierPoOptionsMenu } from '@/components/purchasing/SupplierPoOptionsMenu'
 import { SupplierPoPrintSheet } from '@/components/purchasing/SupplierPoPrintSheet'
 import { SupplierPoReceipt } from '@/components/purchasing/SupplierPoReceipt'
-import { SupplierPoStatusBadge } from '@/components/purchasing/SupplierPoStatusBadge'
+import {
+  SupplierPoApprovalBadge,
+  SupplierPoStatusBadge,
+} from '@/components/purchasing/SupplierPoStatusBadge'
 import {
   BackButton,
   Badge,
@@ -56,6 +62,7 @@ import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import {
   SUPPLIER_PO_EVENTS_LIMIT,
+  supplierPoApprovalBlocker,
   supplierPoRateUnitOf,
   supplierPoSupplierLabel,
   supplierPoTotalsByUnit,
@@ -148,6 +155,9 @@ export function SupplierPoDetail({
   const { t, lang } = useI18n()
   const { can } = usePermissions()
   const canManage = can('purchasing.manage')
+  // 0160 (owner 2026-10-28, EM-107): approval is its own key.
+  const canApprove = can('purchasing.approve')
+  const { user } = useAuth()
   const [po, setPo] = useState<SupplierPoRow | null>(null)
   // The tab reads «SPO260046 · اوامر الشراء» (owner 2026-10-25).
   useTabTitle(po?.po_number)
@@ -163,6 +173,7 @@ export function SupplierPoDetail({
   const [editing, setEditing] = useState<SupplierPoLineRow | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [closeOpen, setCloseOpen] = useState(false)
+  const [approveOpen, setApproveOpen] = useState(false)
   // «تصدير PDF»: the hidden print sheet is mounted only while the browser's
   // print dialog is up (owner 2026-10-22: no tab, no page of the site).
   const [printing, setPrinting] = useState(false)
@@ -207,7 +218,11 @@ export function SupplierPoDetail({
     const poRow = poResult.data as unknown as SupplierPoRow | null
     const names = await fetchProfileNames(
       supabase,
-      [...eventRows.map((event) => event.actor_id), poRow?.created_by],
+      [
+        ...eventRows.map((event) => event.actor_id),
+        poRow?.created_by,
+        poRow?.approved_by,
+      ],
       signal,
     )
     if (signal.aborted) return
@@ -253,6 +268,11 @@ export function SupplierPoDetail({
 
   const open = po.status === 'open'
   const showActions = open && canManage
+  // 0160: an approved PO is locked — no unit, price or start-date change
+  // (the database refuses them too); its notes and closing stay.
+  const approved = po.approval_status === 'approved'
+  const editable = showActions && !approved
+  const approveBlocker = supplierPoApprovalBlocker(po, lines, user?.id)
   const supplier = supplierPoSupplierLabel(po, t)
   const companyName = po.company
     ? localizedName(lang, po.company.name_ar, po.company.name_en)
@@ -325,6 +345,23 @@ export function SupplierPoDetail({
       value: formatDateTime(po.created_at),
       dir: 'ltr',
     },
+    ...(approved && po.approved_at
+      ? [
+          {
+            key: 'approvedAt',
+            icon: <BadgeCheck size={16} />,
+            label: t('supplierPoApprovedAt'),
+            value: formatDateTime(po.approved_at),
+            dir: 'ltr' as const,
+          },
+          {
+            key: 'approvedBy',
+            icon: <User size={16} />,
+            label: t('supplierPoApprovedBy'),
+            value: (po.approved_by && actorNames.get(po.approved_by)) || '—',
+          },
+        ]
+      : []),
     ...(po.closed_at
       ? [
           {
@@ -351,6 +388,12 @@ export function SupplierPoDetail({
       className={className}
       busy={printing}
       onExport={() => setPrinting(true)}
+      // 0160: the PDF is for an approved PO only.
+      exportBlockedReason={approved ? null : 'supplierPoPdfNeedsApproval'}
+      onApprove={
+        canApprove && open && !approved ? () => setApproveOpen(true) : undefined
+      }
+      approveBlockedReason={approveBlocker}
       onEdit={showActions ? () => setEditOpen(true) : undefined}
       onClose={showActions ? () => setCloseOpen(true) : undefined}
     />
@@ -430,6 +473,7 @@ export function SupplierPoDetail({
           badges={
             <>
               <SupplierPoStatusBadge status={po.status} />
+              <SupplierPoApprovalBadge po={po} />
               {unpriced > 0 && (
                 <Badge tone="warning">
                   {t('supplierPoNeedsPrices')} ({unpriced})
@@ -476,6 +520,11 @@ export function SupplierPoDetail({
         </div>
       </div>
 
+      {open && approved && (
+        <Notice tone="info" size="compact" icon={<Lock size={16} />}>
+          {t('supplierPoApprovedLockedNotice')}
+        </Notice>
+      )}
       {!open && (
         <Notice tone="neutral" size="compact" icon={<Lock size={16} />}>
           {t('supplierPoClosedNotice')}
@@ -503,7 +552,7 @@ export function SupplierPoDetail({
               action={
                 <div className="flex flex-wrap items-center gap-2">
                   {lines.length > 1 && sortControls}
-                  {showActions && addButton}
+                  {editable && addButton}
                 </div>
               }
             />
@@ -513,7 +562,7 @@ export function SupplierPoDetail({
               <EmptyState
                 title={t('supplierPoNoEquipment')}
                 className="p-6"
-                action={showActions ? addButton : undefined}
+                action={editable ? addButton : undefined}
               />
             </div>
           ) : (
@@ -572,7 +621,7 @@ export function SupplierPoDetail({
                             )}
                           </p>
                         </div>
-                        {showActions && (
+                        {editable && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -619,15 +668,18 @@ export function SupplierPoDetail({
           className="sticky bottom-0 z-10 -mx-4 flex gap-2 border-t bg-bg p-3 sm:hidden"
           style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
-          <Button
-            variant="primary"
-            className="h-11 flex-1"
-            icon={<Plus size={16} aria-hidden="true" />}
-            onClick={() => setAddOpen(true)}
-          >
-            {t('supplierPoAddEquipment')}
-          </Button>
-          {optionsMenu('h-11')}
+          {/* 0160: an approved PO takes no more units. */}
+          {editable && (
+            <Button
+              variant="primary"
+              className="h-11 flex-1"
+              icon={<Plus size={16} aria-hidden="true" />}
+              onClick={() => setAddOpen(true)}
+            >
+              {t('supplierPoAddEquipment')}
+            </Button>
+          )}
+          {optionsMenu(editable ? 'h-11' : 'h-11 flex-1')}
         </div>
       )}
 
@@ -671,9 +723,19 @@ export function SupplierPoDetail({
           company={companyName}
           project={projectName}
           createdBy={createdByName}
+          approvedBy={(po.approved_by && actorNames.get(po.approved_by)) || '—'}
           onDone={() => setPrinting(false)}
         />
       )}
+      <ApproveSupplierPoDialog
+        po={po}
+        open={approveOpen}
+        onOpenChange={setApproveOpen}
+        onApproved={() => {
+          setApproveOpen(false)
+          fetchData()
+        }}
+      />
       <CloseSupplierPoDialog
         po={po}
         open={closeOpen}

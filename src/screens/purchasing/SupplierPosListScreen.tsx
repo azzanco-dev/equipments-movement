@@ -11,7 +11,10 @@ import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { CreateSupplierPoDialog } from '@/components/purchasing/CreateSupplierPoDialog'
 import { SupplierPoLinesPanel } from '@/components/purchasing/SupplierPoLinesPanel'
-import { SupplierPoStatusBadge } from '@/components/purchasing/SupplierPoStatusBadge'
+import {
+  SupplierPoApprovalBadge,
+  SupplierPoStatusBadge,
+} from '@/components/purchasing/SupplierPoStatusBadge'
 import {
   AppLink,
   Badge,
@@ -167,6 +170,14 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
           )}
         </span>
       ),
+    },
+    // 0160 (owner 2026-10-28, EM-107): «معتمد», «بانتظار الاعتماد» for an
+    // open draft, or «مسودة» for a closed one.
+    {
+      key: 'approval_status',
+      header: t('supplierPoApproval'),
+      sortable: true,
+      cell: (row) => <SupplierPoApprovalBadge po={row} list size="sm" />,
     },
     // 0146: the same «اخر تعديل» column as the other lists, last.
     {

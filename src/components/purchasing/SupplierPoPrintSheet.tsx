@@ -25,6 +25,8 @@ export interface SupplierPoPrintSheetProps {
   company: string
   project: string
   createdBy: string
+  /** 0160: the approver's name (the PDF exists for an approved PO only). */
+  approvedBy?: string
   /** The print dialog closed (or never opened): the sheet is unmounted. */
   onDone: () => void
 }
@@ -48,6 +50,7 @@ export function SupplierPoPrintSheet({
   company,
   project,
   createdBy,
+  approvedBy,
   onDone,
 }: SupplierPoPrintSheetProps) {
   const { t, lang } = useI18n()
@@ -103,6 +106,16 @@ export function SupplierPoPrintSheet({
       value: formatSaudiDateTime(po.created_at),
       ltr: true,
     },
+    ...(po.approved_at
+      ? [
+          {
+            label: t('supplierPoApprovedAt'),
+            value: formatSaudiDateTime(po.approved_at),
+            ltr: true,
+          },
+          { label: t('supplierPoApprovedBy'), value: approvedBy ?? '—' },
+        ]
+      : []),
     ...(po.closed_at
       ? [
           {

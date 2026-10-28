@@ -32,7 +32,7 @@ export const SUPPLIER_PO_STATUS_BADGE: Readonly<
   closed: { key: 'supplierPoStatusClosed', tone: 'neutral' },
 }
 
-/** `supplier_po_events.event_type` (the CHECK list as 0149 re-created it). */
+/** `supplier_po_events.event_type` (the CHECK list as 0160 re-created it). */
 export type SupplierPoEventType =
   | 'created'
   | 'updated'
@@ -41,6 +41,7 @@ export type SupplierPoEventType =
   | 'line_updated'
   | 'card_changed'
   | 'equipment_removed'
+  | 'approved'
   | 'closed'
   | 'reopened'
 
@@ -55,8 +56,66 @@ export const SUPPLIER_PO_EVENT_LABEL_KEYS: Readonly<
   card_changed: 'supplierPoEventCardChanged',
   // 0149: the one-off reopening of SPO260001 / SPO260002 (owner 2026-10-25).
   equipment_removed: 'supplierPoEventEquipmentRemoved',
+  // 0160: approve_supplier_po.
+  approved: 'supplierPoEventApproved',
   closed: 'supplierPoEventClosed',
   reopened: 'supplierPoEventReopened',
+}
+
+// --- Approval (0160) -----------------------------------------------------------
+
+/** `supplier_pos.approval_status` (owner 2026-10-28, EM-107): every PO starts
+ *  as a draft and is approved through `approve_supplier_po`; an approved PO
+ *  is locked (notes and closing stay). */
+export type SupplierPoApprovalStatus = 'draft' | 'approved'
+
+/** The approval badge of the PO page: draft = amber, approved = blue (open
+ *  stays the green status badge beside it). */
+export const SUPPLIER_PO_APPROVAL_BADGE: Readonly<
+  Record<SupplierPoApprovalStatus, { key: TranslationKey; tone: 'warning' | 'info' }>
+> = {
+  draft: { key: 'supplierPoApprovalDraft', tone: 'warning' },
+  approved: { key: 'supplierPoApprovalApproved', tone: 'info' },
+}
+
+/**
+ * The approval badge of a list row: «معتمد», «بانتظار الاعتماد» for an open
+ * draft (the one that waits on someone), or a quiet «مسودة» for a closed
+ * draft that will never be approved.
+ */
+export function supplierPoApprovalListBadge(po: {
+  status: SupplierPoStatus
+  approval_status?: string | null
+}): { key: TranslationKey; tone: 'warning' | 'info' | 'neutral' } {
+  if (po.approval_status === 'approved')
+    return SUPPLIER_PO_APPROVAL_BADGE.approved
+  return po.status === 'open'
+    ? { key: 'supplierPoApprovalPending', tone: 'warning' }
+    : { key: 'supplierPoApprovalDraft', tone: 'neutral' }
+}
+
+/**
+ * Why «اعتماد» cannot run on this PO right now, or null when it can: the
+ * reasons `approve_supplier_po` checks, in the order the user can fix them
+ * (the database re-checks every one of them).
+ */
+export function supplierPoApprovalBlocker(
+  po: {
+    status: SupplierPoStatus
+    approval_status?: string | null
+    created_by: string | null
+  },
+  lines: readonly { price: number | string | null }[],
+  userId: string | null | undefined,
+): TranslationKey | null {
+  if (po.status !== 'open') return 'supplierPoErrorClosed'
+  if (po.approval_status === 'approved') return 'supplierPoErrorNotDraft'
+  if (po.created_by && userId && po.created_by === userId)
+    return 'supplierPoApproveBlockedSelf'
+  if (lines.length === 0) return 'supplierPoApproveBlockedNoLines'
+  if (lines.some((line) => line.price === null || line.price === undefined))
+    return 'supplierPoApproveBlockedUnpriced'
+  return null
 }
 
 /** The PO page shows the latest events only, never a full list. */
@@ -525,9 +584,16 @@ export const SUPPLIER_PO_FORM_MESSAGES: Readonly<Record<string, TranslationKey>>
     invalid_po: 'supplierPoNotFound', // add, close, update (0142)
     invalid_line: 'supplierPoErrorInvalidLine', // update price / line (0142)
     invalid_rate_unit: 'supplierPoRateUnitInvalid', // create (0157)
+    // 0160: approve_supplier_po, and the lock of an approved PO.
+    purchasing_approve_required: 'supplierPoErrorApproveRequired',
+    po_not_draft: 'supplierPoErrorNotDraft',
+    po_self_approval: 'supplierPoApproveBlockedSelf',
+    po_has_no_lines: 'supplierPoApproveBlockedNoLines',
+    po_has_unpriced_lines: 'supplierPoApproveBlockedUnpriced',
+    po_approved_locked: 'supplierPoErrorApprovedLocked',
   }
 
-/** Every stable token of migrations 0136–0157 the client maps, for the tests. */
+/** Every stable token of migrations 0136–0160 the client maps, for the tests. */
 export const SUPPLIER_PO_ERROR_TOKENS: readonly string[] = [
   'purchasing_manage_required',
   'invalid_po',
@@ -552,6 +618,12 @@ export const SUPPLIER_PO_ERROR_TOKENS: readonly string[] = [
   'entry_date_mismatch', // 0148 add_supplier_po_equipment (and create)
   'po_start_date_locked', // 0148 update_supplier_po
   'invalid_rate_unit', // 0157 add / create / update a line
+  'purchasing_approve_required', // 0160 approve_supplier_po
+  'po_not_draft', // 0160
+  'po_self_approval', // 0160
+  'po_has_no_lines', // 0160
+  'po_has_unpriced_lines', // 0160
+  'po_approved_locked', // 0160 every write to an approved PO
 ]
 
 function errorText(error: PostgresLikeError): string {

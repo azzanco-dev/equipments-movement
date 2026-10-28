@@ -304,6 +304,8 @@ const MIGRATIONS = [
   '20261025100000_0148_supplier_po_same_entry_day.sql',
   // 0157: the price unit (invalid_rate_unit).
   '20261028120000_0157_supplier_po_rate_unit.sql',
+  // 0160: approval (approve_supplier_po and the lock of an approved PO).
+  '20261028160000_0160_supplier_po_approval.sql',
 ]
 
 test('every stable token of migrations 0136 to 0138 is known and mapped', () => {
@@ -460,9 +462,10 @@ test('status badge, event labels and the price format', () => {
     open: { key: 'supplierPoStatusOpen', tone: 'success' },
     closed: { key: 'supplierPoStatusClosed', tone: 'neutral' },
   })
-  // The event types of the CHECK as 0149 re-created it (the 0136 five, 0142's
-  // updated and line_updated, 0149's equipment_removed and reopened).
-  const sql = read('supabase', 'migrations', '20261025110000_0149_reopen_spo260001_spo260002.sql')
+  // The event types of the CHECK as 0160 re-created it (the 0136 five, 0142's
+  // updated and line_updated, 0149's equipment_removed and reopened, 0160's
+  // approved).
+  const sql = read('supabase', 'migrations', '20261028160000_0160_supplier_po_approval.sql')
   const check = /event_type IN \(([^)]+)\)/.exec(sql)
   const types = [...check[1].matchAll(/'(\w+)'/g)].map((m) => m[1]).sort()
   assert.deepEqual(
@@ -505,6 +508,8 @@ test('supplierPosListConfig: PO number search, allowlisted filters, standard siz
   )
   assert.deepEqual(filterKeys, [
     'status',
+    // 0160: draft or approved.
+    'approval_status',
     // 0140: «المالك ثم المورد» like the log (party_class computed column).
     'party_class',
     'lessor_id',

@@ -656,6 +656,21 @@ export const supplierPosListConfig: DataListConfig = {
         },
       ],
     },
+    // 0160 (owner 2026-10-28, EM-107): draft or approved.
+    {
+      key: 'approval_status',
+      label: 'supplierPoApproval',
+      type: 'select',
+      operators: ['eq', 'neq'],
+      options: [
+        { value: 'draft', label: 'مسودة', labelI18n: 'supplierPoApprovalDraft' },
+        {
+          value: 'approved',
+          label: 'معتمد',
+          labelI18n: 'supplierPoApprovalApproved',
+        },
+      ],
+    },
     // Owner 2026-10-20: «المالك ثم المورد», like the movement log. The owner
     // is the computed column party_class(supplier_pos) (migration 0140: the
     // PO's owner class, or external_supplier for a lessor party)...
@@ -741,6 +756,7 @@ export const supplierPosListConfig: DataListConfig = {
     { key: 'po_number', label: 'supplierPoNumber' },
     { key: 'start_date', label: 'supplierPoStartDate' },
     { key: 'status', label: 'status' },
+    { key: 'approval_status', label: 'supplierPoApproval' },
     // 0146: supplier_pos.updated_at, moved by the PO row and its lines.
     { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
   ],

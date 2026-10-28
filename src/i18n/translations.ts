@@ -2081,6 +2081,28 @@ export const translations = {
     supplierPoDefaultRateUnit: 'وحدة السعر للمعدات المختارة',
     supplierPoDefaultRateUnitHint:
       'تنطبق على كل معدة تختارها، وتقدر تغيرها لاي معدة جنب سعرها.',
+    // 0160 (owner 2026-10-28, EM-107): draft, then approved and locked.
+    supplierPoApproval: 'الاعتماد',
+    supplierPoApprovalDraft: 'مسودة',
+    supplierPoApprovalApproved: 'معتمد',
+    supplierPoApprovalPending: 'بانتظار الاعتماد',
+    supplierPoApprove: 'اعتماد',
+    supplierPoApproveConfirmTitle: 'اعتماد امر الشراء؟',
+    supplierPoApproveConfirmDesc:
+      'بعد الاعتماد يقفل الامر: لا تضاف معدات ولا تتغير الاسعار ولا تاريخ البداية، وتبقى الملاحظات والاغلاق. ويفتح تصدير PDF.',
+    supplierPoApprovedLockedNotice:
+      'هذا الامر معتمد ومقفل. لتعديل امر معتمد اقفله وانشئ امر جديد.',
+    supplierPoPdfNeedsApproval: 'تصدير PDF بعد اعتماد الامر.',
+    supplierPoApproveBlockedUnpriced: 'لا يعتمد الامر قبل تسعير كل معداته.',
+    supplierPoApproveBlockedNoLines: 'لا يعتمد امر بلا معدات.',
+    supplierPoApproveBlockedSelf: 'لا تعتمد امرا انشاته بنفسك.',
+    supplierPoErrorApproveRequired: 'ليس لديك صلاحية اعتماد اوامر الشراء.',
+    supplierPoErrorNotDraft: 'الامر معتمد مسبقا.',
+    supplierPoErrorApprovedLocked:
+      'الامر معتمد ومقفل. لتعديله اقفله وانشئ امر جديد.',
+    supplierPoApprovedAt: 'تاريخ الاعتماد',
+    supplierPoApprovedBy: 'اعتمد بواسطة',
+    supplierPoEventApproved: 'اعتماد الامر',
     supplierPoEntryDate: 'تاريخ الدخول',
     supplierPoSelectedCount: 'المختارة',
     supplierPoErrorInvalidLine: 'سطر المعدة غير موجود.',
@@ -4231,6 +4253,28 @@ export const translations = {
     supplierPoDefaultRateUnit: 'Price unit for the ticked units',
     supplierPoDefaultRateUnitHint:
       'Applies to every unit you tick; change it for any unit next to its price.',
+    // 0160 (owner 2026-10-28, EM-107): draft, then approved and locked.
+    supplierPoApproval: 'Approval',
+    supplierPoApprovalDraft: 'Draft',
+    supplierPoApprovalApproved: 'Approved',
+    supplierPoApprovalPending: 'Awaiting approval',
+    supplierPoApprove: 'Approve',
+    supplierPoApproveConfirmTitle: 'Approve this purchase order?',
+    supplierPoApproveConfirmDesc:
+      'Approval locks the order: no units are added and no price or start date changes; notes and closing stay. It also opens the PDF export.',
+    supplierPoApprovedLockedNotice:
+      'This order is approved and locked. To change an approved order, close it and create a new one.',
+    supplierPoPdfNeedsApproval: 'The PDF is available once the order is approved.',
+    supplierPoApproveBlockedUnpriced: 'The order cannot be approved until every unit has a price.',
+    supplierPoApproveBlockedNoLines: 'An order without equipment cannot be approved.',
+    supplierPoApproveBlockedSelf: 'You cannot approve an order you created.',
+    supplierPoErrorApproveRequired: 'You do not have permission to approve purchase orders.',
+    supplierPoErrorNotDraft: 'The order is already approved.',
+    supplierPoErrorApprovedLocked:
+      'The order is approved and locked. To change it, close it and create a new one.',
+    supplierPoApprovedAt: 'Approved on',
+    supplierPoApprovedBy: 'Approved by',
+    supplierPoEventApproved: 'Order approved',
     supplierPoEntryDate: 'Entry date',
     supplierPoSelectedCount: 'Selected',
     supplierPoErrorInvalidLine: 'The equipment line does not exist.',

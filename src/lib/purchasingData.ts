@@ -3,6 +3,7 @@ import type { TranslationKey } from '@/i18n/translations'
 import type { CompanyProjectSource } from '@/lib/companyProject'
 import type { PostgresLikeError } from '@/lib/formValidation'
 import type {
+  SupplierPoApprovalStatus,
   SupplierPoCreateLine,
   SupplierPoEventType,
   SupplierPoFormValues,
@@ -66,6 +67,10 @@ export interface SupplierPoRow {
   start_date: string
   status: SupplierPoStatus
   closed_at: string | null
+  /** 0160: draft until approved; an approved PO is locked. */
+  approval_status: SupplierPoApprovalStatus
+  approved_at: string | null
+  approved_by: string | null
   notes: string | null
   created_by: string | null
   created_at: string
@@ -173,7 +178,7 @@ export interface EquipmentPurchasingRow extends SupplierPoLineRow {
 
 const NAMED = 'id,name_ar,name_en'
 
-export const SUPPLIER_PO_SELECT = `id,po_number,lessor_id,owner_class,is_internal,company_id,project_id,start_date,status,closed_at,notes,created_by,created_at,unpriced_count,lessor:lessors(id,name),company:companies(${NAMED}),project:projects(${NAMED})`
+export const SUPPLIER_PO_SELECT = `id,po_number,lessor_id,owner_class,is_internal,company_id,project_id,start_date,status,closed_at,approval_status,approved_at,approved_by,notes,created_by,created_at,unpriced_count,lessor:lessors(id,name),company:companies(${NAMED}),project:projects(${NAMED})`
 
 /** The list adds the line count (one embedded count per row). */
 export const SUPPLIER_PO_LIST_SELECT = `${SUPPLIER_PO_SELECT},updated_at,supplier_po_equipment(count)`
@@ -611,6 +616,14 @@ export async function updateSupplierPo(input: {
 }
 
 /** `close_supplier_po`. */
+/** `approve_supplier_po` (0160): a draft PO becomes approved and locked;
+ *  the database checks the permission, the creator and the prices. */
+export async function approveSupplierPo(poId: string): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('approve_supplier_po', { p_po_id: poId }),
+  )
+}
+
 export async function closeSupplierPo(poId: string): Promise<RpcResult<null>> {
   return asResult<null>(
     await supabase.rpc('close_supplier_po', { p_po_id: poId }),
