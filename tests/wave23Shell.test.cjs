@@ -922,11 +922,11 @@ test('the field home receives its variant from the permission scope', () => {
   const homeSource = read('src', 'lib', 'homeScope.ts')
   assert.match(
     homeSource,
-    /export type HomeMovementsScope =\s+\| 'all_contexts'\s+\| 'site_all'\s+\| 'workshop'\s+\| 'own_site'/,
+    /export type HomeMovementsScope =\s+\| 'all_contexts'\s+\| 'site_all'\s+\| 'workshop_all'\s+\| 'workshop'\s+\| 'own_site'/,
   )
   assert.match(
     read('src', 'lib', 'navPermissions.ts'),
-    /export type ShellHomeScope = 'all_contexts' \| 'site_all' \| 'workshop' \| 'own_site'/,
+    /export type ShellHomeScope =\s+\| 'all_contexts'\s+\| 'site_all'\s+\| 'workshop_all'\s+\| 'workshop'\s+\| 'own_site'/,
   )
 })
 

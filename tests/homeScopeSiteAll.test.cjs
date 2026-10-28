@@ -25,7 +25,8 @@ test('a foreman home follows the movements.read scope', () => {
   assert.equal(scopeOf([['home.foreman', 'own']]), 'own_site')
   assert.equal(scopeOf([['home.foreman', 'all'], ['movements.read', 'site']]), 'site_all')
   assert.equal(scopeOf([['home.foreman', 'own'], ['movements.read', 'all']]), 'site_all')
-  assert.equal(scopeOf([['home.foreman', 'own'], ['movements.read', 'workshop']]), 'own_site')
+  // «لما احط له حركات الورشة فقط، يرجع يجيب حركاته فقط» (2026-10-28).
+  assert.equal(scopeOf([['home.foreman', 'own'], ['movements.read', 'workshop']]), 'workshop_all')
 })
 
 test('the workshop homes and the fallback are unchanged', () => {
@@ -56,6 +57,7 @@ test('the shell gives the foreman home the same list as homeScope', () => {
   for (const entries of [
     [['home.foreman', 'own'], ['movements.read', 'own']],
     [['home.foreman', 'own'], ['movements.read', 'site']],
+    [['home.foreman', 'own'], ['movements.read', 'workshop']],
     [['home.foreman', 'all'], ['movements.read', 'all']],
     [['home.foreman', 'own']],
     [['home.workshop', 'all']],

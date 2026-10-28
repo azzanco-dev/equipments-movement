@@ -375,7 +375,12 @@ export type ShellKind =
   | 'pending'
 
 /** Same values as HomeMovementsScope (src/lib/homeScope.ts). */
-export type ShellHomeScope = 'all_contexts' | 'site_all' | 'workshop' | 'own_site'
+export type ShellHomeScope =
+  | 'all_contexts'
+  | 'site_all'
+  | 'workshop_all'
+  | 'workshop'
+  | 'own_site'
 
 export interface ShellPlan {
   kind: ShellKind
@@ -517,15 +522,20 @@ export function planShell(state: NavPermissionState): ShellPlan {
       pages: openPages(permissions, ADMIN_SHELL_PAGES),
     }
   // The foreman home lists the user's own site movements, unless his
-  // movements.read scope is wider (all / site): then the log embedded
-  // (owner 2026-10-28, «رئيس الفورمين … مايشوف غير حقه»). The same rule as
+  // movements.read scope is wider (all / site / workshop): then the log
+  // embedded (owner 2026-10-28, «رئيس الفورمين … مايشوف غير حقه»). The same rule as
   // homeMovementsScopeFromPermissions in src/lib/homeScope.ts.
   if (permissions.has('home.foreman')) {
     const read = permissions.get('movements.read')
     return {
       kind: 'foreman',
       source: 'permissions',
-      homeScope: read === 'all' || read === 'site' ? 'site_all' : 'own_site',
+      homeScope:
+        read === 'all' || read === 'site'
+          ? 'site_all'
+          : read === 'workshop'
+            ? 'workshop_all'
+            : 'own_site',
       landing: 'dashboard',
       pages: fieldPages(permissions),
     }

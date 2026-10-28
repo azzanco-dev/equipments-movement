@@ -18,6 +18,9 @@ import type { PermissionsStatus } from '@/lib/permissions'
  *   `movements.read` scope is wider than his own rows (`all` or `site`)
  *   gets the admin log embedded, opening on «المشاريع»; RLS still decides
  *   which rows come back.
+ * - `workshop_all` (owner 2026-10-28, «لما احط له حركات الورشة فقط، يرجع
+ *   يجيب حركاته فقط»): the same embedded log for a foreman home whose
+ *   `movements.read` scope is `workshop`, opening on «الورشة».
  * - `own_site`: the foreman's own site movements. It is also the answer for
  *   any other, unknown or missing role, so the gating fails closed onto the
  *   narrowest list (one user's own rows), never onto the wider ones.
@@ -29,6 +32,7 @@ import type { PermissionsStatus } from '@/lib/permissions'
 export type HomeMovementsScope =
   | 'all_contexts'
   | 'site_all'
+  | 'workshop_all'
   | 'workshop'
   | 'own_site'
 
@@ -46,7 +50,9 @@ export function homeMovementsScopeFromPermissions(
 ): HomeMovementsScope {
   if (permissions.has('home.foreman')) {
     const read = permissions.get('movements.read')
-    return read === 'all' || read === 'site' ? 'site_all' : 'own_site'
+    if (read === 'all' || read === 'site') return 'site_all'
+    if (read === 'workshop') return 'workshop_all'
+    return 'own_site'
   }
   const workshopScope = permissions.get('home.workshop')
   if (workshopScope === 'all') return 'all_contexts'

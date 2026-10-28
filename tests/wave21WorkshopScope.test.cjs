@@ -98,7 +98,7 @@ test('the home picks its list through homeMovementsScope', () => {
 test('the managers get the embedded admin log, opening on the workshop', () => {
   const home = read('src', 'screens', 'HomeScreen.tsx')
   const managers = home.match(
-    /scope === 'all_contexts' \|\| scope === 'site_all' \? \(([\s\S]*?)\) : \(\s*<HomeMovementsCard([\s\S]*?)\/>/,
+    /scope === 'all_contexts' \|\|\s+scope === 'site_all' \|\|\s+scope === 'workshop_all' \? \(([\s\S]*?)\) : \(\s*<HomeMovementsCard([\s\S]*?)\/>/,
   )
   assert.ok(managers, 'one branch per scope')
   const [, logBranch, homeBranch] = managers
