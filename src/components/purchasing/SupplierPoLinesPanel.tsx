@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Badge, Skeleton } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
+import { supplierPoRateUnitOf } from '@/lib/purchasing'
 import {
   SUPPLIER_PO_LINE_SELECT,
   type SupplierPoLineRow,
@@ -115,7 +116,7 @@ export function SupplierPoLinesPanel({ poId }: { poId: string }) {
                       {t('supplierPoNoPrice')}
                     </Badge>
                   ) : (
-                    <Price value={line.price} />
+                    <Price value={line.price} unit={supplierPoRateUnitOf(line.rate_unit)} />
                   )}
                 </td>
               </tr>

@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { Price, PricePreview } from '@/components/purchasing/Price'
 import { PurchasingUnitCell } from '@/components/purchasing/PurchasingUnitCell'
-import { Button, Dialog, Field, Input, Notice, Textarea } from '@/components/ui'
+import {
+  Button,
+  Dialog,
+  Field,
+  Input,
+  Notice,
+  Select,
+  Textarea,
+} from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import {
@@ -14,9 +22,13 @@ import {
   type FieldErrors,
 } from '@/lib/formValidation'
 import {
+  SUPPLIER_PO_DEFAULT_RATE_UNIT,
   SUPPLIER_PO_LINE_EDIT_FIELD_ORDER,
   SUPPLIER_PO_LINE_EDIT_FIELD_RULES,
+  SUPPLIER_PO_RATE_UNIT_LABEL_KEYS,
+  SUPPLIER_PO_RATE_UNITS,
   supplierPoErrorOutcome,
+  supplierPoRateUnitOf,
   type SupplierPoLineEditFormValues,
 } from '@/lib/purchasing'
 import {
@@ -29,7 +41,8 @@ import {
  * edited with the price, migration 0142): the price excluding VAT (empty =
  * «تحتاج تسعير») and the note, saved in one call through
  * `update_supplier_po_equipment`, which records a price change as
- * `price_changed` and a note-only change as `line_updated`.
+ * `price_changed` and a note-only change as `line_updated`. 0157 (owner
+ * 2026-10-28): the price unit, month or day, is edited with them.
  */
 export function EditLineDialog({
   line,
@@ -44,6 +57,7 @@ export function EditLineDialog({
   const { t } = useI18n()
   const [form, setForm] = useState<SupplierPoLineEditFormValues>({
     price: '',
+    rate_unit: SUPPLIER_PO_DEFAULT_RATE_UNIT,
     note: '',
   })
   const [errors, setErrors] = useState<
@@ -56,17 +70,19 @@ export function EditLineDialog({
   const lineId = line?.id ?? null
   const linePrice = line?.price
   const lineNote = line?.note
+  const lineRateUnit = line?.rate_unit
 
   useEffect(() => {
     if (!lineId) return
     setForm({
       price: linePrice === undefined || linePrice === null ? '' : String(linePrice),
+      rate_unit: supplierPoRateUnitOf(lineRateUnit),
       note: lineNote ?? '',
     })
     setErrors({})
     setMessage(null)
     setSaving(false)
-  }, [lineId, linePrice, lineNote])
+  }, [lineId, linePrice, lineNote, lineRateUnit])
 
   const update = (patch: Partial<SupplierPoLineEditFormValues>) => {
     setForm((current) => ({ ...current, ...patch }))
@@ -94,6 +110,7 @@ export function EditLineDialog({
     const result = await updateSupplierPoEquipment({
       lineId: line.id,
       price: form.price.trim() ? Number(form.price.trim()) : null,
+      rateUnit: form.rate_unit,
       note: form.note,
     })
     setSaving(false)
@@ -141,7 +158,11 @@ export function EditLineDialog({
             <PurchasingUnitCell unit={unit} />
             <span className="text-muted">
               {t('supplierPoCurrentPrice')}:{' '}
-              {line.price === null ? t('supplierPoNoPrice') : <Price value={line.price} />}
+              {line.price === null ? (
+                t('supplierPoNoPrice')
+              ) : (
+                <Price value={line.price} unit={supplierPoRateUnitOf(line.rate_unit)} />
+              )}
             </span>
           </div>
         )}
@@ -165,6 +186,26 @@ export function EditLineDialog({
               placeholder="0.00"
               value={form.price}
               onChange={(event) => update({ price: event.target.value })}
+            />
+          )}
+        </Field>
+        <Field
+          label={t('supplierPoRateUnit')}
+          name="rate_unit"
+          required
+          error={errors.rate_unit && t(errors.rate_unit)}
+        >
+          {(control) => (
+            <Select
+              {...control}
+              value={form.rate_unit}
+              options={SUPPLIER_PO_RATE_UNITS.map((unit) => ({
+                value: unit,
+                label: t(SUPPLIER_PO_RATE_UNIT_LABEL_KEYS[unit]),
+              }))}
+              onValueChange={(value) =>
+                update({ rate_unit: supplierPoRateUnitOf(value) })
+              }
             />
           )}
         </Field>

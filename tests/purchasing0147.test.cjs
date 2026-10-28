@@ -133,7 +133,11 @@ test('the dialogs take the preset only when they open', () => {
   const create = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
   assert.match(create, /export interface CreateSupplierPoPreset \{/)
   assert.match(create, /preset = null,/)
-  assert.match(create, /setPicked\(preset \? \{ \[preset\.equipmentId\]: \{ price: '', note: '' \} \} : \{\}\)/)
+  // 0157: the preset unit's line also carries the default price unit.
+  assert.match(
+    create,
+    /setPicked\(\s+preset\s+\? \{\s+\[preset\.equipmentId\]: \{\s+price: '',\s+note: '',\s+rate_unit: SUPPLIER_PO_DEFAULT_RATE_UNIT,\s+\},\s+\}\s+: \{\},\s+\)/,
+  )
 })
 
 test('the list config allowlists its filters and sorts, units without a PO first', () => {

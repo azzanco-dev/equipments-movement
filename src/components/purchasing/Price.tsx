@@ -1,6 +1,11 @@
 import { RiyalSign } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
-import { formatSupplierPoPrice, isValidSupplierPoPrice } from '@/lib/purchasing'
+import {
+  formatSupplierPoPrice,
+  isValidSupplierPoPrice,
+  SUPPLIER_PO_PER_UNIT_KEYS,
+  type SupplierPoRateUnit,
+} from '@/lib/purchasing'
 
 /**
  * An amount excluding VAT with the official riyal symbol after it (owner
@@ -9,9 +14,12 @@ import { formatSupplierPoPrice, isValidSupplierPoPrice } from '@/lib/purchasing'
  */
 export function Price({
   value,
+  unit,
   className,
 }: {
   value: number | string | null | undefined
+  /** 0157: the price unit, shown after the currency («/ شهر», «/ يوم»). */
+  unit?: SupplierPoRateUnit
   className?: string
 }) {
   const { t } = useI18n()
@@ -24,6 +32,44 @@ export function Price({
       </bdi>
       <RiyalSign className="text-muted" size="0.8em" />
       <span className="sr-only">{t('currencySar')}</span>
+      {unit && (
+        <span className="text-[0.75em] font-normal text-muted">
+          {t(SUPPLIER_PO_PER_UNIT_KEYS[unit])}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/**
+ * Amounts per unit stacked (owner 2026-10-28: a monthly and a daily total
+ * are never added together), each with its unit; `amount` turns a part's
+ * total into the figure shown (the VAT, the total with VAT).
+ */
+export function PricesByUnit({
+  parts,
+  amount = (total) => total,
+  alignEnd = false,
+  className,
+}: {
+  parts: readonly { unit: SupplierPoRateUnit; total: number }[]
+  amount?: (total: number) => number
+  /** Lines the stacked amounts up at the end side (a receipt's column). */
+  alignEnd?: boolean
+  className?: string
+}) {
+  return (
+    <span
+      className={`inline-flex flex-col gap-0.5 ${alignEnd ? 'items-end' : 'items-start'}`}
+    >
+      {parts.map((part) => (
+        <Price
+          key={part.unit}
+          value={amount(part.total)}
+          unit={part.unit}
+          className={className}
+        />
+      ))}
     </span>
   )
 }

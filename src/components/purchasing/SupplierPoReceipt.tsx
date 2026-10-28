@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useI18n } from '@/i18n/I18nContext'
-import { vatOf, withVat } from '@/lib/purchasing'
-import { Price } from './Price'
+import { vatOf, withVat, type SupplierPoRateUnit } from '@/lib/purchasing'
+import { PricesByUnit } from './Price'
 
 /** One row: the label, a dotted leader filling the gap, the amount. */
 function ReceiptLine({
@@ -34,17 +34,19 @@ function ReceiptLine({
  * «خلاصة الامر» (owner 2026-10-24, taken from the «هوية+» mockup of
  * app/po-test and rebuilt in the project tokens): the lines' subtotal
  * excluding VAT, the VAT, and the total with VAT under a strong rule, joined
- * to their amounts by dotted leaders. Closes the PO's line list.
+ * to their amounts by dotted leaders. Closes the PO's line list. 0157: one
+ * amount per price unit on each row (a month and a day are never added).
  */
 export function SupplierPoReceipt({
   count,
   unpriced,
-  total,
+  totals,
 }: {
   count: number
   unpriced: number
-  /** The lines' sum excluding VAT (unpriced lines count as nothing). */
-  total: number
+  /** The lines' sums excluding VAT per unit (unpriced lines count as
+   *  nothing), from `supplierPoTotalsByUnit`. */
+  totals: readonly { unit: SupplierPoRateUnit; total: number }[]
 }) {
   const { t } = useI18n()
   return (
@@ -57,16 +59,25 @@ export function SupplierPoReceipt({
         <ReceiptLine
           label={`${t('supplierPoReceiptLines')} (${count})`}
           hint={unpriced > 0 ? `${unpriced} ${t('supplierPoUnpricedTotalNote')}` : undefined}
-          value={<Price value={total} className="text-fg" />}
+          value={<PricesByUnit parts={totals} alignEnd className="text-fg" />}
         />
         <ReceiptLine
           label={t('supplierPoSummaryVat')}
-          value={<Price value={vatOf(total)} className="text-fg" />}
+          value={
+            <PricesByUnit parts={totals} amount={vatOf} alignEnd className="text-fg" />
+          }
         />
         <ReceiptLine
           className="mt-3 border-t-2 border-fg pt-2.5 text-sm font-semibold text-fg"
           label={t('supplierPoSummaryTotalWithVat')}
-          value={<Price value={withVat(total)} className="text-base" />}
+          value={
+            <PricesByUnit
+              parts={totals}
+              amount={withVat}
+              alignEnd
+              className="text-base"
+            />
+          }
         />
       </dl>
     </section>

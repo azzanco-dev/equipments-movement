@@ -2080,6 +2080,16 @@ export const translations = {
       'المعدة دخلت المشروع في يوم غير تاريخ بداية الامر. كل معدات الامر يجب ان تكون دخلت في نفس اليوم.',
     supplierPoErrorStartDateLocked:
       'تاريخ البداية هو يوم دخول معدات الامر ولا يتغير ما دام فيه معدات.',
+    // 0157 (owner 2026-10-28): the price is per month or per day.
+    supplierPoRateUnit: 'وحدة السعر',
+    supplierPoRateUnitMonth: 'شهري',
+    supplierPoRateUnitDay: 'يومي',
+    supplierPoPerMonth: '/ شهر',
+    supplierPoPerDay: '/ يوم',
+    supplierPoRateUnitInvalid: 'اختر وحدة السعر: شهري او يومي.',
+    supplierPoDefaultRateUnit: 'وحدة السعر للمعدات المختارة',
+    supplierPoDefaultRateUnitHint:
+      'تنطبق على كل معدة تختارها، وتقدر تغيرها لاي معدة جنب سعرها.',
     supplierPoEntryDate: 'تاريخ الدخول',
     supplierPoSelectedCount: 'المختارة',
     supplierPoErrorInvalidLine: 'سطر المعدة غير موجود.',
@@ -4232,6 +4242,16 @@ export const translations = {
       'The equipment entered the project on a day other than the order start date. All units of one order must have entered on the same day.',
     supplierPoErrorStartDateLocked:
       "The start date is the entry day of the order's equipment and cannot change while the order has equipment.",
+    // 0157 (owner 2026-10-28): the price is per month or per day.
+    supplierPoRateUnit: 'Price unit',
+    supplierPoRateUnitMonth: 'Monthly',
+    supplierPoRateUnitDay: 'Daily',
+    supplierPoPerMonth: '/ month',
+    supplierPoPerDay: '/ day',
+    supplierPoRateUnitInvalid: 'Pick the price unit: monthly or daily.',
+    supplierPoDefaultRateUnit: 'Price unit for the ticked units',
+    supplierPoDefaultRateUnitHint:
+      'Applies to every unit you tick; change it for any unit next to its price.',
     supplierPoEntryDate: 'Entry date',
     supplierPoSelectedCount: 'Selected',
     supplierPoErrorInvalidLine: 'The equipment line does not exist.',

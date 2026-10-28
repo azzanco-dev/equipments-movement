@@ -24,7 +24,7 @@ import { AddEquipmentDialog } from '@/components/purchasing/AddEquipmentDialog'
 import { CloseSupplierPoDialog } from '@/components/purchasing/CloseSupplierPoDialog'
 import { EditLineDialog } from '@/components/purchasing/EditLineDialog'
 import { EditSupplierPoDialog } from '@/components/purchasing/EditSupplierPoDialog'
-import { Price } from '@/components/purchasing/Price'
+import { Price, PricesByUnit } from '@/components/purchasing/Price'
 import { PurchasingUnitCell } from '@/components/purchasing/PurchasingUnitCell'
 import { SupplierPoEventsTimeline } from '@/components/purchasing/SupplierPoEventsTimeline'
 import { SupplierPoOptionsMenu } from '@/components/purchasing/SupplierPoOptionsMenu'
@@ -56,7 +56,9 @@ import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import {
   SUPPLIER_PO_EVENTS_LIMIT,
+  supplierPoRateUnitOf,
   supplierPoSupplierLabel,
+  supplierPoTotalsByUnit,
   vatOf,
   withVat,
 } from '@/lib/purchasing'
@@ -64,7 +66,6 @@ import {
   SUPPLIER_PO_EVENT_SELECT,
   SUPPLIER_PO_LINE_SELECT,
   SUPPLIER_PO_SELECT,
-  supplierPoTotal,
   type SupplierPoEventRow,
   type SupplierPoLineRow,
   type SupplierPoRow,
@@ -259,7 +260,8 @@ export function SupplierPoDetail({
   const projectName = po.project
     ? localizedName(lang, po.project.name_ar, po.project.name_en)
     : '—'
-  const { total, unpriced } = supplierPoTotal(lines)
+  // 0157: one total per price unit (a month and a day are never added).
+  const { parts: totalsByUnit, unpriced } = supplierPoTotalsByUnit(lines)
   const createdByName =
     (po.created_by && actorNames.get(po.created_by)) || '—'
   const codeOf = (equipmentId: string) =>
@@ -448,17 +450,17 @@ export function SupplierPoDetail({
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
             label={t('supplierPoSummaryTotal')}
-            value={<Price value={total} />}
+            value={<PricesByUnit parts={totalsByUnit} />}
             icon={<Coins size={18} />}
           />
           <StatCard
             label={t('supplierPoSummaryVat')}
-            value={<Price value={vatOf(total)} />}
+            value={<PricesByUnit parts={totalsByUnit} amount={vatOf} />}
             icon={<Percent size={18} />}
           />
           <StatCard
             label={t('supplierPoSummaryTotalWithVat')}
-            value={<Price value={withVat(total)} />}
+            value={<PricesByUnit parts={totalsByUnit} amount={withVat} />}
             icon={<Receipt size={18} />}
           />
           <StatCard
@@ -563,7 +565,10 @@ export function SupplierPoDetail({
                             {line.price === null ? (
                               <Badge tone="warning">{t('supplierPoNoPrice')}</Badge>
                             ) : (
-                              <Price value={line.price} />
+                              <Price
+                                value={line.price}
+                                unit={supplierPoRateUnitOf(line.rate_unit)}
+                              />
                             )}
                           </p>
                         </div>
@@ -588,7 +593,7 @@ export function SupplierPoDetail({
                 <SupplierPoReceipt
                   count={lines.length}
                   unpriced={unpriced}
-                  total={total}
+                  totals={totalsByUnit}
                 />
               </li>
             </ul>

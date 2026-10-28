@@ -3,6 +3,7 @@ import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import {
   SUPPLIER_PO_EVENT_LABEL_KEYS,
   SUPPLIER_PO_EVENTS_LIMIT,
+  SUPPLIER_PO_RATE_UNIT_LABEL_KEYS,
   formatSupplierPoPrice,
 } from '@/lib/purchasing'
 import { supplierPoEventDetail, type SupplierPoEventRow } from '@/lib/purchasingData'
@@ -35,6 +36,7 @@ export function SupplierPoEventsTimeline({
           (value) =>
             formatSupplierPoPrice(value as number | string | null | undefined),
           formatDate,
+          (unit) => t(SUPPLIER_PO_RATE_UNIT_LABEL_KEYS[unit]),
         )
         const actor = event.actor_id ? actorNames.get(event.actor_id) : null
         return (

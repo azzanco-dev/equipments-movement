@@ -15,7 +15,7 @@ import {
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
-import { supplierPoSupplierLabel } from '@/lib/purchasing'
+import { supplierPoRateUnitOf, supplierPoSupplierLabel } from '@/lib/purchasing'
 import {
   EQUIPMENT_PURCHASING_LIMIT,
   EQUIPMENT_PURCHASING_SELECT,
@@ -154,7 +154,7 @@ export function EquipmentPurchasingCard({
             {t('supplierPoNoPrice')}
           </Badge>
         ) : (
-          <Price value={row.price} />
+          <Price value={row.price} unit={supplierPoRateUnitOf(row.rate_unit)} />
         ),
     },
   ]

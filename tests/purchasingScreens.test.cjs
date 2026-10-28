@@ -302,6 +302,8 @@ const MIGRATIONS = [
   '20261022100000_0142_supplier_po_update.sql',
   // 0148: the same entry day (entry_date_mismatch, po_start_date_locked).
   '20261025100000_0148_supplier_po_same_entry_day.sql',
+  // 0157: the price unit (invalid_rate_unit).
+  '20261028120000_0157_supplier_po_rate_unit.sql',
 ]
 
 test('every stable token of migrations 0136 to 0138 is known and mapped', () => {

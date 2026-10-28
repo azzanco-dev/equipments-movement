@@ -108,6 +108,73 @@ export function formatSupplierPoPrice(
   }).format(amount)
 }
 
+// --- The price unit (0157) ---------------------------------------------------------
+
+/** `supplier_po_equipment.rate_unit`: the line's price is per month or per
+ *  day with this supplier (owner 2026-10-28; no hourly unit, no standard
+ *  hours, no quantity on the supplier side). */
+export type SupplierPoRateUnit = 'month' | 'day'
+
+export const SUPPLIER_PO_RATE_UNITS: readonly SupplierPoRateUnit[] = ['month', 'day']
+
+export const SUPPLIER_PO_DEFAULT_RATE_UNIT: SupplierPoRateUnit = 'month'
+
+/** The unit's name in a select («شهري» / «يومي»). */
+export const SUPPLIER_PO_RATE_UNIT_LABEL_KEYS: Readonly<
+  Record<SupplierPoRateUnit, TranslationKey>
+> = {
+  month: 'supplierPoRateUnitMonth',
+  day: 'supplierPoRateUnitDay',
+}
+
+/** The suffix after an amount («/ شهر» / «/ يوم»). */
+export const SUPPLIER_PO_PER_UNIT_KEYS: Readonly<
+  Record<SupplierPoRateUnit, TranslationKey>
+> = {
+  month: 'supplierPoPerMonth',
+  day: 'supplierPoPerDay',
+}
+
+export function isSupplierPoRateUnit(
+  value: string | null | undefined,
+): value is SupplierPoRateUnit {
+  return (SUPPLIER_PO_RATE_UNITS as readonly string[]).includes(value ?? '')
+}
+
+/** A stored unit, or month for anything else (every pre-0157 line is month). */
+export function supplierPoRateUnitOf(
+  value: string | null | undefined,
+): SupplierPoRateUnit {
+  return isSupplierPoRateUnit(value) ? value : SUPPLIER_PO_DEFAULT_RATE_UNIT
+}
+
+/**
+ * The PO's totals excluding VAT, one per unit present on its lines, month
+ * first (owner 2026-10-28: a monthly and a daily price are never added
+ * together). Unpriced lines count towards their unit's presence but not its
+ * total; a PO without lines totals 0 per month.
+ */
+export function supplierPoTotalsByUnit(
+  lines: readonly { price: number | string | null; rate_unit?: string | null }[],
+): { parts: { unit: SupplierPoRateUnit; total: number }[]; unpriced: number } {
+  const totals = new Map<SupplierPoRateUnit, number>()
+  let unpriced = 0
+  for (const line of lines) {
+    const unit = supplierPoRateUnitOf(line.rate_unit)
+    const price =
+      line.price === null || line.price === undefined ? NaN : Number(line.price)
+    if (Number.isNaN(price)) unpriced += 1
+    totals.set(unit, (totals.get(unit) ?? 0) + (Number.isNaN(price) ? 0 : price))
+  }
+  const parts = SUPPLIER_PO_RATE_UNITS.filter((unit) => totals.has(unit)).map(
+    (unit) => ({ unit, total: Math.round((totals.get(unit) ?? 0) * 100) / 100 }),
+  )
+  return {
+    parts: parts.length ? parts : [{ unit: SUPPLIER_PO_DEFAULT_RATE_UNIT, total: 0 }],
+    unpriced,
+  }
+}
+
 // --- The party: a lessor or an owner class (0138) ----------------------------------
 
 /** `supplier_pos.owner_class`: the owner classes a PO can be addressed to
@@ -207,6 +274,8 @@ export interface SupplierPoLineFormValues {
   equipment_id: string
   /** As typed; optional since 0138 (empty = «تحتاج سعر»). */
   price: string
+  /** 0157: per month or per day. */
+  rate_unit: SupplierPoRateUnit
   note: string
 }
 
@@ -215,22 +284,30 @@ export interface SupplierPoCreateLine {
   equipment_id: string
   /** As typed; optional. */
   price: string
+  /** 0157: per month or per day. */
+  rate_unit: SupplierPoRateUnit
   note: string
 }
 
 /** The `p_equipment` items of create_supplier_po. */
 export function supplierPoEquipmentPayload(
   lines: readonly SupplierPoCreateLine[],
-): { equipment_id: string; price: number | null; note: string | null }[] {
+): {
+  equipment_id: string
+  price: number | null
+  note: string | null
+  rate_unit: SupplierPoRateUnit
+}[] {
   return lines.map((line) => ({
     equipment_id: line.equipment_id,
     price: line.price.trim() ? Number(line.price.trim()) : null,
     note: line.note.trim() || null,
+    rate_unit: line.rate_unit,
   }))
 }
 
 export const SUPPLIER_PO_LINE_FIELD_ORDER: readonly (keyof SupplierPoLineFormValues)[] =
-  ['equipment_id', 'price', 'note']
+  ['equipment_id', 'price', 'rate_unit', 'note']
 
 /** The form values of «تعديل السعر» (update_supplier_po_equipment_price). */
 export interface SupplierPoPriceFormValues {
@@ -241,11 +318,13 @@ export interface SupplierPoPriceFormValues {
  *  the price (empty = «تحتاج تسعير») and the note together. */
 export interface SupplierPoLineEditFormValues {
   price: string
+  /** 0157: per month or per day. */
+  rate_unit: SupplierPoRateUnit
   note: string
 }
 
 export const SUPPLIER_PO_LINE_EDIT_FIELD_ORDER: readonly (keyof SupplierPoLineEditFormValues)[] =
-  ['price', 'note']
+  ['price', 'rate_unit', 'note']
 
 /** The form values of «تعديل الامر» (update_supplier_po, 0142): the start
  *  date and the notes; the party, company and project never change. */
@@ -358,6 +437,13 @@ export const SUPPLIER_PO_LINE_FIELD_RULES: readonly DatabaseFieldRule<SupplierPo
       field: 'equipment_id',
       key: 'supplierPoErrorEntryDateMismatch',
     },
+    // 0157: the price unit is month or day.
+    {
+      on: 'raised',
+      match: 'invalid_rate_unit',
+      field: 'rate_unit',
+      key: 'supplierPoRateUnitInvalid',
+    },
   ]
 
 /** Tokens of update_supplier_po_equipment_price that name the price field. */
@@ -391,6 +477,13 @@ export const SUPPLIER_PO_LINE_EDIT_FIELD_RULES: readonly DatabaseFieldRule<Suppl
       match: 'invalid_note',
       field: 'note',
       key: 'supplierPoLineNoteTooLong',
+    },
+    // 0157: the price unit is month or day.
+    {
+      on: 'raised',
+      match: 'invalid_rate_unit',
+      field: 'rate_unit',
+      key: 'supplierPoRateUnitInvalid',
     },
   ]
 
@@ -431,9 +524,10 @@ export const SUPPLIER_PO_FORM_MESSAGES: Readonly<Record<string, TranslationKey>>
     purchasing_manage_required: 'supplierPoErrorManageRequired',
     invalid_po: 'supplierPoNotFound', // add, close, update (0142)
     invalid_line: 'supplierPoErrorInvalidLine', // update price / line (0142)
+    invalid_rate_unit: 'supplierPoRateUnitInvalid', // create (0157)
   }
 
-/** Every stable token of migrations 0136–0148 the client maps, for the tests. */
+/** Every stable token of migrations 0136–0157 the client maps, for the tests. */
 export const SUPPLIER_PO_ERROR_TOKENS: readonly string[] = [
   'purchasing_manage_required',
   'invalid_po',
@@ -457,6 +551,7 @@ export const SUPPLIER_PO_ERROR_TOKENS: readonly string[] = [
   'equipment_already_on_open_po',
   'entry_date_mismatch', // 0148 add_supplier_po_equipment (and create)
   'po_start_date_locked', // 0148 update_supplier_po
+  'invalid_rate_unit', // 0157 add / create / update a line
 ]
 
 function errorText(error: PostgresLikeError): string {

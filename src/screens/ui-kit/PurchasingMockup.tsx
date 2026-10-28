@@ -816,6 +816,7 @@ const EQUIPMENT_OPTIONS: AsyncSearchSelectOption[] = EQUIPMENT.map((unit) => ({
 const EMPTY_LINE_FORM: SupplierPoLineFormValues = {
   equipment_id: '',
   price: '',
+  rate_unit: 'month',
   note: '',
 }
 

@@ -66,21 +66,19 @@ test('add_supplier_po_equipment: the 0138 body plus the entry-day check', () => 
 })
 
 test('create_supplier_po inherits the rule: its latest body adds every unit through add', () => {
-  const latest = norm(
-    read('supabase', 'migrations', '20261020110000_0139_supplier_po_is_internal_default.sql'),
-  )
+  // The latest migration that (re-)creates it (0139, then 0157 for the unit).
+  const latestFile = migrations
+    .filter((file) =>
+      /CREATE (OR REPLACE )?FUNCTION public\.create_supplier_po\(/.test(
+        read('supabase', 'migrations', file),
+      ),
+    )
+    .pop()
+  const latest = norm(read('supabase', 'migrations', latestFile))
   assert.match(
     latest,
     /FOR v_item IN SELECT value FROM jsonb_array_elements\(COALESCE\(p_equipment, '\[\]'::jsonb\)\) LOOP PERFORM public\.add_supplier_po_equipment\( v_id,/,
   )
-  // No later migration re-creates create_supplier_po.
-  const createLatest = '20261020110000_0139_supplier_po_is_internal_default.sql'
-  for (const file of migrations.filter((name) => name > createLatest))
-    assert.doesNotMatch(
-      read('supabase', 'migrations', file),
-      /CREATE (OR REPLACE )?FUNCTION public\.create_supplier_po\(/,
-      file,
-    )
   assert.match(sql, /COMMENT ON FUNCTION public\.create_supplier_po\(uuid, text, uuid, uuid, date, text, jsonb\) IS '0136\/0138\/0139\/0148:/)
 })
 

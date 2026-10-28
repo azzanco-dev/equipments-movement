@@ -4,7 +4,15 @@ import {
   type AsyncSearchSelectOption,
 } from '@/components/AsyncSearchSelect'
 import { PricePreview } from '@/components/purchasing/Price'
-import { Button, Dialog, Field, Input, Notice, Textarea } from '@/components/ui'
+import {
+  Button,
+  Dialog,
+  Field,
+  Input,
+  Notice,
+  Select,
+  Textarea,
+} from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import {
@@ -17,9 +25,13 @@ import {
   type FieldErrors,
 } from '@/lib/formValidation'
 import {
+  SUPPLIER_PO_DEFAULT_RATE_UNIT,
   SUPPLIER_PO_LINE_FIELD_ORDER,
   SUPPLIER_PO_LINE_FIELD_RULES,
+  SUPPLIER_PO_RATE_UNIT_LABEL_KEYS,
+  SUPPLIER_PO_RATE_UNITS,
   supplierPoErrorOutcome,
+  supplierPoRateUnitOf,
   type SupplierPoLineFormValues,
 } from '@/lib/purchasing'
 import {
@@ -32,6 +44,7 @@ import {
 const EMPTY_FORM: SupplierPoLineFormValues = {
   equipment_id: '',
   price: '',
+  rate_unit: SUPPLIER_PO_DEFAULT_RATE_UNIT,
   note: '',
 }
 
@@ -127,6 +140,7 @@ export function AddEquipmentDialog({
       poId: po.id,
       equipmentId: form.equipment_id,
       price: form.price.trim() ? Number(form.price.trim()) : null,
+      rateUnit: form.rate_unit,
       note: form.note,
     })
     setSaving(false)
@@ -210,6 +224,27 @@ export function AddEquipmentDialog({
               placeholder="0.00"
               value={form.price}
               onChange={(event) => update({ price: event.target.value })}
+            />
+          )}
+        </Field>
+        {/* 0157 (owner 2026-10-28): the price is per month or per day. */}
+        <Field
+          label={t('supplierPoRateUnit')}
+          name="rate_unit"
+          required
+          error={errors.rate_unit && t(errors.rate_unit)}
+        >
+          {(control) => (
+            <Select
+              {...control}
+              value={form.rate_unit}
+              options={SUPPLIER_PO_RATE_UNITS.map((unit) => ({
+                value: unit,
+                label: t(SUPPLIER_PO_RATE_UNIT_LABEL_KEYS[unit]),
+              }))}
+              onValueChange={(value) =>
+                update({ rate_unit: supplierPoRateUnitOf(value) })
+              }
             />
           )}
         </Field>

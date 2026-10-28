@@ -4,7 +4,7 @@ import {
   type AsyncSearchSelectOption,
 } from '@/components/AsyncSearchSelect'
 import { useMovementFormOptions } from '@/components/movement/useMovementFormOptions'
-import { Price, PricePreview } from '@/components/purchasing/Price'
+import { PricePreview, PricesByUnit } from '@/components/purchasing/Price'
 import {
   Button,
   Checkbox,
@@ -39,6 +39,12 @@ import {
   SUPPLIER_PO_OWNER_CLASSES,
   SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS,
   isValidSupplierPoPrice,
+  SUPPLIER_PO_DEFAULT_RATE_UNIT,
+  SUPPLIER_PO_RATE_UNIT_LABEL_KEYS,
+  SUPPLIER_PO_RATE_UNITS,
+  supplierPoRateUnitOf,
+  supplierPoTotalsByUnit,
+  type SupplierPoRateUnit,
   supplierPoErrorOutcome,
   type SupplierPoCreateLine,
   type SupplierPoFormValues,
@@ -65,7 +71,10 @@ const EMPTY_FORM: SupplierPoFormValues = {
   notes: '',
 }
 
-type Picked = Record<string, { price: string; note: string }>
+type Picked = Record<
+  string,
+  { price: string; note: string; rate_unit: SupplierPoRateUnit }
+>
 
 /**
  * «المعدات في المشاريع» (2026-10-24): a new PO for one unit with no PO and
@@ -132,6 +141,11 @@ export function CreateSupplierPoDialog({
     'idle',
   )
   const [picked, setPicked] = useState<Picked>({})
+  // 0157 (owner 2026-10-28): the unit a newly ticked unit's price takes;
+  // each unit can still be changed next to its price.
+  const [defaultUnit, setDefaultUnit] = useState<SupplierPoRateUnit>(
+    SUPPLIER_PO_DEFAULT_RATE_UNIT,
+  )
   const [errors, setErrors] = useState<FieldErrors<SupplierPoFormValues>>({})
   const [lineErrors, setLineErrors] = useState<Record<string, TranslationKey>>({})
   const [message, setMessage] = useState<TranslationKey | null>(null)
@@ -166,6 +180,14 @@ export function CreateSupplierPoDialog({
     [visits, form.company_id, form.project_id],
   )
   const pickedCount = Object.keys(picked).length
+  const rateUnitOptions = useMemo(
+    () =>
+      SUPPLIER_PO_RATE_UNITS.map((unit) => ({
+        value: unit,
+        label: t(SUPPLIER_PO_RATE_UNIT_LABEL_KEYS[unit]),
+      })),
+    [t],
+  )
   /** 0148: the entry day of the ticked units (they all share it), or null
    *  while none is ticked. */
   const pickedDay = useMemo(() => {
@@ -191,7 +213,18 @@ export function CreateSupplierPoDialog({
     setSupplier(preset?.lessor ?? null)
     setVisits([])
     setVisitsState('idle')
-    setPicked(preset ? { [preset.equipmentId]: { price: '', note: '' } } : {})
+    setDefaultUnit(SUPPLIER_PO_DEFAULT_RATE_UNIT)
+    setPicked(
+      preset
+        ? {
+            [preset.equipmentId]: {
+              price: '',
+              note: '',
+              rate_unit: SUPPLIER_PO_DEFAULT_RATE_UNIT,
+            },
+          }
+        : {},
+    )
     setErrors({})
     setLineErrors({})
     setMessage(null)
@@ -255,7 +288,8 @@ export function CreateSupplierPoDialog({
   const toggle = (visit: PartyOpenVisit, checked: boolean) => {
     setPicked((current) => {
       const next = { ...current }
-      if (checked) next[visit.equipment_id] = { price: '', note: '' }
+      if (checked)
+        next[visit.equipment_id] = { price: '', note: '', rate_unit: defaultUnit }
       else delete next[visit.equipment_id]
       return next
     })
@@ -264,6 +298,28 @@ export function CreateSupplierPoDialog({
       delete next[visit.equipment_id]
       return next
     })
+  }
+
+  const setLineUnit = (equipmentId: string, rateUnit: SupplierPoRateUnit) => {
+    setPicked((current) => ({
+      ...current,
+      [equipmentId]: { ...current[equipmentId], rate_unit: rateUnit },
+    }))
+  }
+
+  /** A new default also moves the ticked units still on the old one; a unit
+   *  changed by hand keeps its own. */
+  const changeDefaultUnit = (next: SupplierPoRateUnit) => {
+    const previous = defaultUnit
+    setDefaultUnit(next)
+    setPicked((current) =>
+      Object.fromEntries(
+        Object.entries(current).map(([equipmentId, line]) => [
+          equipmentId,
+          line.rate_unit === previous ? { ...line, rate_unit: next } : line,
+        ]),
+      ),
+    )
   }
 
   const setLinePrice = (equipmentId: string, price: string) => {
@@ -300,6 +356,7 @@ export function CreateSupplierPoDialog({
       .map((visit) => ({
         equipment_id: visit.equipment_id,
         price: picked[visit.equipment_id].price,
+        rate_unit: picked[visit.equipment_id].rate_unit,
         note: picked[visit.equipment_id].note,
       }))
     const result = await createSupplierPo(form, lines)
@@ -508,6 +565,23 @@ export function CreateSupplierPoDialog({
           ) : unitsAtProject.length === 0 ? (
             <EmptyState title={t('supplierPoNoUnitsAtProject')} className="p-4" />
           ) : (
+            <>
+            <Field
+              label={t('supplierPoDefaultRateUnit')}
+              name="default_rate_unit"
+              hint={t('supplierPoDefaultRateUnitHint')}
+            >
+              {(control) => (
+                <Select
+                  {...control}
+                  value={defaultUnit}
+                  options={rateUnitOptions}
+                  onValueChange={(value) =>
+                    changeDefaultUnit(supplierPoRateUnitOf(value))
+                  }
+                />
+              )}
+            </Field>
             <ul className="space-y-2">
               {unitsAtProject.map((visit) => {
                 const line = picked[visit.equipment_id]
@@ -554,20 +628,33 @@ export function CreateSupplierPoDialog({
                         </span>
                       </label>
                       {line && (
-                        <div className="w-full sm:w-44">
-                          <Input
-                            dir="ltr"
-                            inputMode="decimal"
-                            placeholder="0.00"
-                            aria-label={`${t('supplierPoPrice')} ${visit.equipment_code}`}
-                            value={line.price}
-                            invalid={Boolean(lineErrors[visit.equipment_id])}
-                            data-price-input=""
-                            onChange={(event) =>
-                              setLinePrice(visit.equipment_id, event.target.value)
-                            }
-                            onKeyDown={movePriceFocus}
-                          />
+                        <div className="w-full sm:w-64">
+                          <div className="flex gap-2">
+                            <Input
+                              dir="ltr"
+                              inputMode="decimal"
+                              placeholder="0.00"
+                              aria-label={`${t('supplierPoPrice')} ${visit.equipment_code}`}
+                              value={line.price}
+                              invalid={Boolean(lineErrors[visit.equipment_id])}
+                              data-price-input=""
+                              className="min-w-0 flex-1"
+                              onChange={(event) =>
+                                setLinePrice(visit.equipment_id, event.target.value)
+                              }
+                              onKeyDown={movePriceFocus}
+                            />
+                            {/* 0157: this unit's price per month or per day. */}
+                            <Select
+                              aria-label={`${t('supplierPoRateUnit')} ${visit.equipment_code}`}
+                              className="w-24 shrink-0"
+                              value={line.rate_unit}
+                              options={rateUnitOptions}
+                              onValueChange={(value) =>
+                                setLineUnit(visit.equipment_id, supplierPoRateUnitOf(value))
+                              }
+                            />
+                          </div>
                           {/* Under the LTR field, at its own start (left),
                               like the digits above it (owner 2026-10-20). */}
                           <p dir="ltr" className="mt-1 min-h-4 text-start text-xs text-muted">
@@ -588,6 +675,7 @@ export function CreateSupplierPoDialog({
                 )
               })}
             </ul>
+            </>
           )}
           {pickedCount > 0 && (
             <p className="text-xs text-muted">
@@ -631,13 +719,17 @@ export function CreateSupplierPoDialog({
         {pickedCount > 0 && (
           <p className="text-sm text-muted">
             {t('supplierPoSummaryTotal')}:{' '}
-            <Price
+            {/* 0157: one total per unit, never a month and a day added. */}
+            <PricesByUnit
               className="text-base font-semibold text-fg"
-              value={Object.values(picked).reduce(
-                (sum, line) =>
-                  sum + (isValidSupplierPoPrice(line.price) ? Number(line.price) : 0),
-                0,
-              )}
+              parts={
+                supplierPoTotalsByUnit(
+                  Object.values(picked).map((line) => ({
+                    price: isValidSupplierPoPrice(line.price) ? Number(line.price) : null,
+                    rate_unit: line.rate_unit,
+                  })),
+                ).parts
+              }
             />
           </p>
         )}

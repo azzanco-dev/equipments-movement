@@ -7,6 +7,7 @@ import type {
   SupplierPoEventType,
   SupplierPoFormValues,
   SupplierPoOwnerClass,
+  SupplierPoRateUnit,
   SupplierPoStatus,
 } from '@/lib/purchasing'
 import {
@@ -14,6 +15,7 @@ import {
   SUPPLIER_PO_OWNER_CLASSES,
   SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS,
   isSupplierPoOwnerClass,
+  isSupplierPoRateUnit,
   supplierPoEquipmentPayload,
   supplierPoSupplierLabel,
 } from '@/lib/purchasing'
@@ -107,6 +109,8 @@ export interface SupplierPoLineRow {
   equipment_card_id: string
   /** NULL since 0138 while the price is still to be entered. */
   price: number | null
+  /** 0157: the price is per month or per day (default month). */
+  rate_unit: SupplierPoRateUnit
   note: string | null
   created_at: string
   updated_at: string
@@ -177,13 +181,13 @@ export const SUPPLIER_PO_LIST_SELECT = `${SUPPLIER_PO_SELECT},updated_at,supplie
 export const PURCHASING_UNIT_SELECT =
   'id,code,type,plate_number,chassis_number,ownership_status,lessor:lessors(id,name,is_internal)'
 
-export const SUPPLIER_PO_LINE_SELECT = `id,supplier_po_id,equipment_card_id,price,note,created_at,updated_at,card:equipment_cards(id,equipment_id,period_from,period_to,entry_log_id,equipment:equipment(${PURCHASING_UNIT_SELECT}))`
+export const SUPPLIER_PO_LINE_SELECT = `id,supplier_po_id,equipment_card_id,price,rate_unit,note,created_at,updated_at,card:equipment_cards(id,equipment_id,period_from,period_to,entry_log_id,equipment:equipment(${PURCHASING_UNIT_SELECT}))`
 
 export const SUPPLIER_PO_EVENT_SELECT =
   'id,supplier_po_id,event_type,payload,actor_id,created_at,seq'
 
 /** The equipment page shows the unit's lines with their POs, open card first. */
-export const EQUIPMENT_PURCHASING_SELECT = `id,supplier_po_id,equipment_card_id,price,note,created_at,updated_at,card:equipment_cards!inner(id,equipment_id,period_from,period_to,equipment:equipment(${PURCHASING_UNIT_SELECT})),po:supplier_pos(${SUPPLIER_PO_SELECT})`
+export const EQUIPMENT_PURCHASING_SELECT = `id,supplier_po_id,equipment_card_id,price,rate_unit,note,created_at,updated_at,card:equipment_cards!inner(id,equipment_id,period_from,period_to,equipment:equipment(${PURCHASING_UNIT_SELECT})),po:supplier_pos(${SUPPLIER_PO_SELECT})`
 
 /** The equipment page shows this many purchasing lines at most. */
 export const EQUIPMENT_PURCHASING_LIMIT = 10
@@ -230,19 +234,6 @@ export function supplierPoCompanyProject(
   }
 }
 
-/** Sum of the PRICED lines, excluding VAT, and how many lines have no price. */
-export function supplierPoTotal(
-  lines: readonly { price: number | null }[],
-): { total: number; unpriced: number } {
-  let total = 0
-  let unpriced = 0
-  for (const line of lines) {
-    if (line.price === null || line.price === undefined) unpriced += 1
-    else total += Number(line.price)
-  }
-  return { total, unpriced }
-}
-
 /** The party of a PO as the loaders filter by it. */
 export type SupplierPoParty =
   | { lessor_id: string; owner_class: null }
@@ -272,12 +263,23 @@ export function supplierPoEventDetail(
   codeOf: (equipmentId: string) => string | null,
   formatPrice: (value: unknown) => string,
   formatDay: (value: string) => string = (value) => value,
+  formatUnit: (unit: SupplierPoRateUnit) => string = (unit) => unit,
 ): string | null {
   const payload = event.payload ?? {}
   const code =
     typeof payload.equipment_id === 'string'
       ? codeOf(payload.equipment_id)
       : null
+  // 0157: a change of the price unit, «شهري → يومي».
+  const unitChange =
+    isSupplierPoRateUnit(payload.old_rate_unit as string | null) &&
+    isSupplierPoRateUnit(payload.new_rate_unit as string | null) &&
+    payload.old_rate_unit !== payload.new_rate_unit
+      ? `${formatUnit(payload.old_rate_unit as SupplierPoRateUnit)} → ${formatUnit(payload.new_rate_unit as SupplierPoRateUnit)}`
+      : null
+  const addedUnit = isSupplierPoRateUnit(payload.rate_unit as string | null)
+    ? formatUnit(payload.rate_unit as SupplierPoRateUnit)
+    : null
   switch (event.event_type) {
     case 'created':
       return typeof payload.po_number === 'string' ? payload.po_number : null
@@ -290,7 +292,7 @@ export function supplierPoEventDetail(
         ? `${formatDay(payload.old_start_date)} → ${formatDay(payload.new_start_date)}`
         : null
     case 'line_updated':
-      return code
+      return [code, unitChange].filter(Boolean).join(' · ') || null
     // 0149: the line is gone from the page, so the payload carries the code.
     case 'equipment_removed':
       return (
@@ -300,11 +302,14 @@ export function supplierPoEventDetail(
           : null)
       )
     case 'equipment_added':
-      return [code, formatPrice(payload.price)].filter(Boolean).join(' · ')
+      return [code, formatPrice(payload.price), addedUnit]
+        .filter(Boolean)
+        .join(' · ')
     case 'price_changed':
       return [
         code,
         `${formatPrice(payload.old_price)} → ${formatPrice(payload.new_price)}`,
+        unitChange,
       ]
         .filter(Boolean)
         .join(' · ')
@@ -544,6 +549,8 @@ export async function addSupplierPoEquipment(input: {
   equipmentId: string
   /** Optional since 0138 (null = «تحتاج سعر»). */
   price: number | null
+  /** 0157: per month or per day. */
+  rateUnit: SupplierPoRateUnit
   note: string
 }): Promise<RpcResult<string>> {
   return asResult<string>(
@@ -552,6 +559,7 @@ export async function addSupplierPoEquipment(input: {
       p_equipment_id: input.equipmentId,
       p_price: input.price,
       p_note: input.note.trim() || null,
+      p_rate_unit: input.rateUnit,
     }),
   )
 }
@@ -569,11 +577,12 @@ export async function updateSupplierPoEquipmentPrice(input: {
   )
 }
 
-/** `update_supplier_po_equipment` (0142): the price (null = unpriced) and
- *  the note of a line in one call. */
+/** `update_supplier_po_equipment` (0142/0157): the price (null = unpriced),
+ *  the note and the price unit of a line in one call. */
 export async function updateSupplierPoEquipment(input: {
   lineId: string
   price: number | null
+  rateUnit: SupplierPoRateUnit
   note: string
 }): Promise<RpcResult<null>> {
   return asResult<null>(
@@ -581,6 +590,7 @@ export async function updateSupplierPoEquipment(input: {
       p_line_id: input.lineId,
       p_price: input.price,
       p_note: input.note.trim() || null,
+      p_rate_unit: input.rateUnit,
     }),
   )
 }

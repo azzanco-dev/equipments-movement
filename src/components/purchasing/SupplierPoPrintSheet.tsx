@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Price } from '@/components/purchasing/Price'
+import { Price, PricesByUnit } from '@/components/purchasing/Price'
 import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
 import { formatSaudiDateTime } from '@/lib/printExport'
-import { SUPPLIER_PO_STATUS_BADGE, vatOf, withVat } from '@/lib/purchasing'
 import {
-  supplierPoTotal,
-  type SupplierPoLineRow,
-  type SupplierPoRow,
-} from '@/lib/purchasingData'
+  SUPPLIER_PO_STATUS_BADGE,
+  supplierPoRateUnitOf,
+  supplierPoTotalsByUnit,
+  vatOf,
+  withVat,
+} from '@/lib/purchasing'
+import type { SupplierPoLineRow, SupplierPoRow } from '@/lib/purchasingData'
 import { saudiDateKey } from '@/lib/saudiTime'
 
 /** If the browser never reports the dialog closed, the sheet leaves anyway. */
@@ -88,7 +90,8 @@ export function SupplierPoPrintSheet({
     }
   }, [logoSettled, poNumber])
 
-  const { total, unpriced } = supplierPoTotal(lines)
+  // 0157: one total per price unit (a month and a day are never added).
+  const { parts: totals, unpriced } = supplierPoTotalsByUnit(lines)
   const facts: { label: string; value: string; ltr?: boolean }[] = [
     { label: t('supplierPoSupplier'), value: supplier },
     { label: t('company'), value: company },
@@ -226,7 +229,7 @@ export function SupplierPoPrintSheet({
                     {line.price === null ? (
                       <span className="text-muted">{t('supplierPoNoPrice')}</span>
                     ) : (
-                      <Price value={line.price} />
+                      <Price value={line.price} unit={supplierPoRateUnitOf(line.rate_unit)} />
                     )}
                   </td>
                 </tr>
@@ -240,19 +243,19 @@ export function SupplierPoPrintSheet({
             <div className="flex items-center justify-between gap-3">
               <dt>{t('supplierPoSummaryTotal')}</dt>
               <dd className="m-0 font-semibold">
-                <Price value={total} />
+                <PricesByUnit parts={totals} alignEnd />
               </dd>
             </div>
             <div className="flex items-center justify-between gap-3">
               <dt>{t('supplierPoSummaryVat')}</dt>
               <dd className="m-0 font-medium">
-                <Price value={vatOf(total)} />
+                <PricesByUnit parts={totals} amount={vatOf} alignEnd />
               </dd>
             </div>
             <div className="flex items-center justify-between gap-3 border-t pt-1 text-sm">
               <dt className="font-semibold">{t('supplierPoSummaryTotalWithVat')}</dt>
               <dd className="m-0 font-bold">
-                <Price value={withVat(total)} />
+                <PricesByUnit parts={totals} amount={withVat} alignEnd />
               </dd>
             </div>
             {unpriced > 0 && (
