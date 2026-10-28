@@ -40,3 +40,29 @@ test('the workshop homes and the fallback are unchanged', () => {
     'own_site',
   )
 })
+
+// The shell decides the field home's list too (App passes shell.homeScope):
+// it must follow the same rule (2026-10-28, the first fix missed it).
+test('the shell gives the foreman home the same list as homeScope', () => {
+  const navSource = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'lib', 'navPermissions.ts'),
+    'utf8',
+  )
+  const navOut = ts.transpileModule(navSource, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText
+  const nav = { exports: {} }
+  vm.runInNewContext(navOut, { module: nav, exports: nav.exports, require })
+  for (const entries of [
+    [['home.foreman', 'own'], ['movements.read', 'own']],
+    [['home.foreman', 'own'], ['movements.read', 'site']],
+    [['home.foreman', 'all'], ['movements.read', 'all']],
+    [['home.foreman', 'own']],
+    [['home.workshop', 'all']],
+    [['home.workshop', 'workshop']],
+  ]) {
+    const permissions = new Map(entries)
+    const shell = nav.exports.planShell({ status: 'ready', permissions })
+    assert.equal(shell.homeScope, scopeOf(entries), JSON.stringify(entries))
+  }
+})

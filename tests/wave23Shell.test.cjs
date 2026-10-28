@@ -926,7 +926,7 @@ test('the field home receives its variant from the permission scope', () => {
   )
   assert.match(
     read('src', 'lib', 'navPermissions.ts'),
-    /export type ShellHomeScope = 'all_contexts' \| 'workshop' \| 'own_site'/,
+    /export type ShellHomeScope = 'all_contexts' \| 'site_all' \| 'workshop' \| 'own_site'/,
   )
 })
 
