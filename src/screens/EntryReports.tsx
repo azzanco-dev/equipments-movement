@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { BarChart3, CalendarDays, ExternalLink, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import { PageHeader } from '@/components/PageHeader'
 import { MovementLogCard } from '@/components/MovementLogCard'
@@ -11,6 +12,8 @@ import type { AdminHomeOwner } from '@/lib/adminHomeStats'
 import {
   applyReportFilterParams,
   parseReportContext,
+  clampReportContext,
+  reportContextsForScope,
   parseReportOwners,
   reportOwnersArgument,
   type ReportContext,
@@ -79,7 +82,15 @@ export function EntryReports({
   // per URL and the effect below does not re-run on every render.
   const ownersParam = params.get('owners') ?? ''
   const owners = useMemo(() => parseReportOwners(ownersParam), [ownersParam])
-  const context = parseReportContext(params.get('context'))
+  // The tabs the reader's reports.view scope allows (migration 0158 refuses
+  // the others); a URL asking for another context falls back to the first.
+  const reportContexts = reportContextsForScope(
+    usePermissions().scope('reports.view'),
+  )
+  const context = clampReportContext(
+    parseReportContext(params.get('context')),
+    reportContexts,
+  )
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -237,6 +248,7 @@ export function EntryReports({
             replaceParams(periodParams, { context: next })
           }
           showContext
+          contexts={reportContexts}
         />
       </div>
       {loadError && <Alert type="error">{t('dataLoadError')}</Alert>}

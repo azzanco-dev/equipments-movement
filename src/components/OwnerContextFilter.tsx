@@ -27,6 +27,9 @@ export interface OwnerContextFilterProps {
   onContextChange?: (context: ReportContext) => void
   /** The equipment report has one context only, so it hides the tabs. */
   showContext?: boolean
+  /** The tabs the reader's `reports.view` scope allows (0158); every tab
+   *  when omitted. One allowed context hides the tabs. */
+  contexts?: readonly ReportContext[]
   className?: string
 }
 
@@ -49,6 +52,7 @@ export function OwnerContextFilter({
   context = 'site',
   onContextChange,
   showContext = false,
+  contexts = CONTEXTS,
   className,
 }: OwnerContextFilterProps) {
   const { t } = useI18n()
@@ -74,13 +78,13 @@ export function OwnerContextFilter({
       >
         {t('reportFilterAlazaniOnly')}
       </Button>
-      {showContext && (
+      {showContext && contexts.length > 1 && (
         <Tabs
           value={context}
           onValueChange={(next) => onContextChange?.(next as ReportContext)}
         >
           <TabsList variant="segmented" aria-label={t('reportContextFilter')}>
-            {CONTEXTS.map((option) => (
+            {CONTEXTS.filter((option) => contexts.includes(option)).map((option) => (
               <TabsTrigger key={option} value={option}>
                 {t(CONTEXT_LABEL[option])}
               </TabsTrigger>

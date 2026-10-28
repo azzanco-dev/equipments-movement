@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import { PageHeader } from '@/components/PageHeader'
 import { MovementLogCard } from '@/components/MovementLogCard'
@@ -24,6 +25,8 @@ import type { AdminHomeOwner } from '@/lib/adminHomeStats'
 import {
   applyReportFilterParams,
   parseReportContext,
+  clampReportContext,
+  reportContextsForScope,
   parseReportOwners,
   type ReportContext,
 } from '@/lib/reportFilters'
@@ -110,7 +113,15 @@ export function EntryReportsAll({
   // the effect below does not re-run on every render.
   const ownersParam = params.get('owners') ?? ''
   const owners = useMemo(() => parseReportOwners(ownersParam), [ownersParam])
-  const context = parseReportContext(params.get('context'))
+  // The tabs the reader's reports.view scope allows (migration 0158 refuses
+  // the others); a URL asking for another context falls back to the first.
+  const reportContexts = reportContextsForScope(
+    usePermissions().scope('reports.view'),
+  )
+  const context = clampReportContext(
+    parseReportContext(params.get('context')),
+    reportContexts,
+  )
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params.toString())
     // Cleared dates stay in the URL as empty values so they do not fall back
@@ -287,6 +298,7 @@ export function EntryReportsAll({
           context={context}
           onContextChange={(next) => setFilters({ context: next })}
           showContext
+          contexts={reportContexts}
         />
         <button
           className="btn-outline"

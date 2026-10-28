@@ -74,6 +74,27 @@ export function isReportContext(value: unknown): value is ReportContext {
   return (REPORT_CONTEXTS as readonly unknown[]).includes(value)
 }
 
+/**
+ * The contexts a `reports.view` scope may ask `get_entry_report_summary`
+ * for (migration 0158 refuses the others): `all` → every tab, `site` or
+ * `workshop` → that one only, anything else → none.
+ */
+export function reportContextsForScope(
+  scope: string | null | undefined,
+): ReportContext[] {
+  if (scope === 'all') return [...REPORT_CONTEXTS]
+  if (scope === 'site' || scope === 'workshop') return [scope]
+  return []
+}
+
+/** The requested context when allowed, else the first allowed one. */
+export function clampReportContext(
+  context: ReportContext,
+  allowed: readonly ReportContext[],
+): ReportContext {
+  return allowed.length === 0 || allowed.includes(context) ? context : allowed[0]
+}
+
 /** Reads `?context=`; anything unknown falls back to the previous behaviour. */
 export function parseReportContext(
   raw: string | null | undefined,
