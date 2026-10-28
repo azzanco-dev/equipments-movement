@@ -193,13 +193,17 @@ export function HomeScreen({
     () => ({ onClassify, classifyingId }),
     [onClassify, classifyingId],
   )
+  // A foreman home allowed to read more than its own rows (`site_all`, owner
+  // 2026-10-28) embeds the same log, opening on «المشاريع».
   const movements =
-    scope === 'all_contexts' ? (
+    scope === 'all_contexts' || scope === 'site_all' ? (
       <Card className="space-y-3">
         <SectionHeader as="h2" title={t('homeAllMovementsTitle')} />
         <LogsScreen
           embedded
-          defaultContext={ALL_CONTEXTS_HOME_DEFAULT_TAB}
+          defaultContext={
+            scope === 'site_all' ? 'site' : ALL_CONTEXTS_HOME_DEFAULT_TAB
+          }
           classify={canClassify ? classify : undefined}
           onSelectMovement={onSelectMovement}
           refreshToken={refreshToken}

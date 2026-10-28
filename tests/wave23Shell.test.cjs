@@ -917,11 +917,12 @@ test('the field home receives its variant from the permission scope', () => {
     home,
     /const scope =\s*movementsScope \?\? resolveHomeMovementsScope\(permissionState\)/,
   )
-  // Same three values as the home's own type.
+  // The home's own type (site_all since 2026-10-28: a foreman home that may
+  // read more than its own rows).
   const homeSource = read('src', 'lib', 'homeScope.ts')
   assert.match(
     homeSource,
-    /export type HomeMovementsScope = 'all_contexts' \| 'workshop' \| 'own_site'/,
+    /export type HomeMovementsScope =\s+\| 'all_contexts'\s+\| 'site_all'\s+\| 'workshop'\s+\| 'own_site'/,
   )
   assert.match(
     read('src', 'lib', 'navPermissions.ts'),

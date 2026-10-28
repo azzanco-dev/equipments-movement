@@ -98,13 +98,16 @@ test('the home picks its list through homeMovementsScope', () => {
 test('the managers get the embedded admin log, opening on the workshop', () => {
   const home = read('src', 'screens', 'HomeScreen.tsx')
   const managers = home.match(
-    /scope === 'all_contexts' \? \(([\s\S]*?)\) : \(\s*<HomeMovementsCard([\s\S]*?)\/>/,
+    /scope === 'all_contexts' \|\| scope === 'site_all' \? \(([\s\S]*?)\) : \(\s*<HomeMovementsCard([\s\S]*?)\/>/,
   )
   assert.ok(managers, 'one branch per scope')
   const [, logBranch, homeBranch] = managers
   assert.match(logBranch, /<LogsScreen\s/)
   assert.match(logBranch, /\bembedded\b/)
-  assert.match(logBranch, /defaultContext=\{ALL_CONTEXTS_HOME_DEFAULT_TAB\}/)
+  assert.match(
+    logBranch,
+    /defaultContext=\{\s*scope === 'site_all' \? 'site' : ALL_CONTEXTS_HOME_DEFAULT_TAB\s*\}/,
+  )
   // wave 24: the classification follows movements.workshop.classify.
   assert.match(logBranch, /classify=\{canClassify \? classify : undefined\}/)
   assert.match(logBranch, /refreshToken=\{refreshToken\}/)

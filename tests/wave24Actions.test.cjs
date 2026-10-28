@@ -451,8 +451,10 @@ test('custom role foreman_lead (0126 seed): its scopes widen the foreman', () =>
   assert.equal(form.quickCreateDriver, true)
   assert.equal(form.quickCreateLessor, true)
 
+  // Owner 2026-10-28: its movements.read scope (site) is wider than its own
+  // rows, so the foreman home embeds the log on «المشاريع».
   assert.deepEqual(homeNow(state), {
-    scope: 'own_site',
+    scope: 'site_all',
     logClassify: false,
     pendingList: false,
     cardClassify: false,

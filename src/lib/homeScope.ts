@@ -13,6 +13,11 @@ import type { PermissionsStatus } from '@/lib/permissions'
  *
  * - `all_contexts`: `workshop_manager`, `assistant_workshop_manager`.
  * - `workshop`: the plain `workshop` role, workshop movements only (unchanged).
+ * - `site_all` (owner 2026-10-28, «سويت دور رئيس الفورمين وعطيته عرض جميع
+ *   الحركات، لكن لسى مايعرض الا حركاتي»): a foreman home whose
+ *   `movements.read` scope is wider than his own rows (`all` or `site`)
+ *   gets the admin log embedded, opening on «المشاريع»; RLS still decides
+ *   which rows come back.
  * - `own_site`: the foreman's own site movements. It is also the answer for
  *   any other, unknown or missing role, so the gating fails closed onto the
  *   narrowest list (one user's own rows), never onto the wider ones.
@@ -21,12 +26,17 @@ import type { PermissionsStatus } from '@/lib/permissions'
  * (`select_entry_exit_logs` and `can_access_movement`, migration 0098); this
  * only decides what the home shows.
  */
-export type HomeMovementsScope = 'all_contexts' | 'workshop' | 'own_site'
+export type HomeMovementsScope =
+  | 'all_contexts'
+  | 'site_all'
+  | 'workshop'
+  | 'own_site'
 
 /**
  * wave 24: the decision from the permissions, in the order of
  * `planShell` (src/lib/navPermissions.ts): a `home.foreman` holder gets the
- * foreman's own-site list whatever its scope (one foreman variant);
+ * foreman's own-site list, or the embedded log when his `movements.read`
+ * scope is `all` or `site` (owner 2026-10-28);
  * `home.workshop` 'all' is the managers' variant with the embedded admin log,
  * 'workshop' the plain workshop list. Nothing else fails closed onto the
  * narrowest list. Roles stage 4a (2026-10-27) removed the role variant.
@@ -34,7 +44,10 @@ export type HomeMovementsScope = 'all_contexts' | 'workshop' | 'own_site'
 export function homeMovementsScopeFromPermissions(
   permissions: ReadonlyMap<string, PermissionScope>,
 ): HomeMovementsScope {
-  if (permissions.has('home.foreman')) return 'own_site'
+  if (permissions.has('home.foreman')) {
+    const read = permissions.get('movements.read')
+    return read === 'all' || read === 'site' ? 'site_all' : 'own_site'
+  }
   const workshopScope = permissions.get('home.workshop')
   if (workshopScope === 'all') return 'all_contexts'
   if (workshopScope === 'workshop') return 'workshop'
