@@ -7,7 +7,6 @@ import type {
 } from '@/lib/types'
 import { PERMISSION_SCOPES, isPermissionScope } from '@/lib/permissions'
 import { ROLE_KEY_FORMAT } from '@/lib/formValidation'
-import { SHELL_PAGES, pageGate, type RoutePage } from '@/lib/navPermissions'
 
 /**
  * wave 22B — pure helpers of Settings › «الادوار والصلاحيات» (migration 0126).
@@ -234,26 +233,6 @@ export interface SelectionWarning {
 
 export type SelectionWarnings = Record<string, SelectionWarning[]>
 
-/**
- * The keys whose pages open only in the admin shell (the sidebar): the gates
- * of every admin-shell page a field home (foreman / workshop) cannot render,
- * from src/lib/navPermissions.ts. `movements.read` is left out (a field home
- * with a wide read embeds the log) and so is `home.admin` (it IS the admin
- * shell).
- */
-export const ADMIN_SHELL_ONLY_KEYS: ReadonlySet<string> = (() => {
-  const field = new Set<RoutePage>(SHELL_PAGES.foreman)
-  const keys = new Set<string>()
-  for (const page of SHELL_PAGES.admin) {
-    if (field.has(page)) continue
-    for (const gate of pageGate(page)) keys.add(gate.key)
-  }
-  keys.delete('movements.read')
-  keys.delete('home.admin')
-  keys.delete('')
-  return keys
-})()
-
 /** The movements.read scopes that cover a context fully. */
 const READ_COVERS: Readonly<Record<'site' | 'workshop' | 'all', string[]>> = {
   site: ['site', 'all'],
@@ -307,20 +286,7 @@ export function selectionWarnings(
   } else if (has('home.foreman') && has('home.workshop'))
     warn('home.workshop', 'rolePermissionsWarnHomeShadowed', ['home.foreman'])
 
-  // 5. A field home has no sidebar: the admin-shell pages have no way in.
-  if (!has('home.admin')) {
-    const fieldHome = has('home.foreman')
-      ? 'home.foreman'
-      : has('home.workshop')
-        ? 'home.workshop'
-        : null
-    if (fieldHome)
-      for (const key of Object.keys(selection).sort())
-        if (ADMIN_SHELL_ONLY_KEYS.has(key))
-          warn(key, 'rolePermissionsWarnNoWayInFromFieldHome', [fieldHome])
-  }
-
-  // 6. A report shows only the movements movements.read lets the user read.
+  // 5. A report shows only the movements movements.read lets the user read.
   const reports = selection['reports.view']
   if (
     read &&
@@ -337,19 +303,19 @@ export function selectionWarnings(
         ['movements.read'],
       )
 
-  // 7. The admin home counts the whole fleet's states from every movement.
+  // 6. The admin home counts the whole fleet's states from every movement.
   if (has('home.admin') && read && read !== 'all')
     warn('home.admin', 'rolePermissionsWarnAdminHomeNeedsReadAll', [
       'movements.read',
     ])
 
-  // 8. Deleting a movement removes its photos, other users' ones too.
+  // 7. Deleting a movement removes its photos, other users' ones too.
   if (has('movements.edit_delete') && !has('movements.photos.delete_any'))
     warn('movements.edit_delete', 'rolePermissionsWarnDeleteNeedsPhotos', [
       'movements.photos.delete_any',
     ])
 
-  // 9. The Afaqy field of the equipment form needs both keys.
+  // 8. The Afaqy field of the equipment form needs both keys.
   if (has('equipment.tracker_link') && !has('settings.integrations'))
     warn(
       'equipment.tracker_link',
@@ -357,13 +323,13 @@ export function selectionWarnings(
       ['settings.integrations'],
     )
 
-  // 10. «ربط افاقي» writes the links on the equipment rows.
+  // 9. «ربط افاقي» writes the links on the equipment rows.
   if (has('settings.integrations') && !has('equipment.edit'))
     warn('settings.integrations', 'rolePermissionsWarnIntegrationsNeedsEdit', [
       'equipment.edit',
     ])
 
-  // 11. Quick actions that live inside another form.
+  // 10. Quick actions that live inside another form.
   for (const key of ['drivers.quick_create', 'movements.site.contractor_code'])
     if (has(key) && !has('movements.site.create'))
       warn(key, 'rolePermissionsWarnNeedsSiteCreate', ['movements.site.create'])

@@ -9,8 +9,8 @@ import type { ChangeItem } from './model'
 
 /**
  * The change log as the approved mockup shows it: من / متى / ماذا (plus the
- * role in the full log of «اعدادات النظام»). `onShowAll` adds the «عرض الكل»
- * control under the first rows.
+ * role in «سجل كل التغييرات», the full log of every role). `onShowAll` adds
+ * the «عرض الكل» control under the first rows.
  */
 export function ChangesTable({
   rows,

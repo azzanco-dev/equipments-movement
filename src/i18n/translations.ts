@@ -937,24 +937,13 @@ export const translations = {
     // wave-21-workshop-scope — end
     // wave-22-roles — start
     rolesSettingsTitle: 'الادوار والصلاحيات',
-    rolesSettingsDesc:
-      'تعريف الادوار وصلاحياتها وتعيينها للمستخدمين، ثم تفعيل النظام عند الجاهزية.',
-    rolesSystemInactiveTitle: 'نظام الادوار غير مفعّل',
-    rolesSystemInactiveBody:
-      'الصلاحيات الفعلية ما زالت حسب الدور الحالي لكل مستخدم. ما تغيره في هذه الصفحة لا يؤثر على احد حتى التفعيل.',
-    rolesSystemActiveTitle: 'نظام الادوار مفعّل',
-    rolesSystemActiveBody:
-      'الصلاحيات الفعلية تتبع الدور المعين لكل مستخدم في هذه الصفحة.',
-    rolesSystemSince: 'منذ {date}',
-    rolesSystemChangedBy: 'بواسطة {name}',
-    rolesSystemStatusLoadError: 'تعذر تحميل حالة نظام الادوار',
+    rolesSettingsDesc: 'تعريف الادوار وصلاحياتها وتعيينها للمستخدمين.',
     rolesSystemStatusInactive: 'غير مفعّل',
     rolesSystemStatusActive: 'مفعّل',
     rolesAccessDenied: 'لا تملك صلاحية «الادوار والصلاحيات».',
     rolesAccessLoadError: 'تعذر التحقق من صلاحياتك',
     rolesTabRoles: 'الادوار',
     rolesTabUsers: 'المستخدمون',
-    rolesTabActivation: 'التفعيل',
     rolesTabAudit: 'سجل التغييرات',
     rolesAddRole: 'اضافة دور',
     rolesEditRole: 'تعديل الدور',
@@ -972,8 +961,6 @@ export const translations = {
     rolesDeleteDesc: 'يحذف الدور وصلاحياته، ولا يمكن التراجع.',
     rolesDeleteSystemHint: 'الادوار النظامية لا تحذف',
     rolesDeleteInUseHint: 'الدور معين لمستخدمين، انقلهم اولا',
-    rolesDeleted: 'تم حذف الدور',
-    rolesSaved: 'تم حفظ الدور',
     roleFormKey: 'المعرف',
     roleFormKeyHint:
       'حروف انجليزية صغيرة وارقام وشرطة سفلية، يبدا بحرف (2 الى 40). يقترح من الاسم الانجليزي ولا يتغير بعد الحفظ.',
@@ -1067,42 +1054,6 @@ export const translations = {
     roleUsersInactiveRole: '{name} (غير نشط)',
     roleUsersUnknownRole: 'دور غير معروف',
     roleUsersNone: 'لا يوجد مستخدمون',
-    rolesActivationTitle: 'تفعيل نظام الادوار',
-    rolesActivationDesc:
-      'عند التفعيل تصبح صلاحيات كل مستخدم حسب الدور المعين له في هذه الصفحة بدلا من دوره الحالي. يمكن التعطيل في اي وقت والعودة فورا الى الوضع الحالي.',
-    rolesActivationLoadError: 'تعذر تحميل بيانات التفعيل',
-    rolesOffendersTitle: 'مستخدمون يمنعون التفعيل ({count})',
-    rolesOffendersNone: 'كل المستخدمين لديهم دور نشط صالح.',
-    rolesOffenderNoRole: 'بدون دور',
-    rolesOffenderUnknownRole: 'دور غير معروف',
-    rolesOffenderInactiveRole: 'الدور غير نشط',
-    rolesOffenderAdminMismatch: 'دور الادمن لا يطابق الدور الحالي',
-    rolesOffenderFix: 'اصلاح',
-    rolesPreviewTitle: 'ما يتغير عند التفعيل',
-    rolesPreviewDesc:
-      'لكل مستخدم: الصلاحيات التي يكسبها او يفقدها او يتغير نطاقها مقارنة بالوضع الحالي.',
-    rolesPreviewNone: 'لن تتغير صلاحيات اي مستخدم عند التفعيل.',
-    rolesPreviewGained: 'يكسب',
-    rolesPreviewLost: 'يفقد',
-    rolesPreviewScopeChanged: 'يتغير النطاق',
-    rolesPreviewScopeFromTo: 'من {from} الى {to}',
-    rolesEnableButton: 'تفعيل النظام',
-    rolesDisableButton: 'تعطيل النظام',
-    rolesConfirmWordEnable: 'تفعيل',
-    rolesConfirmWordDisable: 'تعطيل',
-    rolesConfirmLabel: 'اكتب «{word}» للتاكيد',
-    rolesEnableBlocked:
-      'لا يمكن التفعيل حتى يصبح عدد المستخدمين المانعين صفرا.',
-    rolesDisableDesc:
-      'التعطيل يعيد كل المستخدمين الى صلاحيات دورهم الحالي فورا.',
-    rolesEnabledDone: 'تم تفعيل نظام الادوار.',
-    rolesDisabledDone:
-      'تم تعطيل نظام الادوار: عادت الصلاحيات الى الدور الحالي لكل مستخدم.',
-    rolesEnableRefused:
-      'رفض التفعيل: يوجد مستخدمون بلا دور صالح. راجع القائمة.',
-    rolesEnablePreviewChanged: 'تغيرت المعاينة، راجعها ثم اكد مرة اخرى',
-    rolesToggleNoChange: 'لم يتغير شيء: النظام في هذه الحالة مسبقا.',
-    rolesToggleError: 'تعذر تغيير حالة النظام',
     roleChangesTitle: 'سجل التغييرات',
     roleChangesDesc:
       'اخر 50 تغييرا على الادوار والصلاحيات والتعيينات وحالة النظام.',
@@ -1155,9 +1106,6 @@ export const translations = {
       'الرقم الوظيفي مكرر في الملف او مسجل لسائق اخر',
     // wave-24-driver-employee-number — end
     // wave-24-roles-page — start
-    rolesPageSystemSettings: 'اعدادات النظام',
-    rolesPageSystemSettingsDesc:
-      'حالة نظام الادوار والصلاحيات والسجل الكامل لكل الادوار.',
     rolesListSearch: 'ابحث عن دور',
     rolesListEmptySearch: 'لا يوجد دور بهذا الاسم',
     rolesCustomBadge: 'مخصص',
@@ -1178,7 +1126,6 @@ export const translations = {
     rolesActionEnable: 'تفعيل',
     rolesSystemRoleNote: 'الادوار النظامية لا تعطل ولا تحذف',
     rolesEditRoleNamed: 'تعديل دور «{name}»',
-    rolesToggleActiveDone: 'تم تحديث حالة الدور',
     rolePermissionsSearch: 'ابحث في الصلاحيات بالاسم او المفتاح',
     rolePermissionsEmptySearch: 'لا توجد صلاحية تطابق البحث',
     rolePermissionsTableLabel: 'صلاحيات الدور',
@@ -1191,6 +1138,16 @@ export const translations = {
     rolePermissionsReservedChip: 'محجوزة',
     rolePermissionsRequiresMissing: 'تحتاج: {names} (غير ممنوحة)',
     rolePermissionsSavedShort: 'تم الحفظ',
+    rolesPageAllChanges: 'سجل كل التغييرات',
+    rolesPageAllChangesDesc:
+      'كل التغييرات على الادوار والصلاحيات والتعيينات، الاحدث اولا.',
+    rolePermissionsSavedToast: 'تم حفظ صلاحيات دور «{name}»',
+    rolesCreatedToast: 'تم انشاء دور «{name}»',
+    rolesSavedToast: 'تم حفظ بيانات دور «{name}»',
+    rolesEnabledToast: 'تم تفعيل دور «{name}»',
+    rolesDisabledToast: 'تم تعطيل دور «{name}»',
+    rolesDeletedToast: 'تم حذف دور «{name}»',
+    roleAssignedToast: 'تم اسناد دور «{role}» الى {user}',
     rolePermissionsUndo: 'تراجع',
     roleUsersOfRole: 'مستخدمو دور {name}',
     roleUsersOneRoleNote: '{count} بهذا الدور. لكل مستخدم دور واحد فقط.',
@@ -1212,8 +1169,6 @@ export const translations = {
     roleChangesColWhat: 'ماذا',
     roleChangesColRole: 'الدور',
     roleChangesShowAll: 'عرض الكل',
-    roleChangesFullLog: 'السجل الكامل',
-    roleChangesHideFullLog: 'اخفاء السجل الكامل',
     roleFormDialogDescEdit: 'الاسم والوصف فقط؛ المفتاح ثابت بعد الانشاء.',
     roleFormDialogDescAdd:
       'اسم عربي وانجليزي، ومفتاح يقترح تلقائيا، ويمكن نسخ صلاحيات دور موجود كنقطة بداية.',
@@ -1228,17 +1183,6 @@ export const translations = {
     roleFormNamePlaceholderEn: 'e.g. Foreman Lead',
     roleFormKeyFixedHint: 'المفتاح لا يتغير بعد الانشاء.',
     roleFormDescriptionPlaceholder: 'ماذا يفعل صاحب هذا الدور؟',
-    rolesSystemStopTitle: 'ايقاف النظام',
-    rolesSystemStopDesc:
-      'يرجع الجميع الى الادوار القديمة فورا. للتاكيد اكتب كلمة «{word}».',
-    rolesSystemStartTitle: 'تفعيل النظام',
-    rolesSystemStartDesc:
-      'تصبح صلاحيات كل مستخدم حسب الدور المسند له بدلا من دوره الحالي. للتاكيد اكتب كلمة «{word}».',
-    rolesConfirmWordLabel: 'كلمة التاكيد',
-    rolesOffendersFixTitle: 'اسناد دور الى {name}',
-    rolesOffendersFixDesc: 'يحتاج كل مستخدم دورا نشطا صالحا قبل التفعيل.',
-    rolesOffendersFixRole: 'الدور',
-    rolesOffendersFixPick: 'اختر دورا',
     rolePermissionsWarnInquiryNeedsRead:
       'الاستعلام لن يعرض حالة المعدة ولا حركاتها بدون «{names}». اضفها.',
     rolePermissionsWarnCreateNeedsRead:
@@ -1249,8 +1193,6 @@ export const translations = {
       'لوحة الورشة لن تعرض حركات الورشة بدون «{names}». اضفها بنطاق «الورشة» او «الكل».',
     rolePermissionsWarnHomeShadowed:
       'لن تعمل: «{names}» تتقدم عليها ويفتح المستخدم تلك اللوحة فقط، فتضيع ميزات هذه اللوحة. اترك لوحة واحدة.',
-    rolePermissionsWarnNoWayInFromFieldHome:
-      'صفحتها في القائمة الجانبية فقط، ولا مدخل لها من «{names}». احذفها او احذف تلك اللوحة.',
     rolePermissionsWarnSiteReportNeedsRead:
       'تقرير الدخوليات يظهر ناقصا: اجعل نطاق «{names}» «المشاريع» او «الكل».',
     rolePermissionsWarnWorkshopReportNeedsRead:
@@ -3107,17 +3049,7 @@ export const translations = {
     // wave-21-workshop-scope — end
     // wave-22-roles — start
     rolesSettingsTitle: 'Roles and permissions',
-    rolesSettingsDesc:
-      'Define roles and their permissions, assign them to users, then activate the system when ready.',
-    rolesSystemInactiveTitle: 'The roles system is not active',
-    rolesSystemInactiveBody:
-      "Effective permissions still follow each user's current role. Nothing you change on this page affects anyone until activation.",
-    rolesSystemActiveTitle: 'The roles system is active',
-    rolesSystemActiveBody:
-      'Effective permissions follow the role assigned to each user on this page.',
-    rolesSystemSince: 'Since {date}',
-    rolesSystemChangedBy: 'by {name}',
-    rolesSystemStatusLoadError: 'Could not load the roles system status',
+    rolesSettingsDesc: 'Define roles and their permissions and assign them to users.',
     rolesSystemStatusInactive: 'Not active',
     rolesSystemStatusActive: 'Active',
     rolesAccessDenied:
@@ -3125,7 +3057,6 @@ export const translations = {
     rolesAccessLoadError: 'Could not check your permissions',
     rolesTabRoles: 'Roles',
     rolesTabUsers: 'Users',
-    rolesTabActivation: 'Activation',
     rolesTabAudit: 'Change log',
     rolesAddRole: 'Add role',
     rolesEditRole: 'Edit role',
@@ -3144,8 +3075,6 @@ export const translations = {
       'Deletes the role and its permissions. This cannot be undone.',
     rolesDeleteSystemHint: 'System roles cannot be deleted',
     rolesDeleteInUseHint: 'The role is assigned to users; move them first',
-    rolesDeleted: 'Role deleted',
-    rolesSaved: 'Role saved',
     roleFormKey: 'Key',
     roleFormKeyHint:
       'Lowercase English letters, digits and underscores, starting with a letter (2 to 40). Suggested from the English name; it cannot change after saving.',
@@ -3247,44 +3176,6 @@ export const translations = {
     roleUsersInactiveRole: '{name} (inactive)',
     roleUsersUnknownRole: 'Unknown role',
     roleUsersNone: 'No users',
-    rolesActivationTitle: 'Activate the roles system',
-    rolesActivationDesc:
-      "On activation each user's permissions follow the role assigned on this page instead of the current role. It can be deactivated at any time to return to the current behaviour at once.",
-    rolesActivationLoadError: 'Could not load the activation data',
-    rolesOffendersTitle: 'Users blocking activation ({count})',
-    rolesOffendersNone: 'Every user has a valid active role.',
-    rolesOffenderNoRole: 'No role',
-    rolesOffenderUnknownRole: 'Unknown role',
-    rolesOffenderInactiveRole: 'Inactive role',
-    rolesOffenderAdminMismatch:
-      'The admin role does not match the current role',
-    rolesOffenderFix: 'Fix',
-    rolesPreviewTitle: 'What changes on activation',
-    rolesPreviewDesc:
-      'For each user: the permissions gained, lost or rescoped compared with today.',
-    rolesPreviewNone: "No user's permissions change on activation.",
-    rolesPreviewGained: 'Gains',
-    rolesPreviewLost: 'Loses',
-    rolesPreviewScopeChanged: 'Scope changes',
-    rolesPreviewScopeFromTo: 'from {from} to {to}',
-    rolesEnableButton: 'Activate the system',
-    rolesDisableButton: 'Deactivate the system',
-    rolesConfirmWordEnable: 'activate',
-    rolesConfirmWordDisable: 'deactivate',
-    rolesConfirmLabel: 'Type “{word}” to confirm',
-    rolesEnableBlocked: 'Activation is blocked until no user blocks it.',
-    rolesDisableDesc:
-      'Deactivating returns every user to the permissions of the current role at once.',
-    rolesEnabledDone: 'The roles system is now active.',
-    rolesDisabledDone:
-      "The roles system is deactivated: permissions follow each user's current role again.",
-    rolesEnableRefused:
-      'Activation refused: some users have no valid role. Review the list.',
-    rolesEnablePreviewChanged:
-      'The preview changed; review it, then confirm again',
-    rolesToggleNoChange:
-      'Nothing changed: the system was already in this state.',
-    rolesToggleError: 'Could not change the system state',
     roleChangesTitle: 'Change log',
     roleChangesDesc:
       'The last 50 changes to roles, permissions, assignments and the system state.',
@@ -3340,9 +3231,6 @@ export const translations = {
       'The employee number is repeated in the file or already used by another driver',
     // wave-24-driver-employee-number — end
     // wave-24-roles-page — start
-    rolesPageSystemSettings: 'System settings',
-    rolesPageSystemSettingsDesc:
-      'The state of the roles system and the full change log of every role.',
     rolesListSearch: 'Search roles',
     rolesListEmptySearch: 'No role matches this name',
     rolesCustomBadge: 'Custom',
@@ -3363,7 +3251,6 @@ export const translations = {
     rolesActionEnable: 'Activate',
     rolesSystemRoleNote: 'System roles cannot be deactivated or deleted',
     rolesEditRoleNamed: 'Edit the role “{name}”',
-    rolesToggleActiveDone: 'Role status updated',
     rolePermissionsSearch: 'Search permissions by name or key',
     rolePermissionsEmptySearch: 'No permission matches the search',
     rolePermissionsTableLabel: 'Role permissions',
@@ -3376,6 +3263,16 @@ export const translations = {
     rolePermissionsReservedChip: 'Reserved',
     rolePermissionsRequiresMissing: 'Needs: {names} (not granted)',
     rolePermissionsSavedShort: 'Saved',
+    rolesPageAllChanges: 'All changes',
+    rolesPageAllChangesDesc:
+      'Every change to the roles, their permissions and the assignments, newest first.',
+    rolePermissionsSavedToast: 'Permissions of the role “{name}” saved',
+    rolesCreatedToast: 'Role “{name}” created',
+    rolesSavedToast: 'Role “{name}” saved',
+    rolesEnabledToast: 'Role “{name}” enabled',
+    rolesDisabledToast: 'Role “{name}” disabled',
+    rolesDeletedToast: 'Role “{name}” deleted',
+    roleAssignedToast: '{user} now has the role “{role}”',
     rolePermissionsUndo: 'Undo',
     roleUsersOfRole: 'Users of the role {name}',
     roleUsersOneRoleNote:
@@ -3398,8 +3295,6 @@ export const translations = {
     roleChangesColWhat: 'What',
     roleChangesColRole: 'Role',
     roleChangesShowAll: 'Show all',
-    roleChangesFullLog: 'Full log',
-    roleChangesHideFullLog: 'Hide the full log',
     roleFormDialogDescEdit:
       'Names and descriptions only; the key is fixed after creation.',
     roleFormDialogDescAdd:
@@ -3416,18 +3311,6 @@ export const translations = {
     roleFormNamePlaceholderEn: 'e.g. Foreman Lead',
     roleFormKeyFixedHint: 'The key does not change after creation.',
     roleFormDescriptionPlaceholder: 'What does this role do?',
-    rolesSystemStopTitle: 'Stop the system',
-    rolesSystemStopDesc:
-      'Everyone returns to the legacy roles at once. Type “{word}” to confirm.',
-    rolesSystemStartTitle: 'Activate the system',
-    rolesSystemStartDesc:
-      "Each user's permissions follow the assigned role instead of the current role. Type “{word}” to confirm.",
-    rolesConfirmWordLabel: 'Confirmation word',
-    rolesOffendersFixTitle: 'Assign a role to {name}',
-    rolesOffendersFixDesc:
-      'Every user needs a valid active role before activation.',
-    rolesOffendersFixRole: 'Role',
-    rolesOffendersFixPick: 'Choose a role',
     rolePermissionsWarnInquiryNeedsRead:
       'The inquiry shows neither the state nor the movements of a unit without “{names}”. Add it.',
     rolePermissionsWarnCreateNeedsRead:
@@ -3438,8 +3321,6 @@ export const translations = {
       'The workshop home lists no workshop movement without “{names}”. Add it with the “Workshop” or “All” scope.',
     rolePermissionsWarnHomeShadowed:
       'Does not apply: “{names}” comes first and the user gets that home only, so this home’s features are lost. Keep one home.',
-    rolePermissionsWarnNoWayInFromFieldHome:
-      'Its pages are in the sidebar only, with no way in from “{names}”. Remove it or remove that home.',
     rolePermissionsWarnSiteReportNeedsRead:
       'The entries report is incomplete: set the scope of “{names}” to “Projects” or “All”.',
     rolePermissionsWarnWorkshopReportNeedsRead:

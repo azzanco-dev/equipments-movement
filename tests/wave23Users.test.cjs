@@ -160,19 +160,17 @@ test('the pure module has no runtime import', () => {
   assert.deepEqual(imports, ["import type { UserRole } from '@/lib/types'"])
 })
 
-test('PermissionsContext reads the flag and the own assignment once, apart from the permissions', () => {
+test('PermissionsContext reads the own assignment once, apart from the permissions', () => {
   const ctx = read('src', 'auth', 'PermissionsContext.tsx')
-  assert.match(
-    ctx,
-    /\.from\('app_settings'\)\s+\.select\('value'\)\s+\.eq\('key', 'roles_system'\)\s+\.maybeSingle\(\)/,
-  )
+  // 2026-10-28: the roles system flag is no longer read (nothing showed it;
+  // the system is the only one since 0150).
+  assert.doesNotMatch(ctx, /app_settings|roles_system|rolesSystemEnabled/)
   assert.match(
     ctx,
     /\.from\('profile_roles'\)\s+\.select\('role_key,roles\(name_ar,name_en\)'\)\s+\.eq\('profile_id', forUser\)\s+\.maybeSingle\(\)/,
   )
-  assert.match(ctx, /rolesSystemEnabled: boolean \| null/)
   assert.match(ctx, /assignedRole: AssignedRole \| null/)
-  // Their failure never turns the permissions status to error: the status is
+  // Its failure never turns the permissions status to error: the status is
   // set only from the current_permissions() result.
   const statusErrors = ctx.match(/status: 'error'/g) ?? []
   assert.equal(statusErrors.length, 2)

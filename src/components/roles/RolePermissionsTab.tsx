@@ -16,7 +16,10 @@ import type { Permission, RolePermission } from '@/lib/types'
 import type { Language } from '@/i18n/translations'
 import { fill } from './roleRows'
 import {
+  CHANGES_COUNT_KEYS,
   PermissionsTable,
+  countLabel,
+  diffGrants,
   type Grants,
   type PermissionGroupItem,
   type PermissionItem,
@@ -57,18 +60,22 @@ export function toPermissionItems(
 
 /**
  * The «الصلاحيات» tab of one role: reads its `role_permissions` once per mount
- * and saves the whole draft with one `admin_set_role_permissions` call.
- * Nothing here changes anybody's access while the roles system is inactive.
+ * and saves the whole draft with one `admin_set_role_permissions` call. A
+ * successful save calls `onSavedMessage` with the change count, which the
+ * page shows in its success toast.
  */
 export function RolePermissionsTab({
   roleKey,
   catalogue,
   onSaved,
+  onSavedMessage,
   onDirtyChange,
 }: {
   roleKey: string
   catalogue: Permission[]
   onSaved: () => void
+  /** After a successful save: «3 تغييرات». */
+  onSavedMessage: (changes: string) => void
   onDirtyChange: (dirty: boolean) => void
 }) {
   const { t, lang } = useI18n()
@@ -138,8 +145,10 @@ export function RolePermissionsTab({
         }
         return { ok: false, message: t(mapped.messageKey) }
       }
+      const changes = saved ? diffGrants(saved, draft).length : 0
       setSaved(draft as PermissionSelection)
       onSaved()
+      onSavedMessage(countLabel(t, CHANGES_COUNT_KEYS, changes))
       return { ok: true }
     } catch {
       return { ok: false, message: t('rolePermissionsSaveError') }

@@ -54,14 +54,6 @@ export function fill(text: string, values: Record<string, string | number>) {
   )
 }
 
-/** `app_settings.roles_system`: the flag with its last change. */
-export interface RolesSystemFlag {
-  enabled: boolean
-  /** `app_settings.updated_at` of the flag row: when it last changed. */
-  updatedAt: string | null
-  updatedByName: string | null
-}
-
 /** The localized description of a role, null when both are empty. */
 export function roleDescription(
   lang: Language,

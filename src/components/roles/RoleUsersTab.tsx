@@ -33,11 +33,14 @@ export function RoleUsersTab({
   roles,
   revision,
   onChanged,
+  onAssigned,
 }: {
   role: RoleRow
   roles: RoleRow[]
   revision: number
   onChanged: () => void
+  /** After a successful assignment, with the user's name (success toast). */
+  onAssigned: (userName: string) => void
 }) {
   const { t, lang } = useI18n()
   const [users, setUsers] = useState<RoleUserItem[]>([])
@@ -161,6 +164,7 @@ export function RoleUsersTab({
       )
       if (rpcError) return t(rolesRpcError(rpcError).messageKey)
       onChanged()
+      onAssigned(candidate.label)
       return null
     } catch {
       return t('rolesErrGeneric')

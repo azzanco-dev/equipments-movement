@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { useI18n } from '@/i18n/I18nContext'
 import { supabase } from '@/lib/supabase'
 import {
@@ -79,16 +80,19 @@ export function RoleFormContainer({
   onOpenChange: (open: boolean) => void
   /** A write succeeded (the list must be read again). */
   onChanged: () => void
-  /** The dialog finished with this role. */
-  onSaved: (roleKey: string, created: boolean) => void
+  /** The dialog finished with this role (its name for the success toast). */
+  onSaved: (roleKey: string, created: boolean, name: string) => void
 }) {
   const { t, lang } = useI18n()
+  // The name of the role the dialog last saved, in the page's language.
+  const savedName = useRef('')
 
   const save = async (
     values: RoleFormValues,
     copyFrom: string | null,
     createdKey: string | null,
   ): Promise<RoleFormOutcome> => {
+    savedName.current = roleName(lang, values)
     let roleKey = createdKey
     if (!roleKey) {
       const { data, error } = await supabase.rpc('admin_upsert_role', {
@@ -170,7 +174,9 @@ export function RoleFormContainer({
       roles={roleItems}
       onOpenChange={onOpenChange}
       onSave={save}
-      onSaved={(roleKey) => onSaved(roleKey, editing === null)}
+      onSaved={(roleKey) =>
+        onSaved(roleKey, editing === null, savedName.current)
+      }
     />
   )
 }

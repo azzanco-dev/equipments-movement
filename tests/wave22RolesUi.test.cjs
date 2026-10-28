@@ -494,7 +494,10 @@ test('the route is registered only in the admin branch, after the fail-closed ch
   // wave 23: the admin shell is the one the compiler proves is `admin`, after
   // every other shell kind returned; the page renders behind its gate
   // (`settings/roles` -> settings.roles, tests/wave23Shell.test.cjs).
-  const failClosed = app.indexOf("const adminShell: 'admin' = shell.kind")
+  // 2026-10-28: one shell tree for every kind with a sidebar.
+  const failClosed = app.indexOf(
+    "const shellKind: 'admin' | 'foreman' | 'workshop' = shell.kind",
+  )
   const route = app.indexOf('<RolesSettings />')
   assert.ok(failClosed > 0 && route > failClosed)
   assert.equal(app.split('<RolesSettings />').length, 2, 'rendered once')
@@ -541,33 +544,57 @@ function sourceFiles(folder) {
     .sort()
 }
 
-test('nothing in the interface changes the flag', () => {
-  // Roles stage 4c-2 (0156): «اعدادات النظام» shows the state and the log
-  // only; no screen calls set_roles_system_enabled or the dropped
-  // activation functions any more.
+test('nothing in the interface changes the flag; the page shows no system state', () => {
+  // Roles stage 4c-2 (0156): no screen calls set_roles_system_enabled or the
+  // dropped activation functions any more.
   for (const file of sourceFiles(path.join(ROOT, 'src')))
     assert.doesNotMatch(
       read(file),
       /'(set_roles_system_enabled|admin_roles_system_offenders|admin_roles_system_preview)'/,
       file,
     )
-  const container = read(
-    'src',
-    'components',
-    'roles',
+  // Owner 2026-10-28 («شيل تفعيل الصلاحيات»): «اعدادات النظام» and every
+  // on / off state left the roles page; the full log of every role stayed,
+  // as «سجل كل التغييرات».
+  for (const removed of [
     'SystemSettingsContainer.tsx',
-  )
+    path.join('ui', 'SystemSettingsDialog.tsx'),
+  ])
+    assert.ok(!fs.existsSync(path.join(ROLES_DIR, removed)), removed)
+  for (const file of sourceFiles(ROLES_DIR))
+    assert.doesNotMatch(
+      read(file),
+      /SystemSettings|roles_system|app_settings|rolesPageSystemSettings|RolesSystemFlag|systemOpen/,
+      file,
+    )
+  const page = read('src', 'components', 'roles', 'RolesSettings.tsx')
+  assert.match(page, /<AllChangesContainer/)
+  assert.match(page, /\{t\('rolesPageAllChanges'\)\}/)
+  assert.doesNotMatch(page, /<Badge/)
+  const container = read('src', 'components', 'roles', 'AllChangesContainer.tsx')
   assert.doesNotMatch(container, /supabase/)
-  assert.match(container, /<SystemSettingsDialog/)
-  const dialog = read(
-    'src',
-    'components',
-    'roles',
-    'ui',
-    'SystemSettingsDialog.tsx',
-  )
-  assert.doesNotMatch(dialog, /activation[.:?]|offenders[.:?]|preview[.:?]|onToggle/)
-  assert.match(dialog, /<ChangesTable/)
+  assert.match(container, /<AllChangesDialog/)
+  assert.match(container, /roleKey: null,/)
+  const dialog = read('src', 'components', 'roles', 'ui', 'AllChangesDialog.tsx')
+  assert.match(dialog, /<ChangesTable[\s\S]*roleLabel=\{roleLabel\}/)
+  assert.doesNotMatch(dialog, /enabled|status|activation|offenders|preview/)
+  const translations = read('src', 'i18n', 'translations.ts')
+  for (const key of [
+    'rolesPageSystemSettings',
+    'rolesSystemActiveTitle',
+    'rolesSystemInactiveTitle',
+    'rolesSystemStatusLoadError',
+    'rolesSystemStopTitle',
+    'rolesSystemStartTitle',
+    'rolesEnableButton',
+    'rolesOffendersTitle',
+    'rolesPreviewTitle',
+    'roleChangesFullLog',
+  ])
+    assert.doesNotMatch(translations, new RegExp(`^ {4}${key}:`, 'm'), key)
+  // The two state labels stay: the log names a past switch with them, and
+  // the Settings card still reads them.
+  assert.match(translations, /^ {4}rolesSystemStatusActive:/m)
   // No native confirm() anywhere on the roles page.
   for (const file of sourceFiles(ROLES_DIR))
     assert.doesNotMatch(
@@ -575,6 +602,64 @@ test('nothing in the interface changes the flag', () => {
       /window\.confirm|[^.\w]confirm\(\s*['"`]/,
       file,
     )
+})
+
+test('a success is a toast that names what was saved; a failure stays the notice', () => {
+  // Owner 2026-10-28: «حفظ التعديلات في الصلاحيات ابغى رسالة التمام تكون
+  // واضحة». The approved Toast (bottom of the screen, full width on a
+  // phone) replaces the small notice at the top of the page.
+  const page = read('src', 'components', 'roles', 'RolesSettings.tsx')
+  assert.match(
+    page,
+    /export function RolesSettings\(\) \{\s+return \(\s+<ToastProvider>\s+<RolesSettingsPage \/>\s+<\/ToastProvider>/,
+  )
+  assert.match(page, /tone: 'success',\s+duration: ROLES_TOAST_MS,/)
+  assert.match(page, /const ROLES_TOAST_MS = 6000/)
+  for (const key of [
+    'rolePermissionsSavedToast',
+    'rolesCreatedToast',
+    'rolesSavedToast',
+    'rolesEnabledToast',
+    'rolesDisabledToast',
+    'rolesDeletedToast',
+    'roleAssignedToast',
+  ])
+    assert.ok(page.includes(`'${key}'`), key)
+  // Errors: the danger notice at the top, as before.
+  assert.match(
+    page,
+    /<Notice tone="danger" onDismiss=\{\(\) => setErrorMessage\(null\)\}>/,
+  )
+  assert.doesNotMatch(page, /tone: 'success', text:|rolesSaved'|rolesDeleted'|rolesToggleActiveDone/)
+  // The permissions toast carries the change count.
+  const tab = read('src', 'components', 'roles', 'RolePermissionsTab.tsx')
+  assert.match(
+    tab,
+    /onSavedMessage\(countLabel\(t, CHANGES_COUNT_KEYS, changes\)\)/,
+  )
+  // The assignment and the role form report the names they saved.
+  const users = read('src', 'components', 'roles', 'RoleUsersTab.tsx')
+  assert.match(users, /onChanged\(\)\s+onAssigned\(candidate\.label\)/)
+  const form = read('src', 'components', 'roles', 'RoleFormContainer.tsx')
+  assert.match(form, /savedName\.current = roleName\(lang, values\)/)
+  // Every toast names its record in both languages, without alif hamza.
+  const translations = read('src', 'i18n', 'translations.ts')
+  for (const key of [
+    'rolePermissionsSavedToast',
+    'rolesCreatedToast',
+    'rolesSavedToast',
+    'rolesEnabledToast',
+    'rolesDisabledToast',
+    'rolesDeletedToast',
+    'roleAssignedToast',
+  ]) {
+    const entries = [
+      ...translations.matchAll(new RegExp(`^ {4}${key}: '([^']*)'`, 'gm')),
+    ]
+    assert.equal(entries.length, 2, key)
+    for (const [, text] of entries) assert.match(text, /\{(name|role)\}/, key)
+    assert.doesNotMatch(entries[0][1], /[أإآ]/, key)
+  }
 })
 
 test('the roles page writes only through the four 0126 functions', () => {
@@ -645,7 +730,7 @@ test('the shared roles components never reach Supabase; the mockup uses them', (
     'AssignUserDialog',
     'ChangesTable',
     'RoleFormDialog',
-    'SystemSettingsDialog',
+    'AllChangesDialog',
   ])
     assert.ok(mockup.includes(`<${component}`), `mockup renders ${component}`)
   assert.doesNotMatch(mockup, /from ['"][^'"]*supabase|supabase\./i)
@@ -664,7 +749,7 @@ test('the shared roles components never reach Supabase; the mockup uses them', (
     ['RoleUsersTab.tsx', 'AssignUserDialog'],
     ['RoleChangesTab.tsx', 'ChangesTable'],
     ['RoleFormContainer.tsx', 'RoleFormDialog'],
-    ['SystemSettingsContainer.tsx', 'SystemSettingsDialog'],
+    ['AllChangesContainer.tsx', 'AllChangesDialog'],
   ])
     assert.ok(
       read('src', 'components', 'roles', file).includes(`<${component}`),
@@ -678,6 +763,7 @@ test('the shared roles components never reach Supabase; the mockup uses them', (
     'RoleChangesLog.tsx',
     'RolesSystemBanner.tsx',
     'RolePermissionsEditor.tsx',
+    'SystemSettingsContainer.tsx',
   ])
     assert.ok(!fs.existsSync(path.join(ROLES_DIR, removed)), removed)
 })
@@ -878,74 +964,36 @@ test('warning 4: only one home applies (admin > foreman > workshop)', () => {
   assert.deepEqual(warned({ ...base, 'home.workshop': 'all' }), {})
 })
 
-test('warning 5: admin-shell pages have no way in from a field home', () => {
-  // Derived from navPermissions: the gates of the admin-shell pages that
-  // the field shell cannot render (users.read is no page gate; the logs'
-  // movements.read is embedded in a wide field home).
-  assert.deepEqual([...roles.ADMIN_SHELL_ONLY_KEYS].sort(), [
-    'companies_projects.read',
-    'drivers.read',
-    'equipment.read',
-    'lessors.read',
-    'movements.activity',
-    'movements.import',
-    'purchasing.view',
-    'reports.view',
-    'settings.equipment_types',
-    'settings.integrations',
-    'settings.roles',
-    'users.manage',
-  ])
-  const field = {
+test('no warning about admin-shell pages under a field home any more', () => {
+  // Owner 2026-10-28: the sidebar is offered to every user, so a field
+  // home reaches its pages; the old warning 5 and its key list are gone.
+  assert.equal(roles.ADMIN_SHELL_ONLY_KEYS, undefined)
+  const selection = {
     'home.workshop': 'all',
     'movements.read': 'all',
     'movements.workshop.create': null,
     'movements.photos.manage': 'workshop',
     'equipment.edit': null,
-  }
-  const pages = {
     'reports.view': 'all',
     'equipment.read': null,
     'purchasing.view': null,
     'settings.integrations': null,
-    // Field-shell keys: no warning.
-    'inquiry.view': null,
-    'movements.export': null,
-    'users.read': 'workshop',
   }
-  const result = warnings({ ...field, ...pages })
-  assert.deepEqual(Object.keys(result).sort(), [
-    'equipment.read',
-    'purchasing.view',
-    'reports.view',
-    'settings.integrations',
-  ])
-  for (const list of Object.values(result))
-    assert.deepEqual(list, [
-      {
-        message: 'rolePermissionsWarnNoWayInFromFieldHome',
-        keys: ['home.workshop'],
-      },
-    ])
-  // The foreman home is named when both field homes are ticked.
+  assert.deepEqual(warned(selection), {})
   assert.deepEqual(
-    warnings({
-      ...field,
-      'home.foreman': 'own',
-      'movements.site.create': 'own',
-      'equipment.read': null,
-    })['equipment.read'],
-    [
-      {
-        message: 'rolePermissionsWarnNoWayInFromFieldHome',
-        keys: ['home.foreman'],
-      },
+    warned({ ...selection, 'home.foreman': 'own', 'movements.site.create': 'own' })[
+      'equipment.read'
     ],
+    undefined,
   )
-  // The admin shell (home.admin) or no home at all: the sidebar opens them.
-  const shell = { ...pages, 'movements.read': 'all', 'equipment.edit': null }
-  assert.deepEqual(warned({ ...shell, 'home.admin': null }), {})
-  assert.deepEqual(warned(shell), {})
+  assert.doesNotMatch(
+    read('src', 'lib', 'rolesAdmin.ts'),
+    /NoWayInFromFieldHome|navPermissions/,
+  )
+  assert.doesNotMatch(
+    read('src', 'i18n', 'translations.ts'),
+    /rolePermissionsWarnNoWayInFromFieldHome/,
+  )
 })
 
 test('warning 6: a report wider than movements.read is incomplete', () => {

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Settings2 } from 'lucide-react'
-import { Badge, Button, EmptyState, cn } from '@/components/ui'
+import { History } from 'lucide-react'
+import { Button, EmptyState, cn } from '@/components/ui'
 import {
+  AllChangesDialog,
   AssignUserDialog,
   ChangesTable,
   PermissionsTable,
@@ -9,7 +10,6 @@ import {
   RolePanel,
   RoleUsersTable,
   RolesList,
-  SystemSettingsDialog,
   diffGrants,
   normalise,
   type AssignCandidate,
@@ -31,7 +31,6 @@ import {
   PERMISSION_GROUPS,
   ROLES,
   SCOPE_LABELS,
-  SYSTEM_STATE,
   USERS,
   type MockChange,
   type MockRole,
@@ -68,7 +67,7 @@ export function RolesPageMockup() {
   const [roleDialog, setRoleDialog] = useState<
     { mode: 'add' } | { mode: 'edit'; role: MockRole } | null
   >(null)
-  const [systemOpen, setSystemOpen] = useState(false)
+  const [allChangesOpen, setAllChangesOpen] = useState(false)
 
   const selected = roles.find((role) => role.key === selectedKey) ?? roles[0]
 
@@ -227,13 +226,10 @@ export function RolesPageMockup() {
           </div>
           <Button
             variant="outline"
-            icon={<Settings2 size={16} aria-hidden="true" />}
-            onClick={() => setSystemOpen(true)}
+            icon={<History size={16} aria-hidden="true" />}
+            onClick={() => setAllChangesOpen(true)}
           >
-            اعدادات النظام
-            <Badge size="sm" tone="success">
-              مفعّل
-            </Badge>
+            سجل كل التغييرات
           </Button>
         </div>
 
@@ -334,9 +330,9 @@ export function RolesPageMockup() {
           setRoleDialog(null)
         }}
       />
-      <MockSystemSettings
-        open={systemOpen}
-        onOpenChange={setSystemOpen}
+      <MockAllChanges
+        open={allChangesOpen}
+        onOpenChange={setAllChangesOpen}
         changes={changeItems}
         roleName={roleName}
       />
@@ -414,7 +410,7 @@ function MockChangesTab({ rows }: { rows: ChangeItem[] }) {
   )
 }
 
-function MockSystemSettings({
+function MockAllChanges({
   open,
   onOpenChange,
   changes,
@@ -427,17 +423,11 @@ function MockSystemSettings({
 }) {
   const [all, setAll] = useState(false)
   return (
-    <SystemSettingsDialog
+    <AllChangesDialog
       open={open}
       onOpenChange={(next) => {
         if (!next) setAll(false)
         onOpenChange(next)
-      }}
-      status={{
-        state: 'ready',
-        enabled: SYSTEM_STATE.enabled,
-        updatedAt: SYSTEM_STATE.enabledAt,
-        updatedByName: SYSTEM_STATE.enabledBy,
       }}
       log={{
         rows: all ? changes : changes.slice(0, 10),

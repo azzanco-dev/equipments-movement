@@ -906,11 +906,3 @@ export const CHANGES: MockChange[] = [
     what: 'انشا الدور',
   },
 ]
-
-/** The sample system state shown in «اعدادات النظام». */
-export const SYSTEM_STATE = {
-  enabled: true,
-  enabledAt: '11/10/2026 14:25',
-  enabledBy: 'خالد العتيبي',
-  confirmationWord: 'ايقاف',
-}

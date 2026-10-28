@@ -21,8 +21,4 @@ export {
   type RoleFormRole,
   type RoleFormValues,
 } from './RoleFormDialog'
-export {
-  SystemSettingsDialog,
-  type SystemSettingsDialogProps,
-  type SystemStatus,
-} from './SystemSettingsDialog'
+export { AllChangesDialog, type AllChangesDialogProps } from './AllChangesDialog'

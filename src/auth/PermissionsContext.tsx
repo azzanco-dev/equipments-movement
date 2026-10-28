@@ -18,7 +18,6 @@ import {
   type PermissionsStatus,
 } from '@/lib/permissions'
 import type { CurrentPermission, PermissionScope } from '@/lib/types'
-import { rolesSystemEnabledFromValue } from '@/lib/rolesAdmin'
 import {
   assignedRoleFromEmbed,
   type AssignedRole,
@@ -41,11 +40,12 @@ import {
  * fallback), and the API routes and Edge Functions check the permission
  * server-side.
  *
- * Step 3 (users screens and header) adds two reads beside the permissions:
- * the roles system flag (`app_settings.roles_system`) and the signed-in
- * user's own assignment (`profile_roles` with the role names). They are
- * loaded with the permissions and refreshed by `reload()`; their failure is
- * silent (null) and never touches `status`.
+ * Step 3 (users screens and header) adds one read beside the permissions:
+ * the signed-in user's own assignment (`profile_roles` with the role names).
+ * It is loaded with the permissions and refreshed by `reload()`; its failure
+ * is silent (null) and never touches `status`. The roles system flag is no
+ * longer read here (2026-10-28): the system is the only one since 0150 and
+ * nothing showed it any more.
  */
 interface PermissionsContextValue {
   status: PermissionsStatus
@@ -57,9 +57,6 @@ interface PermissionsContextValue {
   reload: () => Promise<void>
   /** The raw map, for diagnostics; empty unless `status` is 'ready'. */
   permissions: ReadonlyMap<string, PermissionScope>
-  /** `app_settings.roles_system.enabled`; null while loading, after a failed
-   *  read or when signed out. */
-  rolesSystemEnabled: boolean | null
   /** The signed-in user's own `profile_roles` assignment with the role's
    *  names; null while loading, after a failed read or without assignment. */
   assignedRole: AssignedRole | null
@@ -80,41 +77,28 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   const revision = useRef(0)
   const [roleInfo, setRoleInfo] = useState<{
     userId: string | null
-    enabled: boolean | null
     assignedRole: AssignedRole | null
-  }>({ userId: null, enabled: null, assignedRole: null })
+  }>({ userId: null, assignedRole: null })
 
-  // The flag and the own assignment: one read each, apart from the
-  // permissions so neither can fail them. Any failure answers null.
+  // The own assignment: one read, apart from the permissions so it cannot
+  // fail them. Any failure answers null.
   const loadRoleInfo = useCallback(async (forUser: string, request: number) => {
     try {
-      const [flag, assignment] = await Promise.all([
-        supabase
-          .from('app_settings')
-          .select('value')
-          .eq('key', 'roles_system')
-          .maybeSingle(),
-        supabase
-          .from('profile_roles')
-          .select('role_key,roles(name_ar,name_en)')
-          .eq('profile_id', forUser)
-          .maybeSingle(),
-      ])
+      const assignment = await supabase
+        .from('profile_roles')
+        .select('role_key,roles(name_ar,name_en)')
+        .eq('profile_id', forUser)
+        .maybeSingle()
       if (request !== revision.current) return
       setRoleInfo({
         userId: forUser,
-        enabled: flag.error
-          ? null
-          : rolesSystemEnabledFromValue(
-              (flag.data as { value: unknown } | null)?.value,
-            ),
         assignedRole: assignment.error
           ? null
           : assignedRoleFromEmbed(assignment.data),
       })
     } catch {
       if (request === revision.current)
-        setRoleInfo({ userId: forUser, enabled: null, assignedRole: null })
+        setRoleInfo({ userId: forUser, assignedRole: null })
     }
   }, [])
 
@@ -123,7 +107,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       const request = ++revision.current
       if (!forUser) {
         setState({ userId: null, status: 'loading', map: EMPTY })
-        setRoleInfo({ userId: null, enabled: null, assignedRole: null })
+        setRoleInfo({ userId: null, assignedRole: null })
         return
       }
       void loadRoleInfo(forUser, request)
@@ -168,8 +152,6 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   const status: PermissionsStatus =
     state.userId === userId ? state.status : 'loading'
   const map = state.userId === userId ? state.map : EMPTY
-  const rolesSystemEnabled =
-    roleInfo.userId === userId ? roleInfo.enabled : null
   const assignedRole = roleInfo.userId === userId ? roleInfo.assignedRole : null
 
   const value = useMemo<PermissionsContextValue>(
@@ -179,10 +161,9 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       scope: (key) => permissionScopeOf(status, map, key),
       reload,
       permissions: status === 'ready' ? map : EMPTY,
-      rolesSystemEnabled,
       assignedRole,
     }),
-    [assignedRole, map, reload, rolesSystemEnabled, status],
+    [assignedRole, map, reload, status],
   )
 
   return (

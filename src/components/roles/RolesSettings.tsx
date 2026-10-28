@@ -2,31 +2,31 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Settings2 } from 'lucide-react'
+import { History } from 'lucide-react'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import { supabase } from '@/lib/supabase'
 import { rolesPageAccess } from '@/lib/permissions'
-import { rolesRpcError, rolesSystemEnabledFromValue } from '@/lib/rolesAdmin'
+import { rolesRpcError } from '@/lib/rolesAdmin'
 import type { Permission } from '@/lib/types'
-import { fetchProfileNames } from '@/components/details/profileNames'
 import {
-  Badge,
   Button,
   EmptyState,
   ErrorState,
   Notice,
   PageHeader,
   Skeleton,
+  ToastProvider,
   cn,
   useConfirm,
+  useToast,
 } from '@/components/ui'
 import {
+  fill,
   roleDescription,
   roleName,
   sortRoles,
   type RoleRow,
-  type RolesSystemFlag,
 } from './roleRows'
 import {
   ROLE_PANEL_TABS,
@@ -39,7 +39,7 @@ import { RolePermissionsTab } from './RolePermissionsTab'
 import { RoleUsersTab } from './RoleUsersTab'
 import { RoleChangesTab } from './RoleChangesTab'
 import { RoleFormContainer } from './RoleFormContainer'
-import { SystemSettingsContainer } from './SystemSettingsContainer'
+import { AllChangesContainer } from './AllChangesContainer'
 
 type RoleQueryRow = Omit<RoleRow, 'user_count' | 'permission_count'> & {
   profile_roles: Array<{ count: number }> | null
@@ -50,17 +50,31 @@ type RoleQueryRow = Omit<RoleRow, 'user_count' | 'permission_count'> & {
  * Settings › «الادوار والصلاحيات» (migration 0126), on the layout the owner
  * approved on /ui-kit (2026-10-14): the roles list at the start side, the
  * selected role's panel (permissions, users, change log) beside it, and
- * «اعدادات النظام» for the activation flow and the full log. The URL keeps the
- * selected role (`?role=`) and tab (`?tab=`) so Back works.
+ * «سجل كل التغييرات» for the log of every role. The URL keeps the selected
+ * role (`?role=`) and tab (`?tab=`) so Back works.
  *
- * Admin only, fail closed twice: App.tsx renders it behind its page gate and
- * the page itself needs a legacy admin who also holds `settings.roles`
- * (`rolesPageAccess`). Every write goes through the admin-only SECURITY
- * DEFINER functions of 0126; the roles system stays INACTIVE until the admin
- * presses the activation button in «اعدادات النظام» — nothing on this page
- * enables it on its own.
+ * Fail closed twice: App.tsx renders it behind its page gate and the page
+ * itself needs `settings.roles` (`rolesPageAccess`). Every write goes through
+ * the admin-only SECURITY DEFINER functions of 0126. The roles system is the
+ * only one (0150 / 0156), so the page shows no on / off state (owner
+ * 2026-10-28, «شيل تفعيل الصلاحيات»).
+ *
+ * A success shows as a toast at the bottom of the screen naming what was
+ * saved (owner 2026-10-28, «رسالة التمام تكون واضحة»); a failure stays the
+ * danger notice at the top. The toast host is local to this page.
  */
 export function RolesSettings() {
+  return (
+    <ToastProvider>
+      <RolesSettingsPage />
+    </ToastProvider>
+  )
+}
+
+/** How long a success toast stays: long enough to read on a phone. */
+const ROLES_TOAST_MS = 6000
+
+function RolesSettingsPage() {
   const { t, lang } = useI18n()
   const router = useRouter()
   const pathname = usePathname()
@@ -73,52 +87,33 @@ export function RolesSettings() {
     ? (tabParam as RolePanelTab)
     : 'permissions'
 
-  const [flag, setFlag] = useState<RolesSystemFlag | null>(null)
-  const [flagError, setFlagError] = useState(false)
   const [roles, setRoles] = useState<RoleRow[]>([])
   const [catalogue, setCatalogue] = useState<Permission[]>([])
   const [baseLoading, setBaseLoading] = useState(true)
   const [baseError, setBaseError] = useState(false)
-  // Bumped after every write so the counts, the tabs, the offenders, the
-  // preview and the audit are read again.
+  // Bumped after every write so the counts, the tabs and the audit are read
+  // again.
   const [revision, setRevision] = useState(0)
   const [editorDirty, setEditorDirty] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState<{
-    tone: 'success' | 'danger'
-    text: string
-  } | null>(null)
+  // Failures only: a success is a toast.
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [roleDialog, setRoleDialog] = useState<
     { mode: 'create' } | { mode: 'edit'; role: RoleRow } | null
   >(null)
-  const [systemOpen, setSystemOpen] = useState(false)
+  const [allChangesOpen, setAllChangesOpen] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
-
-  const loadFlag = useCallback(async () => {
-    setFlagError(false)
-    const { data, error } = await supabase
-      .from('app_settings')
-      .select('value,updated_at,updated_by')
-      .eq('key', 'roles_system')
-      .maybeSingle()
-    if (error) {
-      setFlagError(true)
-      return
-    }
-    const row = data as {
-      value: unknown
-      updated_at: string
-      updated_by: string | null
-    } | null
-    const names = await fetchProfileNames(supabase, [row?.updated_by])
-    setFlag({
-      enabled: rolesSystemEnabledFromValue(row?.value),
-      updatedAt: row?.updated_at ?? null,
-      updatedByName: row?.updated_by
-        ? (names.names.get(row.updated_by) ?? null)
-        : null,
-    })
-  }, [])
+  const toast = useToast()
+  const notifySuccess = useCallback(
+    (title: string, description?: string) =>
+      void toast({
+        title,
+        description,
+        tone: 'success',
+        duration: ROLES_TOAST_MS,
+      }),
+    [toast],
+  )
 
   const loadBase = useCallback(async () => {
     setBaseError(false)
@@ -151,11 +146,6 @@ export function RolesSettings() {
     setCatalogue((catalogueResult.data as Permission[] | null) ?? [])
     setBaseLoading(false)
   }, [])
-
-  useEffect(() => {
-    if (access !== 'allowed') return
-    void loadFlag()
-  }, [access, loadFlag, revision])
 
   useEffect(() => {
     if (access !== 'allowed') return
@@ -248,7 +238,7 @@ export function RolesSettings() {
   const toggleActive = async (role: RoleRow) => {
     if (role.is_system) return
     setBusy(true)
-    setMessage(null)
+    setErrorMessage(null)
     try {
       const { error } = await supabase.rpc('admin_upsert_role', {
         p_key: role.key,
@@ -259,16 +249,17 @@ export function RolesSettings() {
         p_is_active: !role.is_active,
       })
       if (error) {
-        setMessage({
-          tone: 'danger',
-          text: t(rolesRpcError(error, 'roleSaveError').messageKey),
-        })
+        setErrorMessage(t(rolesRpcError(error, 'roleSaveError').messageKey))
         return
       }
-      setMessage({ tone: 'success', text: t('rolesToggleActiveDone') })
+      notifySuccess(
+        fill(t(role.is_active ? 'rolesDisabledToast' : 'rolesEnabledToast'), {
+          name: roleName(lang, role),
+        }),
+      )
       afterChange()
     } catch {
-      setMessage({ tone: 'danger', text: t('roleSaveError') })
+      setErrorMessage(t('roleSaveError'))
     } finally {
       setBusy(false)
     }
@@ -277,24 +268,23 @@ export function RolesSettings() {
   const remove = async (role: RoleRow) => {
     if (role.is_system || role.user_count > 0) return
     setBusy(true)
-    setMessage(null)
+    setErrorMessage(null)
     try {
       const { error } = await supabase.rpc('admin_delete_role', {
         p_role_key: role.key,
       })
       if (error) {
-        setMessage({
-          tone: 'danger',
-          text: t(rolesRpcError(error).messageKey),
-        })
+        setErrorMessage(t(rolesRpcError(error).messageKey))
         return
       }
       setEditorDirty(false)
-      setMessage({ tone: 'success', text: t('rolesDeleted') })
+      notifySuccess(
+        fill(t('rolesDeletedToast'), { name: roleName(lang, role) }),
+      )
       navigate({ role: null, tab: null }, 'replace')
       afterChange()
     } catch {
-      setMessage({ tone: 'danger', text: t('rolesErrGeneric') })
+      setErrorMessage(t('rolesErrGeneric'))
     } finally {
       setBusy(false)
     }
@@ -310,17 +300,10 @@ export function RolesSettings() {
         access === 'allowed' ? (
           <Button
             variant="outline"
-            icon={<Settings2 size={16} aria-hidden="true" />}
-            onClick={() => setSystemOpen(true)}
+            icon={<History size={16} aria-hidden="true" />}
+            onClick={() => setAllChangesOpen(true)}
           >
-            {t('rolesPageSystemSettings')}
-            {flag && (
-              <Badge size="sm" tone={flag.enabled ? 'success' : 'neutral'}>
-                {flag.enabled
-                  ? t('rolesSystemStatusActive')
-                  : t('rolesSystemStatusInactive')}
-              </Badge>
-            )}
+            {t('rolesPageAllChanges')}
           </Button>
         ) : undefined
       }
@@ -358,21 +341,9 @@ export function RolesSettings() {
   return (
     <div className="space-y-4">
       {header}
-      {flagError && (
-        <Notice
-          tone="danger"
-          action={
-            <Button size="sm" onClick={() => void loadFlag()}>
-              {t('retry')}
-            </Button>
-          }
-        >
-          {t('rolesSystemStatusLoadError')}
-        </Notice>
-      )}
-      {message && (
-        <Notice tone={message.tone} onDismiss={() => setMessage(null)}>
-          {message.text}
+      {errorMessage && (
+        <Notice tone="danger" onDismiss={() => setErrorMessage(null)}>
+          {errorMessage}
         </Notice>
       )}
 
@@ -435,6 +406,14 @@ export function RolesSettings() {
                   <RolePermissionsTab
                     roleKey={selected.key}
                     catalogue={catalogue}
+                    onSavedMessage={(changes) =>
+                      notifySuccess(
+                        fill(t('rolePermissionsSavedToast'), {
+                          name: selectedItem.name,
+                        }),
+                        changes,
+                      )
+                    }
                     onSaved={afterChange}
                     onDirtyChange={setEditorDirty}
                   />
@@ -445,6 +424,14 @@ export function RolesSettings() {
                     roles={roles}
                     revision={revision}
                     onChanged={afterChange}
+                    onAssigned={(userName) =>
+                      notifySuccess(
+                        fill(t('roleAssignedToast'), {
+                          user: userName,
+                          role: selectedItem.name,
+                        }),
+                      )
+                    }
                   />
                 )}
                 {tab === 'changes' && (
@@ -472,18 +459,19 @@ export function RolesSettings() {
           if (!open) setRoleDialog(null)
         }}
         onChanged={afterChange}
-        onSaved={(roleKey, created) => {
+        onSaved={(roleKey, created, name) => {
           setRoleDialog(null)
-          setMessage({ tone: 'success', text: t('rolesSaved') })
+          notifySuccess(
+            fill(t(created ? 'rolesCreatedToast' : 'rolesSavedToast'), {
+              name,
+            }),
+          )
           if (created) navigate({ role: roleKey, tab: null }, 'push')
         }}
       />
-      <SystemSettingsContainer
-        open={systemOpen}
-        onOpenChange={setSystemOpen}
-        flag={flag}
-        flagError={flagError}
-        onRetryFlag={() => void loadFlag()}
+      <AllChangesContainer
+        open={allChangesOpen}
+        onOpenChange={setAllChangesOpen}
         roles={roles}
         catalogue={catalogue}
         revision={revision}
