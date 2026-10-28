@@ -16,13 +16,13 @@ import type { PermissionScope } from '@/lib/types'
  * Callers pass the pages their current shell can render (`routable`) so the
  * menu never offers a link the router would not open.
  *
- * The sidebar belongs to the ADMIN shell only: src/App.tsx builds it there
- * (from these entries) and passes no entries to the foreman and workshop
- * homes, so a field user who holds e.g. `inquiry.view` still has no sidebar.
- * Inside the admin shell the menu lists exactly the sections the user's
- * permissions pass; the home entry needs `home.admin` (owner decision
- * 2026-10-13: a user whose permissions open any admin-shell section gets the
- * admin shell with just those sections).
+ * Every shell has the sidebar (owner 2026-10-28: «نبغى نضيف السايد بار
+ * للجميع، بس التابات الي فيه بحسب صلاحيات كل مستخدم»): the admin shell and
+ * the foreman and workshop homes alike list exactly the sections the user's
+ * permissions pass. The home entry «الرئيسية» needs a home key (home.admin,
+ * home.foreman or home.workshop; it opens that user's own home); a user
+ * without any home gets the admin shell with just its sections (owner
+ * decision 2026-10-13).
  *
  * With the frozen `legacy_role_permissions` mapping of the six roles, the menu
  * built here is exactly the role-based menu of before (tests/wave23Nav.test.cjs
@@ -85,9 +85,18 @@ export interface NavEntry<K extends string = NavItemKey> {
  * without `home.admin` lands (`planShell`: the first passing entry).
  */
 export const NAV_ENTRIES: readonly NavEntry[] = [
-  // The admin home: only with home.admin. Without it the admin shell has no
-  // dashboard and lands on the first section below.
-  { key: 'dashboard', requires: [{ key: 'home.admin' }] },
+  // The home: the admin home with home.admin, the field home with
+  // home.foreman / home.workshop (planShell decides which one renders;
+  // 2026-10-28, the sidebar for every user). Without any home the admin
+  // shell has no dashboard and lands on the first section below.
+  {
+    key: 'dashboard',
+    requires: [
+      { key: 'home.admin' },
+      { key: 'home.foreman' },
+      { key: 'home.workshop' },
+    ],
+  },
   {
     key: 'logs',
     // 2026-10-28: the `companies` scope reads the rows of the user's
@@ -221,10 +230,9 @@ function fromPermissions(
  * - `loading` / `error`: nothing (roles stage 4a: no role fallback);
  * - `routable`, when given, drops entries the current shell cannot open.
  *
- * Only the admin shell calls this (the field homes pass no entries). A menu
- * holding nothing but home is returned empty: the sidebar is hidden and home
- * stays reachable through the header logo, sign-out through the header, as
- * for the roles that never had a sidebar.
+ * Every shell calls this with its open pages (2026-10-28: the sidebar for
+ * every user). A menu holding nothing but home is still a menu: the sidebar
+ * is always there for a user with a home.
  */
 export function visibleNavItems(
   state: NavPermissionState,
@@ -233,7 +241,7 @@ export function visibleNavItems(
   const base =
     state.status === 'ready' ? fromPermissions(state.permissions) : []
 
-  const items = routable
+  return routable
     ? base.flatMap((item): VisibleNavItem[] => {
         if (!routable.has(item.key)) return []
         if (!item.children) return [item]
@@ -241,8 +249,6 @@ export function visibleNavItems(
         return children.length ? [{ key: item.key, children }] : []
       })
     : base
-
-  return items.every((item) => item.key === 'dashboard') ? [] : items
 }
 
 // ===========================================================================
@@ -253,10 +259,13 @@ export function visibleNavItems(
 // decided here from the same permission keys as the sidebar (NAV_ENTRIES plus
 // PAGE_GATES below), not from `profiles.role`:
 //
-//   home.admin    -> 'admin'    the sidebar shell with the admin home
+//   home.admin    -> 'admin'    the admin home
 //   home.foreman  -> 'foreman'  the field home, own-site list
 //   home.workshop -> 'workshop' the field home; scope 'all' = the managers'
 //                                variant with the embedded admin log
+// Every shell has the sidebar and opens every admin-shell page its
+// permissions pass (2026-10-28); the shell only decides which home renders
+// at / and a few home-specific details (the workshop form, the way back).
 //   none of them, but some sidebar section of NAV_ENTRIES passes
 //                 -> 'admin'    the sidebar shell WITHOUT the dashboard: the
 //                                sidebar lists the passing sections and the
@@ -427,7 +436,7 @@ export interface ShellPlan {
 
 type HomeShell = 'admin' | 'foreman' | 'workshop'
 
-/** The pages each shell can render at all; the gates narrow them further. */
+/** Every page a shell renders; the gates narrow them further. */
 const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'dashboard',
   'logs',
@@ -460,6 +469,12 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'purchasing/units',
   'purchasing/:id',
 ]
+/**
+ * The field home's own pages (its home, the inquiry, the movement form and
+ * page). Since 2026-10-28 a field shell opens every page of
+ * ADMIN_SHELL_PAGES its permissions pass, these included (`fieldPages`), so
+ * SHELL_PAGES.foreman / .workshop name only the field home's own pages.
+ */
 const FIELD_SHELL_PAGES: readonly RoutePage[] = [
   'dashboard',
   'inquiry',
@@ -494,13 +509,15 @@ function openPages(
 }
 
 /**
- * The pages of a field home: its own home page always (the dashboard gate,
- * home.admin, belongs to the admin shell), the rest by their gates.
+ * The pages of a field home (2026-10-28, the sidebar for every user): every
+ * page the admin shell would open with these permissions, its home included
+ * (the dashboard gate passes on home.foreman / home.workshop), so the sidebar
+ * never offers a link the router refuses.
  */
 function fieldPages(
   permissions: ReadonlyMap<string, PermissionScope>,
 ): Set<RoutePage> {
-  return openPages(permissions, FIELD_SHELL_PAGES).add('dashboard')
+  return openPages(permissions, ADMIN_SHELL_PAGES).add('dashboard')
 }
 
 /**

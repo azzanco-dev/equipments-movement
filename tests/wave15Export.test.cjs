@@ -520,7 +520,9 @@ test('the print page is a chrome-less route of the signed-in app', () => {
   assert.ok(route > app.indexOf('if (!profile) return <AuthScreen />'))
   assert.ok(
     route <
-      app.indexOf("if (shell.kind === 'foreman' || shell.kind === 'workshop')"),
+      app.indexOf(
+        "const shellKind: 'admin' | 'foreman' | 'workshop' = shell.kind",
+      ),
   )
   assert.match(
     app,

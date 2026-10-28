@@ -11,6 +11,12 @@
 // Roles stage 4a (2026-10-27): no role-based fallback router any more. While
 // the permissions load the shell is 'pending' (the bootstrap spinner); after a
 // failed load it is 'unavailable' (the load-error page with a retry).
+//
+// 2026-10-28 (owner: «نبغى نضيف السايد بار للجميع، بس التابات الي فيه بحسب
+// صلاحيات كل مستخدم»): every shell has the sidebar, and a field home opens
+// every admin-shell page its permissions pass (its home stays its own). For
+// the six roles the only new pages are the log for the three workshop roles
+// (KNOWN_DIFFERENCES below); the admin and the monitor are unchanged.
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -260,19 +266,20 @@ function after(state, url) {
   // The admin shell without a dashboard replaces a URL it does not open.
   if (shell.landing !== 'dashboard' && !shell.pages.has(requested))
     return { shell: shell.kind, redirect: `/${shell.landing}` }
-  if (shell.kind === 'foreman' || shell.kind === 'workshop')
-    return {
-      shell: shell.kind,
-      active: page === 'inquiry' ? 'inquiry' : 'dashboard',
-      screen:
-        page === 'movements/new'
+  // 2026-10-28: one shell tree for every kind; a field home renders its own
+  // home at 'dashboard' and keeps its way back from the movement pages.
+  if (shell.kind === 'foreman' || shell.kind === 'workshop') {
+    const screen =
+      page === 'dashboard'
+        ? 'Home'
+        : page === 'movements/new'
           ? 'MovementCreate(home)'
           : page === 'movements/:id'
             ? 'MovementDetail(home)'
-            : page === 'inquiry'
-              ? 'Inquiry'
-              : 'Home',
-    }
+            : NEW_ADMIN_SCREEN[page]
+    assert.ok(screen, `a screen for ${page}`)
+    return { shell: shell.kind, active: nav.navKeyOfPage(page), screen }
+  }
   assert.equal(shell.kind, 'admin')
   const screen =
     page === 'dashboard'
@@ -284,10 +291,10 @@ function after(state, url) {
   return { shell: 'admin', active: nav.navKeyOfPage(page), screen }
 }
 
-/** The sidebar App.tsx shows: built for the admin shell only. */
+/** The sidebar App.tsx shows: built for every shell (2026-10-28). */
 function menu(state) {
   const shell = nav.planShell(state)
-  return shell.kind === 'admin'
+  return ['admin', 'foreman', 'workshop'].includes(shell.kind)
     ? plain(nav.visibleNavItems(state, shell.pages))
     : []
 }
@@ -345,14 +352,24 @@ const URLS = [
   '/unknown/x',
 ]
 
-// The only intended difference with the roles system OFF: the two workshop
-// managers hold movements.export (wave 21 gave their embedded log the export
-// dialog, whose PDF option opens /print/export) but the role-based router
-// sent that tab to their home. The print page fetches nothing.
-const KNOWN_DIFFERENCES = new Set([
+// The intended differences with the roles system OFF:
+// - the two workshop managers hold movements.export (wave 21 gave their
+//   embedded log the export dialog, whose PDF option opens /print/export) but
+//   the role-based router sent that tab to their home. The print page
+//   fetches nothing.
+// - 2026-10-28 (the sidebar for every user): the three workshop roles hold
+//   movements.read scope all, which opens the log, so /logs renders the log
+//   instead of their home.
+const PRINT_DIFFERENCES = new Set([
   'assistant_workshop_manager /print/export',
   'workshop_manager /print/export',
 ])
+const LOG_DIFFERENCES = new Set(
+  ['workshop', 'assistant_workshop_manager', 'workshop_manager'].flatMap(
+    (role) => [`${role} /logs`, `${role} /logs/x`],
+  ),
+)
+const KNOWN_DIFFERENCES = new Set([...PRINT_DIFFERENCES, ...LOG_DIFFERENCES])
 
 // --- Equivalence with the roles system OFF ------------------------------------
 
@@ -369,7 +386,12 @@ for (const role of ROLES) {
       if (KNOWN_DIFFERENCES.has(`${role} ${url}`)) {
         differences.push(`${role} ${url}`)
         assert.deepEqual(then.screen, 'Home')
-        assert.deepEqual(now, { shell: 'print', screen: 'PrintExport' })
+        assert.deepEqual(
+          now,
+          PRINT_DIFFERENCES.has(`${role} ${url}`)
+            ? { shell: 'print', screen: 'PrintExport' }
+            : { shell: 'workshop', active: 'logs', screen: 'Logs' },
+        )
         continue
       }
       assert.deepEqual(now, then, `${role} ${url}`)
@@ -502,9 +524,15 @@ test('precedence admin > foreman > workshop, and the home variants', () => {
 
 // --- The admin shell without a home (owner decision 2026-10-13) ---------------
 
-test('the dashboard entry requires exactly home.admin', () => {
+test('the dashboard entry requires a home key', () => {
+  // 2026-10-28: any home (home.admin alone from 2026-10-13 until then); the
+  // admin shell without a home still has no dashboard.
   const dashboard = nav.NAV_ENTRIES.find((entry) => entry.key === 'dashboard')
-  assert.deepEqual(plain(dashboard.requires), [{ key: 'home.admin' }])
+  assert.deepEqual(plain(dashboard.requires), [
+    { key: 'home.admin' },
+    { key: 'home.foreman' },
+    { key: 'home.workshop' },
+  ])
   assert.equal(dashboard.children, undefined)
   assert.equal(nav.NAV_ENTRIES[0].key, 'dashboard')
 })
@@ -657,7 +685,9 @@ test('a key that opens no section is still the no-permissions page', () => {
   }
 })
 
-test('a field home keeps precedence over the sections, with no sidebar', () => {
+test('a field home keeps precedence and opens the sections it passes', () => {
+  // 2026-10-28: the field shell has the sidebar and opens every admin-shell
+  // page its permissions pass; its home stays the field home.
   const state = ready([
     ['home.foreman', 'own'],
     ['equipment.read', 'all'],
@@ -666,19 +696,84 @@ test('a field home keeps precedence over the sections, with no sidebar', () => {
   const plan = nav.planShell(state)
   assert.equal(plan.kind, 'foreman')
   assert.equal(plan.landing, 'dashboard')
-  assert.deepEqual(sorted(plan.pages), ['dashboard', 'inquiry'])
-  assert.deepEqual(menu(state), [])
+  assert.deepEqual(sorted(plan.pages), [
+    'dashboard',
+    'equipment',
+    'equipment/:id',
+    'inquiry',
+  ])
+  assert.deepEqual(menu(state), [
+    { key: 'dashboard' },
+    { key: 'inquiry' },
+    { key: 'equipment' },
+  ])
   assert.deepEqual(after(state, '/equipment'), {
     shell: 'foreman',
-    active: 'dashboard',
-    screen: 'Home',
+    active: 'equipment',
+    screen: 'AdminEquipment',
   })
+  assert.deepEqual(after(state, '/equipment/e1'), {
+    shell: 'foreman',
+    active: 'equipment',
+    screen: 'EquipmentDetail',
+  })
+  // A page its permissions do not open still renders its home.
+  for (const url of ['/', '/dashboard', '/logs', '/settings', '/unknown'])
+    assert.deepEqual(
+      after(state, url),
+      { shell: 'foreman', active: 'dashboard', screen: 'Home' },
+      url,
+    )
   const workshop = ready([
     ['home.workshop', 'workshop'],
     ['reports.view', 'all'],
   ])
   assert.equal(nav.planShell(workshop).kind, 'workshop')
-  assert.deepEqual(menu(workshop), [])
+  assert.deepEqual(menu(workshop), [
+    { key: 'dashboard' },
+    { key: 'reports', children: ['reports/entries', 'reports/workshop'] },
+  ])
+  assert.deepEqual(after(workshop, '/reports/workshop'), {
+    shell: 'workshop',
+    active: 'reports',
+    screen: 'WorkshopReports',
+  })
+  // Every page a field shell opens is a page the admin shell renders, and
+  // the sidebar never lists a page the shell refuses.
+  for (const entries of [
+    [['home.foreman', 'own']],
+    [['home.workshop', 'all']],
+    [...LEGACY.get('admin')].filter(([key]) => key !== 'home.admin'),
+  ]) {
+    const fieldState = ready(
+      entries.some(([key]) => key.startsWith('home.'))
+        ? entries
+        : [['home.foreman', 'own'], ...entries],
+    )
+    const fieldPlan = nav.planShell(fieldState)
+    assert.ok(['foreman', 'workshop'].includes(fieldPlan.kind))
+    for (const page of fieldPlan.pages)
+      assert.ok(
+        nav.SHELL_PAGES.admin.includes(page) || page === 'print/export',
+        page,
+      )
+    for (const item of menu(fieldState)) {
+      assert.ok(fieldPlan.pages.has(item.key), item.key)
+      for (const child of item.children ?? [])
+        assert.ok(fieldPlan.pages.has(child), child)
+    }
+  }
+  // With the admin's keys but a field home instead of home.admin: the same
+  // pages and the same menu as the admin shell.
+  const adminKeys = [...LEGACY.get('admin')].filter(
+    ([key]) => key !== 'home.admin',
+  )
+  const fieldAdmin = ready([['home.workshop', 'all'], ...adminKeys])
+  assert.deepEqual(
+    sorted(nav.planShell(fieldAdmin).pages),
+    sorted(nav.planShell(ready(LEGACY.get('admin'))).pages),
+  )
+  assert.deepEqual(menu(fieldAdmin), menu(ready(LEGACY.get('admin'))))
 })
 
 // --- The gate table -----------------------------------------------------------
@@ -697,7 +792,11 @@ test('every routable page has a gate made of catalogue keys', () => {
   for (const page of ALL_PAGES)
     for (const gate of nav.pageGate(page))
       assert.ok(catalogue.has(gate.key), `${page}: ${gate.key}`)
-  assert.deepEqual(plain(nav.pageGate('dashboard')), [{ key: 'home.admin' }])
+  assert.deepEqual(plain(nav.pageGate('dashboard')), [
+    { key: 'home.admin' },
+    { key: 'home.foreman' },
+    { key: 'home.workshop' },
+  ])
   assert.deepEqual(Object.keys(nav.SHELL_PAGES), [
     'admin',
     'foreman',
@@ -794,13 +893,14 @@ test('App.tsx picks the shell with planShell and guards with its pages', () => {
   assert.doesNotMatch(content, /profile\.role ===|profile\.role !==/)
   assert.doesNotMatch(content, /ADMIN_PAGES|MONITOR_NAV_PAGES|WORKER_NAV_PAGES/)
   assert.doesNotMatch(content, /minimal|MINIMAL/)
-  // The shells, in order, and fail closed before the admin one.
+  // The shells, in order, and fail closed before the one shell tree (every
+  // kind with a sidebar since 2026-10-28).
   const order = [
     "if (requested === 'print/export' && shell.pages.has('print/export'))",
     "if (shell.kind === 'unavailable' || shell.kind === 'pending')",
     "if (shell.kind === 'none')",
-    "if (shell.kind === 'foreman' || shell.kind === 'workshop')",
-    "const adminShell: 'admin' = shell.kind",
+    "const shellKind: 'admin' | 'foreman' | 'workshop' = shell.kind",
+    "const fieldHome = shellKind === 'foreman' || shellKind === 'workshop'",
   ].map((marker) => content.indexOf(marker))
   for (const index of order) assert.ok(index > 0)
   assert.deepEqual(
@@ -840,9 +940,9 @@ test('App.tsx replaces a URL the dashboard-less admin shell does not open', () =
     content,
     /useEffect\(\(\) => \{\s*if \(landingRedirect\) router\.replace\(landingRedirect\)\s*\}, \[landingRedirect, router\]\)/,
   )
-  // The admin shell shows the route placeholder until the URL matches.
+  // The shell shows the route placeholder until the URL matches.
   const admin = content.slice(
-    content.indexOf("const adminShell: 'admin' = shell.kind"),
+    content.indexOf("const shellKind: 'admin' | 'foreman' | 'workshop' = shell.kind"),
   )
   assert.match(
     admin,
@@ -858,8 +958,8 @@ test('App.tsx replaces a URL the dashboard-less admin shell does not open', () =
 
 test('App.tsx renders each screen behind its page', () => {
   const pairs = [
-    [/page === 'movements\/new' \? \(\s*<MovementCreate/g, 2],
-    [/page === 'movements\/:id' \? \(\s*<MovementDetail/g, 2],
+    [/page === 'movements\/new' \? \(\s*<MovementCreate/g, 1],
+    [/page === 'movements\/:id' \? \(\s*<MovementDetail/g, 1],
     [/page === 'equipment\/:id' \? \(\s*<EquipmentDetail/g, 1],
     [/page === 'drivers\/:id' \? \(\s*<DriverDetail/g, 1],
     [/page === 'users\/:id' \? \(\s*<UserDetail/g, 1],
@@ -871,8 +971,27 @@ test('App.tsx renders each screen behind its page', () => {
   ]
   for (const [re, count] of pairs)
     assert.equal(content.match(re)?.length, count, String(re))
+  // The home: the field HomeScreen for a field shell, else the admin home.
+  assert.match(
+    content,
+    /page === 'dashboard' && fieldHome && \(\s*<HomeScreen\b/,
+  )
+  assert.match(
+    content,
+    /page === 'dashboard' && !fieldHome && \(\s*<AdminHomeScreen\b/,
+  )
+  assert.equal(content.match(/<HomeScreen\b/g).length, 1)
+  assert.equal(content.match(/<AdminHomeScreen\b/g).length, 1)
+  // A field home keeps its way back from the movement pages.
+  assert.match(
+    content,
+    /onClose=\{fieldHome \? backToDashboard : \(\) => router\.push\('\/logs'\)\}/,
+  )
+  assert.match(
+    content,
+    /onBack=\{fieldHome \? backToDashboard : \(\) => router\.back\(\)\}/,
+  )
   const components = {
-    dashboard: 'AdminHomeScreen',
     logs: 'LogsScreen',
     inquiry: 'EquipmentInquiryScreen',
     equipment: 'AdminEquipment',

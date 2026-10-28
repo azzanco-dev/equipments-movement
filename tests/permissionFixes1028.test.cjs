@@ -127,17 +127,17 @@ test('4: the classify key classifies on the foreman log and on /logs', () => {
 
 test('5: the workshop home asks for the workshop form', () => {
   const app = read('src', 'App.tsx')
-  const field = app.slice(
-    app.indexOf("if (shell.kind === 'foreman' || shell.kind === 'workshop')"),
-    app.indexOf("const adminShell: 'admin' = shell.kind"),
+  // 2026-10-28: one shell tree for every kind (the sidebar for every user);
+  // the form is forced on the workshop shell only, never on the admin or
+  // foreman shell.
+  const shell = app.slice(
+    app.indexOf("const shellKind: 'admin' | 'foreman' | 'workshop' = shell.kind"),
   )
   assert.match(
-    field,
-    /workshopForm=\{\s*shell\.kind === 'workshop' &&\s*permissions\.has\('movements\.workshop\.create'\)\s*\}/,
+    shell,
+    /workshopForm=\{\s*shellKind === 'workshop' &&\s*permissions\.has\('movements\.workshop\.create'\)\s*\}/,
   )
-  // The admin shell never forces it.
-  const admin = app.slice(app.indexOf("const adminShell: 'admin' = shell.kind"))
-  assert.doesNotMatch(admin, /workshopForm=/)
+  assert.equal(app.match(/workshopForm=/g).length, 1)
 
   const create = read('src', 'screens', 'MovementCreate.tsx')
   assert.match(create, /forceWorkshopForm=\{workshopForm\}/)
@@ -288,7 +288,8 @@ test('9: links into other pages follow the shell', () => {
   )
   assert.match(inquiry, /shellPages\.has\('equipment\/:id'\)/)
   assert.match(inquiry, /shellPages\.has\('purchasing\/:id'\)/)
-  // A field shell opens neither page, whatever the keys.
+  // 2026-10-28 (the sidebar for every user): a field shell opens both pages
+  // with their keys, and neither without them.
   const field = nav.planShell(
     ready([
       ['home.foreman', 'own'],
@@ -296,8 +297,11 @@ test('9: links into other pages follow the shell', () => {
       ['purchasing.view', 'all'],
     ]),
   )
-  assert.ok(!field.pages.has('equipment/:id'))
-  assert.ok(!field.pages.has('purchasing/:id'))
+  assert.ok(field.pages.has('equipment/:id'))
+  assert.ok(field.pages.has('purchasing/:id'))
+  const bare = nav.planShell(ready([['home.foreman', 'own']]))
+  assert.ok(!bare.pages.has('equipment/:id'))
+  assert.ok(!bare.pages.has('purchasing/:id'))
 })
 
 // --- 10. The inquiry card follows inquiry.view --------------------------------

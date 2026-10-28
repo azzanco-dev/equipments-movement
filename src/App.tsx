@@ -469,60 +469,17 @@ function AppContent() {
   const backToDashboard = () => router.push('/dashboard')
   const navigate = (target: string) => router.push(`/${target}`)
 
-  // The foreman and workshop homes, which never have a sidebar (whatever
-  // other keys the user holds). `movementsScope` comes from the home.*
-  // permission scope.
-  if (shell.kind === 'foreman' || shell.kind === 'workshop')
-    return (
-      <>
-        <Layout
-          activePage={page === 'inquiry' ? 'inquiry' : 'dashboard'}
-          onNavigate={navigate}
-          navItems={[]}
-        >
-          {page === 'movements/new' ? (
-            <MovementCreate
-              movementType={movementType}
-              // 2026-10-28: on the workshop home the shell decides the form:
-              // the workshop form for a holder of movements.workshop.create,
-              // even when he also holds movements.site.create.
-              workshopForm={
-                shell.kind === 'workshop' &&
-                permissions.has('movements.workshop.create')
-              }
-              onClose={backToDashboard}
-              onViewMovement={openMovement}
-              onGoHome={backToDashboard}
-            />
-          ) : page === 'movements/:id' ? (
-            <MovementDetail
-              movementId={detailId}
-              onBack={backToDashboard}
-              onNavigateMovement={openMovement}
-            />
-          ) : page === 'inquiry' ? (
-            <EquipmentInquiryScreen onSelectMovement={openMovement} />
-          ) : (
-            <HomeScreen
-              movementsScope={shell.homeScope}
-              onSelectMovement={openMovement}
-              onCreateMovement={(type) =>
-                router.push(`/movements/new?type=${type}`)
-              }
-            />
-          )}
-        </Layout>
-        {passwordDialog}
-      </>
-    )
-
-  // The admin shell: home.admin, or any admin-shell section without a home,
-  // with the dashboard closed and the landing on the first section. Each page renders only when its gate
-  // passes; AdminHomeScreen only for 'dashboard', which opens with home.admin
-  // alone. Every other kind returned above; the compiler checks it, so
-  // nothing falls through.
-  const adminShell: 'admin' = shell.kind
-  void adminShell
+  // Every shell has the sidebar (owner 2026-10-28: «نبغى نضيف السايد بار
+  // للجميع، بس التابات الي فيه بحسب صلاحيات كل مستخدم»): the admin shell
+  // (home.admin, or any admin-shell section without a home, with the
+  // dashboard closed and the landing on the first section) and the foreman
+  // and workshop homes alike. Each page renders only when its gate passes;
+  // the shell decides which home renders at 'dashboard' — AdminHomeScreen
+  // for home.admin, the field HomeScreen (its list from the home.*
+  // permission scope) for home.foreman / home.workshop. Every other kind
+  // returned above; the compiler checks it, so nothing falls through.
+  const shellKind: 'admin' | 'foreman' | 'workshop' = shell.kind
+  const fieldHome = shellKind === 'foreman' || shellKind === 'workshop'
   // The sidebar lists the sections the permissions pass; the routable set is
   // the shell's open pages, so the menu and the guards agree.
   const navItems = visibleNavItems(permissionState, shell.pages).map(
@@ -551,14 +508,23 @@ function AppContent() {
         ) : page === 'movements/new' ? (
           <MovementCreate
             movementType={movementType}
-            onClose={() => router.push('/logs')}
+            // 2026-10-28: on the workshop home the shell decides the form:
+            // the workshop form for a holder of movements.workshop.create,
+            // even when he also holds movements.site.create. Never on the
+            // admin or foreman shell.
+            workshopForm={
+              shellKind === 'workshop' &&
+              permissions.has('movements.workshop.create')
+            }
+            // A field home goes back to its home, the admin shell to the log.
+            onClose={fieldHome ? backToDashboard : () => router.push('/logs')}
             onViewMovement={openMovement}
             onGoHome={backToDashboard}
           />
         ) : page === 'movements/:id' ? (
           <MovementDetail
             movementId={detailId}
-            onBack={() => router.back()}
+            onBack={fieldHome ? backToDashboard : () => router.back()}
             onNavigateMovement={openMovement}
           />
         ) : page === 'equipment/:id' ? (
@@ -599,7 +565,16 @@ function AppContent() {
           <UserDetail userId={detailId} onBack={() => router.push('/users')} />
         ) : (
           <>
-            {page === 'dashboard' && (
+            {page === 'dashboard' && fieldHome && (
+              <HomeScreen
+                movementsScope={shell.homeScope}
+                onSelectMovement={openMovement}
+                onCreateMovement={(type) =>
+                  router.push(`/movements/new?type=${type}`)
+                }
+              />
+            )}
+            {page === 'dashboard' && !fieldHome && (
               <AdminHomeScreen
                 onSelectEquipment={
                   canOpenEquipment
