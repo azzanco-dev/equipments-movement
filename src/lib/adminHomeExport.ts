@@ -20,8 +20,6 @@ import { exitPurposeExportLabel } from '@/lib/exitPurpose'
 import type {
   FleetEquipmentRow,
   FleetMiniTableId,
-  LatestEntryRow,
-  LatestEquipmentRow,
 } from '@/lib/adminHomeStats'
 import type { ExcelColumn } from '@/lib/excel'
 import type { Language, TranslationKey } from '@/i18n/translations'
@@ -210,81 +208,5 @@ export function fleetEquipmentExcelColumns(
       value: (row) => exitPurposeExportLabel(row.exitPurpose, t),
     },
     owner,
-  ]
-}
-
-/** "اخر الدخوليات": a workshop entry has no company, so it reads «ورشة». */
-export function latestEntryCompany(
-  row: LatestEntryRow,
-  lang: Language,
-  t: Translate,
-): string {
-  if (row.context === 'workshop') return t('workshopContext')
-  if (!row.companyNameAr && !row.companyNameEn) return ''
-  return localizedName(lang, row.companyNameAr, row.companyNameEn)
-}
-
-export function latestEntriesExcelColumns({
-  t,
-  lang,
-  ownerLabel,
-}: FleetExportLabels): ExcelColumn<LatestEntryRow>[] {
-  return [
-    {
-      header: t('adminHomeColEquipment'),
-      width: 14,
-      value: (row) => row.equipmentCode,
-    },
-    {
-      header: t('company'),
-      width: 26,
-      value: (row) => latestEntryCompany(row, lang, t),
-    },
-    {
-      header: t('adminHomeColForeman'),
-      width: 22,
-      value: (row) => row.foreman ?? '',
-    },
-    {
-      header: t('adminHomeColMovementDate'),
-      width: 18,
-      type: 'date',
-      value: (row) => row.recordedAt,
-    },
-    {
-      header: t('adminHomeColType'),
-      width: 24,
-      value: (row) => row.equipmentType,
-    },
-    {
-      header: t('adminHomeColOwner'),
-      width: 16,
-      value: (row) => ownerLabel(row.owner),
-    },
-  ]
-}
-
-export function latestEquipmentExcelColumns({
-  t,
-  ownerLabel,
-}: FleetExportLabels): ExcelColumn<LatestEquipmentRow>[] {
-  return [
-    {
-      header: t('adminHomeColEquipment'),
-      width: 14,
-      value: (row) => row.code,
-    },
-    { header: t('adminHomeColType'), width: 24, value: (row) => row.type },
-    {
-      header: t('adminHomeColOwner'),
-      width: 16,
-      value: (row) => ownerLabel(row.owner),
-    },
-    {
-      header: t('adminHomeColAddedAt'),
-      width: 18,
-      type: 'date',
-      value: (row) => row.createdAt,
-    },
   ]
 }
