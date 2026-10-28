@@ -458,11 +458,17 @@ test('0133 redefines nothing else', () => {
 
 test('no later migration redefines the 0133 objects', () => {
   const later = migrations.filter((file) => file > MIGRATION)
+  // 0158 re-creates delete_log_photos with the 0133 clauses carried over for
+  // every caller without movements.photos.delete_any; tests/
+  // permissionFixes0158.test.cjs pins that carry-over.
+  const DELETE_POLICY_0158 = '20261028140000_0158_permission_scope_fixes.sql'
   for (const file of later) {
     const text = read('supabase', 'migrations', file)
     assert.doesNotMatch(
       text,
-      /POLICY (?:select|update|delete)_log_photos\b/,
+      file === DELETE_POLICY_0158
+        ? /POLICY (?:select|update)_log_photos\b/
+        : /POLICY (?:select|update|delete)_log_photos\b/,
       `${file} redefines a log-photos policy after 0133; carry the 0133 clauses over and update this test`,
     )
     assert.doesNotMatch(
