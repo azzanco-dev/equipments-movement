@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { Download, FileSpreadsheet, Upload } from 'lucide-react'
+import { usePermissions } from '@/auth/PermissionsContext'
+import { driversActions, refusedByPolicy } from '@/lib/actionPermissions'
 import { supabase } from '@/lib/supabase'
 import { workbookReadErrorKey } from '@/lib/safeWorkbook'
 import { Alert } from '@/components/Alert'
@@ -28,6 +30,9 @@ export function DriverExcelImport({
   onImported: () => void
 }) {
   const { t, lang } = useI18n()
+  // The import inserts drivers: `drivers.import` plus the insert policy's
+  // `drivers.create`. Without them the dialog offers no import.
+  const canImport = driversActions(usePermissions()).importRows
   const [rows, setRows] = useState<DriverImportRow[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -115,6 +120,10 @@ export function DriverExcelImport({
   }
   const confirmImport = async () => {
     if (!valid.length) return
+    if (!canImport) {
+      setError(t('driverImportNotAllowed'))
+      return
+    }
     setBusy(true)
     setError('')
     const payload = valid.map((row) => ({
@@ -127,10 +136,15 @@ export function DriverExcelImport({
       job_title: row.job_title,
       employee_number: row.employee_number,
     }))
-    const { error: insertError } = await supabase
+    const { data: inserted, error: insertError } = await supabase
       .from('drivers')
       .insert(payload)
+      .select('id')
     setBusy(false)
+    if (refusedByPolicy(insertError, inserted)) {
+      setError(t('driverImportNotAllowed'))
+      return
+    }
     if (insertError) {
       setError(t('driverImportFailed'))
       return
@@ -174,19 +188,23 @@ export function DriverExcelImport({
           <Button variant="outline" onClick={onClose}>
             {t('cancel')}
           </Button>
-          <Button
-            variant="primary"
-            loading={busy}
-            disabled={!valid.length}
-            onClick={confirmImport}
-          >
-            {t('importValidRows').replace('{count}', String(valid.length))}
-          </Button>
+          {canImport && (
+            <Button
+              variant="primary"
+              loading={busy}
+              disabled={!valid.length}
+              onClick={confirmImport}
+            >
+              {t('importValidRows').replace('{count}', String(valid.length))}
+            </Button>
+          )}
         </>
       }
     >
       <div className="space-y-4">
-        {error && <Alert type="error">{error}</Alert>}
+        {(error || !canImport) && (
+          <Alert type="error">{error || t('driverImportNotAllowed')}</Alert>
+        )}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"

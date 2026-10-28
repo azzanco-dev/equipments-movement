@@ -16,8 +16,10 @@ export interface LessorsTableProps {
   sort: string
   direction: 'asc' | 'desc'
   onSortChange: (key: string, direction: 'asc' | 'desc') => void
-  onEdit: (lessor: Lessor) => void
-  onDelete: (lessor: Lessor) => void
+  /** Omitted without `lessors.edit`: the row shows no edit button. */
+  onEdit?: (lessor: Lessor) => void
+  /** Omitted without `lessors.edit`: the row shows no delete button. */
+  onDelete?: (lessor: Lessor) => void
   emptyAction?: ReactNode
 }
 
@@ -71,20 +73,24 @@ export function LessorsTable({
       header: t('actions'),
       cell: (row) => (
         <span className="flex items-center gap-1">
-          <IconButton
-            size="sm"
-            label={t('edit')}
-            title={t('edit')}
-            icon={<Edit2 size={15} />}
-            onClick={() => onEdit(row)}
-          />
-          <IconButton
-            size="sm"
-            label={t('delete')}
-            title={t('delete')}
-            icon={<Trash2 size={15} />}
-            onClick={() => onDelete(row)}
-          />
+          {onEdit && (
+            <IconButton
+              size="sm"
+              label={t('edit')}
+              title={t('edit')}
+              icon={<Edit2 size={15} />}
+              onClick={() => onEdit(row)}
+            />
+          )}
+          {onDelete && (
+            <IconButton
+              size="sm"
+              label={t('delete')}
+              title={t('delete')}
+              icon={<Trash2 size={15} />}
+              onClick={() => onDelete(row)}
+            />
+          )}
         </span>
       ),
     },

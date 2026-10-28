@@ -7,7 +7,9 @@ import {
   Input,
   Select,
 } from '@/components/ui'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
+import { driversActions, refusedByPolicy } from '@/lib/actionPermissions'
 import { supabase } from '@/lib/supabase'
 import {
   DRIVER_EMPLOYMENT_TYPES,
@@ -57,6 +59,13 @@ export function DriverFormDialog({
   onSaved,
 }: DriverFormDialogProps) {
   const { t } = useI18n()
+  // Adding needs `drivers.create`, editing `drivers.edit` (the row policies
+  // re-check them): without the key the dialog offers no save.
+  const actions = driversActions(usePermissions())
+  const canSave = driver ? actions.edit : actions.create
+  const notAllowed = t(
+    driver ? 'driverEditNotAllowed' : 'driverCreateNotAllowed',
+  )
   const [form, setForm] = useState<DriverFormValues>(EMPTY_DRIVER_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -82,6 +91,10 @@ export function DriverFormDialog({
   }
 
   const save = async () => {
+    if (!canSave) {
+      setError(notAllowed)
+      return
+    }
     const invalid = validateDriverForm(form)
     if (hasErrors(invalid)) {
       setErrors(invalid)
@@ -92,10 +105,20 @@ export function DriverFormDialog({
     setSaving(true)
     setError(null)
     const payload = buildDriverPayload(form)
+    // Without the key an update matches no row and PostgREST answers with no
+    // error, so the returned rows are read: none back is a refusal.
     const result = driver
-      ? await supabase.from('drivers').update(payload).eq('id', driver.id)
-      : await supabase.from('drivers').insert(payload)
+      ? await supabase
+          .from('drivers')
+          .update(payload)
+          .eq('id', driver.id)
+          .select('id')
+      : await supabase.from('drivers').insert(payload).select('id')
     setSaving(false)
+    if (refusedByPolicy(result.error, result.data)) {
+      setError(notAllowed)
+      return
+    }
     if (result.error) {
       // A duplicate mobile or id number belongs on that field; anything the
       // database does not name stays a safe top-level message.
@@ -116,6 +139,8 @@ export function DriverFormDialog({
     onSaved()
   }
 
+  const shownError = error ?? (canSave ? null : notAllowed)
+
   return (
     <Dialog
       open={open}
@@ -128,14 +153,16 @@ export function DriverFormDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('cancel')}
           </Button>
-          <Button variant="primary" loading={saving} onClick={save}>
-            {t('save')}
-          </Button>
+          {canSave && (
+            <Button variant="primary" loading={saving} onClick={save}>
+              {t('save')}
+            </Button>
+          )}
         </>
       }
     >
       <div ref={bodyRef} className="space-y-4">
-        {error && <ErrorState title={error} className="p-4" />}
+        {shownError && <ErrorState title={shownError} className="p-4" />}
         <Field
           label={t('fullName')}
           name="full_name"

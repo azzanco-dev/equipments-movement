@@ -27,8 +27,11 @@ export interface DriversTableProps {
   onToggleRow: (id: string) => void
   onTogglePage: (ids: string[]) => void
   onOpen: (id: string) => void
-  onEdit: (driver: Driver) => void
-  onDelete: (driver: Driver) => void
+  /** Omitted without `drivers.edit`: the row shows no edit button. */
+  onEdit?: (driver: Driver) => void
+  /** Omitted without `drivers.delete`: no delete button and no selection
+   *  column (the selection only feeds the bulk delete). */
+  onDelete?: (driver: Driver) => void
   emptyAction?: ReactNode
 }
 
@@ -64,26 +67,34 @@ export function DriversTable({
   const allOnPageSelected =
     rows.length > 0 && rows.every((driver) => selected.has(driver.id))
 
+  const selectColumn: DataTableColumn<Driver>[] = onDelete
+    ? [
+        {
+          key: 'select',
+          header: (
+            <Checkbox
+              checked={allOnPageSelected}
+              onCheckedChange={() =>
+                onTogglePage(rows.map((driver) => driver.id))
+              }
+              aria-label={t('selectAll')}
+            />
+          ),
+          width: '2.5rem',
+          align: 'center',
+          cell: (row) => (
+            <Checkbox
+              checked={selected.has(row.id)}
+              onCheckedChange={() => onToggleRow(row.id)}
+              aria-label={row.full_name}
+            />
+          ),
+        },
+      ]
+    : []
+
   const columns: DataTableColumn<Driver>[] = [
-    {
-      key: 'select',
-      header: (
-        <Checkbox
-          checked={allOnPageSelected}
-          onCheckedChange={() => onTogglePage(rows.map((driver) => driver.id))}
-          aria-label={t('selectAll')}
-        />
-      ),
-      width: '2.5rem',
-      align: 'center',
-      cell: (row) => (
-        <Checkbox
-          checked={selected.has(row.id)}
-          onCheckedChange={() => onToggleRow(row.id)}
-          aria-label={row.full_name}
-        />
-      ),
-    },
+    ...selectColumn,
     {
       key: 'full_name',
       header: t('fullName'),
@@ -142,20 +153,24 @@ export function DriversTable({
             icon={<Eye size={15} />}
             onClick={() => onOpen(row.id)}
           />
-          <IconButton
-            size="sm"
-            label={t('edit')}
-            title={t('edit')}
-            icon={<Edit2 size={15} />}
-            onClick={() => onEdit(row)}
-          />
-          <IconButton
-            size="sm"
-            label={t('delete')}
-            title={t('delete')}
-            icon={<Trash2 size={15} />}
-            onClick={() => onDelete(row)}
-          />
+          {onEdit && (
+            <IconButton
+              size="sm"
+              label={t('edit')}
+              title={t('edit')}
+              icon={<Edit2 size={15} />}
+              onClick={() => onEdit(row)}
+            />
+          )}
+          {onDelete && (
+            <IconButton
+              size="sm"
+              label={t('delete')}
+              title={t('delete')}
+              icon={<Trash2 size={15} />}
+              onClick={() => onDelete(row)}
+            />
+          )}
         </span>
       ),
     },

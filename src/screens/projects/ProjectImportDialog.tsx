@@ -9,6 +9,7 @@ import {
 import { Dialog } from '@/components/ui'
 import { Alert } from '@/components/Alert'
 import { useI18n } from '@/i18n/I18nContext'
+import { refusedByPolicy } from '@/lib/actionPermissions'
 import { supabase } from '@/lib/supabase'
 import { workbookReadErrorKey } from '@/lib/safeWorkbook'
 import {
@@ -133,12 +134,25 @@ export function ProjectImportDialog({
     try {
       let successCount = 0
       let failCount = 0
+      let refused = false
       const batchSize = 50
       for (let i = 0; i < payload.length; i += batchSize) {
         const batch = payload.slice(i, i + batchSize)
-        const { error } = await supabase.from('projects').insert(batch)
-        if (error) failCount += batch.length
+        // The inserted rows are read back: the insert policy's refusal
+        // (`companies_projects.edit`) is reported as such, never as a count.
+        const { data, error } = await supabase
+          .from('projects')
+          .insert(batch)
+          .select('id')
+        if (refusedByPolicy(error, data)) {
+          refused = true
+          failCount += batch.length
+        } else if (error) failCount += batch.length
         else successCount += batch.length
+      }
+      if (refused && successCount === 0) {
+        setImportError(t('companiesProjectsImportNotAllowed'))
+        return
       }
       setImportResult({ success: successCount, fail: failCount })
       if (successCount > 0) onImported()

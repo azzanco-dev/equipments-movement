@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, ErrorState, Field, Input } from '@/components/ui'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
+import {
+  companiesProjectsActions,
+  refusedByPolicy,
+} from '@/lib/actionPermissions'
 import { supabase } from '@/lib/supabase'
 import {
   COMPANY_FIELD_ORDER,
@@ -34,6 +39,10 @@ export function CompanyFormDialog({
   onSaved,
 }: CompanyFormDialogProps) {
   const { t } = useI18n()
+  // Adding and editing need `companies_projects.edit` (the row policies
+  // re-check it): without the key the dialog offers no save.
+  const canSave = companiesProjectsActions(usePermissions()).edit
+  const notAllowed = t('companiesProjectsSaveNotAllowed')
   const [form, setForm] = useState<CompanyFormValues>(EMPTY_COMPANY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -59,6 +68,10 @@ export function CompanyFormDialog({
   }
 
   const save = async () => {
+    if (!canSave) {
+      setError(notAllowed)
+      return
+    }
     const invalid = validateCompanyForm(form)
     if (hasErrors(invalid)) {
       setErrors(invalid)
@@ -69,10 +82,20 @@ export function CompanyFormDialog({
     setSaving(true)
     setError(null)
     const payload = buildCompanyPayload(form)
+    // Without the key an update matches no row and PostgREST answers with no
+    // error, so the returned rows are read: none back is a refusal.
     const result = company
-      ? await supabase.from('companies').update(payload).eq('id', company.id)
-      : await supabase.from('companies').insert(payload)
+      ? await supabase
+          .from('companies')
+          .update(payload)
+          .eq('id', company.id)
+          .select('id')
+      : await supabase.from('companies').insert(payload).select('id')
     setSaving(false)
+    if (refusedByPolicy(result.error, result.data)) {
+      setError(notAllowed)
+      return
+    }
     if (result.error) {
       // A duplicate name belongs on the name that caused it; anything else
       // stays a safe top-level message.
@@ -91,6 +114,8 @@ export function CompanyFormDialog({
     onSaved()
   }
 
+  const shownError = error ?? (canSave ? null : notAllowed)
+
   return (
     <Dialog
       open={open}
@@ -103,14 +128,16 @@ export function CompanyFormDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('cancel')}
           </Button>
-          <Button variant="primary" loading={saving} onClick={save}>
-            {t('save')}
-          </Button>
+          {canSave && (
+            <Button variant="primary" loading={saving} onClick={save}>
+              {t('save')}
+            </Button>
+          )}
         </>
       }
     >
       <div ref={bodyRef} className="space-y-4">
-        {error && <ErrorState title={error} className="p-4" />}
+        {shownError && <ErrorState title={shownError} className="p-4" />}
         <Field
           label={t('companyNameAr')}
           name="name_ar"

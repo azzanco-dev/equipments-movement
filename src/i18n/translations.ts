@@ -1256,6 +1256,26 @@ export const translations = {
     equipmentCreateNotAllowed:
       'لم تحفظ المعدة: الاضافة تحتاج صلاحية «اضافة معدة». اطلب من مدير النظام اضافتها لدورك.',
     // equipment-save-refused — end
+    // master-data-save-refused — start
+    driverEditNotAllowed:
+      'لم يحفظ التعديل: تعديل السائقين يحتاج صلاحية «تعديل السائقين». اطلب من مدير النظام اضافتها لدورك.',
+    driverCreateNotAllowed:
+      'لم يحفظ السائق: الاضافة تحتاج صلاحية «اضافة سائق». اطلب من مدير النظام اضافتها لدورك.',
+    driverDeleteNotAllowed:
+      'لم يحذف السائق: الحذف يحتاج صلاحية «حذف السائقين». اطلب من مدير النظام اضافتها لدورك.',
+    driverImportNotAllowed:
+      'لم يستورد اي سائق: الاستيراد يحتاج صلاحية «استيراد السائقين» وصلاحية «اضافة سائق». اطلب من مدير النظام اضافتها لدورك.',
+    companiesProjectsSaveNotAllowed:
+      'لم يحفظ التعديل: تعديل الشركات والمشاريع يحتاج صلاحية «ادارة الشركات والمشاريع». اطلب من مدير النظام اضافتها لدورك.',
+    companiesProjectsDeleteNotAllowed:
+      'لم يحذف: الحذف يحتاج صلاحية «ادارة الشركات والمشاريع». اطلب من مدير النظام اضافتها لدورك.',
+    companiesProjectsImportNotAllowed:
+      'لم يستورد اي صف: الاستيراد يحتاج صلاحية «ادارة الشركات والمشاريع». اطلب من مدير النظام اضافتها لدورك.',
+    lessorSaveNotAllowed:
+      'لم يحفظ التعديل: تعديل الموردين يحتاج صلاحية «ادارة الموردين». اطلب من مدير النظام اضافتها لدورك.',
+    lessorDeleteNotAllowed:
+      'لم يحذف المورد: الحذف يحتاج صلاحية «ادارة الموردين». اطلب من مدير النظام اضافتها لدورك.',
+    // master-data-save-refused — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
     userEmailExists: 'البريد الإلكتروني مستخدم لحساب آخر.',
@@ -3397,6 +3417,26 @@ export const translations = {
     equipmentCreateNotAllowed:
       'The equipment was not saved: adding needs the "Add equipment" permission. Ask the system admin to add it to your role.',
     // equipment-save-refused — end
+    // master-data-save-refused — start
+    driverEditNotAllowed:
+      'The change was not saved: editing drivers needs the "Edit drivers" permission. Ask the system admin to add it to your role.',
+    driverCreateNotAllowed:
+      'The driver was not saved: adding needs the "Add drivers" permission. Ask the system admin to add it to your role.',
+    driverDeleteNotAllowed:
+      'The driver was not deleted: deleting needs the "Delete drivers" permission. Ask the system admin to add it to your role.',
+    driverImportNotAllowed:
+      'No driver was imported: the import needs the "Import drivers" and "Add drivers" permissions. Ask the system admin to add them to your role.',
+    companiesProjectsSaveNotAllowed:
+      'The change was not saved: editing companies and projects needs the "Manage companies and projects" permission. Ask the system admin to add it to your role.',
+    companiesProjectsDeleteNotAllowed:
+      'Nothing was deleted: deleting needs the "Manage companies and projects" permission. Ask the system admin to add it to your role.',
+    companiesProjectsImportNotAllowed:
+      'No row was imported: the import needs the "Manage companies and projects" permission. Ask the system admin to add it to your role.',
+    lessorSaveNotAllowed:
+      'The change was not saved: editing suppliers needs the "Manage suppliers" permission. Ask the system admin to add it to your role.',
+    lessorDeleteNotAllowed:
+      'The supplier was not deleted: deleting needs the "Manage suppliers" permission. Ask the system admin to add it to your role.',
+    // master-data-save-refused — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
     userEmailExists: 'This email is already used by another account.',

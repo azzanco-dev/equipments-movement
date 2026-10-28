@@ -18,8 +18,10 @@ export interface ProjectsTableProps {
   sort: string
   direction: 'asc' | 'desc'
   onSortChange: (key: string, direction: 'asc' | 'desc') => void
-  onEdit: (project: Project) => void
-  onDelete: (project: Project) => void
+  /** Omitted without `companies_projects.edit`: the row shows no edit button. */
+  onEdit?: (project: Project) => void
+  /** Omitted without `companies_projects.edit`: the row shows no delete button. */
+  onDelete?: (project: Project) => void
   emptyAction?: ReactNode
 }
 
@@ -61,20 +63,24 @@ export function ProjectsTable({
       header: t('actions'),
       cell: (row) => (
         <span className="flex items-center gap-1">
-          <IconButton
-            size="sm"
-            label={t('edit')}
-            title={t('edit')}
-            icon={<Edit2 size={15} />}
-            onClick={() => onEdit(row)}
-          />
-          <IconButton
-            size="sm"
-            label={t('delete')}
-            title={t('delete')}
-            icon={<Trash2 size={15} />}
-            onClick={() => onDelete(row)}
-          />
+          {onEdit && (
+            <IconButton
+              size="sm"
+              label={t('edit')}
+              title={t('edit')}
+              icon={<Edit2 size={15} />}
+              onClick={() => onEdit(row)}
+            />
+          )}
+          {onDelete && (
+            <IconButton
+              size="sm"
+              label={t('delete')}
+              title={t('delete')}
+              icon={<Trash2 size={15} />}
+              onClick={() => onDelete(row)}
+            />
+          )}
         </span>
       ),
     },

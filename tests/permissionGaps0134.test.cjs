@@ -429,7 +429,9 @@ test('the three list screens map a 23503 refusal to a safe message', () => {
     assert.match(
       text,
       new RegExp(
-        `\\.from\\('${table}'\\)\\s+\\.delete\\(\\)\\s+\\.eq\\('id', \\w+\\.id\\)\\s+if \\(error\\) \\{[\\s\\S]*?setLoadError\\(\\s+t\\(\\s+databaseErrorKind\\(error\\) === 'foreignKey'\\s+\\? '${key}'\\s+: 'deleteFailed',\\s+\\),\\s+\\)\\s+return\\s+\\}`,
+        // 2026-10-28: the delete reads its rows back and answers a policy
+        // refusal first (tests/masterDataActions.test.cjs).
+        `\\.from\\('${table}'\\)\\s+\\.delete\\(\\)\\s+\\.eq\\('id', \\w+\\.id\\)\\s+\\.select\\('id'\\)\\s+if \\(refusedByPolicy\\(error, data\\)\\) \\{[\\s\\S]*?return\\s+\\}\\s+if \\(error\\) \\{[\\s\\S]*?setLoadError\\(\\s+t\\(\\s+databaseErrorKind\\(error\\) === 'foreignKey'\\s+\\? '${key}'\\s+: 'deleteFailed',\\s+\\),\\s+\\)\\s+return\\s+\\}`,
       ),
       `${file} surfaces the refused delete`,
     )

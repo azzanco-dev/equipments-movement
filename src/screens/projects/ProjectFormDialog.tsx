@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, ErrorState, Field, Input } from '@/components/ui'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
+import {
+  companiesProjectsActions,
+  refusedByPolicy,
+} from '@/lib/actionPermissions'
 import { supabase } from '@/lib/supabase'
 import {
   EMPTY_PROJECT_FORM,
@@ -34,6 +39,10 @@ export function ProjectFormDialog({
   onSaved,
 }: ProjectFormDialogProps) {
   const { t } = useI18n()
+  // Adding and editing need `companies_projects.edit` (the row policies
+  // re-check it): without the key the dialog offers no save.
+  const canSave = companiesProjectsActions(usePermissions()).edit
+  const notAllowed = t('companiesProjectsSaveNotAllowed')
   const [form, setForm] = useState<ProjectFormValues>(EMPTY_PROJECT_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -59,6 +68,10 @@ export function ProjectFormDialog({
   }
 
   const save = async () => {
+    if (!canSave) {
+      setError(notAllowed)
+      return
+    }
     const invalid = validateProjectForm(form)
     if (hasErrors(invalid)) {
       setErrors(invalid)
@@ -69,10 +82,20 @@ export function ProjectFormDialog({
     setSaving(true)
     setError(null)
     const payload = buildProjectPayload(form)
+    // Without the key an update matches no row and PostgREST answers with no
+    // error, so the returned rows are read: none back is a refusal.
     const result = project
-      ? await supabase.from('projects').update(payload).eq('id', project.id)
-      : await supabase.from('projects').insert(payload)
+      ? await supabase
+          .from('projects')
+          .update(payload)
+          .eq('id', project.id)
+          .select('id')
+      : await supabase.from('projects').insert(payload).select('id')
     setSaving(false)
+    if (refusedByPolicy(result.error, result.data)) {
+      setError(notAllowed)
+      return
+    }
     if (result.error) {
       const attributed = projectSaveFieldErrors(result.error)
       if (attributed) {
@@ -89,6 +112,8 @@ export function ProjectFormDialog({
     onSaved()
   }
 
+  const shownError = error ?? (canSave ? null : notAllowed)
+
   return (
     <Dialog
       open={open}
@@ -101,14 +126,16 @@ export function ProjectFormDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('cancel')}
           </Button>
-          <Button variant="primary" loading={saving} onClick={save}>
-            {t('save')}
-          </Button>
+          {canSave && (
+            <Button variant="primary" loading={saving} onClick={save}>
+              {t('save')}
+            </Button>
+          )}
         </>
       }
     >
       <div ref={bodyRef} className="space-y-4">
-        {error && <ErrorState title={error} className="p-4" />}
+        {shownError && <ErrorState title={shownError} className="p-4" />}
         <Field
           label={t('projectNameAr')}
           name="name_ar"

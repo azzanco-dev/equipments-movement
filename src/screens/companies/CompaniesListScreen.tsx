@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Download, Plus, Upload } from 'lucide-react'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { Button, PageHeader, useConfirm } from '@/components/ui'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
@@ -7,6 +8,10 @@ import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
+import {
+  companiesProjectsActions,
+  refusedByPolicy,
+} from '@/lib/actionPermissions'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { databaseErrorKind } from '@/lib/formValidation'
 import { companiesListConfig } from '@/lib/listConfigs'
@@ -25,6 +30,10 @@ const LIST_SELECT = 'id,name_ar,name_en,created_at,updated_at'
  *  drivers screens. */
 export function CompaniesListScreen() {
   const { t } = useI18n()
+  // Add, edit, delete, the Excel import and the project links follow
+  // `companies_projects.edit` (the row policies re-check it); the export and
+  // the read-only list of linked projects stay for every reader.
+  const canEdit = companiesProjectsActions(usePermissions()).edit
   const list = useDataListState(companiesListConfig)
   const [companies, setCompanies] = useState<Company[]>([])
   const [total, setTotal] = useState(0)
@@ -97,10 +106,17 @@ export function CompaniesListScreen() {
       }))
     )
       return
-    const { error } = await supabase
+    // Without the key the delete matches no row and PostgREST answers with
+    // no error, so the deleted rows are read back.
+    const { data, error } = await supabase
       .from('companies')
       .delete()
       .eq('id', company.id)
+      .select('id')
+    if (refusedByPolicy(error, data)) {
+      setLoadError(t('companiesProjectsDeleteNotAllowed'))
+      return
+    }
     if (error) {
       // 0134: a company referenced by a movement is refused by the database
       // (foreign key, ON DELETE RESTRICT); never show the raw error text.
@@ -116,7 +132,7 @@ export function CompaniesListScreen() {
     fetchCompanies()
   }
 
-  const addButton = (
+  const addButton = canEdit ? (
     <Button
       variant="primary"
       icon={<Plus size={16} aria-hidden="true" />}
@@ -124,7 +140,7 @@ export function CompaniesListScreen() {
     >
       {t('addCompany')}
     </Button>
-  )
+  ) : undefined
 
   return (
     <div className="space-y-4">
@@ -142,13 +158,15 @@ export function CompaniesListScreen() {
                 >
                   {t('exportExcel')}
                 </Button>
-                <Button
-                  variant="ghost"
-                  icon={<Upload size={16} aria-hidden="true" />}
-                  onClick={() => setImportOpen(true)}
-                >
-                  {t('importExcel')}
-                </Button>
+                {canEdit && (
+                  <Button
+                    variant="ghost"
+                    icon={<Upload size={16} aria-hidden="true" />}
+                    onClick={() => setImportOpen(true)}
+                  >
+                    {t('importExcel')}
+                  </Button>
+                )}
               </>
             }
             primaryAction={addButton}
@@ -175,9 +193,9 @@ export function CompaniesListScreen() {
         sort={list.sort}
         direction={list.direction}
         onSortChange={list.setSort}
-        onEdit={openEdit}
+        onEdit={canEdit ? openEdit : undefined}
         onManageProjects={setProjectsCompany}
-        onDelete={remove}
+        onDelete={canEdit ? remove : undefined}
         emptyAction={addButton}
       />
       {!loadError && total > 0 && (
@@ -197,7 +215,7 @@ export function CompaniesListScreen() {
         onSaved={fetchCompanies}
       />
       <CompanyImportDialog
-        open={importOpen}
+        open={importOpen && canEdit}
         onOpenChange={setImportOpen}
         existingCompanies={companies}
         onImported={fetchCompanies}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { FileSpreadsheet, Plus, Trash2 } from 'lucide-react'
 import { Button, PageHeader, useConfirm } from '@/components/ui'
 import { DataListActions } from '@/components/data-list/DataListActions'
@@ -10,6 +11,7 @@ import { useListRequest } from '@/components/data-list/useListRequest'
 import { useRowSelection } from '@/components/data-list/useRowSelection'
 import { DriverExcelImport } from '@/components/DriverExcelImport'
 import { useI18n } from '@/i18n/I18nContext'
+import { driversActions, refusedByPolicy } from '@/lib/actionPermissions'
 import { applyListFilters } from '@/lib/applyListFilters'
 import {
   DRIVER_DIALOG_QUERY_PARAM,
@@ -51,6 +53,10 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
   // See the prop's doc comment: the list now opens the dialog itself.
   void onSelectDriver
   const { t } = useI18n()
+  // Add, edit, delete and the Excel import follow drivers.create / .edit /
+  // .delete / .import (the row policies re-check them); nothing is offered
+  // while the permissions load or after a failed load.
+  const actions = driversActions(usePermissions())
   const router = useRouter()
   const searchParams = useSearchParams()
   const openDriverId = driverIdFromSearchParams(searchParams)
@@ -144,11 +150,15 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
       }))
     )
       return
-    const { error } = await supabase
+    // Without `drivers.delete` the delete matches no row and PostgREST
+    // answers with no error, so the deleted rows are read back.
+    const { data, error } = await supabase
       .from('drivers')
       .delete()
       .eq('id', driver.id)
-    if (error) setLoadError(t('driverDeleteBlocked'))
+      .select('id')
+    if (refusedByPolicy(error, data)) setLoadError(t('driverDeleteNotAllowed'))
+    else if (error) setLoadError(t('driverDeleteBlocked'))
     else fetchDrivers()
   }
 
@@ -162,18 +172,20 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
       }))
     )
       return
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('drivers')
       .delete()
       .in('id', [...selection.selected])
-    if (error) setLoadError(t('driverDeleteBlocked'))
+      .select('id')
+    if (refusedByPolicy(error, data)) setLoadError(t('driverDeleteNotAllowed'))
+    else if (error) setLoadError(t('driverDeleteBlocked'))
     else {
       selection.clear()
       fetchDrivers()
     }
   }
 
-  const addButton = (
+  const addButton = actions.create ? (
     <Button
       variant="primary"
       icon={<Plus size={16} aria-hidden="true" />}
@@ -181,7 +193,7 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
     >
       {t('addDriver')}
     </Button>
-  )
+  ) : undefined
 
   return (
     <div className="space-y-4">
@@ -191,13 +203,15 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
         actions={
           <DataListActions
             menuActions={
-              <Button
-                variant="ghost"
-                icon={<FileSpreadsheet size={16} aria-hidden="true" />}
-                onClick={() => setImportOpen(true)}
-              >
-                {t('importExcel')}
-              </Button>
+              actions.importRows ? (
+                <Button
+                  variant="ghost"
+                  icon={<FileSpreadsheet size={16} aria-hidden="true" />}
+                  onClick={() => setImportOpen(true)}
+                >
+                  {t('importExcel')}
+                </Button>
+              ) : undefined
             }
             primaryAction={addButton}
           />
@@ -214,16 +228,18 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
         filterFields={driversListConfig.filterFields}
         filters={list.filters}
         onFilters={list.setFilters}
-        selectedCount={selection.selected.size}
+        selectedCount={actions.remove ? selection.selected.size : 0}
         bulkActions={
-          <Button
-            variant="outline"
-            size="sm"
-            icon={<Trash2 size={15} aria-hidden="true" />}
-            onClick={removeSelected}
-          >
-            {t('delete')}
-          </Button>
+          actions.remove ? (
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Trash2 size={15} aria-hidden="true" />}
+              onClick={removeSelected}
+            >
+              {t('delete')}
+            </Button>
+          ) : undefined
         }
       />
 
@@ -239,8 +255,8 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
         onToggleRow={selection.toggle}
         onTogglePage={selection.togglePage}
         onOpen={openDriverDialog}
-        onEdit={openEdit}
-        onDelete={remove}
+        onEdit={actions.edit ? openEdit : undefined}
+        onDelete={actions.remove ? remove : undefined}
         emptyAction={addButton}
       />
       {!loadError && total > 0 && (
@@ -260,7 +276,7 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
         onSaved={fetchDrivers}
       />
       <DriverExcelImport
-        open={importOpen}
+        open={importOpen && actions.importRows}
         onClose={() => setImportOpen(false)}
         onImported={fetchDrivers}
       />

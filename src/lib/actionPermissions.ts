@@ -298,6 +298,77 @@ export function equipmentListActions(
   }))
 }
 
+// ---------------------------------------------------------------------------
+// Master data: drivers, companies / projects, lessors (2026-10-28)
+// ---------------------------------------------------------------------------
+//
+// The list pages open on the *.read keys, but their writes are plain
+// PostgREST calls whose row policies (0127) test the keys below. A refused
+// UPDATE / DELETE matches no row and PostgREST answers without an error, so
+// the buttons follow the write keys and every write reads its returned rows.
+
+export interface DriversActions {
+  /** «اضافة سائق» (`drivers.create`, policy insert_drivers). */
+  create: boolean
+  /** The row edit button (`drivers.edit`, policy update_drivers). */
+  edit: boolean
+  /** The row and bulk delete (`drivers.delete`, policy delete_drivers). */
+  remove: boolean
+  /** The Excel import (`drivers.import`); its rows are inserted, so the
+   *  insert policy's `drivers.create` is needed too. */
+  importRows: boolean
+}
+
+export function driversActions(state: ActionPermissionState): DriversActions {
+  return decideByPermissions(state, (permissions) => ({
+    create: permissions.has('drivers.create'),
+    edit: permissions.has('drivers.edit'),
+    remove: permissions.has('drivers.delete'),
+    importRows:
+      permissions.has('drivers.import') && permissions.has('drivers.create'),
+  }))
+}
+
+export interface CompaniesProjectsActions {
+  /** Add / edit / delete / import companies and projects and the
+   *  company-project links: one key, `companies_projects.edit` (the insert,
+   *  update and delete policies of companies, projects, company_projects). */
+  edit: boolean
+}
+
+export function companiesProjectsActions(
+  state: ActionPermissionState,
+): CompaniesProjectsActions {
+  return decideByPermissions(state, (permissions) => ({
+    edit: permissions.has('companies_projects.edit'),
+  }))
+}
+
+export interface LessorsActions {
+  /** Add / edit / delete suppliers: one key, `lessors.edit` (the insert,
+   *  update and delete policies of lessors). */
+  edit: boolean
+}
+
+export function lessorsActions(state: ActionPermissionState): LessorsActions {
+  return decideByPermissions(state, (permissions) => ({
+    edit: permissions.has('lessors.edit'),
+  }))
+}
+
+/**
+ * A master-data write the row policies refused: the insert's 42501, or an
+ * update / delete (read back with `.select('id')`) that returned no row.
+ * Any other error is the caller's to map (duplicate, foreign key, ...).
+ */
+export function refusedByPolicy(
+  error: { code?: string | null } | null | undefined,
+  rows: readonly unknown[] | null | undefined,
+): boolean {
+  if (error) return error.code === '42501'
+  return !rows?.length
+}
+
 export interface UsersActions {
   /** Adding, editing and saving users (`users.manage`). */
   manage: boolean

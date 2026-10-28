@@ -4,7 +4,12 @@ import { Dialog, ErrorState } from '@/components/ui'
 import { Spinner } from '@/components/ui/Spinner'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/components/Select'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
+import {
+  companiesProjectsActions,
+  refusedByPolicy,
+} from '@/lib/actionPermissions'
 import { localizedName } from '@/lib/localizedName'
 import { buildSearchFilter, COMPANY_PROJECT_SEARCH_FIELDS } from '@/lib/search'
 import { unwrapRows } from '@/lib/supabaseResult'
@@ -34,6 +39,10 @@ export function CompanyProjectsDialog({
   company,
 }: CompanyProjectsDialogProps) {
   const { t, lang } = useI18n()
+  // Linking and unlinking need `companies_projects.edit` (the
+  // company_projects policies re-check it); without it the dialog only lists
+  // the linked projects.
+  const canEdit = companiesProjectsActions(usePermissions()).edit
   const [links, setLinks] = useState<CompanyProjectWithProject[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -92,11 +101,16 @@ export function CompanyProjectsDialog({
   )
 
   const addLink = async () => {
-    if (!company || !addProjectId) return
+    if (!company || !addProjectId || !canEdit) return
     setError(null)
-    const { error: insertError } = await supabase
+    const { data: inserted, error: insertError } = await supabase
       .from('company_projects')
       .insert({ company_id: company.id, project_id: addProjectId })
+      .select('id')
+    if (refusedByPolicy(insertError, inserted)) {
+      setError(t('companiesProjectsSaveNotAllowed'))
+      return
+    }
     if (insertError) {
       console.error(insertError)
       setError(t('saveFailed'))
@@ -108,12 +122,19 @@ export function CompanyProjectsDialog({
   }
 
   const removeLink = async (linkId: string) => {
-    if (!company) return
+    if (!company || !canEdit) return
     setError(null)
-    const { error: deleteError } = await supabase
+    // Without the key the delete matches no row and PostgREST answers with
+    // no error, so the deleted rows are read back.
+    const { data: deleted, error: deleteError } = await supabase
       .from('company_projects')
       .delete()
       .eq('id', linkId)
+      .select('id')
+    if (refusedByPolicy(deleteError, deleted)) {
+      setError(t('companiesProjectsDeleteNotAllowed'))
+      return
+    }
     if (deleteError) {
       console.error(deleteError)
       setError(t('saveFailed'))
@@ -172,45 +193,49 @@ export function CompanyProjectsDialog({
                           )
                         : link.project_id}
                     </span>
-                    <button
-                      onClick={() => removeLink(link.id)}
-                      className="btn-ghost p-1 text-red-600 dark:text-red-400"
-                      title={t('removeProjectLink')}
-                    >
-                      <X size={16} />
-                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => removeLink(link.id)}
+                        className="btn-ghost p-1 text-red-600 dark:text-red-400"
+                        title={t('removeProjectLink')}
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          <div
-            className="pt-2 border-t"
-            style={{ borderColor: 'var(--border)' }}
-          >
-            <p className="label mb-2">{t('addProjectLink')}</p>
-            <div className="flex gap-2">
-              <AsyncSearchSelect
-                className="flex-1"
-                value={addProjectId}
-                selectedOption={addProjectOption}
-                onChange={(value, option) => {
-                  setAddProjectId(value)
-                  setAddProjectOption(option)
-                }}
-                loadOptions={loadAvailableProjects}
-                placeholder="—"
-              />
-              <button
-                onClick={addLink}
-                disabled={!addProjectId}
-                className="btn-primary px-3"
-              >
-                <Plus size={16} />
-              </button>
+          {canEdit && (
+            <div
+              className="pt-2 border-t"
+              style={{ borderColor: 'var(--border)' }}
+            >
+              <p className="label mb-2">{t('addProjectLink')}</p>
+              <div className="flex gap-2">
+                <AsyncSearchSelect
+                  className="flex-1"
+                  value={addProjectId}
+                  selectedOption={addProjectOption}
+                  onChange={(value, option) => {
+                    setAddProjectId(value)
+                    setAddProjectOption(option)
+                  }}
+                  loadOptions={loadAvailableProjects}
+                  placeholder="—"
+                />
+                <button
+                  onClick={addLink}
+                  disabled={!addProjectId}
+                  className="btn-primary px-3"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </Dialog>

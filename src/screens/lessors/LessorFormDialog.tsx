@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, ErrorState, Field, Input } from '@/components/ui'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
+import { lessorsActions, refusedByPolicy } from '@/lib/actionPermissions'
 import { supabase } from '@/lib/supabase'
 import {
   EMPTY_LESSOR_FORM,
@@ -33,6 +35,10 @@ export function LessorFormDialog({
   onSaved,
 }: LessorFormDialogProps) {
   const { t } = useI18n()
+  // Adding and editing need `lessors.edit` (the row policies re-check it):
+  // without the key the dialog offers no save.
+  const canSave = lessorsActions(usePermissions()).edit
+  const notAllowed = t('lessorSaveNotAllowed')
   const [form, setForm] = useState<LessorFormValues>(EMPTY_LESSOR_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -58,6 +64,10 @@ export function LessorFormDialog({
   }
 
   const save = async () => {
+    if (!canSave) {
+      setError(notAllowed)
+      return
+    }
     const invalid = validateLessorForm(form)
     if (hasErrors(invalid)) {
       setErrors(invalid)
@@ -68,10 +78,20 @@ export function LessorFormDialog({
     setSaving(true)
     setError(null)
     const payload = buildLessorPayload(form)
+    // Without the key an update matches no row and PostgREST answers with no
+    // error, so the returned rows are read: none back is a refusal.
     const result = lessor
-      ? await supabase.from('lessors').update(payload).eq('id', lessor.id)
-      : await supabase.from('lessors').insert(payload)
+      ? await supabase
+          .from('lessors')
+          .update(payload)
+          .eq('id', lessor.id)
+          .select('id')
+      : await supabase.from('lessors').insert(payload).select('id')
     setSaving(false)
+    if (refusedByPolicy(result.error, result.data)) {
+      setError(notAllowed)
+      return
+    }
     if (result.error) {
       setError(t('saveFailed'))
       return
@@ -79,6 +99,8 @@ export function LessorFormDialog({
     onOpenChange(false)
     onSaved()
   }
+
+  const shownError = error ?? (canSave ? null : notAllowed)
 
   return (
     <Dialog
@@ -92,14 +114,16 @@ export function LessorFormDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('cancel')}
           </Button>
-          <Button variant="primary" loading={saving} onClick={save}>
-            {t('save')}
-          </Button>
+          {canSave && (
+            <Button variant="primary" loading={saving} onClick={save}>
+              {t('save')}
+            </Button>
+          )}
         </>
       }
     >
       <div ref={bodyRef} className="space-y-4">
-        {error && <ErrorState title={error} className="p-4" />}
+        {shownError && <ErrorState title={shownError} className="p-4" />}
         <Field
           label={t('lessorName')}
           name="name"

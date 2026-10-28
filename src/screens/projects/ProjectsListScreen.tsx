@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { FileSpreadsheet, Plus } from 'lucide-react'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { Button, PageHeader, useConfirm } from '@/components/ui'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
@@ -7,6 +8,10 @@ import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
+import {
+  companiesProjectsActions,
+  refusedByPolicy,
+} from '@/lib/actionPermissions'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { databaseErrorKind } from '@/lib/formValidation'
 import { projectsListConfig } from '@/lib/listConfigs'
@@ -22,6 +27,9 @@ const LIST_SELECT = 'id,name_ar,name_en,created_at,updated_at'
 /** Orchestrator for the projects list; same shape as the companies screen. */
 export function ProjectsListScreen() {
   const { t } = useI18n()
+  // Add, edit, delete and the Excel import follow `companies_projects.edit`
+  // (the row policies re-check it).
+  const canEdit = companiesProjectsActions(usePermissions()).edit
   const list = useDataListState(projectsListConfig)
   const [projects, setProjects] = useState<Project[]>([])
   const [total, setTotal] = useState(0)
@@ -92,10 +100,17 @@ export function ProjectsListScreen() {
       }))
     )
       return
-    const { error } = await supabase
+    // Without the key the delete matches no row and PostgREST answers with
+    // no error, so the deleted rows are read back.
+    const { data, error } = await supabase
       .from('projects')
       .delete()
       .eq('id', project.id)
+      .select('id')
+    if (refusedByPolicy(error, data)) {
+      setLoadError(t('companiesProjectsDeleteNotAllowed'))
+      return
+    }
     if (error) {
       // 0134: a project referenced by a movement or a unit is refused by the
       // database (foreign key, ON DELETE RESTRICT); never show the raw text.
@@ -111,7 +126,7 @@ export function ProjectsListScreen() {
     fetchProjects()
   }
 
-  const addButton = (
+  const addButton = canEdit ? (
     <Button
       variant="primary"
       icon={<Plus size={16} aria-hidden="true" />}
@@ -119,7 +134,7 @@ export function ProjectsListScreen() {
     >
       {t('addProject')}
     </Button>
-  )
+  ) : undefined
 
   return (
     <div className="space-y-4">
@@ -129,13 +144,15 @@ export function ProjectsListScreen() {
         actions={
           <DataListActions
             menuActions={
-              <Button
-                variant="ghost"
-                icon={<FileSpreadsheet size={16} aria-hidden="true" />}
-                onClick={() => setImportOpen(true)}
-              >
-                {t('importExcel')}
-              </Button>
+              canEdit ? (
+                <Button
+                  variant="ghost"
+                  icon={<FileSpreadsheet size={16} aria-hidden="true" />}
+                  onClick={() => setImportOpen(true)}
+                >
+                  {t('importExcel')}
+                </Button>
+              ) : undefined
             }
             primaryAction={addButton}
           />
@@ -161,8 +178,8 @@ export function ProjectsListScreen() {
         sort={list.sort}
         direction={list.direction}
         onSortChange={list.setSort}
-        onEdit={openEdit}
-        onDelete={remove}
+        onEdit={canEdit ? openEdit : undefined}
+        onDelete={canEdit ? remove : undefined}
         emptyAction={addButton}
       />
       {!loadError && total > 0 && (
@@ -182,7 +199,7 @@ export function ProjectsListScreen() {
         onSaved={fetchProjects}
       />
       <ProjectImportDialog
-        open={importOpen}
+        open={importOpen && canEdit}
         onOpenChange={setImportOpen}
         existingProjects={projects}
         onImported={fetchProjects}

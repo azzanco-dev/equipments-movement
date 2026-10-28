@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { Button, PageHeader, useConfirm } from '@/components/ui'
 import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
@@ -7,6 +8,7 @@ import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
+import { lessorsActions, refusedByPolicy } from '@/lib/actionPermissions'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { databaseErrorKind } from '@/lib/formValidation'
 import { lessorsListConfig } from '@/lib/listConfigs'
@@ -23,6 +25,9 @@ const LIST_SELECT =
  *  minus the import/export/link dialogs lessors does not have. */
 export function LessorsListScreen() {
   const { t } = useI18n()
+  // Add, edit and delete follow `lessors.edit` (the row policies re-check
+  // it); the purchasing role, for one, reads suppliers without it.
+  const canEdit = lessorsActions(usePermissions()).edit
   const list = useDataListState(lessorsListConfig)
   const [lessors, setLessors] = useState<Lessor[]>([])
   const [total, setTotal] = useState(0)
@@ -92,10 +97,17 @@ export function LessorsListScreen() {
       }))
     )
       return
-    const { error } = await supabase
+    // Without the key the delete matches no row and PostgREST answers with
+    // no error, so the deleted rows are read back.
+    const { data, error } = await supabase
       .from('lessors')
       .delete()
       .eq('id', lessor.id)
+      .select('id')
+    if (refusedByPolicy(error, data)) {
+      setLoadError(t('lessorDeleteNotAllowed'))
+      return
+    }
     if (error) {
       // 0134: a supplier referenced by equipment is refused by the database
       // (foreign key, ON DELETE RESTRICT); never show the raw error text.
@@ -111,7 +123,7 @@ export function LessorsListScreen() {
     fetchLessors()
   }
 
-  const addButton = (
+  const addButton = canEdit ? (
     <Button
       variant="primary"
       icon={<Plus size={16} aria-hidden="true" />}
@@ -119,7 +131,7 @@ export function LessorsListScreen() {
     >
       {t('addLessor')}
     </Button>
-  )
+  ) : undefined
 
   return (
     <div className="space-y-4">
@@ -148,8 +160,8 @@ export function LessorsListScreen() {
         sort={list.sort}
         direction={list.direction}
         onSortChange={list.setSort}
-        onEdit={openEdit}
-        onDelete={remove}
+        onEdit={canEdit ? openEdit : undefined}
+        onDelete={canEdit ? remove : undefined}
         emptyAction={addButton}
       />
       {!loadError && total > 0 && (

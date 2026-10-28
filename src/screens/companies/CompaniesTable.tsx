@@ -19,9 +19,11 @@ export interface CompaniesTableProps {
   sort: string
   direction: 'asc' | 'desc'
   onSortChange: (key: string, direction: 'asc' | 'desc') => void
-  onEdit: (company: Company) => void
+  /** Omitted without `companies_projects.edit`: the row shows no edit button. */
+  onEdit?: (company: Company) => void
   onManageProjects: (company: Company) => void
-  onDelete: (company: Company) => void
+  /** Omitted without `companies_projects.edit`: the row shows no delete button. */
+  onDelete?: (company: Company) => void
   emptyAction?: ReactNode
 }
 
@@ -64,13 +66,15 @@ export function CompaniesTable({
       header: t('actions'),
       cell: (row) => (
         <span className="flex items-center gap-1">
-          <IconButton
-            size="sm"
-            label={t('edit')}
-            title={t('edit')}
-            icon={<Edit2 size={15} />}
-            onClick={() => onEdit(row)}
-          />
+          {onEdit && (
+            <IconButton
+              size="sm"
+              label={t('edit')}
+              title={t('edit')}
+              icon={<Edit2 size={15} />}
+              onClick={() => onEdit(row)}
+            />
+          )}
           <IconButton
             size="sm"
             label={t('manageProjects')}
@@ -78,13 +82,15 @@ export function CompaniesTable({
             icon={<FolderTree size={15} />}
             onClick={() => onManageProjects(row)}
           />
-          <IconButton
-            size="sm"
-            label={t('delete')}
-            title={t('delete')}
-            icon={<Trash2 size={15} />}
-            onClick={() => onDelete(row)}
-          />
+          {onDelete && (
+            <IconButton
+              size="sm"
+              label={t('delete')}
+              title={t('delete')}
+              icon={<Trash2 size={15} />}
+              onClick={() => onDelete(row)}
+            />
+          )}
         </span>
       ),
     },
