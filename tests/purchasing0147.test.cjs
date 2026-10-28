@@ -113,6 +113,15 @@ test('the page reads the view server-side and adds through the existing dialogs'
   assert.match(screen, /group-hover\/move:max-w-32/)
   assert.match(screen, /group-focus-visible\/move:max-w-32/)
   assert.match(screen, /motion-safe:transition-all/)
+  // 2026-10-27: the two counts (without a PO / on one), head-only counts
+  // with the search and every filter but the PO one, refreshed after an add.
+  assert.match(screen, /\.select\('entry_id', \{ count: 'exact', head: true \}\)\s+\.eq\('has_po', hasPo\)/)
+  assert.match(screen, /\.filter\(\(key\) => key !== 'has_po'\)/)
+  assert.match(screen, /countOf\(false\), countOf\(true\)/)
+  assert.match(screen, /\{ key: 'siteUnitsNoPo', tone: 'warning', value: poCounts\.noPo \}/)
+  assert.match(screen, /\{ key: 'siteUnitsHasPo', tone: 'success', value: poCounts\.withPo \}/)
+  assert.match(screen, /\{poCounts && !loadError && \(/)
+  assert.match(screen, /setTarget\(null\)\s+refresh\(\)/)
   const app = read('src', 'App.tsx')
   assert.match(app, /onSelectMovement=\{\s+shell\.pages\.has\('movements\/:id'\) \? openMovement : undefined\s+\}/)
 })

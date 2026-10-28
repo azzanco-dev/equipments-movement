@@ -172,6 +172,59 @@ export function SiteUnitsScreen({
     fetchRows()
   }, [fetchRows])
 
+  // Owner 2026-10-27: how many units are without a PO and how many on one.
+  // Two head-only counts with the search and every filter but the PO one,
+  // so both numbers stay meaningful whichever PO filter is on; paging and
+  // sorting do not reload them. A failed count hides the line (never a 0).
+  const [poCounts, setPoCounts] = useState<{
+    noPo: number
+    withPo: number
+  } | null>(null)
+  const loadPoCounts = useCallback(async () => {
+    const filterKeys = new Set(
+      siteUnitsListConfig.filterFields
+        .map((field) => field.key)
+        .filter((key) => key !== 'has_po'),
+    )
+    const searchFilter = buildSearchFilter(
+      siteUnitsListConfig.searchFields,
+      list.search,
+    )
+    const countOf = async (hasPo: boolean) => {
+      let query = supabase
+        .from('purchasing_site_units')
+        .select('entry_id', { count: 'exact', head: true })
+        .eq('has_po', hasPo)
+      if (searchFilter) query = query.or(searchFilter)
+      query = applyListFilters(query, list.filters, filterKeys)
+      const { count, error } = await query
+      if (error) throw error
+      return count ?? 0
+    }
+    try {
+      const [noPo, withPo] = await Promise.all([countOf(false), countOf(true)])
+      return { noPo, withPo }
+    } catch {
+      return null
+    }
+  }, [list.filters, list.search])
+
+  useEffect(() => {
+    let cancelled = false
+    loadPoCounts().then((counts) => {
+      if (!cancelled) setPoCounts(counts)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [loadPoCounts])
+
+  /** After an add: the list and the two counts. */
+  const refresh = () => {
+    fetchRows()
+    loadPoCounts().then(setPoCounts)
+  }
+
   const filtered = Boolean(list.search.trim()) || list.filters.length > 0
 
   const ownerLine = (row: SiteUnitRow) =>
@@ -257,6 +310,34 @@ export function SiteUnitsScreen({
         onFilters={list.setFilters}
         asyncFields={asyncFields}
       />
+      {/* Owner 2026-10-27: the two counts, small pills in the stubs' soft
+          tones (amber without a PO, green on one), not big cards. */}
+      {poCounts && !loadError && (
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              { key: 'siteUnitsNoPo', tone: 'warning', value: poCounts.noPo },
+              { key: 'siteUnitsHasPo', tone: 'success', value: poCounts.withPo },
+            ] as const
+          ).map((pill) => (
+            <span
+              key={pill.key}
+              className="inline-flex h-8 items-center gap-2 rounded-full px-3 text-xs text-fg"
+              style={{ backgroundColor: `var(--${pill.tone}-soft)` }}
+            >
+              <span
+                aria-hidden="true"
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: `var(--${pill.tone})` }}
+              />
+              {t(pill.key)}
+              <bdi dir="ltr" className="text-sm font-semibold tabular-nums">
+                {pill.value}
+              </bdi>
+            </span>
+          ))}
+        </div>
+      )}
       {loadError ? (
         <ErrorState description={t('siteUnitsLoadError')} onRetry={fetchRows} />
       ) : loading && rows.length === 0 ? (
@@ -460,7 +541,7 @@ export function SiteUnitsScreen({
           initialUnit={existingUnit}
           onAdded={() => {
             setTarget(null)
-            fetchRows()
+            refresh()
           }}
         />
       )}
@@ -470,7 +551,7 @@ export function SiteUnitsScreen({
         preset={target?.kind === 'new' ? target.preset : null}
         onCreated={() => {
           setTarget(null)
-          fetchRows()
+          refresh()
         }}
       />
     </div>
