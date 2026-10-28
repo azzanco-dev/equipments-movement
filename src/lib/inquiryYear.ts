@@ -63,8 +63,16 @@ export function inquiryYearRange(year: number, now: number): InquiryYearRange {
   }
 }
 
+/** The day the year starts counting from (owner 2026-10-28, «نخليها من اول
+ *  حركة»): the unit's first movement, else its creation when it has none.
+ *  The days before it are `before`, not «بدون تسجيل» — a unit is added to
+ *  the system before its first movement is recorded. */
+export function inquiryCountFrom(firstMovementAt: number, createdAt: number): number {
+  return Number.isFinite(firstMovementAt) ? firstMovementAt : createdAt
+}
+
 /** The years a reader may pick, newest first: from this year back to the
- *  unit's first year (its first movement or its creation, the earlier). */
+ *  year counting starts in (`inquiryCountFrom`). */
 export function inquiryYearChoices(firstYear: number | null, now: number): number[] {
   const current = saudiYear(now)
   const from = firstYear !== null && firstYear <= current ? firstYear : current
@@ -93,20 +101,21 @@ export interface InquiryDay {
 
 /**
  * Every Saudi day of a calendar year with the state it was in: the latest
- * stay covering it, else «بدون تسجيل», `before` until the unit was added,
- * `future` after today. A stay counts on its entry day, its exit day and
+ * stay covering it, else «بدون تسجيل», `before` until `countFrom`
+ * (`inquiryCountFrom`: the first movement, else the creation), `future`
+ * after today. A stay counts on its entry day, its exit day and
  * every day between (an open stay through today); a lone legacy exit has no
  * start and colours nothing.
  */
 export function inquiryYearDays(
   visits: readonly EquipmentVisit[],
-  createdAt: number,
+  countFrom: number,
   now: number,
   year: number,
 ): InquiryDay[] {
   const { firstDay, lastDay } = inquiryYearRange(year, now)
   const today = saudiDay(now)
-  const created = Number.isFinite(createdAt) ? saudiDay(createdAt) : firstDay
+  const created = Number.isFinite(countFrom) ? saudiDay(countFrom) : firstDay
   const days: InquiryDay[] = []
   for (let day = firstDay; day <= lastDay; day += 1)
     days.push({

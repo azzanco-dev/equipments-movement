@@ -106,6 +106,29 @@ test('stays colour their days, later stays win, before creation stays blank', ()
   assert.equal(summary.counted, summary.siteDays + summary.workshopDays + summary.unrecordedDays)
 })
 
+test('counting starts at the first movement, else the creation (A162)', () => {
+  // Added on 25 August, first entry on 31 August: the six days between are
+  // not «بدون تسجيل» (owner 2026-10-28).
+  const created = Date.parse(saudi('2026-08-25', 11))
+  const visits = timeline.buildEquipmentVisits([
+    move('site', 'entry', '2026-08-31'),
+    move('site', 'exit', '2026-10-01', { exit_purpose: 'work_completed' }),
+    move('workshop', 'entry', '2026-10-02', { workshop_purpose: 'parking' }),
+  ])
+  const firstAt = Date.parse(saudi('2026-08-31'))
+  const countFrom = year.inquiryCountFrom(firstAt, created)
+  assert.equal(countFrom, firstAt)
+  const days = year.inquiryYearDays(visits, countFrom, NOW, 2026)
+  const at = (date) => days.find((day) => day.day === year.saudiDay(Date.parse(saudi(date))))
+  assert.equal(at('2026-08-25').state, 'before')
+  assert.equal(at('2026-08-30').state, 'before')
+  assert.equal(at('2026-08-31').state, 'site')
+  assert.equal(year.summarizeInquiryYear(days).unrecordedDays, 0)
+  // No movement: the creation, as before.
+  assert.equal(year.inquiryCountFrom(NaN, created), created)
+  assert.ok(Number.isNaN(year.inquiryCountFrom(NaN, NaN)))
+})
+
 test('a stay open before the year starts colours from 1 January', () => {
   const visits = timeline.buildEquipmentVisits([move('site', 'entry', '2024-11-24')])
   const days = year.inquiryYearDays(visits, Date.parse('2024-01-01'), NOW, 2026)

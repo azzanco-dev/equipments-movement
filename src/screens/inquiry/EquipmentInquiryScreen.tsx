@@ -48,6 +48,7 @@ import {
 } from '@/components/inquiry/inquiryStyle'
 import { buildEquipmentVisits, type TimelineMovement } from '@/lib/visitTimeline'
 import {
+  inquiryCountFrom,
   inquiryYearChoices,
   inquiryYearDays,
   inquiryYearMonths,
@@ -279,8 +280,9 @@ export function EquipmentInquiryScreen({
   const [yearLoadedFor, setYearLoadedFor] = useState<string | null>(null)
   // A calendar year (owner 2026-10-27: «المفروض بالسنة»), this year first.
   const [selectedYear, setSelectedYear] = useState(() => saudiYear(Date.now()))
-  // The year of the unit's first movement, for the year picker.
-  const [firstMovementYear, setFirstMovementYear] = useState<number | null>(null)
+  // The unit's first movement: the year counts from it and the picker
+  // starts at its year (NaN: none, or not read).
+  const [firstMovementAt, setFirstMovementAt] = useState(Number.NaN)
 
   // The stay the 12-month strip opened in the history.
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null)
@@ -580,7 +582,7 @@ export function EquipmentInquiryScreen({
           .order('id', { ascending: false })
           .limit(1)
           .abortSignal(signal),
-        // The unit's first movement, once per unit, for the year picker.
+        // The unit's first movement, once per unit: counting starts there.
         withFirst
           ? supabase
               .from('movement_log_search')
@@ -597,7 +599,7 @@ export function EquipmentInquiryScreen({
       setYearLoadedFor(`${id}:${year}`)
       if (first) {
         const firstAt = (first.data as { recorded_at: string }[] | null)?.[0]?.recorded_at
-        setFirstMovementYear(firstAt && !first.error ? saudiYear(Date.parse(firstAt)) : null)
+        setFirstMovementAt(firstAt && !first.error ? Date.parse(firstAt) : Number.NaN)
       }
       if (inside.error || before.error) {
         setYearError(true)
@@ -660,7 +662,7 @@ export function EquipmentInquiryScreen({
       setMovementsLoadedId(null)
       setYearLoadedId(null)
       setYearLoadedFor(null)
-      setFirstMovementYear(null)
+      setFirstMovementAt(Number.NaN)
       return
     }
     const at = Date.now()
@@ -745,20 +747,20 @@ export function EquipmentInquiryScreen({
     [movements, lang],
   )
   const createdAt = equipment?.created_at ? Date.parse(equipment.created_at) : Number.NaN
+  // Counting starts at the first movement, else the creation (owner
+  // 2026-10-28: the days between adding a unit and its first movement are
+  // not «بدون تسجيل»).
+  const countFrom = inquiryCountFrom(firstMovementAt, createdAt)
   const year = useMemo(() => {
     const yearVisits = buildEquipmentVisits(
       yearMovements.map((row) => toTimelineMovement(row, lang)),
     )
-    const days = inquiryYearDays(yearVisits, createdAt, now, selectedYear)
+    const days = inquiryYearDays(yearVisits, countFrom, now, selectedYear)
     return { days, months: inquiryYearMonths(days), summary: summarizeInquiryYear(days) }
-  }, [yearMovements, lang, createdAt, now, selectedYear])
-  // From this year back to the unit's first year: its first movement or its
-  // creation, the earlier.
-  const createdYear = Number.isFinite(createdAt) ? saudiYear(createdAt) : null
+  }, [yearMovements, lang, countFrom, now, selectedYear])
+  // From this year back to the year counting starts in.
   const yearChoices = inquiryYearChoices(
-    firstMovementYear !== null && createdYear !== null
-      ? Math.min(firstMovementYear, createdYear)
-      : (firstMovementYear ?? createdYear),
+    Number.isFinite(countFrom) ? saudiYear(countFrom) : null,
     now,
   )
   const yearLoading = Boolean(equipmentId) && yearLoadedFor !== `${equipmentId}:${selectedYear}`
