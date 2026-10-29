@@ -120,7 +120,7 @@ export function SupplierPoPrintSheet({
   doneRef.current = onDone
   const poNumber = po.po_number
   const draft = po.approval_status !== 'approved'
-  // The party in Arabic and, when it has one, English (0164).
+  // The party; an owner class also in English.
   const supplier = supplierPoSupplierNames(po, ar, en)
 
   useEffect(() => {

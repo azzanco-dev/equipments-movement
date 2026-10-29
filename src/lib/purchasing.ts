@@ -320,16 +320,16 @@ export function supplierPoSupplierLabel(
 }
 
 /**
- * The party on the bilingual PO PDF (owner 2026-10-29, «والمورد عربي
- * وانجليزي»): the owner class's Arabic and English labels, else the lessor's
- * name with its English name (0164; none while empty), else «العزاني» for a
- * pre-0138 internal PO.
+ * The party on the bilingual PO PDF: the owner class's Arabic and English
+ * labels, else the lessor's name alone (the supplier's English name of 0164
+ * was dropped again the same day, owner «نقدر نلغي الاسم الانجليزي للمورد»),
+ * else «العزاني» for a pre-0138 internal PO.
  */
 export function supplierPoSupplierNames(
   po: {
     is_internal: boolean
     owner_class?: string | null
-    lessor?: { name: string | null; name_en?: string | null } | null
+    lessor?: { name: string | null } | null
   },
   ar: (key: TranslationKey) => string,
   en: (key: TranslationKey) => string,
@@ -339,7 +339,7 @@ export function supplierPoSupplierNames(
     return { ar: ar(key), en: en(key) }
   }
   const name = po.lessor?.name?.trim()
-  if (name) return { ar: name, en: po.lessor?.name_en?.trim() || null }
+  if (name) return { ar: name, en: null }
   return po.is_internal
     ? { ar: ar('supplierPoInternalSupplier'), en: en('supplierPoInternalSupplier') }
     : { ar: '—', en: null }
