@@ -177,7 +177,9 @@ export function AsyncMultiSelect({
                 key={option.value}
                 className="inline-flex max-w-full items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-xs dark:bg-gray-800"
               >
-                <span className="truncate">{option.label}</span>
+                {/* min-w-0: a long name shrinks and truncates inside the
+                    chip instead of spilling past it on a phone. */}
+                <span className="min-w-0 truncate">{option.label}</span>
                 <button
                   type="button"
                   aria-label={t('clear')}

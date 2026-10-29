@@ -207,8 +207,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   const companiesFor = (roleKey: string | null | undefined) =>
     foremanKeys && systemRoleLoaded
       ? isForemanRoleKey(roleKey, foremanKeys)
-      : roleKey === 'supervisor' ||
-        (user?.assigned_companies?.length ?? 0) > 0
+      : roleKey === 'supervisor' || (user?.assigned_companies?.length ?? 0) > 0
   const companiesApply = companiesFor(assignedRoleKey || savedAssignedKey)
   const savedCompaniesApply = user ? companiesFor(savedAssignedKey) : false
 
@@ -486,14 +485,13 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 ...current,
                 full_name: nextFullName,
                 email: nextEmail,
-                assigned_companies:
-                  companiesApply
-                    ? companies.map((company) => ({
-                        id: company.value,
-                        name_ar: company.name_ar,
-                        name_en: company.name_en,
-                      }))
-                    : [],
+                assigned_companies: companiesApply
+                  ? companies.map((company) => ({
+                      id: company.value,
+                      name_ar: company.name_ar,
+                      name_en: company.name_en,
+                    }))
+                  : [],
               }
             : current,
         )
@@ -682,7 +680,12 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             value: user.assigned_companies?.length ? (
               <span className="flex flex-wrap gap-1.5">
                 {user.assigned_companies.map((company) => (
-                  <Badge key={company.id} tone="neutral">
+                  // A long name wraps inside its badge on a phone.
+                  <Badge
+                    key={company.id}
+                    tone="neutral"
+                    className="max-w-full !shrink !whitespace-normal break-words"
+                  >
                     {localizedName(lang, company.name_ar, company.name_en)}
                   </Badge>
                 ))}
@@ -705,9 +708,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           subtitle={t('userDetails')}
           badges={
             <>
-              {savedRoleLabel && (
-                <Badge tone="neutral">{savedRoleLabel}</Badge>
-              )}
+              {savedRoleLabel && <Badge tone="neutral">{savedRoleLabel}</Badge>}
               {user.must_change_password && (
                 <Badge tone="warning">{t('mustChangePassword')}</Badge>
               )}
