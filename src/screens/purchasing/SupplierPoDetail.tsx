@@ -720,9 +720,7 @@ export function SupplierPoDetail({
           po={po}
           lines={sortedLines}
           supplier={supplier}
-          company={companyName}
           project={projectName}
-          createdBy={createdByName}
           approvedBy={(po.approved_by && actorNames.get(po.approved_by)) || '—'}
           onDone={() => setPrinting(false)}
         />

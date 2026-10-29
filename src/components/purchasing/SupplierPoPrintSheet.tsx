@@ -5,7 +5,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
 import { formatSaudiDateTime } from '@/lib/printExport'
 import {
-  SUPPLIER_PO_STATUS_BADGE,
+  SUPPLIER_PO_RATE_UNIT_LABEL_KEYS,
   supplierPoRateUnitOf,
   supplierPoTotalsByUnit,
   vatOf,
@@ -22,9 +22,7 @@ export interface SupplierPoPrintSheetProps {
   /** The lines in the order the page shows them. */
   lines: readonly SupplierPoLineRow[]
   supplier: string
-  company: string
   project: string
-  createdBy: string
   /** 0160: the approver's name (the PDF exists for an approved PO only). */
   approvedBy?: string
   /** The print dialog closed (or never opened): the sheet is unmounted. */
@@ -42,16 +40,19 @@ export interface SupplierPoPrintSheetProps {
  * fonts are ready it calls `window.print()`, names the PDF after the PO
  * number and the day, and unmounts on `afterprint`. The page's own data is
  * the content; nothing is fetched or stored. Owner 2026-10-29: a DRAFT
- * (0160) exports too, with «مسودة - غير معتمد» across every page, next to
- * the status and in the file name; an approved PO prints clean.
+ * (0160) exports too, marked «مسودة - غير معتمد» in the header and the file
+ * name; an approved PO prints clean. Owner's review of the sheet the same
+ * day: the buyer (Al-Azani, with the project only) on the start side and
+ * the supplier on the other, no creator / creation time / issue time, no
+ * status badge or watermark, the lines as unit · rent start · price unit ·
+ * price (no note column, no «مفتوح», no «/ شهر»), and no browser header or
+ * footer (the page has no margin; the sheet carries its own padding).
  */
 export function SupplierPoPrintSheet({
   po,
   lines,
   supplier,
-  company,
   project,
-  createdBy,
   approvedBy,
   onDone,
 }: SupplierPoPrintSheetProps) {
@@ -106,17 +107,13 @@ export function SupplierPoPrintSheet({
 
   // 0157: one total per price unit (a month and a day are never added).
   const { parts: totals, unpriced } = supplierPoTotalsByUnit(lines)
+  // The unit column says the unit; the totals name it only when a PO mixes
+  // monthly and daily prices.
+  const mixedUnits = totals.length > 1
+  // Owner 2026-10-29: no creator, creation time or company here; the
+  // project sits in the buyer's box.
   const facts: { label: string; value: string; ltr?: boolean }[] = [
-    { label: t('supplierPoSupplier'), value: supplier },
-    { label: t('company'), value: company },
-    { label: t('project'), value: project },
     { label: t('supplierPoStartDate'), value: formatDate(po.start_date), ltr: true },
-    { label: t('supplierPoCreatedBy'), value: createdBy },
-    {
-      label: t('supplierPoCreatedAt'),
-      value: formatSaudiDateTime(po.created_at),
-      ltr: true,
-    },
     ...(po.approved_at
       ? [
           {
@@ -137,12 +134,13 @@ export function SupplierPoPrintSheet({
         ]
       : []),
   ]
-  const periodOf = (line: SupplierPoLineRow) => {
+  // The day the rent starts; an ended card adds its last day (no «مفتوح»).
+  const rentStartOf = (line: SupplierPoLineRow) => {
     if (!line.card) return '—'
-    const to = line.card.period_to
-      ? formatDate(line.card.period_to)
-      : t('equipmentPurchasingOpenEnd')
-    return `${formatDate(line.card.period_from)} – ${to}`
+    const from = formatDate(line.card.period_from)
+    return line.card.period_to
+      ? `${from} – ${formatDate(line.card.period_to)}`
+      : from
   }
   const cell = 'border px-2 py-1.5 align-top'
 
@@ -153,17 +151,11 @@ export function SupplierPoPrintSheet({
       lang={lang}
       aria-hidden="true"
     >
-      <style>{'@page { size: A4 portrait; margin: 12mm 10mm; }'}</style>
-      {/* A fixed element repeats on every printed page: the draft mark sits
-          behind the content, light enough to read the sheet through it. */}
-      {draft && (
-        <div className="pointer-events-none fixed inset-0 flex items-center justify-center">
-          <span className="-rotate-[30deg] select-none whitespace-nowrap text-[64px] font-bold text-fg opacity-[0.08]">
-            {draftMark}
-          </span>
-        </div>
-      )}
-      <div className="mx-auto max-w-[190mm] text-[12px] leading-snug">
+      {/* No page margin, so the browser prints no header (date, title) or
+          footer (the link); the sheet's own padding is the margin, repeated
+          on every page through box-decoration-break. */}
+      <style>{'@page { size: A4 portrait; margin: 0; }'}</style>
+      <div className="mx-auto max-w-[210mm] px-[10mm] py-[12mm] text-[12px] leading-snug [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">
         <header className="mb-4 flex items-start justify-between gap-4 border-b pb-3">
           <div className="flex items-start gap-3">
             <img
@@ -179,28 +171,31 @@ export function SupplierPoPrintSheet({
               <h1 className="text-lg font-bold leading-tight">
                 {t('supplierPoPrintTitle')} <bdi dir="ltr">{po.po_number}</bdi>
               </h1>
-              <p className="text-base font-semibold">{supplier}</p>
             </div>
           </div>
-          <div className="shrink-0 space-y-1 text-end text-xs">
-            <p className="flex flex-wrap justify-end gap-1">
-              <span className="inline-block rounded-full border px-2 py-0.5 font-medium">
-                {t(SUPPLIER_PO_STATUS_BADGE[po.status].key)}
-              </span>
-              {draft && (
-                <span className="inline-block rounded-full border-2 border-fg px-2 py-0.5 font-bold">
-                  {draftMark}
-                </span>
-              )}
-            </p>
-            <p className="text-muted">
-              {t('printGeneratedAt').replace(
-                '{date}',
-                formatSaudiDateTime(new Date()),
-              )}
-            </p>
-          </div>
+          {/* A draft is still marked as one; an approved PO has nothing here. */}
+          {draft && (
+            <span className="shrink-0 rounded-full border-2 border-fg px-2 py-0.5 text-xs font-bold">
+              {draftMark}
+            </span>
+          )}
         </header>
+
+        {/* Owner 2026-10-29: the buyer on the start side (right in Arabic),
+            the supplier on the other. */}
+        <div className="mb-4 grid grid-cols-2 gap-4">
+          <section className="rounded border p-3">
+            <h2 className="text-[11px] text-muted">{t('supplierPoPrintBuyer')}</h2>
+            <p className="text-base font-semibold">{t('supplierPoPrintBuyerName')}</p>
+            <p className="mt-1">
+              <span className="text-muted">{t('project')}:</span> {project}
+            </p>
+          </section>
+          <section className="rounded border p-3">
+            <h2 className="text-[11px] text-muted">{t('supplierPoSupplier')}</h2>
+            <p className="text-base font-semibold">{supplier}</p>
+          </section>
+        </div>
 
         <dl className="mb-4 grid grid-cols-3 gap-x-6 gap-y-1.5">
           {facts.map((fact) => (
@@ -219,18 +214,18 @@ export function SupplierPoPrintSheet({
         <table className="w-full table-fixed border-collapse">
           <colgroup>
             <col style={{ width: '6%' }} />
-            <col style={{ width: '30%' }} />
-            <col style={{ width: '24%' }} />
-            <col style={{ width: '22%' }} />
-            <col style={{ width: '18%' }} />
+            <col style={{ width: '40%' }} />
+            <col style={{ width: '20%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: '20%' }} />
           </colgroup>
           <thead className="[display:table-header-group]">
             <tr>
               {[
                 '#',
                 t('supplierPoEquipmentField'),
-                t('equipmentPurchasingPeriod'),
-                t('supplierPoLineNote'),
+                t('supplierPoPrintRentStart'),
+                t('supplierPoPrintUnit'),
                 t('supplierPoPrice'),
               ].map((header, index) => (
                 <th
@@ -260,14 +255,16 @@ export function SupplierPoPrintSheet({
                     )}
                   </td>
                   <td className={cell}>
-                    <bdi dir="ltr">{periodOf(line)}</bdi>
+                    <bdi dir="ltr">{rentStartOf(line)}</bdi>
                   </td>
-                  <td className={`${cell} break-words`}>{line.note ?? '—'}</td>
+                  <td className={cell}>
+                    {t(SUPPLIER_PO_RATE_UNIT_LABEL_KEYS[supplierPoRateUnitOf(line.rate_unit)])}
+                  </td>
                   <td className={`${cell} text-end font-medium`}>
                     {line.price === null ? (
                       <span className="text-muted">{t('supplierPoNoPrice')}</span>
                     ) : (
-                      <Price value={line.price} unit={supplierPoRateUnitOf(line.rate_unit)} />
+                      <Price value={line.price} />
                     )}
                   </td>
                 </tr>
@@ -281,19 +278,29 @@ export function SupplierPoPrintSheet({
             <div className="flex items-center justify-between gap-3">
               <dt>{t('supplierPoSummaryTotal')}</dt>
               <dd className="m-0 font-semibold">
-                <PricesByUnit parts={totals} alignEnd />
+                <PricesByUnit parts={totals} alignEnd showUnit={mixedUnits} />
               </dd>
             </div>
             <div className="flex items-center justify-between gap-3">
               <dt>{t('supplierPoSummaryVat')}</dt>
               <dd className="m-0 font-medium">
-                <PricesByUnit parts={totals} amount={vatOf} alignEnd />
+                <PricesByUnit
+                  parts={totals}
+                  amount={vatOf}
+                  alignEnd
+                  showUnit={mixedUnits}
+                />
               </dd>
             </div>
             <div className="flex items-center justify-between gap-3 border-t pt-1 text-sm">
               <dt className="font-semibold">{t('supplierPoSummaryTotalWithVat')}</dt>
               <dd className="m-0 font-bold">
-                <PricesByUnit parts={totals} amount={withVat} alignEnd />
+                <PricesByUnit
+                  parts={totals}
+                  amount={withVat}
+                  alignEnd
+                  showUnit={mixedUnits}
+                />
               </dd>
             </div>
             {unpriced > 0 && (

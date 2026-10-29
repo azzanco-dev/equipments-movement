@@ -54,12 +54,16 @@ export function PricesByUnit({
   parts,
   amount = (total) => total,
   alignEnd = false,
+  showUnit = true,
   className,
 }: {
   parts: readonly { unit: SupplierPoRateUnit; total: number }[]
   amount?: (total: number) => number
   /** Lines the stacked amounts up at the end side (a receipt's column). */
   alignEnd?: boolean
+  /** The unit after each amount; the PDF drops it when its unit column says
+   *  it already and only one unit is present. */
+  showUnit?: boolean
   className?: string
 }) {
   return (
@@ -70,7 +74,7 @@ export function PricesByUnit({
         <Price
           key={part.unit}
           value={amount(part.total)}
-          unit={part.unit}
+          unit={showUnit ? part.unit : undefined}
           className={className}
         />
       ))}

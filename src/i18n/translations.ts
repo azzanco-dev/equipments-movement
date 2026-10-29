@@ -2094,6 +2094,11 @@ export const translations = {
       'هذا الامر معتمد ومقفل. لتعديل امر معتمد اقفله وانشئ امر جديد.',
     // Owner 2026-10-29: a draft's PDF carries this mark on every page.
     supplierPoDraftWatermark: 'مسودة - غير معتمد',
+    // Owner 2026-10-29: the PDF's buyer box and line columns.
+    supplierPoPrintBuyer: 'المشتري',
+    supplierPoPrintBuyerName: 'العزاني',
+    supplierPoPrintRentStart: 'بداية الايجار',
+    supplierPoPrintUnit: 'الوحدة',
     supplierPoApproveBlockedUnpriced: 'لا يعتمد الامر قبل تسعير كل معداته.',
     supplierPoApproveBlockedNoLines: 'لا يعتمد امر بلا معدات.',
     supplierPoApproveBlockedSelf: 'لا تعتمد امرا انشاته بنفسك.',
@@ -4267,6 +4272,11 @@ export const translations = {
       'This order is approved and locked. To change an approved order, close it and create a new one.',
     // Owner 2026-10-29: a draft's PDF carries this mark on every page.
     supplierPoDraftWatermark: 'DRAFT - NOT APPROVED',
+    // Owner 2026-10-29: the PDF's buyer box and line columns.
+    supplierPoPrintBuyer: 'Buyer',
+    supplierPoPrintBuyerName: 'Al-Azani',
+    supplierPoPrintRentStart: 'Rent start',
+    supplierPoPrintUnit: 'Unit',
     supplierPoApproveBlockedUnpriced: 'The order cannot be approved until every unit has a price.',
     supplierPoApproveBlockedNoLines: 'An order without equipment cannot be approved.',
     supplierPoApproveBlockedSelf: 'You cannot approve an order you created.',

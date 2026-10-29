@@ -262,8 +262,24 @@ test('the screens: approve for approvers, locked when approved, a draft PDF mark
   assert.doesNotMatch(detail, /exportBlockedReason=/)
   const sheet = read('src', 'components', 'purchasing', 'SupplierPoPrintSheet.tsx')
   assert.match(sheet, /const draft = po\.approval_status !== 'approved'/)
-  assert.ok(sheet.includes('{draft && (\n        <div className="pointer-events-none fixed inset-0 flex items-center justify-center">'))
   assert.match(sheet, /draft \? draftMark : null,/)
+  // Owner's review 2026-10-29: the draft is marked in the header only (no
+  // watermark, no status badge), the buyer and the supplier side by side,
+  // no creator / creation / issue time, unit and rent start columns, no
+  // note column, no browser header or footer.
+  assert.doesNotMatch(
+    sheet,
+    /fixed inset-0|SUPPLIER_PO_STATUS_BADGE|printGeneratedAt|createdBy|supplierPoCreatedAt|supplierPoLineNote|equipmentPurchasingOpenEnd/,
+  )
+  assert.match(sheet, /\{draft && \(\s+<span className="shrink-0 rounded-full border-2 border-fg/)
+  assert.match(
+    sheet,
+    /t\('supplierPoPrintBuyer'\)[\s\S]*t\('supplierPoPrintBuyerName'\)[\s\S]*t\('project'\)[\s\S]*t\('supplierPoSupplier'\)/,
+  )
+  assert.match(sheet, /t\('supplierPoPrintRentStart'\),\s+t\('supplierPoPrintUnit'\),\s+t\('supplierPoPrice'\),/)
+  assert.match(sheet, /@page \{ size: A4 portrait; margin: 0; \}/)
+  assert.match(sheet, /<Price value=\{line\.price\} \/>/)
+  assert.match(sheet, /showUnit=\{mixedUnits\}/)
   assert.match(detail, /canApprove && open && !approved \? \(\) => setApproveOpen\(true\) : undefined/)
   assert.match(detail, /approveBlockedReason=\{approveBlocker\}/)
   assert.match(detail, /\{editable && addButton\}/)

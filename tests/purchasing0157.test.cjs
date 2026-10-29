@@ -214,11 +214,13 @@ test('the screens send, edit and show the unit', () => {
   assert.match(detail, /<PricesByUnit parts=\{totalsByUnit\} amount=\{vatOf\} \/>/)
   assert.match(detail, /<PricesByUnit parts=\{totalsByUnit\} amount=\{withVat\} \/>/)
   assert.match(detail, /totals=\{totalsByUnit\}/)
-  for (const file of [
-    ['src', 'screens', 'purchasing', 'SupplierPoDetail.tsx'],
-    ['src', 'components', 'purchasing', 'SupplierPoPrintSheet.tsx'],
-  ])
-    assert.match(read(...file), /unit=\{supplierPoRateUnitOf\(line\.rate_unit\)\}/, file.join('/'))
+  assert.match(detail, /unit=\{supplierPoRateUnitOf\(line\.rate_unit\)\}/)
+  // The PDF says the unit in its own column (owner 2026-10-29).
+  assert.ok(
+    read('src', 'components', 'purchasing', 'SupplierPoPrintSheet.tsx').includes(
+      '{t(SUPPLIER_PO_RATE_UNIT_LABEL_KEYS[supplierPoRateUnitOf(line.rate_unit)])}',
+    ),
+  )
   // The PO list's opened row: the unit in its own column (owner 2026-10-28).
   const panel = read('src', 'components', 'purchasing', 'SupplierPoLinesPanel.tsx')
   assert.ok(panel.includes("{t('supplierPoRateUnit')}"))
