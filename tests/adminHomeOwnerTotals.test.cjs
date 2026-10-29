@@ -230,20 +230,10 @@ test('the suppliers card parses, loads on its own and follows the fleet tables',
     section,
     /field: 'equipment_state',\s*operator: 'neq',\s*value: 'working'/,
   )
-  // Its states: the four workshop ones (the log's open workshop visits) and
-  // available (the equipment list).
-  for (const state of [
-    'workshop_maintenance',
-    'workshop_parking',
-    'workshop_out_of_service',
-    'workshop_unclassified',
-    'available',
-  ])
-    assert.match(section, new RegExp(`state: '${state}'`))
-  assert.match(section, /workshopStateLogHref\(item\.purpose\)/)
-  assert.match(section, /restEquipmentHref\(null\)/)
-  assert.match(section, /operator: 'is_not_set'/)
-  assert.match(section, /\{extra\}\s*<\/section>\s*<\/Card>/)
+  // Owner 2026-10-29: «وشيل كروت الصيانة الي تحت المتبقي» — no state
+  // cards under it any more.
+  assert.doesNotMatch(section, /REST_STATES|workshopStateLogHref|extra=/)
+  assert.match(section, /<\/ul>\s*<\/section>\s*<\/Card>/)
   assert.match(section, /\/logs\?context=workshop&vfilters=/)
   // Light owner tints with the charts' readable text («بالوان فاتحة»).
   assert.match(
