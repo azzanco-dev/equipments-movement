@@ -1,7 +1,7 @@
 // Migration 0160 (owner 2026-10-28, EM-107): supplier POs start as a draft
 // and are approved by a holder of `purchasing.approve` who did not create
 // them, once every line is priced; an approved PO is locked (notes and
-// closing stay) and only it prints a PDF.
+// closing stay); a draft's PDF is marked «مسودة - غير معتمد» (owner 2026-10-29).
 //
 // Source checks plus the pure helpers.
 const { test } = require('node:test')
@@ -250,7 +250,7 @@ test('the pure helpers: why approval cannot run, and the list badge', () => {
   }
 })
 
-test('the screens: approve for approvers, locked when approved, PDF only when approved', () => {
+test('the screens: approve for approvers, locked when approved, a draft PDF marked as a draft', () => {
   const data = read('src', 'lib', 'purchasingData.ts')
   assert.match(data, /SUPPLIER_PO_SELECT = `id,po_number,lessor_id,owner_class,is_internal,company_id,project_id,start_date,status,closed_at,approval_status,approved_at,approved_by,/)
   assert.match(data, /supabase\.rpc\('approve_supplier_po', \{ p_po_id: poId \}\)/)
@@ -258,7 +258,12 @@ test('the screens: approve for approvers, locked when approved, PDF only when ap
   const detail = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
   assert.match(detail, /const canApprove = can\('purchasing\.approve'\)/)
   assert.match(detail, /const editable = showActions && !approved/)
-  assert.match(detail, /exportBlockedReason=\{approved \? null : 'supplierPoPdfNeedsApproval'\}/)
+  // Owner 2026-10-29: a draft exports too, marked as a draft on every page.
+  assert.doesNotMatch(detail, /exportBlockedReason=/)
+  const sheet = read('src', 'components', 'purchasing', 'SupplierPoPrintSheet.tsx')
+  assert.match(sheet, /const draft = po\.approval_status !== 'approved'/)
+  assert.ok(sheet.includes('{draft && (\n        <div className="pointer-events-none fixed inset-0 flex items-center justify-center">'))
+  assert.match(sheet, /draft \? draftMark : null,/)
   assert.match(detail, /canApprove && open && !approved \? \(\) => setApproveOpen\(true\) : undefined/)
   assert.match(detail, /approveBlockedReason=\{approveBlocker\}/)
   assert.match(detail, /\{editable && addButton\}/)
@@ -295,7 +300,7 @@ test('the labels, Arabic and English, plain alif', () => {
     'supplierPoApproveConfirmTitle',
     'supplierPoApproveConfirmDesc',
     'supplierPoApprovedLockedNotice',
-    'supplierPoPdfNeedsApproval',
+    'supplierPoDraftWatermark',
     'supplierPoApproveBlockedUnpriced',
     'supplierPoApproveBlockedNoLines',
     'supplierPoApproveBlockedSelf',

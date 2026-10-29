@@ -41,7 +41,9 @@ export interface SupplierPoPrintSheetProps {
  * the `print-export` class forces the light tokens). Once the logo and the
  * fonts are ready it calls `window.print()`, names the PDF after the PO
  * number and the day, and unmounts on `afterprint`. The page's own data is
- * the content; nothing is fetched or stored.
+ * the content; nothing is fetched or stored. Owner 2026-10-29: a DRAFT
+ * (0160) exports too, with «مسودة - غير معتمد» across every page, next to
+ * the status and in the file name; an approved PO prints clean.
  */
 export function SupplierPoPrintSheet({
   po,
@@ -60,6 +62,8 @@ export function SupplierPoPrintSheet({
   const doneRef = useRef(onDone)
   doneRef.current = onDone
   const poNumber = po.po_number
+  const draft = po.approval_status !== 'approved'
+  const draftMark = t('supplierPoDraftWatermark')
 
   useEffect(() => {
     // Once per mount: the ref survives React's development double-mount.
@@ -78,8 +82,15 @@ export function SupplierPoPrintSheet({
     }
     const fallback = window.setTimeout(finish, AFTERPRINT_FALLBACK_MS)
     window.addEventListener('afterprint', finish)
-    // The suggested PDF file name: the PO number and the day.
-    document.title = `${poNumber} ${saudiDateKey(new Date().toISOString())}`
+    // The suggested PDF file name: the PO number, «مسودة» for a draft, and
+    // the day.
+    document.title = [
+      poNumber,
+      draft ? draftMark : null,
+      saudiDateKey(new Date().toISOString()),
+    ]
+      .filter(Boolean)
+      .join(' ')
     const fontsReady =
       typeof document.fonts?.ready?.then === 'function'
         ? document.fonts.ready
@@ -91,7 +102,7 @@ export function SupplierPoPrintSheet({
       window.removeEventListener('afterprint', finish)
       window.clearTimeout(fallback)
     }
-  }, [logoSettled, poNumber])
+  }, [logoSettled, poNumber, draft, draftMark])
 
   // 0157: one total per price unit (a month and a day are never added).
   const { parts: totals, unpriced } = supplierPoTotalsByUnit(lines)
@@ -143,6 +154,15 @@ export function SupplierPoPrintSheet({
       aria-hidden="true"
     >
       <style>{'@page { size: A4 portrait; margin: 12mm 10mm; }'}</style>
+      {/* A fixed element repeats on every printed page: the draft mark sits
+          behind the content, light enough to read the sheet through it. */}
+      {draft && (
+        <div className="pointer-events-none fixed inset-0 flex items-center justify-center">
+          <span className="-rotate-[30deg] select-none whitespace-nowrap text-[64px] font-bold text-fg opacity-[0.08]">
+            {draftMark}
+          </span>
+        </div>
+      )}
       <div className="mx-auto max-w-[190mm] text-[12px] leading-snug">
         <header className="mb-4 flex items-start justify-between gap-4 border-b pb-3">
           <div className="flex items-start gap-3">
@@ -163,10 +183,15 @@ export function SupplierPoPrintSheet({
             </div>
           </div>
           <div className="shrink-0 space-y-1 text-end text-xs">
-            <p>
+            <p className="flex flex-wrap justify-end gap-1">
               <span className="inline-block rounded-full border px-2 py-0.5 font-medium">
                 {t(SUPPLIER_PO_STATUS_BADGE[po.status].key)}
               </span>
+              {draft && (
+                <span className="inline-block rounded-full border-2 border-fg px-2 py-0.5 font-bold">
+                  {draftMark}
+                </span>
+              )}
             </p>
             <p className="text-muted">
               {t('printGeneratedAt').replace(

@@ -387,9 +387,9 @@ export function SupplierPoDetail({
     <SupplierPoOptionsMenu
       className={className}
       busy={printing}
+      // Owner 2026-10-29: a draft exports too, marked «مسودة - غير معتمد»
+      // on every page (SupplierPoPrintSheet); an approved PO prints clean.
       onExport={() => setPrinting(true)}
-      // 0160: the PDF is for an approved PO only.
-      exportBlockedReason={approved ? null : 'supplierPoPdfNeedsApproval'}
       onApprove={
         canApprove && open && !approved ? () => setApproveOpen(true) : undefined
       }

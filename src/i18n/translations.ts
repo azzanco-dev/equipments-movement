@@ -2092,7 +2092,8 @@ export const translations = {
       'بعد الاعتماد يقفل الامر: لا تضاف معدات ولا تتغير الاسعار ولا تاريخ البداية، وتبقى الملاحظات والاغلاق. ويفتح تصدير PDF.',
     supplierPoApprovedLockedNotice:
       'هذا الامر معتمد ومقفل. لتعديل امر معتمد اقفله وانشئ امر جديد.',
-    supplierPoPdfNeedsApproval: 'تصدير PDF بعد اعتماد الامر.',
+    // Owner 2026-10-29: a draft's PDF carries this mark on every page.
+    supplierPoDraftWatermark: 'مسودة - غير معتمد',
     supplierPoApproveBlockedUnpriced: 'لا يعتمد الامر قبل تسعير كل معداته.',
     supplierPoApproveBlockedNoLines: 'لا يعتمد امر بلا معدات.',
     supplierPoApproveBlockedSelf: 'لا تعتمد امرا انشاته بنفسك.',
@@ -4264,7 +4265,8 @@ export const translations = {
       'Approval locks the order: no units are added and no price or start date changes; notes and closing stay. It also opens the PDF export.',
     supplierPoApprovedLockedNotice:
       'This order is approved and locked. To change an approved order, close it and create a new one.',
-    supplierPoPdfNeedsApproval: 'The PDF is available once the order is approved.',
+    // Owner 2026-10-29: a draft's PDF carries this mark on every page.
+    supplierPoDraftWatermark: 'DRAFT - NOT APPROVED',
     supplierPoApproveBlockedUnpriced: 'The order cannot be approved until every unit has a price.',
     supplierPoApproveBlockedNoLines: 'An order without equipment cannot be approved.',
     supplierPoApproveBlockedSelf: 'You cannot approve an order you created.',
