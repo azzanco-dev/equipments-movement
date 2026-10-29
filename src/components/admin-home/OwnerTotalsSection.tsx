@@ -112,13 +112,15 @@ function OwnerTotalsRow({
       {/* The total on a row of its own (owner 2026-10-29, «خلي الاجمالي في
           صف لحاله»), the owners' cards under it. */}
       {/* At the start, the right in Arabic («خلي الارقام الاجمالية يمين»):
-          the title, the number under it («الارقام الاجمالية تحت العنوان»),
-          then the hint (owner 2026-10-29). */}
+          the title and the hint, then the number under both («تحت
+          النصوص», owner 2026-10-29). */}
       <div className="flex items-center gap-3 rounded-xl border bg-surface p-3">
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium">{title}</span>
-          <span className="block text-3xl font-bold tabular-nums">{total}</span>
           <span className="block text-xs text-muted">{hint}</span>
+          <span className="mt-1 block text-3xl font-bold tabular-nums">
+            {total}
+          </span>
         </span>
         <span
           aria-hidden="true"

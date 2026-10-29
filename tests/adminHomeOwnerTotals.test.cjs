@@ -209,10 +209,11 @@ test('the suppliers card parses, loads on its own and comes after the rows', () 
   )
   assert.match(section, /color: 'var\(--chart-text\)'/)
   assert.doesNotMatch(section, /#[0-9a-fA-F]{3,6}/)
-  // The title, then the total under it; more room between the sections.
+  // The title and hint, then the total under both; more room between the
+  // sections.
   assert.match(
     section,
-    /\{title\}<\/span>\s*<span className="block text-3xl font-bold tabular-nums">\s*\{total\}/,
+    /\{title\}<\/span>\s*<span className="block text-xs text-muted">\{hint\}<\/span>\s*<span className="mt-1 block text-3xl font-bold tabular-nums">\s*\{total\}/,
   )
   assert.match(section, /<div className="space-y-8">\s*<OwnerTotalsRow/)
   assert.match(
