@@ -196,12 +196,20 @@ test('the suppliers card parses, loads on its own and comes after the rows', () 
   )
   assert.match(
     section,
-    /<SupplierSitesCard canOpenLogs=\{canOpenLogs\} \/>\s*<\/div>/,
+    /<SupplierSitesCard canOpenLogs=\{canOpenLogs\} \/>\s*<OwnerTotalsRow/,
   )
   // Owner 2026-10-29: «كاردز صغيرة» — a row per total, the total first.
   assert.match(section, /function OwnerTotalsRow\(/)
   assert.match(section, /grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5/)
-  assert.equal(section.match(/<OwnerTotalsRow/g).length, 2)
+  // Owner 2026-10-29: «اضف قسم الورشة تحتهم» — a third row, every
+  // workshop state, opening the log's open workshop visits of that owner.
+  assert.equal(section.match(/<OwnerTotalsRow/g).length, 3)
+  assert.match(section, /state\.startsWith\('workshop_'\)/)
+  assert.match(section, /\/logs\?context=workshop&vfilters=/)
+  assert.ok(
+    section.indexOf("t('adminHomeOwnerWorkshopTitle')") >
+      section.indexOf('<SupplierSitesCard canOpenLogs'),
+  )
   // Light owner tints with the charts' readable text («بالوان فاتحة»).
   assert.match(
     section,

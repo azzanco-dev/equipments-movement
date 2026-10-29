@@ -1,5 +1,5 @@
 import { useCallback, useState, type ReactNode } from 'react'
-import { ClipboardList, Store, Truck } from 'lucide-react'
+import { ClipboardList, Store, Truck, Warehouse } from 'lucide-react'
 import { AppLink, Button, Card, ErrorState, Skeleton } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import {
@@ -69,6 +69,21 @@ export function insideProjectsLogHref(
       : []),
   ]
   return `/logs?vfilters=${encodeURIComponent(JSON.stringify(filters))}`
+}
+
+/** The log's workshop tab as visits, the units inside now of one owner
+ *  (owner 2026-10-29, «اضف قسم الورشة تحتهم»). */
+export function insideWorkshopLogHref(owner: AdminHomeOwner): string {
+  const filters = [
+    { id: 'open', field: 'is_open', operator: 'eq', value: 'true' },
+    {
+      id: 'owner',
+      field: 'equipment_ownership_status',
+      operator: 'eq',
+      value: owner,
+    },
+  ]
+  return `/logs?context=workshop&vfilters=${encodeURIComponent(JSON.stringify(filters))}`
 }
 
 /**
@@ -325,6 +340,7 @@ export function OwnerTotalsSection({
       <div className="space-y-3">
         <Skeleton className="h-28 w-full" />
         <Skeleton className="h-28 w-full" />
+        <Skeleton className="h-28 w-full" />
         <span className="sr-only">{t('loading')}</span>
       </div>
     )
@@ -332,6 +348,11 @@ export function OwnerTotalsSection({
   if (!data) return null
   const fleet = ownerTotals(data, FLEET_STATES)
   const sites = ownerTotals(data, ['inside_site'])
+  // Every workshop state: maintenance, standby, out of service, unclassified.
+  const workshop = ownerTotals(
+    data,
+    FLEET_STATES.filter((state) => state.startsWith('workshop_')),
+  )
 
   return (
     // More room between the two sections (owner 2026-10-29).
@@ -358,6 +379,17 @@ export function OwnerTotalsSection({
         }
       />
       <SupplierSitesCard canOpenLogs={canOpenLogs} />
+      <OwnerTotalsRow
+        title={t('adminHomeOwnerWorkshopTitle')}
+        hint={t('adminHomeOwnerWorkshopHint')}
+        icon={<Warehouse size={16} />}
+        total={workshop.total}
+        owners={workshop.owners}
+        // The log's open workshop visits of that owner (owner 2026-10-29).
+        hrefOf={
+          canOpenLogs ? (owner) => insideWorkshopLogHref(owner) : undefined
+        }
+      />
     </div>
   )
 }
