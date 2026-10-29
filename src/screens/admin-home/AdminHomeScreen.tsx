@@ -149,6 +149,7 @@ export function AdminHomeScreen({
           onSelectEquipment={onSelectEquipment}
           onSelectMovement={onSelectMovement}
           showCards={false}
+          showInsideTable={false}
         />
         <SupplierSitesCard canOpenLogs={canOpenLogs} />
         {/* Owner 2026-10-26: the Afaqy tracker figures of the fleet, right

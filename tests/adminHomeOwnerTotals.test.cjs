@@ -200,7 +200,7 @@ test('the suppliers card parses, loads on its own and follows the fleet tables',
   const home = read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx')
   assert.match(
     home,
-    /<OwnerTotalsSection[\s\S]*?\/>\s*(\{\/\*[\s\S]*?\*\/\}\s*)?<FleetStateSection[\s\S]*?showCards=\{false\}\s*\/>\s*<SupplierSitesCard canOpenLogs=\{canOpenLogs\} \/>/,
+    /<OwnerTotalsSection[\s\S]*?\/>\s*(\{\/\*[\s\S]*?\*\/\}\s*)?<FleetStateSection[\s\S]*?showCards=\{false\}\s*showInsideTable=\{false\}\s*\/>\s*<SupplierSitesCard canOpenLogs=\{canOpenLogs\} \/>/,
   )
   const fleetState = read(
     'src',

@@ -134,6 +134,9 @@ export interface FleetStateSectionProps {
    * totals now, so the section is its tables, with its owner filter.
    */
   showCards?: boolean
+  /** The «داخل المشاريع» table; the admin home passes `false` (owner
+   *  2026-10-29, «وشيل داخل المشاريع»). */
+  showInsideTable?: boolean
 }
 
 /**
@@ -171,6 +174,7 @@ export function FleetStateSection({
   onSelectEquipment,
   onSelectMovement,
   showCards = true,
+  showInsideTable = true,
 }: FleetStateSectionProps) {
   const { t } = useI18n()
   // Plain component state, not the URL: it scopes this section only, so it is
@@ -266,6 +270,7 @@ export function FleetStateSection({
           jump={jump}
           onSelectEquipment={onSelectEquipment}
           onSelectMovement={onSelectMovement}
+          showInside={showInsideTable}
         />
       </div>
     </AdminHomeSection>

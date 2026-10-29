@@ -50,3 +50,33 @@ test('an expanded table still moves to the start of its own row', () => {
   assert.ok(order(3, true) > order(0, false))
   assert.ok(order(3, true) < order(2, false))
 })
+
+// Owner 2026-10-29: «وشيل داخل المشاريع» — off on the home only.
+test('the home leaves the inside table out', () => {
+  assert.match(source, /showInside = true,/)
+  assert.match(source, /\{showInside && \(\s*<FleetTable\s+table="inside"/)
+  const state = fs.readFileSync(
+    path.join(
+      __dirname,
+      '..',
+      'src',
+      'components',
+      'admin-home',
+      'FleetStateSection.tsx',
+    ),
+    'utf8',
+  )
+  assert.match(state, /showInside=\{showInsideTable\}/)
+  const home = fs.readFileSync(
+    path.join(
+      __dirname,
+      '..',
+      'src',
+      'screens',
+      'admin-home',
+      'AdminHomeScreen.tsx',
+    ),
+    'utf8',
+  )
+  assert.match(home, /showInsideTable=\{false\}/)
+})

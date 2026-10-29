@@ -506,6 +506,8 @@ export interface FleetMiniTablesProps {
    *  على الحركة»): a workshop row opens its open workshop ENTRY (the unit's
    *  latest movement), else the equipment as before. */
   onSelectMovement?: (id: string) => void
+  /** The «داخل المشاريع» table (default on). */
+  showInside?: boolean
 }
 
 /**
@@ -527,6 +529,7 @@ export function FleetMiniTables({
   jump,
   onSelectEquipment,
   onSelectMovement,
+  showInside = true,
 }: FleetMiniTablesProps) {
   const { t, lang } = useI18n()
   const ownerLabel = useOwnerLabel()
@@ -787,34 +790,40 @@ export function FleetMiniTables({
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      <FleetTable
-        table="inside"
-        gridIndex={0}
-        // Owner 2026-10-29 («ومتاحة جنب داخل الورشة»): inside a project on
-        // the full row, the workshop and available side by side under it.
-        // The grid indices skip 1 so an expanded table still moves to the
-        // start of its own row (`gridOrder`).
-        fullRow
-        title={t('adminHomeFleetInsideTitle')}
-        description={t('adminHomeFleetInsideDescription')}
-        columns={insideColumns}
-        expandedColumns={[
-          sortable(codeColumn),
-          sortable(typeColumn),
-          sortable(companyProjectColumn),
-          foremanColumn,
-          sortable(sinceColumn),
-        ]}
-        defaultSort={{ key: sinceColumn.key, direction: 'desc' }}
-        loadPage={loadInside}
-        filterKey={ownersKey}
-        rowKey={(row) => row.id}
-        onRowClick={openEquipment}
-        empty={t('adminHomeFleetInsideEmpty')}
-        highlighted={highlighted === 'inside'}
-        showCount
-        excelColumns={(labels) => fleetEquipmentExcelColumns('inside', labels)}
-      />
+      {/* Owner 2026-10-29: «وشيل داخل المشاريع» — the home leaves it out
+          (`showInside`); the «في المشاريع» owner row opens those units. */}
+      {showInside && (
+        <FleetTable
+          table="inside"
+          gridIndex={0}
+          // Owner 2026-10-29 («ومتاحة جنب داخل الورشة»): inside a project on
+          // the full row, the workshop and available side by side under it.
+          // The grid indices skip 1 so an expanded table still moves to the
+          // start of its own row (`gridOrder`).
+          fullRow
+          title={t('adminHomeFleetInsideTitle')}
+          description={t('adminHomeFleetInsideDescription')}
+          columns={insideColumns}
+          expandedColumns={[
+            sortable(codeColumn),
+            sortable(typeColumn),
+            sortable(companyProjectColumn),
+            foremanColumn,
+            sortable(sinceColumn),
+          ]}
+          defaultSort={{ key: sinceColumn.key, direction: 'desc' }}
+          loadPage={loadInside}
+          filterKey={ownersKey}
+          rowKey={(row) => row.id}
+          onRowClick={openEquipment}
+          empty={t('adminHomeFleetInsideEmpty')}
+          highlighted={highlighted === 'inside'}
+          showCount
+          excelColumns={(labels) =>
+            fleetEquipmentExcelColumns('inside', labels)
+          }
+        />
+      )}
       <FleetTable
         table="workshop"
         gridIndex={2}
