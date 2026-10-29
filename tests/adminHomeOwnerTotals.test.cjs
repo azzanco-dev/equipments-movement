@@ -202,6 +202,11 @@ test('the suppliers card parses, loads on its own and comes after the rows', () 
   assert.match(section, /function OwnerTotalsRow\(/)
   assert.match(section, /grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5/)
   assert.equal(section.match(/<OwnerTotalsRow/g).length, 2)
+  // The total's number first in its row (the right in Arabic).
+  assert.match(
+    section,
+    /bg-surface p-3">\s*<span className="text-3xl font-bold tabular-nums">\{total\}<\/span>/,
+  )
   assert.match(
     read('src', 'lib', 'adminHomeData.ts'),
     /rpc\('get_admin_supplier_site_counts'\)/,

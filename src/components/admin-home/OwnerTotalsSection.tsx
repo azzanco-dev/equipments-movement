@@ -101,18 +101,20 @@ function OwnerTotalsRow({
     <section aria-label={title} className="space-y-2">
       {/* The total on a row of its own (owner 2026-10-29, «خلي الاجمالي في
           صف لحاله»), the owners' cards under it. */}
+      {/* The number at the start, the right in Arabic (owner 2026-10-29,
+          «خلي الارقام الاجمالية يمين»). */}
       <div className="flex items-center gap-3 rounded-xl border bg-surface p-3">
+        <span className="text-3xl font-bold tabular-nums">{total}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium">{title}</span>
+          <span className="block text-xs text-muted">{hint}</span>
+        </span>
         <span
           aria-hidden="true"
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg text-muted"
         >
           {icon}
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium">{title}</span>
-          <span className="block text-xs text-muted">{hint}</span>
-        </span>
-        <span className="text-3xl font-bold tabular-nums">{total}</span>
       </div>
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {owners.map((row) => {
