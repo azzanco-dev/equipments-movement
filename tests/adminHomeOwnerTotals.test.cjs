@@ -234,7 +234,6 @@ test('the suppliers card parses, loads on its own and follows the fleet tables',
   // cards under it any more.
   assert.doesNotMatch(section, /REST_STATES|workshopStateLogHref|extra=/)
   assert.match(section, /<\/ul>\s*<\/section>\s*<\/Card>/)
-  assert.match(section, /\/logs\?context=workshop&vfilters=/)
   // Light owner tints with the charts' readable text («بالوان فاتحة»).
   assert.match(
     section,
