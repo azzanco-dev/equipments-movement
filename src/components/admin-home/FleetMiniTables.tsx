@@ -171,9 +171,7 @@ interface FleetTableProps<Row> {
 
 // The grid is one column on phones and two equal columns from `md`
 // (Tailwind's default 768 px breakpoint; owner 2026-10-27).
-const GRID_QUERIES = [
-  { query: '(min-width: 768px)', columns: 2 },
-] as const
+const GRID_QUERIES = [{ query: '(min-width: 768px)', columns: 2 }] as const
 
 function subscribeToGridColumns(onChange: () => void) {
   const lists = GRID_QUERIES.map(({ query }) => window.matchMedia(query))
@@ -365,7 +363,9 @@ function FleetTable<Row>({
     header: '#',
     width: '2.5rem',
     cell: (row) => (
-      <span className="text-muted tabular-nums">{cardRows.indexOf(row) + 1}</span>
+      <span className="text-muted tabular-nums">
+        {cardRows.indexOf(row) + 1}
+      </span>
     ),
   }
 
@@ -502,6 +502,10 @@ export interface FleetMiniTablesProps {
   /** The latest state-card click, or `null` before the first one. */
   jump: FleetJumpRequest | null
   onSelectEquipment?: (id: string) => void
+  /** Owner 2026-10-29 («جدول داخل الورشة لما اضغط على المعدة مفروض يوديني
+   *  على الحركة»): a workshop row opens its open workshop ENTRY (the unit's
+   *  latest movement), else the equipment as before. */
+  onSelectMovement?: (id: string) => void
 }
 
 /**
@@ -521,6 +525,7 @@ export function FleetMiniTables({
   owners,
   jump,
   onSelectEquipment,
+  onSelectMovement,
 }: FleetMiniTablesProps) {
   const { t, lang } = useI18n()
   const ownerLabel = useOwnerLabel()
@@ -590,6 +595,15 @@ export function FleetMiniTables({
   const openEquipment = onSelectEquipment
     ? (row: { id: string }) => onSelectEquipment(row.id)
     : undefined
+  // In the workshop the unit's latest movement is its open workshop entry.
+  const openWorkshopRow =
+    onSelectMovement || openEquipment
+      ? (row: FleetEquipmentRow) => {
+          if (onSelectMovement && row.lastMovementId)
+            onSelectMovement(row.lastMovementId)
+          else openEquipment?.(row)
+        }
+      : undefined
 
   const date = (value: string | null) => (
     <span className="text-muted">{value ? formatDate(value) : '—'}</span>
@@ -812,7 +826,7 @@ export function FleetMiniTables({
         loadPage={loadWorkshop}
         filterKey={`${ownersKey}|${purpose}`}
         rowKey={(row) => row.id}
-        onRowClick={openEquipment}
+        onRowClick={openWorkshopRow}
         empty={t('adminHomeFleetWorkshopEmpty')}
         toolbar={purposeChips}
         highlighted={highlighted === 'workshop'}

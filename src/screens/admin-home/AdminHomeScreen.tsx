@@ -18,6 +18,8 @@ import {
 
 export interface AdminHomeScreenProps {
   onSelectEquipment?: (id: string) => void
+  /** Opens a movement; the «داخل الورشة» table opens the open entry. */
+  onSelectMovement?: (id: string) => void
   /** Admin only: the legacy dashboard's register entry/exit shortcuts. */
   onCreateMovement?: (type: 'entry' | 'exit') => void
 }
@@ -46,6 +48,7 @@ export interface AdminHomeScreenProps {
  */
 export function AdminHomeScreen({
   onSelectEquipment,
+  onSelectMovement,
   onCreateMovement,
 }: AdminHomeScreenProps) {
   const { t } = useI18n()
@@ -114,7 +117,10 @@ export function AdminHomeScreen({
             ) : undefined
           }
         />
-        <FleetStateSection onSelectEquipment={onSelectEquipment} />
+        <FleetStateSection
+          onSelectEquipment={onSelectEquipment}
+          onSelectMovement={onSelectMovement}
+        />
         {/* Owner 2026-10-26: the Afaqy tracker figures of the fleet, right
             under its state in the program (location-view permission). */}
         <AfaqySection onSelectEquipment={onSelectEquipment} />

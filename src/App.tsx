@@ -576,6 +576,7 @@ function AppContent() {
             )}
             {page === 'dashboard' && !fieldHome && (
               <AdminHomeScreen
+                onSelectMovement={openMovement}
                 onSelectEquipment={
                   canOpenEquipment
                     ? (id) => router.push(`/equipment/${id}`)

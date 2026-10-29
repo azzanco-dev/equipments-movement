@@ -125,6 +125,8 @@ export interface FleetStateSectionProps {
   /** Opens an equipment from a mini table row; rows are not clickable
    *  without it (the monitor has no equipment page). */
   onSelectEquipment?: (id: string) => void
+  /** Opens a movement: a «داخل الورشة» row opens its open workshop entry. */
+  onSelectMovement?: (id: string) => void
 }
 
 /**
@@ -160,6 +162,7 @@ export interface FleetStateSectionProps {
 export function FleetStateSection({
   onSelectState,
   onSelectEquipment,
+  onSelectMovement,
 }: FleetStateSectionProps) {
   const { t } = useI18n()
   // Plain component state, not the URL: it scopes this section only, so it is
@@ -252,6 +255,7 @@ export function FleetStateSection({
           owners={owners}
           jump={jump}
           onSelectEquipment={onSelectEquipment}
+          onSelectMovement={onSelectMovement}
         />
       </div>
     </AdminHomeSection>
