@@ -16,6 +16,16 @@ import { SUPPLIER_FILTER_KEY } from '@/lib/equipmentSupplier'
 import { useAdminHomeSection } from './useAdminHomeSection'
 import { ownershipBadge } from '@/lib/equipmentForm'
 
+/** One light fill per owner (owner 2026-10-29, «لونت الكروت بالوان فاتحة»):
+ *  the chart tints, each matching its owner's outline shade below. */
+const OWNER_FILL: Record<AdminHomeOwner, string> = {
+  alazani: 'var(--chart-1)',
+  takween: 'var(--chart-3)',
+  third_party_f: 'var(--chart-2)',
+  third_party_partnership_b: 'var(--chart-5)',
+  external_supplier: 'var(--chart-4)',
+}
+
 /** One tone per owner, in `ALL_OWNERS` order (the chart outline shades). */
 const OWNER_STROKE: Record<AdminHomeOwner, string> = {
   alazani: 'var(--chart-stroke-1)',
@@ -96,7 +106,7 @@ function OwnerTotalsRow({
   const { t } = useI18n()
   const share = (count: number) =>
     total > 0 ? Math.round((count / total) * 100) : 0
-  const cardClass = 'flex h-full flex-col gap-1 rounded-xl border bg-bg p-3'
+  const cardClass = 'flex h-full flex-col gap-1 rounded-xl p-3'
   return (
     <section aria-label={title} className="space-y-2">
       {/* The total on a row of its own (owner 2026-10-29, «خلي الاجمالي في
@@ -120,7 +130,7 @@ function OwnerTotalsRow({
         {owners.map((row) => {
           const body = (
             <>
-              <span className="flex items-start gap-1.5 text-xs text-muted">
+              <span className="flex items-start gap-1.5 text-xs">
                 <span
                   aria-hidden="true"
                   className="mt-1 h-2 w-2 shrink-0 rounded-full"
@@ -134,23 +144,32 @@ function OwnerTotalsRow({
                 <span className="text-2xl font-bold tabular-nums">
                   {row.count}
                 </span>
-                <span className="text-xs tabular-nums text-muted">
+                <span className="text-xs tabular-nums opacity-80">
                   {share(row.count)}%
                 </span>
               </span>
             </>
           )
+          // The tint with the charts' readable text (`--chart-text`, dark on
+          // the light tints, near-white on the dark theme's).
+          const tint = {
+            backgroundColor: OWNER_FILL[row.owner],
+            color: 'var(--chart-text)',
+          }
           return (
             <li key={row.owner}>
               {hrefOf ? (
                 <AppLink
                   href={hrefOf(row.owner)}
-                  className={`${cardClass} transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}
+                  style={tint}
+                  className={`${cardClass} transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}
                 >
                   {body}
                 </AppLink>
               ) : (
-                <div className={cardClass}>{body}</div>
+                <div style={tint} className={cardClass}>
+                  {body}
+                </div>
               )}
             </li>
           )

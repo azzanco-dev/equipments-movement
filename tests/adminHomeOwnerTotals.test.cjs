@@ -202,6 +202,10 @@ test('the suppliers card parses, loads on its own and comes after the rows', () 
   assert.match(section, /function OwnerTotalsRow\(/)
   assert.match(section, /grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5/)
   assert.equal(section.match(/<OwnerTotalsRow/g).length, 2)
+  // Light owner tints with the charts' readable text («بالوان فاتحة»).
+  assert.match(section, /backgroundColor: OWNER_FILL\[row\.owner\]/)
+  assert.match(section, /color: 'var\(--chart-text\)'/)
+  assert.doesNotMatch(section, /#[0-9a-fA-F]{3,6}/)
   // The total's number first in its row (the right in Arabic).
   assert.match(
     section,
