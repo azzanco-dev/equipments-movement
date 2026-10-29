@@ -234,6 +234,121 @@ function AttentionStrip({
   )
 }
 
+// --- «الاسطول» و«المشاريع» حسب المالك --------------------------------------
+// Owner 2026-10-29: «قسم الاسطول، اجمالي الاسطول وتحته كل مالك بعدد الاسطول
+// تبعه، وقسم المشاريع، اجمالي الي في المشاريع وتحته كل مالك لحاله».
+
+type OwnerCount = { owner: string; count: number; stroke: string }
+
+const OWNER_STROKES = [
+  'var(--chart-stroke-1)',
+  'var(--chart-stroke-3)',
+  'var(--chart-stroke-2)',
+  'var(--chart-stroke-5)',
+  'var(--chart-stroke-4)',
+]
+
+const ownerCounts = (counts: number[]): OwnerCount[] =>
+  ['العزاني', 'تكوين', 'طرف ثالث F', 'طرف ثالث B', 'مالك اخر'].map(
+    (owner, index) => ({
+      owner,
+      count: counts[index],
+      stroke: OWNER_STROKES[index],
+    }),
+  )
+
+const FLEET_BY_OWNER = ownerCounts([142, 38, 47, 21, 37])
+const PROJECTS_BY_OWNER = ownerCounts([88, 24, 33, 14, 27])
+
+function OwnerTotalCard({
+  title,
+  description,
+  icon,
+  rows,
+}: {
+  title: string
+  description: string
+  icon: ReactNode
+  rows: OwnerCount[]
+}) {
+  const total = rows.reduce((sum, row) => sum + row.count, 0)
+  return (
+    <Card className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-sm font-medium text-muted">{title}</h2>
+          <p className="text-3xl font-semibold tabular-nums">{total}</p>
+          <p className="text-xs text-muted">{description}</p>
+        </div>
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-hover text-muted"
+        >
+          {icon}
+        </span>
+      </div>
+      {/* One stacked bar of the owners' shares, then a row per owner. */}
+      <div
+        className="flex h-2 overflow-hidden rounded-full"
+        style={{ backgroundColor: 'var(--chart-4)' }}
+        aria-hidden="true"
+      >
+        {rows.map((row) => (
+          <span
+            key={row.owner}
+            style={{
+              width: `${(row.count / total) * 100}%`,
+              backgroundColor: row.stroke,
+            }}
+          />
+        ))}
+      </div>
+      <ul className="divide-y">
+        {rows.map((row) => (
+          <li key={row.owner}>
+            <button
+              type="button"
+              className="flex w-full items-center gap-2 py-2 text-start text-sm transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              <span
+                aria-hidden="true"
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: row.stroke }}
+              />
+              <span className="min-w-0 flex-1">{row.owner}</span>
+              <span className="text-xs tabular-nums text-muted">
+                {Math.round((row.count / total) * 100)}%
+              </span>
+              <span className="w-10 text-end font-semibold tabular-nums">
+                {row.count}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  )
+}
+
+function OwnerTotals() {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <OwnerTotalCard
+        title="الاسطول"
+        description="كل المعدات النشطة. المالك يفتح قائمة المعدات مفلترة عليه."
+        icon={<Truck size={16} />}
+        rows={FLEET_BY_OWNER}
+      />
+      <OwnerTotalCard
+        title="في المشاريع"
+        description="داخل المشاريع الان. المالك يفتح جدول المشاريع مفلترا عليه."
+        icon={<ClipboardList size={16} />}
+        rows={PROJECTS_BY_OWNER}
+      />
+    </div>
+  )
+}
+
 // --- «الحالة الان» -----------------------------------------------------------
 
 type FleetTab = 'site' | 'workshop' | 'available'
@@ -795,6 +910,7 @@ export function HomeRedesignMockup() {
           </p>
         )}
 
+        {sees.fleet && <OwnerTotals />}
         {sees.fleet && (
           <FleetNow
             initialTab={viewer === 'workshop_manager' ? 'workshop' : 'site'}
