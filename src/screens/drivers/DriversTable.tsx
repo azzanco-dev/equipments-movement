@@ -99,15 +99,19 @@ export function DriversTable({
       key: 'full_name',
       header: t('fullName'),
       sortable: true,
-      className: 'font-semibold',
-      cell: (row) => row.full_name,
-    },
-    {
-      key: 'name_en',
-      header: t('driverNameEn'),
-      sortable: true,
-      hideBelow: 'md',
-      cell: (row) => <span dir="ltr">{row.name_en ?? '—'}</span>,
+      // Owner 2026-10-29 (the log / PO list look): the English name is a
+      // muted line under the name instead of a column; it still sorts from
+      // the toolbar.
+      cell: (row) => (
+        <span className="flex flex-col text-start">
+          <span className="font-semibold">{row.full_name}</span>
+          {row.name_en && (
+            <span dir="ltr" className="text-start text-xs text-muted">
+              {row.name_en}
+            </span>
+          )}
+        </span>
+      ),
     },
     {
       key: 'id_number',
@@ -198,6 +202,10 @@ export function DriversTable({
       // The detail is a dialog opened by `?driver=` on the list.
       rowHref={(row) => buildDriverDialogHref(row.id)}
       rowLinkColumn="full_name"
+      // Owner 2026-10-29: the log / PO list look — 13 px rows with 8 px above
+      // and below the content (headers stay 12 px).
+      cellTextClassName="text-[13px]"
+      cellClassName="py-2"
       empty={t('noDrivers')}
     />
   )

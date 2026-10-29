@@ -85,28 +85,27 @@ export function EquipmentTable({
       key: 'code',
       header: t('equipmentCode'),
       sortable: true,
-      className: 'font-semibold',
       // EM-236: the «بيانات غير مكتملة» badge (the retired completeness
       // flag) left the UI; the column stays in the database unused. The
       // «جديدة» mark sits here, by the code (owner decision 2026-10-14).
+      // Owner 2026-10-29 (the log / PO list look): the type is a muted line
+      // under the code instead of a column; it still sorts from the toolbar.
       cell: (row) => (
-        <span className="inline-flex items-center gap-2">
-          <span dir="ltr">{row.code}</span>
-          <EquipmentNewBadge isNew={row.equipment_is_new} />
-          {previousCodeMatchIds?.has(row.id) && (
-            <Badge tone="neutral" size="sm">
-              {t('previousCodeBadge')}
-            </Badge>
-          )}
+        <span className="flex flex-col text-start">
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span dir="ltr" className="font-semibold">
+              {row.code}
+            </span>
+            <EquipmentNewBadge isNew={row.equipment_is_new} />
+            {previousCodeMatchIds?.has(row.id) && (
+              <Badge tone="neutral" size="sm">
+                {t('previousCodeBadge')}
+              </Badge>
+            )}
+          </span>
+          <span className="text-xs text-muted">{row.type}</span>
         </span>
       ),
-    },
-    {
-      key: 'type',
-      header: t('equipmentType'),
-      sortable: true,
-      className: 'text-muted',
-      cell: (row) => row.type,
     },
     {
       key: 'plate_number',
@@ -124,23 +123,29 @@ export function EquipmentTable({
       key: 'equipment_state',
       header: t('equipmentState'),
       sortable: true,
-      cell: (row) => <EquipmentStateBadge state={row.equipment_state} />,
+      cell: (row) => (
+        <EquipmentStateBadge state={row.equipment_state} size="sm" />
+      ),
     },
     {
       key: 'ownership_status',
       header: t('ownershipStatus'),
       sortable: true,
+      // Owner 2026-10-29: the supplier of an «مالك اخر» unit is a muted
+      // line under the badge, as in the log.
       cell: (row) => {
         const badge = ownershipBadge(row.ownership_status)
         const supplier =
           usesExternalSupplier(row.ownership_status) && row.lessor?.name
-            ? ` - ${row.lessor.name}`
-            : ''
+            ? row.lessor.name
+            : null
         return (
-          <Badge tone={badge.tone}>
-            {t(badge.key)}
-            {supplier}
-          </Badge>
+          <span className="flex flex-col items-start gap-0.5">
+            <Badge tone={badge.tone} size="sm">
+              {t(badge.key)}
+            </Badge>
+            {supplier && <span className="text-xs text-muted">{supplier}</span>}
+          </span>
         )
       },
     },
@@ -150,7 +155,11 @@ export function EquipmentTable({
       sortable: true,
       cell: (row) => {
         const badge = equipmentStatusBadge(row.status)
-        return <Badge tone={badge.tone}>{t(badge.key)}</Badge>
+        return (
+          <Badge tone={badge.tone} size="sm">
+            {t(badge.key)}
+          </Badge>
+        )
       },
     },
     {
@@ -198,6 +207,10 @@ export function EquipmentTable({
       onRowClick={(row) => onOpen(row.id)}
       rowHref={(row) => `/equipment/${row.id}`}
       empty={t('noEquipment')}
+      // Owner 2026-10-29: the log / PO list look — 13 px rows with 8 px above
+      // and below the content (headers stay 12 px).
+      cellTextClassName="text-[13px]"
+      cellClassName="py-2"
     />
   )
 }

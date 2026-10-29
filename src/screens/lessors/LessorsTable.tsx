@@ -53,14 +53,16 @@ export function LessorsTable({
       key: 'name',
       header: t('lessorName'),
       sortable: true,
-      className: 'font-semibold',
-      cell: (row) => row.name,
-    },
-    {
-      key: 'contact_person',
-      header: t('contactPerson'),
-      className: 'text-muted',
-      cell: (row) => row.contact_person ?? '—',
+      // Owner 2026-10-29 (the log / PO list look): the contact person is a
+      // muted line under the name instead of a column.
+      cell: (row) => (
+        <span className="flex flex-col text-start">
+          <span className="font-semibold">{row.name}</span>
+          {row.contact_person && (
+            <span className="text-xs text-muted">{row.contact_person}</span>
+          )}
+        </span>
+      ),
     },
     {
       key: 'contact_number',
@@ -113,6 +115,10 @@ export function LessorsTable({
       loading={loading}
       loadingRows={8}
       caption={t('lessors')}
+      // Owner 2026-10-29: the log / PO list look — 13 px rows with 8 px above
+      // and below the content (headers stay 12 px).
+      cellTextClassName="text-[13px]"
+      cellClassName="py-2"
       sort={{ key: sort, direction }}
       onSortChange={onSortChange}
       empty={t('noLessors')}

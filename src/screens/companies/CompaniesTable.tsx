@@ -113,6 +113,10 @@ export function CompaniesTable({
       loading={loading}
       loadingRows={8}
       caption={t('companies')}
+      // Owner 2026-10-29: the log / PO list look — 13 px rows with 8 px above
+      // and below the content (headers stay 12 px).
+      cellTextClassName="text-[13px]"
+      cellClassName="py-2"
       sort={{ key: sort, direction }}
       onSortChange={onSortChange}
       empty={t('noCompanies')}

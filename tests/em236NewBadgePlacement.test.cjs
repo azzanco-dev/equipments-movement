@@ -20,7 +20,8 @@ const IMPORT =
  *  badge must follow in the same JSX span. */
 const PLACEMENTS = {
   'src/screens/equipment/EquipmentTable.tsx': [
-    /<span dir="ltr">\{row\.code\}<\/span>\s*<EquipmentNewBadge isNew=\{row\.equipment_is_new\} \/>/,
+    // 2026-10-29: the code is bold in its own span (the type sits under it).
+    /<span dir="ltr" className="font-semibold">\s*\{row\.code\}\s*<\/span>\s*<EquipmentNewBadge isNew=\{row\.equipment_is_new\} \/>/,
   ],
   'src/screens/EquipmentDetail.tsx': [
     // The detail header: first in the `badges` slot, right after the code.
