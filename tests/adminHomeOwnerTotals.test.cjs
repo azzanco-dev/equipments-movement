@@ -216,20 +216,32 @@ test('the suppliers card parses, loads on its own and follows the fleet tables',
   // Owner 2026-10-29: «كاردز صغيرة» — a row per total, the total first.
   assert.match(section, /function OwnerTotalsRow\(/)
   assert.match(section, /grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5/)
-  // Owner 2026-10-29: «اضف قسم الورشة تحتهم» — a third row, every
-  // workshop state, opening the log's open workshop visits of that owner.
+  // Owner 2026-10-29: the third row is «المتبقي» («خلي قسم في الورشة يصير
+  // المتبقي، والي هو الاسطول - المشاريع»): every state but inside_site, the
+  // owner cards opening that owner's units outside a project.
   assert.equal(section.match(/<OwnerTotalsRow/g).length, 3)
-  assert.match(section, /state\.startsWith\('workshop_'\)/)
-  // «وحالات الورشة»: the four states under the workshop owners, each a
-  // link to the log's open workshop visits of that purpose.
+  assert.match(section, /state !== 'inside_site'/)
+  assert.match(section, /t\('adminHomeOwnerRestTitle'\)/)
+  assert.match(
+    section,
+    /canOpenEquipment \? \(owner\) => restEquipmentHref\(owner\)/,
+  )
+  assert.match(
+    section,
+    /field: 'equipment_state',\s*operator: 'neq',\s*value: 'working'/,
+  )
+  // Its states: the four workshop ones (the log's open workshop visits) and
+  // available (the equipment list).
   for (const state of [
     'workshop_maintenance',
     'workshop_parking',
     'workshop_out_of_service',
     'workshop_unclassified',
+    'available',
   ])
     assert.match(section, new RegExp(`state: '${state}'`))
-  assert.match(section, /href=\{workshopStateLogHref\(item\.purpose\)\}/)
+  assert.match(section, /workshopStateLogHref\(item\.purpose\)/)
+  assert.match(section, /restEquipmentHref\(null\)/)
   assert.match(section, /operator: 'is_not_set'/)
   assert.match(section, /\{extra\}\s*<\/section>\s*<\/Card>/)
   assert.match(section, /\/logs\?context=workshop&vfilters=/)

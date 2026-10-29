@@ -26,14 +26,16 @@ const OWNER_STROKE: Record<AdminHomeOwner, string> = {
   external_supplier: 'var(--chart-stroke-4)',
 }
 
-/** The workshop states (owner 2026-10-29, «وحالات الورشة»): label, the
- *  shade its card is tinted with, and the purpose the log filters on
- *  (`null` = no purpose yet). */
-const WORKSHOP_STATES: {
+/** The states of «المتبقي» (owner 2026-10-29, «وحالات الورشة», then «خلي
+ *  قسم في الورشة يصير المتبقي، والي هو الاسطول - المشاريع»): the four
+ *  workshop states and available. Label, the shade its card is tinted with,
+ *  and what it opens: the log's open workshop visits of a purpose (`null` =
+ *  no purpose yet), or the equipment list of the available units. */
+const REST_STATES: {
   state: string
   label: TranslationKey
   stroke: string
-  purpose: 'maintenance' | 'parking' | 'out_of_service' | null
+  purpose: 'maintenance' | 'parking' | 'out_of_service' | null | 'available'
 }[] = [
   {
     state: 'workshop_maintenance',
@@ -58,6 +60,12 @@ const WORKSHOP_STATES: {
     label: 'equipmentStateUnclassified',
     stroke: 'var(--chart-stroke-5)',
     purpose: null,
+  },
+  {
+    state: 'available',
+    label: 'equipmentStateAvailable',
+    stroke: 'var(--chart-stroke-6)',
+    purpose: 'available',
   },
 ]
 
@@ -131,19 +139,37 @@ export function workshopStateLogHref(
   return `/logs?context=workshop&vfilters=${encodeURIComponent(JSON.stringify(filters))}`
 }
 
-/** The log's workshop tab as visits, the units inside now of one owner
- *  (owner 2026-10-29, «اضف قسم الورشة تحتهم»). */
-export function insideWorkshopLogHref(owner: AdminHomeOwner): string {
+/** The equipment list of one owner's active units outside a project (the
+ *  fleet minus the projects: workshop and available), or of every active
+ *  available unit when `owner` is null. */
+export function restEquipmentHref(owner: AdminHomeOwner | null): string {
   const filters = [
-    { id: 'open', field: 'is_open', operator: 'eq', value: 'true' },
-    {
-      id: 'owner',
-      field: 'equipment_ownership_status',
-      operator: 'eq',
-      value: owner,
-    },
+    ...(owner
+      ? [
+          {
+            id: 'owner',
+            field: 'ownership_status',
+            operator: 'eq',
+            value: owner,
+          },
+          {
+            id: 'state',
+            field: 'equipment_state',
+            operator: 'neq',
+            value: 'working',
+          },
+        ]
+      : [
+          {
+            id: 'state',
+            field: 'equipment_state',
+            operator: 'eq',
+            value: 'available',
+          },
+        ]),
+    { id: 'status', field: 'status', operator: 'eq', value: 'active' },
   ]
-  return `/logs?context=workshop&vfilters=${encodeURIComponent(JSON.stringify(filters))}`
+  return `/equipment?filters=${encodeURIComponent(JSON.stringify(filters))}`
 }
 
 /**
@@ -416,10 +442,11 @@ export function OwnerTotalsSection({
   if (!data) return null
   const fleet = ownerTotals(data, FLEET_STATES)
   const sites = ownerTotals(data, ['inside_site'])
-  // Every workshop state: maintenance, standby, out of service, unclassified.
-  const workshop = ownerTotals(
+  // «المتبقي»: the fleet minus the projects — every workshop state and
+  // available.
+  const rest = ownerTotals(
     data,
-    FLEET_STATES.filter((state) => state.startsWith('workshop_')),
+    FLEET_STATES.filter((state) => state !== 'inside_site'),
   )
 
   return (
@@ -447,24 +474,30 @@ export function OwnerTotalsSection({
         }
       />
       <OwnerTotalsRow
-        title={t('adminHomeOwnerWorkshopTitle')}
-        hint={t('adminHomeOwnerWorkshopHint')}
+        title={t('adminHomeOwnerRestTitle')}
+        hint={t('adminHomeOwnerRestHint')}
         icon={<Warehouse size={16} />}
-        total={workshop.total}
-        owners={workshop.owners}
-        // The log's open workshop visits of that owner (owner 2026-10-29).
+        total={rest.total}
+        owners={rest.owners}
+        // That owner's units outside a project, on the equipment list.
         hrefOf={
-          canOpenLogs ? (owner) => insideWorkshopLogHref(owner) : undefined
+          canOpenEquipment ? (owner) => restEquipmentHref(owner) : undefined
         }
-        // Then the workshop states over every owner («وحالات الورشة»).
+        // Then its states over every owner: the workshop's and available.
         extra={
-          <ul className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-            {WORKSHOP_STATES.map((item) => {
+          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            {REST_STATES.map((item) => {
               const count = ownerTotals(data, [item.state]).total
               const share =
-                workshop.total > 0
-                  ? Math.round((count / workshop.total) * 100)
-                  : 0
+                rest.total > 0 ? Math.round((count / rest.total) * 100) : 0
+              const href =
+                item.purpose === 'available'
+                  ? canOpenEquipment
+                    ? restEquipmentHref(null)
+                    : null
+                  : canOpenLogs
+                    ? workshopStateLogHref(item.purpose)
+                    : null
               const style = {
                 backgroundColor: `color-mix(in srgb, ${item.stroke} 18%, var(--bg))`,
                 color: 'var(--chart-text)',
@@ -492,9 +525,9 @@ export function OwnerTotalsSection({
               const cardClass = 'flex h-full flex-col gap-1 rounded-xl p-3'
               return (
                 <li key={item.state}>
-                  {canOpenLogs ? (
+                  {href ? (
                     <AppLink
-                      href={workshopStateLogHref(item.purpose)}
+                      href={href}
                       style={style}
                       className={`${cardClass} transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}
                     >
