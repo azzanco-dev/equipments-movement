@@ -127,6 +127,15 @@ export const SUPPLIER_PO_EVENTS_LIMIT = 20
  *  2026-10-21); invoices are issued elsewhere. */
 export const SUPPLIER_PO_VAT_RATE = 0.15
 
+/** «الشروط والاحكام» under the PDF's table (owner 2026-10-29), in order.
+ *  A first draft for the owner to replace with the company's own terms. */
+export const SUPPLIER_PO_TERMS_KEYS: readonly TranslationKey[] = [
+  'supplierPoTerm1',
+  'supplierPoTerm2',
+  'supplierPoTerm3',
+  'supplierPoTerm4',
+]
+
 /** The VAT on an amount excluding VAT, rounded to halalas. */
 export function vatOf(amountExclVat: number): number {
   return Math.round(amountExclVat * SUPPLIER_PO_VAT_RATE * 100) / 100
