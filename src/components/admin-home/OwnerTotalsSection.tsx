@@ -16,16 +16,6 @@ import { SUPPLIER_FILTER_KEY } from '@/lib/equipmentSupplier'
 import { useAdminHomeSection } from './useAdminHomeSection'
 import { ownershipBadge } from '@/lib/equipmentForm'
 
-/** One light fill per owner (owner 2026-10-29, «لونت الكروت بالوان فاتحة»):
- *  the chart tints, each matching its owner's outline shade below. */
-const OWNER_FILL: Record<AdminHomeOwner, string> = {
-  alazani: 'var(--chart-1)',
-  takween: 'var(--chart-3)',
-  third_party_f: 'var(--chart-2)',
-  third_party_partnership_b: 'var(--chart-5)',
-  external_supplier: 'var(--chart-4)',
-}
-
 /** One tone per owner, in `ALL_OWNERS` order (the chart outline shades). */
 const OWNER_STROKE: Record<AdminHomeOwner, string> = {
   alazani: 'var(--chart-stroke-1)',
@@ -154,11 +144,13 @@ function OwnerTotalsRow({
               </span>
             </>
           )
-          // The tint with the charts' readable text (`--chart-text`, dark on
-          // the light tints, near-white on the dark theme's).
-          // Half the tint over the page («خليها اخف», owner 2026-10-29).
+          // A light fill per owner (owner 2026-10-29, «لونت الكروت بالوان
+          // فاتحة» then «خليها اخف»): its outline shade at 18% over the page,
+          // so the hues stay apart (the pastel tints made Takween's blue and
+          // B's violet look alike, «لون تكوين قريب من لون B»). The text is
+          // the charts' readable one (`--chart-text`).
           const tint = {
-            backgroundColor: `color-mix(in srgb, ${OWNER_FILL[row.owner]} 50%, var(--bg))`,
+            backgroundColor: `color-mix(in srgb, ${OWNER_STROKE[row.owner]} 18%, var(--bg))`,
             color: 'var(--chart-text)',
           }
           return (

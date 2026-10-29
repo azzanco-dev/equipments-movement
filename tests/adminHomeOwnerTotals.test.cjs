@@ -205,7 +205,7 @@ test('the suppliers card parses, loads on its own and comes after the rows', () 
   // Light owner tints with the charts' readable text («بالوان فاتحة»).
   assert.match(
     section,
-    /color-mix\(in srgb, \$\{OWNER_FILL\[row\.owner\]\} 50%, var\(--bg\)\)/,
+    /color-mix\(in srgb, \$\{OWNER_STROKE\[row\.owner\]\} 18%, var\(--bg\)\)/,
   )
   assert.match(section, /color: 'var\(--chart-text\)'/)
   assert.doesNotMatch(section, /#[0-9a-fA-F]{3,6}/)
