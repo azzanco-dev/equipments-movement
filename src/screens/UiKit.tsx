@@ -54,6 +54,7 @@ import { SiteUnitsMockup } from '@/screens/ui-kit/SiteUnitsMockup'
 import { MobileSearchFieldShowcase } from '@/screens/ui-kit/MobileSearchFieldShowcase'
 import { InquiryRedesignMockup } from '@/screens/ui-kit/InquiryRedesignMockup'
 import { InquiryAllStatesShowcase } from '@/screens/ui-kit/InquiryAllStatesShowcase'
+import { HomeRedesignMockup } from '@/screens/ui-kit/HomeRedesignMockup'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -120,6 +121,17 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // Owner 2026-10-29: «ابغى اعيد تشكيل الرئيسية … ايش رايك», then «Build
+    // the mockup» on the proposal.
+    id: 'home-redesign',
+    title: 'نموذج الرئيسية الجديدة',
+    purpose:
+      'يحتاج انتباهك اولا، ثم الحالة الان بتبويبات بدل ثلاث جداول، ثم حركة اليوم، والتحليل اخيرا. كل قسم حسب الصلاحية، ببيانات عينة.',
+    status: 'review',
+    defaultOpen: true,
+    element: <HomeRedesignMockup />,
+  },
   {
     // Owner 2026-10-27: «في ui-kit سوي معدة فيها جميع الحالات عشان اشوفها».
     id: 'inquiry-all-states',
