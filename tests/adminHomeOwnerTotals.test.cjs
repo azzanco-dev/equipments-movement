@@ -200,7 +200,7 @@ test('the suppliers card parses, loads on its own and comes after the rows', () 
   )
   // Owner 2026-10-29: «كاردز صغيرة» — a row per total, the total first.
   assert.match(section, /function OwnerTotalsRow\(/)
-  assert.match(section, /grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6/)
+  assert.match(section, /grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5/)
   assert.equal(section.match(/<OwnerTotalsRow/g).length, 2)
   assert.match(
     read('src', 'lib', 'adminHomeData.ts'),

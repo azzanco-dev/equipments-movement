@@ -73,7 +73,7 @@ export function insideProjectsLogHref(
 
 /**
  * One row of small cards (owner 2026-10-29, «تقسم حق الاسطول والمشاريع
- * بحيث تكون في كاردز صغيرة»): the total first, then one card per owner with
+ * بحيث تكون في كاردز صغيرة»): the total on its own row, then one card per owner with
  * its full name (as on the equipment page, «الاسماء خليها كاملة»), its count
  * and its share, each a link to its list when the shell opens it.
  */
@@ -98,18 +98,23 @@ function OwnerTotalsRow({
     total > 0 ? Math.round((count / total) * 100) : 0
   const cardClass = 'flex h-full flex-col gap-1 rounded-xl border bg-bg p-3'
   return (
-    <section aria-label={title}>
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <li className={`${cardClass} bg-surface`}>
-          <span className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium">{title}</span>
-            <span aria-hidden="true" className="text-muted">
-              {icon}
-            </span>
-          </span>
-          <span className="text-3xl font-bold tabular-nums">{total}</span>
-          <span className="text-xs text-muted">{hint}</span>
-        </li>
+    <section aria-label={title} className="space-y-2">
+      {/* The total on a row of its own (owner 2026-10-29, «خلي الاجمالي في
+          صف لحاله»), the owners' cards under it. */}
+      <div className="flex items-center gap-3 rounded-xl border bg-surface p-3">
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg text-muted"
+        >
+          {icon}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium">{title}</span>
+          <span className="block text-xs text-muted">{hint}</span>
+        </span>
+        <span className="text-3xl font-bold tabular-nums">{total}</span>
+      </div>
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {owners.map((row) => {
           const body = (
             <>
