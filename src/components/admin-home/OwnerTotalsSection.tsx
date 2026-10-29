@@ -113,20 +113,21 @@ function OwnerTotalsRow({
           صف لحاله»), the owners' cards under it. */}
       {/* At the start, the right in Arabic («خلي الارقام الاجمالية يمين»):
           the title and the hint, then the number under both («تحت
-          النصوص», owner 2026-10-29). */}
-      <div className="flex items-center gap-3 rounded-xl border bg-surface p-3">
+          النصوص», owner 2026-10-29), with the icon before them, on their
+          right («والايقونة يمينهم»). */}
+      <div className="flex items-start gap-3 rounded-xl border bg-surface p-3">
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg text-muted"
+        >
+          {icon}
+        </span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium">{title}</span>
           <span className="block text-xs text-muted">{hint}</span>
           <span className="mt-1 block text-3xl font-bold tabular-nums">
             {total}
           </span>
-        </span>
-        <span
-          aria-hidden="true"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg text-muted"
-        >
-          {icon}
         </span>
       </div>
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">

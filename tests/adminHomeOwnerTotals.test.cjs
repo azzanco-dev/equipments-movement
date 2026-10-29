@@ -215,6 +215,11 @@ test('the suppliers card parses, loads on its own and comes after the rows', () 
     section,
     /\{title\}<\/span>\s*<span className="block text-xs text-muted">\{hint\}<\/span>\s*<span className="mt-1 block text-3xl font-bold tabular-nums">\s*\{total\}/,
   )
+  // The icon first in the total row, on the texts' right.
+  assert.match(
+    section,
+    /items-start gap-3 rounded-xl border bg-surface p-3">\s*<span\s+aria-hidden="true"[^>]*>\s*\{icon\}/,
+  )
   assert.match(section, /<div className="space-y-8">\s*<OwnerTotalsRow/)
   assert.match(
     read('src', 'lib', 'adminHomeData.ts'),
