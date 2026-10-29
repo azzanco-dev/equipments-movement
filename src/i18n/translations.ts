@@ -1731,6 +1731,12 @@ export const translations = {
     equipmentStatus: 'حالة المعدة',
     equipmentStatusActive: 'نشطة',
     equipmentStatusSold: 'مباعة',
+    // 0163 (owner 2026-10-29): a supplier unit whose rental ended.
+    equipmentStatusRentalEnded: 'منتهية',
+    equipmentStatusRentalEndedHint:
+      'المعدة رجعت لصاحبها ولا تحسب في الاسطول. تصير منتهية تلقائيا عند خروجها من مشروع، وترجع نشطة عند دخولها.',
+    equipmentRentalEndedExternalOnly: 'منتهية لمعدات المالك الاخر فقط.',
+    equipmentInsideCannotEnd: 'سجل خروج المعدة من المشروع او الورشة قبل جعلها منتهية.',
     equipmentStatusScrapped: 'مشطوبة',
     equipmentStatusRentedOut: 'مؤجرة للغير',
     equipmentStatusHint:
@@ -3936,6 +3942,11 @@ export const translations = {
     equipmentStatus: 'Equipment status',
     equipmentStatusActive: 'Active',
     equipmentStatusSold: 'Sold',
+    equipmentStatusRentalEnded: 'Rental ended',
+    equipmentStatusRentalEndedHint:
+      'Returned to its owner and not counted in the fleet. It ends automatically when it leaves a project and is active again when it enters.',
+    equipmentRentalEndedExternalOnly: 'Rental ended is for other-owner units only.',
+    equipmentInsideCannotEnd: 'Record the unit leaving its project or the workshop first.',
     equipmentStatusScrapped: 'Scrapped',
     equipmentStatusRentedOut: 'Rented out',
     equipmentStatusHint:

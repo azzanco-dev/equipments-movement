@@ -47,8 +47,22 @@ const form = loadLibModule('equipmentForm')
 // tests/equipment-form.test.cjs does.
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null))
 
-test('active and sold are the only asset statuses offered (0125)', () => {
-  assert.deepEqual(plain(form.EQUIPMENT_STATUSES), ['active', 'sold'])
+test('active and sold are the asset statuses of 0125; 0163 adds rental_ended', () => {
+  assert.deepEqual(plain(form.EQUIPMENT_STATUSES), [
+    'active',
+    'sold',
+    'rental_ended',
+  ])
+  // «منتهية» is offered for «مالك اخر» only.
+  assert.deepEqual(plain(form.equipmentStatusesFor('external_supplier')), [
+    'active',
+    'sold',
+    'rental_ended',
+  ])
+  assert.deepEqual(plain(form.equipmentStatusesFor('alazani')), [
+    'active',
+    'sold',
+  ])
 })
 
 test('only an active status reads as a fleet badge', () => {

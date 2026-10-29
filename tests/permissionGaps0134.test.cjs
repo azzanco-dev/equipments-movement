@@ -385,9 +385,16 @@ test('no later migration redefines the 0134 objects', () => {
       /POLICY movement_audit_logs_admin_select\b/,
       `${file} redefines the audit policy after 0134; carry the scope clause over and update this test`,
     )
+    // 0163 re-creates update_equipment_from_excel from its 0134 body with
+    // the per-row code-change check carried over.
+    const carriesExcel =
+      /_0163_/.test(file) &&
+      /AND NOT public\.has_permission\('equipment\.change_code'\)/.test(text)
     assert.doesNotMatch(
       text,
-      /FUNCTION public\.(?:enforce_equipment_code_change_permission|update_equipment_from_excel|import_movement_rows)\(/,
+      carriesExcel
+        ? /FUNCTION public\.(?:enforce_equipment_code_change_permission|import_movement_rows)\(/
+        : /FUNCTION public\.(?:enforce_equipment_code_change_permission|update_equipment_from_excel|import_movement_rows)\(/,
       `${file} redefines a 0134 function; carry the 0134 checks over and update this test`,
     )
     assert.doesNotMatch(

@@ -253,6 +253,12 @@ export const equipmentListConfig: DataListConfig = {
           label: 'مباعة',
           labelI18n: 'equipmentStatusSold',
         },
+        // 0163: a supplier unit whose rental ended.
+        {
+          value: 'rental_ended',
+          label: 'منتهية',
+          labelI18n: 'equipmentStatusRentalEnded',
+        },
       ],
     },
   ],
@@ -663,7 +669,11 @@ export const supplierPosListConfig: DataListConfig = {
       type: 'select',
       operators: ['eq', 'neq'],
       options: [
-        { value: 'draft', label: 'مسودة', labelI18n: 'supplierPoApprovalDraft' },
+        {
+          value: 'draft',
+          label: 'مسودة',
+          labelI18n: 'supplierPoApprovalDraft',
+        },
         {
           value: 'approved',
           label: 'معتمد',

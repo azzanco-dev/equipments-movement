@@ -223,6 +223,19 @@ export const EQUIPMENT_DATABASE_RULES: readonly DatabaseFieldRule<EquipmentFormV
       field: 'plate_number',
       key: 'plateNumberInvalid',
     },
+    // 0163: «منتهية» is for supplier units only, and never while inside.
+    {
+      on: 'check',
+      match: 'equipment_rental_ended_external_check',
+      field: 'status',
+      key: 'equipmentRentalEndedExternalOnly',
+    },
+    {
+      on: 'raised',
+      match: 'equipment_inside_cannot_end',
+      field: 'status',
+      key: 'equipmentInsideCannotEnd',
+    },
     // 0135: the table check on the code format (letters, digits, space, _
     // and -, at most 30 characters) applies to every write path.
     {
@@ -435,16 +448,31 @@ export function ownershipBadge(status: OwnershipStatus): BadgeDescriptor {
   return { tone: 'neutral', key: 'ownershipExternalSupplier' }
 }
 
-/** The two asset status values (migration 0125), in the order the form and
- *  the filter list them. */
+/** The asset status values (migration 0125; 0163 added `rental_ended`), in
+ *  the order the form and the filter list them. */
 export const EQUIPMENT_STATUSES: readonly EquipmentStatus[] = [
   'active',
   'sold',
+  'rental_ended',
 ] as const
 
 const EQUIPMENT_STATUS_KEYS: Record<EquipmentStatus, TranslationKey> = {
   active: 'equipmentStatusActive',
   sold: 'equipmentStatusSold',
+  rental_ended: 'equipmentStatusRentalEnded',
+}
+
+/**
+ * The statuses the form offers for an owner (owner 2026-10-29): «منتهية» is
+ * for «مالك اخر» units only, as the database check
+ * `equipment_rental_ended_external_check` enforces.
+ */
+export function equipmentStatusesFor(
+  ownership: OwnershipStatus | null | undefined,
+): readonly EquipmentStatus[] {
+  return ownership === 'external_supplier'
+    ? EQUIPMENT_STATUSES
+    : EQUIPMENT_STATUSES.filter((status) => status !== 'rental_ended')
 }
 
 /** Translation key for a status, falling back to `active` (the column default)

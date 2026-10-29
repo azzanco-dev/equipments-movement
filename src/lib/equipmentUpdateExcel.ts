@@ -4,6 +4,7 @@ import type { TranslationKey } from '@/i18n/translations'
 import type { Equipment, EquipmentStatus } from '@/lib/types'
 import { parseEquipmentExcel, type EquipmentImportRow } from '@/lib/excel'
 import { equipmentStateText } from '@/lib/equipmentState'
+import { equipmentStatusKey } from '@/lib/equipmentForm'
 
 export interface EquipmentUpdateRow extends EquipmentImportRow {
   record_id: string
@@ -29,6 +30,9 @@ const STATUS_ALIASES: Record<string, EquipmentStatus> = {
   مباعة: 'sold',
   مباع: 'sold',
   sold: 'sold',
+  // 0163
+  منتهية: 'rental_ended',
+  rental_ended: 'rental_ended',
 }
 
 /** Parses one status cell: blank keeps the current value (`null`), an unknown
@@ -104,9 +108,7 @@ export function downloadEquipmentUpdateWorkbook(
       item.equipment_state ?? null,
       item.equipment_is_new,
     ),
-    [t('equipmentStatus')]: t(
-      item.status === 'sold' ? 'equipmentStatusSold' : 'equipmentStatusActive',
-    ),
+    [t('equipmentStatus')]: t(equipmentStatusKey(item.status)),
     [t('ownershipStatus')]:
       item.ownership_status === 'alazani'
         ? t('ownershipAlazani')

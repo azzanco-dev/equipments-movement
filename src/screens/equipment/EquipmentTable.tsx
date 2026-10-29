@@ -124,7 +124,11 @@ export function EquipmentTable({
       header: t('equipmentState'),
       sortable: true,
       cell: (row) => (
-        <EquipmentStateBadge state={row.equipment_state} size="sm" />
+        <EquipmentStateBadge
+          state={row.equipment_state}
+          assetStatus={row.status}
+          size="sm"
+        />
       ),
     },
     {

@@ -21,7 +21,8 @@ export type UserRole =
  * current-state reports. The operational state is not stored: see
  * `EquipmentState` (src/lib/equipmentState.ts).
  */
-export type EquipmentStatus = 'active' | 'sold'
+/** 0163: `rental_ended` («منتهية») — a supplier unit whose rental ended. */
+export type EquipmentStatus = 'active' | 'sold' | 'rental_ended'
 export type OwnershipStatus =
   | 'alazani'
   | 'takween'

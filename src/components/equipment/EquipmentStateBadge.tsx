@@ -15,14 +15,24 @@ import {
  */
 export function EquipmentStateBadge({
   state,
+  assetStatus,
   size,
   className,
 }: {
   state: string | null | undefined
+  /** 0163 (owner 2026-10-29): a «منتهية» supplier unit shows «منتهية» in
+   *  grey instead of the «متاحة» its last exit derives. */
+  assetStatus?: string | null
   size?: BadgeSize
   className?: string
 }) {
   const { t } = useI18n()
+  if (assetStatus === 'rental_ended')
+    return (
+      <Badge tone="neutral" size={size} className={className}>
+        {t('equipmentStatusRentalEnded')}
+      </Badge>
+    )
   const parsed = parseEquipmentState(state)
   if (!parsed) return <span className="text-muted">—</span>
   return (

@@ -37,7 +37,7 @@ test('the secondary facts are muted lines under the identity', () => {
   )
   assert.match(
     equipment,
-    /<EquipmentStateBadge state=\{row\.equipment_state\} size="sm" \/>/,
+    /<EquipmentStateBadge\s+state=\{row\.equipment_state\}\s+assetStatus=\{row\.status\}\s+size="sm"\s*\/>/,
   )
   assert.doesNotMatch(equipment, /` - \$\{row\.lessor\.name\}`/)
 

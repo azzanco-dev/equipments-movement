@@ -309,7 +309,12 @@ export function EquipmentDetail({
       key: 'equipmentState',
       icon: <Wrench size={16} />,
       label: t('equipmentState'),
-      value: <EquipmentStateBadge state={equipment.equipment_state} />,
+      value: (
+        <EquipmentStateBadge
+          state={equipment.equipment_state}
+          assetStatus={equipment.status}
+        />
+      ),
     },
   ]
 

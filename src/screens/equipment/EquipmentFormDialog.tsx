@@ -38,7 +38,7 @@ import { usesExternalSupplier } from '@/lib/equipmentOwnership'
 import {
   EMPTY_EQUIPMENT_FORM,
   EQUIPMENT_FIELD_ORDER,
-  EQUIPMENT_STATUSES,
+  equipmentStatusesFor,
   equipmentStatusKey,
   applyEquipmentCode,
   applyOwnershipStatus,
@@ -313,7 +313,12 @@ export function EquipmentFormDialog({
   const updateOwnership = (status: OwnershipStatus) =>
     setForm((current) => {
       if (!usesExternalSupplier(status)) setLessorOption(null)
-      return applyOwnershipStatus(current, status)
+      const next = applyOwnershipStatus(current, status)
+      // 0163: «منتهية» is for «مالك اخر» only; another owner makes the
+      // unit active again rather than leave a status the database refuses.
+      return status !== 'external_supplier' && next.status === 'rental_ended'
+        ? { ...next, status: 'active' }
+        : next
     })
 
   // Editing only: a real code change (not case or spaces) keeps the same
@@ -432,7 +437,9 @@ export function EquipmentFormDialog({
       ) {
         // The row policies (equipment.edit / equipment.create) refused it.
         setError(
-          t(equipment ? 'equipmentEditNotAllowed' : 'equipmentCreateNotAllowed'),
+          t(
+            equipment ? 'equipmentEditNotAllowed' : 'equipmentCreateNotAllowed',
+          ),
         )
       } else {
         setError(t('saveFailed'))
@@ -652,7 +659,11 @@ export function EquipmentFormDialog({
         <Field
           label={t('equipmentStatus')}
           name="status"
-          hint={t('equipmentStatusHint')}
+          hint={t(
+            form.status === 'rental_ended'
+              ? 'equipmentStatusRentalEndedHint'
+              : 'equipmentStatusHint',
+          )}
           error={errors.status && t(errors.status)}
         >
           {(control) => (
@@ -666,10 +677,12 @@ export function EquipmentFormDialog({
                   status: value as EquipmentStatus,
                 }))
               }}
-              options={EQUIPMENT_STATUSES.map((value) => ({
-                value,
-                label: t(equipmentStatusKey(value)),
-              }))}
+              options={equipmentStatusesFor(form.ownership_status).map(
+                (value) => ({
+                  value,
+                  label: t(equipmentStatusKey(value)),
+                }),
+              )}
             />
           )}
         </Field>

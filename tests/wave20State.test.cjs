@@ -582,7 +582,8 @@ test('the equipment list filters the derived state and two asset statuses', () =
   )
   assert.deepEqual(
     plain(field('status').options.map((option) => option.value)),
-    ['active', 'sold'],
+    // 0163 added «منتهية».
+    ['active', 'sold', 'rental_ended'],
   )
   assert.ok(list.sortableFields.some((item) => item.key === 'equipment_state'))
   assert.ok(

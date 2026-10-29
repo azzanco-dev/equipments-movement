@@ -115,6 +115,8 @@ interface InquiryEquipmentRow {
    *  «جديدة» mark is "created within the last 7 days" (migration 0129). */
   created_at?: string | null
   ownership_status?: OwnershipStatus | null
+  /** The asset status (0163: «منتهية» shows instead of the derived state). */
+  status?: string | null
   lessor?: { id: string; name: string | null } | null
   /** The suggestions' dot only. */
   equipment_state?: string | null
@@ -470,7 +472,7 @@ export function EquipmentInquiryScreen({
           supabase
             .from('equipment')
             .select(
-              'id,code,type,plate_number,chassis_number,created_at,ownership_status,lessor:lessors(id,name)',
+              'id,code,type,plate_number,chassis_number,created_at,ownership_status,status,lessor:lessors(id,name)',
             )
             .eq('id', id)
             .abortSignal(signal)
@@ -1003,7 +1005,7 @@ export function EquipmentInquiryScreen({
                       {inquiryState === 'error' ? (
                         <span className="text-sm text-danger">{t('dataLoadError')}</span>
                       ) : (
-                        <EquipmentStateBadge state={state} />
+                        <EquipmentStateBadge state={state} assetStatus={equipment.status} />
                       )}
                     </div>
                     <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm text-muted">

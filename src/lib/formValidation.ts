@@ -321,8 +321,13 @@ export const quickDriverFormSchema = z.object({
   mobile: mobileNumber('mobileNumberRequired'),
 })
 
-/** The asset status values the database CHECK allows (migration 0125). */
-export const EQUIPMENT_ASSET_STATUSES = ['active', 'sold'] as const
+/** The asset status values the database CHECK allows (migration 0125;
+ *  0163 added rental_ended, «منتهية», for supplier units only). */
+export const EQUIPMENT_ASSET_STATUSES = [
+  'active',
+  'sold',
+  'rental_ended',
+] as const
 
 /**
  * Equipment add/edit: code, type and QR value are `NOT NULL`; a numbered unit
@@ -350,8 +355,19 @@ export const equipmentFormSchema = z
           (EQUIPMENT_ASSET_STATUSES as readonly string[]).includes(value),
         message('valueNotInList'),
       ),
+    ownership_status: z.string().optional(),
   })
   .superRefine((form, context) => {
+    // 0163: «منتهية» only for «مالك اخر».
+    if (
+      form.status === 'rental_ended' &&
+      form.ownership_status !== 'external_supplier'
+    )
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['status'],
+        message: 'equipmentRentalEndedExternalOnly',
+      })
     if (form.numbering_status !== 'numbered') return
     const result = plate().safeParse(form.plate_number)
     if (!result.success)
@@ -588,7 +604,9 @@ export const supplierPoFormSchema = z
  */
 export function supplierPoPrice({ required }: { required: boolean }) {
   const base = z.string().trim()
-  return (required ? base.min(1, message('supplierPoPriceRequired')) : base).refine(
+  return (
+    required ? base.min(1, message('supplierPoPriceRequired')) : base
+  ).refine(
     (value) => !value || isValidSupplierPoPrice(value),
     message('supplierPoPriceInvalid'),
   )
