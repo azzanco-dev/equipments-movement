@@ -152,6 +152,12 @@ export function AdminHomeScreen({
           canOpenEquipment={Boolean(onSelectEquipment)}
           canOpenLogs={canOpenLogs}
         />
+        {/* Owner 2026-10-29: «حالات المتبقي», with its owner filter and
+            export, in place of the «المتبقي» owner box. */}
+        <RestStatesCard
+          canOpenEquipment={Boolean(onSelectEquipment)}
+          canOpenLogs={canOpenLogs}
+        />
         {/* Owner 2026-10-29: the tables right under the workshop states,
             without the state cards the owner rows replace, then the
             suppliers in projects. */}
@@ -160,6 +166,8 @@ export function AdminHomeScreen({
           onSelectMovement={onSelectMovement}
           showCards={false}
           tables={['workshop', 'available']}
+          title="adminHomeFleetTablesTitle"
+          description="adminHomeFleetTablesDescription"
         />
         <SupplierSitesCard canOpenLogs={canOpenLogs} />
         {/* Owner 2026-10-26: the Afaqy tracker figures of the fleet, right
@@ -179,16 +187,12 @@ export function AdminHomeScreen({
           onShowExitsChange={setShowExits}
         />
         {/* Owner 2026-10-29: «اي شي حذفناه اليوم من الرئيسية رجعه وخليه اخر
-            الصفحة تحت» — the state cards and the «داخل المشاريع» table of
-            «الحالة الان», «حالات المتبقي» and «يحتاج انتباهك», at the end. */}
+            الصفحة تحت» — the state cards with the «داخل المشاريع» table
+            («حالة الاسطول») and «يحتاج انتباهك», at the end. */}
         <FleetStateSection
           onSelectEquipment={onSelectEquipment}
           onSelectMovement={onSelectMovement}
           tables={['inside']}
-        />
-        <RestStatesCard
-          canOpenEquipment={Boolean(onSelectEquipment)}
-          canOpenLogs={canOpenLogs}
         />
         <AttentionSection
           canOpenPage={canOpenPage}

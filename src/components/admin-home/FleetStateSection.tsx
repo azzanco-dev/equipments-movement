@@ -9,7 +9,7 @@ import {
   Warehouse,
   Wrench,
 } from 'lucide-react'
-import { Badge, ErrorState, Skeleton, StatCard, cn } from '@/components/ui'
+import { ErrorState, Skeleton, StatCard, cn } from '@/components/ui'
 import type { StatCardAccent } from '@/components/ui/StatCard'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
@@ -25,7 +25,7 @@ import {
 } from '@/lib/adminHomeStats'
 import { AdminHomeSection } from './AdminHomeSection'
 import { FleetMiniTables, type FleetJumpRequest } from './FleetMiniTables'
-import { HomeOwnerFilter } from './OwnerFilter'
+import { FleetOwnerFilter } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 interface FleetCard {
@@ -138,6 +138,10 @@ export interface FleetStateSectionProps {
   /** Which fleet tables this copy shows (default all three; see
    *  `FleetMiniTables`). */
   tables?: readonly FleetMiniTableId[]
+  /** The heading (owner 2026-10-29: «الحالة الان غيرها لعنوان مناسب وشيل
+   *  كلمة الان»); defaults to «حالة الاسطول». */
+  title?: TranslationKey
+  description?: TranslationKey
 }
 
 /**
@@ -176,6 +180,8 @@ export function FleetStateSection({
   onSelectMovement,
   showCards = true,
   tables,
+  title = 'adminHomeStateTitle',
+  description = 'adminHomeStateDescription',
 }: FleetStateSectionProps) {
   const { t } = useI18n()
   // Plain component state, not the URL: it scopes this section only, so it is
@@ -219,12 +225,11 @@ export function FleetStateSection({
 
   return (
     <AdminHomeSection
-      title={t('adminHomeStateTitle')}
-      description={t('adminHomeStateDescription')}
+      title={t(title)}
+      description={t(description)}
       action={
         <div className="flex flex-wrap items-center gap-2">
-          <Badge tone="info">{t('adminHomeNow')}</Badge>
-          <HomeOwnerFilter
+          <FleetOwnerFilter
             size="sm"
             className="w-44"
             value={owners}

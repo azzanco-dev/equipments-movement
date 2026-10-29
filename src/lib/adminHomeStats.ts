@@ -92,6 +92,26 @@ export function normalizeHomeOwnerFilters(
 }
 
 /**
+ * The owners the fleet tables / cards may filter on (owner 2026-10-29: «اضف
+ * خيار تكوين في الفلتر»): the home's three plus Takween. An empty or unknown
+ * selection means these four.
+ */
+export const FLEET_FILTER_OWNERS: readonly AdminHomeOwner[] = [
+  'alazani',
+  'takween',
+  'third_party_f',
+  'third_party_partnership_b',
+]
+
+export function fleetOwnerArgument(
+  owners: AdminHomeOwner[] | string[] | null | undefined,
+): AdminHomeOwner[] {
+  const chosen = new Set(ownerParts(owners as string[]))
+  const list = FLEET_FILTER_OWNERS.filter((owner) => chosen.has(owner))
+  return list.length ? list : [...FLEET_FILTER_OWNERS]
+}
+
+/**
  * The argument the report functions take: `null` for "every owner", never an
  * empty array, so the two representations can never diverge.
  *
@@ -436,7 +456,8 @@ export function fleetEquipmentRpcArgs(params: {
       : null
   return {
     p_state: params.state,
-    p_owners: homeOwnerArgument(params.owners),
+    // The fleet tables also offer Takween (owner 2026-10-29).
+    p_owners: fleetOwnerArgument(params.owners),
     p_purpose:
       params.state === 'workshop'
         ? workshopPurposeArgument(params.purpose ?? 'all')

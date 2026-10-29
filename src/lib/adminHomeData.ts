@@ -17,6 +17,7 @@ import { saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
 import { supabase } from '@/lib/supabase'
 import {
   fleetEquipmentRpcArgs,
+  fleetOwnerArgument,
   homeOwnerArgument,
   pageOffset,
   parseAvailabilityPage,
@@ -92,7 +93,7 @@ export async function fetchFleetState(
   signal: AbortSignal,
 ): Promise<FleetState> {
   const { data, error } = await supabase
-    .rpc('get_admin_fleet_state', { p_owners: homeOwnerArgument(owners) })
+    .rpc('get_admin_fleet_state', { p_owners: fleetOwnerArgument(owners) })
     .abortSignal(signal)
   if (error) fail('fleetState', error)
   return parseFleetState(data)
@@ -219,15 +220,113 @@ export async function fetchEntriesYearly(
 }
 
 /** The same snapshot over EVERY owner (`p_owners` NULL), for the owner
- *  totals cards (owner 2026-10-29), not limited to the home's three. */
+ *  totals cards (owner 2026-10-29), not limited to the home's three; or over
+ *  the given owners («حالات المتبقي»'s filter; empty = every owner). */
 export async function fetchAllOwnersStateMatrix(
   signal: AbortSignal,
+  owners: readonly AdminHomeOwner[] = [],
 ): Promise<OwnerStateMatrix> {
   const { data, error } = await supabase
-    .rpc('get_admin_owner_state_matrix', { p_owners: null })
+    .rpc('get_admin_owner_state_matrix', {
+      p_owners: owners.length ? [...owners] : null,
+    })
     .abortSignal(signal)
   if (error) fail('ownerStateMatrix', error)
   return parseOwnerStateMatrix(data)
+}
+
+/** One unit of «حالات المتبقي»'s Excel export (owner 2026-10-29: «تصدير
+ *  اكسل، الاعمدة بيانات المعدة، تاريخ الدخول، والحالة»). */
+export interface RestUnitRow {
+  id: string
+  code: string
+  type: string
+  owner: string
+  /** A `FLEET_STATES` value other than `inside_site`. */
+  state: string
+  /** The latest movement: the workshop entry, or the exit that made the
+   *  unit available; null for a unit that never moved. */
+  since: string | null
+  plate: string | null
+  chassis: string | null
+  lessor: string | null
+}
+
+/**
+ * One page of the active units outside a project (`admin_equipment_state`,
+ * security_invoker), of the given owners (empty = every owner), by state then
+ * code, with the plate, chassis and supplier added from `equipment` for those
+ * ids only. Throws on a failed read; never loads a whole table at once.
+ */
+export async function fetchRestUnitsPage(
+  owners: readonly AdminHomeOwner[],
+  page: number,
+  pageSize: number,
+  signal: AbortSignal,
+): Promise<{ rows: RestUnitRow[]; total: number }> {
+  let query = supabase
+    .from('admin_equipment_state')
+    .select('id,code,type,ownership_status,state,last_movement_at', {
+      count: 'exact',
+    })
+    .eq('is_active', true)
+    .eq('status', 'active')
+    .neq('state', 'inside_site')
+    .order('state')
+    .order('code')
+    .range((page - 1) * pageSize, page * pageSize - 1)
+    .abortSignal(signal)
+  if (owners.length) query = query.in('ownership_status', [...owners])
+  const { data, count, error } = await query
+  if (error) fail('restUnits', error)
+  const base = (data ?? []) as {
+    id: string
+    code: string
+    type: string
+    ownership_status: string
+    state: string
+    last_movement_at: string | null
+  }[]
+  const details = new Map<
+    string,
+    { plate: string | null; chassis: string | null; lessor: string | null }
+  >()
+  if (base.length) {
+    const { data: units, error: unitsError } = await supabase
+      .from('equipment')
+      .select('id,plate_number,chassis_number,lessor:lessors(name)')
+      .in(
+        'id',
+        base.map((row) => row.id),
+      )
+      .abortSignal(signal)
+    if (unitsError) fail('restUnits', unitsError)
+    for (const unit of (units ?? []) as unknown as {
+      id: string
+      plate_number: string | null
+      chassis_number: string | null
+      lessor: { name: string | null } | null
+    }[])
+      details.set(unit.id, {
+        plate: unit.plate_number,
+        chassis: unit.chassis_number,
+        lessor: unit.lessor?.name ?? null,
+      })
+  }
+  return {
+    total: count ?? 0,
+    rows: base.map((row) => ({
+      id: row.id,
+      code: row.code,
+      type: row.type,
+      owner: row.ownership_status,
+      state: row.state,
+      since: row.last_movement_at,
+      plate: details.get(row.id)?.plate ?? null,
+      chassis: details.get(row.id)?.chassis ?? null,
+      lessor: details.get(row.id)?.lessor ?? null,
+    })),
+  }
 }
 
 /** The suppliers inside projects (migration 0161). */

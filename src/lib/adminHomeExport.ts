@@ -17,10 +17,8 @@
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import { exitPurposeExportLabel } from '@/lib/exitPurpose'
-import type {
-  FleetEquipmentRow,
-  FleetMiniTableId,
-} from '@/lib/adminHomeStats'
+import type { FleetEquipmentRow, FleetMiniTableId } from '@/lib/adminHomeStats'
+import type { RestUnitRow } from '@/lib/adminHomeData'
 import type { ExcelColumn } from '@/lib/excel'
 import type { Language, TranslationKey } from '@/i18n/translations'
 
@@ -208,5 +206,67 @@ export function fleetEquipmentExcelColumns(
       value: (row) => exitPurposeExportLabel(row.exitPurpose, t),
     },
     owner,
+  ]
+}
+
+/** «حالات المتبقي»'s export page: the equipment lookup sends the page's ids
+ *  in one `in` filter, so a page stays small enough for the URL. */
+export const REST_EXPORT_PAGE_SIZE = 150
+
+/** The state label of a unit outside a project. */
+const REST_STATE_LABEL: Record<string, TranslationKey> = {
+  workshop_maintenance: 'maintenancePurpose',
+  workshop_parking: 'parkingPurpose',
+  workshop_out_of_service: 'workshopPurposeOutOfService',
+  workshop_unclassified: 'equipmentStateUnclassified',
+  available: 'equipmentStateAvailable',
+}
+
+/**
+ * «حالات المتبقي»'s Excel columns (owner 2026-10-29: «الاعمدة بيانات المعدة،
+ * تاريخ الدخول، والحالة»): the unit (code, type, plate or chassis, owner,
+ * supplier), the date it entered its state (the workshop entry, or the exit
+ * that made it available; empty for a unit that never moved) and the state.
+ */
+export function restUnitExcelColumns({
+  t,
+  ownerLabel,
+}: FleetExportLabels): ExcelColumn<RestUnitRow>[] {
+  return [
+    {
+      header: t('adminHomeColEquipment'),
+      width: 14,
+      value: (row) => row.code,
+    },
+    { header: t('adminHomeColType'), width: 24, value: (row) => row.type },
+    {
+      header: t('plateNumber'),
+      width: 16,
+      value: (row) => row.plate ?? row.chassis ?? '',
+    },
+    {
+      header: t('adminHomeColOwner'),
+      width: 16,
+      value: (row) => ownerLabel(row.owner),
+    },
+    {
+      header: t('supplierFilter'),
+      width: 24,
+      value: (row) => row.lessor ?? '',
+    },
+    {
+      header: t('adminHomeColEntryDate'),
+      width: 18,
+      type: 'date',
+      value: (row) => row.since,
+    },
+    {
+      header: t('equipmentState'),
+      width: 16,
+      value: (row) =>
+        row.state in REST_STATE_LABEL
+          ? t(REST_STATE_LABEL[row.state])
+          : row.state,
+    },
   ]
 }

@@ -77,6 +77,7 @@ test('the home shows each table once, inside at the end', () => {
   const end = home.indexOf("tables={['inside']}")
   assert.ok(top > 0 && end > top)
   assert.ok(end > home.indexOf('<EntriesFlowSection'))
-  assert.ok(home.indexOf('<RestStatesCard') > end)
+  // «حالات المتبقي» moved up in place of «المتبقي» (owner 2026-10-29).
+  assert.ok(home.indexOf('<RestStatesCard') < top)
   assert.ok(home.indexOf('<AttentionSection') > end)
 })

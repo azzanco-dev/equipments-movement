@@ -1,12 +1,25 @@
 import { useCallback, useState, type ReactNode } from 'react'
-import { ClipboardList, Store, Truck, Warehouse } from 'lucide-react'
-import { AppLink, Button, Card, ErrorState, Skeleton } from '@/components/ui'
+import { ClipboardList, Download, Store, Truck, Warehouse } from 'lucide-react'
+import {
+  AppLink,
+  Button,
+  Card,
+  ErrorState,
+  Skeleton,
+  cn,
+} from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import {
   fetchAllOwnersStateMatrix,
+  fetchRestUnitsPage,
   fetchSupplierSiteCounts,
 } from '@/lib/adminHomeData'
+import {
+  REST_EXPORT_PAGE_SIZE,
+  collectAllPages,
+  restUnitExcelColumns,
+} from '@/lib/adminHomeExport'
 import {
   FLEET_STATES,
   ownerTotals,
@@ -15,6 +28,7 @@ import {
 import { EMPTY_FILTER_VALUE } from '@/lib/applyListFilters'
 import { SUPPLIER_FILTER_KEY } from '@/lib/equipmentSupplier'
 import { useAdminHomeSection } from './useAdminHomeSection'
+import { OwnerFilter, useOwnerLabel } from './OwnerFilter'
 import { ownershipBadge } from '@/lib/equipmentForm'
 
 /** One tone per owner, in `ALL_OWNERS` order (the chart outline shades). */
@@ -120,6 +134,7 @@ const REST_STATES: {
  *  (`null` = not classified yet). */
 export function workshopStateLogHref(
   purpose: 'maintenance' | 'parking' | 'out_of_service' | null,
+  owners: readonly AdminHomeOwner[] = [],
 ): string {
   const filters = [
     { id: 'open', field: 'is_open', operator: 'eq', value: 'true' },
@@ -136,12 +151,16 @@ export function workshopStateLogHref(
           operator: 'is_not_set',
           value: '',
         },
+    ...ownersFilter('equipment_ownership_status', owners),
   ]
   return `/logs?context=workshop&vfilters=${encodeURIComponent(JSON.stringify(filters))}`
 }
 
-/** The equipment list of every active available unit. */
-export function availableEquipmentHref(): string {
+/** The equipment list of the active available units of the chosen owners
+ *  (empty = every owner). */
+export function availableEquipmentHref(
+  owners: readonly AdminHomeOwner[] = [],
+): string {
   const filters = [
     {
       id: 'state',
@@ -150,22 +169,7 @@ export function availableEquipmentHref(): string {
       value: 'available',
     },
     { id: 'status', field: 'status', operator: 'eq', value: 'active' },
-  ]
-  return `/equipment?filters=${encodeURIComponent(JSON.stringify(filters))}`
-}
-
-/** The equipment list of one owner's active units outside a project (the
- *  fleet minus the projects: workshop and available). */
-export function restEquipmentHref(owner: AdminHomeOwner): string {
-  const filters = [
-    { id: 'owner', field: 'ownership_status', operator: 'eq', value: owner },
-    {
-      id: 'state',
-      field: 'equipment_state',
-      operator: 'neq',
-      value: 'working',
-    },
-    { id: 'status', field: 'status', operator: 'eq', value: 'active' },
+    ...ownersFilter('ownership_status', owners),
   ]
   return `/equipment?filters=${encodeURIComponent(JSON.stringify(filters))}`
 }
@@ -436,12 +440,6 @@ export function OwnerTotalsSection({
   if (!data) return null
   const fleet = ownerTotals(data, FLEET_STATES)
   const sites = ownerTotals(data, ['inside_site'])
-  // «المتبقي»: the fleet minus the projects — every workshop state and
-  // available.
-  const rest = ownerTotals(
-    data,
-    FLEET_STATES.filter((state) => state !== 'inside_site'),
-  )
 
   return (
     // More room between the two sections (owner 2026-10-29).
@@ -467,28 +465,30 @@ export function OwnerTotalsSection({
           canOpenLogs ? (owner) => insideProjectsLogHref(owner) : undefined
         }
       />
-      <OwnerTotalsRow
-        title={t('adminHomeOwnerRestTitle')}
-        hint={t('adminHomeOwnerRestHint')}
-        icon={<Warehouse size={16} />}
-        total={rest.total}
-        owners={rest.owners}
-        // That owner's units outside a project, on the equipment list.
-        hrefOf={
-          canOpenEquipment ? (owner) => restEquipmentHref(owner) : undefined
-        }
-      />
     </div>
   )
 }
 
+/** The URL filter of the chosen owners: `eq` for one, `in` for several, none
+ *  for an empty selection (every owner). */
+function ownersFilter(field: string, owners: readonly AdminHomeOwner[]) {
+  if (owners.length === 0) return []
+  return [
+    owners.length === 1
+      ? { id: 'owner', field, operator: 'eq', value: owners[0] }
+      : { id: 'owner', field, operator: 'in', value: owners.join(',') },
+  ]
+}
+
 /**
- * «حالات المتبقي» at the end of the admin home (owner 2026-10-29: the state
- * cards that sat under «المتبقي» were removed, then restored at the page's
- * end with everything else removed that day): the four workshop states and
- * available over every owner, each with its count and its share of the
- * remaining fleet, opening the log's open workshop visits of that purpose or
- * the equipment list of the available units.
+ * «حالات المتبقي» (owner 2026-10-29): the fleet minus the projects by state —
+ * the four workshop states and available — for the owners chosen in its own
+ * filter (all five offered, Al-Azani by default, «اضف له فلتر للملاك كلهم،
+ * وافتراضي على العزاني»; empty = every owner), each with its count and share,
+ * opening the log's open workshop visits of that purpose or the equipment
+ * list of the available units for those owners; and an Excel export of the
+ * units («الاعمدة بيانات المعدة، تاريخ الدخول، والحالة»). It replaced the
+ * «المتبقي» owner box at the top («واستبدله بقسم المتبقي فوق»).
  */
 export function RestStatesCard({
   canOpenEquipment,
@@ -497,12 +497,43 @@ export function RestStatesCard({
   canOpenEquipment: boolean
   canOpenLogs: boolean
 }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
+  const ownerLabel = useOwnerLabel()
+  const [owners, setOwners] = useState<AdminHomeOwner[]>(['alazani'])
+  const [exporting, setExporting] = useState(false)
+  const [exportNote, setExportNote] = useState<'failed' | 'capped' | null>(null)
   const load = useCallback(
-    (signal: AbortSignal) => fetchAllOwnersStateMatrix(signal),
-    [],
+    (signal: AbortSignal) => fetchAllOwnersStateMatrix(signal, owners),
+    [owners],
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
+
+  const runExport = async () => {
+    setExporting(true)
+    setExportNote(null)
+    const controller = new AbortController()
+    try {
+      const [{ exportRowsToExcel }, collected] = await Promise.all([
+        import('@/lib/excel'),
+        collectAllPages(
+          (page, size) =>
+            fetchRestUnitsPage(owners, page, size, controller.signal),
+          { pageSize: REST_EXPORT_PAGE_SIZE },
+        ),
+      ])
+      exportRowsToExcel(
+        t('adminHomeRestStatesTitle'),
+        restUnitExcelColumns({ t, lang, ownerLabel }),
+        collected.rows,
+        { fileName: 'remaining-by-state', rtl: lang === 'ar' },
+      )
+      if (collected.capped) setExportNote('capped')
+    } catch {
+      setExportNote('failed')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   if (failed)
     return (
@@ -524,7 +555,7 @@ export function RestStatesCard({
   return (
     <Card as="div" className="space-y-3">
       <section aria-label={t('adminHomeRestStatesTitle')} className="space-y-3">
-        <div className="flex items-start gap-3 rounded-xl bg-surface p-3">
+        <div className="flex flex-wrap items-start gap-3 rounded-xl bg-surface p-3">
           <span
             aria-hidden="true"
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg text-muted"
@@ -538,12 +569,54 @@ export function RestStatesCard({
             <span className="block text-xs text-muted">
               {t('adminHomeRestStatesHint')}
             </span>
-            <span className="mt-1 block text-3xl font-bold tabular-nums">
+            <span
+              className={cn(
+                'mt-1 block text-3xl font-bold tabular-nums',
+                loading && 'opacity-60',
+              )}
+            >
               {rest.total}
             </span>
           </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <OwnerFilter
+              size="sm"
+              className="w-44"
+              value={owners}
+              onChange={setOwners}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              loading={exporting}
+              disabled={rest.total === 0}
+              icon={<Download size={14} aria-hidden="true" />}
+              onClick={() => void runExport()}
+            >
+              {t('exportExcel')}
+            </Button>
+          </div>
         </div>
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        {exportNote && (
+          <p
+            role={exportNote === 'failed' ? 'alert' : undefined}
+            className={cn(
+              'text-xs',
+              exportNote === 'failed' ? 'text-danger' : 'text-muted',
+            )}
+          >
+            {exportNote === 'failed'
+              ? t('adminHomeExportFailed')
+              : t('adminHomeExportCapped')}
+          </p>
+        )}
+        <ul
+          aria-busy={loading}
+          className={cn(
+            'grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5',
+            loading && 'opacity-60',
+          )}
+        >
           {REST_STATES.map((item) => {
             const count = ownerTotals(data, [item.state]).total
             const share =
@@ -551,10 +624,10 @@ export function RestStatesCard({
             const href =
               item.purpose === 'available'
                 ? canOpenEquipment
-                  ? availableEquipmentHref()
+                  ? availableEquipmentHref(owners)
                   : null
                 : canOpenLogs
-                  ? workshopStateLogHref(item.purpose)
+                  ? workshopStateLogHref(item.purpose, owners)
                   : null
             const style = {
               backgroundColor: `color-mix(in srgb, ${item.stroke} 18%, var(--bg))`,

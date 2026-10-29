@@ -4,6 +4,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import {
   ADMIN_HOME_OWNERS,
   ALL_OWNERS,
+  FLEET_FILTER_OWNERS,
   type AdminHomeOwner,
 } from '@/lib/adminHomeStats'
 import type { TranslationKey } from '@/i18n/translations'
@@ -121,6 +122,29 @@ export function HomeOwnerFilter(
       // Naming all three keeps the trigger identical for "empty" and "all
       // ticked", instead of flipping to "3 ملاك".
       summaryAfter={ADMIN_HOME_OWNERS.length}
+    />
+  )
+}
+
+/**
+ * The fleet tables' owner filter (owner 2026-10-29, «اضف خيار تكوين في
+ * الفلتر»): the home's three plus Takween; an empty selection reads as those
+ * four (`fleetOwnerArgument`).
+ */
+export function FleetOwnerFilter(
+  props: Omit<OwnerFilterProps, 'options' | 'allLabel' | 'summaryAfter'>,
+) {
+  const label = useOwnerLabel()
+  const allLabel = useMemo(
+    () => FLEET_FILTER_OWNERS.map((owner) => label(owner)).join('، '),
+    [label],
+  )
+  return (
+    <OwnerFilter
+      {...props}
+      options={FLEET_FILTER_OWNERS}
+      allLabel={allLabel}
+      summaryAfter={FLEET_FILTER_OWNERS.length}
     />
   )
 }
