@@ -70,7 +70,8 @@ export function AdminHomeScreen({
   // Owner 2026-10-26: the greeting and the name in one font (the heading's,
   // through `h1 *` in index.css), larger than other page titles.
   const greeting = parts ? (
-    <span className="text-[30px] leading-tight sm:text-[36px]">
+    // Bold since owner 2026-10-29 («التصبيحة خليها بولد»).
+    <span className="text-[30px] font-bold leading-tight sm:text-[36px]">
       {parts.before}
       <bdi>{name}</bdi>
       {parts.after}

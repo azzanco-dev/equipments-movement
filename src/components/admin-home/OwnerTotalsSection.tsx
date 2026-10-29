@@ -9,7 +9,7 @@ import {
   type AdminHomeOwner,
 } from '@/lib/adminHomeStats'
 import { useAdminHomeSection } from './useAdminHomeSection'
-import { useOwnerLabel } from './OwnerFilter'
+import { ownershipBadge } from '@/lib/equipmentForm'
 
 /** One tone per owner, in `ALL_OWNERS` order (the chart outline shades). */
 const OWNER_STROKE: Record<AdminHomeOwner, string> = {
@@ -61,7 +61,9 @@ function OwnerTotalCard({
   /** Without it (no equipment page) the rows are not links. */
   hrefOf?: (owner: AdminHomeOwner) => string
 }) {
-  const ownerLabel = useOwnerLabel()
+  // Full owner names, as on the equipment page (owner 2026-10-29,
+  // «الاسماء خليها كاملة»), wrapping on a narrow card.
+  const { t } = useI18n()
   const share = (count: number) =>
     total > 0 ? Math.round((count / total) * 100) : 0
   return (
@@ -69,7 +71,7 @@ function OwnerTotalCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-sm font-medium text-muted">{title}</h3>
-          <p className="text-3xl font-semibold tabular-nums">{total}</p>
+          <p className="text-3xl font-bold tabular-nums">{total}</p>
           <p className="text-xs text-muted">{hint}</p>
         </div>
         <span
@@ -106,11 +108,13 @@ function OwnerTotalCard({
                 className="h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ backgroundColor: OWNER_STROKE[row.owner] }}
               />
-              <span className="min-w-0 flex-1">{ownerLabel(row.owner)}</span>
+              <span className="min-w-0 flex-1">
+                {t(ownershipBadge(row.owner).key)}
+              </span>
               <span className="text-xs tabular-nums text-muted">
                 {share(row.count)}%
               </span>
-              <span className="w-10 text-end font-semibold tabular-nums">
+              <span className="w-10 text-end font-bold tabular-nums">
                 {row.count}
               </span>
             </>

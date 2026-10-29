@@ -52,11 +52,11 @@ test('the greeting and the day follow Saudi time', () => {
   )
   assert.equal(
     greeting.saudiDayLabel(new Date('2026-10-29T06:30:00Z'), 'ar'),
-    'الخميس 29 اكتوبر',
+    'الخميس 29 اكتوبر 2026',
   )
   assert.equal(
     greeting.saudiDayLabel(new Date('2026-10-29T06:30:00Z'), 'en'),
-    'Thursday 29 October',
+    'Thursday 29 October 2026',
   )
   // The Saudi day, not the UTC one: 22:00 UTC on the 28th is the 29th.
   assert.match(
@@ -128,4 +128,8 @@ test('the cards read every owner and link to the filtered equipment list', () =>
   )
   assert.match(screen, /description=\{saudiDayLabel\(now, lang\)\}/)
   assert.match(screen, /'adminHomeGreetingMorning'/)
+  // Owner 2026-10-29: the greeting and the big numbers bold, full names.
+  assert.match(screen, /className="text-\[30px\] font-bold/)
+  assert.match(section, /text-3xl font-bold tabular-nums/)
+  assert.match(section, /t\(ownershipBadge\(row\.owner\)\.key\)/)
 })
