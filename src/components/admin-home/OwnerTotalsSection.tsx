@@ -111,12 +111,13 @@ function OwnerTotalsRow({
     <section aria-label={title} className="space-y-2">
       {/* The total on a row of its own (owner 2026-10-29, «خلي الاجمالي في
           صف لحاله»), the owners' cards under it. */}
-      {/* The number at the start, the right in Arabic (owner 2026-10-29,
-          «خلي الارقام الاجمالية يمين»). */}
+      {/* At the start, the right in Arabic («خلي الارقام الاجمالية يمين»):
+          the title, the number under it («الارقام الاجمالية تحت العنوان»),
+          then the hint (owner 2026-10-29). */}
       <div className="flex items-center gap-3 rounded-xl border bg-surface p-3">
-        <span className="text-3xl font-bold tabular-nums">{total}</span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium">{title}</span>
+          <span className="block text-3xl font-bold tabular-nums">{total}</span>
           <span className="block text-xs text-muted">{hint}</span>
         </span>
         <span
@@ -152,8 +153,9 @@ function OwnerTotalsRow({
           )
           // The tint with the charts' readable text (`--chart-text`, dark on
           // the light tints, near-white on the dark theme's).
+          // Half the tint over the page («خليها اخف», owner 2026-10-29).
           const tint = {
-            backgroundColor: OWNER_FILL[row.owner],
+            backgroundColor: `color-mix(in srgb, ${OWNER_FILL[row.owner]} 50%, var(--bg))`,
             color: 'var(--chart-text)',
           }
           return (
@@ -337,7 +339,8 @@ export function OwnerTotalsSection({
   const sites = ownerTotals(data, ['inside_site'])
 
   return (
-    <div className="space-y-3">
+    // More room between the two sections (owner 2026-10-29).
+    <div className="space-y-8">
       <OwnerTotalsRow
         title={t('adminHomeOwnerFleetTitle')}
         hint={t('adminHomeOwnerFleetHint')}
