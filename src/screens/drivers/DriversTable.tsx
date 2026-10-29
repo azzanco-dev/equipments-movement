@@ -106,8 +106,10 @@ export function DriversTable({
         <span className="flex flex-col text-start">
           <span className="font-semibold">{row.full_name}</span>
           {row.name_en && (
-            <span dir="ltr" className="text-start text-xs text-muted">
-              {row.name_en}
+            // The line follows the page's direction (start = right in
+            // Arabic); only the Latin text is isolated.
+            <span className="text-xs text-muted">
+              <bdi dir="ltr">{row.name_en}</bdi>
             </span>
           )}
         </span>
