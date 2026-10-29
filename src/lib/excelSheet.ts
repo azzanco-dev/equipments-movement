@@ -124,9 +124,12 @@ export function sheetAoa<T>(
 
 // ============ SHEET LOOK ============
 //
-// One look for every export: neutral grey header, thin light-grey borders,
-// comfortable row height, text indented from the edge it is read from. No
-// saturated colors; the file is a working document, not a report page.
+// One look for every export, a «Format as Table» look (owner 2026-10-29,
+// «اضف الوان، وformat as table»; drawn with cell styles because SheetJS
+// cannot write a real Excel table; the owner chose black over blue, green,
+// teal and orange): a near-black header with white bold text, light-grey
+// banded rows, thin light-grey borders, comfortable row height, text indented
+// from the edge it is read from.
 
 /** Row heights in points. */
 export const EXPORT_HEADER_HEIGHT_PT = 30
@@ -139,9 +142,11 @@ export const EXPORT_ROW_HEIGHT_PT = 24
 export const EXPORT_WIDTH_PADDING = 4
 
 const BORDER_COLOR = 'D1D5DB'
-const HEADER_FILL = 'F3F4F6'
-const HEADER_TEXT = '111827'
+const HEADER_FILL = '1F2937'
+const HEADER_TEXT = 'FFFFFF'
 const BODY_TEXT = '1F2937'
+/** Every second data row (the table's banding). */
+const BAND_FILL = 'F3F4F6'
 
 /** A cell style in `xlsx-js-style`'s shape, described without importing it. */
 export interface ExportCellStyle {
@@ -177,6 +182,7 @@ export function exportCellStyle(
   kind: ExportCellKind,
   rtl: boolean,
   headerCentered = false,
+  banded = false,
 ): ExportCellStyle {
   const centered = kind === 'date' || (kind === 'header' && headerCentered)
   const style: ExportCellStyle = {
@@ -193,6 +199,8 @@ export function exportCellStyle(
   }
   if (kind === 'header')
     style.fill = { patternType: 'solid', fgColor: { rgb: HEADER_FILL } }
+  else if (banded)
+    style.fill = { patternType: 'solid', fgColor: { rgb: BAND_FILL } }
   return style
 }
 

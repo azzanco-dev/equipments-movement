@@ -131,3 +131,25 @@ test('no saturated color is used by the sheet look', () => {
     assert.ok(Math.max(r, g, b) - Math.min(r, g, b) <= 24, hex)
   }
 })
+
+// Owner 2026-10-29: «اضف الوان، وformat as table», black chosen over blue,
+// green, teal and orange (samples compared before it was applied).
+test('the table look: a black header, white bold text, banded rows', () => {
+  const header = sheet.exportCellStyle('header', true)
+  assert.equal(header.fill.fgColor.rgb, '1F2937')
+  assert.equal(header.font.color.rgb, 'FFFFFF')
+  assert.equal(header.font.bold, true)
+  assert.equal(sheet.exportCellStyle('text', true).fill, undefined)
+  assert.equal(
+    sheet.exportCellStyle('text', true, false, true).fill.fgColor.rgb,
+    'F3F4F6',
+  )
+  const workbook = writer.buildExportWorkbook('Visits', columns, rows, {
+    rtl: true,
+  })
+  const ws = workbook.Sheets.Visits
+  // Row 2 is the first data row (plain), row 3 the second (banded).
+  assert.equal(ws.A2.s.fill, undefined)
+  assert.equal(ws.A3.s.fill.fgColor.rgb, 'F3F4F6')
+  assert.equal(ws.C3.s.fill.fgColor.rgb, 'F3F4F6')
+})

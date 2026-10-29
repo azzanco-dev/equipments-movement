@@ -7,7 +7,8 @@
  * downloaded when someone presses an export button.
  *
  * Every exported file opens the same way: Arabic headers from the translation
- * system, a grey bold header row, thin borders, comfortable row height and
+ * system, a «Format as Table» look (a near-black header with white bold
+ * text and light-grey banded rows), thin borders, comfortable row height and
  * padding, readable column widths, an autofilter on the header, a right-to-left
  * sheet for the Arabic interface, and timestamps that read as Saudi time
  * wherever the file is opened (see `@/lib/excelSheet`).
@@ -58,6 +59,9 @@ export function buildExportWorkbook<T>(
   const headerDate = exportCellStyle('header', rtl, true)
   const bodyText = exportCellStyle('text', rtl)
   const bodyDate = exportCellStyle('date', rtl)
+  // Every second data row is banded, as an Excel table is.
+  const bandText = exportCellStyle('text', rtl, false, true)
+  const bandDate = exportCellStyle('date', rtl, false, true)
 
   columns.forEach((column, columnIndex) => {
     const isDate = column.type === 'date'
@@ -69,7 +73,14 @@ export function buildExportWorkbook<T>(
         cell.s = isDate ? headerDate : headerText
         continue
       }
-      cell.s = isDate ? bodyDate : bodyText
+      const banded = rowIndex % 2 === 0
+      cell.s = isDate
+        ? banded
+          ? bandDate
+          : bodyDate
+        : banded
+          ? bandText
+          : bodyText
       // Date cells carry the display format; `aoa_to_sheet` wrote them as
       // plain numbers, which would otherwise show as a five-digit serial.
       if (isDate && typeof cell.v === 'number') {
