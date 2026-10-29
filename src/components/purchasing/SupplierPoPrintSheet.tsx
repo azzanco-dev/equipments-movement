@@ -172,20 +172,12 @@ export function SupplierPoPrintSheet({
     ...(po.status === 'closed' ? (['supplierPoStatusClosed'] as const) : []),
   ]
   const headerFacts: { key: TranslationKey; value: ReactNode }[] = [
-    { key: 'supplierPoNumber', value: <bdi dir="ltr">{po.po_number}</bdi> },
+    { key: 'supplierPoPrintNumber', value: po.po_number },
     {
       key: 'supplierPoPrintIssueDate',
-      value: <bdi dir="ltr">{formatDate(saudiDateKey(new Date().toISOString()))}</bdi>,
+      value: formatDate(saudiDateKey(new Date().toISOString())),
     },
-    {
-      key: 'supplierPoPrintStatus',
-      value: stateKeys.map((key, index) => (
-        <span key={key}>
-          {index > 0 && ' · '}
-          <Inline k={key} />
-        </span>
-      )),
-    },
+    { key: 'supplierPoPrintStatus', value: stateKeys.map(en).join(' · ') },
   ]
   // Under the parties: the PO's start, its approval and its closing.
   const facts: { key: TranslationKey; value: ReactNode }[] = [
@@ -252,9 +244,9 @@ export function SupplierPoPrintSheet({
             ref={logoRef}
             onLoad={() => setLogoSettled(true)}
             onError={() => setLogoSettled(true)}
-            src="/azzanco-logo.png"
+            src="/azzanco-logo-full.png"
             alt=""
-            className="h-16 w-16 object-contain"
+            className="h-[18mm] w-auto justify-self-start object-contain"
           />
           <div className="text-center">
             <h1 className="text-xl font-bold leading-tight">
@@ -265,12 +257,11 @@ export function SupplierPoPrintSheet({
             </p>
             <p className="mt-1">{project}</p>
           </div>
-          <dl className="m-0 justify-self-end space-y-0.5 text-[11px]">
+          {/* The corner is English only (owner 2026-10-29): «PO Number: …». */}
+          <dl className="m-0 justify-self-end space-y-0.5 text-[11px]" dir="ltr">
             {headerFacts.map((fact) => (
-              <div key={fact.key} className="flex justify-end gap-1.5">
-                <dt className="text-muted">
-                  <Inline k={fact.key} />:
-                </dt>
+              <div key={fact.key} className="flex gap-1.5">
+                <dt className="text-muted">{en(fact.key)}:</dt>
                 <dd className="m-0 font-semibold">{fact.value}</dd>
               </div>
             ))}

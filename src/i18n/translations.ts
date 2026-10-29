@@ -2147,17 +2147,19 @@ export const translations = {
     supplierPoPrintTitleAr: 'امر شراء',
     supplierPoPrintTitleEn: 'Purchase Order',
     supplierPoPrintIssueDate: 'تاريخ الاصدار',
+    supplierPoPrintNumber: 'رقم الـ PO',
     supplierPoPrintStatus: 'الحالة',
     supplierPoPrintUnitDescription: 'وصف المعدة',
     supplierPoPrintBeforeVat: 'الاجمالي قبل الضريبة',
     supplierPoPrintVat: 'ضريبة القيمة المضافة ({rate}%)',
     supplierPoPrintTotal: 'الاجمالي',
     supplierPoTermsTitle: 'الشروط والاحكام',
-    supplierPoTerm1: 'الاسعار المذكورة لا تشمل ضريبة القيمة المضافة.',
+    // Owner 2026-10-29: the terms of the company's own PO (his scan).
+    supplierPoTerm1: 'يتم اعتماد ساعات العمل بناء على كرت الشركة الرسمي المعتمد من الموقع.',
     supplierPoTerm2:
-      'تبدا مدة ايجار كل معدة من تاريخ بدايتها المذكور، وتستمر ما دامت المعدة تعمل في المشروع.',
-    supplierPoTerm3: 'يحسب المستحق حسب ساعات كرت التشغيل المعتمد من العميل.',
-    supplierPoTerm4: 'لا يعتد بامر الشراء الا بعد اعتماده.',
+      'يتم سداد مستحقات المورد حسب استلام الدفعة المقابلة من الشركة المالكة للمشروع.',
+    supplierPoTerm3:
+      'في حال تشغيل المعدة خلال وردية ثانية (دوام ليلي)، يتم احتساب اجرة الوردية الثانية بنسبة 70% من قيمة الايجار المعتادة، وذلك بعد خصم 30%.',
     supplierPoApproveBlockedUnpriced: 'لا يعتمد الامر قبل تسعير كل معداته.',
     supplierPoApproveBlockedNoLines: 'لا يعتمد امر بلا معدات.',
     supplierPoApproveBlockedSelf: 'لا تعتمد امرا انشاته بنفسك.',
@@ -4379,18 +4381,21 @@ export const translations = {
     // totals box. The title is printed in both languages.
     supplierPoPrintTitleAr: 'امر شراء',
     supplierPoPrintTitleEn: 'Purchase Order',
-    supplierPoPrintIssueDate: 'Issue date',
+    supplierPoPrintIssueDate: 'Issue Date',
+    supplierPoPrintNumber: 'PO Number',
     supplierPoPrintStatus: 'Status',
     supplierPoPrintUnitDescription: 'Equipment description',
     supplierPoPrintBeforeVat: 'Total before VAT',
     supplierPoPrintVat: 'VAT ({rate}%)',
     supplierPoPrintTotal: 'Total',
     supplierPoTermsTitle: 'Terms and conditions',
-    supplierPoTerm1: 'The prices stated exclude VAT.',
+    // Owner 2026-10-29: the terms of the company's own PO (his scan).
+    supplierPoTerm1:
+      "Working hours shall be calculated and approved based on the Company's official timesheet duly approved by the site.",
     supplierPoTerm2:
-      'The rent of each unit starts on its stated start date and runs while the unit works on the project.',
-    supplierPoTerm3: 'The amount due follows the hours of the timesheet approved by the client.',
-    supplierPoTerm4: 'The purchase order is valid only once approved.',
+      'Payment to the Supplier shall be made subject to receipt of the corresponding payment from the project owner/client.',
+    supplierPoTerm3:
+      'If the equipment operates during a second shift (night shift), the rental rate for the second shift shall be calculated at 70% of the normal rental rate, after a 30% deduction.',
     supplierPoApproveBlockedUnpriced: 'The order cannot be approved until every unit has a price.',
     supplierPoApproveBlockedNoLines: 'An order without equipment cannot be approved.',
     supplierPoApproveBlockedSelf: 'You cannot approve an order you created.',

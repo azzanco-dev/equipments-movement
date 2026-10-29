@@ -279,7 +279,19 @@ test('the screens: approve for approvers, locked when approved, a draft PDF mark
     /useI18n|fixed inset-0|SUPPLIER_PO_STATUS_BADGE|printGeneratedAt|createdBy|supplierPoCreatedAt|supplierPoLineNote|equipmentPurchasingOpenEnd|appName|supplierPoEquipment'|supplierPoDraftWatermark|text-left/,
   )
   assert.match(sheet, /ar\('supplierPoPrintTitleAr'\)[\s\S]*en\('supplierPoPrintTitleEn'\)[\s\S]*\{project\}/)
-  assert.match(sheet, /key: 'supplierPoNumber'[\s\S]*key: 'supplierPoPrintIssueDate'[\s\S]*key: 'supplierPoPrintStatus'/)
+  assert.match(sheet, /key: 'supplierPoPrintNumber'[\s\S]*key: 'supplierPoPrintIssueDate'[\s\S]*key: 'supplierPoPrintStatus'/)
+  // The corner is English only: «PO Number: SPO…», the state in English.
+  assert.match(sheet, /<dl className="m-0 justify-self-end space-y-0\.5 text-\[11px\]" dir="ltr">/)
+  assert.match(sheet, /<dt className="text-muted">\{en\(fact\.key\)\}:<\/dt>/)
+  assert.match(sheet, /\{ key: 'supplierPoPrintStatus', value: stateKeys\.map\(en\)\.join\(' · '\) \}/)
+  // The full logo with the company name.
+  assert.match(sheet, /src="\/azzanco-logo-full\.png"/)
+  assert.ok(fs.existsSync(path.join(root, 'public', 'azzanco-logo-full.png')))
+  // The terms of the company's own PO: three.
+  assert.match(
+    read('src', 'lib', 'purchasing.ts'),
+    /SUPPLIER_PO_TERMS_KEYS: readonly TranslationKey\[\] = \[\s+'supplierPoTerm1',\s+'supplierPoTerm2',\s+'supplierPoTerm3',\s+\]/,
+  )
   assert.match(sheet, /draft \? 'supplierPoApprovalDraft' : 'supplierPoApprovalApproved'/)
   assert.match(sheet, /<Inline k="supplierPoPrintBuyer" \/>[\s\S]*<Stacked k="supplierPoPrintBuyerName" \/>[\s\S]*<Inline k="supplierPoSupplier" \/>/)
   assert.match(

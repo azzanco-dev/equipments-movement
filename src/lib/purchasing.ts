@@ -133,7 +133,6 @@ export const SUPPLIER_PO_TERMS_KEYS: readonly TranslationKey[] = [
   'supplierPoTerm1',
   'supplierPoTerm2',
   'supplierPoTerm3',
-  'supplierPoTerm4',
 ]
 
 /** The VAT on an amount excluding VAT, rounded to halalas. */
