@@ -7,7 +7,10 @@ import { AvailabilitySection } from '@/components/admin-home/AvailabilitySection
 import { EntriesFlowSection } from '@/components/admin-home/EntriesFlowSection'
 import { FleetDonutSection } from '@/components/admin-home/FleetDonutSection'
 import { FleetStateSection } from '@/components/admin-home/FleetStateSection'
-import { OwnerTotalsSection } from '@/components/admin-home/OwnerTotalsSection'
+import {
+  OwnerTotalsSection,
+  SupplierSitesCard,
+} from '@/components/admin-home/OwnerTotalsSection'
 import { WhatsAppStatusAlert } from '@/components/WhatsAppGatewayStatus'
 import { useI18n } from '@/i18n/I18nContext'
 import { useAuth } from '@/auth/AuthContext'
@@ -139,10 +142,15 @@ export function AdminHomeScreen({
           canOpenEquipment={Boolean(onSelectEquipment)}
           canOpenLogs={canOpenLogs}
         />
+        {/* Owner 2026-10-29: the tables right under the workshop states,
+            without the state cards the owner rows replace, then the
+            suppliers in projects. */}
         <FleetStateSection
           onSelectEquipment={onSelectEquipment}
           onSelectMovement={onSelectMovement}
+          showCards={false}
         />
+        <SupplierSitesCard canOpenLogs={canOpenLogs} />
         {/* Owner 2026-10-26: the Afaqy tracker figures of the fleet, right
             under its state in the program (location-view permission). */}
         <AfaqySection onSelectEquipment={onSelectEquipment} />

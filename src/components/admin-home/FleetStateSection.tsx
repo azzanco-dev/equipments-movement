@@ -127,6 +127,13 @@ export interface FleetStateSectionProps {
   onSelectEquipment?: (id: string) => void
   /** Opens a movement: a «داخل الورشة» row opens its open workshop entry. */
   onSelectMovement?: (id: string) => void
+  /**
+   * The state cards above the tables. The admin home passes `false` since
+   * owner 2026-10-29 («ارفع داخل المشاريع وداخل الورشة ومتاحة فوق تصير تحت
+   * الصيانة»): the owner rows above them (`OwnerTotalsSection`) give the
+   * totals now, so the section is its tables, with its owner filter.
+   */
+  showCards?: boolean
 }
 
 /**
@@ -163,14 +170,17 @@ export function FleetStateSection({
   onSelectState,
   onSelectEquipment,
   onSelectMovement,
+  showCards = true,
 }: FleetStateSectionProps) {
   const { t } = useI18n()
   // Plain component state, not the URL: it scopes this section only, so it is
   // a view control rather than something a shared link should carry.
   const [owners, setOwners] = useState<AdminHomeOwner[]>(DEFAULT_HOME_OWNERS)
+  // Without the cards nothing reads the fleet state, so it is not fetched.
   const load = useCallback(
-    (signal: AbortSignal) => fetchFleetState(owners, signal),
-    [owners],
+    (signal: AbortSignal) =>
+      showCards ? fetchFleetState(owners, signal) : Promise.resolve(null),
+    [owners, showCards],
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
   const [jump, setJump] = useState<FleetJumpRequest | null>(null)
@@ -218,7 +228,7 @@ export function FleetStateSection({
         </div>
       }
     >
-      {failed ? (
+      {!showCards ? null : failed ? (
         // A failed load is a failure with a retry, never zeros.
         <ErrorState
           title={t('adminHomeSectionError')}

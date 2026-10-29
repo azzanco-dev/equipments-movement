@@ -170,7 +170,7 @@ test('0161 counts the supplier units inside projects, read-only', () => {
   assert.doesNotMatch(code, /\b(UPDATE|DELETE FROM|INSERT INTO|ALTER TABLE)\b/)
 })
 
-test('the suppliers card parses, loads on its own and comes after the rows', () => {
+test('the suppliers card parses, loads on its own and follows the fleet tables', () => {
   const stats = loadLib('adminHomeStats')
   const parsed = stats.parseSupplierSiteCounts({
     total: 5,
@@ -189,15 +189,30 @@ test('the suppliers card parses, loads on its own and comes after the rows', () 
     'admin-home',
     'OwnerTotalsSection.tsx',
   )
-  assert.match(section, /function SupplierSitesCard\(\{ canOpenLogs \}/)
+  assert.match(section, /export function SupplierSitesCard\(\{\s*canOpenLogs,?/)
   assert.match(
     section,
     /useAdminHomeSection\(load\)[\s\S]*useAdminHomeSection\(load\)/,
   )
+  // Owner 2026-10-29: the home renders it after the fleet tables, which sit
+  // right under the workshop states without the old state cards.
+  assert.doesNotMatch(section, /<SupplierSitesCard/)
+  const home = read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx')
   assert.match(
-    section,
-    /<SupplierSitesCard canOpenLogs=\{canOpenLogs\} \/>\s*<OwnerTotalsRow/,
+    home,
+    /<OwnerTotalsSection[\s\S]*?\/>\s*(\{\/\*[\s\S]*?\*\/\}\s*)?<FleetStateSection[\s\S]*?showCards=\{false\}\s*\/>\s*<SupplierSitesCard canOpenLogs=\{canOpenLogs\} \/>/,
   )
+  const fleetState = read(
+    'src',
+    'components',
+    'admin-home',
+    'FleetStateSection.tsx',
+  )
+  assert.match(
+    fleetState,
+    /showCards \? fetchFleetState\(owners, signal\) : Promise\.resolve\(null\)/,
+  )
+  assert.match(fleetState, /\{!showCards \? null : failed \?/)
   // Owner 2026-10-29: «كاردز صغيرة» — a row per total, the total first.
   assert.match(section, /function OwnerTotalsRow\(/)
   assert.match(section, /grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5/)
@@ -218,10 +233,6 @@ test('the suppliers card parses, loads on its own and comes after the rows', () 
   assert.match(section, /operator: 'is_not_set'/)
   assert.match(section, /\{extra\}\s*<\/section>/)
   assert.match(section, /\/logs\?context=workshop&vfilters=/)
-  assert.ok(
-    section.indexOf("t('adminHomeOwnerWorkshopTitle')") >
-      section.indexOf('<SupplierSitesCard canOpenLogs'),
-  )
   // Light owner tints with the charts' readable text («بالوان فاتحة»).
   assert.match(
     section,

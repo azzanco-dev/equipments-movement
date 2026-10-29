@@ -264,7 +264,7 @@ const SUPPLIERS_COLLAPSED = 7
  * per supplier, the largest first. It loads on its own, so a failure (or a
  * database without 0161 yet) never hides the two owner cards.
  */
-function SupplierSitesCard({ canOpenLogs }: { canOpenLogs: boolean }) {
+export function SupplierSitesCard({ canOpenLogs }: { canOpenLogs: boolean }) {
   const { t } = useI18n()
   const [expanded, setExpanded] = useState(false)
   const load = useCallback(
@@ -442,7 +442,6 @@ export function OwnerTotalsSection({
           canOpenLogs ? (owner) => insideProjectsLogHref(owner) : undefined
         }
       />
-      <SupplierSitesCard canOpenLogs={canOpenLogs} />
       <OwnerTotalsRow
         title={t('adminHomeOwnerWorkshopTitle')}
         hint={t('adminHomeOwnerWorkshopHint')}
