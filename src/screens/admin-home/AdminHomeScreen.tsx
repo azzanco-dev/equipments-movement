@@ -3,7 +3,6 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { LogIn, LogOut } from 'lucide-react'
 import { Button, PageHeader } from '@/components/ui'
 import { AfaqySection } from '@/components/admin-home/AfaqySection'
-import { AttentionSection } from '@/components/admin-home/AttentionSection'
 import { AvailabilitySection } from '@/components/admin-home/AvailabilitySection'
 import { EntriesFlowSection } from '@/components/admin-home/EntriesFlowSection'
 import { FleetDonutSection } from '@/components/admin-home/FleetDonutSection'
@@ -19,19 +18,12 @@ import {
   type AdminHomeGranularity,
 } from '@/lib/adminHomeStats'
 
-/** The Afaqy section's anchor, for the «يحتاج انتباهك» no-signal item. */
-const AFAQY_ANCHOR = 'home-afaqy'
-
 export interface AdminHomeScreenProps {
   onSelectEquipment?: (id: string) => void
   /** Opens a movement; the «داخل الورشة» table opens the open entry. */
   onSelectMovement?: (id: string) => void
   /** The shell opens /logs: the projects and suppliers cards link there. */
   canOpenLogs?: boolean
-  /** Whether the shell opens a page («يحتاج انتباهك» links only then). */
-  canOpenPage?: (
-    page: 'logs' | 'purchasing/units' | 'purchasing/orders',
-  ) => boolean
   /** Admin only: the legacy dashboard's register entry/exit shortcuts. */
   onCreateMovement?: (type: 'entry' | 'exit') => void
 }
@@ -62,7 +54,6 @@ export function AdminHomeScreen({
   onSelectEquipment,
   onSelectMovement,
   canOpenLogs = false,
-  canOpenPage = () => false,
   onCreateMovement,
 }: AdminHomeScreenProps) {
   const { t, lang } = useI18n()
@@ -142,16 +133,6 @@ export function AdminHomeScreen({
             ) : undefined
           }
         />
-        {/* Owner 2026-10-29: «يحتاج انتباهك» first; hidden when nothing is
-            left. */}
-        <AttentionSection
-          canOpenPage={canOpenPage}
-          onShowAfaqy={() =>
-            document
-              .getElementById(AFAQY_ANCHOR)
-              ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          }
-        />
         {/* Owner 2026-10-29: «الاسطول» and «في المشاريع» by owner, all five
             owners, above the fleet state. */}
         <OwnerTotalsSection
@@ -164,9 +145,7 @@ export function AdminHomeScreen({
         />
         {/* Owner 2026-10-26: the Afaqy tracker figures of the fleet, right
             under its state in the program (location-view permission). */}
-        <div id={AFAQY_ANCHOR} className="scroll-mt-20">
-          <AfaqySection onSelectEquipment={onSelectEquipment} />
-        </div>
+        <AfaqySection onSelectEquipment={onSelectEquipment} />
         {/* Its former neighbour "معدات بلا حركة" is now the "متاحة" mini table
           under the state cards, so the availability table takes the full
           width. */}

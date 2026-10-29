@@ -579,7 +579,6 @@ function AppContent() {
               <AdminHomeScreen
                 onSelectMovement={openMovement}
                 canOpenLogs={canOpenLogs}
-                canOpenPage={(target) => shell.pages.has(target)}
                 onSelectEquipment={
                   canOpenEquipment
                     ? (id) => router.push(`/equipment/${id}`)

@@ -170,7 +170,7 @@ test('0161 counts the supplier units inside projects, read-only', () => {
   assert.doesNotMatch(code, /\b(UPDATE|DELETE FROM|INSERT INTO|ALTER TABLE)\b/)
 })
 
-test('the suppliers card parses, loads on its own and sits third', () => {
+test('the suppliers card parses, loads on its own and comes after the rows', () => {
   const stats = loadLib('adminHomeStats')
   const parsed = stats.parseSupplierSiteCounts({
     total: 5,
@@ -196,9 +196,12 @@ test('the suppliers card parses, loads on its own and sits third', () => {
   )
   assert.match(
     section,
-    /<SupplierSitesCard canOpenLogs=\{canOpenLogs\} \/>\s*<\/section>/,
+    /<SupplierSitesCard canOpenLogs=\{canOpenLogs\} \/>\s*<\/div>/,
   )
-  assert.match(section, /className="grid gap-4 lg:grid-cols-3"/)
+  // Owner 2026-10-29: «كاردز صغيرة» — a row per total, the total first.
+  assert.match(section, /function OwnerTotalsRow\(/)
+  assert.match(section, /grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6/)
+  assert.equal(section.match(/<OwnerTotalsRow/g).length, 2)
   assert.match(
     read('src', 'lib', 'adminHomeData.ts'),
     /rpc\('get_admin_supplier_site_counts'\)/,

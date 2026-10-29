@@ -71,7 +71,13 @@ export function insideProjectsLogHref(
   return `/logs?vfilters=${encodeURIComponent(JSON.stringify(filters))}`
 }
 
-function OwnerTotalCard({
+/**
+ * One row of small cards (owner 2026-10-29, «تقسم حق الاسطول والمشاريع
+ * بحيث تكون في كاردز صغيرة»): the total first, then one card per owner with
+ * its full name (as on the equipment page, «الاسماء خليها كاملة»), its count
+ * and its share, each a link to its list when the shell opens it.
+ */
+function OwnerTotalsRow({
   title,
   hint,
   icon,
@@ -84,86 +90,66 @@ function OwnerTotalCard({
   icon: ReactNode
   total: number
   owners: { owner: AdminHomeOwner; count: number }[]
-  /** Without it (no equipment page) the rows are not links. */
+  /** Without it (the page is not opened by the shell) no card is a link. */
   hrefOf?: (owner: AdminHomeOwner) => string
 }) {
-  // Full owner names, as on the equipment page (owner 2026-10-29,
-  // «الاسماء خليها كاملة»), wrapping on a narrow card.
   const { t } = useI18n()
   const share = (count: number) =>
     total > 0 ? Math.round((count / total) * 100) : 0
+  const cardClass = 'flex h-full flex-col gap-1 rounded-xl border bg-bg p-3'
   return (
-    <Card className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-sm font-medium text-muted">{title}</h3>
-          <p className="text-3xl font-bold tabular-nums">{total}</p>
-          <p className="text-xs text-muted">{hint}</p>
-        </div>
-        <span
-          aria-hidden="true"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-hover text-muted"
-        >
-          {icon}
-        </span>
-      </div>
-      {/* The owners' shares as one stacked bar. */}
-      <div
-        aria-hidden="true"
-        className="flex h-2 overflow-hidden rounded-full"
-        style={{ backgroundColor: 'var(--chart-4)' }}
-      >
-        {owners.map((row) =>
-          row.count > 0 ? (
-            <span
-              key={row.owner}
-              style={{
-                width: `${(row.count / total) * 100}%`,
-                backgroundColor: OWNER_STROKE[row.owner],
-              }}
-            />
-          ) : null,
-        )}
-      </div>
-      <ul className="divide-y">
+    <section aria-label={title}>
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <li className={`${cardClass} bg-surface`}>
+          <span className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium">{title}</span>
+            <span aria-hidden="true" className="text-muted">
+              {icon}
+            </span>
+          </span>
+          <span className="text-3xl font-bold tabular-nums">{total}</span>
+          <span className="text-xs text-muted">{hint}</span>
+        </li>
         {owners.map((row) => {
           const body = (
             <>
-              <span
-                aria-hidden="true"
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: OWNER_STROKE[row.owner] }}
-              />
-              <span className="min-w-0 flex-1">
-                {t(ownershipBadge(row.owner).key)}
+              <span className="flex items-start gap-1.5 text-xs text-muted">
+                <span
+                  aria-hidden="true"
+                  className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: OWNER_STROKE[row.owner] }}
+                />
+                <span className="min-w-0">
+                  {t(ownershipBadge(row.owner).key)}
+                </span>
               </span>
-              <span className="text-xs tabular-nums text-muted">
-                {share(row.count)}%
-              </span>
-              <span className="w-10 text-end font-bold tabular-nums">
-                {row.count}
+              <span className="mt-auto flex items-baseline justify-between gap-2">
+                <span className="text-2xl font-bold tabular-nums">
+                  {row.count}
+                </span>
+                <span className="text-xs tabular-nums text-muted">
+                  {share(row.count)}%
+                </span>
               </span>
             </>
           )
-          const rowClass =
-            'flex w-full items-center gap-2 py-2 text-start text-sm'
           return (
             <li key={row.owner}>
               {hrefOf ? (
                 <AppLink
                   href={hrefOf(row.owner)}
-                  className={`${rowClass} rounded transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring`}
+                  className={`${cardClass} transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}
                 >
                   {body}
                 </AppLink>
               ) : (
-                <span className={rowClass}>{body}</span>
+                <div className={cardClass}>{body}</div>
               )}
             </li>
           )
         })}
       </ul>
-    </Card>
+    </section>
   )
 }
 
@@ -193,7 +179,7 @@ function SupplierSitesCard({ canOpenLogs }: { canOpenLogs: boolean }) {
         onRetry={retry}
       />
     )
-  if (loading && data === null) return <Skeleton className="h-72 w-full" />
+  if (loading && data === null) return <Skeleton className="h-40 w-full" />
   if (!data) return null
 
   const shown = expanded
@@ -280,7 +266,8 @@ function SupplierSitesCard({ canOpenLogs }: { canOpenLogs: boolean }) {
 }
 
 /**
- * «الاسطول» and «في المشاريع» side by side (owner 2026-10-29, approved on the
+ * «الاسطول» and «في المشاريع», each a row of small cards, then the suppliers
+ * card (owner 2026-10-29, approved on the
  * /ui-kit «نموذج الرئيسية الجديدة»: «قسم الاسطول، اجمالي الاسطول وتحته كل
  * مالك … وقسم المشاريع، اجمالي الي في المشاريع وتحته كل مالك لحاله»): each
  * total with every owner's count, share and a link to the equipment list
@@ -312,10 +299,9 @@ export function OwnerTotalsSection({
 
   if (loading && data === null)
     return (
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Skeleton className="h-72 w-full" />
-        <Skeleton className="h-72 w-full" />
-        <Skeleton className="h-72 w-full" />
+      <div className="space-y-3">
+        <Skeleton className="h-28 w-full" />
+        <Skeleton className="h-28 w-full" />
         <span className="sr-only">{t('loading')}</span>
       </div>
     )
@@ -325,11 +311,8 @@ export function OwnerTotalsSection({
   const sites = ownerTotals(data, ['inside_site'])
 
   return (
-    <section
-      aria-label={t('adminHomeOwnerTotalsLabel')}
-      className="grid gap-4 lg:grid-cols-3"
-    >
-      <OwnerTotalCard
+    <div className="space-y-3">
+      <OwnerTotalsRow
         title={t('adminHomeOwnerFleetTitle')}
         hint={t('adminHomeOwnerFleetHint')}
         icon={<Truck size={16} />}
@@ -339,7 +322,7 @@ export function OwnerTotalsSection({
           canOpenEquipment ? (owner) => ownerEquipmentHref(owner) : undefined
         }
       />
-      <OwnerTotalCard
+      <OwnerTotalsRow
         title={t('adminHomeOwnerSitesTitle')}
         hint={t('adminHomeOwnerSitesHint')}
         icon={<ClipboardList size={16} />}
@@ -351,6 +334,6 @@ export function OwnerTotalsSection({
         }
       />
       <SupplierSitesCard canOpenLogs={canOpenLogs} />
-    </section>
+    </div>
   )
 }
