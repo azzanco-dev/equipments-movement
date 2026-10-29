@@ -10,6 +10,7 @@ import {
   SUPPLIER_PO_TERMS_KEYS,
   SUPPLIER_PO_VAT_RATE,
   supplierPoRateUnitOf,
+  supplierPoSupplierNames,
   supplierPoTotalsByUnit,
   vatOf,
   withVat,
@@ -28,7 +29,6 @@ export interface SupplierPoPrintSheetProps {
   po: SupplierPoRow
   /** The lines in the order the page shows them. */
   lines: readonly SupplierPoLineRow[]
-  supplier: string
   project: string
   /** 0160: the approver's name (an approved PO). */
   approvedBy?: string
@@ -109,7 +109,6 @@ function plateOrChassis(unit: PurchasingUnit): string | null {
 export function SupplierPoPrintSheet({
   po,
   lines,
-  supplier,
   project,
   approvedBy,
   onDone,
@@ -121,6 +120,8 @@ export function SupplierPoPrintSheet({
   doneRef.current = onDone
   const poNumber = po.po_number
   const draft = po.approval_status !== 'approved'
+  // The party in Arabic and, when it has one, English (0164).
+  const supplier = supplierPoSupplierNames(po, ar, en)
 
   useEffect(() => {
     // Once per mount: the ref survives React's development double-mount.
@@ -290,7 +291,15 @@ export function SupplierPoPrintSheet({
             <h2 className="text-[11px] text-muted">
               <Inline k="supplierPoSupplier" />
             </h2>
-            <p className="font-semibold">{supplier}</p>
+            <p className="font-semibold">
+              {supplier.ar}
+              {supplier.en && (
+                <>
+                  <br />
+                  <En>{supplier.en}</En>
+                </>
+              )}
+            </p>
           </section>
         </div>
 

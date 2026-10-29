@@ -51,6 +51,8 @@ export interface NamedRef {
 export interface LessorRef {
   id: string
   name: string | null
+  /** 0164: the supplier PO PDF prints it under the Arabic name. */
+  name_en?: string | null
   is_internal?: boolean
 }
 
@@ -178,7 +180,7 @@ export interface EquipmentPurchasingRow extends SupplierPoLineRow {
 
 const NAMED = 'id,name_ar,name_en'
 
-export const SUPPLIER_PO_SELECT = `id,po_number,lessor_id,owner_class,is_internal,company_id,project_id,start_date,status,closed_at,approval_status,approved_at,approved_by,notes,created_by,created_at,unpriced_count,lessor:lessors(id,name),company:companies(${NAMED}),project:projects(${NAMED})`
+export const SUPPLIER_PO_SELECT = `id,po_number,lessor_id,owner_class,is_internal,company_id,project_id,start_date,status,closed_at,approval_status,approved_at,approved_by,notes,created_by,created_at,unpriced_count,lessor:lessors(id,name,name_en),company:companies(${NAMED}),project:projects(${NAMED})`
 
 /** The list adds the line count (one embedded count per row). */
 export const SUPPLIER_PO_LIST_SELECT = `${SUPPLIER_PO_SELECT},updated_at,supplier_po_equipment(count)`

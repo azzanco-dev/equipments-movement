@@ -19,7 +19,7 @@ import { LessorFormDialog } from './LessorFormDialog'
 import { LessorsTable } from './LessorsTable'
 
 const LIST_SELECT =
-  'id,name,contact_person,contact_number,created_at,updated_at'
+  'id,name,name_en,contact_person,contact_number,created_at,updated_at'
 
 /** Orchestrator for the lessors list; same shape as the companies screen,
  *  minus the import/export/link dialogs lessors does not have. */

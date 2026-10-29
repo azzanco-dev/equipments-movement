@@ -139,6 +139,22 @@ export function LessorFormDialog({
             />
           )}
         </Field>
+        <Field
+          label={t('lessorNameEn')}
+          name="name_en"
+          hint={t('lessorNameEnHint')}
+        >
+          {(control) => (
+            <Input
+              {...control}
+              dir="ltr"
+              maxLength={200}
+              placeholder={t('lessorNameEnPlaceholder')}
+              value={form.name_en}
+              onChange={(event) => update({ name_en: event.target.value })}
+            />
+          )}
+        </Field>
         <Field label={t('contactPerson')} name="contact_person">
           {(control) => (
             <Input

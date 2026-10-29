@@ -719,7 +719,6 @@ export function SupplierPoDetail({
         <SupplierPoPrintSheet
           po={po}
           lines={sortedLines}
-          supplier={supplier}
           project={projectName}
           approvedBy={(po.approved_by && actorNames.get(po.approved_by)) || '—'}
           onDone={() => setPrinting(false)}

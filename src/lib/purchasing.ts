@@ -320,6 +320,32 @@ export function supplierPoSupplierLabel(
   return po.is_internal ? t('supplierPoInternalSupplier') : '—'
 }
 
+/**
+ * The party on the bilingual PO PDF (owner 2026-10-29, «والمورد عربي
+ * وانجليزي»): the owner class's Arabic and English labels, else the lessor's
+ * name with its English name (0164; none while empty), else «العزاني» for a
+ * pre-0138 internal PO.
+ */
+export function supplierPoSupplierNames(
+  po: {
+    is_internal: boolean
+    owner_class?: string | null
+    lessor?: { name: string | null; name_en?: string | null } | null
+  },
+  ar: (key: TranslationKey) => string,
+  en: (key: TranslationKey) => string,
+): { ar: string; en: string | null } {
+  if (isSupplierPoOwnerClass(po.owner_class)) {
+    const key = SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS[po.owner_class]
+    return { ar: ar(key), en: en(key) }
+  }
+  const name = po.lessor?.name?.trim()
+  if (name) return { ar: name, en: po.lessor?.name_en?.trim() || null }
+  return po.is_internal
+    ? { ar: ar('supplierPoInternalSupplier'), en: en('supplierPoInternalSupplier') }
+    : { ar: '—', en: null }
+}
+
 // --- The 0136 error tokens --------------------------------------------------------
 
 /** The form values of «امر شراء جديد» (create_supplier_po). The party is

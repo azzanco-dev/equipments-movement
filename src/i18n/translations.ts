@@ -661,6 +661,9 @@ export const translations = {
 
     // Lessors management
     lessorName: 'اسم المورّد',
+    lessorNameEn: 'الاسم بالانجليزي',
+    lessorNameEnPlaceholder: 'Supplier name in English',
+    lessorNameEnHint: 'اختياري، يظهر تحت الاسم العربي في امر الشراء',
     contactPerson: 'الشخص المسؤول',
     contactNumber: 'رقم التواصل',
     addLessor: 'إضافة مورّد',
@@ -2853,6 +2856,9 @@ export const translations = {
     duplicateProject: 'Duplicate project name',
 
     lessorName: 'Lessor Name',
+    lessorNameEn: 'English name',
+    lessorNameEnPlaceholder: 'Supplier name in English',
+    lessorNameEnHint: 'Optional, printed under the Arabic name on the purchase order',
     contactPerson: 'Contact Person',
     contactNumber: 'Contact Number',
     addLessor: 'Add Lessor',

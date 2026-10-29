@@ -92,6 +92,8 @@ export interface Project {
 export interface Lessor {
   id: string
   name: string
+  /** 0164: optional English name (the supplier PO PDF). */
+  name_en?: string | null
   contact_person: string | null
   contact_number: string | null
   created_at: string
