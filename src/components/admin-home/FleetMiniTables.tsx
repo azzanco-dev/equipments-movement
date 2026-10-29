@@ -49,6 +49,7 @@ import {
   clampPage,
   FLEET_MINI_ROWS,
   fleetMiniTableDomId,
+  FLEET_MINI_TABLES,
   fleetSortArgument,
   normalizeWorkshopPurposeFilter,
   WORKSHOP_PURPOSE_FILTERS,
@@ -506,8 +507,14 @@ export interface FleetMiniTablesProps {
    *  على الحركة»): a workshop row opens its open workshop ENTRY (the unit's
    *  latest movement), else the equipment as before. */
   onSelectMovement?: (id: string) => void
-  /** The «داخل المشاريع» table (default on). */
-  showInside?: boolean
+  /**
+   * Which tables this copy shows (default all three). The admin home splits
+   * them (owner 2026-10-29): the workshop and available under the owner
+   * boxes, inside a project at the bottom with the state cards («اي شي
+   * حذفناه اليوم من الرئيسية رجعه وخليه اخر الصفحة تحت»). Each table is
+   * shown by one copy only, so its DOM id stays unique.
+   */
+  tables?: readonly FleetMiniTableId[]
 }
 
 /**
@@ -529,7 +536,7 @@ export function FleetMiniTables({
   jump,
   onSelectEquipment,
   onSelectMovement,
-  showInside = true,
+  tables = FLEET_MINI_TABLES,
 }: FleetMiniTablesProps) {
   const { t, lang } = useI18n()
   const ownerLabel = useOwnerLabel()
@@ -790,9 +797,7 @@ export function FleetMiniTables({
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
-      {/* Owner 2026-10-29: «وشيل داخل المشاريع» — the home leaves it out
-          (`showInside`); the «في المشاريع» owner row opens those units. */}
-      {showInside && (
+      {tables.includes('inside') && (
         <FleetTable
           table="inside"
           gridIndex={0}
@@ -824,58 +829,62 @@ export function FleetMiniTables({
           }
         />
       )}
-      <FleetTable
-        table="workshop"
-        gridIndex={2}
-        title={t('adminHomeFleetWorkshopTitle')}
-        description={t('adminHomeFleetWorkshopDescription')}
-        columns={workshopColumns}
-        expandedColumns={[
-          sortable(codeColumn),
-          sortable(purposeColumn),
-          sortable(typeColumn),
-          sortable(ownerColumn),
-          sortable(sinceColumn),
-        ]}
-        defaultSort={{ key: sinceColumn.key, direction: 'desc' }}
-        loadPage={loadWorkshop}
-        filterKey={`${ownersKey}|${purpose}`}
-        rowKey={(row) => row.id}
-        onRowClick={openWorkshopRow}
-        empty={t('adminHomeFleetWorkshopEmpty')}
-        toolbar={purposeChips}
-        highlighted={highlighted === 'workshop'}
-        showCount
-        excelColumns={(labels) =>
-          fleetEquipmentExcelColumns('workshop', labels)
-        }
-      />
-      <FleetTable
-        table="available"
-        gridIndex={3}
-        title={t('adminHomeAvailable')}
-        description={t('adminHomeFleetAvailableDescription')}
-        columns={availableColumns}
-        expandedColumns={[
-          sortable(codeColumn),
-          sortable(availableTypeColumn),
-          sortable(availableCompanyProjectColumn),
-          sortable(exitPurposeColumn),
-          foremanColumn,
-          sortable(lastExitColumn),
-        ]}
-        defaultSort={{ key: lastExitColumn.key, direction: 'desc' }}
-        loadPage={loadAvailable}
-        filterKey={ownersKey}
-        rowKey={(row) => row.id}
-        onRowClick={openEquipment}
-        empty={t('adminHomeFleetAvailableEmpty')}
-        highlighted={highlighted === 'available'}
-        showCount
-        excelColumns={(labels) =>
-          fleetEquipmentExcelColumns('available', labels)
-        }
-      />
+      {tables.includes('workshop') && (
+        <FleetTable
+          table="workshop"
+          gridIndex={2}
+          title={t('adminHomeFleetWorkshopTitle')}
+          description={t('adminHomeFleetWorkshopDescription')}
+          columns={workshopColumns}
+          expandedColumns={[
+            sortable(codeColumn),
+            sortable(purposeColumn),
+            sortable(typeColumn),
+            sortable(ownerColumn),
+            sortable(sinceColumn),
+          ]}
+          defaultSort={{ key: sinceColumn.key, direction: 'desc' }}
+          loadPage={loadWorkshop}
+          filterKey={`${ownersKey}|${purpose}`}
+          rowKey={(row) => row.id}
+          onRowClick={openWorkshopRow}
+          empty={t('adminHomeFleetWorkshopEmpty')}
+          toolbar={purposeChips}
+          highlighted={highlighted === 'workshop'}
+          showCount
+          excelColumns={(labels) =>
+            fleetEquipmentExcelColumns('workshop', labels)
+          }
+        />
+      )}
+      {tables.includes('available') && (
+        <FleetTable
+          table="available"
+          gridIndex={3}
+          title={t('adminHomeAvailable')}
+          description={t('adminHomeFleetAvailableDescription')}
+          columns={availableColumns}
+          expandedColumns={[
+            sortable(codeColumn),
+            sortable(availableTypeColumn),
+            sortable(availableCompanyProjectColumn),
+            sortable(exitPurposeColumn),
+            foremanColumn,
+            sortable(lastExitColumn),
+          ]}
+          defaultSort={{ key: lastExitColumn.key, direction: 'desc' }}
+          loadPage={loadAvailable}
+          filterKey={ownersKey}
+          rowKey={(row) => row.id}
+          onRowClick={openEquipment}
+          empty={t('adminHomeFleetAvailableEmpty')}
+          highlighted={highlighted === 'available'}
+          showCount
+          excelColumns={(labels) =>
+            fleetEquipmentExcelColumns('available', labels)
+          }
+        />
+      )}
     </div>
   )
 }

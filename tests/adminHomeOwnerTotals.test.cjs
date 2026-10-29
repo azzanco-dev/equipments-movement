@@ -200,7 +200,7 @@ test('the suppliers card parses, loads on its own and follows the fleet tables',
   const home = read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx')
   assert.match(
     home,
-    /<OwnerTotalsSection[\s\S]*?\/>\s*(\{\/\*[\s\S]*?\*\/\}\s*)?<FleetStateSection[\s\S]*?showCards=\{false\}\s*showInsideTable=\{false\}\s*\/>\s*<SupplierSitesCard canOpenLogs=\{canOpenLogs\} \/>/,
+    /<OwnerTotalsSection[\s\S]*?\/>\s*(\{\/\*[\s\S]*?\*\/\}\s*)?<FleetStateSection[\s\S]*?showCards=\{false\}\s*tables=\{\['workshop', 'available'\]\}\s*\/>\s*<SupplierSitesCard canOpenLogs=\{canOpenLogs\} \/>/,
   )
   const fleetState = read(
     'src',
@@ -230,9 +230,20 @@ test('the suppliers card parses, loads on its own and follows the fleet tables',
     section,
     /field: 'equipment_state',\s*operator: 'neq',\s*value: 'working'/,
   )
-  // Owner 2026-10-29: «وشيل كروت الصيانة الي تحت المتبقي» — no state
-  // cards under it any more.
-  assert.doesNotMatch(section, /REST_STATES|workshopStateLogHref|extra=/)
+  // Owner 2026-10-29: «وشيل كروت الصيانة الي تحت المتبقي», then back as
+  // their own box at the page's end («حالات المتبقي», `RestStatesCard`).
+  assert.doesNotMatch(section, /extra=/)
+  assert.match(section, /export function RestStatesCard\(/)
+  for (const state of [
+    'workshop_maintenance',
+    'workshop_parking',
+    'workshop_out_of_service',
+    'workshop_unclassified',
+    'available',
+  ])
+    assert.match(section, new RegExp(`state: '${state}'`))
+  assert.match(section, /workshopStateLogHref\(item\.purpose\)/)
+  assert.match(section, /availableEquipmentHref\(\)/)
   assert.match(section, /<\/ul>\s*<\/section>\s*<\/Card>/)
   // Light owner tints with the charts' readable text («بالوان فاتحة»).
   assert.match(

@@ -2,6 +2,7 @@ import { useCallback, useState, type ReactNode } from 'react'
 import { ClipboardList, Store, Truck, Warehouse } from 'lucide-react'
 import { AppLink, Button, Card, ErrorState, Skeleton } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
+import type { TranslationKey } from '@/i18n/translations'
 import {
   fetchAllOwnersStateMatrix,
   fetchSupplierSiteCounts,
@@ -69,6 +70,88 @@ export function insideProjectsLogHref(
       : []),
   ]
   return `/logs?vfilters=${encodeURIComponent(JSON.stringify(filters))}`
+}
+
+/** The states of «المتبقي» (owner 2026-10-29, «وحالات الورشة»; off its box
+ *  the same day, then back at the page's end, «اي شي حذفناه اليوم من
+ *  الرئيسية رجعه وخليه اخر الصفحة تحت»): the four
+ *  workshop states and available. Label, the shade its card is tinted with,
+ *  and what it opens: the log's open workshop visits of a purpose (`null` =
+ *  no purpose yet), or the equipment list of the available units. */
+const REST_STATES: {
+  state: string
+  label: TranslationKey
+  stroke: string
+  purpose: 'maintenance' | 'parking' | 'out_of_service' | null | 'available'
+}[] = [
+  {
+    state: 'workshop_maintenance',
+    label: 'maintenancePurpose',
+    stroke: 'var(--chart-stroke-2)',
+    purpose: 'maintenance',
+  },
+  {
+    state: 'workshop_parking',
+    label: 'parkingPurpose',
+    stroke: 'var(--chart-stroke-3)',
+    purpose: 'parking',
+  },
+  {
+    state: 'workshop_out_of_service',
+    label: 'workshopPurposeOutOfService',
+    stroke: 'var(--danger)',
+    purpose: 'out_of_service',
+  },
+  {
+    state: 'workshop_unclassified',
+    label: 'equipmentStateUnclassified',
+    stroke: 'var(--chart-stroke-5)',
+    purpose: null,
+  },
+  {
+    state: 'available',
+    label: 'equipmentStateAvailable',
+    stroke: 'var(--chart-stroke-6)',
+    purpose: 'available',
+  },
+]
+
+/** The log's workshop tab as visits, the open ones of one workshop purpose
+ *  (`null` = not classified yet). */
+export function workshopStateLogHref(
+  purpose: 'maintenance' | 'parking' | 'out_of_service' | null,
+): string {
+  const filters = [
+    { id: 'open', field: 'is_open', operator: 'eq', value: 'true' },
+    purpose
+      ? {
+          id: 'purpose',
+          field: 'workshop_purpose',
+          operator: 'eq',
+          value: purpose,
+        }
+      : {
+          id: 'purpose',
+          field: 'workshop_purpose',
+          operator: 'is_not_set',
+          value: '',
+        },
+  ]
+  return `/logs?context=workshop&vfilters=${encodeURIComponent(JSON.stringify(filters))}`
+}
+
+/** The equipment list of every active available unit. */
+export function availableEquipmentHref(): string {
+  const filters = [
+    {
+      id: 'state',
+      field: 'equipment_state',
+      operator: 'eq',
+      value: 'available',
+    },
+    { id: 'status', field: 'status', operator: 'eq', value: 'active' },
+  ]
+  return `/equipment?filters=${encodeURIComponent(JSON.stringify(filters))}`
 }
 
 /** The equipment list of one owner's active units outside a project (the
@@ -396,5 +479,127 @@ export function OwnerTotalsSection({
         }
       />
     </div>
+  )
+}
+
+/**
+ * «حالات المتبقي» at the end of the admin home (owner 2026-10-29: the state
+ * cards that sat under «المتبقي» were removed, then restored at the page's
+ * end with everything else removed that day): the four workshop states and
+ * available over every owner, each with its count and its share of the
+ * remaining fleet, opening the log's open workshop visits of that purpose or
+ * the equipment list of the available units.
+ */
+export function RestStatesCard({
+  canOpenEquipment,
+  canOpenLogs,
+}: {
+  canOpenEquipment: boolean
+  canOpenLogs: boolean
+}) {
+  const { t } = useI18n()
+  const load = useCallback(
+    (signal: AbortSignal) => fetchAllOwnersStateMatrix(signal),
+    [],
+  )
+  const { data, loading, failed, retry } = useAdminHomeSection(load)
+
+  if (failed)
+    return (
+      <ErrorState
+        title={t('adminHomeSectionError')}
+        description={t('adminHomeSectionErrorHint')}
+        onRetry={retry}
+      />
+    )
+  if (loading && data === null) return <Skeleton className="h-40 w-full" />
+  if (!data) return null
+
+  const rest = ownerTotals(
+    data,
+    FLEET_STATES.filter((state) => state !== 'inside_site'),
+  )
+  const cardClass = 'flex h-full flex-col gap-1 rounded-xl p-3'
+
+  return (
+    <Card as="div" className="space-y-3">
+      <section aria-label={t('adminHomeRestStatesTitle')} className="space-y-3">
+        <div className="flex items-start gap-3 rounded-xl bg-surface p-3">
+          <span
+            aria-hidden="true"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg text-muted"
+          >
+            <Warehouse size={16} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">
+              {t('adminHomeRestStatesTitle')}
+            </span>
+            <span className="block text-xs text-muted">
+              {t('adminHomeRestStatesHint')}
+            </span>
+            <span className="mt-1 block text-3xl font-bold tabular-nums">
+              {rest.total}
+            </span>
+          </span>
+        </div>
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          {REST_STATES.map((item) => {
+            const count = ownerTotals(data, [item.state]).total
+            const share =
+              rest.total > 0 ? Math.round((count / rest.total) * 100) : 0
+            const href =
+              item.purpose === 'available'
+                ? canOpenEquipment
+                  ? availableEquipmentHref()
+                  : null
+                : canOpenLogs
+                  ? workshopStateLogHref(item.purpose)
+                  : null
+            const style = {
+              backgroundColor: `color-mix(in srgb, ${item.stroke} 18%, var(--bg))`,
+              color: 'var(--chart-text)',
+            }
+            const body = (
+              <>
+                <span className="flex items-center gap-1.5 text-xs">
+                  <span
+                    aria-hidden="true"
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: item.stroke }}
+                  />
+                  {t(item.label)}
+                </span>
+                <span className="mt-auto flex items-baseline justify-between gap-2">
+                  <span className="text-2xl font-bold tabular-nums">
+                    {count}
+                  </span>
+                  <span className="text-xs tabular-nums opacity-80">
+                    {share}%
+                  </span>
+                </span>
+              </>
+            )
+            return (
+              <li key={item.state}>
+                {href ? (
+                  <AppLink
+                    href={href}
+                    style={style}
+                    className={`${cardClass} transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}
+                  >
+                    {body}
+                  </AppLink>
+                ) : (
+                  <div style={style} className={cardClass}>
+                    {body}
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </section>
+    </Card>
   )
 }

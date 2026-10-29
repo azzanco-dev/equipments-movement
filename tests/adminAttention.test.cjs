@@ -89,7 +89,7 @@ test('every item opens its list with allowlisted filters', () => {
   )
 })
 
-test('the section gates its items and is off the home for now', () => {
+test('the section gates its items and sits at the end of the home', () => {
   const section = read(
     'src',
     'components',
@@ -103,8 +103,15 @@ test('the section gates its items and is off the home for now', () => {
   assert.match(section, /canOpenPage\('logs'\)/)
   assert.match(section, /canOpenPage\('purchasing\/units'\)/)
   assert.match(section, /canOpenPage\('purchasing\/orders'\)/)
-  // Owner 2026-10-29 («شيله من الرئيسية»): built, but off the home until he
-  // says where it goes.
+  // Owner 2026-10-29: off the top («شيله من الرئيسية»), then back at the
+  // page's end with everything removed that day.
   const screen = read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx')
-  assert.doesNotMatch(screen, /AttentionSection/)
+  assert.ok(
+    screen.indexOf('<AttentionSection') > screen.indexOf('<EntriesFlowSection'),
+  )
+  assert.match(screen, /<div id=\{AFAQY_ANCHOR\}/)
+  assert.match(
+    read('src', 'App.tsx'),
+    /canOpenPage=\{\(target\) => shell\.pages\.has\(target\)\}/,
+  )
 })
