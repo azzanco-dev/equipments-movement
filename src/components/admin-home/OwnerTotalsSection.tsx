@@ -2,6 +2,7 @@ import { useCallback, useState, type ReactNode } from 'react'
 import { ClipboardList, Store, Truck, Warehouse } from 'lucide-react'
 import { AppLink, Button, Card, ErrorState, Skeleton } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
+import type { TranslationKey } from '@/i18n/translations'
 import {
   fetchAllOwnersStateMatrix,
   fetchSupplierSiteCounts,
@@ -24,6 +25,41 @@ const OWNER_STROKE: Record<AdminHomeOwner, string> = {
   third_party_partnership_b: 'var(--chart-stroke-5)',
   external_supplier: 'var(--chart-stroke-4)',
 }
+
+/** The workshop states (owner 2026-10-29, «وحالات الورشة»): label, the
+ *  shade its card is tinted with, and the purpose the log filters on
+ *  (`null` = no purpose yet). */
+const WORKSHOP_STATES: {
+  state: string
+  label: TranslationKey
+  stroke: string
+  purpose: 'maintenance' | 'parking' | 'out_of_service' | null
+}[] = [
+  {
+    state: 'workshop_maintenance',
+    label: 'maintenancePurpose',
+    stroke: 'var(--chart-stroke-2)',
+    purpose: 'maintenance',
+  },
+  {
+    state: 'workshop_parking',
+    label: 'parkingPurpose',
+    stroke: 'var(--chart-stroke-3)',
+    purpose: 'parking',
+  },
+  {
+    state: 'workshop_out_of_service',
+    label: 'workshopPurposeOutOfService',
+    stroke: 'var(--danger)',
+    purpose: 'out_of_service',
+  },
+  {
+    state: 'workshop_unclassified',
+    label: 'equipmentStateUnclassified',
+    stroke: 'var(--chart-stroke-5)',
+    purpose: null,
+  },
+]
 
 /**
  * The equipment list filtered to one owner's active units (the list's own
@@ -71,6 +107,30 @@ export function insideProjectsLogHref(
   return `/logs?vfilters=${encodeURIComponent(JSON.stringify(filters))}`
 }
 
+/** The log's workshop tab as visits, the open ones of one workshop purpose
+ *  (`null` = not classified yet). */
+export function workshopStateLogHref(
+  purpose: 'maintenance' | 'parking' | 'out_of_service' | null,
+): string {
+  const filters = [
+    { id: 'open', field: 'is_open', operator: 'eq', value: 'true' },
+    purpose
+      ? {
+          id: 'purpose',
+          field: 'workshop_purpose',
+          operator: 'eq',
+          value: purpose,
+        }
+      : {
+          id: 'purpose',
+          field: 'workshop_purpose',
+          operator: 'is_not_set',
+          value: '',
+        },
+  ]
+  return `/logs?context=workshop&vfilters=${encodeURIComponent(JSON.stringify(filters))}`
+}
+
 /** The log's workshop tab as visits, the units inside now of one owner
  *  (owner 2026-10-29, «اضف قسم الورشة تحتهم»). */
 export function insideWorkshopLogHref(owner: AdminHomeOwner): string {
@@ -99,6 +159,7 @@ function OwnerTotalsRow({
   total,
   owners,
   hrefOf,
+  extra,
 }: {
   title: string
   hint: string
@@ -107,6 +168,8 @@ function OwnerTotalsRow({
   owners: { owner: AdminHomeOwner; count: number }[]
   /** Without it (the page is not opened by the shell) no card is a link. */
   hrefOf?: (owner: AdminHomeOwner) => string
+  /** A further row under the owners' cards (the workshop states). */
+  extra?: ReactNode
 }) {
   const { t } = useI18n()
   const share = (count: number) =>
@@ -187,6 +250,7 @@ function OwnerTotalsRow({
           )
         })}
       </ul>
+      {extra}
     </section>
   )
 }
@@ -388,6 +452,60 @@ export function OwnerTotalsSection({
         // The log's open workshop visits of that owner (owner 2026-10-29).
         hrefOf={
           canOpenLogs ? (owner) => insideWorkshopLogHref(owner) : undefined
+        }
+        // Then the workshop states over every owner («وحالات الورشة»).
+        extra={
+          <ul className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+            {WORKSHOP_STATES.map((item) => {
+              const count = ownerTotals(data, [item.state]).total
+              const share =
+                workshop.total > 0
+                  ? Math.round((count / workshop.total) * 100)
+                  : 0
+              const style = {
+                backgroundColor: `color-mix(in srgb, ${item.stroke} 18%, var(--bg))`,
+                color: 'var(--chart-text)',
+              }
+              const body = (
+                <>
+                  <span className="flex items-center gap-1.5 text-xs">
+                    <span
+                      aria-hidden="true"
+                      className="h-2 w-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: item.stroke }}
+                    />
+                    {t(item.label)}
+                  </span>
+                  <span className="mt-auto flex items-baseline justify-between gap-2">
+                    <span className="text-2xl font-bold tabular-nums">
+                      {count}
+                    </span>
+                    <span className="text-xs tabular-nums opacity-80">
+                      {share}%
+                    </span>
+                  </span>
+                </>
+              )
+              const cardClass = 'flex h-full flex-col gap-1 rounded-xl p-3'
+              return (
+                <li key={item.state}>
+                  {canOpenLogs ? (
+                    <AppLink
+                      href={workshopStateLogHref(item.purpose)}
+                      style={style}
+                      className={`${cardClass} transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}
+                    >
+                      {body}
+                    </AppLink>
+                  ) : (
+                    <div style={style} className={cardClass}>
+                      {body}
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
         }
       />
     </div>

@@ -205,6 +205,18 @@ test('the suppliers card parses, loads on its own and comes after the rows', () 
   // workshop state, opening the log's open workshop visits of that owner.
   assert.equal(section.match(/<OwnerTotalsRow/g).length, 3)
   assert.match(section, /state\.startsWith\('workshop_'\)/)
+  // «وحالات الورشة»: the four states under the workshop owners, each a
+  // link to the log's open workshop visits of that purpose.
+  for (const state of [
+    'workshop_maintenance',
+    'workshop_parking',
+    'workshop_out_of_service',
+    'workshop_unclassified',
+  ])
+    assert.match(section, new RegExp(`state: '${state}'`))
+  assert.match(section, /href=\{workshopStateLogHref\(item\.purpose\)\}/)
+  assert.match(section, /operator: 'is_not_set'/)
+  assert.match(section, /\{extra\}\s*<\/section>/)
   assert.match(section, /\/logs\?context=workshop&vfilters=/)
   assert.ok(
     section.indexOf("t('adminHomeOwnerWorkshopTitle')") >
