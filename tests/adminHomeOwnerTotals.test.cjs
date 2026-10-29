@@ -112,15 +112,25 @@ test('the cards read every owner and link to the filtered equipment list', () =>
   assert.match(section, /ownerTotals\(data, FLEET_STATES\)/)
   assert.match(section, /ownerTotals\(data, \['inside_site'\]\)/)
   assert.match(section, /field: 'ownership_status'/)
+  assert.match(section, /canOpenEquipment\s*\?/)
+  // Owner 2026-10-29: «في المشاريع» and the suppliers open the log's open
+  // project visits of that owner / supplier; the fleet the equipment list.
   assert.match(
     section,
-    /field: 'equipment_state',\s*operator: 'eq',\s*value: state/,
+    /canOpenLogs \? \(owner\) => insideProjectsLogHref\(owner\)/,
   )
-  assert.match(section, /canOpenEquipment\s*\?/)
+  assert.match(section, /insideProjectsLogHref\('external_supplier', row\.id\)/)
+  assert.match(section, /field: 'is_open', operator: 'eq', value: 'true'/)
+  assert.match(section, /field: SUPPLIER_FILTER_KEY/)
+  assert.match(section, /\/logs\?vfilters=/)
+  assert.match(
+    read('src', 'App.tsx'),
+    /const canOpenLogs = shell\.pages\.has\('logs'\)/,
+  )
   const screen = read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx')
   assert.match(
     screen,
-    /<OwnerTotalsSection canOpenEquipment=\{Boolean\(onSelectEquipment\)\} \/>/,
+    /<OwnerTotalsSection\s+canOpenEquipment=\{Boolean\(onSelectEquipment\)\}\s+canOpenLogs=\{canOpenLogs\}\s*\/>/,
   )
   assert.ok(
     screen.indexOf('<OwnerTotalsSection') <
@@ -179,12 +189,15 @@ test('the suppliers card parses, loads on its own and sits third', () => {
     'admin-home',
     'OwnerTotalsSection.tsx',
   )
-  assert.match(section, /function SupplierSitesCard\(\)/)
+  assert.match(section, /function SupplierSitesCard\(\{ canOpenLogs \}/)
   assert.match(
     section,
     /useAdminHomeSection\(load\)[\s\S]*useAdminHomeSection\(load\)/,
   )
-  assert.match(section, /<SupplierSitesCard \/>\s*<\/section>/)
+  assert.match(
+    section,
+    /<SupplierSitesCard canOpenLogs=\{canOpenLogs\} \/>\s*<\/section>/,
+  )
   assert.match(section, /className="grid gap-4 lg:grid-cols-3"/)
   assert.match(
     read('src', 'lib', 'adminHomeData.ts'),

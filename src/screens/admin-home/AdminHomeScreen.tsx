@@ -22,6 +22,8 @@ export interface AdminHomeScreenProps {
   onSelectEquipment?: (id: string) => void
   /** Opens a movement; the «داخل الورشة» table opens the open entry. */
   onSelectMovement?: (id: string) => void
+  /** The shell opens /logs: the projects and suppliers cards link there. */
+  canOpenLogs?: boolean
   /** Admin only: the legacy dashboard's register entry/exit shortcuts. */
   onCreateMovement?: (type: 'entry' | 'exit') => void
 }
@@ -51,6 +53,7 @@ export interface AdminHomeScreenProps {
 export function AdminHomeScreen({
   onSelectEquipment,
   onSelectMovement,
+  canOpenLogs = false,
   onCreateMovement,
 }: AdminHomeScreenProps) {
   const { t, lang } = useI18n()
@@ -132,7 +135,10 @@ export function AdminHomeScreen({
         />
         {/* Owner 2026-10-29: «الاسطول» and «في المشاريع» by owner, all five
             owners, above the fleet state. */}
-        <OwnerTotalsSection canOpenEquipment={Boolean(onSelectEquipment)} />
+        <OwnerTotalsSection
+          canOpenEquipment={Boolean(onSelectEquipment)}
+          canOpenLogs={canOpenLogs}
+        />
         <FleetStateSection
           onSelectEquipment={onSelectEquipment}
           onSelectMovement={onSelectMovement}

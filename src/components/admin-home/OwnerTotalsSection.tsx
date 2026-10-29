@@ -11,6 +11,8 @@ import {
   ownerTotals,
   type AdminHomeOwner,
 } from '@/lib/adminHomeStats'
+import { EMPTY_FILTER_VALUE } from '@/lib/applyListFilters'
+import { SUPPLIER_FILTER_KEY } from '@/lib/equipmentSupplier'
 import { useAdminHomeSection } from './useAdminHomeSection'
 import { ownershipBadge } from '@/lib/equipmentForm'
 
@@ -24,28 +26,49 @@ const OWNER_STROKE: Record<AdminHomeOwner, string> = {
 }
 
 /**
- * The equipment list filtered to one owner's active units, optionally in one
- * state (the list's own URL filter format, `useDataListState`).
+ * The equipment list filtered to one owner's active units (the list's own
+ * URL filter format, `useDataListState`).
  */
-export function ownerEquipmentHref(
-  owner: AdminHomeOwner,
-  state?: 'working',
-): string {
+export function ownerEquipmentHref(owner: AdminHomeOwner): string {
   const filters = [
     { id: 'owner', field: 'ownership_status', operator: 'eq', value: owner },
     { id: 'status', field: 'status', operator: 'eq', value: 'active' },
-    ...(state
+  ]
+  return `/equipment?filters=${encodeURIComponent(JSON.stringify(filters))}`
+}
+
+/**
+ * The log's projects tab as visits, filtered to the units inside now and one
+ * owner, or one supplier of «مالك اخر» (owner 2026-10-29, «في المشاريع مفروض
+ * الدخوليات وكذلك الموردون في المشاريع»). `/logs` opens on the projects tab
+ * and the visits view by default; `v` is the visits URL prefix and the
+ * fields are `adminVisitsListConfig`'s. A supplier-less row (`id` null) is
+ * the multi-select's «no value» entry.
+ */
+export function insideProjectsLogHref(
+  owner: AdminHomeOwner,
+  lessorId?: string | null,
+): string {
+  const filters = [
+    { id: 'open', field: 'is_open', operator: 'eq', value: 'true' },
+    {
+      id: 'owner',
+      field: 'equipment_ownership_status',
+      operator: 'eq',
+      value: owner,
+    },
+    ...(lessorId !== undefined
       ? [
           {
-            id: 'state',
-            field: 'equipment_state',
-            operator: 'eq',
-            value: state,
+            id: 'supplier',
+            field: SUPPLIER_FILTER_KEY,
+            operator: 'in',
+            value: lessorId ?? EMPTY_FILTER_VALUE,
           },
         ]
       : []),
   ]
-  return `/equipment?filters=${encodeURIComponent(JSON.stringify(filters))}`
+  return `/logs?vfilters=${encodeURIComponent(JSON.stringify(filters))}`
 }
 
 function OwnerTotalCard({
@@ -153,7 +176,7 @@ const SUPPLIERS_COLLAPSED = 7
  * per supplier, the largest first. It loads on its own, so a failure (or a
  * database without 0161 yet) never hides the two owner cards.
  */
-function SupplierSitesCard() {
+function SupplierSitesCard({ canOpenLogs }: { canOpenLogs: boolean }) {
   const { t } = useI18n()
   const [expanded, setExpanded] = useState(false)
   const load = useCallback(
@@ -204,24 +227,38 @@ function SupplierSitesCard() {
         <ul
           className={`divide-y ${expanded ? 'max-h-80 overflow-y-auto' : ''}`}
         >
-          {shown.map((row) => (
-            <li
-              key={row.id ?? 'none'}
-              className="flex items-center gap-2 py-2 text-sm"
-            >
-              <span
-                className={`min-w-0 flex-1 ${row.name ? '' : 'text-muted'}`}
-              >
-                {row.name ?? t('adminHomeSupplierSitesNone')}
-              </span>
-              <span className="text-xs tabular-nums text-muted">
-                {share(row.count)}%
-              </span>
-              <span className="w-10 text-end font-bold tabular-nums">
-                {row.count}
-              </span>
-            </li>
-          ))}
+          {shown.map((row) => {
+            const body = (
+              <>
+                <span
+                  className={`min-w-0 flex-1 ${row.name ? '' : 'text-muted'}`}
+                >
+                  {row.name ?? t('adminHomeSupplierSitesNone')}
+                </span>
+                <span className="text-xs tabular-nums text-muted">
+                  {share(row.count)}%
+                </span>
+                <span className="w-10 text-end font-bold tabular-nums">
+                  {row.count}
+                </span>
+              </>
+            )
+            const rowClass = 'flex w-full items-center gap-2 py-2 text-sm'
+            return (
+              <li key={row.id ?? 'none'}>
+                {canOpenLogs ? (
+                  <AppLink
+                    href={insideProjectsLogHref('external_supplier', row.id)}
+                    className={`${rowClass} rounded transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring`}
+                  >
+                    {body}
+                  </AppLink>
+                ) : (
+                  <span className={rowClass}>{body}</span>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
       {data.suppliers.length > SUPPLIERS_COLLAPSED && (
@@ -252,8 +289,10 @@ function SupplierSitesCard() {
  */
 export function OwnerTotalsSection({
   canOpenEquipment,
+  canOpenLogs,
 }: {
   canOpenEquipment: boolean
+  canOpenLogs: boolean
 }) {
   const { t } = useI18n()
   const load = useCallback(
@@ -306,13 +345,12 @@ export function OwnerTotalsSection({
         icon={<ClipboardList size={16} />}
         total={sites.total}
         owners={sites.owners}
+        // The log's open project visits of that owner (owner 2026-10-29).
         hrefOf={
-          canOpenEquipment
-            ? (owner) => ownerEquipmentHref(owner, 'working')
-            : undefined
+          canOpenLogs ? (owner) => insideProjectsLogHref(owner) : undefined
         }
       />
-      <SupplierSitesCard />
+      <SupplierSitesCard canOpenLogs={canOpenLogs} />
     </section>
   )
 }

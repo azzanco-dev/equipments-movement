@@ -495,6 +495,7 @@ function AppContent() {
   )
   const canOpenEquipment = shell.pages.has('equipment/:id')
   const canCreateMovement = shell.pages.has('movements/new')
+  const canOpenLogs = shell.pages.has('logs')
 
   return (
     <>
@@ -577,6 +578,7 @@ function AppContent() {
             {page === 'dashboard' && !fieldHome && (
               <AdminHomeScreen
                 onSelectMovement={openMovement}
+                canOpenLogs={canOpenLogs}
                 onSelectEquipment={
                   canOpenEquipment
                     ? (id) => router.push(`/equipment/${id}`)
