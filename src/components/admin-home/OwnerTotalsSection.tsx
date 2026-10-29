@@ -176,82 +176,86 @@ function OwnerTotalsRow({
     total > 0 ? Math.round((count / total) * 100) : 0
   const cardClass = 'flex h-full flex-col gap-1 rounded-xl p-3'
   return (
-    <section aria-label={title} className="space-y-2">
-      {/* The total on a row of its own (owner 2026-10-29, «خلي الاجمالي في
+    // Each section in a box of its own (owner 2026-10-29, «خلي قسم قسم في
+    // مربع»).
+    <Card as="div" className="space-y-3">
+      <section aria-label={title} className="space-y-3">
+        {/* The total on a row of its own (owner 2026-10-29, «خلي الاجمالي في
           صف لحاله»), the owners' cards under it. */}
-      {/* At the start, the right in Arabic («خلي الارقام الاجمالية يمين»):
+        {/* At the start, the right in Arabic («خلي الارقام الاجمالية يمين»):
           the title and the hint, then the number under both («تحت
           النصوص», owner 2026-10-29), with the icon before them, on their
           right («والايقونة يمينهم»). */}
-      <div className="flex items-start gap-3 rounded-xl border bg-surface p-3">
-        <span
-          aria-hidden="true"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg text-muted"
-        >
-          {icon}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-medium">{title}</span>
-          <span className="block text-xs text-muted">{hint}</span>
-          <span className="mt-1 block text-3xl font-bold tabular-nums">
-            {total}
+        <div className="flex items-start gap-3 rounded-xl bg-surface p-3">
+          <span
+            aria-hidden="true"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg text-muted"
+          >
+            {icon}
           </span>
-        </span>
-      </div>
-      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        {owners.map((row) => {
-          const body = (
-            <>
-              <span className="flex items-start gap-1.5 text-xs">
-                <span
-                  aria-hidden="true"
-                  className="mt-1 h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: OWNER_STROKE[row.owner] }}
-                />
-                <span className="min-w-0">
-                  {t(ownershipBadge(row.owner).key)}
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium">{title}</span>
+            <span className="block text-xs text-muted">{hint}</span>
+            <span className="mt-1 block text-3xl font-bold tabular-nums">
+              {total}
+            </span>
+          </span>
+        </div>
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          {owners.map((row) => {
+            const body = (
+              <>
+                <span className="flex items-start gap-1.5 text-xs">
+                  <span
+                    aria-hidden="true"
+                    className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: OWNER_STROKE[row.owner] }}
+                  />
+                  <span className="min-w-0">
+                    {t(ownershipBadge(row.owner).key)}
+                  </span>
                 </span>
-              </span>
-              <span className="mt-auto flex items-baseline justify-between gap-2">
-                <span className="text-2xl font-bold tabular-nums">
-                  {row.count}
+                <span className="mt-auto flex items-baseline justify-between gap-2">
+                  <span className="text-2xl font-bold tabular-nums">
+                    {row.count}
+                  </span>
+                  <span className="text-xs tabular-nums opacity-80">
+                    {share(row.count)}%
+                  </span>
                 </span>
-                <span className="text-xs tabular-nums opacity-80">
-                  {share(row.count)}%
-                </span>
-              </span>
-            </>
-          )
-          // A light fill per owner (owner 2026-10-29, «لونت الكروت بالوان
-          // فاتحة» then «خليها اخف»): its outline shade at 18% over the page,
-          // so the hues stay apart (the pastel tints made Takween's blue and
-          // B's violet look alike, «لون تكوين قريب من لون B»). The text is
-          // the charts' readable one (`--chart-text`).
-          const tint = {
-            backgroundColor: `color-mix(in srgb, ${OWNER_STROKE[row.owner]} 18%, var(--bg))`,
-            color: 'var(--chart-text)',
-          }
-          return (
-            <li key={row.owner}>
-              {hrefOf ? (
-                <AppLink
-                  href={hrefOf(row.owner)}
-                  style={tint}
-                  className={`${cardClass} transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}
-                >
-                  {body}
-                </AppLink>
-              ) : (
-                <div style={tint} className={cardClass}>
-                  {body}
-                </div>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-      {extra}
-    </section>
+              </>
+            )
+            // A light fill per owner (owner 2026-10-29, «لونت الكروت بالوان
+            // فاتحة» then «خليها اخف»): its outline shade at 18% over the page,
+            // so the hues stay apart (the pastel tints made Takween's blue and
+            // B's violet look alike, «لون تكوين قريب من لون B»). The text is
+            // the charts' readable one (`--chart-text`).
+            const tint = {
+              backgroundColor: `color-mix(in srgb, ${OWNER_STROKE[row.owner]} 18%, var(--bg))`,
+              color: 'var(--chart-text)',
+            }
+            return (
+              <li key={row.owner}>
+                {hrefOf ? (
+                  <AppLink
+                    href={hrefOf(row.owner)}
+                    style={tint}
+                    className={`${cardClass} transition-[filter] hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring`}
+                  >
+                    {body}
+                  </AppLink>
+                ) : (
+                  <div style={tint} className={cardClass}>
+                    {body}
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+        {extra}
+      </section>
+    </Card>
   )
 }
 
@@ -420,7 +424,7 @@ export function OwnerTotalsSection({
 
   return (
     // More room between the two sections (owner 2026-10-29).
-    <div className="space-y-8">
+    <div className="space-y-4">
       <OwnerTotalsRow
         title={t('adminHomeOwnerFleetTitle')}
         hint={t('adminHomeOwnerFleetHint')}

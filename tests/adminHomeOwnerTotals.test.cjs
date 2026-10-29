@@ -231,7 +231,7 @@ test('the suppliers card parses, loads on its own and follows the fleet tables',
     assert.match(section, new RegExp(`state: '${state}'`))
   assert.match(section, /href=\{workshopStateLogHref\(item\.purpose\)\}/)
   assert.match(section, /operator: 'is_not_set'/)
-  assert.match(section, /\{extra\}\s*<\/section>/)
+  assert.match(section, /\{extra\}\s*<\/section>\s*<\/Card>/)
   assert.match(section, /\/logs\?context=workshop&vfilters=/)
   // Light owner tints with the charts' readable text («بالوان فاتحة»).
   assert.match(
@@ -249,9 +249,9 @@ test('the suppliers card parses, loads on its own and follows the fleet tables',
   // The icon first in the total row, on the texts' right.
   assert.match(
     section,
-    /items-start gap-3 rounded-xl border bg-surface p-3">\s*<span\s+aria-hidden="true"[^>]*>\s*\{icon\}/,
+    /items-start gap-3 rounded-xl bg-surface p-3">\s*<span\s+aria-hidden="true"[^>]*>\s*\{icon\}/,
   )
-  assert.match(section, /<div className="space-y-8">\s*<OwnerTotalsRow/)
+  assert.match(section, /<div className="space-y-4">\s*<OwnerTotalsRow/)
   assert.match(
     read('src', 'lib', 'adminHomeData.ts'),
     /rpc\('get_admin_supplier_site_counts'\)/,
