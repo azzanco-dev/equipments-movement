@@ -2137,14 +2137,14 @@ export const translations = {
       'هذا الامر معتمد ومقفل. لتعديل امر معتمد اقفله وانشئ امر جديد.',
     // Owner 2026-10-29: the PDF's buyer box and line columns.
     supplierPoPrintBuyer: 'المشتري',
-    supplierPoPrintBuyerName: 'العزاني',
+    supplierPoPrintBuyerName: 'شركة عبدالله احمد العزاني للمقاولات',
     supplierPoPrintUnit: 'الوحدة',
     // Owner 2026-10-29 (second review): the header, the line column and the
     // totals box. The title is printed in both languages.
     supplierPoPrintTitleAr: 'امر شراء',
     supplierPoPrintTitleEn: 'Purchase Order',
     supplierPoPrintIssueDate: 'تاريخ الاصدار',
-    supplierPoPrintStatus: 'حالة الـ PO',
+    supplierPoPrintStatus: 'الحالة',
     supplierPoPrintUnitDescription: 'وصف المعدة',
     supplierPoPrintBeforeVat: 'الاجمالي قبل الضريبة',
     supplierPoPrintVat: 'ضريبة القيمة المضافة ({rate}%)',
@@ -4367,14 +4367,14 @@ export const translations = {
       'This order is approved and locked. To change an approved order, close it and create a new one.',
     // Owner 2026-10-29: the PDF's buyer box and line columns.
     supplierPoPrintBuyer: 'Buyer',
-    supplierPoPrintBuyerName: 'Al Azani',
+    supplierPoPrintBuyerName: 'Abdullah Ahmed Al Azani Contracting Co.',
     supplierPoPrintUnit: 'Unit',
     // Owner 2026-10-29 (second review): the header, the line column and the
     // totals box. The title is printed in both languages.
     supplierPoPrintTitleAr: 'امر شراء',
     supplierPoPrintTitleEn: 'Purchase Order',
     supplierPoPrintIssueDate: 'Issue date',
-    supplierPoPrintStatus: 'PO status',
+    supplierPoPrintStatus: 'Status',
     supplierPoPrintUnitDescription: 'Equipment description',
     supplierPoPrintBeforeVat: 'Total before VAT',
     supplierPoPrintVat: 'VAT ({rate}%)',

@@ -283,7 +283,7 @@ export function SupplierPoPrintSheet({
               <Inline k="supplierPoPrintBuyer" />
             </h2>
             <p className="font-semibold">
-              {ar('supplierPoPrintBuyerName')} <En>{en('supplierPoPrintBuyerName')}</En>
+              <Stacked k="supplierPoPrintBuyerName" />
             </p>
           </section>
           <section className="rounded border p-3">

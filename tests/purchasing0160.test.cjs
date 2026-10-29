@@ -281,7 +281,7 @@ test('the screens: approve for approvers, locked when approved, a draft PDF mark
   assert.match(sheet, /ar\('supplierPoPrintTitleAr'\)[\s\S]*en\('supplierPoPrintTitleEn'\)[\s\S]*\{project\}/)
   assert.match(sheet, /key: 'supplierPoNumber'[\s\S]*key: 'supplierPoPrintIssueDate'[\s\S]*key: 'supplierPoPrintStatus'/)
   assert.match(sheet, /draft \? 'supplierPoApprovalDraft' : 'supplierPoApprovalApproved'/)
-  assert.match(sheet, /<Inline k="supplierPoPrintBuyer" \/>[\s\S]*ar\('supplierPoPrintBuyerName'\)[\s\S]*<Inline k="supplierPoSupplier" \/>/)
+  assert.match(sheet, /<Inline k="supplierPoPrintBuyer" \/>[\s\S]*<Stacked k="supplierPoPrintBuyerName" \/>[\s\S]*<Inline k="supplierPoSupplier" \/>/)
   assert.match(
     sheet,
     /'supplierPoPrintUnitDescription',\s+'supplierPoStartDate',\s+'supplierPoPrintUnit',\s+'supplierPoPrice',/,
