@@ -822,6 +822,27 @@ export function parseOwnerStateMatrix(source: unknown): OwnerStateMatrix {
   }
 }
 
+/**
+ * The «الاسطول» / «في المشاريع» cards of the admin home (owner 2026-10-29):
+ * every owner of `ALL_OWNERS` in that order with its count — the whole active
+ * fleet, or only one state (`inside_site`) — and their total. Unlike the rest
+ * of the home (EM-199), these cards cover all five owners, as approved on the
+ * /ui-kit mockup. An owner without units shows 0.
+ */
+export function ownerTotals(
+  matrix: Pick<OwnerStateMatrix, 'count'>,
+  states: readonly string[],
+): { total: number; owners: { owner: AdminHomeOwner; count: number }[] } {
+  const owners = ALL_OWNERS.map((owner) => ({
+    owner,
+    count: states.reduce((sum, state) => sum + matrix.count(owner, state), 0),
+  }))
+  return {
+    total: owners.reduce((sum, row) => sum + row.count, 0),
+    owners,
+  }
+}
+
 // --- Chart granularity -----------------------------------------------------
 
 /**

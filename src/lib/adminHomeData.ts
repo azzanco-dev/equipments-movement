@@ -216,6 +216,18 @@ export async function fetchEntriesYearly(
   return parseYearlySeries(data)
 }
 
+/** The same snapshot over EVERY owner (`p_owners` NULL), for the owner
+ *  totals cards (owner 2026-10-29), not limited to the home's three. */
+export async function fetchAllOwnersStateMatrix(
+  signal: AbortSignal,
+): Promise<OwnerStateMatrix> {
+  const { data, error } = await supabase
+    .rpc('get_admin_owner_state_matrix', { p_owners: null })
+    .abortSignal(signal)
+  if (error) fail('ownerStateMatrix', error)
+  return parseOwnerStateMatrix(data)
+}
+
 export async function fetchOwnerStateMatrix(
   owners: AdminHomeOwner[],
   signal: AbortSignal,

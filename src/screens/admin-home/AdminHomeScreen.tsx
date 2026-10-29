@@ -7,10 +7,12 @@ import { AvailabilitySection } from '@/components/admin-home/AvailabilitySection
 import { EntriesFlowSection } from '@/components/admin-home/EntriesFlowSection'
 import { FleetDonutSection } from '@/components/admin-home/FleetDonutSection'
 import { FleetStateSection } from '@/components/admin-home/FleetStateSection'
+import { OwnerTotalsSection } from '@/components/admin-home/OwnerTotalsSection'
 import { WhatsAppStatusAlert } from '@/components/WhatsAppGatewayStatus'
 import { useI18n } from '@/i18n/I18nContext'
 import { useAuth } from '@/auth/AuthContext'
 import { greetingName, greetingParts } from '@/lib/greetingName'
+import { saudiDayLabel, saudiGreetingPeriod } from '@/lib/homeGreeting'
 import {
   normalizeGranularity,
   type AdminHomeGranularity,
@@ -51,10 +53,20 @@ export function AdminHomeScreen({
   onSelectMovement,
   onCreateMovement,
 }: AdminHomeScreenProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const { profile } = useAuth()
   const name = greetingName(profile?.full_name)
-  const parts = greetingParts(t('homeGreeting'), name !== '')
+  // Owner 2026-10-29 (the /ui-kit home mockup): «صباح الخير» / «مساء الخير»
+  // by Saudi time, and the Saudi day under it instead of the description.
+  const now = new Date()
+  const parts = greetingParts(
+    t(
+      saudiGreetingPeriod(now) === 'morning'
+        ? 'adminHomeGreetingMorning'
+        : 'adminHomeGreetingEvening',
+    ),
+    name !== '',
+  )
   // Owner 2026-10-26: the greeting and the name in one font (the heading's,
   // through `h1 *` in index.css), larger than other page titles.
   const greeting = parts ? (
@@ -95,7 +107,7 @@ export function AdminHomeScreen({
       <div className="space-y-4">
         <PageHeader
           title={greeting ?? t('adminHomeTitle')}
-          description={t('adminHomeDescription')}
+          description={saudiDayLabel(now, lang)}
           actions={
             onCreateMovement ? (
               <div className="flex flex-wrap items-center gap-2">
@@ -117,6 +129,9 @@ export function AdminHomeScreen({
             ) : undefined
           }
         />
+        {/* Owner 2026-10-29: «الاسطول» and «في المشاريع» by owner, all five
+            owners, above the fleet state. */}
+        <OwnerTotalsSection canOpenEquipment={Boolean(onSelectEquipment)} />
         <FleetStateSection
           onSelectEquipment={onSelectEquipment}
           onSelectMovement={onSelectMovement}

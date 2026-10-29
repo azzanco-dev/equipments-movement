@@ -682,6 +682,14 @@ export const translations = {
     // wave-8-security — end
     // wave-9-greeting — start
     homeGreeting: 'اهلاً، {name}',
+    // Owner 2026-10-29: the admin home's greeting by Saudi time.
+    adminHomeGreetingMorning: 'صباح الخير، {name}',
+    adminHomeGreetingEvening: 'مساء الخير، {name}',
+    adminHomeOwnerFleetTitle: 'الاسطول',
+    adminHomeOwnerFleetHint: 'كل المعدات النشطة',
+    adminHomeOwnerSitesTitle: 'في المشاريع',
+    adminHomeOwnerSitesHint: 'داخل المشاريع الان',
+    adminHomeOwnerTotalsLabel: 'الاعداد حسب المالك',
     // wave-9-greeting — end
     // wave-9-notices — start
     notifyForemanTitle: 'المعدة ما زالت مسجلة داخل مشروع',
@@ -2831,6 +2839,13 @@ export const translations = {
     // wave-8-security — end
     // wave-9-greeting — start
     homeGreeting: 'Welcome, {name}',
+    adminHomeGreetingMorning: 'Good morning, {name}',
+    adminHomeGreetingEvening: 'Good evening, {name}',
+    adminHomeOwnerFleetTitle: 'Fleet',
+    adminHomeOwnerFleetHint: 'All active equipment',
+    adminHomeOwnerSitesTitle: 'In projects',
+    adminHomeOwnerSitesHint: 'Inside projects now',
+    adminHomeOwnerTotalsLabel: 'Counts by owner',
     // wave-9-greeting — end
     // wave-9-notices — start
     notifyForemanTitle: 'The equipment is still recorded inside a project',
