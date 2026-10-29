@@ -512,8 +512,9 @@ export interface FleetMiniTablesProps {
  * The mini tables under the fleet state cards (owner-approved design,
  * 2026-09-30): inside sites, in the workshop (with purpose chips) and
  * available. Owner 2026-10-27: the latest entries and the latest added
- * equipment are gone; inside and workshop sit in two equal columns and
- * available spans the full row under them (one column on a phone).
+ * equipment are gone. Owner 2026-10-29: inside spans the full row, and the
+ * workshop and available sit in two equal columns under it (one column on
+ * a phone).
  *
  * Everything is server-side: the three tables read
  * `get_admin_fleet_equipment` (migration 0107), each limited to 7 rows
@@ -789,6 +790,11 @@ export function FleetMiniTables({
       <FleetTable
         table="inside"
         gridIndex={0}
+        // Owner 2026-10-29 («ومتاحة جنب داخل الورشة»): inside a project on
+        // the full row, the workshop and available side by side under it.
+        // The grid indices skip 1 so an expanded table still moves to the
+        // start of its own row (`gridOrder`).
+        fullRow
         title={t('adminHomeFleetInsideTitle')}
         description={t('adminHomeFleetInsideDescription')}
         columns={insideColumns}
@@ -811,7 +817,7 @@ export function FleetMiniTables({
       />
       <FleetTable
         table="workshop"
-        gridIndex={1}
+        gridIndex={2}
         title={t('adminHomeFleetWorkshopTitle')}
         description={t('adminHomeFleetWorkshopDescription')}
         columns={workshopColumns}
@@ -837,8 +843,7 @@ export function FleetMiniTables({
       />
       <FleetTable
         table="available"
-        gridIndex={2}
-        fullRow
+        gridIndex={3}
         title={t('adminHomeAvailable')}
         description={t('adminHomeFleetAvailableDescription')}
         columns={availableColumns}
