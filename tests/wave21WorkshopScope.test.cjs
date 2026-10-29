@@ -150,16 +150,17 @@ test('the plain workshop home keeps its workshop-only list', () => {
 test('/logs keeps opening on the projects tab for admin and monitor', () => {
   const logs = read('src', 'screens', 'admin-home', 'LogsScreen.tsx')
   assert.match(logs, /defaultContext = 'site',/)
-  assert.match(
-    logs,
-    /isLogsTab\(requestedTab\) \? requestedTab : defaultContext/,
-  )
+  // Since 2026-10-29 the default is clamped to the tabs the movements.read
+  // scope offers (`homeTab`); scope `all` (admin, monitor) offers all three.
+  assert.match(logs, /const homeTab = clampLogsTab\(defaultContext, tabs\)/)
+  assert.match(logs, /isLogsTab\(requestedTab\) \? requestedTab : homeTab/)
   // The default tab is the one left out of the URL.
+  assert.match(logs, /if \(next === homeTab\) query\.delete\('context'\)/)
+  const logsTabs = read('src', 'lib', 'logsTabs.ts')
   assert.match(
-    logs,
-    /if \(next === defaultContext\) query\.delete\('context'\)/,
+    logsTabs,
+    /LOGS_TABS: readonly LogsTab\[\] = \['site', 'workshop', 'all'\]/,
   )
-  assert.match(logs, /const TABS: LogsTab\[\] = \['site', 'workshop', 'all'\]/)
   // The admin-shell route (the admin and monitor roles and, since 2026-10-13,
   // anyone whose sections include the log) passes none of the embedding
   // props; since 2026-10-28 it classifies by itself for a holder of the

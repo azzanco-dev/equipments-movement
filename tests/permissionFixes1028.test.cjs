@@ -52,7 +52,7 @@ test('1: every movement Excel export button needs movements.export', () => {
     const source = read(...parts)
     assert.match(
       source,
-      /const canExport = usePermissions\(\)\.can\('movements\.export'\)/,
+      /const canExport = (?:usePermissions\(\)|permissions)\.can\('movements\.export'\)/,
       parts.join('/'),
     )
     assert.match(source, /\{canExport && \(\s*<Button/, parts.join('/'))
@@ -131,7 +131,9 @@ test('5: the workshop home asks for the workshop form', () => {
   // the form is forced on the workshop shell only, never on the admin or
   // foreman shell.
   const shell = app.slice(
-    app.indexOf("const shellKind: 'admin' | 'foreman' | 'workshop' = shell.kind"),
+    app.indexOf(
+      "const shellKind: 'admin' | 'foreman' | 'workshop' = shell.kind",
+    ),
   )
   assert.match(
     shell,

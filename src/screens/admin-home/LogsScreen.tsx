@@ -65,6 +65,12 @@ import {
 import { sanitizeSearchTerm } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { VisitsTable } from '@/components/visits/VisitsTable'
+import {
+  clampLogsTab,
+  isLogsTab,
+  logsTabsForScope,
+  type LogsTab,
+} from '@/lib/logsTabs'
 import { displayDriverName } from '@/lib/driverDisplayName'
 import {
   WORKSHOP_PURPOSES,
@@ -72,13 +78,7 @@ import {
 } from '@/lib/equipmentState'
 
 /** Which movements the tab shows; `all` applies no context predicate. */
-export type LogsTab = 'site' | 'workshop' | 'all'
-
-const TABS: LogsTab[] = ['site', 'workshop', 'all']
-
-function isLogsTab(value: string | null): value is LogsTab {
-  return value === 'site' || value === 'workshop' || value === 'all'
-}
+export type { LogsTab }
 
 /**
  * The second level (owner request EM-197): the recorded movements, or the
@@ -270,7 +270,14 @@ export function LogsScreen({
   )
   const { t, lang } = useI18n()
   // The Excel export is for the holders of `movements.export` only.
-  const canExport = usePermissions().can('movements.export')
+  const permissions = usePermissions()
+  const canExport = permissions.can('movements.export')
+  // The context tabs follow the `movements.read` scope (owner 2026-10-29);
+  // a URL or default naming a tab the scope does not offer falls back to
+  // the first one offered.
+  const readScope = permissions.scope('movements.read')
+  const tabs = useMemo(() => logsTabsForScope(readScope), [readScope])
+  const homeTab = clampLogsTab(defaultContext, tabs)
   // The page's own classification (`selfClassify`): the same RPC as the
   // field home, then both views refetch.
   const [ownRefresh, setOwnRefresh] = useState(0)
@@ -307,7 +314,10 @@ export function LogsScreen({
   const pathname = usePathname()
   const params = useSearchParams()
   const requestedTab = params.get('context')
-  const tab: LogsTab = isLogsTab(requestedTab) ? requestedTab : defaultContext
+  const tab: LogsTab = clampLogsTab(
+    isLogsTab(requestedTab) ? requestedTab : homeTab,
+    tabs,
+  )
   const view = resolveLogsView(params)
 
   const list = useDataListState(logsListConfig)
@@ -337,7 +347,7 @@ export function LogsScreen({
 
   const setTab = (next: LogsTab) => {
     const query = new URLSearchParams(params.toString())
-    if (next === defaultContext) query.delete('context')
+    if (next === homeTab) query.delete('context')
     else query.set('context', next)
     // A new context is a new list for both views.
     query.delete('page')
@@ -724,19 +734,22 @@ export function LogsScreen({
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <Tabs value={tab} onValueChange={(value) => setTab(value as LogsTab)}>
-          <TabsList variant="segmented" aria-label={t('logsContextFilter')}>
-            {TABS.map((value) => (
-              <TabsTrigger key={value} value={value}>
-                {value === 'site'
-                  ? t('logsSites')
-                  : value === 'workshop'
-                    ? t('logsWorkshop')
-                    : t('logsAll')}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        {/* One allowed context needs no switch. */}
+        {tabs.length > 1 && (
+          <Tabs value={tab} onValueChange={(value) => setTab(value as LogsTab)}>
+            <TabsList variant="segmented" aria-label={t('logsContextFilter')}>
+              {tabs.map((value) => (
+                <TabsTrigger key={value} value={value}>
+                  {value === 'site'
+                    ? t('logsSites')
+                    : value === 'workshop'
+                      ? t('logsWorkshop')
+                      : t('logsAll')}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        )}
         <Tabs
           value={view}
           onValueChange={(value) => setView(value as LogsView)}
