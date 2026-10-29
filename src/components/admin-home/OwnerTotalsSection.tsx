@@ -28,6 +28,7 @@ import {
 import { EMPTY_FILTER_VALUE } from '@/lib/applyListFilters'
 import { SUPPLIER_FILTER_KEY } from '@/lib/equipmentSupplier'
 import { useAdminHomeSection } from './useAdminHomeSection'
+import { CountUp } from './CountUp'
 import { OwnerFilter, useOwnerLabel } from './OwnerFilter'
 import { ownershipBadge } from '@/lib/equipmentForm'
 
@@ -222,7 +223,7 @@ function OwnerTotalsRow({
             <span className="block text-sm font-medium">{title}</span>
             <span className="block text-xs text-muted">{hint}</span>
             <span className="mt-1 block text-3xl font-bold tabular-nums">
-              {total}
+              <CountUp value={total} />
             </span>
           </span>
         </div>
@@ -242,7 +243,7 @@ function OwnerTotalsRow({
                 </span>
                 <span className="mt-auto flex items-baseline justify-between gap-2">
                   <span className="text-2xl font-bold tabular-nums">
-                    {row.count}
+                    <CountUp value={row.count} />
                   </span>
                   <span className="text-xs tabular-nums opacity-80">
                     {share(row.count)}%
@@ -325,7 +326,9 @@ export function SupplierSitesCard({ canOpenLogs }: { canOpenLogs: boolean }) {
           <h3 className="text-sm font-medium text-muted">
             {t('adminHomeSupplierSitesTitle')}
           </h3>
-          <p className="text-3xl font-bold tabular-nums">{data.total}</p>
+          <p className="text-3xl font-bold tabular-nums">
+            <CountUp value={data.total} />
+          </p>
           <p className="text-xs text-muted">
             {t('adminHomeSupplierSitesHint')}
           </p>
@@ -355,7 +358,7 @@ export function SupplierSitesCard({ canOpenLogs }: { canOpenLogs: boolean }) {
                   {share(row.count)}%
                 </span>
                 <span className="w-10 text-end font-bold tabular-nums">
-                  {row.count}
+                  <CountUp value={row.count} />
                 </span>
               </>
             )
@@ -575,7 +578,7 @@ export function RestStatesCard({
                 loading && 'opacity-60',
               )}
             >
-              {rest.total}
+              <CountUp value={rest.total} />
             </span>
           </span>
           <div className="flex flex-wrap items-center gap-2">
@@ -645,7 +648,7 @@ export function RestStatesCard({
                 </span>
                 <span className="mt-auto flex items-baseline justify-between gap-2">
                   <span className="text-2xl font-bold tabular-nums">
-                    {count}
+                    <CountUp value={count} />
                   </span>
                   <span className="text-xs tabular-nums opacity-80">
                     {share}%

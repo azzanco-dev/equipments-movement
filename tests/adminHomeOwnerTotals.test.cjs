@@ -248,6 +248,23 @@ test('the suppliers card parses, loads on its own and follows the fleet tables',
   // Excel export of its units.
   assert.match(section, /useState<AdminHomeOwner\[\]>\(\['alazani'\]\)/)
   assert.match(section, /<OwnerFilter\s/)
+  // Owner 2026-10-29: «بالنسبة للارقام الاحصائية خليها counter».
+  for (const value of [
+    'total',
+    'row.count',
+    'data.total',
+    'rest.total',
+    'count',
+  ])
+    assert.match(
+      section,
+      new RegExp(`<CountUp value=\{${value.replace('.', '\.')}\} \/>`),
+      value,
+    )
+  const counter = read('src', 'components', 'admin-home', 'CountUp.tsx')
+  assert.match(counter, /prefers-reduced-motion: reduce/)
+  assert.match(counter, /<span className="sr-only">\{value\}<\/span>/)
+  assert.match(counter, /const from = shownRef\.current/)
   assert.match(section, /fetchAllOwnersStateMatrix\(signal, owners\)/)
   assert.match(section, /restUnitExcelColumns\(/)
   assert.match(section, /fetchRestUnitsPage\(owners, page, size/)
@@ -263,7 +280,7 @@ test('the suppliers card parses, loads on its own and follows the fleet tables',
   // sections.
   assert.match(
     section,
-    /\{title\}<\/span>\s*<span className="block text-xs text-muted">\{hint\}<\/span>\s*<span className="mt-1 block text-3xl font-bold tabular-nums">\s*\{total\}/,
+    /\{title\}<\/span>\s*<span className="block text-xs text-muted">\{hint\}<\/span>\s*<span className="mt-1 block text-3xl font-bold tabular-nums">\s*<CountUp value=\{total\} \/>/,
   )
   // The icon first in the total row, on the texts' right.
   assert.match(
