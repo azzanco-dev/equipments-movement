@@ -133,3 +133,61 @@ test('the cards read every owner and link to the filtered equipment list', () =>
   assert.match(section, /text-3xl font-bold tabular-nums/)
   assert.match(section, /t\(ownershipBadge\(row\.owner\)\.key\)/)
 })
+
+// Owner 2026-10-29: «اضف عمود في المشاريع تبع الموردين» (migration 0161).
+test('0161 counts the supplier units inside projects, read-only', () => {
+  const files = fs
+    .readdirSync(path.join(ROOT, 'supabase', 'migrations'))
+    .filter((file) => /_0161_/.test(file))
+  assert.equal(files.length, 1)
+  const sql = read('supabase', 'migrations', files[0])
+  assert.match(sql, /FUNCTION public\.get_admin_supplier_site_counts\(\)/)
+  assert.match(sql, /SECURITY INVOKER/)
+  assert.match(sql, /SET search_path = public, pg_temp/)
+  assert.match(sql, /has_permission\('home\.admin'\)/)
+  assert.match(sql, /s\.ownership_status = 'external_supplier'/)
+  assert.match(sql, /s\.state = 'inside_site'/)
+  assert.match(sql, /s\.is_active\s+AND s\.status = 'active'/)
+  assert.match(sql, /LIMIT 200/)
+  assert.match(
+    sql,
+    /REVOKE ALL ON FUNCTION public\.get_admin_supplier_site_counts\(\) FROM PUBLIC, anon;/,
+  )
+  const code = sql
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('--'))
+    .join('\n')
+  assert.doesNotMatch(code, /\b(UPDATE|DELETE FROM|INSERT INTO|ALTER TABLE)\b/)
+})
+
+test('the suppliers card parses, loads on its own and sits third', () => {
+  const stats = loadLib('adminHomeStats')
+  const parsed = stats.parseSupplierSiteCounts({
+    total: 5,
+    suppliers: [
+      { lessor_id: 'a', name: 'مورد', count: 4 },
+      { lessor_id: null, name: null, count: 1 },
+    ],
+  })
+  assert.equal(parsed.total, 5)
+  assert.equal(parsed.suppliers[1].id, null)
+  assert.equal(parsed.suppliers[1].name, null)
+  assert.equal(parsed.suppliers[0].count, 4)
+  const section = read(
+    'src',
+    'components',
+    'admin-home',
+    'OwnerTotalsSection.tsx',
+  )
+  assert.match(section, /function SupplierSitesCard\(\)/)
+  assert.match(
+    section,
+    /useAdminHomeSection\(load\)[\s\S]*useAdminHomeSection\(load\)/,
+  )
+  assert.match(section, /<SupplierSitesCard \/>\s*<\/section>/)
+  assert.match(section, /className="grid gap-4 lg:grid-cols-3"/)
+  assert.match(
+    read('src', 'lib', 'adminHomeData.ts'),
+    /rpc\('get_admin_supplier_site_counts'\)/,
+  )
+})

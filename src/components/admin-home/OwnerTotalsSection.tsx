@@ -1,8 +1,11 @@
-import { useCallback, type ReactNode } from 'react'
-import { ClipboardList, Truck } from 'lucide-react'
-import { AppLink, Card, ErrorState, Skeleton } from '@/components/ui'
+import { useCallback, useState, type ReactNode } from 'react'
+import { ClipboardList, Store, Truck } from 'lucide-react'
+import { AppLink, Button, Card, ErrorState, Skeleton } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
-import { fetchAllOwnersStateMatrix } from '@/lib/adminHomeData'
+import {
+  fetchAllOwnersStateMatrix,
+  fetchSupplierSiteCounts,
+} from '@/lib/adminHomeData'
 import {
   FLEET_STATES,
   ownerTotals,
@@ -141,6 +144,104 @@ function OwnerTotalCard({
   )
 }
 
+/** Suppliers shown before «عرض الكل». */
+const SUPPLIERS_COLLAPSED = 7
+
+/**
+ * «الموردون في المشاريع» (owner 2026-10-29, «اضف عمود في المشاريع تبع
+ * الموردين», migration 0161): the «مالك اخر» units inside a project now,
+ * per supplier, the largest first. It loads on its own, so a failure (or a
+ * database without 0161 yet) never hides the two owner cards.
+ */
+function SupplierSitesCard() {
+  const { t } = useI18n()
+  const [expanded, setExpanded] = useState(false)
+  const load = useCallback(
+    (signal: AbortSignal) => fetchSupplierSiteCounts(signal),
+    [],
+  )
+  const { data, loading, failed, retry } = useAdminHomeSection(load)
+
+  if (failed)
+    return (
+      <ErrorState
+        title={t('adminHomeSectionError')}
+        description={t('adminHomeSectionErrorHint')}
+        onRetry={retry}
+      />
+    )
+  if (loading && data === null) return <Skeleton className="h-72 w-full" />
+  if (!data) return null
+
+  const shown = expanded
+    ? data.suppliers
+    : data.suppliers.slice(0, SUPPLIERS_COLLAPSED)
+  const share = (count: number) =>
+    data.total > 0 ? Math.round((count / data.total) * 100) : 0
+
+  return (
+    <Card className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-medium text-muted">
+            {t('adminHomeSupplierSitesTitle')}
+          </h3>
+          <p className="text-3xl font-bold tabular-nums">{data.total}</p>
+          <p className="text-xs text-muted">
+            {t('adminHomeSupplierSitesHint')}
+          </p>
+        </div>
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-hover text-muted"
+        >
+          <Store size={16} />
+        </span>
+      </div>
+      {data.suppliers.length === 0 ? (
+        <p className="text-sm text-muted">{t('adminHomeSupplierSitesEmpty')}</p>
+      ) : (
+        <ul
+          className={`divide-y ${expanded ? 'max-h-80 overflow-y-auto' : ''}`}
+        >
+          {shown.map((row) => (
+            <li
+              key={row.id ?? 'none'}
+              className="flex items-center gap-2 py-2 text-sm"
+            >
+              <span
+                className={`min-w-0 flex-1 ${row.name ? '' : 'text-muted'}`}
+              >
+                {row.name ?? t('adminHomeSupplierSitesNone')}
+              </span>
+              <span className="text-xs tabular-nums text-muted">
+                {share(row.count)}%
+              </span>
+              <span className="w-10 text-end font-bold tabular-nums">
+                {row.count}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {data.suppliers.length > SUPPLIERS_COLLAPSED && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded
+            ? t('adminHomeSupplierSitesLess')
+            : t('adminHomeSupplierSitesAll').replace(
+                '{count}',
+                String(data.suppliers.length),
+              )}
+        </Button>
+      )}
+    </Card>
+  )
+}
+
 /**
  * «الاسطول» and «في المشاريع» side by side (owner 2026-10-29, approved on the
  * /ui-kit «نموذج الرئيسية الجديدة»: «قسم الاسطول، اجمالي الاسطول وتحته كل
@@ -172,7 +273,8 @@ export function OwnerTotalsSection({
 
   if (loading && data === null)
     return (
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Skeleton className="h-72 w-full" />
         <Skeleton className="h-72 w-full" />
         <Skeleton className="h-72 w-full" />
         <span className="sr-only">{t('loading')}</span>
@@ -186,7 +288,7 @@ export function OwnerTotalsSection({
   return (
     <section
       aria-label={t('adminHomeOwnerTotalsLabel')}
-      className="grid gap-4 lg:grid-cols-2"
+      className="grid gap-4 lg:grid-cols-3"
     >
       <OwnerTotalCard
         title={t('adminHomeOwnerFleetTitle')}
@@ -210,6 +312,7 @@ export function OwnerTotalsSection({
             : undefined
         }
       />
+      <SupplierSitesCard />
     </section>
   )
 }

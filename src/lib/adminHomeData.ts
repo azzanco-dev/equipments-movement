@@ -24,6 +24,7 @@ import {
   parseFleetState,
   parseFleetEquipmentPage,
   parseOwnerStateMatrix,
+  parseSupplierSiteCounts,
   parseYearlySeries,
   type AdminHomeOwner,
   type AdminHomePage,
@@ -34,6 +35,7 @@ import {
   type FleetSortKey,
   type FleetState,
   type OwnerStateMatrix,
+  type SupplierSiteCounts,
   type WorkshopPurposeFilter,
   type YearlyMovementCount,
 } from '@/lib/adminHomeStats'
@@ -226,6 +228,17 @@ export async function fetchAllOwnersStateMatrix(
     .abortSignal(signal)
   if (error) fail('ownerStateMatrix', error)
   return parseOwnerStateMatrix(data)
+}
+
+/** The suppliers inside projects (migration 0161). */
+export async function fetchSupplierSiteCounts(
+  signal: AbortSignal,
+): Promise<SupplierSiteCounts> {
+  const { data, error } = await supabase
+    .rpc('get_admin_supplier_site_counts')
+    .abortSignal(signal)
+  if (error) fail('supplierSiteCounts', error)
+  return parseSupplierSiteCounts(data)
 }
 
 export async function fetchOwnerStateMatrix(

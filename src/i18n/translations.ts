@@ -690,6 +690,12 @@ export const translations = {
     adminHomeOwnerSitesTitle: 'في المشاريع',
     adminHomeOwnerSitesHint: 'داخل المشاريع الان',
     adminHomeOwnerTotalsLabel: 'الاعداد حسب المالك',
+    adminHomeSupplierSitesTitle: 'الموردون في المشاريع',
+    adminHomeSupplierSitesHint: 'معدات مالك اخر داخل المشاريع الان',
+    adminHomeSupplierSitesEmpty: 'لا توجد معدات موردين داخل المشاريع.',
+    adminHomeSupplierSitesNone: 'بدون مورد',
+    adminHomeSupplierSitesAll: 'عرض الكل ({count})',
+    adminHomeSupplierSitesLess: 'عرض اقل',
     // wave-9-greeting — end
     // wave-9-notices — start
     notifyForemanTitle: 'المعدة ما زالت مسجلة داخل مشروع',
@@ -2846,6 +2852,12 @@ export const translations = {
     adminHomeOwnerSitesTitle: 'In projects',
     adminHomeOwnerSitesHint: 'Inside projects now',
     adminHomeOwnerTotalsLabel: 'Counts by owner',
+    adminHomeSupplierSitesTitle: 'Suppliers in projects',
+    adminHomeSupplierSitesHint: 'Other-owner units inside projects now',
+    adminHomeSupplierSitesEmpty: 'No supplier units inside projects.',
+    adminHomeSupplierSitesNone: 'No supplier',
+    adminHomeSupplierSitesAll: 'Show all ({count})',
+    adminHomeSupplierSitesLess: 'Show less',
     // wave-9-greeting — end
     // wave-9-notices — start
     notifyForemanTitle: 'The equipment is still recorded inside a project',

@@ -843,6 +843,25 @@ export function ownerTotals(
   }
 }
 
+/** The suppliers card (owner 2026-10-29, migration 0161): «مالك اخر» units
+ *  inside a project now, per supplier; `id` / `name` NULL for a unit
+ *  without one. */
+export interface SupplierSiteCounts {
+  total: number
+  suppliers: { id: string | null; name: string | null; count: number }[]
+}
+
+export function parseSupplierSiteCounts(source: unknown): SupplierSiteCounts {
+  return {
+    total: num(source, 'total'),
+    suppliers: rows(source, 'suppliers').map((row) => ({
+      id: optionalText(row, 'lessor_id'),
+      name: optionalText(row, 'name'),
+      count: num(row, 'count'),
+    })),
+  }
+}
+
 // --- Chart granularity -----------------------------------------------------
 
 /**
