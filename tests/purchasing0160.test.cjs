@@ -262,32 +262,35 @@ test('the screens: approve for approvers, locked when approved, a draft PDF mark
   assert.doesNotMatch(detail, /exportBlockedReason=/)
   const sheet = read('src', 'components', 'purchasing', 'SupplierPoPrintSheet.tsx')
   assert.match(sheet, /const draft = po\.approval_status !== 'approved'/)
-  assert.match(sheet, /draft \? draftMark : null,/)
-  // The owner's two reviews 2026-10-29: no watermark, status badge, creator,
-  // creation time, note column, «مفتوح» or app name; the header is the logo,
-  // the bilingual title with the project, and the PO number, issue date and
-  // state; the buyer and the supplier side by side; «وصف المعدة» (code +
-  // plate or chassis, type under) · «تاريخ البداية» · «الوحدة» · price; the
-  // totals in a box; the terms; no browser header or footer.
+  assert.match(sheet, /draft \? ar\('supplierPoApprovalDraft'\) : null,/)
+  // Version 4 of the owner's PDF reviews, approved 2026-10-29: bilingual
+  // whatever the screen language (Arabic, then English), no watermark,
+  // status badge, creator, creation time, note column, «مفتوح» or app name;
+  // the header is the logo, «امر شراء / Purchase Order» with the project,
+  // and the PO number, issue date and state; the buyer and the supplier
+  // side by side; «وصف المعدة» (code + plate or chassis, type under) ·
+  // «تاريخ البداية» · «الوحدة» · price; the totals in a box with light
+  // leader lines; the terms in both languages; no browser header or footer.
+  assert.match(sheet, /const ar = \(key: TranslationKey\) => translations\.ar\[key\]/)
+  assert.match(sheet, /const en = \(key: TranslationKey\) => translations\.en\[key\]/)
+  assert.match(sheet, /dir="rtl"\s+lang="ar"/)
   assert.doesNotMatch(
     sheet,
-    /fixed inset-0|SUPPLIER_PO_STATUS_BADGE|printGeneratedAt|createdBy|supplierPoCreatedAt|supplierPoLineNote|equipmentPurchasingOpenEnd|t\('appName'\)|supplierPoEquipment'\)/,
+    /useI18n|fixed inset-0|SUPPLIER_PO_STATUS_BADGE|printGeneratedAt|createdBy|supplierPoCreatedAt|supplierPoLineNote|equipmentPurchasingOpenEnd|appName|supplierPoEquipment'|supplierPoDraftWatermark|text-left/,
   )
+  assert.match(sheet, /ar\('supplierPoPrintTitleAr'\)[\s\S]*en\('supplierPoPrintTitleEn'\)[\s\S]*\{project\}/)
+  assert.match(sheet, /key: 'supplierPoNumber'[\s\S]*key: 'supplierPoPrintIssueDate'[\s\S]*key: 'supplierPoPrintStatus'/)
+  assert.match(sheet, /draft \? 'supplierPoApprovalDraft' : 'supplierPoApprovalApproved'/)
+  assert.match(sheet, /<Inline k="supplierPoPrintBuyer" \/>[\s\S]*ar\('supplierPoPrintBuyerName'\)[\s\S]*<Inline k="supplierPoSupplier" \/>/)
   assert.match(
     sheet,
-    /t\('supplierPoPrintTitleAr'\)[\s\S]*t\('supplierPoPrintTitleEn'\)[\s\S]*\{project\}/,
-  )
-  assert.match(sheet, /label: t\('supplierPoNumber'\)[\s\S]*label: t\('supplierPoPrintIssueDate'\)[\s\S]*label: t\('supplierPoPrintStatus'\), value: state/)
-  assert.match(sheet, /draft \? draftMark : t\('supplierPoApprovalApproved'\)/)
-  assert.match(sheet, /t\('supplierPoPrintBuyer'\)[\s\S]*t\('supplierPoPrintBuyerName'\)[\s\S]*t\('supplierPoSupplier'\)/)
-  assert.match(
-    sheet,
-    /t\('supplierPoPrintUnitDescription'\),\s+t\('supplierPoStartDate'\),\s+t\('supplierPoPrintUnit'\),\s+t\('supplierPoPrice'\),/,
+    /'supplierPoPrintUnitDescription',\s+'supplierPoStartDate',\s+'supplierPoPrintUnit',\s+'supplierPoPrice',/,
   )
   assert.match(sheet, /const identifier = unit \? plateOrChassis\(unit\) : null/)
-  assert.match(sheet, /<dl className="m-0 w-full max-w-\[80mm\] space-y-1\.5 rounded border p-3">/)
-  assert.match(sheet, /t\('supplierPoPrintBeforeVat'\)[\s\S]*\{vatLabel\}[\s\S]*t\('supplierPoPrintTotal'\)/)
-  assert.match(sheet, /SUPPLIER_PO_TERMS_KEYS\.map\(/)
+  assert.match(sheet, /<dl className="m-0 w-full max-w-\[80mm\] space-y-2 rounded border p-3">/)
+  assert.match(sheet, /<span aria-hidden="true" className="min-w-3 flex-1 border-b" \/>/)
+  assert.match(sheet, /<Stacked k="supplierPoPrintBeforeVat" \/>[\s\S]*<Stacked text=\{vatLabel\} \/>[\s\S]*<Stacked k="supplierPoPrintTotal" \/>/)
+  assert.match(sheet, /<li key=\{key\}>\{ar\(key\)\}<\/li>[\s\S]*<li key=\{key\}>\{en\(key\)\}<\/li>/)
   assert.match(sheet, /@page \{ size: A4 portrait; margin: 0; \}/)
   assert.match(sheet, /<Price value=\{line\.price\} \/>/)
   assert.match(sheet, /showUnit=\{mixedUnits\}/)
@@ -327,7 +330,6 @@ test('the labels, Arabic and English, plain alif', () => {
     'supplierPoApproveConfirmTitle',
     'supplierPoApproveConfirmDesc',
     'supplierPoApprovedLockedNotice',
-    'supplierPoDraftWatermark',
     'supplierPoApproveBlockedUnpriced',
     'supplierPoApproveBlockedNoLines',
     'supplierPoApproveBlockedSelf',

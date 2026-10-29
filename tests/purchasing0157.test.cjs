@@ -218,7 +218,7 @@ test('the screens send, edit and show the unit', () => {
   // The PDF says the unit in its own column (owner 2026-10-29).
   assert.ok(
     read('src', 'components', 'purchasing', 'SupplierPoPrintSheet.tsx').includes(
-      '{t(SUPPLIER_PO_RATE_UNIT_LABEL_KEYS[supplierPoRateUnitOf(line.rate_unit)])}',
+      'const unitKey = SUPPLIER_PO_RATE_UNIT_LABEL_KEYS[supplierPoRateUnitOf(line.rate_unit)]',
     ),
   )
   // The PO list's opened row: the unit in its own column (owner 2026-10-28).

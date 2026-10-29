@@ -2105,8 +2105,6 @@ export const translations = {
       'بعد الاعتماد يقفل الامر: لا تضاف معدات ولا تتغير الاسعار ولا تاريخ البداية، وتبقى الملاحظات والاغلاق. ويفتح تصدير PDF.',
     supplierPoApprovedLockedNotice:
       'هذا الامر معتمد ومقفل. لتعديل امر معتمد اقفله وانشئ امر جديد.',
-    // Owner 2026-10-29: a draft's PDF carries this mark on every page.
-    supplierPoDraftWatermark: 'مسودة - غير معتمد',
     // Owner 2026-10-29: the PDF's buyer box and line columns.
     supplierPoPrintBuyer: 'المشتري',
     supplierPoPrintBuyerName: 'العزاني',
@@ -2118,7 +2116,7 @@ export const translations = {
     supplierPoPrintIssueDate: 'تاريخ الاصدار',
     supplierPoPrintStatus: 'حالة الـ PO',
     supplierPoPrintUnitDescription: 'وصف المعدة',
-    supplierPoPrintBeforeVat: 'قبل الضريبة',
+    supplierPoPrintBeforeVat: 'الاجمالي قبل الضريبة',
     supplierPoPrintVat: 'ضريبة القيمة المضافة ({rate}%)',
     supplierPoPrintTotal: 'الاجمالي',
     supplierPoTermsTitle: 'الشروط والاحكام',
@@ -4310,11 +4308,9 @@ export const translations = {
       'Approval locks the order: no units are added and no price or start date changes; notes and closing stay. It also opens the PDF export.',
     supplierPoApprovedLockedNotice:
       'This order is approved and locked. To change an approved order, close it and create a new one.',
-    // Owner 2026-10-29: a draft's PDF carries this mark on every page.
-    supplierPoDraftWatermark: 'DRAFT - NOT APPROVED',
     // Owner 2026-10-29: the PDF's buyer box and line columns.
     supplierPoPrintBuyer: 'Buyer',
-    supplierPoPrintBuyerName: 'Al-Azani',
+    supplierPoPrintBuyerName: 'Al Azani',
     supplierPoPrintUnit: 'Unit',
     // Owner 2026-10-29 (second review): the header, the line column and the
     // totals box. The title is printed in both languages.
@@ -4323,7 +4319,7 @@ export const translations = {
     supplierPoPrintIssueDate: 'Issue date',
     supplierPoPrintStatus: 'PO status',
     supplierPoPrintUnitDescription: 'Equipment description',
-    supplierPoPrintBeforeVat: 'Before VAT',
+    supplierPoPrintBeforeVat: 'Total before VAT',
     supplierPoPrintVat: 'VAT ({rate}%)',
     supplierPoPrintTotal: 'Total',
     supplierPoTermsTitle: 'Terms and conditions',
