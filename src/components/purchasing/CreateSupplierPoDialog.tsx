@@ -194,6 +194,19 @@ export function CreateSupplierPoDialog({
     const first = unitsAtProject.find((visit) => picked[visit.equipment_id])
     return first ? visitEntryDay(first) : null
   }, [unitsAtProject, picked])
+  // Owner 2026-10-31 («اظهر الي في نفس اليوم بعد»): once a unit is ticked
+  // the list keeps the units of ITS entry day only (they used to stay,
+  // greyed, as «دخلت في يوم اخر»); a line under the list counts the rest.
+  const sameDayUnits = useMemo(
+    () =>
+      pickedDay === null
+        ? unitsAtProject
+        : unitsAtProject.filter(
+            (visit) => visitEntryDay(visit) === pickedDay,
+          ),
+    [unitsAtProject, pickedDay],
+  )
+  const otherDayCount = unitsAtProject.length - sameDayUnits.length
 
   useEffect(() => {
     if (!open) return
@@ -587,13 +600,11 @@ export function CreateSupplierPoDialog({
               )}
             </Field>
             <ul className="space-y-2">
-              {unitsAtProject.map((visit) => {
+              {sameDayUnits.map((visit) => {
                 const line = picked[visit.equipment_id]
                 const id = `po-unit-${visit.equipment_id}`
-                // 0148: once a unit is ticked, a unit of another entry day
-                // cannot join this PO.
-                const otherDay =
-                  !line && pickedDay !== null && visitEntryDay(visit) !== pickedDay
+                // 0148: once a unit is ticked, only the units of its entry
+                // day are listed (sameDayUnits), so every row can be ticked.
                 return (
                   <li
                     key={visit.equipment_id}
@@ -602,15 +613,11 @@ export function CreateSupplierPoDialog({
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                       <label
                         htmlFor={id}
-                        className={cn(
-                          'flex min-w-0 flex-1 items-center gap-3',
-                          otherDay ? 'cursor-not-allowed text-muted' : 'cursor-pointer',
-                        )}
+                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3"
                       >
                         <Checkbox
                           id={id}
                           checked={Boolean(line)}
-                          disabled={otherDay}
                           onCheckedChange={(checked) => toggle(visit, checked === true)}
                         />
                         <span className="flex min-w-0 flex-col text-start">
@@ -627,7 +634,6 @@ export function CreateSupplierPoDialog({
                           <span className="text-xs text-muted">
                             {visit.equipment_type ?? '—'} · {t('supplierPoEntryDate')}{' '}
                             <bdi dir="ltr">{formatDate(visit.entry_at)}</bdi>
-                            {otherDay && <> · {t('supplierPoOtherEntryDay')}</>}
                           </span>
                         </span>
                       </label>
@@ -679,6 +685,14 @@ export function CreateSupplierPoDialog({
                 )
               })}
             </ul>
+            {otherDayCount > 0 && (
+              <p className="text-xs text-muted">
+                {t('supplierPoOtherDayHidden').replace(
+                  '{count}',
+                  String(otherDayCount),
+                )}
+              </p>
+            )}
             </>
           )}
           {pickedCount > 0 && (

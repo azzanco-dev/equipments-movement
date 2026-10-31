@@ -157,8 +157,13 @@ test('the dialogs: same-day units, the start date follows them or is locked', ()
 
   const create = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
   assert.match(create, /return first \? visitEntryDay\(first\) : null/)
-  assert.match(create, /!line && pickedDay !== null && visitEntryDay\(visit\) !== pickedDay/)
-  assert.match(create, /disabled=\{otherDay\}/)
+  // Owner 2026-10-31 («اظهر الي في نفس اليوم بعد»): the other-day units are
+  // hidden once a unit is ticked, not greyed; a line counts them.
+  assert.match(create, /visitEntryDay\(visit\) === pickedDay/)
+  assert.match(create, /\{sameDayUnits\.map\(\(visit\) => \{/)
+  assert.match(create, /otherDayCount > 0 && \(/)
+  assert.match(create, /t\('supplierPoOtherDayHidden'\)\.replace\(/)
+  assert.doesNotMatch(create, /disabled=\{otherDay\}|supplierPoOtherEntryDay/)
   assert.match(create, /disabled=\{pickedDay !== null\}/)
   assert.match(create, /current\.start_date === pickedDay/)
   assert.doesNotMatch(create, /dateTouched|suggestStartDate/)

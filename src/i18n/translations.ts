@@ -2118,6 +2118,8 @@ export const translations = {
     supplierPoStartDateFollowsEntry:
       'يوم دخول المعدات المختارة. كل معدات الامر دخلت في نفس اليوم.',
     supplierPoOtherEntryDay: 'دخلت في يوم اخر',
+    supplierPoOtherDayHidden:
+      'تظهر معدات يوم دخول المعدة المختارة فقط؛ {count} معدة اخرى دخلت في ايام اخرى لا تظهر.',
     supplierPoEquipmentSameDayHint:
       'تظهر معدات هذه الجهة الموجودة الان داخل شركة الامر ومشروعه والتي دخلت في تاريخ بداية الامر فقط.',
     supplierPoStartDateLockedHint: 'مقفل ما دام في الامر معدات: هو يوم دخولها.',
@@ -4372,6 +4374,8 @@ export const translations = {
     supplierPoStartDateFollowsEntry:
       'The entry day of the ticked units. All units of one order entered on the same day.',
     supplierPoOtherEntryDay: 'Entered on another day',
+    supplierPoOtherDayHidden:
+      "Only the units that entered on the ticked unit's day are listed; {count} other units entered on other days and are hidden.",
     supplierPoEquipmentSameDayHint:
       "Only this party's units currently inside the order's company and project that entered on the order start date are listed.",
     supplierPoStartDateLockedHint: 'Locked while the order has equipment: it is their entry day.',
