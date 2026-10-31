@@ -411,7 +411,12 @@ test('the foreman home filters company and project on both tabs', () => {
 
   const table = read('src/components/visits/VisitsTable.tsx')
   assert.match(table, /<FilterButton\s+fields=\{config\.filterFields\}/)
-  assert.match(table, /applyListFilters\(query, filters, allowedFilterKeys\)/)
+  // The computed «الفترة» is pulled out first; the rest go column by column.
+  assert.match(table, /visitPeriodOrFilter\(filters\)/)
+  assert.match(
+    table,
+    /applyListFilters\(query, period\.rest, allowedFilterKeys\)/,
+  )
 
   const log = read('src/components/home/HomeMovementsCard.tsx')
   assert.match(log, /useDataListState\(homeMovementsListConfig\)/)
