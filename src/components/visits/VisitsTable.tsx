@@ -62,12 +62,10 @@ import {
   formatVisitCreatedAgo,
   formatVisitDuration,
   siteEntryIds,
-  visitColumnFilterKeys,
   visitContextFilter,
   visitExportColumns,
   visitExitPurpose,
   visitExportFileName,
-  visitPeriodOrFilter,
   visitSortField,
   visitStateView,
   visitsListConfig,
@@ -90,11 +88,9 @@ function loadVisitDriverChanges(
   return loadDriverChanges(supabase, siteEntryIds(visits), signal)
 }
 
-/**
- * A config's allowlisted filter COLUMNS; nothing else reaches PostgREST.
- * The computed «الفترة» is applied apart through `visitPeriodOrFilter`.
- */
-const filterKeys = (config: DataListConfig) => visitColumnFilterKeys(config)
+/** A config's allowlisted filter keys; nothing else reaches PostgREST. */
+const filterKeys = (config: DataListConfig) =>
+  new Set(config.filterFields.map((field) => field.key))
 
 /** Allowlisted filter keys of the admin log's visits view. */
 const ADMIN_FILTER_KEYS = filterKeys(adminVisitsListConfig)
@@ -227,13 +223,8 @@ export function VisitsTable({
         previousIds,
       )
       if (searchFilter) query = query.or(searchFilter)
-      // «الفترة»: the entry OR the exit inside the period, one more `or`
-      // (AND-ed with the search's); the other filters go column by column.
-      // Only the log's config offers it, so the homes never carry one.
-      const period = visitPeriodOrFilter(filters)
-      if (period.clause && isLog) query = query.or(period.clause)
       // Keys are allowlisted per config before they reach PostgREST.
-      return applyListFilters(query, period.rest, allowedFilterKeys)
+      return applyListFilters(query, filters, allowedFilterKeys)
     },
     [
       allowedFilterKeys,
