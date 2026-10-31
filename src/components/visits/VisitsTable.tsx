@@ -227,8 +227,8 @@ export function VisitsTable({
         previousIds,
       )
       if (searchFilter) query = query.or(searchFilter)
-      // «الفترة»: the visits inside at some moment of the period, one more
-      // `or` (AND-ed with the search's); the other filters go column by column.
+      // «الفترة»: the entry OR the exit inside the period, one more `or`
+      // (AND-ed with the search's); the other filters go column by column.
       // Only the log's config offers it, so the homes never carry one.
       const period = visitPeriodOrFilter(filters)
       if (period.clause && isLog) query = query.or(period.clause)

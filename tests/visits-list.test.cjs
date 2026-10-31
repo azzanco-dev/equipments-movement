@@ -374,7 +374,7 @@ test('the admin visits filters are an allowlist of movement_visits columns', () 
 })
 
 // ---------------------------------------------------------------------------
-// «الفترة»: the visits inside at some moment of the period (owner 2026-10-31)
+// «الفترة»: the entry OR the exit inside the period (owner 2026-10-31)
 // ---------------------------------------------------------------------------
 
 test('«الفترة» is a date filter right after «وقت الخروج»', () => {
@@ -399,18 +399,18 @@ const OTHER = { id: 'o', field: 'is_open', operator: 'eq', value: 'false' }
 const SEP15_START = '2026-09-14T21:00:00.000Z'
 const SEP15_END = '2026-09-15T20:59:59.999Z'
 
-/** The overlap clause: entered by `end`, and still inside or left after `start`. */
-const overlap = (start, end) =>
-  `and(entry_at.lte."${end}",exit_at.is.null),` +
-  `and(entry_at.lte."${end}",exit_at.gte."${start}")`
+/** The clause: the entry OR the exit between `start` and `end`. */
+const entryOrExit = (start, end) =>
+  `and(entry_at.gte."${start}",entry_at.lte."${end}"),` +
+  `and(exit_at.gte."${start}",exit_at.lte."${end}")`
 
-test('«الفترة» eq is one Saudi day: inside at some moment of it', () => {
+test('«الفترة» eq is one Saudi day on both columns', () => {
   for (const value of ['2026-09-15', SEP15_START]) {
     const result = visitPeriodOrFilter([
       OTHER,
       { id: 'p', field: 'period', operator: 'eq', value },
     ])
-    assert.equal(result.clause, overlap(SEP15_START, SEP15_END))
+    assert.equal(result.clause, entryOrExit(SEP15_START, SEP15_END))
     assert.deepEqual(asData(result.rest), [OTHER])
   }
 })
@@ -428,7 +428,7 @@ test('«الفترة» between keeps the range control bounds as «وقت الد
   ])
   assert.equal(
     result.clause,
-    overlap('2026-08-31T21:00:00.000Z', '2026-09-30T20:59:59.999Z'),
+    entryOrExit('2026-08-31T21:00:00.000Z', '2026-09-30T20:59:59.999Z'),
   )
   assert.deepEqual(asData(result.rest), [OTHER])
   // An older URL holding date keys reaches the same Saudi bounds.
@@ -447,19 +447,17 @@ test('«الفترة» between keeps the range control bounds as «وقت الد
 })
 
 test('«الفترة» gte / lte bound one side only', () => {
-  // From the start on: still inside, or left on or after it.
   assert.equal(
     visitPeriodOrFilter([
       { id: 'p', field: 'period', operator: 'gte', value: SEP15_START },
     ]).clause,
-    `exit_at.is.null,exit_at.gte."${SEP15_START}"`,
+    `entry_at.gte."${SEP15_START}",exit_at.gte."${SEP15_START}"`,
   )
-  // Up to the end: entered on or before it.
   assert.equal(
     visitPeriodOrFilter([
       { id: 'p', field: 'period', operator: 'lte', value: SEP15_END },
     ]).clause,
-    `entry_at.lte."${SEP15_END}"`,
+    `entry_at.lte."${SEP15_END}",exit_at.lte."${SEP15_END}"`,
   )
 })
 

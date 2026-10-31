@@ -234,11 +234,11 @@ const VISIT_DATE_OPS: FilterOperator[] = [
 ]
 
 /**
- * «الفترة» (owner 2026-10-31, «اضف فلتر الفترة»): a visit matches when the
- * unit was INSIDE (the project or the workshop) at some moment of the period
- * — it entered on or before the period's end and left on or after its start,
- * or has not left yet. So it also finds the visits that span the period
- * whole, which «وقت الدخول» and «وقت الخروج» cannot. It is not a column of
+ * «الفترة» (owner 2026-10-31, «اي دخول او اي خروج خلال هذي الفترة»): a visit
+ * matches when its ENTRY or its EXIT falls inside the period — so the
+ * visits that entered before it and are still inside, or left after it,
+ * stay out (an «inside at some moment» reading was tried first and matched
+ * nearly every visit for a recent month). It is not a column of
  * `movement_visits`: `visitPeriodOrFilter` turns it into one PostgREST `or`
  * and `visitColumnFilterKeys` keeps it out of `applyListFilters`. Only the
  * operators the date range control emits (`between` / `gte` / `lte`) plus
@@ -291,12 +291,11 @@ function periodBound(
 
 /**
  * Pulls the «الفترة» filter out of the list filters and returns its PostgREST
- * `or` clause — the visit overlaps the period: `entry_at <= end` AND
- * (`exit_at IS NULL` OR `exit_at >= start`), written as the alternatives of
- * one `or` — with the filters left for `applyListFilters`. `rest` never
- * holds a period filter, even an invalid one; `clause` is `null` when there
- * is none or its value is not a date. `eq` is one Saudi day, `between` both
- * bounds, `gte` (from the start on) / `lte` (up to the end) one bound.
+ * `or` clause (the entry OR the exit inside the period; an open visit has no
+ * `exit_at`, so only its entry can match) with the filters left for
+ * `applyListFilters`. `rest` never holds a period filter, even an invalid
+ * one; `clause` is `null` when there is none or its value is not a date.
+ * `eq` is one Saudi day, `between` both bounds, `gte` / `lte` one bound.
  */
 export function visitPeriodOrFilter(filters: readonly ListFilter[]): {
   clause: string | null
@@ -337,20 +336,13 @@ export function visitPeriodOrFilter(filters: readonly ListFilter[]): {
       return { clause: null, rest }
   }
   if (!start && !end) return { clause: null, rest }
-  // Still inside, or left on or after the start.
-  const stillInside = 'exit_at.is.null'
-  const leftAfterStart = start ? `exit_at.gte.${logicTreeValue(start)}` : null
-  // Entered on or before the end.
-  const enteredBeforeEnd = end ? `entry_at.lte.${logicTreeValue(end)}` : null
-  if (!enteredBeforeEnd)
-    return { clause: `${stillInside},${leftAfterStart}`, rest }
-  if (!leftAfterStart) return { clause: enteredBeforeEnd, rest }
-  return {
-    clause:
-      `and(${enteredBeforeEnd},${stillInside}),` +
-      `and(${enteredBeforeEnd},${leftAfterStart})`,
-    rest,
+  const side = (column: 'entry_at' | 'exit_at') => {
+    const parts: string[] = []
+    if (start) parts.push(`${column}.gte.${logicTreeValue(start)}`)
+    if (end) parts.push(`${column}.lte.${logicTreeValue(end)}`)
+    return parts.length > 1 ? `and(${parts.join(',')})` : parts[0]
   }
+  return { clause: `${side('entry_at')},${side('exit_at')}`, rest }
 }
 
 /**
@@ -381,9 +373,8 @@ export const adminVisitsListConfig: DataListConfig = {
       type: 'date',
       operators: VISIT_DATE_OPS,
     },
-    // Owner 2026-10-31: the visits that were IN the project (or the
-    // workshop) at some moment of the period (`visitPeriodOrFilter`); not a
-    // column, so never sent as one.
+    // Owner 2026-10-31: the visits whose ENTRY or EXIT falls in the period
+    // (`visitPeriodOrFilter`); not a column, so never sent as one.
     {
       key: VISIT_PERIOD_FILTER_KEY,
       label: { ar: 'الفترة', en: 'Period' },
