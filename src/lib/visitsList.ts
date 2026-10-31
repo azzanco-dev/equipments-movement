@@ -530,10 +530,18 @@ export function visitExitPurpose(
   return exitPurposeOrNull(visit.exit_purpose)
 }
 
+/**
+ * The duration words (owner 2026-10-31, «مدة الزيارة والانشاء خليهم human
+ * readable»): the Afaqy tables' forms («يومين», «ساعتين», «7 شهور»,
+ * «سنتين», `src/lib/elapsedWords.ts`) — one, two, three to ten, eleven and
+ * more — up to months (30 days) and years (365 days).
+ */
 const ARABIC_UNITS = {
-  minute: ['دقيقة', 'دقيقتان', 'دقائق', 'دقيقة'],
-  hour: ['ساعة', 'ساعتان', 'ساعات', 'ساعة'],
-  day: ['يوم', 'يومان', 'ايام', 'يوما'],
+  minute: ['دقيقة', 'دقيقتين', 'دقائق', 'دقيقة'],
+  hour: ['ساعة', 'ساعتين', 'ساعات', 'ساعة'],
+  day: ['يوم', 'يومين', 'ايام', 'يوما'],
+  month: ['شهر', 'شهرين', 'شهور', 'شهرا'],
+  year: ['سنة', 'سنتين', 'سنوات', 'سنة'],
 } as const
 
 type DurationUnit = keyof typeof ARABIC_UNITS
@@ -542,17 +550,36 @@ const ENGLISH_UNITS: Record<DurationUnit, string> = {
   minute: 'minute',
   hour: 'hour',
   day: 'day',
+  month: 'month',
+  year: 'year',
 }
+
+/** Whole minutes in each unit; a month is 30 days and a year 365. */
+const MINUTES_PER: Record<DurationUnit, number> = {
+  minute: 1,
+  hour: 60,
+  day: 60 * 24,
+  month: 60 * 24 * 30,
+  year: 60 * 24 * 365,
+}
+
+/** The units from the largest down, so a duration takes adjacent ones. */
+const UNITS_LARGEST_FIRST: readonly DurationUnit[] = [
+  'year',
+  'month',
+  'day',
+  'hour',
+  'minute',
+]
 
 /**
  * Arabic number agreement: 1 is the bare singular, 2 is the dual, 3–10 take
  * the plural, and 11 and up return to the singular. Only the last two forms
  * are printed with the digits, which is how "3 ايام" and "11 يوما" read
- * naturally while "يوم" and "يومان" carry the count in the word itself.
+ * naturally while "يوم" and "يومين" carry the count in the word itself.
  */
 function arabicUnit(count: number, unit: DurationUnit): string {
   const forms = ARABIC_UNITS[unit]
-  if (count === 0) return `${count} ${forms[3]}`
   if (count === 1) return forms[0]
   if (count === 2) return forms[1]
   if (count <= 10) return `${count} ${forms[2]}`
@@ -565,39 +592,53 @@ function englishUnit(count: number, unit: DurationUnit): string {
 
 /**
  * Humanises a visit duration that the database already reduced to whole
- * minutes: minutes below an hour, hours below a day, whole days above that.
- * The largest unit alone is enough for the list column — the movement detail
- * is where an exact instant belongs.
+ * minutes, in words (owner 2026-10-31, «human readable»): the largest whole
+ * unit and, when `parts` is 2 (the default, the «مدة الزيارة» column and the
+ * export), the next smaller unit when it is not zero — «3 ايام و5 ساعات»,
+ * «شهر و12 يوما», «سنة وشهرين», «ساعة و30 دقيقة»; «3 days and 5 hours». A
+ * month counts 30 days and a year 365. Under a minute reads «اقل من
+ * دقيقة». The movement detail is where an exact instant belongs.
  *
  * Returns `null` for a missing or negative duration so the caller renders its
- * own placeholder instead of "0 دقيقة".
+ * own placeholder.
  */
 export function formatVisitDuration(
   minutes: number | null | undefined,
   lang: Language,
+  parts: 1 | 2 = 2,
 ): string | null {
   if (typeof minutes !== 'number' || !Number.isFinite(minutes) || minutes < 0)
     return null
 
   const whole = Math.floor(minutes)
-  const unit: DurationUnit =
-    whole < 60 ? 'minute' : whole < 60 * 24 ? 'hour' : 'day'
-  const count =
-    unit === 'minute'
-      ? whole
-      : unit === 'hour'
-        ? Math.floor(whole / 60)
-        : Math.floor(whole / (60 * 24))
+  if (whole < 1) return lang === 'ar' ? 'اقل من دقيقة' : 'less than a minute'
 
-  return lang === 'ar' ? arabicUnit(count, unit) : englishUnit(count, unit)
+  const words: string[] = []
+  let rest = whole
+  for (const unit of UNITS_LARGEST_FIRST) {
+    const count = Math.floor(rest / MINUTES_PER[unit])
+    if (count === 0) {
+      // The second unit is the one right under the first; when it is empty
+      // the text stops («سنة», never «سنة و5 ايام»).
+      if (words.length) break
+      continue
+    }
+    words.push(
+      lang === 'ar' ? arabicUnit(count, unit) : englishUnit(count, unit),
+    )
+    if (words.length === parts) break
+    rest -= count * MINUTES_PER[unit]
+  }
+  return lang === 'ar' ? words.join(' و') : words.join(' and ')
 }
 
 /**
- * How long ago a visit's ENTRY was created, in the words of
- * `formatVisitDuration` (the «الانشاء» column, owner 2026-10-28: «بنفس نمط مدة
- * الزيارة»): «3 ايام», «ساعتان». The caller wraps it as «منذ …». A creation
- * time slightly ahead of this device's clock reads as 0 minutes; `null` for a
- * missing or unparseable time, so the caller renders its own placeholder.
+ * How long ago a visit's ENTRY was created, in the duration words' LARGEST
+ * unit alone (the «الانشاء» column, owner 2026-10-28: «بنفس نمط مدة
+ * الزيارة»): «3 ايام», «ساعتين», «شهرين». The caller wraps it as «منذ …»,
+ * which the dual forms already fit («منذ يومين»). A creation time slightly
+ * ahead of this device's clock reads «اقل من دقيقة»; `null` for a missing or
+ * unparseable time, so the caller renders its own placeholder.
  */
 export function formatVisitCreatedAgo(
   createdAt: string | null | undefined,
@@ -607,12 +648,7 @@ export function formatVisitCreatedAgo(
   if (!createdAt) return null
   const created = Date.parse(createdAt)
   if (Number.isNaN(created)) return null
-  const text = formatVisitDuration(Math.max(0, (now - created) / 60000), lang)
-  // After «منذ» the Arabic dual takes its genitive form: «منذ يومين», not
-  // «منذ يومان».
-  if (lang !== 'ar' || !text) return text
-  const dual = Object.values(ARABIC_UNITS).find((forms) => forms[1] === text)
-  return dual ? `${text.slice(0, -2)}ين` : text
+  return formatVisitDuration(Math.max(0, (now - created) / 60000), lang, 1)
 }
 
 // ============ VISITS EXPORT ============

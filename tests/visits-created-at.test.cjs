@@ -125,22 +125,26 @@ test('the visits select reads entry_created_at, never *', () => {
   )
 })
 
-test('the creation age uses the duration words', () => {
+test('the creation age uses the duration words, the largest unit alone', () => {
   const now = Date.parse('2026-10-28T12:00:00Z')
   const ago = (iso, lang = 'ar') => visits.formatVisitCreatedAgo(iso, lang, now)
   assert.equal(
     ago('2026-10-25T10:00:00Z'),
-    visits.formatVisitDuration(3 * 24 * 60 + 120, 'ar'),
+    visits.formatVisitDuration(3 * 24 * 60 + 120, 'ar', 1),
   )
   assert.equal(ago('2026-10-25T10:00:00Z'), '3 ايام')
-  // After «منذ» the dual is genitive: «منذ ساعتين», «منذ يومين».
+  // After «منذ» the dual reads «منذ ساعتين», «منذ يومين».
   assert.equal(ago('2026-10-28T10:00:00Z'), 'ساعتين')
   assert.equal(ago('2026-10-26T11:00:00Z'), 'يومين')
   assert.equal(ago('2026-10-28T11:58:00Z'), 'دقيقتين')
   assert.equal(ago('2026-10-27T11:00:00Z'), 'يوم')
+  // Months and years in words (owner 2026-10-31, «human readable»).
+  assert.equal(ago('2026-03-20T12:00:00Z'), '7 شهور')
+  assert.equal(ago('2024-10-01T12:00:00Z'), 'سنتين')
   assert.equal(ago('2026-10-28T11:55:00Z', 'en'), '5 minutes')
-  // A creation time slightly ahead of the device clock is "0 minutes".
-  assert.equal(ago('2026-10-28T12:01:00Z'), '0 دقيقة')
+  assert.equal(ago('2026-08-01T12:00:00Z', 'en'), '2 months')
+  // A creation time slightly ahead of the device clock.
+  assert.equal(ago('2026-10-28T12:01:00Z'), 'اقل من دقيقة')
   assert.equal(ago(null), null)
   assert.equal(ago(undefined), null)
   assert.equal(ago('not a date'), null)

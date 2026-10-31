@@ -175,40 +175,87 @@ test('a missing exit side reads as still inside, whatever is_open says', () => {
 // ---------------------------------------------------------------------------
 
 test('Arabic number agreement: singular, dual, plural, then singular again', () => {
-  assert.equal(formatVisitDuration(0, 'ar'), '0 دقيقة')
+  assert.equal(formatVisitDuration(0, 'ar'), 'اقل من دقيقة')
   assert.equal(formatVisitDuration(1, 'ar'), 'دقيقة')
-  assert.equal(formatVisitDuration(2, 'ar'), 'دقيقتان')
+  assert.equal(formatVisitDuration(2, 'ar'), 'دقيقتين')
   assert.equal(formatVisitDuration(5, 'ar'), '5 دقائق')
   assert.equal(formatVisitDuration(10, 'ar'), '10 دقائق')
   assert.equal(formatVisitDuration(11, 'ar'), '11 دقيقة')
   assert.equal(formatVisitDuration(59, 'ar'), '59 دقيقة')
 })
 
-test('the largest whole unit wins: minutes, then hours, then days', () => {
+const DAY = 24 * 60
+const MONTH = 30 * DAY
+const YEAR = 365 * DAY
+
+test('human readable: the largest unit and the one under it when not empty', () => {
+  // Owner 2026-10-31 («خليهم human readable»): months and years too.
   assert.equal(formatVisitDuration(60, 'ar'), 'ساعة')
-  assert.equal(formatVisitDuration(120, 'ar'), 'ساعتان')
-  assert.equal(formatVisitDuration(5 * 60 + 59, 'ar'), '5 ساعات')
-  assert.equal(formatVisitDuration(23 * 60 + 59, 'ar'), '23 ساعة')
-  assert.equal(formatVisitDuration(24 * 60, 'ar'), 'يوم')
-  assert.equal(formatVisitDuration(2 * 24 * 60, 'ar'), 'يومان')
-  assert.equal(formatVisitDuration(3 * 24 * 60 + 90, 'ar'), '3 ايام')
-  assert.equal(formatVisitDuration(11 * 24 * 60, 'ar'), '11 يوما')
+  assert.equal(formatVisitDuration(90, 'ar'), 'ساعة و30 دقيقة')
+  assert.equal(formatVisitDuration(120, 'ar'), 'ساعتين')
+  assert.equal(formatVisitDuration(5 * 60 + 59, 'ar'), '5 ساعات و59 دقيقة')
+  assert.equal(formatVisitDuration(DAY, 'ar'), 'يوم')
+  assert.equal(formatVisitDuration(2 * DAY, 'ar'), 'يومين')
+  assert.equal(formatVisitDuration(3 * DAY + 90, 'ar'), '3 ايام وساعة')
+  assert.equal(formatVisitDuration(3 * DAY + 5 * 60, 'ar'), '3 ايام و5 ساعات')
+  assert.equal(formatVisitDuration(11 * DAY, 'ar'), '11 يوما')
+  assert.equal(formatVisitDuration(MONTH, 'ar'), 'شهر')
+  assert.equal(formatVisitDuration(MONTH + 12 * DAY, 'ar'), 'شهر و12 يوما')
+  assert.equal(formatVisitDuration(2 * MONTH, 'ar'), 'شهرين')
+  assert.equal(formatVisitDuration(7 * MONTH + 3 * DAY, 'ar'), '7 شهور و3 ايام')
+  assert.equal(formatVisitDuration(11 * MONTH, 'ar'), '11 شهرا')
+  assert.equal(formatVisitDuration(YEAR, 'ar'), 'سنة')
+  // The second unit is the adjacent one: an empty month count ends the text.
+  assert.equal(formatVisitDuration(YEAR + 5 * DAY, 'ar'), 'سنة')
+  assert.equal(formatVisitDuration(YEAR + 2 * MONTH, 'ar'), 'سنة وشهرين')
+  assert.equal(formatVisitDuration(2 * YEAR, 'ar'), 'سنتين')
+  assert.equal(formatVisitDuration(12 * YEAR + MONTH, 'ar'), '12 سنة وشهر')
+  // The «الانشاء» column asks for the largest unit alone.
+  assert.equal(formatVisitDuration(3 * DAY + 5 * 60, 'ar', 1), '3 ايام')
+  assert.equal(formatVisitDuration(YEAR + 2 * MONTH, 'ar', 1), 'سنة')
 })
 
 test('no Arabic duration word uses a hamza or madda alif', () => {
-  for (const minutes of [0, 1, 2, 5, 11, 60, 120, 300, 1440, 2880, 4320]) {
+  for (const minutes of [
+    0,
+    1,
+    2,
+    5,
+    11,
+    60,
+    90,
+    120,
+    300,
+    1440,
+    2880,
+    4320,
+    MONTH,
+    2 * MONTH,
+    7 * MONTH,
+    11 * MONTH,
+    YEAR,
+    2 * YEAR,
+    12 * YEAR,
+  ]) {
     const text = formatVisitDuration(minutes, 'ar')
     assert.ok(!/[أإآ]/.test(text), `${minutes} -> ${text}`)
   }
 })
 
 test('English duration keeps plain plurals', () => {
+  assert.equal(formatVisitDuration(0, 'en'), 'less than a minute')
   assert.equal(formatVisitDuration(1, 'en'), '1 minute')
   assert.equal(formatVisitDuration(45, 'en'), '45 minutes')
   assert.equal(formatVisitDuration(60, 'en'), '1 hour')
-  assert.equal(formatVisitDuration(3 * 60, 'en'), '3 hours')
-  assert.equal(formatVisitDuration(24 * 60, 'en'), '1 day')
-  assert.equal(formatVisitDuration(5 * 24 * 60, 'en'), '5 days')
+  assert.equal(formatVisitDuration(3 * 60 + 1, 'en'), '3 hours and 1 minute')
+  assert.equal(formatVisitDuration(DAY, 'en'), '1 day')
+  assert.equal(
+    formatVisitDuration(5 * DAY + 2 * 60, 'en'),
+    '5 days and 2 hours',
+  )
+  assert.equal(formatVisitDuration(3 * MONTH, 'en'), '3 months')
+  assert.equal(formatVisitDuration(YEAR + MONTH, 'en'), '1 year and 1 month')
+  assert.equal(formatVisitDuration(5 * DAY + 2 * 60, 'en', 1), '5 days')
 })
 
 test('a missing or impossible duration has no text at all', () => {
