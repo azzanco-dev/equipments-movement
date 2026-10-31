@@ -14,11 +14,11 @@ test('the visits table uses 44 px rows and date-only entry/exit cells', () => {
   assert.doesNotMatch(source, /formatDateTime/)
 })
 
-test('the visits duration cells use the 12 px text size', () => {
+test('the visits duration cells use the 11 px text size (owner 2026-10-31)', () => {
   const source = read('src/components/visits/VisitsTable.tsx')
   assert.match(
     source,
-    /className="text-xs text-muted">\s*\{formatVisitDuration\(/,
+    /className="text-\[11px\] text-muted">\s*\{formatVisitDuration\(/,
   )
 })
 

@@ -574,15 +574,17 @@ export function VisitsTable({
       key: 'duration_minutes',
       header: t('visitDuration'),
       align: 'end',
-      // 12 px, one step below the rest of the row (owner request 2026-09-30).
+      // 11 px, one step below the rest of the row (owner request 2026-09-30;
+      // 12 px until the owner's size rule of 2026-10-31: durations, last
+      // modified and creation times are 11 px).
       cell: (visit) => (
-        <span className="text-xs text-muted">
+        <span className="text-[11px] text-muted">
           {formatVisitDuration(visit.duration_minutes, lang) ?? '—'}
         </span>
       ),
     }
     // Owner 2026-10-28: «الانشاء», the LAST column, «بنفس نمط مدة الزيارة»:
-    // the same 12 px muted text at the end, as the time since the ENTRY was
+    // the same 11 px muted text at the end (owner 2026-10-31), as the time since the ENTRY was
     // registered (`entry_created_at`, migration 0159), with the exact Saudi
     // date-time on hover. Not sortable.
     const createdAt: DataTableColumn<EquipmentVisitRow> = {
@@ -593,7 +595,7 @@ export function VisitsTable({
         const ago = formatVisitCreatedAgo(visit.entry_created_at, lang)
         return (
           <span
-            className="text-xs text-muted"
+            className="text-[11px] text-muted"
             title={formatSaudiDateTime(visit.entry_created_at) || undefined}
           >
             {ago ? t('visitCreatedAgo').replace('{duration}', ago) : '—'}

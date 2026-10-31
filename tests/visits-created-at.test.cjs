@@ -80,7 +80,10 @@ test('0159 is the 0132 view verbatim plus the two additions', () => {
   )
   assert.equal(visitsTail(V0159), expected)
   assert.match(V0159, /WITH \(security_invoker = true\)/)
-  assert.match(V0159, /REVOKE ALL ON public\.movement_visits FROM PUBLIC, anon;/)
+  assert.match(
+    V0159,
+    /REVOKE ALL ON public\.movement_visits FROM PUBLIC, anon;/,
+  )
   assert.match(
     V0159,
     /GRANT SELECT ON public\.movement_visits TO authenticated;/,
@@ -148,8 +151,7 @@ test('«الانشاء» is the last column of every variant, in the duration st
   // Every column list returned by the memo ends with the duration, then it.
   const lists = source.match(/\[\s*equipment,[\s\S]*?\]/g)
   assert.equal(lists.length, 5)
-  for (const list of lists)
-    assert.match(list, /duration,\s*createdAt,?\s*\]$/)
+  for (const list of lists) assert.match(list, /duration,\s*createdAt,?\s*\]$/)
   const column = source.slice(
     source.indexOf('const createdAt: DataTableColumn'),
     source.indexOf("if (context === 'workshop')"),
@@ -159,7 +161,7 @@ test('«الانشاء» is the last column of every variant, in the duration st
   assert.match(column, /align: 'end'/)
   assert.doesNotMatch(column, /sortable:|hideBelow:/)
   // The same span as the duration cell, through the duration's words.
-  assert.match(column, /className="text-xs text-muted"/)
+  assert.match(column, /className="text-\[11px\] text-muted"/)
   assert.match(column, /formatVisitCreatedAgo\(visit\.entry_created_at, lang\)/)
   assert.match(column, /title=\{formatSaudiDateTime\(visit\.entry_created_at\)/)
   assert.match(column, /t\('visitCreatedAgo'\)\.replace\('\{duration\}', ago\)/)

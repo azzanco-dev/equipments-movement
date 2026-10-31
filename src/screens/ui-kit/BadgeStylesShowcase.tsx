@@ -109,7 +109,7 @@ function ProposalBadge({
         {label}
       </Badge>
     )
-  const size = small ? 'text-[11px] leading-4' : 'text-xs leading-5'
+  const size = small ? 'text-xs leading-4' : 'text-xs leading-5'
   const base = `inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-medium ${size}`
   let style: CSSProperties = {}
   let extra = ''

@@ -25,8 +25,9 @@ export type BadgeSize = 'sm' | 'md'
 
 export interface BadgeProps {
   tone?: BadgeTone
-  /** `sm` is for dense places such as dropdown options and table cells; `md`
-   *  sits between the former md (12 px) and sm (11 px) since 2026-10-24. */
+  /** `sm` is for dense places such as dropdown options and table cells
+   *  (12 px since 2026-10-31, owner rule: 11 px is kept for durations, last
+   *  modified and creation times only); `md` is 11.5 px. */
   size?: BadgeSize
   icon?: ReactNode
   className?: string
@@ -44,9 +45,8 @@ export function Badge({
     <span
       className={cn(
         'inline-flex shrink-0 items-center gap-1 whitespace-nowrap font-medium',
-        size === 'md' &&
-          'rounded-md px-2 py-0.5 text-[11.5px] leading-[18px]',
-        size === 'sm' && 'rounded px-1.5 py-0 text-[11px] leading-4',
+        size === 'md' && 'rounded-md px-2 py-0.5 text-[11.5px] leading-[18px]',
+        size === 'sm' && 'rounded px-1.5 py-0 text-xs leading-4',
         // No border any more: a shade darker than the surface so a neutral
         // badge still shows on a surface card.
         tone === 'neutral' && 'bg-surface-hover text-fg',
