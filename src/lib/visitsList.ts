@@ -246,14 +246,6 @@ export const adminVisitsListConfig: DataListConfig = {
       type: 'date',
       operators: VISIT_DATE_OPS,
     },
-    // `exit_at` is NULL for an open visit, so a date filter on it keeps
-    // closed visits only.
-    {
-      key: 'exit_at',
-      label: { ar: 'وقت الخروج', en: 'Exit time' },
-      type: 'date',
-      operators: VISIT_DATE_OPS,
-    },
     {
       key: 'is_open',
       label: 'visitState',
