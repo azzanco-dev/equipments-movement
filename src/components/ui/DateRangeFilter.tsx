@@ -4,13 +4,20 @@ import {
   type Language,
   type TranslationKey,
 } from '@/i18n/translations'
-import { saudiPeriodKeys, type ReportPeriod } from '@/lib/saudiTime'
+import {
+  MONTH_PRESETS,
+  MONTH_PRESET_BACK,
+  monthPresetLabel,
+  saudiDateKey,
+  saudiMonthKeys,
+  type MonthPreset,
+} from '@/lib/saudiTime'
 import { compareDateKeys, isValidDateKey } from '@/lib/calendar'
 import { DatePicker } from './DatePicker'
-import { Tabs, TabsList, TabsTrigger } from './Tabs'
+import { PRIMARY_ACTIVE_TRIGGER, Tabs, TabsList, TabsTrigger } from './Tabs'
 import { cn } from './cn'
 
-export type DateRangePreset = ReportPeriod | 'custom'
+export type DateRangePreset = MonthPreset | 'custom'
 
 export interface DateRangeValue {
   preset: DateRangePreset
@@ -30,7 +37,7 @@ export interface DateRangeFilterProps {
   className?: string
 }
 
-const PRESETS: DateRangePreset[] = ['today', 'week', 'month', 'custom']
+const PRESETS: DateRangePreset[] = [...MONTH_PRESETS, 'custom']
 
 function isPreset(value: string): value is DateRangePreset {
   return (PRESETS as string[]).includes(value)
@@ -57,9 +64,11 @@ function translateFor(lang: Language) {
 }
 
 /**
- * Report period filter: اليوم / هذا الاسبوع / هذا الشهر presets plus a
- * فترة مخصصة (custom) range. Presets always resolve to a valid Saudi-time
- * range; the custom range only calls `onChange` when from <= to.
+ * Period filter: three whole-month presets — the month before last, the
+ * previous month and this month (1st → today), oldest first (owner
+ * 2026-10-31) — plus a فترة مخصصة (custom) range. A month tab reads as the English month and its number,
+ * "Oct (10)", in both UI languages. Presets always resolve to a valid
+ * Saudi-time range; the custom range only calls `onChange` when from <= to.
  */
 export function DateRangeFilter({
   value,
@@ -72,6 +81,7 @@ export function DateRangeFilter({
   const { lang: ambientLang } = useI18n()
   const lang = langOverride ?? ambientLang
   const t = translateFor(lang)
+  const today = saudiDateKey()
 
   const handlePresetChange = (next: string) => {
     if (!isPreset(next) || next === value.preset) return
@@ -81,7 +91,7 @@ export function DateRangeFilter({
       onChange({ preset: 'custom', from: value.from, to: value.to })
       return
     }
-    const { from, to } = saudiPeriodKeys(next)
+    const { from, to } = saudiMonthKeys(MONTH_PRESET_BACK[next], today)
     onChange({ preset: next, from, to })
   }
 
@@ -105,10 +115,20 @@ export function DateRangeFilter({
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
       <Tabs value={value.preset} onValueChange={handlePresetChange}>
         <TabsList variant="segmented" aria-label={t('reportPeriodLabel')}>
-          <TabsTrigger value="today">{t('todayBadge')}</TabsTrigger>
-          <TabsTrigger value="week">{t('thisWeek')}</TabsTrigger>
-          <TabsTrigger value="month">{t('thisMonth')}</TabsTrigger>
-          <TabsTrigger value="custom">{t('customPeriod')}</TabsTrigger>
+          {MONTH_PRESETS.map((preset) => (
+            <TabsTrigger
+              key={preset}
+              value={preset}
+              className={PRIMARY_ACTIVE_TRIGGER}
+            >
+              <bdi dir="ltr">
+                {monthPresetLabel(MONTH_PRESET_BACK[preset], today)}
+              </bdi>
+            </TabsTrigger>
+          ))}
+          <TabsTrigger value="custom" className={PRIMARY_ACTIVE_TRIGGER}>
+            {t('customPeriod')}
+          </TabsTrigger>
         </TabsList>
       </Tabs>
       {value.preset === 'custom' && (

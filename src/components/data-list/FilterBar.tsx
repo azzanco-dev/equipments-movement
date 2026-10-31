@@ -21,8 +21,9 @@ import {
   saudiDateKey,
   saudiDayEnd,
   saudiDayStart,
-  saudiPeriodKeys,
-  type ReportPeriod,
+  MONTH_PRESETS,
+  MONTH_PRESET_BACK,
+  saudiMonthKeys,
 } from '@/lib/saudiTime'
 import { AsyncMultiSelect } from './AsyncMultiSelect'
 import { useListLabel, useOptionLabel } from './labels'
@@ -181,13 +182,15 @@ export function dateRangeKeys(filter: ListFilter | undefined): {
   }
 }
 
-const PERIODS: ReportPeriod[] = ['today', 'week', 'month']
-
-/** The preset a from/to pair matches today, else "custom". */
-export function inferDatePreset(from: string, to: string): DateRangePreset {
-  for (const period of PERIODS) {
-    const keys = saudiPeriodKeys(period)
-    if (keys.from === from && keys.to === to) return period
+/** The month preset a from/to pair matches today, else "custom". */
+export function inferDatePreset(
+  from: string,
+  to: string,
+  today: string = saudiDateKey(),
+): DateRangePreset {
+  for (const preset of MONTH_PRESETS) {
+    const keys = saudiMonthKeys(MONTH_PRESET_BACK[preset], today)
+    if (keys.from === from && keys.to === to) return preset
   }
   return 'custom'
 }
@@ -377,10 +380,11 @@ function TextFilterControl({
 }
 
 /**
- * The movement-time style range: one `DateRangeFilter` (today / this week /
- * this month / custom from–to) instead of two separate date fields. Nothing
- * is highlighted while the field is unfiltered; "custom" opens the two date
- * pickers and either end alone is a valid filter (`gte` / `lte`).
+ * The movement-time style range: one `DateRangeFilter` (this month / the
+ * previous month / the month before / custom from–to) instead of two separate
+ * date fields. Nothing is highlighted while the field is unfiltered; "custom"
+ * opens the two date pickers and either end alone is a valid filter (`gte` /
+ * `lte`).
  */
 function DateRangeFilterControl({
   label,
@@ -395,7 +399,7 @@ function DateRangeFilterControl({
   const labelId = useId()
   const { from, to } = dateRangeKeys(filter)
   const active = !!(from || to)
-  // The preset the user last chose. "Custom" over the same dates as "today"
+  // The preset the user last chose. "Custom" over the same dates as a month
   // must stay "custom", so the tab is not inferred from the dates alone.
   const [chosen, setChosen] = useState<DateRangePreset | null>(null)
   const wasActive = useRef(active)

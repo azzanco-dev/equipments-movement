@@ -927,8 +927,8 @@ export function AdminHomeMockup({
   const dir = lang === 'ar' ? 'rtl' : 'ltr'
 
   const [period, setPeriod] = useState<DateRangeValue>(() => {
-    const { from, to } = saudiPeriodKeys('week')
-    return { preset: 'week', from, to }
+    const { from, to } = saudiPeriodKeys('month')
+    return { preset: 'month', from, to }
   })
 
   return (

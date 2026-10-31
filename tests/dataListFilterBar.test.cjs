@@ -238,6 +238,29 @@ test('a stored range reads back as the same Saudi dates', () => {
   assert.equal(inferDatePreset('2020-01-01', '2020-01-02'), 'custom')
 })
 
+test('a stored range shows its month preset tab', () => {
+  const today = '2026-10-31'
+  assert.equal(inferDatePreset('2026-10-01', '2026-10-31', today), 'month')
+  assert.equal(inferDatePreset('2026-09-01', '2026-09-30', today), 'last_month')
+  assert.equal(
+    inferDatePreset('2026-08-01', '2026-08-31', today),
+    'month_before_last',
+  )
+  // Part of a month, or a month further back, is a custom range.
+  assert.equal(inferDatePreset('2026-09-01', '2026-09-29', today), 'custom')
+  assert.equal(inferDatePreset('2026-07-01', '2026-07-31', today), 'custom')
+  assert.equal(inferDatePreset('2026-10-31', '2026-10-31', today), 'custom')
+  // Across the year: in January the presets are Jan, Dec and Nov.
+  assert.equal(
+    inferDatePreset('2026-12-01', '2026-12-31', '2027-01-05'),
+    'last_month',
+  )
+  assert.equal(
+    inferDatePreset('2026-11-01', '2026-11-30', '2027-01-05'),
+    'month_before_last',
+  )
+})
+
 test('the active count ignores empty filters', () => {
   assert.equal(
     countActiveFilters([

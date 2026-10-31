@@ -38,6 +38,18 @@ export const TabsList = forwardRef<HTMLDivElement, TabsListProps>(
   },
 )
 
+/**
+ * The selected segmented tab as a primary button — opt-in per use (owner
+ * 2026-10-31: the PO list's view switch, «خلي التاب المختار يكون لونه اسود»,
+ * then the list filters' date range, «والاختيار عليها خليه اوضح»): black in
+ * light mode, white in dark mode. Pass it as a `TabsTrigger` className; the
+ * default segmented look below stays. The same variants as the shared active
+ * classes plus `aria-selected` (Radix sets it on the active trigger), so these
+ * win by specificity, not by CSS order.
+ */
+export const PRIMARY_ACTIVE_TRIGGER =
+  'group-data-[variant=segmented]/tabs:data-[state=active]:aria-selected:bg-primary group-data-[variant=segmented]/tabs:data-[state=active]:aria-selected:text-primary-contrast group-data-[variant=segmented]/tabs:data-[state=active]:aria-selected:hover:bg-primary-hover'
+
 export const TabsTrigger = forwardRef<
   HTMLButtonElement,
   ComponentPropsWithoutRef<typeof RadixTabs.Trigger>

@@ -12,7 +12,7 @@ import {
   DateRangeFilter,
   type DateRangeValue,
 } from '@/components/ui/DateRangeFilter'
-import { saudiPeriodKeys } from '@/lib/saudiTime'
+import { saudiMonthKeys } from '@/lib/saudiTime'
 
 // Fourth component batch on /ui-kit: Popover, Tooltip, DatePicker, and
 // DateRangeFilter. Sample copy only; nothing here is wired to real data.
@@ -236,17 +236,17 @@ function DatePickerShowcase() {
 function DateRangeFilterShowcase() {
   const [range, setRange] = useState<DateRangeValue>({
     preset: 'month',
-    ...saudiPeriodKeys('month'),
+    ...saudiMonthKeys(0),
   })
   const [rangeEn, setRangeEn] = useState<DateRangeValue>({
-    preset: 'today',
-    ...saudiPeriodKeys('today'),
+    preset: 'last_month',
+    ...saudiMonthKeys(1),
   })
 
   return (
     <Section
       title="فلتر الفترة (DateRangeFilter)"
-      description="اليوم / هذا الاسبوع / هذا الشهر تحسب تلقائيا بتوقيت السعودية. فترة مخصصة تعرض منتقيي تاريخ ولا تصدر قيمة الا اذا كانت البداية قبل النهاية او تساويها."
+      description="الشهر الحالي والشهران قبله، باسم الشهر الانجليزي ورقمه مثل Oct (10)، تحسب تلقائيا بتوقيت السعودية. فترة مخصصة تعرض منتقيي تاريخ ولا تصدر قيمة الا اذا كانت البداية قبل النهاية او تساويها."
     >
       <div className="space-y-2">
         <DateRangeFilter value={range} onChange={setRange} />

@@ -1119,7 +1119,7 @@ test('the PO list switches between «حسب المعدات» (the default) and �
   // home's «يحتاج انتباهك» links) opens the orders list; else the units.
   const start = screen.indexOf('const PO_ORDERS_STATE_KEYS')
   const end = screen.indexOf(
-    '/**',
+    'export interface SupplierPosListScreenProps',
     screen.indexOf('function resolvePoListView'),
   )
   assert.ok(start > 0 && end > start)
@@ -1142,22 +1142,24 @@ test('the PO list switches between «حسب المعدات» (the default) and �
     screen,
     /\.filter\(\(\[key\]\) => key !== 'view'\),\s+\)\s+if \(next === 'orders' \|\| hasOrdersState\(query\)\) query\.set\('view', next\)/,
   )
-  // The selected tab looks like the primary button, on this page only, and
-  // wins over the shared segmented classes by specificity (aria-selected).
-  assert.match(
-    screen,
-    /const PRIMARY_ACTIVE_TAB =\s+'group-data-\[variant=segmented\]\/tabs:data-\[state=active\]:aria-selected:bg-primary group-data-\[variant=segmented\]\/tabs:data-\[state=active\]:aria-selected:text-primary-contrast /,
-  )
-  assert.equal(
-    (screen.match(/className=\{PRIMARY_ACTIVE_TAB\}/g) ?? []).length,
-    1,
-  )
+  // The selected tab looks like the primary button (the opt-in shared
+  // PRIMARY_ACTIVE_TRIGGER) and wins over the shared segmented classes by
+  // specificity (aria-selected); the default segmented look stays.
   const tabs = read('src', 'components', 'ui', 'Tabs.tsx')
   assert.match(
     tabs,
+    /export const PRIMARY_ACTIVE_TRIGGER =\s+'group-data-\[variant=segmented\]\/tabs:data-\[state=active\]:aria-selected:bg-primary group-data-\[variant=segmented\]\/tabs:data-\[state=active\]:aria-selected:text-primary-contrast /,
+  )
+  assert.equal(
+    (screen.match(/className=\{PRIMARY_ACTIVE_TRIGGER\}/g) ?? []).length,
+    1,
+  )
+  const trigger = tabs.slice(tabs.indexOf('export const TabsTrigger'))
+  assert.match(
+    trigger,
     /group-data-\[variant=segmented\]\/tabs:data-\[state=active\]:bg-bg /,
   )
-  assert.doesNotMatch(tabs, /bg-primary/)
+  assert.doesNotMatch(trigger, /bg-primary/)
   assert.match(screen, /const list = useDataListState\(supplierPosListConfig\)/)
   assert.match(
     screen,

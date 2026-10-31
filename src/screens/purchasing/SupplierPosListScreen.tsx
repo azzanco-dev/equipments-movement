@@ -24,6 +24,7 @@ import {
   EmptyState,
   ErrorState,
   PageHeader,
+  PRIMARY_ACTIVE_TRIGGER,
   Tabs,
   TabsList,
   TabsTrigger,
@@ -77,16 +78,6 @@ function resolvePoListView(
   if (requested === 'orders' || requested === 'units') return requested
   return hasOrdersState(params) ? 'orders' : 'units'
 }
-
-/**
- * The selected view looks like a primary button (owner 2026-10-31, «خلي
- * التاب المختار يكون لونه اسود»): black in light mode, white in dark mode.
- * Only on this page; the shared segmented look stays. The same variants as
- * the shared active classes plus `aria-selected` (Radix sets it on the
- * active trigger), so these win by specificity, not by CSS order.
- */
-const PRIMARY_ACTIVE_TAB =
-  'group-data-[variant=segmented]/tabs:data-[state=active]:aria-selected:bg-primary group-data-[variant=segmented]/tabs:data-[state=active]:aria-selected:text-primary-contrast group-data-[variant=segmented]/tabs:data-[state=active]:aria-selected:hover:bg-primary-hover'
 
 export interface SupplierPosListScreenProps {
   onSelectPo: (poId: string) => void
@@ -303,7 +294,7 @@ export function SupplierPosListScreen({
             <TabsTrigger
               key={value}
               value={value}
-              className={PRIMARY_ACTIVE_TAB}
+              className={PRIMARY_ACTIVE_TRIGGER}
             >
               {value === 'orders'
                 ? t('poUnitsViewOrders')

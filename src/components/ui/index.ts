@@ -30,7 +30,13 @@ export {
   DropdownMenuTrigger,
 } from './DropdownMenu'
 export type { DropdownMenuItemProps } from './DropdownMenu'
-export { Tabs, TabsContent, TabsList, TabsTrigger } from './Tabs'
+export {
+  PRIMARY_ACTIVE_TRIGGER,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from './Tabs'
 export type { TabsListProps, TabsVariant } from './Tabs'
 export { DataTable } from './DataTable'
 export type {

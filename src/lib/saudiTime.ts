@@ -46,3 +46,72 @@ export function saudiPeriodKeys(period: ReportPeriod): {
   date.setUTCDate(date.getUTCDate() - (day === 0 ? 6 : day - 1))
   return { from: date.toISOString().slice(0, 10), to: today }
 }
+
+const MONTH_ABBREVIATIONS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const
+
+/** The UTC midnight of the 1st of the Saudi calendar month `monthsBack`
+ *  months before the month of `today` (0 = this month). */
+function monthStartBack(monthsBack: number, today: string): Date {
+  const year = Number(today.slice(0, 4))
+  const month = Number(today.slice(5, 7)) - 1
+  return new Date(Date.UTC(year, month - monthsBack, 1))
+}
+
+/**
+ * Saudi date keys of a whole calendar month `monthsBack` months before the
+ * current one: 0 = this month (1st → today), 1 = the previous month (1st →
+ * its last day), 2 = the month before that, and so on. Pure date-key / UTC
+ * arithmetic, so year boundaries and February's length come out right.
+ */
+export function saudiMonthKeys(
+  monthsBack: number,
+  today: string = saudiDateKey(),
+): { from: string; to: string } {
+  const start = monthStartBack(monthsBack, today)
+  const from = start.toISOString().slice(0, 10)
+  if (monthsBack <= 0) return { from, to: today }
+  const last = new Date(
+    Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0),
+  )
+  return { from, to: last.toISOString().slice(0, 10) }
+}
+
+/** The month preset's label, the same in every UI language: the English
+ *  three-letter month and its number, e.g. "Oct (10)". */
+export function monthPresetLabel(
+  monthsBack: number,
+  today: string = saudiDateKey(),
+): string {
+  const index = monthStartBack(monthsBack, today).getUTCMonth()
+  return `${MONTH_ABBREVIATIONS[index]} (${index + 1})`
+}
+
+/** The month presets of the list filters' date range, in tab order oldest
+ *  first (owner 2026-10-31), and how many months each one lies before the
+ *  current Saudi month. */
+export type MonthPreset = 'month' | 'last_month' | 'month_before_last'
+
+export const MONTH_PRESETS: readonly MonthPreset[] = [
+  'month_before_last',
+  'last_month',
+  'month',
+]
+
+export const MONTH_PRESET_BACK: Record<MonthPreset, number> = {
+  month: 0,
+  last_month: 1,
+  month_before_last: 2,
+}
