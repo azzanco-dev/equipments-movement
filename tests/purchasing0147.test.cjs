@@ -40,13 +40,22 @@ test('the view: open site visits, read as the caller, select only', () => {
   )
   assert.match(sql, /FROM public\.movement_visits v/)
   assert.match(sql, /WHERE v\.is_open AND v\.movement_context = 'site';/)
-  assert.match(sql, /REVOKE ALL ON public\.purchasing_site_units FROM PUBLIC, anon;/)
-  assert.match(sql, /GRANT SELECT ON public\.purchasing_site_units TO authenticated;/)
+  assert.match(
+    sql,
+    /REVOKE ALL ON public\.purchasing_site_units FROM PUBLIC, anon;/,
+  )
+  assert.match(
+    sql,
+    /GRANT SELECT ON public\.purchasing_site_units TO authenticated;/,
+  )
   // Read-only: no function, no trigger, no write.
-  assert.doesNotMatch(sql, /CREATE (OR REPLACE )?FUNCTION|CREATE TRIGGER|INSERT INTO|UPDATE public|DELETE FROM/)
+  assert.doesNotMatch(
+    sql,
+    /CREATE (OR REPLACE )?FUNCTION|CREATE TRIGGER|INSERT INTO|UPDATE public|DELETE FROM/,
+  )
 })
 
-test('the unit\'s open PO there, else its party\'s open PO there', () => {
+test("the unit's open PO there, else its party's open PO there", () => {
   // The PO the unit sits on: its card, an open PO, the same company and project.
   assert.match(
     sql,
@@ -63,7 +72,10 @@ test('the unit\'s open PO there, else its party\'s open PO there', () => {
     sql,
     /v\.equipment_ownership_status <> 'external_supplier' AND p\.owner_class = v\.equipment_ownership_status/,
   )
-  assert.match(sql, /party_po\.id AS party_po_id, party_po\.po_number AS party_po_number/)
+  assert.match(
+    sql,
+    /party_po\.id AS party_po_id, party_po\.po_number AS party_po_number/,
+  )
 })
 
 test('the page reads the view server-side and adds through the existing dialogs', () => {
@@ -71,32 +83,59 @@ test('the page reads the view server-side and adds through the existing dialogs'
   assert.match(screen, /\.from\('purchasing_site_units'\)/)
   assert.match(screen, /\.select\(SITE_UNITS_SELECT, \{ count: 'exact' \}\)/)
   assert.match(screen, /\.range\(/)
-  assert.match(screen, /buildSearchFilter\(\s+siteUnitsListConfig\.searchFields,/)
+  assert.match(
+    screen,
+    /buildSearchFilter\(\s+siteUnitsListConfig\.searchFields,/,
+  )
   assert.match(screen, /applyListFilters\(/)
   // Deterministic paging after the chosen sort.
   assert.match(screen, /\.order\('entry_id', \{ ascending: true \}\)/)
   // No direct write: the dialogs call the purchasing functions.
   assert.doesNotMatch(screen, /\.insert\(|\.update\(|\.delete\(|\.rpc\(/)
   // The party's open PO when there is one, else a new PO with the unit.
-  assert.match(screen, /if \(row\.party_po_id\) \{\s+setTarget\(\{ kind: 'existing', row \}\)/)
+  assert.match(
+    screen,
+    /if \(row\.party_po_id\) \{\s+setTarget\(\{ kind: 'existing', row \}\)/,
+  )
   assert.match(screen, /kind: 'new',\s+preset: \{/)
-  assert.match(screen, /<AddEquipmentDialog[\s\S]*?initialUnit=\{existingUnit\}/)
-  assert.match(screen, /<CreateSupplierPoDialog[\s\S]*?preset=\{target\?\.kind === 'new' \? target\.preset : null\}/)
+  assert.match(
+    screen,
+    /<AddEquipmentDialog[\s\S]*?initialUnit=\{existingUnit\}/,
+  )
+  assert.match(
+    screen,
+    /<CreateSupplierPoDialog[\s\S]*?preset=\{target\?\.kind === 'new' \? target\.preset : null\}/,
+  )
   // The add needs purchasing.manage; readers see the state only.
   assert.match(screen, /const canManage = can\('purchasing\.manage'\)/)
   // Tickets (owner 2026-10-25, the «تذكرة» design of /ui-kit): white
   // ticket, dashed perforation with no side notches, a stub in the state's
   // tone with the round SPO or «+»; no badge; at most three columns.
-  assert.match(screen, /const toneOf = \(row: SiteUnitRow\) => \(row\.has_po \? 'success' : 'warning'\)/)
-  assert.match(screen, /className="flex flex-col rounded-xl border bg-bg text-\[13px\]"/)
-  assert.match(screen, /<div className="mx-3 mt-auto border-t border-dashed" \/>/)
-  assert.match(screen, /style=\{\{ backgroundColor: `var\(--\$\{toneOf\(row\)\}-soft\)` \}\}/)
+  assert.match(
+    screen,
+    /const toneOf = \(row: SiteUnitRow\) => \(row\.has_po \? 'success' : 'warning'\)/,
+  )
+  assert.match(
+    screen,
+    /className="flex flex-col rounded-xl border bg-bg text-\[13px\]"/,
+  )
+  assert.match(
+    screen,
+    /<div className="mx-3 mt-auto border-t border-dashed" \/>/,
+  )
+  assert.match(
+    screen,
+    /style=\{\{ backgroundColor: `var\(--\$\{toneOf\(row\)\}-soft\)` \}\}/,
+  )
   assert.match(screen, /rounded-full px-2\.5 text-xs font-semibold/)
   // `!` because the shared button's rounded-lg wins over a plain rounded-full.
   // 2026-10-25: the «+» widens on hover / focus and says what it will do.
   assert.match(screen, /group-hover\/add:max-w-40/)
   assert.match(screen, /group-focus-visible\/add:max-w-40/)
-  assert.match(screen, /\{row\.party_po_id \? \(\s+<>\s+\{t\('siteUnitsAddTo'\)\}/)
+  assert.match(
+    screen,
+    /\{row\.party_po_id \? \(\s+<>\s+\{t\('siteUnitsAddTo'\)\}/,
+  )
   assert.match(screen, /t\('siteUnitsNewPo'\)/)
   assert.doesNotMatch(screen, /<Badge/)
   assert.match(screen, /grid grid-cols-2 gap-4 sm:grid-cols-3/)
@@ -106,8 +145,14 @@ test('the page reads the view server-side and adds through the existing dialogs'
   // movement, only when the shell can open the movement page.
   assert.match(screen, /onSelectMovement\?: \(movementId: string\) => void/)
   // 2026-10-25: real links (right click › new tab, Ctrl click).
-  assert.match(screen, /\{onSelectMovement && \(\s+<AppLink\s+href=\{`\/movements\/\$\{row\.entry_id\}`\}\s+onNavigate=\{\(\) => onSelectMovement\(row\.entry_id\)\}/)
-  assert.match(screen, /<AppLink\s+href=\{`\/purchasing\/\$\{row\.supplier_po_id\}`\}/)
+  assert.match(
+    screen,
+    /\{onSelectMovement && \(\s+<AppLink\s+href=\{`\/movements\/\$\{row\.entry_id\}`\}\s+onNavigate=\{\(\) => onSelectMovement\(row\.entry_id\)\}/,
+  )
+  assert.match(
+    screen,
+    /<AppLink\s+href=\{`\/purchasing\/\$\{row\.supplier_po_id\}`\}/,
+  )
   // 2026-10-25 trial: it widens on hover / focus to show its label, and the
   // motion runs only when the device allows motion.
   assert.match(screen, /group-hover\/move:max-w-32/)
@@ -115,22 +160,42 @@ test('the page reads the view server-side and adds through the existing dialogs'
   assert.match(screen, /motion-safe:transition-all/)
   // 2026-10-27: the two counts (without a PO / on one), head-only counts
   // with the search and every filter but the PO one, refreshed after an add.
-  assert.match(screen, /\.select\('entry_id', \{ count: 'exact', head: true \}\)\s+\.eq\('has_po', hasPo\)/)
+  assert.match(
+    screen,
+    /\.select\('entry_id', \{ count: 'exact', head: true \}\)\s+\.eq\('has_po', hasPo\)/,
+  )
   assert.match(screen, /\.filter\(\(key\) => key !== 'has_po'\)/)
   assert.match(screen, /countOf\(false\), countOf\(true\)/)
-  assert.match(screen, /\{ key: 'siteUnitsNoPo', tone: 'warning', value: poCounts\.noPo \}/)
-  assert.match(screen, /\{ key: 'siteUnitsHasPo', tone: 'success', value: poCounts\.withPo \}/)
+  assert.match(
+    screen,
+    /\{ key: 'siteUnitsNoPo', tone: 'warning', value: poCounts\.noPo \}/,
+  )
+  assert.match(
+    screen,
+    /\{ key: 'siteUnitsHasPo', tone: 'success', value: poCounts\.withPo \}/,
+  )
   assert.match(screen, /\{poCounts && !loadError && \(/)
   assert.match(screen, /setTarget\(null\)\s+refresh\(\)/)
   const app = read('src', 'App.tsx')
-  assert.match(app, /onSelectMovement=\{\s+shell\.pages\.has\('movements\/:id'\) \? openMovement : undefined\s+\}/)
+  assert.match(
+    app,
+    /onSelectMovement=\{\s+shell\.pages\.has\('movements\/:id'\) \? openMovement : undefined\s+\}/,
+  )
 })
 
 test('the dialogs take the preset only when they open', () => {
   const add = read('src', 'components', 'purchasing', 'AddEquipmentDialog.tsx')
   assert.match(add, /initialUnit = null,/)
-  assert.match(add, /setForm\(\{ \.\.\.EMPTY_FORM, equipment_id: initialUnit\?\.value \?\? '' \}\)/)
-  const create = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
+  assert.match(
+    add,
+    /setForm\(\{ \.\.\.EMPTY_FORM, equipment_id: initialUnit\?\.value \?\? '' \}\)/,
+  )
+  const create = read(
+    'src',
+    'components',
+    'purchasing',
+    'CreateSupplierPoDialog.tsx',
+  )
   assert.match(create, /export interface CreateSupplierPoPreset \{/)
   assert.match(create, /preset = null,/)
   // 0157: the preset unit's line also carries the default price unit.
@@ -160,16 +225,48 @@ test('the list config allowlists its filters and sorts, units without a PO first
 
 test('the route, the sidebar section and the translations', () => {
   const nav = read('src', 'lib', 'navPermissions.ts')
-  assert.match(nav, /\{ key: 'purchasing\/units', requires: \[\{ key: 'purchasing\.view' \}\] \}/)
+  assert.match(
+    nav,
+    /\{ key: 'purchasing\/units', requires: \[\{ key: 'purchasing\.view' \}\] \}/,
+  )
   assert.match(nav, /if \(second === 'units'\) return 'purchasing\/units'/)
   const app = read('src', 'App.tsx')
   assert.match(app, /'purchasing\/units': 'siteUnits',/)
   assert.match(app, /page === 'purchasing\/units' && \(\s+<SiteUnitsScreen/)
   const translations = read('src', 'i18n', 'translations.ts')
-  for (const key of ['siteUnits', 'siteUnitsAddToPo', 'siteUnitsNoPo', 'siteUnitsHasPo']) {
-    const matches = translations.match(new RegExp(`^    ${key}: '([^']*)',$`, 'gm')) ?? []
+  for (const key of [
+    'siteUnits',
+    'siteUnitsAddToPo',
+    'siteUnitsNoPo',
+    'siteUnitsHasPo',
+  ]) {
+    const matches =
+      translations.match(new RegExp(`^    ${key}: '([^']*)',$`, 'gm')) ?? []
     assert.equal(matches.length, 2, key)
     // New Arabic copy: plain alif only.
     assert.doesNotMatch(matches[0], /[أإآ]/, key)
   }
+})
+
+test('the create dialog reloads the party visits on every open (owner 2026-10-31)', () => {
+  // «اذا قفلت الـdialog وفتحت نفس المعدة معاد يظهر لي شي»: the same unit is
+  // the same party, so the visits effect must run on `open` too, and the
+  // reset effect must not clear the visits without a reload.
+  const create = read(
+    'src',
+    'components',
+    'purchasing',
+    'CreateSupplierPoDialog.tsx',
+  )
+  const effect = create.slice(
+    create.indexOf('const partyKey ='),
+    create.indexOf('const update = '),
+  )
+  assert.match(effect, /if \(!open\) return/)
+  assert.match(effect, /\}, \[open, partyKey\]\)/)
+  const reset = create.slice(
+    create.indexOf('useEffect(() => {\n    if (!open) return\n    setForm('),
+    create.indexOf('const partyKey ='),
+  )
+  assert.doesNotMatch(reset, /setVisits\(\[\]\)/)
 })

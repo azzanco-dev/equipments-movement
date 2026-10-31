@@ -211,8 +211,8 @@ export function CreateSupplierPoDialog({
     )
     setOwner(preset ? (preset.ownerClass ?? EXTERNAL) : '')
     setSupplier(preset?.lessor ?? null)
-    setVisits([])
-    setVisitsState('idle')
+    // The visits are not cleared here: the loading effect below reloads them
+    // on every open, so reopening on the same party shows them again.
     setDefaultUnit(SUPPLIER_PO_DEFAULT_RATE_UNIT)
     setPicked(
       preset
@@ -234,8 +234,12 @@ export function CreateSupplierPoDialog({
   }, [open])
 
   // The party's open visits drive the company, project and unit choices.
+  // Reloaded on every open as well as on a party change (owner 2026-10-31,
+  // «اذا قفلت الـdialog وفتحت نفس المعدة معاد يظهر لي شي»: the same unit is
+  // the same party, so a party-only key never refetched after a reopen).
   const partyKey = `${form.lessor_id}|${form.owner_class}`
   useEffect(() => {
+    if (!open) return
     const current = supplierPoParty({
       lessor_id: form.lessor_id || null,
       owner_class: form.owner_class || null,
@@ -262,7 +266,7 @@ export function CreateSupplierPoDialog({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [partyKey])
+  }, [open, partyKey])
 
   const update = (patch: Partial<SupplierPoFormValues>) => {
     setForm((current) => ({ ...current, ...patch }))
