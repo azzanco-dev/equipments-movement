@@ -284,6 +284,7 @@ test('the admin visits filters are an allowlist of movement_visits columns', () 
       'entry_supervisor_id',
       'equipment_lessor_id',
       'equipment_ownership_status',
+      'exit_at',
       'exit_purpose',
       'is_open',
       'project_id',
