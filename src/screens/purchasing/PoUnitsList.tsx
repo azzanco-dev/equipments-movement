@@ -39,8 +39,9 @@ import { PO_UNITS_SELECT, type PoUnitRow } from '@/lib/purchasingData'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 
-/** The URL prefix of this view's list state; «حسب الاوامر» keeps the
- *  unprefixed parameters (the home's deep links point at it). */
+/** The URL prefix of this view's list state (like the visits' `v` on
+ *  /logs): «حسب المعدات» is the default view, while «حسب الاوامر» keeps the
+ *  unprefixed parameters the home's deep links carry. */
 export const PO_UNITS_URL_PREFIX = 'u'
 
 /** The green SPO pill of «المعدات في المشاريع». */
@@ -51,7 +52,7 @@ const SPO_PILL_STYLE: CSSProperties = {
 
 /** The plate's digits, then its letters spaced by letter-spacing (as on the
  *  «المعدات في المشاريع» tickets); a plate not in the stored form, or the
- *  chassis, shows as it is. */
+ *  chassis, shows as it is; nothing without either. */
 function PlateOrChassis({
   plate,
   chassis,
@@ -63,15 +64,15 @@ function PlateOrChassis({
   const text = plate?.trim() || chassis?.trim()
   if (!parts)
     return text ? (
-      <bdi dir="ltr">{text}</bdi>
-    ) : (
-      <span className="text-muted">—</span>
-    )
+      <span dir="ltr" className="text-xs text-muted">
+        {text}
+      </span>
+    ) : null
   return (
-    <bdi dir="ltr">
+    <span dir="ltr" className="text-xs text-muted">
       {parts.digits}{' '}
       <span className="-me-[0.15em] tracking-[0.15em]">{parts.letters}</span>
-    </bdi>
+    </span>
   )
 }
 
@@ -157,33 +158,30 @@ export function PoUnitsList({ onSelectPo }: PoUnitsListProps) {
   const filtered = Boolean(list.search.trim()) || list.filters.length > 0
 
   const columns: DataTableColumn<PoUnitRow>[] = [
-    // The identity cell: the code, the type under it.
+    // The identity cell (the equipment list's look): the bold code with the
+    // plate or the chassis beside it (owner 2026-10-31, «اللوحة او الشاصي مع
+    // عمود المعدة», as on the PO PDF), the type under them.
     {
       key: 'equipment_code',
       header: t('supplierPoEquipmentField'),
       sortable: true,
       cell: (row) => (
         <span className="flex flex-col text-start">
-          <bdi dir="ltr" className="font-semibold">
-            {row.equipment_code ?? '—'}
-          </bdi>
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span dir="ltr" className="font-semibold">
+              {row.equipment_code ?? '—'}
+            </span>
+            <PlateOrChassis
+              plate={row.equipment_plate_number}
+              chassis={row.equipment_chassis_number}
+            />
+          </span>
           {row.equipment_type && (
             <span className="truncate-safe max-w-[12rem] text-xs text-muted">
               {row.equipment_type}
             </span>
           )}
         </span>
-      ),
-    },
-    {
-      key: 'plate',
-      header: t('poUnitsPlateOrChassis'),
-      hideBelow: 'md',
-      cell: (row) => (
-        <PlateOrChassis
-          plate={row.equipment_plate_number}
-          chassis={row.equipment_chassis_number}
-        />
       ),
     },
     // The row's link cell (rowLinkColumn): the green SPO pill.
@@ -218,7 +216,7 @@ export function PoUnitsList({ onSelectPo }: PoUnitsListProps) {
     {
       key: 'company_project',
       header: t('supplierPoCompanyProject'),
-      hideBelow: 'lg',
+      hideBelow: 'md',
       cell: (row) => <CompanyProjectCell row={row} />,
     },
     {

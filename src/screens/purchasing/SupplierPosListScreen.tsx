@@ -49,18 +49,44 @@ import { supabase } from '@/lib/supabase'
 import { PoUnitsList } from '@/screens/purchasing/PoUnitsList'
 
 /**
- * Owner 2026-10-31: «حسب الاوامر» (the PO list, the default, left out of the
- * query string so its unprefixed deep links keep working) or «حسب المعدات»
- * (`?view=units`, one row per unit on a PO, its list state under the `u`
- * prefix; see `PoUnitsList`).
+ * Owner 2026-10-31: «حسب المعدات» (one row per unit on a PO, its list state
+ * under the `u` prefix; see `PoUnitsList`) or «حسب الاوامر» (the PO list,
+ * `?view=orders`, with the unprefixed list state). «حسب المعدات» is the
+ * default and is left out of the query string (owner: «وحسب المعدات هو
+ * الافتراضي»), the same rule as the visits of /logs.
  */
 type PoListView = 'orders' | 'units'
 
-const VIEWS: PoListView[] = ['orders', 'units']
+const VIEWS: PoListView[] = ['units', 'orders']
 
-function resolvePoListView(params: Pick<URLSearchParams, 'get'>): PoListView {
-  return params.get('view') === 'units' ? 'units' : 'orders'
+/**
+ * Unprefixed list state that only the orders list reads. The home's
+ * «يحتاج انتباهك» links (`/purchasing/orders?filters=…`) carry it without a
+ * `view`, so a URL holding any of these still opens the orders list.
+ */
+const PO_ORDERS_STATE_KEYS = ['q', 'filters', 'sort', 'dir', 'page', 'size']
+
+function hasOrdersState(params: Pick<URLSearchParams, 'has'>): boolean {
+  return PO_ORDERS_STATE_KEYS.some((key) => params.has(key))
 }
+
+function resolvePoListView(
+  params: Pick<URLSearchParams, 'get' | 'has'>,
+): PoListView {
+  const requested = params.get('view')
+  if (requested === 'orders' || requested === 'units') return requested
+  return hasOrdersState(params) ? 'orders' : 'units'
+}
+
+/**
+ * The selected view looks like a primary button (owner 2026-10-31, «خلي
+ * التاب المختار يكون لونه اسود»): black in light mode, white in dark mode.
+ * Only on this page; the shared segmented look stays. The same variants as
+ * the shared active classes plus `aria-selected` (Radix sets it on the
+ * active trigger), so these win by specificity, not by CSS order.
+ */
+const PRIMARY_ACTIVE_TAB =
+  'group-data-[variant=segmented]/tabs:data-[state=active]:aria-selected:bg-primary group-data-[variant=segmented]/tabs:data-[state=active]:aria-selected:text-primary-contrast group-data-[variant=segmented]/tabs:data-[state=active]:aria-selected:hover:bg-primary-hover'
 
 export interface SupplierPosListScreenProps {
   onSelectPo: (poId: string) => void
@@ -146,11 +172,13 @@ export function SupplierPosListScreen({
   }, [fetchRows, view])
 
   const setView = (next: PoListView) => {
-    // «حسب الاوامر» is the default and is left out of the query string.
+    // «حسب المعدات» is the default and is left out of the query string,
+    // unless the URL still carries orders state that would otherwise select
+    // the orders list (see `resolvePoListView`).
     const query = new URLSearchParams(
       [...params.entries()].filter(([key]) => key !== 'view'),
     )
-    if (next !== 'orders') query.set('view', next)
+    if (next === 'orders' || hasOrdersState(query)) query.set('view', next)
     const search = query.toString()
     window.history.replaceState(
       null,
@@ -272,7 +300,11 @@ export function SupplierPosListScreen({
       >
         <TabsList variant="segmented" aria-label={t('poUnitsViewFilter')}>
           {VIEWS.map((value) => (
-            <TabsTrigger key={value} value={value}>
+            <TabsTrigger
+              key={value}
+              value={value}
+              className={PRIMARY_ACTIVE_TAB}
+            >
               {value === 'orders'
                 ? t('poUnitsViewOrders')
                 : t('poUnitsViewUnits')}

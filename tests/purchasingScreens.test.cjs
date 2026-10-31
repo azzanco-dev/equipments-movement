@@ -1105,7 +1105,7 @@ test('poUnitsListConfig: unit and PO number search, allowlisted filters, open PO
   }
 })
 
-test('the PO list switches between «حسب الاوامر» and «حسب المعدات» (?view=units, prefix u)', () => {
+test('the PO list switches between «حسب المعدات» (the default) and «حسب الاوامر» (?view=orders, prefix u for units)', () => {
   const screen = read(
     'src',
     'screens',
@@ -1113,15 +1113,51 @@ test('the PO list switches between «حسب الاوامر» and «حسب الم
     'SupplierPosListScreen.tsx',
   )
   assert.match(screen, /type PoListView = 'orders' \| 'units'/)
-  // Orders is the default and keeps its unprefixed state (the home's links).
+  // Owner 2026-10-31: «حسب المعدات» is the default, listed first.
+  assert.match(screen, /const VIEWS: PoListView\[\] = \['units', 'orders'\]/)
+  // The /logs rule: an explicit view wins; else unprefixed orders state (the
+  // home's «يحتاج انتباهك» links) opens the orders list; else the units.
+  const start = screen.indexOf('const PO_ORDERS_STATE_KEYS')
+  const end = screen.indexOf(
+    '/**',
+    screen.indexOf('function resolvePoListView'),
+  )
+  assert.ok(start > 0 && end > start)
+  const resolve = new Function(
+    `${ts.transpileModule(screen.slice(start, end), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText}; return resolvePoListView`,
+  )()
+  const at = (query) => resolve(new URLSearchParams(query))
+  assert.equal(at(''), 'units')
+  assert.equal(at('view=orders'), 'orders')
+  assert.equal(at('view=units'), 'units')
+  assert.equal(at('filters=%5B%5D'), 'orders')
+  for (const key of ['q', 'filters', 'sort', 'dir', 'page', 'size'])
+    assert.equal(at(`${key}=x`), 'orders', key)
+  assert.equal(at('view=units&filters=%5B%5D'), 'units')
+  // The units' own state is prefixed and never selects the orders.
+  assert.equal(at('ufilters=%5B%5D&uq=A1&upage=2'), 'units')
+  // setView: orders always explicit; units left out unless orders state is
+  // in the URL.
   assert.match(
     screen,
-    /return params\.get\('view'\) === 'units' \? 'units' : 'orders'/,
+    /\.filter\(\(\[key\]\) => key !== 'view'\),\s+\)\s+if \(next === 'orders' \|\| hasOrdersState\(query\)\) query\.set\('view', next\)/,
   )
+  // The selected tab looks like the primary button, on this page only, and
+  // wins over the shared segmented classes by specificity (aria-selected).
   assert.match(
     screen,
-    /\.filter\(\(\[key\]\) => key !== 'view'\),\s+\)\s+if \(next !== 'orders'\) query\.set\('view', next\)/,
+    /const PRIMARY_ACTIVE_TAB =\s+'group-data-\[variant=segmented\]\/tabs:data-\[state=active\]:aria-selected:bg-primary group-data-\[variant=segmented\]\/tabs:data-\[state=active\]:aria-selected:text-primary-contrast /,
   )
+  assert.equal(
+    (screen.match(/className=\{PRIMARY_ACTIVE_TAB\}/g) ?? []).length,
+    1,
+  )
+  const tabs = read('src', 'components', 'ui', 'Tabs.tsx')
+  assert.match(
+    tabs,
+    /group-data-\[variant=segmented\]\/tabs:data-\[state=active\]:bg-bg /,
+  )
+  assert.doesNotMatch(tabs, /bg-primary/)
   assert.match(screen, /const list = useDataListState\(supplierPosListConfig\)/)
   assert.match(
     screen,
@@ -1167,6 +1203,18 @@ test('the PO list switches between «حسب الاوامر» and «حسب الم
   // The home's deep links still point at the orders view, unprefixed.
   const attention = read('src', 'lib', 'adminAttention.ts')
   assert.doesNotMatch(attention, /view=units|ufilters/)
+  // They carry orders state without a `view`, so they open the orders list.
+  assert.match(attention, /`\/purchasing\/orders\?filters=\$\{/)
+  assert.doesNotMatch(attention, /view=/)
+  // The identity cell (the equipment list's look): the bold code with the
+  // plate or chassis beside it in one inline row, the type under them; no
+  // plate column of its own.
+  assert.match(
+    units,
+    /<span className="flex flex-col text-start">\s+<span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">\s+<span dir="ltr" className="font-semibold">\s+\{row\.equipment_code \?\? '—'\}\s+<\/span>\s+<PlateOrChassis/,
+  )
+  assert.doesNotMatch(units, /key: 'plate'/)
+  assert.doesNotMatch(read(...TRANSLATIONS), /poUnitsPlateOrChassis/)
   // The translations of the switch, both languages, plain alif.
   const translations = read(...TRANSLATIONS)
   for (const key of [
