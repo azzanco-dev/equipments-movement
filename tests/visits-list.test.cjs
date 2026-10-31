@@ -37,10 +37,12 @@ const {
   buildVisitSearchFilter,
   foremanVisitsListConfig,
   formatVisitDuration,
+  visitColumnFilterKeys,
   visitContextFilter,
   visitExportColumns,
   visitExportFileName,
   visitOwnerLabel,
+  visitPeriodOrFilter,
   visitSortField,
   visitStateView,
   visitsListConfig,
@@ -276,21 +278,30 @@ test('the context filter maps all to no predicate', () => {
 
 test('the admin visits filters are an allowlist of movement_visits columns', () => {
   const keys = adminVisitsListConfig.filterFields.map((field) => field.key)
+  const columns_ = [
+    'company_id',
+    'entry_at',
+    'entry_supervisor_id',
+    'equipment_lessor_id',
+    'equipment_ownership_status',
+    'exit_at',
+    'exit_purpose',
+    'is_open',
+    'project_id',
+    'workshop_purpose',
+  ]
+  // The config also offers the computed «الفترة»…
+  assert.deepEqual([...keys].sort(), [...columns_, 'period'].sort())
+  // …but only real columns reach applyListFilters.
   assert.deepEqual(
-    [...keys].sort(),
-    [
-      'company_id',
-      'entry_at',
-      'entry_supervisor_id',
-      'equipment_lessor_id',
-      'equipment_ownership_status',
-      'exit_at',
-      'exit_purpose',
-      'is_open',
-      'project_id',
-      'workshop_purpose',
-    ].sort(),
+    [...visitColumnFilterKeys(adminVisitsListConfig)].sort(),
+    [...columns_].sort(),
   )
+  for (const config of [visitsListConfig, foremanVisitsListConfig])
+    assert.deepEqual(
+      [...visitColumnFilterKeys(config)],
+      [...config.filterFields.map((field) => field.key)],
+    )
   // Every filter key is a column the view's select list also reads.
   const columns = EQUIPMENT_VISITS_SELECT.split(',')
   for (const key of ['company_id', 'project_id'])
@@ -313,6 +324,125 @@ test('the admin visits filters are an allowlist of movement_visits columns', () 
   assert.equal(adminVisitsListConfig.defaultSort, 'entry_at')
   assert.equal(adminVisitsListConfig.defaultDirection, 'desc')
   assert.notEqual(adminVisitsListConfig.id, visitsListConfig.id)
+})
+
+// ---------------------------------------------------------------------------
+// «الفترة»: the visits inside at some moment of the period (owner 2026-10-31)
+// ---------------------------------------------------------------------------
+
+test('«الفترة» is a date filter right after «وقت الخروج»', () => {
+  const keys = adminVisitsListConfig.filterFields.map((field) => field.key)
+  assert.equal(keys.indexOf('period'), keys.indexOf('exit_at') + 1)
+  const field = adminVisitsListConfig.filterFields.find(
+    (item) => item.key === 'period',
+  )
+  assert.equal(field.type, 'date')
+  assert.deepEqual(asData(field.label), { ar: 'الفترة', en: 'Period' })
+  assert.deepEqual([...field.operators].sort(), ['between', 'eq', 'gte', 'lte'])
+  assert.equal(field.visibleWhen, undefined)
+  // The homes never offer it.
+  for (const config of [visitsListConfig, foremanVisitsListConfig])
+    assert.ok(!config.filterFields.some((item) => item.key === 'period'))
+})
+
+// The helpers run in their own vm realm; compare plain data, not realms.
+const asData = (value) => JSON.parse(JSON.stringify(value))
+const OTHER = { id: 'o', field: 'is_open', operator: 'eq', value: 'false' }
+// The Saudi day 2026-09-15 runs 2026-09-14T21:00Z .. 2026-09-15T20:59:59.999Z.
+const SEP15_START = '2026-09-14T21:00:00.000Z'
+const SEP15_END = '2026-09-15T20:59:59.999Z'
+
+/** The overlap clause: entered by `end`, and still inside or left after `start`. */
+const overlap = (start, end) =>
+  `and(entry_at.lte."${end}",exit_at.is.null),` +
+  `and(entry_at.lte."${end}",exit_at.gte."${start}")`
+
+test('«الفترة» eq is one Saudi day: inside at some moment of it', () => {
+  for (const value of ['2026-09-15', SEP15_START]) {
+    const result = visitPeriodOrFilter([
+      OTHER,
+      { id: 'p', field: 'period', operator: 'eq', value },
+    ])
+    assert.equal(result.clause, overlap(SEP15_START, SEP15_END))
+    assert.deepEqual(asData(result.rest), [OTHER])
+  }
+})
+
+test('«الفترة» between keeps the range control bounds as «وقت الدخول» does', () => {
+  const result = visitPeriodOrFilter([
+    {
+      id: 'p',
+      field: 'period',
+      operator: 'between',
+      value: '2026-08-31T21:00:00.000Z',
+      valueTo: '2026-09-30T20:59:59.999Z',
+    },
+    OTHER,
+  ])
+  assert.equal(
+    result.clause,
+    overlap('2026-08-31T21:00:00.000Z', '2026-09-30T20:59:59.999Z'),
+  )
+  assert.deepEqual(asData(result.rest), [OTHER])
+  // An older URL holding date keys reaches the same Saudi bounds.
+  assert.equal(
+    visitPeriodOrFilter([
+      {
+        id: 'p',
+        field: 'period',
+        operator: 'between',
+        value: '2026-09-01',
+        valueTo: '2026-09-30',
+      },
+    ]).clause,
+    result.clause,
+  )
+})
+
+test('«الفترة» gte / lte bound one side only', () => {
+  // From the start on: still inside, or left on or after it.
+  assert.equal(
+    visitPeriodOrFilter([
+      { id: 'p', field: 'period', operator: 'gte', value: SEP15_START },
+    ]).clause,
+    `exit_at.is.null,exit_at.gte."${SEP15_START}"`,
+  )
+  // Up to the end: entered on or before it.
+  assert.equal(
+    visitPeriodOrFilter([
+      { id: 'p', field: 'period', operator: 'lte', value: SEP15_END },
+    ]).clause,
+    `entry_at.lte."${SEP15_END}"`,
+  )
+})
+
+test('«الفترة» leaves a list without it untouched', () => {
+  const filters = [
+    OTHER,
+    { id: 'e', field: 'entry_at', operator: 'gte', value: SEP15_START },
+  ]
+  const result = visitPeriodOrFilter(filters)
+  assert.equal(result.clause, null)
+  assert.deepEqual(asData(result.rest), filters)
+})
+
+test('an invalid «الفترة» is dropped, never interpolated', () => {
+  for (const filter of [
+    { id: 'p', field: 'period', operator: 'eq', value: 'x),id.neq.(1' },
+    { id: 'p', field: 'period', operator: 'gte', value: '' },
+    {
+      id: 'p',
+      field: 'period',
+      operator: 'between',
+      value: SEP15_START,
+      valueTo: 'not a date',
+    },
+    { id: 'p', field: 'period', operator: 'gt', value: SEP15_START },
+  ]) {
+    const result = visitPeriodOrFilter([filter, OTHER])
+    assert.equal(result.clause, null, JSON.stringify(filter))
+    assert.deepEqual(asData(result.rest), [OTHER])
+  }
 })
 
 test('visits filter company and project by id, several at once', () => {

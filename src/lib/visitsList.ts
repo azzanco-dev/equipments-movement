@@ -1,11 +1,18 @@
+import { logicTreeValue } from '@/lib/applyListFilters'
 import { SUPPLIER_FILTER_FIELD } from '@/lib/equipmentSupplier'
-import { saudiDateKey } from '@/lib/saudiTime'
+import {
+  isDateKey,
+  saudiDateKey,
+  saudiDayEnd,
+  saudiDayStart,
+} from '@/lib/saudiTime'
 import { buildSearchFilter } from '@/lib/search'
 import type { Language, TranslationKey } from '@/i18n/translations'
 import type {
   DataListConfig,
   FilterField,
   FilterOperator,
+  ListFilter,
 } from '@/components/data-list/types'
 import type { ExcelColumn } from '@/lib/excel'
 import {
@@ -227,6 +234,126 @@ const VISIT_DATE_OPS: FilterOperator[] = [
 ]
 
 /**
+ * «الفترة» (owner 2026-10-31, «اضف فلتر الفترة»): a visit matches when the
+ * unit was INSIDE (the project or the workshop) at some moment of the period
+ * — it entered on or before the period's end and left on or after its start,
+ * or has not left yet. So it also finds the visits that span the period
+ * whole, which «وقت الدخول» and «وقت الخروج» cannot. It is not a column of
+ * `movement_visits`: `visitPeriodOrFilter` turns it into one PostgREST `or`
+ * and `visitColumnFilterKeys` keeps it out of `applyListFilters`. Only the
+ * operators the date range control emits (`between` / `gte` / `lte`) plus
+ * `eq` as one Saudi day.
+ */
+export const VISIT_PERIOD_FILTER_KEY = 'period'
+
+const VISIT_PERIOD_OPS: FilterOperator[] = ['eq', 'between', 'gte', 'lte']
+
+/** Filter keys of the visits configs that are not `movement_visits` columns. */
+const VISIT_COMPUTED_FILTER_KEYS: ReadonlySet<string> = new Set([
+  VISIT_PERIOD_FILTER_KEY,
+])
+
+/**
+ * A visits config's filter keys that may reach PostgREST as columns through
+ * `applyListFilters`: the allowlist minus the computed «الفترة».
+ */
+export function visitColumnFilterKeys(config: DataListConfig): Set<string> {
+  return new Set(
+    config.filterFields
+      .map((field) => field.key)
+      .filter((key) => !VISIT_COMPUTED_FILTER_KEYS.has(key)),
+  )
+}
+
+/**
+ * One bound of the period as an ISO instant. The range control stores the
+ * first / last instant of a Saudi day (`saudiDayStart` / `saudiDayEnd`, the
+ * values «وقت الدخول» sends as they are); an older date key becomes that
+ * Saudi day's edge. Anything that is not a date is `null`, so no user text
+ * is ever interpolated.
+ */
+function periodBound(
+  value: string | undefined,
+  edge: 'start' | 'end',
+): string | null {
+  const text = value?.trim()
+  if (!text) return null
+  if (isDateKey(text))
+    return edge === 'start' ? saudiDayStart(text) : saudiDayEnd(text)
+  const time = Date.parse(text)
+  if (Number.isNaN(time)) return null
+  try {
+    return new Date(time).toISOString()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Pulls the «الفترة» filter out of the list filters and returns its PostgREST
+ * `or` clause — the visit overlaps the period: `entry_at <= end` AND
+ * (`exit_at IS NULL` OR `exit_at >= start`), written as the alternatives of
+ * one `or` — with the filters left for `applyListFilters`. `rest` never
+ * holds a period filter, even an invalid one; `clause` is `null` when there
+ * is none or its value is not a date. `eq` is one Saudi day, `between` both
+ * bounds, `gte` (from the start on) / `lte` (up to the end) one bound.
+ */
+export function visitPeriodOrFilter(filters: readonly ListFilter[]): {
+  clause: string | null
+  rest: ListFilter[]
+} {
+  const rest = filters.filter(
+    (filter) => filter.field !== VISIT_PERIOD_FILTER_KEY,
+  )
+  const period = filters.find(
+    (filter) => filter.field === VISIT_PERIOD_FILTER_KEY,
+  )
+  if (!period) return { clause: null, rest }
+  let start: string | null = null
+  let end: string | null = null
+  switch (period.operator) {
+    case 'eq': {
+      const instant = periodBound(period.value, 'start')
+      if (!instant) return { clause: null, rest }
+      const day = isDateKey(period.value.trim())
+        ? period.value.trim()
+        : saudiDateKey(instant)
+      start = saudiDayStart(day)
+      end = saudiDayEnd(day)
+      break
+    }
+    case 'between':
+      start = periodBound(period.value, 'start')
+      end = periodBound(period.valueTo ?? period.value, 'end')
+      if (!start || !end) return { clause: null, rest }
+      break
+    case 'gte':
+      start = periodBound(period.value, 'start')
+      break
+    case 'lte':
+      end = periodBound(period.value, 'end')
+      break
+    default:
+      return { clause: null, rest }
+  }
+  if (!start && !end) return { clause: null, rest }
+  // Still inside, or left on or after the start.
+  const stillInside = 'exit_at.is.null'
+  const leftAfterStart = start ? `exit_at.gte.${logicTreeValue(start)}` : null
+  // Entered on or before the end.
+  const enteredBeforeEnd = end ? `entry_at.lte.${logicTreeValue(end)}` : null
+  if (!enteredBeforeEnd)
+    return { clause: `${stillInside},${leftAfterStart}`, rest }
+  if (!leftAfterStart) return { clause: enteredBeforeEnd, rest }
+  return {
+    clause:
+      `and(${enteredBeforeEnd},${stillInside}),` +
+      `and(${enteredBeforeEnd},${leftAfterStart})`,
+    rest,
+  }
+}
+
+/**
  * The visits view of the admin log (`/logs`, admin and monitor only).
  *
  * Same search and sort as the home tab, plus an allowlisted filter set that
@@ -253,6 +380,15 @@ export const adminVisitsListConfig: DataListConfig = {
       label: { ar: 'وقت الخروج', en: 'Exit time' },
       type: 'date',
       operators: VISIT_DATE_OPS,
+    },
+    // Owner 2026-10-31: the visits that were IN the project (or the
+    // workshop) at some moment of the period (`visitPeriodOrFilter`); not a
+    // column, so never sent as one.
+    {
+      key: VISIT_PERIOD_FILTER_KEY,
+      label: { ar: 'الفترة', en: 'Period' },
+      type: 'date',
+      operators: VISIT_PERIOD_OPS,
     },
     {
       key: 'is_open',
