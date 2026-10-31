@@ -436,16 +436,29 @@ export function partyOptionLoader(
   }
 }
 
+/** A page of the party's open visits; the loop below reads them all. */
+export const PARTY_OPEN_VISITS_PAGE = 500
+
 /** The party's open visits, grouped: the companies (and under each, the
- *  projects) where the party has units right now. One bounded request; a
- *  party has a handful of open visits. */
+ *  projects) where the party has units right now. ALL of them, read page by
+ *  page by equipment code then entry (owner 2026-10-31, «لما اختار معدة
+ *  معينة ماتكون ظاهرة ضمن المعدات المتاحة»: a single request capped at 200
+ *  dropped the units after the 200th code of an owner class with more units
+ *  inside projects, the ticked unit included). */
 export async function fetchPartyOpenVisits(
   party: SupplierPoParty,
 ): Promise<PartyOpenVisit[]> {
-  const rows = unwrapRows<PartyOpenVisit>(
-    await partyOpenVisits(party).order('equipment_code').limit(200),
-  )
-  return rows
+  const rows: PartyOpenVisit[] = []
+  for (let from = 0; ; from += PARTY_OPEN_VISITS_PAGE) {
+    const page = unwrapRows<PartyOpenVisit>(
+      await partyOpenVisits(party)
+        .order('equipment_code')
+        .order('entry_id')
+        .range(from, from + PARTY_OPEN_VISITS_PAGE - 1),
+    )
+    rows.push(...page)
+    if (page.length < PARTY_OPEN_VISITS_PAGE) return rows
+  }
 }
 
 /** Distinct companies of some open visits, as picker options. */

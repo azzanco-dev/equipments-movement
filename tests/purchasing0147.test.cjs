@@ -270,3 +270,20 @@ test('the create dialog reloads the party visits on every open (owner 2026-10-31
   )
   assert.doesNotMatch(reset, /setVisits\(\[\]\)/)
 })
+
+test('the party visits are read whole, page by page, not capped (owner 2026-10-31)', () => {
+  // «لما اختار معدة معينة ماتكون ظاهرة ضمن المعدات المتاحة»: a 200-row cap
+  // dropped the units after the 200th code of a large owner class.
+  const data = read('src', 'lib', 'purchasingData.ts')
+  const fetch = data.slice(
+    data.indexOf('export async function fetchPartyOpenVisits'),
+    data.indexOf('/** Distinct companies of some open visits'),
+  )
+  assert.doesNotMatch(fetch, /\.limit\(/)
+  assert.match(fetch, /\.range\(from, from \+ PARTY_OPEN_VISITS_PAGE - 1\)/)
+  assert.match(
+    fetch,
+    /if \(page\.length < PARTY_OPEN_VISITS_PAGE\) return rows/,
+  )
+  assert.match(data, /export const PARTY_OPEN_VISITS_PAGE = 500/)
+})
