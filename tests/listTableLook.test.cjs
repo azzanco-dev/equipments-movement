@@ -46,8 +46,14 @@ test('the secondary facts are muted lines under the identity', () => {
   assert.match(drivers, /\{row\.name_en\}/)
 
   const lessors = read('src/screens/lessors/LessorsTable.tsx')
-  assert.doesNotMatch(lessors, /key: 'contact_person',/)
-  assert.match(lessors, /\{row\.contact_person\}/)
+  // Owner 2026-10-31: the contact person is a column of its own again, right
+  // after the name, not sortable.
+  assert.match(lessors, /key: 'contact_person',/)
+  assert.match(lessors, /header: t\('contactPerson'\)/)
+  assert.doesNotMatch(
+    lessors,
+    /<span className="text-xs text-muted">\{row\.contact_person\}/,
+  )
 
   // The row actions stay icon buttons (owner: «الازرار تبقى ايقونات»).
   for (const file of TABLES.slice(2))

@@ -53,16 +53,15 @@ export function LessorsTable({
       key: 'name',
       header: t('lessorName'),
       sortable: true,
-      // Owner 2026-10-29 (the log / PO list look): the contact person is a
-      // muted line under the name instead of a column.
-      cell: (row) => (
-        <span className="flex flex-col text-start">
-          <span className="font-semibold">{row.name}</span>
-          {row.contact_person && (
-            <span className="text-xs text-muted">{row.contact_person}</span>
-          )}
-        </span>
-      ),
+      // Owner 2026-10-29 put the contact person under the name; the owner
+      // reversed it on 2026-10-31: it is a column of its own again.
+      cell: (row) => <span className="font-semibold">{row.name}</span>,
+    },
+    {
+      key: 'contact_person',
+      header: t('contactPerson'),
+      className: 'text-muted',
+      cell: (row) => row.contact_person || '—',
     },
     {
       key: 'contact_number',
