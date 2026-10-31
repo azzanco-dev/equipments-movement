@@ -1747,8 +1747,9 @@ export const translations = {
     // wave6-J3
     movementActions: 'اجراءات الحركة',
     options: 'خيارات',
+    // 0166 (owner 2026-10-31): the edit corrects the current driver in place.
     movementEditOpenVisitDriverHint:
-      'الزيارة ما زالت مفتوحة، لذلك يسجل تغيير السائق كسجل جديد ويبقى سائق الدخول الاصلي كما هو.',
+      'تغيير السائق هنا يصحح السائق الحالي مباشرة. لتسجيل تسليم المعدة لسائق اخر استخدم «تغيير السائق».',
     movementAdminDriverNotSupported: 'حركات الورشة تسجل بدون سائق.',
     movementAdminAccessDenied: 'ليست لديك صلاحية لتعديل هذه الحركة او حذفها.',
     movementAdminInvalidDriver: 'السائق المحدد غير موجود.',
@@ -1776,7 +1777,17 @@ export const translations = {
     movementEditInvalidPayload:
       'بيانات التعديل غير مكتملة. تحقق من الحقول المطلوبة وحاول مرة اخرى.',
     movementEditDriverPartial:
-      'تم حفظ تعديلات الحركة، لكن تعذر تسجيل تغيير السائق. حاول تغيير السائق مرة اخرى.',
+      'تم حفظ تعديلات الحركة، لكن تعذر تصحيح السائق. حاول مرة اخرى.',
+    // 0166 (owner 2026-10-31): correcting one driver of a visit in place.
+    driverCorrectionTitle: 'تصحيح السائق',
+    driverCorrectionDesc:
+      'يستبدل هذا السائق في سجل الزيارة مباشرة ولا يسجل كتبديل سائق. استخدمه لتصحيح سائق مكرر او مدخل بالغلط.',
+    driverCorrectionCurrent: 'السائق المسجل',
+    driverCorrectionNew: 'السائق الصحيح',
+    driverCorrectionAction: 'تصحيح',
+    driverCorrectionFailed: 'تعذر تصحيح السائق. حاول مرة اخرى.',
+    driverCorrectionStale: 'تغير سجل السائقين. حدث الصفحة وحاول مرة اخرى.',
+    driverCorrectionAuditField: 'سائق في سجل التغيير',
 
     // wave6-K3
     reportFilterAlazaniOnly: 'العزاني فقط',
@@ -3960,7 +3971,7 @@ export const translations = {
     movementActions: 'Movement actions',
     options: 'Options',
     movementEditOpenVisitDriverHint:
-      'The visit is still open, so a driver change is appended as a new record and the original entry driver stays unchanged.',
+      'Changing the driver here corrects the current driver in place. To record handing the unit to another driver, use "Change driver".',
     movementAdminDriverNotSupported:
       'Workshop movements are recorded without a driver.',
     movementAdminAccessDenied:
@@ -3992,7 +4003,17 @@ export const translations = {
     movementEditInvalidPayload:
       'The correction is incomplete. Check the required fields and try again.',
     movementEditDriverPartial:
-      'The movement changes were saved, but the driver change could not be recorded. Try changing the driver again.',
+      'The movement changes were saved, but the driver could not be corrected. Try again.',
+    driverCorrectionTitle: 'Correct driver',
+    driverCorrectionDesc:
+      'Replaces this driver in the visit history in place; it is not recorded as a driver swap. Use it to fix a duplicate or mistaken driver.',
+    driverCorrectionCurrent: 'Recorded driver',
+    driverCorrectionNew: 'Correct driver',
+    driverCorrectionAction: 'Correct',
+    driverCorrectionFailed: 'The driver could not be corrected. Try again.',
+    driverCorrectionStale:
+      'The driver history changed. Refresh the page and try again.',
+    driverCorrectionAuditField: 'Driver in the change history',
 
     // wave6-K3
     reportFilterAlazaniOnly: 'Al-Azani only',

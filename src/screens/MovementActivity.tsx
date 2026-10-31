@@ -148,6 +148,8 @@ export function MovementActivity() {
       notes: t('notes'),
       recorded_at: t('actualMovementTime'),
       workshop_purpose: t('workshopPurpose'),
+      // 0166: a corrected driver of the visit's change history.
+      driver_change: t('driverCorrectionAuditField'),
     }),
     [t],
   )

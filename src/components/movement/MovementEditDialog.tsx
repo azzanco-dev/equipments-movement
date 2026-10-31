@@ -25,6 +25,7 @@ import {
   MOVEMENT_EDIT_FIELD_ORDER,
   MOVEMENT_NOTES_MAX_LENGTH,
   buildMovementEditPayload,
+  correctsVisitDriver,
   localDateKey,
   movementAdminErrorKey,
   movementEditFieldErrors,
@@ -43,6 +44,10 @@ import {
   Notice,
   Textarea,
 } from '@/components/ui'
+import {
+  correctVisitDriver,
+  driverCorrectionError,
+} from '@/lib/driverCorrection'
 
 
 export interface MovementEditDialogProps {
@@ -57,10 +62,15 @@ export interface MovementEditDialogProps {
   /** Which driver path applies — see `movementDriverEditMode`. */
   driverMode: MovementDriverEditMode
   /**
-   * The ENTRY that owns the append-only driver-change history; required when
-   * `driverMode` is `driver_change`.
+   * The ENTRY that owns the visit's driver chain; required when `driverMode`
+   * is `driver_change` or `entry`.
    */
   driverEntryId: string | null
+  /**
+   * The chain link the driver field shows (0166): the latest change on an
+   * open visit, null for the entry driver.
+   */
+  driverChangeId: string | null
   loadDrivers: (query: string) => Promise<SelectOption[]>
   /**
    * Called after something was stored, so the page refetches. `warning` is a
@@ -72,14 +82,13 @@ export interface MovementEditDialogProps {
 /**
  * wave6-J4 — the ONE admin correction dialog of a movement.
  *
- * Every field except an open visit's driver is written by a single
+ * Every field except an entry's driver is written by a single
  * `PATCH /api/movements/:id`, i.e. one `admin_update_movement` call (migration
  * 0105) in one transaction; the database re-checks the admin role, the
- * ENTRY/EXIT sequence and the driver rules. The driver of an OPEN site visit
- * is never rewritten: that change is appended through
- * `change_active_movement_driver` (migrations 0040/0067) after the correction
- * was stored, so a failure there is reported as a partial success — never as
- * a total failure.
+ * ENTRY/EXIT sequence and the driver rules. An entry's driver is corrected in
+ * place through `admin_correct_visit_driver` (0166, owner 2026-10-31) after
+ * the correction was stored, so a failure there is reported as a partial
+ * success — never as a total failure.
  */
 export function MovementEditDialog({
   open,
@@ -91,6 +100,7 @@ export function MovementEditDialog({
   driverName,
   driverMode,
   driverEntryId,
+  driverChangeId,
   loadDrivers,
   onSaved,
 }: MovementEditDialogProps) {
@@ -275,14 +285,14 @@ export function MovementEditDialog({
       return
     }
 
-    // An open site visit keeps its entry driver: that change is appended
-    // separately, so it never makes the correction call necessary by itself.
-    const appendDriver =
-      driverMode === 'driver_change' &&
+    // An entry's driver is corrected by its own call (0166), so it never makes
+    // the movement correction call necessary by itself.
+    const correctDriver =
+      correctsVisitDriver(driverMode) &&
       Boolean(values.driver_id) &&
       values.driver_id !== initial.driver_id
     const correctionNeeded = !movementEditUnchanged(
-      appendDriver ? { ...values, driver_id: '' } : values,
+      correctDriver ? { ...values, driver_id: initial.driver_id } : values,
       initial,
     )
 
@@ -323,21 +333,20 @@ export function MovementEditDialog({
         }
       }
 
-      if (!failure && !fieldFailure && appendDriver && driverEntryId) {
-        const { error: changeError } = await supabase.rpc(
-          'change_active_movement_driver',
-          {
-            p_entry_log_id: driverEntryId,
-            p_new_driver_id: values.driver_id,
-            p_note: null,
-          },
-        )
+      if (!failure && !fieldFailure && correctDriver && driverEntryId) {
+        const { error: changeError } = await correctVisitDriver(supabase, {
+          entryId: driverEntryId,
+          changeId: driverChangeId,
+          driverId: values.driver_id,
+        })
         // Raw PostgreSQL text never reaches the user.
-        if (changeError)
-          failure = stored
-            ? t('movementEditDriverPartial')
-            : t('driverChangeFailed')
-        else stored = true
+        if (changeError) {
+          const refused = driverCorrectionError(changeError.message)
+          if (stored) failure = t('movementEditDriverPartial')
+          else if (refused.target === 'driver_id')
+            fieldFailure = { driver_id: refused.key }
+          else failure = t(refused.key)
+        } else stored = true
       }
     } catch (cause) {
       console.error('Movement edit request failed', cause)

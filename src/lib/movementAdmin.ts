@@ -173,16 +173,23 @@ export function movementEditKeepsDriver(params: {
   )
 }
 
-export type MovementDriverEditMode = 'unsupported' | 'driver_change' | 'admin'
+export type MovementDriverEditMode =
+  | 'unsupported'
+  | 'driver_change'
+  | 'entry'
+  | 'admin'
 
 /**
- * Which path a driver change must take, mirroring migration 0105:
+ * Which path a driver correction takes:
  *   * `unsupported` — workshop movements are recorded without a driver;
- *   * `driver_change` — a site ENTRY whose visit is still open keeps its
- *     immutable entry driver, so the append-only
- *     `change_active_movement_driver` (migrations 0040/0067) is the only path;
- *   * `admin` — a closed visit or an EXIT row, corrected in place by
- *     `admin_update_movement`.
+ *   * `driver_change` — a site ENTRY whose visit is still open: the field
+ *     shows the CURRENT driver (the latest change), corrected in place by
+ *     `admin_correct_visit_driver` (0166, owner 2026-10-31; it was appended
+ *     through `change_active_movement_driver` before);
+ *   * `entry` — a site ENTRY of a closed visit: the field shows the entry
+ *     driver, corrected by `admin_correct_visit_driver` so the change history
+ *     after it stays consistent;
+ *   * `admin` — an EXIT row, corrected in place by `admin_update_movement`.
  */
 export function movementDriverEditMode(params: {
   movementType: string
@@ -190,9 +197,14 @@ export function movementDriverEditMode(params: {
   hasLaterMovement: boolean
 }): MovementDriverEditMode {
   if ((params.movementContext ?? 'site') !== 'site') return 'unsupported'
-  if (params.movementType === 'entry' && !params.hasLaterMovement)
-    return 'driver_change'
+  if (params.movementType === 'entry')
+    return params.hasLaterMovement ? 'entry' : 'driver_change'
   return 'admin'
+}
+
+/** Whether the edit dialog corrects the driver through 0166. */
+export function correctsVisitDriver(mode: MovementDriverEditMode): boolean {
+  return mode === 'driver_change' || mode === 'entry'
 }
 
 /** Body of `PATCH /api/movements/:id` — the one admin correction call. */
@@ -210,9 +222,9 @@ export interface MovementEditPayload {
 }
 
 /**
- * Builds the API body. A driver change on an open visit is NEVER sent here:
- * it goes through `change_active_movement_driver` so the entry driver stays
- * immutable and the change is appended.
+ * Builds the API body. Only an EXIT row's driver is sent here; an entry's
+ * driver goes through `admin_correct_visit_driver` (0166) so the visit's
+ * change history stays consistent.
  */
 export function buildMovementEditPayload(
   values: MovementEditValues,

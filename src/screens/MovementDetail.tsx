@@ -102,6 +102,7 @@ import { LtrValue } from '@/components/ui/InfoGrid'
 import { MovementAdminMenu } from '@/components/movement/MovementAdminMenu'
 import { MovementDetailSkeleton } from '@/components/movement/MovementDetailSkeleton'
 import { MovementEditDialog } from '@/components/movement/MovementEditDialog'
+import { DriverCorrectionDialog } from '@/components/movement/DriverCorrectionDialog'
 import {
   movementAdminErrorKey,
   movementDriverEditMode,
@@ -200,6 +201,11 @@ export function MovementDetail({
   // Partial success of the correction dialog (the correction was stored but
   // the appended driver change failed). Survives the refetch.
   const [editWarning, setEditWarning] = useState<string | null>(null)
+  // 0166: the visit driver being corrected (null change = the entry driver).
+  const [driverCorrection, setDriverCorrection] = useState<{
+    changeId: string | null
+    name: string | null
+  } | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -832,17 +838,18 @@ export function MovementDetail({
   const photosReadOnly =
     !canAddPhotos && !galleryItems.some((item) => item.removable !== false)
 
-  // wave6-J3 — which driver path the admin edit must take. An open site visit
-  // keeps its immutable entry driver, so the dialog routes that change through
-  // the append-only `change_active_movement_driver`; the prefilled driver is
-  // then the CURRENT one (latest append), while a closed visit or an EXIT row
-  // corrects the row's own `driver_id` column.
+  // wave6-J3 / 0166 — which driver the admin edit corrects. On an open site
+  // visit the prefilled driver is the CURRENT one (the latest change), on a
+  // closed visit's entry the entry driver; both are corrected in place by
+  // `admin_correct_visit_driver`. An EXIT row corrects its own `driver_id`.
   const driverEditMode = movementDriverEditMode({
     movementType: log.movement_type,
     movementContext: log.movement_context,
     hasLaterMovement: Boolean(linkedLog),
   })
   const latestDriverChange = driverChanges.at(-1)
+  const editDriverChangeId =
+    driverEditMode === 'driver_change' ? (latestDriverChange?.id ?? null) : null
   const editDriverId =
     driverEditMode === 'driver_change'
       ? (latestDriverChange?.new_driver_id ?? log.driver_id ?? null)
@@ -857,6 +864,18 @@ export function MovementDetail({
     driverEditMode === 'driver_change'
       ? (changeNewDriverName(latestDriverChange) ?? logDriverName)
       : logDriverName
+  // The visit's entry driver: this row on an entry, the linked entry on an
+  // exit page.
+  const entryDriverName = isEntry
+    ? logDriverName
+    : linkedLog
+      ? displayDriverName({
+          driver_full_name: embeddedFullName(linkedLog.driver),
+          driver_name: linkedLog.driver_name,
+        }) || null
+      : null
+  // 0166: `movements.edit_delete` corrects any driver of the visit in place.
+  const canCorrectDriver = canEditMovement && Boolean(driverEntryId)
 
   let durationMs = 0
 
@@ -1301,7 +1320,35 @@ export function MovementDetail({
             >
               {t('dataLoadError')}
             </Notice>
-          ) : driverChanges.length === 0 ? (
+          ) : (
+            canCorrectDriver && (
+              <div
+                className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <div className="min-w-0">
+                  <p className="text-xs text-muted">{t('entryDriver')}</p>
+                  <p className="break-words font-medium">
+                    {entryDriverName ? (
+                      <bdi>{entryDriverName}</bdi>
+                    ) : (
+                      <span className="font-normal text-muted">—</span>
+                    )}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setDriverCorrection({ changeId: null, name: entryDriverName })
+                  }
+                >
+                  {t('driverCorrectionAction')}
+                </Button>
+              </div>
+            )
+          )}
+          {driverChangesError ? null : driverChanges.length === 0 ? (
             <p className="text-sm text-muted">{t('noDriverChanges')}</p>
           ) : (
             <div className="space-y-2">
@@ -1334,12 +1381,28 @@ export function MovementDetail({
                       </p>
                     </div>
                   </div>
-                  <p className="mt-1 text-xs text-muted">
-                    {formatDateTime(change.changed_at)}
-                    {change.changer?.full_name
-                      ? ` — ${change.changer.full_name}`
-                      : ''}
-                  </p>
+                  <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-muted">
+                      {formatDateTime(change.changed_at)}
+                      {change.changer?.full_name
+                        ? ` — ${change.changer.full_name}`
+                        : ''}
+                    </p>
+                    {canCorrectDriver && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setDriverCorrection({
+                            changeId: change.id,
+                            name: changeNewDriverName(change),
+                          })
+                        }
+                      >
+                        {t('driverCorrectionAction')}
+                      </Button>
+                    )}
+                  </div>
                   {change.note && <p className="mt-1 text-xs">{change.note}</p>}
                 </div>
               ))}
@@ -1527,6 +1590,20 @@ export function MovementDetail({
         </Dialog>
       )}
 
+      {canCorrectDriver && driverEntryId && (
+        <DriverCorrectionDialog
+          open={driverCorrection !== null}
+          onOpenChange={(open) => {
+            if (!open) setDriverCorrection(null)
+          }}
+          entryId={driverEntryId}
+          changeId={driverCorrection?.changeId ?? null}
+          currentDriverName={driverCorrection?.name ?? null}
+          loadDrivers={loadDrivers}
+          onSaved={fetchData}
+        />
+      )}
+
       {canEditMovement && (
         <>
           <MovementEditDialog
@@ -1539,6 +1616,7 @@ export function MovementDetail({
             driverName={editDriverName}
             driverMode={driverEditMode}
             driverEntryId={driverEntryId ?? (isEntry ? log.id : null)}
+            driverChangeId={editDriverChangeId}
             loadDrivers={loadDrivers}
             onSaved={async (warning) => {
               setEditWarning(warning ?? null)

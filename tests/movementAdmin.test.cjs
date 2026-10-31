@@ -239,7 +239,7 @@ test('the payload sends every field and the full note', () => {
   )
 })
 
-test('only a closed visit or an EXIT sends the driver in place', () => {
+test('only an EXIT sends the driver in place', () => {
   const params = {
     context: 'site',
     originalRecordedAt: RECORDED.toISOString(),
@@ -252,14 +252,12 @@ test('only a closed visit or an EXIT sends the driver in place', () => {
       .driver_id,
     'driver-2',
   )
-  // An open visit appends through change_active_movement_driver instead.
-  assert.equal(
-    buildMovementEditPayload(changed, {
-      ...params,
-      driverMode: 'driver_change',
-    }).driver_id,
-    null,
-  )
+  // An entry's driver goes through admin_correct_visit_driver (0166).
+  for (const driverMode of ['driver_change', 'entry'])
+    assert.equal(
+      buildMovementEditPayload(changed, { ...params, driverMode }).driver_id,
+      null,
+    )
   // Workshop movements send no site fields and no driver.
   const workshop = buildMovementEditPayload(changed, {
     ...params,
@@ -272,7 +270,7 @@ test('only a closed visit or an EXIT sends the driver in place', () => {
   assert.equal(workshop.contractor_equipment_code, null)
 })
 
-test('an open site ENTRY keeps the append-only driver path', () => {
+test('a site ENTRY corrects its driver through 0166, an EXIT in place', () => {
   assert.equal(
     movementDriverEditMode({
       movementType: 'entry',
@@ -281,14 +279,14 @@ test('an open site ENTRY keeps the append-only driver path', () => {
     }),
     'driver_change',
   )
-  // A closed visit is corrected on the row itself.
+  // A closed visit's entry corrects the entry driver (0166).
   assert.equal(
     movementDriverEditMode({
       movementType: 'entry',
       movementContext: 'site',
       hasLaterMovement: true,
     }),
-    'admin',
+    'entry',
   )
   assert.equal(
     movementDriverEditMode({
@@ -316,7 +314,7 @@ test('an open site ENTRY keeps the append-only driver path', () => {
       movementContext: null,
       hasLaterMovement: true,
     }),
-    'admin',
+    'entry',
   )
 })
 
