@@ -290,9 +290,19 @@ test('the drivers list hides the external supplier by default, NULL kept', () =>
     allowed,
   )
   assert.deepEqual(plain(calls), [['in', 'employment_type', [EXTERNAL]]])
-  // Only the drivers list has a default.
+  // Only the drivers list has a default, and (owner 2026-10-31, migration
+  // 0167) the PO list's «حسب المعدات» view: the open POs.
   for (const config of Object.values(configs))
-    if (config !== driversListConfig)
+    if (config === configs.poUnitsListConfig)
+      assert.deepEqual(plain(config.defaultFilters), [
+        {
+          id: 'default-po-status',
+          field: 'po_status',
+          operator: 'eq',
+          value: 'open',
+        },
+      ])
+    else if (config !== driversListConfig)
       assert.equal(config.defaultFilters, undefined, config.id)
 })
 

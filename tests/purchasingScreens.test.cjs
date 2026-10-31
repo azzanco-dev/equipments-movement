@@ -79,7 +79,10 @@ test('the purchasing mockup is a screen section of /ui-kit', () => {
   assert.match(screens, /element: <PurchasingMockup \/>/)
   // Review material, not approved yet.
   const section = screens.slice(screens.indexOf("id: 'purchasing-mockup'"))
-  assert.match(section.slice(0, section.indexOf('element:')), /status: 'review'/)
+  assert.match(
+    section.slice(0, section.indexOf('element:')),
+    /status: 'review'/,
+  )
 })
 
 test('the mockup renders the three screens and their states with sample data only', () => {
@@ -126,7 +129,10 @@ test('the mockup renders the three screens and their states with sample data onl
   ])
     assert.match(source, new RegExp(`function ${name}\\(`), name)
   // The states each mockup can show.
-  assert.match(source, /type DemoState = 'data' \| 'loading' \| 'empty' \| 'error'/)
+  assert.match(
+    source,
+    /type DemoState = 'data' \| 'loading' \| 'empty' \| 'error'/,
+  )
   // The real list config and the shared components, not ad hoc ones.
   assert.match(source, /supplierPosListConfig/)
   assert.match(source, /<DataListToolbar/)
@@ -222,7 +228,10 @@ test('supplierPoFormSchema: a party (lessor or owner class), company, project an
     owner_class: '',
   })
   assert.equal(
-    purchasing.partyOptionValue({ lessor_id: null, owner_class: 'third_party_f' }),
+    purchasing.partyOptionValue({
+      lessor_id: null,
+      owner_class: 'third_party_f',
+    }),
     'class:third_party_f',
   )
   assert.equal(
@@ -245,7 +254,10 @@ test('supplierPoLineFormSchema: the unit, and a valid price when one is typed (o
   assert.deepEqual(errors(schema, { equipment_id: '', price: '', note: '' }), {
     equipment_id: 'supplierPoEquipmentRequired',
   })
-  assert.deepEqual(errors(schema, { equipment_id: 'e1', price: '', note: '' }), {})
+  assert.deepEqual(
+    errors(schema, { equipment_id: 'e1', price: '', note: '' }),
+    {},
+  )
   for (const price of ['0', '0.00', '1250', '1250.5', '9999999999.99'])
     assert.deepEqual(
       errors(schema, { equipment_id: 'e1', price, note: '' }),
@@ -309,7 +321,9 @@ const MIGRATIONS = [
 ]
 
 test('every stable token of migrations 0136 to 0138 is known and mapped', () => {
-  const sql = MIGRATIONS.map((file) => read('supabase', 'migrations', file)).join('\n')
+  const sql = MIGRATIONS.map((file) =>
+    read('supabase', 'migrations', file),
+  ).join('\n')
   const raised = new Set(
     [...sql.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g)].map((m) => m[1]),
   )
@@ -339,15 +353,24 @@ test('the token → field mapping of the three dialogs', () => {
 
   // «امر شراء جديد»
   assert.deepEqual(
-    map(raisedError('invalid_company'), purchasing.SUPPLIER_PO_CREATE_FIELD_RULES),
+    map(
+      raisedError('invalid_company'),
+      purchasing.SUPPLIER_PO_CREATE_FIELD_RULES,
+    ),
     { company_id: 'supplierPoErrorInvalidCompany' },
   )
   assert.deepEqual(
-    map(raisedError('invalid_project'), purchasing.SUPPLIER_PO_CREATE_FIELD_RULES),
+    map(
+      raisedError('invalid_project'),
+      purchasing.SUPPLIER_PO_CREATE_FIELD_RULES,
+    ),
     { project_id: 'supplierPoErrorInvalidProject' },
   )
   assert.deepEqual(
-    map(raisedError('invalid_lessor'), purchasing.SUPPLIER_PO_CREATE_FIELD_RULES),
+    map(
+      raisedError('invalid_lessor'),
+      purchasing.SUPPLIER_PO_CREATE_FIELD_RULES,
+    ),
     { lessor_id: 'supplierPoErrorInvalidSupplier' },
   )
   assert.deepEqual(
@@ -465,7 +488,11 @@ test('status badge, event labels and the price format', () => {
   // The event types of the CHECK as 0160 re-created it (the 0136 five, 0142's
   // updated and line_updated, 0149's equipment_removed and reopened, 0160's
   // approved).
-  const sql = read('supabase', 'migrations', '20261028160000_0160_supplier_po_approval.sql')
+  const sql = read(
+    'supabase',
+    'migrations',
+    '20261028160000_0160_supplier_po_approval.sql',
+  )
   const check = /event_type IN \(([^)]+)\)/.exec(sql)
   const types = [...check[1].matchAll(/'(\w+)'/g)].map((m) => m[1]).sort()
   assert.deepEqual(
@@ -567,9 +594,9 @@ test('every purchasing translation key exists in Arabic and English', () => {
   )
   const used = new Set([
     ...[...read(...MOCKUP).matchAll(/\bt\('(\w+)'\)/g)].map((m) => m[1]),
-    ...[...read(...LIB).matchAll(/'(supplierPo\w+|equipmentPurchasing\w+)'/g)].map(
-      (m) => m[1],
-    ),
+    ...[
+      ...read(...LIB).matchAll(/'(supplierPo\w+|equipmentPurchasing\w+)'/g),
+    ].map((m) => m[1]),
   ])
   for (const key of used) assert.ok(allKeys.has(key), `${key} is translated`)
   // The names the owner decided.
@@ -583,7 +610,10 @@ test('every purchasing translation key exists in Arabic and English', () => {
   )
   // Owner 2026-10-20: the party is picked explicitly; the old wording is gone.
   assert.doesNotMatch(ar.block, /بدون مورد = معدات العزاني/)
-  assert.match(ar.block, /supplierPoOwnerAlazani: 'شركة عبدالله احمد العزاني للمقاولات'/)
+  assert.match(
+    ar.block,
+    /supplierPoOwnerAlazani: 'شركة عبدالله احمد العزاني للمقاولات'/,
+  )
   assert.match(ar.block, /supplierPoOwnerF: 'معدات F'/)
 })
 
@@ -648,7 +678,10 @@ test('the purchasing section, routes and page gates are keyed on purchasing.view
   assert.equal(plan.kind, 'admin')
   assert.equal(plan.landing, 'purchasing/orders')
   assert.equal(navLib.routePageOf(['purchasing']), 'purchasing/orders')
-  assert.equal(navLib.routePageOf(['purchasing', 'orders']), 'purchasing/orders')
+  assert.equal(
+    navLib.routePageOf(['purchasing', 'orders']),
+    'purchasing/orders',
+  )
   // 2026-10-24: «المعدات في المشاريع».
   assert.equal(navLib.routePageOf(['purchasing', 'units']), 'purchasing/units')
   assert.ok(navLib.canOpenPage(state.permissions, 'purchasing/units'))
@@ -662,7 +695,10 @@ test('the purchasing section, routes and page gates are keyed on purchasing.view
     nav.indexOf('const ADMIN_SHELL_PAGES'),
     nav.indexOf('const FIELD_SHELL_PAGES'),
   )
-  assert.match(shellPages, /'purchasing',\s+'purchasing\/orders',\s+'purchasing\/units',\s+'purchasing\/:id',/)
+  assert.match(
+    shellPages,
+    /'purchasing',\s+'purchasing\/orders',\s+'purchasing\/units',\s+'purchasing\/:id',/,
+  )
   // Only the admin shell: the field homes never list it.
   const fieldPages = nav.slice(
     nav.indexOf('const FIELD_SHELL_PAGES'),
@@ -671,10 +707,16 @@ test('the purchasing section, routes and page gates are keyed on purchasing.view
   assert.doesNotMatch(fieldPages, /purchasing/)
 
   const app = read('src', 'App.tsx')
-  assert.match(app, /purchasing: \{ label: 'purchasing', icon: <ShoppingCart size=\{18\} \/> \}/)
+  assert.match(
+    app,
+    /purchasing: \{ label: 'purchasing', icon: <ShoppingCart size=\{18\} \/> \}/,
+  )
   assert.match(app, /'purchasing\/orders': 'supplierPos'/)
   assert.match(app, /page === 'purchasing\/:id' \? \(\s+<SupplierPoDetail/)
-  assert.match(app, /\{page === 'purchasing\/orders' && \(\s+<SupplierPosListScreen/)
+  assert.match(
+    app,
+    /\{page === 'purchasing\/orders' && \(\s+<SupplierPosListScreen/,
+  )
   assert.match(app, /onOpenPo=\{\s+shell\.pages\.has\('purchasing\/:id'\)/)
 })
 
@@ -695,9 +737,21 @@ test('the real screens read through RLS and write only through the 0136 function
     ['src', 'components', 'purchasing', 'EquipmentPurchasingCard.tsx'],
   ]) {
     const source = read(...file)
-    assert.doesNotMatch(source, /\.(insert|update|upsert|delete)\(/, file.join('/'))
-    assert.doesNotMatch(source, /\.rpc\(/, `${file.join('/')} calls the lib, not rpc`)
-    assert.match(source, /usePermissions\(\)/, `${file.join('/')} gates by permissions`)
+    assert.doesNotMatch(
+      source,
+      /\.(insert|update|upsert|delete)\(/,
+      file.join('/'),
+    )
+    assert.doesNotMatch(
+      source,
+      /\.rpc\(/,
+      `${file.join('/')} calls the lib, not rpc`,
+    )
+    assert.match(
+      source,
+      /usePermissions\(\)/,
+      `${file.join('/')} gates by permissions`,
+    )
   }
   // The dialogs call the lib wrappers and map the tokens to fields.
   const add = read('src', 'components', 'purchasing', 'AddEquipmentDialog.tsx')
@@ -715,7 +769,11 @@ test('the real screens read through RLS and write only through the 0136 function
   // or in the sort, and one «اضافة معدة» button (the section's, primary).
   assert.doesNotMatch(poPage, /lineSupplierName/)
   assert.match(poPage, /type SortKey = 'equipment' \| 'period' \| 'price'/)
-  assert.equal((poPage.match(/setAddOpen\(true\)/g) ?? []).length, 2, 'section button + mobile bar')
+  assert.equal(
+    (poPage.match(/setAddOpen\(true\)/g) ?? []).length,
+    2,
+    'section button + mobile bar',
+  )
   const dataLib = read('src', 'lib', 'purchasingData.ts')
   // 0138: the party's open site visits (its lessor, or its owner class)...
   const visitsFn = dataLib.slice(
@@ -725,7 +783,10 @@ test('the real screens read through RLS and write only through the 0136 function
   assert.match(visitsFn, /\.from\('movement_visits'\)/)
   assert.match(visitsFn, /\.eq\('is_open', true\)/)
   assert.match(visitsFn, /\.eq\('movement_context', 'site'\)/)
-  assert.match(visitsFn, /\.eq\('equipment_ownership_status', party\.owner_class\)/)
+  assert.match(
+    visitsFn,
+    /\.eq\('equipment_ownership_status', party\.owner_class\)/,
+  )
   assert.match(visitsFn, /\.eq\('equipment_lessor_id', party\.lessor_id\)/)
   // ...narrowed to the PO's company and project for «اضافة معدة».
   const loader = dataLib.slice(
@@ -737,23 +798,39 @@ test('the real screens read through RLS and write only through the 0136 function
   assert.match(loader, /\.not\('equipment_id', 'in', /)
   // The create dialog: the party first, then only its places and units, the
   // start date from the earliest entry, everything saved in one call.
-  const createDialog = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
+  const createDialog = read(
+    'src',
+    'components',
+    'purchasing',
+    'CreateSupplierPoDialog.tsx',
+  )
   // Owner 2026-10-21: the owner select (four fixed owners + «مورد خارجي»),
   // then the supplier field sliding in only for an external supplier.
   assert.match(createDialog, /const EXTERNAL = 'external_supplier'/)
   assert.match(createDialog, /SUPPLIER_PO_OWNER_CLASSES\.map\(/)
-  assert.match(createDialog, /\{ value: EXTERNAL, label: t\('supplierPoOwnerExternal'\) \}/)
+  assert.match(
+    createDialog,
+    /\{ value: EXTERNAL, label: t\('supplierPoOwnerExternal'\) \}/,
+  )
   assert.match(createDialog, /grid-rows-\[1fr\] opacity-100/)
   assert.match(createDialog, /grid-rows-\[0fr\] opacity-0/)
   assert.match(createDialog, /aria-hidden=\{!external\}/)
   assert.match(createDialog, /disabled=\{!external\}/)
   assert.match(createDialog, /fetchPartyOpenVisits\(current\)/)
   assert.match(createDialog, /visitCompanyOptions\(visits, lang\)/)
-  assert.match(createDialog, /visitProjectOptions\(visits, form\.company_id, lang\)/)
+  assert.match(
+    createDialog,
+    /visitProjectOptions\(visits, form\.company_id, lang\)/,
+  )
   assert.match(createDialog, /createSupplierPo\(form, lines\)/)
   // 0148: the start date follows the entry day of the ticked units.
   assert.match(createDialog, /const pickedDay = useMemo\(/)
-  const create = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
+  const create = read(
+    'src',
+    'components',
+    'purchasing',
+    'CreateSupplierPoDialog.tsx',
+  )
   assert.match(create, /createSupplierPo\(/)
   assert.match(create, /SUPPLIER_PO_CREATE_FIELD_RULES/)
   // 0142: «تعديل المعدة» saves the price and the note in one call...
@@ -762,16 +839,29 @@ test('the real screens read through RLS and write only through the 0136 function
   assert.match(edit, /SUPPLIER_PO_LINE_EDIT_FIELD_RULES/)
   assert.match(edit, /supplierPoLineEditFormSchema/)
   // ...and «تعديل الامر» the start date and the notes.
-  const editPo = read('src', 'components', 'purchasing', 'EditSupplierPoDialog.tsx')
+  const editPo = read(
+    'src',
+    'components',
+    'purchasing',
+    'EditSupplierPoDialog.tsx',
+  )
   assert.match(editPo, /updateSupplierPo\(/)
   assert.match(editPo, /SUPPLIER_PO_EDIT_FIELD_RULES/)
   assert.match(editPo, /supplierPoEditFormSchema/)
   // The equipment page card renders nothing without purchasing.view.
-  const card = read('src', 'components', 'purchasing', 'EquipmentPurchasingCard.tsx')
+  const card = read(
+    'src',
+    'components',
+    'purchasing',
+    'EquipmentPurchasingCard.tsx',
+  )
   assert.match(card, /const allowed = can\('purchasing\.view'\)/)
   assert.match(card, /if \(!allowed\) return null/)
   const detail = read('src', 'screens', 'EquipmentDetail.tsx')
-  assert.match(detail, /<EquipmentPurchasingCard equipmentId=\{equipment\.id\} onOpenPo=\{onOpenPo\} \/>/)
+  assert.match(
+    detail,
+    /<EquipmentPurchasingCard equipmentId=\{equipment\.id\} onOpenPo=\{onOpenPo\} \/>/,
+  )
 })
 
 test('the mockup section of /ui-kit still names no route of its own', () => {
@@ -784,7 +874,12 @@ test('the mockup section of /ui-kit still names no route of its own', () => {
 // --- The PO list: owner OR supplier (owner 2026-10-22) ---------------------------
 
 test('supplierPoPartyOrFilter: the owner and supplier filters are OR-ed in the PO list', () => {
-  const f = (field, operator, value, id = field) => ({ id, field, operator, value })
+  const f = (field, operator, value, id = field) => ({
+    id,
+    field,
+    operator,
+    value,
+  })
   const status = f('status', 'eq', 'open')
   // Both set: the non-external owners OR the ticked suppliers; the rest
   // stays for the generic pass.
@@ -793,7 +888,10 @@ test('supplierPoPartyOrFilter: the owner and supplier filters are OR-ed in the P
     f('party_class', 'in', 'takween,external_supplier'),
     f('lessor_id', 'in', 'l1,l2'),
   ])
-  assert.equal(both.clause, 'party_class.in.("takween"),lessor_id.in.("l1","l2")')
+  assert.equal(
+    both.clause,
+    'party_class.in.("takween"),lessor_id.in.("l1","l2")',
+  )
   assert.deepEqual(both.rest, [status])
   // Only «مالك اخر» ticked: the suppliers alone.
   assert.equal(
@@ -804,19 +902,39 @@ test('supplierPoPartyOrFilter: the owner and supplier filters are OR-ed in the P
     'lessor_id.in.("l1")',
   )
   // One of the two missing (or empty): the generic pass applies them.
-  assert.equal(purchasing.supplierPoPartyOrFilter([f('party_class', 'in', 'takween')]), null)
-  assert.equal(purchasing.supplierPoPartyOrFilter([f('lessor_id', 'in', 'l1')]), null)
   assert.equal(
-    purchasing.supplierPoPartyOrFilter([f('party_class', 'in', 'takween'), f('lessor_id', 'in', '')]),
+    purchasing.supplierPoPartyOrFilter([f('party_class', 'in', 'takween')]),
+    null,
+  )
+  assert.equal(
+    purchasing.supplierPoPartyOrFilter([f('lessor_id', 'in', 'l1')]),
+    null,
+  )
+  assert.equal(
+    purchasing.supplierPoPartyOrFilter([
+      f('party_class', 'in', 'takween'),
+      f('lessor_id', 'in', ''),
+    ]),
     null,
   )
   // A negated owner filter is not rewritten.
   assert.equal(
-    purchasing.supplierPoPartyOrFilter([f('party_class', 'not_in', 'takween'), f('lessor_id', 'in', 'l1')]),
+    purchasing.supplierPoPartyOrFilter([
+      f('party_class', 'not_in', 'takween'),
+      f('lessor_id', 'in', 'l1'),
+    ]),
     null,
   )
-  const screen = read('src', 'screens', 'purchasing', 'SupplierPosListScreen.tsx')
-  assert.match(screen, /const partyOr = supplierPoPartyOrFilter\(list\.filters\)/)
+  const screen = read(
+    'src',
+    'screens',
+    'purchasing',
+    'SupplierPosListScreen.tsx',
+  )
+  assert.match(
+    screen,
+    /const partyOr = supplierPoPartyOrFilter\(list\.filters\)/,
+  )
   assert.match(screen, /if \(partyOr\) query = query\.or\(partyOr\.clause\)/)
   assert.match(screen, /partyOr \? partyOr\.rest : list\.filters/)
 })
@@ -829,25 +947,55 @@ test('the PO page closes through a typed order number, from the options menu', (
   assert.doesNotMatch(page, /useConfirm|closeSupplierPo|variant="danger"/)
   // One menu element, rendered in the header and in the mobile bar.
   assert.equal((page.match(/<SupplierPoOptionsMenu/g) ?? []).length, 1)
-  assert.equal((page.match(/\{optionsMenu\(/g) ?? []).length, 2, 'desktop header + mobile bar')
+  assert.equal(
+    (page.match(/\{optionsMenu\(/g) ?? []).length,
+    2,
+    'desktop header + mobile bar',
+  )
   assert.match(page, /<EditSupplierPoDialog/)
   assert.match(page, /<CloseSupplierPoDialog/)
-  const menu = read('src', 'components', 'purchasing', 'SupplierPoOptionsMenu.tsx')
+  const menu = read(
+    'src',
+    'components',
+    'purchasing',
+    'SupplierPoOptionsMenu.tsx',
+  )
   assert.match(menu, /DropdownMenuTrigger asChild/)
   assert.match(menu, /t\('supplierPoEdit'\)/)
   assert.match(menu, /tone="danger"[\s\S]*t\('supplierPoClose'\)/)
   // Owner 2026-10-22: «تصدير PDF» is the first item, for every reader; the
   // management items only with their handlers.
-  assert.ok(menu.indexOf("t('supplierPoPdf')") < menu.indexOf("t('supplierPoEdit')"))
+  assert.ok(
+    menu.indexOf("t('supplierPoPdf')") < menu.indexOf("t('supplierPoEdit')"),
+  )
   assert.match(menu, /const manage = Boolean\(onEdit && onClose\)/)
-  assert.match(page, /onEdit=\{showActions \? \(\) => setEditOpen\(true\) : undefined\}/)
-  const close = read('src', 'components', 'purchasing', 'CloseSupplierPoDialog.tsx')
+  assert.match(
+    page,
+    /onEdit=\{showActions \? \(\) => setEditOpen\(true\) : undefined\}/,
+  )
+  const close = read(
+    'src',
+    'components',
+    'purchasing',
+    'CloseSupplierPoDialog.tsx',
+  )
   assert.match(close, /closeSupplierPo\(po\.id\)/)
   assert.match(close, /disabled=\{!matches\}/)
   assert.match(close, /if \(!matches \|\| saving\) return/)
   // The matcher ignores case and spaces, nothing else.
-  const src = close.slice(close.indexOf('export function closeConfirmationMatches'), close.indexOf('/**', close.indexOf('export function closeConfirmationMatches')))
-  const matches = new Function(`${src.replace(/: string/g, '').replace(/\): boolean/, ')').replace('export ', '')}; return closeConfirmationMatches`)()
+  const src = close.slice(
+    close.indexOf('export function closeConfirmationMatches'),
+    close.indexOf(
+      '/**',
+      close.indexOf('export function closeConfirmationMatches'),
+    ),
+  )
+  const matches = new Function(
+    `${src
+      .replace(/: string/g, '')
+      .replace(/\): boolean/, ')')
+      .replace('export ', '')}; return closeConfirmationMatches`,
+  )()
   assert.equal(matches(' spo26 0001 ', 'SPO260001'), true)
   assert.equal(matches('SPO260002', 'SPO260001'), false)
   assert.equal(matches('', 'SPO260001'), false)
@@ -863,20 +1011,173 @@ test('the PO PDF prints a hidden sheet from the PO page itself', () => {
   assert.doesNotMatch(detail, /pdfButton|FileDown/)
   assert.match(detail, /\{printing && \(\s*<SupplierPoPrintSheet/)
   assert.match(detail, /onDone=\{\(\) => setPrinting\(false\)\}/)
-  const sheet = read('src', 'components', 'purchasing', 'SupplierPoPrintSheet.tsx')
+  const sheet = read(
+    'src',
+    'components',
+    'purchasing',
+    'SupplierPoPrintSheet.tsx',
+  )
   assert.doesNotMatch(sheet, /supabase|fetch\(|sessionStorage/)
   assert.match(sheet, /createPortal\(/)
   assert.match(sheet, /document\.body,\s*\)/)
   assert.match(sheet, /className="po-print-sheet print-export hidden /)
   assert.match(sheet, /window\.addEventListener\('afterprint', finish\)/)
-  assert.match(sheet, /window\.requestAnimationFrame\(\(\) => window\.print\(\)\)/)
+  assert.match(
+    sheet,
+    /window\.requestAnimationFrame\(\(\) => window\.print\(\)\)/,
+  )
   assert.match(sheet, /@page \{ size: A4 portrait;/)
   // Only the sheet prints, on paper colors, while it exists.
   const css = read('src', 'index.css')
-  assert.match(css, /html:has\(\.po-print-sheet\) body > :not\(\.po-print-sheet\) \{\s*display: none !important;/)
+  assert.match(
+    css,
+    /html:has\(\.po-print-sheet\) body > :not\(\.po-print-sheet\) \{\s*display: none !important;/,
+  )
   assert.match(css, /\.po-print-sheet \{\s*display: block !important;/)
   assert.match(css, /html:has\(\.print-export\) \{/)
   // No route of its own any more.
   const navSource = read('src', 'lib', 'navPermissions.ts')
   assert.doesNotMatch(navSource, /print\/po/)
+})
+
+// --- «حسب المعدات» (owner 2026-10-31, migration 0167) --------------------------------
+
+test('poUnitsListConfig: unit and PO number search, allowlisted filters, open POs by default', () => {
+  const source = read('src', 'lib', 'listConfigs.ts')
+  const start = source.indexOf('export const poUnitsListConfig')
+  assert.ok(start > 0)
+  // Before the orders config: the purchasing tests slice the configs after it.
+  assert.ok(start < source.indexOf('export const supplierPosListConfig'))
+  const config = source.slice(start, source.indexOf('export const', start + 1))
+  assert.match(config, /id: 'poUnits'/)
+  assert.match(
+    config.replace(/\s+/g, ' '),
+    /searchFields: \[ 'equipment_code', 'equipment_type_search', 'equipment_plate_number', 'equipment_chassis_number', 'equipment_plate_digits', 'po_number', \],/,
+  )
+  assert.match(
+    config,
+    /defaultSort: 'equipment_code',\s+defaultDirection: 'asc',/,
+  )
+  const filterKeys = [...config.matchAll(/^\s{6}key: '(\w+)',$/gm)].map(
+    (m) => m[1],
+  )
+  assert.deepEqual(filterKeys, [
+    'po_status',
+    'approval_status',
+    'party_class',
+    'lessor_id',
+    'company_id',
+    'project_id',
+    'is_priced',
+  ])
+  assert.match(
+    config.replace(/\s+/g, ' '),
+    /key: 'lessor_id', label: 'supplierPoSupplier', type: 'select', operators: \['in'\], options: \[\], multiple: true, visibleWhen: \{ field: 'party_class', includes: 'external_supplier' \},/,
+  )
+  // The owner decided: the open POs by default, a visible removable filter.
+  assert.match(
+    config.replace(/\s+/g, ' '),
+    /defaultFilters: \[ \{ id: 'default-po-status', field: 'po_status', operator: 'eq', value: 'open', \}, \],/,
+  )
+  const sorts = [...config.matchAll(/\{ key: '(\w+)', label:/g)].map(
+    (m) => m[1],
+  )
+  assert.deepEqual(sorts, [
+    'equipment_code',
+    'po_number',
+    'start_date',
+    'price',
+    'updated_at',
+  ])
+  assert.doesNotMatch(config, /pageSizeOptions/)
+  assert.doesNotMatch(config, HAMZA_ALIF)
+  // Its labels are translated in both languages.
+  const translations = read(...TRANSLATIONS)
+  for (const key of [
+    'poUnitsPricedFilter',
+    'poUnitsPriced',
+    'poUnitsUnpriced',
+  ]) {
+    const matches =
+      translations.match(new RegExp(`^    ${key}: '([^']*)',$`, 'gm')) ?? []
+    assert.equal(matches.length, 2, key)
+    assert.doesNotMatch(matches[0], HAMZA_ALIF, key)
+  }
+})
+
+test('the PO list switches between «حسب الاوامر» and «حسب المعدات» (?view=units, prefix u)', () => {
+  const screen = read(
+    'src',
+    'screens',
+    'purchasing',
+    'SupplierPosListScreen.tsx',
+  )
+  assert.match(screen, /type PoListView = 'orders' \| 'units'/)
+  // Orders is the default and keeps its unprefixed state (the home's links).
+  assert.match(
+    screen,
+    /return params\.get\('view'\) === 'units' \? 'units' : 'orders'/,
+  )
+  assert.match(
+    screen,
+    /\.filter\(\(\[key\]\) => key !== 'view'\),\s+\)\s+if \(next !== 'orders'\) query\.set\('view', next\)/,
+  )
+  assert.match(screen, /const list = useDataListState\(supplierPosListConfig\)/)
+  assert.match(
+    screen,
+    /<TabsList variant="segmented" aria-label=\{t\('poUnitsViewFilter'\)\}>/,
+  )
+  // Each view fetches only while shown.
+  assert.match(screen, /if \(view === 'orders'\) fetchRows\(\)/)
+  assert.match(
+    screen,
+    /\{view === 'units' \? \(\s+<PoUnitsList onSelectPo=\{onSelectPo\} \/>/,
+  )
+  const units = read('src', 'screens', 'purchasing', 'PoUnitsList.tsx')
+  assert.match(units, /export const PO_UNITS_URL_PREFIX = 'u'/)
+  assert.match(
+    units,
+    /useDataListState\(poUnitsListConfig, PO_UNITS_URL_PREFIX\)/,
+  )
+  assert.match(
+    units,
+    /\.from\('purchasing_po_units'\)\s+\.select\(PO_UNITS_SELECT, \{ count: 'exact' \}\)/,
+  )
+  assert.match(units, /\.order\('line_id', \{ ascending \}\)/)
+  assert.match(units, /buildSearchFilter\(\s+poUnitsListConfig\.searchFields,/)
+  assert.match(
+    units,
+    /const partyOr = supplierPoPartyOrFilter\(list\.filters\)/,
+  )
+  assert.match(units, /partyOr \? partyOr\.rest : list\.filters/)
+  // A failed load is an error with retry, never the empty state.
+  assert.match(
+    units,
+    /\{loadError \? \(\s+<ErrorState description=\{t\('poUnitsLoadError'\)\} onRetry=\{fetchRows\} \/>/,
+  )
+  // Reads only; the row opens its PO as a real link.
+  assert.doesNotMatch(units, /\.(insert|update|upsert|delete|rpc)\(/)
+  assert.match(
+    units,
+    /rowHref=\{\(row\) => `\/purchasing\/\$\{row\.supplier_po_id\}`\}/,
+  )
+  assert.match(units, /rowLinkColumn="po_number"/)
+  assert.match(units, /cellTextClassName="text-\[13px\]"/)
+  assert.match(units, /cellClassName="py-2"/)
+  // The home's deep links still point at the orders view, unprefixed.
+  const attention = read('src', 'lib', 'adminAttention.ts')
+  assert.doesNotMatch(attention, /view=units|ufilters/)
+  // The translations of the switch, both languages, plain alif.
+  const translations = read(...TRANSLATIONS)
+  for (const key of [
+    'poUnitsViewOrders',
+    'poUnitsViewUnits',
+    'poUnitsNeedsPrice',
+    'poUnitsLoadError',
+  ]) {
+    const matches =
+      translations.match(new RegExp(`^    ${key}: '([^']*)',$`, 'gm')) ?? []
+    assert.equal(matches.length, 2, key)
+    assert.doesNotMatch(matches[0], HAMZA_ALIF, key)
+  }
 })

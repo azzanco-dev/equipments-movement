@@ -170,6 +170,51 @@ export interface SiteUnitRow {
 export const SITE_UNITS_SELECT =
   'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,entry_at,contractor_equipment_code,supplier_po_id,po_number,has_po,party_po_id,party_po_number'
 
+/**
+ * One unit on a supplier PO (migration 0167, `purchasing_po_units`): a line
+ * flattened with its PO, the PO's company and project and the unit. The
+ * «حسب المعدات» view of the PO list.
+ */
+export interface PoUnitRow {
+  line_id: string
+  /** NULL while the price is still to be entered (0138). */
+  price: number | null
+  /** 0157: the LINE's price unit. */
+  rate_unit: SupplierPoRateUnit
+  line_note: string | null
+  line_created_at: string
+  updated_at: string
+  is_priced: boolean
+  supplier_po_id: string
+  po_number: string
+  po_status: SupplierPoStatus
+  approval_status: SupplierPoApprovalStatus
+  start_date: string
+  lessor_id: string | null
+  owner_class: string | null
+  party_class: string
+  lessor_name: string | null
+  lessor_is_internal: boolean | null
+  company_id: string | null
+  company_name_ar: string | null
+  company_name_en: string | null
+  project_id: string | null
+  project_name_ar: string | null
+  project_name_en: string | null
+  equipment_id: string
+  equipment_code: string | null
+  equipment_type: string | null
+  equipment_plate_number: string | null
+  equipment_chassis_number: string | null
+  equipment_ownership_status: OwnershipStatus | null
+  card_period_from: string
+  card_period_to: string | null
+}
+
+/** Only what the «حسب المعدات» table shows and its row opens. */
+export const PO_UNITS_SELECT =
+  'line_id,price,rate_unit,line_note,line_created_at,updated_at,is_priced,supplier_po_id,po_number,po_status,approval_status,start_date,lessor_id,owner_class,party_class,lessor_name,lessor_is_internal,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,equipment_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,card_period_from,card_period_to'
+
 export interface EquipmentPurchasingRow extends SupplierPoLineRow {
   po: SupplierPoRow | null
 }
@@ -210,7 +255,9 @@ export function isInternalUnit(
   unit: Pick<PurchasingUnit, 'ownership_status' | 'lessor'> | null | undefined,
 ): boolean {
   if (!unit) return false
-  return unit.ownership_status === 'alazani' || Boolean(unit.lessor?.is_internal)
+  return (
+    unit.ownership_status === 'alazani' || Boolean(unit.lessor?.is_internal)
+  )
 }
 
 /** The supplier NAME of a line (owner 2026-10-19): the unit's own supplier
@@ -411,7 +458,11 @@ export function visitCompanyOptions(
     if (!seen.has(visit.company_id))
       seen.set(visit.company_id, {
         value: visit.company_id,
-        label: localizedName(lang, visit.company_name_ar, visit.company_name_en),
+        label: localizedName(
+          lang,
+          visit.company_name_ar,
+          visit.company_name_en,
+        ),
       })
   return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label, lang))
 }
@@ -427,7 +478,11 @@ export function visitProjectOptions(
     if (visit.company_id === companyId && !seen.has(visit.project_id))
       seen.set(visit.project_id, {
         value: visit.project_id,
-        label: localizedName(lang, visit.project_name_ar, visit.project_name_en),
+        label: localizedName(
+          lang,
+          visit.project_name_ar,
+          visit.project_name_en,
+        ),
       })
   return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label, lang))
 }
@@ -465,7 +520,9 @@ export function equipmentAtProjectOptionLoader(
   options: { excludeEquipmentIds?: readonly string[]; entryDay?: string } = {},
 ): (query: string) => Promise<AsyncSearchSelectOption[]> {
   const excluded = options.excludeEquipmentIds ?? []
-  const nextDay = options.entryDay ? addDaysToDateKey(options.entryDay, 1) : null
+  const nextDay = options.entryDay
+    ? addDaysToDateKey(options.entryDay, 1)
+    : null
   return async (query) => {
     let request = partyOpenVisits(party)
       .eq('company_id', companyId)
@@ -509,12 +566,16 @@ export async function fetchPurchasingUnit(
 // --- Writes (the four functions of 0136) --------------------------------------------
 
 export type RpcResult<T> =
-  | { data: T; error: null }
-  | { data: null; error: PostgresLikeError }
+  { data: T; error: null } | { data: null; error: PostgresLikeError }
 
 function asResult<T>(result: {
   data: unknown
-  error: { code?: string; message: string; details?: string; hint?: string } | null
+  error: {
+    code?: string
+    message: string
+    details?: string
+    hint?: string
+  } | null
 }): RpcResult<T> {
   if (result.error)
     return {
@@ -618,7 +679,9 @@ export async function updateSupplierPo(input: {
 /** `close_supplier_po`. */
 /** `approve_supplier_po` (0160): a draft PO becomes approved and locked;
  *  the database checks the permission, the creator and the prices. */
-export async function approveSupplierPo(poId: string): Promise<RpcResult<null>> {
+export async function approveSupplierPo(
+  poId: string,
+): Promise<RpcResult<null>> {
   return asResult<null>(
     await supabase.rpc('approve_supplier_po', { p_po_id: poId }),
   )

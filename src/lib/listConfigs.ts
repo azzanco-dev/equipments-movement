@@ -633,6 +633,153 @@ export const logsListConfig: DataListConfig = {
 }
 
 /**
+ * «حسب المعدات» of the PO list (owner 2026-10-31, migration 0167): one row
+ * per unit on a supplier PO, over `purchasing_po_units`, with its PO number.
+ * Server-side search, filters, sort and paging like every list; the open POs
+ * by default (a visible, removable default filter). Placed before the orders
+ * config: the purchasing tests slice the configs that follow it.
+ */
+export const poUnitsListConfig: DataListConfig = {
+  id: 'poUnits',
+  searchPlaceholder: {
+    ar: 'البحث برقم المعدة او النوع او اللوحة او الشاصي او رقم PO',
+    en: 'Search by unit, type, plate, chassis or PO number',
+  },
+  searchFields: [
+    'equipment_code',
+    'equipment_type_search',
+    'equipment_plate_number',
+    'equipment_chassis_number',
+    'equipment_plate_digits',
+    'po_number',
+  ],
+  defaultSort: 'equipment_code',
+  defaultDirection: 'asc',
+  filterFields: [
+    {
+      key: 'po_status',
+      label: 'status',
+      type: 'select',
+      operators: ['eq', 'neq'],
+      options: [
+        { value: 'open', label: 'مفتوح', labelI18n: 'supplierPoStatusOpen' },
+        {
+          value: 'closed',
+          label: 'مغلق',
+          labelI18n: 'supplierPoStatusClosed',
+        },
+      ],
+    },
+    {
+      key: 'approval_status',
+      label: 'supplierPoApproval',
+      type: 'select',
+      operators: ['eq', 'neq'],
+      options: [
+        {
+          value: 'draft',
+          label: 'مسودة',
+          labelI18n: 'supplierPoApprovalDraft',
+        },
+        {
+          value: 'approved',
+          label: 'معتمد',
+          labelI18n: 'supplierPoApprovalApproved',
+        },
+      ],
+    },
+    // The PO's party as an owner class (the view inlines 0140's
+    // party_class), then the supplier while it selects «مالك اخر»; the two
+    // are OR-ed like the orders list (supplierPoPartyOrFilter).
+    {
+      key: 'party_class',
+      label: 'ownershipStatus',
+      type: 'select',
+      operators: ['eq', 'neq', 'in', 'not_in'],
+      multiple: true,
+      options: [
+        {
+          value: 'alazani',
+          label: 'العزاني',
+          labelI18n: 'adminHomeOwnerAlazani',
+        },
+        {
+          value: 'takween',
+          label: 'تكوين',
+          labelI18n: 'adminHomeOwnerTakween',
+        },
+        {
+          value: 'third_party_f',
+          label: 'طرف ثالث F',
+          labelI18n: 'adminHomeOwnerThirdPartyF',
+        },
+        {
+          value: 'third_party_partnership_b',
+          label: 'طرف ثالث B',
+          labelI18n: 'adminHomeOwnerThirdPartyB',
+        },
+        {
+          value: 'external_supplier',
+          label: 'مالك اخر',
+          labelI18n: 'adminHomeOwnerExternal',
+        },
+      ],
+    },
+    {
+      key: 'lessor_id',
+      label: 'supplierPoSupplier',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+      visibleWhen: { field: 'party_class', includes: 'external_supplier' },
+    },
+    {
+      key: 'company_id',
+      label: 'company',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'project_id',
+      label: 'project',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'is_priced',
+      label: 'poUnitsPricedFilter',
+      type: 'select',
+      operators: ['eq'],
+      options: [
+        { value: 'true', label: 'مسعرة', labelI18n: 'poUnitsPriced' },
+        { value: 'false', label: 'بدون سعر', labelI18n: 'poUnitsUnpriced' },
+      ],
+    },
+  ],
+  // Owner 2026-10-31: the open POs by default.
+  defaultFilters: [
+    {
+      id: 'default-po-status',
+      field: 'po_status',
+      operator: 'eq',
+      value: 'open',
+    },
+  ],
+  sortableFields: [
+    { key: 'equipment_code', label: 'equipmentCode' },
+    { key: 'po_number', label: 'siteUnitsPoNumber' },
+    { key: 'start_date', label: 'supplierPoStartDate' },
+    { key: 'price', label: 'supplierPoPrice' },
+    { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
+  ],
+}
+
+/**
  * purchasing-screens (migration 0136): the supplier purchase orders list
  * («قائمة اوامر الشراء»), over `supplier_pos`. Search is the PO number only;
  * the allowlisted filters are the status, the supplier (`lessor_id`, an

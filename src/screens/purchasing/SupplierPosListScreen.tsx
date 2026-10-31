@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { Plus, ShoppingCart } from 'lucide-react'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { RelativeTime } from '@/components/RelativeTime'
@@ -23,6 +24,9 @@ import {
   EmptyState,
   ErrorState,
   PageHeader,
+  Tabs,
+  TabsList,
+  TabsTrigger,
   type DataTableColumn,
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
@@ -30,7 +34,10 @@ import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
 import { lessorFilterOptions } from '@/lib/equipmentSupplier'
 import { supplierPosListConfig } from '@/lib/listConfigs'
-import { supplierPoPartyOrFilter, supplierPoSupplierLabel } from '@/lib/purchasing'
+import {
+  supplierPoPartyOrFilter,
+  supplierPoSupplierLabel,
+} from '@/lib/purchasing'
 import {
   SUPPLIER_PO_LIST_SELECT,
   supplierPoCompanyProject,
@@ -39,6 +46,21 @@ import {
 } from '@/lib/purchasingData'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
+import { PoUnitsList } from '@/screens/purchasing/PoUnitsList'
+
+/**
+ * Owner 2026-10-31: «حسب الاوامر» (the PO list, the default, left out of the
+ * query string so its unprefixed deep links keep working) or «حسب المعدات»
+ * (`?view=units`, one row per unit on a PO, its list state under the `u`
+ * prefix; see `PoUnitsList`).
+ */
+type PoListView = 'orders' | 'units'
+
+const VIEWS: PoListView[] = ['orders', 'units']
+
+function resolvePoListView(params: Pick<URLSearchParams, 'get'>): PoListView {
+  return params.get('view') === 'units' ? 'units' : 'orders'
+}
 
 export interface SupplierPosListScreenProps {
   onSelectPo: (poId: string) => void
@@ -51,10 +73,15 @@ export interface SupplierPosListScreenProps {
  * «امر شراء جديد» button needs `purchasing.manage` (the database checks it
  * again in `create_supplier_po`).
  */
-export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps) {
+export function SupplierPosListScreen({
+  onSelectPo,
+}: SupplierPosListScreenProps) {
   const { t } = useI18n()
   const { can } = usePermissions()
   const canManage = can('purchasing.manage')
+  const pathname = usePathname()
+  const params = useSearchParams()
+  const view = resolvePoListView(params)
   const list = useDataListState(supplierPosListConfig)
   const [rows, setRows] = useState<SupplierPoRow[]>([])
   const [total, setTotal] = useState(0)
@@ -113,9 +140,24 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
     t,
   ])
 
+  // Each view fetches only while it is shown.
   useEffect(() => {
-    fetchRows()
-  }, [fetchRows])
+    if (view === 'orders') fetchRows()
+  }, [fetchRows, view])
+
+  const setView = (next: PoListView) => {
+    // «حسب الاوامر» is the default and is left out of the query string.
+    const query = new URLSearchParams(
+      [...params.entries()].filter(([key]) => key !== 'view'),
+    )
+    if (next !== 'orders') query.set('view', next)
+    const search = query.toString()
+    window.history.replaceState(
+      null,
+      '',
+      search ? `${pathname}?${search}` : pathname,
+    )
+  }
 
   const filtered = Boolean(list.search.trim()) || list.filters.length > 0
 
@@ -224,56 +266,78 @@ export function SupplierPosListScreen({ onSelectPo }: SupplierPosListScreenProps
         description={t('supplierPosDesc')}
         actions={addButton && <DataListActions primaryAction={addButton} />}
       />
-      <DataListToolbar
-        config={supplierPosListConfig}
-        search={list.searchInput}
-        onSearch={list.setSearchInput}
-        sort={list.sort}
-        direction={list.direction}
-        onSort={list.setSort}
-        filterFields={supplierPosListConfig.filterFields}
-        filters={list.filters}
-        onFilters={list.setFilters}
-        asyncFields={asyncFields}
-      />
-      {loadError ? (
-        <ErrorState description={loadError} onRetry={fetchRows} />
-      ) : !loading && rows.length === 0 ? (
-        <EmptyState
-          icon={<ShoppingCart size={28} aria-hidden="true" />}
-          title={filtered ? t('supplierPoEmptyFiltered') : t('supplierPoEmpty')}
-          action={filtered ? undefined : addButton}
-        />
+      <Tabs
+        value={view}
+        onValueChange={(value) => setView(value as PoListView)}
+      >
+        <TabsList variant="segmented" aria-label={t('poUnitsViewFilter')}>
+          {VIEWS.map((value) => (
+            <TabsTrigger key={value} value={value}>
+              {value === 'orders'
+                ? t('poUnitsViewOrders')
+                : t('poUnitsViewUnits')}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      {view === 'units' ? (
+        <PoUnitsList onSelectPo={onSelectPo} />
       ) : (
-        <DataTable
-          size="md"
-          columns={columns}
-          rows={rows}
-          rowKey={(row) => row.id}
-          loading={loading}
-          loadingRows={6}
-          caption={t('supplierPos')}
-          sort={{ key: list.sort, direction: list.direction }}
-          onSortChange={list.setSort}
-          // Owner 2026-10-24 («اوامر · فتح صف»): a click on the row shows its
-          // equipment under it; «تفاصيل» at the end opens the PO page.
-          expandable={{
-            render: (row) => <SupplierPoLinesPanel poId={row.id} />,
-          }}
-          // Owner 2026-10-24: 13 px rows on this list (headers stay 12 px).
-          cellTextClassName="text-[13px]"
-          // Owner 2026-10-24: more air above and below each row's content.
-          cellClassName="py-2"
-        />
-      )}
-      {!loadError && total > 0 && (
-        <DataListPagination
-          page={list.page}
-          pageSize={list.pageSize}
-          total={total}
-          onPage={list.setPage}
-          onPageSize={list.setPageSize}
-        />
+        <>
+          <DataListToolbar
+            config={supplierPosListConfig}
+            search={list.searchInput}
+            onSearch={list.setSearchInput}
+            sort={list.sort}
+            direction={list.direction}
+            onSort={list.setSort}
+            filterFields={supplierPosListConfig.filterFields}
+            filters={list.filters}
+            onFilters={list.setFilters}
+            asyncFields={asyncFields}
+          />
+          {loadError ? (
+            <ErrorState description={loadError} onRetry={fetchRows} />
+          ) : !loading && rows.length === 0 ? (
+            <EmptyState
+              icon={<ShoppingCart size={28} aria-hidden="true" />}
+              title={
+                filtered ? t('supplierPoEmptyFiltered') : t('supplierPoEmpty')
+              }
+              action={filtered ? undefined : addButton}
+            />
+          ) : (
+            <DataTable
+              size="md"
+              columns={columns}
+              rows={rows}
+              rowKey={(row) => row.id}
+              loading={loading}
+              loadingRows={6}
+              caption={t('supplierPos')}
+              sort={{ key: list.sort, direction: list.direction }}
+              onSortChange={list.setSort}
+              // Owner 2026-10-24 («اوامر · فتح صف»): a click on the row shows its
+              // equipment under it; «تفاصيل» at the end opens the PO page.
+              expandable={{
+                render: (row) => <SupplierPoLinesPanel poId={row.id} />,
+              }}
+              // Owner 2026-10-24: 13 px rows on this list (headers stay 12 px).
+              cellTextClassName="text-[13px]"
+              // Owner 2026-10-24: more air above and below each row's content.
+              cellClassName="py-2"
+            />
+          )}
+          {!loadError && total > 0 && (
+            <DataListPagination
+              page={list.page}
+              pageSize={list.pageSize}
+              total={total}
+              onPage={list.setPage}
+              onPageSize={list.setPageSize}
+            />
+          )}
+        </>
       )}
       <CreateSupplierPoDialog
         open={createOpen}

@@ -2192,6 +2192,19 @@ export const translations = {
     supplierPoSummaryAge: 'منذ البداية',
     supplierPoDaysUnit: 'يوم',
     currencySar: 'ريال سعودي',
+    // Owner 2026-10-31 (0167): the PO list «حسب المعدات».
+    poUnitsViewFilter: 'طريقة العرض',
+    poUnitsViewOrders: 'حسب الاوامر',
+    poUnitsViewUnits: 'حسب المعدات',
+    poUnitsPlateOrChassis: 'اللوحة / الشاصي',
+    poUnitsNeedsPrice: 'تحتاج سعر',
+    poUnitsPricedFilter: 'التسعير',
+    poUnitsPriced: 'مسعرة',
+    poUnitsUnpriced: 'بدون سعر',
+    poUnitsCaption: 'معدات اوامر الشراء',
+    poUnitsEmpty: 'لا توجد معدات على اوامر الشراء بعد.',
+    poUnitsEmptyFiltered: 'لا توجد معدات تطابق البحث او الفلاتر.',
+    poUnitsLoadError: 'تعذر تحميل معدات اوامر الشراء.',
     // purchasing-screens — end
   },
   en: {
@@ -4437,6 +4450,19 @@ export const translations = {
     supplierPoSummaryAge: 'Since start',
     supplierPoDaysUnit: 'days',
     currencySar: 'Saudi riyal',
+    // Owner 2026-10-31 (0167): the PO list «حسب المعدات».
+    poUnitsViewFilter: 'View',
+    poUnitsViewOrders: 'By order',
+    poUnitsViewUnits: 'By unit',
+    poUnitsPlateOrChassis: 'Plate / chassis',
+    poUnitsNeedsPrice: 'Needs a price',
+    poUnitsPricedFilter: 'Pricing',
+    poUnitsPriced: 'Priced',
+    poUnitsUnpriced: 'Unpriced',
+    poUnitsCaption: 'Units on purchase orders',
+    poUnitsEmpty: 'No units on purchase orders yet.',
+    poUnitsEmptyFiltered: 'No units match the search or filters.',
+    poUnitsLoadError: 'Could not load the units on purchase orders.',
     // purchasing-screens — end
   },
 } as const
