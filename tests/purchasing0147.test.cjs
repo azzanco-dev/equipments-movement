@@ -287,3 +287,14 @@ test('the party visits are read whole, page by page, not capped (owner 2026-10-3
   )
   assert.match(data, /export const PARTY_OPEN_VISITS_PAGE = 500/)
 })
+
+test('the ticket shows the entry date under the foreman (owner 2026-10-31)', () => {
+  const screen = read('src', 'screens', 'purchasing', 'SiteUnitsScreen.tsx')
+  const ticket = screen.slice(
+    screen.indexOf("{t('logsColForeman')}"),
+    screen.indexOf('{/* The perforation'),
+  )
+  assert.match(ticket, /\{t\('supplierPoEntryDate'\)\}/)
+  assert.match(ticket, /\{formatDate\(row\.entry_at\)\}/)
+  assert.match(screen, /import \{ formatDate \} from '@\/lib\/dateFormat'/)
+})

@@ -30,6 +30,7 @@ import {
   lessorFilterOptions,
   SUPPLIER_FILTER_KEY,
 } from '@/lib/equipmentSupplier'
+import { formatDate } from '@/lib/dateFormat'
 import { foremanFilterOptions } from '@/lib/foremanFilter'
 import { siteUnitsListConfig } from '@/lib/listConfigs'
 import { localizedName } from '@/lib/localizedName'
@@ -461,6 +462,14 @@ export function SiteUnitsScreen({
                       <span className="font-medium text-fg">
                         {row.entry_supervisor_name ?? '—'}
                       </span>
+                    </p>
+                    {/* Owner 2026-10-31 («اضف برضه في الكارد تاريخ الدخول»):
+                        the open entry's day, the PO's start date (0148). */}
+                    <p className="break-words text-xs leading-5 text-muted">
+                      {t('supplierPoEntryDate')}{' '}
+                      <bdi dir="ltr" className="font-medium text-fg">
+                        {formatDate(row.entry_at)}
+                      </bdi>
                     </p>
                   </div>
                 </div>
