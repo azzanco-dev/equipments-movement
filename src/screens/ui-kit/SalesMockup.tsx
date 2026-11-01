@@ -1,0 +1,1548 @@
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpRight,
+  Building2,
+  Calendar,
+  CalendarDays,
+  Clock,
+  Coins,
+  Edit2,
+  FileText,
+  Filter,
+  Lock,
+  MapPin,
+  Plus,
+  Receipt,
+  StickyNote,
+  Timer,
+  Truck,
+  User,
+} from 'lucide-react'
+import { RelativeTime } from '@/components/RelativeTime'
+import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
+import { DataListPagination } from '@/components/data-list/DataListPagination'
+import { EquipmentIdentifierTag } from '@/components/data-list/EquipmentIdentifierTag'
+import {
+  BackButton,
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  DescriptionList,
+  DetailHeader,
+  EmptyState,
+  IconButton,
+  Notice,
+  PRIMARY_ACTIVE_TRIGGER,
+  RiyalSign,
+  SearchInput,
+  SectionHeader,
+  Select,
+  StatCard,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  type DataTableColumn,
+  type DataTableSort,
+  type DescriptionListItem,
+} from '@/components/ui'
+import { useI18n } from '@/i18n/I18nContext'
+import { formatDate, formatDateTime } from '@/lib/dateFormat'
+import { localizedName } from '@/lib/localizedName'
+import { splitPlateForDisplay } from '@/lib/plate'
+import { formatSupplierPoPrice } from '@/lib/purchasing'
+import {
+  CLIENT_POS,
+  CLIENT_PO_EVENTS,
+  CLIENT_PO_EVENT_LABEL,
+  CLIENT_PO_LINES,
+  SALES_CARD_EQUIPMENT_ID,
+  SALES_DECISIONS,
+  SALE_PER_UNIT_LABEL,
+  SALE_RATE_UNIT_LABEL,
+  TICKETS,
+  clientPoById,
+  clientPoTotalFigures,
+  clientPoTotalsByUnit,
+  companyById,
+  equipmentById,
+  linesOfClientPo,
+  projectById,
+  quantityLabel,
+  remainingShare,
+  type ClientPoStatus,
+  type MockClientPo,
+  type MockClientPoEvent,
+  type MockClientPoLine,
+  type MockEquipment,
+  type MockTicket,
+  type SaleRateUnit,
+} from './salesMockupData'
+
+// sales-screens — REVIEW MOCKUPS of the sales phase-1 screens («PO العملاء»,
+// owner 2026-11-01) on /ui-kit, in the purchasing look the owner approved:
+// the list with its two views, the client PO page in the approved
+// detail-page pattern (PurchasingMockup's `PoPageMockupV2` is the model),
+// the «المبيعات» card of the equipment page and the «المعدات في المشاريع»
+// ticket with a second stub for the client PO. Everything is in-memory
+// sample data (salesMockupData.ts): nothing reads or writes the database,
+// no route exists yet, and the shared components are the ones the real
+// screens will render. Arabic copy uses plain alif (no hamza / madda).
+
+// --- Small shared pieces -----------------------------------------------------------
+
+/** The green pill of a PO number (the SPO pill of «المعدات في المشاريع»). */
+const PO_PILL_STYLE: CSSProperties = {
+  color: 'var(--success)',
+  backgroundColor: 'var(--success-soft)',
+}
+
+/** The «+» of a missing PO: solid amber, fully round, the page colour for
+ *  the sign (the ticket's add button). Tokens only. */
+const ADD_BUTTON_STYLE: CSSProperties = {
+  color: 'var(--bg)',
+  borderColor: 'var(--warning)',
+  backgroundColor: 'var(--warning)',
+}
+
+const STATUS_LABEL: Readonly<Record<ClientPoStatus, string>> = {
+  open: 'مفتوح',
+  closed: 'مغلق',
+}
+
+function StatusBadge({
+  status,
+  size,
+}: {
+  status: ClientPoStatus
+  size?: 'sm' | 'md'
+}) {
+  return (
+    <Badge tone={status === 'open' ? 'success' : 'neutral'} size={size}>
+      {STATUS_LABEL[status]}
+    </Badge>
+  )
+}
+
+/** An amount excluding VAT with the riyal symbol after it and the price
+ *  unit after that («/ شهر», «/ ساعة»); the digits stay an LTR run. */
+function SalePrice({
+  value,
+  unit,
+  className,
+}: {
+  value: number
+  unit?: SaleRateUnit
+  className?: string
+}) {
+  const { t } = useI18n()
+  return (
+    <span
+      className={`inline-flex flex-wrap items-baseline gap-x-1 ${className ?? ''}`}
+    >
+      <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+        <bdi dir="ltr" className="tabular-nums">
+          {formatSupplierPoPrice(value)}
+        </bdi>
+        <RiyalSign className="text-muted" size="0.8em" />
+        <span className="sr-only">{t('currencySar')}</span>
+      </span>
+      {unit && (
+        <span className="whitespace-nowrap text-[0.75em] font-normal text-muted">
+          {SALE_PER_UNIT_LABEL[unit]}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** The totals stacked, one per price unit (a month, a day and an hour are
+ *  never added together); `amount` turns a part into the figure shown. */
+function TotalsByUnit({
+  parts,
+  amount = (total) => total,
+  alignEnd = false,
+  className,
+}: {
+  parts: readonly { unit: SaleRateUnit; total: number }[]
+  amount?: (total: number) => number
+  alignEnd?: boolean
+  className?: string
+}) {
+  return (
+    <span
+      className={`inline-flex flex-col gap-0.5 ${alignEnd ? 'items-end' : 'items-start'}`}
+    >
+      {parts.map((part) => (
+        <SalePrice
+          key={part.unit}
+          value={amount(part.total)}
+          unit={part.unit}
+          className={className}
+        />
+      ))}
+    </span>
+  )
+}
+
+/** The identity cell of the purchasing lists: the bold code with the plate
+ *  or the chassis beside it, the type under them. */
+function UnitCell({
+  unit,
+  withType = true,
+}: {
+  unit: MockEquipment | null
+  withType?: boolean
+}) {
+  if (!unit) return <span className="text-muted">—</span>
+  return (
+    <span className="flex min-w-0 flex-col text-start">
+      <span className="flex flex-wrap items-baseline gap-x-1.5">
+        <bdi dir="ltr" className="font-semibold">
+          {unit.code}
+        </bdi>
+        <EquipmentIdentifierTag
+          row={{
+            equipment_plate_number: unit.plate_number,
+            equipment_chassis_number: unit.chassis_number,
+          }}
+        />
+      </span>
+      {withType && <span className="text-xs text-muted">{unit.type}</span>}
+    </span>
+  )
+}
+
+function PoPill({ number, onClick }: { number: string; onClick?: () => void }) {
+  const className =
+    'inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs font-semibold'
+  if (!onClick)
+    return (
+      <span className={className} style={PO_PILL_STYLE}>
+        <bdi dir="ltr">{number}</bdi>
+      </span>
+    )
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${className} underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring`}
+      style={PO_PILL_STYLE}
+    >
+      <bdi dir="ltr">{number}</bdi>
+    </button>
+  )
+}
+
+/** «6 اشهر» with the thin remaining bar under it (a placeholder for phase
+ *  4's remaining-quantity tracking), or a dash without a ceiling. */
+function QuantityCell({
+  line,
+  compact = false,
+}: {
+  line: MockClientPoLine
+  compact?: boolean
+}) {
+  const label = quantityLabel(line.quantity, line.quantity_unit)
+  const share = remainingShare(line)
+  if (!label || share === null)
+    return <span className="text-xs text-muted">بدون سقف</span>
+  const remaining =
+    line.quantity === null ? null : Math.max(0, line.quantity - line.consumed)
+  return (
+    <span className={`flex min-w-0 flex-col gap-1 ${compact ? 'w-28' : 'w-full'}`}>
+      <span className="flex items-baseline justify-between gap-2 text-xs">
+        <span className="font-medium text-fg">{label}</span>
+        <span className="text-muted">
+          متبقي{' '}
+          <bdi dir="ltr" className="tabular-nums">
+            {remaining}
+          </bdi>
+        </span>
+      </span>
+      <span
+        aria-hidden="true"
+        className="block h-1.5 w-full overflow-hidden rounded-full bg-surface-hover"
+      >
+        <span
+          className="block h-full rounded-full"
+          style={{
+            width: `${Math.round(share * 100)}%`,
+            backgroundColor:
+              share > 0.25 ? 'var(--chart-stroke-2)' : 'var(--warning)',
+          }}
+        />
+      </span>
+    </span>
+  )
+}
+
+function PermissionNote({ children }: { children: ReactNode }) {
+  return (
+    <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
+      <Lock size={12} aria-hidden="true" />
+      {children}
+    </p>
+  )
+}
+
+function Mockup({
+  title,
+  permission,
+  controls,
+  children,
+}: {
+  title: string
+  permission: string
+  controls?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold">{title}</h3>
+          <PermissionNote>{permission}</PermissionNote>
+        </div>
+        {controls}
+      </div>
+      <div className="rounded-xl border bg-surface p-3 sm:p-4">{children}</div>
+    </section>
+  )
+}
+
+/** The unified list toolbar's look (search, «الفلاتر», the sort select and
+ *  its direction); the search and the filters are inert in the mockup. */
+function ToolbarLookalike({
+  sortOptions,
+  sort,
+  onSort,
+}: {
+  sortOptions: { value: string; label: string }[]
+  sort: DataTableSort
+  onSort: (sort: DataTableSort) => void
+}) {
+  const { t } = useI18n()
+  const [search, setSearch] = useState('')
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <SearchInput
+        value={search}
+        onValueChange={setSearch}
+        placeholder="بحث برقم المعدة او اللوحة او رقم PO"
+        className="w-full sm:w-72"
+      />
+      <Button variant="outline" icon={<Filter size={15} aria-hidden="true" />}>
+        {t('filters')}
+      </Button>
+      <div className="ms-auto flex items-center gap-1.5">
+        <Select
+          aria-label={t('sortBy')}
+          className="w-[170px]"
+          value={sort.key}
+          onValueChange={(key) => onSort({ ...sort, key })}
+          options={sortOptions}
+        />
+        <IconButton
+          variant="outline"
+          label={sort.direction === 'asc' ? t('sortDescending') : t('sortAscending')}
+          icon={
+            sort.direction === 'asc' ? (
+              <ArrowUp size={15} aria-hidden="true" />
+            ) : (
+              <ArrowDown size={15} aria-hidden="true" />
+            )
+          }
+          onClick={() =>
+            onSort({
+              ...sort,
+              direction: sort.direction === 'asc' ? 'desc' : 'asc',
+            })
+          }
+        />
+      </div>
+    </div>
+  )
+}
+
+function sortRows<Row>(
+  rows: Row[],
+  sort: DataTableSort,
+  valueOf: (row: Row, key: string) => string | number,
+  lang: string,
+): Row[] {
+  const sign = sort.direction === 'asc' ? 1 : -1
+  return [...rows].sort((a, b) => {
+    const va = valueOf(a, sort.key)
+    const vb = valueOf(b, sort.key)
+    const cmp =
+      typeof va === 'number' && typeof vb === 'number'
+        ? va - vb
+        : String(va).localeCompare(String(vb), lang)
+    return cmp * sign
+  })
+}
+
+/** A client PO with its company and project names embedded. */
+function poRow(po: MockClientPo) {
+  const company = companyById(po.company_id)
+  const project = projectById(po.project_id)
+  return {
+    ...po,
+    company_name_ar: company?.name_ar ?? null,
+    company_name_en: company?.name_en ?? null,
+    project_name_ar: project?.name_ar ?? null,
+    project_name_en: project?.name_en ?? null,
+  }
+}
+
+// --- 1. The list with its two views ---------------------------------------------
+
+type ListView = 'units' | 'orders'
+
+type UnitRow = MockClientPoLine & {
+  unit: MockEquipment | null
+  po: ReturnType<typeof poRow>
+}
+
+type OrderRow = ReturnType<typeof poRow> & {
+  equipment_count: number
+  totals: { unit: SaleRateUnit; total: number }[]
+}
+
+function ClientPoListMockup({ onOpen }: { onOpen: (id: string) => void }) {
+  const { t, lang } = useI18n()
+  const [view, setView] = useState<ListView>('units')
+  const [unitSort, setUnitSort] = useState<DataTableSort>({
+    key: 'equipment',
+    direction: 'asc',
+  })
+  const [orderSort, setOrderSort] = useState<DataTableSort>({
+    key: 'issue_date',
+    direction: 'desc',
+  })
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+
+  const unitRows = useMemo(() => {
+    const rows: UnitRow[] = CLIENT_PO_LINES.map((line) => {
+      const po = clientPoById(line.client_po_id) ?? CLIENT_POS[0]
+      return { ...line, unit: equipmentById(line.equipment_id), po: poRow(po) }
+    })
+    return sortRows(
+      rows,
+      unitSort,
+      (row, key) => {
+        switch (key) {
+          case 'po_number':
+            return row.po.po_number
+          case 'period_from':
+            return row.period_from
+          case 'price':
+            return row.price
+          case 'updated_at':
+            return row.updated_at
+          default:
+            return row.unit?.code ?? ''
+        }
+      },
+      lang,
+    )
+  }, [unitSort, lang])
+
+  const orderRows = useMemo(() => {
+    const rows: OrderRow[] = CLIENT_POS.map((po) => {
+      const lines = linesOfClientPo(po.id)
+      return {
+        ...poRow(po),
+        equipment_count: lines.length,
+        totals: clientPoTotalsByUnit(lines),
+      }
+    })
+    return sortRows(
+      rows,
+      orderSort,
+      (row, key) => {
+        switch (key) {
+          case 'po_number':
+            return row.po_number
+          case 'expiry_date':
+            return row.expiry_date ?? ''
+          case 'status':
+            return row.status
+          case 'updated_at':
+            return row.updated_at
+          default:
+            return row.issue_date
+        }
+      },
+      lang,
+    )
+  }, [orderSort, lang])
+
+  const unitColumns: DataTableColumn<UnitRow>[] = [
+    {
+      key: 'equipment',
+      header: 'المعدة',
+      sortable: true,
+      cell: (row) => <UnitCell unit={row.unit} />,
+    },
+    {
+      key: 'po_number',
+      header: 'PO العميل',
+      sortable: true,
+      cell: (row) => <PoPill number={row.po.po_number} />,
+    },
+    {
+      key: 'company_project',
+      header: 'الشركة · المشروع',
+      hideBelow: 'md',
+      cell: (row) => <CompanyProjectCell row={row.po} />,
+    },
+    {
+      key: 'period_from',
+      header: 'تاريخ البداية',
+      sortable: true,
+      hideBelow: 'md',
+      className: 'tabular-nums',
+      cell: (row) => formatDate(row.period_from),
+    },
+    {
+      key: 'price',
+      header: 'السعر',
+      sortable: true,
+      cell: (row) => <SalePrice value={row.price} unit={row.rate_unit} />,
+    },
+    {
+      key: 'quantity',
+      header: 'الكمية · المتبقي',
+      hideBelow: 'sm',
+      cell: (row) => <QuantityCell line={row} compact />,
+    },
+    {
+      key: 'updated_at',
+      header: t('updatedAt'),
+      sortable: true,
+      hideBelow: 'md',
+      className: 'text-muted',
+      cell: (row) => <RelativeTime value={row.updated_at} />,
+    },
+  ]
+
+  const orderColumns: DataTableColumn<OrderRow>[] = [
+    {
+      key: 'po_number',
+      header: 'رقم PO العميل',
+      sortable: true,
+      cell: (row) => (
+        <bdi dir="ltr" className="font-semibold">
+          {row.po_number}
+        </bdi>
+      ),
+    },
+    {
+      key: 'company',
+      header: 'الشركة',
+      cell: (row) => (
+        <span className="flex flex-col text-start">
+          <span className="font-medium">
+            {localizedName(lang, row.company_name_ar, row.company_name_en)}
+          </span>
+          <span className="text-xs text-muted">
+            {localizedName(lang, row.project_name_ar, row.project_name_en)}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: 'issue_date',
+      header: 'تاريخ الاصدار',
+      sortable: true,
+      hideBelow: 'md',
+      className: 'tabular-nums',
+      cell: (row) => formatDate(row.issue_date),
+    },
+    {
+      key: 'expiry_date',
+      header: 'تاريخ الانتهاء',
+      sortable: true,
+      hideBelow: 'md',
+      className: 'tabular-nums',
+      cell: (row) =>
+        row.expiry_date ? (
+          formatDate(row.expiry_date)
+        ) : (
+          <span className="text-muted">—</span>
+        ),
+    },
+    {
+      key: 'equipment_count',
+      header: t('supplierPoEquipmentCount'),
+      align: 'center',
+      hideBelow: 'sm',
+      className: 'tabular-nums',
+      cell: (row) => row.equipment_count,
+    },
+    {
+      key: 'total',
+      header: t('supplierPoSummaryTotal'),
+      align: 'end',
+      cell: (row) => <TotalsByUnit parts={row.totals} alignEnd />,
+    },
+    {
+      key: 'status',
+      header: t('status'),
+      sortable: true,
+      cell: (row) => <StatusBadge status={row.status} size="sm" />,
+    },
+    {
+      key: 'updated_at',
+      header: t('updatedAt'),
+      sortable: true,
+      hideBelow: 'md',
+      className: 'text-muted',
+      cell: (row) => <RelativeTime value={row.updated_at} />,
+    },
+  ]
+
+  const unitSortOptions = [
+    { value: 'equipment', label: 'المعدة' },
+    { value: 'po_number', label: 'رقم PO العميل' },
+    { value: 'period_from', label: 'تاريخ البداية' },
+    { value: 'price', label: 'السعر' },
+    { value: 'updated_at', label: t('updatedAt') },
+  ]
+  const orderSortOptions = [
+    { value: 'issue_date', label: 'تاريخ الاصدار' },
+    { value: 'po_number', label: 'رقم PO العميل' },
+    { value: 'expiry_date', label: 'تاريخ الانتهاء' },
+    { value: 'status', label: t('status') },
+    { value: 'updated_at', label: t('updatedAt') },
+  ]
+
+  const total = view === 'units' ? unitRows.length : orderRows.length
+
+  return (
+    <Mockup
+      title="1. قائمة PO العملاء — /sales/orders"
+      permission="sales.view يعرض القائمة · sales.manage يظهر زر «PO عميل جديد» (لاحقا)"
+    >
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold">PO العملاء</h2>
+            <p className="text-sm text-muted">
+              اوامر الشراء الواردة من العملاء ومعداتها واسعار البيع.
+            </p>
+          </div>
+          <Button variant="primary" icon={<Plus size={16} aria-hidden="true" />}>
+            PO عميل جديد
+          </Button>
+        </div>
+        {/* The PO list's view switch (owner 2026-10-31): the selected tab is
+            black like a primary button on this page only. */}
+        <Tabs
+          value={view}
+          onValueChange={(next) => {
+            setView(next as ListView)
+            setPage(1)
+          }}
+        >
+          <TabsList variant="segmented" aria-label="طريقة العرض">
+            <TabsTrigger value="units" className={PRIMARY_ACTIVE_TRIGGER}>
+              {t('poUnitsViewUnits')}
+            </TabsTrigger>
+            <TabsTrigger value="orders" className={PRIMARY_ACTIVE_TRIGGER}>
+              {t('poUnitsViewOrders')}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        {view === 'units' ? (
+          <>
+            <ToolbarLookalike
+              sortOptions={unitSortOptions}
+              sort={unitSort}
+              onSort={setUnitSort}
+            />
+            <DataTable
+              size="md"
+              cellTextClassName="text-[13px]"
+              cellClassName="py-2"
+              columns={unitColumns}
+              rows={unitRows}
+              rowKey={(row) => row.id}
+              caption="PO العملاء حسب المعدات"
+              sort={unitSort}
+              onSortChange={(key, direction) => setUnitSort({ key, direction })}
+              onRowClick={(row) => onOpen(row.po.id)}
+            />
+          </>
+        ) : (
+          <>
+            <ToolbarLookalike
+              sortOptions={orderSortOptions}
+              sort={orderSort}
+              onSort={setOrderSort}
+            />
+            <DataTable
+              size="md"
+              cellTextClassName="text-[13px]"
+              cellClassName="py-2"
+              columns={orderColumns}
+              rows={orderRows}
+              rowKey={(row) => row.id}
+              caption="PO العملاء حسب الاوامر"
+              sort={orderSort}
+              onSortChange={(key, direction) => setOrderSort({ key, direction })}
+              onRowClick={(row) => onOpen(row.id)}
+            />
+          </>
+        )}
+        <DataListPagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onPage={setPage}
+          onPageSize={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }}
+        />
+      </div>
+    </Mockup>
+  )
+}
+
+// --- 2. The client PO page --------------------------------------------------------
+
+function EventTimeline({ events }: { events: MockClientPoEvent[] }) {
+  const latest = [...events].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at),
+  )
+  if (latest.length === 0)
+    return <p className="text-sm text-muted">لا احداث بعد.</p>
+  return (
+    <ol className="relative ms-1.5 space-y-4 border-s ps-4">
+      {latest.map((event) => (
+        <li key={event.id} className="relative">
+          <span
+            aria-hidden="true"
+            className="absolute -start-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-bg bg-muted"
+          />
+          <p className="text-sm font-medium">
+            {CLIENT_PO_EVENT_LABEL[event.event_type]}
+          </p>
+          {event.detail && (
+            <p className="text-sm text-muted">
+              <bdi dir="ltr">{event.detail}</bdi>
+            </p>
+          )}
+          <p className="mt-0.5 text-xs text-muted">
+            {event.actor_name} ·{' '}
+            <bdi dir="ltr">{formatDateTime(event.created_at, false)}</bdi>
+          </p>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+/** The card period behind a line: «from – to», or «from – مفتوح». */
+function periodLabel(line: MockClientPoLine, openEnd: string): string {
+  const to = line.period_to ? formatDate(line.period_to) : openEnd
+  return `${formatDate(line.period_from)} – ${to}`
+}
+
+function ClientPoPageMockup({
+  selectedId,
+  onSelect,
+}: {
+  selectedId: string
+  onSelect: (id: string) => void
+}) {
+  const { t, lang } = useI18n()
+  const po = clientPoById(selectedId) ?? CLIENT_POS[0]
+  const row = poRow(po)
+  const lines = linesOfClientPo(po.id).map((line) => ({
+    ...line,
+    unit: equipmentById(line.equipment_id),
+  }))
+  const events = CLIENT_PO_EVENTS.filter((event) => event.client_po_id === po.id)
+  const open = po.status === 'open'
+  const totals = clientPoTotalsByUnit(lines)
+  const [sort, setSort] = useState<DataTableSort>({
+    key: 'equipment',
+    direction: 'asc',
+  })
+  const companyName = localizedName(lang, row.company_name_ar, row.company_name_en)
+  const projectName = localizedName(lang, row.project_name_ar, row.project_name_en)
+
+  const facts: DescriptionListItem[] = [
+    {
+      key: 'company',
+      icon: <Building2 size={16} />,
+      label: 'الشركة (العميل)',
+      value: companyName,
+    },
+    {
+      key: 'project',
+      icon: <MapPin size={16} />,
+      label: t('project'),
+      value: projectName,
+    },
+    {
+      key: 'issue',
+      icon: <Calendar size={16} />,
+      label: 'تاريخ الاصدار',
+      value: formatDate(po.issue_date),
+      dir: 'ltr',
+    },
+    {
+      key: 'expiry',
+      icon: <CalendarDays size={16} />,
+      label: 'تاريخ الانتهاء',
+      value: po.expiry_date ? formatDate(po.expiry_date) : 'بدون تاريخ انتهاء',
+      dir: po.expiry_date ? 'ltr' : undefined,
+    },
+    {
+      key: 'hours',
+      icon: <Timer size={16} />,
+      label: 'الساعات القياسية',
+      value: (
+        <>
+          <bdi dir="ltr" className="tabular-nums">
+            {po.standard_hours}
+          </bdi>{' '}
+          ساعة / شهر
+        </>
+      ),
+    },
+    {
+      key: 'createdBy',
+      icon: <User size={16} />,
+      label: 'انشئ بواسطة',
+      value: po.created_by_name,
+    },
+    {
+      key: 'createdAt',
+      icon: <Clock size={16} />,
+      label: 'تاريخ الانشاء',
+      value: formatDateTime(po.created_at),
+      dir: 'ltr',
+    },
+    ...(po.closed_at
+      ? [
+          {
+            key: 'closedAt',
+            icon: <Lock size={16} />,
+            label: 'اقفل في',
+            value: formatDateTime(po.closed_at),
+            dir: 'ltr' as const,
+          },
+        ]
+      : []),
+    {
+      key: 'notes',
+      icon: <StickyNote size={16} />,
+      label: t('notes'),
+      value: po.notes ?? '—',
+    },
+  ]
+
+  const sortedLines = sortRows(
+    lines,
+    sort,
+    (line, key) => {
+      switch (key) {
+        case 'period':
+          return line.period_from
+        case 'price':
+          return line.price
+        default:
+          return line.unit?.code ?? ''
+      }
+    },
+    lang,
+  )
+  const sortOptions = [
+    { value: 'equipment', label: 'المعدة' },
+    { value: 'period', label: 'الفترة' },
+    { value: 'price', label: 'السعر' },
+  ]
+  const sortControls = (
+    <div className="flex items-center gap-1.5">
+      <Select
+        size="sm"
+        aria-label={t('sortBy')}
+        className="w-[130px]"
+        value={sort.key}
+        onValueChange={(key) => setSort((current) => ({ ...current, key }))}
+        options={sortOptions}
+      />
+      <IconButton
+        size="sm"
+        variant="outline"
+        label={sort.direction === 'asc' ? t('sortDescending') : t('sortAscending')}
+        icon={
+          sort.direction === 'asc' ? (
+            <ArrowUp size={14} aria-hidden="true" />
+          ) : (
+            <ArrowDown size={14} aria-hidden="true" />
+          )
+        }
+        onClick={() =>
+          setSort((current) => ({
+            ...current,
+            direction: current.direction === 'asc' ? 'desc' : 'asc',
+          }))
+        }
+      />
+    </div>
+  )
+
+  const editButton = (size: 'sm' | 'md') => (
+    <Button
+      variant="outline"
+      size={size}
+      className={size === 'md' ? 'h-11 flex-1' : undefined}
+      icon={<Edit2 size={size === 'sm' ? 14 : 16} aria-hidden="true" />}
+    >
+      تعديل
+    </Button>
+  )
+  const closeButton = (size: 'sm' | 'md') => (
+    <Button
+      variant="danger"
+      size={size}
+      className={size === 'md' ? 'h-11' : undefined}
+    >
+      اقفال
+    </Button>
+  )
+
+  return (
+    <Mockup
+      title="2. صفحة PO العميل — /sales/orders/:id (نمط صفحات التفاصيل المعتمد)"
+      permission="sales.view يعرض الصفحة · sales.manage يظهر «اضافة معدة» و«تعديل» و«اقفال» على الامر المفتوح · بلا اعتماد وبلا PDF"
+      controls={
+        <Select
+          size="sm"
+          aria-label="PO العميل المعروض"
+          className="w-[230px]"
+          value={po.id}
+          onValueChange={onSelect}
+          options={CLIENT_POS.map((item) => ({
+            value: item.id,
+            label: `${item.po_number} · ${STATUS_LABEL[item.status]}`,
+          }))}
+        />
+      }
+    >
+      <div className="space-y-4">
+        <BackButton onClick={() => undefined} label="العودة الى PO العملاء" />
+
+        {/* 1. The header card (owner 2026-10-24: no meta line): the client's
+            number with its status, the CLIENT on its own line, the project
+            under it, the actions at the end, then the summary strip. */}
+        <div className="card space-y-4 p-4">
+          <DetailHeader
+            as="h2"
+            identifier={po.po_number}
+            identifierLtr
+            subtitle={
+              <span className="flex flex-col gap-0.5">
+                <span className="flex items-center gap-1.5 text-base font-semibold text-fg">
+                  <Building2 size={16} aria-hidden="true" className="text-muted" />
+                  {companyName}
+                </span>
+                <span className="flex items-center gap-1.5 text-sm text-muted">
+                  <MapPin size={14} aria-hidden="true" />
+                  {projectName}
+                </span>
+              </span>
+            }
+            badges={<StatusBadge status={po.status} />}
+            actions={
+              open ? (
+                <div className="hidden gap-2 sm:flex">
+                  {editButton('sm')}
+                  {closeButton('sm')}
+                </div>
+              ) : undefined
+            }
+          />
+          {/* 2. The summary strip: four cards, one amount per price unit
+              (a month, a day and an hour are never added together). */}
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <StatCard
+              label={t('supplierPoSummaryTotal')}
+              value={<TotalsByUnit parts={totals} />}
+              icon={<Coins size={18} />}
+            />
+            <StatCard
+              label={t('supplierPoSummaryVat')}
+              hint="15%"
+              value={
+                <TotalsByUnit
+                  parts={totals}
+                  amount={(total) => clientPoTotalFigures(total).vat}
+                />
+              }
+              icon={<Receipt size={18} />}
+            />
+            <StatCard
+              label={t('supplierPoSummaryTotalWithVat')}
+              value={
+                <TotalsByUnit
+                  parts={totals}
+                  amount={(total) => clientPoTotalFigures(total).inclVat}
+                />
+              }
+              icon={<Coins size={18} />}
+            />
+            <StatCard
+              label={t('supplierPoEquipmentCount')}
+              value={lines.length}
+              icon={<Truck size={18} />}
+            />
+          </div>
+        </div>
+
+        {!open && (
+          <Notice tone="neutral" size="compact" icon={<Lock size={16} />}>
+            PO مغلق: للقراءة فقط، لا اضافة ولا تعديل.
+          </Notice>
+        )}
+
+        {/* 3. The body (owner 2026-10-24): below xl the facts sit ABOVE the
+            lines, then the timeline; from xl the lines span two columns
+            beside the facts and the timeline. */}
+        <div className="grid gap-4 xl:grid-cols-3 xl:grid-rows-[auto_1fr]">
+          <Card className="order-1 space-y-3 p-4 xl:order-none xl:col-start-3">
+            <SectionHeader title="بيانات PO العميل" />
+            <DescriptionList items={facts} className="-my-2" />
+          </Card>
+
+          <Card
+            padded={false}
+            className="order-2 flex min-w-0 flex-col xl:order-none xl:col-span-2 xl:col-start-1 xl:row-span-2 xl:row-start-1"
+          >
+            <div className="p-4 pb-0">
+              <SectionHeader
+                title={
+                  <span className="flex items-center gap-2">
+                    معدات الـ PO
+                    <Badge size="sm">{lines.length}</Badge>
+                  </span>
+                }
+                description="كل معدة بسعر بيعها بدون ضريبة ووحدته وساعاتها القياسية وكميتها التعاقدية."
+                action={
+                  <div className="flex flex-wrap items-center gap-2">
+                    {lines.length > 1 && sortControls}
+                    {open && (
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        icon={<Plus size={14} aria-hidden="true" />}
+                      >
+                        اضافة معدة
+                      </Button>
+                    )}
+                  </div>
+                }
+              />
+            </div>
+            {lines.length === 0 ? (
+              <div className="p-4">
+                <EmptyState title="لا معدات على هذا الـ PO بعد" className="p-6" />
+              </div>
+            ) : (
+              <ul className="space-y-2 p-4 pt-3">
+                {/* 4. One wide card per line: identity at the start, the
+                    period, hours and note in the middle, and at the end a
+                    fixed-width block with the price, the quantity and the
+                    remaining bar (a phase-4 placeholder). */}
+                {sortedLines.map((line) => (
+                  <li key={line.id} className="rounded-xl border bg-bg p-3 sm:p-4">
+                    <div className="flex flex-wrap items-start gap-x-4 gap-y-3 sm:flex-nowrap">
+                      <div className="min-w-0 flex-1 sm:basis-2/5">
+                        <UnitCell unit={line.unit} />
+                      </div>
+                      <div className="min-w-0 flex-1 space-y-1 sm:basis-3/5">
+                        <p className="flex items-center gap-1.5 text-xs text-muted">
+                          <Calendar size={12} aria-hidden="true" className="shrink-0" />
+                          <bdi dir="ltr">
+                            {periodLabel(line, t('equipmentPurchasingOpenEnd'))}
+                          </bdi>
+                        </p>
+                        <p className="flex items-center gap-1.5 text-xs text-muted">
+                          <Timer size={12} aria-hidden="true" className="shrink-0" />
+                          <span>
+                            الساعات القياسية{' '}
+                            <bdi dir="ltr" className="font-medium text-fg">
+                              {line.standard_hours}
+                            </bdi>{' '}
+                            · {SALE_RATE_UNIT_LABEL[line.rate_unit]}
+                          </span>
+                        </p>
+                        {line.note && (
+                          <p className="flex items-start gap-1.5 text-xs text-muted">
+                            <StickyNote
+                              size={12}
+                              aria-hidden="true"
+                              className="mt-0.5 shrink-0"
+                            />
+                            <span className="min-w-0 break-words">{line.note}</span>
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex w-full flex-col gap-2 border-t pt-3 sm:w-48 sm:shrink-0 sm:items-end sm:border-t-0 sm:pt-0">
+                        <div className="flex w-full items-start justify-between gap-3 sm:flex-col sm:items-end">
+                          <div className="text-start sm:text-end">
+                            <p className="text-xs text-muted">سعر البيع</p>
+                            <p className="text-lg font-semibold">
+                              <SalePrice value={line.price} unit={line.rate_unit} />
+                            </p>
+                          </div>
+                          {open && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              icon={<Edit2 size={14} aria-hidden="true" />}
+                            >
+                              تعديل
+                            </Button>
+                          )}
+                        </div>
+                        <QuantityCell line={line} />
+                      </div>
+                    </div>
+                  </li>
+                ))}
+                <li className="rounded-xl border bg-surface p-3 sm:p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
+                    <p className="text-sm font-medium">{t('supplierPoSummaryTotal')}</p>
+                    <p className="text-lg font-semibold sm:w-48 sm:shrink-0">
+                      <TotalsByUnit parts={totals} alignEnd />
+                    </p>
+                  </div>
+                </li>
+              </ul>
+            )}
+          </Card>
+
+          <Card className="order-3 space-y-3 p-4 xl:order-none xl:col-start-3">
+            <SectionHeader
+              title="سجل الاحداث"
+              description="الانشاء واضافة المعدات وتعديل الاسعار والاقفال."
+            />
+            <EventTimeline events={events} />
+          </Card>
+        </div>
+
+        {/* 5. The mobile action bar (fixed to the viewport in the real page). */}
+        {open && (
+          <div
+            className="sticky bottom-0 z-10 -mx-3 -mb-3 flex gap-2 border-t bg-bg p-3 sm:hidden"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
+            <Button
+              variant="primary"
+              className="h-11 flex-1"
+              icon={<Plus size={16} aria-hidden="true" />}
+            >
+              اضافة معدة
+            </Button>
+            {editButton('md')}
+            {closeButton('md')}
+          </div>
+        )}
+      </div>
+    </Mockup>
+  )
+}
+
+// --- 3. The «المبيعات» card of the equipment page -----------------------------------
+
+function EquipmentSalesCardMockup({ onOpen }: { onOpen: (id: string) => void }) {
+  const { t } = useI18n()
+  const [withPo, setWithPo] = useState<'with' | 'without'>('with')
+  const unit = equipmentById(SALES_CARD_EQUIPMENT_ID)
+  const rows = CLIENT_PO_LINES.filter(
+    (line) => line.equipment_id === SALES_CARD_EQUIPMENT_ID,
+  )
+    .map((line) => {
+      const po = clientPoById(line.client_po_id)
+      return po ? { ...line, po: poRow(po) } : null
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null)
+  type CardRow = (typeof rows)[number]
+
+  const columns: DataTableColumn<CardRow>[] = [
+    {
+      key: 'po',
+      header: 'PO العميل',
+      cell: (row) => <PoPill number={row.po.po_number} onClick={() => onOpen(row.po.id)} />,
+    },
+    {
+      key: 'company_project',
+      header: 'الشركة · المشروع',
+      cell: (row) => <CompanyProjectCell row={row.po} />,
+    },
+    {
+      key: 'since',
+      header: 'منذ',
+      className: 'tabular-nums',
+      hideBelow: 'sm',
+      cell: (row) => (
+        <span className="whitespace-nowrap">
+          {formatDate(row.period_from)}
+          {' – '}
+          {row.period_to ? formatDate(row.period_to) : t('equipmentPurchasingOpenEnd')}
+        </span>
+      ),
+    },
+    {
+      key: 'price',
+      header: 'سعر البيع',
+      align: 'end',
+      cell: (row) => <SalePrice value={row.price} unit={row.rate_unit} />,
+    },
+    {
+      key: 'quantity',
+      header: 'الكمية',
+      hideBelow: 'md',
+      cell: (row) => quantityLabel(row.quantity, row.quantity_unit) ?? '—',
+    },
+  ]
+
+  return (
+    <Mockup
+      title="3. كرت «المبيعات» في صفحة المعدة — /equipment/:id"
+      permission="يظهر فقط مع sales.view · للقراءة فقط، تحت كرت «المشتريات»"
+      controls={
+        <Tabs value={withPo} onValueChange={(next) => setWithPo(next as 'with' | 'without')}>
+          <TabsList variant="segmented" aria-label="حالة الكرت">
+            <TabsTrigger value="with">مع PO عميل</TabsTrigger>
+            <TabsTrigger value="without">بدون PO عميل</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-xs text-muted">
+          موضع الكرت: بعد كرت «المشتريات» وقبل سجل الحركات. المعدة في المثال:{' '}
+          <bdi dir="ltr">{unit?.code}</bdi> · {unit?.type}
+        </p>
+        <Card padded={false} className="flex min-w-0 flex-col">
+          <div className="p-4 pb-0">
+            <SectionHeader
+              title="المبيعات"
+              description="PO العملاء التي تقف عليها المعدة، الحالي اولا."
+            />
+          </div>
+          <div className="p-4">
+            {withPo === 'without' ? (
+              <EmptyState
+                icon={<FileText size={24} aria-hidden="true" />}
+                title="بدون PO عميل"
+                description="المعدة ليست على اي PO عميل الان."
+                className="p-6"
+              />
+            ) : (
+              <DataTable
+                size="md"
+                columns={columns}
+                rows={rows}
+                rowKey={(row) => row.id}
+                caption="المبيعات"
+              />
+            )}
+          </div>
+        </Card>
+      </div>
+    </Mockup>
+  )
+}
+
+// --- 4. The ticket with two stubs -------------------------------------------------
+
+/** The plate's digits, then its letters spaced by letter-spacing, or the
+ *  chassis as it is (the ticket's identity line). */
+function PlateOrChassis({
+  plate,
+  chassis,
+}: {
+  plate: string | null
+  chassis: string | null
+}) {
+  const parts = plate ? splitPlateForDisplay(plate) : null
+  const text = plate?.trim() || chassis?.trim()
+  if (!parts) return text ? <>{text}</> : null
+  return (
+    <>
+      {parts.digits}{' '}
+      <span className="-me-[0.15em] tracking-[0.15em]">{parts.letters}</span>
+    </>
+  )
+}
+
+/** One stub under the perforation: who it is for (المورد / العميل), the
+ *  state, and the PO pill or the round amber «+» that says what it will do. */
+function Stub({
+  side,
+  poNumber,
+  targetPoNumber,
+  noPoLabel,
+  first,
+}: {
+  side: string
+  poNumber: string | null
+  targetPoNumber: string | null
+  noPoLabel: string
+  first: boolean
+}) {
+  const tone = poNumber ? 'success' : 'warning'
+  return (
+    <div
+      className={`flex min-w-0 flex-col gap-1.5 px-3 py-2.5 ${
+        first ? 'rounded-es-xl' : 'rounded-ee-xl border-s border-dashed'
+      }`}
+      style={{ backgroundColor: `var(--${tone}-soft)` }}
+    >
+      <span className="text-[11px] leading-4 text-muted">{side}</span>
+      {/* Half the ticket's width per stub: with a PO the pill speaks alone
+          (the stub's own label above says whose PO it is). */}
+      <div className="flex items-center justify-between gap-2">
+        {!poNumber && (
+          <span
+            className="text-xs font-medium"
+            style={{ color: `var(--${tone})` }}
+          >
+            {noPoLabel}
+          </span>
+        )}
+        {poNumber ? (
+          <PoPill number={poNumber} onClick={() => undefined} />
+        ) : (
+          <button
+            type="button"
+            className="group/add inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full px-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+            style={ADD_BUTTON_STYLE}
+          >
+            <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-normal opacity-0 group-hover/add:max-w-40 group-hover/add:pe-1 group-hover/add:ps-2 group-hover/add:opacity-100 group-focus-visible/add:max-w-40 group-focus-visible/add:pe-1 group-focus-visible/add:ps-2 group-focus-visible/add:opacity-100 motion-safe:transition-all motion-safe:duration-300 motion-safe:ease-out">
+              {targetPoNumber ? (
+                <>
+                  اضافة الى <bdi dir="ltr">{targetPoNumber}</bdi>
+                </>
+              ) : (
+                'PO جديد'
+              )}
+            </span>
+            <Plus size={15} strokeWidth={2.5} aria-hidden="true" className="shrink-0" />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Ticket({ ticket }: { ticket: MockTicket }) {
+  const { lang } = useI18n()
+  const unit = equipmentById(ticket.equipment_id)
+  const company = companyById(ticket.company_id)
+  const project = projectById(ticket.project_id)
+  const ownerLine = unit
+    ? unit.ownership === 'external_supplier'
+      ? (unit.lessor_name ?? 'مالك اخر')
+      : unit.ownership === 'alazani'
+        ? 'العزاني'
+        : unit.ownership === 'takween'
+          ? 'تكوين'
+          : unit.ownership === 'third_party_f'
+            ? 'طرف ثالث F'
+            : 'طرف ثالث B'
+    : '—'
+  return (
+    <div className="flex flex-1 flex-col rounded-xl border bg-bg text-[13px]">
+      <div className="space-y-2 p-3">
+        <div>
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-lg font-bold leading-6">
+              <bdi dir="ltr">{unit?.code ?? '—'}</bdi>
+            </p>
+            <span className="inline-flex h-7 shrink-0 items-center rounded-full bg-surface-hover px-1.5 text-fg">
+              <ArrowUpRight size={16} aria-hidden="true" className="rtl:-scale-x-100" />
+            </span>
+          </div>
+          <p className="break-words leading-5">{unit?.type ?? '—'}</p>
+          <p className="text-xs leading-5 text-muted">
+            {(unit?.plate_number || unit?.chassis_number) && (
+              <>
+                <bdi dir="ltr">
+                  <PlateOrChassis
+                    plate={unit?.plate_number ?? null}
+                    chassis={unit?.chassis_number ?? null}
+                  />
+                </bdi>
+                {' · '}
+              </>
+            )}
+            {ticket.contractor_code ? (
+              <bdi dir="ltr" className="font-medium text-fg">
+                {ticket.contractor_code}
+              </bdi>
+            ) : (
+              '—'
+            )}
+          </p>
+        </div>
+        <div className="border-t" />
+        <div className="min-w-0 space-y-1">
+          <p className="break-words text-xs leading-5 text-muted">{ownerLine}</p>
+          <p className="break-words text-xs leading-5 text-muted">
+            {company ? localizedName(lang, company.name_ar, company.name_en) : '—'} ·{' '}
+            {project ? localizedName(lang, project.name_ar, project.name_en) : '—'}
+          </p>
+          <p className="break-words text-xs leading-5 text-muted">
+            الفورمان <span className="font-medium text-fg">{ticket.foreman}</span>
+          </p>
+          <p className="break-words text-xs leading-5 text-muted">
+            تاريخ الدخول{' '}
+            <bdi dir="ltr" className="font-medium text-fg">
+              {formatDate(ticket.entry_date)}
+            </bdi>
+          </p>
+        </div>
+      </div>
+      {/* The perforation (no side notches), then TWO stubs side by side:
+          the supplier PO as today and the client PO beside it. */}
+      <div className="mx-3 mt-auto border-t border-dashed" />
+      <div className="grid grid-cols-2">
+        <Stub
+          side="PO المورد"
+          poNumber={ticket.supplier_po_number}
+          targetPoNumber={ticket.supplier_party_po_number}
+          noPoLabel="بدون PO"
+          first
+        />
+        <Stub
+          side="PO العميل"
+          poNumber={ticket.client_po_number}
+          targetPoNumber={ticket.client_project_po_number}
+          noPoLabel="بدون PO عميل"
+          first={false}
+        />
+      </div>
+    </div>
+  )
+}
+
+const TICKET_CASES = [
+  'الحالتان مكتملتان',
+  'PO مورد فقط',
+  'PO عميل فقط',
+  'بدون الاثنين',
+]
+
+function TicketsMockup() {
+  return (
+    <Mockup
+      title="4. تذكرة المعدة في «المعدات في المشاريع» — /purchasing/units"
+      permission="كعب المورد يحتاج purchasing.view (والاضافة purchasing.manage) · كعب العميل يحتاج sales.view (والاضافة sales.manage) · من لا يملك احدهما يرى كعبا واحدا كما اليوم"
+    >
+      <div className="space-y-3">
+        <p className="text-xs text-muted">
+          التذكرة المعتمدة كما هي فوق الخط المنقط، وتحته كعبان متجاوران بدل
+          واحد: المورد في البداية والعميل في النهاية، كل كعب بلون حالته
+          (كهرماني بدون PO مع زر «+» يقول ماذا سيفعل، اخضر مع رقم الـ PO).
+          الحالات الاربع:
+        </p>
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {TICKETS.map((ticket, index) => (
+            <li key={ticket.id} className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted">{TICKET_CASES[index]}</span>
+              <Ticket ticket={ticket} />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </Mockup>
+  )
+}
+
+// --- The decisions and the section ------------------------------------------------
+
+function DecisionsBlock() {
+  return (
+    <Card className="space-y-3 p-4">
+      <SectionHeader
+        title="القرارات — المرحلة الاولى من المبيعات (2026-11-01)"
+        description="النموذج والشاشات يراجعان معا؛ ما يتغير هنا يتغير في الشاشات."
+      />
+      <ol className="grid gap-2 sm:grid-cols-2">
+        {SALES_DECISIONS.map((decision, index) => (
+          <li key={decision.title} className="flex gap-3 rounded-lg border bg-bg p-3">
+            <span
+              aria-hidden="true"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-hover text-xs font-semibold tabular-nums"
+            >
+              {index + 1}
+            </span>
+            <span className="min-w-0 space-y-0.5">
+              <span className="block text-sm font-semibold">{decision.title}</span>
+              <span className="block text-xs leading-5 text-muted">{decision.detail}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+    </Card>
+  )
+}
+
+type SalesTab = 'list' | 'page' | 'card' | 'ticket'
+
+const SALES_TABS: { id: SalesTab; label: string }[] = [
+  { id: 'list', label: 'قائمة PO العملاء' },
+  { id: 'page', label: 'صفحة PO العميل' },
+  { id: 'card', label: 'كرت المبيعات في صفحة المعدة' },
+  { id: 'ticket', label: 'تذكرة المعدة' },
+]
+
+export function SalesMockup() {
+  const [tab, setTab] = useState<SalesTab>('list')
+  const [selectedId, setSelectedId] = useState(CLIENT_POS[0].id)
+
+  const openPo = (id: string) => {
+    setSelectedId(id)
+    setTab('page')
+  }
+
+  return (
+    <div className="space-y-6">
+      <Notice tone="info" size="compact">
+        نماذج للمراجعة ببيانات عينة في الذاكرة: لا جداول ولا قراءة ولا كتابة
+        على القاعدة ولا مسارات بعد. قسم «المبيعات» في الشريط الجانبي يحمل «PO
+        العملاء»، والشاشات بنفس مكونات المشتريات المعتمدة.
+      </Notice>
+      <DecisionsBlock />
+      <Tabs value={tab} onValueChange={(next) => setTab(next as SalesTab)}>
+        <TabsList variant="segmented" aria-label="شاشات المبيعات">
+          {SALES_TABS.map((item) => (
+            <TabsTrigger key={item.id} value={item.id}>
+              {item.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      {tab === 'list' && <ClientPoListMockup onOpen={openPo} />}
+      {tab === 'page' && (
+        <ClientPoPageMockup selectedId={selectedId} onSelect={setSelectedId} />
+      )}
+      {tab === 'card' && <EquipmentSalesCardMockup onOpen={openPo} />}
+      {tab === 'ticket' && <TicketsMockup />}
+    </div>
+  )
+}

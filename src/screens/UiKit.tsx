@@ -56,6 +56,7 @@ import { InquiryRedesignMockup } from '@/screens/ui-kit/InquiryRedesignMockup'
 import { InquiryAllStatesShowcase } from '@/screens/ui-kit/InquiryAllStatesShowcase'
 import { HomeRedesignMockup } from '@/screens/ui-kit/HomeRedesignMockup'
 import { DenseDashboardMockup } from '@/screens/ui-kit/DenseDashboardMockup'
+import { SalesMockup } from '@/screens/ui-kit/SalesMockup'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -122,6 +123,18 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // Owner 2026-11-01: the sales phase starts with «PO العملاء»; its four
+    // screens are reviewed here as mockups, with the phase-1 decisions,
+    // before anything real is built.
+    id: 'sales-mockup',
+    title: 'نماذج شاشات المبيعات',
+    purpose:
+      'قائمة PO العملاء بعرضيها، وصفحة PO العميل، وكرت المبيعات في صفحة المعدة، وتذكرة المعدة بكعبين، ببيانات عينة وبلا اتصال بالقاعدة.',
+    status: 'review',
+    defaultOpen: true,
+    element: <SalesMockup />,
+  },
   {
     // Owner 2026-11-01 (EM-252): «الارقام الحالية ماخذه كامل الصفحة», with a
     // board of dashboard designs as the reference look.
