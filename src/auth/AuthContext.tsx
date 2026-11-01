@@ -8,6 +8,13 @@ import {
   type ReactNode,
 } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
+import {
+  clearAutoSignOut,
+  readAutoSignOut,
+  rememberAutoSignOut,
+  resetRecordedAuthError,
+  type AutoSignOutInfo,
+} from '@/lib/authDiagnostics'
 import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/types'
 
@@ -17,6 +24,9 @@ interface AuthContextValue {
   profile: Profile | null
   loading: boolean
   profileLoadError: boolean
+  /** The last sign-out the user did not ask for (EM-174), until the next
+   *  successful sign-in; the login screen explains it. */
+  autoSignOut: AutoSignOutInfo | null
   retryProfile: () => Promise<void>
   refreshProfile: () => Promise<void>
   signIn: (
@@ -53,7 +63,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [profileLoadError, setProfileLoadError] = useState(false)
+  const [autoSignOut, setAutoSignOut] = useState<AutoSignOutInfo | null>(null)
   const currentUserIdRef = useRef<string | null>(null)
+  // True from the user's own signOut() until its SIGNED_OUT arrives, so that
+  // event is not recorded as an automatic sign-out.
+  const userSignOutRef = useRef(false)
+
+  // The remembered automatic sign-out of this browser, read once.
+  useEffect(() => {
+    setAutoSignOut(readAutoSignOut())
+  }, [])
 
   const fetchProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase
@@ -106,9 +125,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       // INITIAL_SESSION initializes the provider without a duplicate getSession.
-      if (active) applySession(session)
+      if (!active) return
+      // EM-174: a SIGNED_OUT while a user was signed in and nobody pressed
+      // «تسجيل الخروج» here is the auth client dropping the session (a
+      // refresh that failed with a non-network error) or another tab
+      // signing out; remember it with its cause for the login screen.
+      if (event === 'SIGNED_OUT') {
+        if (!userSignOutRef.current && currentUserIdRef.current)
+          setAutoSignOut(rememberAutoSignOut())
+        userSignOutRef.current = false
+      }
+      applySession(session)
     })
 
     return () => {
@@ -131,6 +160,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         if (error) return { error: mapSignInError(error) }
 
+        // A new session: the earlier automatic sign-out is explained and gone.
+        clearAutoSignOut()
+        resetRecordedAuthError()
+        setAutoSignOut(null)
         return { error: null }
       } catch {
         return { error: 'authConnectionError' }
@@ -140,7 +173,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut()
+    userSignOutRef.current = true
+    try {
+      await supabase.auth.signOut()
+    } finally {
+      // A failed sign-out fires no SIGNED_OUT; do not blame the next one.
+      setTimeout(() => {
+        userSignOutRef.current = false
+      }, 0)
+    }
     setProfile(null)
   }, [])
 
@@ -171,6 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         loading,
         profileLoadError,
+        autoSignOut,
         retryProfile,
         signIn,
         signOut,

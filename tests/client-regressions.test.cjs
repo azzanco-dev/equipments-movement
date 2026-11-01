@@ -330,6 +330,18 @@ test('auth initializes once, ignores duplicate events, and rejects stale account
   }
   const app = harness('src/auth/AuthContext.tsx', {
     '@/lib/supabase': { supabase },
+    // EM-174: the automatic sign-out diagnostics are a no-op here.
+    '@/lib/authDiagnostics': {
+      clearAutoSignOut() {},
+      readAutoSignOut: () => null,
+      rememberAutoSignOut: () => ({
+        at: 0,
+        error: null,
+        online: null,
+        visible: null,
+      }),
+      resetRecordedAuthError() {},
+    },
   })
   const session = (id) => ({ user: { id } })
   app.start((module) => module.AuthProvider({ children: null }).value)

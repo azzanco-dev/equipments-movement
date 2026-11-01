@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { recordAuthDebug } from '@/lib/authDiagnostics'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
@@ -19,5 +20,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: false,
     flowType: 'pkce',
+    // EM-174: the client's debug lines go to this hook, which keeps only
+    // the last refresh error so an automatic sign-out can name its cause
+    // on the login screen (src/lib/authDiagnostics.ts). Nothing is printed.
+    debug: recordAuthDebug,
   },
 })
