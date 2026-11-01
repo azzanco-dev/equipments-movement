@@ -4,6 +4,9 @@ import { useEffect, useState, type ComponentType } from 'react'
 import { Skeleton } from '@/components/ui/Skeleton'
 import type { EntriesLineChartProps } from './EntriesLineChart'
 import type { FleetDonutProps } from './FleetDonut'
+import type { SoftAreaChartProps } from './SoftAreaChart'
+import type { SoftBarChartProps } from './SoftBarChart'
+import type { SoftDonutProps } from './SoftDonut'
 
 /**
  * The only entry point to the Recharts-backed charts.
@@ -100,6 +103,25 @@ export const useEntriesLineChartReady = entriesLineChart.useReady
 export const FleetDonut = fleetDonut.Chart
 export const useFleetDonutReady = fleetDonut.useReady
 
+// The «soft» look (owner 2026-11-01, «اعادة تنسيق recharts»), reviewed on
+// /ui-kit in the dense dashboard mockup before any home section uses it.
+const softAreaChart = lazyChart<SoftAreaChartProps>(() =>
+  import('./SoftAreaChart').then((module) => module.SoftAreaChart),
+)
+const softDonut = lazyChart<SoftDonutProps>(() =>
+  import('./SoftDonut').then((module) => module.SoftDonut),
+)
+const softBarChart = lazyChart<SoftBarChartProps>(() =>
+  import('./SoftBarChart').then((module) => module.SoftBarChart),
+)
+
+export const SoftAreaChart = softAreaChart.Chart
+export const useSoftAreaChartReady = softAreaChart.useReady
+export const SoftDonut = softDonut.Chart
+export const useSoftDonutReady = softDonut.useReady
+export const SoftBarChart = softBarChart.Chart
+export const useSoftBarChartReady = softBarChart.useReady
+
 // Type-only re-exports: erased at compile time, so they pull in no runtime
 // code and no recharts.
 export type {
@@ -107,3 +129,6 @@ export type {
   EntriesLinePoint,
 } from './EntriesLineChart'
 export type { FleetDonutProps, FleetDonutSlice } from './FleetDonut'
+export type { SoftAreaChartProps } from './SoftAreaChart'
+export type { SoftBarChartProps } from './SoftBarChart'
+export type { SoftDonutProps } from './SoftDonut'

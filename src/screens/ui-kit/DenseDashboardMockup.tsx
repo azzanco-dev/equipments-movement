@@ -23,7 +23,13 @@ import {
   type BadgeTone,
   type DataTableColumn,
 } from '@/components/ui'
-import { EntriesLineChart, FleetDonut } from '@/components/charts/lazy'
+import {
+  EntriesLineChart,
+  FleetDonut,
+  SoftAreaChart,
+  SoftBarChart,
+  SoftDonut,
+} from '@/components/charts/lazy'
 import { workshopPurposeTone, type WorkshopPurpose } from '@/lib/equipmentState'
 import {
   AFAQY,
@@ -53,6 +59,18 @@ import {
 // denser tables). Sample data only; nothing here reads or writes Supabase.
 
 type Variant = 'tiles' | 'denser'
+
+// Owner 2026-11-01, after the first review («ايش بدائل مكتب rechart لانها
+// ماعجبتني حقهم» → «اعادة تنسيق recharts»): the same Recharts, restyled in
+// the board's look — a smooth line over a flat pale fill without dots, a wide
+// rounded donut with nothing written on the slices, rounded bars. «الحالية»
+// keeps the home's current charts beside it for the comparison.
+type ChartLook = 'soft' | 'current'
+
+const CHART_LOOKS: { id: ChartLook; label: string }[] = [
+  { id: 'soft', label: 'الجديدة' },
+  { id: 'current', label: 'الحالية' },
+]
 
 const VARIANTS: { id: Variant; label: string }[] = [
   { id: 'tiles', label: 'مربعات' },
@@ -320,7 +338,8 @@ function DenseCard({
 
 // --- (c) the trend chart and the owners' donut -----------------------------
 
-function EntriesCard({ density }: { density: Density }) {
+function EntriesCard({ density, look }: { density: Density; look: ChartLook }) {
+  const Chart = look === 'soft' ? SoftAreaChart : EntriesLineChart
   return (
     <DenseCard
       title="الدخوليات اخر 30 يوم"
@@ -328,7 +347,7 @@ function EntriesCard({ density }: { density: Density }) {
       density={density}
       className="xl:col-span-2"
     >
-      <EntriesLineChart
+      <Chart
         ariaLabel="الدخول والخروج في اخر 30 يوم"
         points={DAYS_30}
         entriesLabel="دخول"
@@ -340,27 +359,43 @@ function EntriesCard({ density }: { density: Density }) {
   )
 }
 
-function OwnersDonutCard({ density }: { density: Density }) {
+function OwnersDonutCard({
+  density,
+  look,
+}: {
+  density: Density
+  look: ChartLook
+}) {
+  const slices = OWNERS.map((owner) => ({
+    id: owner.id,
+    label: owner.label,
+    value: owner.fleet,
+    color: `var(--chart-${owner.shade})`,
+    strokeColor: `var(--chart-stroke-${owner.shade})`,
+  }))
   return (
     <DenseCard
       title="الاسطول حسب المالك"
       meta={`${FLEET_TOTAL} معدة`}
       density={density}
     >
-      <FleetDonut
-        ariaLabel="الاسطول حسب المالك"
-        centerLabel="معدة"
-        height={density.donutHeight}
-        innerRadius="58%"
-        outerRadius="88%"
-        slices={OWNERS.map((owner) => ({
-          id: owner.id,
-          label: owner.label,
-          value: owner.fleet,
-          color: `var(--chart-${owner.shade})`,
-          strokeColor: `var(--chart-stroke-${owner.shade})`,
-        }))}
-      />
+      {look === 'soft' ? (
+        <SoftDonut
+          ariaLabel="الاسطول حسب المالك"
+          centerLabel="معدة"
+          height={density.donutHeight}
+          slices={slices}
+        />
+      ) : (
+        <FleetDonut
+          ariaLabel="الاسطول حسب المالك"
+          centerLabel="معدة"
+          height={density.donutHeight}
+          innerRadius="58%"
+          outerRadius="88%"
+          slices={slices}
+        />
+      )}
     </DenseCard>
   )
 }
@@ -480,9 +515,37 @@ function SuppliersCard({ density }: { density: Density }) {
   )
 }
 
-function TopTypesCard({ density }: { density: Density }) {
+function TopTypesCard({
+  density,
+  look,
+}: {
+  density: Density
+  look: ChartLook
+}) {
   const max = Math.max(...TOP_TYPES.map((row) => row.count))
   const plot = density.workshopRows > 7 ? 'h-24' : 'h-28'
+  if (look === 'soft')
+    return (
+      <DenseCard
+        title="الاكثر طلبا حسب النوع"
+        meta="في المشاريع الان"
+        density={density}
+        bodyClassName="flex flex-col justify-end"
+      >
+        <SoftBarChart
+          ariaLabel="المعدات في المشاريع حسب النوع"
+          height={density.workshopRows > 7 ? 140 : 156}
+          labelDir="ltr"
+          singleColor="var(--chart-3)"
+          singleStroke="var(--chart-stroke-3)"
+          items={TOP_TYPES.map((row) => ({
+            id: row.id,
+            label: row.label,
+            value: row.count,
+          }))}
+        />
+      </DenseCard>
+    )
   return (
     <DenseCard
       title="الاكثر طلبا حسب النوع"
@@ -730,7 +793,13 @@ function AfaqyStrip() {
 
 // --- the page --------------------------------------------------------------
 
-function DenseDashboard({ variant }: { variant: Variant }) {
+function DenseDashboard({
+  variant,
+  look,
+}: {
+  variant: Variant
+  look: ChartLook
+}) {
   const density = DENSITY[variant]
   return (
     <div
@@ -753,13 +822,13 @@ function DenseDashboard({ variant }: { variant: Variant }) {
         ))}
       </div>
       <div className={cn('grid xl:grid-cols-3', density.gap)}>
-        <EntriesCard density={density} />
-        <OwnersDonutCard density={density} />
+        <EntriesCard density={density} look={look} />
+        <OwnersDonutCard density={density} look={look} />
       </div>
       <div className={cn('grid md:grid-cols-2 xl:grid-cols-3', density.gap)}>
         <RestStatesCard density={density} />
         <SuppliersCard density={density} />
-        <TopTypesCard density={density} />
+        <TopTypesCard density={density} look={look} />
       </div>
       <div className={cn('grid md:grid-cols-2', density.gap)}>
         <WorkshopTableCard density={density} />
@@ -771,6 +840,7 @@ function DenseDashboard({ variant }: { variant: Variant }) {
 
 export function DenseDashboardMockup() {
   const [variant, setVariant] = useState<Variant>('tiles')
+  const [look, setLook] = useState<ChartLook>('soft')
   return (
     <div className="space-y-4">
       {/* Mockup controls, not part of the page. */}
@@ -793,8 +863,21 @@ export function DenseDashboardMockup() {
             ? 'شبكة المربعات والكروت كما في اللوحة المرجعية.'
             : 'نفس المحتوى بمربعات اصغر وجداول اكثف.'}
         </span>
+        <span className="ms-auto text-muted">الرسوم:</span>
+        <Tabs
+          value={look}
+          onValueChange={(value) => setLook(value as ChartLook)}
+        >
+          <TabsList variant="segmented" aria-label="شكل الرسوم">
+            {CHART_LOOKS.map((item) => (
+              <TabsTrigger key={item.id} value={item.id}>
+                {item.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
-      <DenseDashboard variant={variant} />
+      <DenseDashboard variant={variant} look={look} />
     </div>
   )
 }

@@ -13,7 +13,10 @@ const read = (...parts) => fs.readFileSync(path.join(ROOT, ...parts), 'utf8')
 const mockup = read('src', 'screens', 'ui-kit', 'DenseDashboardMockup.tsx')
 const data = read('src', 'screens', 'ui-kit', 'denseDashboardData.ts')
 const uiKit = read('src', 'screens', 'UiKit.tsx')
-const sources = { mockup, data }
+const softArea = read('src', 'components', 'charts', 'SoftAreaChart.tsx')
+const softDonut = read('src', 'components', 'charts', 'SoftDonut.tsx')
+const softBar = read('src', 'components', 'charts', 'SoftBarChart.tsx')
+const sources = { mockup, data, softArea, softDonut, softBar }
 
 test('the section is registered on /ui-kit under review', () => {
   assert.match(
@@ -48,13 +51,39 @@ test('two variants on the shared segmented Tabs', () => {
 })
 
 test('charts come from the lazy entry point, fills from the chart tints', () => {
-  assert.match(
-    mockup,
-    /import \{ EntriesLineChart, FleetDonut \} from '@\/components\/charts\/lazy'/,
+  const lazyImport = mockup.slice(
+    mockup.indexOf('import {\n  EntriesLineChart'),
+    mockup.indexOf("from '@/components/charts/lazy'"),
   )
+  for (const name of [
+    'EntriesLineChart',
+    'FleetDonut',
+    'SoftAreaChart',
+    'SoftBarChart',
+    'SoftDonut',
+  ])
+    assert.match(lazyImport, new RegExp(`\\b${name},`), `${name} from lazy`)
   assert.doesNotMatch(mockup, /from 'recharts'/)
   assert.match(data, /var\(--chart-\d\)/)
   assert.match(data, /var\(--chart-stroke-\d\)/)
+})
+
+// Owner 2026-11-01, «اعادة تنسيق recharts»: the soft look lives in three
+// chart components registered in the lazy entry point, with a look switch in
+// the mockup for the comparison.
+test('the soft Recharts look is registered in lazy.tsx and switchable', () => {
+  const lazy = read('src', 'components', 'charts', 'lazy.tsx')
+  for (const name of ['SoftAreaChart', 'SoftDonut', 'SoftBarChart']) {
+    assert.match(lazy, new RegExp(`import\\('./${name}'\\)`), `${name} lazy`)
+    assert.match(lazy, new RegExp(`export const ${name} = `), `${name} export`)
+  }
+  assert.match(mockup, /label: 'الجديدة'/)
+  assert.match(mockup, /label: 'الحالية'/)
+  // No dots on the soft area, nothing written on the soft donut's slices.
+  assert.match(sources.softArea, /dot=\{false\}/)
+  assert.doesNotMatch(sources.softDonut, /\slabel=\{/)
+  assert.match(sources.softDonut, /cornerRadius=/)
+  assert.match(sources.softBar, /radius=\{\[6, 6, 0, 0\]\}/)
 })
 
 test('project tokens only: no hex colors, no Tailwind palette classes', () => {
