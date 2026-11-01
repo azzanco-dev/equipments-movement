@@ -121,7 +121,7 @@ export function FleetDonut({
     return (
       <div
         dir={direction}
-        className="rounded-lg border bg-bg px-2.5 py-2 text-xs shadow-lg"
+        className="animate-fade-in-opacity rounded-lg border bg-bg px-2.5 py-2 text-xs shadow-lg motion-reduce:animate-none"
       >
         <span className="flex items-center gap-1.5">
           <span
@@ -237,7 +237,7 @@ export function FleetDonut({
             <PieChart>
               {/* No slide of the tooltip from the previous point to the next
                   (owner 2026-11-01, «الانيميشن حق ظهور الرقم عند الـ hover
-                  غريب»): it appears where the pointer is. */}
+                  غريب»): it fades in where the pointer is («خليه fade خفيف»). */}
               <Tooltip isAnimationActive={false} content={renderTooltip} />
               <Pie
                 data={slices}
