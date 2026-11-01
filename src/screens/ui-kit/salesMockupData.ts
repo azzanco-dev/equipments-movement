@@ -519,3 +519,481 @@ export const SALES_DECISIONS: readonly { title: string; detail: string }[] = [
     detail: 'sales.view و sales.manage ودور مخصص «المبيعات»؛ الشاشات هنا بلا بوابات.',
   },
 ]
+
+// --- «كرت المعدة»: the spine both sides attach to ---------------------------------
+
+export type CardStatus = 'open' | 'ended'
+
+/** One row of the staff's monthly Excel, phase 2: the hours of the month
+ *  from the client's approved timesheet («كرت التشغيل»). */
+export interface MockCardMonth {
+  /** Saudi month key, `YYYY-MM`. */
+  month: string
+  /** Hours worked in the month; null while the timesheet is still awaited. */
+  hours: number | null
+  /** The timesheet's state: attached or awaited. */
+  timesheet: 'attached' | 'pending'
+  /** The running month (the month of today). */
+  current: boolean
+}
+
+/**
+ * «كرت المعدة» (`equipment_cards`): one unit in one company + project over a
+ * period, with its two sides — the supplier PO line (purchase price) and the
+ * client PO line (sale price, standard hours, optional contract quantity).
+ * An Al-Azani unit has the client side only (`owned`). The movement facts
+ * come from the entry the card stores (`entry_log_id`).
+ */
+export interface MockCard {
+  id: string
+  equipment_id: string
+  company_id: string
+  project_id: string
+  period_from: string
+  period_to: string | null
+  status: CardStatus
+  /** The card's shared fields (client side): rate unit and standard hours. */
+  rate_unit: SaleRateUnit
+  standard_hours: number
+  // The movement behind the card.
+  entry_id: string
+  entry_date: string
+  exit_date: string | null
+  foreman: string
+  driver: string
+  // The client side (the client PO line), or none yet.
+  client_po_number: string | null
+  sale_price: number | null
+  quantity: number | null
+  quantity_unit: SaleQuantityUnit
+  consumed: number
+  // The supplier side (the supplier PO line), or none; an owned unit never has one.
+  owned: boolean
+  supplier_po_number: string | null
+  supplier_name: string | null
+  purchase_price: number | null
+  purchase_rate_unit: SaleRateUnit
+  updated_at: string
+  /** The monthly rows (phase 2 sample), only for the page's two cards. */
+  months: MockCardMonth[]
+}
+
+const MONTHS_RENTED: MockCardMonth[] = [
+  { month: '2026-08', hours: 260, timesheet: 'attached', current: false },
+  { month: '2026-09', hours: 248, timesheet: 'attached', current: false },
+  { month: '2026-10', hours: 271, timesheet: 'attached', current: false },
+  { month: '2026-11', hours: 12, timesheet: 'pending', current: true },
+]
+
+const MONTHS_OWNED: MockCardMonth[] = [
+  { month: '2026-09', hours: 236, timesheet: 'attached', current: false },
+  { month: '2026-10', hours: 262, timesheet: 'pending', current: false },
+  { month: '2026-11', hours: 9, timesheet: 'pending', current: true },
+]
+
+export const CARDS: MockCard[] = [
+  {
+    // The page's RENTED sample: both sides.
+    id: 'card1',
+    equipment_id: 'e2',
+    company_id: 'c2',
+    project_id: 'p1',
+    period_from: '2026-07-15',
+    period_to: null,
+    status: 'open',
+    rate_unit: 'month',
+    standard_hours: 260,
+    entry_id: 'mv-9012',
+    entry_date: '2026-07-15',
+    exit_date: null,
+    foreman: 'سعد الدوسري',
+    driver: 'محمد عبدالله الزهراني',
+    client_po_number: 'PO20241200550',
+    sale_price: 24000,
+    quantity: 6,
+    quantity_unit: 'month',
+    consumed: 3,
+    owned: false,
+    supplier_po_number: 'SPO260011',
+    supplier_name: 'شركة الخليج للمعدات الثقيلة',
+    purchase_price: 17000,
+    purchase_rate_unit: 'month',
+    updated_at: '2026-10-28T14:20:00+03:00',
+    months: MONTHS_RENTED,
+  },
+  {
+    // The page's OWNED sample: the client side only.
+    id: 'card2',
+    equipment_id: 'e1',
+    company_id: 'c2',
+    project_id: 'p1',
+    period_from: '2026-09-01',
+    period_to: null,
+    status: 'open',
+    rate_unit: 'month',
+    standard_hours: 260,
+    entry_id: 'mv-9105',
+    entry_date: '2026-09-01',
+    exit_date: null,
+    foreman: 'سعد الدوسري',
+    driver: 'عبدالرحمن سالم الغامدي',
+    client_po_number: 'PO20241200550',
+    sale_price: 18500,
+    quantity: 6,
+    quantity_unit: 'month',
+    consumed: 2,
+    owned: true,
+    supplier_po_number: null,
+    supplier_name: null,
+    purchase_price: null,
+    purchase_rate_unit: 'month',
+    updated_at: '2026-10-05T12:00:00+03:00',
+    months: MONTHS_OWNED,
+  },
+  {
+    id: 'card3',
+    equipment_id: 'e5',
+    company_id: 'c2',
+    project_id: 'p1',
+    period_from: '2026-10-12',
+    period_to: null,
+    status: 'open',
+    rate_unit: 'hour',
+    standard_hours: 260,
+    entry_id: 'mv-9230',
+    entry_date: '2026-10-12',
+    exit_date: null,
+    foreman: 'سعد الدوسري',
+    driver: 'فهد ناصر العمري',
+    client_po_number: 'PO20241200550',
+    sale_price: 950,
+    quantity: 400,
+    quantity_unit: 'hour',
+    consumed: 112,
+    owned: true,
+    supplier_po_number: null,
+    supplier_name: null,
+    purchase_price: null,
+    purchase_rate_unit: 'month',
+    updated_at: '2026-10-12T09:30:00+03:00',
+    months: [],
+  },
+  {
+    id: 'card4',
+    equipment_id: 'e4',
+    company_id: 'c2',
+    project_id: 'p1',
+    period_from: '2026-10-01',
+    period_to: null,
+    status: 'open',
+    rate_unit: 'day',
+    standard_hours: 260,
+    entry_id: 'mv-9201',
+    entry_date: '2026-10-01',
+    exit_date: null,
+    foreman: 'سعد الدوسري',
+    driver: 'علي حسن القرني',
+    client_po_number: null,
+    sale_price: null,
+    quantity: null,
+    quantity_unit: 'month',
+    consumed: 0,
+    owned: false,
+    supplier_po_number: 'SPO260004',
+    supplier_name: 'مؤسسة النخبة لتاجير المعدات',
+    purchase_price: 950,
+    purchase_rate_unit: 'day',
+    updated_at: '2026-10-01T08:30:00+03:00',
+    months: [],
+  },
+  {
+    id: 'card5',
+    equipment_id: 'e3',
+    company_id: 'c3',
+    project_id: 'p3',
+    period_from: '2026-09-15',
+    period_to: null,
+    status: 'open',
+    rate_unit: 'month',
+    standard_hours: 260,
+    entry_id: 'mv-9150',
+    entry_date: '2026-09-15',
+    exit_date: null,
+    foreman: 'ماجد الشهري',
+    driver: 'سالم محمد الحارثي',
+    client_po_number: 'PO-ALY-2026-0187',
+    sale_price: 16000,
+    quantity: null,
+    quantity_unit: 'month',
+    consumed: 0,
+    owned: false,
+    supplier_po_number: null,
+    supplier_name: 'طرف ثالث B',
+    purchase_price: null,
+    purchase_rate_unit: 'month',
+    updated_at: '2026-10-20T08:05:00+03:00',
+    months: [],
+  },
+  {
+    id: 'card6',
+    equipment_id: 'e6',
+    company_id: 'c3',
+    project_id: 'p3',
+    period_from: '2026-10-29',
+    period_to: null,
+    status: 'open',
+    rate_unit: 'month',
+    standard_hours: 260,
+    entry_id: 'mv-9310',
+    entry_date: '2026-10-29',
+    exit_date: null,
+    foreman: 'ماجد الشهري',
+    driver: 'ياسر احمد الشمراني',
+    client_po_number: null,
+    sale_price: null,
+    quantity: null,
+    quantity_unit: 'month',
+    consumed: 0,
+    owned: false,
+    supplier_po_number: null,
+    supplier_name: 'تكوين',
+    purchase_price: null,
+    purchase_rate_unit: 'month',
+    updated_at: '2026-10-29T07:10:00+03:00',
+    months: [],
+  },
+  {
+    id: 'card7',
+    equipment_id: 'e4',
+    company_id: 'c3',
+    project_id: 'p3',
+    period_from: '2026-09-20',
+    period_to: null,
+    status: 'open',
+    rate_unit: 'day',
+    standard_hours: 260,
+    entry_id: 'mv-9170',
+    entry_date: '2026-09-20',
+    exit_date: null,
+    foreman: 'ماجد الشهري',
+    driver: 'علي حسن القرني',
+    client_po_number: 'PO-ALY-2026-0187',
+    sale_price: 1400,
+    quantity: 3,
+    quantity_unit: 'month',
+    consumed: 1,
+    owned: false,
+    supplier_po_number: 'SPO260002',
+    supplier_name: 'مؤسسة النخبة لتاجير المعدات',
+    purchase_price: 950,
+    purchase_rate_unit: 'day',
+    updated_at: '2026-09-20T07:45:00+03:00',
+    months: [],
+  },
+  {
+    id: 'card8',
+    equipment_id: 'e1',
+    company_id: 'c1',
+    project_id: 'p2',
+    period_from: '2026-10-20',
+    period_to: null,
+    status: 'open',
+    rate_unit: 'month',
+    standard_hours: 260,
+    entry_id: 'mv-9280',
+    entry_date: '2026-10-20',
+    exit_date: null,
+    foreman: 'بدر سعيد العسيري',
+    driver: 'عبدالرحمن سالم الغامدي',
+    client_po_number: null,
+    sale_price: null,
+    quantity: null,
+    quantity_unit: 'month',
+    consumed: 0,
+    owned: true,
+    supplier_po_number: null,
+    supplier_name: null,
+    purchase_price: null,
+    purchase_rate_unit: 'month',
+    updated_at: '2026-10-20T10:00:00+03:00',
+    months: [],
+  },
+  {
+    // The ENDED card: the unit left the project, both sides closed.
+    id: 'card9',
+    equipment_id: 'e6',
+    company_id: 'c2',
+    project_id: 'p2',
+    period_from: '2026-06-01',
+    period_to: '2026-09-30',
+    status: 'ended',
+    rate_unit: 'month',
+    standard_hours: 208,
+    entry_id: 'mv-8720',
+    entry_date: '2026-06-01',
+    exit_date: '2026-09-30',
+    foreman: 'بدر سعيد العسيري',
+    driver: 'ياسر احمد الشمراني',
+    client_po_number: 'PO20240900412',
+    sale_price: 21000,
+    quantity: 4,
+    quantity_unit: 'month',
+    consumed: 4,
+    owned: false,
+    supplier_po_number: 'SPO260001',
+    supplier_name: 'تكوين',
+    purchase_price: 15500,
+    purchase_rate_unit: 'month',
+    updated_at: '2026-09-30T16:00:00+03:00',
+    months: [],
+  },
+]
+
+/** The two cards of the page's toggle: rented (both sides) and owned. */
+export const CARD_PAGE_SAMPLES: Readonly<Record<'rented' | 'owned', string>> = {
+  rented: 'card1',
+  owned: 'card2',
+}
+
+export const cardById = (id: string) => CARDS.find((card) => card.id === id) ?? null
+
+export type CardEventType =
+  | 'created'
+  | 'supplier_line_added'
+  | 'client_line_added'
+  | 'timesheet_attached'
+  | 'ended'
+
+export const CARD_EVENT_LABEL: Readonly<Record<CardEventType, string>> = {
+  created: 'انشاء الكرت مع دخول المعدة',
+  supplier_line_added: 'ربط سطر PO المورد',
+  client_line_added: 'ربط سطر PO العميل',
+  timesheet_attached: 'ارفاق كرت التشغيل',
+  ended: 'انهاء الكرت مع خروج المعدة',
+}
+
+export interface MockCardEvent {
+  id: string
+  card_id: string
+  event_type: CardEventType
+  actor_name: string
+  created_at: string
+  detail: string | null
+}
+
+export const CARD_EVENTS: MockCardEvent[] = [
+  {
+    id: 'cae1',
+    card_id: 'card1',
+    event_type: 'created',
+    actor_name: 'النظام',
+    created_at: '2026-07-15T07:40:00+03:00',
+    detail: 'F112 · مشروع طريق الملك فهد',
+  },
+  {
+    id: 'cae2',
+    card_id: 'card1',
+    event_type: 'supplier_line_added',
+    actor_name: 'سارة المطيري',
+    created_at: '2026-07-15T09:05:00+03:00',
+    detail: 'SPO260011 · 17,000.00 / شهر',
+  },
+  {
+    id: 'cae3',
+    card_id: 'card1',
+    event_type: 'client_line_added',
+    actor_name: SALES_ACTOR_NAME,
+    created_at: '2026-10-05T12:00:00+03:00',
+    detail: 'PO20241200550 · 24,000.00 / شهر',
+  },
+  {
+    id: 'cae4',
+    card_id: 'card1',
+    event_type: 'timesheet_attached',
+    actor_name: 'خالد العتيبي',
+    created_at: '2026-11-01T08:15:00+03:00',
+    detail: 'اكتوبر 2026 · 271 ساعة',
+  },
+  {
+    id: 'cae5',
+    card_id: 'card2',
+    event_type: 'created',
+    actor_name: 'النظام',
+    created_at: '2026-09-01T06:55:00+03:00',
+    detail: 'A055 · مشروع طريق الملك فهد',
+  },
+  {
+    id: 'cae6',
+    card_id: 'card2',
+    event_type: 'client_line_added',
+    actor_name: SALES_ACTOR_NAME,
+    created_at: '2026-10-02T09:12:00+03:00',
+    detail: 'PO20241200550 · 18,500.00 / شهر',
+  },
+  {
+    id: 'cae7',
+    card_id: 'card2',
+    event_type: 'timesheet_attached',
+    actor_name: 'خالد العتيبي',
+    created_at: '2026-10-03T10:30:00+03:00',
+    detail: 'سبتمبر 2026 · 236 ساعة',
+  },
+]
+
+/** The month's due of one side: the monthly price × hours / standard hours
+ *  (the staff's Excel rule); null without a price or hours. A daily or
+ *  hourly price is out of this sample's scope (null). */
+export function monthDue(
+  price: number | null,
+  unit: SaleRateUnit,
+  hours: number | null,
+  standardHours: number,
+): number | null {
+  if (price === null || hours === null || unit !== 'month' || standardHours <= 0)
+    return null
+  return Math.round(((price * hours) / standardHours) * 100) / 100
+}
+
+/** The month's figures of a card: client due, supplier due and the margin
+ *  (the client due alone for an owned unit). */
+export function cardMonthFigures(card: MockCard, month: MockCardMonth) {
+  const client = monthDue(
+    card.sale_price,
+    card.rate_unit,
+    month.hours,
+    card.standard_hours,
+  )
+  const supplier = card.owned
+    ? null
+    : monthDue(
+        card.purchase_price,
+        card.purchase_rate_unit,
+        month.hours,
+        card.standard_hours,
+      )
+  const margin =
+    client === null ? null : Math.round((client - (supplier ?? 0)) * 100) / 100
+  return { client, supplier, margin }
+}
+
+const ARABIC_MONTHS = [
+  'يناير',
+  'فبراير',
+  'مارس',
+  'ابريل',
+  'مايو',
+  'يونيو',
+  'يوليو',
+  'اغسطس',
+  'سبتمبر',
+  'اكتوبر',
+  'نوفمبر',
+  'ديسمبر',
+]
+
+/** «اكتوبر 2026» from a `YYYY-MM` key. */
+export function monthLabel(key: string): string {
+  const [year, month] = key.split('-')
+  const index = Number(month) - 1
+  return `${ARABIC_MONTHS[index] ?? month} ${year}`
+}

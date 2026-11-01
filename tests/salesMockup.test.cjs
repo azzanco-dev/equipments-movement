@@ -47,6 +47,8 @@ test('the four screens sit behind sub-tabs on the shared segmented Tabs', () => 
     'صفحة PO العميل',
     'كرت المبيعات في صفحة المعدة',
     'تذكرة المعدة',
+    'صفحة كرت المعدة',
+    'قائمة كروت المعدات',
   ])
     assert.match(mockup, new RegExp(`label: '${label}'`), label)
   // The list's view switch: the PO list's black selected tab, units default.
@@ -113,10 +115,79 @@ test('the ticket carries two stubs: the supplier PO and the client PO', () => {
   // Four sample tickets: both, supplier only, client only, none.
   const tickets = [
     ...data.matchAll(
-      /supplier_po_number: ('[^']+'|null),[\s\S]*?client_po_number: ('[^']+'|null),/g,
+      /id: 't\d+',[\s\S]*?supplier_po_number: ('[^']+'|null),[\s\S]*?client_po_number: ('[^']+'|null),/g,
     ),
   ].map((m) => `${m[1] === 'null' ? 0 : 1}${m[2] === 'null' ? 0 : 1}`)
   assert.deepEqual([...tickets].sort(), ['00', '01', '10', '11'])
+})
+
+test('the card page: two samples, three side cards, the months table, one action', () => {
+  const start = mockup.indexOf('function CardPageMockup(')
+  const end = mockup.indexOf('// --- 6. The equipment cards list')
+  assert.ok(start > 0 && end > start)
+  const page = mockup.slice(start, end)
+  assert.match(page, /value="rented"/)
+  assert.match(page, /value="owned"/)
+  for (const title of ['title="الحركة"', 'title="المبيعات"', 'title="المشتريات"'])
+    assert.match(page, new RegExp(title), title)
+  assert.match(page, /معدة مملوكة · بدون PO مورد/)
+  assert.match(page, /انتقل للحركة/)
+  assert.match(page, /انهاء الكرت/)
+  // The summary strip's four figures and the months table's columns.
+  assert.equal((page.match(/<StatCard/g) ?? []).length, 4)
+  for (const header of [
+    "header: 'الشهر'",
+    "header: 'الساعات'",
+    "header: 'مستحق العميل'",
+    "header: 'مستحق المورد'",
+    "header: 'الهامش'",
+    "header: 'كرت التشغيل'",
+  ])
+    assert.ok(page.includes(header), header)
+  assert.match(page, /جاري/)
+  assert.match(page, /كروت التشغيل/)
+  // The visibility rule, no hiding between the two sides.
+  assert.match(page, /2026-10-15/)
+  assert.match(page, /sticky bottom-0 .*sm:hidden/)
+  // Sample months: the running month is one, the rest attached or pending.
+  const months = [...data.matchAll(/current: (true|false)/g)].map((m) => m[1])
+  assert.equal(months.filter((flag) => flag === 'true').length, 2)
+  assert.match(data, /export function cardMonthFigures/)
+})
+
+test('the cards list: the four PO combinations and an ended card, open first', () => {
+  const start = mockup.indexOf('function CardsListMockup(')
+  const end = mockup.indexOf('// --- The decisions and the section')
+  assert.ok(start > 0 && end > start)
+  const list = mockup.slice(start, end)
+  assert.match(list, /cellTextClassName="text-\[13px\]"/)
+  assert.match(list, /cellClassName="py-2"/)
+  for (const header of [
+    "header: 'المعدة'",
+    "header: 'الشركة · المشروع'",
+    "header: 'الفترة'",
+    "header: 'PO العميل'",
+    "header: 'PO المورد'",
+    "header: 'سعر البيع'",
+    "header: 'سعر الشراء'",
+  ])
+    assert.ok(list.includes(header), header)
+  assert.match(list, /مملوكة/)
+  assert.match(list, /key: 'open_first'/)
+  for (const field of ['الشركة', 'المشروع', 'الحالة', 'بدون PO عميل', 'بدون PO مورد'])
+    assert.ok(mockup.includes(field), field)
+  const cards = [
+    ...data.matchAll(
+      /id: 'card\d+',[\s\S]*?client_po_number: ('[^']+'|null),[\s\S]*?owned: (true|false),\n\s+supplier_po_number: ('[^']+'|null),/g,
+    ),
+  ]
+  assert.ok(cards.length >= 8 && cards.length <= 10, `${cards.length} cards`)
+  const combos = new Set(
+    cards.map((m) => `${m[1] === 'null' ? 0 : 1}${m[3] === 'null' ? 0 : 1}`),
+  )
+  assert.deepEqual([...combos].sort(), ['00', '01', '10', '11'])
+  assert.ok(cards.some((m) => m[2] === 'true'), 'an owned card')
+  assert.equal((data.match(/status: 'ended'/g) ?? []).length, 1)
 })
 
 test('project tokens only: no hex colors, no Tailwind palette classes, no gradients', () => {

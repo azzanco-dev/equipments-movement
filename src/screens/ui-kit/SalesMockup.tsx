@@ -9,10 +9,16 @@ import {
   Clock,
   Coins,
   Edit2,
+  Eye,
   FileText,
   Filter,
+  Hourglass,
   Lock,
+  LogIn,
+  LogOut,
   MapPin,
+  Paperclip,
+  Percent,
   Plus,
   Receipt,
   StickyNote,
@@ -54,27 +60,37 @@ import { localizedName } from '@/lib/localizedName'
 import { splitPlateForDisplay } from '@/lib/plate'
 import { formatSupplierPoPrice } from '@/lib/purchasing'
 import {
+  CARDS,
+  CARD_EVENTS,
+  CARD_EVENT_LABEL,
+  CARD_PAGE_SAMPLES,
   CLIENT_POS,
   CLIENT_PO_EVENTS,
   CLIENT_PO_EVENT_LABEL,
   CLIENT_PO_LINES,
+  COMPANIES,
+  PROJECTS,
   SALES_CARD_EQUIPMENT_ID,
   SALES_DECISIONS,
   SALE_PER_UNIT_LABEL,
   SALE_RATE_UNIT_LABEL,
   TICKETS,
+  cardById,
+  cardMonthFigures,
   clientPoById,
   clientPoTotalFigures,
   clientPoTotalsByUnit,
   companyById,
   equipmentById,
   linesOfClientPo,
+  monthLabel,
   projectById,
   quantityLabel,
   remainingShare,
+  type CardStatus,
   type ClientPoStatus,
+  type MockCard,
   type MockClientPo,
-  type MockClientPoEvent,
   type MockClientPoLine,
   type MockEquipment,
   type MockTicket,
@@ -242,7 +258,7 @@ function QuantityCell({
   line,
   compact = false,
 }: {
-  line: MockClientPoLine
+  line: Pick<MockClientPoLine, 'quantity' | 'quantity_unit' | 'consumed'>
   compact?: boolean
 }) {
   const label = quantityLabel(line.quantity, line.quantity_unit)
@@ -717,7 +733,17 @@ function ClientPoListMockup({ onOpen }: { onOpen: (id: string) => void }) {
 
 // --- 2. The client PO page --------------------------------------------------------
 
-function EventTimeline({ events }: { events: MockClientPoEvent[] }) {
+/** The detail-page pattern's timeline, shared by the PO page and the card
+ *  page: each event already carries its label. */
+interface TimelineEvent {
+  id: string
+  label: string
+  detail: string | null
+  actor_name: string
+  created_at: string
+}
+
+function EventTimeline({ events }: { events: TimelineEvent[] }) {
   const latest = [...events].sort((a, b) =>
     b.created_at.localeCompare(a.created_at),
   )
@@ -731,9 +757,7 @@ function EventTimeline({ events }: { events: MockClientPoEvent[] }) {
             aria-hidden="true"
             className="absolute -start-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-bg bg-muted"
           />
-          <p className="text-sm font-medium">
-            {CLIENT_PO_EVENT_LABEL[event.event_type]}
-          </p>
+          <p className="text-sm font-medium">{event.label}</p>
           {event.detail && (
             <p className="text-sm text-muted">
               <bdi dir="ltr">{event.detail}</bdi>
@@ -769,7 +793,9 @@ function ClientPoPageMockup({
     ...line,
     unit: equipmentById(line.equipment_id),
   }))
-  const events = CLIENT_PO_EVENTS.filter((event) => event.client_po_id === po.id)
+  const events = CLIENT_PO_EVENTS.filter(
+    (event) => event.client_po_id === po.id,
+  ).map((event) => ({ ...event, label: CLIENT_PO_EVENT_LABEL[event.event_type] }))
   const open = po.status === 'open'
   const totals = clientPoTotalsByUnit(lines)
   const [sort, setSort] = useState<DataTableSort>({
@@ -1473,6 +1499,630 @@ function TicketsMockup() {
   )
 }
 
+// --- 5. The equipment card page -----------------------------------------------------
+
+const CARD_STATUS_LABEL: Readonly<Record<CardStatus, string>> = {
+  open: 'مفتوح',
+  ended: 'منتهي',
+}
+
+function CardStatusBadge({
+  status,
+  size,
+}: {
+  status: CardStatus
+  size?: 'sm' | 'md'
+}) {
+  return (
+    <Badge tone={status === 'open' ? 'success' : 'neutral'} size={size}>
+      {CARD_STATUS_LABEL[status]}
+    </Badge>
+  )
+}
+
+/** «من 15/07/2026 · مفتوح» / «15/07/2026 – 30/09/2026». */
+function cardPeriodLabel(card: Pick<MockCard, 'period_from' | 'period_to'>) {
+  return card.period_to
+    ? `${formatDate(card.period_from)} – ${formatDate(card.period_to)}`
+    : `${formatDate(card.period_from)} · مفتوح`
+}
+
+/** An amount or a muted dash. */
+function AmountOrDash({ value, unit }: { value: number | null; unit?: SaleRateUnit }) {
+  if (value === null) return <span className="text-muted">—</span>
+  return <SalePrice value={value} unit={unit} />
+}
+
+type CardSample = keyof typeof CARD_PAGE_SAMPLES
+
+function CardPageMockup({
+  sample,
+  onSample,
+}: {
+  sample: CardSample
+  onSample: (sample: CardSample) => void
+}) {
+  const { lang } = useI18n()
+  const card = cardById(CARD_PAGE_SAMPLES[sample]) ?? CARDS[0]
+  const unit = equipmentById(card.equipment_id)
+  const company = companyById(card.company_id)
+  const project = projectById(card.project_id)
+  const companyName = company ? localizedName(lang, company.name_ar, company.name_en) : '—'
+  const projectName = project ? localizedName(lang, project.name_ar, project.name_en) : '—'
+  const open = card.status === 'open'
+  const current = card.months.find((month) => month.current) ?? null
+  const figures = current ? cardMonthFigures(card, current) : null
+  const events = CARD_EVENTS.filter((event) => event.card_id === card.id).map(
+    (event) => ({ ...event, label: CARD_EVENT_LABEL[event.event_type] }),
+  )
+
+  const movementFacts: DescriptionListItem[] = [
+    {
+      key: 'entry',
+      icon: <LogIn size={16} />,
+      label: 'تاريخ الدخول',
+      value: formatDate(card.entry_date),
+      dir: 'ltr',
+    },
+    {
+      key: 'exit',
+      icon: <LogOut size={16} />,
+      label: 'تاريخ الخروج',
+      value: card.exit_date ? formatDate(card.exit_date) : 'ما زالت داخل',
+      dir: card.exit_date ? 'ltr' : undefined,
+    },
+    {
+      key: 'foreman',
+      icon: <User size={16} />,
+      label: 'الفورمان',
+      value: card.foreman,
+    },
+    {
+      key: 'driver',
+      icon: <User size={16} />,
+      label: 'السائق الحالي',
+      value: card.driver,
+    },
+  ]
+
+  const salesFacts: DescriptionListItem[] = card.client_po_number
+    ? [
+        {
+          key: 'po',
+          icon: <FileText size={16} />,
+          label: 'PO العميل',
+          value: <PoPill number={card.client_po_number} onClick={() => undefined} />,
+        },
+        {
+          key: 'price',
+          icon: <Coins size={16} />,
+          label: 'سعر البيع',
+          value: <AmountOrDash value={card.sale_price} unit={card.rate_unit} />,
+        },
+        {
+          key: 'hours',
+          icon: <Timer size={16} />,
+          label: 'الساعات القياسية',
+          value: (
+            <>
+              <bdi dir="ltr" className="tabular-nums">
+                {card.standard_hours}
+              </bdi>{' '}
+              ساعة / شهر
+            </>
+          ),
+        },
+        {
+          key: 'quantity',
+          icon: <Hourglass size={16} />,
+          label: 'الكمية التعاقدية',
+          value: (
+            <QuantityCell
+              line={{
+                quantity: card.quantity,
+                quantity_unit: card.quantity_unit,
+                consumed: card.consumed,
+              }}
+            />
+          ),
+        },
+      ]
+    : []
+
+  const purchasingFacts: DescriptionListItem[] =
+    card.owned || !card.supplier_po_number
+      ? []
+      : [
+          {
+            key: 'po',
+            icon: <FileText size={16} />,
+            label: 'PO المورد',
+            value: <PoPill number={card.supplier_po_number} onClick={() => undefined} />,
+          },
+          {
+            key: 'supplier',
+            icon: <Building2 size={16} />,
+            label: 'المورد',
+            value: card.supplier_name ?? '—',
+          },
+          {
+            key: 'price',
+            icon: <Coins size={16} />,
+            label: 'سعر الشراء',
+            value: (
+              <AmountOrDash value={card.purchase_price} unit={card.purchase_rate_unit} />
+            ),
+          },
+        ]
+
+  type MonthRow = (typeof card.months)[number]
+  const monthColumns: DataTableColumn<MonthRow>[] = [
+    {
+      key: 'month',
+      header: 'الشهر',
+      cell: (row) => (
+        <span className="flex items-center gap-2 font-medium">
+          {monthLabel(row.month)}
+          {row.current && (
+            <Badge tone="info" size="sm">
+              جاري
+            </Badge>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'hours',
+      header: 'الساعات',
+      align: 'center',
+      className: 'tabular-nums',
+      cell: (row) =>
+        row.hours === null ? <span className="text-muted">—</span> : row.hours,
+    },
+    {
+      key: 'client',
+      header: 'مستحق العميل',
+      align: 'end',
+      cell: (row) => <AmountOrDash value={cardMonthFigures(card, row).client} />,
+    },
+    {
+      key: 'supplier',
+      header: 'مستحق المورد',
+      align: 'end',
+      hideBelow: 'sm',
+      cell: (row) => <AmountOrDash value={cardMonthFigures(card, row).supplier} />,
+    },
+    {
+      key: 'margin',
+      header: 'الهامش',
+      align: 'end',
+      hideBelow: 'sm',
+      cell: (row) => <AmountOrDash value={cardMonthFigures(card, row).margin} />,
+    },
+    {
+      key: 'timesheet',
+      header: 'كرت التشغيل',
+      cell: (row) =>
+        row.timesheet === 'attached' ? (
+          <Badge tone="success" size="sm" icon={<Paperclip size={11} aria-hidden="true" />}>
+            مرفق
+          </Badge>
+        ) : (
+          <Badge tone="warning" size="sm" icon={<Hourglass size={11} aria-hidden="true" />}>
+            بانتظار
+          </Badge>
+        ),
+    },
+  ]
+
+  const endButton = (size: 'sm' | 'md') => (
+    <Button
+      variant="danger"
+      size={size}
+      className={size === 'md' ? 'h-11 flex-1' : undefined}
+      icon={<Lock size={size === 'sm' ? 14 : 16} aria-hidden="true" />}
+    >
+      انهاء الكرت
+    </Button>
+  )
+
+  return (
+    <Mockup
+      title="5. صفحة كرت المعدة — /cards/:id (نمط صفحات التفاصيل المعتمد)"
+      permission="sales.view او purchasing.view يعرض الصفحة كاملة (قرار 2026-10-15: لا اخفاء بين الجانبين) · «انهاء الكرت» للادمن على الكرت المفتوح · الساعات من المرحلة الثانية"
+      controls={
+        <Tabs value={sample} onValueChange={(next) => onSample(next as CardSample)}>
+          <TabsList variant="segmented" aria-label="عينة الكرت">
+            <TabsTrigger value="rented">معدة مستاجرة (الجانبان)</TabsTrigger>
+            <TabsTrigger value="owned">معدة العزاني (العميل فقط)</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      }
+    >
+      <div className="space-y-4">
+        <BackButton onClick={() => undefined} label="العودة الى كروت المعدات" />
+
+        {/* 1. The header card: the unit with its plate and type, the company
+            and project on their own line, the period, the status, the one
+            action, then the summary strip. */}
+        <div className="card space-y-4 p-4">
+          <DetailHeader
+            as="h2"
+            identifier={unit?.code ?? '—'}
+            identifierLtr
+            subtitle={
+              <span className="flex flex-col gap-0.5">
+                <span className="flex flex-wrap items-baseline gap-x-2 text-sm text-muted">
+                  {unit && (
+                    <EquipmentIdentifierTag
+                      row={{
+                        equipment_plate_number: unit.plate_number,
+                        equipment_chassis_number: unit.chassis_number,
+                      }}
+                    />
+                  )}
+                  <span>{unit?.type ?? '—'}</span>
+                </span>
+                <span className="flex items-center gap-1.5 text-base font-semibold text-fg">
+                  <Building2 size={16} aria-hidden="true" className="text-muted" />
+                  {companyName} · {projectName}
+                </span>
+                <span className="flex items-center gap-1.5 text-sm text-muted">
+                  <Calendar size={14} aria-hidden="true" />
+                  <bdi dir="ltr">{cardPeriodLabel(card)}</bdi>
+                </span>
+              </span>
+            }
+            badges={<CardStatusBadge status={card.status} />}
+            actions={open ? <div className="hidden gap-2 sm:flex">{endButton('sm')}</div> : undefined}
+          />
+          {/* 2. The summary strip: this month's figures (phase 2 sample). */}
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <StatCard
+              label="مستحق العميل هذا الشهر"
+              value={<AmountOrDash value={figures?.client ?? null} />}
+              hint={current ? monthLabel(current.month) : undefined}
+              icon={<Coins size={18} />}
+            />
+            <StatCard
+              label="مستحق المورد هذا الشهر"
+              value={<AmountOrDash value={figures?.supplier ?? null} />}
+              hint={card.owned ? 'معدة مملوكة' : current ? monthLabel(current.month) : undefined}
+              icon={<Receipt size={18} />}
+            />
+            <StatCard
+              label="الهامش"
+              value={<AmountOrDash value={figures?.margin ?? null} />}
+              hint={card.owned ? 'مستحق العميل كاملا' : 'العميل − المورد'}
+              icon={<Percent size={18} />}
+            />
+            <StatCard
+              label="الساعات هذا الشهر"
+              value={current?.hours ?? '—'}
+              hint={`من ${card.standard_hours} ساعة قياسية`}
+              icon={<Timer size={18} />}
+            />
+          </div>
+        </div>
+
+        {!open && (
+          <Notice tone="neutral" size="compact" icon={<Lock size={16} />}>
+            كرت منتهي: للقراءة فقط.
+          </Notice>
+        )}
+
+        {/* The visibility rule (owner 2026-10-15): nothing is hidden. */}
+        <Notice tone="info" size="compact" icon={<Eye size={16} />}>
+          المبيعات ترى سعر الشراء والمشتريات ترى سعر البيع (قرار 2026-10-15): لا
+          اخفاء بين الجانبين في هذه الصفحة.
+        </Notice>
+
+        {/* 3. The three sides of the card, side by side; stacked on a phone. */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="space-y-3 p-4">
+            <SectionHeader
+              title="الحركة"
+              action={
+                <Button
+                  size="sm"
+                  variant="outline"
+                  icon={<ArrowUpRight size={14} aria-hidden="true" className="rtl:-scale-x-100" />}
+                >
+                  انتقل للحركة
+                </Button>
+              }
+              actionBesideText
+            />
+            <DescriptionList items={movementFacts} className="-my-2" />
+          </Card>
+          <Card className="space-y-3 p-4">
+            <SectionHeader
+              title="المبيعات"
+              description={card.client_po_number ? undefined : 'لا سطر PO عميل بعد'}
+            />
+            {salesFacts.length > 0 ? (
+              <DescriptionList items={salesFacts} className="-my-2" />
+            ) : (
+              <EmptyState title="بدون PO عميل" className="p-4" />
+            )}
+          </Card>
+          <Card className="space-y-3 p-4">
+            <SectionHeader title="المشتريات" />
+            {card.owned ? (
+              <p className="flex items-center gap-2 text-sm text-muted">
+                <Truck size={16} aria-hidden="true" />
+                معدة مملوكة · بدون PO مورد
+              </p>
+            ) : purchasingFacts.length > 0 ? (
+              <DescriptionList items={purchasingFacts} className="-my-2" />
+            ) : (
+              <EmptyState title="بدون PO مورد" className="p-4" />
+            )}
+          </Card>
+        </div>
+
+        {/* 4. The months: the staff's Excel row per month (phase 2). */}
+        <Card padded={false} className="flex min-w-0 flex-col">
+          <div className="p-4 pb-0">
+            <SectionHeader
+              title={
+                <span className="flex items-center gap-2">
+                  الشهور
+                  <Badge size="sm">{card.months.length}</Badge>
+                </span>
+              }
+              description="سطر لكل شهر: الساعات من كرت التشغيل المعتمد، ومنها مستحق العميل ومستحق المورد."
+            />
+          </div>
+          <div className="p-4 pt-3">
+            {card.months.length === 0 ? (
+              <EmptyState title="لا شهور بعد" className="p-6" />
+            ) : (
+              <DataTable
+                size="md"
+                cellTextClassName="text-[13px]"
+                cellClassName="py-2"
+                columns={monthColumns}
+                rows={[...card.months].reverse()}
+                rowKey={(row) => row.month}
+                caption="الشهور"
+              />
+            )}
+            <p className="mt-3 text-xs text-muted">
+              الساعات تاتي من المرحلة الثانية («كروت التشغيل»، التايم شيت الشهري
+              المعتمد من الموقع)؛ المستحق = السعر الشهري × الساعات ÷ الساعات
+              القياسية. ارقام هذه الصفحة عينة.
+            </p>
+          </div>
+        </Card>
+
+        {/* 5. The event timeline. */}
+        <Card className="space-y-3 p-4">
+          <SectionHeader
+            title="سجل الاحداث"
+            description="انشاء الكرت مع الدخول، ربط سطري المورد والعميل، كروت التشغيل، الانهاء."
+          />
+          <EventTimeline events={events} />
+        </Card>
+
+        {/* 6. The mobile action bar. */}
+        {open && (
+          <div
+            className="sticky bottom-0 z-10 -mx-3 -mb-3 flex gap-2 border-t bg-bg p-3 sm:hidden"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
+            {endButton('md')}
+          </div>
+        )}
+      </div>
+    </Mockup>
+  )
+}
+
+// --- 6. The equipment cards list -----------------------------------------------------
+
+type CardRow = MockCard & {
+  unit: MockEquipment | null
+  company_name_ar: string | null
+  company_name_en: string | null
+  project_name_ar: string | null
+  project_name_en: string | null
+}
+
+const CARD_FILTER_FIELDS: { key: string; label: string; options: string[] }[] = [
+  { key: 'company', label: 'الشركة', options: COMPANIES.map((item) => item.name_ar) },
+  { key: 'project', label: 'المشروع', options: PROJECTS.map((item) => item.name_ar) },
+  { key: 'status', label: 'الحالة', options: ['مفتوح', 'منتهي'] },
+  { key: 'missing', label: 'بدون PO', options: ['بدون PO عميل', 'بدون PO مورد'] },
+]
+
+function CardsListMockup({ onOpen }: { onOpen: (card: MockCard) => void }) {
+  const { t, lang } = useI18n()
+  const [sort, setSort] = useState<DataTableSort>({
+    key: 'open_first',
+    direction: 'desc',
+  })
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+
+  const rows = useMemo(() => {
+    const all: CardRow[] = CARDS.map((card) => {
+      const company = companyById(card.company_id)
+      const project = projectById(card.project_id)
+      return {
+        ...card,
+        unit: equipmentById(card.equipment_id),
+        company_name_ar: company?.name_ar ?? null,
+        company_name_en: company?.name_en ?? null,
+        project_name_ar: project?.name_ar ?? null,
+        project_name_en: project?.name_en ?? null,
+      }
+    })
+    return sortRows(
+      all,
+      sort,
+      (row, key) => {
+        switch (key) {
+          case 'equipment':
+            return row.unit?.code ?? ''
+          case 'period_from':
+            return row.period_from
+          case 'updated_at':
+            return row.updated_at
+          default:
+            // Open cards first (owner: the default), then the newest period.
+            return `${row.status === 'open' ? '1' : '0'}-${row.period_from}`
+        }
+      },
+      lang,
+    )
+  }, [sort, lang])
+
+  const columns: DataTableColumn<CardRow>[] = [
+    {
+      key: 'equipment',
+      header: 'المعدة',
+      sortable: true,
+      cell: (row) => <UnitCell unit={row.unit} />,
+    },
+    {
+      key: 'company_project',
+      header: 'الشركة · المشروع',
+      hideBelow: 'md',
+      cell: (row) => <CompanyProjectCell row={row} />,
+    },
+    {
+      key: 'period_from',
+      header: 'الفترة',
+      sortable: true,
+      className: 'tabular-nums',
+      cell: (row) => (
+        <span className="whitespace-nowrap">
+          {formatDate(row.period_from)}
+          {' → '}
+          {row.period_to ? formatDate(row.period_to) : 'مفتوح'}
+        </span>
+      ),
+    },
+    {
+      key: 'client_po',
+      header: 'PO العميل',
+      cell: (row) =>
+        row.client_po_number ? (
+          <PoPill number={row.client_po_number} />
+        ) : (
+          <Badge tone="warning" size="sm">
+            بدون
+          </Badge>
+        ),
+    },
+    {
+      key: 'supplier_po',
+      header: 'PO المورد',
+      hideBelow: 'sm',
+      cell: (row) =>
+        row.owned ? (
+          <span className="text-xs text-muted">مملوكة</span>
+        ) : row.supplier_po_number ? (
+          <PoPill number={row.supplier_po_number} />
+        ) : (
+          <Badge tone="warning" size="sm">
+            بدون
+          </Badge>
+        ),
+    },
+    {
+      key: 'sale_price',
+      header: 'سعر البيع',
+      hideBelow: 'md',
+      cell: (row) => <AmountOrDash value={row.sale_price} unit={row.rate_unit} />,
+    },
+    {
+      key: 'purchase_price',
+      header: 'سعر الشراء',
+      hideBelow: 'md',
+      cell: (row) =>
+        row.owned ? (
+          <span className="text-muted">—</span>
+        ) : (
+          <AmountOrDash value={row.purchase_price} unit={row.purchase_rate_unit} />
+        ),
+    },
+    {
+      key: 'status',
+      header: t('status'),
+      cell: (row) => <CardStatusBadge status={row.status} size="sm" />,
+    },
+    {
+      key: 'updated_at',
+      header: t('updatedAt'),
+      sortable: true,
+      hideBelow: 'lg',
+      className: 'text-muted',
+      cell: (row) => <RelativeTime value={row.updated_at} />,
+    },
+  ]
+
+  const sortOptions = [
+    { value: 'open_first', label: 'المفتوحة اولا' },
+    { value: 'equipment', label: 'المعدة' },
+    { value: 'period_from', label: 'الفترة' },
+    { value: 'updated_at', label: t('updatedAt') },
+  ]
+
+  return (
+    <Mockup
+      title="6. قائمة كروت المعدات — /cards"
+      permission="sales.view او purchasing.view يعرض القائمة · الفلاتر والبحث هنا شكل فقط"
+    >
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-lg font-bold">كروت المعدات</h2>
+          <p className="text-sm text-muted">
+            كل معدة في شركة ومشروع خلال فترة، مع سطر PO العميل وسطر PO المورد.
+          </p>
+        </div>
+        <ToolbarLookalike sortOptions={sortOptions} sort={sort} onSort={setSort} />
+        {/* The filter fields (the FilterBar look): inert in the mockup. */}
+        <div className="flex flex-wrap items-center gap-2">
+          {CARD_FILTER_FIELDS.map((field) => (
+            <Select
+              key={field.key}
+              size="sm"
+              aria-label={field.label}
+              placeholder={field.label}
+              className="w-[150px]"
+              options={field.options.map((option) => ({ value: option, label: option }))}
+            />
+          ))}
+        </div>
+        <DataTable
+          size="md"
+          cellTextClassName="text-[13px]"
+          cellClassName="py-2"
+          columns={columns}
+          rows={rows}
+          rowKey={(row) => row.id}
+          caption="كروت المعدات"
+          sort={sort}
+          onSortChange={(key, direction) => setSort({ key, direction })}
+          onRowClick={(row) => onOpen(row)}
+        />
+        <DataListPagination
+          page={page}
+          pageSize={pageSize}
+          total={rows.length}
+          onPage={setPage}
+          onPageSize={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }}
+        />
+      </div>
+    </Mockup>
+  )
+}
+
 // --- The decisions and the section ------------------------------------------------
 
 function DecisionsBlock() {
@@ -1502,22 +2152,30 @@ function DecisionsBlock() {
   )
 }
 
-type SalesTab = 'list' | 'page' | 'card' | 'ticket'
+type SalesTab = 'list' | 'page' | 'card' | 'ticket' | 'cardPage' | 'cards'
 
 const SALES_TABS: { id: SalesTab; label: string }[] = [
   { id: 'list', label: 'قائمة PO العملاء' },
   { id: 'page', label: 'صفحة PO العميل' },
   { id: 'card', label: 'كرت المبيعات في صفحة المعدة' },
   { id: 'ticket', label: 'تذكرة المعدة' },
+  { id: 'cardPage', label: 'صفحة كرت المعدة' },
+  { id: 'cards', label: 'قائمة كروت المعدات' },
 ]
 
 export function SalesMockup() {
   const [tab, setTab] = useState<SalesTab>('list')
   const [selectedId, setSelectedId] = useState(CLIENT_POS[0].id)
+  const [cardSample, setCardSample] = useState<CardSample>('rented')
 
   const openPo = (id: string) => {
     setSelectedId(id)
     setTab('page')
+  }
+  // The page has two samples; a list row opens the one of its kind.
+  const openCard = (card: MockCard) => {
+    setCardSample(card.owned ? 'owned' : 'rented')
+    setTab('cardPage')
   }
 
   return (
@@ -1529,7 +2187,7 @@ export function SalesMockup() {
       </Notice>
       <DecisionsBlock />
       <Tabs value={tab} onValueChange={(next) => setTab(next as SalesTab)}>
-        <TabsList variant="segmented" aria-label="شاشات المبيعات">
+        <TabsList variant="segmented" aria-label="شاشات المبيعات" className="flex-wrap">
           {SALES_TABS.map((item) => (
             <TabsTrigger key={item.id} value={item.id}>
               {item.label}
@@ -1543,6 +2201,10 @@ export function SalesMockup() {
       )}
       {tab === 'card' && <EquipmentSalesCardMockup onOpen={openPo} />}
       {tab === 'ticket' && <TicketsMockup />}
+      {tab === 'cardPage' && (
+        <CardPageMockup sample={cardSample} onSample={setCardSample} />
+      )}
+      {tab === 'cards' && <CardsListMockup onOpen={openCard} />}
     </div>
   )
 }
