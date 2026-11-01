@@ -20,6 +20,8 @@ export {
   ChartSrTable,
   seriesColor,
   seriesStroke,
+  deepTint,
+  SOFT_TINT_DEPTH,
 } from './chartShared'
 export type {
   ChartBaseProps,

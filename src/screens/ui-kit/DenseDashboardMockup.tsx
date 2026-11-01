@@ -23,6 +23,7 @@ import {
   type BadgeTone,
   type DataTableColumn,
 } from '@/components/ui'
+import { deepTint } from '@/components/charts'
 import {
   EntriesLineChart,
   FleetDonut,
@@ -433,8 +434,7 @@ function BarRow({
           className="block h-full rounded-full"
           style={{
             width: `${max > 0 ? (value / max) * 100 : 0}%`,
-            backgroundColor: fill,
-            boxShadow: `inset 0 0 0 1px ${stroke}`,
+            backgroundColor: deepTint(fill, stroke),
           }}
         />
       </span>

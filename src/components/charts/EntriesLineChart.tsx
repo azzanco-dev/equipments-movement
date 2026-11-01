@@ -280,7 +280,11 @@ export function EntriesLineChart({
               axisLine={false}
               tick={{ fill: CHART_LABEL_COLOR, fontSize: 11 }}
             />
+            {/* No slide of the tooltip from the previous point to the next
+                (owner 2026-11-01, «الانيميشن حق ظهور الرقم عند الـ hover
+                غريب»): it appears where the pointer is. */}
             <Tooltip
+              isAnimationActive={false}
               content={renderTooltip}
               cursor={{ stroke: CHART_AXIS_COLOR, strokeWidth: 1 }}
             />

@@ -235,7 +235,10 @@ export function FleetDonut({
         <div style={{ height }}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Tooltip content={renderTooltip} />
+              {/* No slide of the tooltip from the previous point to the next
+                  (owner 2026-11-01, «الانيميشن حق ظهور الرقم عند الـ hover
+                  غريب»): it appears where the pointer is. */}
+              <Tooltip isAnimationActive={false} content={renderTooltip} />
               <Pie
                 data={slices}
                 dataKey="value"

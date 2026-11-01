@@ -14,6 +14,7 @@ import {
   CHART_LABEL_COLOR,
   ChartShell,
   ChartSrTable,
+  deepTint,
   seriesColor,
   seriesStroke,
   useChartDirection,
@@ -138,7 +139,11 @@ export function SoftBarChart({
               height={32}
             />
             <YAxis hide allowDecimals={false} />
+            {/* No slide of the tooltip from the previous point to the next
+                (owner 2026-11-01, «الانيميشن حق ظهور الرقم عند الـ hover
+                غريب»): it appears where the pointer is. */}
             <Tooltip
+              isAnimationActive={false}
               content={renderTooltip}
               cursor={{ fill: 'var(--surface-hover)' }}
             />
@@ -151,7 +156,10 @@ export function SoftBarChart({
               {items.map((item, index) => (
                 <Cell
                   key={item.id}
-                  fill={singleColor ?? seriesColor(index, item.color)}
+                  fill={deepTint(
+                    singleColor ?? seriesColor(index, item.color),
+                    singleStroke ?? seriesStroke(index, item.strokeColor),
+                  )}
                   stroke={singleStroke ?? seriesStroke(index, item.strokeColor)}
                 />
               ))}

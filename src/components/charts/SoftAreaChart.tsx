@@ -15,6 +15,7 @@ import {
   ChartLegend,
   ChartShell,
   ChartSrTable,
+  deepTint,
   useChartDirection,
   useChartText,
   type ChartBaseProps,
@@ -31,10 +32,10 @@ export interface SoftAreaChartProps extends ChartBaseProps {
   height?: number
 }
 
-const ENTRY_TINT = 'var(--chart-1)'
 const ENTRY_STROKE = 'var(--chart-stroke-1)'
-const EXIT_TINT = 'var(--chart-2)'
+const ENTRY_TINT = deepTint('var(--chart-1)', ENTRY_STROKE)
 const EXIT_STROKE = 'var(--chart-stroke-2)'
+const EXIT_TINT = deepTint('var(--chart-2)', EXIT_STROKE)
 
 /** What Recharts hands a custom `label` renderer, narrowed to what is used. */
 type PointLabelProps = {
@@ -222,7 +223,11 @@ export function SoftAreaChart({
               axisLine={false}
               tick={{ fill: CHART_LABEL_COLOR, fontSize: 10 }}
             />
+            {/* No slide of the tooltip from the previous point to the next
+                (owner 2026-11-01, «الانيميشن حق ظهور الرقم عند الـ hover
+                غريب»): it appears where the pointer is. */}
             <Tooltip
+              isAnimationActive={false}
               content={renderTooltip}
               cursor={{ stroke: CHART_AXIS_COLOR, strokeWidth: 1 }}
             />

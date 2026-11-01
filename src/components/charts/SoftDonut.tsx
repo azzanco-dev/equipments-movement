@@ -4,6 +4,7 @@ import { cn } from '@/components/ui/cn'
 import {
   ChartShell,
   ChartSrTable,
+  deepTint,
   percentOf,
   useChartDirection,
   useChartText,
@@ -50,6 +51,8 @@ export function SoftDonut({
     [slices],
   )
   const middle = centerValue ?? total
+  const fillOf = (slice: FleetDonutSlice) =>
+    deepTint(slice.color, slice.strokeColor ?? slice.color)
 
   const renderTooltip = ({
     active,
@@ -98,8 +101,7 @@ export function SoftDonut({
             aria-hidden="true"
             className="block h-2.5 w-2.5 shrink-0 rounded-full"
             style={{
-              backgroundColor: slice.color,
-              boxShadow: `inset 0 0 0 1.5px ${slice.strokeColor ?? slice.color}`,
+              backgroundColor: fillOf(slice),
             }}
           />
           <span className="truncate-safe min-w-0 flex-1 text-fg">
@@ -125,7 +127,10 @@ export function SoftDonut({
       <div style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Tooltip content={renderTooltip} />
+            {/* No slide of the tooltip from the previous point to the next
+                (owner 2026-11-01, «الانيميشن حق ظهور الرقم عند الـ hover
+                غريب»): it appears where the pointer is. */}
+            <Tooltip isAnimationActive={false} content={renderTooltip} />
             <Pie
               data={slices}
               dataKey="value"
@@ -138,7 +143,7 @@ export function SoftDonut({
               isAnimationActive={false}
             >
               {slices.map((slice) => (
-                <Cell key={slice.id} fill={slice.color} />
+                <Cell key={slice.id} fill={fillOf(slice)} />
               ))}
             </Pie>
           </PieChart>

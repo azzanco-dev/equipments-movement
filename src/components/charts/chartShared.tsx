@@ -99,6 +99,23 @@ export function niceMax(value: number): number {
   return 10 * magnitude
 }
 
+/**
+ * How far a chart tint is pulled toward its outline in the «soft» look
+ * (owner 2026-11-01, «غمق الالوان شوي» after the first soft charts): a flat
+ * `color-mix` of the two tokens, so light and dark still switch with the
+ * interface and no chart hardcodes a colour. 0 is the plain tint, 100 the
+ * outline itself.
+ */
+export const SOFT_TINT_DEPTH = 35
+
+export function deepTint(
+  tint: string,
+  stroke: string,
+  depth: number = SOFT_TINT_DEPTH,
+): string {
+  return `color-mix(in srgb, ${stroke} ${depth}%, ${tint})`
+}
+
 export function percentOf(value: number, total: number): number {
   if (total <= 0) return 0
   return Math.round((value / total) * 100)
