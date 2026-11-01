@@ -1898,10 +1898,12 @@ export const translations = {
     extractingErrLocalUpdate: 'تعذر تحديث السائق في النظام الحالي',
     extractingErrLookup: 'تعذر البحث عن سجل بهذا الرقم. حاول مرة اخرى',
     extractingUpdateSubmit: 'تحديث السجل الموجود',
+    // Owner 2026-11-01: update mode also writes the edited employment data
+    // and a typed password.
     extractingUpdateNotice:
-      'في وضع التحديث تكتب حقول الهوية فقط، بالقيم غير الفارغة:',
+      'في وضع التحديث تكتب حقول الهوية بالقيم غير الفارغة:',
     extractingUpdateNoticeSuffix:
-      'لن يتم تغيير رقم الاقامة، ولا بريد مستخدم ERPNext او كلمة مروره، ولا بيانات التوظيف (الشركة، نوع التوظيف، القسم، تاريخ المباشرة، الراتب، رقم الموظف)',
+      'وتكتب بيانات التوظيف (الشركة، نوع التوظيف، القسم، تاريخ المباشرة، الراتب، رقم الموظف) التي عدلتها في النموذج فقط، وكلمة مرور مستخدم ERPNext اذا كتبتها. لا يتغير رقم الاقامة ولا بريد المستخدم.',
     extractingLookupSection: 'سجل موجود',
     extractingLookupDescription: 'البحث برقم الاقامة في منصات النشر',
     extractingLookupLoading: 'جار البحث عن سجل بهذا الرقم',
@@ -1918,6 +1920,7 @@ export const translations = {
     extractingErrErpEmployeeLookup: 'تعذر التحقق من الموظف في ERPNext',
     extractingErrErpUserLookup: 'تعذر التحقق من المستخدم في ERPNext',
     extractingErrErpUserCreate: 'تعذر انشاء المستخدم في ERPNext',
+    extractingErrErpUserPassword: 'تعذر تغيير كلمة مرور المستخدم في ERPNext',
     extractingErrErpEmployeeCreate: 'تعذر انشاء الموظف في ERPNext',
     extractingErrErpUserConflict:
       'الموظف مرتبط بمستخدم ERPNext مختلف ويحتاج مراجعة',
@@ -4147,9 +4150,9 @@ export const translations = {
       'Could not look up a record for this number. Try again',
     extractingUpdateSubmit: 'Update the existing record',
     extractingUpdateNotice:
-      'In update mode only the identity fields are written, non-empty values only:',
+      'In update mode the identity fields are written, non-empty values only:',
     extractingUpdateNoticeSuffix:
-      'The residence number, the ERPNext user email and password, and the employment data (company, employment type, department, date of joining, salary, employee number) are never changed',
+      'The employment data (company, employment type, department, date of joining, salary, employee number) is written only for the fields you changed on the form, and the ERPNext user password when you type one. The residence number and the user email never change.',
     extractingLookupSection: 'Existing record',
     extractingLookupDescription:
       'Looked up by the residence number in the publish targets',
@@ -4168,6 +4171,8 @@ export const translations = {
     extractingErrErpEmployeeLookup: 'Could not check the employee in ERPNext',
     extractingErrErpUserLookup: 'Could not check the user in ERPNext',
     extractingErrErpUserCreate: 'Could not create the user in ERPNext',
+    extractingErrErpUserPassword:
+      'Could not change the user password in ERPNext',
     extractingErrErpEmployeeCreate: 'Could not create the employee in ERPNext',
     extractingErrErpUserConflict:
       'The employee is linked to a different ERPNext user and needs review',

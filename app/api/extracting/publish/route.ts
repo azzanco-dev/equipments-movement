@@ -17,10 +17,12 @@ import {
   erpErrorDetails,
   erpEmployeePayload,
   erpEmployeeUpdatePayload,
+  erpUserPasswordUpdate,
   erpUserPayload,
   missingErpFields,
   parsePublishRequest,
   type ExtractionPublishData,
+  type EmploymentUpdateField,
   type PublishMode,
   type PublishStatus,
   type TargetPublishResult,
@@ -45,6 +47,7 @@ async function publishCurrentSystem(
   supabase: SupabaseClient,
   data: ExtractionPublishData,
   mode: PublishMode,
+  employmentEdited: ReadonlySet<EmploymentUpdateField>,
 ): Promise<TargetPublishResult> {
   const findDriver = () =>
     supabase
@@ -59,7 +62,7 @@ async function publishCurrentSystem(
     if (mode !== 'update') return { status: 'existing', id: existing.id }
     const { error: updateError } = await supabase
       .from('drivers')
-      .update(currentSystemDriverUpdatePayload(data))
+      .update(currentSystemDriverUpdatePayload(data, employmentEdited))
       .eq('id', existing.id)
     if (updateError)
       return { status: 'failed', id: existing.id, error: 'local_update_failed' }
@@ -141,12 +144,13 @@ async function invalidErpReference(
 }
 
 /**
- * Ensures the ERPNext user exists; returns its id and whether it was new. An
- * existing User is never modified in any mode: its email and password stay
- * as they are. In `create` mode an existing User is not reused either: the
- * caller would otherwise bind someone else's ERPNext login to the new
- * Employee (security audit run-1, owner decision 2026-10-18); only the admin's
- * `update` mode may link an existing User.
+ * Ensures the ERPNext user exists; returns its id and whether it was new. In
+ * `create` mode an existing User is not reused: the caller would otherwise
+ * bind someone else's ERPNext login to the new Employee (security audit
+ * run-1, owner decision 2026-10-18); only the admin's `update` mode may link
+ * an existing User. Its email never changes; since 2026-11-01 (owner «ضمّن
+ * تغيير كلمة المرور») a password typed in update mode is set on it
+ * (`new_password`) and the step reports `updated`.
  */
 async function ensureErpUser(
   erp: ErpRequest,
@@ -158,10 +162,18 @@ async function ensureErpUser(
   )
   if (lookup.ok) {
     if (mode !== 'update') return { exists: true as const }
-    return {
-      userId: resourceName(lookup.data) ?? data.email,
-      status: 'existing' as const,
-    }
+    const userId = resourceName(lookup.data) ?? data.email
+    const password = erpUserPasswordUpdate(data)
+    if (!password) return { userId, status: 'existing' as const }
+    const changed = await erp(`/api/resource/User/${encodeURIComponent(userId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(password),
+    })
+    if (!changed.ok)
+      return {
+        passwordFailure: erpErrorDetails(changed.data, changed.status),
+      }
+    return { userId, status: 'updated' as const }
   }
   if (lookup.status !== 404) throw new ErpError('erp_user_lookup_failed')
 
@@ -190,13 +202,18 @@ async function existingEmployeeUpdate(
   data: ExtractionPublishData,
   employee: ErpEmployeeMatch,
   userId: string,
+  employmentEdited: ReadonlySet<EmploymentUpdateField>,
 ): Promise<{ update: Record<string, string> } | { error: string }> {
   const [availableFields, invalidReference] = await Promise.all([
     employeeFieldNames(erp),
     invalidErpReference(erp, data),
   ])
   if (invalidReference) return { error: invalidReference }
-  const update = erpEmployeeUpdatePayload(data, availableFields)
+  const update = erpEmployeeUpdatePayload(
+    data,
+    availableFields,
+    employmentEdited,
+  )
   if (!employee.userId) update.user_id = userId
   return { update }
 }
@@ -204,6 +221,7 @@ async function existingEmployeeUpdate(
 async function publishErpNext(
   data: ExtractionPublishData,
   mode: PublishMode,
+  employmentEdited: ReadonlySet<EmploymentUpdateField>,
 ): Promise<TargetPublishResult> {
   if (missingErpFields(data).length)
     return { status: 'failed', error: 'erp_required_fields_missing' }
@@ -245,14 +263,21 @@ async function publishErpNext(
         error: 'erp_user_create_failed',
         details: user.failure,
       }
+    if ('passwordFailure' in user)
+      return {
+        status: 'failed',
+        steps: { user: 'failed', employee: 'skipped' },
+        error: 'erp_user_password_failed',
+        details: user.passwordFailure,
+      }
     const { userId } = user
 
-    // Only a newly created user makes a later employee failure "partial".
+    // A user created or changed here makes a later employee failure "partial".
     const employeeFailed = (
       error: string,
       extra?: Partial<TargetPublishResult>,
     ): TargetPublishResult => ({
-      status: user.status === 'created' ? 'partial' : 'failed',
+      status: user.status === 'existing' ? 'failed' : 'partial',
       userId,
       steps: { user: user.status, employee: 'failed' },
       error,
@@ -268,6 +293,7 @@ async function publishErpNext(
         data,
         existingEmployee,
         userId,
+        employmentEdited,
       )
       if ('error' in prepared)
         return employeeFailed(prepared.error, { employeeId })
@@ -304,7 +330,7 @@ async function publishErpNext(
     const status: PublishStatus =
       user.status === 'created' || employeeStatus === 'created'
         ? 'created'
-        : employeeStatus === 'updated'
+        : employeeStatus === 'updated' || user.status === 'updated'
           ? 'updated'
           : 'existing'
     return {
@@ -327,7 +353,7 @@ export async function POST(request: Request) {
 
   const parsed = parsePublishRequest(await request.json().catch(() => null))
   if (!parsed) return apiError('invalid_payload', 400)
-  const { data, targets, mode } = parsed
+  const { data, targets, mode, employmentEdited } = parsed
 
   // Update mode is the admin's alone (`public.is_admin()` with the caller's
   // token), whatever permission opened the page; decided before any write.
@@ -337,9 +363,11 @@ export async function POST(request: Request) {
   try {
     const [currentSystem, erpnext] = await Promise.all([
       targets.currentSystem
-        ? publishCurrentSystem(auth.supabase, data, mode)
+        ? publishCurrentSystem(auth.supabase, data, mode, employmentEdited)
         : SKIPPED,
-      targets.erpnext ? publishErpNext(data, mode) : SKIPPED,
+      targets.erpnext
+        ? publishErpNext(data, mode, employmentEdited)
+        : SKIPPED,
     ])
     return NextResponse.json({ results: { currentSystem, erpnext } })
   } catch {

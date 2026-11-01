@@ -87,6 +87,8 @@ export async function publishExtraction(
   data: ExtractionForm,
   targets: PublishTargets,
   mode: PublishMode = 'create',
+  /** Update mode: the employment fields the admin filled or changed. */
+  employmentEdited: readonly string[] = [],
 ): Promise<PublishResults> {
   const payload = await request<{ results: PublishResults }>(
     '/api/extracting/publish',
@@ -94,7 +96,12 @@ export async function publishExtraction(
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data, targets, mode }),
+      body: JSON.stringify({
+        data,
+        targets,
+        mode,
+        ...(mode === 'update' ? { employment_edited: employmentEdited } : {}),
+      }),
     },
     'publish_failed',
   )

@@ -11,6 +11,7 @@ import {
   EXTRACTION_FIELDS,
   applyFormPatch,
   createDefaultForm,
+  isEmploymentField,
   isValidIdNumber,
   validateExtractionForm,
   type ExtractionFieldKey,
@@ -79,6 +80,11 @@ export function useExtraction(token: string | undefined) {
   const [lookup, setLookup] = useState<LookupState>({ status: 'idle' })
   // Bumped after a publish so the card reflects the records just written.
   const [lookupVersion, setLookupVersion] = useState(0)
+  // Update mode writes only the employment fields the admin filled or
+  // changed (owner 2026-11-01), never the form's defaults.
+  const [employmentEdited, setEmploymentEdited] = useState<
+    ReadonlySet<ExtractionFieldKey>
+  >(() => new Set())
   const lookupRequest = useRef(0)
 
   // Looks up the existing records once the fields are under review and the
@@ -141,10 +147,13 @@ export function useExtraction(token: string | undefined) {
     setResults(null)
     setErrors({})
     setForm(createDefaultForm(saudiToday()))
+    setEmploymentEdited(new Set())
   }
 
   const updateField = (key: ExtractionFieldKey, value: string) => {
     setForm((current) => applyFormPatch(current, { [key]: value }))
+    if (isEmploymentField(key) && !employmentEdited.has(key))
+      setEmploymentEdited((current) => new Set(current).add(key))
     if (errors[key])
       setErrors((current) => {
         const next = { ...current }
@@ -198,7 +207,11 @@ export function useExtraction(token: string | undefined) {
     setNotice(null)
     setResults(null)
     try {
-      setResults(await publishExtraction(token, form, targets, mode))
+      setResults(
+        await publishExtraction(token, form, targets, mode, [
+          ...employmentEdited,
+        ]),
+      )
       setNotice({ tone: 'success', message: 'extractingPublishDone' })
       setLookupVersion((version) => version + 1)
     } catch (error) {

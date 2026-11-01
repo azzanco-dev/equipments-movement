@@ -44,12 +44,12 @@ export type PublishMode = 'create' | 'update'
 export const PUBLISH_MODES = ['create', 'update'] as const
 
 /**
- * The ONLY fields update mode writes to an existing driver / Employee: the
- * identity data the OCR extracts (plus the residence number, which stays the
- * match key and is never written). Employment and account data (email,
- * password, language, company, employment type, department, date of joining,
- * salary, employee number, status) are never overwritten. Within this list
- * only non-empty values are written.
+ * The identity fields update mode writes to an existing driver / Employee:
+ * the data the OCR extracts (the residence number stays the match key and is
+ * never written). Within this list only non-empty values are written. The
+ * employment data of `EMPLOYMENT_UPDATE_FIELDS` and the ERPNext password
+ * follow their own rules below; the email, the language and the status are
+ * never overwritten.
  */
 export const UPDATE_FIELDS = [
   'full_name_ar',
@@ -64,6 +64,41 @@ export const UPDATE_FIELDS = [
 
 export function isUpdateField(key: ExtractionFieldKey): boolean {
   return (UPDATE_FIELDS as readonly ExtractionFieldKey[]).includes(key)
+}
+
+/**
+ * Owner 2026-11-01 («ضمّن تغيير كلمة المرور، وبيانات التوظيف … في حال كانت
+ * مسجلة في الحقول تبعها»): update mode also writes the employment data, but
+ * only the fields the admin filled or changed on the form (sent as
+ * `employment_edited`) and only with a non-empty value. The form's defaults
+ * (the default company and employment type, today's joining date, the
+ * employee number mirroring the residence number) are never written over an
+ * existing record unless the admin touched them. A typed password changes the
+ * ERPNext login's password.
+ */
+export const EMPLOYMENT_UPDATE_FIELDS = [
+  'company',
+  'employment_type',
+  'department',
+  'date_of_joining',
+  'ctc',
+  'employee_number',
+] as const satisfies readonly ExtractionFieldKey[]
+
+export type EmploymentUpdateField = (typeof EMPLOYMENT_UPDATE_FIELDS)[number]
+
+export function isEmploymentField(
+  key: string,
+): key is EmploymentUpdateField {
+  return (EMPLOYMENT_UPDATE_FIELDS as readonly string[]).includes(key)
+}
+
+/** The edited employment fields of a request body, allowlisted. */
+export function parseEmploymentEdited(
+  value: unknown,
+): ReadonlySet<EmploymentUpdateField> {
+  if (!Array.isArray(value)) return new Set()
+  return new Set(value.filter(isEmploymentField))
 }
 
 export interface TargetPublishResult {

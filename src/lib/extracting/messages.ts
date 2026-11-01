@@ -39,6 +39,7 @@ const ERROR_MESSAGES: Record<string, TranslationKey> = {
   erp_employee_lookup_failed: 'extractingErrErpEmployeeLookup',
   erp_user_lookup_failed: 'extractingErrErpUserLookup',
   erp_user_create_failed: 'extractingErrErpUserCreate',
+  erp_user_password_failed: 'extractingErrErpUserPassword',
   erp_employee_create_failed: 'extractingErrErpEmployeeCreate',
   erp_employee_user_conflict: 'extractingErrErpUserConflict',
   erp_employee_exists: 'extractingErrErpEmployeeExists',

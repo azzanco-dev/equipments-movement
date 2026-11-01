@@ -3,9 +3,12 @@ import {
   ERP_REQUIRED_FIELDS,
   EXTRACTION_FIELDS,
   PUBLISH_MODES,
+  isEmploymentField,
   isUpdateField,
+  parseEmploymentEdited,
   toIsoDate,
   validateExtractionForm,
+  type EmploymentUpdateField,
   type ExtractionFieldKey,
   type ExtractionForm,
   type PublishMode,
@@ -13,6 +16,7 @@ import {
 } from './form'
 
 export type {
+  EmploymentUpdateField,
   PublishMode,
   PublishStatus,
   TargetPublishResult,
@@ -44,12 +48,15 @@ function parsePublishMode(value: unknown): PublishMode | null {
  * checked here: a missing one fails the ERPNext target alone (see
  * `missingErpFields`) so the current system can still be published. `mode`
  * is optional and defaults to `create`; the route decides whether the caller
- * may use `update`, never this parser.
+ * may use `update`, never this parser. `employmentEdited` lists the
+ * employment fields the admin filled or changed (update mode writes only
+ * those; empty in create mode, which writes the whole form).
  */
 export function parsePublishRequest(value: unknown): {
   data: ExtractionPublishData
   targets: PublishTargets
   mode: PublishMode
+  employmentEdited: ReadonlySet<EmploymentUpdateField>
 } | null {
   if (!value || typeof value !== 'object') return null
   const body = value as Record<string, unknown>
@@ -84,7 +91,21 @@ export function parsePublishRequest(value: unknown): {
     employee_number: raw.employee_number || raw.id_number,
   } as ExtractionPublishData
   for (const key of DATE_FIELDS) data[key] = toIsoDate(raw[key])
-  return { data, targets, mode }
+  return {
+    data,
+    targets,
+    mode,
+    employmentEdited:
+      mode === 'update' ? parseEmploymentEdited(body.employment_edited) : new Set(),
+  }
+}
+
+/** Whether update mode writes this field with its non-empty value. */
+function writesOnUpdate(
+  key: ExtractionFieldKey,
+  employmentEdited: ReadonlySet<EmploymentUpdateField>,
+) {
+  return isUpdateField(key) || (isEmploymentField(key) && employmentEdited.has(key))
 }
 
 export function missingErpFields(data: ExtractionPublishData) {
@@ -115,14 +136,18 @@ export function currentSystemDriverPayload(data: ExtractionPublishData) {
 /**
  * Update mode: the `DRIVER_COLUMNS` fed by an `UPDATE_FIELDS` identity field
  * (`full_name`, `name_en`, `mobile_number`, `nationality`, `job_title`) whose
- * reviewed value is non-empty. `id_number` is the match key and
- * `employment_type` is employment data: neither is ever written, and an empty
- * field never clears a stored value.
+ * reviewed value is non-empty, plus `employment_type` when the admin edited it
+ * (owner 2026-11-01). `id_number` is the match key and is never written, and
+ * an empty field never clears a stored value.
  */
-export function currentSystemDriverUpdatePayload(data: ExtractionPublishData) {
+export function currentSystemDriverUpdatePayload(
+  data: ExtractionPublishData,
+  employmentEdited: ReadonlySet<EmploymentUpdateField> = new Set(),
+) {
   const update: Record<string, string> = {}
   for (const [column, key] of DRIVER_COLUMNS)
-    if (isUpdateField(key) && data[key]) update[column] = data[key]
+    if (writesOnUpdate(key, employmentEdited) && data[key])
+      update[column] = data[key]
   return update
 }
 
@@ -233,7 +258,7 @@ function erpEmployeeEntries(
     ['designation', data.occupation, 'occupation'],
     ['cell_number', data.mobile_number, 'mobile_number'],
     ['ctc', data.ctc, 'ctc'],
-    ['employee_number', data.employee_number || data.id_number, null],
+    ['employee_number', data.employee_number || data.id_number, 'employee_number'],
     [
       availableFieldName(
         availableFields,
@@ -285,22 +310,29 @@ export function erpEmployeePayload(
 
 /**
  * Update mode: the Employee fields of `erpEmployeePayload` fed by an
- * `UPDATE_FIELDS` identity field, non-empty only. Never written: `user_id`
- * (the route sets it only when the Employee has none, as in create mode),
- * `status`, the residence number (the match key), `employee_number`, and the
- * employment data (`date_of_joining`, `company`, `employment_type`,
- * `department`, `ctc`). The User's email and password are never part of an
- * Employee update.
+ * `UPDATE_FIELDS` identity field, plus the employment data the admin edited
+ * (`date_of_joining`, `company`, `employment_type`, `department`, `ctc`,
+ * `employee_number`; owner 2026-11-01), non-empty only. Never written:
+ * `user_id` (the route sets it only when the Employee has none, as in create
+ * mode), `status` and the residence number (the match key). The User's
+ * password is changed by the route on the User itself, never here.
  */
 export function erpEmployeeUpdatePayload(
   data: ExtractionPublishData,
   availableFields?: ReadonlySet<string>,
+  employmentEdited: ReadonlySet<EmploymentUpdateField> = new Set(),
 ) {
   const update: Record<string, string> = {}
   for (const [field, value, source] of erpEmployeeEntries(
     data,
     availableFields,
   ))
-    if (field && source && isUpdateField(source) && value) update[field] = value
+    if (field && source && writesOnUpdate(source, employmentEdited) && value)
+      update[field] = value
   return update
+}
+
+/** The User update that sets a new password (`new_password`, update mode). */
+export function erpUserPasswordUpdate(data: ExtractionPublishData) {
+  return data.password ? { new_password: data.password } : null
 }

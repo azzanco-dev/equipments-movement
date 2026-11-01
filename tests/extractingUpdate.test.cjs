@@ -32,14 +32,33 @@ test('the publish route gates update mode on is_admin before any write', () => {
   )
   assert.ok(gate > handler && gate < firstWrite)
   // No client flag is trusted: the mode comes from the parser only.
-  assert.match(route, /const \{ data, targets, mode \} = parsed/)
+  assert.match(route, /const \{ data, targets, mode, employmentEdited \} = parsed/)
   assert.ok(!/canUpdate/.test(route), 'the publish route ignores canUpdate')
-  // The current-system update rewrites only the non-empty mapped columns.
-  assert.match(route, /\.update\(currentSystemDriverUpdatePayload\(data\)\)/)
-  // The Employee PUT comes from the update payload; an existing User is never
-  // modified (no PUT /api/resource/User).
-  assert.match(route, /erpEmployeeUpdatePayload\(data, availableFields\)/)
-  assert.ok(!/resource\/User\/[^`]*`,\s*\{\s*method: 'PUT'/.test(route))
+  // The current-system update rewrites only the non-empty mapped columns
+  // (plus the employment data the admin edited, 2026-11-01).
+  assert.match(
+    route,
+    /\.update\(currentSystemDriverUpdatePayload\(data, employmentEdited\)\)/,
+  )
+  // The Employee PUT comes from the update payload.
+  assert.match(
+    route,
+    /erpEmployeeUpdatePayload\(\s*data,\s*availableFields,\s*employmentEdited,\s*\)/,
+  )
+  // An existing User is changed in update mode only, and only its password
+  // (owner 2026-11-01): the PUT body is erpUserPasswordUpdate, reached after
+  // the create-mode refusal.
+  const refusal = route.indexOf(
+    "if (mode !== 'update') return { exists: true as const }",
+  )
+  const passwordPut = route.indexOf('const password = erpUserPasswordUpdate(data)')
+  assert.ok(refusal > -1 && passwordPut > refusal)
+  assert.equal(
+    (route.match(/method: 'PUT'/g) ?? []).length,
+    2,
+    'one User password PUT and one Employee PUT',
+  )
+  assert.match(route, /body: JSON\.stringify\(password\)/)
 })
 
 test('the lookup route exists behind requireExtractingAccess and is read-only', () => {
@@ -60,7 +79,7 @@ test('the lookup route exists behind requireExtractingAccess and is read-only', 
 
 test("the page sends mode 'update' only when the lookup allows it", () => {
   const hook = read('src/components/extracting/useExtraction.ts')
-  assert.match(hook, /publishExtraction\(token, form, targets, mode\)/)
+  assert.match(hook, /publishExtraction\(token, form, targets, mode, \[/)
   assert.match(hook, /const mode = publishModeFor\(/)
   assert.match(hook, /LOOKUP_DEBOUNCE_MS = 400/)
   assert.match(hook, /isValidIdNumber\(idNumber\)/)
