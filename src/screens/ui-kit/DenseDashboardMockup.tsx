@@ -367,34 +367,52 @@ function OwnersDonutCard({
   density: Density
   look: ChartLook
 }) {
-  const slices = OWNERS.map((owner) => ({
-    id: owner.id,
-    label: owner.label,
-    value: owner.fleet,
-    color: `var(--chart-${owner.shade})`,
-    strokeColor: `var(--chart-stroke-${owner.shade})`,
-  }))
+  const slicesOf = (pick: (owner: (typeof OWNERS)[number]) => number) =>
+    OWNERS.map((owner) => ({
+      id: owner.id,
+      label: owner.label,
+      value: pick(owner),
+      color: `var(--chart-${owner.shade})`,
+      strokeColor: `var(--chart-stroke-${owner.shade})`,
+    }))
+  const fleet = slicesOf((owner) => owner.fleet)
+  const inProjects = slicesOf((owner) => owner.inProjects)
+  // Two rings in the card's height (owner 2026-11-01, «اضف كيكة ثانية،
+  // داخل المشاريع»), each with its owners beside it.
+  const ring = density.donutHeight - 50
   return (
     <DenseCard
-      title="الاسطول حسب المالك"
-      meta={`${FLEET_TOTAL} معدة`}
+      title="حسب المالك"
+      meta={`${FLEET_TOTAL} في الاسطول · ${IN_PROJECTS} في المشاريع`}
       density={density}
-      // Beside the taller chart card the ring and its owners sit in the
-      // middle of the card instead of leaving the bottom empty.
+      // Beside the taller chart card the rings sit in the middle of the card
+      // instead of leaving the bottom empty.
       bodyClassName={
         look === 'soft' ? 'flex flex-col justify-center' : undefined
       }
     >
       {look === 'soft' ? (
-        <SoftDonut
-          ariaLabel="الاسطول حسب المالك"
-          centerLabel="معدة"
-          height={density.donutHeight}
-          // Owner 2026-11-01: «نخلي الكيكة مع البيانات الي معاها تصير عمودين
-          // بدال صفين» — the owners beside the ring, not under it.
-          legend="side"
-          slices={slices}
-        />
+        <div className="divide-y">
+          {[
+            { id: 'fleet', title: 'الاسطول', slices: fleet },
+            { id: 'projects', title: 'داخل المشاريع', slices: inProjects },
+          ].map((donut) => (
+            <div key={donut.id} className="py-2 first:pt-0 last:pb-0">
+              <p className="mb-1 text-[11px] font-medium text-muted">
+                {donut.title}
+              </p>
+              <SoftDonut
+                ariaLabel={`${donut.title} حسب المالك`}
+                centerLabel="معدة"
+                height={ring}
+                // Owner 2026-11-01: «نخلي الكيكة مع البيانات الي معاها تصير
+                // عمودين بدال صفين» — the owners beside the ring, not under it.
+                legend="side"
+                slices={donut.slices}
+              />
+            </div>
+          ))}
+        </div>
       ) : (
         <FleetDonut
           ariaLabel="الاسطول حسب المالك"
@@ -402,7 +420,7 @@ function OwnersDonutCard({
           height={density.donutHeight}
           innerRadius="58%"
           outerRadius="88%"
-          slices={slices}
+          slices={fleet}
         />
       )}
     </DenseCard>
