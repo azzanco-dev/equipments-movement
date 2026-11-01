@@ -83,7 +83,7 @@ test('the soft Recharts look is registered in lazy.tsx and switchable', () => {
   assert.match(sources.softArea, /dot=\{false\}/)
   assert.doesNotMatch(sources.softDonut, /\slabel=\{/)
   assert.match(sources.softDonut, /cornerRadius=/)
-  assert.match(sources.softBar, /radius=\{\[6, 6, 0, 0\]\}/)
+  assert.match(sources.softBar, /radius=\{\[3, 3, 0, 0\]\}/)
 })
 
 test('project tokens only: no hex colors, no Tailwind palette classes', () => {

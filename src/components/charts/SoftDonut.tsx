@@ -140,7 +140,8 @@ export function SoftDonut({
               innerRadius="66%"
               outerRadius="96%"
               paddingAngle={2.5}
-              cornerRadius={6}
+              // Owner 2026-11-01, «خفف الradius»: 3 instead of 6.
+              cornerRadius={3}
               stroke="none"
               isAnimationActive={false}
             >

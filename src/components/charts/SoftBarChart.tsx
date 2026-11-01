@@ -149,7 +149,7 @@ export function SoftBarChart({
             />
             <Bar
               dataKey="value"
-              radius={[6, 6, 0, 0]}
+              radius={[3, 3, 0, 0]}
               strokeWidth={1}
               isAnimationActive={false}
             >
