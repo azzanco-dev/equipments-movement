@@ -333,7 +333,6 @@ test('auth initializes once, ignores duplicate events, and rejects stale account
     // EM-174: the automatic sign-out diagnostics are a no-op here.
     '@/lib/authDiagnostics': {
       clearAutoSignOut() {},
-      readAutoSignOut: () => null,
       rememberAutoSignOut: () => ({
         at: 0,
         error: null,

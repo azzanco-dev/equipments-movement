@@ -6,7 +6,6 @@ import { Sun, Moon, Languages } from 'lucide-react'
 import { PasswordInput } from '@/components/PasswordInput'
 import { Alert } from '@/components/Alert'
 import { Button, Field, IconButton, Input } from '@/components/ui'
-import { describeAutoSignOut } from '@/lib/authDiagnostics'
 import { useRouter } from 'next/navigation'
 import {
   clearFieldErrors,
@@ -27,7 +26,7 @@ export function AuthScreen() {
   const router = useRouter()
   const { t, toggleLanguage, lang } = useI18n()
   const { theme, toggleTheme } = useTheme()
-  const { signIn, autoSignOut } = useAuth()
+  const { signIn } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -109,19 +108,6 @@ export function AuthScreen() {
               <h2 className="text-lg font-bold mb-1">{t('signIn')}</h2>
               <p className="text-sm text-muted">{t('signInSubtitle')}</p>
             </div>
-
-            {/* EM-174: a sign-out the user did not ask for is explained here,
-                with one Latin detail line to report (time, error, network). */}
-            {autoSignOut && (
-              <div className="mb-4">
-                <Alert type="warning">
-                  <p>{t('autoSignedOut')}</p>
-                  <p dir="ltr" className="mt-1 text-start text-xs opacity-80">
-                    {describeAutoSignOut(autoSignOut)}
-                  </p>
-                </Alert>
-              </div>
-            )}
 
             <form
               ref={formRef}

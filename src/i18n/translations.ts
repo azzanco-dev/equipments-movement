@@ -92,8 +92,6 @@ export const translations = {
     signInButton: 'دخول',
     signUpButton: 'إنشاء حساب',
     signInSubtitle: 'سجّل دخولك للوصول إلى النظام',
-    autoSignedOut:
-      'تم تسجيل خروجك تلقائيا لان الجلسة انتهت او تعذر تجديدها. سجل دخولك من جديد، ولو تكرر ذلك ارسل السطر التالي للدعم.',
     signUpSubtitle: 'أنشئ حساب مشرف جديد',
     haveAccount: 'لديك حساب؟ سجّل الدخول',
     noAccount: 'ليس لديك حساب؟ أنشئ حساباً',
@@ -2303,8 +2301,6 @@ export const translations = {
     signInButton: 'Sign In',
     signUpButton: 'Sign Up',
     signInSubtitle: 'Sign in to access the system',
-    autoSignedOut:
-      'You were signed out automatically because the session ended or could not be renewed. Sign in again, and if it keeps happening send the line below to support.',
     signUpSubtitle: 'Create a new supervisor account',
     haveAccount: 'Have an account? Sign in',
     noAccount: "Don't have an account? Sign up",

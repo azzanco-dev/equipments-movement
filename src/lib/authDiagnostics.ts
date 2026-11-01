@@ -10,10 +10,12 @@
  * This module keeps the LAST auth error the client's debug hook hands over
  * (`recordAuthDebug`, wired as the client's `auth.debug` logger) and, when
  * the provider sees a SIGNED_OUT that the user did not ask for, remembers
- * the moment with that error in localStorage (`rememberAutoSignOut`), so
- * the login screen can say «تم تسجيل خروجك تلقائيا» with a detail line the
- * owner can report. A per-browser convenience: every storage access is
- * guarded, and nothing here changes how sessions are refreshed.
+ * the moment with that error in localStorage (`rememberAutoSignOut`, key
+ * `auth:lastAutoSignOut`). Nothing is shown to users (owner 2026-11-01):
+ * the owner reads the record from the browser's storage when the case
+ * repeats (`describeAutoSignOut` formats it as one Latin line). A
+ * per-browser convenience: every storage access is guarded, and nothing
+ * here changes how sessions are refreshed.
  */
 
 export interface AuthErrorSummary {

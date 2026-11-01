@@ -1,6 +1,7 @@
 // EM-174 (owner 2026-11-01, «حل EM-174»): an automatic sign-out — the auth
 // client dropping the session after a refresh failed with a non-network
-// error — is remembered with its cause and explained on the login screen.
+// error — is remembered with its cause in localStorage, silently (owner:
+// no message for users); the owner reads it when the case repeats.
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
@@ -139,27 +140,16 @@ test('the client, the provider and the login screen are wired', () => {
   const provider = read('src', 'auth', 'AuthContext.tsx')
   assert.match(
     provider,
-    /if \(event === 'SIGNED_OUT'\) \{\s+if \(!userSignOutRef\.current && currentUserIdRef\.current\)\s+setAutoSignOut\(rememberAutoSignOut\(\)\)/,
+    /if \(event === 'SIGNED_OUT'\) \{\s+if \(!userSignOutRef\.current && currentUserIdRef\.current\)\s+rememberAutoSignOut\(\)/,
   )
   assert.match(
     provider,
     /userSignOutRef\.current = true\s+try \{\s+await supabase\.auth\.signOut\(\)/,
   )
-  assert.match(
-    provider,
-    /clearAutoSignOut\(\)\s+resetRecordedAuthError\(\)\s+setAutoSignOut\(null\)/,
-  )
-  assert.match(provider, /autoSignOut: AutoSignOutInfo \| null/)
-
+  assert.match(provider, /clearAutoSignOut\(\)\s+resetRecordedAuthError\(\)/)
+  // Nothing reaches the user (owner 2026-11-01): no state, no login notice.
+  assert.doesNotMatch(provider, /autoSignOut:|readAutoSignOut/)
   const screen = read('src', 'screens', 'AuthScreen.tsx')
-  assert.match(screen, /const \{ signIn, autoSignOut \} = useAuth\(\)/)
-  assert.match(screen, /\{autoSignOut && \(/)
-  assert.match(screen, /<Alert type="warning">/)
-  assert.match(screen, /\{t\('autoSignedOut'\)\}/)
-  assert.match(screen, /\{describeAutoSignOut\(autoSignOut\)\}/)
-
-  const translations = read('src', 'i18n', 'translations.ts')
-  const matches = translations.match(/^\s+autoSignedOut:\n\s+'[^']+',$/gm)
-  assert.equal(matches.length, 2)
-  assert.doesNotMatch(matches[0], /[أإآ]/)
+  assert.doesNotMatch(screen, /autoSignOut|describeAutoSignOut/)
+  assert.doesNotMatch(read('src', 'i18n', 'translations.ts'), /autoSignedOut/)
 })
