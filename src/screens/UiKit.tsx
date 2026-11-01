@@ -55,6 +55,7 @@ import { MobileSearchFieldShowcase } from '@/screens/ui-kit/MobileSearchFieldSho
 import { InquiryRedesignMockup } from '@/screens/ui-kit/InquiryRedesignMockup'
 import { InquiryAllStatesShowcase } from '@/screens/ui-kit/InquiryAllStatesShowcase'
 import { HomeRedesignMockup } from '@/screens/ui-kit/HomeRedesignMockup'
+import { DenseDashboardMockup } from '@/screens/ui-kit/DenseDashboardMockup'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -121,6 +122,17 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // Owner 2026-11-01 (EM-252): «الارقام الحالية ماخذه كامل الصفحة», with a
+    // board of dashboard designs as the reference look.
+    id: 'dense-dashboard',
+    title: 'نموذج لوحة التحكم الكثيفة',
+    purpose:
+      'معلومات الرئيسية نفسها بمربعات صغيرة ورسوم وجداول مضغوطة في شاشتين بدل خمس، بنسختين للمقارنة، ببيانات عينة.',
+    status: 'review',
+    defaultOpen: true,
+    element: <DenseDashboardMockup />,
+  },
   {
     // Owner 2026-10-29: «ابغى اعيد تشكيل الرئيسية … ايش رايك», then «Build
     // the mockup» on the proposal.
