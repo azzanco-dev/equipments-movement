@@ -92,7 +92,9 @@ export function SoftDonut({
         'text-xs',
         // Under the ring the rows pair up, so five owners take three rows
         // and the card stays as short as the chart beside it.
-        legend === 'under' ? 'grid grid-cols-2 gap-x-3' : 'self-center',
+        legend === 'under'
+          ? 'grid grid-cols-2 gap-x-3'
+          : 'shrink-0 self-center',
       )}
     >
       {slices.map((slice) => (

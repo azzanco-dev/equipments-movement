@@ -379,12 +379,20 @@ function OwnersDonutCard({
       title="الاسطول حسب المالك"
       meta={`${FLEET_TOTAL} معدة`}
       density={density}
+      // Beside the taller chart card the ring and its owners sit in the
+      // middle of the card instead of leaving the bottom empty.
+      bodyClassName={
+        look === 'soft' ? 'flex flex-col justify-center' : undefined
+      }
     >
       {look === 'soft' ? (
         <SoftDonut
           ariaLabel="الاسطول حسب المالك"
           centerLabel="معدة"
           height={density.donutHeight}
+          // Owner 2026-11-01: «نخلي الكيكة مع البيانات الي معاها تصير عمودين
+          // بدال صفين» — the owners beside the ring, not under it.
+          legend="side"
           slices={slices}
         />
       ) : (
