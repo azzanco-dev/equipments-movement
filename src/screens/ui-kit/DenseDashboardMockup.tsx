@@ -6,6 +6,8 @@ import {
   CircleDollarSign,
   FileWarning,
   HardHat,
+  LogIn,
+  LogOut,
   PowerOff,
   Radio,
   Truck,
@@ -14,8 +16,10 @@ import {
 } from 'lucide-react'
 import {
   Badge,
+  Button,
   Card,
   DataTable,
+  SearchInput,
   Tabs,
   TabsList,
   TabsTrigger,
@@ -145,17 +149,108 @@ function accentColors(accent: Accent): { strong: string; soft: string } {
 
 // --- (a) the greeting ------------------------------------------------------
 
-function GreetingLine() {
+// Owner 2026-11-01 («خلنا الحين نشتغل على البار العلوي، بحيث ندف بعض
+// المحتوى لفوق + اضافة جمالية للبار»): the greeting line became a bar card.
+// It carries what used to sit lower on the page — today's entries and exits,
+// the «يحتاج انتباهك» total and Afaqy's connected count — as small pills
+// between the greeting and the actions, plus a quick unit search and the
+// two movement buttons. On a phone it stacks: greeting, pills, actions.
+
+type BarStat = {
+  id: string
+  label: string
+  value: ReactNode
+  tone?: BadgeTone
+}
+
+function TopBar({ density }: { density: Density }) {
+  const [query, setQuery] = useState('')
+  const attention = ATTENTION.reduce((sum, item) => sum + item.count, 0)
+  const stats: BarStat[] = [
+    { id: 'in', label: 'دخول اليوم', value: 9, tone: 'entry' },
+    { id: 'out', label: 'خروج اليوم', value: 7, tone: 'exit' },
+    {
+      id: 'attention',
+      label: 'يحتاج انتباهك',
+      value: attention,
+      tone: 'warning',
+    },
+    {
+      id: 'afaqy',
+      label: 'افاقي متصلة',
+      value: `${AFAQY.connected} / ${AFAQY.linked}`,
+    },
+  ]
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1">
-      <p className="text-sm">
-        <span className="font-semibold">صباح الخير، مبارك</span>
-        <span className="text-muted"> · الاحد 1 نوفمبر 2026</span>
-      </p>
-      <p className="text-xs text-muted">
-        الارقام حتى الان · حركة اليوم: 9 دخول و7 خروج
-      </p>
-    </div>
+    <Card
+      className={cn(
+        'flex flex-col gap-3 rounded-2xl lg:flex-row lg:items-center',
+        density.cardPad,
+      )}
+    >
+      <div className="flex shrink-0 items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="brand-mark flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-bold"
+        >
+          م
+        </span>
+        <div className="min-w-0">
+          <p className="whitespace-nowrap text-[15px] font-bold leading-tight">
+            صباح الخير، مبارك
+          </p>
+          <p className="whitespace-nowrap text-xs text-muted">
+            الاحد 1 نوفمبر 2026 · 10:42
+          </p>
+        </div>
+      </div>
+
+      {/* The pills scroll sideways when the bar is narrow; the greeting and
+          the actions never shrink. */}
+      <ul className="-mx-1 flex min-w-0 gap-1.5 overflow-x-auto px-1 py-0.5 [scrollbar-width:thin] lg:mx-0 lg:flex-1 lg:px-0">
+        {stats.map((stat) => (
+          <li
+            key={stat.id}
+            className="flex shrink-0 items-center gap-2 rounded-xl bg-surface px-2.5 py-1.5"
+          >
+            <span className="text-[11px] text-muted">{stat.label}</span>
+            <Badge
+              size="sm"
+              tone={stat.tone ?? 'neutral'}
+              className="tabular-nums"
+            >
+              {stat.value}
+            </Badge>
+          </li>
+        ))}
+      </ul>
+
+      {/* On a phone the search takes a row of its own and the two buttons
+          share the next one. */}
+      <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
+        <SearchInput
+          value={query}
+          onValueChange={setQuery}
+          placeholder="رقم المعدة او اللوحة"
+          aria-label="بحث عن معدة"
+          className="basis-full sm:min-w-0 sm:flex-1 sm:basis-auto lg:w-44 lg:flex-none"
+        />
+        <Button
+          variant="primary"
+          icon={<LogIn size={16} />}
+          className="flex-1 sm:flex-none"
+        >
+          <span className="hidden sm:inline">تسجيل </span>دخول
+        </Button>
+        <Button
+          variant="outline"
+          icon={<LogOut size={16} />}
+          className="flex-1 sm:flex-none"
+        >
+          <span className="hidden sm:inline">تسجيل </span>خروج
+        </Button>
+      </div>
+    </Card>
   )
 }
 
@@ -835,7 +930,7 @@ function DenseDashboard({
         'space-y-3',
       )}
     >
-      <GreetingLine />
+      <TopBar density={density} />
       <div
         className={cn(
           'grid grid-cols-2 sm:grid-cols-4',
