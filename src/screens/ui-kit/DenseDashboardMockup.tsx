@@ -6,8 +6,10 @@ import {
   CircleDollarSign,
   FileWarning,
   HardHat,
-  LogIn,
+  Languages,
   LogOut,
+  Menu,
+  Moon,
   PowerOff,
   Radio,
   Truck,
@@ -19,6 +21,7 @@ import {
   Button,
   Card,
   DataTable,
+  IconButton,
   SearchInput,
   Tabs,
   TabsList,
@@ -149,106 +152,122 @@ function accentColors(accent: Accent): { strong: string; soft: string } {
 
 // --- (a) the greeting ------------------------------------------------------
 
-// Owner 2026-11-01 («خلنا الحين نشتغل على البار العلوي، بحيث ندف بعض
-// المحتوى لفوق + اضافة جمالية للبار»): the greeting line became a bar card.
-// It carries what used to sit lower on the page — today's entries and exits,
-// the «يحتاج انتباهك» total and Afaqy's connected count — as small pills
-// between the greeting and the actions, plus a quick unit search and the
-// two movement buttons. On a phone it stacks: greeting, pills, actions.
+// --- (a) the app header ----------------------------------------------------
+// Owner 2026-11-01 («خلنا الحين نشتغل على البار العلوي، بحيث ندف بعض المحتوى
+// لفوق + اضافة جمالية للبار», then «قصدي البار اللي فيه اللوقو. مايكون فيه
+// تسجيل الدخولية او الخروج ولا يحتاج انتباهك، ممكن يكون فيه بحث عام»): a
+// mockup of the application header itself — the logo and the app name as
+// today, a GENERAL search in the middle (units, drivers, companies, projects,
+// POs) with a keyboard hint, and on the end side the greeting with the Saudi
+// date and time (moved up from the page), the language and theme switches
+// and the user. No movement buttons and no attention count here.
 
-type BarStat = {
-  id: string
-  label: string
-  value: ReactNode
-  tone?: BadgeTone
-}
-
-function TopBar({ density }: { density: Density }) {
+function AppHeaderMockup() {
   const [query, setQuery] = useState('')
-  const attention = ATTENTION.reduce((sum, item) => sum + item.count, 0)
-  const stats: BarStat[] = [
-    { id: 'in', label: 'دخول اليوم', value: 9, tone: 'entry' },
-    { id: 'out', label: 'خروج اليوم', value: 7, tone: 'exit' },
-    {
-      id: 'attention',
-      label: 'يحتاج انتباهك',
-      value: attention,
-      tone: 'warning',
-    },
-    {
-      id: 'afaqy',
-      label: 'افاقي متصلة',
-      value: `${AFAQY.connected} / ${AFAQY.linked}`,
-    },
-  ]
   return (
-    <Card
-      className={cn(
-        'flex flex-col gap-3 rounded-2xl lg:flex-row lg:items-center',
-        density.cardPad,
-      )}
-    >
-      <div className="flex shrink-0 items-center gap-3">
-        <span
-          aria-hidden="true"
-          className="brand-mark flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-bold"
-        >
-          م
-        </span>
-        <div className="min-w-0">
-          <p className="whitespace-nowrap text-[15px] font-bold leading-tight">
-            صباح الخير، مبارك
-          </p>
-          <p className="whitespace-nowrap text-xs text-muted">
-            الاحد 1 نوفمبر 2026 · 10:42
-          </p>
+    <Card className="rounded-2xl px-3 py-2.5 sm:px-4">
+      <div className="flex items-center gap-3">
+        <IconButton
+          className="lg:hidden"
+          label="القائمة"
+          variant="ghost"
+          icon={<Menu size={20} />}
+        />
+        <div className="flex shrink-0 items-center gap-2">
+          <img
+            src="/azzanco-logo.png"
+            alt=""
+            aria-hidden="true"
+            className="h-9 w-9 shrink-0 rounded-lg object-contain"
+          />
+          <div className="hidden md:block">
+            <p className="text-sm font-bold leading-tight">
+              ادارة المعدات الثقيلة
+            </p>
+            <p className="text-xs leading-tight text-muted">
+              نظام تتبع دخول وخروج المعدات
+            </p>
+          </div>
+        </div>
+
+        {/* The general search: one field for everything, centred, with the
+            shortcut hint at its end on wide screens. */}
+        <div className="hidden min-w-0 flex-1 justify-center sm:flex">
+          <div className="relative w-full max-w-xl">
+            <SearchInput
+              value={query}
+              onValueChange={setQuery}
+              placeholder="ابحث عن معدة، سائق، شركة، مشروع او PO"
+              aria-label="بحث عام"
+              className="rounded-full !bg-surface xl:pe-16"
+            />
+            <kbd
+              aria-hidden="true"
+              className="pointer-events-none absolute end-3 top-1/2 hidden -translate-y-1/2 rounded-md border bg-bg px-1.5 font-latin text-[10px] leading-5 text-muted xl:block"
+              dir="ltr"
+            >
+              Ctrl K
+            </kbd>
+          </div>
+        </div>
+
+        <div className="ms-auto flex shrink-0 items-center gap-1.5">
+          <div className="hidden text-end xl:block">
+            <p className="text-xs font-semibold leading-tight">
+              صباح الخير، مبارك
+            </p>
+            <p className="text-[11px] leading-tight text-muted">
+              الاحد 1 نوفمبر 2026 · 10:42
+            </p>
+          </div>
+          <div className="mx-1 hidden h-6 w-px bg-border xl:block" />
+          <Button
+            variant="ghost"
+            size="sm"
+            title="تبديل اللغة"
+            icon={<Languages size={16} />}
+            className="hidden sm:inline-flex"
+          >
+            EN
+          </Button>
+          <IconButton
+            label="تبديل المظهر"
+            variant="ghost"
+            size="sm"
+            icon={<Moon size={16} />}
+            className="hidden sm:inline-flex"
+          />
+          <div className="mx-1 hidden h-6 w-px bg-border sm:block" />
+          <div className="flex items-center gap-2">
+            <span
+              aria-hidden="true"
+              className="brand-mark flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold"
+            >
+              م
+            </span>
+            <div className="hidden text-start lg:block">
+              <p className="text-xs font-medium leading-tight">مبارك باكرمان</p>
+              <p className="text-[11px] leading-tight text-muted">ادمن</p>
+            </div>
+          </div>
+          <IconButton
+            label="تسجيل الخروج من الحساب"
+            variant="ghost"
+            size="sm"
+            icon={<LogOut size={16} />}
+            className="hidden sm:inline-flex"
+          />
         </div>
       </div>
-
-      {/* The pills scroll sideways when the bar is narrow; the greeting and
-          the actions never shrink. */}
-      <ul className="-mx-1 flex min-w-0 gap-1.5 overflow-x-auto px-1 py-0.5 [scrollbar-width:thin] lg:mx-0 lg:flex-1 lg:px-0">
-        {stats.map((stat) => (
-          <li
-            key={stat.id}
-            className="flex shrink-0 items-center gap-2 rounded-xl bg-surface px-2.5 py-1.5"
-          >
-            <span className="text-[11px] text-muted">{stat.label}</span>
-            <Badge
-              size="sm"
-              tone={stat.tone ?? 'neutral'}
-              className="tabular-nums"
-            >
-              {stat.value}
-            </Badge>
-          </li>
-        ))}
-      </ul>
-
-      {/* On a phone the search takes a row of its own and the two buttons
-          share the next one. */}
-      <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
+      {/* On a phone the search gets a row of its own under the logo. */}
+      <div className="mt-2 sm:hidden">
         <SearchInput
           value={query}
           onValueChange={setQuery}
-          placeholder="رقم المعدة او اللوحة"
-          aria-label="بحث عن معدة"
-          className="basis-full sm:min-w-0 sm:flex-1 sm:basis-auto lg:w-44 lg:flex-none"
+          placeholder="ابحث عن معدة، سائق، شركة، مشروع او PO"
+          aria-label="بحث عام"
+          className="rounded-full !bg-surface"
         />
-        <Button
-          variant="primary"
-          icon={<LogIn size={16} />}
-          className="flex-1 sm:flex-none"
-        >
-          <span className="hidden sm:inline">تسجيل </span>دخول
-        </Button>
-        <Button
-          variant="outline"
-          icon={<LogOut size={16} />}
-          className="flex-1 sm:flex-none"
-        >
-          <span className="hidden sm:inline">تسجيل </span>خروج
-        </Button>
       </div>
     </Card>
   )
@@ -923,37 +942,39 @@ function DenseDashboard({
 }) {
   const density = DENSITY[variant]
   return (
-    <div
-      className={cn(
-        'rounded-2xl bg-surface p-3 sm:p-4',
-        density.gap,
-        'space-y-3',
-      )}
-    >
-      <TopBar density={density} />
+    <div className="space-y-3">
+      <AppHeaderMockup />
       <div
         className={cn(
-          'grid grid-cols-2 sm:grid-cols-4',
-          variant === 'tiles' ? 'xl:grid-cols-8' : 'lg:grid-cols-8',
+          'rounded-2xl bg-surface p-3 sm:p-4',
           density.gap,
+          'space-y-3',
         )}
       >
-        {KPIS.map((kpi) => (
-          <KpiTile key={kpi.id} kpi={kpi} density={density} />
-        ))}
-      </div>
-      <div className={cn('grid xl:grid-cols-3', density.gap)}>
-        <EntriesCard density={density} look={look} />
-        <OwnersDonutCard density={density} look={look} />
-      </div>
-      <div className={cn('grid md:grid-cols-2 xl:grid-cols-3', density.gap)}>
-        <RestStatesCard density={density} />
-        <SuppliersCard density={density} />
-        <TopTypesCard density={density} look={look} />
-      </div>
-      <div className={cn('grid md:grid-cols-2', density.gap)}>
-        <WorkshopTableCard density={density} />
-        <AttentionCard density={density} />
+        <div
+          className={cn(
+            'grid grid-cols-2 sm:grid-cols-4',
+            variant === 'tiles' ? 'xl:grid-cols-8' : 'lg:grid-cols-8',
+            density.gap,
+          )}
+        >
+          {KPIS.map((kpi) => (
+            <KpiTile key={kpi.id} kpi={kpi} density={density} />
+          ))}
+        </div>
+        <div className={cn('grid xl:grid-cols-3', density.gap)}>
+          <EntriesCard density={density} look={look} />
+          <OwnersDonutCard density={density} look={look} />
+        </div>
+        <div className={cn('grid md:grid-cols-2 xl:grid-cols-3', density.gap)}>
+          <RestStatesCard density={density} />
+          <SuppliersCard density={density} />
+          <TopTypesCard density={density} look={look} />
+        </div>
+        <div className={cn('grid md:grid-cols-2', density.gap)}>
+          <WorkshopTableCard density={density} />
+          <AttentionCard density={density} />
+        </div>
       </div>
     </div>
   )
