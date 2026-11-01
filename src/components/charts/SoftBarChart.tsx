@@ -14,6 +14,7 @@ import {
   CHART_LABEL_COLOR,
   ChartShell,
   ChartSrTable,
+  TOOLTIP_WRAPPER_STYLE,
   deepTint,
   seriesColor,
   seriesStroke,
@@ -144,6 +145,7 @@ export function SoftBarChart({
                 غريب»): it fades in where the pointer is («خليه fade خفيف»). */}
             <Tooltip
               isAnimationActive={false}
+              wrapperStyle={TOOLTIP_WRAPPER_STYLE}
               content={renderTooltip}
               cursor={{ fill: 'var(--surface-hover)' }}
             />

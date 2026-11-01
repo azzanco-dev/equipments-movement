@@ -116,6 +116,14 @@ export function deepTint(
   return `color-mix(in srgb, ${stroke} ${depth}%, ${tint})`
 }
 
+/**
+ * The Recharts tooltip wrapper has no z-index of its own, so a donut's centre
+ * text (an absolute layer after it in the DOM) and the cards below painted
+ * over it (owner 2026-11-01, «المحتوى الي يطلع يظهر اسفل محتوى نصي اخر»).
+ * Every chart passes this as the tooltip's `wrapperStyle`.
+ */
+export const TOOLTIP_WRAPPER_STYLE = { zIndex: 20 } as const
+
 export function percentOf(value: number, total: number): number {
   if (total <= 0) return 0
   return Math.round((value / total) * 100)

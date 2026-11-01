@@ -4,6 +4,7 @@ import { cn } from '@/components/ui/cn'
 import {
   ChartShell,
   ChartSrTable,
+  TOOLTIP_WRAPPER_STYLE,
   deepTint,
   percentOf,
   useChartDirection,
@@ -132,7 +133,11 @@ export function SoftDonut({
             {/* No slide of the tooltip from the previous point to the next
                 (owner 2026-11-01, «الانيميشن حق ظهور الرقم عند الـ hover
                 غريب»): it fades in where the pointer is («خليه fade خفيف»). */}
-            <Tooltip isAnimationActive={false} content={renderTooltip} />
+            <Tooltip
+              isAnimationActive={false}
+              wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+              content={renderTooltip}
+            />
             <Pie
               data={slices}
               dataKey="value"

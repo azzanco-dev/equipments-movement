@@ -15,6 +15,7 @@ import {
   ChartLegend,
   ChartShell,
   ChartSrTable,
+  TOOLTIP_WRAPPER_STYLE,
   deepTint,
   useChartDirection,
   useChartText,
@@ -228,6 +229,7 @@ export function SoftAreaChart({
                 غريب»): it fades in where the pointer is («خليه fade خفيف»). */}
             <Tooltip
               isAnimationActive={false}
+              wrapperStyle={TOOLTIP_WRAPPER_STYLE}
               content={renderTooltip}
               cursor={{ stroke: CHART_AXIS_COLOR, strokeWidth: 1 }}
             />
