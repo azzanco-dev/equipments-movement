@@ -57,6 +57,7 @@ import { InquiryAllStatesShowcase } from '@/screens/ui-kit/InquiryAllStatesShowc
 import { HomeRedesignMockup } from '@/screens/ui-kit/HomeRedesignMockup'
 import { DenseDashboardMockup } from '@/screens/ui-kit/DenseDashboardMockup'
 import { SalesMockup } from '@/screens/ui-kit/SalesMockup'
+import { ActivityMockup } from '@/screens/ui-kit/ActivityMockup'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -123,6 +124,19 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // Owner 2026-11-02: a unit was set to «مباعة» and nobody could tell who
+    // did it → «خلنا نسوي سجل تعديلات المعدات، يكون ضمن النشاط، وصفحة النشاط
+    // يبغالها اعادة بناء برضه». The database side is migration 0168; the
+    // rebuilt page is reviewed here first.
+    id: 'activity-redesign',
+    title: 'نموذج صفحة النشاط الجديدة',
+    purpose:
+      'قائمة واحدة للحركات وتعديلات المعدات (قبل وبعد لكل حقل)، بشريط بحث وفلاتر وترتيب، وصف يتوسع للتفاصيل، وكروت على الجوال، مع كرت «سجل التعديلات» لصفحة المعدة، ببيانات عينة.',
+    status: 'review',
+    defaultOpen: true,
+    element: <ActivityMockup />,
+  },
   {
     // Owner 2026-11-01: the sales phase starts with «PO العملاء»; its four
     // screens are reviewed here as mockups, with the phase-1 decisions,
