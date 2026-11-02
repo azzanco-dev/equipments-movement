@@ -1,5 +1,14 @@
 import type { ReactNode } from 'react'
-import { CircleDashed, Hash, History, LogIn, LogOut, User, UserCheck } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  CircleDashed,
+  Hash,
+  History,
+  LogIn,
+  LogOut,
+  User,
+  UserCheck,
+} from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import { AppLink, cn } from '@/components/ui'
 import { ExitPurposeBadge } from '@/components/movement/ExitPurposeBadge'
@@ -12,8 +21,14 @@ import {
   type OutsideGap,
   type TimelineMovement,
 } from '@/lib/visitTimeline'
-import { visitStateKey } from '@/lib/inquiryYear'
 import {
+  inquiryJourneyItems,
+  visitStateKey,
+  type InquirySold,
+} from '@/lib/inquiryYear'
+import type { EquipmentCodeChange } from '@/lib/equipmentCodeHistory'
+import {
+  INQUIRY_EVENT_COLORS,
   INQUIRY_STATE_COLORS,
   INQUIRY_STATE_LABEL,
   INQUIRY_SURFACE,
@@ -224,9 +239,72 @@ function UnrecordedTile({ gap }: { gap: OutsideGap }) {
   )
 }
 
+/** A code change («التحويلات», owner 2026-11-02): «تحويل الكود من A028 الى
+ *  A128» with its Saudi day and, when given, the reason. The codes are LTR
+ *  runs inside the Arabic sentence. */
+function CodeChangeTile({ change }: { change: EquipmentCodeChange }) {
+  const { t } = useI18n()
+  const parts = t('inquiryCodeChange').split(/(\{from\}|\{to\})/)
+  return (
+    <div
+      className="min-w-0 flex-1 rounded-2xl px-3.5 py-2.5 text-xs"
+      style={{ backgroundColor: INQUIRY_EVENT_COLORS.fill }}
+    >
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="font-semibold">
+          {parts.map((part, position) =>
+            part === '{from}' || part === '{to}' ? (
+              <bdi key={position} dir="ltr" className="font-bold">
+                {part === '{from}' ? change.old_code : change.new_code}
+              </bdi>
+            ) : (
+              <span key={position}>{part}</span>
+            ),
+          )}
+        </span>
+        <span className="ms-auto text-muted">
+          <bdi dir="ltr">{formatDate(change.changed_at)}</bdi>
+        </span>
+      </div>
+      {change.reason && (
+        <p className="mt-1 break-words text-muted">
+          <span>{t('inquiryCodeChangeReason')}: </span>
+          {change.reason}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** The final «مباعة» tile of a sold unit (owner 2026-11-02, «تكون اخر حالة
+ *  مباعة»): after the last recorded exit, or alone when the unit never
+ *  moved — no sale date. */
+function SoldTile({ since }: { since: string | null }) {
+  const { t } = useI18n()
+  const colors = INQUIRY_STATE_COLORS.sold
+  return (
+    <div
+      className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl px-3.5 py-2.5 text-xs"
+      style={{ backgroundColor: colors.fill }}
+    >
+      <span className="text-sm font-bold">{t('equipmentStatusSold')}</span>
+      <span className="text-muted">
+        {since ? t('inquirySoldSinceExit') : t('inquirySoldNoMovements')}
+      </span>
+      {since && (
+        <span className="ms-auto text-muted">
+          <bdi dir="ltr">{formatDate(since)}</bdi>
+        </span>
+      )}
+    </div>
+  )
+}
+
 /**
  * «الرحلة» (owner 2026-10-26): every stay and every unrecorded stretch,
  * newest first, on one rail; no project/workshop filter («بدون فلتر»).
+ * Since 2026-11-02 the code changes sit among them as dated events and a
+ * sold unit ends with «مباعة» (`inquiryJourneyItems`).
  */
 /** The element id of a stay's tile, for the strip to scroll to. */
 export function inquiryVisitAnchor(key: string): string {
@@ -238,6 +316,8 @@ export function InquiryJourney({
   now,
   index,
   highlightedKey = null,
+  codeChanges = [],
+  sold = null,
   onSelectMovement,
   footer,
 }: {
@@ -246,12 +326,16 @@ export function InquiryJourney({
   now: number
   index: number
   highlightedKey?: string | null
+  /** The unit's code changes, shown as events among the stays. */
+  codeChanges?: readonly EquipmentCodeChange[]
+  /** A sold unit ends the journey with «مباعة». */
+  sold?: InquirySold | null
   onSelectMovement: (id: string) => void
   /** «عرض المزيد» under the stays. */
   footer?: ReactNode
 }) {
   const { t } = useI18n()
-  const items = buildTimelineItems(visits, now)
+  const items = inquiryJourneyItems(buildTimelineItems(visits, now), codeChanges, sold)
   return (
     <section className={cn(INQUIRY_SURFACE, 'inq-rise p-4')} style={inquiryRise(index)}>
       <div className="mb-4 flex items-center justify-between gap-2">
@@ -260,7 +344,7 @@ export function InquiryJourney({
           {t('inquiryVisitCount').replace('{count}', String(visits.length))}
         </span>
       </div>
-      {visits.length === 0 ? (
+      {items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl bg-surface px-4 py-10 text-center">
           <InquiryIconTile colors={INQUIRY_STATE_COLORS.unrecorded} size={40}>
             <CircleDashed size={18} />
@@ -299,7 +383,7 @@ export function InquiryJourney({
                     onSelectMovement={onSelectMovement}
                   />
                 </>
-              ) : (
+              ) : item.kind === 'gap' ? (
                 <>
                   <span className="relative flex h-9 w-8 shrink-0 items-center justify-center">
                     <InquiryIconTile colors={INQUIRY_STATE_COLORS.unrecorded} size={20}>
@@ -307,6 +391,24 @@ export function InquiryJourney({
                     </InquiryIconTile>
                   </span>
                   <UnrecordedTile gap={item.gap} />
+                </>
+              ) : item.kind === 'code_change' ? (
+                <>
+                  <span className="relative flex h-9 w-8 shrink-0 items-center justify-center">
+                    <InquiryIconTile colors={INQUIRY_EVENT_COLORS} size={20}>
+                      <ArrowLeftRight size={11} />
+                    </InquiryIconTile>
+                  </span>
+                  <CodeChangeTile change={item.change} />
+                </>
+              ) : (
+                <>
+                  <span className="relative flex h-9 w-8 shrink-0 items-center justify-center">
+                    <InquiryIconTile colors={INQUIRY_STATE_COLORS.sold} size={24}>
+                      {inquiryStateIcon('sold', 12)}
+                    </InquiryIconTile>
+                  </span>
+                  <SoldTile since={item.since} />
                 </>
               )}
             </li>

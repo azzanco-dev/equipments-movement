@@ -106,9 +106,11 @@ test('the fleet tables share one code column and have no local badge', () => {
 
 test('the inquiry no longer carries isNew in its state object', () => {
   const source = read('src/screens/inquiry/EquipmentInquiryScreen.tsx')
+  // Since 2026-11-02 the state object also carries the last movement's
+  // instant for the «مباعة» state; still no «جديدة» in it.
   assert.match(
     source,
-    /type InquiryState = \{ state: EquipmentState \} \| 'error' \| null/,
+    /type InquiryState =\s+\| \{\s+state: EquipmentState\s+(?:\/\*\*[\s\S]*?\*\/\s+)?lastMovementAt: number \| null\s+\}\s+\| 'error'\s+\| null/,
   )
   assert.ok(!/isNew: isEquipmentNew/.test(source))
   assert.match(

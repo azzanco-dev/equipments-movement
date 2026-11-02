@@ -5,7 +5,7 @@ import { formatDate } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
 import type { EquipmentState } from '@/lib/equipmentState'
 import type { EquipmentVisit } from '@/lib/visitTimeline'
-import { visitStateKey, type InquiryStateKey } from '@/lib/inquiryYear'
+import { visitStateKey, type InquirySold, type InquiryStateKey } from '@/lib/inquiryYear'
 import {
   INQUIRY_STATE_COLORS,
   INQUIRY_STATE_LABEL,
@@ -30,17 +30,20 @@ function stateKeyOf(state: EquipmentState | null): InquiryStateKey | null {
  * responsible for the movement; else «بدون تسجيل» with the last recorded
  * exit. The open visit comes from the visible movements; when the reader's
  * access hides it, the state of the latest movement (`state`) still names
- * where the unit is, without details.
+ * where the unit is, without details. A sold unit (owner 2026-11-02) reads
+ * «مباعة» whatever its movements say, with its last recorded exit under it.
  */
 export function InquiryNow({
   visits,
   state,
   now,
+  sold = null,
 }: {
   /** Newest first, as `buildEquipmentVisits` returns them. */
   visits: EquipmentVisit[]
   state: EquipmentState | null
   now: number
+  sold?: InquirySold | null
 }) {
   const { t, lang } = useI18n()
   const open = visits.find((visit) => visit.open && visit.startedAt) ?? null
@@ -53,7 +56,19 @@ export function InquiryNow({
   const people: { icon: ReactNode; label: string; value: string }[] = []
 
   const hiddenKey = open ? null : stateKeyOf(state)
-  if (open && open.context === 'site') {
+  if (sold) {
+    key = 'sold'
+    title = <span className="font-bold">{t('equipmentStatusSold')}</span>
+    if (last?.endedAt) {
+      since = last.endedAt
+      place = t('inquiryLastRecordedExit').replace(
+        '{place}',
+        last.context === 'workshop'
+          ? t('workshopLocation')
+          : (last.entry ?? last.exit)?.project_name || t('inquiryStateSite'),
+      )
+    } else if (!last && sold.since === null) place = t('inquirySoldNoMovements')
+  } else if (open && open.context === 'site') {
     key = 'site'
     title = (
       <>

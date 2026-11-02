@@ -42,14 +42,18 @@ import {
   inquiryVisitAnchor,
 } from '@/components/inquiry/InquiryJourney'
 import {
+  INQUIRY_STATE_COLORS,
   INQUIRY_SURFACE,
   InquiryCardTitle,
   InquiryStateDot,
   inquiryRise,
+  inquiryStateIcon,
 } from '@/components/inquiry/inquiryStyle'
 import { buildEquipmentVisits, type TimelineMovement } from '@/lib/visitTimeline'
 import {
   inquiryCountFrom,
+  inquirySoldOf,
+  inquiryYearMarkers,
   inquiryYearChoices,
   inquiryYearDays,
   inquiryYearMonths,
@@ -200,7 +204,15 @@ function writeRecent(units: RecentUnit[]) {
  * part of it: it is the row's age (`isEquipmentNew`, migration 0129) and
  * sits next to the code (owner decision 2026-10-14).
  */
-type InquiryState = { state: EquipmentState } | 'error' | null
+type InquiryState =
+  | {
+      state: EquipmentState
+      /** The instant of the latest movement (`get_last_movement`), for the
+       *  «مباعة» state of a sold unit: sold since its last exit. */
+      lastMovementAt: number | null
+    }
+  | 'error'
+  | null
 
 function toTimelineMovement(
   row: MovementLogTimelineRow,
@@ -505,11 +517,16 @@ export function EquipmentInquiryScreen({
               movement_type: string | null
               movement_context: string | null
               workshop_purpose: string | null
+              recorded_at: string | null
             }> | null
           )?.[0] ?? null
         // Migration 0129: «جديدة» is the row's age, not "no movement"; the
         // header derives it from `created_at` next to the code.
-        setInquiryState({ state: equipmentStateFromMovement(latest) })
+        const lastAt = latest?.recorded_at ? Date.parse(latest.recorded_at) : Number.NaN
+        setInquiryState({
+          state: equipmentStateFromMovement(latest),
+          lastMovementAt: Number.isFinite(lastAt) ? lastAt : null,
+        })
       }
       setCodeChangesError(Boolean(codeChangesResult.error))
       setCodeChanges(
@@ -771,13 +788,27 @@ export function EquipmentInquiryScreen({
   // 2026-10-28: the days between adding a unit and its first movement are
   // not «بدون تسجيل»).
   const countFrom = inquiryCountFrom(firstMovementAt, createdAt)
+  // «مباعة» (owner 2026-11-02): a sold unit's final state, from its last
+  // recorded movement; no sale date («مو شرط تاريخ البيع»).
+  const lastMovementAt =
+    inquiryState && inquiryState !== 'error' ? inquiryState.lastMovementAt : null
+  const sold = useMemo(
+    () => inquirySoldOf(equipment?.status, lastMovementAt),
+    [equipment?.status, lastMovementAt],
+  )
   const year = useMemo(() => {
     const yearVisits = buildEquipmentVisits(
       yearMovements.map((row) => toTimelineMovement(row, lang)),
     )
-    const days = inquiryYearDays(yearVisits, countFrom, now, selectedYear)
-    return { days, months: inquiryYearMonths(days), summary: summarizeInquiryYear(days) }
-  }, [yearMovements, lang, countFrom, now, selectedYear])
+    const days = inquiryYearDays(yearVisits, countFrom, now, selectedYear, sold)
+    return {
+      days,
+      months: inquiryYearMonths(days),
+      summary: summarizeInquiryYear(days),
+      // The code changes of the year as thin markers («التحويلات»).
+      markers: inquiryYearMarkers(codeChanges, days),
+    }
+  }, [yearMovements, lang, countFrom, now, selectedYear, sold, codeChanges])
   // From this year back to the year counting starts in.
   const yearChoices = inquiryYearChoices(
     Number.isFinite(countFrom) ? saudiYear(countFrom) : null,
@@ -1004,6 +1035,19 @@ export function EquipmentInquiryScreen({
                       </h2>
                       {inquiryState === 'error' ? (
                         <span className="text-sm text-danger">{t('dataLoadError')}</span>
+                      ) : sold ? (
+                        // «مباعة» over the derived state (owner 2026-11-02),
+                        // in the page's flat dark grey.
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                          style={{
+                            backgroundColor: INQUIRY_STATE_COLORS.sold.fill,
+                            color: INQUIRY_STATE_COLORS.sold.stroke,
+                          }}
+                        >
+                          {inquiryStateIcon('sold', 12)}
+                          {t('equipmentStatusSold')}
+                        </span>
                       ) : (
                         <EquipmentStateBadge state={state} assetStatus={equipment.status} />
                       )}
@@ -1040,10 +1084,10 @@ export function EquipmentInquiryScreen({
                     </Button>
                   </div>
                 </div>
-                <InquiryNow visits={visits} state={state} now={now} />
+                <InquiryNow visits={visits} state={state} now={now} sold={sold} />
               </section>
 
-              {visits.length > 0 && (
+              {(visits.length > 0 || sold) && (
                 <>
                   {/* The calendar year (owner 2026-10-27: «المفروض بالسنة»,
                       «طبقه»): this year from 1 January, any earlier year of
@@ -1100,6 +1144,7 @@ export function EquipmentInquiryScreen({
                       <InquiryYearStrip
                         days={year.days}
                         months={year.months}
+                        markers={year.markers}
                         index={6}
                         onSelectVisit={selectVisit}
                       />
@@ -1155,6 +1200,8 @@ export function EquipmentInquiryScreen({
                       now={now}
                       index={7}
                       highlightedKey={highlightedKey}
+                      codeChanges={codeChanges}
+                      sold={sold}
                       onSelectMovement={selectMovement}
                       footer={
                         hasMoreMovements && (

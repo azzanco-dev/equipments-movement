@@ -288,7 +288,13 @@ test('D: the clients read only the state fields from the inquiry call', () => {
   const call = inquiry.indexOf(".rpc('get_last_movement'")
   assert.ok(call > 0)
   const use = inquiry.slice(call, inquiry.indexOf('equipmentStateFromMovement(latest)', call))
-  assert.match(use, /movement_type: string \| null\s+movement_context: string \| null\s+workshop_purpose: string \| null\s+\}/)
+  // Plus `recorded_at` since 2026-11-02 (the «مباعة» state starts at the
+  // last movement); still none of the name fields.
+  assert.match(
+    use,
+    /movement_type: string \| null\s+movement_context: string \| null\s+workshop_purpose: string \| null\s+recorded_at: string \| null\s+\}/,
+  )
+  assert.doesNotMatch(use, /supervisor_name|driver_name|project_name/)
 })
 
 // --- E. classify_workshop_entry ---------------------------------------------------

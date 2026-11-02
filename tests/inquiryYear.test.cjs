@@ -154,7 +154,7 @@ test('the screen: AI-style start, rings, journey in full, no filter', () => {
   // a stay on it opens its tile in the history.
   assert.match(
     screen,
-    /<InquiryYearStrip\s+days=\{year\.days\}\s+months=\{year\.months\}\s+index=\{\d+\}\s+onSelectVisit=\{selectVisit\}/,
+    /<InquiryYearStrip\s+days=\{year\.days\}\s+months=\{year\.months\}\s+markers=\{year\.markers\}\s+index=\{\d+\}\s+onSelectVisit=\{selectVisit\}/,
   )
   assert.doesNotMatch(screen, /<InquiryYearRings/)
   assert.match(screen, /getElementById\(inquiryVisitAnchor\(key\)\)/)

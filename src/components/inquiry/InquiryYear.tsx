@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react'
-import { Calendar, CircleDashed, History, MapPin, Wrench } from 'lucide-react'
+import { ArrowLeftRight, Calendar, CircleDashed, History, MapPin, Wrench } from 'lucide-react'
+import { formatDate } from '@/lib/dateFormat'
 import { useI18n } from '@/i18n/I18nContext'
 import { cn } from '@/components/ui'
 import {
   INQUIRY_STATE_ORDER,
   type InquiryDay,
   type InquiryMonth,
+  type InquiryYearMarker,
   type InquiryYearSummary,
 } from '@/lib/inquiryYear'
 import {
@@ -206,8 +208,9 @@ function runsOf(days: InquiryDay[]): Run[] {
   return runs
 }
 
-/** The legend under a year view: each state with its days. */
-function YearLegend({ days }: { days: InquiryDay[] }) {
+/** The legend under a year view: each state with its days, and the code
+ *  changes marked on the strip when there are any. */
+function YearLegend({ days, markers = 0 }: { days: InquiryDay[]; markers?: number }) {
   const { t } = useI18n()
   const counts = new Map<string, number>()
   for (const day of days)
@@ -231,8 +234,26 @@ function YearLegend({ days }: { days: InquiryDay[] }) {
           <span className="text-muted">{t('days')}</span>
         </li>
       ))}
+      {markers > 0 && (
+        <li className="inline-flex items-center gap-1.5 rounded-full bg-surface px-2.5 py-1">
+          <span aria-hidden="true" className="h-2.5 w-0.5 rounded-full bg-fg" />
+          {t('inquiryCodeChanges')}
+          <span className="font-bold tabular-nums">{markers}</span>
+        </li>
+      )}
     </ul>
   )
+}
+
+/** «تحويل الكود من A028 الى A128 · 12/03/2026», for a marker's tooltip. */
+export function codeChangeMarkerLabel(
+  marker: InquiryYearMarker,
+  t: (key: 'inquiryCodeChange') => string,
+): string {
+  const text = t('inquiryCodeChange')
+    .replace('{from}', marker.change.old_code)
+    .replace('{to}', marker.change.new_code)
+  return `${text} · ${formatDate(marker.change.changed_at)}`
 }
 
 /**
@@ -241,16 +262,20 @@ function YearLegend({ days }: { days: InquiryDay[] }) {
  * end edge, every stay a block as long as it lasted in its state's colour,
  * named with its days when it lasted four weeks or more; «بدون تسجيل» light
  * grey; the days before the unit was added and after today left bare. A
- * stay opens its tile in the visit history below.
+ * stay opens its tile in the visit history below. A sold unit ends in a
+ * dark grey «مباعة» block, and every code change («التحويلات», owner
+ * 2026-11-02) is a thin marker on its day with the change as its tooltip.
  */
 export function InquiryYearStrip({
   days,
   months,
+  markers = [],
   index,
   onSelectVisit,
 }: {
   days: InquiryDay[]
   months: InquiryMonth[]
+  markers?: InquiryYearMarker[]
   index: number
   onSelectVisit: (key: string) => void
 }) {
@@ -328,6 +353,26 @@ export function InquiryYearStrip({
               </div>
             )
           })}
+          {markers.map((marker) => {
+            const label = codeChangeMarkerLabel(marker, t)
+            return (
+              <span
+                key={marker.change.id}
+                role="img"
+                title={label}
+                aria-label={label}
+                className="absolute inset-y-0 z-10 flex w-0.5 items-start justify-center bg-fg"
+                style={{ insetInlineStart: `calc(${pct(marker.position)}% - 1px)` }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="-mt-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-fg text-bg"
+                >
+                  <ArrowLeftRight size={8} />
+                </span>
+              </span>
+            )
+          })}
         </div>
         <div className="relative h-4 text-[11px] text-muted" aria-hidden="true">
           {labels.map(({ month, start }, position) => (
@@ -344,7 +389,7 @@ export function InquiryYearStrip({
           ))}
         </div>
       </div>
-      <YearLegend days={days} />
+      <YearLegend days={days} markers={markers.length} />
     </section>
   )
 }

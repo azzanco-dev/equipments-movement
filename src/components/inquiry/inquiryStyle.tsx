@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { Ban, CircleDashed, MapPin, ParkingCircle, Wrench } from 'lucide-react'
+import { Ban, CircleDashed, HandCoins, MapPin, ParkingCircle, Wrench } from 'lucide-react'
 import type { TranslationKey } from '@/i18n/translations'
 import type { InquiryStateKey } from '@/lib/inquiryYear'
 
@@ -48,6 +48,14 @@ export const INQUIRY_STATE_COLORS: Record<InquiryStateKey, InquiryColors> = {
     tint: 'var(--chart-4)',
     stroke: 'var(--chart-stroke-4)',
   },
+  // «مباعة» (owner 2026-11-02): a neutral dark grey, flat like the rest —
+  // deeper than the light grey of «بدون تسجيل», from the grey chart shade
+  // and the chart text colour, so it stays readable in dark mode.
+  sold: {
+    fill: 'color-mix(in srgb, var(--chart-stroke-4) 30%, var(--bg))',
+    tint: 'color-mix(in srgb, var(--chart-stroke-4) 55%, var(--bg))',
+    stroke: 'var(--chart-text)',
+  },
 }
 
 export const INQUIRY_STATE_LABEL: Record<InquiryStateKey, TranslationKey> = {
@@ -56,6 +64,7 @@ export const INQUIRY_STATE_LABEL: Record<InquiryStateKey, TranslationKey> = {
   parking: 'inquiryStateParking',
   out_of_service: 'inquiryStateOutOfService',
   unrecorded: 'inquiryStateUnrecorded',
+  sold: 'equipmentStatusSold',
 }
 
 /** A day's or a ring part's colour: a stay's strong colour, the light grey
@@ -113,8 +122,17 @@ export function inquiryStateIcon(key: InquiryStateKey, size: number): ReactNode 
           ? Ban
           : key === 'maintenance'
             ? Wrench
-            : CircleDashed
+            : key === 'sold'
+              ? HandCoins
+              : CircleDashed
   return <Icon size={size} />
+}
+
+/** The neutral tone of an event that is not a state (a code change). */
+export const INQUIRY_EVENT_COLORS: InquiryColors = {
+  fill: 'var(--surface)',
+  tint: 'var(--surface-hover)',
+  stroke: 'var(--muted)',
 }
 
 /** Borderless surface with a soft shadow. */

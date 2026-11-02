@@ -1586,6 +1586,12 @@ export const translations = {
     inquiryFacts: 'بيانات المعدة',
     inquiryCreatedAt: 'تاريخ الاضافة',
     inquiryYearLoadError: 'تعذر تحميل نشاط السنة.',
+    // 2026-11-02: «مباعة» as the final state, and code changes as events.
+    inquirySoldNoMovements: 'لم تسجل لها اي حركة، وحالتها الاخيرة مباعة.',
+    inquirySoldSinceExit: 'مباعة بعد اخر خروج مسجل',
+    inquiryCodeChange: 'تحويل الكود من {from} الى {to}',
+    inquiryCodeChanges: 'تحويلات الكود',
+    inquiryCodeChangeReason: 'السبب',
 
     // wave6-D
     confirmDeleteTitle: 'تاكيد الحذف',
@@ -3825,6 +3831,11 @@ export const translations = {
     inquiryFacts: 'Equipment details',
     inquiryCreatedAt: 'Added on',
     inquiryYearLoadError: 'Could not load the year.',
+    inquirySoldNoMovements: 'No movement was recorded; its final state is sold.',
+    inquirySoldSinceExit: 'Sold after the last recorded exit',
+    inquiryCodeChange: 'Code changed from {from} to {to}',
+    inquiryCodeChanges: 'Code changes',
+    inquiryCodeChangeReason: 'Reason',
 
     // wave6-D
     confirmDeleteTitle: 'Confirm Delete',

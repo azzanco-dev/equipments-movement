@@ -4,17 +4,22 @@
 // unit was in, and the days grouped by calendar month. Pure and import-free (type imports only),
 // so tests/inquiryYear.test.cjs loads it directly.
 
-import type { EquipmentVisit } from './visitTimeline'
+import type { EquipmentVisit, TimelineItem } from './visitTimeline'
+import type { EquipmentCodeChange } from './equipmentCodeHistory'
 
 /** One colour per state on the page. «بدون تسجيل» is a general state: no
  *  stay was recorded that day, wherever the unit was («مو شرط انها على
- *  الطريق … خليها حالة عامة»). */
+ *  الطريق … خليها حالة عامة»). «مباعة» (owner 2026-11-02, «ابغى اضمّن
+ *  البيعات … في صفحة الاستعلام») is the FINAL state of a unit whose
+ *  `equipment.status` is `sold`: from its last recorded movement to today,
+ *  with no sale date («مو شرط تاريخ البيع، من تاريخ اخر خروج»). */
 export type InquiryStateKey =
   | 'site'
   | 'maintenance'
   | 'parking'
   | 'out_of_service'
   | 'unrecorded'
+  | 'sold'
 
 /** The order states stack in, first at the start of a ring. */
 export const INQUIRY_STATE_ORDER: readonly InquiryStateKey[] = [
@@ -23,7 +28,30 @@ export const INQUIRY_STATE_ORDER: readonly InquiryStateKey[] = [
   'parking',
   'out_of_service',
   'unrecorded',
+  'sold',
 ]
+
+/** A sold unit: `since` is the instant of its last recorded movement (its
+ *  exit), `null` when it never moved — then every counted day is sold. */
+export interface InquirySold {
+  since: number | null
+}
+
+/** The sold state of an equipment row for the page: only `status = 'sold'`
+ *  counts; «منتهية» (`rental_ended`) keeps its own grey badge and its
+ *  derived days unchanged. */
+export function inquirySoldOf(
+  status: string | null | undefined,
+  lastMovementAt: number | null | undefined,
+): InquirySold | null {
+  if (status !== 'sold') return null
+  return {
+    since:
+      typeof lastMovementAt === 'number' && Number.isFinite(lastMovementAt)
+        ? lastMovementAt
+        : null,
+  }
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const SAUDI_OFFSET_MS = 3 * 60 * 60 * 1000
@@ -105,13 +133,16 @@ export interface InquiryDay {
  * (`inquiryCountFrom`: the first movement, else the creation), `future`
  * after today. A stay counts on its entry day, its exit day and
  * every day between (an open stay through today); a lone legacy exit has no
- * start and colours nothing.
+ * start and colours nothing. A sold unit (`sold`) is «مباعة» from the day
+ * of its last movement through today — over the exit day, as a later state
+ * always wins — or on every counted day when it never moved.
  */
 export function inquiryYearDays(
   visits: readonly EquipmentVisit[],
   countFrom: number,
   now: number,
   year: number,
+  sold: InquirySold | null = null,
 ): InquiryDay[] {
   const { firstDay, lastDay } = inquiryYearRange(year, now)
   const today = saudiDay(now)
@@ -138,7 +169,91 @@ export function inquiryYearDays(
       days[day - firstDay].visit = visit
     }
   }
+  if (sold) {
+    const since = sold.since === null ? created : Math.max(created, saudiDay(sold.since))
+    for (let day = Math.max(since, firstDay); day <= last; day += 1) {
+      days[day - firstDay].state = 'sold'
+      days[day - firstDay].visit = null
+    }
+  }
   return days
+}
+
+/** A code change («التحويلات», owner 2026-11-02) placed on the year strip:
+ *  `position` is the index of its Saudi day in `days`. */
+export interface InquiryYearMarker {
+  change: EquipmentCodeChange
+  position: number
+  day: number
+}
+
+/** The code changes that fall inside the year's days, oldest first; a
+ *  change outside the year (or with an unreadable time) is skipped. */
+export function inquiryYearMarkers(
+  changes: readonly EquipmentCodeChange[],
+  days: readonly InquiryDay[],
+): InquiryYearMarker[] {
+  if (days.length === 0) return []
+  const firstDay = days[0].day
+  const lastDay = days[days.length - 1].day
+  const markers: InquiryYearMarker[] = []
+  for (const change of changes) {
+    const at = Date.parse(change.changed_at)
+    if (Number.isNaN(at)) continue
+    const day = saudiDay(at)
+    if (day < firstDay || day > lastDay) continue
+    markers.push({ change, position: day - firstDay, day })
+  }
+  return markers.sort(
+    (a, b) =>
+      Date.parse(a.change.changed_at) - Date.parse(b.change.changed_at) ||
+      (a.change.id < b.change.id ? -1 : a.change.id > b.change.id ? 1 : 0),
+  )
+}
+
+/** «الرحلة» with its events: the stays and gaps of `buildTimelineItems`,
+ *  every code change as a dated event among them, and the final «مباعة»
+ *  tile of a sold unit. Newest first, like the timeline items. */
+export type InquiryJourneyItem =
+  | TimelineItem
+  | { kind: 'code_change'; key: string; sortAt: string; change: EquipmentCodeChange }
+  | { kind: 'sold'; key: string; sortAt: string; since: string | null }
+
+function instantOf(value: string): number {
+  const ms = Date.parse(value)
+  return Number.isNaN(ms) ? 0 : ms
+}
+
+/**
+ * Places the code changes among the timeline items by time (a change at the
+ * same instant as an item sits above it) and, for a sold unit, ends the
+ * journey with «مباعة»: the open «بدون تسجيل» stretch after the last exit is
+ * dropped — the unit is sold, not unrecorded — and the sold tile is the
+ * newest item whatever the dates.
+ */
+export function inquiryJourneyItems(
+  items: readonly TimelineItem[],
+  changes: readonly EquipmentCodeChange[],
+  sold: InquirySold | null = null,
+): InquiryJourneyItem[] {
+  const events: InquiryJourneyItem[] = changes
+    .filter((change) => !Number.isNaN(Date.parse(change.changed_at)))
+    .map((change) => ({
+      kind: 'code_change' as const,
+      key: `code:${change.id}`,
+      sortAt: change.changed_at,
+      change,
+    }))
+  const kept: InquiryJourneyItem[] = sold
+    ? items.filter((item) => !(item.kind === 'gap' && item.gap.open))
+    : [...items]
+  // Stable: the events first, so on a tie an event stays above the item.
+  const merged = [...events, ...kept].sort(
+    (a, b) => instantOf(b.sortAt) - instantOf(a.sortAt),
+  )
+  if (!sold) return merged
+  const since = sold.since === null ? null : new Date(sold.since).toISOString()
+  return [{ kind: 'sold', key: 'sold', sortAt: since ?? '', since }, ...merged]
 }
 
 export interface InquiryMonth {
@@ -154,7 +269,7 @@ export interface InquiryMonth {
 }
 
 function emptyCounts(): Record<InquiryStateKey, number> {
-  return { site: 0, maintenance: 0, parking: 0, out_of_service: 0, unrecorded: 0 }
+  return { site: 0, maintenance: 0, parking: 0, out_of_service: 0, unrecorded: 0, sold: 0 }
 }
 
 /** The year's days by calendar month, January first. */
@@ -191,6 +306,8 @@ export interface InquiryYearSummary {
   /** Maintenance, standby and out of service together. */
   workshopDays: number
   unrecordedDays: number
+  /** Days after the sale (a sold unit's final state). */
+  soldDays: number
   /** Stays with at least one day in the window. */
   visitCount: number
   /** Whole percent of the counted days spent in a project. */
@@ -215,6 +332,7 @@ export function summarizeInquiryYear(days: readonly InquiryDay[]): InquiryYearSu
     siteDays: counts.site,
     workshopDays: counts.maintenance + counts.parking + counts.out_of_service,
     unrecordedDays: counts.unrecorded,
+    soldDays: counts.sold,
     visitCount: visits.size,
     siteShare: counted > 0 ? Math.round((counts.site / counted) * 100) : 0,
   }
