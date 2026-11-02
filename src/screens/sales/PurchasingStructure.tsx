@@ -35,7 +35,9 @@ import {
   type SampleLine,
 } from './purchasingModel'
 
-// REVIEW PAGE of the purchasing module structure («PO الموردين») on /sales.
+// REVIEW PAGE of the purchasing module structure («PO الموردين») on
+// /sales-structure (it was /sales until 2026-11-02, when /sales became the
+// sales section of the app: «PO العملاء» and «كروت المعدات»).
 // Like /ui-kit it is open in development and admin-only in production. It
 // renders the proposed phases, entities, relations and the PO lifecycle from
 // purchasingModel.ts; nothing here reads or writes the database.

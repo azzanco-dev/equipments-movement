@@ -1,6 +1,6 @@
 // Proposed data model of the purchasing module («PO الموردين»), as discussed
 // with the product owner on 2026-10-15 and 2026-10-17. This is REVIEW
-// material rendered on /sales: nothing here exists in the database yet, the
+// material rendered on /sales-structure: nothing here exists in the database yet, the
 // names are tentative and every row is sample data. Arabic copy follows the
 // project rule of plain alif (no hamza/madda) for new text.
 

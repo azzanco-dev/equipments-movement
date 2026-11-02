@@ -2,6 +2,6 @@
 
 import { PurchasingStructure } from '@/screens/sales/PurchasingStructure'
 
-export default function SalesPage() {
+export default function SalesStructurePage() {
   return <PurchasingStructure />
 }
