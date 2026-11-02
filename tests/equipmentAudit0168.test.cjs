@@ -34,11 +34,9 @@ test('0168 is the only 0168 and comes after 0167', () => {
   const file0167 = files.find((f) => /_0167_/.test(f))
   assert.ok(file0167)
   assert.ok(file > file0167, 'the 0168 timestamp sorts after 0167')
-  assert.equal(
-    files.filter((f) => f > file0167).length,
-    1,
-    '0168 is the latest migration',
-  )
+  // 0169 (client POs) and 0170 (the activity_log view) follow it since
+  // 2026-11-02; 0168 only has to be the first after 0167.
+  assert.equal(files.filter((f) => f > file0167)[0], file)
 })
 
 test('the table has the audit columns and no updated_at', () => {
