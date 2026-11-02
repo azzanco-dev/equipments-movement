@@ -243,11 +243,9 @@ const MovementImport = dynamic(
     import('@/screens/MovementImport').then((module) => module.MovementImport),
   { loading: screenLoading },
 )
-const MovementActivity = dynamic(
+const ActivityScreen = dynamic(
   () =>
-    import('@/screens/MovementActivity').then(
-      (module) => module.MovementActivity,
-    ),
+    import('@/screens/ActivityScreen').then((module) => module.ActivityScreen),
   { loading: listLoading },
 )
 const EntryReports = dynamic(
@@ -637,7 +635,7 @@ function AppContent() {
               <AdminUsers onSelectUser={(id) => router.push(`/users/${id}`)} />
             )}
             {page === 'movement-import' && <MovementImport />}
-            {page === 'activity' && <MovementActivity />}
+            {page === 'activity' && <ActivityScreen />}
             {page === 'reports/workshop' && (
               <WorkshopReports onSelectMovement={openMovement} />
             )}

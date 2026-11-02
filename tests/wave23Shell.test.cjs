@@ -1001,7 +1001,8 @@ test('App.tsx renders each screen behind its page', () => {
     drivers: 'AdminDrivers',
     users: 'AdminUsers',
     'movement-import': 'MovementImport',
-    activity: 'MovementActivity',
+    // The rebuilt activity page (2026-11-02) replaced MovementActivity.
+    activity: 'ActivityScreen',
   }
   for (const [page, component] of Object.entries(components))
     assert.match(

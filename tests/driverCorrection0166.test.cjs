@@ -93,8 +93,10 @@ test('a corrected change row is audited as driver_change', () => {
   assert.match(code, /insert into public\.movement_audit_logs/)
   assert.match(code, /array\['driver_change'\]/)
   assert.match(
-    read('src', 'screens', 'MovementActivity.tsx'),
-    /driver_change: t\('driverCorrectionAuditField'\)/,
+    // The rebuilt activity page (2026-11-02) labels the fields in
+    // src/lib/activityLog.ts.
+    read('src', 'lib', 'activityLog.ts'),
+    /driver_change: 'driverCorrectionAuditField'/,
   )
 })
 

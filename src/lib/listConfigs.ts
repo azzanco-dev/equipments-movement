@@ -3,6 +3,11 @@ import type {
   FilterOperator,
   FilterOption,
 } from '@/components/data-list/types'
+import {
+  ACTIVITY_FIELD_FILTER_KEY,
+  ACTIVITY_KIND_FILTER_KEY,
+  activityFieldFilterOptions,
+} from '@/lib/activityFields'
 import { EMPTY_FILTER_VALUE } from '@/lib/applyListFilters'
 import {
   DRIVER_EMPLOYMENT_TYPES,
@@ -628,6 +633,96 @@ export const logsListConfig: DataListConfig = {
     { key: 'recorded_at', label: { ar: 'وقت الحركة', en: 'Movement time' } },
     { key: 'created_at', label: { ar: 'وقت الانشاء', en: 'Created' } },
     { key: 'movement_type', label: 'movementType' },
+    { key: 'equipment_code', label: 'equipmentCode' },
+  ],
+}
+
+/**
+ * «سجل النشاط» (/activity, owner 2026-11-02, approved on /ui-kit «نموذج صفحة
+ * النشاط الجديدة»): one list over the movement log and the equipment change
+ * log through the view `activity_log` (migration 0170). Searched by the unit
+ * code and the actor's name; the kind («الحركات» / «المعدات», the segmented
+ * switch of the toolbar) is a filter like the others, the movement context
+ * is offered only for movements and the «الحقل» filter (`changed_fields`
+ * overlaps the ticked keys, applied by the screen) only for equipment
+ * changes; the date filter carries the month presets; newest first.
+ */
+export const activityListConfig: DataListConfig = {
+  id: 'activity',
+  searchPlaceholder: 'searchActivity',
+  searchFields: ['equipment_code', 'actor_name'],
+  defaultSort: 'created_at',
+  defaultDirection: 'desc',
+  filterFields: [
+    {
+      key: ACTIVITY_KIND_FILTER_KEY,
+      label: 'activityKindFilter',
+      type: 'select',
+      operators: ['eq'],
+      options: [
+        {
+          value: 'movement',
+          label: 'الحركات',
+          labelI18n: 'activityKindMovements',
+        },
+        {
+          value: 'equipment',
+          label: 'المعدات',
+          labelI18n: 'activityKindEquipments',
+        },
+      ],
+    },
+    {
+      key: 'action',
+      label: 'action',
+      type: 'select',
+      operators: ['eq', 'neq'],
+      options: [
+        { value: 'create', label: 'اضافة', labelI18n: 'activityCreated' },
+        { value: 'update', label: 'تعديل', labelI18n: 'activityUpdated' },
+        { value: 'delete', label: 'حذف', labelI18n: 'activityDeleted' },
+      ],
+    },
+    // The options come from `activityActorFilterOptions` passed as
+    // `asyncFields` (server-side search over `profile_names`, 20 results,
+    // plus «النظام» for rows with no actor).
+    {
+      key: 'actor_id',
+      label: 'user',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'movement_context',
+      label: 'location',
+      type: 'select',
+      operators: ['eq'],
+      options: [
+        { value: 'site', label: 'المشاريع', labelI18n: 'logsSites' },
+        { value: 'workshop', label: 'الورشة', labelI18n: 'workshopLocation' },
+      ],
+      visibleWhen: { field: ACTIVITY_KIND_FILTER_KEY, includes: 'movement' },
+    },
+    {
+      key: ACTIVITY_FIELD_FILTER_KEY,
+      label: 'activityFieldFilter',
+      type: 'select',
+      operators: ['in'],
+      options: activityFieldFilterOptions(),
+      multiple: true,
+      visibleWhen: { field: ACTIVITY_KIND_FILTER_KEY, includes: 'equipment' },
+    },
+    {
+      key: 'created_at',
+      label: 'activityColTime',
+      type: 'date',
+      operators: dateOps,
+    },
+  ],
+  sortableFields: [
+    { key: 'created_at', label: 'activityColTime' },
     { key: 'equipment_code', label: 'equipmentCode' },
   ],
 }
