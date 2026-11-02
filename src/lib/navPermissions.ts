@@ -40,6 +40,7 @@ export type NavItemKey =
   | 'companies'
   | 'lessors'
   | 'purchasing'
+  | 'sales'
   | 'drivers'
   | 'users'
   | 'activity'
@@ -53,6 +54,8 @@ export type NavChildKey =
   | 'reports/workshop'
   | 'purchasing/orders'
   | 'purchasing/units'
+  | 'sales/orders'
+  | 'sales/cards'
 
 /** One permission key, optionally limited to some of its scopes. */
 export interface NavGate {
@@ -125,6 +128,17 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
       { key: 'purchasing/orders', requires: [{ key: 'purchasing.view' }] },
       // «المعدات في المشاريع» (owner 2026-10-24, migration 0147).
       { key: 'purchasing/units', requires: [{ key: 'purchasing.view' }] },
+    ],
+  },
+  // Sales phase 1 (migration 0169, screens 2026-11-02): a parent like
+  // «المشتريات» with «PO العملاء» first and «كروت المعدات»; the key is held
+  // by the admin, the custom «المبيعات» role and (view only) «المشتريات».
+  {
+    key: 'sales',
+    requires: [{ key: 'sales.view' }],
+    children: [
+      { key: 'sales/orders', requires: [{ key: 'sales.view' }] },
+      { key: 'sales/cards', requires: [{ key: 'sales.view' }] },
     ],
   },
   { key: 'drivers', requires: [{ key: 'drivers.read' }] },
@@ -294,6 +308,8 @@ export type RoutePage =
   | 'drivers/:id'
   | 'users/:id'
   | 'purchasing/:id'
+  | 'sales/:id'
+  | 'sales/cards/:id'
   | 'print/export'
 
 type ExtraPage = Exclude<RoutePage, NavItemKey | NavChildKey>
@@ -317,6 +333,9 @@ const PAGE_GATES: Readonly<Record<ExtraPage, readonly NavGate[]>> = {
   'drivers/:id': [{ key: 'drivers.read' }],
   'users/:id': [{ key: 'users.manage' }],
   'purchasing/:id': [{ key: 'purchasing.view' }],
+  // Sales phase 1 (0169): the client PO page and the equipment card page.
+  'sales/:id': [{ key: 'sales.view' }],
+  'sales/cards/:id': [{ key: 'sales.view' }],
   'print/export': [{ key: 'movements.export' }],
 }
 
@@ -369,6 +388,13 @@ export function routePageOf(segments: readonly string[]): RoutePage {
     if (!second || second === 'orders') return 'purchasing/orders'
     if (second === 'units') return 'purchasing/units'
     return 'purchasing/:id'
+  }
+  if (first === 'sales') {
+    // /sales opens its first section, like /purchasing; /sales/cards/:id is
+    // an equipment card, any other second segment a client PO id.
+    if (!second || second === 'orders') return 'sales/orders'
+    if (second === 'cards') return third ? 'sales/cards/:id' : 'sales/cards'
+    return 'sales/:id'
   }
   if (first === 'reports') {
     if (second === 'workshop') return 'reports/workshop'
@@ -468,6 +494,11 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'purchasing/orders',
   'purchasing/units',
   'purchasing/:id',
+  'sales',
+  'sales/orders',
+  'sales/cards',
+  'sales/:id',
+  'sales/cards/:id',
 ]
 /**
  * The field home's own pages (its home, the inquiry, the movement form and

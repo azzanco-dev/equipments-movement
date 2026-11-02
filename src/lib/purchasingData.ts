@@ -164,6 +164,14 @@ export interface SiteUnitRow {
   has_po: boolean
   party_po_id: string | null
   party_po_number: string | null
+  /** 0169 (trailing columns, selected for a `sales.view` reader only): the
+   *  open client PO the unit sits on there, else the open client PO of
+   *  that company and project it could join. */
+  client_po_id?: string | null
+  client_po_number?: string | null
+  has_client_po?: boolean | null
+  project_client_po_id?: string | null
+  project_client_po_number?: string | null
 }
 
 /** Only what the «المعدات في المشاريع» tiles show and the add needs. */

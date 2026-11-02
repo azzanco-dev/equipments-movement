@@ -1114,3 +1114,261 @@ export const siteUnitsListConfig: DataListConfig = {
     { key: 'equipment_lessor_name', label: 'supplierPoSupplier' },
   ],
 }
+
+/**
+ * sales-screens (migration 0169), «حسب المعدات» of «PO العملاء»: one row per
+ * unit on a client PO, over `sales_po_units`, with its PO number. The same
+ * shape as `poUnitsListConfig`; the open POs by default (a visible,
+ * removable default filter).
+ */
+export const clientPoUnitsListConfig: DataListConfig = {
+  id: 'clientPoUnits',
+  searchPlaceholder: {
+    ar: 'البحث برقم المعدة او النوع او اللوحة او الشاصي او رقم PO العميل',
+    en: 'Search by unit, type, plate, chassis or client PO number',
+  },
+  searchFields: [
+    'equipment_code',
+    'equipment_type_search',
+    'equipment_plate_number',
+    'equipment_chassis_number',
+    'equipment_plate_digits',
+    'po_number',
+  ],
+  defaultSort: 'equipment_code',
+  defaultDirection: 'asc',
+  filterFields: [
+    {
+      key: 'po_status',
+      label: 'status',
+      type: 'select',
+      operators: ['eq', 'neq'],
+      options: [
+        { value: 'open', label: 'مفتوح', labelI18n: 'supplierPoStatusOpen' },
+        {
+          value: 'closed',
+          label: 'مغلق',
+          labelI18n: 'supplierPoStatusClosed',
+        },
+      ],
+    },
+    {
+      key: 'company_id',
+      label: 'company',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'project_id',
+      label: 'project',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'is_priced',
+      label: 'poUnitsPricedFilter',
+      type: 'select',
+      operators: ['eq'],
+      options: [
+        { value: 'true', label: 'مسعرة', labelI18n: 'poUnitsPriced' },
+        { value: 'false', label: 'بدون سعر', labelI18n: 'poUnitsUnpriced' },
+      ],
+    },
+  ],
+  defaultFilters: [
+    {
+      id: 'default-po-status',
+      field: 'po_status',
+      operator: 'eq',
+      value: 'open',
+    },
+  ],
+  sortableFields: [
+    { key: 'equipment_code', label: 'equipmentCode' },
+    { key: 'po_number', label: 'clientPoNumber' },
+    { key: 'card_period_from', label: 'supplierPoStartDate' },
+    { key: 'price', label: 'salePrice' },
+    { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
+  ],
+}
+
+/**
+ * sales-screens (migration 0169), «حسب الاوامر» of «PO العملاء»: the client
+ * purchase orders, over `client_pos`. Search is the client's PO number; the
+ * allowlisted filters are the status, the company and project (searched
+ * server-side through `asyncFields`) and priced / unpriced.
+ */
+export const clientPosListConfig: DataListConfig = {
+  id: 'clientPos',
+  searchPlaceholder: 'clientPoSearchPlaceholder',
+  searchFields: ['po_number'],
+  defaultSort: 'issue_date',
+  defaultDirection: 'desc',
+  filterFields: [
+    {
+      key: 'status',
+      label: 'status',
+      type: 'select',
+      operators: ['eq', 'neq'],
+      options: [
+        { value: 'open', label: 'مفتوح', labelI18n: 'supplierPoStatusOpen' },
+        {
+          value: 'closed',
+          label: 'مغلق',
+          labelI18n: 'supplierPoStatusClosed',
+        },
+      ],
+    },
+    {
+      key: 'company_id',
+      label: 'company',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'project_id',
+      label: 'project',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    // The computed column unpriced_count(client_pos): «تحتاج تسعير» = at
+    // least one line without a price (a yes / no choice).
+    {
+      key: 'unpriced_count',
+      label: 'supplierPoNeedsPrices',
+      type: 'select',
+      operators: ['gt', 'eq'],
+      options: [],
+      choices: [
+        { key: 'needs_prices', operator: 'gt', value: '0', label: 'yes' },
+        { key: 'all_priced', operator: 'eq', value: '0', label: 'no' },
+      ],
+    },
+  ],
+  defaultFilters: [
+    {
+      id: 'default-status',
+      field: 'status',
+      operator: 'eq',
+      value: 'open',
+    },
+  ],
+  sortableFields: [
+    { key: 'issue_date', label: 'clientPoIssueDate' },
+    { key: 'po_number', label: 'clientPoNumber' },
+    { key: 'expiry_date', label: 'clientPoExpiryDate' },
+    { key: 'status', label: 'status' },
+    { key: 'created_at', label: 'supplierPoCreatedAt' },
+    { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
+  ],
+}
+
+/**
+ * sales-screens (migration 0169), «كروت المعدات»: every «كرت المعدة» with
+ * both sides, over `sales_equipment_cards`. Server-side search, filters and
+ * sort like every list; the open cards first by default.
+ */
+export const equipmentCardsListConfig: DataListConfig = {
+  id: 'equipmentCards',
+  searchPlaceholder: {
+    ar: 'البحث برقم المعدة او النوع او اللوحة او الشاصي او رقم PO',
+    en: 'Search by unit, type, plate, chassis or PO number',
+  },
+  searchFields: [
+    'equipment_code',
+    'equipment_type_search',
+    'equipment_plate_number',
+    'equipment_chassis_number',
+    'equipment_plate_digits',
+    'client_po_number',
+    'supplier_po_number',
+  ],
+  defaultSort: 'is_open',
+  defaultDirection: 'desc',
+  filterFields: [
+    {
+      key: 'company_id',
+      label: 'company',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'project_id',
+      label: 'project',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'is_open',
+      label: 'status',
+      type: 'select',
+      operators: ['eq'],
+      options: [
+        {
+          value: 'true',
+          label: 'مفتوح',
+          labelI18n: 'equipmentCardStatusOpen',
+        },
+        {
+          value: 'false',
+          label: 'منتهي',
+          labelI18n: 'equipmentCardStatusEnded',
+        },
+      ],
+    },
+    {
+      key: 'has_client_po',
+      label: 'clientPo',
+      type: 'select',
+      operators: ['eq'],
+      options: [
+        {
+          value: 'false',
+          label: 'بدون PO عميل',
+          labelI18n: 'equipmentCardNoClientPo',
+        },
+        {
+          value: 'true',
+          label: 'عليها PO عميل',
+          labelI18n: 'equipmentCardHasClientPo',
+        },
+      ],
+    },
+    {
+      key: 'has_supplier_po',
+      label: 'supplierPo',
+      type: 'select',
+      operators: ['eq'],
+      options: [
+        {
+          value: 'false',
+          label: 'بدون PO مورد',
+          labelI18n: 'equipmentCardNoSupplierPo',
+        },
+        {
+          value: 'true',
+          label: 'عليها PO مورد',
+          labelI18n: 'equipmentCardHasSupplierPo',
+        },
+      ],
+    },
+  ],
+  sortableFields: [
+    { key: 'is_open', label: 'equipmentCardsSortOpenFirst' },
+    { key: 'equipment_code', label: 'equipmentCode' },
+    { key: 'period_from', label: 'equipmentPurchasingPeriod' },
+    { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
+  ],
+}

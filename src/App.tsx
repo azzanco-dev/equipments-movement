@@ -26,6 +26,7 @@ import {
   BarChart3,
   Search,
   ShoppingCart,
+  Receipt,
 } from 'lucide-react'
 import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog'
 import { RouteFallback } from '@/components/RouteFallback'
@@ -201,6 +202,36 @@ const SupplierPoDetail = dynamic(
     ),
   { loading: screenLoading },
 )
+// Sales phase 1 (migration 0169, screens 2026-11-02): the client PO list and
+// page and the equipment cards, behind the `sales.view` gates.
+const ClientPosListScreen = dynamic(
+  () =>
+    import('@/screens/sales/ClientPosListScreen').then(
+      (module) => module.ClientPosListScreen,
+    ),
+  { loading: listLoading },
+)
+const ClientPoDetail = dynamic(
+  () =>
+    import('@/screens/sales/ClientPoDetail').then(
+      (module) => module.ClientPoDetail,
+    ),
+  { loading: screenLoading },
+)
+const EquipmentCardsScreen = dynamic(
+  () =>
+    import('@/screens/sales/EquipmentCardsScreen').then(
+      (module) => module.EquipmentCardsScreen,
+    ),
+  { loading: listLoading },
+)
+const EquipmentCardDetail = dynamic(
+  () =>
+    import('@/screens/sales/EquipmentCardDetail').then(
+      (module) => module.EquipmentCardDetail,
+    ),
+  { loading: screenLoading },
+)
 const UserDetail = dynamic(
   () => import('@/screens/UserDetail').then((module) => module.UserDetail),
   { loading: screenLoading },
@@ -294,6 +325,7 @@ const NAV_PRESENTATION: Record<
   companies: { label: 'companies', icon: <Briefcase size={18} /> },
   lessors: { label: 'lessors', icon: <Building2 size={18} /> },
   purchasing: { label: 'purchasing', icon: <ShoppingCart size={18} /> },
+  sales: { label: 'sales', icon: <Receipt size={18} /> },
   drivers: { label: 'drivers', icon: <Contact size={18} /> },
   users: { label: 'users', icon: <Users size={18} /> },
   activity: { label: 'activityLog', icon: <History size={18} /> },
@@ -308,6 +340,8 @@ const NAV_CHILD_LABELS: Record<NavChildKey, TranslationKey> = {
   'reports/workshop': 'workshopReports',
   'purchasing/orders': 'supplierPos',
   'purchasing/units': 'siteUnits',
+  'sales/orders': 'clientPos',
+  'sales/cards': 'equipmentCards',
 }
 
 /**
@@ -544,6 +578,40 @@ function AppContent() {
                 ? (id) => router.push(`/purchasing/${id}`)
                 : undefined
             }
+            onOpenClientPo={
+              shell.pages.has('sales/:id')
+                ? (id) => router.push(`/sales/${id}`)
+                : undefined
+            }
+          />
+        ) : page === 'sales/:id' ? (
+          <ClientPoDetail
+            poId={detailId}
+            onBack={() => router.push('/sales/orders')}
+            onOpenEquipment={
+              canOpenEquipment
+                ? (id) => router.push(`/equipment/${id}`)
+                : undefined
+            }
+          />
+        ) : page === 'sales/cards/:id' ? (
+          <EquipmentCardDetail
+            cardId={segments[2] ?? ''}
+            onBack={() => router.push('/sales/cards')}
+            onOpenEquipment={
+              canOpenEquipment
+                ? (id) => router.push(`/equipment/${id}`)
+                : undefined
+            }
+            onOpenMovement={
+              shell.pages.has('movements/:id') ? openMovement : undefined
+            }
+            onOpenClientPo={(id) => router.push(`/sales/${id}`)}
+            onOpenSupplierPo={
+              shell.pages.has('purchasing/:id')
+                ? (id) => router.push(`/purchasing/${id}`)
+                : undefined
+            }
           />
         ) : page === 'purchasing/:id' ? (
           <SupplierPoDetail
@@ -624,6 +692,21 @@ function AppContent() {
                 onSelectMovement={
                   shell.pages.has('movements/:id') ? openMovement : undefined
                 }
+                onSelectClientPo={
+                  shell.pages.has('sales/:id')
+                    ? (id) => router.push(`/sales/${id}`)
+                    : undefined
+                }
+              />
+            )}
+            {page === 'sales/orders' && (
+              <ClientPosListScreen
+                onSelectPo={(id) => router.push(`/sales/${id}`)}
+              />
+            )}
+            {page === 'sales/cards' && (
+              <EquipmentCardsScreen
+                onSelectCard={(id) => router.push(`/sales/cards/${id}`)}
               />
             )}
             {page === 'drivers' && (

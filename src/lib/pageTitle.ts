@@ -29,6 +29,7 @@ const PAGE_TITLES: Readonly<
   companies: { kind: 'top', name: 'companies' },
   lessors: { kind: 'top', name: 'lessors' },
   purchasing: { kind: 'top', name: 'purchasing' },
+  sales: { kind: 'top', name: 'sales' },
   drivers: { kind: 'top', name: 'drivers' },
   users: { kind: 'top', name: 'users' },
   activity: { kind: 'top', name: 'activityLog' },
@@ -57,6 +58,9 @@ const PAGE_TITLES: Readonly<
     section: 'purchasing',
   },
   'purchasing/units': { kind: 'sub', name: 'siteUnits', section: 'purchasing' },
+  // Sales phase 1 (migration 0169): «PO العملاء» and «كروت المعدات».
+  'sales/orders': { kind: 'sub', name: 'clientPos', section: 'sales' },
+  'sales/cards': { kind: 'sub', name: 'equipmentCards', section: 'sales' },
   'settings/equipment-types': {
     kind: 'sub',
     name: 'equipmentTypes',
@@ -82,6 +86,8 @@ const PAGE_TITLES: Readonly<
   'drivers/:id': { kind: 'detail', section: 'drivers' },
   'users/:id': { kind: 'detail', section: 'users' },
   'purchasing/:id': { kind: 'detail', section: 'supplierPos' },
+  'sales/:id': { kind: 'detail', section: 'clientPos' },
+  'sales/cards/:id': { kind: 'detail', section: 'equipmentCards' },
 }
 
 const join = (...parts: string[]) => parts.join(TAB_TITLE_SEPARATOR)

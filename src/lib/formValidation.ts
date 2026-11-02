@@ -3,6 +3,7 @@ import type { TranslationKey } from '@/i18n/translations'
 import { isValidUserMobile, normalizeUserMobileInput } from '@/lib/userMobile'
 import { DRIVER_EMPLOYEE_NUMBER_MAX } from '@/lib/driverEmployeeNumber'
 import { isValidSupplierPoPrice } from '@/lib/purchasing'
+import { isValidClientPoQuantity, isValidStandardHours } from '@/lib/sales'
 
 /**
  * Per-field validation messages for one form: the field name maps to the
@@ -640,6 +641,96 @@ export const supplierPoEditFormSchema = supplierPoFormSchema.innerType().pick({
   start_date: true,
   notes: true,
 })
+
+// --- sales-screens (migration 0169) ----------------------------------------------
+
+/** `client_pos.po_number`: the client's own number, at most 60 characters. */
+export const CLIENT_PO_NUMBER_MAX = 60
+
+/** The PO's or a line's standard hours: a positive whole number. */
+function clientPoStandardHours({ required }: { required: boolean }) {
+  const base = z.string().trim()
+  return (
+    required ? base.min(1, message('clientPoStandardHoursRequired')) : base
+  ).refine(
+    (value) => !value || isValidStandardHours(value),
+    message('clientPoStandardHoursInvalid'),
+  )
+}
+
+/** The expiry date, when given, is never before the issue date (the
+ *  database refuses it as `invalid_expiry_date`). */
+function expiryAfterIssue(
+  form: { issue_date: string; expiry_date: string },
+  context: z.RefinementCtx,
+) {
+  if (form.expiry_date && form.issue_date && form.expiry_date < form.issue_date)
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['expiry_date'],
+      message: 'clientPoExpiryBeforeIssue',
+    })
+}
+
+/**
+ * «PO عميل جديد» (create_client_po): company, project, the client's number
+ * (trimmed, at most 60 characters), the issue date and the standard hours
+ * are mandatory; the expiry date is optional and never before the issue
+ * date; the notes respect the database length.
+ */
+export const clientPoFormSchema = z
+  .object({
+    company_id: selected('supplierPoCompanyRequired'),
+    project_id: selected('supplierPoProjectRequired'),
+    po_number: z
+      .string()
+      .trim()
+      .min(1, message('clientPoNumberRequired'))
+      .max(CLIENT_PO_NUMBER_MAX, message('clientPoNumberInvalid')),
+    issue_date: selected('clientPoIssueDateRequired'),
+    expiry_date: z.string().trim(),
+    standard_hours: clientPoStandardHours({ required: true }),
+    notes: optionalText({
+      max: SUPPLIER_PO_NOTES_MAX,
+      lengthKey: 'supplierPoNotesTooLong',
+    }),
+  })
+  .superRefine(expiryAfterIssue)
+
+/** «اضافة معدة» (add_client_po_equipment); also one line of «PO عميل جديد»,
+ *  where `equipment_id` comes from the ticked unit. The sale price is
+ *  optional (empty = «تحتاج سعر»), the standard hours default to the PO's,
+ *  the quantity is an optional ceiling above zero. */
+export const clientPoLineFormSchema = z.object({
+  equipment_id: selected('supplierPoEquipmentRequired'),
+  price: supplierPoPrice({ required: false }),
+  standard_hours: clientPoStandardHours({ required: false }),
+  quantity: z
+    .string()
+    .trim()
+    .refine(
+      (value) => !value || isValidClientPoQuantity(value),
+      message('clientPoQuantityInvalid'),
+    ),
+  note: optionalText({
+    max: SUPPLIER_PO_LINE_NOTE_MAX,
+    lengthKey: 'supplierPoLineNoteTooLong',
+  }),
+})
+
+/** «تعديل المعدة» (update_client_po_equipment): the line without its unit. */
+export const clientPoLineEditFormSchema = clientPoLineFormSchema.pick({
+  price: true,
+  standard_hours: true,
+  quantity: true,
+  note: true,
+})
+
+/** «تعديل PO العميل» (update_client_po): the dates and the notes. */
+export const clientPoEditFormSchema = clientPoFormSchema
+  .innerType()
+  .pick({ issue_date: true, expiry_date: true, notes: true })
+  .superRefine(expiryAfterIssue)
 
 export interface PostgresLikeError {
   code?: string | null

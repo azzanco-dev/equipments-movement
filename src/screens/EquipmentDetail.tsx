@@ -50,6 +50,7 @@ import { PreviousCodesLine } from '@/components/inquiry/PreviousCodes'
 import { MovementTypeBadge } from '@/components/movement/ExitPurposeBadge'
 import { EquipmentLocationCard } from '@/components/afaqy/EquipmentLocationCard'
 import { EquipmentPurchasingCard } from '@/components/purchasing/EquipmentPurchasingCard'
+import { EquipmentSalesCard } from '@/components/sales/EquipmentSalesCard'
 import { embeddedFullName, preferRecordName } from '@/lib/driverDisplayName'
 import {
   EQUIPMENT_CODE_CHANGES_LIMIT,
@@ -65,6 +66,9 @@ interface EquipmentDetailProps {
   onViewAllMovements?: (equipmentCode: string) => void
   /** Opens a supplier PO from the «المشتريات» card (purchasing.view). */
   onOpenPo?: (poId: string) => void
+  /** Sales phase 1 (0169): opens a client PO (/sales/:id); omitted when
+   *  the shell cannot open that page. */
+  onOpenClientPo?: (poId: string) => void
 }
 
 /** The latest movements shown on the page; the full history is one "View
@@ -101,6 +105,7 @@ export function EquipmentDetail({
   onSelectMovement,
   onViewAllMovements,
   onOpenPo,
+  onOpenClientPo,
 }: EquipmentDetailProps) {
   const { t, lang } = useI18n()
   // The edit button follows `equipment.edit`, as on the list.
@@ -448,6 +453,10 @@ export function EquipmentDetail({
 
       {/* Purchasing (2026-10-19): renders nothing without purchasing.view. */}
       <EquipmentPurchasingCard equipmentId={equipment.id} onOpenPo={onOpenPo} />
+
+      {/* Sales phase 1 (2026-11-02): under «المشتريات», before the
+          movements; renders nothing without sales.view. */}
+      <EquipmentSalesCard equipmentId={equipment.id} onOpenPo={onOpenClientPo} />
 
       <MiniTable
         title={t('movementHistory')}

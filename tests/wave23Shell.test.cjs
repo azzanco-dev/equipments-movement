@@ -662,6 +662,8 @@ test('the landing is the first passing section in menu order', () => {
     'projects',
     'lessors',
     'purchasing/orders',
+    // Sales phase 1 (0169): «PO العملاء» first in the sales section.
+    'sales/orders',
     'drivers',
     'users',
     'reports/entries',

@@ -81,7 +81,11 @@ test("the unit's open PO there, else its party's open PO there", () => {
 test('the page reads the view server-side and adds through the existing dialogs', () => {
   const screen = read('src', 'screens', 'purchasing', 'SiteUnitsScreen.tsx')
   assert.match(screen, /\.from\('purchasing_site_units'\)/)
-  assert.match(screen, /\.select\(SITE_UNITS_SELECT, \{ count: 'exact' \}\)/)
+  // 0169: a sales reader also selects the client stub's trailing columns.
+  assert.match(
+    screen,
+    /\.select\(\s*showClient\s*\?\s*`\$\{SITE_UNITS_SELECT\},\$\{SITE_UNITS_CLIENT_SELECT\}`\s*:\s*SITE_UNITS_SELECT,\s*\{ count: 'exact' \},?\s*\)/,
+  )
   assert.match(screen, /\.range\(/)
   assert.match(
     screen,
@@ -209,7 +213,10 @@ test('the list config allowlists its filters and sorts, units without a PO first
   const source = read('src', 'lib', 'listConfigs.ts')
   const start = source.indexOf('export const siteUnitsListConfig')
   assert.ok(start > 0)
-  const config = source.slice(start)
+  // The sales configs (0169) follow it in the file.
+  const end = source.indexOf('export const clientPoUnitsListConfig')
+  assert.ok(end > start)
+  const config = source.slice(start, end)
   assert.match(config, /defaultSort: 'has_po',\s+defaultDirection: 'asc',/)
   const keys = [...config.matchAll(/^\s{6}key: '(\w+)',$/gm)].map((m) => m[1])
   assert.deepEqual(keys, [

@@ -17,6 +17,11 @@ import {
   CreateSupplierPoDialog,
   type CreateSupplierPoPreset,
 } from '@/components/purchasing/CreateSupplierPoDialog'
+import { AddClientPoEquipmentDialog } from '@/components/sales/AddClientPoEquipmentDialog'
+import {
+  CreateClientPoDialog,
+  type CreateClientPoPreset,
+} from '@/components/sales/CreateClientPoDialog'
 import {
   AppLink,
   EmptyState,
@@ -40,6 +45,7 @@ import {
   SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS,
 } from '@/lib/purchasing'
 import { SITE_UNITS_SELECT, type SiteUnitRow } from '@/lib/purchasingData'
+import { SITE_UNITS_CLIENT_SELECT } from '@/lib/salesData'
 import { saudiDateKey } from '@/lib/saudiTime'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
@@ -69,6 +75,9 @@ export interface SiteUnitsScreenProps {
   /** Opens the unit's open entry (/movements/:id); omitted when the shell
    *  cannot open the movement page, and the button is not shown. */
   onSelectMovement?: (movementId: string) => void
+  /** Sales phase 1 (0169): opens a client PO (/sales/:id); the client stub
+   *  shows only for a `sales.view` reader whose shell opens that page. */
+  onSelectClientPo?: (poId: string) => void
 }
 
 /** Stable across renders, so the bar's controls do not reload on each one. */
@@ -79,6 +88,10 @@ const ASYNC_FILTERS = {
 
 /** The tone of a ticket's stub: amber without a PO, green with one. */
 const toneOf = (row: SiteUnitRow) => (row.has_po ? 'success' : 'warning')
+
+/** The client stub's tone (0169): amber without a client PO, green with one. */
+const clientToneOf = (row: SiteUnitRow) =>
+  row.has_client_po ? 'success' : 'warning'
 
 /** The «+» on a ticket without a PO: solid amber, fully round, with the page
  *  colour for the sign (white in the light theme). Tokens only. */
@@ -94,10 +107,13 @@ const SPO_BUTTON_STYLE: CSSProperties = {
   backgroundColor: 'var(--success-soft)',
 }
 
-/** The add target: the party's open PO there, else a new PO for the unit. */
+/** The add target: the party's open PO there, else a new PO for the unit;
+ *  0169: the open client PO of that company and project, else a new one. */
 type AddTarget =
   | { kind: 'existing'; row: SiteUnitRow }
   | { kind: 'new'; preset: CreateSupplierPoPreset }
+  | { kind: 'client_existing'; row: SiteUnitRow }
+  | { kind: 'client_new'; preset: CreateClientPoPreset }
 
 /**
  * «المعدات في المشاريع» (/purchasing/units, owner 2026-10-24, design
@@ -113,10 +129,15 @@ type AddTarget =
 export function SiteUnitsScreen({
   onSelectPo,
   onSelectMovement,
+  onSelectClientPo,
 }: SiteUnitsScreenProps) {
   const { t, lang } = useI18n()
   const { can } = usePermissions()
   const canManage = can('purchasing.manage')
+  // 0169: the client stub (and its columns) for a sales reader only; the
+  // shell must open the client PO page for the pill to lead anywhere.
+  const showClient = can('sales.view') && Boolean(onSelectClientPo)
+  const canManageSales = can('sales.manage')
   const list = useDataListState(siteUnitsListConfig)
   const [rows, setRows] = useState<SiteUnitRow[]>([])
   const [total, setTotal] = useState(0)
@@ -137,7 +158,12 @@ export function SiteUnitsScreen({
     setLoadError(false)
     let query = supabase
       .from('purchasing_site_units')
-      .select(SITE_UNITS_SELECT, { count: 'exact' })
+      .select(
+        showClient
+          ? `${SITE_UNITS_SELECT},${SITE_UNITS_CLIENT_SELECT}`
+          : SITE_UNITS_SELECT,
+        { count: 'exact' },
+      )
       .order(list.sort, { ascending: list.direction === 'asc' })
       // Newest entry next, then the entry id: deterministic paging.
       .order('entry_at', { ascending: false })
@@ -166,6 +192,7 @@ export function SiteUnitsScreen({
     list.pageSize,
     list.search,
     list.sort,
+    showClient,
     startListRequest,
   ])
 
@@ -262,9 +289,125 @@ export function SiteUnitsScreen({
     })
   }
 
+  /** 0169: the client «+» — the open client PO of that company and project
+   *  (`project_client_po_id`), else a new client PO with the unit ticked. */
+  const openClientAdd = (row: SiteUnitRow) => {
+    if (row.project_client_po_id) {
+      setTarget({ kind: 'client_existing', row })
+      return
+    }
+    setTarget({
+      kind: 'client_new',
+      preset: {
+        companyId: row.company_id ?? '',
+        projectId: row.project_id ?? '',
+        equipmentId: row.equipment_id,
+      },
+    })
+  }
+
   const closeAdd = (open: boolean) => {
     if (!open) setTarget(null)
   }
+
+  const clientExisting =
+    target?.kind === 'client_existing' ? target.row : null
+  const clientExistingPo = useMemo(
+    () =>
+      clientExisting && {
+        id: clientExisting.project_client_po_id!,
+        company_id: clientExisting.company_id ?? '',
+        project_id: clientExisting.project_id ?? '',
+        // The view carries no default hours: the dialog leaves the field
+        // empty, which the database reads as the PO's own.
+        standard_hours: null,
+      },
+    [clientExisting],
+  )
+  const clientExistingUnit = useMemo(
+    () =>
+      clientExisting && {
+        value: clientExisting.equipment_id,
+        label: clientExisting.equipment_code ?? '',
+      },
+    [clientExisting],
+  )
+
+  /** The supplier stub's control: the SPO pill that opens the PO, else the
+   *  «+» for `purchasing.manage` (unchanged since 2026-10-25). */
+  const supplierStubControl = (row: SiteUnitRow) =>
+    row.supplier_po_id ? (
+      <AppLink
+        href={`/purchasing/${row.supplier_po_id}`}
+        onNavigate={() => onSelectPo(row.supplier_po_id!)}
+        className="inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs font-semibold underline-offset-2 hover:underline"
+        style={SPO_BUTTON_STYLE}
+      >
+        <bdi dir="ltr">{row.po_number}</bdi>
+      </AppLink>
+    ) : (
+      // Owner 2026-10-25: like «انتقل للحركة», the «+» widens on hover or
+      // keyboard focus, and its label says what it will do: «اضافة الى
+      // SPO…» on the party's open PO there, else «PO جديد». 0148: the view
+      // gives `party_po_id` only for a PO whose start date is this unit's
+      // entry day.
+      canManage && (
+        <button
+          type="button"
+          onClick={() => openAdd(row)}
+          className="group/add inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full px-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          style={ADD_BUTTON_STYLE}
+        >
+          <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-normal opacity-0 group-hover/add:max-w-40 group-hover/add:pe-1 group-hover/add:ps-2 group-hover/add:opacity-100 group-focus-visible/add:max-w-40 group-focus-visible/add:pe-1 group-focus-visible/add:ps-2 group-focus-visible/add:opacity-100 motion-safe:transition-all motion-safe:duration-300 motion-safe:ease-out">
+            {row.party_po_id ? (
+              <>
+                {t('siteUnitsAddTo')}{' '}
+                <bdi dir="ltr">{row.party_po_number}</bdi>
+              </>
+            ) : (
+              t('siteUnitsNewPo')
+            )}
+          </span>
+          <Plus size={15} strokeWidth={2.5} aria-hidden="true" className="shrink-0" />
+        </button>
+      )
+    )
+
+  /** 0169: the client stub's control — the client PO pill that opens
+   *  /sales/:id, else the «+» for `sales.manage` («اضافة الى …» on the open
+   *  client PO of that company and project, else «PO جديد»). */
+  const clientStubControl = (row: SiteUnitRow) =>
+    row.client_po_id ? (
+      <AppLink
+        href={`/sales/${row.client_po_id}`}
+        onNavigate={() => onSelectClientPo?.(row.client_po_id!)}
+        className="inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs font-semibold underline-offset-2 hover:underline"
+        style={SPO_BUTTON_STYLE}
+      >
+        <bdi dir="ltr">{row.client_po_number}</bdi>
+      </AppLink>
+    ) : (
+      canManageSales && (
+        <button
+          type="button"
+          onClick={() => openClientAdd(row)}
+          className="group/add inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full px-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          style={ADD_BUTTON_STYLE}
+        >
+          <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-normal opacity-0 group-hover/add:max-w-40 group-hover/add:pe-1 group-hover/add:ps-2 group-hover/add:opacity-100 group-focus-visible/add:max-w-40 group-focus-visible/add:pe-1 group-focus-visible/add:ps-2 group-focus-visible/add:opacity-100 motion-safe:transition-all motion-safe:duration-300 motion-safe:ease-out">
+            {row.project_client_po_id ? (
+              <>
+                {t('siteUnitsAddTo')}{' '}
+                <bdi dir="ltr">{row.project_client_po_number}</bdi>
+              </>
+            ) : (
+              t('siteUnitsNewPo')
+            )}
+          </span>
+          <Plus size={15} strokeWidth={2.5} aria-hidden="true" className="shrink-0" />
+        </button>
+      )
+    )
 
   const existing = target?.kind === 'existing' ? target.row : null
   // Stable while the dialog is open, so its unit search does not reload.
@@ -475,59 +618,69 @@ export function SiteUnitsScreen({
                 </div>
                 {/* The perforation (no side notches). */}
                 <div className="mx-3 mt-auto border-t border-dashed" />
-                <div
-                  className="flex items-center justify-between gap-2 rounded-b-xl px-3 py-2.5"
-                  style={{ backgroundColor: `var(--${toneOf(row)}-soft)` }}
-                >
-                  <span
-                    className="text-xs font-medium"
-                    style={{ color: `var(--${toneOf(row)})` }}
-                  >
-                    {/* Owner 2026-10-25: «رقم PO» beside the SPO pill. */}
-                    {row.has_po ? t('siteUnitsPoNumber') : t('siteUnitsNoPo')}
-                  </span>
-                  {row.supplier_po_id ? (
-                    <AppLink
-                      href={`/purchasing/${row.supplier_po_id}`}
-                      onNavigate={() => onSelectPo(row.supplier_po_id!)}
-                      className="inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs font-semibold underline-offset-2 hover:underline"
-                      style={SPO_BUTTON_STYLE}
+                {showClient ? (
+                  /* 0169 (owner approval 2026-11-02, the /ui-kit ticket):
+                     for a sales reader TWO stubs side by side — the
+                     supplier PO at the start, the client PO at the end,
+                     each in its state's tone; with a PO the pill stands
+                     alone under the stub's own label. */
+                  <div className="grid grid-cols-2">
+                    <div
+                      className="flex min-w-0 flex-col gap-1.5 rounded-es-xl px-3 py-2.5"
+                      style={{ backgroundColor: `var(--${toneOf(row)}-soft)` }}
                     >
-                      <bdi dir="ltr">{row.po_number}</bdi>
-                    </AppLink>
-                  ) : (
-                    // Owner 2026-10-25: like «انتقل للحركة», the «+» widens on
-                    // hover or keyboard focus, and its label says what it will
-                    // do: «اضافة الى SPO…» on the party's open PO there, else
-                    // «PO جديد». 0148: the view gives `party_po_id` only for a
-                    // PO whose start date is this unit's entry day.
-                    canManage && (
-                      <button
-                        type="button"
-                        onClick={() => openAdd(row)}
-                        className="group/add inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full px-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-                        style={ADD_BUTTON_STYLE}
-                      >
-                        <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-normal opacity-0 group-hover/add:max-w-40 group-hover/add:pe-1 group-hover/add:ps-2 group-hover/add:opacity-100 group-focus-visible/add:max-w-40 group-focus-visible/add:pe-1 group-focus-visible/add:ps-2 group-focus-visible/add:opacity-100 motion-safe:transition-all motion-safe:duration-300 motion-safe:ease-out">
-                          {row.party_po_id ? (
-                            <>
-                              {t('siteUnitsAddTo')}{' '}
-                              <bdi dir="ltr">{row.party_po_number}</bdi>
-                            </>
-                          ) : (
-                            t('siteUnitsNewPo')
-                          )}
-                        </span>
-                        <Plus
-                          size={15}
-                          strokeWidth={2.5}
-                          aria-hidden="true"
-                          className="shrink-0"
-                        />
-                      </button>
-                    )
-                  )}
-                </div>
+                      <span className="text-[11px] leading-4 text-muted">
+                        {t('supplierPo')}
+                      </span>
+                      <div className="flex items-center justify-between gap-2">
+                        {!row.has_po && (
+                          <span
+                            className="text-xs font-medium"
+                            style={{ color: `var(--${toneOf(row)})` }}
+                          >
+                            {t('siteUnitsNoPo')}
+                          </span>
+                        )}
+                        {supplierStubControl(row)}
+                      </div>
+                    </div>
+                    <div
+                      className="flex min-w-0 flex-col gap-1.5 rounded-ee-xl border-s border-dashed px-3 py-2.5"
+                      style={{
+                        backgroundColor: `var(--${clientToneOf(row)}-soft)`,
+                      }}
+                    >
+                      <span className="text-[11px] leading-4 text-muted">
+                        {t('clientPo')}
+                      </span>
+                      <div className="flex items-center justify-between gap-2">
+                        {!row.has_client_po && (
+                          <span
+                            className="text-xs font-medium"
+                            style={{ color: `var(--${clientToneOf(row)})` }}
+                          >
+                            {t('equipmentSalesNone')}
+                          </span>
+                        )}
+                        {clientStubControl(row)}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="flex items-center justify-between gap-2 rounded-b-xl px-3 py-2.5"
+                    style={{ backgroundColor: `var(--${toneOf(row)}-soft)` }}
+                  >
+                    <span
+                      className="text-xs font-medium"
+                      style={{ color: `var(--${toneOf(row)})` }}
+                    >
+                      {/* Owner 2026-10-25: «رقم PO» beside the SPO pill. */}
+                      {row.has_po ? t('siteUnitsPoNumber') : t('siteUnitsNoPo')}
+                    </span>
+                    {supplierStubControl(row)}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
@@ -558,6 +711,28 @@ export function SiteUnitsScreen({
         open={target?.kind === 'new'}
         onOpenChange={closeAdd}
         preset={target?.kind === 'new' ? target.preset : null}
+        onCreated={() => {
+          setTarget(null)
+          refresh()
+        }}
+      />
+      {/* 0169: the client stub's two targets. */}
+      {clientExistingPo && (
+        <AddClientPoEquipmentDialog
+          open
+          onOpenChange={closeAdd}
+          po={clientExistingPo}
+          initialUnit={clientExistingUnit}
+          onAdded={() => {
+            setTarget(null)
+            refresh()
+          }}
+        />
+      )}
+      <CreateClientPoDialog
+        open={target?.kind === 'client_new'}
+        onOpenChange={closeAdd}
+        preset={target?.kind === 'client_new' ? target.preset : null}
         onCreated={() => {
           setTarget(null)
           refresh()
