@@ -1,10 +1,9 @@
 import { vatOf, withVat } from '@/lib/purchasing'
 import {
   COMPANIES,
-  EQUIPMENT,
+  EQUIPMENT as PURCHASING_EQUIPMENT,
   PROJECTS,
   companyById,
-  equipmentById,
   projectById,
   type MockEquipment,
   type MockNamed,
@@ -22,8 +21,41 @@ import {
 // projects and units are the purchasing mockup's, so the two sides of one
 // unit can be compared. Arabic copy uses plain alif (no hamza / madda).
 
-export { COMPANIES, EQUIPMENT, PROJECTS, companyById, equipmentById, projectById }
+export { COMPANIES, PROJECTS, companyById, projectById }
 export type { MockEquipment, MockNamed }
+
+/** Two units of the sales mockups only (phase-2 samples: a client line
+ *  without a price and a daily client line); the purchasing units stay. */
+export const SALES_EXTRA_EQUIPMENT: MockEquipment[] = [
+  {
+    id: 'e7',
+    code: 'F204',
+    type: 'EXCAVATOR 336',
+    plate_number: 'ق ك ل 5512',
+    chassis_number: null,
+    internal: false,
+    ownership: 'third_party_f',
+    lessor_name: null,
+  },
+  {
+    id: 'e8',
+    code: 'U022',
+    type: 'WATER TANKER 32000 L',
+    plate_number: 'م ن ه 7731',
+    chassis_number: null,
+    internal: false,
+    ownership: 'external_supplier',
+    lessor_name: 'مؤسسة النخبة لتاجير المعدات',
+  },
+]
+
+export const EQUIPMENT: MockEquipment[] = [
+  ...PURCHASING_EQUIPMENT,
+  ...SALES_EXTRA_EQUIPMENT,
+]
+
+export const equipmentById = (id: string) =>
+  EQUIPMENT.find((unit) => unit.id === id) ?? null
 
 export type ClientPoStatus = 'open' | 'closed'
 
@@ -44,6 +76,35 @@ export const SALE_RATE_UNIT_LABEL: Readonly<Record<SaleRateUnit, string>> = {
   month: 'شهري',
   day: 'يومي',
   hour: 'بالساعة',
+}
+
+const ARABIC_MONTHS = [
+  'يناير',
+  'فبراير',
+  'مارس',
+  'ابريل',
+  'مايو',
+  'يونيو',
+  'يوليو',
+  'اغسطس',
+  'سبتمبر',
+  'اكتوبر',
+  'نوفمبر',
+  'ديسمبر',
+]
+
+/** «اكتوبر 2026» from a `YYYY-MM` key. */
+export function monthLabel(key: string): string {
+  const [year, month] = key.split('-')
+  const index = Number(month) - 1
+  return `${ARABIC_MONTHS[index] ?? month} ${year}`
+}
+
+/** «اكتوبر (10)» from a `YYYY-MM` key: the month presets' look in Arabic. */
+export function monthShortLabel(key: string): string {
+  const month = key.slice(5, 7)
+  const index = Number(month) - 1
+  return `${ARABIC_MONTHS[index] ?? month} (${index + 1})`
 }
 
 /** The contract quantity's unit: months or hours (a ceiling for phase 4's
@@ -520,22 +581,60 @@ export const SALES_DECISIONS: readonly { title: string; detail: string }[] = [
   },
 ]
 
+/** The phase-2 decisions («كروت التشغيل», owner 2026-11-03), shown above the
+ *  phase-2 screens so the rules and the screens are reviewed together. */
+export const SALES_PHASE2_DECISIONS: readonly { title: string; detail: string }[] = [
+  {
+    title: 'نفس الاكسل',
+    detail:
+      'الساعات دائما كما سجلت. مستحق العميل = السعر الشهري × الساعات ÷ الساعات القياسية للسطر (260)؛ السطر بالساعة = السعر × الساعات؛ السطر اليومي بلا قاعدة بعد («—»).',
+  },
+  {
+    title: 'مستحق المورد بنفس الساعات',
+    detail:
+      'نفس ساعات الشهر على السعر الشهري لسطر المورد ÷ الساعات القياسية لسطر العميل. معدة العزاني بلا مستحق مورد، والهامش = مستحق العميل كاملا.',
+  },
+  {
+    title: 'بلا اعتماد',
+    detail: 'سجل الشهر يحفظ ويعدل بحرية مثل PO العميل، ومن عدله يظهر في سجل احداث الكرت.',
+  },
+  {
+    title: 'شاشة ادخال جماعي',
+    detail:
+      'تايم شيت العميل الشهري يغطي مشروعا كاملا: شركة + مشروع + شهر = جدول واحد وحفظ واحد.',
+  },
+  {
+    title: 'مرفق التايم شيت لاحقا',
+    detail: 'الحالة هنا هي حالة التسجيل: «مسجل» او «بانتظار» (شهر منقضي لكرت مفتوح بلا ساعات).',
+  },
+]
+
 // --- «كرت المعدة»: the spine both sides attach to ---------------------------------
 
 export type CardStatus = 'open' | 'ended'
 
-/** One row of the staff's monthly Excel, phase 2: the hours of the month
- *  from the client's approved timesheet («كرت التشغيل»). */
+/**
+ * «كرت التشغيل», phase 2 (owner decisions 2026-11-03): one RECORDED month of
+ * a card — the hours of a Saudi month from the client's monthly timesheet,
+ * entered by sales. Hours are always what is recorded, never computed; a
+ * record is edited freely (the card's event log says who), and there is no
+ * approval. A month without a record is derived, never stored (see
+ * `cardMonthRows`).
+ */
 export interface MockCardMonth {
   /** Saudi month key, `YYYY-MM`. */
   month: string
-  /** Hours worked in the month; null while the timesheet is still awaited. */
-  hours: number | null
-  /** The timesheet's state: attached or awaited. */
-  timesheet: 'attached' | 'pending'
-  /** The running month (the month of today). */
-  current: boolean
+  /** Hours worked in the month, as the timesheet says. */
+  hours: number
+  note: string | null
+  recorded_by_name: string
+  recorded_at: string
 }
+
+/** The Saudi day the mockups count from, so the sample months and the month
+ *  presets («Sep (9) · Oct (10) · Nov (11)») stay aligned whenever the
+ *  owner reviews the page. The real screens use `saudiDateKey()`. */
+export const SAMPLE_TODAY = '2026-11-03'
 
 /**
  * «كرت المعدة» (`equipment_cards`): one unit in one company + project over a
@@ -574,21 +673,110 @@ export interface MockCard {
   purchase_price: number | null
   purchase_rate_unit: SaleRateUnit
   updated_at: string
-  /** The monthly rows (phase 2 sample), only for the page's two cards. */
+  /** The RECORDED months (phase 2 sample). Months without a record are
+   *  derived from the card's period (`cardMonthRows`). */
   months: MockCardMonth[]
 }
 
+const RECORDER_NAME = 'خالد العتيبي'
+
+/** The rented page sample (F112): August and September full, September
+ *  corrected from 240 to 260 (see its events), October 248; November runs. */
 const MONTHS_RENTED: MockCardMonth[] = [
-  { month: '2026-08', hours: 260, timesheet: 'attached', current: false },
-  { month: '2026-09', hours: 248, timesheet: 'attached', current: false },
-  { month: '2026-10', hours: 271, timesheet: 'attached', current: false },
-  { month: '2026-11', hours: 12, timesheet: 'pending', current: true },
+  {
+    month: '2026-08',
+    hours: 260,
+    note: null,
+    recorded_by_name: RECORDER_NAME,
+    recorded_at: '2026-09-02T09:20:00+03:00',
+  },
+  {
+    month: '2026-09',
+    hours: 260,
+    note: 'تصحيح بعد مراجعة التايم شيت مع الموقع.',
+    recorded_by_name: SALES_ACTOR_NAME,
+    recorded_at: '2026-10-06T11:15:00+03:00',
+  },
+  {
+    month: '2026-10',
+    hours: 248,
+    note: null,
+    recorded_by_name: RECORDER_NAME,
+    recorded_at: '2026-11-02T08:40:00+03:00',
+  },
 ]
 
+/** The owned page sample (A055): September and October recorded. */
 const MONTHS_OWNED: MockCardMonth[] = [
-  { month: '2026-09', hours: 236, timesheet: 'attached', current: false },
-  { month: '2026-10', hours: 262, timesheet: 'pending', current: false },
-  { month: '2026-11', hours: 9, timesheet: 'pending', current: true },
+  {
+    month: '2026-09',
+    hours: 236,
+    note: null,
+    recorded_by_name: RECORDER_NAME,
+    recorded_at: '2026-10-03T10:30:00+03:00',
+  },
+  {
+    month: '2026-10',
+    hours: 262,
+    note: null,
+    recorded_by_name: RECORDER_NAME,
+    recorded_at: '2026-11-02T08:52:00+03:00',
+  },
+]
+
+/** The daily page sample (U022): September recorded; the amounts stay «—»
+ *  until the daily rule exists. */
+const MONTHS_DAILY: MockCardMonth[] = [
+  {
+    month: '2026-09',
+    hours: 240,
+    note: null,
+    recorded_by_name: RECORDER_NAME,
+    recorded_at: '2026-10-03T10:41:00+03:00',
+  },
+]
+
+/** The third-party B unit on the Dammam bridge: October recorded. */
+const MONTHS_B207: MockCardMonth[] = [
+  {
+    month: '2026-10',
+    hours: 255,
+    note: null,
+    recorded_by_name: SALES_ACTOR_NAME,
+    recorded_at: '2026-11-01T13:05:00+03:00',
+  },
+]
+
+/** The ended card (June – September, 208 standard hours): every month in. */
+const MONTHS_ENDED: MockCardMonth[] = [
+  {
+    month: '2026-06',
+    hours: 208,
+    note: null,
+    recorded_by_name: RECORDER_NAME,
+    recorded_at: '2026-07-02T09:00:00+03:00',
+  },
+  {
+    month: '2026-07',
+    hours: 214,
+    note: null,
+    recorded_by_name: RECORDER_NAME,
+    recorded_at: '2026-08-02T09:00:00+03:00',
+  },
+  {
+    month: '2026-08',
+    hours: 196,
+    note: 'توقف اسبوع بسبب الصيانة.',
+    recorded_by_name: RECORDER_NAME,
+    recorded_at: '2026-09-02T09:00:00+03:00',
+  },
+  {
+    month: '2026-09',
+    hours: 208,
+    note: null,
+    recorded_by_name: RECORDER_NAME,
+    recorded_at: '2026-10-02T09:00:00+03:00',
+  },
 ]
 
 export const CARDS: MockCard[] = [
@@ -732,7 +920,7 @@ export const CARDS: MockCard[] = [
     purchase_price: null,
     purchase_rate_unit: 'month',
     updated_at: '2026-10-20T08:05:00+03:00',
-    months: [],
+    months: MONTHS_B207,
   },
   {
     id: 'card6',
@@ -845,14 +1033,76 @@ export const CARDS: MockCard[] = [
     purchase_price: 15500,
     purchase_rate_unit: 'month',
     updated_at: '2026-09-30T16:00:00+03:00',
+    months: MONTHS_ENDED,
+  },
+  {
+    // Phase 2: a DAILY client line (and a daily supplier line) — the
+    // amounts stay «—» until the daily rule exists; hours are recorded.
+    id: 'card10',
+    equipment_id: 'e8',
+    company_id: 'c2',
+    project_id: 'p1',
+    period_from: '2026-09-05',
+    period_to: null,
+    status: 'open',
+    rate_unit: 'day',
+    standard_hours: 260,
+    entry_id: 'mv-9120',
+    entry_date: '2026-09-05',
+    exit_date: null,
+    foreman: 'سعد الدوسري',
+    driver: 'حسين علي اليامي',
+    client_po_number: 'PO20241200550',
+    sale_price: 1400,
+    quantity: 3,
+    quantity_unit: 'month',
+    consumed: 1,
+    owned: false,
+    supplier_po_number: 'SPO260004',
+    supplier_name: 'مؤسسة النخبة لتاجير المعدات',
+    purchase_price: 950,
+    purchase_rate_unit: 'day',
+    updated_at: '2026-10-03T10:41:00+03:00',
+    months: MONTHS_DAILY,
+  },
+  {
+    // Phase 2: a client line WITHOUT a price yet («تحتاج سعر») on a priced
+    // supplier line.
+    id: 'card11',
+    equipment_id: 'e7',
+    company_id: 'c2',
+    project_id: 'p1',
+    period_from: '2026-10-03',
+    period_to: null,
+    status: 'open',
+    rate_unit: 'month',
+    standard_hours: 260,
+    entry_id: 'mv-9208',
+    entry_date: '2026-10-03',
+    exit_date: null,
+    foreman: 'سعد الدوسري',
+    driver: 'عمر خالد البقمي',
+    client_po_number: 'PO20241200550',
+    sale_price: null,
+    quantity: null,
+    quantity_unit: 'month',
+    consumed: 0,
+    owned: false,
+    supplier_po_number: 'SPO260012',
+    supplier_name: 'طرف ثالث F',
+    purchase_price: 19000,
+    purchase_rate_unit: 'month',
+    updated_at: '2026-10-03T09:10:00+03:00',
     months: [],
   },
 ]
 
-/** The two cards of the page's toggle: rented (both sides) and owned. */
-export const CARD_PAGE_SAMPLES: Readonly<Record<'rented' | 'owned', string>> = {
+/** The three cards of the page's toggle: rented (both sides), owned, and a
+ *  daily client line (phase 2: its amounts are «—» for now). */
+export const CARD_PAGE_SAMPLES: Readonly<Record<'rented' | 'owned' | 'daily', string>> = {
   rented: 'card1',
   owned: 'card2',
+  daily: 'card10',
 }
 
 export const cardById = (id: string) => CARDS.find((card) => card.id === id) ?? null
@@ -861,14 +1111,18 @@ export type CardEventType =
   | 'created'
   | 'supplier_line_added'
   | 'client_line_added'
-  | 'timesheet_attached'
+  | 'hours_recorded'
+  | 'hours_updated'
+  | 'hours_deleted'
   | 'ended'
 
 export const CARD_EVENT_LABEL: Readonly<Record<CardEventType, string>> = {
   created: 'انشاء الكرت مع دخول المعدة',
   supplier_line_added: 'ربط سطر PO المورد',
   client_line_added: 'ربط سطر PO العميل',
-  timesheet_attached: 'ارفاق كرت التشغيل',
+  hours_recorded: 'تسجيل ساعات',
+  hours_updated: 'تعديل ساعات',
+  hours_deleted: 'حذف ساعات',
   ended: 'انهاء الكرت مع خروج المعدة',
 }
 
@@ -909,10 +1163,34 @@ export const CARD_EVENTS: MockCardEvent[] = [
   {
     id: 'cae4',
     card_id: 'card1',
-    event_type: 'timesheet_attached',
-    actor_name: 'خالد العتيبي',
-    created_at: '2026-11-01T08:15:00+03:00',
-    detail: 'اكتوبر 2026 · 271 ساعة',
+    event_type: 'hours_recorded',
+    actor_name: RECORDER_NAME,
+    created_at: '2026-09-02T09:20:00+03:00',
+    detail: hoursRecordedDetail('2026-08', 260),
+  },
+  {
+    id: 'cae4b',
+    card_id: 'card1',
+    event_type: 'hours_recorded',
+    actor_name: RECORDER_NAME,
+    created_at: '2026-10-02T09:05:00+03:00',
+    detail: hoursRecordedDetail('2026-09', 240),
+  },
+  {
+    id: 'cae4c',
+    card_id: 'card1',
+    event_type: 'hours_updated',
+    actor_name: SALES_ACTOR_NAME,
+    created_at: '2026-10-06T11:15:00+03:00',
+    detail: hoursUpdatedDetail('2026-09', 240, 260),
+  },
+  {
+    id: 'cae4d',
+    card_id: 'card1',
+    event_type: 'hours_recorded',
+    actor_name: RECORDER_NAME,
+    created_at: '2026-11-02T08:40:00+03:00',
+    detail: hoursRecordedDetail('2026-10', 248),
   },
   {
     id: 'cae5',
@@ -933,67 +1211,233 @@ export const CARD_EVENTS: MockCardEvent[] = [
   {
     id: 'cae7',
     card_id: 'card2',
-    event_type: 'timesheet_attached',
-    actor_name: 'خالد العتيبي',
+    event_type: 'hours_recorded',
+    actor_name: RECORDER_NAME,
     created_at: '2026-10-03T10:30:00+03:00',
-    detail: 'سبتمبر 2026 · 236 ساعة',
+    detail: hoursRecordedDetail('2026-09', 236),
+  },
+  {
+    id: 'cae8',
+    card_id: 'card2',
+    event_type: 'hours_recorded',
+    actor_name: RECORDER_NAME,
+    created_at: '2026-11-02T08:52:00+03:00',
+    detail: hoursRecordedDetail('2026-10', 262),
+  },
+  {
+    id: 'cae9',
+    card_id: 'card10',
+    event_type: 'created',
+    actor_name: 'النظام',
+    created_at: '2026-09-05T07:30:00+03:00',
+    detail: 'U022 · مشروع طريق الملك فهد',
+  },
+  {
+    id: 'cae10',
+    card_id: 'card10',
+    event_type: 'supplier_line_added',
+    actor_name: 'سارة المطيري',
+    created_at: '2026-09-05T09:00:00+03:00',
+    detail: 'SPO260004 · 950.00 / يوم',
+  },
+  {
+    id: 'cae11',
+    card_id: 'card10',
+    event_type: 'client_line_added',
+    actor_name: SALES_ACTOR_NAME,
+    created_at: '2026-10-02T09:15:00+03:00',
+    detail: 'PO20241200550 · 1,400.00 / يوم',
+  },
+  {
+    id: 'cae12',
+    card_id: 'card10',
+    event_type: 'hours_recorded',
+    actor_name: RECORDER_NAME,
+    created_at: '2026-10-03T10:41:00+03:00',
+    detail: hoursRecordedDetail('2026-09', 240),
   },
 ]
 
-/** The month's due of one side: the monthly price × hours / standard hours
- *  (the staff's Excel rule); null without a price or hours. A daily or
- *  hourly price is out of this sample's scope (null). */
+// --- Phase 2: the months of a card and the monthly amounts -------------------------
+
+/**
+ * Why one side of a month has no amount. `no_line`: the card has no PO line
+ * on that side; `unpriced`: the line has no price yet («تحتاج سعر»);
+ * `daily`: a daily line, whose rule comes later («—» with a hint);
+ * `owned`: the supplier side of an Al-Azani unit; `no_hours`: the month is
+ * not recorded yet.
+ */
+export type DueBlocker = 'no_line' | 'unpriced' | 'daily' | 'owned' | 'no_hours'
+
+export interface MonthDue {
+  value: number | null
+  blocker: DueBlocker | null
+}
+
+const roundMoney = (value: number) => Math.round(value * 100) / 100
+
+/**
+ * The month's due of one side (owner 2026-11-03, «نفس الاكسل»): a monthly
+ * price × hours ÷ the CLIENT line's standard hours; an hourly price × hours;
+ * a daily price has no rule yet. Hours are always what is recorded.
+ */
 export function monthDue(
   price: number | null,
   unit: SaleRateUnit,
   hours: number | null,
   standardHours: number,
-): number | null {
-  if (price === null || hours === null || unit !== 'month' || standardHours <= 0)
-    return null
-  return Math.round(((price * hours) / standardHours) * 100) / 100
+  hasLine = true,
+): MonthDue {
+  if (!hasLine) return { value: null, blocker: 'no_line' }
+  if (price === null) return { value: null, blocker: 'unpriced' }
+  if (unit === 'day') return { value: null, blocker: 'daily' }
+  if (hours === null) return { value: null, blocker: 'no_hours' }
+  if (unit === 'hour') return { value: roundMoney(price * hours), blocker: null }
+  if (standardHours <= 0) return { value: null, blocker: 'unpriced' }
+  return { value: roundMoney((price * hours) / standardHours), blocker: null }
 }
 
-/** The month's figures of a card: client due, supplier due and the margin
- *  (the client due alone for an owned unit). */
-export function cardMonthFigures(card: MockCard, month: MockCardMonth) {
+export interface CardMonthFigures {
+  client: MonthDue
+  supplier: MonthDue
+  margin: MonthDue
+}
+
+/**
+ * The month's figures of a card for the given hours: the client due, the
+ * supplier due (the SAME hours on the supplier line's price ÷ the client
+ * line's standard hours; none for an owned unit) and the margin (client −
+ * supplier, or the client due in full for an owned unit).
+ */
+export function cardMonthFigures(
+  card: MockCard,
+  hours: number | null,
+): CardMonthFigures {
   const client = monthDue(
     card.sale_price,
     card.rate_unit,
-    month.hours,
+    hours,
     card.standard_hours,
+    card.client_po_number !== null,
   )
-  const supplier = card.owned
-    ? null
+  const supplier: MonthDue = card.owned
+    ? { value: null, blocker: 'owned' }
     : monthDue(
         card.purchase_price,
         card.purchase_rate_unit,
-        month.hours,
+        hours,
         card.standard_hours,
+        card.supplier_po_number !== null,
       )
-  const margin =
-    client === null ? null : Math.round((client - (supplier ?? 0)) * 100) / 100
+  let margin: MonthDue
+  if (client.value === null) margin = { value: null, blocker: client.blocker }
+  else if (card.owned) margin = { value: client.value, blocker: null }
+  else if (supplier.value === null) margin = { value: null, blocker: supplier.blocker }
+  else margin = { value: roundMoney(client.value - supplier.value), blocker: null }
   return { client, supplier, margin }
 }
 
-const ARABIC_MONTHS = [
-  'يناير',
-  'فبراير',
-  'مارس',
-  'ابريل',
-  'مايو',
-  'يونيو',
-  'يوليو',
-  'اغسطس',
-  'سبتمبر',
-  'اكتوبر',
-  'نوفمبر',
-  'ديسمبر',
-]
+/** The state of a card's month: recorded, awaited (an elapsed month without
+ *  a record) or the running month without a record. */
+export type CardMonthState = 'recorded' | 'pending' | 'running'
 
-/** «اكتوبر 2026» from a `YYYY-MM` key. */
-export function monthLabel(key: string): string {
-  const [year, month] = key.split('-')
-  const index = Number(month) - 1
-  return `${ARABIC_MONTHS[index] ?? month} ${year}`
+export const CARD_MONTH_STATE_LABEL: Readonly<Record<CardMonthState, string>> = {
+  recorded: 'مسجل',
+  pending: 'بانتظار',
+  running: 'جاري',
+}
+
+/** One month of a card as the screens list it: the record when there is one. */
+export interface CardMonthRow {
+  month: string
+  state: CardMonthState
+  record: MockCardMonth | null
+}
+
+const monthKeyOf = (dateKey: string) => dateKey.slice(0, 7)
+
+/** The `YYYY-MM` key `offset` months after `key` (negative goes back). */
+export function shiftMonth(key: string, offset: number): string {
+  const [year, month] = key.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1 + offset, 1))
+  return date.toISOString().slice(0, 7)
+}
+
+/** The month keys of a card from its first month to its last (the end of its
+ *  period, else the month of `today`), oldest first. */
+export function cardMonthKeys(
+  card: Pick<MockCard, 'period_from' | 'period_to'>,
+  today: string = SAMPLE_TODAY,
+): string[] {
+  const first = monthKeyOf(card.period_from)
+  const last = monthKeyOf(card.period_to ?? today)
+  const keys: string[] = []
+  for (let key = first; key <= last && keys.length < 120; key = shiftMonth(key, 1))
+    keys.push(key)
+  return keys
+}
+
+/** Whether the card is open at some moment of the month. */
+export function cardCoversMonth(
+  card: Pick<MockCard, 'period_from' | 'period_to'>,
+  month: string,
+): boolean {
+  const from = monthKeyOf(card.period_from)
+  const to = card.period_to ? monthKeyOf(card.period_to) : null
+  return from <= month && (to === null || to >= month)
+}
+
+/** The rows of a card's months, oldest first: the record of each month, or
+ *  its derived state («بانتظار» for an elapsed month, «جاري» for the running
+ *  one). `records` replaces the card's own list when the screen holds the
+ *  edited copy. */
+export function cardMonthRows(
+  card: MockCard,
+  records: readonly MockCardMonth[] = card.months,
+  today: string = SAMPLE_TODAY,
+): CardMonthRow[] {
+  const thisMonth = monthKeyOf(today)
+  return cardMonthKeys(card, today).map((month) => {
+    const record = records.find((item) => item.month === month) ?? null
+    const state: CardMonthState = record
+      ? 'recorded'
+      : month === thisMonth && card.period_to === null
+        ? 'running'
+        : 'pending'
+    return { month, state, record }
+  })
+}
+
+/** The latest recorded month of a card, or null. */
+export function latestRecordedMonth(
+  records: readonly MockCardMonth[],
+): MockCardMonth | null {
+  return (
+    [...records].sort((a, b) => b.month.localeCompare(a.month))[0] ?? null
+  )
+}
+
+/** The hours in words: «248 ساعة». */
+export function hoursLabel(hours: number): string {
+  return `${hours} ساعة`
+}
+
+/** «3 شهور» for the save button of the batch screen. */
+export function monthsCountLabel(count: number): string {
+  if (count === 1) return 'شهر'
+  if (count === 2) return 'شهرين'
+  if (count <= 10) return `${count} شهور`
+  return `${count} شهرا`
+}
+
+/** The detail of a «تسجيل ساعات» event: «اكتوبر (10): 248 ساعة». */
+export function hoursRecordedDetail(month: string, hours: number): string {
+  return `${monthShortLabel(month)}: ${hoursLabel(hours)}`
+}
+
+/** The detail of a «تعديل ساعات» event. The arrow reads right to left: the
+ *  old hours on the start side, the arrow pointing to the new ones, as the
+ *  activity page writes a change («نشطة ← مباعة»). */
+export function hoursUpdatedDetail(month: string, from: number, to: number): string {
+  return `${monthShortLabel(month)}: ${from} ← ${to}`
 }

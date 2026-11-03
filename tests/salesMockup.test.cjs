@@ -59,7 +59,7 @@ test('the four screens sit behind sub-tabs on the shared segmented Tabs', () => 
 })
 
 test('the decisions block lists the phase-1 decisions', () => {
-  assert.match(mockup, /SALES_DECISIONS\.map/)
+  assert.match(mockup, /items = SALES_DECISIONS/)
   for (const title of [
     'PO عميل واحد = شركة واحدة + مشروع واحد',
     'رقم العميل هو الهوية',
@@ -121,13 +121,14 @@ test('the ticket carries two stubs: the supplier PO and the client PO', () => {
   assert.deepEqual([...tickets].sort(), ['00', '01', '10', '11'])
 })
 
-test('the card page: two samples, three side cards, the months table, one action', () => {
+test('the card page: three samples, three side cards, the months table, the actions', () => {
   const start = mockup.indexOf('function CardPageMockup(')
   const end = mockup.indexOf('// --- 6. The equipment cards list')
   assert.ok(start > 0 && end > start)
   const page = mockup.slice(start, end)
-  assert.match(page, /value="rented"/)
-  assert.match(page, /value="owned"/)
+  // Rented (both sides), owned, and — since phase 2 — a daily client line.
+  assert.match(data, /rented: 'card1',\n\s+owned: 'card2',\n\s+daily: 'card10',/)
+  assert.match(page, /CARD_SAMPLE_LABEL\[key\]/)
   for (const title of ['title="الحركة"', 'title="المبيعات"', 'title="المشتريات"'])
     assert.match(page, new RegExp(title), title)
   assert.match(page, /معدة مملوكة · بدون PO مورد/)
@@ -141,17 +142,20 @@ test('the card page: two samples, three side cards, the months table, one action
     "header: 'مستحق العميل'",
     "header: 'مستحق المورد'",
     "header: 'الهامش'",
-    "header: 'كرت التشغيل'",
+    "header: 'الحالة'",
   ])
     assert.ok(page.includes(header), header)
-  assert.match(page, /جاري/)
+  // Phase 2 (owner 2026-11-03): the recording state replaces the deferred
+  // timesheet attachment, «تسجيل شهر» opens the dialog, a row edits.
+  assert.match(page, /<MonthStateBadge state=\{row\.state\} \/>/)
+  assert.match(page, /تسجيل شهر/)
+  assert.match(page, /<MonthRecordDialog/)
   assert.match(page, /كروت التشغيل/)
   // The visibility rule, no hiding between the two sides.
   assert.match(page, /2026-10-15/)
   assert.match(page, /sticky bottom-0 .*sm:hidden/)
-  // Sample months: the running month is one, the rest attached or pending.
-  const months = [...data.matchAll(/current: (true|false)/g)].map((m) => m[1])
-  assert.equal(months.filter((flag) => flag === 'true').length, 2)
+  // Months are RECORDS; the awaited and running months are derived.
+  assert.match(data, /export function cardMonthRows/)
   assert.match(data, /export function cardMonthFigures/)
 })
 
@@ -181,7 +185,7 @@ test('the cards list: the four PO combinations and an ended card, open first', (
       /id: 'card\d+',[\s\S]*?client_po_number: ('[^']+'|null),[\s\S]*?owned: (true|false),\n\s+supplier_po_number: ('[^']+'|null),/g,
     ),
   ]
-  assert.ok(cards.length >= 8 && cards.length <= 10, `${cards.length} cards`)
+  assert.ok(cards.length >= 8 && cards.length <= 12, `${cards.length} cards`)
   const combos = new Set(
     cards.map((m) => `${m[1] === 'null' ? 0 : 1}${m[3] === 'null' ? 0 : 1}`),
   )

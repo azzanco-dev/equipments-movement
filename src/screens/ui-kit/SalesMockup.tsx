@@ -17,12 +17,13 @@ import {
   LogIn,
   LogOut,
   MapPin,
-  Paperclip,
   Percent,
   Plus,
   Receipt,
+  Save,
   StickyNote,
   Timer,
+  Trash2,
   Truck,
   User,
 } from 'lucide-react'
@@ -38,8 +39,11 @@ import {
   DataTable,
   DescriptionList,
   DetailHeader,
+  Dialog,
   EmptyState,
+  Field,
   IconButton,
+  Input,
   Notice,
   PRIMARY_ACTIVE_TRIGGER,
   RiyalSign,
@@ -50,6 +54,7 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
+  Textarea,
   type DataTableColumn,
   type DataTableSort,
   type DescriptionListItem,
@@ -59,10 +64,12 @@ import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import { splitPlateForDisplay } from '@/lib/plate'
 import { formatSupplierPoPrice } from '@/lib/purchasing'
+import { MONTH_PRESETS, MONTH_PRESET_BACK, monthPresetLabel } from '@/lib/saudiTime'
 import {
   CARDS,
   CARD_EVENTS,
   CARD_EVENT_LABEL,
+  CARD_MONTH_STATE_LABEL,
   CARD_PAGE_SAMPLES,
   CLIENT_POS,
   CLIENT_PO_EVENTS,
@@ -70,30 +77,46 @@ import {
   CLIENT_PO_LINES,
   COMPANIES,
   PROJECTS,
+  SALES_ACTOR_NAME,
   SALES_CARD_EQUIPMENT_ID,
   SALES_DECISIONS,
+  SALES_PHASE2_DECISIONS,
   SALE_PER_UNIT_LABEL,
   SALE_RATE_UNIT_LABEL,
+  SAMPLE_TODAY,
   TICKETS,
   cardById,
+  cardCoversMonth,
   cardMonthFigures,
+  cardMonthRows,
   clientPoById,
   clientPoTotalFigures,
   clientPoTotalsByUnit,
   companyById,
   equipmentById,
+  hoursRecordedDetail,
+  hoursUpdatedDetail,
+  latestRecordedMonth,
   linesOfClientPo,
   monthLabel,
+  monthShortLabel,
+  monthsCountLabel,
   projectById,
   quantityLabel,
   remainingShare,
+  shiftMonth,
+  type CardMonthRow,
+  type CardMonthState,
   type CardStatus,
   type ClientPoStatus,
   type MockCard,
+  type MockCardEvent,
+  type MockCardMonth,
   type MockClientPo,
   type MockClientPoLine,
   type MockEquipment,
   type MockTicket,
+  type MonthDue,
   type SaleRateUnit,
 } from './salesMockupData'
 
@@ -335,10 +358,12 @@ function ToolbarLookalike({
   sortOptions,
   sort,
   onSort,
+  placeholder = 'بحث برقم المعدة او اللوحة او رقم PO',
 }: {
   sortOptions: { value: string; label: string }[]
   sort: DataTableSort
   onSort: (sort: DataTableSort) => void
+  placeholder?: string
 }) {
   const { t } = useI18n()
   const [search, setSearch] = useState('')
@@ -347,7 +372,7 @@ function ToolbarLookalike({
       <SearchInput
         value={search}
         onValueChange={setSearch}
-        placeholder="بحث برقم المعدة او اللوحة او رقم PO"
+        placeholder={placeholder}
         className="w-full sm:w-72"
       />
       <Button variant="outline" icon={<Filter size={15} aria-hidden="true" />}>
@@ -760,7 +785,9 @@ function EventTimeline({ events }: { events: TimelineEvent[] }) {
           <p className="text-sm font-medium">{event.label}</p>
           {event.detail && (
             <p className="text-sm text-muted">
-              <bdi dir="ltr">{event.detail}</bdi>
+              {/* A detail that starts with a code or a number runs LTR; one
+                  that starts with Arabic («اكتوبر (10): 248 ساعة») runs RTL. */}
+              <bdi dir="auto">{event.detail}</bdi>
             </p>
           )}
           <p className="mt-0.5 text-xs text-muted">
@@ -1533,28 +1560,344 @@ function AmountOrDash({ value, unit }: { value: number | null; unit?: SaleRateUn
   return <SalePrice value={value} unit={unit} />
 }
 
+// --- Phase 2 («كروت التشغيل»): the monthly hours of a card -------------------------
+
+type DueSide = 'client' | 'supplier' | 'margin'
+
+const NO_LINE_LABEL: Readonly<Record<DueSide, string>> = {
+  client: 'بدون PO عميل',
+  supplier: 'بدون PO مورد',
+  margin: '—',
+}
+
+/** A month's amount of one side, or why there is none: «تحتاج سعر» for an
+ *  unpriced line, «—» with its hint for a daily line (no rule yet), a muted
+ *  dash otherwise (no hours, an owned unit's supplier side, no line). */
+function DueCell({
+  due,
+  side,
+  alignEnd = true,
+}: {
+  due: MonthDue
+  side: DueSide
+  alignEnd?: boolean
+}) {
+  if (due.value !== null) return <AmountOrDash value={due.value} />
+  const align = alignEnd ? 'items-end text-end' : 'items-start text-start'
+  switch (due.blocker) {
+    case 'unpriced':
+      return <span className="text-xs font-medium text-warning">تحتاج سعر</span>
+    case 'no_line':
+      return <span className="text-xs text-muted">{NO_LINE_LABEL[side]}</span>
+    case 'daily':
+      // The hint sits under the side that is daily; the margin's dash is
+      // explained by the side beside it.
+      if (side === 'margin') return <span className="text-muted">—</span>
+      return (
+        <span className={`inline-flex flex-col ${align}`}>
+          <span className="text-muted">—</span>
+          <span className="text-[11px] leading-4 text-muted">سطر يومي: الحساب لاحقا</span>
+        </span>
+      )
+    default:
+      return <span className="text-muted">—</span>
+  }
+}
+
+/** «مسجل» (green) / «بانتظار» (amber: an elapsed month of an open card
+ *  without hours) / «جاري» (the running month). */
+function MonthStateBadge({ state, size = 'sm' }: { state: CardMonthState; size?: 'sm' | 'md' }) {
+  const tone = state === 'recorded' ? 'success' : state === 'pending' ? 'warning' : 'info'
+  return (
+    <Badge tone={tone} size={size}>
+      {CARD_MONTH_STATE_LABEL[state]}
+    </Badge>
+  )
+}
+
+/** The in-memory store of the phase-2 mockups: the recorded months of every
+ *  card and the events the screens add, shared by the batch screen, the
+ *  months list and the card page so a save shows everywhere. */
+interface MonthsStore {
+  recordsOf: (card: MockCard) => MockCardMonth[]
+  eventsOf: (cardId: string) => MockCardEvent[]
+  saveMany: (
+    items: { card: MockCard; month: string; hours: number; note: string | null }[],
+  ) => void
+  remove: (card: MockCard, month: string) => void
+}
+
+const byMonth = (a: MockCardMonth, b: MockCardMonth) => a.month.localeCompare(b.month)
+
+function useMonthsStore(): MonthsStore {
+  const [overrides, setOverrides] = useState<Record<string, MockCardMonth[]>>({})
+  const [extraEvents, setExtraEvents] = useState<MockCardEvent[]>([])
+  const recordsOf = (card: MockCard) => overrides[card.id] ?? card.months
+  const eventsOf = (cardId: string) => [
+    ...CARD_EVENTS.filter((event) => event.card_id === cardId),
+    ...extraEvents.filter((event) => event.card_id === cardId),
+  ]
+  const addEvents = (events: Omit<MockCardEvent, 'id' | 'actor_name' | 'created_at'>[]) => {
+    const now = new Date().toISOString()
+    setExtraEvents((prev) => [
+      ...prev,
+      ...events.map((event, index) => ({
+        ...event,
+        id: `local-${prev.length + index + 1}`,
+        actor_name: SALES_ACTOR_NAME,
+        created_at: now,
+      })),
+    ])
+  }
+  const saveMany: MonthsStore['saveMany'] = (items) => {
+    const now = new Date().toISOString()
+    const events: Omit<MockCardEvent, 'id' | 'actor_name' | 'created_at'>[] = []
+    setOverrides((prev) => {
+      const next = { ...prev }
+      for (const item of items) {
+        const current = next[item.card.id] ?? item.card.months
+        const existing = current.find((record) => record.month === item.month) ?? null
+        const record: MockCardMonth = {
+          month: item.month,
+          hours: item.hours,
+          note: item.note,
+          recorded_by_name: SALES_ACTOR_NAME,
+          recorded_at: now,
+        }
+        next[item.card.id] = [
+          ...current.filter((entry) => entry.month !== item.month),
+          record,
+        ].sort(byMonth)
+        events.push({
+          card_id: item.card.id,
+          event_type: existing ? 'hours_updated' : 'hours_recorded',
+          detail: existing
+            ? existing.hours === item.hours
+              ? `${monthShortLabel(item.month)}: تعديل الملاحظة`
+              : hoursUpdatedDetail(item.month, existing.hours, item.hours)
+            : hoursRecordedDetail(item.month, item.hours),
+        })
+      }
+      return next
+    })
+    addEvents(events)
+  }
+  const remove: MonthsStore['remove'] = (card, month) => {
+    const existing = recordsOf(card).find((record) => record.month === month)
+    setOverrides((prev) => ({
+      ...prev,
+      [card.id]: (prev[card.id] ?? card.months).filter((record) => record.month !== month),
+    }))
+    if (existing)
+      addEvents([
+        {
+          card_id: card.id,
+          event_type: 'hours_deleted',
+          detail: hoursRecordedDetail(month, existing.hours),
+        },
+      ])
+  }
+  return { recordsOf, eventsOf, saveMany, remove }
+}
+
+/** The hours typed in a field as a number, or null when empty or invalid. */
+function parseHours(value: string): number | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const hours = Number(trimmed)
+  return Number.isFinite(hours) && hours >= 0 ? hours : null
+}
+
+/** The dialog «تسجيل شهر» of the card page: a month without a record (or
+ *  the recorded month being edited, locked), the hours with the live client
+ *  due under them, a note; «حذف» for a recorded month. */
+function MonthRecordDialog({
+  card,
+  rows,
+  month: initialMonth,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  card: MockCard
+  rows: CardMonthRow[]
+  /** The month to record or edit; null picks the newest month without a record. */
+  month: string | null
+  onClose: () => void
+  onSave: (month: string, hours: number, note: string | null) => void
+  onDelete: (month: string) => void
+}) {
+  const initialRow = initialMonth ? rows.find((row) => row.month === initialMonth) ?? null : null
+  const editing = initialRow?.record ?? null
+  const openMonths = editing
+    ? [initialRow as CardMonthRow]
+    : [...rows].reverse().filter((row) => row.state !== 'recorded')
+  const [month, setMonth] = useState(initialMonth ?? openMonths[0]?.month ?? '')
+  const [hours, setHours] = useState(editing ? String(editing.hours) : '')
+  const [note, setNote] = useState(editing?.note ?? '')
+  const parsed = parseHours(hours)
+  const figures = cardMonthFigures(card, parsed)
+  const valid = month !== '' && parsed !== null
+  const dueHint =
+    parsed === null ? (
+      'مستحق العميل يحسب من الساعات مباشرة.'
+    ) : figures.client.value !== null ? (
+      <span className="inline-flex items-baseline gap-1">
+        مستحق العميل: <SalePrice value={figures.client.value} className="text-fg" />
+      </span>
+    ) : figures.client.blocker === 'daily' ? (
+      'سطر يومي: الحساب لاحقا.'
+    ) : figures.client.blocker === 'unpriced' ? (
+      'سطر العميل بلا سعر بعد: الساعات تسجل والمستحق يحسب عند تسعيره.'
+    ) : (
+      'بدون PO عميل: الساعات تسجل فقط.'
+    )
+  return (
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next) onClose()
+      }}
+      title={editing ? `تعديل ساعات ${monthShortLabel(month)}` : 'تسجيل شهر'}
+      description={
+        <>
+          <bdi dir="ltr">{equipmentById(card.equipment_id)?.code}</bdi> · الساعات من كرت
+          التشغيل (التايم شيت الشهري للعميل).
+        </>
+      }
+      footer={
+        <>
+          {editing && (
+            <Button
+              variant="ghost"
+              className="me-auto text-danger hover:text-danger"
+              icon={<Trash2 size={16} aria-hidden="true" />}
+              onClick={() => {
+                onDelete(month)
+                onClose()
+              }}
+            >
+              حذف
+            </Button>
+          )}
+          <Button variant="outline" onClick={onClose}>
+            الغاء
+          </Button>
+          <Button
+            variant="primary"
+            disabled={!valid}
+            icon={<Save size={16} aria-hidden="true" />}
+            onClick={() => {
+              if (parsed === null) return
+              onSave(month, parsed, note.trim() || null)
+              onClose()
+            }}
+          >
+            حفظ
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Field
+          label="الشهر"
+          required
+          hint={
+            editing
+              ? 'الشهر المسجل لا يتغير؛ عدل ساعاته او احذفه.'
+              : openMonths.length === 0
+                ? 'كل شهور الكرت مسجلة.'
+                : undefined
+          }
+        >
+          {(control) => (
+            <Select
+              {...control}
+              value={month}
+              onValueChange={setMonth}
+              disabled={!!editing || openMonths.length === 0}
+              placeholder="اختر الشهر"
+              options={openMonths.map((row) => ({
+                value: row.month,
+                label: monthLabel(row.month),
+                description: row.state === 'running' ? 'الشهر الجاري' : undefined,
+              }))}
+            />
+          )}
+        </Field>
+        <Field label="الساعات" required hint={dueHint}>
+          {(control) => (
+            <Input
+              {...control}
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={1}
+              value={hours}
+              onChange={(event) => setHours(event.target.value)}
+              placeholder={`الساعات القياسية ${card.standard_hours}`}
+              className="tabular-nums"
+              autoFocus
+            />
+          )}
+        </Field>
+        <Field label="ملاحظة">
+          {(control) => (
+            <Textarea
+              {...control}
+              rows={2}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="اختياري"
+            />
+          )}
+        </Field>
+      </div>
+    </Dialog>
+  )
+}
+
 type CardSample = keyof typeof CARD_PAGE_SAMPLES
 
+const CARD_SAMPLE_LABEL: Readonly<Record<CardSample, string>> = {
+  rented: 'معدة مستاجرة (الجانبان)',
+  owned: 'معدة العزاني (العميل فقط)',
+  daily: 'سطر يومي',
+}
+
+/** The sample whose card is open, if the open card is one of them. */
+function sampleOfCard(cardId: string): CardSample | undefined {
+  return (Object.keys(CARD_PAGE_SAMPLES) as CardSample[]).find(
+    (key) => CARD_PAGE_SAMPLES[key] === cardId,
+  )
+}
+
 function CardPageMockup({
-  sample,
-  onSample,
+  cardId,
+  onSelectCard,
+  store,
 }: {
-  sample: CardSample
-  onSample: (sample: CardSample) => void
+  cardId: string
+  onSelectCard: (id: string) => void
+  store: MonthsStore
 }) {
   const { lang } = useI18n()
-  const card = cardById(CARD_PAGE_SAMPLES[sample]) ?? CARDS[0]
+  const card = cardById(cardId) ?? CARDS[0]
   const unit = equipmentById(card.equipment_id)
   const company = companyById(card.company_id)
   const project = projectById(card.project_id)
   const companyName = company ? localizedName(lang, company.name_ar, company.name_en) : '—'
   const projectName = project ? localizedName(lang, project.name_ar, project.name_en) : '—'
   const open = card.status === 'open'
-  const current = card.months.find((month) => month.current) ?? null
-  const figures = current ? cardMonthFigures(card, current) : null
-  const events = CARD_EVENTS.filter((event) => event.card_id === card.id).map(
-    (event) => ({ ...event, label: CARD_EVENT_LABEL[event.event_type] }),
-  )
+  const records = store.recordsOf(card)
+  const monthRows = cardMonthRows(card, records)
+  const latest = latestRecordedMonth(records)
+  const figures = cardMonthFigures(card, latest?.hours ?? null)
+  const pendingCount = monthRows.filter((row) => row.state !== 'recorded').length
+  const [dialog, setDialog] = useState<{ month: string | null } | null>(null)
+  const events = store
+    .eventsOf(card.id)
+    .map((event) => ({ ...event, label: CARD_EVENT_LABEL[event.event_type] }))
 
   const movementFacts: DescriptionListItem[] = [
     {
@@ -1655,21 +1998,11 @@ function CardPageMockup({
           },
         ]
 
-  type MonthRow = (typeof card.months)[number]
-  const monthColumns: DataTableColumn<MonthRow>[] = [
+  const monthColumns: DataTableColumn<CardMonthRow>[] = [
     {
       key: 'month',
       header: 'الشهر',
-      cell: (row) => (
-        <span className="flex items-center gap-2 font-medium">
-          {monthLabel(row.month)}
-          {row.current && (
-            <Badge tone="info" size="sm">
-              جاري
-            </Badge>
-          )}
-        </span>
-      ),
+      cell: (row) => <span className="font-medium">{monthLabel(row.month)}</span>,
     },
     {
       key: 'hours',
@@ -1677,40 +2010,63 @@ function CardPageMockup({
       align: 'center',
       className: 'tabular-nums',
       cell: (row) =>
-        row.hours === null ? <span className="text-muted">—</span> : row.hours,
+        row.record ? row.record.hours : <span className="text-muted">—</span>,
     },
     {
       key: 'client',
       header: 'مستحق العميل',
       align: 'end',
-      cell: (row) => <AmountOrDash value={cardMonthFigures(card, row).client} />,
+      cell: (row) => (
+        <DueCell due={cardMonthFigures(card, row.record?.hours ?? null).client} side="client" />
+      ),
     },
     {
       key: 'supplier',
       header: 'مستحق المورد',
       align: 'end',
       hideBelow: 'sm',
-      cell: (row) => <AmountOrDash value={cardMonthFigures(card, row).supplier} />,
+      cell: (row) => (
+        <DueCell
+          due={cardMonthFigures(card, row.record?.hours ?? null).supplier}
+          side="supplier"
+        />
+      ),
     },
     {
       key: 'margin',
       header: 'الهامش',
       align: 'end',
       hideBelow: 'sm',
-      cell: (row) => <AmountOrDash value={cardMonthFigures(card, row).margin} />,
+      cell: (row) => (
+        <DueCell due={cardMonthFigures(card, row.record?.hours ?? null).margin} side="margin" />
+      ),
     },
     {
-      key: 'timesheet',
-      header: 'كرت التشغيل',
+      key: 'state',
+      header: 'الحالة',
+      cell: (row) => <MonthStateBadge state={row.state} />,
+    },
+    {
+      key: 'actions',
+      header: <span className="sr-only">الاجراءات</span>,
+      align: 'end',
       cell: (row) =>
-        row.timesheet === 'attached' ? (
-          <Badge tone="success" size="sm" icon={<Paperclip size={11} aria-hidden="true" />}>
-            مرفق
-          </Badge>
+        !open ? null : row.record ? (
+          <IconButton
+            size="sm"
+            variant="ghost"
+            label={`تعديل ساعات ${monthLabel(row.month)}`}
+            icon={<Edit2 size={14} aria-hidden="true" />}
+            onClick={() => setDialog({ month: row.month })}
+          />
         ) : (
-          <Badge tone="warning" size="sm" icon={<Hourglass size={11} aria-hidden="true" />}>
-            بانتظار
-          </Badge>
+          <IconButton
+            size="sm"
+            variant="ghost"
+            label={`تسجيل ساعات ${monthLabel(row.month)}`}
+            icon={<Plus size={14} aria-hidden="true" />}
+            onClick={() => setDialog({ month: row.month })}
+          />
         ),
     },
   ]
@@ -1719,22 +2075,42 @@ function CardPageMockup({
     <Button
       variant="danger"
       size={size}
-      className={size === 'md' ? 'h-11 flex-1' : undefined}
+      className={size === 'md' ? 'h-11' : undefined}
       icon={<Lock size={size === 'sm' ? 14 : 16} aria-hidden="true" />}
     >
       انهاء الكرت
     </Button>
   )
+  const recordButton = (size: 'sm' | 'md') => (
+    <Button
+      variant="primary"
+      size={size}
+      className={size === 'md' ? 'h-11 flex-1' : undefined}
+      icon={<Plus size={size === 'sm' ? 14 : 16} aria-hidden="true" />}
+      disabled={pendingCount === 0}
+      onClick={() => setDialog({ month: null })}
+    >
+      تسجيل شهر
+    </Button>
+  )
+  const latestHint = latest ? `${monthLabel(latest.month)} · اخر شهر مسجل` : 'لا شهر مسجل بعد'
+  const sample = sampleOfCard(card.id)
 
   return (
     <Mockup
-      title="5. صفحة كرت المعدة — /cards/:id (نمط صفحات التفاصيل المعتمد)"
-      permission="sales.view او purchasing.view يعرض الصفحة كاملة (قرار 2026-10-15: لا اخفاء بين الجانبين) · «انهاء الكرت» للادمن على الكرت المفتوح · الساعات من المرحلة الثانية"
+      title="5. صفحة كرت المعدة — /sales/cards/:id (نمط صفحات التفاصيل المعتمد)"
+      permission="sales.view او purchasing.view يعرض الصفحة كاملة (قرار 2026-10-15: لا اخفاء بين الجانبين) · «تسجيل شهر» والتعديل والحذف لحاملي sales.manage · «انهاء الكرت» للادمن على الكرت المفتوح"
       controls={
-        <Tabs value={sample} onValueChange={(next) => onSample(next as CardSample)}>
+        <Tabs
+          value={sample ?? ''}
+          onValueChange={(next) => onSelectCard(CARD_PAGE_SAMPLES[next as CardSample])}
+        >
           <TabsList variant="segmented" aria-label="عينة الكرت">
-            <TabsTrigger value="rented">معدة مستاجرة (الجانبان)</TabsTrigger>
-            <TabsTrigger value="owned">معدة العزاني (العميل فقط)</TabsTrigger>
+            {(Object.keys(CARD_PAGE_SAMPLES) as CardSample[]).map((key) => (
+              <TabsTrigger key={key} value={key}>
+                {CARD_SAMPLE_LABEL[key]}
+              </TabsTrigger>
+            ))}
           </TabsList>
         </Tabs>
       }
@@ -1774,32 +2150,44 @@ function CardPageMockup({
               </span>
             }
             badges={<CardStatusBadge status={card.status} />}
-            actions={open ? <div className="hidden gap-2 sm:flex">{endButton('sm')}</div> : undefined}
+            actions={
+              open ? (
+                <div className="hidden gap-2 sm:flex">
+                  {recordButton('sm')}
+                  {endButton('sm')}
+                </div>
+              ) : undefined
+            }
           />
-          {/* 2. The summary strip: this month's figures (phase 2 sample). */}
+          {/* 2. The summary strip: the LATEST RECORDED month's figures
+              (phase 2); the month is the hint. */}
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <StatCard
-              label="مستحق العميل هذا الشهر"
-              value={<AmountOrDash value={figures?.client ?? null} />}
-              hint={current ? monthLabel(current.month) : undefined}
+              label="مستحق العميل"
+              value={<DueCell due={figures.client} side="client" alignEnd={false} />}
+              hint={latestHint}
               icon={<Coins size={18} />}
             />
             <StatCard
-              label="مستحق المورد هذا الشهر"
-              value={<AmountOrDash value={figures?.supplier ?? null} />}
-              hint={card.owned ? 'معدة مملوكة' : current ? monthLabel(current.month) : undefined}
+              label="مستحق المورد"
+              value={<DueCell due={figures.supplier} side="supplier" alignEnd={false} />}
+              hint={card.owned ? 'معدة مملوكة' : latestHint}
               icon={<Receipt size={18} />}
             />
             <StatCard
               label="الهامش"
-              value={<AmountOrDash value={figures?.margin ?? null} />}
+              value={<DueCell due={figures.margin} side="margin" alignEnd={false} />}
               hint={card.owned ? 'مستحق العميل كاملا' : 'العميل − المورد'}
               icon={<Percent size={18} />}
             />
             <StatCard
-              label="الساعات هذا الشهر"
-              value={current?.hours ?? '—'}
-              hint={`من ${card.standard_hours} ساعة قياسية`}
+              label="الساعات"
+              value={latest?.hours ?? '—'}
+              hint={
+                latest
+                  ? `${monthShortLabel(latest.month)} · من ${card.standard_hours} ساعة قياسية`
+                  : `من ${card.standard_hours} ساعة قياسية`
+              }
               icon={<Timer size={18} />}
             />
           </div>
@@ -1861,21 +2249,29 @@ function CardPageMockup({
           </Card>
         </div>
 
-        {/* 4. The months: the staff's Excel row per month (phase 2). */}
+        {/* 4. The months («كروت التشغيل», phase 2): one row per month of the
+            card's period, newest first — the recorded hours with their
+            amounts, or the awaited month. */}
         <Card padded={false} className="flex min-w-0 flex-col">
           <div className="p-4 pb-0">
             <SectionHeader
               title={
                 <span className="flex items-center gap-2">
                   الشهور
-                  <Badge size="sm">{card.months.length}</Badge>
+                  <Badge size="sm">{monthRows.length}</Badge>
+                  {pendingCount > 0 && (
+                    <Badge tone="warning" size="sm">
+                      {pendingCount} بانتظار
+                    </Badge>
+                  )}
                 </span>
               }
-              description="سطر لكل شهر: الساعات من كرت التشغيل المعتمد، ومنها مستحق العميل ومستحق المورد."
+              description="سطر لكل شهر: الساعات من كروت التشغيل (التايم شيت الشهري للعميل)، ومنها مستحق العميل ومستحق المورد."
+              action={open ? recordButton('sm') : undefined}
             />
           </div>
           <div className="p-4 pt-3">
-            {card.months.length === 0 ? (
+            {monthRows.length === 0 ? (
               <EmptyState title="لا شهور بعد" className="p-6" />
             ) : (
               <DataTable
@@ -1883,15 +2279,15 @@ function CardPageMockup({
                 cellTextClassName="text-[13px]"
                 cellClassName="py-2"
                 columns={monthColumns}
-                rows={[...card.months].reverse()}
+                rows={[...monthRows].reverse()}
                 rowKey={(row) => row.month}
                 caption="الشهور"
               />
             )}
             <p className="mt-3 text-xs text-muted">
-              الساعات تاتي من المرحلة الثانية («كروت التشغيل»، التايم شيت الشهري
-              المعتمد من الموقع)؛ المستحق = السعر الشهري × الساعات ÷ الساعات
-              القياسية. ارقام هذه الصفحة عينة.
+              الساعات دائما كما سجلت. المستحق = السعر الشهري × الساعات ÷ الساعات
+              القياسية، وبالساعة = السعر × الساعات؛ السطر اليومي بلا قاعدة بعد.
+              مرفق التايم شيت لاحقا. ارقام هذه الصفحة عينة.
             </p>
           </div>
         </Card>
@@ -1900,7 +2296,7 @@ function CardPageMockup({
         <Card className="space-y-3 p-4">
           <SectionHeader
             title="سجل الاحداث"
-            description="انشاء الكرت مع الدخول، ربط سطري المورد والعميل، كروت التشغيل، الانهاء."
+            description="انشاء الكرت مع الدخول، ربط سطري المورد والعميل، تسجيل الساعات وتعديلها وحذفها، الانهاء."
           />
           <EventTimeline events={events} />
         </Card>
@@ -1911,8 +2307,20 @@ function CardPageMockup({
             className="sticky bottom-0 z-10 -mx-3 -mb-3 flex gap-2 border-t bg-bg p-3 sm:hidden"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
           >
+            {recordButton('md')}
             {endButton('md')}
           </div>
+        )}
+
+        {dialog && (
+          <MonthRecordDialog
+            card={card}
+            rows={monthRows}
+            month={dialog.month}
+            onClose={() => setDialog(null)}
+            onSave={(month, hours, note) => store.saveMany([{ card, month, hours, note }])}
+            onDelete={(month) => store.remove(card, month)}
+          />
         )}
       </div>
     </Mockup>
@@ -1927,6 +2335,20 @@ type CardRow = MockCard & {
   company_name_en: string | null
   project_name_ar: string | null
   project_name_en: string | null
+}
+
+/** A card with its unit and its company and project names embedded. */
+function cardRow(card: MockCard): CardRow {
+  const company = companyById(card.company_id)
+  const project = projectById(card.project_id)
+  return {
+    ...card,
+    unit: equipmentById(card.equipment_id),
+    company_name_ar: company?.name_ar ?? null,
+    company_name_en: company?.name_en ?? null,
+    project_name_ar: project?.name_ar ?? null,
+    project_name_en: project?.name_en ?? null,
+  }
 }
 
 const CARD_FILTER_FIELDS: { key: string; label: string; options: string[] }[] = [
@@ -1946,18 +2368,7 @@ function CardsListMockup({ onOpen }: { onOpen: (card: MockCard) => void }) {
   const [pageSize, setPageSize] = useState(20)
 
   const rows = useMemo(() => {
-    const all: CardRow[] = CARDS.map((card) => {
-      const company = companyById(card.company_id)
-      const project = projectById(card.project_id)
-      return {
-        ...card,
-        unit: equipmentById(card.equipment_id),
-        company_name_ar: company?.name_ar ?? null,
-        company_name_en: company?.name_en ?? null,
-        project_name_ar: project?.name_ar ?? null,
-        project_name_en: project?.name_en ?? null,
-      }
-    })
+    const all: CardRow[] = CARDS.map(cardRow)
     return sortRows(
       all,
       sort,
@@ -2123,17 +2534,783 @@ function CardsListMockup({ onOpen }: { onOpen: (card: MockCard) => void }) {
   )
 }
 
+// --- 7. «كروت التشغيل»: the batch entry of one project's month ---------------------
+
+const THIS_MONTH = SAMPLE_TODAY.slice(0, 7)
+
+/** The three month presets of the list filters (owner 2026-10-31), oldest
+ *  first, as `YYYY-MM` keys of the mockups' today. */
+const PRESET_MONTHS = MONTH_PRESETS.map((preset) =>
+  shiftMonth(THIS_MONTH, -MONTH_PRESET_BACK[preset]),
+)
+
+/** The months before the presets, offered in a select. */
+const OLDER_MONTHS = [3, 4, 5].map((back) => shiftMonth(THIS_MONTH, -back))
+
+/** The month filter: the three presets («Sep (9) · Oct (10) · Nov (11)») as
+ *  primary tabs, then «شهر اقدم» with a select of older months. */
+function MonthPicker({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (month: string) => void
+}) {
+  const tab = PRESET_MONTHS.includes(value) ? value : 'older'
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Tabs
+        value={tab}
+        onValueChange={(next) => onChange(next === 'older' ? OLDER_MONTHS[0] : next)}
+      >
+        <TabsList variant="segmented" aria-label="الشهر">
+          {PRESET_MONTHS.map((month, index) => (
+            <TabsTrigger key={month} value={month} className={PRIMARY_ACTIVE_TRIGGER}>
+              <bdi dir="ltr">
+                {monthPresetLabel(MONTH_PRESET_BACK[MONTH_PRESETS[index]], SAMPLE_TODAY)}
+              </bdi>
+            </TabsTrigger>
+          ))}
+          <TabsTrigger value="older" className={PRIMARY_ACTIVE_TRIGGER}>
+            شهر اقدم
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {tab === 'older' && (
+        <Select
+          aria-label="شهر اقدم"
+          className="w-[160px]"
+          value={value}
+          onValueChange={onChange}
+          options={OLDER_MONTHS.map((month) => ({ value: month, label: monthLabel(month) }))}
+        />
+      )}
+    </div>
+  )
+}
+
+/** The projects a company has cards in. */
+function projectsOfCompany(companyId: string) {
+  const ids = new Set(
+    CARDS.filter((card) => card.company_id === companyId).map((card) => card.project_id),
+  )
+  return PROJECTS.filter((project) => ids.has(project.id))
+}
+
+/** A total per price unit in the bottom bar: the unit's name before the
+ *  amount only when the rows mix units (a month and an hour are never added). */
+function DueTotal({
+  label,
+  parts,
+  className,
+}: {
+  label: string
+  parts: readonly { unit: SaleRateUnit; total: number }[]
+  className?: string
+}) {
+  return (
+    <div className={`flex flex-col ${className ?? ''}`}>
+      <span className="text-[11px] leading-4 text-muted">{label}</span>
+      <span className="flex flex-col text-sm font-semibold">
+        {parts.map((part) => (
+          <span key={part.unit} className="inline-flex items-baseline gap-1.5">
+            {parts.length > 1 && (
+              <span className="text-[11px] font-normal text-muted">
+                {SALE_RATE_UNIT_LABEL[part.unit]}
+              </span>
+            )}
+            <SalePrice value={part.total} />
+          </span>
+        ))}
+      </span>
+    </div>
+  )
+}
+
+interface BatchRow {
+  card: MockCard
+  unit: MockEquipment | null
+  month: CardMonthRow
+}
+
+interface Draft {
+  hours: string
+  note: string
+}
+
+const draftKey = (cardId: string, month: string) => `${cardId}:${month}`
+
+function BatchEntryMockup({
+  store,
+  onOpenCard,
+}: {
+  store: MonthsStore
+  onOpenCard: (card: MockCard) => void
+}) {
+  const { lang } = useI18n()
+  const [companyId, setCompanyId] = useState('c2')
+  const [projectId, setProjectId] = useState('p1')
+  const [month, setMonth] = useState(PRESET_MONTHS[1])
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({})
+  const [saved, setSaved] = useState<number | null>(null)
+
+  const projects = companyId ? projectsOfCompany(companyId) : []
+  const selected = companyId !== '' && projectId !== ''
+  const rows: BatchRow[] = selected
+    ? CARDS.filter(
+        (card) =>
+          card.company_id === companyId &&
+          card.project_id === projectId &&
+          cardCoversMonth(card, month),
+      )
+        .map((card) => ({
+          card,
+          unit: equipmentById(card.equipment_id),
+          month:
+            cardMonthRows(card, store.recordsOf(card)).find((row) => row.month === month) ?? {
+              month,
+              state: 'pending' as const,
+              record: null,
+            },
+        }))
+        .sort((a, b) => (a.unit?.code ?? '').localeCompare(b.unit?.code ?? '', 'en'))
+    : []
+
+  const draftOf = (row: BatchRow): Draft =>
+    drafts[draftKey(row.card.id, month)] ?? {
+      hours: row.month.record ? String(row.month.record.hours) : '',
+      note: row.month.record?.note ?? '',
+    }
+  const setDraft = (row: BatchRow, patch: Partial<Draft>) => {
+    setSaved(null)
+    setDrafts((prev) => ({
+      ...prev,
+      [draftKey(row.card.id, month)]: { ...draftOf(row), ...patch },
+    }))
+  }
+
+  /** The rows with hours, and among them the ones the save would write:
+   *  a new record, or a changed one; rows left empty are never saved. */
+  const filled = rows
+    .map((row) => ({ row, draft: draftOf(row), hours: parseHours(draftOf(row).hours) }))
+    .filter((item): item is typeof item & { hours: number } => item.hours !== null)
+  const changed = filled.filter(({ row, draft, hours }) => {
+    const record = row.month.record
+    return !record || record.hours !== hours || (record.note ?? '') !== draft.note.trim()
+  })
+  const figuresOf = filled.map(({ row, hours }) => ({
+    row,
+    figures: cardMonthFigures(row.card, hours),
+  }))
+  const totals = (
+    side: DueSide,
+    unitOf: (card: MockCard) => SaleRateUnit,
+  ) =>
+    clientPoTotalsByUnit(
+      figuresOf
+        .filter(({ figures }) => figures[side].value !== null)
+        .map(({ row, figures }) => ({
+          price: figures[side].value ?? 0,
+          rate_unit: unitOf(row.card),
+        })),
+    )
+
+  const save = () => {
+    store.saveMany(
+      changed.map(({ row, draft, hours }) => ({
+        card: row.card,
+        month,
+        hours,
+        note: draft.note.trim() || null,
+      })),
+    )
+    setDrafts((prev) => {
+      const next = { ...prev }
+      for (const { row } of changed) delete next[draftKey(row.card.id, month)]
+      return next
+    })
+    setSaved(changed.length)
+  }
+  const clear = () => {
+    setSaved(null)
+    setDrafts((prev) => {
+      const next = { ...prev }
+      for (const row of rows) next[draftKey(row.card.id, month)] = { hours: '', note: '' }
+      return next
+    })
+  }
+
+  const columns: DataTableColumn<BatchRow>[] = [
+    {
+      key: 'equipment',
+      header: 'المعدة',
+      cell: (row) => (
+        <button
+          type="button"
+          className="text-start underline-offset-2 hover:underline"
+          onClick={() => onOpenCard(row.card)}
+        >
+          <UnitCell unit={row.unit} />
+        </button>
+      ),
+    },
+    {
+      key: 'client_po',
+      header: 'PO العميل',
+      hideBelow: 'md',
+      cell: (row) =>
+        row.card.client_po_number ? (
+          <PoPill number={row.card.client_po_number} />
+        ) : (
+          <span className="text-xs text-muted">بدون PO عميل</span>
+        ),
+    },
+    {
+      key: 'supplier_po',
+      header: 'PO المورد',
+      hideBelow: 'md',
+      cell: (row) =>
+        row.card.owned ? (
+          <span className="text-xs text-muted">مملوكة</span>
+        ) : row.card.supplier_po_number ? (
+          <PoPill number={row.card.supplier_po_number} />
+        ) : (
+          <span className="text-xs text-muted">بدون PO مورد</span>
+        ),
+    },
+    {
+      key: 'hours',
+      header: 'الساعات',
+      cell: (row) => (
+        <span className="flex items-center gap-2">
+          <Input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step={1}
+            aria-label={`ساعات ${row.unit?.code ?? ''} في ${monthLabel(month)}`}
+            value={draftOf(row).hours}
+            onChange={(event) => setDraft(row, { hours: event.target.value })}
+            placeholder={row.month.record ? String(row.month.record.hours) : '0'}
+            className="w-24 tabular-nums"
+          />
+          {row.month.record && <MonthStateBadge state="recorded" />}
+        </span>
+      ),
+    },
+    {
+      key: 'client',
+      header: 'مستحق العميل',
+      align: 'end',
+      cell: (row) => (
+        <DueCell
+          due={cardMonthFigures(row.card, parseHours(draftOf(row).hours)).client}
+          side="client"
+        />
+      ),
+    },
+    {
+      key: 'supplier',
+      header: 'مستحق المورد',
+      align: 'end',
+      hideBelow: 'sm',
+      cell: (row) => (
+        <DueCell
+          due={cardMonthFigures(row.card, parseHours(draftOf(row).hours)).supplier}
+          side="supplier"
+        />
+      ),
+    },
+    {
+      key: 'margin',
+      header: 'الهامش',
+      align: 'end',
+      hideBelow: 'sm',
+      cell: (row) => (
+        <DueCell
+          due={cardMonthFigures(row.card, parseHours(draftOf(row).hours)).margin}
+          side="margin"
+        />
+      ),
+    },
+    {
+      key: 'note',
+      header: 'ملاحظة',
+      hideBelow: 'lg',
+      cell: (row) => (
+        <Input
+          aria-label={`ملاحظة ${row.unit?.code ?? ''}`}
+          value={draftOf(row).note}
+          onChange={(event) => setDraft(row, { note: event.target.value })}
+          placeholder="اختياري"
+          maxLength={120}
+          className="w-44"
+        />
+      ),
+    },
+  ]
+
+  const companyName = (id: string) => {
+    const company = companyById(id)
+    return company ? localizedName(lang, company.name_ar, company.name_en) : id
+  }
+  const projectName = (id: string) => {
+    const project = projectById(id)
+    return project ? localizedName(lang, project.name_ar, project.name_en) : id
+  }
+
+  return (
+    <Mockup
+      title="7. كروت التشغيل — ادخال ساعات شهر لمشروع كامل — /sales/timesheets"
+      permission="sales.manage يفتح الشاشة ويحفظ · تايم شيت العميل الشهري = شركة + مشروع + شهر = جدول واحد وحفظ واحد"
+      controls={
+        selected ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setCompanyId('')
+              setProjectId('')
+            }}
+          >
+            مسح الاختيار (الحالة الفارغة)
+          </Button>
+        ) : undefined
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-lg font-bold">كروت التشغيل</h2>
+          <p className="text-sm text-muted">
+            ساعات كل معدة في الشهر من التايم شيت الشهري للعميل؛ مستحق العميل
+            ومستحق المورد يحسبان مباشرة.
+          </p>
+        </div>
+
+        {/* The three selections: company → its projects → the month. */}
+        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+          <Field label="الشركة" required>
+            {(control) => (
+              <Select
+                {...control}
+                value={companyId}
+                onValueChange={(next) => {
+                  setCompanyId(next)
+                  setProjectId('')
+                  setSaved(null)
+                }}
+                placeholder="اختر الشركة"
+                options={COMPANIES.map((company) => ({
+                  value: company.id,
+                  label: localizedName(lang, company.name_ar, company.name_en),
+                }))}
+              />
+            )}
+          </Field>
+          <Field
+            label="المشروع"
+            required
+            hint={companyId && projects.length === 0 ? 'لا مشاريع لهذه الشركة بكروت.' : undefined}
+          >
+            {(control) => (
+              <Select
+                {...control}
+                value={projectId}
+                onValueChange={(next) => {
+                  setProjectId(next)
+                  setSaved(null)
+                }}
+                disabled={!companyId || projects.length === 0}
+                placeholder="اختر المشروع"
+                options={projects.map((project) => ({
+                  value: project.id,
+                  label: localizedName(lang, project.name_ar, project.name_en),
+                }))}
+              />
+            )}
+          </Field>
+          <Field label="الشهر" required>
+            {() => (
+              <MonthPicker
+                value={month}
+                onChange={(next) => {
+                  setMonth(next)
+                  setSaved(null)
+                }}
+              />
+            )}
+          </Field>
+        </div>
+
+        {!selected ? (
+          <EmptyState
+            icon={<CalendarDays size={24} aria-hidden="true" />}
+            title="اختر الشركة والمشروع والشهر"
+            description="يظهر جدول كل الكروت المفتوحة في ذلك المشروع خلال الشهر."
+            className="p-8"
+          />
+        ) : rows.length === 0 ? (
+          <EmptyState
+            icon={<Truck size={24} aria-hidden="true" />}
+            title={`لا كروت في ${projectName(projectId)} خلال ${monthLabel(month)}`}
+            description={`${companyName(companyId)}: لا معدة كانت داخل هذا المشروع في هذا الشهر.`}
+            className="p-8"
+          />
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm">
+                <span className="font-semibold">{companyName(companyId)}</span>
+                <span className="text-muted"> · {projectName(projectId)} · </span>
+                <span className="font-semibold">{monthLabel(month)}</span>
+              </p>
+              <p className="text-xs text-muted">
+                {rows.length} كرت · {rows.filter((row) => row.month.record).length} مسجل ·{' '}
+                {rows.filter((row) => !row.month.record).length} بانتظار
+              </p>
+            </div>
+            {saved !== null && saved > 0 && (
+              <Notice tone="success" size="compact">
+                تم حفظ {monthsCountLabel(saved)} لشهر {monthLabel(month)}.
+              </Notice>
+            )}
+            <DataTable
+              size="md"
+              cellTextClassName="text-[13px]"
+              cellClassName="py-2"
+              columns={columns}
+              rows={rows}
+              rowKey={(row) => row.card.id}
+              caption={`ساعات ${monthLabel(month)}`}
+            />
+            <p className="text-xs text-muted">
+              الصفوف الفارغة لا تحفظ. المستحق = السعر الشهري × الساعات ÷ الساعات
+              القياسية (260)، وبالساعة = السعر × الساعات؛ السطر اليومي بلا قاعدة
+              بعد؛ معدة العزاني بلا مستحق مورد وهامشها مستحق العميل كاملا.
+            </p>
+          </>
+        )}
+
+        {/* The sticky bottom bar: the save with its count, the totals of the
+            filled rows per price unit, and «تفريغ». */}
+        {selected && rows.length > 0 && (
+          <div
+            className="sticky bottom-0 z-10 -mx-3 -mb-3 flex flex-wrap items-center gap-3 border-t bg-bg px-3 pt-3 sm:-mx-4 sm:-mb-4 sm:px-4"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
+            <Button
+              variant="primary"
+              className="h-11"
+              icon={<Save size={16} aria-hidden="true" />}
+              disabled={changed.length === 0}
+              onClick={save}
+            >
+              {changed.length === 0 ? 'حفظ' : `حفظ ${monthsCountLabel(changed.length)}`}
+            </Button>
+            <Button variant="ghost" className="h-11" onClick={clear}>
+              تفريغ
+            </Button>
+            <div className="ms-auto flex flex-wrap items-end gap-x-5 gap-y-2">
+              <DueTotal
+                label="مستحق العميل"
+                parts={totals('client', (card) => card.rate_unit)}
+              />
+              <DueTotal
+                label="مستحق المورد"
+                parts={totals('supplier', (card) => card.purchase_rate_unit)}
+                className="hidden sm:flex"
+              />
+              <DueTotal
+                label="الهامش"
+                parts={totals('margin', (card) => card.rate_unit)}
+                className="hidden sm:flex"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </Mockup>
+  )
+}
+
+// --- 8. «الشهور»: the months of every card as a list ---------------------------------
+
+const ALL = 'all'
+
+/** The months the list filter offers: this month and the five before it. */
+const LIST_MONTHS = [0, 1, 2, 3, 4, 5].map((back) => shiftMonth(THIS_MONTH, -back))
+
+const MONTH_STATE_RANK: Readonly<Record<CardMonthState, string>> = {
+  pending: '0',
+  running: '1',
+  recorded: '2',
+}
+
+type MonthListRow = CardRow & {
+  row_id: string
+  monthRow: CardMonthRow
+  figures: ReturnType<typeof cardMonthFigures>
+}
+
+function MonthsListMockup({
+  store,
+  onOpen,
+}: {
+  store: MonthsStore
+  onOpen: (card: MockCard) => void
+}) {
+  const { t, lang } = useI18n()
+  const [month, setMonth] = useState(PRESET_MONTHS[1])
+  const [companyId, setCompanyId] = useState(ALL)
+  const [projectId, setProjectId] = useState(ALL)
+  const [state, setState] = useState(ALL)
+  const [sort, setSort] = useState<DataTableSort>({ key: 'state', direction: 'asc' })
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+
+  const rows = sortRows(
+    CARDS.filter(
+      (card) =>
+        cardCoversMonth(card, month) &&
+        (companyId === ALL || card.company_id === companyId) &&
+        (projectId === ALL || card.project_id === projectId),
+    )
+      .map((card): MonthListRow => {
+        const monthRow =
+          cardMonthRows(card, store.recordsOf(card)).find((row) => row.month === month) ?? {
+            month,
+            state: 'pending' as const,
+            record: null,
+          }
+        return {
+          ...cardRow(card),
+          row_id: `${card.id}:${month}`,
+          monthRow,
+          figures: cardMonthFigures(card, monthRow.record?.hours ?? null),
+        }
+      })
+      .filter((row) => state === ALL || row.monthRow.state === state),
+    sort,
+    (row, key) => {
+      switch (key) {
+        case 'equipment':
+          return row.unit?.code ?? ''
+        case 'hours':
+          return row.monthRow.record?.hours ?? -1
+        case 'client':
+          return row.figures.client.value ?? -1
+        case 'margin':
+          return row.figures.margin.value ?? -1
+        default:
+          // «بانتظار» first (the default), then the running month, then the
+          // recorded ones; the unit code inside each group.
+          return `${MONTH_STATE_RANK[row.monthRow.state]}-${row.unit?.code ?? ''}`
+      }
+    },
+    lang,
+  )
+
+  const columns: DataTableColumn<MonthListRow>[] = [
+    {
+      key: 'month',
+      header: 'الشهر',
+      className: 'whitespace-nowrap font-medium',
+      cell: (row) => monthLabel(row.monthRow.month),
+    },
+    {
+      key: 'equipment',
+      header: 'المعدة',
+      sortable: true,
+      cell: (row) => <UnitCell unit={row.unit} />,
+    },
+    {
+      key: 'company_project',
+      header: 'الشركة · المشروع',
+      hideBelow: 'md',
+      cell: (row) => <CompanyProjectCell row={row} />,
+    },
+    {
+      key: 'hours',
+      header: 'الساعات',
+      sortable: true,
+      align: 'center',
+      className: 'tabular-nums',
+      cell: (row) =>
+        row.monthRow.record ? row.monthRow.record.hours : <span className="text-muted">—</span>,
+    },
+    {
+      key: 'client',
+      header: 'مستحق العميل',
+      sortable: true,
+      align: 'end',
+      cell: (row) => <DueCell due={row.figures.client} side="client" />,
+    },
+    {
+      key: 'supplier',
+      header: 'مستحق المورد',
+      align: 'end',
+      hideBelow: 'sm',
+      cell: (row) => <DueCell due={row.figures.supplier} side="supplier" />,
+    },
+    {
+      key: 'margin',
+      header: 'الهامش',
+      sortable: true,
+      align: 'end',
+      hideBelow: 'sm',
+      cell: (row) => <DueCell due={row.figures.margin} side="margin" />,
+    },
+    {
+      key: 'state',
+      header: t('status'),
+      sortable: true,
+      cell: (row) => <MonthStateBadge state={row.monthRow.state} />,
+    },
+  ]
+
+  const sortOptions = [
+    { value: 'state', label: 'بانتظار اولا' },
+    { value: 'equipment', label: 'المعدة' },
+    { value: 'hours', label: 'الساعات' },
+    { value: 'client', label: 'مستحق العميل' },
+    { value: 'margin', label: 'الهامش' },
+  ]
+  const projects = companyId === ALL ? PROJECTS : projectsOfCompany(companyId)
+
+  return (
+    <Mockup
+      title="8. الشهور — كل شهر لكل كرت — /sales/months"
+      permission="sales.view يعرض القائمة · الصف يفتح صفحة الكرت · الفلتر الافتراضي: الشهر الماضي، «بانتظار» اولا"
+    >
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-lg font-bold">الشهور</h2>
+          <p className="text-sm text-muted">
+            شهر لكل كرت: الساعات المسجلة ومستحقاتها، او ما زال بانتظار كرت
+            التشغيل.
+          </p>
+        </div>
+        <ToolbarLookalike
+          sortOptions={sortOptions}
+          sort={sort}
+          onSort={setSort}
+          placeholder="بحث برقم المعدة او اللوحة"
+        />
+        {/* The filter fields (the FilterBar look); these four work on the
+            sample rows. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            size="sm"
+            aria-label="الشهر"
+            className="w-[150px]"
+            value={month}
+            onValueChange={(next) => {
+              setMonth(next)
+              setPage(1)
+            }}
+            options={LIST_MONTHS.map((key) => ({ value: key, label: monthLabel(key) }))}
+          />
+          <Select
+            size="sm"
+            aria-label="الشركة"
+            className="w-[190px]"
+            value={companyId}
+            onValueChange={(next) => {
+              setCompanyId(next)
+              setProjectId(ALL)
+              setPage(1)
+            }}
+            options={[
+              { value: ALL, label: 'كل الشركات' },
+              ...COMPANIES.map((company) => ({
+                value: company.id,
+                label: localizedName(lang, company.name_ar, company.name_en),
+              })),
+            ]}
+          />
+          <Select
+            size="sm"
+            aria-label="المشروع"
+            className="w-[190px]"
+            value={projectId}
+            onValueChange={(next) => {
+              setProjectId(next)
+              setPage(1)
+            }}
+            options={[
+              { value: ALL, label: 'كل المشاريع' },
+              ...projects.map((project) => ({
+                value: project.id,
+                label: localizedName(lang, project.name_ar, project.name_en),
+              })),
+            ]}
+          />
+          <Select
+            size="sm"
+            aria-label={t('status')}
+            className="w-[150px]"
+            value={state}
+            onValueChange={(next) => {
+              setState(next)
+              setPage(1)
+            }}
+            options={[
+              { value: ALL, label: 'كل الحالات' },
+              { value: 'recorded', label: CARD_MONTH_STATE_LABEL.recorded },
+              { value: 'pending', label: CARD_MONTH_STATE_LABEL.pending },
+            ]}
+          />
+        </div>
+        {rows.length === 0 ? (
+          <EmptyState
+            title={`لا شهور تطابق الفلاتر في ${monthLabel(month)}`}
+            className="p-8"
+          />
+        ) : (
+          <DataTable
+            size="md"
+            cellTextClassName="text-[13px]"
+            cellClassName="py-2"
+            columns={columns}
+            rows={rows}
+            rowKey={(row) => row.row_id}
+            caption="الشهور"
+            sort={sort}
+            onSortChange={(key, direction) => setSort({ key, direction })}
+            onRowClick={(row) => onOpen(row)}
+          />
+        )}
+        <DataListPagination
+          page={page}
+          pageSize={pageSize}
+          total={rows.length}
+          onPage={setPage}
+          onPageSize={(size) => {
+            setPageSize(size)
+            setPage(1)
+          }}
+        />
+      </div>
+    </Mockup>
+  )
+}
+
 // --- The decisions and the section ------------------------------------------------
 
-function DecisionsBlock() {
+function DecisionsBlock({
+  title = 'القرارات — المرحلة الاولى من المبيعات (2026-11-01)',
+  description = 'النموذج والشاشات يراجعان معا؛ ما يتغير هنا يتغير في الشاشات.',
+  items = SALES_DECISIONS,
+}: {
+  title?: string
+  description?: string
+  items?: readonly { title: string; detail: string }[]
+}) {
   return (
     <Card className="space-y-3 p-4">
-      <SectionHeader
-        title="القرارات — المرحلة الاولى من المبيعات (2026-11-01)"
-        description="النموذج والشاشات يراجعان معا؛ ما يتغير هنا يتغير في الشاشات."
-      />
+      <SectionHeader title={title} description={description} />
       <ol className="grid gap-2 sm:grid-cols-2">
-        {SALES_DECISIONS.map((decision, index) => (
+        {items.map((decision, index) => (
           <li key={decision.title} className="flex gap-3 rounded-lg border bg-bg p-3">
             <span
               aria-hidden="true"
@@ -2152,7 +3329,15 @@ function DecisionsBlock() {
   )
 }
 
-type SalesTab = 'list' | 'page' | 'card' | 'ticket' | 'cardPage' | 'cards'
+type SalesTab =
+  | 'list'
+  | 'page'
+  | 'card'
+  | 'ticket'
+  | 'cardPage'
+  | 'cards'
+  | 'batch'
+  | 'months'
 
 const SALES_TABS: { id: SalesTab; label: string }[] = [
   { id: 'list', label: 'قائمة PO العملاء' },
@@ -2161,20 +3346,27 @@ const SALES_TABS: { id: SalesTab; label: string }[] = [
   { id: 'ticket', label: 'تذكرة المعدة' },
   { id: 'cardPage', label: 'صفحة كرت المعدة' },
   { id: 'cards', label: 'قائمة كروت المعدات' },
+  { id: 'batch', label: 'كروت التشغيل' },
+  { id: 'months', label: 'الشهور' },
 ]
+
+/** The phase-2 tabs (owner 2026-11-03), shown with the phase-2 decisions. */
+const PHASE2_TABS: readonly SalesTab[] = ['batch', 'months']
 
 export function SalesMockup() {
   const [tab, setTab] = useState<SalesTab>('list')
   const [selectedId, setSelectedId] = useState(CLIENT_POS[0].id)
-  const [cardSample, setCardSample] = useState<CardSample>('rented')
+  const [cardId, setCardId] = useState<string>(CARD_PAGE_SAMPLES.rented)
+  // The recorded months and the events the phase-2 screens add, shared so a
+  // save in the batch screen shows on the card page and in the months list.
+  const store = useMonthsStore()
 
   const openPo = (id: string) => {
     setSelectedId(id)
     setTab('page')
   }
-  // The page has two samples; a list row opens the one of its kind.
   const openCard = (card: MockCard) => {
-    setCardSample(card.owned ? 'owned' : 'rented')
+    setCardId(card.id)
     setTab('cardPage')
   }
 
@@ -2183,9 +3375,19 @@ export function SalesMockup() {
       <Notice tone="info" size="compact">
         نماذج للمراجعة ببيانات عينة في الذاكرة: لا جداول ولا قراءة ولا كتابة
         على القاعدة ولا مسارات بعد. قسم «المبيعات» في الشريط الجانبي يحمل «PO
-        العملاء»، والشاشات بنفس مكونات المشتريات المعتمدة.
+        العملاء»، والشاشات بنفس مكونات المشتريات المعتمدة. المرحلة الثانية
+        («كروت التشغيل» و«الشهور» وتعديلات صفحة الكرت) تحفظ في الذاكرة فقط
+        حتى يراجعها المالك.
       </Notice>
-      <DecisionsBlock />
+      {PHASE2_TABS.includes(tab) ? (
+        <DecisionsBlock
+          title="القرارات — المرحلة الثانية: كروت التشغيل (2026-11-03)"
+          description="ساعات كل كرت لكل شهر سعودي من التايم شيت الشهري للعميل؛ القواعد هنا هي ما تحسبه الشاشات."
+          items={SALES_PHASE2_DECISIONS}
+        />
+      ) : (
+        <DecisionsBlock />
+      )}
       <Tabs value={tab} onValueChange={(next) => setTab(next as SalesTab)}>
         <TabsList variant="segmented" aria-label="شاشات المبيعات" className="flex-wrap">
           {SALES_TABS.map((item) => (
@@ -2202,9 +3404,11 @@ export function SalesMockup() {
       {tab === 'card' && <EquipmentSalesCardMockup onOpen={openPo} />}
       {tab === 'ticket' && <TicketsMockup />}
       {tab === 'cardPage' && (
-        <CardPageMockup sample={cardSample} onSample={setCardSample} />
+        <CardPageMockup cardId={cardId} onSelectCard={setCardId} store={store} />
       )}
       {tab === 'cards' && <CardsListMockup onOpen={openCard} />}
+      {tab === 'batch' && <BatchEntryMockup store={store} onOpenCard={openCard} />}
+      {tab === 'months' && <MonthsListMockup store={store} onOpen={openCard} />}
     </div>
   )
 }
