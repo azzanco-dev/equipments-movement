@@ -114,7 +114,7 @@ test('the lists give their rows the page they open', () => {
     assert.match(read(...file), pattern, file.join('/'))
 })
 
-test('purchasing: «تفاصيل», the SPO pill and «انتقل للحركة» are links', () => {
+test('purchasing: «تفاصيل», the PO pill and «انتقل للحركة» are links', () => {
   const list = read('src', 'screens', 'purchasing', 'SupplierPosListScreen.tsx')
   assert.match(
     list,

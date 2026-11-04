@@ -1,5 +1,5 @@
 // Migration 0147 and «المعدات في المشاريع» (owner 2026-10-24): every unit
-// inside a project now with its open SPO, or «اضافة الى PO» — to the open PO
+// inside a project now with its open PO number, or «اضافة الى PO» — to the open PO
 // of its party there when one exists, else a new PO with the unit ticked.
 //
 // Source checks only.
@@ -113,7 +113,7 @@ test('the page reads the view server-side and adds through the existing dialogs'
   assert.match(screen, /const canManage = can\('purchasing\.manage'\)/)
   // Tickets (owner 2026-10-25, the «تذكرة» design of /ui-kit): white
   // ticket, dashed perforation with no side notches, a stub in the state's
-  // tone with the round SPO or «+»; no badge; at most three columns.
+  // tone with the round PO pill or «+»; no badge; at most three columns.
   assert.match(
     screen,
     /const toneOf = \(row: SiteUnitRow\) => \(row\.has_po \? 'success' : 'warning'\)/,

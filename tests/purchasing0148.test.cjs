@@ -175,7 +175,7 @@ test('the dialogs: same-day units, the start date follows them or is locked', ()
   const detail = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
   assert.match(detail, /<EditSupplierPoDialog\s+po=\{po\}\s+hasLines=\{lines\.length > 0\}/)
 
-  // «المعدات في المشاريع»: the «+» says «اضافة الى SPO…» only for the
+  // «المعدات في المشاريع»: the «+» says «اضافة الى PO-…» only for the
   // party PO the view returns (same day), and the add dialog filters on it.
   const screen = read('src', 'screens', 'purchasing', 'SiteUnitsScreen.tsx')
   assert.match(screen, /start_date: saudiDateKey\(existing\.entry_at\),/)

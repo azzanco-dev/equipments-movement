@@ -44,7 +44,7 @@ import { supabase } from '@/lib/supabase'
  *  unprefixed parameters the home's deep links carry. */
 export const PO_UNITS_URL_PREFIX = 'u'
 
-/** The green SPO pill of «المعدات في المشاريع». */
+/** The green PO pill of «المعدات في المشاريع». */
 const SPO_PILL_STYLE: CSSProperties = {
   color: 'var(--success)',
   backgroundColor: 'var(--success-soft)',
@@ -184,7 +184,7 @@ export function PoUnitsList({ onSelectPo }: PoUnitsListProps) {
         </span>
       ),
     },
-    // The row's link cell (rowLinkColumn): the green SPO pill.
+    // The row's link cell (rowLinkColumn): the green PO pill.
     {
       key: 'po_number',
       header: t('siteUnitsPoNumber'),

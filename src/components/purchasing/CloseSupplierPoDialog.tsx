@@ -5,9 +5,11 @@ import type { TranslationKey } from '@/i18n/translations'
 import { supplierPoFormMessage } from '@/lib/purchasing'
 import { closeSupplierPo, type SupplierPoRow } from '@/lib/purchasingData'
 
-/** The typed number matches the PO's, whatever the case or spaces. */
+/** The typed number matches the PO's, whatever the case, spaces or dashes
+ *  (0173: the number is «PO-2026110001»; «po 2026110001» counts too). */
 export function closeConfirmationMatches(typed: string, poNumber: string): boolean {
-  return typed.replace(/\s+/g, '').toUpperCase() === poNumber.trim().toUpperCase()
+  const bare = (value: string) => value.replace(/[\s-]+/g, '').toUpperCase()
+  return bare(typed) !== '' && bare(typed) === bare(poNumber)
 }
 
 /**

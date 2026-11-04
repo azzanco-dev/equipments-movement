@@ -1,10 +1,10 @@
 import { useI18n } from '@/i18n/I18nContext'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import {
-  SUPPLIER_PO_EVENT_LABEL_KEYS,
   SUPPLIER_PO_EVENTS_LIMIT,
   SUPPLIER_PO_RATE_UNIT_LABEL_KEYS,
   formatSupplierPoPrice,
+  supplierPoEventLabel,
 } from '@/lib/purchasing'
 import { supplierPoEventDetail, type SupplierPoEventRow } from '@/lib/purchasingData'
 
@@ -23,7 +23,7 @@ export function SupplierPoEventsTimeline({
   /** The code of a unit named in a payload, from the page's lines. */
   codeOf: (equipmentId: string) => string | null
 }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const latest = events.slice(0, SUPPLIER_PO_EVENTS_LIMIT)
   if (latest.length === 0)
     return <p className="text-sm text-muted">{t('supplierPoNoEvents')}</p>
@@ -46,7 +46,7 @@ export function SupplierPoEventsTimeline({
               className="absolute -start-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-bg bg-muted"
             />
             <p className="text-sm font-medium">
-              {t(SUPPLIER_PO_EVENT_LABEL_KEYS[event.event_type])}
+              {supplierPoEventLabel(event.event_type, t, lang)}
             </p>
             {detail && (
               <p className="text-sm text-muted">

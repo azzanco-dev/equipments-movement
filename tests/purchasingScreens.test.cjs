@@ -485,13 +485,13 @@ test('status badge, event labels and the price format', () => {
     open: { key: 'supplierPoStatusOpen', tone: 'success' },
     closed: { key: 'supplierPoStatusClosed', tone: 'neutral' },
   })
-  // The event types of the CHECK as 0160 re-created it (the 0136 five, 0142's
+  // The event types of the CHECK as 0173 re-created it (the 0136 five, 0142's
   // updated and line_updated, 0149's equipment_removed and reopened, 0160's
-  // approved).
+  // approved, 0173's renumbered).
   const sql = read(
     'supabase',
     'migrations',
-    '20261028160000_0160_supplier_po_approval.sql',
+    '20261104100000_0173_supplier_po_number_format.sql',
   )
   const check = /event_type IN \(([^)]+)\)/.exec(sql)
   const types = [...check[1].matchAll(/'(\w+)'/g)].map((m) => m[1]).sort()
@@ -982,7 +982,8 @@ test('the PO page closes through a typed order number, from the options menu', (
   assert.match(close, /closeSupplierPo\(po\.id\)/)
   assert.match(close, /disabled=\{!matches\}/)
   assert.match(close, /if \(!matches \|\| saving\) return/)
-  // The matcher ignores case and spaces, nothing else.
+  // The matcher ignores case, spaces and dashes (0173: «PO-2026110001»),
+  // nothing else; an empty entry never matches.
   const src = close.slice(
     close.indexOf('export function closeConfirmationMatches'),
     close.indexOf(
@@ -996,9 +997,11 @@ test('the PO page closes through a typed order number, from the options menu', (
       .replace(/\): boolean/, ')')
       .replace('export ', '')}; return closeConfirmationMatches`,
   )()
-  assert.equal(matches(' spo26 0001 ', 'SPO260001'), true)
-  assert.equal(matches('SPO260002', 'SPO260001'), false)
-  assert.equal(matches('', 'SPO260001'), false)
+  assert.equal(matches(' po-2026 110001 ', 'PO-2026110001'), true)
+  assert.equal(matches('PO2026110001', 'PO-2026110001'), true)
+  assert.equal(matches('PO-2026110002', 'PO-2026110001'), false)
+  assert.equal(matches('', 'PO-2026110001'), false)
+  assert.equal(matches('-', '-'), false)
 })
 
 // --- «تصدير PDF» of a PO (owner 2026-10-22): the print dialog, no page -------------

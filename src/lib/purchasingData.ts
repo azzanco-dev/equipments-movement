@@ -367,6 +367,12 @@ export function supplierPoEventDetail(
       ]
         .filter(Boolean)
         .join(' · ')
+    // 0173: the one-off renumbering, «SPO260046 → PO-2026100046».
+    case 'renumbered':
+      return typeof payload.old_number === 'string' &&
+        typeof payload.new_number === 'string'
+        ? `${payload.old_number} → ${payload.new_number}`
+        : null
     default:
       return null
   }

@@ -157,7 +157,10 @@ test('equipment_cards is the shared card: defaults, open end, no overlap per uni
   assert.match(stripped, /CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA extensions;/)
 })
 
-test('supplier_pos: SPO number, lessor only NULL when internal, open/closed with closed_at', () => {
+// The SPO + YY + four-digit yearly number below is 0136's text as written;
+// migration 0173 (owner 2026-11-04) replaced it with PO-YYYYMM + an endless
+// sequence and renumbered every PO (tests/supplierPoNumber0173.test.cjs).
+test('supplier_pos: SPO number (as 0136 wrote it), lessor only NULL when internal, open/closed with closed_at', () => {
   const table = stripped.slice(
     stripped.indexOf('CREATE TABLE public.supplier_pos ('),
     stripped.indexOf(');', stripped.indexOf('CREATE TABLE public.supplier_pos (')),

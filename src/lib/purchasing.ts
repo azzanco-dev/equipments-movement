@@ -32,7 +32,7 @@ export const SUPPLIER_PO_STATUS_BADGE: Readonly<
   closed: { key: 'supplierPoStatusClosed', tone: 'neutral' },
 }
 
-/** `supplier_po_events.event_type` (the CHECK list as 0160 re-created it). */
+/** `supplier_po_events.event_type` (the CHECK list as 0173 re-created it). */
 export type SupplierPoEventType =
   | 'created'
   | 'updated'
@@ -44,6 +44,7 @@ export type SupplierPoEventType =
   | 'approved'
   | 'closed'
   | 'reopened'
+  | 'renumbered'
 
 export const SUPPLIER_PO_EVENT_LABEL_KEYS: Readonly<
   Record<SupplierPoEventType, TranslationKey>
@@ -54,12 +55,39 @@ export const SUPPLIER_PO_EVENT_LABEL_KEYS: Readonly<
   price_changed: 'supplierPoEventPriceChanged',
   line_updated: 'supplierPoEventLineUpdated',
   card_changed: 'supplierPoEventCardChanged',
-  // 0149: the one-off reopening of SPO260001 / SPO260002 (owner 2026-10-25).
+  // 0149: the one-off reopening of the first two POs (owner 2026-10-25).
   equipment_removed: 'supplierPoEventEquipmentRemoved',
   // 0160: approve_supplier_po.
   approved: 'supplierPoEventApproved',
   closed: 'supplierPoEventClosed',
   reopened: 'supplierPoEventReopened',
+  // 0173: the one-off renumbering to «PO-YYYYMM…» (owner 2026-11-04). The
+  // translation block has no key of its own yet, so the screens label it
+  // through `supplierPoEventLabel` below; this entry is the typed fallback
+  // for a consumer that reads the map directly.
+  renumbered: 'supplierPoEventUpdated',
+}
+
+/** The label of the 0173 `renumbered` event, inline until the translation
+ *  block gets `supplierPoEventRenumbered` (the sales session owns
+ *  translations.ts today). */
+export const SUPPLIER_PO_RENUMBERED_LABEL: Readonly<Record<'ar' | 'en', string>> = {
+  ar: 'اعادة ترقيم الامر',
+  en: 'Order renumbered',
+}
+
+/**
+ * The label of an event on the PO page's timeline: the translation of
+ * `SUPPLIER_PO_EVENT_LABEL_KEYS`, except `renumbered`, which has its inline
+ * label until a key exists.
+ */
+export function supplierPoEventLabel(
+  eventType: SupplierPoEventType,
+  t: (key: TranslationKey) => string,
+  lang: 'ar' | 'en',
+): string {
+  if (eventType === 'renumbered') return SUPPLIER_PO_RENUMBERED_LABEL[lang]
+  return t(SUPPLIER_PO_EVENT_LABEL_KEYS[eventType])
 }
 
 // --- Approval (0160) -----------------------------------------------------------

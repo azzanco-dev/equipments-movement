@@ -88,7 +88,7 @@ const ADD_BUTTON_STYLE: CSSProperties = {
   backgroundColor: 'var(--warning)',
 }
 
-/** The SPO on a ticket with a PO: a round green pill that opens the PO. */
+/** The PO number on a ticket with a PO: a round green pill that opens the PO. */
 const SPO_BUTTON_STYLE: CSSProperties = {
   color: 'var(--success)',
   backgroundColor: 'var(--success-soft)',
@@ -105,7 +105,7 @@ type AddTarget =
  * (`purchasing_site_units`, migration 0147) as a coloured tile — the code
  * with its plate or chassis, the company's number under it, the type, the
  * owner or supplier, «الشركة · المشروع», the foreman — ending in its open
- * SPO or «اضافة الى PO». Search, filters, sort and paging are server-side
+ * PO number or «اضافة الى PO». Search, filters, sort and paging are server-side
  * through the unified list system. Adding goes to the party's open PO there
  * (`add_supplier_po_equipment`), else opens a new PO with the unit ticked;
  * the database re-checks every rule. The add needs `purchasing.manage`.
@@ -270,7 +270,7 @@ export function SiteUnitsScreen({
     if (!open) setTarget(null)
   }
 
-  /** The supplier stub's control: the SPO pill that opens the PO, else the
+  /** The supplier stub's control: the PO pill that opens the PO, else the
    *  «+» for `purchasing.manage` (unchanged since 2026-10-25). */
   const supplierStubControl = (row: SiteUnitRow) =>
     row.supplier_po_id ? (
@@ -285,7 +285,7 @@ export function SiteUnitsScreen({
     ) : (
       // Owner 2026-10-25: like «انتقل للحركة», the «+» widens on hover or
       // keyboard focus, and its label says what it will do: «اضافة الى
-      // SPO…» on the party's open PO there, else «PO جديد». 0148: the view
+      // PO-…» on the party's open PO there, else «PO جديد». 0148: the view
       // gives `party_po_id` only for a PO whose start date is this unit's
       // entry day.
       canManage && (
@@ -404,7 +404,7 @@ export function SiteUnitsScreen({
           </p>
           {/* Owner 2026-10-25: the «تذكرة» design approved on /ui-kit — the
               unit on top, a dashed perforation, and a stub in the state's
-              tone holding the state and the SPO or the «+». At most three
+              tone holding the state and the PO pill or the «+». At most three
               columns, a 16 px gap and no side padding, so the tickets line
               up with the toolbar (owner 2026-10-25). */}
           <ul
@@ -527,7 +527,7 @@ export function SiteUnitsScreen({
                     className="text-xs font-medium"
                     style={{ color: `var(--${toneOf(row)})` }}
                   >
-                    {/* Owner 2026-10-25: «رقم PO» beside the SPO pill. */}
+                    {/* Owner 2026-10-25: «رقم PO» beside the PO pill. */}
                     {row.has_po ? t('siteUnitsPoNumber') : t('siteUnitsNoPo')}
                   </span>
                   {supplierStubControl(row)}

@@ -56,8 +56,8 @@ test('a sub-page: «name · section»', () => {
 
 test('a detail page: «record · section», «section · app» while loading', () => {
   assert.equal(
-    tabTitle('purchasing/:id', t, 'SPO260046'),
-    'SPO260046 · <supplierPos>',
+    tabTitle('purchasing/:id', t, 'PO-2026100046'),
+    'PO-2026100046 · <supplierPos>',
   )
   assert.equal(
     tabTitle('purchasing/:id', t, null),

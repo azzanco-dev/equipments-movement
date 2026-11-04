@@ -159,7 +159,8 @@ export function SupplierPoDetail({
   const canApprove = can('purchasing.approve')
   const { user } = useAuth()
   const [po, setPo] = useState<SupplierPoRow | null>(null)
-  // The tab reads «SPO260046 · اوامر الشراء» (owner 2026-10-25).
+  // The tab reads «PO-2026100046 · اوامر الشراء» (owner 2026-10-25; the
+  // number's shape is the database's, 0173).
   useTabTitle(po?.po_number)
   const [lines, setLines] = useState<SupplierPoLineRow[]>([])
   const [events, setEvents] = useState<SupplierPoEventRow[]>([])

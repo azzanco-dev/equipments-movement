@@ -280,7 +280,7 @@ test('the screens: approve for approvers, locked when approved, a draft PDF mark
   )
   assert.match(sheet, /ar\('supplierPoPrintTitleAr'\)[\s\S]*en\('supplierPoPrintTitleEn'\)[\s\S]*\{project\}/)
   assert.match(sheet, /key: 'supplierPoPrintNumber'[\s\S]*key: 'supplierPoPrintIssueDate'[\s\S]*key: 'supplierPoPrintStatus'/)
-  // The corner is English only: «PO Number: SPO…», the state in English.
+  // The corner is English only: «PO Number: PO-…», the state in English.
   assert.match(sheet, /<dl className="m-0 justify-self-end space-y-0\.5 text-\[11px\]" dir="ltr">/)
   assert.match(sheet, /<dt className="text-muted">\{en\(fact\.key\)\}:<\/dt>/)
   assert.match(sheet, /\{ key: 'supplierPoPrintStatus', value: stateKeys\.map\(en\)\.join\(' · '\) \}/)
