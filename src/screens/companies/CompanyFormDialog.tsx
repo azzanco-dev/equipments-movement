@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, ErrorState, Field, Input } from '@/components/ui'
+import {
+  PartyFormSection,
+  type PartyFieldSpec,
+} from '@/components/parties/PartyFormSection'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import {
@@ -23,6 +27,53 @@ import {
   type FieldErrors,
 } from '@/lib/formValidation'
 import type { Company } from '@/lib/types'
+
+/** EM-260 (0175): «بيانات رسمية», then «بيانات الاتصال». */
+const OFFICIAL_FIELDS: readonly PartyFieldSpec<CompanyFormValues>[] = [
+  {
+    field: 'tax_number',
+    label: 'taxNumber',
+    placeholder: 'taxNumberPlaceholder',
+    ltr: true,
+    inputMode: 'numeric',
+  },
+  {
+    field: 'commercial_register',
+    label: 'commercialRegister',
+    placeholder: 'commercialRegisterPlaceholder',
+    ltr: true,
+    inputMode: 'numeric',
+  },
+  { field: 'city', label: 'city', placeholder: 'cityPlaceholder' },
+  {
+    field: 'address',
+    label: 'address',
+    placeholder: 'addressPlaceholder',
+    wide: true,
+  },
+]
+const CONTACT_FIELDS: readonly PartyFieldSpec<CompanyFormValues>[] = [
+  {
+    field: 'contact_person',
+    label: 'contactPerson',
+    placeholder: 'contactPersonPlaceholder',
+  },
+  {
+    field: 'contact_number',
+    label: 'contactNumber',
+    placeholder: 'contactNumberPlaceholder',
+    ltr: true,
+    type: 'tel',
+  },
+  {
+    field: 'email',
+    label: 'email',
+    placeholder: 'partyEmailPlaceholder',
+    ltr: true,
+    type: 'email',
+    wide: true,
+  },
+]
 
 export interface CompanyFormDialogProps {
   open: boolean
@@ -97,7 +148,7 @@ export function CompanyFormDialog({
       return
     }
     if (result.error) {
-      // A duplicate name belongs on the name that caused it; anything else
+      // A duplicate name or 0175 value belongs on its field; anything else
       // stays a safe top-level message.
       const attributed = companySaveFieldErrors(result.error)
       if (attributed) {
@@ -122,7 +173,7 @@ export function CompanyFormDialog({
       onOpenChange={onOpenChange}
       title={company ? t('editCompany') : t('addCompany')}
       description={t('dialogDescCompanyForm')}
-      size="sm"
+      size="md"
       footer={
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -170,6 +221,20 @@ export function CompanyFormDialog({
             />
           )}
         </Field>
+        <PartyFormSection
+          title="partyOfficialSection"
+          fields={OFFICIAL_FIELDS}
+          form={form}
+          errors={errors}
+          onChange={update}
+        />
+        <PartyFormSection
+          title="partyContactSection"
+          fields={CONTACT_FIELDS}
+          form={form}
+          errors={errors}
+          onChange={update}
+        />
       </div>
     </Dialog>
   )

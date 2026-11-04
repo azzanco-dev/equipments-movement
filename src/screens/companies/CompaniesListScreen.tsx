@@ -19,12 +19,17 @@ import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import type { Company } from '@/lib/types'
 import { CompaniesTable } from './CompaniesTable'
+import { CompanyDetailsDialog } from './CompanyDetailsDialog'
 import { CompanyExportDialog } from './CompanyExportDialog'
 import { CompanyFormDialog } from './CompanyFormDialog'
 import { CompanyImportDialog } from './CompanyImportDialog'
 import { CompanyProjectsDialog } from './CompanyProjectsDialog'
 
-const LIST_SELECT = 'id,name_ar,name_en,created_at,updated_at'
+// EM-260 (0175): the edit and details dialogs read their record from the
+// list row, so the row carries every field the form saves (a field left out
+// here would be saved back as empty).
+const LIST_SELECT =
+  'id,name_ar,name_en,tax_number,commercial_register,address,city,email,contact_person,contact_number,created_at,updated_at'
 
 /** Orchestrator for the companies list; same shape as the equipment and
  *  drivers screens. */
@@ -41,6 +46,7 @@ export function CompaniesListScreen() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Company | null>(null)
+  const [viewing, setViewing] = useState<Company | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [projectsCompany, setProjectsCompany] = useState<Company | null>(null)
@@ -93,6 +99,7 @@ export function CompaniesListScreen() {
     setFormOpen(true)
   }
   const openEdit = (company: Company) => {
+    setViewing(null)
     setEditing(company)
     setFormOpen(true)
   }
@@ -193,6 +200,7 @@ export function CompaniesListScreen() {
         sort={list.sort}
         direction={list.direction}
         onSortChange={list.setSort}
+        onOpen={setViewing}
         onEdit={canEdit ? openEdit : undefined}
         onManageProjects={setProjectsCompany}
         onDelete={canEdit ? remove : undefined}
@@ -221,6 +229,13 @@ export function CompaniesListScreen() {
         onImported={fetchCompanies}
       />
       <CompanyExportDialog open={exportOpen} onOpenChange={setExportOpen} />
+      <CompanyDetailsDialog
+        company={viewing}
+        onOpenChange={(open) => {
+          if (!open) setViewing(null)
+        }}
+        onEdit={canEdit && viewing ? () => openEdit(viewing) : undefined}
+      />
       <CompanyProjectsDialog
         open={projectsCompany !== null}
         onOpenChange={(open) => {

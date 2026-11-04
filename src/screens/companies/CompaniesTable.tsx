@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Building2, Edit2, FolderTree, Trash2 } from 'lucide-react'
+import { Building2, Edit2, Eye, FolderTree, Trash2 } from 'lucide-react'
 import { DataTable, EmptyState, ErrorState, IconButton } from '@/components/ui'
 import type { DataTableColumn } from '@/components/ui'
 import { RelativeTime } from '@/components/RelativeTime'
@@ -19,6 +19,8 @@ export interface CompaniesTableProps {
   sort: string
   direction: 'asc' | 'desc'
   onSortChange: (key: string, direction: 'asc' | 'desc') => void
+  /** Opens the company's details (EM-260): the name and the eye button. */
+  onOpen?: (company: Company) => void
   /** Omitted without `companies_projects.edit`: the row shows no edit button. */
   onEdit?: (company: Company) => void
   onManageProjects: (company: Company) => void
@@ -35,6 +37,7 @@ export function CompaniesTable({
   sort,
   direction,
   onSortChange,
+  onOpen,
   onEdit,
   onManageProjects,
   onDelete,
@@ -59,13 +62,33 @@ export function CompaniesTable({
       header: t('company'),
       sortable: true,
       className: 'font-semibold',
-      cell: (row) => localizedName(lang, row.name_ar, row.name_en),
+      cell: (row) =>
+        onOpen ? (
+          <button
+            type="button"
+            className="text-start font-semibold hover:underline focus-visible:underline"
+            onClick={() => onOpen(row)}
+          >
+            {localizedName(lang, row.name_ar, row.name_en)}
+          </button>
+        ) : (
+          localizedName(lang, row.name_ar, row.name_en)
+        ),
     },
     {
       key: 'actions',
       header: t('actions'),
       cell: (row) => (
         <span className="flex items-center gap-1">
+          {onOpen && (
+            <IconButton
+              size="sm"
+              label={t('companyDetailsDialogTitle')}
+              title={t('companyDetailsDialogTitle')}
+              icon={<Eye size={15} />}
+              onClick={() => onOpen(row)}
+            />
+          )}
           {onEdit && (
             <IconButton
               size="sm"

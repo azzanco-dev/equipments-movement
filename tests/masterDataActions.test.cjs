@@ -281,6 +281,8 @@ const WRITERS = [
   'src/screens/projects/ProjectImportDialog.tsx',
   'src/screens/lessors/LessorsListScreen.tsx',
   'src/screens/lessors/LessorFormDialog.tsx',
+  // EM-260: the supplier Excel import.
+  'src/screens/lessors/LessorImportDialog.tsx',
 ]
 
 /** Every `.from('<table>')` chain that writes, up to its `await`ed end. */
@@ -321,7 +323,7 @@ test('every master-data write reads its rows back and checks the refusal', () =>
       file,
     )
   }
-  assert.equal(count, 18)
+  assert.equal(count, 19)
 })
 
 test('no other screen writes these tables directly', () => {
@@ -401,6 +403,9 @@ const GATES = {
     /const addButton = canEdit \?/,
     /onEdit=\{canEdit \? openEdit : undefined\}/,
     /onDelete=\{canEdit \? remove : undefined\}/,
+    // EM-260: the supplier import follows the same key.
+    /canEdit \? \(\s*<Button[\s\S]*?setImportOpen\(true\)/,
+    /open=\{importOpen && canEdit\}/,
   ],
   'src/screens/lessors/LessorFormDialog.tsx': [
     /const canSave = lessorsActions\(usePermissions\(\)\)\.edit/,

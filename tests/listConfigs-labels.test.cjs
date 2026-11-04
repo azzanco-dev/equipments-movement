@@ -81,12 +81,19 @@ const ARABIC_SNAPSHOT = {
     filters: ['الحالة', 'جديدة', 'المالك', 'حالة المعدة'],
   },
   companies: {
-    search: 'البحث باسم الشركة',
+    // EM-260 (0175): the tax number and the CR are searched too.
+    search: 'البحث باسم الشركة او الرقم الضريبي او السجل التجاري',
     // The name text filters were removed in the 2026-09-29 owner review: the
     // search box already matches both names.
     filters: [],
   },
-  lessors: { search: 'البحث بالاسم أو جهة الاتصال أو الجوال', filters: [] },
+  // EM-260 (0175): the tax number and the CR joined the search; the new
+  // copy uses the plain alif.
+  lessors: {
+    search:
+      'البحث بالاسم او جهة الاتصال او الجوال او الرقم الضريبي او السجل التجاري',
+    filters: [],
+  },
   logs: {
     filters: [
       'نوع الحركة',

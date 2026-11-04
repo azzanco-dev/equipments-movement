@@ -4,6 +4,20 @@ import { isValidUserMobile, normalizeUserMobileInput } from '@/lib/userMobile'
 import { DRIVER_EMPLOYEE_NUMBER_MAX } from '@/lib/driverEmployeeNumber'
 import { isValidSupplierPoPrice } from '@/lib/purchasing'
 import {
+  COMMERCIAL_REGISTER_PATTERN,
+  EMAIL_SHAPE_PATTERN,
+  PARTY_ADDRESS_MAX,
+  PARTY_BANK_NAME_MAX,
+  PARTY_CITY_MAX,
+  PARTY_CONTACT_NUMBER_MAX,
+  PARTY_CONTACT_PERSON_MAX,
+  PARTY_EMAIL_MAX,
+  SAUDI_IBAN_PATTERN,
+  TAX_NUMBER_PATTERN,
+  normalizeIban,
+  normalizeRegistryNumber,
+} from '@/lib/partyFields'
+import {
   CARD_MONTH_NOTE_MAX,
   isValidCardMonthHours,
   isValidCardPrice,
@@ -425,10 +439,57 @@ export function quickEquipmentFormSchema(workshopMode: boolean) {
     })
 }
 
-/** Companies: both names are `NOT NULL`. */
+/**
+ * The 0175 fields shared by the supplier and the client forms (EM-260): all
+ * optional; the tax number and the CR are checked on their normalised text
+ * (spaces and dashes stripped, as the database trigger stores them), the
+ * email on its lenient shape, the address and the city on their length.
+ */
+const partySharedFieldsShape = {
+  tax_number: z
+    .string()
+    .trim()
+    .refine(
+      (value) =>
+        !value || TAX_NUMBER_PATTERN.test(normalizeRegistryNumber(value)),
+      message('taxNumberFormatInvalid'),
+    ),
+  commercial_register: z
+    .string()
+    .trim()
+    .refine(
+      (value) =>
+        !value ||
+        COMMERCIAL_REGISTER_PATTERN.test(normalizeRegistryNumber(value)),
+      message('commercialRegisterFormatInvalid'),
+    ),
+  address: optionalText({ max: PARTY_ADDRESS_MAX, lengthKey: 'addressTooLong' }),
+  city: optionalText({ max: PARTY_CITY_MAX, lengthKey: 'cityTooLong' }),
+  email: z
+    .string()
+    .trim()
+    .refine(
+      (value) =>
+        !value ||
+        (value.length <= PARTY_EMAIL_MAX && EMAIL_SHAPE_PATTERN.test(value)),
+      message('emailFormatInvalid'),
+    ),
+}
+
+/** Companies: both names are `NOT NULL`; the 0175 fields are optional, the
+ *  contact person and number bounded like their CHECKs. */
 export const companyFormSchema = z.object({
   name_ar: requiredText('companyNameArRequired'),
   name_en: requiredText('companyNameEnRequired'),
+  contact_person: optionalText({
+    max: PARTY_CONTACT_PERSON_MAX,
+    lengthKey: 'contactPersonTooLong',
+  }),
+  contact_number: optionalText({
+    max: PARTY_CONTACT_NUMBER_MAX,
+    lengthKey: 'contactNumberTooLong',
+  }),
+  ...partySharedFieldsShape,
 })
 
 /** Projects: both names are `NOT NULL`. */
@@ -440,10 +501,25 @@ export const projectFormSchema = z.object({
 /**
  * External suppliers: only the name is mandatory. The contact number is free
  * text in the database (no check), so it stays unvalidated: existing numbers
- * written in other ways must keep saving.
+ * written in other ways must keep saving. The 0175 fields are optional; the
+ * IBAN is checked on its normalised text (no spaces or dashes, upper-case).
  */
 export const lessorFormSchema = z.object({
   name: requiredText('lessorNameRequired'),
+  contact_person: z.string().trim(),
+  contact_number: z.string().trim(),
+  ...partySharedFieldsShape,
+  bank_name: optionalText({
+    max: PARTY_BANK_NAME_MAX,
+    lengthKey: 'bankNameTooLong',
+  }),
+  iban: z
+    .string()
+    .trim()
+    .refine(
+      (value) => !value || SAUDI_IBAN_PATTERN.test(normalizeIban(value)),
+      message('ibanFormatInvalid'),
+    ),
 })
 
 /** Quick Create supplier: `quick_create_lessor_by_name` takes 150 characters. */

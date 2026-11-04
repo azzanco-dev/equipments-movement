@@ -73,10 +73,26 @@ export interface ProfileContact {
   updated_at: string
 }
 
-export interface Company {
+/**
+ * The extra master-data fields of suppliers and clients (migration 0175,
+ * EM-260), all optional in the database; `undefined` where a select leaves
+ * them out.
+ */
+export interface PartyFields {
+  tax_number?: string | null
+  commercial_register?: string | null
+  address?: string | null
+  city?: string | null
+  email?: string | null
+}
+
+export interface Company extends PartyFields {
   id: string
   name_ar: string
   name_en: string
+  /** 0175: the client's contact person and number. */
+  contact_person?: string | null
+  contact_number?: string | null
   created_at: string
   updated_at: string
 }
@@ -89,11 +105,14 @@ export interface Project {
   updated_at: string
 }
 
-export interface Lessor {
+export interface Lessor extends PartyFields {
   id: string
   name: string
   contact_person: string | null
   contact_number: string | null
+  /** 0175: the supplier's bank and IBAN (stored without spaces, upper-case). */
+  bank_name?: string | null
+  iban?: string | null
   created_at: string
   updated_at: string
 }

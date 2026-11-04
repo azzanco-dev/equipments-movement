@@ -289,6 +289,9 @@ const CONCEPTS = {
   mobile: { ar: 'الجوال', en: 'mobile' },
   contactPerson: { ar: 'جهة الاتصال', en: 'contact person' },
   employeeNumber: { ar: 'الرقم الوظيفي', en: 'employee number' },
+  // EM-260 (0175): the suppliers' and clients' official numbers.
+  taxNumber: { ar: 'الرقم الضريبي', en: 'tax number' },
+  commercialRegister: { ar: 'السجل التجاري', en: 'cr number' },
 }
 const COLUMN_CONCEPT = {
   code: 'code',
@@ -317,6 +320,8 @@ const COLUMN_CONCEPT = {
   contact_number: 'mobile',
   contact_person_search: 'contactPerson',
   employee_number: 'employeeNumber',
+  tax_number: 'taxNumber',
+  commercial_register: 'commercialRegister',
 }
 
 function mentions(text, concept, lang) {

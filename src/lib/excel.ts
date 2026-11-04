@@ -10,10 +10,26 @@ import type {
 import { normalizePlateNumber } from '@/lib/plate'
 import { exportRowsToExcel } from '@/lib/excelExport'
 import type { ExcelColumn } from '@/lib/excelSheet'
+import {
+  COMPANY_IMPORT_PARTY_FIELDS,
+  LESSOR_IMPORT_PARTY_FIELDS,
+  matchPartyHeaders,
+  partyTemplateColumns,
+  readPartyValues,
+  type PartyImportValues,
+} from '@/lib/partyImport'
 
-export interface CompanyImportRow {
+/** EM-260 (0175): the optional party columns ride on the row. */
+export interface CompanyImportRow extends PartyImportValues {
   name_ar: string
   name_en: string
+  _rowNumber: number
+  _errors: string[]
+}
+
+/** The supplier import (EM-260): the name and the optional columns. */
+export interface LessorImportRow extends PartyImportValues {
+  name: string
   _rowNumber: number
   _errors: string[]
 }
@@ -440,11 +456,19 @@ export function parseCompaniesExcel(
   })
 
   const keyMap: Record<string, string> = {}
-  for (const k of Object.keys(json[0] ?? {})) {
+  const headers = Object.keys(json[0] ?? {})
+  for (const k of headers) {
     const nk = normalizeKey(k)
     if (nk === normalizeKey(t('companyNameAr'))) keyMap['name_ar'] = k
     else if (nk === normalizeKey(t('companyNameEn'))) keyMap['name_en'] = k
   }
+  // EM-260 (0175): the optional client columns, by header.
+  const partyHeaders = matchPartyHeaders(
+    headers.filter((k) => !Object.values(keyMap).includes(k)),
+    COMPANY_IMPORT_PARTY_FIELDS,
+    t,
+    normalizeKey,
+  )
 
   return json.map((row, idx) => {
     const errors: string[] = []
@@ -461,9 +485,18 @@ export function parseCompaniesExcel(
     if (!name_en)
       errors.push(columnError(t, 'companyNameEn', 'importColumnRequired'))
 
+    const party = readPartyValues(
+      row,
+      partyHeaders,
+      COMPANY_IMPORT_PARTY_FIELDS,
+      t,
+      errors,
+    )
+
     return {
       name_ar,
       name_en,
+      ...party,
       _rowNumber: idx + 2,
       _errors: errors,
     }
@@ -475,13 +508,76 @@ export function downloadCompanyTemplate(t: (key: TranslationKey) => string) {
     {
       [t('companyNameAr')]: 'شركة المقاولات الحديثة',
       [t('companyNameEn')]: 'Modern Contracting Co.',
+      ...partyTemplateColumns(COMPANY_IMPORT_PARTY_FIELDS, t),
     },
   ]
   const ws = XLSX.utils.json_to_sheet(sample)
-  ws['!cols'] = [{ wch: 30 }, { wch: 30 }]
+  ws['!cols'] = [
+    { wch: 30 },
+    { wch: 30 },
+    ...COMPANY_IMPORT_PARTY_FIELDS.map(() => ({ wch: 22 })),
+  ]
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Companies')
   XLSX.writeFile(wb, 'companies-template.xlsx')
+}
+
+// ============ SUPPLIERS ============
+
+/** The supplier import (EM-260): the name is required; the contact
+ *  details, the 0175 columns and the bank details are optional. */
+export function parseLessorsExcel(
+  data: ArrayBuffer,
+  t: (key: TranslationKey) => string,
+): LessorImportRow[] {
+  const wb = readWorkbookSafely(XLSX, data, { type: 'array' })
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  const json: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, {
+    defval: '',
+  })
+
+  const headers = Object.keys(json[0] ?? {})
+  const nameNames = [t('lessorName'), 'name', 'اسم المورد', 'المورد', 'supplier']
+  const nameHeader = headers.find((k) =>
+    nameNames.some((name) => normalizeKey(name) === normalizeKey(k)),
+  )
+  const partyHeaders = matchPartyHeaders(
+    headers.filter((k) => k !== nameHeader),
+    LESSOR_IMPORT_PARTY_FIELDS,
+    t,
+    normalizeKey,
+  )
+
+  return json.map((row, idx) => {
+    const errors: string[] = []
+    const name = nameHeader ? String(row[nameHeader] ?? '').trim() : ''
+    if (!name) errors.push(columnError(t, 'lessorName', 'importColumnRequired'))
+    const party = readPartyValues(
+      row,
+      partyHeaders,
+      LESSOR_IMPORT_PARTY_FIELDS,
+      t,
+      errors,
+    )
+    return { name, ...party, _rowNumber: idx + 2, _errors: errors }
+  })
+}
+
+export function downloadLessorTemplate(t: (key: TranslationKey) => string) {
+  const sample = [
+    {
+      [t('lessorName')]: 'مؤسسة النقل الحديث',
+      ...partyTemplateColumns(LESSOR_IMPORT_PARTY_FIELDS, t),
+    },
+  ]
+  const ws = XLSX.utils.json_to_sheet(sample)
+  ws['!cols'] = [
+    { wch: 30 },
+    ...LESSOR_IMPORT_PARTY_FIELDS.map(() => ({ wch: 24 })),
+  ]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Suppliers')
+  XLSX.writeFile(wb, 'suppliers-template.xlsx')
 }
 
 // ============ PROJECTS ============

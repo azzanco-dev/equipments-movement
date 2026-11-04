@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, ErrorState, Field, Input } from '@/components/ui'
+import {
+  PartyFormSection,
+  type PartyFieldSpec,
+} from '@/components/parties/PartyFormSection'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import { lessorsActions, refusedByPolicy } from '@/lib/actionPermissions'
@@ -9,6 +13,7 @@ import {
   LESSOR_FIELD_ORDER,
   buildLessorPayload,
   lessorFormValues,
+  lessorSaveFieldErrors,
   validateLessorForm,
   type LessorFormValues,
 } from '@/lib/lessorForm'
@@ -19,6 +24,57 @@ import {
   type FieldErrors,
 } from '@/lib/formValidation'
 import type { Lessor } from '@/lib/types'
+
+/** EM-260 (0175): «بيانات رسمية», then the contact details, then the bank. */
+const OFFICIAL_FIELDS: readonly PartyFieldSpec<LessorFormValues>[] = [
+  {
+    field: 'tax_number',
+    label: 'taxNumber',
+    placeholder: 'taxNumberPlaceholder',
+    ltr: true,
+    inputMode: 'numeric',
+  },
+  {
+    field: 'commercial_register',
+    label: 'commercialRegister',
+    placeholder: 'commercialRegisterPlaceholder',
+    ltr: true,
+    inputMode: 'numeric',
+  },
+  { field: 'city', label: 'city', placeholder: 'cityPlaceholder' },
+  {
+    field: 'address',
+    label: 'address',
+    placeholder: 'addressPlaceholder',
+    wide: true,
+  },
+]
+const CONTACT_FIELDS: readonly PartyFieldSpec<LessorFormValues>[] = [
+  {
+    field: 'contact_person',
+    label: 'contactPerson',
+    placeholder: 'contactPersonPlaceholder',
+  },
+  {
+    field: 'contact_number',
+    label: 'contactNumber',
+    placeholder: 'contactNumberPlaceholder',
+    ltr: true,
+    type: 'tel',
+  },
+  {
+    field: 'email',
+    label: 'email',
+    placeholder: 'partyEmailPlaceholder',
+    ltr: true,
+    type: 'email',
+    wide: true,
+  },
+]
+const BANK_FIELDS: readonly PartyFieldSpec<LessorFormValues>[] = [
+  { field: 'bank_name', label: 'bankName', placeholder: 'bankNamePlaceholder' },
+  { field: 'iban', label: 'iban', placeholder: 'ibanPlaceholder', ltr: true },
+]
 
 export interface LessorFormDialogProps {
   open: boolean
@@ -93,6 +149,16 @@ export function LessorFormDialog({
       return
     }
     if (result.error) {
+      // A duplicate or malformed 0175 value belongs on its field; anything
+      // else stays a safe top-level message.
+      const attributed = lessorSaveFieldErrors(result.error)
+      if (attributed) {
+        setErrors(attributed)
+        focusFirstError(attributed, LESSOR_FIELD_ORDER, {
+          root: bodyRef.current,
+        })
+        return
+      }
       setError(t('saveFailed'))
       return
     }
@@ -108,7 +174,7 @@ export function LessorFormDialog({
       onOpenChange={onOpenChange}
       title={lessor ? t('editLessor') : t('addLessor')}
       description={t('dialogDescLessorForm')}
-      size="sm"
+      size="md"
       footer={
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -139,31 +205,27 @@ export function LessorFormDialog({
             />
           )}
         </Field>
-        <Field label={t('contactPerson')} name="contact_person">
-          {(control) => (
-            <Input
-              {...control}
-              placeholder={t('contactPersonPlaceholder')}
-              value={form.contact_person}
-              onChange={(event) =>
-                update({ contact_person: event.target.value })
-              }
-            />
-          )}
-        </Field>
-        <Field label={t('contactNumber')} name="contact_number">
-          {(control) => (
-            <Input
-              {...control}
-              dir="ltr"
-              placeholder={t('contactNumberPlaceholder')}
-              value={form.contact_number}
-              onChange={(event) =>
-                update({ contact_number: event.target.value })
-              }
-            />
-          )}
-        </Field>
+        <PartyFormSection
+          title="partyOfficialSection"
+          fields={OFFICIAL_FIELDS}
+          form={form}
+          errors={errors}
+          onChange={update}
+        />
+        <PartyFormSection
+          title="partyContactSection"
+          fields={CONTACT_FIELDS}
+          form={form}
+          errors={errors}
+          onChange={update}
+        />
+        <PartyFormSection
+          title="partyBankSection"
+          fields={BANK_FIELDS}
+          form={form}
+          errors={errors}
+          onChange={update}
+        />
       </div>
     </Dialog>
   )

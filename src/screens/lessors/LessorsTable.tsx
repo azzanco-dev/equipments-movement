@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Edit2, Trash2, Truck } from 'lucide-react'
+import { Edit2, Eye, Trash2, Truck } from 'lucide-react'
 import { DataTable, EmptyState, ErrorState, IconButton } from '@/components/ui'
 import type { DataTableColumn } from '@/components/ui'
 import { RelativeTime } from '@/components/RelativeTime'
@@ -16,6 +16,8 @@ export interface LessorsTableProps {
   sort: string
   direction: 'asc' | 'desc'
   onSortChange: (key: string, direction: 'asc' | 'desc') => void
+  /** Opens the supplier's details (EM-260): the name and the eye button. */
+  onOpen?: (lessor: Lessor) => void
   /** Omitted without `lessors.edit`: the row shows no edit button. */
   onEdit?: (lessor: Lessor) => void
   /** Omitted without `lessors.edit`: the row shows no delete button. */
@@ -31,6 +33,7 @@ export function LessorsTable({
   sort,
   direction,
   onSortChange,
+  onOpen,
   onEdit,
   onDelete,
   emptyAction,
@@ -55,7 +58,18 @@ export function LessorsTable({
       sortable: true,
       // Owner 2026-10-29 put the contact person under the name; the owner
       // reversed it on 2026-10-31: it is a column of its own again.
-      cell: (row) => <span className="font-semibold">{row.name}</span>,
+      cell: (row) =>
+        onOpen ? (
+          <button
+            type="button"
+            className="text-start font-semibold hover:underline focus-visible:underline"
+            onClick={() => onOpen(row)}
+          >
+            {row.name}
+          </button>
+        ) : (
+          <span className="font-semibold">{row.name}</span>
+        ),
     },
     {
       key: 'contact_person',
@@ -74,6 +88,15 @@ export function LessorsTable({
       header: t('actions'),
       cell: (row) => (
         <span className="flex items-center gap-1">
+          {onOpen && (
+            <IconButton
+              size="sm"
+              label={t('lessorDetailsDialogTitle')}
+              title={t('lessorDetailsDialogTitle')}
+              icon={<Eye size={15} />}
+              onClick={() => onOpen(row)}
+            />
+          )}
           {onEdit && (
             <IconButton
               size="sm"

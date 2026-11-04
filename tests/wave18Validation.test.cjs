@@ -65,7 +65,7 @@ test('fieldErrorsFromZod keeps the first issue per field and {} when valid', () 
   )
   // A missing value (wrong type) falls back to the generic key.
   assert.deepEqual(
-    plain(v.fieldErrorsFromZod(v.companyFormSchema.safeParse({}))),
+    plain(v.fieldErrorsFromZod(v.projectFormSchema.safeParse({}))),
     { name_ar: 'required', name_en: 'required' },
   )
 })

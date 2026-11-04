@@ -699,6 +699,51 @@ export const translations = {
     noLessors: 'لا يوجد مورّدون',
     lessorsLoadError: 'تعذر تحميل الموردين. حاول مرة اخرى.',
 
+    // party-fields — start (EM-260, migration 0175: the extra master-data
+    // fields of suppliers and clients)
+    partyOfficialSection: 'بيانات رسمية',
+    partyContactSection: 'بيانات الاتصال',
+    taxNumber: 'الرقم الضريبي',
+    commercialRegister: 'السجل التجاري',
+    address: 'العنوان',
+    city: 'المدينة',
+    iban: 'الايبان (IBAN)',
+    bankName: 'البنك',
+    bankNamePlaceholder: 'مثال: مصرف الراجحي',
+    bankNameTooLong: 'اسم البنك يجب الا يزيد عن 100 حرف',
+    partyBankSection: 'بيانات البنك',
+    lessorsImportSuccess: 'تم استيراد {count} مورد',
+    lessorsImportPartialSuccess: 'تم استيراد {success} مورد، وفشل {fail}',
+    duplicateLessorName: 'يوجد مورد بنفس الاسم',
+    taxNumberPlaceholder: '15 رقما، مثال: 300000000000003',
+    commercialRegisterPlaceholder: 'مثال: 1010123456',
+    addressPlaceholder: 'العنوان الوطني او الشارع',
+    cityPlaceholder: 'مثال: الرياض',
+    partyEmailPlaceholder: 'name@example.com',
+    ibanPlaceholder: 'SA00 0000 0000 0000 0000 0000',
+    taxNumberFormatInvalid: 'الرقم الضريبي 15 رقما',
+    commercialRegisterFormatInvalid: 'السجل التجاري ارقام فقط من 4 الى 20 خانة',
+    ibanFormatInvalid: 'الايبان يبدا بـ SA ويتكون من 24 خانة',
+    emailFormatInvalid: 'صيغة البريد غير صحيحة',
+    addressTooLong: 'العنوان يجب الا يزيد عن 200 حرف',
+    cityTooLong: 'المدينة يجب الا تزيد عن 60 حرفا',
+    contactPersonTooLong: 'جهة الاتصال يجب الا تزيد عن 120 حرفا',
+    contactNumberTooLong: 'رقم التواصل يجب الا يزيد عن 30 خانة',
+    taxNumberExistsLessor: 'الرقم الضريبي مستخدم لمورد اخر',
+    commercialRegisterExistsLessor: 'السجل التجاري مستخدم لمورد اخر',
+    taxNumberExistsCompany: 'الرقم الضريبي مستخدم لشركة اخرى',
+    commercialRegisterExistsCompany: 'السجل التجاري مستخدم لشركة اخرى',
+    taxNumberDuplicate: 'الرقم الضريبي مكرر',
+    commercialRegisterDuplicate: 'السجل التجاري مكرر',
+    lessorDetailsDialogTitle: 'تفاصيل المورد',
+    companyDetailsDialogTitle: 'تفاصيل الشركة',
+    importLessors: 'استيراد موردين',
+    dialogDescLessorImport:
+      'ارفع ملف اكسل حسب القالب. اسم المورد الزامي، وباقي الاعمدة اختيارية: الشخص المسؤول، رقم التواصل، الرقم الضريبي، السجل التجاري، العنوان، المدينة، البريد، البنك، الايبان. الرقم الضريبي او السجل التجاري المكرر مع مورد موجود او مع صف اخر يُستبعد',
+    supplierPoPrintVatNumber: 'الرقم الضريبي',
+    supplierPoPrintCrNumber: 'السجل التجاري',
+    // party-fields — end
+
     // Users management
     addUser: 'إضافة مستخدم',
     editUser: 'تعديل مستخدم',
@@ -1314,6 +1359,8 @@ export const translations = {
       'لم يحفظ التعديل: تعديل الموردين يحتاج صلاحية «ادارة الموردين». اطلب من مدير النظام اضافتها لدورك.',
     lessorDeleteNotAllowed:
       'لم يحذف المورد: الحذف يحتاج صلاحية «ادارة الموردين». اطلب من مدير النظام اضافتها لدورك.',
+    lessorsImportNotAllowed:
+      'لم يستورد اي مورد: الاستيراد يحتاج صلاحية «ادارة الموردين». اطلب من مدير النظام اضافتها لدورك.',
     // master-data-save-refused — end
     userCreated: 'تم إنشاء المستخدم',
     userCreateError: 'خطأ في إنشاء المستخدم',
@@ -1630,9 +1677,9 @@ export const translations = {
     confirmDeleteTitle: 'تاكيد الحذف',
     confirmDeleteQuestion: 'هل انت متاكد من الحذف؟',
     dialogDescCompanyForm:
-      'الاسم بالعربي والاسم بالانجليزي كلاهما الزامي لحفظ الشركة',
+      'الاسم بالعربي والاسم بالانجليزي كلاهما الزامي لحفظ الشركة، وباقي البيانات اختيارية',
     dialogDescCompanyImport:
-      'ارفع ملف اكسل حسب القالب. الاسم المكرر مع شركة موجودة او مع صف اخر في الملف يُستبعد تلقائيا',
+      'ارفع ملف اكسل حسب القالب. الاسم المكرر مع شركة موجودة او مع صف اخر في الملف يُستبعد تلقائيا. الاعمدة الاختيارية: جهة الاتصال، الجوال، الرقم الضريبي، السجل التجاري، العنوان، المدينة، البريد',
     dialogDescCompanyProjects:
       'هذه الروابط لا تؤثر على تسجيل الدخوليات حاليا، وهي محفوظة لاستخدام لاحق',
     dialogDescCompanyDelete:
@@ -1644,7 +1691,7 @@ export const translations = {
     dialogDescProjectDelete:
       'الحذف نهائي ولا يمكن التراجع عنه. قد يفشل اذا كان المشروع مستخدما في حركات او معدات',
     dialogDescLessorForm:
-      'اسم المورد هو الحقل الالزامي الوحيد. جهة الاتصال ورقم التواصل اختياريان',
+      'اسم المورد هو الحقل الالزامي الوحيد، وباقي البيانات اختيارية',
     dialogDescLessorDelete:
       'الحذف نهائي ولا يمكن التراجع عنه. لا يمكن حذف مورد مرتبط بمعدات',
     dialogDescDriverForm:
@@ -3237,6 +3284,50 @@ export const translations = {
     noLessors: 'No lessors',
     lessorsLoadError: 'Unable to load lessors. Please try again.',
 
+    // party-fields — start (EM-260, migration 0175)
+    partyOfficialSection: 'Official details',
+    partyContactSection: 'Contact details',
+    taxNumber: 'Tax number',
+    commercialRegister: 'Commercial register',
+    address: 'Address',
+    city: 'City',
+    iban: 'IBAN',
+    bankName: 'Bank',
+    bankNamePlaceholder: 'e.g. Al Rajhi Bank',
+    bankNameTooLong: 'The bank name must not exceed 100 characters.',
+    partyBankSection: 'Bank details',
+    lessorsImportSuccess: 'Imported {count} suppliers',
+    lessorsImportPartialSuccess: 'Imported {success} suppliers, {fail} failed',
+    duplicateLessorName: 'A supplier with this name already exists',
+    taxNumberPlaceholder: '15 digits, e.g. 300000000000003',
+    commercialRegisterPlaceholder: 'e.g. 1010123456',
+    addressPlaceholder: 'National address or street',
+    cityPlaceholder: 'e.g. Riyadh',
+    partyEmailPlaceholder: 'name@example.com',
+    ibanPlaceholder: 'SA00 0000 0000 0000 0000 0000',
+    taxNumberFormatInvalid: 'The tax number is 15 digits.',
+    commercialRegisterFormatInvalid: 'The CR number is 4 to 20 digits.',
+    ibanFormatInvalid: 'The IBAN starts with SA and has 24 characters.',
+    emailFormatInvalid: 'The email address is not valid.',
+    addressTooLong: 'The address must not exceed 200 characters.',
+    cityTooLong: 'The city must not exceed 60 characters.',
+    contactPersonTooLong: 'The contact person must not exceed 120 characters.',
+    contactNumberTooLong: 'The contact number must not exceed 30 characters.',
+    taxNumberExistsLessor: 'This tax number belongs to another supplier.',
+    commercialRegisterExistsLessor: 'This CR number belongs to another supplier.',
+    taxNumberExistsCompany: 'This tax number belongs to another company.',
+    commercialRegisterExistsCompany: 'This CR number belongs to another company.',
+    taxNumberDuplicate: 'Duplicate tax number',
+    commercialRegisterDuplicate: 'Duplicate CR number',
+    lessorDetailsDialogTitle: 'Supplier details',
+    companyDetailsDialogTitle: 'Company details',
+    importLessors: 'Import suppliers',
+    dialogDescLessorImport:
+      'Upload an Excel file using the template. The supplier name is required; the other columns are optional: contact person, contact number, tax number, commercial register, address, city, email, bank, IBAN. A tax number or CR that duplicates an existing supplier or another row is skipped.',
+    supplierPoPrintVatNumber: 'VAT No.',
+    supplierPoPrintCrNumber: 'CR No.',
+    // party-fields — end
+
     addUser: 'Add User',
     editUser: 'Edit User',
     noUsers: 'No users',
@@ -3871,6 +3962,8 @@ export const translations = {
       'The change was not saved: editing suppliers needs the "Manage suppliers" permission. Ask the system admin to add it to your role.',
     lessorDeleteNotAllowed:
       'The supplier was not deleted: deleting needs the "Manage suppliers" permission. Ask the system admin to add it to your role.',
+    lessorsImportNotAllowed:
+      'No supplier was imported: the import needs the "Manage suppliers" permission. Ask the system admin to add it to your role.',
     // master-data-save-refused — end
     userCreated: 'User created successfully',
     userCreateError: 'Error creating user',
@@ -4184,9 +4277,9 @@ export const translations = {
     confirmDeleteTitle: 'Confirm Delete',
     confirmDeleteQuestion: 'Are you sure you want to delete this?',
     dialogDescCompanyForm:
-      'Both the Arabic and English names are required to save the company.',
+      'Both the Arabic and English names are required to save the company; everything else is optional.',
     dialogDescCompanyImport:
-      'Upload an Excel file using the template. A name that duplicates an existing company or another row in the file is skipped automatically.',
+      'Upload an Excel file using the template. A name that duplicates an existing company or another row in the file is skipped automatically. Optional columns: contact person, contact number, tax number, commercial register, address, city, email.',
     dialogDescCompanyProjects:
       'These links do not affect movement recording yet; they are kept for later use.',
     dialogDescCompanyDelete:
@@ -4198,7 +4291,7 @@ export const translations = {
     dialogDescProjectDelete:
       'Deletion is permanent and cannot be undone. It may fail if the project is used in movements or equipment.',
     dialogDescLessorForm:
-      'The supplier name is the only required field. Contact person and number are optional.',
+      'The supplier name is the only required field; everything else is optional.',
     dialogDescLessorDelete:
       'Deletion is permanent and cannot be undone. A supplier linked to equipment cannot be deleted.',
     dialogDescDriverForm:

@@ -17,6 +17,13 @@ import {
   downloadCompanyTemplate,
   type CompanyImportRow,
 } from '@/lib/excel'
+import { fetchTakenPartyNumbers } from '@/lib/partyData'
+import {
+  COMPANY_IMPORT_PARTY_FIELDS,
+  markPartyDuplicates,
+  partyImportPayload,
+  partyNumbersOf,
+} from '@/lib/partyImport'
 import type { Company } from '@/lib/types'
 
 export interface CompanyImportDialogProps {
@@ -93,6 +100,16 @@ export function CompanyImportDialog({
         if (row.name_ar) seenAr.add(row.name_ar.toLowerCase())
         if (row.name_en) seenEn.add(row.name_en.toLowerCase())
       }
+      // EM-260 (0175): a tax number or CR already stored, or repeated in the
+      // file, would be refused by the partial unique indexes.
+      let taken
+      try {
+        taken = await fetchTakenPartyNumbers('companies', partyNumbersOf(rows))
+      } catch {
+        setImportError(t('importError'))
+        return
+      }
+      markPartyDuplicates(rows, taken, t)
 
       setImportData(rows)
       const validIndices = new Set(
@@ -129,6 +146,7 @@ export function CompanyImportDialog({
     const payload = rowsToImport.map((r) => ({
       name_ar: r.name_ar,
       name_en: r.name_en,
+      ...partyImportPayload(r, COMPANY_IMPORT_PARTY_FIELDS),
     }))
 
     try {

@@ -291,6 +291,25 @@ export function SupplierPoPrintSheet({
                 </>
               )}
             </p>
+            {/* EM-260 (0175): the supplier's VAT and CR numbers, each only
+                when the supplier carries it. */}
+            {(
+              [
+                ['supplierPoPrintVatNumber', po.lessor?.tax_number],
+                ['supplierPoPrintCrNumber', po.lessor?.commercial_register],
+              ] as const
+            ).map(([key, value]) =>
+              value ? (
+                <p key={key} className="mt-1 text-[11px]">
+                  <span className="text-muted">
+                    <Inline k={key} />:
+                  </span>{' '}
+                  <bdi dir="ltr" className="font-semibold">
+                    {value}
+                  </bdi>
+                </p>
+              ) : null,
+            )}
           </section>
         </div>
 

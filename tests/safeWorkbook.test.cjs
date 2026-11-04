@@ -449,7 +449,8 @@ test('every importer reads through readWorkbookSafely and safeWorkbook.ts import
     const reads = source.match(/readWorkbookSafely\(/g) ?? []
     assert.equal(
       reads.length,
-      importer === 'src/lib/excel.ts' ? 3 : 1,
+      // excel.ts: equipment, companies, projects and (EM-260) suppliers.
+      importer === 'src/lib/excel.ts' ? 4 : 1,
       `${importer} reads`,
     )
   }

@@ -77,15 +77,20 @@ test('no screen reads or writes the supplier English name', () => {
   for (const parts of files) {
     assert.doesNotMatch(read(...parts), /name_en|lessorNameEn/, parts.join('/'))
   }
-  const lessorType = /export interface Lessor {[^}]*}/.exec(read('src', 'lib', 'types.ts'))[0]
+  // EM-260 (0175): `Lessor` extends the shared party fields.
+  const lessorType = /export interface Lessor (?:extends \w+ )?{[^}]*}/.exec(read('src', 'lib', 'types.ts'))[0]
   assert.doesNotMatch(lessorType, /name_en/)
   const lessorRef = /export interface LessorRef {[^}]*}/.exec(read('src', 'lib', 'purchasingData.ts'))[0]
   assert.doesNotMatch(lessorRef, /name_en/)
   assert.match(
     read('src', 'screens', 'lessors', 'LessorsListScreen.tsx'),
-    /'id,name,contact_person,contact_number,created_at,updated_at'/,
+    /'id,name,contact_person,contact_number,tax_number,commercial_register,address,city,email,bank_name,iban,created_at,updated_at'/,
   )
-  assert.match(read('src', 'lib', 'purchasingData.ts'), /lessor:lessors\(id,name\),company/)
+  // 0175 added the two numbers the PO PDF prints, never an English name.
+  assert.match(
+    read('src', 'lib', 'purchasingData.ts'),
+    /lessor:lessors\(id,name,tax_number,commercial_register\),company/,
+  )
   assert.doesNotMatch(read('src', 'i18n', 'translations.ts'), /lessorNameEn/)
 })
 

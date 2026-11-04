@@ -128,17 +128,26 @@ export const DRIVER_SEARCH_FIELDS = [
   'mobile_number',
 ] as const
 
-/** `companies` / `projects`: both names. */
+/** `companies` / `projects`: both names (every selector and the projects list). */
 export const COMPANY_PROJECT_SEARCH_FIELDS = [
   'name_ar_search',
   'name_en',
 ] as const
 
-/** `lessors`: the supplier list. */
+/** `companies`: the clients list also searches the two 0175 numbers. */
+export const COMPANY_SEARCH_FIELDS = [
+  ...COMPANY_PROJECT_SEARCH_FIELDS,
+  'tax_number',
+  'commercial_register',
+] as const
+
+/** `lessors`: the supplier list (the two 0175 numbers since EM-260). */
 export const LESSOR_SEARCH_FIELDS = [
   'name_search',
   'contact_person_search',
   'contact_number',
+  'tax_number',
+  'commercial_register',
 ] as const
 
 /** `lessors` selectors and `equipment_types` (one name column each). */

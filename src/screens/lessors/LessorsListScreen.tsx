@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Upload } from 'lucide-react'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { Button, PageHeader, useConfirm } from '@/components/ui'
 import { DataListActions } from '@/components/data-list/DataListActions'
@@ -15,14 +15,19 @@ import { lessorsListConfig } from '@/lib/listConfigs'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import type { Lessor } from '@/lib/types'
+import { LessorDetailsDialog } from './LessorDetailsDialog'
 import { LessorFormDialog } from './LessorFormDialog'
+import { LessorImportDialog } from './LessorImportDialog'
 import { LessorsTable } from './LessorsTable'
 
+// EM-260 (0175): the edit and details dialogs read their record from the
+// list row, so the row carries every field the form saves (a field left out
+// here would be saved back as empty).
 const LIST_SELECT =
-  'id,name,contact_person,contact_number,created_at,updated_at'
+  'id,name,contact_person,contact_number,tax_number,commercial_register,address,city,email,bank_name,iban,created_at,updated_at'
 
 /** Orchestrator for the lessors list; same shape as the companies screen,
- *  minus the import/export/link dialogs lessors does not have. */
+ *  with the details dialog and the Excel import of EM-260. */
 export function LessorsListScreen() {
   const { t } = useI18n()
   // Add, edit and delete follow `lessors.edit` (the row policies re-check
@@ -35,6 +40,8 @@ export function LessorsListScreen() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Lessor | null>(null)
+  const [viewing, setViewing] = useState<Lessor | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
 
   const startListRequest = useListRequest()
@@ -84,6 +91,7 @@ export function LessorsListScreen() {
     setFormOpen(true)
   }
   const openEdit = (lessor: Lessor) => {
+    setViewing(null)
     setEditing(lessor)
     setFormOpen(true)
   }
@@ -138,7 +146,22 @@ export function LessorsListScreen() {
       <PageHeader
         title={t('lessors')}
         description={t('lessorsDesc')}
-        actions={<DataListActions primaryAction={addButton} />}
+        actions={
+          <DataListActions
+            menuActions={
+              canEdit ? (
+                <Button
+                  variant="ghost"
+                  icon={<Upload size={16} aria-hidden="true" />}
+                  onClick={() => setImportOpen(true)}
+                >
+                  {t('importExcel')}
+                </Button>
+              ) : undefined
+            }
+            primaryAction={addButton}
+          />
+        }
       />
       <DataListToolbar
         config={lessorsListConfig}
@@ -160,6 +183,7 @@ export function LessorsListScreen() {
         sort={list.sort}
         direction={list.direction}
         onSortChange={list.setSort}
+        onOpen={setViewing}
         onEdit={canEdit ? openEdit : undefined}
         onDelete={canEdit ? remove : undefined}
         emptyAction={addButton}
@@ -179,6 +203,18 @@ export function LessorsListScreen() {
         onOpenChange={setFormOpen}
         lessor={editing}
         onSaved={fetchLessors}
+      />
+      <LessorDetailsDialog
+        lessor={viewing}
+        onOpenChange={(open) => {
+          if (!open) setViewing(null)
+        }}
+        onEdit={canEdit && viewing ? () => openEdit(viewing) : undefined}
+      />
+      <LessorImportDialog
+        open={importOpen && canEdit}
+        onOpenChange={setImportOpen}
+        onImported={fetchLessors}
       />
       {confirmDialog}
     </div>

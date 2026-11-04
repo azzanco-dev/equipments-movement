@@ -52,6 +52,7 @@ test('only the name is mandatory', () => {
   // The contact details stay unvalidated, exactly as before.
   assertErrors(
     lessorForm.validateLessorForm({
+      ...base(),
       name: 'مؤسسة النقل',
       contact_person: '',
       contact_number: 'not-a-number',
@@ -63,15 +64,24 @@ test('only the name is mandatory', () => {
 test('the payload trims text and turns empty optional fields into null', () => {
   const payload = plain(
     lessorForm.buildLessorPayload({
+      ...base(),
       name: '  مؤسسة النقل  ',
       contact_person: '  ',
       contact_number: '0500000000',
     }),
   )
+  // The 0175 fields (EM-260) are null while empty.
   assertErrors(payload, {
     name: 'مؤسسة النقل',
     contact_person: null,
     contact_number: '0500000000',
+    tax_number: null,
+    commercial_register: null,
+    address: null,
+    city: null,
+    email: null,
+    bank_name: null,
+    iban: null,
   })
 })
 
@@ -90,5 +100,12 @@ test('a record maps onto the form with nulls turned into empty strings', () => {
     name: 'مؤسسة النقل',
     contact_person: '',
     contact_number: '',
+    tax_number: '',
+    commercial_register: '',
+    address: '',
+    city: '',
+    email: '',
+    bank_name: '',
+    iban: '',
   })
 })

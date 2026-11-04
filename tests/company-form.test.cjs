@@ -61,6 +61,7 @@ test('both the Arabic and English names are mandatory', () => {
   )
   assertErrors(
     companyForm.validateCompanyForm({
+      ...base(),
       name_ar: 'شركة العزاني',
       name_en: 'Azani Co.',
     }),
@@ -83,13 +84,22 @@ test('a duplicate name is attributed to the name that caused it', () => {
 test('the payload trims both names', () => {
   const payload = plain(
     companyForm.buildCompanyPayload({
+      ...base(),
       name_ar: '  شركة العزاني  ',
       name_en: '  Azani Co.  ',
     }),
   )
+  // The 0175 fields (EM-260) are null while empty.
   assertErrors(payload, {
     name_ar: 'شركة العزاني',
     name_en: 'Azani Co.',
+    tax_number: null,
+    commercial_register: null,
+    address: null,
+    city: null,
+    email: null,
+    contact_person: null,
+    contact_number: null,
   })
 })
 
@@ -106,5 +116,12 @@ test('a record maps onto the form as-is', () => {
   assertErrors(values, {
     name_ar: 'شركة العزاني',
     name_en: 'Azani Co.',
+    tax_number: '',
+    commercial_register: '',
+    address: '',
+    city: '',
+    email: '',
+    contact_person: '',
+    contact_number: '',
   })
 })

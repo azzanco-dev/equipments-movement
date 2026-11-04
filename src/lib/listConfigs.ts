@@ -27,6 +27,7 @@ import {
 } from '@/lib/cardMonthsList'
 import {
   COMPANY_PROJECT_SEARCH_FIELDS,
+  COMPANY_SEARCH_FIELDS,
   DRIVER_SEARCH_FIELDS,
   EQUIPMENT_SEARCH_FIELDS,
   LESSOR_SEARCH_FIELDS,
@@ -285,11 +286,13 @@ export const equipmentListConfig: DataListConfig = {
 }
 export const companiesListConfig: DataListConfig = {
   id: 'companies',
+  // EM-260 (migration 0175): the tax number and the CR are searched too; the
+  // tables stay narrow (owner), so neither is a column.
   searchPlaceholder: {
-    ar: 'البحث باسم الشركة',
-    en: 'Search by company name',
+    ar: 'البحث باسم الشركة او الرقم الضريبي او السجل التجاري',
+    en: 'Search by company name, tax number or CR number',
   },
-  searchFields: [...COMPANY_PROJECT_SEARCH_FIELDS],
+  searchFields: [...COMPANY_SEARCH_FIELDS],
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
   // No filter fields (owner review, 2026-09-29): the search box already
@@ -309,12 +312,16 @@ export const projectsListConfig: DataListConfig = {
     ar: 'البحث باسم المشروع',
     en: 'Search by project name',
   },
+  // `projects` has no 0175 columns: the two names only.
+  searchFields: [...COMPANY_PROJECT_SEARCH_FIELDS],
 }
 export const lessorsListConfig: DataListConfig = {
   id: 'lessors',
+  // EM-260 (migration 0175): the tax number and the CR are searched too, as
+  // on the companies list; no new column.
   searchPlaceholder: {
-    ar: 'البحث بالاسم أو جهة الاتصال أو الجوال',
-    en: 'Search by name, contact person or mobile',
+    ar: 'البحث بالاسم او جهة الاتصال او الجوال او الرقم الضريبي او السجل التجاري',
+    en: 'Search by name, contact person, mobile, tax number or CR number',
   },
   searchFields: [...LESSOR_SEARCH_FIELDS],
   defaultSort: 'updated_at',

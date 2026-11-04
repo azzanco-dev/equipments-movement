@@ -52,6 +52,9 @@ export interface LessorRef {
   id: string
   name: string | null
   is_internal?: boolean
+  /** 0175: printed under the supplier's name on the PO PDF when set. */
+  tax_number?: string | null
+  commercial_register?: string | null
 }
 
 /** `supplier_pos` with its embeds and the line count. */
@@ -225,7 +228,7 @@ export interface EquipmentPurchasingRow extends SupplierPoLineRow {
 
 const NAMED = 'id,name_ar,name_en'
 
-export const SUPPLIER_PO_SELECT = `id,po_number,lessor_id,owner_class,is_internal,company_id,project_id,start_date,status,closed_at,approval_status,approved_at,approved_by,notes,created_by,created_at,unpriced_count,lessor:lessors(id,name),company:companies(${NAMED}),project:projects(${NAMED})`
+export const SUPPLIER_PO_SELECT = `id,po_number,lessor_id,owner_class,is_internal,company_id,project_id,start_date,status,closed_at,approval_status,approved_at,approved_by,notes,created_by,created_at,unpriced_count,lessor:lessors(id,name,tax_number,commercial_register),company:companies(${NAMED}),project:projects(${NAMED})`
 
 /** The list adds the line count (one embedded count per row). */
 export const SUPPLIER_PO_LIST_SELECT = `${SUPPLIER_PO_SELECT},updated_at,supplier_po_equipment(count)`
