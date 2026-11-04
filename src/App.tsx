@@ -248,6 +248,15 @@ const CardMonthsListScreen = dynamic(
     ),
   { loading: listLoading },
 )
+// Card pricing (migration 0174, owner 2026-11-04): «اسعار المعدات», the one
+// listed sales page; the four pages above stay reachable by URL.
+const CardPricesScreen = dynamic(
+  () =>
+    import('@/screens/sales/CardPricesScreen').then(
+      (module) => module.CardPricesScreen,
+    ),
+  { loading: listLoading },
+)
 const UserDetail = dynamic(
   () => import('@/screens/UserDetail').then((module) => module.UserDetail),
   { loading: screenLoading },
@@ -356,6 +365,7 @@ const NAV_CHILD_LABELS: Record<NavChildKey, TranslationKey> = {
   'reports/workshop': 'workshopReports',
   'purchasing/orders': 'supplierPos',
   'purchasing/units': 'siteUnits',
+  'sales/prices': 'cardPrices',
   'sales/orders': 'clientPos',
   'sales/cards': 'equipmentCards',
   'sales/timesheets': 'cardTimesheets',
@@ -709,6 +719,16 @@ function AppContent() {
                 onSelectPo={(id) => router.push(`/purchasing/${id}`)}
                 onSelectMovement={
                   shell.pages.has('movements/:id') ? openMovement : undefined
+                }
+              />
+            )}
+            {page === 'sales/prices' && (
+              <CardPricesScreen
+                onOpenCard={(id) => router.push(`/sales/cards/${id}`)}
+                onOpenSupplierPo={
+                  shell.pages.has('purchasing/:id')
+                    ? (id) => router.push(`/purchasing/${id}`)
+                    : undefined
                 }
               />
             )}

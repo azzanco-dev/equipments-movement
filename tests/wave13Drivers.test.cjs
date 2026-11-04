@@ -308,7 +308,12 @@ test('the drivers list hides the external supplier by default, NULL kept', () =>
       ])
     else if (config === configs.clientPosListConfig)
       assert.deepEqual(plain(config.defaultFilters), [
-        { id: 'default-status', field: 'status', operator: 'eq', value: 'open' },
+        {
+          id: 'default-status',
+          field: 'status',
+          operator: 'eq',
+          value: 'open',
+        },
       ])
     // Sales phase 2 (0172): the «الشهور» list opens on the previous Saudi
     // month (the view is computed on read, never read whole).
@@ -320,6 +325,11 @@ test('the drivers list hides the external supplier by default, NULL kept', () =>
           operator: 'eq',
           value: lib('cardMonthsList').CARD_MONTHS_DEFAULT_MONTH,
         },
+      ])
+    // Card pricing (0174): «اسعار المعدات» opens on the open cards.
+    else if (config === configs.cardPricesListConfig)
+      assert.deepEqual(plain(config.defaultFilters), [
+        { id: 'default-open', field: 'is_open', operator: 'eq', value: 'true' },
       ])
     else if (config !== driversListConfig)
       assert.equal(config.defaultFilters, undefined, config.id)

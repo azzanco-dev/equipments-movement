@@ -662,8 +662,9 @@ test('the landing is the first passing section in menu order', () => {
     'projects',
     'lessors',
     'purchasing/orders',
-    // Sales phase 1 (0169): «PO العملاء» first in the sales section.
-    'sales/orders',
+    // Sales (0169; since 0174 «اسعار المعدات» is the section's one listed
+    // page and its landing).
+    'sales/prices',
     'drivers',
     'users',
     'reports/entries',
@@ -944,7 +945,9 @@ test('App.tsx replaces a URL the dashboard-less admin shell does not open', () =
   )
   // The shell shows the route placeholder until the URL matches.
   const admin = content.slice(
-    content.indexOf("const shellKind: 'admin' | 'foreman' | 'workshop' = shell.kind"),
+    content.indexOf(
+      "const shellKind: 'admin' | 'foreman' | 'workshop' = shell.kind",
+    ),
   )
   assert.match(
     admin,

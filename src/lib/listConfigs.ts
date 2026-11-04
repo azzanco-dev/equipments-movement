@@ -16,6 +16,7 @@ import {
 } from '@/lib/driverExcel'
 import { EXIT_PURPOSE_FILTER_FIELD } from '@/lib/exitPurpose'
 import { SUPPLIER_FILTER_FIELD } from '@/lib/equipmentSupplier'
+import { CARD_PRICES_DEFAULT_FILTER } from '@/lib/cardPricesList'
 import {
   MOVEMENT_COMPANY_PROJECT_SEARCH_FIELDS,
   MOVEMENT_SEARCH_FIELDS,
@@ -1447,5 +1448,121 @@ export const cardMonthsListConfig: DataListConfig = {
     { key: 'hours', label: 'cardMonthHours' },
     { key: 'client_due', label: 'cardMonthClientDue' },
     { key: 'margin', label: 'equipmentCardMargin' },
+  ],
+}
+
+/**
+ * Card pricing (migration 0174), «اسعار المعدات»: every card on a supplier
+ * PO line over `sales_equipment_cards` (the screen always adds
+ * `supplier_line_id IS NOT NULL`, `src/lib/cardPricesList.ts`) with its
+ * client price, the supplier price, the margin and the pricing approval;
+ * search, filters, sort and paging server-side; the open cards by default (a
+ * visible, removable filter); the owner filter as the purchasing lists, the
+ * supplier only while it selects «مالك اخر».
+ */
+export const cardPricesListConfig: DataListConfig = {
+  id: 'cardPrices',
+  searchPlaceholder: {
+    ar: 'البحث برقم المعدة او اللوحة او الشاصي او رقم PO المورد',
+    en: 'Search by unit, plate, chassis or supplier PO number',
+  },
+  searchFields: [
+    'equipment_code',
+    'equipment_plate_digits',
+    'equipment_chassis_number',
+    'supplier_po_number',
+  ],
+  defaultSort: 'equipment_code',
+  defaultDirection: 'asc',
+  filterFields: [
+    {
+      key: 'is_open',
+      label: 'status',
+      type: 'select',
+      operators: ['eq'],
+      options: [
+        {
+          value: 'true',
+          label: 'مفتوح',
+          labelI18n: 'equipmentCardStatusOpen',
+        },
+        {
+          value: 'false',
+          label: 'منتهي',
+          labelI18n: 'equipmentCardStatusEnded',
+        },
+      ],
+    },
+    {
+      key: 'pricing_status',
+      label: 'cardPricingStatus',
+      type: 'select',
+      operators: ['eq', 'neq'],
+      options: [
+        { value: 'draft', label: 'مسودة', labelI18n: 'cardPricingDraft' },
+        { value: 'approved', label: 'معتمد', labelI18n: 'cardPricingApproved' },
+      ],
+    },
+    {
+      key: 'equipment_ownership_status',
+      label: 'ownershipStatus',
+      type: 'select',
+      operators: ['in'],
+      multiple: true,
+      options: [
+        {
+          value: 'alazani',
+          label: 'العزاني',
+          labelI18n: 'adminHomeOwnerAlazani',
+        },
+        {
+          value: 'takween',
+          label: 'تكوين',
+          labelI18n: 'adminHomeOwnerTakween',
+        },
+        {
+          value: 'third_party_f',
+          label: 'طرف ثالث F',
+          labelI18n: 'adminHomeOwnerThirdPartyF',
+        },
+        {
+          value: 'third_party_partnership_b',
+          label: 'طرف ثالث B',
+          labelI18n: 'adminHomeOwnerThirdPartyB',
+        },
+        {
+          value: 'external_supplier',
+          label: 'مالك اخر',
+          labelI18n: 'adminHomeOwnerExternal',
+        },
+      ],
+    },
+    // The supplier, only while the owner filter selects «مالك اخر».
+    SUPPLIER_FILTER_FIELD,
+    {
+      key: 'company_id',
+      label: 'company',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'project_id',
+      label: 'project',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+  ],
+  defaultFilters: [CARD_PRICES_DEFAULT_FILTER],
+  sortableFields: [
+    { key: 'equipment_code', label: 'equipmentCode' },
+    { key: 'company_name_ar', label: 'company' },
+    { key: 'supplier_price', label: 'cardPriceSupplier' },
+    { key: 'card_client_price', label: 'cardPriceClient' },
+    { key: 'card_margin_pct', label: 'cardPriceMarginPct' },
+    { key: 'pricing_status', label: 'cardPricingStatus' },
   ],
 }

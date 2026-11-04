@@ -84,11 +84,18 @@ test('the sales section: a parent with its children on sales.view, like purchasi
     key: 'sales',
     requires: [{ key: 'sales.view' }],
     children: [
-      { key: 'sales/orders', requires: [{ key: 'sales.view' }] },
-      { key: 'sales/cards', requires: [{ key: 'sales.view' }] },
+      // Card pricing (0174, owner 2026-11-04): the one listed page; the four
+      // earlier pages stay reachable by URL only.
+      { key: 'sales/prices', requires: [{ key: 'sales.view' }] },
+      { key: 'sales/orders', requires: [{ key: 'sales.view' }], hidden: true },
+      { key: 'sales/cards', requires: [{ key: 'sales.view' }], hidden: true },
       // Phase 2 (0172): «كروت التشغيل» and «الشهور».
-      { key: 'sales/timesheets', requires: [{ key: 'sales.view' }] },
-      { key: 'sales/months', requires: [{ key: 'sales.view' }] },
+      {
+        key: 'sales/timesheets',
+        requires: [{ key: 'sales.view' }],
+        hidden: true,
+      },
+      { key: 'sales/months', requires: [{ key: 'sales.view' }], hidden: true },
     ],
   })
   // Right after purchasing in menu order.
@@ -99,8 +106,8 @@ test('the sales section: a parent with its children on sales.view, like purchasi
   assert.deepEqual(plain(nav.pageGate('sales/cards/:id')), [
     { key: 'sales.view' },
   ])
-  // /sales opens the orders list; /sales/cards/:id is a card.
-  assert.equal(nav.routePageOf(['sales']), 'sales/orders')
+  // /sales opens the prices (0174); /sales/cards/:id is a card.
+  assert.equal(nav.routePageOf(['sales']), 'sales/prices')
   assert.equal(nav.routePageOf(['sales', 'orders']), 'sales/orders')
   assert.equal(nav.routePageOf(['sales', 'cards']), 'sales/cards')
   assert.equal(nav.routePageOf(['sales', 'cards', 'c1']), 'sales/cards/:id')
@@ -111,7 +118,7 @@ test('the sales section: a parent with its children on sales.view, like purchasi
     permissions: new Map([['sales.view', 'all']]),
   })
   assert.equal(plan.kind, 'admin')
-  assert.equal(plan.landing, 'sales/orders')
+  assert.equal(plan.landing, 'sales/prices')
   assert.deepEqual([...plan.pages].sort(), [
     'sales',
     'sales/:id',
@@ -119,6 +126,7 @@ test('the sales section: a parent with its children on sales.view, like purchasi
     'sales/cards/:id',
     'sales/months',
     'sales/orders',
+    'sales/prices',
     'sales/timesheets',
   ])
   // Nothing without the key.
@@ -243,19 +251,33 @@ const MIGRATION = read(
   '20261102120000_0169_client_pos.sql',
 )
 
+// 0174 re-creates sales_equipment_cards with 0169's columns plus the
+// trailing pricing columns, so that view is read from 0174.
+const MIGRATION_0174 = read(
+  'supabase',
+  'migrations',
+  '20261104110000_0174_equipment_card_pricing.sql',
+)
+
 function viewBody(name) {
-  const start = MIGRATION.indexOf(`CREATE OR REPLACE VIEW public.${name}`)
+  const source = name === 'sales_equipment_cards' ? MIGRATION_0174 : MIGRATION
+  const start = source.indexOf(`CREATE OR REPLACE VIEW public.${name}`)
   assert.ok(start > 0, name)
-  const end = MIGRATION.indexOf('COMMENT ON VIEW', start)
-  return MIGRATION.slice(start, end)
+  const end = source.indexOf('COMMENT ON VIEW', start)
+  return source.slice(start, end)
 }
 
 test('the selects of the screens name only columns of the 0169 views', () => {
   const data = read('src', 'lib', 'salesData.ts')
   const selectOf = (name) => {
-    const match = new RegExp(`export const ${name} =\\s+'([^']+)'`).exec(data)
+    // A plain string, or (0174) a template carrying CARD_PRICING_COLUMNS.
+    const match = new RegExp(
+      `export const ${name} =\\s+['\`]([^'\`]+)['\`]`,
+    ).exec(data)
     assert.ok(match, name)
-    return match[1].split(',')
+    const pricing = /export const CARD_PRICING_COLUMNS =\s+'([^']+)'/.exec(data)
+    assert.ok(pricing, 'CARD_PRICING_COLUMNS')
+    return match[1].replace('${CARD_PRICING_COLUMNS}', pricing[1]).split(',')
   }
   const check = (constant, view) => {
     const sql = viewBody(view)
@@ -373,7 +395,10 @@ test('tokens only, plain alif, logical direction utilities, AppLink for navigati
     tickets,
     /<AppLink\s+href=\{`\/purchasing\/\$\{row\.supplier_po_id\}`\}/,
   )
-  assert.doesNotMatch(tickets, /client_po|onSelectClientPo|sales\.(view|manage)/)
+  assert.doesNotMatch(
+    tickets,
+    /client_po|onSelectClientPo|sales\.(view|manage)/,
+  )
   const app = read('src', 'App.tsx')
   assert.doesNotMatch(app, /onSelectClientPo/)
 })

@@ -4,7 +4,12 @@ import type {
   FieldErrors,
   PostgresLikeError,
 } from '@/lib/formValidation'
-import { SUPPLIER_PO_PRICE_PATTERN, vatOf, withVat } from '@/lib/purchasing'
+import {
+  SUPPLIER_PO_PRICE_PATTERN,
+  formatSupplierPoPrice,
+  vatOf,
+  withVat,
+} from '@/lib/purchasing'
 import { saudiDateKey } from '@/lib/saudiTime'
 
 /**
@@ -1051,7 +1056,13 @@ export function cardMonthState(
 // --- The card events (equipment_card_events) --------------------------------------------------
 
 export type EquipmentCardEventType =
-  'month_recorded' | 'month_updated' | 'month_deleted'
+  | 'month_recorded'
+  | 'month_updated'
+  | 'month_deleted'
+  // 0174: the card pricing.
+  | 'client_price_changed'
+  | 'pricing_approved'
+  | 'pricing_returned'
 
 export const EQUIPMENT_CARD_EVENT_LABEL_KEYS: Readonly<
   Record<EquipmentCardEventType, TranslationKey>
@@ -1059,6 +1070,9 @@ export const EQUIPMENT_CARD_EVENT_LABEL_KEYS: Readonly<
   month_recorded: 'cardMonthEventRecorded',
   month_updated: 'cardMonthEventUpdated',
   month_deleted: 'cardMonthEventDeleted',
+  client_price_changed: 'cardPricingEventPriceChanged',
+  pricing_approved: 'cardPricingEventApproved',
+  pricing_returned: 'cardPricingEventReturned',
 }
 
 /**
@@ -1071,6 +1085,10 @@ export function equipmentCardEventDetail(
   event: { event_type: string; payload: Record<string, unknown> | null },
   lang: Language,
   hoursText: (hours: number) => string = (hours) => formatHours(hours),
+  priceText: (price: number) => string = (price) =>
+    formatSupplierPoPrice(price),
+  poApprovedText?: (po: string | null) => string,
+  poReturnedText?: () => string,
 ): string | null {
   const payload = event.payload ?? {}
   const month =
@@ -1102,6 +1120,42 @@ export function equipmentCardEventDetail(
       return oldHours === null
         ? month
         : `${month ? `${month}: ` : ''}${hoursText(oldHours)}`
+    // 0174: the card pricing. «1,000.00 ← 1,200.00» for a price change (the
+    // old price on the start side, as the activity page writes a change),
+    // the client price for an approval (plus the PO when it became
+    // approved), the note for a return (plus the PO when it went back).
+    case 'client_price_changed': {
+      const oldPrice = number(payload.old_price)
+      const newPrice = number(payload.new_price)
+      const price = (value: number | null) =>
+        value === null ? '—' : priceText(value)
+      if (oldPrice === null && newPrice === null) return null
+      return `${price(oldPrice)} ${arrow} ${price(newPrice)}`
+    }
+    case 'pricing_approved': {
+      const clientPrice = number(payload.client_price)
+      const po =
+        typeof payload.supplier_po_number === 'string'
+          ? payload.supplier_po_number
+          : null
+      const parts = [
+        clientPrice === null ? null : priceText(clientPrice),
+        payload.supplier_po_approved === true && poApprovedText
+          ? poApprovedText(po)
+          : null,
+      ].filter((part): part is string => Boolean(part))
+      return parts.length ? parts.join(' · ') : null
+    }
+    case 'pricing_returned': {
+      const note = typeof payload.note === 'string' ? payload.note : null
+      const parts = [
+        note,
+        payload.supplier_po_returned === true && poReturnedText
+          ? poReturnedText()
+          : null,
+      ].filter((part): part is string => Boolean(part))
+      return parts.length ? parts.join(' · ') : null
+    }
     default:
       return null
   }
@@ -1220,4 +1274,218 @@ export interface CardMonthBatchItem {
   card_id: string
   hours: number
   note: string | null
+}
+
+// --- Card pricing («اسعار المعدات», migration 0174) ------------------------------------------
+//
+// Owner decisions 2026-11-04: every card on a supplier PO line gets a CLIENT
+// rental price (monthly, excluding VAT) stored on the card itself
+// (`equipment_cards.client_price`), the margin is computed from it and the
+// supplier line's price, and the pricing is approved per card («اعتماد» /
+// «رجوع للتعديل», `sales.approve`); approving the last draft card of a
+// supplier PO approves that PO, returning one puts the PO back into draft.
+// The helpers below mirror the view's `card_margin` / `card_margin_pct`
+// exactly for the live figures while a price is typed.
+
+/** `equipment_cards.pricing_status`. */
+export type CardPricingStatus = 'draft' | 'approved'
+
+export const CARD_PRICING_STATUS_BADGE: Readonly<
+  Record<
+    CardPricingStatus,
+    { key: TranslationKey; tone: 'success' | 'neutral' }
+  >
+> = {
+  draft: { key: 'cardPricingDraft', tone: 'neutral' },
+  approved: { key: 'cardPricingApproved', tone: 'success' },
+}
+
+export function cardPricingStatusOf(
+  value: string | null | undefined,
+): CardPricingStatus {
+  return value === 'approved' ? 'approved' : 'draft'
+}
+
+/** The client price as typed: the same bound as the supplier price
+ *  (numeric(12, 2) >= 0); an empty value means «no price». */
+export const CARD_PRICE_PATTERN = SUPPLIER_PO_PRICE_PATTERN
+
+export function isValidCardPrice(value: string): boolean {
+  return CARD_PRICE_PATTERN.test(value.trim())
+}
+
+/** The typed price as a number, null while empty or not a price yet. */
+export function parseCardPrice(value: string): number | null {
+  const trimmed = value.trim()
+  if (!trimmed || !isValidCardPrice(trimmed)) return null
+  return Number(trimmed)
+}
+
+const toNumber = (value: number | string | null | undefined): number | null => {
+  if (value === null || value === undefined) return null
+  const amount = typeof value === 'string' ? Number(value) : value
+  return Number.isNaN(amount) ? null : amount
+}
+
+/**
+ * The view's `card_margin`: client price − supplier price, both set and the
+ * supplier line MONTHLY (a daily supplier price has no rule yet → null); an
+ * owned Al-Azani unit on a 0-priced line keeps the full client price.
+ * Rounded to 2 decimals.
+ */
+export function cardMargin(
+  clientPrice: number | string | null | undefined,
+  supplierPrice: number | string | null | undefined,
+  supplierRateUnit: string | null | undefined,
+): number | null {
+  const client = toNumber(clientPrice)
+  const supplier = toNumber(supplierPrice)
+  if (client === null || supplier === null || supplierRateUnit !== 'month')
+    return null
+  return Math.round((client - supplier) * 100) / 100
+}
+
+/** The view's `card_margin_pct`: the margin over the client price, in
+ *  percent with 2 decimals; null without a margin or with a 0 price. */
+export function cardMarginPct(
+  margin: number | string | null | undefined,
+  clientPrice: number | string | null | undefined,
+): number | null {
+  const value = toNumber(margin)
+  const client = toNumber(clientPrice)
+  if (value === null || client === null || client === 0) return null
+  return Math.round((value / client) * 100 * 100) / 100
+}
+
+/** «36.4%»: the percentage as the lists show it (one decimal, LTR run). */
+export function formatMarginPct(
+  pct: number | string | null | undefined,
+): string {
+  const value = toNumber(pct)
+  if (value === null) return '—'
+  return `${new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(value)}%`
+}
+
+/** Why the margin has no value on this row (the hint beside «—»). */
+export type CardMarginBlocker =
+  'no_client_price' | 'no_supplier_price' | 'daily' | null
+
+export function cardMarginBlocker(row: {
+  clientPrice: number | string | null | undefined
+  supplierPrice: number | string | null | undefined
+  supplierRateUnit: string | null | undefined
+}): CardMarginBlocker {
+  if (toNumber(row.clientPrice) === null) return 'no_client_price'
+  if (toNumber(row.supplierPrice) === null) return 'no_supplier_price'
+  if (row.supplierRateUnit !== 'month') return 'daily'
+  return null
+}
+
+/**
+ * Why «اعتماد» cannot run on this card right now, or null when it can: the
+ * reasons `approve_equipment_card_pricing` checks, in the order the user can
+ * fix them, plus the screen's own «save first» (the database re-checks every
+ * one of them). A daily supplier line is approvable: it has a price, only
+ * no margin rule yet.
+ */
+export function cardPricingApprovalBlocker(row: {
+  pricing_status: string | null | undefined
+  /** The SAVED client price (never the typed draft). */
+  card_client_price: number | string | null | undefined
+  supplier_line_id: string | null | undefined
+  supplier_po_status: string | null | undefined
+  supplier_price: number | string | null | undefined
+  /** The typed value differs from the saved one. */
+  unsaved?: boolean
+}): TranslationKey | null {
+  if (row.pricing_status === 'approved') return 'cardPricingErrorNotDraft'
+  if (row.unsaved) return 'cardPricingBlockedUnsaved'
+  if (toNumber(row.card_client_price) === null)
+    return 'cardPricingBlockedNoClientPrice'
+  if (!row.supplier_line_id || row.supplier_po_status !== 'open')
+    return 'cardPricingBlockedNoSupplierLine'
+  if (toNumber(row.supplier_price) === null)
+    return 'cardPricingBlockedNoSupplierPrice'
+  return null
+}
+
+/** «3 اسعار» / «3 prices»: the save button and the success toast. */
+export function pricesCountLabel(count: number, lang: Language): string {
+  if (lang === 'en') return `${count} ${count === 1 ? 'price' : 'prices'}`
+  if (count === 1) return 'سعر'
+  if (count === 2) return 'سعرين'
+  if (count <= 10) return `${count} اسعار`
+  return `${count} سعرا`
+}
+
+/** The `p_items` of set_equipment_card_client_prices: price as a JSON
+ *  number, null = no price. */
+export interface CardPriceBatchItem {
+  card_id: string
+  price: number | null
+}
+
+/**
+ * The supplier PO event labels the sales screens need beyond
+ * `SUPPLIER_PO_EVENT_LABEL_KEYS` (owned by purchasing): `approval_returned`
+ * (0174) until the purchasing module lists it. The card page asks here
+ * first, then purchasing's table.
+ */
+export const SALES_SUPPLIER_PO_EVENT_LABEL_KEYS: Readonly<
+  Record<string, TranslationKey>
+> = {
+  approval_returned: 'supplierPoEventApprovalReturned',
+}
+
+/** The 0174 tokens as messages: the prices page has no field for an item's
+ *  token, the dialogs show one message. */
+export const CARD_PRICING_FORM_MESSAGES: Readonly<
+  Record<string, TranslationKey>
+> = {
+  sales_manage_required: 'clientPoErrorManageRequired',
+  sales_approve_required: 'cardPricingErrorApproveRequired',
+  invalid_card: 'equipmentCardNotFound',
+  invalid_price: 'cardPriceInvalid',
+  invalid_note: 'cardMonthNoteTooLong',
+  invalid_items: 'cardMonthErrorInvalidItems',
+  card_pricing_approved_locked: 'cardPricingErrorApprovedLocked',
+  card_pricing_not_draft: 'cardPricingErrorNotDraft',
+  card_pricing_not_approved: 'cardPricingErrorNotApproved',
+  card_pricing_no_client_price: 'cardPricingErrorNoClientPrice',
+  card_pricing_no_supplier_line: 'cardPricingBlockedNoSupplierLine',
+  card_pricing_no_supplier_price: 'cardPricingErrorNoSupplierPrice',
+}
+
+/** Every stable token of migration 0174 the client maps, for the tests. */
+export const CARD_PRICING_ERROR_TOKENS: readonly string[] = [
+  'sales_manage_required',
+  'sales_approve_required',
+  'invalid_card',
+  'invalid_price',
+  'invalid_note',
+  'invalid_items',
+  'card_pricing_approved_locked',
+  'card_pricing_not_draft',
+  'card_pricing_not_approved',
+  'card_pricing_no_client_price',
+  'card_pricing_no_supplier_line',
+  'card_pricing_no_supplier_price',
+]
+
+/** The safe message for a rejected pricing write; never the raw text. */
+export function cardPricingFormMessage(
+  error: PostgresLikeError | null | undefined,
+): TranslationKey {
+  if (!error) return 'supplierPoSaveFailed'
+  const text = errorText(error)
+  // The longer tokens first, so `card_pricing_no_supplier_price` is never
+  // read as another token's prefix.
+  for (const [token, key] of Object.entries(CARD_PRICING_FORM_MESSAGES).sort(
+    (a, b) => b[0].length - a[0].length,
+  ))
+    if (text.includes(token)) return key
+  return 'supplierPoSaveFailed'
 }

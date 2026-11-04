@@ -6,6 +6,7 @@ import { isValidSupplierPoPrice } from '@/lib/purchasing'
 import {
   CARD_MONTH_NOTE_MAX,
   isValidCardMonthHours,
+  isValidCardPrice,
   isValidClientPoQuantity,
   isValidStandardHours,
 } from '@/lib/sales'
@@ -756,6 +757,28 @@ export const cardMonthFormSchema = z.object({
       (value) => !value || isValidCardMonthHours(value),
       message('cardMonthHoursInvalid'),
     ),
+  note: optionalText({
+    max: CARD_MONTH_NOTE_MAX,
+    lengthKey: 'cardMonthNoteTooLong',
+  }),
+})
+
+/**
+ * Card pricing (migration 0174): the client's monthly price typed inline on
+ * «اسعار المعدات» — empty = no price, else a non-negative amount with at
+ * most two decimals (`set_equipment_card_client_price` rejects the rest
+ * with `invalid_price`).
+ */
+export const cardPriceSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => !value || isValidCardPrice(value),
+    message('cardPriceInvalid'),
+  )
+
+/** The optional note of «رجوع للتعديل» (return_equipment_card_pricing). */
+export const cardPricingReturnSchema = z.object({
   note: optionalText({
     max: CARD_MONTH_NOTE_MAX,
     lengthKey: 'cardMonthNoteTooLong',

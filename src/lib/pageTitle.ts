@@ -58,6 +58,8 @@ const PAGE_TITLES: Readonly<
     section: 'purchasing',
   },
   'purchasing/units': { kind: 'sub', name: 'siteUnits', section: 'purchasing' },
+  // Card pricing (migration 0174): «اسعار المعدات · المبيعات».
+  'sales/prices': { kind: 'sub', name: 'cardPrices', section: 'sales' },
   // Sales phase 1 (migration 0169): «PO العملاء» and «كروت المعدات».
   'sales/orders': { kind: 'sub', name: 'clientPos', section: 'sales' },
   'sales/cards': { kind: 'sub', name: 'equipmentCards', section: 'sales' },

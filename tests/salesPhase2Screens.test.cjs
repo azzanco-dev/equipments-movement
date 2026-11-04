@@ -95,7 +95,9 @@ function viewBody(name) {
 test('the two new children of «المبيعات» on sales.view, their routes and tab titles', () => {
   const entry = nav.NAV_ENTRIES.find((item) => item.key === 'sales')
   const keys = plain(entry.children.map((child) => child.key))
+  // 0174: the prices page first; the phase 1 and 2 pages hidden (URL only).
   assert.deepEqual(keys, [
+    'sales/prices',
     'sales/orders',
     'sales/cards',
     'sales/timesheets',
@@ -113,7 +115,7 @@ test('the two new children of «المبيعات» on sales.view, their routes a
   })
   assert.ok(plan.pages.has('sales/timesheets'))
   assert.ok(plan.pages.has('sales/months'))
-  assert.equal(plan.landing, 'sales/orders')
+  assert.equal(plan.landing, 'sales/prices')
   const none = nav.planShell({
     status: 'ready',
     permissions: new Map([['purchasing.view', 'all']]),
@@ -636,6 +638,10 @@ test('the card event details: «اكتوبر (10): 248 ساعة», «سبتمب�
     month_recorded: 'cardMonthEventRecorded',
     month_updated: 'cardMonthEventUpdated',
     month_deleted: 'cardMonthEventDeleted',
+    // 0174: the card pricing events.
+    client_price_changed: 'cardPricingEventPriceChanged',
+    pricing_approved: 'cardPricingEventApproved',
+    pricing_returned: 'cardPricingEventReturned',
   })
 })
 

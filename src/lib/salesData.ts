@@ -14,6 +14,8 @@ import {
   clientPoEquipmentPayload,
   monthStartOf,
   type CardMonthBatchItem,
+  type CardPriceBatchItem,
+  type CardPricingStatus,
   type ClientPoCreateLine,
   type ClientPoEventType,
   type ClientPoFormValues,
@@ -201,11 +203,66 @@ export interface SalesEquipmentCardRow {
   supplier_price: number | null
   supplier_rate_unit: SupplierPoRateUnit | null
   has_supplier_po: boolean
+  // 0174: the card's own client price («اسعار المعدات») and its approval.
+  card_client_price: number | null
+  pricing_status: CardPricingStatus
+  pricing_approved_at: string | null
+  pricing_approved_by: string | null
+  pricing_approved_by_name: string | null
+  card_margin: number | null
+  card_margin_pct: number | null
+  supplier_po_approval_status: string | null
 }
 
+/** The 0174 trailing columns of `sales_equipment_cards`. */
+export const CARD_PRICING_COLUMNS =
+  'card_client_price,pricing_status,pricing_approved_at,pricing_approved_by,pricing_approved_by_name,card_margin,card_margin_pct,supplier_po_approval_status'
+
 /** Every column of the view the cards list and the card page show. */
-export const EQUIPMENT_CARDS_SELECT =
-  'card_id,equipment_id,company_id,project_id,period_from,period_to,is_open,rate_unit,standard_hours,note,entry_log_id,entry_at,created_at,updated_at,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_name_ar,company_name_en,project_name_ar,project_name_en,client_line_id,client_po_id,client_po_number,client_po_status,client_price,client_rate_unit,client_standard_hours,client_quantity,has_client_po,supplier_line_id,supplier_po_id,supplier_po_number,supplier_po_status,supplier_price,supplier_rate_unit,has_supplier_po'
+export const EQUIPMENT_CARDS_SELECT = `card_id,equipment_id,company_id,project_id,period_from,period_to,is_open,rate_unit,standard_hours,note,entry_log_id,entry_at,created_at,updated_at,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_name_ar,company_name_en,project_name_ar,project_name_en,client_line_id,client_po_id,client_po_number,client_po_status,client_price,client_rate_unit,client_standard_hours,client_quantity,has_client_po,supplier_line_id,supplier_po_id,supplier_po_number,supplier_po_status,supplier_price,supplier_rate_unit,has_supplier_po,${CARD_PRICING_COLUMNS}`
+
+/**
+ * One row of «اسعار المعدات» (`sales_equipment_cards` WHERE supplier_line_id
+ * IS NOT NULL): the unit, the company and project, the supplier side and
+ * the card's own pricing. Only what the page shows.
+ */
+export type CardPriceRow = Pick<
+  SalesEquipmentCardRow,
+  | 'card_id'
+  | 'equipment_id'
+  | 'company_id'
+  | 'project_id'
+  | 'period_from'
+  | 'period_to'
+  | 'is_open'
+  | 'equipment_code'
+  | 'equipment_type'
+  | 'equipment_plate_number'
+  | 'equipment_chassis_number'
+  | 'equipment_ownership_status'
+  | 'equipment_lessor_id'
+  | 'equipment_lessor_name'
+  | 'company_name_ar'
+  | 'company_name_en'
+  | 'project_name_ar'
+  | 'project_name_en'
+  | 'supplier_line_id'
+  | 'supplier_po_id'
+  | 'supplier_po_number'
+  | 'supplier_po_status'
+  | 'supplier_price'
+  | 'supplier_rate_unit'
+  | 'card_client_price'
+  | 'pricing_status'
+  | 'pricing_approved_at'
+  | 'pricing_approved_by'
+  | 'pricing_approved_by_name'
+  | 'card_margin'
+  | 'card_margin_pct'
+  | 'supplier_po_approval_status'
+>
+
+export const CARD_PRICES_SELECT = `card_id,equipment_id,company_id,project_id,period_from,period_to,is_open,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_name_ar,company_name_en,project_name_ar,project_name_en,supplier_line_id,supplier_po_id,supplier_po_number,supplier_po_status,supplier_price,supplier_rate_unit,${CARD_PRICING_COLUMNS}`
 
 /** The movement facts of a card's entry (`movement_visits`). */
 export interface CardVisitRow {
@@ -711,6 +768,62 @@ export async function deleteEquipmentCardMonth(input: {
     await supabase.rpc('delete_equipment_card_month', {
       p_card_id: input.cardId,
       p_month: monthStartOf(input.month),
+    }),
+  )
+}
+
+// --- Card pricing (the four functions of 0174) ----------------------------------------------
+
+/** `set_equipment_card_client_price`: the client's monthly price of ONE
+ *  card; null = no price. */
+export async function setEquipmentCardClientPrice(input: {
+  cardId: string
+  price: number | null
+}): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('set_equipment_card_client_price', {
+      p_card_id: input.cardId,
+      p_price: input.price,
+    }),
+  )
+}
+
+/** `set_equipment_card_client_prices`: the «اسعار المعدات» save in ONE
+ *  transaction (a refused item refuses the whole batch with its own token);
+ *  returns the number of items processed. */
+export async function setEquipmentCardClientPrices(
+  items: readonly CardPriceBatchItem[],
+): Promise<RpcResult<number>> {
+  return asResult<number>(
+    await supabase.rpc('set_equipment_card_client_prices', {
+      p_items: items.map((item) => ({
+        card_id: item.card_id,
+        price: item.price,
+      })),
+    }),
+  )
+}
+
+/** `approve_equipment_card_pricing` (sales.approve): approves the card and,
+ *  when it was the PO's last draft card, the supplier PO. */
+export async function approveEquipmentCardPricing(
+  cardId: string,
+): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('approve_equipment_card_pricing', { p_card_id: cardId }),
+  )
+}
+
+/** `return_equipment_card_pricing` (sales.approve): back to draft, the
+ *  approved supplier PO too. */
+export async function returnEquipmentCardPricing(input: {
+  cardId: string
+  note: string
+}): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('return_equipment_card_pricing', {
+      p_card_id: input.cardId,
+      p_note: input.note.trim() || null,
     }),
   )
 }

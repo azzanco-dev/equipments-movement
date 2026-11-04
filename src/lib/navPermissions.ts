@@ -54,6 +54,7 @@ export type NavChildKey =
   | 'reports/workshop'
   | 'purchasing/orders'
   | 'purchasing/units'
+  | 'sales/prices'
   | 'sales/orders'
   | 'sales/cards'
   | 'sales/timesheets'
@@ -138,14 +139,23 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // Phase 2 (migration 0172, screens 2026-11-04) adds «كروت التشغيل» (the
   // batch entry of a project's month) and «الشهور» (every month of every
   // card); the writes need sales.manage inside the screens.
+  // Card pricing (owner 2026-11-04, migration 0174, «ممكن تسوي صفحة جديدة
+  // بدال كروت المعدات, وتخفي الكروت لو احتجناها بعدين»): the section is
+  // reduced to ONE listed page, «اسعار المعدات»; the four earlier pages stay
+  // hidden (URL only, still gated) and /sales lands on the prices.
   {
     key: 'sales',
     requires: [{ key: 'sales.view' }],
     children: [
-      { key: 'sales/orders', requires: [{ key: 'sales.view' }] },
-      { key: 'sales/cards', requires: [{ key: 'sales.view' }] },
-      { key: 'sales/timesheets', requires: [{ key: 'sales.view' }] },
-      { key: 'sales/months', requires: [{ key: 'sales.view' }] },
+      { key: 'sales/prices', requires: [{ key: 'sales.view' }] },
+      { key: 'sales/orders', requires: [{ key: 'sales.view' }], hidden: true },
+      { key: 'sales/cards', requires: [{ key: 'sales.view' }], hidden: true },
+      {
+        key: 'sales/timesheets',
+        requires: [{ key: 'sales.view' }],
+        hidden: true,
+      },
+      { key: 'sales/months', requires: [{ key: 'sales.view' }], hidden: true },
     ],
   },
   { key: 'drivers', requires: [{ key: 'drivers.read' }] },
@@ -236,8 +246,9 @@ function fromPermissions(
       items.push({ key: entry.key })
       continue
     }
+    // A hidden child (0174: the earlier sales pages) is never listed either.
     const children = entry.children
-      .filter((child) => allowed(permissions, child))
+      .filter((child) => !child.hidden && allowed(permissions, child))
       .map((child) => child.key)
     if (children.length) items.push({ key: entry.key, children })
   }
@@ -397,9 +408,11 @@ export function routePageOf(segments: readonly string[]): RoutePage {
     return 'purchasing/:id'
   }
   if (first === 'sales') {
-    // /sales opens its first section, like /purchasing; /sales/cards/:id is
-    // an equipment card, any other second segment a client PO id.
-    if (!second || second === 'orders') return 'sales/orders'
+    // /sales opens its first section, like /purchasing — since 0174 the
+    // prices («اسعار المعدات»); /sales/cards/:id is an equipment card, any
+    // other second segment a client PO id.
+    if (!second || second === 'prices') return 'sales/prices'
+    if (second === 'orders') return 'sales/orders'
     if (second === 'cards') return third ? 'sales/cards/:id' : 'sales/cards'
     // Phase 2 (0172): the batch entry and the months list.
     if (second === 'timesheets') return 'sales/timesheets'
@@ -505,6 +518,7 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'purchasing/units',
   'purchasing/:id',
   'sales',
+  'sales/prices',
   'sales/orders',
   'sales/cards',
   'sales/timesheets',
@@ -583,7 +597,12 @@ function firstOpenSection(
       )
         continue
       if (!entry.children) return entry.key
-      const child = entry.children.find((item) => allowed(permissions, item))
+      // A listed child first; a hidden one (0174) only when no listed child
+      // of the section passes.
+      const child =
+        entry.children.find(
+          (item) => !item.hidden && allowed(permissions, item),
+        ) ?? entry.children.find((item) => allowed(permissions, item))
       if (child) return child.key
     }
   return undefined

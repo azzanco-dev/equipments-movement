@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   ArrowUpRight,
+  BadgeCheck,
   Building2,
   Calendar,
+  Check,
   Clock,
   Coins,
   CreditCard,
@@ -16,6 +18,7 @@ import {
   Percent,
   Plus,
   Receipt,
+  RotateCcw,
   Timer,
   Truck,
   User,
@@ -29,6 +32,16 @@ import {
   CardMonthStateBadge,
   HoursFigure,
 } from '@/components/sales/CardMonthCells'
+import {
+  CardMarginCell,
+  CardPricingStatusBadge,
+  CardSupplierPriceCell,
+} from '@/components/sales/CardPricingCells'
+import {
+  ApproveCardPricingDialog,
+  ReturnCardPricingDialog,
+  type CardPricingTarget,
+} from '@/components/sales/CardPricingDialogs'
 import { EquipmentCardStatusBadge } from '@/components/sales/ClientPoStatusBadge'
 import {
   EventTimeline,
@@ -60,6 +73,7 @@ import {
   Skeleton,
   StatCard,
   ToastProvider,
+  Tooltip,
   useToast,
   type DataTableColumn,
   type DescriptionListItem,
@@ -85,7 +99,12 @@ import {
 import {
   CLIENT_PO_EVENTS_LIMIT,
   EQUIPMENT_CARD_EVENT_LABEL_KEYS,
+  SALES_SUPPLIER_PO_EVENT_LABEL_KEYS,
+  cardMargin,
+  cardMarginPct,
   cardMonthState,
+  cardPricingApprovalBlocker,
+  cardPricingStatusOf,
   contractHours,
   currentSaudiMonthKey,
   equipmentCardEventDetail,
@@ -126,6 +145,14 @@ export interface EquipmentCardDetailProps {
   onOpenClientPo?: (poId: string) => void
   onOpenSupplierPo?: (poId: string) => void
 }
+
+/**
+ * Owner 2026-11-04 (card pricing, migration 0174): the «الشهور» section of
+ * phase 2 («كروت التشغيل»), its «تسجيل شهر» button and its reads are hidden
+ * for now, like the other sales pages; the code stays for when they come
+ * back. While hidden, the summary strip shows the card's pricing instead.
+ */
+export const SHOW_CARD_MONTHS = false
 
 function PageSkeleton({ label }: { label: string }) {
   return (
@@ -219,8 +246,12 @@ function CardDetail({
   const { t, lang } = useI18n()
   const { can } = usePermissions()
   const canManage = can('sales.manage')
+  const canApprove = can('sales.approve')
   const toast = useToast()
   const [card, setCard] = useState<SalesEquipmentCardRow | null>(null)
+  const [pricingDialog, setPricingDialog] = useState<
+    'approve' | 'return' | null
+  >(null)
   useTabTitle(card?.equipment_code)
   const [visit, setVisit] = useState<CardVisitRow | null>(null)
   const [clientEvents, setClientEvents] = useState<ClientPoEventRow[]>([])
@@ -297,22 +328,27 @@ function CardDetail({
               .abortSignal(signal)
           : Promise.resolve({ data: null, error: null }),
         // Phase 2: the recorded months (newest first), the awaited months
-        // of the card's period and the card's own events.
-        supabase
-          .from('sales_card_months')
-          .select(CARD_MONTHS_SELECT)
-          .eq('card_id', cardId)
-          .order('month', { ascending: false })
-          .limit(CARD_MONTHS_LIMIT)
-          .abortSignal(signal),
-        supabase
-          .from('sales_card_month_slots')
-          .select(CARD_PENDING_SLOTS_SELECT)
-          .eq('card_id', cardId)
-          .eq('recorded', false)
-          .order('month', { ascending: false })
-          .limit(CARD_MONTHS_LIMIT)
-          .abortSignal(signal),
+        // of the card's period and the card's own events. The two month
+        // reads are skipped while the section is hidden (SHOW_CARD_MONTHS).
+        SHOW_CARD_MONTHS
+          ? supabase
+              .from('sales_card_months')
+              .select(CARD_MONTHS_SELECT)
+              .eq('card_id', cardId)
+              .order('month', { ascending: false })
+              .limit(CARD_MONTHS_LIMIT)
+              .abortSignal(signal)
+          : Promise.resolve({ data: null, error: null }),
+        SHOW_CARD_MONTHS
+          ? supabase
+              .from('sales_card_month_slots')
+              .select(CARD_PENDING_SLOTS_SELECT)
+              .eq('card_id', cardId)
+              .eq('recorded', false)
+              .order('month', { ascending: false })
+              .limit(CARD_MONTHS_LIMIT)
+              .abortSignal(signal)
+          : Promise.resolve({ data: null, error: null }),
         supabase
           .from('equipment_card_events')
           .select(EQUIPMENT_CARD_EVENT_SELECT)
@@ -435,7 +471,12 @@ function CardDetail({
     .slice(0, SUPPLIER_PO_EVENTS_LIMIT)
     .map((event) => ({
       id: event.id,
-      label: `${t('supplierPo')} · ${t(SUPPLIER_PO_EVENT_LABEL_KEYS[event.event_type] ?? 'supplierPoEventUpdated')}`,
+      // 0174's approval_returned is labelled here until purchasing lists it.
+      label: `${t('supplierPo')} · ${t(
+        SALES_SUPPLIER_PO_EVENT_LABEL_KEYS[event.event_type] ??
+          SUPPLIER_PO_EVENT_LABEL_KEYS[event.event_type] ??
+          'supplierPoEventUpdated',
+      )}`,
       detail: supplierPoEventDetail(
         event,
         () => card.equipment_code,
@@ -461,6 +502,9 @@ function CardDetail({
         event,
         lang,
         (hours) => `${formatHours(hours)} ${t('cardMonthHoursUnit')}`,
+        (price) => formatSupplierPoPrice(price),
+        (po) => t('cardPricingPoApprovedDetail').replace('{po}', po ?? ''),
+        () => t('cardPricingPoReturnedDetail'),
       ),
       actor: event.actor_name,
       created_at: event.created_at,
@@ -595,6 +639,86 @@ function CardDetail({
         },
       ]
     : []
+
+  // Card pricing (0174): the card's own client price (monthly), its state
+  // and, for sales.approve, «اعتماد» / «رجوع للتعديل».
+  const pricingStatus = cardPricingStatusOf(card.pricing_status)
+  const pricingMargin = cardMargin(
+    card.card_client_price,
+    card.supplier_price,
+    card.supplier_rate_unit,
+  )
+  const approvalBlocker = cardPricingApprovalBlocker(card)
+  const pricingTarget: CardPricingTarget = {
+    card_id: card.card_id,
+    equipment_code: card.equipment_code,
+  }
+  const pricingButton = (size: 'sm' | 'md') => {
+    const className = size === 'md' ? 'h-11 flex-1' : undefined
+    if (pricingStatus === 'approved')
+      return (
+        <Button
+          size={size}
+          variant="outline"
+          className={className}
+          icon={<RotateCcw size={size === 'sm' ? 14 : 16} aria-hidden="true" />}
+          onClick={() => setPricingDialog('return')}
+        >
+          {t('cardPricingReturn')}
+        </Button>
+      )
+    return (
+      <Tooltip
+        content={approvalBlocker ? t(approvalBlocker) : ''}
+        disabled={!approvalBlocker}
+      >
+        <span className={size === 'md' ? 'flex flex-1' : 'inline-flex'}>
+          <Button
+            size={size}
+            variant="primary"
+            className={className}
+            icon={<Check size={size === 'sm' ? 14 : 16} aria-hidden="true" />}
+            disabled={approvalBlocker !== null}
+            onClick={() => setPricingDialog('approve')}
+          >
+            {t('cardPricingApprove')}
+          </Button>
+        </span>
+      </Tooltip>
+    )
+  }
+  const pricingFacts: DescriptionListItem[] = [
+    {
+      key: 'clientPrice',
+      icon: <Coins size={16} />,
+      label: t('cardPriceClientMonthly'),
+      value:
+        card.card_client_price === null ? (
+          <Badge tone="warning" size="sm">
+            {t('cardMonthNeedsPrice')}
+          </Badge>
+        ) : (
+          <span className="inline-flex items-center gap-1.5">
+            {pricingStatus === 'approved' && (
+              <Lock size={14} aria-hidden="true" className="text-muted" />
+            )}
+            <SaleAmountOrDash value={card.card_client_price} unit="month" />
+          </span>
+        ),
+    },
+    {
+      key: 'pricingStatus',
+      icon: <BadgeCheck size={16} />,
+      label: t('cardPricingStatus'),
+      value: (
+        <CardPricingStatusBadge
+          status={pricingStatus}
+          approvedBy={card.pricing_approved_by_name}
+          approvedAt={card.pricing_approved_at}
+        />
+      ),
+    },
+  ]
 
   const salesFacts: DescriptionListItem[] = card.client_po_number
     ? [
@@ -857,7 +981,7 @@ function CardDetail({
           subtitle={unitCell}
           badges={<EquipmentCardStatusBadge status={status} />}
           actions={
-            onOpenEquipment || canManage ? (
+            onOpenEquipment || canManage || canApprove ? (
               <div className="hidden gap-2 sm:flex">
                 {onOpenEquipment && (
                   <Button size="sm" variant="outline" asChild>
@@ -870,75 +994,151 @@ function CardDetail({
                     </AppLink>
                   </Button>
                 )}
-                {canManage && recordButton('sm')}
+                {canApprove && pricingButton('sm')}
+                {canManage && SHOW_CARD_MONTHS && recordButton('sm')}
               </div>
             ) : undefined
           }
         />
         {/* 2. The summary strip: the LATEST RECORDED month's figures (phase
-            2); the month is the hint, «—» while no month is recorded. */}
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <StatCard
-            label={t('cardMonthClientDue')}
-            value={
-              <CardMonthDueCell
-                due={latestFigures.client}
-                side="client"
-                alignEnd={false}
-              />
-            }
-            hint={latestHint}
-            icon={<Coins size={18} />}
-          />
-          <StatCard
-            label={t('cardMonthSupplierDue')}
-            value={
-              <CardMonthDueCell
-                due={latestFigures.supplier}
-                side="supplier"
-                alignEnd={false}
-              />
-            }
-            hint={owned ? t('equipmentCardOwnedNoSupplierPo') : latestHint}
-            icon={<Receipt size={18} />}
-          />
-          <StatCard
-            label={t('equipmentCardMargin')}
-            value={
-              <CardMonthDueCell
-                due={latestFigures.margin}
-                side="margin"
-                alignEnd={false}
-              />
-            }
-            hint={
-              owned ? t('cardMonthMarginOwnedHint') : t('cardMonthMarginHint')
-            }
-            icon={<Percent size={18} />}
-          />
-          <StatCard
-            label={t('cardMonthHours')}
-            value={
-              latest ? (
-                <bdi dir="ltr" className="tabular-nums">
-                  {formatHours(latest.hours)}
-                </bdi>
-              ) : (
-                <span className="text-muted">—</span>
-              )
-            }
-            hint={
-              (latest
-                ? `${monthShortLabel(monthKeyOf(latest.month), lang)} · `
-                : '') +
-              t('equipmentCardFromStandardHours').replace(
-                '{hours}',
-                String(standardHours ?? card.standard_hours),
-              )
-            }
-            icon={<Timer size={18} />}
-          />
-        </div>
+            2); the month is the hint, «—» while no month is recorded. While
+            the months are hidden (0174), the card's pricing instead: the
+            client price, the supplier price, the margin and its state. */}
+        {!SHOW_CARD_MONTHS && (
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <StatCard
+              label={t('cardPriceClientMonthly')}
+              value={
+                card.card_client_price === null ? (
+                  <span className="text-muted">—</span>
+                ) : (
+                  <SaleAmountOrDash
+                    value={card.card_client_price}
+                    unit="month"
+                  />
+                )
+              }
+              hint={
+                card.card_client_price === null
+                  ? t('cardMonthNeedsPrice')
+                  : undefined
+              }
+              icon={<Coins size={18} />}
+            />
+            <StatCard
+              label={t('cardPriceSupplier')}
+              value={
+                owned && card.supplier_price === null ? (
+                  <span className="text-muted">—</span>
+                ) : (
+                  <CardSupplierPriceCell
+                    price={card.supplier_price}
+                    rateUnit={card.supplier_rate_unit}
+                  />
+                )
+              }
+              hint={owned ? t('equipmentCardOwnedNoSupplierPo') : undefined}
+              icon={<Receipt size={18} />}
+            />
+            <StatCard
+              label={t('equipmentCardMargin')}
+              value={
+                <CardMarginCell
+                  margin={pricingMargin}
+                  pct={cardMarginPct(pricingMargin, card.card_client_price)}
+                  clientPrice={card.card_client_price}
+                  supplierPrice={card.supplier_price}
+                  supplierRateUnit={card.supplier_rate_unit}
+                  alignEnd={false}
+                />
+              }
+              hint={owned ? t('cardPriceOwnedHint') : t('cardMonthMarginHint')}
+              icon={<Percent size={18} />}
+            />
+            <StatCard
+              label={t('cardPricingStatus')}
+              value={
+                <CardPricingStatusBadge
+                  status={pricingStatus}
+                  approvedBy={card.pricing_approved_by_name}
+                  approvedAt={card.pricing_approved_at}
+                  size="md"
+                  compact
+                />
+              }
+              hint={
+                pricingStatus === 'approved' && card.pricing_approved_at
+                  ? `${card.pricing_approved_by_name ?? '—'} · ${formatDateTime(card.pricing_approved_at, false)}`
+                  : undefined
+              }
+              icon={<BadgeCheck size={18} />}
+            />
+          </div>
+        )}
+        {SHOW_CARD_MONTHS && (
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <StatCard
+              label={t('cardMonthClientDue')}
+              value={
+                <CardMonthDueCell
+                  due={latestFigures.client}
+                  side="client"
+                  alignEnd={false}
+                />
+              }
+              hint={latestHint}
+              icon={<Coins size={18} />}
+            />
+            <StatCard
+              label={t('cardMonthSupplierDue')}
+              value={
+                <CardMonthDueCell
+                  due={latestFigures.supplier}
+                  side="supplier"
+                  alignEnd={false}
+                />
+              }
+              hint={owned ? t('equipmentCardOwnedNoSupplierPo') : latestHint}
+              icon={<Receipt size={18} />}
+            />
+            <StatCard
+              label={t('equipmentCardMargin')}
+              value={
+                <CardMonthDueCell
+                  due={latestFigures.margin}
+                  side="margin"
+                  alignEnd={false}
+                />
+              }
+              hint={
+                owned ? t('cardMonthMarginOwnedHint') : t('cardMonthMarginHint')
+              }
+              icon={<Percent size={18} />}
+            />
+            <StatCard
+              label={t('cardMonthHours')}
+              value={
+                latest ? (
+                  <bdi dir="ltr" className="tabular-nums">
+                    {formatHours(latest.hours)}
+                  </bdi>
+                ) : (
+                  <span className="text-muted">—</span>
+                )
+              }
+              hint={
+                (latest
+                  ? `${monthShortLabel(monthKeyOf(latest.month), lang)} · `
+                  : '') +
+                t('equipmentCardFromStandardHours').replace(
+                  '{hours}',
+                  String(standardHours ?? card.standard_hours),
+                )
+              }
+              icon={<Timer size={18} />}
+            />
+          </div>
+        )}
       </div>
 
       {!open && (
@@ -988,12 +1188,13 @@ function CardDetail({
             description={
               card.client_po_number ? undefined : t('equipmentCardNoClientLine')
             }
+            action={canApprove ? pricingButton('sm') : undefined}
+            actionBesideText
           />
-          {salesFacts.length > 0 ? (
-            <DescriptionList items={salesFacts} className="-my-2" />
-          ) : (
-            <EmptyState title={t('equipmentSalesNone')} className="p-4" />
-          )}
+          <DescriptionList
+            items={[...pricingFacts, ...salesFacts]}
+            className="-my-2"
+          />
         </Card>
         <Card className="space-y-3 p-4">
           <SectionHeader
@@ -1023,89 +1224,92 @@ function CardDetail({
       {/* 4. The months («كروت التشغيل», phase 2): one row per month of the
           card's period, newest first — the recorded hours with their
           amounts, or the awaited month — under the consumed hours against
-          the contract total (owner 2026-11-04). */}
-      <Card padded={false} className="flex min-w-0 flex-col">
-        <div className="p-4 pb-0">
-          <SectionHeader
-            title={
-              <span className="flex items-center gap-2">
-                {t('equipmentCardMonths')}
-                <Badge size="sm">{monthRows.length}</Badge>
-                {openMonths.length > 0 && (
-                  <Badge tone="warning" size="sm">
-                    {t('cardMonthPendingCount').replace(
-                      '{count}',
-                      String(openMonths.length),
-                    )}
-                  </Badge>
-                )}
-              </span>
-            }
-            description={t('equipmentCardMonthsDesc')}
-            action={canManage ? recordButton('sm') : undefined}
-          />
-          <div className="mt-3 space-y-1.5">
-            <p className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs text-muted">
-              <span>
-                {t('cardMonthConsumed')}{' '}
-                <bdi dir="ltr" className="font-medium tabular-nums text-fg">
-                  {formatHours(consumedHours)}
-                </bdi>
-                {totalHours !== null && (
-                  <>
-                    {' '}
-                    {t('cardMonthOf')}{' '}
-                    <bdi dir="ltr" className="tabular-nums">
-                      {formatHours(totalHours)}
-                    </bdi>
-                  </>
-                )}{' '}
-                {t('cardMonthHoursUnit')}
-              </span>
-              {remainingHours !== null && (
+          the contract total (owner 2026-11-04). Hidden for now
+          (SHOW_CARD_MONTHS, owner 2026-11-04). */}
+      {SHOW_CARD_MONTHS && (
+        <Card padded={false} className="flex min-w-0 flex-col">
+          <div className="p-4 pb-0">
+            <SectionHeader
+              title={
+                <span className="flex items-center gap-2">
+                  {t('equipmentCardMonths')}
+                  <Badge size="sm">{monthRows.length}</Badge>
+                  {openMonths.length > 0 && (
+                    <Badge tone="warning" size="sm">
+                      {t('cardMonthPendingCount').replace(
+                        '{count}',
+                        String(openMonths.length),
+                      )}
+                    </Badge>
+                  )}
+                </span>
+              }
+              description={t('equipmentCardMonthsDesc')}
+              action={canManage ? recordButton('sm') : undefined}
+            />
+            <div className="mt-3 space-y-1.5">
+              <p className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs text-muted">
                 <span>
-                  {t('cardMonthRemaining')}{' '}
+                  {t('cardMonthConsumed')}{' '}
                   <bdi dir="ltr" className="font-medium tabular-nums text-fg">
-                    {formatHours(remainingHours)}
-                  </bdi>{' '}
+                    {formatHours(consumedHours)}
+                  </bdi>
+                  {totalHours !== null && (
+                    <>
+                      {' '}
+                      {t('cardMonthOf')}{' '}
+                      <bdi dir="ltr" className="tabular-nums">
+                        {formatHours(totalHours)}
+                      </bdi>
+                    </>
+                  )}{' '}
                   {t('cardMonthHoursUnit')}
                 </span>
-              )}
-            </p>
-            {consumedShare !== null && (
-              <span
-                aria-hidden="true"
-                className="block h-1.5 w-full overflow-hidden rounded-full bg-surface-hover"
-              >
+                {remainingHours !== null && (
+                  <span>
+                    {t('cardMonthRemaining')}{' '}
+                    <bdi dir="ltr" className="font-medium tabular-nums text-fg">
+                      {formatHours(remainingHours)}
+                    </bdi>{' '}
+                    {t('cardMonthHoursUnit')}
+                  </span>
+                )}
+              </p>
+              {consumedShare !== null && (
                 <span
-                  className="block h-full rounded-full bg-fg"
-                  style={{ width: `${Math.round(consumedShare * 100)}%` }}
-                />
-              </span>
-            )}
+                  aria-hidden="true"
+                  className="block h-1.5 w-full overflow-hidden rounded-full bg-surface-hover"
+                >
+                  <span
+                    className="block h-full rounded-full bg-fg"
+                    style={{ width: `${Math.round(consumedShare * 100)}%` }}
+                  />
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="p-4 pt-3">
-          {monthRows.length === 0 ? (
-            <EmptyState
-              icon={<Hourglass size={24} aria-hidden="true" />}
-              title={t('cardMonthNoMonths')}
-              className="p-6"
-            />
-          ) : (
-            <DataTable
-              size="md"
-              cellTextClassName="text-[13px]"
-              cellClassName="py-2"
-              columns={monthColumns}
-              rows={monthRows}
-              rowKey={(row) => row.month}
-              caption={t('equipmentCardMonths')}
-            />
-          )}
-          <p className="mt-3 text-xs text-muted">{t('cardMonthsRuleNote')}</p>
-        </div>
-      </Card>
+          <div className="p-4 pt-3">
+            {monthRows.length === 0 ? (
+              <EmptyState
+                icon={<Hourglass size={24} aria-hidden="true" />}
+                title={t('cardMonthNoMonths')}
+                className="p-6"
+              />
+            ) : (
+              <DataTable
+                size="md"
+                cellTextClassName="text-[13px]"
+                cellClassName="py-2"
+                columns={monthColumns}
+                rows={monthRows}
+                rowKey={(row) => row.month}
+                caption={t('equipmentCardMonths')}
+              />
+            )}
+            <p className="mt-3 text-xs text-muted">{t('cardMonthsRuleNote')}</p>
+          </div>
+        </Card>
+      )}
 
       {/* 5. The event timeline from both PO event tables and the card's. */}
       <Card className="space-y-3 p-4">
@@ -1122,16 +1326,58 @@ function CardDetail({
       </p>
 
       {/* 6. The mobile action bar. */}
-      {canManage && (
+      {((canManage && SHOW_CARD_MONTHS) || canApprove) && (
         <div
           className="sticky bottom-0 z-10 -mx-4 flex gap-2 border-t bg-bg p-3 sm:hidden"
           style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
-          {recordButton('md')}
+          {canApprove && pricingButton('md')}
+          {canManage && SHOW_CARD_MONTHS && recordButton('md')}
         </div>
       )}
 
-      {canManage && (
+      {canApprove && (
+        <>
+          <ApproveCardPricingDialog
+            card={pricingTarget}
+            open={pricingDialog === 'approve'}
+            onOpenChange={(next) => {
+              if (!next) setPricingDialog(null)
+            }}
+            onApproved={(target) => {
+              setPricingDialog(null)
+              void toast({
+                title: t('cardPricingApprovedToast').replace(
+                  '{unit}',
+                  target.equipment_code ?? '—',
+                ),
+                tone: 'success',
+              })
+              fetchData()
+            }}
+          />
+          <ReturnCardPricingDialog
+            card={pricingTarget}
+            open={pricingDialog === 'return'}
+            onOpenChange={(next) => {
+              if (!next) setPricingDialog(null)
+            }}
+            onReturned={(target) => {
+              setPricingDialog(null)
+              void toast({
+                title: t('cardPricingReturnedToast').replace(
+                  '{unit}',
+                  target.equipment_code ?? '—',
+                ),
+                tone: 'success',
+              })
+              fetchData()
+            }}
+          />
+        </>
+      )}
+
+      {canManage && SHOW_CARD_MONTHS && (
         <RecordCardMonthDialog
           open={dialog !== null}
           onOpenChange={(next) => {
