@@ -93,7 +93,10 @@ import {
   clientPoTotalFigures,
   clientPoTotalsByUnit,
   companyById,
+  contractHours,
+  contractHoursTotal,
   equipmentById,
+  formatHours,
   hoursRecordedDetail,
   hoursUpdatedDetail,
   latestRecordedMonth,
@@ -103,6 +106,7 @@ import {
   monthsCountLabel,
   projectById,
   quantityLabel,
+  recordedHoursTotal,
   remainingShare,
   shiftMonth,
   type CardMonthRow,
@@ -315,6 +319,20 @@ function QuantityCell({
         />
       </span>
     </span>
+  )
+}
+
+/** «1,560 ساعة» as a figure, or a dash when the line has no total (a daily
+ *  line, whose rule comes later, or no quantity). */
+function HoursFigure({ hours, strong = true }: { hours: number | null; strong?: boolean }) {
+  if (hours === null) return <>—</>
+  return (
+    <>
+      <bdi dir="ltr" className={`tabular-nums ${strong ? 'font-medium text-fg' : ''}`}>
+        {formatHours(hours)}
+      </bdi>{' '}
+      ساعة
+    </>
   )
 }
 
@@ -873,6 +891,15 @@ function ClientPoPageMockup({
       ),
     },
     {
+      // Owner 2026-11-04: the contract ceiling in hours, summed over the
+      // lines that have a total (quantity × standard hours, or the hourly
+      // quantity; a daily line has no rule yet).
+      key: 'contractHours',
+      icon: <Hourglass size={16} />,
+      label: 'اجمالي الساعات التعاقدية',
+      value: <HoursFigure hours={contractHoursTotal(lines)} strong={false} />,
+    },
+    {
       key: 'createdBy',
       icon: <User size={16} />,
       label: 'انشئ بواسطة',
@@ -1170,6 +1197,9 @@ function ClientPoPageMockup({
                           )}
                         </div>
                         <QuantityCell line={line} />
+                        <p className="w-full text-start text-xs text-muted sm:text-end">
+                          اجمالي الساعات: <HoursFigure hours={contractHours(line)} />
+                        </p>
                       </div>
                     </div>
                   </li>
@@ -1894,6 +1924,13 @@ function CardPageMockup({
   const latest = latestRecordedMonth(records)
   const figures = cardMonthFigures(card, latest?.hours ?? null)
   const pendingCount = monthRows.filter((row) => row.state !== 'recorded').length
+  // The contract ceiling in hours (owner 2026-11-04) against the recorded
+  // months: null without a client line, a quantity or a rule (daily).
+  const totalHours = card.client_po_number ? contractHours(card) : null
+  const consumedHours = recordedHoursTotal(records)
+  const remainingHours = totalHours === null ? null : Math.max(0, totalHours - consumedHours)
+  const consumedShare =
+    totalHours === null ? null : Math.min(1, consumedHours / totalHours)
   const [dialog, setDialog] = useState<{ month: string | null } | null>(null)
   const events = store
     .eventsOf(card.id)
@@ -1968,6 +2005,13 @@ function CardPageMockup({
               }}
             />
           ),
+        },
+        {
+          // Owner 2026-11-04: quantity × standard hours (a daily line «—»).
+          key: 'contractHours',
+          icon: <Clock size={16} />,
+          label: 'اجمالي الساعات التعاقدية',
+          value: <HoursFigure hours={totalHours} strong={false} />,
         },
       ]
     : []
@@ -2269,6 +2313,49 @@ function CardPageMockup({
               description="سطر لكل شهر: الساعات من كروت التشغيل (التايم شيت الشهري للعميل)، ومنها مستحق العميل ومستحق المورد."
               action={open ? recordButton('sm') : undefined}
             />
+            {/* Owner 2026-11-04: the recorded hours against the contract
+                ceiling (quantity × standard hours); the consumed hours alone
+                when the line has no total. */}
+            <div className="mt-3 space-y-1.5">
+              <p className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs text-muted">
+                <span>
+                  المستهلك{' '}
+                  <bdi dir="ltr" className="font-medium tabular-nums text-fg">
+                    {formatHours(consumedHours)}
+                  </bdi>
+                  {totalHours !== null && (
+                    <>
+                      {' '}
+                      من{' '}
+                      <bdi dir="ltr" className="tabular-nums">
+                        {formatHours(totalHours)}
+                      </bdi>
+                    </>
+                  )}{' '}
+                  ساعة
+                </span>
+                {remainingHours !== null && (
+                  <span>
+                    المتبقي{' '}
+                    <bdi dir="ltr" className="font-medium tabular-nums text-fg">
+                      {formatHours(remainingHours)}
+                    </bdi>{' '}
+                    ساعة
+                  </span>
+                )}
+              </p>
+              {consumedShare !== null && (
+                <span
+                  aria-hidden="true"
+                  className="block h-1.5 w-full overflow-hidden rounded-full bg-surface-hover"
+                >
+                  <span
+                    className="block h-full rounded-full bg-fg"
+                    style={{ width: `${Math.round(consumedShare * 100)}%` }}
+                  />
+                </span>
+              )}
+            </div>
           </div>
           <div className="p-4 pt-3">
             {monthRows.length === 0 ? (

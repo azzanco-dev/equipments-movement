@@ -468,6 +468,42 @@ export function remainingShare(line: Pick<MockClientPoLine, 'quantity' | 'consum
   return Math.max(0, Math.min(1, (line.quantity - line.consumed) / line.quantity))
 }
 
+/**
+ * The TOTAL CONTRACT HOURS of a client PO line (owner 2026-11-04, «نبغى نعرف
+ * كمية الساعات الاجمالية = الكمية × الساعات القياسية»; the staff's Excel: 6
+ * months × 260 = 1560 hours as the contract ceiling). The one rule, shared by
+ * the PO page and the card page: a MONTHLY line → the quantity (months) × its
+ * standard hours; an HOURLY line → the quantity itself; a DAILY line has no
+ * rule yet (null, exactly as its dues show «—»); no quantity → null.
+ */
+export function contractHours(
+  line: Pick<MockClientPoLine, 'quantity' | 'rate_unit' | 'standard_hours'>,
+): number | null {
+  if (line.quantity === null || line.quantity <= 0) return null
+  if (line.rate_unit === 'day') return null
+  if (line.rate_unit === 'hour') return line.quantity
+  if (line.standard_hours <= 0) return null
+  return line.quantity * line.standard_hours
+}
+
+/** The PO's total contract hours: the sum over the lines that have a total,
+ *  or null when none has one. */
+export function contractHoursTotal(
+  lines: readonly Pick<MockClientPoLine, 'quantity' | 'rate_unit' | 'standard_hours'>[],
+): number | null {
+  let total: number | null = null
+  for (const line of lines) {
+    const hours = contractHours(line)
+    if (hours !== null) total = (total ?? 0) + hours
+  }
+  return total
+}
+
+/** «1,560»: hours with a thousands separator (up to two decimals). */
+export function formatHours(hours: number): string {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(hours)
+}
+
 // --- The tickets of «المعدات في المشاريع» -----------------------------------------
 
 /** One ticket: the unit inside a project with its supplier side and its
@@ -1415,6 +1451,11 @@ export function latestRecordedMonth(
   return (
     [...records].sort((a, b) => b.month.localeCompare(a.month))[0] ?? null
   )
+}
+
+/** The hours consumed so far: the sum of the recorded months' hours. */
+export function recordedHoursTotal(records: readonly MockCardMonth[]): number {
+  return records.reduce((sum, record) => sum + record.hours, 0)
 }
 
 /** The hours in words: «248 ساعة». */
