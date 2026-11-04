@@ -89,7 +89,6 @@ import {
   SUPPLIER_PO_EVENTS_LIMIT,
   SUPPLIER_PO_RATE_UNIT_LABEL_KEYS,
   formatSupplierPoPrice,
-  supplierPoRateUnitOf,
 } from '@/lib/purchasing'
 import {
   SUPPLIER_PO_EVENT_SELECT,
@@ -706,7 +705,7 @@ function CardDetail({
             {pricingStatus === 'approved' && (
               <Lock size={14} aria-hidden="true" className="text-muted" />
             )}
-            <SaleAmountOrDash value={card.card_client_price} unit="month" />
+            <SaleAmountOrDash value={card.card_client_price} />
           </span>
         ),
     },
@@ -827,12 +826,15 @@ function CardDetail({
             key: 'price',
             icon: <Coins size={16} />,
             label: t('purchasePrice'),
-            value: (
-              <SaleAmountOrDash
-                value={card.supplier_price}
-                unit={supplierPoRateUnitOf(card.supplier_rate_unit)}
-              />
-            ),
+            value:
+              card.supplier_price === null ? (
+                <span className="text-muted">—</span>
+              ) : (
+                <CardSupplierPriceCell
+                  price={card.supplier_price}
+                  rateUnit={card.supplier_rate_unit}
+                />
+              ),
           },
         ]
 
@@ -1016,10 +1018,7 @@ function CardDetail({
                 card.card_client_price === null ? (
                   <span className="text-muted">—</span>
                 ) : (
-                  <SaleAmountOrDash
-                    value={card.card_client_price}
-                    unit="month"
-                  />
+                  <SaleAmountOrDash value={card.card_client_price} />
                 )
               }
               hint={

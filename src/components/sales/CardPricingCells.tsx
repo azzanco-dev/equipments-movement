@@ -59,10 +59,12 @@ export function CardPricingStatusBadge({
 }
 
 /**
- * The margin of a card: the amount with «/ شهر» and the percentage under
- * it, or «—» with the reason it has no value (a missing price, or a daily
- * supplier line, which has no rule yet). The figures are the view's or the
- * live mirror of them (`cardMargin` / `cardMarginPct`).
+ * The margin of a card: the amount and the percentage under it, or «—» with
+ * the reason it has no value (a missing price, or a daily supplier line,
+ * which has no rule yet). The figures are the view's or the live mirror of
+ * them (`cardMargin` / `cardMarginPct`). No unit beside the amount (owner
+ * 2026-11-04, «شيل اي كلمة شهر جنب الارقام»): the prices here are monthly,
+ * and a daily supplier price carries its own «(يومي)» mark.
  */
 export function CardMarginCell({
   margin,
@@ -106,7 +108,6 @@ export function CardMarginCell({
     <span className={`flex flex-col ${align}`}>
       <SalePrice
         value={margin}
-        unit="month"
         className={negative ? 'text-danger' : undefined}
       />
       <span className="text-xs text-muted">
@@ -136,13 +137,19 @@ export function CardMarginPctCell({
   )
 }
 
-/** The supplier price of a card with its unit, «تحتاج سعر» while NULL. */
+/**
+ * The supplier price of a card, «تحتاج سعر» while NULL. No «/ شهر» beside
+ * the amount (owner 2026-11-04): a monthly price is the rule here, and a
+ * DAILY price is marked «(يومي)» after the amount instead.
+ */
 export function CardSupplierPriceCell({
   price,
   rateUnit,
+  className,
 }: {
   price: number | string | null | undefined
   rateUnit: string | null | undefined
+  className?: string
 }) {
   const { t } = useI18n()
   if (price === null || price === undefined)
@@ -152,9 +159,14 @@ export function CardSupplierPriceCell({
       </Badge>
     )
   return (
-    <SalePrice
-      value={formatSupplierPoPrice(price) === '—' ? null : price}
-      unit={rateUnit === 'day' ? 'day' : 'month'}
-    />
+    <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
+      <SalePrice
+        value={formatSupplierPoPrice(price) === '—' ? null : price}
+        className={className}
+      />
+      {rateUnit === 'day' && (
+        <span className="text-xs text-muted">{t('cardPriceDailyMark')}</span>
+      )}
+    </span>
   )
 }

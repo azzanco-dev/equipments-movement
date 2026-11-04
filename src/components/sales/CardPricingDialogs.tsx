@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle2, RotateCcw } from 'lucide-react'
-import { Price } from '@/components/purchasing/Price'
 import {
   Button,
   DescriptionList,
@@ -27,6 +26,7 @@ import {
   approveEquipmentCardPricing,
   returnEquipmentCardPricing,
 } from '@/lib/salesData'
+import { CardSupplierPriceCell } from './CardPricingCells'
 import { SalePrice } from './SalePrice'
 
 /**
@@ -69,11 +69,7 @@ function PricingFacts({ card }: { card: CardPricingTarget }) {
             card.client_price === null || card.client_price === undefined ? (
               dash
             ) : (
-              <SalePrice
-                value={card.client_price}
-                unit="month"
-                className="font-semibold"
-              />
+              <SalePrice value={card.client_price} className="font-semibold" />
             ),
         },
         {
@@ -84,9 +80,9 @@ function PricingFacts({ card }: { card: CardPricingTarget }) {
             card.supplier_price === undefined ? (
               dash
             ) : (
-              <Price
-                value={card.supplier_price}
-                unit={card.supplier_rate_unit ?? undefined}
+              <CardSupplierPriceCell
+                price={card.supplier_price}
+                rateUnit={card.supplier_rate_unit}
                 className="font-semibold"
               />
             ),

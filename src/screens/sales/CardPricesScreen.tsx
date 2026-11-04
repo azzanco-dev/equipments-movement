@@ -355,7 +355,7 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
                   {t('cardMonthNeedsPrice')}
                 </Badge>
               ) : (
-                <SalePrice value={row.card_client_price} unit="month" />
+                <SalePrice value={row.card_client_price} />
               )}
             </span>
           )
@@ -373,9 +373,6 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
               invalid={draft.trim() !== '' && !isValidCardPrice(draft)}
               className={`w-28 tabular-nums ${isChanged(row) ? 'font-semibold' : ''}`}
             />
-            <span className="whitespace-nowrap text-xs text-muted">
-              {t('supplierPoPerMonth')}
-            </span>
           </span>
         )
       },
