@@ -81,11 +81,10 @@ test("the unit's open PO there, else its party's open PO there", () => {
 test('the page reads the view server-side and adds through the existing dialogs', () => {
   const screen = read('src', 'screens', 'purchasing', 'SiteUnitsScreen.tsx')
   assert.match(screen, /\.from\('purchasing_site_units'\)/)
-  // 0169: a sales reader also selects the client stub's trailing columns.
-  assert.match(
-    screen,
-    /\.select\(\s*showClient\s*\?\s*`\$\{SITE_UNITS_SELECT\},\$\{SITE_UNITS_CLIENT_SELECT\}`\s*:\s*SITE_UNITS_SELECT,\s*\{ count: 'exact' \},?\s*\)/,
-  )
+  // The supplier columns only: the client stub of 0169 was removed on the
+  // owner's word (2026-11-04), so the client columns are never selected here.
+  assert.match(screen, /\.select\(SITE_UNITS_SELECT, \{ count: 'exact' \}\)/)
+  assert.doesNotMatch(screen, /client_po|SITE_UNITS_CLIENT_SELECT|sales\./)
   assert.match(screen, /\.range\(/)
   assert.match(
     screen,

@@ -1,8 +1,8 @@
 // sales-screens (owner approval 2026-11-02, migration 0169): the real sales
 // phase-1 screens mirror the purchasing screens — «PO العملاء» with its two
-// views, the client PO page, the «المبيعات» card of the equipment page, the
-// second stub of the «المعدات في المشاريع» ticket, «كروت المعدات» and the
-// card page — behind the `sales.view` gates. Source checks plus the pure
+// views, the client PO page, the «المبيعات» card of the equipment page,
+// «كروت المعدات» and the card page — behind the `sales.view` gates (the
+// second stub of the «المعدات في المشاريع» ticket was removed 2026-11-04). Source checks plus the pure
 // helpers of src/lib/sales.ts and the Zod schemas.
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
@@ -268,7 +268,6 @@ test('the selects of the screens name only columns of the 0169 views', () => {
   }
   check('SALES_PO_UNITS_SELECT', 'sales_po_units')
   check('EQUIPMENT_CARDS_SELECT', 'sales_equipment_cards')
-  check('SITE_UNITS_CLIENT_SELECT', 'purchasing_site_units')
   // The list configs' search, filter and sort fields are view columns too.
   const configs = read('src', 'lib', 'listConfigs.ts')
   const fieldsOf = (name, next) => {
@@ -366,22 +365,17 @@ test('tokens only, plain alif, logical direction utilities, AppLink for navigati
     cards,
     /rowHref=\{\(row\) => `\/sales\/cards\/\$\{row\.card_id\}`\}/,
   )
+  // The «المعدات في المشاريع» ticket carries the supplier stub only: the
+  // client stub was removed on the owner's word (2026-11-04, «شيل PO العميل
+  // من صفحة المشتريات/المعدات في المشاريع»).
   const tickets = read('src', 'screens', 'purchasing', 'SiteUnitsScreen.tsx')
-  assert.match(
-    tickets,
-    /<AppLink\s+href=\{`\/sales\/\$\{row\.client_po_id\}`\}/,
-  )
-  // The client stub only for a sales reader whose shell opens the PO page;
-  // the supplier stub unchanged.
-  assert.match(
-    tickets,
-    /const showClient = can\('sales\.view'\) && Boolean\(onSelectClientPo\)/,
-  )
   assert.match(
     tickets,
     /<AppLink\s+href=\{`\/purchasing\/\$\{row\.supplier_po_id\}`\}/,
   )
-  assert.match(tickets, /canManageSales && \(/)
+  assert.doesNotMatch(tickets, /client_po|onSelectClientPo|sales\.(view|manage)/)
+  const app = read('src', 'App.tsx')
+  assert.doesNotMatch(app, /onSelectClientPo/)
 })
 
 test('the list screens: two views with the purchasing URL rule, the approved table look, error states', () => {

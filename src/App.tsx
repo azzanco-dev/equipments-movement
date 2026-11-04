@@ -710,11 +710,6 @@ function AppContent() {
                 onSelectMovement={
                   shell.pages.has('movements/:id') ? openMovement : undefined
                 }
-                onSelectClientPo={
-                  shell.pages.has('sales/:id')
-                    ? (id) => router.push(`/sales/${id}`)
-                    : undefined
-                }
               />
             )}
             {page === 'sales/orders' && (

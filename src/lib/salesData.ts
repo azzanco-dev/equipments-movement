@@ -242,11 +242,6 @@ export const EQUIPMENT_SALES_SELECT = `id,client_po_id,equipment_card_id,price,r
 /** The equipment page shows this many sales lines at most. */
 export const EQUIPMENT_SALES_LIMIT = 10
 
-/** The `purchasing_site_units` columns of the client stub (0169, trailing);
- *  selected only for a `sales.view` reader. */
-export const SITE_UNITS_CLIENT_SELECT =
-  'client_po_id,client_po_number,has_client_po,project_client_po_id,project_client_po_number'
-
 // --- Derivations ---------------------------------------------------------------
 
 /** The line count of a list row (0 when the embed is missing). */
