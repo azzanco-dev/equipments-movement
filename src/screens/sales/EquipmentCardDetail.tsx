@@ -652,6 +652,10 @@ function CardDetail({
   const pricingTarget: CardPricingTarget = {
     card_id: card.card_id,
     equipment_code: card.equipment_code,
+    client_price: card.card_client_price,
+    supplier_price: card.supplier_price,
+    supplier_rate_unit: card.supplier_rate_unit,
+    supplier_po_number: card.supplier_po_number,
   }
   const pricingButton = (size: 'sm' | 'md') => {
     const className = size === 'md' ? 'h-11 flex-1' : undefined

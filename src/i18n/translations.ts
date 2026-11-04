@@ -2482,12 +2482,18 @@ export const translations = {
     cardPricingApproved: 'معتمد',
     cardPricingApprove: 'اعتماد',
     cardPricingReturn: 'رجوع للتعديل',
-    cardPricingApproveConfirmTitle: 'اعتماد سعر المعدة {unit}؟',
+    cardPricingApproveConfirmTitle: 'اعتماد سعر المعدة {unit}',
     cardPricingApproveConfirmDesc:
-      'يقفل الاعتماد سعر العميل على هذا الكرت. اذا كانت كل معدات PO المورد معتمدة يصير PO المورد معتمدا.',
-    cardPricingReturnConfirmTitle: 'رجوع سعر المعدة {unit} للتعديل؟',
+      'هل انت متاكد من اعتماد السعر؟ يترتب عليه اعتماد PO المورد {po}.',
+    cardPricingApproveConfirmButton: 'نعم، اعتمد',
+    cardPricingApproveConsequence:
+      'بعد الاعتماد يُقفل سعر العميل. يُعتمد PO المورد تلقائيا عندما تكون كل معداته معتمدة؛ وللتعديل بعدها استخدم «رجوع للتعديل».',
+    cardPricingReturnConfirmTitle: 'رجوع سعر المعدة {unit} للتعديل',
     cardPricingReturnConfirmDesc:
-      'يعود السعر مسودة قابلة للتعديل، ويعود PO المورد المعتمد مسودة ايضا.',
+      'هل انت متاكد من ارجاع السعر للتعديل؟ يرجع PO المورد {po} المعتمد الى مسودة ايضا.',
+    cardPricingReturnConfirmButton: 'نعم، ارجعه للتعديل',
+    cardPricingReturnConsequence:
+      'يعود سعر العميل مسودة قابلة للتعديل، ويعود PO المورد ومعداته قابلة للتعديل حتى يُعتمد من جديد.',
     cardPricingReturnNote: 'ملاحظة (اختياري)',
     cardPricingApprovedToast: 'تم اعتماد سعر {unit}',
     cardPricingReturnedToast: 'رجع سعر {unit} للتعديل',
@@ -5060,12 +5066,18 @@ export const translations = {
     cardPricingApproved: 'Approved',
     cardPricingApprove: 'Approve',
     cardPricingReturn: 'Return for editing',
-    cardPricingApproveConfirmTitle: 'Approve the pricing of {unit}?',
+    cardPricingApproveConfirmTitle: 'Approve the price of {unit}',
     cardPricingApproveConfirmDesc:
-      'Approval locks the client price on this card. Once every unit of the supplier PO is approved, the supplier PO becomes approved.',
-    cardPricingReturnConfirmTitle: 'Return the pricing of {unit} for editing?',
+      'Are you sure you want to approve the price? It entails approving supplier PO {po}.',
+    cardPricingApproveConfirmButton: 'Yes, approve',
+    cardPricingApproveConsequence:
+      'After approval the client price is locked. The supplier PO becomes approved automatically once every one of its units is approved; to change it afterwards use “Return for editing”.',
+    cardPricingReturnConfirmTitle: 'Return the price of {unit} for editing',
     cardPricingReturnConfirmDesc:
-      'The price becomes an editable draft again, and an approved supplier PO goes back to draft too.',
+      'Are you sure you want to return the price for editing? The approved supplier PO {po} goes back to draft too.',
+    cardPricingReturnConfirmButton: 'Yes, return it',
+    cardPricingReturnConsequence:
+      'The client price becomes an editable draft again, and the supplier PO and its units are editable until approved again.',
     cardPricingReturnNote: 'Note (optional)',
     cardPricingApprovedToast: 'Approved the pricing of {unit}',
     cardPricingReturnedToast: 'Returned the pricing of {unit} for editing',

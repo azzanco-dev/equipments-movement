@@ -230,9 +230,14 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
     setDrafts({})
   }
 
+  // The dialog shows the SAVED prices (never a typed draft) and the PO.
   const target = (row: CardPriceRow): CardPricingTarget => ({
     card_id: row.card_id,
     equipment_code: row.equipment_code,
+    client_price: row.card_client_price,
+    supplier_price: row.supplier_price,
+    supplier_rate_unit: row.supplier_rate_unit,
+    supplier_po_number: row.supplier_po_number,
   })
   const notify = (
     key: 'cardPricingApprovedToast' | 'cardPricingReturnedToast',
