@@ -62,6 +62,9 @@ const SCREENS = [
   ['src', 'screens', 'sales', 'ClientPoDetail.tsx'],
   ['src', 'screens', 'sales', 'EquipmentCardsScreen.tsx'],
   ['src', 'screens', 'sales', 'EquipmentCardDetail.tsx'],
+  // Phase 2 (migration 0172).
+  ['src', 'screens', 'sales', 'CardMonthsBatchScreen.tsx'],
+  ['src', 'screens', 'sales', 'CardMonthsListScreen.tsx'],
 ]
 const COMPONENTS = fs
   .readdirSync(path.join(ROOT, 'src', 'components', 'sales'))
@@ -75,7 +78,7 @@ const ALL = [...SCREENS, ...COMPONENTS, ...LIBS]
 
 // --- Routes and gates --------------------------------------------------------------
 
-test('the sales section: a parent with two children on sales.view, like purchasing', () => {
+test('the sales section: a parent with its children on sales.view, like purchasing', () => {
   const entry = nav.NAV_ENTRIES.find((item) => item.key === 'sales')
   assert.deepEqual(plain(entry), {
     key: 'sales',
@@ -83,6 +86,9 @@ test('the sales section: a parent with two children on sales.view, like purchasi
     children: [
       { key: 'sales/orders', requires: [{ key: 'sales.view' }] },
       { key: 'sales/cards', requires: [{ key: 'sales.view' }] },
+      // Phase 2 (0172): «كروت التشغيل» and «الشهور».
+      { key: 'sales/timesheets', requires: [{ key: 'sales.view' }] },
+      { key: 'sales/months', requires: [{ key: 'sales.view' }] },
     ],
   })
   // Right after purchasing in menu order.
@@ -111,7 +117,9 @@ test('the sales section: a parent with two children on sales.view, like purchasi
     'sales/:id',
     'sales/cards',
     'sales/cards/:id',
+    'sales/months',
     'sales/orders',
+    'sales/timesheets',
   ])
   // Nothing without the key.
   const none = nav.planShell({
@@ -282,7 +290,8 @@ test('the selects of the screens name only columns of the 0169 views', () => {
       new RegExp(`(AS |\\.)${field}[, \\n]`),
       field,
     )
-  const cards = fieldsOf('equipmentCardsListConfig')
+  // The phase-2 «الشهور» config (0172) follows it in the file.
+  const cards = fieldsOf('equipmentCardsListConfig', 'cardMonthsListConfig')
   assert.ok(cards.length >= 12)
   for (const field of cards)
     assert.match(
@@ -432,14 +441,15 @@ test('the client PO page: the approved pattern, sales.manage actions, no approva
   )
   const menu = read('src', 'components', 'sales', 'ClientPoOptionsMenu.tsx')
   assert.doesNotMatch(menu, /onExport|onApprove/)
-  // The card page: no «انهاء الكرت» (no function in phase 1), the months as
-  // an empty state, both event tables.
+  // The card page: no «انهاء الكرت» (no function yet), the months table
+  // of phase 2 (tests/salesPhase2Screens.test.cjs), both event tables.
   const card = read('src', 'screens', 'sales', 'EquipmentCardDetail.tsx')
   assert.doesNotMatch(
     card,
     /end_equipment_card|endCard|onEndCard|variant="danger"/,
   )
-  assert.match(card, /title=\{t\('equipmentCardPhase2Hint'\)\}/)
+  assert.doesNotMatch(card, /equipmentCardPhase2Hint/)
+  assert.match(card, /\.from\('sales_card_months'\)/)
   assert.match(card, /\.from\('client_po_events'\)/)
   assert.match(card, /\.from\('supplier_po_events'\)/)
   assert.match(card, /\.from\('movement_visits'\)/)

@@ -232,6 +232,22 @@ const EquipmentCardDetail = dynamic(
     ),
   { loading: screenLoading },
 )
+// Sales phase 2 (migration 0172, screens 2026-11-04): «كروت التشغيل» (the
+// batch entry of one project's month) and «الشهور» (every month of every card).
+const CardMonthsBatchScreen = dynamic(
+  () =>
+    import('@/screens/sales/CardMonthsBatchScreen').then(
+      (module) => module.CardMonthsBatchScreen,
+    ),
+  { loading: screenLoading },
+)
+const CardMonthsListScreen = dynamic(
+  () =>
+    import('@/screens/sales/CardMonthsListScreen').then(
+      (module) => module.CardMonthsListScreen,
+    ),
+  { loading: listLoading },
+)
 const UserDetail = dynamic(
   () => import('@/screens/UserDetail').then((module) => module.UserDetail),
   { loading: screenLoading },
@@ -342,6 +358,8 @@ const NAV_CHILD_LABELS: Record<NavChildKey, TranslationKey> = {
   'purchasing/units': 'siteUnits',
   'sales/orders': 'clientPos',
   'sales/cards': 'equipmentCards',
+  'sales/timesheets': 'cardTimesheets',
+  'sales/months': 'cardMonths',
 }
 
 /**
@@ -706,6 +724,16 @@ function AppContent() {
             )}
             {page === 'sales/cards' && (
               <EquipmentCardsScreen
+                onSelectCard={(id) => router.push(`/sales/cards/${id}`)}
+              />
+            )}
+            {page === 'sales/timesheets' && (
+              <CardMonthsBatchScreen
+                onOpenCard={(id) => router.push(`/sales/cards/${id}`)}
+              />
+            )}
+            {page === 'sales/months' && (
+              <CardMonthsListScreen
                 onSelectCard={(id) => router.push(`/sales/cards/${id}`)}
               />
             )}

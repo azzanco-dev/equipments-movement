@@ -310,6 +310,17 @@ test('the drivers list hides the external supplier by default, NULL kept', () =>
       assert.deepEqual(plain(config.defaultFilters), [
         { id: 'default-status', field: 'status', operator: 'eq', value: 'open' },
       ])
+    // Sales phase 2 (0172): the «الشهور» list opens on the previous Saudi
+    // month (the view is computed on read, never read whole).
+    else if (config === configs.cardMonthsListConfig)
+      assert.deepEqual(plain(config.defaultFilters), [
+        {
+          id: 'default-month',
+          field: 'month',
+          operator: 'eq',
+          value: lib('cardMonthsList').CARD_MONTHS_DEFAULT_MONTH,
+        },
+      ])
     else if (config !== driversListConfig)
       assert.equal(config.defaultFilters, undefined, config.id)
 })

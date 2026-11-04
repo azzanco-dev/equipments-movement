@@ -11,6 +11,7 @@ import { ClientPoStatusBadge } from '@/components/sales/ClientPoStatusBadge'
 import { PoPill } from '@/components/sales/PoPill'
 import { QuantityCell } from '@/components/sales/QuantityCell'
 import { SalePrice } from '@/components/sales/SalePrice'
+import { UnitIdentityCell } from '@/components/sales/UnitIdentityCell'
 import {
   Badge,
   DataTable,
@@ -22,7 +23,6 @@ import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
 import { clientPoUnitsListConfig } from '@/lib/listConfigs'
-import { splitPlateForDisplay } from '@/lib/plate'
 import { SALES_PO_UNITS_SELECT, type SalesPoUnitRow } from '@/lib/salesData'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
@@ -31,31 +31,6 @@ import { supabase } from '@/lib/supabase'
  *  المعدات» is the default view, while «حسب الاوامر» keeps the unprefixed
  *  parameters. */
 export const CLIENT_PO_UNITS_URL_PREFIX = 'u'
-
-/** The plate's digits, then its letters spaced by letter-spacing (as on
- *  the purchasing lists); the chassis as it is; nothing without either. */
-function PlateOrChassis({
-  plate,
-  chassis,
-}: {
-  plate: string | null
-  chassis: string | null
-}) {
-  const parts = plate ? splitPlateForDisplay(plate) : null
-  const text = plate?.trim() || chassis?.trim()
-  if (!parts)
-    return text ? (
-      <span dir="ltr" className="text-xs text-muted">
-        {text}
-      </span>
-    ) : null
-  return (
-    <span dir="ltr" className="text-xs text-muted">
-      {parts.digits}{' '}
-      <span className="-me-[0.15em] tracking-[0.15em]">{parts.letters}</span>
-    </span>
-  )
-}
 
 export interface ClientPoUnitsListProps {
   onSelectPo: (poId: string) => void
@@ -144,22 +119,12 @@ export function ClientPoUnitsList({ onSelectPo }: ClientPoUnitsListProps) {
       header: t('supplierPoEquipmentField'),
       sortable: true,
       cell: (row) => (
-        <span className="flex flex-col text-start">
-          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span dir="ltr" className="font-semibold">
-              {row.equipment_code ?? '—'}
-            </span>
-            <PlateOrChassis
-              plate={row.equipment_plate_number}
-              chassis={row.equipment_chassis_number}
-            />
-          </span>
-          {row.equipment_type && (
-            <span className="truncate-safe max-w-[12rem] text-xs text-muted">
-              {row.equipment_type}
-            </span>
-          )}
-        </span>
+        <UnitIdentityCell
+          code={row.equipment_code}
+          type={row.equipment_type}
+          plate={row.equipment_plate_number}
+          chassis={row.equipment_chassis_number}
+        />
       ),
     },
     // The row's link cell (rowLinkColumn): the green client PO pill, with

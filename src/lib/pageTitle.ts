@@ -61,6 +61,9 @@ const PAGE_TITLES: Readonly<
   // Sales phase 1 (migration 0169): «PO العملاء» and «كروت المعدات».
   'sales/orders': { kind: 'sub', name: 'clientPos', section: 'sales' },
   'sales/cards': { kind: 'sub', name: 'equipmentCards', section: 'sales' },
+  // Sales phase 2 (migration 0172): «كروت التشغيل» and «الشهور».
+  'sales/timesheets': { kind: 'sub', name: 'cardTimesheets', section: 'sales' },
+  'sales/months': { kind: 'sub', name: 'cardMonths', section: 'sales' },
   'settings/equipment-types': {
     kind: 'sub',
     name: 'equipmentTypes',

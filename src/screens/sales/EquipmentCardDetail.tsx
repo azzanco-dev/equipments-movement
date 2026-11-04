@@ -3,8 +3,10 @@ import {
   ArrowUpRight,
   Building2,
   Calendar,
+  Clock,
   Coins,
   CreditCard,
+  Edit2,
   Eye,
   FileText,
   Hourglass,
@@ -12,36 +14,54 @@ import {
   LogIn,
   LogOut,
   Percent,
+  Plus,
   Receipt,
   Timer,
   Truck,
   User,
 } from 'lucide-react'
+import { usePermissions } from '@/auth/PermissionsContext'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { EquipmentIdentifierTag } from '@/components/data-list/EquipmentIdentifierTag'
 import { fetchProfileNames } from '@/components/details/profileNames'
+import {
+  CardMonthDueCell,
+  CardMonthStateBadge,
+  HoursFigure,
+} from '@/components/sales/CardMonthCells'
 import { EquipmentCardStatusBadge } from '@/components/sales/ClientPoStatusBadge'
 import {
   EventTimeline,
+  compareTimelineItems,
   useClientPoTimelineItems,
   type TimelineItem,
 } from '@/components/sales/EventTimeline'
 import { PoPill } from '@/components/sales/PoPill'
 import { QuantityCell } from '@/components/sales/QuantityCell'
+import {
+  RecordCardMonthDialog,
+  type RecordCardMonthEditing,
+} from '@/components/sales/RecordCardMonthDialog'
 import { SaleAmountOrDash } from '@/components/sales/SalePrice'
 import {
   AppLink,
   BackButton,
+  Badge,
   Button,
   Card,
+  DataTable,
   DescriptionList,
   DetailHeader,
   EmptyState,
   ErrorState,
+  IconButton,
   Notice,
   SectionHeader,
   Skeleton,
   StatCard,
+  ToastProvider,
+  useToast,
+  type DataTableColumn,
   type DescriptionListItem,
 } from '@/components/ui'
 import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
@@ -62,13 +82,38 @@ import {
   supplierPoEventDetail,
   type SupplierPoEventRow,
 } from '@/lib/purchasingData'
-import { CLIENT_PO_EVENTS_LIMIT, equipmentCardStatus } from '@/lib/sales'
 import {
+  CLIENT_PO_EVENTS_LIMIT,
+  EQUIPMENT_CARD_EVENT_LABEL_KEYS,
+  cardMonthState,
+  contractHours,
+  currentSaudiMonthKey,
+  equipmentCardEventDetail,
+  equipmentCardStatus,
+  formatHours,
+  monthKeyOf,
+  monthLabel,
+  monthShortLabel,
+  recordedHoursTotal,
+  storedCardMonthFigures,
+  type CardMonthDue,
+  type CardMonthSides,
+  type CardMonthState,
+  type MonthKey,
+} from '@/lib/sales'
+import {
+  CARD_MONTHS_LIMIT,
+  CARD_MONTHS_SELECT,
+  CARD_PENDING_SLOTS_SELECT,
   CARD_VISIT_SELECT,
   CLIENT_PO_EVENT_SELECT,
+  EQUIPMENT_CARD_EVENT_SELECT,
   EQUIPMENT_CARDS_SELECT,
+  type CardMonthRecordRow,
+  type CardPendingSlotRow,
   type CardVisitRow,
   type ClientPoEventRow,
+  type EquipmentCardEventRow,
   type SalesEquipmentCardRow,
 } from '@/lib/salesData'
 import { supabase } from '@/lib/supabase'
@@ -132,19 +177,38 @@ function concernsCard(
   )
 }
 
+/** One row of the «الشهور» table: a recorded month, or an awaited one. */
+interface CardMonthRow {
+  month: MonthKey
+  state: CardMonthState
+  record: CardMonthRecordRow | null
+}
+
 /**
  * «صفحة كرت المعدة» (/sales/cards/:id, migration 0169, the /ui-kit mockup
- * the owner approved on 2026-11-02, phase 1): the header (the unit with
- * its plate and type, «الشركة · المشروع», the period, the status), the
- * summary strip with «—» for the monthly figures phase 2 will fill, the
- * three cards الحركة / المبيعات / المشتريات with real data, the «الشهور»
- * table as an empty state («تبدا مع كروت التشغيل»: no invented numbers)
- * and the timeline from both PO event tables. «انهاء الكرت» is NOT in
- * phase 1 (no function exists), so the page has no action. Reads through
- * RLS: `sales.view` or `purchasing.view` for the card, each side's own key
- * (the other side is simply NULL without it).
+ * the owner approved on 2026-11-02, phase 1; phase 2 «كروت التشغيل»,
+ * migration 0172, approved 2026-11-04): the header (the unit with its plate
+ * and type, «الشركة · المشروع», the period, the status), the summary strip
+ * with the LATEST RECORDED month's figures, the three cards الحركة /
+ * المبيعات / المشتريات with real data, the «الشهور» table (the recorded
+ * months of `sales_card_months` with their amounts and the awaited months
+ * of `sales_card_month_slots`, newest first, under the consumed hours
+ * against the contract total), «تسجيل شهر» / edit / delete for
+ * `sales.manage` through `RecordCardMonthDialog`, and the timeline from
+ * both PO event tables plus the card's own events. «انهاء الكرت» does not
+ * exist yet (no function). Reads through RLS: `sales.view` or
+ * `purchasing.view` for the card, each side's own key (the other side is
+ * simply NULL without it).
  */
-export function EquipmentCardDetail({
+export function EquipmentCardDetail(props: EquipmentCardDetailProps) {
+  return (
+    <ToastProvider>
+      <CardDetail {...props} />
+    </ToastProvider>
+  )
+}
+
+function CardDetail({
   cardId,
   onBack,
   onOpenEquipment,
@@ -153,17 +217,27 @@ export function EquipmentCardDetail({
   onOpenSupplierPo,
 }: EquipmentCardDetailProps) {
   const { t, lang } = useI18n()
+  const { can } = usePermissions()
+  const canManage = can('sales.manage')
+  const toast = useToast()
   const [card, setCard] = useState<SalesEquipmentCardRow | null>(null)
   useTabTitle(card?.equipment_code)
   const [visit, setVisit] = useState<CardVisitRow | null>(null)
   const [clientEvents, setClientEvents] = useState<ClientPoEventRow[]>([])
   const [supplierEvents, setSupplierEvents] = useState<SupplierPoEventRow[]>([])
+  const [cardEvents, setCardEvents] = useState<EquipmentCardEventRow[]>([])
+  const [months, setMonths] = useState<CardMonthRecordRow[]>([])
+  const [pendingSlots, setPendingSlots] = useState<CardPendingSlotRow[]>([])
   const [actorNames, setActorNames] = useState<ReadonlyMap<string, string>>(
     new Map(),
   )
   const [loading, setLoading] = useState(true)
   const [loadedId, setLoadedId] = useState<string | null>(null)
   const [loadError, setLoadError] = useState(false)
+  const [dialog, setDialog] = useState<{
+    editing: RecordCardMonthEditing | null
+    initialMonth: MonthKey | null
+  } | null>(null)
   const startRequest = useListRequest()
 
   const fetchData = useCallback(async () => {
@@ -182,8 +256,18 @@ export function EquipmentCardDetail({
     let visitRow: CardVisitRow | null = null
     let clientRows: ClientPoEventRow[] = []
     let supplierRows: SupplierPoEventRow[] = []
+    let monthRows: CardMonthRecordRow[] = []
+    let pendingRows: CardPendingSlotRow[] = []
+    let cardEventRows: EquipmentCardEventRow[] = []
     if (row) {
-      const [visitResult, clientResult, supplierResult] = await Promise.all([
+      const [
+        visitResult,
+        clientResult,
+        supplierResult,
+        monthsResult,
+        pendingResult,
+        cardEventsResult,
+      ] = await Promise.all([
         row.entry_log_id
           ? supabase
               .from('movement_visits')
@@ -212,16 +296,55 @@ export function EquipmentCardDetail({
               .limit(SUPPLIER_PO_EVENTS_LIMIT * 3)
               .abortSignal(signal)
           : Promise.resolve({ data: null, error: null }),
+        // Phase 2: the recorded months (newest first), the awaited months
+        // of the card's period and the card's own events.
+        supabase
+          .from('sales_card_months')
+          .select(CARD_MONTHS_SELECT)
+          .eq('card_id', cardId)
+          .order('month', { ascending: false })
+          .limit(CARD_MONTHS_LIMIT)
+          .abortSignal(signal),
+        supabase
+          .from('sales_card_month_slots')
+          .select(CARD_PENDING_SLOTS_SELECT)
+          .eq('card_id', cardId)
+          .eq('recorded', false)
+          .order('month', { ascending: false })
+          .limit(CARD_MONTHS_LIMIT)
+          .abortSignal(signal),
+        supabase
+          .from('equipment_card_events')
+          .select(EQUIPMENT_CARD_EVENT_SELECT)
+          .eq('equipment_card_id', cardId)
+          .order('created_at', { ascending: false })
+          .order('seq', { ascending: false })
+          .limit(CLIENT_PO_EVENTS_LIMIT * 3)
+          .abortSignal(signal),
       ])
       if (signal.aborted) return
       failed =
         failed ||
-        Boolean(visitResult.error || clientResult.error || supplierResult.error)
+        Boolean(
+          visitResult.error ||
+          clientResult.error ||
+          supplierResult.error ||
+          monthsResult.error ||
+          pendingResult.error ||
+          cardEventsResult.error,
+        )
       visitRow = (visitResult.data as unknown as CardVisitRow | null) ?? null
       clientRows =
         (clientResult.data as unknown as ClientPoEventRow[] | null) ?? []
       supplierRows =
         (supplierResult.data as unknown as SupplierPoEventRow[] | null) ?? []
+      monthRows =
+        (monthsResult.data as unknown as CardMonthRecordRow[] | null) ?? []
+      pendingRows =
+        (pendingResult.data as unknown as CardPendingSlotRow[] | null) ?? []
+      cardEventRows =
+        (cardEventsResult.data as unknown as EquipmentCardEventRow[] | null) ??
+        []
     }
     // The supplier events carry no actor name: looked up like the PO page.
     const names = await fetchProfileNames(
@@ -235,6 +358,9 @@ export function EquipmentCardDetail({
     setVisit(visitRow)
     setClientEvents(clientRows)
     setSupplierEvents(supplierRows)
+    setMonths(monthRows)
+    setPendingSlots(pendingRows)
+    setCardEvents(cardEventRows)
     setActorNames(names.names)
     setLoadedId(cardId)
     setLoading(false)
@@ -321,10 +447,121 @@ export function EquipmentCardDetail({
       actor: event.actor_id ? (actorNames.get(event.actor_id) ?? null) : null,
       created_at: event.created_at,
     }))
-  // Both sides on one timeline, newest first.
-  const timeline = [...clientItems, ...supplierItems].sort((a, b) =>
-    b.created_at.localeCompare(a.created_at),
+  // The card's own events (0172): the hours recorded, changed or deleted,
+  // with the actor's name stored on the event.
+  const cardItems: TimelineItem[] = cardEvents
+    .slice(0, CLIENT_PO_EVENTS_LIMIT)
+    .map((event) => ({
+      id: event.id,
+      label: t(
+        EQUIPMENT_CARD_EVENT_LABEL_KEYS[event.event_type] ??
+          'cardMonthEventUpdated',
+      ),
+      detail: equipmentCardEventDetail(
+        event,
+        lang,
+        (hours) => `${formatHours(hours)} ${t('cardMonthHoursUnit')}`,
+      ),
+      actor: event.actor_name,
+      created_at: event.created_at,
+      seq: event.seq,
+    }))
+  // All three sources on one timeline, newest first (events of one
+  // transaction share created_at; seq keeps their order).
+  const timeline = [...clientItems, ...supplierItems, ...cardItems].sort(
+    compareTimelineItems,
   )
+
+  // --- The months (phase 2): the recorded ones with their amounts and the
+  // awaited ones, newest first; the figures of the latest recorded month.
+  const currentMonth = currentSaudiMonthKey()
+  const sides: CardMonthSides = {
+    client_line_id: card.client_line_id,
+    client_price: card.client_price,
+    client_rate_unit: card.client_rate_unit,
+    supplier_line_id: card.supplier_line_id,
+    supplier_price: card.supplier_price,
+    supplier_rate_unit: card.supplier_rate_unit,
+    owned,
+    due_standard_hours: card.client_standard_hours ?? card.standard_hours,
+  }
+  const monthRows: CardMonthRow[] = [
+    ...months.map((record) => ({
+      month: monthKeyOf(record.month),
+      state: 'recorded' as const,
+      record,
+    })),
+    ...pendingSlots
+      .filter(
+        (slot) =>
+          !months.some(
+            (record) => monthKeyOf(record.month) === monthKeyOf(slot.month),
+          ),
+      )
+      .map((slot) => ({
+        month: monthKeyOf(slot.month),
+        state: cardMonthState(slot, currentMonth),
+        record: null,
+      })),
+  ].sort((a, b) => b.month.localeCompare(a.month))
+  const openMonths = monthRows.filter((row) => row.state !== 'recorded')
+  const latest = months[0] ?? null
+  const figuresOf = (record: CardMonthRecordRow) =>
+    storedCardMonthFigures({
+      ...sides,
+      due_standard_hours: record.due_standard_hours ?? sides.due_standard_hours,
+      hours: record.hours,
+      client_due: record.client_due,
+      supplier_due: record.supplier_due,
+      margin: record.margin,
+    })
+  const noHours: CardMonthDue = { value: null, blocker: 'no_hours' }
+  const latestFigures = latest
+    ? figuresOf(latest)
+    : {
+        client: noHours,
+        supplier: owned ? { value: null, blocker: 'owned' as const } : noHours,
+        margin: noHours,
+      }
+  const latestHint = latest
+    ? t('cardMonthLatestHint').replace(
+        '{month}',
+        monthLabel(monthKeyOf(latest.month), lang),
+      )
+    : t('cardMonthNoneRecorded')
+  const standardHours = latest?.due_standard_hours ?? sides.due_standard_hours
+  // The contract ceiling in hours (owner 2026-11-04) against the recorded
+  // months: null without a client line, a quantity or a rule (daily).
+  const totalHours = card.client_line_id
+    ? contractHours({
+        quantity: card.client_quantity,
+        rate_unit: card.client_rate_unit,
+        standard_hours: card.client_standard_hours ?? card.standard_hours,
+      })
+    : null
+  const consumedHours = recordedHoursTotal(months)
+  const remainingHours =
+    totalHours === null ? null : Math.max(0, totalHours - consumedHours)
+  const consumedShare =
+    totalHours === null || totalHours <= 0
+      ? null
+      : Math.min(1, consumedHours / totalHours)
+
+  const openDialog = (row: CardMonthRow | null) =>
+    setDialog({
+      editing: row?.record
+        ? { month: row.month, hours: row.record.hours, note: row.record.note }
+        : null,
+      initialMonth: row && !row.record ? row.month : null,
+    })
+  const notify = (
+    key: 'cardMonthRecorded' | 'cardMonthDeleted',
+    month: MonthKey,
+  ) =>
+    void toast({
+      title: t(key).replace('{month}', monthShortLabel(month, lang)),
+      tone: 'success',
+    })
 
   const movementFacts: DescriptionListItem[] = visit
     ? [
@@ -417,6 +654,13 @@ export function EquipmentCardDetail({
             />
           ),
         },
+        {
+          // Owner 2026-11-04: quantity × standard hours (a daily line «—»).
+          key: 'contractHours',
+          icon: <Clock size={16} />,
+          label: t('clientPoContractHours'),
+          value: <HoursFigure hours={totalHours} strong={false} />,
+        },
       ]
     : []
 
@@ -464,7 +708,113 @@ export function EquipmentCardDetail({
           },
         ]
 
-  const dash = <span className="text-muted">—</span>
+  const monthColumns: DataTableColumn<CardMonthRow>[] = [
+    {
+      key: 'month',
+      header: t('cardMonthsMonth'),
+      className: 'whitespace-nowrap',
+      cell: (row) => (
+        <span className="font-medium">{monthLabel(row.month, lang)}</span>
+      ),
+    },
+    {
+      key: 'hours',
+      header: t('cardMonthHours'),
+      align: 'center',
+      className: 'tabular-nums',
+      cell: (row) =>
+        row.record ? (
+          <bdi dir="ltr">{row.record.hours}</bdi>
+        ) : (
+          <span className="text-muted">—</span>
+        ),
+    },
+    {
+      key: 'client',
+      header: t('cardMonthClientDue'),
+      align: 'end',
+      cell: (row) => (
+        <CardMonthDueCell
+          due={row.record ? figuresOf(row.record).client : noHours}
+          side="client"
+        />
+      ),
+    },
+    {
+      key: 'supplier',
+      header: t('cardMonthSupplierDue'),
+      align: 'end',
+      hideBelow: 'sm',
+      cell: (row) => (
+        <CardMonthDueCell
+          due={
+            row.record
+              ? figuresOf(row.record).supplier
+              : owned
+                ? { value: null, blocker: 'owned' }
+                : noHours
+          }
+          side="supplier"
+        />
+      ),
+    },
+    {
+      key: 'margin',
+      header: t('equipmentCardMargin'),
+      align: 'end',
+      hideBelow: 'sm',
+      cell: (row) => (
+        <CardMonthDueCell
+          due={row.record ? figuresOf(row.record).margin : noHours}
+          side="margin"
+        />
+      ),
+    },
+    {
+      key: 'state',
+      header: t('status'),
+      cell: (row) => <CardMonthStateBadge state={row.state} />,
+    },
+    ...(canManage
+      ? [
+          {
+            key: 'actions',
+            header: <span className="sr-only">{t('cardMonthActions')}</span>,
+            align: 'end' as const,
+            cell: (row: CardMonthRow) => (
+              <IconButton
+                size="sm"
+                variant="ghost"
+                label={t(
+                  row.record ? 'cardMonthEdit' : 'cardMonthRecordMonth',
+                ).replace('{month}', monthShortLabel(row.month, lang))}
+                icon={
+                  row.record ? (
+                    <Edit2 size={14} aria-hidden="true" />
+                  ) : (
+                    <Plus size={14} aria-hidden="true" />
+                  )
+                }
+                onClick={() => openDialog(row)}
+              />
+            ),
+          },
+        ]
+      : []),
+  ]
+  const recordButton = (size: 'sm' | 'md') => (
+    <Button
+      variant="primary"
+      size={size}
+      className={size === 'md' ? 'h-11 flex-1' : undefined}
+      icon={<Plus size={size === 'sm' ? 14 : 16} aria-hidden="true" />}
+      disabled={openMonths.length === 0}
+      onClick={() => openDialog(null)}
+    >
+      {t('cardMonthRecord')}
+    </Button>
+  )
+
   const unitCell = (
     <span className="flex flex-col gap-0.5">
       <span className="flex flex-wrap items-baseline gap-x-2 text-sm text-muted">
@@ -507,48 +857,85 @@ export function EquipmentCardDetail({
           subtitle={unitCell}
           badges={<EquipmentCardStatusBadge status={status} />}
           actions={
-            onOpenEquipment ? (
-              <Button size="sm" variant="outline" asChild>
-                <AppLink
-                  href={`/equipment/${card.equipment_id}`}
-                  onNavigate={() => onOpenEquipment(card.equipment_id)}
-                >
-                  <Truck size={14} aria-hidden="true" />
-                  {t('equipment')}
-                </AppLink>
-              </Button>
+            onOpenEquipment || canManage ? (
+              <div className="hidden gap-2 sm:flex">
+                {onOpenEquipment && (
+                  <Button size="sm" variant="outline" asChild>
+                    <AppLink
+                      href={`/equipment/${card.equipment_id}`}
+                      onNavigate={() => onOpenEquipment(card.equipment_id)}
+                    >
+                      <Truck size={14} aria-hidden="true" />
+                      {t('equipment')}
+                    </AppLink>
+                  </Button>
+                )}
+                {canManage && recordButton('sm')}
+              </div>
             ) : undefined
           }
         />
-        {/* 2. The summary strip: the monthly figures wait for phase 2. */}
+        {/* 2. The summary strip: the LATEST RECORDED month's figures (phase
+            2); the month is the hint, «—» while no month is recorded. */}
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <StatCard
-            label={t('equipmentCardClientDue')}
-            value={dash}
-            hint={t('equipmentCardPhase2Hint')}
+            label={t('cardMonthClientDue')}
+            value={
+              <CardMonthDueCell
+                due={latestFigures.client}
+                side="client"
+                alignEnd={false}
+              />
+            }
+            hint={latestHint}
             icon={<Coins size={18} />}
           />
           <StatCard
-            label={t('equipmentCardSupplierDue')}
-            value={dash}
-            hint={
-              owned ? t('equipmentCardOwned') : t('equipmentCardPhase2Hint')
+            label={t('cardMonthSupplierDue')}
+            value={
+              <CardMonthDueCell
+                due={latestFigures.supplier}
+                side="supplier"
+                alignEnd={false}
+              />
             }
+            hint={owned ? t('equipmentCardOwnedNoSupplierPo') : latestHint}
             icon={<Receipt size={18} />}
           />
           <StatCard
             label={t('equipmentCardMargin')}
-            value={dash}
-            hint={t('equipmentCardPhase2Hint')}
+            value={
+              <CardMonthDueCell
+                due={latestFigures.margin}
+                side="margin"
+                alignEnd={false}
+              />
+            }
+            hint={
+              owned ? t('cardMonthMarginOwnedHint') : t('cardMonthMarginHint')
+            }
             icon={<Percent size={18} />}
           />
           <StatCard
-            label={t('equipmentCardHoursThisMonth')}
-            value={dash}
-            hint={t('equipmentCardFromStandardHours').replace(
-              '{hours}',
-              String(card.client_standard_hours ?? card.standard_hours),
-            )}
+            label={t('cardMonthHours')}
+            value={
+              latest ? (
+                <bdi dir="ltr" className="tabular-nums">
+                  {formatHours(latest.hours)}
+                </bdi>
+              ) : (
+                <span className="text-muted">—</span>
+              )
+            }
+            hint={
+              (latest
+                ? `${monthShortLabel(monthKeyOf(latest.month), lang)} · `
+                : '') +
+              t('equipmentCardFromStandardHours').replace(
+                '{hours}',
+                String(standardHours ?? card.standard_hours),
+              )
+            }
             icon={<Timer size={18} />}
           />
         </div>
@@ -633,27 +1020,94 @@ export function EquipmentCardDetail({
         </Card>
       </div>
 
-      {/* 4. The months (phase 2): an empty state, never invented numbers. */}
+      {/* 4. The months («كروت التشغيل», phase 2): one row per month of the
+          card's period, newest first — the recorded hours with their
+          amounts, or the awaited month — under the consumed hours against
+          the contract total (owner 2026-11-04). */}
       <Card padded={false} className="flex min-w-0 flex-col">
         <div className="p-4 pb-0">
           <SectionHeader
-            title={t('equipmentCardMonths')}
+            title={
+              <span className="flex items-center gap-2">
+                {t('equipmentCardMonths')}
+                <Badge size="sm">{monthRows.length}</Badge>
+                {openMonths.length > 0 && (
+                  <Badge tone="warning" size="sm">
+                    {t('cardMonthPendingCount').replace(
+                      '{count}',
+                      String(openMonths.length),
+                    )}
+                  </Badge>
+                )}
+              </span>
+            }
             description={t('equipmentCardMonthsDesc')}
+            action={canManage ? recordButton('sm') : undefined}
           />
+          <div className="mt-3 space-y-1.5">
+            <p className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs text-muted">
+              <span>
+                {t('cardMonthConsumed')}{' '}
+                <bdi dir="ltr" className="font-medium tabular-nums text-fg">
+                  {formatHours(consumedHours)}
+                </bdi>
+                {totalHours !== null && (
+                  <>
+                    {' '}
+                    {t('cardMonthOf')}{' '}
+                    <bdi dir="ltr" className="tabular-nums">
+                      {formatHours(totalHours)}
+                    </bdi>
+                  </>
+                )}{' '}
+                {t('cardMonthHoursUnit')}
+              </span>
+              {remainingHours !== null && (
+                <span>
+                  {t('cardMonthRemaining')}{' '}
+                  <bdi dir="ltr" className="font-medium tabular-nums text-fg">
+                    {formatHours(remainingHours)}
+                  </bdi>{' '}
+                  {t('cardMonthHoursUnit')}
+                </span>
+              )}
+            </p>
+            {consumedShare !== null && (
+              <span
+                aria-hidden="true"
+                className="block h-1.5 w-full overflow-hidden rounded-full bg-surface-hover"
+              >
+                <span
+                  className="block h-full rounded-full bg-fg"
+                  style={{ width: `${Math.round(consumedShare * 100)}%` }}
+                />
+              </span>
+            )}
+          </div>
         </div>
         <div className="p-4 pt-3">
-          <EmptyState
-            icon={<Hourglass size={24} aria-hidden="true" />}
-            title={t('equipmentCardPhase2Hint')}
-            className="p-6"
-          />
-          <p className="mt-3 text-xs text-muted">
-            {t('equipmentCardMonthsNote')}
-          </p>
+          {monthRows.length === 0 ? (
+            <EmptyState
+              icon={<Hourglass size={24} aria-hidden="true" />}
+              title={t('cardMonthNoMonths')}
+              className="p-6"
+            />
+          ) : (
+            <DataTable
+              size="md"
+              cellTextClassName="text-[13px]"
+              cellClassName="py-2"
+              columns={monthColumns}
+              rows={monthRows}
+              rowKey={(row) => row.month}
+              caption={t('equipmentCardMonths')}
+            />
+          )}
+          <p className="mt-3 text-xs text-muted">{t('cardMonthsRuleNote')}</p>
         </div>
       </Card>
 
-      {/* 5. The event timeline from both PO event tables. */}
+      {/* 5. The event timeline from both PO event tables and the card's. */}
       <Card className="space-y-3 p-4">
         <SectionHeader
           title={t('supplierPoEvents')}
@@ -666,6 +1120,44 @@ export function EquipmentCardDetail({
         {t('supplierPoCreatedAt')}:{' '}
         <bdi dir="ltr">{formatDateTime(card.created_at, false)}</bdi>
       </p>
+
+      {/* 6. The mobile action bar. */}
+      {canManage && (
+        <div
+          className="sticky bottom-0 z-10 -mx-4 flex gap-2 border-t bg-bg p-3 sm:hidden"
+          style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+        >
+          {recordButton('md')}
+        </div>
+      )}
+
+      {canManage && (
+        <RecordCardMonthDialog
+          open={dialog !== null}
+          onOpenChange={(next) => {
+            if (!next) setDialog(null)
+          }}
+          card={{
+            ...sides,
+            card_id: card.card_id,
+            equipment_code: card.equipment_code,
+            standard_hours: card.standard_hours,
+          }}
+          openMonths={openMonths}
+          editing={dialog?.editing ?? null}
+          initialMonth={dialog?.initialMonth ?? null}
+          onSaved={(month) => {
+            setDialog(null)
+            notify('cardMonthRecorded', month)
+            fetchData()
+          }}
+          onDeleted={(month) => {
+            setDialog(null)
+            notify('cardMonthDeleted', month)
+            fetchData()
+          }}
+        />
+      )}
     </div>
   )
 }

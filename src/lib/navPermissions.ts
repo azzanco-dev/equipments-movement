@@ -56,6 +56,8 @@ export type NavChildKey =
   | 'purchasing/units'
   | 'sales/orders'
   | 'sales/cards'
+  | 'sales/timesheets'
+  | 'sales/months'
 
 /** One permission key, optionally limited to some of its scopes. */
 export interface NavGate {
@@ -133,12 +135,17 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // Sales phase 1 (migration 0169, screens 2026-11-02): a parent like
   // «المشتريات» with «PO العملاء» first and «كروت المعدات»; the key is held
   // by the admin, the custom «المبيعات» role and (view only) «المشتريات».
+  // Phase 2 (migration 0172, screens 2026-11-04) adds «كروت التشغيل» (the
+  // batch entry of a project's month) and «الشهور» (every month of every
+  // card); the writes need sales.manage inside the screens.
   {
     key: 'sales',
     requires: [{ key: 'sales.view' }],
     children: [
       { key: 'sales/orders', requires: [{ key: 'sales.view' }] },
       { key: 'sales/cards', requires: [{ key: 'sales.view' }] },
+      { key: 'sales/timesheets', requires: [{ key: 'sales.view' }] },
+      { key: 'sales/months', requires: [{ key: 'sales.view' }] },
     ],
   },
   { key: 'drivers', requires: [{ key: 'drivers.read' }] },
@@ -394,6 +401,9 @@ export function routePageOf(segments: readonly string[]): RoutePage {
     // an equipment card, any other second segment a client PO id.
     if (!second || second === 'orders') return 'sales/orders'
     if (second === 'cards') return third ? 'sales/cards/:id' : 'sales/cards'
+    // Phase 2 (0172): the batch entry and the months list.
+    if (second === 'timesheets') return 'sales/timesheets'
+    if (second === 'months') return 'sales/months'
     return 'sales/:id'
   }
   if (first === 'reports') {
@@ -497,6 +507,8 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'sales',
   'sales/orders',
   'sales/cards',
+  'sales/timesheets',
+  'sales/months',
   'sales/:id',
   'sales/cards/:id',
 ]

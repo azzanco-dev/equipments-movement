@@ -12,10 +12,13 @@ import {
 } from '@/lib/purchasingData'
 import {
   clientPoEquipmentPayload,
+  monthStartOf,
+  type CardMonthBatchItem,
   type ClientPoCreateLine,
   type ClientPoEventType,
   type ClientPoFormValues,
   type ClientPoStatus,
+  type EquipmentCardEventType,
   type SaleRateUnit,
 } from '@/lib/sales'
 import { buildSearchFilter } from '@/lib/search'
@@ -32,6 +35,10 @@ import type { OwnershipStatus } from '@/lib/types'
  * SECURITY DEFINER functions of 0169 (RLS has no insert / update policy on
  * the sales tables), so the database stays authoritative. The pure labels
  * and the token → field mapping live in `src/lib/sales.ts`.
+ *
+ * Phase 2 («كروت التشغيل», migration 0172) adds, at the end: the rows of
+ * `sales_card_months` / `sales_card_month_slots` and `equipment_card_events`,
+ * the bounded reads of the batch screen and the three month functions.
  */
 
 // --- Rows --------------------------------------------------------------------
@@ -466,5 +473,249 @@ export async function updateClientPoEquipment(input: {
 export async function closeClientPo(poId: string): Promise<RpcResult<null>> {
   return asResult<null>(
     await supabase.rpc('close_client_po', { p_client_po_id: poId }),
+  )
+}
+
+// ===================================================================================
+// Phase 2 — «كروت التشغيل»: the months of a card (migration 0172)
+// ===================================================================================
+
+// --- Rows --------------------------------------------------------------------
+
+/**
+ * One month of a card as both 0172 views expose it: the record (null while
+ * a slot is not recorded), the card and unit facts of `sales_equipment_cards`,
+ * both PO lines and the computed amounts. `slot_id`, `recorded` and
+ * `month_id` exist on `sales_card_month_slots` only.
+ */
+export interface CardMonthSlotRow {
+  slot_id: string
+  /** The first day of the Saudi month. */
+  month: string
+  recorded: boolean
+  month_id: string | null
+  hours: number | string | null
+  note: string | null
+  card_id: string
+  equipment_id: string
+  company_id: string
+  project_id: string
+  period_from: string
+  period_to: string | null
+  is_open: boolean
+  standard_hours: number
+  equipment_code: string | null
+  equipment_type: string | null
+  equipment_plate_number: string | null
+  equipment_chassis_number: string | null
+  equipment_ownership_status: OwnershipStatus | null
+  owned: boolean
+  company_name_ar: string | null
+  company_name_en: string | null
+  project_name_ar: string | null
+  project_name_en: string | null
+  client_line_id: string | null
+  client_po_id: string | null
+  client_po_number: string | null
+  client_price: number | string | null
+  client_rate_unit: SaleRateUnit | null
+  client_standard_hours: number | null
+  supplier_line_id: string | null
+  supplier_po_id: string | null
+  supplier_po_number: string | null
+  supplier_price: number | string | null
+  supplier_rate_unit: SupplierPoRateUnit | null
+  due_standard_hours: number | null
+  client_due: number | string | null
+  supplier_due: number | string | null
+  margin: number | string | null
+}
+
+/** The slot columns the «الشهور» list and the batch screen show. */
+export const CARD_MONTH_SLOTS_SELECT =
+  'slot_id,month,recorded,month_id,hours,note,card_id,equipment_id,company_id,project_id,period_from,period_to,is_open,standard_hours,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,owned,company_name_ar,company_name_en,project_name_ar,project_name_en,client_line_id,client_po_id,client_po_number,client_price,client_rate_unit,client_standard_hours,supplier_line_id,supplier_po_id,supplier_po_number,supplier_price,supplier_rate_unit,due_standard_hours,client_due,supplier_due,margin'
+
+/** One RECORDED month of a card (`sales_card_months`), as the card page
+ *  lists it: the card's facts are already on the page, so only the record
+ *  and its amounts are selected. */
+export interface CardMonthRecordRow {
+  id: string
+  month: string
+  hours: number | string
+  note: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  card_id: string
+  due_standard_hours: number | null
+  client_due: number | string | null
+  supplier_due: number | string | null
+  margin: number | string | null
+}
+
+export const CARD_MONTHS_SELECT =
+  'id,month,hours,note,created_by,created_at,updated_at,card_id,due_standard_hours,client_due,supplier_due,margin'
+
+/** The months of one card the page shows at most (ten years). */
+export const CARD_MONTHS_LIMIT = 120
+
+/** A pending slot of the card page: the month and whether the card is open
+ *  (the running month of an open card is «جاري», not «بانتظار»). */
+export interface CardPendingSlotRow {
+  slot_id: string
+  month: string
+  recorded: boolean
+  is_open: boolean
+}
+
+export const CARD_PENDING_SLOTS_SELECT = 'slot_id,month,recorded,is_open'
+
+/** `equipment_card_events`: the card's own append-only audit (0172). */
+export interface EquipmentCardEventRow {
+  id: string
+  seq: number
+  equipment_card_id: string
+  event_type: EquipmentCardEventType
+  payload: Record<string, unknown> | null
+  actor_id: string | null
+  /** The actor's name as it was when the event was written. */
+  actor_name: string | null
+  created_at: string
+}
+
+export const EQUIPMENT_CARD_EVENT_SELECT =
+  'id,seq,equipment_card_id,event_type,payload,actor_id,actor_name,created_at'
+
+/** A company and project a card sits in (the batch screen's pickers). */
+export interface CardPlaceRow {
+  card_id: string
+  period_from: string
+  period_to: string | null
+  company_id: string
+  company_name_ar: string | null
+  company_name_en: string | null
+  project_id: string
+  project_name_ar: string | null
+  project_name_en: string | null
+}
+
+export const CARD_PLACES_SELECT =
+  'card_id,period_from,period_to,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en'
+
+/** At most this many cards feed the batch screen's pickers. */
+export const CARD_PLACES_LIMIT = 1000
+
+/** At most this many cards of one project and month in the batch table. */
+export const CARD_MONTH_BATCH_LIMIT = 500
+
+// --- Reads -------------------------------------------------------------------
+
+/**
+ * The companies and projects the batch screen offers: the cards OPEN now
+ * plus the cards ended on or after `sinceDay` (the first day of the oldest
+ * month preset, so a card ended last month still takes its late timesheet),
+ * one bounded read; the dialog groups them into companies → projects.
+ */
+export async function fetchCardPlaces(
+  sinceDay: string,
+  signal?: AbortSignal,
+): Promise<CardPlaceRow[]> {
+  let request = supabase
+    .from('sales_equipment_cards')
+    .select(CARD_PLACES_SELECT)
+    .or(`is_open.eq.true,period_to.gte.${sinceDay}`)
+    .order('company_id')
+    .order('project_id')
+    .order('card_id')
+    .limit(CARD_PLACES_LIMIT)
+  if (signal) request = request.abortSignal(signal)
+  return unwrapRows<CardPlaceRow>(await request)
+}
+
+/** The earliest `period_from` of any card: where the month pickers stop. */
+export async function fetchEarliestCardDay(
+  signal?: AbortSignal,
+): Promise<string | null> {
+  let request = supabase
+    .from('sales_equipment_cards')
+    .select('period_from')
+    .order('period_from', { ascending: true })
+    .limit(1)
+  if (signal) request = request.abortSignal(signal)
+  const rows = unwrapRows<{ period_from: string }>(await request)
+  return rows[0]?.period_from ?? null
+}
+
+/**
+ * The batch screen's rows: every card of one company and project covering
+ * one month (`sales_card_month_slots`, computed on read, so always filtered
+ * by company + project + month), by equipment code.
+ */
+export async function fetchCardMonthSlots(
+  input: { companyId: string; projectId: string; month: string },
+  signal?: AbortSignal,
+): Promise<CardMonthSlotRow[]> {
+  let request = supabase
+    .from('sales_card_month_slots')
+    .select(CARD_MONTH_SLOTS_SELECT)
+    .eq('company_id', input.companyId)
+    .eq('project_id', input.projectId)
+    .eq('month', monthStartOf(input.month))
+    .order('equipment_code', { ascending: true })
+    .order('card_id', { ascending: true })
+    .limit(CARD_MONTH_BATCH_LIMIT)
+  if (signal) request = request.abortSignal(signal)
+  return unwrapRows<CardMonthSlotRow>(await request)
+}
+
+// --- Writes (the three functions of 0172) ------------------------------------------
+
+/** `record_equipment_card_month`: the upsert of ONE month; returns the
+ *  record id. `month` is a month key (YYYY-MM). */
+export async function recordEquipmentCardMonth(input: {
+  cardId: string
+  month: string
+  hours: number
+  note: string
+}): Promise<RpcResult<string>> {
+  return asResult<string>(
+    await supabase.rpc('record_equipment_card_month', {
+      p_card_id: input.cardId,
+      p_month: monthStartOf(input.month),
+      p_hours: input.hours,
+      p_note: input.note.trim() || null,
+    }),
+  )
+}
+
+/** `record_equipment_card_months`: one project's month in ONE transaction
+ *  (a refused item refuses the whole batch with its own token); returns the
+ *  number of items recorded. */
+export async function recordEquipmentCardMonths(
+  month: string,
+  items: readonly CardMonthBatchItem[],
+): Promise<RpcResult<number>> {
+  return asResult<number>(
+    await supabase.rpc('record_equipment_card_months', {
+      p_month: monthStartOf(month),
+      p_items: items.map((item) => ({
+        card_id: item.card_id,
+        hours: item.hours,
+        note: item.note?.trim() || null,
+      })),
+    }),
+  )
+}
+
+/** `delete_equipment_card_month`. */
+export async function deleteEquipmentCardMonth(input: {
+  cardId: string
+  month: string
+}): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('delete_equipment_card_month', {
+      p_card_id: input.cardId,
+      p_month: monthStartOf(input.month),
+    }),
   )
 }

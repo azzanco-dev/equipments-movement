@@ -21,6 +21,10 @@ import {
   MOVEMENT_SEARCH_FIELDS,
 } from '@/lib/movementLogSearch'
 import {
+  CARD_MONTHS_DEFAULT_FILTER,
+  CARD_MONTHS_MONTH_FILTER_KEY,
+} from '@/lib/cardMonthsList'
+import {
   COMPANY_PROJECT_SEARCH_FIELDS,
   DRIVER_SEARCH_FIELDS,
   EQUIPMENT_SEARCH_FIELDS,
@@ -1370,5 +1374,78 @@ export const equipmentCardsListConfig: DataListConfig = {
     { key: 'equipment_code', label: 'equipmentCode' },
     { key: 'period_from', label: 'equipmentPurchasingPeriod' },
     { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
+  ],
+}
+
+/**
+ * sales phase 2 (migration 0172), «الشهور»: every month of every card over
+ * `sales_card_month_slots` — recorded or awaited. The month filter's options
+ * (the presets and the older months back to the earliest card) are filled by
+ * the screen; search, filters, sort and paging are server-side; the awaited
+ * months first by default, the previous Saudi month by default (a visible,
+ * removable filter from `src/lib/cardMonthsList.ts`).
+ */
+export const cardMonthsListConfig: DataListConfig = {
+  id: 'cardMonths',
+  searchPlaceholder: {
+    ar: 'البحث برقم المعدة او اللوحة او الشاصي',
+    en: 'Search by unit, plate or chassis',
+  },
+  searchFields: [
+    'equipment_code',
+    'equipment_plate_digits',
+    'equipment_chassis_number',
+  ],
+  defaultSort: 'recorded',
+  defaultDirection: 'asc',
+  filterFields: [
+    {
+      key: CARD_MONTHS_MONTH_FILTER_KEY,
+      label: 'cardMonthsMonth',
+      type: 'select',
+      operators: ['eq'],
+      // Filled at runtime by the screen (the month presets, then older
+      // months back to the earliest card month).
+      options: [],
+    },
+    {
+      key: 'company_id',
+      label: 'company',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'project_id',
+      label: 'project',
+      type: 'select',
+      operators: ['in'],
+      options: [],
+      multiple: true,
+    },
+    {
+      key: 'recorded',
+      label: 'status',
+      type: 'select',
+      operators: ['eq'],
+      options: [
+        { value: 'true', label: 'مسجل', labelI18n: 'cardMonthStateRecorded' },
+        {
+          value: 'false',
+          label: 'بانتظار',
+          labelI18n: 'cardMonthStatePending',
+        },
+      ],
+    },
+  ],
+  defaultFilters: [CARD_MONTHS_DEFAULT_FILTER],
+  sortableFields: [
+    { key: 'recorded', label: 'cardMonthsSortPendingFirst' },
+    { key: 'equipment_code', label: 'equipmentCode' },
+    { key: 'month', label: 'cardMonthsMonth' },
+    { key: 'hours', label: 'cardMonthHours' },
+    { key: 'client_due', label: 'cardMonthClientDue' },
+    { key: 'margin', label: 'equipmentCardMargin' },
   ],
 }

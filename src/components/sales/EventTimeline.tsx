@@ -16,6 +16,15 @@ export interface TimelineItem {
   detail: string | null
   actor: string | null
   created_at: string
+  /** Insertion order within one created_at (events of one transaction). */
+  seq?: number | null
+}
+
+/** Newest first; events sharing a timestamp keep their insertion order. */
+export function compareTimelineItems(a: TimelineItem, b: TimelineItem): number {
+  const byTime = b.created_at.localeCompare(a.created_at)
+  if (byTime !== 0) return byTime
+  return (b.seq ?? 0) - (a.seq ?? 0)
 }
 
 /**
@@ -41,9 +50,12 @@ export function EventTimeline({
             className="absolute -start-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-bg bg-muted"
           />
           <p className="text-sm font-medium">{item.label}</p>
+          {/* A detail starting with Latin (a code, a price) reads LTR; the
+              month details of the card events («اكتوبر (10): 248 ساعة»)
+              start with Arabic and read RTL (the approved mockup). */}
           {item.detail && (
             <p className="text-sm text-muted">
-              <bdi dir="ltr">{item.detail}</bdi>
+              <bdi dir="auto">{item.detail}</bdi>
             </p>
           )}
           <p className="mt-0.5 text-xs text-muted">
@@ -76,6 +88,7 @@ export function useClientPoTimelineItems(
     ),
     actor: event.actor_name,
     created_at: event.created_at,
+    seq: event.seq,
   }))
 }
 

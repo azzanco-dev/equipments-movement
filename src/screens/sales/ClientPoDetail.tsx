@@ -24,6 +24,7 @@ import { useListRequest } from '@/components/data-list/useListRequest'
 import { fetchProfileNames } from '@/components/details/profileNames'
 import { PurchasingUnitCell } from '@/components/purchasing/PurchasingUnitCell'
 import { AddClientPoEquipmentDialog } from '@/components/sales/AddClientPoEquipmentDialog'
+import { HoursFigure } from '@/components/sales/CardMonthCells'
 import { ClientPoOptionsMenu } from '@/components/sales/ClientPoOptionsMenu'
 import { ClientPoStatusBadge } from '@/components/sales/ClientPoStatusBadge'
 import { CloseClientPoDialog } from '@/components/sales/CloseClientPoDialog'
@@ -59,6 +60,8 @@ import {
   CLIENT_PO_EVENTS_LIMIT,
   SALE_RATE_UNIT_LABEL_KEYS,
   clientPoTotalsByUnit,
+  contractHours,
+  contractHoursTotal,
   saleRateUnitOf,
 } from '@/lib/sales'
 import {
@@ -303,6 +306,15 @@ export function ClientPoDetail({
           {t('clientPoHoursPerMonth')}
         </>
       ),
+    },
+    {
+      // Owner 2026-11-04: the lines' contract hours (quantity × standard
+      // hours; an hourly line its quantity; a daily line none) summed over
+      // the lines that have a total.
+      key: 'contractHours',
+      icon: <Clock size={16} />,
+      label: t('clientPoContractHours'),
+      value: <HoursFigure hours={contractHoursTotal(lines)} strong={false} />,
     },
     {
       key: 'createdBy',
@@ -621,6 +633,13 @@ export function ClientPoDetail({
                           quantity={line.quantity}
                           unit={line.rate_unit}
                         />
+                        {/* Owner 2026-11-04: the line's total contract
+                            hours under its quantity («—» for a daily line
+                            or no quantity). */}
+                        <p className="text-xs text-muted">
+                          {t('clientPoContractHoursShort')}:{' '}
+                          <HoursFigure hours={contractHours(line)} />
+                        </p>
                       </div>
                     </div>
                   </li>

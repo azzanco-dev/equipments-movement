@@ -3,7 +3,12 @@ import type { TranslationKey } from '@/i18n/translations'
 import { isValidUserMobile, normalizeUserMobileInput } from '@/lib/userMobile'
 import { DRIVER_EMPLOYEE_NUMBER_MAX } from '@/lib/driverEmployeeNumber'
 import { isValidSupplierPoPrice } from '@/lib/purchasing'
-import { isValidClientPoQuantity, isValidStandardHours } from '@/lib/sales'
+import {
+  CARD_MONTH_NOTE_MAX,
+  isValidCardMonthHours,
+  isValidClientPoQuantity,
+  isValidStandardHours,
+} from '@/lib/sales'
 
 /**
  * Per-field validation messages for one form: the field name maps to the
@@ -731,6 +736,31 @@ export const clientPoEditFormSchema = clientPoFormSchema
   .innerType()
   .pick({ issue_date: true, expiry_date: true, notes: true })
   .superRefine(expiryAfterIssue)
+
+// --- sales phase 2 (migration 0172) ----------------------------------------------
+
+/**
+ * «تسجيل شهر» (record_equipment_card_month): the month is chosen, the hours
+ * are mandatory and within the database bound (0 to 9999, two decimals),
+ * the note optional and at most 500 characters. The month rules of 0172
+ * (inside the card's period, not in the future) stay in the database and
+ * come back as field messages through `CARD_MONTH_FIELD_RULES`.
+ */
+export const cardMonthFormSchema = z.object({
+  month: selected('cardMonthMonthRequired'),
+  hours: z
+    .string()
+    .trim()
+    .min(1, message('cardMonthHoursRequired'))
+    .refine(
+      (value) => !value || isValidCardMonthHours(value),
+      message('cardMonthHoursInvalid'),
+    ),
+  note: optionalText({
+    max: CARD_MONTH_NOTE_MAX,
+    lengthKey: 'cardMonthNoteTooLong',
+  }),
+})
 
 export interface PostgresLikeError {
   code?: string | null
