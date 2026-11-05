@@ -13,8 +13,10 @@ import {
   PARTY_CONTACT_PERSON_MAX,
   PARTY_EMAIL_MAX,
   SAUDI_IBAN_PATTERN,
+  SHORT_ADDRESS_PATTERN,
   TAX_NUMBER_PATTERN,
   normalizeIban,
+  normalizeShortAddress,
   normalizeRegistryNumber,
 } from '@/lib/partyFields'
 import {
@@ -473,6 +475,15 @@ const partySharedFieldsShape = {
         !value ||
         (value.length <= PARTY_EMAIL_MAX && EMAIL_SHAPE_PATTERN.test(value)),
       message('emailFormatInvalid'),
+    ),
+  // 0179: 4 letters then 4 digits, checked on the stored form.
+  short_address: z
+    .string()
+    .trim()
+    .refine(
+      (value) =>
+        !value || SHORT_ADDRESS_PATTERN.test(normalizeShortAddress(value)),
+      message('shortAddressFormatInvalid'),
     ),
 }
 

@@ -84,6 +84,8 @@ export interface PartyFields {
   address?: string | null
   city?: string | null
   email?: string | null
+  /** 0179: the short national address, «RRRD2929». */
+  short_address?: string | null
 }
 
 export interface Company extends PartyFields {

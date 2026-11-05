@@ -10,10 +10,12 @@ import {
   PARTY_EMAIL_MAX,
   PARTY_IMPORT_HEADERS,
   SAUDI_IBAN_PATTERN,
+  SHORT_ADDRESS_PATTERN,
   TAX_NUMBER_PATTERN,
   normalizeEmail,
   normalizeIban,
   normalizeRegistryNumber,
+  normalizeShortAddress,
   type PartyImportField,
 } from '@/lib/partyFields'
 
@@ -34,6 +36,7 @@ export const COMPANY_IMPORT_PARTY_FIELDS = [
   'tax_number',
   'commercial_register',
   'address',
+  'short_address',
   'city',
   'email',
 ] as const satisfies readonly PartyImportField[]
@@ -46,6 +49,7 @@ export const LESSOR_IMPORT_PARTY_FIELDS = [
   'tax_number',
   'commercial_register',
   'address',
+  'short_address',
   'city',
   'email',
   'bank_name',
@@ -58,6 +62,7 @@ export const PARTY_LABEL_KEYS: Record<PartyImportField, TranslationKey> = {
   tax_number: 'taxNumber',
   commercial_register: 'commercialRegister',
   address: 'address',
+  short_address: 'shortAddress',
   city: 'city',
   email: 'email',
   contact_person: 'contactPerson',
@@ -84,6 +89,7 @@ export const PARTY_TEMPLATE_SAMPLES: Record<PartyImportField, string> = {
   tax_number: '300000000000003',
   commercial_register: '1010123456',
   address: 'حي العليا، طريق الملك فهد',
+  short_address: 'RRRD2929',
   city: 'الرياض',
   email: 'info@example.com',
   bank_name: 'مصرف الراجحي',
@@ -126,6 +132,7 @@ export function normalizePartyCell(
   if (field === 'tax_number' || field === 'commercial_register')
     return normalizeRegistryNumber(value) || null
   if (field === 'iban') return normalizeIban(value) || null
+  if (field === 'short_address') return normalizeShortAddress(value) || null
   if (field === 'email') return normalizeEmail(value) || null
   return value
 }
@@ -144,6 +151,10 @@ export function partyCellError(
       : 'commercialRegisterFormatInvalid'
   if (field === 'iban')
     return SAUDI_IBAN_PATTERN.test(value) ? null : 'ibanFormatInvalid'
+  if (field === 'short_address')
+    return SHORT_ADDRESS_PATTERN.test(value)
+      ? null
+      : 'shortAddressFormatInvalid'
   if (field === 'email')
     return value.length <= PARTY_EMAIL_MAX && EMAIL_SHAPE_PATTERN.test(value)
       ? null

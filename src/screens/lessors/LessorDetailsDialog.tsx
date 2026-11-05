@@ -1,6 +1,6 @@
 import { PartyDetailsDialog } from '@/components/parties/PartyDetailsDialog'
 import { useI18n } from '@/i18n/I18nContext'
-import { formatIban } from '@/lib/partyFields'
+import { formatIban, formatShortAddress } from '@/lib/partyFields'
 import type { Lessor } from '@/lib/types'
 
 export interface LessorDetailsDialogProps {
@@ -38,6 +38,13 @@ export function LessorDetailsDialog({
             },
             { label: t('city'), value: lessor?.city },
             { label: t('address'), value: lessor?.address },
+            {
+              label: t('shortAddress'),
+              value: lessor?.short_address
+                ? formatShortAddress(lessor.short_address)
+                : null,
+              dir: 'ltr',
+            },
           ],
         },
         {

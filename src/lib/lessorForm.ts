@@ -24,6 +24,8 @@ export interface LessorFormValues {
   tax_number: string
   commercial_register: string
   address: string
+  /** 0179: the short national address, «RRRD2929». */
+  short_address: string
   city: string
   email: string
   /** The bank details (owner 2026-11-04, «البنك والايبان»). */
@@ -38,6 +40,7 @@ export const EMPTY_LESSOR_FORM: LessorFormValues = {
   tax_number: '',
   commercial_register: '',
   address: '',
+  short_address: '',
   city: '',
   email: '',
   bank_name: '',
@@ -63,6 +66,7 @@ export const LESSOR_FIELD_ORDER = [
   'tax_number',
   'commercial_register',
   'address',
+  'short_address',
   'city',
   'contact_person',
   'contact_number',

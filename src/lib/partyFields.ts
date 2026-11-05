@@ -21,6 +21,8 @@ export const PARTY_SHARED_FIELDS = [
   'address',
   'city',
   'email',
+  // 0179 (owner 2026-11-05): the short national address, «RRRD2929».
+  'short_address',
 ] as const
 export type PartySharedField = (typeof PARTY_SHARED_FIELDS)[number]
 
@@ -42,6 +44,10 @@ export const TAX_NUMBER_PATTERN = /^\d{15}$/
 export const COMMERCIAL_REGISTER_PATTERN = /^\d{4,20}$/
 export const SAUDI_IBAN_PATTERN = /^SA\d{4}[0-9A-Z]{18}$/
 export const EMAIL_SHAPE_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+/** The short national address of 0179: 4 Latin letters, then 4 digits. */
+export const SHORT_ADDRESS_PATTERN = /^[A-Z]{4}\d{4}$/
+export const SHORT_ADDRESS_LETTERS = 4
+export const SHORT_ADDRESS_DIGITS = 4
 
 /** Latin digits for the Arabic-Indic and Persian ones a keyboard may send. */
 function latinDigits(value: string): string {
@@ -63,6 +69,29 @@ export function normalizeIban(value: string): string {
   return latinDigits(value).replace(/[\s-]/g, '').toUpperCase()
 }
 
+/** The short address as the trigger stores it: no spaces or dashes,
+ *  upper-case («rrrd 2929» → «RRRD2929»). */
+export function normalizeShortAddress(value: string): string {
+  return latinDigits(value).replace(/[\s-]/g, '').toUpperCase()
+}
+
+/** The two parts of a short address, each cleaned to its own characters
+ *  and length: the Latin letters (4), then the digits (4). */
+export function splitShortAddress(value: string): {
+  letters: string
+  digits: string
+} {
+  const clean = normalizeShortAddress(value)
+  const lead = clean.match(/^[A-Z]*/)?.[0] ?? ''
+  return {
+    letters: lead.slice(0, SHORT_ADDRESS_LETTERS),
+    digits: clean
+      .slice(lead.length)
+      .replace(/\D/g, '')
+      .slice(0, SHORT_ADDRESS_DIGITS),
+  }
+}
+
 /** The email as the trigger stores it: trimmed, lower-case. */
 export function normalizeEmail(value: string): string {
   return value.trim().toLowerCase()
@@ -73,7 +102,7 @@ export function optionalTextOrNull(value: string): string | null {
   return value.trim() || null
 }
 
-/** The payload of the five shared fields, normalised like the trigger. */
+/** The payload of the shared fields, normalised like the trigger. */
 export function partySharedPayload(
   form: Record<PartySharedField, string>,
 ): Record<PartySharedField, string | null> {
@@ -83,10 +112,11 @@ export function partySharedPayload(
     address: optionalTextOrNull(form.address),
     city: optionalTextOrNull(form.city),
     email: normalizeEmail(form.email) || null,
+    short_address: normalizeShortAddress(form.short_address) || null,
   }
 }
 
-/** The five shared fields of a record as form values (`null` → ''). */
+/** The shared fields of a record as form values (`null` → ''). */
 export function partySharedFormValues(
   record: Partial<Record<PartySharedField, string | null>>,
 ): Record<PartySharedField, string> {
@@ -96,6 +126,7 @@ export function partySharedFormValues(
     address: record.address ?? '',
     city: record.city ?? '',
     email: record.email ?? '',
+    short_address: record.short_address ?? '',
   }
 }
 
@@ -159,6 +190,12 @@ export function partySharedDatabaseRules<T extends Record<PartySharedField, stri
       field: 'email',
       key: 'emailFormatInvalid',
     },
+    {
+      on: 'check',
+      match: `${table}_short_address_check`,
+      field: 'short_address',
+      key: 'shortAddressFormatInvalid',
+    },
   ]
 }
 
@@ -178,6 +215,12 @@ export const PARTY_IMPORT_HEADERS = {
     'cr',
   ],
   address: ['address', 'العنوان'],
+  short_address: [
+    'short_address',
+    'العنوان المختصر',
+    'العنوان الوطني المختصر',
+    'short address',
+  ],
   city: ['city', 'المدينة'],
   email: ['email', 'البريد', 'البريد الالكتروني', 'البريد الإلكتروني', 'e-mail'],
   bank_name: ['bank_name', 'البنك', 'اسم البنك', 'bank', 'bank name'],
@@ -197,3 +240,9 @@ export const PARTY_IMPORT_HEADERS = {
   ],
 } as const
 export type PartyImportField = keyof typeof PARTY_IMPORT_HEADERS
+
+/** The short address for display: «RRRD 2929». */
+export function formatShortAddress(value: string): string {
+  const { letters, digits } = splitShortAddress(value)
+  return [letters, digits].filter(Boolean).join(' ')
+}

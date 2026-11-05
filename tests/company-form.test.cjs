@@ -98,6 +98,7 @@ test('the payload trims both names', () => {
     address: null,
     city: null,
     email: null,
+    short_address: null,
     contact_person: null,
     contact_number: null,
   })
@@ -121,6 +122,7 @@ test('a record maps onto the form as-is', () => {
     address: '',
     city: '',
     email: '',
+    short_address: '',
     contact_person: '',
     contact_number: '',
   })

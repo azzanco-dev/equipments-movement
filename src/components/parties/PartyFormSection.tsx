@@ -1,6 +1,7 @@
 import type { HTMLAttributes, ReactNode } from 'react'
 import { Field, Input } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
+import { ShortAddressInput } from '@/components/parties/ShortAddressInput'
 import type { TranslationKey } from '@/i18n/translations'
 import type { FieldErrors } from '@/lib/formValidation'
 
@@ -15,6 +16,8 @@ export interface PartyFieldSpec<T> {
   type?: 'text' | 'email' | 'tel'
   /** Spans both columns from `sm` up (the address). */
   wide?: boolean
+  /** The split «RRRD | 2929» control of the short address (0179). */
+  control?: 'text' | 'shortAddress'
 }
 
 export interface PartyFormSectionProps<T extends object> {
@@ -57,19 +60,33 @@ export function PartyFormSection<T extends object>({
               className={spec.wide ? 'sm:col-span-2' : undefined}
               error={error && t(error)}
             >
-              {(control) => (
-                <Input
-                  {...control}
-                  dir={spec.ltr ? 'ltr' : undefined}
-                  type={spec.type ?? 'text'}
-                  inputMode={spec.inputMode}
-                  placeholder={spec.placeholder && t(spec.placeholder)}
-                  value={String(form[spec.field] ?? '')}
-                  onChange={(event) =>
-                    onChange({ [spec.field]: event.target.value } as Partial<T>)
-                  }
-                />
-              )}
+              {(control) =>
+                spec.control === 'shortAddress' ? (
+                  <ShortAddressInput
+                    id={control.id}
+                    invalid={control.invalid}
+                    aria-describedby={control['aria-describedby']}
+                    value={String(form[spec.field] ?? '')}
+                    onChange={(value) =>
+                      onChange({ [spec.field]: value } as Partial<T>)
+                    }
+                  />
+                ) : (
+                  <Input
+                    {...control}
+                    dir={spec.ltr ? 'ltr' : undefined}
+                    type={spec.type ?? 'text'}
+                    inputMode={spec.inputMode}
+                    placeholder={spec.placeholder && t(spec.placeholder)}
+                    value={String(form[spec.field] ?? '')}
+                    onChange={(event) =>
+                      onChange({
+                        [spec.field]: event.target.value,
+                      } as Partial<T>)
+                    }
+                  />
+                )
+              }
             </Field>
           )
         })}

@@ -22,6 +22,8 @@ export interface CompanyFormValues {
   tax_number: string
   commercial_register: string
   address: string
+  /** 0179: the short national address, «RRRD2929». */
+  short_address: string
   city: string
   contact_person: string
   contact_number: string
@@ -34,6 +36,7 @@ export const EMPTY_COMPANY_FORM: CompanyFormValues = {
   tax_number: '',
   commercial_register: '',
   address: '',
+  short_address: '',
   city: '',
   contact_person: '',
   contact_number: '',
@@ -59,6 +62,7 @@ export const COMPANY_FIELD_ORDER = [
   'tax_number',
   'commercial_register',
   'address',
+  'short_address',
   'city',
   'contact_person',
   'contact_number',

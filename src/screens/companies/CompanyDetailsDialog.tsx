@@ -1,5 +1,6 @@
 import { PartyDetailsDialog } from '@/components/parties/PartyDetailsDialog'
 import { useI18n } from '@/i18n/I18nContext'
+import { formatShortAddress } from '@/lib/partyFields'
 import type { Company } from '@/lib/types'
 
 export interface CompanyDetailsDialogProps {
@@ -46,6 +47,13 @@ export function CompanyDetailsDialog({
             },
             { label: t('city'), value: company?.city },
             { label: t('address'), value: company?.address },
+            {
+              label: t('shortAddress'),
+              value: company?.short_address
+                ? formatShortAddress(company.short_address)
+                : null,
+              dir: 'ltr',
+            },
           ],
         },
         {

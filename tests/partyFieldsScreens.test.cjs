@@ -189,11 +189,11 @@ test('both lists search the two numbers, with no new column', () => {
 test('the list rows carry every field the dialogs save', () => {
   assert.match(
     read('src', 'screens', 'lessors', 'LessorsListScreen.tsx'),
-    /'id,name,contact_person,contact_number,tax_number,commercial_register,address,city,email,bank_name,iban,created_at,updated_at'/,
+    /'id,name,contact_person,contact_number,tax_number,commercial_register,address,short_address,city,email,bank_name,iban,created_at,updated_at'/,
   )
   assert.match(
     read('src', 'screens', 'companies', 'CompaniesListScreen.tsx'),
-    /'id,name_ar,name_en,tax_number,commercial_register,address,city,email,contact_person,contact_number,created_at,updated_at'/,
+    /'id,name_ar,name_en,tax_number,commercial_register,address,short_address,city,email,contact_person,contact_number,created_at,updated_at'/,
   )
 })
 

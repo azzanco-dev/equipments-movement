@@ -44,6 +44,12 @@ const OFFICIAL_FIELDS: readonly PartyFieldSpec<LessorFormValues>[] = [
     inputMode: 'numeric',
   },
   { field: 'city', label: 'city', placeholder: 'cityPlaceholder' },
+  // 0179: the short national address, split «RRRD | 2929».
+  {
+    field: 'short_address',
+    label: 'shortAddress',
+    control: 'shortAddress',
+  },
   {
     field: 'address',
     label: 'address',

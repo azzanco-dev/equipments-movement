@@ -743,6 +743,11 @@ export const translations = {
     supplierPoPrintVatNumber: 'الرقم الضريبي',
     supplierPoPrintCrNumber: 'السجل التجاري',
     // party-fields — end
+    // short address (migration 0179)
+    shortAddress: 'العنوان الوطني المختصر',
+    shortAddressLetters: 'حروف العنوان المختصر',
+    shortAddressDigits: 'ارقام العنوان المختصر',
+    shortAddressFormatInvalid: 'العنوان المختصر 4 حروف انجليزية ثم 4 ارقام، مثال: RRRD2929',
     // banks — start (migration 0177: the banks list, Settings › «البنوك»)
     banks: 'البنوك',
     banksDesc: 'قائمة البنوك التي يختار منها بنك المورد.',
@@ -3347,6 +3352,11 @@ export const translations = {
     supplierPoPrintVatNumber: 'VAT No.',
     supplierPoPrintCrNumber: 'CR No.',
     // party-fields — end
+    // short address (migration 0179)
+    shortAddress: 'Short national address',
+    shortAddressLetters: 'Short address letters',
+    shortAddressDigits: 'Short address digits',
+    shortAddressFormatInvalid: 'The short address is 4 English letters then 4 digits, e.g. RRRD2929.',
     // banks — start (migration 0177: the banks list, Settings › «البنوك»)
     banks: 'Banks',
     banksDesc: "The banks a supplier's bank is chosen from.",

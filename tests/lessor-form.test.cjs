@@ -80,6 +80,7 @@ test('the payload trims text and turns empty optional fields into null', () => {
     address: null,
     city: null,
     email: null,
+    short_address: null,
     bank_name: null,
     iban: null,
   })
@@ -105,6 +106,7 @@ test('a record maps onto the form with nulls turned into empty strings', () => {
     address: '',
     city: '',
     email: '',
+    short_address: '',
     bank_name: '',
     iban: '',
   })
