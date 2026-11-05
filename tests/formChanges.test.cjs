@@ -48,7 +48,8 @@ test('the supplier form: the count beside save, no empty save, ask before discar
 
 test('each changed field is coloured until saved (owner «تعلم لون على الحقل الي تعدل»)', () => {
   const form = read('src', 'screens', 'lessors', 'LessorFormDialog.tsx')
-  assert.match(form, /const changedSet = new Set<string>\(changedFields\(initial, form\)\)/)
+  // Editing only: a new record is not marked (owner «مايحتاج … مستند جديد»).
+  assert.match(form, /new Set<string>\(\s+(lessor|company) \? changedFields\(initial, form\) : \[\],?\s+\)/)
   // The three sections, the name and the bank all follow the set.
   assert.equal(form.match(/changed=\{changedSet\}/g).length, 3)
   assert.match(form, /changedSet\.has\('name'\) \? CHANGED_CONTROL_CLASS : undefined/)
@@ -82,7 +83,8 @@ test('the supplier details dialog is wide (owner «وسع dialog تفاصيل ا
 
 test('the client form and details follow the supplier ones (owner «اعتمد التعديلات هذي للشركات»)', () => {
   const form = read('src', 'screens', 'companies', 'CompanyFormDialog.tsx')
-  assert.match(form, /const changedSet = new Set<string>\(changedFields\(initial, form\)\)/)
+  // Editing only: a new record is not marked (owner «مايحتاج … مستند جديد»).
+  assert.match(form, /new Set<string>\(\s+(lessor|company) \? changedFields\(initial, form\) : \[\],?\s+\)/)
   assert.equal(form.match(/changed=\{changedSet\}/g).length, 2)
   assert.match(form, /changedSet\.has\('name_ar'\) \? CHANGED_CONTROL_CLASS : undefined/)
   assert.match(form, /changedSet\.has\('name_en'\) \? CHANGED_CONTROL_CLASS : undefined/)

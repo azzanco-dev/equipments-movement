@@ -201,7 +201,9 @@ export function LessorFormDialog({
   // cannot be saved; closing with unsaved changes asks first.
   // Owner 2026-11-05 («تعلم لون على الحقل الي تعدل»): each changed field is
   // coloured too, until it is saved or set back.
-  const changedSet = new Set<string>(changedFields(initial, form))
+  // Only when editing a record (owner «مايحتاج تسوي حق التعديلات في حال
+  // بسوي مستند جديد»): a new record shows no marks and closes without asking.
+  const changedSet = new Set<string>(lessor ? changedFields(initial, form) : [])
   const changed = changedSet.size
   const dirty = changed > 0
 

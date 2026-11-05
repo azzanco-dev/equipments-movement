@@ -194,7 +194,11 @@ export function CompanyFormDialog({
   // Owner 2026-11-05 («اعتمد التعديلات هذي للشركات»): as the supplier form —
   // the unsaved count beside save, each changed field in light blue until
   // saved, «حفظ التغييرات» only after a change, and ask before discarding.
-  const changedSet = new Set<string>(changedFields(initial, form))
+  // Only when editing a record (owner «مايحتاج تسوي حق التعديلات في حال
+  // بسوي مستند جديد»): a new record shows no marks and closes without asking.
+  const changedSet = new Set<string>(
+    company ? changedFields(initial, form) : [],
+  )
   const changed = changedSet.size
   const dirty = changed > 0
 
