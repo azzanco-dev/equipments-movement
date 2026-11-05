@@ -91,6 +91,9 @@ test('the eight one-character boxes (owner: the one-time-code look)', () => {
   assert.ok(input.includes('cells.map((char, index) =>'))
   assert.ok(input.includes("event.key === 'Backspace' && !cells[index]"))
   assert.ok(input.includes('onPaste={(event) => onPaste(index, event)}'))
+  // Each empty box shows its character of the example (owner «اضف placeholder»).
+  assert.ok(input.includes("export const SHORT_ADDRESS_EXAMPLE = 'RRRD2929'"))
+  assert.ok(input.includes('placeholder={SHORT_ADDRESS_EXAMPLE[index]}'))
 })
 
 test('the forms use the split control; lists, details, import and messages carry the field', () => {

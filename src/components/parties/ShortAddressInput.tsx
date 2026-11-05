@@ -29,6 +29,10 @@ export interface ShortAddressInputProps {
   'aria-describedby'?: string
 }
 
+/** The example shown in the empty boxes, one character each (owner
+ *  2026-11-05, «اضف placeholder للعنوان الوطني المختصر»). */
+export const SHORT_ADDRESS_EXAMPLE = 'RRRD2929'
+
 /** The stored code as the eight boxes' characters. */
 function cellsOf(value: string): string[] {
   return fillShortAddressCells(
@@ -166,6 +170,7 @@ export function ShortAddressInput({
               autoCapitalize={letter ? 'characters' : undefined}
               spellCheck={false}
               inputMode={letter ? 'text' : 'numeric'}
+              placeholder={SHORT_ADDRESS_EXAMPLE[index]}
               value={char}
               onFocus={(event) => event.target.select()}
               onChange={(event) => {
