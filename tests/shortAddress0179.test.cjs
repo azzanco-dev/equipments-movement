@@ -92,7 +92,7 @@ test('the eight one-character boxes (owner: the one-time-code look)', () => {
   assert.ok(input.includes("event.key === 'Backspace' && !cells[index]"))
   assert.ok(input.includes('onPaste={(event) => onPaste(index, event)}'))
   // Each empty box shows its character of the example (owner «اضف placeholder»).
-  assert.ok(input.includes("export const SHORT_ADDRESS_EXAMPLE = 'RRRD2929'"))
+  assert.ok(input.includes("export const SHORT_ADDRESS_EXAMPLE = 'AAAA1111'"))
   assert.ok(input.includes('placeholder={SHORT_ADDRESS_EXAMPLE[index]}'))
 })
 
