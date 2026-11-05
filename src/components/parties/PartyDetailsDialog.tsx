@@ -23,6 +23,9 @@ export interface PartyDetailsDialogProps {
   sections: readonly PartyDetailsSection[]
   /** Omitted without the edit key: no «تعديل». */
   onEdit?: () => void
+  /** The dialog width; the supplier's is `lg` (owner 2026-11-05, «وسع
+   *  dialog تفاصيل المورد»). */
+  size?: 'md' | 'lg'
 }
 
 /**
@@ -38,6 +41,7 @@ export function PartyDetailsDialog({
   heading,
   sections,
   onEdit,
+  size = 'md',
 }: PartyDetailsDialogProps) {
   const { t } = useI18n()
   return (
@@ -45,7 +49,7 @@ export function PartyDetailsDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={t(title)}
-      size="md"
+      size={size}
       footer={
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

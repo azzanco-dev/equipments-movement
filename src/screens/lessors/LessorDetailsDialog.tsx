@@ -24,6 +24,7 @@ export function LessorDetailsDialog({
       open={lessor !== null}
       onOpenChange={onOpenChange}
       title="lessorDetailsDialogTitle"
+      size="lg"
       heading={lessor?.name}
       onEdit={onEdit}
       sections={[

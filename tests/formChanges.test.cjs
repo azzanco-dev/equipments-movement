@@ -58,8 +58,13 @@ test('each changed field is coloured until saved (owner «تعلم لون على
   assert.match(section, /isChanged \? CHANGED_CONTROL_CLASS : undefined/)
   assert.match(section, /changed=\{isChanged\}/)
   const mark = read('src', 'components', 'parties', 'changedField.tsx')
-  // Token colours only: the ring's light yellow.
-  assert.match(mark, /border-\[var\(--progress-mid\)\]/)
+  // Token colours only: light blue (owner «خليه ازرق»).
+  assert.ok(
+    mark.includes(
+      'border-[color-mix(in_srgb,var(--info)_55%,transparent)] bg-[var(--info-soft)]',
+    ),
+  )
+  assert.doesNotMatch(mark, /progress-mid/)
   assert.doesNotMatch(mark, /#[0-9a-f]{3,6}\b/i)
   assert.match(mark, /<span className="sr-only">\{t\('fieldChanged'\)\}<\/span>/)
   assert.match(
@@ -68,4 +73,9 @@ test('each changed field is coloured until saved (owner «تعلم لون على
   )
   const tr = read('src', 'i18n', 'translations.ts')
   assert.equal(tr.match(/fieldChanged:/g).length, 2)
+})
+
+test('the supplier details dialog is wide (owner «وسع dialog تفاصيل المورد»)', () => {
+  assert.match(read('src', 'screens', 'lessors', 'LessorDetailsDialog.tsx'), /size="lg"/)
+  assert.match(read('src', 'components', 'parties', 'PartyDetailsDialog.tsx'), /size={size}/)
 })

@@ -323,7 +323,7 @@ export function LessorFormDialog({
                   // The selector's trigger has no tint of its own: a ring.
                   className={
                     changedSet.has('bank_name')
-                      ? 'rounded-lg ring-2 ring-[var(--progress-mid)]'
+                      ? 'rounded-lg ring-2 ring-[color-mix(in_srgb,var(--info)_55%,transparent)]'
                       : undefined
                   }
                   value={form.bank_name}
