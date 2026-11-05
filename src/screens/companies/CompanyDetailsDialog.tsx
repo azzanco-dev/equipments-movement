@@ -24,6 +24,7 @@ export function CompanyDetailsDialog({
       open={company !== null}
       onOpenChange={onOpenChange}
       title="companyDetailsDialogTitle"
+      size="lg"
       heading={
         company && (
           <>

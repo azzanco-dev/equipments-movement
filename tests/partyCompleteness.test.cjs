@@ -75,3 +75,27 @@ test('the ring is the last column of the suppliers table, in token colours', () 
   assert.equal(tr.match(/completenessSummary:/g).length, 2)
   assert.doesNotMatch(/completeness: '([^']*)'/.exec(tr)[1], /[أإآ]/)
 })
+
+test('the companies list ends with the same ring over the client form', () => {
+  // Owner 2026-11-05: «اعتمد التعديلات هذي للشركات».
+  const fields = [...lib.COMPANY_COMPLETENESS_FIELDS.map((f) => f.field)]
+  assert.deepEqual(fields, [
+    'name_ar',
+    'name_en',
+    'tax_number',
+    'commercial_register',
+    'short_address',
+    'address',
+    'contact_person',
+    'contact_number',
+    'email',
+  ])
+  const select = /const LIST_SELECT =\s+'([^']+)'/.exec(
+    read('src', 'screens', 'companies', 'CompaniesListScreen.tsx'),
+  )[1].split(',')
+  for (const field of fields) assert.ok(select.includes(field), field)
+  const table = read('src', 'screens', 'companies', 'CompaniesTable.tsx')
+  const last = table.lastIndexOf("key: '")
+  assert.equal(table.slice(last, last + 19), "key: 'completeness'")
+  assert.match(table, /partyCompleteness\(row, COMPANY_COMPLETENESS_FIELDS\)/)
+})

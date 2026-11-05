@@ -3,8 +3,13 @@ import { Building2, Edit2, Eye, FolderTree, Trash2 } from 'lucide-react'
 import { DataTable, EmptyState, ErrorState, IconButton } from '@/components/ui'
 import type { DataTableColumn } from '@/components/ui'
 import { RelativeTime } from '@/components/RelativeTime'
+import { CompletenessRing } from '@/components/parties/CompletenessRing'
 import { useI18n } from '@/i18n/I18nContext'
 import { localizedName } from '@/lib/localizedName'
+import {
+  COMPANY_COMPLETENESS_FIELDS,
+  partyCompleteness,
+} from '@/lib/partyCompleteness'
 import type { Company } from '@/lib/types'
 
 /** Same pattern as `screens/equipment/EquipmentTable.tsx` (see the comment
@@ -124,6 +129,17 @@ export function CompaniesTable({
       className: 'text-muted',
       hideBelow: 'md',
       cell: (row) => <RelativeTime value={row.updated_at} />,
+    },
+    // Owner 2026-11-05 («اعتمد التعديلات هذي للشركات»): the suppliers'
+    // completeness ring, last; computed from the row, not sortable.
+    {
+      key: 'completeness',
+      header: t('completeness'),
+      cell: (row) => (
+        <CompletenessRing
+          value={partyCompleteness(row, COMPANY_COMPLETENESS_FIELDS)}
+        />
+      ),
     },
   ]
 

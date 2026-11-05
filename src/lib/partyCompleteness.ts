@@ -30,6 +30,20 @@ export const LESSOR_COMPLETENESS_FIELDS: readonly CompletenessField[] = [
   { field: 'iban', label: 'iban' },
 ]
 
+/** Every field of the client form (owner 2026-11-05, «اعتمد التعديلات هذي
+ *  للشركات»). */
+export const COMPANY_COMPLETENESS_FIELDS: readonly CompletenessField[] = [
+  { field: 'name_ar', label: 'companyNameAr' },
+  { field: 'name_en', label: 'companyNameEn' },
+  { field: 'tax_number', label: 'taxNumber' },
+  { field: 'commercial_register', label: 'commercialRegister' },
+  { field: 'short_address', label: 'shortAddress' },
+  { field: 'address', label: 'address' },
+  { field: 'contact_person', label: 'contactPerson' },
+  { field: 'contact_number', label: 'contactNumber' },
+  { field: 'email', label: 'email' },
+]
+
 /** Red under half, yellow from half, green from 90 % (owner 2026-11-05,
  *  «خلي الاخضر عند 90»). */
 export const COMPLETENESS_WARNING_FROM = 50

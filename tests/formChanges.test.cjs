@@ -79,3 +79,17 @@ test('the supplier details dialog is wide (owner «وسع dialog تفاصيل ا
   assert.match(read('src', 'screens', 'lessors', 'LessorDetailsDialog.tsx'), /size="lg"/)
   assert.match(read('src', 'components', 'parties', 'PartyDetailsDialog.tsx'), /size={size}/)
 })
+
+test('the client form and details follow the supplier ones (owner «اعتمد التعديلات هذي للشركات»)', () => {
+  const form = read('src', 'screens', 'companies', 'CompanyFormDialog.tsx')
+  assert.match(form, /const changedSet = new Set<string>\(changedFields\(initial, form\)\)/)
+  assert.equal(form.match(/changed=\{changedSet\}/g).length, 2)
+  assert.match(form, /changedSet\.has\('name_ar'\) \? CHANGED_CONTROL_CLASS : undefined/)
+  assert.match(form, /changedSet\.has\('name_en'\) \? CHANGED_CONTROL_CLASS : undefined/)
+  assert.match(form, /t\('unsavedFieldsCount'\)\.replace\('\{count\}', String\(changed\)\)/)
+  assert.match(form, /disabled=\{!!company && !dirty\}/)
+  assert.match(form, /title: t\('unsavedChanges'\)/)
+  assert.match(form, /\{confirmDialog\}/)
+  assert.match(form, /size="lg"/)
+  assert.match(read('src', 'screens', 'companies', 'CompanyDetailsDialog.tsx'), /size="lg"/)
+})
