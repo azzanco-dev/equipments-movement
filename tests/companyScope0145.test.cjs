@@ -109,16 +109,22 @@ test('the entry form filters its company and project selectors by the linked com
   // the id comes from the form (the movement components read no auth).
   assert.doesNotMatch(hook, /useAuth/)
   assert.match(read('src', 'components', 'EntryExitForm.tsx'), /useMovementFormOptions\(\{ userId: user\?\.id \?\? null \}\)/)
-  assert.match(hook, /\.from\('profile_companies'\)\s+\.select\('company_id'\)\s+\.eq\('profile_id', userId\)/)
+  // Since 0176 (Settings › «اسنادات الفورمينات») the links are read through
+  // `profile_assignments`: the companies, and the projects a company is
+  // narrowed to (none = all of its projects).
+  assert.match(hook, /\.from\('profile_assignments'\)\s+\.select\('profile_id,company_id,project_ids'\)\s+\.eq\('profile_id', userId\)/)
   // Companies: only the linked ones while there are any.
   assert.match(hook, /if \(assignedCompanyIds\.length\)\s+request = request\.in\('id', assignedCompanyIds\)/)
-  // Projects: those company_projects links to the linked companies, server side.
-  assert.match(hook, /\.select\('id,name_ar,name_en,company_projects!inner\(company_id\)'\)\s+\.in\('company_projects\.company_id', assignedCompanyIds\)/)
+  // Projects: those company_projects links to his whole companies, server side…
+  assert.match(hook, /\.select\('id,name_ar,name_en,company_projects!inner\(company_id\)'\)\s+\.in\('company_projects\.company_id', wholeCompanyIds\)/)
+  // …plus the projects he is narrowed to, by id.
+  assert.match(hook, /\.in\('id', assignedProjectIds\)/)
   // Owner 2026-10-22 (option 2): no linked project at all = every project.
-  assert.match(hook, /\.from\('company_projects'\)\s+\.select\('project_id', \{ count: 'exact', head: true \}\)\s+\.in\('company_id', ids\)/)
-  assert.match(hook, /if \(assignedCompanyIds\.length && hasLinkedProjects\) \{/)
+  assert.match(hook, /\.from\('company_projects'\)\s+\.select\('project_id', \{ count: 'exact', head: true \}\)\s+\.in\('company_id', scope\.wholeCompanyIds\)/)
+  assert.match(hook, /assignedCompanyIds\.length &&\s+\(hasLinkedProjects \|\| assignedProjectIds\.length\)/)
   // Still at most 20 rows, still searched on the server.
-  assert.equal((hook.match(/\.limit\(20\)/g) ?? []).length, 6)
+  assert.equal((hook.match(/\.limit\(20\)/g) ?? []).length, 7)
+  assert.match(hook, /\.slice\(0, 20\)/)
   assert.doesNotMatch(hook, /\.filter\(\(/)
   // The hint on the user page says what the links do.
   const translations = read('src', 'i18n', 'translations.ts')

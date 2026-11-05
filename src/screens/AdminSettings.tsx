@@ -12,6 +12,7 @@ import {
   Upload,
   History,
   Landmark,
+  UserCog,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { readWorkbookSafely, workbookReadErrorKey } from '@/lib/safeWorkbook'
@@ -62,6 +63,7 @@ import { usePermissions } from '@/auth/PermissionsContext'
 import { canOpenPage, type RoutePage } from '@/lib/navPermissions'
 import { AfaqySettings } from '@/components/afaqy/AfaqySettings'
 import { BanksSettings } from '@/components/banks/BanksSettings'
+import { ForemanAssignmentsSettings } from '@/components/foremanAssignments/ForemanAssignmentsSettings'
 
 type EquipmentTypeRow = {
   id: string
@@ -107,6 +109,9 @@ export function AdminSettings() {
   const showAfaqy = pathname === '/settings/afaqy'
   // 0177 (owner 2026-11-05): the banks list of the supplier form.
   const showBanks = pathname === '/settings/banks'
+  // 0176 (owner 2026-11-05): the foremen's companies and projects.
+  const showForemanAssignments =
+    pathname === '/settings/foreman-assignments'
   // Each hub card follows the gate of the page it opens (pageGate in
   // src/lib/navPermissions.ts, 2026-10-28), so a card never leads to a page
   // that sends the user back; «سجل النشاط» (owner 2026-10-22) is the
@@ -455,6 +460,19 @@ export function AdminSettings() {
       </div>
     )
 
+  if (showForemanAssignments)
+    return (
+      <div className="space-y-4">
+        <PageHeader
+          title={t('foremanAssignmentsTitle')}
+          description={t('foremanAssignmentsDesc')}
+          onBack={() => router.push('/settings')}
+          backLabel={t('backToSettings')}
+        />
+        <ForemanAssignmentsSettings />
+      </div>
+    )
+
   if (showBanks)
     return (
       <div className="space-y-4">
@@ -548,6 +566,30 @@ export function AdminSettings() {
               <h2 className="font-semibold">{t('afaqySettingsTitle')}</h2>
               <p className="mt-1 text-sm text-muted">
                 {t('afaqySettingsDesc')}
+              </p>
+            </button>
+          )}
+          {opens('settings/foreman-assignments') && (
+            <button
+              type="button"
+              onClick={() => router.push('/settings/foreman-assignments')}
+              className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
+            >
+              <div className="mb-4 flex w-full items-start justify-between gap-3">
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  <UserCog size={18} />
+                </span>
+                <ChevronRight
+                  size={18}
+                  className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip"
+                />
+              </div>
+              <h2 className="font-semibold">{t('foremanAssignmentsTitle')}</h2>
+              <p className="mt-1 text-sm text-muted">
+                {t('foremanAssignmentsDesc')}
               </p>
             </button>
           )}
