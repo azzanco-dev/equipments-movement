@@ -1,6 +1,11 @@
+import { FileText, Landmark, Phone, Truck } from 'lucide-react'
 import { PartyDetailsDialog } from '@/components/parties/PartyDetailsDialog'
 import { useI18n } from '@/i18n/I18nContext'
-import { formatIban, formatShortAddress } from '@/lib/partyFields'
+import {
+  LESSOR_COMPLETENESS_FIELDS,
+  partyCompleteness,
+} from '@/lib/partyCompleteness'
+import { formatIban, formatShortAddress, telHref } from '@/lib/partyFields'
 import type { Lessor } from '@/lib/types'
 
 export interface LessorDetailsDialogProps {
@@ -12,7 +17,7 @@ export interface LessorDetailsDialogProps {
 }
 
 /** A supplier's facts (EM-260, 0175): «بيانات رسمية», «بيانات الاتصال»,
- *  «بيانات البنك». */
+ *  «بيانات البنك», in the redesigned dialog (owner 2026-11-05). */
 export function LessorDetailsDialog({
   lessor,
   onOpenChange,
@@ -25,48 +30,76 @@ export function LessorDetailsDialog({
       onOpenChange={onOpenChange}
       title="lessorDetailsDialogTitle"
       size="lg"
+      icon={<Truck size={22} />}
       heading={lessor?.name}
+      completeness={
+        lessor
+          ? partyCompleteness(lessor, LESSOR_COMPLETENESS_FIELDS)
+          : undefined
+      }
       onEdit={onEdit}
       sections={[
         {
           title: 'partyOfficialSection',
+          icon: <FileText size={16} />,
           items: [
-            { label: t('taxNumber'), value: lessor?.tax_number, dir: 'ltr' },
+            {
+              label: t('taxNumber'),
+              value: lessor?.tax_number,
+              ltr: true,
+              copy: true,
+            },
             {
               label: t('commercialRegister'),
               value: lessor?.commercial_register,
-              dir: 'ltr',
+              ltr: true,
+              copy: true,
             },
-            { label: t('address'), value: lessor?.address },
             {
               label: t('shortAddress'),
-              value: lessor?.short_address
+              value: lessor?.short_address,
+              display: lessor?.short_address
                 ? formatShortAddress(lessor.short_address)
-                : null,
-              dir: 'ltr',
+                : undefined,
+              ltr: true,
+              copy: true,
             },
+            { label: t('address'), value: lessor?.address, wide: true },
           ],
         },
         {
           title: 'partyContactSection',
+          icon: <Phone size={16} />,
           items: [
             { label: t('contactPerson'), value: lessor?.contact_person },
             {
               label: t('contactNumber'),
               value: lessor?.contact_number,
-              dir: 'ltr',
+              ltr: true,
+              copy: true,
+              href: telHref(lessor?.contact_number),
             },
-            { label: t('email'), value: lessor?.email, dir: 'ltr' },
+            {
+              label: t('email'),
+              value: lessor?.email,
+              ltr: true,
+              copy: true,
+              href: lessor?.email ? `mailto:${lessor.email}` : undefined,
+              wide: true,
+            },
           ],
         },
         {
           title: 'partyBankSection',
+          icon: <Landmark size={16} />,
           items: [
             { label: t('bankName'), value: lessor?.bank_name },
             {
               label: t('iban'),
-              value: lessor?.iban ? formatIban(lessor.iban) : null,
-              dir: 'ltr',
+              value: lessor?.iban,
+              display: lessor?.iban ? formatIban(lessor.iban) : undefined,
+              ltr: true,
+              copy: true,
             },
           ],
         },

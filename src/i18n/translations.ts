@@ -746,6 +746,10 @@ export const translations = {
     // unsaved changes in a form (owner 2026-11-05, supplier form first)
     unsavedFieldsCount: 'تعديلات غير محفوظة: {count}',
     fieldChanged: 'معدل ولم يحفظ',
+    // the redesigned details dialog (owner 2026-11-05)
+    detailsCopy: 'نسخ',
+    detailsCopied: 'تم النسخ',
+    detailsNotRecorded: 'غير مسجل',
     // completeness ring (owner 2026-11-05, suppliers list)
     completeness: 'اكتمال البيانات',
     completenessSummary: 'البيانات مكتملة {percent}% ({filled} من {total} حقول)',
@@ -3383,6 +3387,10 @@ export const translations = {
     // unsaved changes in a form (owner 2026-11-05, supplier form first)
     unsavedFieldsCount: '{count} unsaved changes',
     fieldChanged: 'Changed, not saved',
+    // the redesigned details dialog (owner 2026-11-05)
+    detailsCopy: 'Copy',
+    detailsCopied: 'Copied',
+    detailsNotRecorded: 'Not recorded',
     // completeness ring (owner 2026-11-05, suppliers list)
     completeness: 'Completeness',
     completenessSummary: '{percent}% complete ({filled} of {total} fields)',

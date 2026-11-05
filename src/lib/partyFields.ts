@@ -283,3 +283,10 @@ export function fillShortAddressCells(
   }
   return { cells: next, next: Math.min(at, SHORT_ADDRESS_CELLS - 1) }
 }
+
+/** A phone number as a `tel:` link (its digits and a leading +), for the
+ *  details dialogs. */
+export function telHref(value: string | null | undefined) {
+  const digits = latinDigits(value ?? '').replace(/[^\d+]/g, '')
+  return digits ? `tel:${digits}` : undefined
+}

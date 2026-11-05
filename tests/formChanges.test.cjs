@@ -96,8 +96,32 @@ test('the client form and details follow the supplier ones (owner «اعتمد �
   assert.match(read('src', 'screens', 'companies', 'CompanyDetailsDialog.tsx'), /size="lg"/)
 })
 
-test('the client details heading: the English name under the Arabic one, same edge', () => {
-  const dialog = read('src', 'screens', 'companies', 'CompanyDetailsDialog.tsx')
-  assert.match(dialog, /<span className="block text-sm font-normal text-muted">\s+<bdi dir="ltr">\{company\.name_en\}<\/bdi>/)
-  assert.doesNotMatch(dialog, /text-muted" dir="ltr"/)
+test('the redesigned details dialogs (owner «حسن الdialog حق التفاصيل … خليها جمالي اكثر»)', () => {
+  const shared = read('src', 'components', 'parties', 'PartyDetailsDialog.tsx')
+  const has = (text, piece) => assert.ok(text.includes(piece), piece)
+  // Header: avatar, name, the muted line under it and the completeness ring.
+  has(shared, '<CompletenessRing value={completeness} />')
+  has(shared, '{subheading && <p className="text-sm text-muted">{subheading}</p>}')
+  // One soft card per section, the facts as a definition list in two columns.
+  has(shared, 'className="rounded-xl border bg-[var(--surface)] p-4"')
+  has(shared, '<dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">')
+  // Empty: «غير مسجل»; copy to the clipboard; links for the phone and mail.
+  has(shared, "t('detailsNotRecorded')")
+  has(shared, 'navigator.clipboard.writeText(value)')
+  assert.doesNotMatch(shared, /#[0-9a-f]{3,6}\b/i)
+  for (const [file, fields] of [
+    [['src', 'screens', 'lessors', 'LessorDetailsDialog.tsx'], 'LESSOR_COMPLETENESS_FIELDS'],
+    [['src', 'screens', 'companies', 'CompanyDetailsDialog.tsx'], 'COMPANY_COMPLETENESS_FIELDS'],
+  ]) {
+    const dialog = read(...file)
+    has(dialog, fields)
+    has(dialog, 'href: telHref(')
+    has(dialog, 'mailto:')
+  }
+  // The client's English name under the Arabic one, same edge (owner
+  // «… مفروض يكون تحت بعض»): a line of its own, only the name LTR.
+  const company = read('src', 'screens', 'companies', 'CompanyDetailsDialog.tsx')
+  has(company, '<bdi dir="ltr">{company.name_en}</bdi>')
+  const tr = read('src', 'i18n', 'translations.ts')
+  assert.equal(tr.match(/detailsNotRecorded:/g).length, 2)
 })
