@@ -320,7 +320,6 @@ export type RoutePage =
   | 'settings/workshop-opening-balance'
   | 'settings/afaqy'
   | 'settings/banks'
-  | 'settings/foreman-assignments'
   | 'settings/roles'
   | 'movements/new'
   | 'movements/:id'
@@ -344,8 +343,6 @@ const PAGE_GATES: Readonly<Record<ExtraPage, readonly NavGate[]>> = {
   'settings/afaqy': [{ key: 'settings.integrations' }],
   // 0177: the banks list is edited by whoever edits the suppliers.
   'settings/banks': [{ key: 'lessors.edit' }],
-  // 0176: admin_set_profile_assignments needs users.manage.
-  'settings/foreman-assignments': [{ key: 'users.manage' }],
   'settings/roles': [{ key: 'settings.roles' }],
   'movements/new': [
     { key: 'movements.site.create' },
@@ -390,7 +387,6 @@ const SETTINGS_SUBPAGES: ReadonlySet<string> = new Set([
   'workshop-opening-balance',
   'afaqy',
   'banks',
-  'foreman-assignments',
 ])
 
 /**
@@ -516,7 +512,6 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'settings/workshop-opening-balance',
   'settings/afaqy',
   'settings/banks',
-  'settings/foreman-assignments',
   'settings/roles',
   'movements/new',
   'movements/:id',

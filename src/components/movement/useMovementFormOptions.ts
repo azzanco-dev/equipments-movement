@@ -71,15 +71,7 @@ export function useMovementFormOptions({
         'profile_id' | 'company_id' | 'project_ids'
       >[]
       const ids = rows.map((row) => row.company_id)
-      const scope = projectScopeOf(
-        rows.map((row) => ({
-          ...row,
-          company_name_ar: '',
-          company_name_en: null,
-          project_names_ar: [],
-          project_names_en: [],
-        })),
-      )
+      const scope = projectScopeOf(rows)
       let linked = false
       if (scope.wholeCompanyIds.length) {
         const { count } = await supabase

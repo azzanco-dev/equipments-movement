@@ -20,6 +20,15 @@ import type { Profile, ProfileContact } from '@/lib/types'
 import { normalizeUserMobileInput, userMobileErrorCode } from '@/lib/userMobile'
 import { rolesRpcError } from '@/lib/rolesAdmin'
 import {
+  PROFILE_ASSIGNMENTS_SELECT,
+  assignedProjectsOf,
+  assignmentSaveMessage,
+  companiesProjectLoader,
+  projectsWithinCompanies,
+  type ProfileAssignmentRow,
+  type ProjectOption,
+} from '@/lib/foremanAssignments'
+import {
   ASSIGN_ROLE_FIELD_CODES,
   assignedRoleFromEmbed,
   planRoleChange,
@@ -101,6 +110,21 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [companies, setCompanies] = useState<CompanyOption[]>([])
+  // «المشاريع المسؤول عنها» (migration 0176, owner 2026-11-05): the projects
+  // of the chosen companies the user is narrowed to; none chosen in a
+  // company = every project of it. Read from `profile_assignments` and
+  // written by `admin_set_profile_assignments`, apart from `manage-user`
+  // (like the mobile number); a failed read leaves the field locked.
+  const [projects, setProjects] = useState<ProjectOption[]>([])
+  const [projectsLoad, setProjectsLoad] = useState<{
+    userId: string
+    state: 'loaded' | 'failed'
+    /** The saved projects' ids, sorted. */
+    saved: string
+    /** The saved projects, for the summary above the form. */
+    options: ProjectOption[]
+  } | null>(null)
+  const [projectsReloadKey, setProjectsReloadKey] = useState(0)
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
   // wave 9 — the mobile number (migration 0110). It is read and written apart
   // from the rest of the record: the `manage-user` Edge Function neither
@@ -185,7 +209,16 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   const savedMobile = mobileLoad?.userId === userId ? mobileLoad.saved : ''
   const mobileChanged =
     mobileState === 'loaded' && normalizeUserMobileInput(mobile) !== savedMobile
-  const hasUnsavedChanges = mainChanged || mobileChanged || assignmentChanged
+  const projectsState =
+    projectsLoad?.userId === userId ? projectsLoad.state : 'loading'
+  const projectIdsKey = projects
+    .map((project) => project.value)
+    .sort()
+    .join(',')
+  const projectsChanged =
+    projectsState === 'loaded' && projectIdsKey !== projectsLoad?.saved
+  const hasUnsavedChanges =
+    mainChanged || mobileChanged || assignmentChanged || projectsChanged
 
   // The steps a save runs for the role (`planRoleChange`): the assignment
   // through `admin_assign_profile_role` when it changed.
@@ -335,6 +368,39 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   useEffect(() => {
     let active = true
     supabase
+      .from('profile_assignments')
+      .select(PROFILE_ASSIGNMENTS_SELECT)
+      .eq('profile_id', userId)
+      .then(({ data, error: loadError }) => {
+        if (!active) return
+        if (loadError) {
+          setProjects([])
+          setProjectsLoad({ userId, state: 'failed', saved: '', options: [] })
+          return
+        }
+        const saved = assignedProjectsOf(
+          (data ?? []) as ProfileAssignmentRow[],
+          'ar',
+        )
+        setProjects(saved)
+        setProjectsLoad({
+          userId,
+          state: 'loaded',
+          saved: saved
+            .map((project) => project.value)
+            .sort()
+            .join(','),
+          options: saved,
+        })
+      })
+    return () => {
+      active = false
+    }
+  }, [projectsReloadKey, userId])
+
+  useEffect(() => {
+    let active = true
+    supabase
       .from('profile_roles')
       .select('role_key,roles(name_ar,name_en)')
       .eq('profile_id', userId)
@@ -406,6 +472,46 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     }))
   }, [lang])
 
+  const companyIdsKey = companies.map((company) => company.value).join(',')
+  const loadProjects = useMemo(
+    () =>
+      companiesProjectLoader(
+        supabase,
+        companyIdsKey ? companyIdsKey.split(',') : [],
+        lang,
+      ),
+    [companyIdsKey, lang],
+  )
+  const projectOptions = useMemo(
+    () =>
+      projects.map((project) => ({
+        ...project,
+        label: localizedName(lang, project.name_ar, project.name_en),
+      })),
+    [projects, lang],
+  )
+  // The saved projects in the active language (the summary).
+  const savedProjectNames = useMemo(
+    () =>
+      (projectsLoad?.userId === userId ? projectsLoad.options : []).map(
+        (project) => ({
+          ...project,
+          label: localizedName(lang, project.name_ar, project.name_en),
+        }),
+      ),
+    [lang, projectsLoad, userId],
+  )
+  /** The companies changed: their projects that left go with them. */
+  const changeCompanies = (next: CompanyOption[]) => {
+    setCompanies(next)
+    setProjects((current) =>
+      projectsWithinCompanies(
+        current,
+        next.map((company) => company.value),
+      ),
+    )
+  }
+
   // The selected companies with their labels in the active language.
   const companyOptions = useMemo(
     () =>
@@ -445,7 +551,8 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       //    only when the mobile number and/or the assignment alone changed,
       //    so correcting a number (or assigning a role) does not rewrite the
       //    login details and company assignments.
-      const saveMain = mainChanged || (!mobileChanged && !assignStep)
+      const saveMain =
+        mainChanged || (!mobileChanged && !assignStep && !projectsChanged)
       if (saveMain) {
         const nextFullName = fullName.trim()
         const nextEmail = email.trim()
@@ -527,6 +634,34 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           return
         }
         applyAssignment(assignStep.roleKey)
+      }
+
+      // 1c. The projects (0176), when they changed: one call with the
+      //     companies on the form, so both sets agree. What step 1 saved
+      //     stays saved and is said to be saved.
+      if (projectsChanged) {
+        const { error: projectsError } = await supabase.rpc(
+          'admin_set_profile_assignments',
+          {
+            p_profile_id: userId,
+            p_company_ids: companiesApply
+              ? companies.map((company) => company.value)
+              : [],
+            p_project_ids: companiesApply
+              ? projects.map((project) => project.value)
+              : [],
+          },
+        )
+        if (projectsError) {
+          setError(t(assignmentSaveMessage(projectsError)))
+          return
+        }
+        setProjectsLoad({
+          userId,
+          state: 'loaded',
+          saved: projectIdsKey,
+          options: projects,
+        })
       }
 
       // 2. The mobile number, only when it changed. Its failure is reported
@@ -694,6 +829,30 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             // On the grid cell, so the badges get the whole row.
             cellClassName: 'sm:col-span-2',
           },
+          ...(user.assigned_companies?.length && projectsState === 'loaded'
+            ? [
+                {
+                  key: 'assignedProjects',
+                  label: t('assignedProjects'),
+                  value: savedProjectNames.length ? (
+                    <span className="flex flex-wrap gap-1.5">
+                      {savedProjectNames.map((project) => (
+                        <Badge
+                          key={project.value}
+                          tone="neutral"
+                          className="max-w-full !shrink !whitespace-normal break-words"
+                        >
+                          {project.label}
+                        </Badge>
+                      ))}
+                    </span>
+                  ) : (
+                    t('assignedProjectsAll')
+                  ),
+                  cellClassName: 'sm:col-span-2',
+                },
+              ]
+            : []),
         ]
       : []),
   ]
@@ -802,7 +961,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 onValueChange={(value) => {
                   clearError('role')
                   setAssignedRoleKey(value)
-                  if (!companiesFor(value)) setCompanies([])
+                  if (!companiesFor(value)) changeCompanies([])
                 }}
                 options={assignedRoleOptions}
               />
@@ -864,10 +1023,49 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 value={companyOptions}
                 // Every option comes from the loaders of this screen, which
                 // always carry both names.
-                onChange={(next) => setCompanies(next as CompanyOption[])}
+                onChange={(next) => changeCompanies(next as CompanyOption[])}
                 loadOptions={loadCompanies}
                 loadAllOptions={loadAllCompanies}
                 placeholder={t('selectCompanies')}
+              />
+            )}
+          </Field>
+        )}
+        {companiesApply && companies.length > 0 && (
+          <Field
+            label={t('assignedProjects')}
+            hint={
+              projectsState === 'failed'
+                ? undefined
+                : projects.length
+                  ? t('assignedProjectsSomeHint')
+                  : t('assignedProjectsHelp')
+            }
+            error={
+              projectsState === 'failed' ? (
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  {t('assignedProjectsLoadError')}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setProjectsReloadKey((key) => key + 1)}
+                  >
+                    {t('retry')}
+                  </Button>
+                </span>
+              ) : undefined
+            }
+          >
+            {() => (
+              <AsyncMultiSelect
+                // Re-mounted when the companies change, so its options
+                // follow them.
+                key={companyIdsKey}
+                value={projectOptions}
+                onChange={(next) => setProjects(next as ProjectOption[])}
+                loadOptions={loadProjects}
+                placeholder={t('assignedProjectsAll')}
+                disabled={projectsState !== 'loaded'}
               />
             )}
           </Field>

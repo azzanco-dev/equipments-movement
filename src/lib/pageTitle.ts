@@ -82,11 +82,6 @@ const PAGE_TITLES: Readonly<
     section: 'settings',
   },
   'settings/banks': { kind: 'sub', name: 'banks', section: 'settings' },
-  'settings/foreman-assignments': {
-    kind: 'sub',
-    name: 'foremanAssignmentsTitle',
-    section: 'settings',
-  },
   'settings/roles': {
     kind: 'sub',
     name: 'rolesSettingsTitle',

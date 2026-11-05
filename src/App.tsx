@@ -778,8 +778,7 @@ function AppContent() {
               page === 'settings/equipment-types' ||
               page === 'settings/workshop-opening-balance' ||
               page === 'settings/afaqy' ||
-              page === 'settings/banks' ||
-              page === 'settings/foreman-assignments') && <AdminSettings />}
+              page === 'settings/banks') && <AdminSettings />}
           </>
         )}
       </Layout>

@@ -252,7 +252,6 @@ const NEW_ADMIN_SCREEN = {
   'settings/workshop-opening-balance': 'AdminSettings',
   'settings/afaqy': 'AdminSettings',
   'settings/banks': 'AdminSettings',
-  'settings/foreman-assignments': 'AdminSettings',
 }
 
 function after(state, url) {
@@ -341,7 +340,6 @@ const URLS = [
   '/settings/afaqy',
   '/settings/afaqy/x',
   '/settings/banks',
-  '/settings/foreman-assignments',
   '/settings/equipment-types',
   '/settings/workshop-opening-balance',
   '/settings/other',
@@ -838,8 +836,6 @@ test('the gates of the pages outside the sidebar', () => {
   assert.deepEqual(gate('settings/roles'), [{ key: 'settings.roles' }])
   // 0177: the banks list follows the suppliers' edit key.
   assert.deepEqual(gate('settings/banks'), [{ key: 'lessors.edit' }])
-  // 0176: the foremen's assignments follow users.manage.
-  assert.deepEqual(gate('settings/foreman-assignments'), [{ key: 'users.manage' }])
   assert.deepEqual(gate('settings/equipment-types'), [
     { key: 'settings.equipment_types' },
   ])
@@ -880,7 +876,6 @@ test('routePageOf reads the URL as the old router did', () => {
   assert.equal(page('/settings/afaqy'), 'settings/afaqy')
   assert.equal(page('/settings/afaqy/x'), 'settings')
   assert.equal(page('/settings/banks'), 'settings/banks')
-  assert.equal(page('/settings/foreman-assignments'), 'settings/foreman-assignments')
   assert.equal(page('/print/export'), 'print/export')
   assert.equal(page('/print'), 'dashboard')
   assert.equal(page('/ui-kit'), 'dashboard')
@@ -1027,7 +1022,7 @@ test('App.tsx renders each screen behind its page', () => {
     )
   assert.match(
     content,
-    /\(page === 'settings' \|\|\s*page === 'settings\/equipment-types' \|\|\s*page === 'settings\/workshop-opening-balance' \|\|\s*page === 'settings\/afaqy' \|\|\s*page === 'settings\/banks' \|\|\s*page === 'settings\/foreman-assignments'\) && <AdminSettings \/>/,
+    /\(page === 'settings' \|\|\s*page === 'settings\/equipment-types' \|\|\s*page === 'settings\/workshop-opening-balance' \|\|\s*page === 'settings\/afaqy' \|\|\s*page === 'settings\/banks'\) && <AdminSettings \/>/,
   )
   // The admin home's shortcuts follow the pages they open.
   assert.match(

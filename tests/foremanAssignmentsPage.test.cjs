@@ -5,11 +5,15 @@ const path = require('node:path')
 const vm = require('node:vm')
 const ts = require('typescript')
 
-// Settings › «اسنادات الفورمينات» (owner 2026-11-05, «ابدا في صفحة
-// الاسنادات») over migration 0176, and the movement form's project scope.
+// A foreman's projects (migration 0176) on the user page: owner 2026-11-05,
+// «مانحتاج صفحة الاسنادات، نقدر نسويها في صفحة المستخدم نفسه، يكون حقل ثاني
+// مشابه للشركات، والقائمة الي فيه هي المشاريع الي في الشركات المسنودة».
+// The Settings page built the same day is gone; the movement form follows
+// the projects.
 
 const ROOT = path.join(__dirname, '..')
 const read = (...parts) => fs.readFileSync(path.join(ROOT, ...parts), 'utf8')
+const has = (text, piece) => assert.ok(text.includes(piece), piece)
 
 const lib = (() => {
   const source = path.join(ROOT, 'src', 'lib', 'foremanAssignments.ts')
@@ -39,25 +43,16 @@ const ROWS = [
   {
     profile_id: 'f1',
     company_id: 'c2',
-    company_name_ar: 'ب شركة',
-    company_name_en: 'B Co',
-    project_ids: ['p1', 'p2'],
-    project_names_ar: ['مشروع 1', 'مشروع 2'],
-    project_names_en: ['P1', null],
+    company_name_ar: 'ب',
+    company_name_en: null,
+    project_ids: ['p2', 'p1'],
+    project_names_ar: ['مشروع 2', 'مشروع 1'],
+    project_names_en: [null, 'P1'],
   },
   {
     profile_id: 'f1',
     company_id: 'c1',
-    company_name_ar: 'ا شركة',
-    company_name_en: null,
-    project_ids: [],
-    project_names_ar: [],
-    project_names_en: [],
-  },
-  {
-    profile_id: 'f2',
-    company_id: 'c1',
-    company_name_ar: 'ا شركة',
+    company_name_ar: 'ا',
     company_name_en: null,
     project_ids: [],
     project_names_ar: [],
@@ -65,85 +60,73 @@ const ROWS = [
   },
 ]
 
-test('the view rows become one foreman’s companies with their projects', () => {
-  const groups = lib.groupAssignments(ROWS)
-  assert.equal(groups.get('f1').length, 2)
-  assert.equal(groups.get('f2').length, 1)
-  assert.deepEqual(plain(lib.assignmentsOf(groups.get('f1'), 'ar')), [
-    { company: { value: 'c1', label: 'ا شركة' }, projects: [] },
-    {
-      company: { value: 'c2', label: 'ب شركة' },
-      projects: [
-        { value: 'p1', label: 'مشروع 1' },
-        { value: 'p2', label: 'مشروع 2' },
-      ],
-    },
+test('the saved projects come from the view, by name, with their companies', () => {
+  const projects = lib.assignedProjectsOf(ROWS, 'ar')
+  assert.deepEqual(plain(projects.map((p) => [p.value, p.label, p.company_ids])), [
+    ['p1', 'مشروع 1', ['c2']],
+    ['p2', 'مشروع 2', ['c2']],
   ])
-  // English falls back to the Arabic name where there is no English one.
-  assert.equal(lib.assignmentsOf(groups.get('f1'), 'en')[1].projects[1].label, 'مشروع 2')
-})
-
-test('one save call carries every company and the narrowed projects once', () => {
-  const items = lib.assignmentsOf(lib.groupAssignments(ROWS).get('f1'), 'ar')
-  assert.deepEqual(plain(lib.assignmentPayload('f1', [...items, items[1]])), {
-    p_profile_id: 'f1',
-    p_company_ids: ['c1', 'c2'],
-    p_project_ids: ['p1', 'p2'],
-  })
-  // A kept company keeps its projects, a new one starts with all of them,
-  // a removed one leaves with its projects.
-  const next = lib.withCompanies(items, [items[1].company, { value: 'c3', label: 'ج' }])
-  assert.deepEqual(plain(next.map((item) => [item.company.value, item.projects.length])), [
-    ['c2', 2],
-    ['c3', 0],
-  ])
+  assert.equal(lib.assignedProjectsOf(ROWS, 'en')[0].label, 'P1')
+  // A company taken off the field takes its projects with it.
+  assert.deepEqual(plain(lib.projectsWithinCompanies(projects, ['c1'])), [])
+  assert.equal(lib.projectsWithinCompanies(projects, ['c1', 'c2']).length, 2)
 })
 
 test('the 0176 tokens become safe messages', () => {
   assert.equal(lib.assignmentSaveMessage({ message: 'users_manage_required' }), 'foremanAssignmentsNotAllowed')
-  assert.equal(lib.assignmentSaveMessage({ code: '23503', message: 'project_company_not_assigned' }), 'foremanAssignmentsProjectOutside')
+  assert.equal(lib.assignmentSaveMessage({ message: 'project_company_not_assigned' }), 'foremanAssignmentsProjectOutside')
   assert.equal(lib.assignmentSaveMessage({ message: 'invalid_project' }), 'foremanAssignmentsStale')
-  assert.equal(lib.assignmentSaveMessage({ message: 'boom' }), 'saveFailed')
+  assert.equal(lib.assignmentSaveMessage({ message: 'boom' }), 'userProjectsSaveFailed')
 })
 
 test('the movement form scope: whole companies and narrowed projects', () => {
-  assert.deepEqual(plain(lib.projectScopeOf(ROWS.slice(0, 2))), {
+  assert.deepEqual(plain(lib.projectScopeOf(ROWS)), {
     wholeCompanyIds: ['c1'],
-    projectIds: ['p1', 'p2'],
+    projectIds: ['p2', 'p1'],
   })
-  const hook = read('src', 'components', 'movement', 'useMovementFormOptions.ts')
-  assert.match(hook, /projectScopeOf\(/)
+  has(read('src', 'components', 'movement', 'useMovementFormOptions.ts'), 'projectScopeOf(rows)')
 })
 
-test('the page: Settings card and route on users.manage, one bounded read per page', () => {
-  const settings = read('src', 'screens', 'AdminSettings.tsx')
-  assert.match(settings, /\{opens\('settings\/foreman-assignments'\) && \(/)
-  assert.match(settings, /<ForemanAssignmentsSettings \/>/)
-  assert.match(read('src', 'lib', 'navPermissions.ts'), /'settings\/foreman-assignments': \[\{ key: 'users\.manage' \}\]/)
-  const page = read('src', 'components', 'foremanAssignments', 'ForemanAssignmentsSettings.tsx')
-  assert.match(page, /foremanRoleKeys\(supabase\)/)
-  assert.match(page, /\.from\('profile_names'\)\s+\.select\('id,full_name', \{ count: 'exact' \}\)\s+\.in\('role', roleKeys\)/)
-  assert.match(page, /\.range\(/)
-  assert.match(page, /\.from\('profile_assignments'\)\s+\.select\(PROFILE_ASSIGNMENTS_SELECT\)\s+\.in\(/)
-  assert.match(page, /<ErrorState description=\{loadError\} onRetry=\{fetchRows\} \/>/)
-  const dialog = read('src', 'components', 'foremanAssignments', 'ForemanAssignmentDialog.tsx')
-  assert.match(dialog, /supabase\.rpc\(\s+'admin_set_profile_assignments',\s+assignmentPayload\(foreman\.id, items\),?\s+\)/)
-  assert.match(dialog, /t\(assignmentSaveMessage\(saveError\)\)/)
-  // Every picker is server-side, 20 at most.
-  const loaders = read('src', 'lib', 'foremanAssignments.ts')
-  assert.equal(loaders.match(/\.limit\(20\)/g).length, 2)
-  assert.match(loaders, /\.eq\('company_projects\.company_id', companyId\)/)
+test('the user page: a projects field under the companies, saved in one call', () => {
+  const page = read('src', 'screens', 'UserDetail.tsx')
+  has(page, "label={t('assignedProjects')}")
+  has(page, '{companiesApply && companies.length > 0 && (')
+  // Its options are the projects of the chosen companies (server side, 20).
+  has(page, 'companiesProjectLoader(')
+  const loader = read('src', 'lib', 'foremanAssignments.ts')
+  has(loader, ".in('company_projects.company_id', Array.from(companyIds))")
+  has(loader, '.limit(20)')
+  // Read from the view, written by the 0176 function, apart from manage-user.
+  has(page, ".from('profile_assignments')")
+  has(page, "'admin_set_profile_assignments'")
+  has(page, 'setError(t(assignmentSaveMessage(projectsError)))')
+  // A projects-only change does not rewrite the record through manage-user.
+  has(page, '!mobileChanged && !assignStep && !projectsChanged')
+  // Removing a company drops its projects; the field follows the companies.
+  has(page, 'projectsWithinCompanies(')
+  has(page, 'key={companyIdsKey}')
+  // A failed read locks the field and offers a retry, never an empty list.
+  has(page, "disabled={projectsState !== 'loaded'}")
+  has(page, "t('assignedProjectsLoadError')")
+  has(page, "key: 'assignedProjects'")
 })
 
-test('the new copy, both languages, no hamza on the alif', () => {
+test('the Settings page is gone', () => {
+  assert.ok(!fs.existsSync(path.join(ROOT, 'src', 'components', 'foremanAssignments')))
+  for (const file of [
+    ['src', 'screens', 'AdminSettings.tsx'],
+    ['src', 'lib', 'navPermissions.ts'],
+    ['src', 'lib', 'pageTitle.ts'],
+    ['src', 'App.tsx'],
+  ])
+    assert.doesNotMatch(read(...file), /foreman-assignments/)
+})
+
+test('the copy, both languages, no hamza on the alif', () => {
   const tr = read('src', 'i18n', 'translations.ts')
-  assert.equal(tr.match(/\/\/ foreman assignments — start/g).length, 2)
-  const ar = /\/\/ foreman assignments — start[\s\S]*?\/\/ foreman assignments — end/.exec(tr)[0]
-  assert.doesNotMatch(ar, /[أإآ]/)
-})
-
-test('the page hosts its own toasts (the dialog calls useToast)', () => {
-  const page = read('src', 'components', 'foremanAssignments', 'ForemanAssignmentsSettings.tsx')
-  assert.match(page, /<ToastProvider>\s+<ForemanAssignmentsPage \/>\s+<\/ToastProvider>/)
-  assert.ok(read('src', 'components', 'foremanAssignments', 'ForemanAssignmentDialog.tsx').includes('useToast()'))
+  const blocks = tr.match(/\/\/ foreman assignments — start[\s\S]*?\/\/ foreman assignments — end/g)
+  assert.equal(blocks.length, 2)
+  assert.doesNotMatch(blocks[0], /[أإآ]/)
+  const keys = (block) => [...block.matchAll(/^\s*(\w+):/gm)].map((m) => m[1]).sort()
+  assert.deepEqual(keys(blocks[0]), keys(blocks[1]))
 })
