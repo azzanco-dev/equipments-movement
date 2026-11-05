@@ -743,6 +743,8 @@ export const translations = {
     supplierPoPrintVatNumber: 'الرقم الضريبي',
     supplierPoPrintCrNumber: 'السجل التجاري',
     // party-fields — end
+    // unsaved changes in a form (owner 2026-11-05, supplier form first)
+    unsavedFieldsCount: 'تعديلات غير محفوظة: {count}',
     // completeness ring (owner 2026-11-05, suppliers list)
     completeness: 'اكتمال البيانات',
     completenessSummary: 'البيانات مكتملة {percent}% ({filled} من {total} حقول)',
@@ -3356,6 +3358,8 @@ export const translations = {
     supplierPoPrintVatNumber: 'VAT No.',
     supplierPoPrintCrNumber: 'CR No.',
     // party-fields — end
+    // unsaved changes in a form (owner 2026-11-05, supplier form first)
+    unsavedFieldsCount: '{count} unsaved changes',
     // completeness ring (owner 2026-11-05, suppliers list)
     completeness: 'Completeness',
     completenessSummary: '{percent}% complete ({filled} of {total} fields)',

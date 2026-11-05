@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Dialog, ErrorState, Field, Input } from '@/components/ui'
+import {
+  Button,
+  Dialog,
+  ErrorState,
+  Field,
+  Input,
+  useConfirm,
+} from '@/components/ui'
 import {
   PartyFormSection,
   type PartyFieldSpec,
@@ -7,6 +14,7 @@ import {
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { bankOptionLoader } from '@/lib/banks'
+import { changedFields } from '@/lib/formChanges'
 import { useI18n } from '@/i18n/I18nContext'
 import { lessorsActions, refusedByPolicy } from '@/lib/actionPermissions'
 import { supabase } from '@/lib/supabase'
@@ -104,6 +112,9 @@ export function LessorFormDialog({
   const canSave = lessorsActions(usePermissions()).edit
   const notAllowed = t('lessorSaveNotAllowed')
   const [form, setForm] = useState<LessorFormValues>(EMPTY_LESSOR_FORM)
+  // The values the dialog opened with, to tell the user what is unsaved.
+  const [initial, setInitial] = useState<LessorFormValues>(EMPTY_LESSOR_FORM)
+  const { confirm, confirmDialog } = useConfirm()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [errors, setErrors] = useState<FieldErrors<LessorFormValues>>({})
@@ -112,7 +123,9 @@ export function LessorFormDialog({
 
   useEffect(() => {
     if (!open) return
-    setForm(lessor ? lessorFormValues(lessor) : EMPTY_LESSOR_FORM)
+    const start = lessor ? lessorFormValues(lessor) : EMPTY_LESSOR_FORM
+    setForm(start)
+    setInitial(start)
     setError(null)
     setErrors({})
   }, [open, lessor])
@@ -177,21 +190,59 @@ export function LessorFormDialog({
 
   const shownError = error ?? (canSave ? null : notAllowed)
 
+  // Owner 2026-11-05 («لما يضاف تعديل جديد في احد الحقول, عطني شي يعلمني …
+  // تنبيه عام, او في زر الحفظ»): the footer says how many fields are
+  // unsaved, the save button reads «حفظ التعديلات» and an unchanged record
+  // cannot be saved; closing with unsaved changes asks first.
+  const changed = changedFields(initial, form).length
+  const dirty = changed > 0
+
+  const requestClose = async () => {
+    if (
+      dirty &&
+      canSave &&
+      !(await confirm({
+        title: t('unsavedChanges'),
+        description: t('dialogDescUnsavedChanges'),
+        tone: 'danger',
+      }))
+    )
+      return
+    onOpenChange(false)
+  }
+
   return (
     <Dialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(next) => (next ? onOpenChange(true) : void requestClose())}
       title={lessor ? t('editLessor') : t('addLessor')}
       description={t('dialogDescLessorForm')}
       size="lg"
       footer={
         <>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          {canSave && dirty && (
+            <span
+              role="status"
+              className="me-auto flex items-center gap-2 self-center text-sm font-medium text-[var(--warning)]"
+            >
+              <span
+                aria-hidden="true"
+                className="h-2 w-2 shrink-0 rounded-full bg-[var(--warning)]"
+              />
+              {t('unsavedFieldsCount').replace('{count}', String(changed))}
+            </span>
+          )}
+          <Button variant="outline" onClick={() => void requestClose()}>
             {t('cancel')}
           </Button>
           {canSave && (
-            <Button variant="primary" loading={saving} onClick={save}>
-              {t('save')}
+            <Button
+              variant="primary"
+              loading={saving}
+              disabled={!!lessor && !dirty}
+              onClick={save}
+            >
+              {lessor ? t('saveChanges') : t('save')}
             </Button>
           )}
         </>
@@ -260,6 +311,7 @@ export function LessorFormDialog({
           }
         />
       </div>
+      {confirmDialog}
     </Dialog>
   )
 }
