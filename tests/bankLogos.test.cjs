@@ -58,7 +58,7 @@ test('the tile: white (dark for a white logo) in both themes, initials on the su
   assert.equal(css.match(/ {2}--logo-tile-dark: #1f2937;/g).length, 2)
 })
 
-test('reviewed on /ui-kit only: no screen uses the logos yet', () => {
+test('approved on /ui-kit, then used by the three bank screens', () => {
   const kit = read('src', 'screens', 'UiKit.tsx')
   assert.ok(kit.includes("id: 'bank-logos'"))
   assert.ok(kit.includes('element: <BankLogosMockup />'))
@@ -77,5 +77,14 @@ test('reviewed on /ui-kit only: no screen uses the logos yet', () => {
     'src/lib/bankLogos.ts',
     'src/screens/UiKit.tsx',
     'src/screens/ui-kit/BankLogosMockup.tsx',
-  ])
+  ].concat([
+    'src/components/banks/BanksSettings.tsx',
+    'src/screens/lessors/LessorDetailsDialog.tsx',
+    'src/screens/lessors/LessorFormDialog.tsx',
+  ]).sort())
+  // The picker passes the logo through the shared option's opt-in icon.
+  const select = read('src', 'components', 'AsyncSearchSelect.tsx')
+  assert.ok(select.includes('{option.icon && ('))
+  assert.ok(select.includes('{selectedOption?.icon && ('))
+  assert.ok(read('src', 'screens', 'lessors', 'LessorFormDialog.tsx').includes('icon: <BankLogo name={option.value} size="sm" />'))
 })

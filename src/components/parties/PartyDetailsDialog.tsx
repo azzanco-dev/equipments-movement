@@ -22,6 +22,8 @@ export interface PartyDetailsItem {
   href?: string
   /** Spans both columns (the full address). */
   wide?: boolean
+  /** A picture before the value (the bank's logo). */
+  icon?: ReactNode
 }
 
 export interface PartyDetailsSection {
@@ -178,7 +180,10 @@ function DetailsItem({ item }: { item: PartyDetailsItem }) {
                 {text}
               </a>
             ) : (
-              <span className="min-w-0 break-words">{text}</span>
+              <span className="flex min-w-0 items-center gap-2 break-words">
+                {item.icon}
+                {text}
+              </span>
             )}
             {item.copy && (
               <IconButton

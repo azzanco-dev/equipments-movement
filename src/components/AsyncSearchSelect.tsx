@@ -4,6 +4,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ReactNode,
 } from 'react'
 import { Check, ChevronDown, Loader2, Search, X } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
@@ -31,6 +32,12 @@ export interface AsyncSearchSelectOption extends SelectOption {
    * currently inside a site. Rendered with the shared `Badge`.
    */
   badge?: { label: string; tone: BadgeTone }
+  /**
+   * Optional picture before the label, in the list and in the closed field
+   * (popover mode): first the bank logos of the supplier form (owner
+   * 2026-11-05). Options without one render exactly as before.
+   */
+  icon?: ReactNode
 }
 
 /** Plain-text tooltip built from label/description, for truncated text. */
@@ -317,7 +324,10 @@ export function AsyncSearchSelect({
             onClick={() => select(option)}
             className={`flex w-full items-start justify-between gap-2 px-3.5 py-2 text-start text-sm hover:bg-surface-hover focus-visible:bg-surface-hover ${option.value === value ? 'font-semibold' : ''}`}
           >
-            <span className="flex min-w-0 flex-col gap-0.5">
+            {option.icon && (
+              <span className="shrink-0 self-center">{option.icon}</span>
+            )}
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="flex min-w-0 flex-wrap items-center gap-1.5">
                 <span className="min-w-0 whitespace-normal break-words">
                   {option.label}
@@ -496,6 +506,9 @@ export function AsyncSearchSelect({
               borderColor: invalid ? 'var(--danger)' : 'var(--border)',
             }}
           >
+            {selectedOption?.icon && (
+              <span className="shrink-0">{selectedOption.icon}</span>
+            )}
             <span
               className={cn(
                 'min-w-0 flex-1 truncate-safe text-start',

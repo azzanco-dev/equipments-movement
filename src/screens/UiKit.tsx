@@ -133,7 +133,7 @@ const SCREEN_SECTIONS: SectionDef[] = [
     title: 'شعارات البنوك',
     purpose:
       'شعار كل بنك في قائمة البنوك، وكيف يظهر في اختيار البنك بنموذج المورد، وجدول البنوك في الاعدادات، وتفاصيل المورد. البنك بدون ملف يظهر باول حرفين من اسمه.',
-    status: 'review',
+    status: 'approved',
     defaultOpen: true,
     element: <BankLogosMockup />,
   },

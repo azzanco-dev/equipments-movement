@@ -18,6 +18,7 @@ import {
 } from '@/components/parties/changedField'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { bankOptionLoader } from '@/lib/banks'
+import { BankLogo } from '@/components/banks/BankLogo'
 import { changedFields } from '@/lib/formChanges'
 import { useI18n } from '@/i18n/I18nContext'
 import { lessorsActions, refusedByPolicy } from '@/lib/actionPermissions'
@@ -124,7 +125,16 @@ export function LessorFormDialog({
   const [error, setError] = useState<string | null>(null)
   const [errors, setErrors] = useState<FieldErrors<LessorFormValues>>({})
   const bodyRef = useRef<HTMLDivElement>(null)
-  const loadBanks = useMemo(() => bankOptionLoader(supabase), [])
+  // Owner 2026-11-05 (approved on /ui-kit «شعارات البنوك»): every bank
+  // with its logo, in the list and in the closed field.
+  const loadBanks = useMemo(() => {
+    const load = bankOptionLoader(supabase)
+    return async (query: string) =>
+      (await load(query)).map((option) => ({
+        ...option,
+        icon: <BankLogo name={option.value} size="sm" />,
+      }))
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -331,7 +341,11 @@ export function LessorFormDialog({
                   value={form.bank_name}
                   selectedOption={
                     form.bank_name
-                      ? { value: form.bank_name, label: form.bank_name }
+                      ? {
+                          value: form.bank_name,
+                          label: form.bank_name,
+                          icon: <BankLogo name={form.bank_name} size="sm" />,
+                        }
                       : null
                   }
                   onChange={(value) => update({ bank_name: value })}

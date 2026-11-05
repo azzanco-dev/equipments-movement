@@ -17,6 +17,7 @@ import { Notice } from '@/components/ui/Notice'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { RelativeTime } from '@/components/RelativeTime'
+import { BankLogo } from '@/components/banks/BankLogo'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import { lessorsActions, refusedByPolicy } from '@/lib/actionPermissions'
@@ -200,7 +201,12 @@ export function BanksSettings() {
       key: 'name',
       header: t('bankNameLabel'),
       className: 'font-semibold',
-      cell: (row) => row.name,
+      cell: (row) => (
+        <span className="flex items-center gap-2">
+          <BankLogo name={row.name} size="sm" />
+          {row.name}
+        </span>
+      ),
     },
     {
       key: 'lessor_count',

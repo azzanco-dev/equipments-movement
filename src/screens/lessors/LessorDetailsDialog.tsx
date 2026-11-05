@@ -1,5 +1,6 @@
 import { Building2, FileText, Landmark, Phone } from 'lucide-react'
 import { PartyDetailsDialog } from '@/components/parties/PartyDetailsDialog'
+import { BankLogo } from '@/components/banks/BankLogo'
 import { useI18n } from '@/i18n/I18nContext'
 import {
   LESSOR_COMPLETENESS_FIELDS,
@@ -93,7 +94,13 @@ export function LessorDetailsDialog({
           title: 'partyBankSection',
           icon: <Landmark size={16} />,
           items: [
-            { label: t('bankName'), value: lessor?.bank_name },
+            {
+              label: t('bankName'),
+              value: lessor?.bank_name,
+              icon: lessor?.bank_name ? (
+                <BankLogo name={lessor.bank_name} size="md" />
+              ) : undefined,
+            },
             {
               label: t('iban'),
               value: lessor?.iban,

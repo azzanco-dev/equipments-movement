@@ -2,8 +2,9 @@
  * The Saudi banks' logos (owner 2026-11-05, «ابغاك تضيف شعارات البنوك، اول
  * سويها في ui-kit»; the files were downloaded with his OK from each bank's
  * own website into `public/banks/`; Banque Saudi Fransi's from bsf.sa and
- * Bank Aljazira's from aljazirabank.com.sa, their current sites). For review on /ui-kit only until he
- * approves: nothing outside the mockup reads this yet.
+ * Bank Aljazira's from aljazirabank.com.sa, their current sites). Approved on
+ * /ui-kit «شعارات البنوك» the same day («Yes, apply them»): the supplier
+ * form's bank picker, Settings › «البنوك» and the supplier details.
  *
  * Matched by the bank's name in the banks list (migration 0177), compared
  * without spaces; a bank without a file (any bank added in Settings) shows
