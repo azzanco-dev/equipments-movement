@@ -106,3 +106,16 @@ test('the new Arabic copy has no hamza on the alif', () => {
   assert.doesNotMatch(block, /[أإآ]/)
   assert.equal(tr.match(/\/\/ banks — start/g).length, 2)
 })
+
+test('0178: the banks list carries the normalised name_search the shared search reads', () => {
+  const fix = files.find((name) => /_0178_/.test(name))
+  assert.ok(fix, '0178 exists')
+  const sql = fs.readFileSync(path.join(MIGRATIONS, fix), 'utf8')
+  assert.match(
+    sql,
+    /ALTER TABLE public\.banks\s+ADD COLUMN IF NOT EXISTS name_search text\s+GENERATED ALWAYS AS \(public\.normalize_search_text\(name\)\) STORED/,
+  )
+  assert.match(sql, /banks_name_search_trgm_idx\s+ON public\.banks USING gin \(name_search extensions\.gin_trgm_ops\)/)
+  // The two screens search through NAME_SEARCH_FIELDS = ['name_search'].
+  assert.match(read('src', 'lib', 'banks.ts'), /buildSearchFilter\(NAME_SEARCH_FIELDS, query\)/)
+})
