@@ -29,8 +29,12 @@ export function CompanyDetailsDialog({
         company && (
           <>
             {company.name_ar}
-            <span className="block text-sm font-normal text-muted" dir="ltr">
-              {company.name_en}
+            {/* Owner 2026-11-05 «اسم الشركة العربي والانقليزي … مفروض يكون
+                تحت بعض»: the English name on its own line, aligned with the
+                Arabic one (the line keeps the page direction; only the name
+                reads left to right). */}
+            <span className="block text-sm font-normal text-muted">
+              <bdi dir="ltr">{company.name_en}</bdi>
             </span>
           </>
         )

@@ -95,3 +95,9 @@ test('the client form and details follow the supplier ones (owner «اعتمد �
   assert.match(form, /size="lg"/)
   assert.match(read('src', 'screens', 'companies', 'CompanyDetailsDialog.tsx'), /size="lg"/)
 })
+
+test('the client details heading: the English name under the Arabic one, same edge', () => {
+  const dialog = read('src', 'screens', 'companies', 'CompanyDetailsDialog.tsx')
+  assert.match(dialog, /<span className="block text-sm font-normal text-muted">\s+<bdi dir="ltr">\{company\.name_en\}<\/bdi>/)
+  assert.doesNotMatch(dialog, /text-muted" dir="ltr"/)
+})
