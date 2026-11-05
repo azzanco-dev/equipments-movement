@@ -58,6 +58,7 @@ import { HomeRedesignMockup } from '@/screens/ui-kit/HomeRedesignMockup'
 import { DenseDashboardMockup } from '@/screens/ui-kit/DenseDashboardMockup'
 import { SalesMockup } from '@/screens/ui-kit/SalesMockup'
 import { ActivityMockup } from '@/screens/ui-kit/ActivityMockup'
+import { BankLogosMockup } from '@/screens/ui-kit/BankLogosMockup'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -124,6 +125,18 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // Owner 2026-11-05: «ابغاك تضيف شعارات البنوك، اول سويها في ui-kit»; the
+    // logos come from the banks' own websites (public/banks/, downloaded
+    // with his OK).
+    id: 'bank-logos',
+    title: 'شعارات البنوك',
+    purpose:
+      'شعار كل بنك في قائمة البنوك، وكيف يظهر في اختيار البنك بنموذج المورد، وجدول البنوك في الاعدادات، وتفاصيل المورد. البنك بدون ملف يظهر باول حرفين من اسمه.',
+    status: 'review',
+    defaultOpen: true,
+    element: <BankLogosMockup />,
+  },
   {
     // Owner 2026-11-02: a unit was set to «مباعة» and nobody could tell who
     // did it → «خلنا نسوي سجل تعديلات المعدات، يكون ضمن النشاط، وصفحة النشاط
