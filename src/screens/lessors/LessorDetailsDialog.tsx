@@ -1,4 +1,4 @@
-import { FileText, Landmark, Phone, Truck } from 'lucide-react'
+import { Building2, FileText, Landmark, Phone } from 'lucide-react'
 import { PartyDetailsDialog } from '@/components/parties/PartyDetailsDialog'
 import { useI18n } from '@/i18n/I18nContext'
 import {
@@ -30,7 +30,7 @@ export function LessorDetailsDialog({
       onOpenChange={onOpenChange}
       title="lessorDetailsDialogTitle"
       size="lg"
-      icon={<Truck size={22} />}
+      icon={<Building2 size={22} />}
       heading={lessor?.name}
       completeness={
         lessor

@@ -39,7 +39,8 @@ export interface PartyDetailsDialogProps {
   /** A muted line under the name (the client's English name, the
    *  supplier's contact person). */
   subheading?: ReactNode
-  /** The avatar's icon (a truck for a supplier, a building for a client). */
+  /** The avatar's icon: the sidebar's (Building2 for a supplier,
+   *  Briefcase for a client). */
   icon: ReactNode
   /** The list's completeness ring, repeated in the header. */
   completeness?: Completeness

@@ -1,4 +1,4 @@
-import { Building2, FileText, Phone } from 'lucide-react'
+import { Briefcase, FileText, Phone } from 'lucide-react'
 import { PartyDetailsDialog } from '@/components/parties/PartyDetailsDialog'
 import { useI18n } from '@/i18n/I18nContext'
 import {
@@ -30,7 +30,7 @@ export function CompanyDetailsDialog({
       onOpenChange={onOpenChange}
       title="companyDetailsDialogTitle"
       size="lg"
-      icon={<Building2 size={22} />}
+      icon={<Briefcase size={22} />}
       heading={company?.name_ar}
       // Owner 2026-11-05 «اسم الشركة العربي والانقليزي … مفروض يكون تحت
       // بعض»: the English name on the line under the Arabic one, same edge

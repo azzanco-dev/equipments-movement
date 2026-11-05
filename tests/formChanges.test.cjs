@@ -124,6 +124,14 @@ test('the redesigned details dialogs (owner «حسن الdialog حق التفا�
   // «… مفروض يكون تحت بعض»): a line of its own, only the name LTR.
   const company = read('src', 'screens', 'companies', 'CompanyDetailsDialog.tsx')
   has(company, '<bdi dir="ltr">{company.name_en}</bdi>')
+  // The sidebar's icons (owner «ايقونة الشركات في السايدبار خليها هي في
+  // التفاصيل … ونفس الشي للموردين»): Briefcase for clients, Building2 for
+  // suppliers, as NAV_ICONS in src/App.tsx.
+  const app = read('src', 'App.tsx')
+  has(app, "companies: { label: 'companies', icon: <Briefcase size={18} /> }")
+  has(app, "lessors: { label: 'lessors', icon: <Building2 size={18} /> }")
+  has(company, 'icon={<Briefcase size={22} />}')
+  has(read('src', 'screens', 'lessors', 'LessorDetailsDialog.tsx'), 'icon={<Building2 size={22} />}')
   const tr = read('src', 'i18n', 'translations.ts')
   assert.equal(tr.match(/detailsNotRecorded:/g).length, 2)
 })
