@@ -31,10 +31,10 @@ export const LESSOR_COMPLETENESS_FIELDS: readonly CompletenessField[] = [
   { field: 'iban', label: 'iban' },
 ]
 
-/** Red under half, yellow from half to just under complete, green when
- *  every field is filled. */
+/** Red under half, yellow from half, green from 90 % (owner 2026-11-05,
+ *  «خلي الاخضر عند 90»). */
 export const COMPLETENESS_WARNING_FROM = 50
-export const COMPLETENESS_SUCCESS_AT = 100
+export const COMPLETENESS_SUCCESS_AT = 90
 
 export interface Completeness {
   filled: number
@@ -65,7 +65,7 @@ export function partyCompleteness(
     .map(({ label }) => label)
   const total = fields.length
   const filled = total - missing.length
-  // Floor, so a ring never reads 100 while a field is still empty.
+  // Floored, so 100 means nothing is missing.
   const percent = total ? Math.floor((filled / total) * 100) : 0
   return { filled, total, percent, tone: completenessTone(percent), missing }
 }

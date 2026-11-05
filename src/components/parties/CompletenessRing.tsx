@@ -2,14 +2,16 @@ import { Tooltip } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import type { Completeness, CompletenessTone } from '@/lib/partyCompleteness'
 
+// Light shades (owner 2026-11-05, «خلي الالوان فاتحة»): --warning read as
+// red next to --danger, so the ring has its own soft tokens in index.css.
 const TONE_COLOR: Record<CompletenessTone, string> = {
-  danger: 'var(--danger)',
-  warning: 'var(--warning)',
-  success: 'var(--success)',
+  danger: 'var(--progress-low)',
+  warning: 'var(--progress-mid)',
+  success: 'var(--progress-high)',
 }
 
 const SIZE = 32
-const STROKE = 3
+const STROKE = 4
 const RADIUS = (SIZE - STROKE) / 2
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
@@ -75,8 +77,7 @@ export function CompletenessRing({ value }: { value: Completeness }) {
         </svg>
         <span
           aria-hidden="true"
-          className="absolute text-[10px] font-semibold tabular-nums"
-          style={{ color }}
+          className="absolute text-[10px] font-semibold tabular-nums text-[var(--fg)]"
         >
           {value.percent}
         </span>

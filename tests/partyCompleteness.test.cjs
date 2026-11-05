@@ -44,12 +44,14 @@ test('the share, its colour and the missing fields', () => {
   const full = Object.fromEntries(F.map((f) => [f.field, 'x']))
   assert.equal(partyCompleteness(full, F).tone, 'success')
   assert.equal(partyCompleteness(full, F).percent, 100)
-  // 10 of 11 is 90%, still yellow: green only when nothing is missing.
+  // Owner 2026-11-05: green from 90 % («خلي الاخضر عند 90»); 72 is yellow.
   const almost = { ...full, iban: null }
   assert.equal(partyCompleteness(almost, F).percent, 90)
-  assert.equal(partyCompleteness(almost, F).tone, 'warning')
+  assert.equal(partyCompleteness(almost, F).tone, 'success')
   assert.equal(lib.completenessTone(49), 'danger')
   assert.equal(lib.completenessTone(50), 'warning')
+  assert.equal(lib.completenessTone(72), 'warning')
+  assert.equal(lib.completenessTone(89), 'warning')
 })
 
 test('the ring is the last column of the suppliers table, in token colours', () => {
@@ -57,9 +59,14 @@ test('the ring is the last column of the suppliers table, in token colours', () 
   const last = table.lastIndexOf("key: '")
   assert.equal(table.slice(last, last + 19), "key: 'completeness'")
   const ring = read('src', 'components', 'parties', 'CompletenessRing.tsx')
-  assert.match(ring, /danger: 'var\(--danger\)'/)
-  assert.match(ring, /warning: 'var\(--warning\)'/)
-  assert.match(ring, /success: 'var\(--success\)'/)
+  // Light shades with a dark number (owner «خلي الالوان فاتحة»).
+  assert.match(ring, /danger: 'var\(--progress-low\)'/)
+  assert.match(ring, /warning: 'var\(--progress-mid\)'/)
+  assert.match(ring, /success: 'var\(--progress-high\)'/)
+  assert.match(ring, /text-\[var\(--fg\)\]/)
+  const css = read('src', 'index.css')
+  for (const token of ['--progress-low', '--progress-mid', '--progress-high'])
+    assert.equal(css.match(new RegExp(`  ${token}: #`, 'g')).length, 2, token)
   assert.doesNotMatch(ring, /#[0-9a-f]{3,6}\b/i)
   assert.match(ring, /aria-label=\{summary\}/)
   const tr = read('src', 'i18n', 'translations.ts')

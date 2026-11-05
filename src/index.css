@@ -244,6 +244,11 @@ body {
   --success-soft: #ecfdf3;
   --warning: #b45309;
   --warning-soft: #fff7ed;
+  /* The data-completeness ring (owner 2026-11-05, «خلي الالوان فاتحة»):
+     light red / yellow / green strokes; the number stays --fg. */
+  --progress-low: #f4b4b4;
+  --progress-mid: #f5d76e;
+  --progress-high: #9ed9b2;
   /* Darkened from #dc2626 (4.4:1 on danger-soft) to pass WCAG AA (5.2:1). */
   --danger: #c81e1e;
   --danger-soft: #fef2f2;
@@ -297,6 +302,9 @@ body {
   --success-soft: #13271b;
   --warning: #fbbf24;
   --warning-soft: #2b2112;
+  --progress-low: #a65a5a;
+  --progress-mid: #a8914a;
+  --progress-high: #4e8f66;
   --danger: #f87171;
   --danger-soft: #2a1414;
   --info: #7dd3fc;
