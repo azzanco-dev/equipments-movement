@@ -238,6 +238,7 @@ export function LessorFormDialog({
                 <AsyncSearchSelect
                   {...control}
                   size="md"
+                  menuSide="top"
                   value={form.bank_name}
                   selectedOption={
                     form.bank_name

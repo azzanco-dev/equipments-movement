@@ -69,6 +69,8 @@ test('the supplier form picks the bank from the list; the dialog is wide', () =>
   assert.match(form, /<AsyncSearchSelect[\s\S]*?value=\{form\.bank_name\}/)
   assert.doesNotMatch(form, /field: 'bank_name'/)
   assert.match(form, /size="lg"/)
+  // Owner 2026-11-05 «خلي قائمة البنوك تظهر على فوق»: the menu opens upward.
+  assert.match(form, /menuSide="top"/)
   const rules = read('src', 'lib', 'lessorForm.ts')
   assert.match(rules, /on: 'foreignKey',\s+match: 'lessors_bank_name_fkey',\s+field: 'bank_name',\s+key: 'bankNotInList'/)
   const loader = read('src', 'lib', 'banks.ts')

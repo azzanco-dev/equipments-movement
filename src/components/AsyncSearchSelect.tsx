@@ -78,6 +78,13 @@ interface AsyncSearchSelectProps {
    * entry form: «انسخ الارتفاع حق حقل الملاك».
    */
   size?: 'legacy' | 'md'
+  /**
+   * The side the menu opens on (the popover; phone mode keeps its own rule).
+   * `bottom` by default; `top` for a field low in a dialog — first the bank
+   * of the supplier form (owner 2026-11-05). Radix still flips it when there
+   * is no room.
+   */
+  menuSide?: 'top' | 'bottom'
 }
 
 const FIELD_HEIGHT: Record<'legacy' | 'md', string> = {
@@ -122,6 +129,7 @@ export function AsyncSearchSelect({
   invalid,
   phoneInline = false,
   size = 'legacy',
+  menuSide = 'bottom',
   ...aria
 }: AsyncSearchSelectProps) {
   const { t } = useI18n()
@@ -526,7 +534,7 @@ export function AsyncSearchSelect({
 
       <PopoverContent
         data-select-portal="true"
-        side="bottom"
+        side={menuSide}
         align="start"
         sideOffset={4}
         avoidCollisions
