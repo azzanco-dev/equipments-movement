@@ -36,7 +36,6 @@ export function LessorDetailsDialog({
               value: lessor?.commercial_register,
               dir: 'ltr',
             },
-            { label: t('city'), value: lessor?.city },
             { label: t('address'), value: lessor?.address },
             {
               label: t('shortAddress'),

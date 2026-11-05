@@ -45,7 +45,6 @@ export function CompanyDetailsDialog({
               value: company?.commercial_register,
               dir: 'ltr',
             },
-            { label: t('city'), value: company?.city },
             { label: t('address'), value: company?.address },
             {
               label: t('shortAddress'),

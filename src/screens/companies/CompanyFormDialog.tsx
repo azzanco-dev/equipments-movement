@@ -44,7 +44,8 @@ const OFFICIAL_FIELDS: readonly PartyFieldSpec<CompanyFormValues>[] = [
     ltr: true,
     inputMode: 'numeric',
   },
-  { field: 'city', label: 'city', placeholder: 'cityPlaceholder' },
+  // Owner 2026-11-05 «شيل المدينة, العنوان خليه العنوان الكامل»: no city
+  // field (the column and its stored value stay, saved back unchanged).
   // 0179: the short national address, split «RRRD | 2929».
   {
     field: 'short_address',

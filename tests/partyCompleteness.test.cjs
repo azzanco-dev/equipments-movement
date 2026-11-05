@@ -23,7 +23,9 @@ const lib = (() => {
 
 test('every field of the supplier form counts, the name included', () => {
   const fields = lib.LESSOR_COMPLETENESS_FIELDS.map((f) => f.field)
-  assert.equal(fields.length, 11)
+  // Owner 2026-11-05 took the city out of the form («شيل المدينة»).
+  assert.equal(fields.length, 10)
+  assert.ok(!fields.includes('city'))
   for (const field of ['name', 'tax_number', 'short_address', 'bank_name', 'iban'])
     assert.ok(fields.includes(field), field)
   // Every counted field is selected by the list (the ring reads the row).
@@ -37,9 +39,9 @@ test('the share, its colour and the missing fields', () => {
   const { partyCompleteness, LESSOR_COMPLETENESS_FIELDS: F } = lib
   const only = partyCompleteness({ name: 'مؤسسة', email: '  ' }, F)
   assert.equal(only.filled, 1)
-  assert.equal(only.percent, 9)
+  assert.equal(only.percent, 10)
   assert.equal(only.tone, 'danger')
-  assert.equal(only.missing.length, 10)
+  assert.equal(only.missing.length, 9)
   assert.equal(only.missing[0], 'taxNumber')
   const full = Object.fromEntries(F.map((f) => [f.field, 'x']))
   assert.equal(partyCompleteness(full, F).tone, 'success')

@@ -211,7 +211,7 @@ test('the import headers: Arabic, English, raw keys and the form labels', () => 
     tax_number: 'الرقم الضريبي',
     commercial_register: 'CR Number',
     address: 'العنوان',
-    city: 'city',
+    // No city column since the owner took the city out (2026-11-05).
     email: 'البريد',
     bank_name: 'اسم البنك',
     iban: 'IBAN',

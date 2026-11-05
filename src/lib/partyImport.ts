@@ -37,7 +37,6 @@ export const COMPANY_IMPORT_PARTY_FIELDS = [
   'commercial_register',
   'address',
   'short_address',
-  'city',
   'email',
 ] as const satisfies readonly PartyImportField[]
 
@@ -50,7 +49,6 @@ export const LESSOR_IMPORT_PARTY_FIELDS = [
   'commercial_register',
   'address',
   'short_address',
-  'city',
   'email',
   'bank_name',
   'iban',

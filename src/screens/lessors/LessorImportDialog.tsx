@@ -35,7 +35,7 @@ export interface LessorImportDialogProps {
 
 /**
  * The supplier Excel import (EM-260, 0175): the name is required; the
- * contact details, the tax number, the CR, the address, the city, the
+ * contact details, the tax number, the CR, the address, the short address, the
  * email, the bank and the IBAN are optional columns, matched by their
  * Arabic or English header. A bad shape, a name already stored or repeated,
  * and a tax number or CR already stored or repeated are marked per row and

@@ -21,7 +21,6 @@ export const LESSOR_COMPLETENESS_FIELDS: readonly CompletenessField[] = [
   { field: 'name', label: 'lessorName' },
   { field: 'tax_number', label: 'taxNumber' },
   { field: 'commercial_register', label: 'commercialRegister' },
-  { field: 'city', label: 'city' },
   { field: 'short_address', label: 'shortAddress' },
   { field: 'address', label: 'address' },
   { field: 'contact_person', label: 'contactPerson' },

@@ -67,7 +67,6 @@ export const LESSOR_FIELD_ORDER = [
   'commercial_register',
   'address',
   'short_address',
-  'city',
   'contact_person',
   'contact_number',
   'email',
