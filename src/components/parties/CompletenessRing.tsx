@@ -10,7 +10,8 @@ const TONE_COLOR: Record<CompletenessTone, string> = {
   success: 'var(--progress-high)',
 }
 
-const SIZE = 32
+// 38 px so «100%» fits inside the ring.
+const SIZE = 38
 const STROKE = 4
 const RADIUS = (SIZE - STROKE) / 2
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
@@ -77,9 +78,12 @@ export function CompletenessRing({ value }: { value: Completeness }) {
         </svg>
         <span
           aria-hidden="true"
-          className="absolute text-[10px] font-semibold tabular-nums text-[var(--fg)]"
+          dir="ltr"
+          className="absolute text-[10px] font-semibold leading-none tabular-nums text-[var(--fg)]"
         >
           {value.percent}
+          {/* Owner 2026-11-05: «اضف نسبة داخل الدايرة» — the % sign. */}
+          <span className="text-[8px]">%</span>
         </span>
       </span>
     </Tooltip>

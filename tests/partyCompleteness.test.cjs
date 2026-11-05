@@ -99,3 +99,9 @@ test('the companies list ends with the same ring over the client form', () => {
   assert.equal(table.slice(last, last + 19), "key: 'completeness'")
   assert.match(table, /partyCompleteness\(row, COMPANY_COMPLETENESS_FIELDS\)/)
 })
+
+test('the ring shows the percent sign (owner «اضف نسبة داخل الدايرة»)', () => {
+  const ring = read('src', 'components', 'parties', 'CompletenessRing.tsx')
+  assert.match(ring, /\{value\.percent\}\s+\{\/\*[^*]*\*\/\}\s+<span className="text-\[8px\]">%<\/span>/)
+  assert.match(ring, /const SIZE = 38/)
+})
