@@ -82,7 +82,7 @@ const ARABIC_SNAPSHOT = {
   },
   companies: {
     // EM-260 (0175): the tax number and the CR are searched too.
-    search: 'البحث باسم الشركة او الرقم الضريبي او السجل التجاري',
+    search: 'البحث باسم الشركة او الرقم الضريبي او الرقم الوطني الموحد',
     // The name text filters were removed in the 2026-09-29 owner review: the
     // search box already matches both names.
     filters: [],
@@ -91,7 +91,7 @@ const ARABIC_SNAPSHOT = {
   // copy uses the plain alif.
   lessors: {
     search:
-      'البحث بالاسم او جهة الاتصال او الجوال او الرقم الضريبي او السجل التجاري',
+      'البحث بالاسم او جهة الاتصال او الجوال او الرقم الضريبي او الرقم الوطني الموحد',
     filters: [],
   },
   logs: {

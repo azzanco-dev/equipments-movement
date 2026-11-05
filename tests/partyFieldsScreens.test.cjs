@@ -324,8 +324,8 @@ test('the new copy exists in both languages without hamza or madda on alif', () 
   for (const key of ['bankName', 'partyBankSection', 'bankNameTooLong', 'iban', 'taxNumber'])
     assert.ok(keys(blocks[0]).includes(key), key)
   for (const placeholder of [
-    'البحث باسم الشركة او الرقم الضريبي او السجل التجاري',
-    'البحث بالاسم او جهة الاتصال او الجوال او الرقم الضريبي او السجل التجاري',
+    'البحث باسم الشركة او الرقم الضريبي او الرقم الوطني الموحد',
+    'البحث بالاسم او جهة الاتصال او الجوال او الرقم الضريبي او الرقم الوطني الموحد',
   ])
     assert.ok(read('src', 'lib', 'listConfigs.ts').includes(placeholder))
 })

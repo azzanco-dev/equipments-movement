@@ -291,7 +291,7 @@ const CONCEPTS = {
   employeeNumber: { ar: 'الرقم الوظيفي', en: 'employee number' },
   // EM-260 (0175): the suppliers' and clients' official numbers.
   taxNumber: { ar: 'الرقم الضريبي', en: 'tax number' },
-  commercialRegister: { ar: 'السجل التجاري', en: 'cr number' },
+  commercialRegister: { ar: 'الرقم الوطني الموحد', en: 'unified national number' },
 }
 const COLUMN_CONCEPT = {
   code: 'code',

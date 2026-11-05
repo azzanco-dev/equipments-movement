@@ -289,8 +289,8 @@ export const companiesListConfig: DataListConfig = {
   // EM-260 (migration 0175): the tax number and the CR are searched too; the
   // tables stay narrow (owner), so neither is a column.
   searchPlaceholder: {
-    ar: 'البحث باسم الشركة او الرقم الضريبي او السجل التجاري',
-    en: 'Search by company name, tax number or CR number',
+    ar: 'البحث باسم الشركة او الرقم الضريبي او الرقم الوطني الموحد',
+    en: 'Search by company name, tax number or unified national number',
   },
   searchFields: [...COMPANY_SEARCH_FIELDS],
   defaultSort: 'updated_at',
@@ -320,8 +320,8 @@ export const lessorsListConfig: DataListConfig = {
   // EM-260 (migration 0175): the tax number and the CR are searched too, as
   // on the companies list; no new column.
   searchPlaceholder: {
-    ar: 'البحث بالاسم او جهة الاتصال او الجوال او الرقم الضريبي او السجل التجاري',
-    en: 'Search by name, contact person, mobile, tax number or CR number',
+    ar: 'البحث بالاسم او جهة الاتصال او الجوال او الرقم الضريبي او الرقم الوطني الموحد',
+    en: 'Search by name, contact person, mobile, tax number or unified national number',
   },
   searchFields: [...LESSOR_SEARCH_FIELDS],
   defaultSort: 'updated_at',

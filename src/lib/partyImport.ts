@@ -85,7 +85,7 @@ export const PARTY_TEMPLATE_SAMPLES: Record<PartyImportField, string> = {
   contact_person: 'محمد احمد',
   contact_number: '0500000000',
   tax_number: '300000000000003',
-  commercial_register: '1010123456',
+  commercial_register: '7001234567',
   address: 'حي العليا، طريق الملك فهد',
   short_address: 'RRRD2929',
   city: 'الرياض',

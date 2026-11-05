@@ -209,6 +209,11 @@ export const PARTY_IMPORT_HEADERS = {
   tax_number: ['tax_number', 'الرقم الضريبي', 'tax number', 'vat number'],
   commercial_register: [
     'commercial_register',
+    // Owner 2026-11-05: «الرقم الوطني الموحد» (the old CR headers still match).
+    'الرقم الوطني الموحد',
+    'الرقم الموحد',
+    'unified national number',
+    'unified number',
     'السجل التجاري',
     'commercial register',
     'cr number',
