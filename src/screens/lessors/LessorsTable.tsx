@@ -3,7 +3,12 @@ import { Edit2, Eye, Trash2, Truck } from 'lucide-react'
 import { DataTable, EmptyState, ErrorState, IconButton } from '@/components/ui'
 import type { DataTableColumn } from '@/components/ui'
 import { RelativeTime } from '@/components/RelativeTime'
+import { CompletenessRing } from '@/components/parties/CompletenessRing'
 import { useI18n } from '@/i18n/I18nContext'
+import {
+  LESSOR_COMPLETENESS_FIELDS,
+  partyCompleteness,
+} from '@/lib/partyCompleteness'
 import type { Lessor } from '@/lib/types'
 
 /** Same pattern as `screens/equipment/EquipmentTable.tsx` (see the comment
@@ -125,6 +130,17 @@ export function LessorsTable({
       className: 'text-muted',
       hideBelow: 'md',
       cell: (row) => <RelativeTime value={row.updated_at} />,
+    },
+    // Owner 2026-11-05: the data completeness at the END of each row
+    // («نهاية كل صف»), suppliers first; computed from the row, not sortable.
+    {
+      key: 'completeness',
+      header: t('completeness'),
+      cell: (row) => (
+        <CompletenessRing
+          value={partyCompleteness(row, LESSOR_COMPLETENESS_FIELDS)}
+        />
+      ),
     },
   ]
 
