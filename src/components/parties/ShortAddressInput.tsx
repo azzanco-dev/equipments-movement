@@ -31,8 +31,8 @@ export interface ShortAddressInputProps {
 
 /** The example shown in the empty boxes, one character each (owner
  *  2026-11-05, «اضف placeholder للعنوان الوطني المختصر», then «خليها
- *  AAAA 1111»). */
-export const SHORT_ADDRESS_EXAMPLE = 'AAAA1111'
+ *  AAAA 1111», then «ABCD 1234»). */
+export const SHORT_ADDRESS_EXAMPLE = 'ABCD1234'
 
 /** The stored code as the eight boxes' characters. */
 function cellsOf(value: string): string[] {
