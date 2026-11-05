@@ -107,6 +107,8 @@ test('the redesigned details dialogs (owner «حسن الdialog حق التفا�
   has(shared, '<dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">')
   // Empty: «غير مسجل»; copy to the clipboard; links for the phone and mail.
   has(shared, "t('detailsNotRecorded')")
+  // Owner «غير مسجل خليها لون افتح»: the lighter placeholder token.
+  has(shared, 'className="text-xs font-normal text-placeholder"')
   has(shared, 'navigator.clipboard.writeText(value)')
   assert.doesNotMatch(shared, /#[0-9a-f]{3,6}\b/i)
   for (const [file, fields] of [

@@ -196,7 +196,7 @@ function DetailsItem({ item }: { item: PartyDetailsItem }) {
             )}
           </>
         ) : (
-          <span className="font-normal text-muted">
+          <span className="text-xs font-normal text-placeholder">
             {t('detailsNotRecorded')}
           </span>
         )}
