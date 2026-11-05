@@ -246,3 +246,40 @@ export function formatShortAddress(value: string): string {
   const { letters, digits } = splitShortAddress(value)
   return [letters, digits].filter(Boolean).join(' ')
 }
+
+/** The short address cells of the split field: 4 letters, then 4 digits. */
+export const SHORT_ADDRESS_CELLS = SHORT_ADDRESS_LETTERS + SHORT_ADDRESS_DIGITS
+
+/** One cell's character as stored («r» → «R», «٢» → «2»), or '' when the
+ *  character does not belong in that cell (a digit in a letter cell). */
+export function shortAddressCellChar(index: number, raw: string): string {
+  const char = normalizeShortAddress(raw).slice(-1)
+  const ok =
+    index < SHORT_ADDRESS_LETTERS ? /^[A-Z]$/.test(char) : /^\d$/.test(char)
+  return ok ? char : ''
+}
+
+/**
+ * Types `text` into the cells from `start` (a pasted or auto-filled code):
+ * each character goes to the next cell that accepts it, the others are
+ * skipped. Returns the new cells and the index of the cell to focus next.
+ * A whole code pasted anywhere («rrrd-2929») fills all eight from the first.
+ */
+export function fillShortAddressCells(
+  cells: readonly string[],
+  start: number,
+  text: string,
+): { cells: string[]; next: number } {
+  const clean = normalizeShortAddress(text)
+  const from = SHORT_ADDRESS_PATTERN.test(clean) ? 0 : start
+  const next = [...cells]
+  let at = from
+  for (const char of clean) {
+    if (at >= SHORT_ADDRESS_CELLS) break
+    const accepted = shortAddressCellChar(at, char)
+    if (!accepted) continue
+    next[at] = accepted
+    at += 1
+  }
+  return { cells: next, next: Math.min(at, SHORT_ADDRESS_CELLS - 1) }
+}

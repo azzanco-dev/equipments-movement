@@ -26,7 +26,7 @@ const partyFields = (() => {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
   }).outputText
   const exports = {}
-  vm.runInNewContext(code, { exports, require: () => ({}) })
+  vm.runInNewContext(code, { exports, Math, require: () => ({}) })
   return exports
 })()
 
@@ -70,6 +70,29 @@ test('the helpers mirror the trigger and split the two parts', () => {
   assert.equal(formatShortAddress('RRRD2929'), 'RRRD 2929')
 })
 
+test('the eight one-character boxes (owner: the one-time-code look)', () => {
+  const { shortAddressCellChar: cell, fillShortAddressCells: fill, SHORT_ADDRESS_CELLS } =
+    partyFields
+  assert.equal(SHORT_ADDRESS_CELLS, 8)
+  assert.equal(cell(0, 'r'), 'R')
+  assert.equal(cell(0, '5'), '')
+  assert.equal(cell(4, 'x'), '')
+  assert.equal(cell(7, '٩'), '9')
+  const empty = Array(8).fill('')
+  // A whole code pasted into any box fills all eight from the first.
+  const whole = fill(empty, 5, 'rrrd-2929')
+  assert.equal(whole.cells.join(''), 'RRRD2929')
+  assert.equal(whole.next, 7)
+  // A partial text fills from the box it lands in, skipping what does not fit.
+  const part = fill(empty, 2, 'rd29')
+  assert.deepEqual([...part.cells], ['', '', 'R', 'D', '2', '9', '', ''])
+  assert.equal(part.next, 6)
+  const input = read('src', 'components', 'parties', 'ShortAddressInput.tsx')
+  assert.ok(input.includes('cells.map((char, index) =>'))
+  assert.ok(input.includes("event.key === 'Backspace' && !cells[index]"))
+  assert.ok(input.includes('onPaste={(event) => onPaste(index, event)}'))
+})
+
 test('the forms use the split control; lists, details, import and messages carry the field', () => {
   for (const form of ['screens/lessors/LessorFormDialog.tsx', 'screens/companies/CompanyFormDialog.tsx'])
     assert.match(
@@ -80,7 +103,7 @@ test('the forms use the split control; lists, details, import and messages carry
   assert.match(section, /spec\.control === 'shortAddress' \? \(\s+<ShortAddressInput/)
   const input = read('src', 'components', 'parties', 'ShortAddressInput.tsx')
   assert.match(input, /dir="ltr"/)
-  assert.match(input, /inputMode="numeric"/)
+  assert.ok(input.includes("inputMode={letter ? 'text' : 'numeric'}"))
   assert.match(input, /text-base/) // 16 px on phones: no iOS zoom
   for (const list of ['screens/lessors/LessorsListScreen.tsx', 'screens/companies/CompaniesListScreen.tsx'])
     assert.match(read('src', ...list.split('/')), /address,short_address,city/)

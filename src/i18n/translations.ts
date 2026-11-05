@@ -749,8 +749,8 @@ export const translations = {
     completenessMissing: 'ناقص:',
     // short address (migration 0179)
     shortAddress: 'العنوان الوطني المختصر',
-    shortAddressLetters: 'حروف العنوان المختصر',
-    shortAddressDigits: 'ارقام العنوان المختصر',
+    shortAddressLetterBox: 'الحرف {n} من العنوان المختصر',
+    shortAddressDigitBox: 'الرقم {n} من العنوان المختصر',
     shortAddressFormatInvalid: 'العنوان المختصر 4 حروف انجليزية ثم 4 ارقام، مثال: RRRD2929',
     // banks — start (migration 0177: the banks list, Settings › «البنوك»)
     banks: 'البنوك',
@@ -3362,8 +3362,8 @@ export const translations = {
     completenessMissing: 'Missing:',
     // short address (migration 0179)
     shortAddress: 'Short national address',
-    shortAddressLetters: 'Short address letters',
-    shortAddressDigits: 'Short address digits',
+    shortAddressLetterBox: 'Short address letter {n}',
+    shortAddressDigitBox: 'Short address digit {n}',
     shortAddressFormatInvalid: 'The short address is 4 English letters then 4 digits, e.g. RRRD2929.',
     // banks — start (migration 0177: the banks list, Settings › «البنوك»)
     banks: 'Banks',

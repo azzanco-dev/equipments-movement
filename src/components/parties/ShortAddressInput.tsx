@@ -1,31 +1,51 @@
-import { useEffect, useRef, useState, type ClipboardEvent } from 'react'
-import { useI18n } from '@/i18n/I18nContext'
-import { cn } from '@/components/ui'
 import {
-  SHORT_ADDRESS_DIGITS,
+  Fragment,
+  useEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type KeyboardEvent,
+} from 'react'
+import { useI18n } from '@/i18n/I18nContext'
+import {
+  SHORT_ADDRESS_CELLS,
   SHORT_ADDRESS_LETTERS,
+  fillShortAddressCells,
   normalizeShortAddress,
-  splitShortAddress,
+  shortAddressCellChar,
 } from '@/lib/partyFields'
 
 export interface ShortAddressInputProps {
   value: string
   onChange: (value: string) => void
-  /** Set by `Field`; goes on the letters cell so the label focuses it. */
+  /** Set by `Field`; goes on the first box so the label focuses it. */
   id?: string
   /** Marks the field invalid; `Field` sets it automatically. */
   invalid?: boolean
   'aria-describedby'?: string
 }
 
+/** The stored code as the eight boxes' characters. */
+function cellsOf(value: string): string[] {
+  return fillShortAddressCells(
+    Array<string>(SHORT_ADDRESS_CELLS).fill(''),
+    0,
+    value,
+  ).cells
+}
+
 /**
- * The short national address (migration 0179, owner 2026-11-05: «حقل يكون
- * مقسم»): one field split in two cells, read left to right like the code
- * itself — 4 Latin letters, then 4 digits («RRRD | 2929»). The letters are
- * upper-cased and anything else is dropped; a full letters cell moves the
- * cursor to the digits, Backspace in an empty digits cell goes back, and a
- * pasted whole code («RRRD2929», «rrrd-2929») fills both cells. The value
- * sent up is the joined code, as the trigger stores it.
+ * The short national address (migration 0179). Owner 2026-11-05: «حقل يكون
+ * مقسم», then a one-time-code look sent as a picture («ابغاك يكون حاجة زي
+ * كذا»): eight boxes of one character each, read left to right like the
+ * code — 4 Latin letters, a small gap, 4 digits («R R R D – 2 9 2 9»).
+ *
+ * A box takes only its own kind of character (letters upper-cased,
+ * Arabic-Indic digits made Latin) and moves on to the next box; Backspace
+ * in an empty box clears the one before it; the arrow keys move between
+ * boxes; a pasted or auto-filled code fills the boxes from the start
+ * («rrrd-2929»). The value sent up is the joined code, as the trigger
+ * stores it.
  */
 export function ShortAddressInput({
   value,
@@ -35,100 +55,127 @@ export function ShortAddressInput({
   'aria-describedby': describedBy,
 }: ShortAddressInputProps) {
   const { t } = useI18n()
-  const [parts, setParts] = useState(() => splitShortAddress(value))
-  const lettersRef = useRef<HTMLInputElement>(null)
-  const digitsRef = useRef<HTMLInputElement>(null)
+  const [cells, setCells] = useState(() => cellsOf(value))
+  const refs = useRef<(HTMLInputElement | null)[]>([])
 
   // A value set from outside (the dialog opening on a record) refills the
-  // cells; typing keeps them as they are.
+  // boxes; typing keeps them as they are.
   useEffect(() => {
-    if (normalizeShortAddress(value) !== parts.letters + parts.digits)
-      setParts(splitShortAddress(value))
-  }, [value, parts])
+    if (normalizeShortAddress(value) !== cells.join(''))
+      setCells(cellsOf(value))
+  }, [value, cells])
 
-  const update = (next: { letters: string; digits: string }) => {
-    setParts(next)
-    onChange(next.letters + next.digits)
+  const focus = (index: number) => {
+    const box = refs.current[index]
+    box?.focus()
+    box?.select()
   }
 
-  const onLetters = (raw: string) => {
-    const letters = raw
-      .toUpperCase()
-      .replace(/[^A-Z]/g, '')
-      .slice(0, SHORT_ADDRESS_LETTERS)
-    update({ ...parts, letters })
-    if (letters.length === SHORT_ADDRESS_LETTERS && !parts.digits)
-      digitsRef.current?.focus()
+  const commit = (next: string[]) => {
+    setCells(next)
+    onChange(next.join(''))
   }
 
-  const onDigits = (raw: string) => {
-    const digits = splitShortAddress(
-      `AAAA${raw.replace(/[A-Za-z]/g, '')}`,
-    ).digits
-    update({ ...parts, digits })
+  const type = (index: number, raw: string) => {
+    if (!raw) {
+      const next = [...cells]
+      next[index] = ''
+      commit(next)
+      return
+    }
+    // One key is one character; more is the phone's auto-fill or a paste.
+    if (normalizeShortAddress(raw).length > 1) {
+      const filled = fillShortAddressCells(cells, index, raw)
+      commit(filled.cells)
+      focus(filled.next)
+      return
+    }
+    const char = shortAddressCellChar(index, raw)
+    if (!char) return
+    const next = [...cells]
+    next[index] = char
+    commit(next)
+    if (index < SHORT_ADDRESS_CELLS - 1) focus(index + 1)
   }
 
-  /** A whole code pasted into either cell fills both. */
-  const onPaste = (event: ClipboardEvent<HTMLInputElement>) => {
-    const text = event.clipboardData.getData('text')
-    const whole = splitShortAddress(text)
-    if (!whole.letters || !whole.digits) return
+  const onKeyDown = (index: number, event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Backspace' && !cells[index] && index > 0) {
+      event.preventDefault()
+      const next = [...cells]
+      next[index - 1] = ''
+      commit(next)
+      focus(index - 1)
+    } else if (event.key === 'ArrowLeft' && index > 0) {
+      event.preventDefault()
+      focus(index - 1)
+    } else if (event.key === 'ArrowRight' && index < SHORT_ADDRESS_CELLS - 1) {
+      event.preventDefault()
+      focus(index + 1)
+    }
+  }
+
+  const onPaste = (index: number, event: ClipboardEvent<HTMLInputElement>) => {
     event.preventDefault()
-    update(whole)
-    digitsRef.current?.focus()
+    const filled = fillShortAddressCells(
+      cells,
+      index,
+      event.clipboardData.getData('text'),
+    )
+    commit(filled.cells)
+    focus(filled.next)
   }
-
-  const cell =
-    'h-10 w-full min-w-0 bg-transparent px-3 text-center text-base tabular-nums outline-none [font-family:var(--font-field)] placeholder:text-placeholder md:h-9 md:text-sm'
 
   return (
     <div
       dir="ltr"
       role="group"
       aria-label={t('shortAddress')}
-      aria-invalid={invalid || undefined}
-      className={cn(
-        // The look of the shared `.input`: token border, primary focus ring.
-        'flex items-stretch overflow-hidden rounded-lg border border-[var(--border)] bg-transparent transition-colors focus-within:border-[var(--primary)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--primary)_16%,transparent)]',
-        invalid && '!border-[var(--danger)]',
-      )}
+      aria-describedby={describedBy}
+      className="flex items-center justify-start gap-1.5 rtl:justify-end"
     >
-      <input
-        ref={lettersRef}
-        id={id}
-        aria-label={t('shortAddressLetters')}
-        aria-describedby={describedBy}
-        aria-invalid={invalid || undefined}
-        autoComplete="off"
-        autoCapitalize="characters"
-        spellCheck={false}
-        inputMode="text"
-        maxLength={SHORT_ADDRESS_LETTERS}
-        placeholder="RRRD"
-        value={parts.letters}
-        onChange={(event) => onLetters(event.target.value)}
-        onPaste={onPaste}
-        className={cell}
-      />
-      <span aria-hidden="true" className="w-px shrink-0 bg-[var(--border)]" />
-      <input
-        ref={digitsRef}
-        aria-label={t('shortAddressDigits')}
-        aria-describedby={describedBy}
-        aria-invalid={invalid || undefined}
-        autoComplete="off"
-        inputMode="numeric"
-        maxLength={SHORT_ADDRESS_DIGITS}
-        placeholder="2929"
-        value={parts.digits}
-        onChange={(event) => onDigits(event.target.value)}
-        onPaste={onPaste}
-        onKeyDown={(event) => {
-          if (event.key === 'Backspace' && !parts.digits)
-            lettersRef.current?.focus()
-        }}
-        className={cell}
-      />
+      {cells.map((char, index) => {
+        const letter = index < SHORT_ADDRESS_LETTERS
+        return (
+          <Fragment key={index}>
+            {index === SHORT_ADDRESS_LETTERS && (
+              <span
+                aria-hidden="true"
+                className="w-2 shrink-0 text-center text-muted"
+              >
+                –
+              </span>
+            )}
+            <input
+              ref={(element) => {
+                refs.current[index] = element
+              }}
+              id={index === 0 ? id : undefined}
+              aria-label={t(
+                letter ? 'shortAddressLetterBox' : 'shortAddressDigitBox',
+              ).replace(
+                '{n}',
+                String(letter ? index + 1 : index - SHORT_ADDRESS_LETTERS + 1),
+              )}
+              aria-invalid={invalid || undefined}
+              autoComplete="off"
+              autoCapitalize={letter ? 'characters' : undefined}
+              spellCheck={false}
+              inputMode={letter ? 'text' : 'numeric'}
+              value={char}
+              onFocus={(event) => event.target.select()}
+              onChange={(event) => {
+                // The box holds one character: a key typed beside it
+                // replaces it; a longer text is an auto-fill, kept whole.
+                const raw = event.target.value
+                type(index, raw.length > 2 ? raw : raw.replace(char, '') || raw)
+              }}
+              onKeyDown={(event) => onKeyDown(index, event)}
+              onPaste={(event) => onPaste(index, event)}
+              className="input h-11 w-full min-w-0 max-w-10 flex-1 px-0 text-center text-base font-medium tabular-nums placeholder:text-placeholder md:h-10"
+            />
+          </Fragment>
+        )
+      })}
     </div>
   )
 }
