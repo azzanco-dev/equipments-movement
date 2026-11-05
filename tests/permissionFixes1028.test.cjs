@@ -188,6 +188,7 @@ test('7: each Settings card is shown only when its page opens', () => {
   for (const [page, href] of [
     ['settings/equipment-types', '/settings/equipment-types'],
     ['settings/afaqy', '/settings/afaqy'],
+    ['settings/banks', '/settings/banks'],
     ['settings/roles', '/settings/roles'],
   ]) {
     const at = settings.indexOf(`{opens('${page}') && (`)

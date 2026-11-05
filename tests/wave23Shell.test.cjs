@@ -251,6 +251,7 @@ const NEW_ADMIN_SCREEN = {
   'settings/equipment-types': 'AdminSettings',
   'settings/workshop-opening-balance': 'AdminSettings',
   'settings/afaqy': 'AdminSettings',
+  'settings/banks': 'AdminSettings',
 }
 
 function after(state, url) {
@@ -338,6 +339,7 @@ const URLS = [
   '/settings/roles/x',
   '/settings/afaqy',
   '/settings/afaqy/x',
+  '/settings/banks',
   '/settings/equipment-types',
   '/settings/workshop-opening-balance',
   '/settings/other',
@@ -832,6 +834,8 @@ test('the gates of the pages outside the sidebar', () => {
   assert.deepEqual(gate('print/export'), [{ key: 'movements.export' }])
   assert.deepEqual(gate('settings/afaqy'), [{ key: 'settings.integrations' }])
   assert.deepEqual(gate('settings/roles'), [{ key: 'settings.roles' }])
+  // 0177: the banks list follows the suppliers' edit key.
+  assert.deepEqual(gate('settings/banks'), [{ key: 'lessors.edit' }])
   assert.deepEqual(gate('settings/equipment-types'), [
     { key: 'settings.equipment_types' },
   ])
@@ -871,6 +875,7 @@ test('routePageOf reads the URL as the old router did', () => {
   assert.equal(page('/settings/roles/x'), 'settings/roles')
   assert.equal(page('/settings/afaqy'), 'settings/afaqy')
   assert.equal(page('/settings/afaqy/x'), 'settings')
+  assert.equal(page('/settings/banks'), 'settings/banks')
   assert.equal(page('/print/export'), 'print/export')
   assert.equal(page('/print'), 'dashboard')
   assert.equal(page('/ui-kit'), 'dashboard')
@@ -1017,7 +1022,7 @@ test('App.tsx renders each screen behind its page', () => {
     )
   assert.match(
     content,
-    /\(page === 'settings' \|\|\s*page === 'settings\/equipment-types' \|\|\s*page === 'settings\/workshop-opening-balance' \|\|\s*page === 'settings\/afaqy'\) && <AdminSettings \/>/,
+    /\(page === 'settings' \|\|\s*page === 'settings\/equipment-types' \|\|\s*page === 'settings\/workshop-opening-balance' \|\|\s*page === 'settings\/afaqy' \|\|\s*page === 'settings\/banks'\) && <AdminSettings \/>/,
   )
   // The admin home's shortcuts follow the pages they open.
   assert.match(

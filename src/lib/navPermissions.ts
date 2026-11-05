@@ -319,6 +319,7 @@ export type RoutePage =
   | 'settings/equipment-types'
   | 'settings/workshop-opening-balance'
   | 'settings/afaqy'
+  | 'settings/banks'
   | 'settings/roles'
   | 'movements/new'
   | 'movements/:id'
@@ -340,6 +341,8 @@ const PAGE_GATES: Readonly<Record<ExtraPage, readonly NavGate[]>> = {
   // add_workshop_opening_balance is gated on movements.import (0127).
   'settings/workshop-opening-balance': [{ key: 'movements.import' }],
   'settings/afaqy': [{ key: 'settings.integrations' }],
+  // 0177: the banks list is edited by whoever edits the suppliers.
+  'settings/banks': [{ key: 'lessors.edit' }],
   'settings/roles': [{ key: 'settings.roles' }],
   'movements/new': [
     { key: 'movements.site.create' },
@@ -383,6 +386,7 @@ const SETTINGS_SUBPAGES: ReadonlySet<string> = new Set([
   'equipment-types',
   'workshop-opening-balance',
   'afaqy',
+  'banks',
 ])
 
 /**
@@ -507,6 +511,7 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'settings/equipment-types',
   'settings/workshop-opening-balance',
   'settings/afaqy',
+  'settings/banks',
   'settings/roles',
   'movements/new',
   'movements/:id',

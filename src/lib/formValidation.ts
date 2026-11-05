@@ -535,6 +535,15 @@ export const equipmentTypeFormSchema = z.object({
   name: requiredText('equipmentTypeRequired'),
 })
 
+/** Settings › «البنوك» (0177): the bank's name, at most 100 characters
+ *  (`banks_name_check`, the length of 0175's `lessors.bank_name`). */
+export const bankFormSchema = z.object({
+  name: requiredText('bankRequired', {
+    max: PARTY_BANK_NAME_MAX,
+    lengthKey: 'bankNameTooLong',
+  }),
+})
+
 const emailField = requiredText('emailRequired').refine(
   (value) => !value || EMAIL_PATTERN.test(value),
   message('invalidUserEmail'),

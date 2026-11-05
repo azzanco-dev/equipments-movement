@@ -1,4 +1,4 @@
-import type { HTMLAttributes } from 'react'
+import type { HTMLAttributes, ReactNode } from 'react'
 import { Field, Input } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
@@ -23,6 +23,9 @@ export interface PartyFormSectionProps<T extends object> {
   form: T
   errors: FieldErrors<T>
   onChange: (patch: Partial<T>) => void
+  /** Controls placed before the text fields in the same grid (the bank
+   *  selector of the supplier form, 0177). */
+  leading?: ReactNode
 }
 
 /**
@@ -36,12 +39,14 @@ export function PartyFormSection<T extends object>({
   form,
   errors,
   onChange,
+  leading,
 }: PartyFormSectionProps<T>) {
   const { t } = useI18n()
   return (
     <section className="space-y-3 border-t pt-4">
       <h3 className="text-sm font-semibold">{t(title)}</h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {leading}
         {fields.map((spec) => {
           const error = errors[spec.field]
           return (

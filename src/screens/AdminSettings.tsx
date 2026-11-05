@@ -11,6 +11,7 @@ import {
   Trash2,
   Upload,
   History,
+  Landmark,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { readWorkbookSafely, workbookReadErrorKey } from '@/lib/safeWorkbook'
@@ -60,6 +61,7 @@ import { RelativeTime } from '@/components/RelativeTime'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { canOpenPage, type RoutePage } from '@/lib/navPermissions'
 import { AfaqySettings } from '@/components/afaqy/AfaqySettings'
+import { BanksSettings } from '@/components/banks/BanksSettings'
 
 type EquipmentTypeRow = {
   id: string
@@ -103,6 +105,8 @@ export function AdminSettings() {
   const showWorkshopOpening = pathname === '/settings/workshop-opening-balance'
   // wave 17: the Afaqy tracker link.
   const showAfaqy = pathname === '/settings/afaqy'
+  // 0177 (owner 2026-11-05): the banks list of the supplier form.
+  const showBanks = pathname === '/settings/banks'
   // Each hub card follows the gate of the page it opens (pageGate in
   // src/lib/navPermissions.ts, 2026-10-28), so a card never leads to a page
   // that sends the user back; «سجل النشاط» (owner 2026-10-22) is the
@@ -451,6 +455,19 @@ export function AdminSettings() {
       </div>
     )
 
+  if (showBanks)
+    return (
+      <div className="space-y-4">
+        <PageHeader
+          title={t('banks')}
+          description={t('banksDesc')}
+          onBack={() => router.push('/settings')}
+          backLabel={t('backToSettings')}
+        />
+        <BanksSettings />
+      </div>
+    )
+
   if (!showEquipmentTypes)
     return (
       <div className="space-y-4">
@@ -532,6 +549,28 @@ export function AdminSettings() {
               <p className="mt-1 text-sm text-muted">
                 {t('afaqySettingsDesc')}
               </p>
+            </button>
+          )}
+          {opens('settings/banks') && (
+            <button
+              type="button"
+              onClick={() => router.push('/settings/banks')}
+              className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
+            >
+              <div className="mb-4 flex w-full items-start justify-between gap-3">
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  <Landmark size={18} />
+                </span>
+                <ChevronRight
+                  size={18}
+                  className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip"
+                />
+              </div>
+              <h2 className="font-semibold">{t('banks')}</h2>
+              <p className="mt-1 text-sm text-muted">{t('banksDesc')}</p>
             </button>
           )}
           {opens('settings/roles') && (

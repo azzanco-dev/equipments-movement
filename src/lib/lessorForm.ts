@@ -98,6 +98,13 @@ export const LESSOR_DATABASE_RULES: readonly DatabaseFieldRule<LessorFormValues>
       field: 'bank_name',
       key: 'bankNameTooLong',
     },
+    // 0177: the bank must be one of the banks list (deleted meanwhile).
+    {
+      on: 'foreignKey',
+      match: 'lessors_bank_name_fkey',
+      field: 'bank_name',
+      key: 'bankNotInList',
+    },
     {
       on: 'check',
       match: 'lessors_iban_check',

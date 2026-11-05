@@ -81,6 +81,7 @@ const PAGE_TITLES: Readonly<
     name: 'afaqySettingsTitle',
     section: 'settings',
   },
+  'settings/banks': { kind: 'sub', name: 'banks', section: 'settings' },
   'settings/roles': {
     kind: 'sub',
     name: 'rolesSettingsTitle',

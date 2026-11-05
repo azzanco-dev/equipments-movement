@@ -777,7 +777,8 @@ function AppContent() {
             {(page === 'settings' ||
               page === 'settings/equipment-types' ||
               page === 'settings/workshop-opening-balance' ||
-              page === 'settings/afaqy') && <AdminSettings />}
+              page === 'settings/afaqy' ||
+              page === 'settings/banks') && <AdminSettings />}
           </>
         )}
       </Layout>

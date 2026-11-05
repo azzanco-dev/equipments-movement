@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Dialog, ErrorState, Field, Input } from '@/components/ui'
 import {
   PartyFormSection,
   type PartyFieldSpec,
 } from '@/components/parties/PartyFormSection'
+import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import { usePermissions } from '@/auth/PermissionsContext'
+import { bankOptionLoader } from '@/lib/banks'
 import { useI18n } from '@/i18n/I18nContext'
 import { lessorsActions, refusedByPolicy } from '@/lib/actionPermissions'
 import { supabase } from '@/lib/supabase'
@@ -71,8 +73,8 @@ const CONTACT_FIELDS: readonly PartyFieldSpec<LessorFormValues>[] = [
     wide: true,
   },
 ]
+/** The bank itself is picked from the banks list (0177), above the IBAN. */
 const BANK_FIELDS: readonly PartyFieldSpec<LessorFormValues>[] = [
-  { field: 'bank_name', label: 'bankName', placeholder: 'bankNamePlaceholder' },
   { field: 'iban', label: 'iban', placeholder: 'ibanPlaceholder', ltr: true },
 ]
 
@@ -100,6 +102,7 @@ export function LessorFormDialog({
   const [error, setError] = useState<string | null>(null)
   const [errors, setErrors] = useState<FieldErrors<LessorFormValues>>({})
   const bodyRef = useRef<HTMLDivElement>(null)
+  const loadBanks = useMemo(() => bankOptionLoader(supabase), [])
 
   useEffect(() => {
     if (!open) return
@@ -174,7 +177,7 @@ export function LessorFormDialog({
       onOpenChange={onOpenChange}
       title={lessor ? t('editLessor') : t('addLessor')}
       description={t('dialogDescLessorForm')}
-      size="md"
+      size="lg"
       footer={
         <>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -225,6 +228,29 @@ export function LessorFormDialog({
           form={form}
           errors={errors}
           onChange={update}
+          leading={
+            <Field
+              label={t('bankName')}
+              name="bank_name"
+              error={errors.bank_name && t(errors.bank_name)}
+            >
+              {(control) => (
+                <AsyncSearchSelect
+                  {...control}
+                  size="md"
+                  value={form.bank_name}
+                  selectedOption={
+                    form.bank_name
+                      ? { value: form.bank_name, label: form.bank_name }
+                      : null
+                  }
+                  onChange={(value) => update({ bank_name: value })}
+                  loadOptions={loadBanks}
+                  placeholder={t('bankNamePlaceholder')}
+                />
+              )}
+            </Field>
+          }
         />
       </div>
     </Dialog>

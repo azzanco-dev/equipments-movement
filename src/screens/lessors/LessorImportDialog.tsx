@@ -15,6 +15,7 @@ import {
   parseLessorsExcel,
   type LessorImportRow,
 } from '@/lib/excel'
+import { fetchBankNames, matchImportBanks } from '@/lib/banks'
 import { fetchTakenPartyNumbers } from '@/lib/partyData'
 import {
   LESSOR_IMPORT_PARTY_FIELDS,
@@ -106,6 +107,13 @@ export function LessorImportDialog({
         await fetchTakenPartyNumbers('lessors', partyNumbersOf(parsed)),
         t,
       )
+      // 0177: the bank must be one of the banks list (Settings › «البنوك»).
+      if (parsed.some((row) => row.bank_name))
+        matchImportBanks(
+          parsed,
+          await fetchBankNames(supabase),
+          t('bankNotInList'),
+        )
     } catch {
       setError(t('importError'))
       return
