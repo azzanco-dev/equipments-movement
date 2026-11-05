@@ -141,3 +141,9 @@ test('the new copy, both languages, no hamza on the alif', () => {
   const ar = /\/\/ foreman assignments — start[\s\S]*?\/\/ foreman assignments — end/.exec(tr)[0]
   assert.doesNotMatch(ar, /[أإآ]/)
 })
+
+test('the page hosts its own toasts (the dialog calls useToast)', () => {
+  const page = read('src', 'components', 'foremanAssignments', 'ForemanAssignmentsSettings.tsx')
+  assert.match(page, /<ToastProvider>\s+<ForemanAssignmentsPage \/>\s+<\/ToastProvider>/)
+  assert.ok(read('src', 'components', 'foremanAssignments', 'ForemanAssignmentDialog.tsx').includes('useToast()'))
+})

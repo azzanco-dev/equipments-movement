@@ -7,6 +7,7 @@ import {
   ErrorState,
   IconButton,
   SearchInput,
+  ToastProvider,
 } from '@/components/ui'
 import type { DataTableColumn } from '@/components/ui'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
@@ -42,6 +43,17 @@ interface ForemanRow {
  * page gate and the function).
  */
 export function ForemanAssignmentsSettings() {
+  // The dialog's success toast needs a host; it is local to each page that
+  // uses one (as the roles page). Without it the page crashed on render
+  // («useToast must be used within ToastProvider», owner 2026-11-05).
+  return (
+    <ToastProvider>
+      <ForemanAssignmentsPage />
+    </ToastProvider>
+  )
+}
+
+function ForemanAssignmentsPage() {
   const { t, lang } = useI18n()
   const [rows, setRows] = useState<ForemanRow[]>([])
   const [total, setTotal] = useState(0)
