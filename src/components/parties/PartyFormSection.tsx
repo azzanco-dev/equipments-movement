@@ -2,6 +2,10 @@ import type { HTMLAttributes, ReactNode } from 'react'
 import { Field, Input } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { ShortAddressInput } from '@/components/parties/ShortAddressInput'
+import {
+  CHANGED_CONTROL_CLASS,
+  ChangedLabel,
+} from '@/components/parties/changedField'
 import type { TranslationKey } from '@/i18n/translations'
 import type { FieldErrors } from '@/lib/formValidation'
 
@@ -29,6 +33,8 @@ export interface PartyFormSectionProps<T extends object> {
   /** Controls placed before the text fields in the same grid (the bank
    *  selector of the supplier form, 0177). */
   leading?: ReactNode
+  /** The fields changed since the form opened, coloured until saved. */
+  changed?: ReadonlySet<string>
 }
 
 /**
@@ -43,6 +49,7 @@ export function PartyFormSection<T extends object>({
   errors,
   onChange,
   leading,
+  changed,
 }: PartyFormSectionProps<T>) {
   const { t } = useI18n()
   return (
@@ -52,10 +59,11 @@ export function PartyFormSection<T extends object>({
         {leading}
         {fields.map((spec) => {
           const error = errors[spec.field]
+          const isChanged = !!changed?.has(spec.field)
           return (
             <Field
               key={spec.field}
-              label={t(spec.label)}
+              label={<ChangedLabel label={t(spec.label)} changed={isChanged} />}
               name={spec.field}
               className={spec.wide ? 'sm:col-span-2' : undefined}
               error={error && t(error)}
@@ -65,6 +73,7 @@ export function PartyFormSection<T extends object>({
                   <ShortAddressInput
                     id={control.id}
                     invalid={control.invalid}
+                    changed={isChanged}
                     aria-describedby={control['aria-describedby']}
                     value={String(form[spec.field] ?? '')}
                     onChange={(value) =>
@@ -75,6 +84,7 @@ export function PartyFormSection<T extends object>({
                   <Input
                     {...control}
                     dir={spec.ltr ? 'ltr' : undefined}
+                    className={isChanged ? CHANGED_CONTROL_CLASS : undefined}
                     type={spec.type ?? 'text'}
                     inputMode={spec.inputMode}
                     placeholder={spec.placeholder && t(spec.placeholder)}

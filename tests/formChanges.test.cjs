@@ -32,7 +32,7 @@ test('changedFields compares trimmed text and lists the changed keys', () => {
 
 test('the supplier form: the count beside save, no empty save, ask before discarding', () => {
   const form = read('src', 'screens', 'lessors', 'LessorFormDialog.tsx')
-  assert.match(form, /const changed = changedFields\(initial, form\)\.length/)
+  assert.match(form, /const changed = changedSet\.size/)
   assert.match(form, /setInitial\(start\)/)
   assert.match(form, /t\('unsavedFieldsCount'\)\.replace\('\{count\}', String\(changed\)\)/)
   assert.match(form, /disabled=\{!!lessor && !dirty\}/)
@@ -44,4 +44,28 @@ test('the supplier form: the count beside save, no empty save, ask before discar
   const tr = read('src', 'i18n', 'translations.ts')
   assert.equal(tr.match(/unsavedFieldsCount:/g).length, 2)
   assert.doesNotMatch(/unsavedFieldsCount: '([^']*)'/.exec(tr)[1], /[أإآ]/)
+})
+
+test('each changed field is coloured until saved (owner «تعلم لون على الحقل الي تعدل»)', () => {
+  const form = read('src', 'screens', 'lessors', 'LessorFormDialog.tsx')
+  assert.match(form, /const changedSet = new Set<string>\(changedFields\(initial, form\)\)/)
+  // The three sections, the name and the bank all follow the set.
+  assert.equal(form.match(/changed=\{changedSet\}/g).length, 3)
+  assert.match(form, /changedSet\.has\('name'\) \? CHANGED_CONTROL_CLASS : undefined/)
+  assert.match(form, /changedSet\.has\('bank_name'\)/)
+  const section = read('src', 'components', 'parties', 'PartyFormSection.tsx')
+  assert.match(section, /const isChanged = !!changed\?\.has\(spec\.field\)/)
+  assert.match(section, /isChanged \? CHANGED_CONTROL_CLASS : undefined/)
+  assert.match(section, /changed=\{isChanged\}/)
+  const mark = read('src', 'components', 'parties', 'changedField.tsx')
+  // Token colours only: the ring's light yellow.
+  assert.match(mark, /border-\[var\(--progress-mid\)\]/)
+  assert.doesNotMatch(mark, /#[0-9a-f]{3,6}\b/i)
+  assert.match(mark, /<span className="sr-only">\{t\('fieldChanged'\)\}<\/span>/)
+  assert.match(
+    read('src', 'components', 'parties', 'ShortAddressInput.tsx'),
+    /changed && CHANGED_CONTROL_CLASS/,
+  )
+  const tr = read('src', 'i18n', 'translations.ts')
+  assert.equal(tr.match(/fieldChanged:/g).length, 2)
 })

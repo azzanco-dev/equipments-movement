@@ -7,6 +7,8 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { useI18n } from '@/i18n/I18nContext'
+import { cn } from '@/components/ui'
+import { CHANGED_CONTROL_CLASS } from '@/components/parties/changedField'
 import {
   SHORT_ADDRESS_CELLS,
   SHORT_ADDRESS_LETTERS,
@@ -22,6 +24,8 @@ export interface ShortAddressInputProps {
   id?: string
   /** Marks the field invalid; `Field` sets it automatically. */
   invalid?: boolean
+  /** Changed and not saved yet: the boxes take the changed colour. */
+  changed?: boolean
   'aria-describedby'?: string
 }
 
@@ -52,6 +56,7 @@ export function ShortAddressInput({
   onChange,
   id,
   invalid,
+  changed = false,
   'aria-describedby': describedBy,
 }: ShortAddressInputProps) {
   const { t } = useI18n()
@@ -171,7 +176,10 @@ export function ShortAddressInput({
               }}
               onKeyDown={(event) => onKeyDown(index, event)}
               onPaste={(event) => onPaste(index, event)}
-              className="input h-11 w-full min-w-0 max-w-10 flex-1 px-0 text-center text-base font-medium tabular-nums placeholder:text-placeholder md:h-10"
+              className={cn(
+                'input h-11 w-full min-w-0 max-w-10 flex-1 px-0 text-center text-base font-medium tabular-nums placeholder:text-placeholder md:h-10',
+                changed && CHANGED_CONTROL_CLASS,
+              )}
             />
           </Fragment>
         )

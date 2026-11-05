@@ -12,6 +12,10 @@ import {
   type PartyFieldSpec,
 } from '@/components/parties/PartyFormSection'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
+import {
+  CHANGED_CONTROL_CLASS,
+  ChangedLabel,
+} from '@/components/parties/changedField'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { bankOptionLoader } from '@/lib/banks'
 import { changedFields } from '@/lib/formChanges'
@@ -195,7 +199,10 @@ export function LessorFormDialog({
   // تنبيه عام, او في زر الحفظ»): the footer says how many fields are
   // unsaved, the save button reads «حفظ التعديلات» and an unchanged record
   // cannot be saved; closing with unsaved changes asks first.
-  const changed = changedFields(initial, form).length
+  // Owner 2026-11-05 («تعلم لون على الحقل الي تعدل»): each changed field is
+  // coloured too, until it is saved or set back.
+  const changedSet = new Set<string>(changedFields(initial, form))
+  const changed = changedSet.size
   const dirty = changed > 0
 
   const requestClose = async () => {
@@ -252,7 +259,12 @@ export function LessorFormDialog({
       <div ref={bodyRef} className="space-y-4">
         {shownError && <ErrorState title={shownError} className="p-4" />}
         <Field
-          label={t('lessorName')}
+          label={
+            <ChangedLabel
+              label={t('lessorName')}
+              changed={changedSet.has('name')}
+            />
+          }
           name="name"
           required
           error={errors.name && t(errors.name)}
@@ -260,6 +272,9 @@ export function LessorFormDialog({
           {(control) => (
             <Input
               {...control}
+              className={
+                changedSet.has('name') ? CHANGED_CONTROL_CLASS : undefined
+              }
               placeholder={t('lessorNamePlaceholder')}
               value={form.name}
               onChange={(event) => update({ name: event.target.value })}
@@ -272,6 +287,7 @@ export function LessorFormDialog({
           form={form}
           errors={errors}
           onChange={update}
+          changed={changedSet}
         />
         <PartyFormSection
           title="partyContactSection"
@@ -279,6 +295,7 @@ export function LessorFormDialog({
           form={form}
           errors={errors}
           onChange={update}
+          changed={changedSet}
         />
         <PartyFormSection
           title="partyBankSection"
@@ -286,9 +303,15 @@ export function LessorFormDialog({
           form={form}
           errors={errors}
           onChange={update}
+          changed={changedSet}
           leading={
             <Field
-              label={t('bankName')}
+              label={
+                <ChangedLabel
+                  label={t('bankName')}
+                  changed={changedSet.has('bank_name')}
+                />
+              }
               name="bank_name"
               error={errors.bank_name && t(errors.bank_name)}
             >
@@ -297,6 +320,12 @@ export function LessorFormDialog({
                   {...control}
                   size="md"
                   menuSide="top"
+                  // The selector's trigger has no tint of its own: a ring.
+                  className={
+                    changedSet.has('bank_name')
+                      ? 'rounded-lg ring-2 ring-[var(--progress-mid)]'
+                      : undefined
+                  }
                   value={form.bank_name}
                   selectedOption={
                     form.bank_name

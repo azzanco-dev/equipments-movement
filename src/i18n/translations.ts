@@ -745,6 +745,7 @@ export const translations = {
     // party-fields — end
     // unsaved changes in a form (owner 2026-11-05, supplier form first)
     unsavedFieldsCount: 'تعديلات غير محفوظة: {count}',
+    fieldChanged: 'معدل ولم يحفظ',
     // completeness ring (owner 2026-11-05, suppliers list)
     completeness: 'اكتمال البيانات',
     completenessSummary: 'البيانات مكتملة {percent}% ({filled} من {total} حقول)',
@@ -3360,6 +3361,7 @@ export const translations = {
     // party-fields — end
     // unsaved changes in a form (owner 2026-11-05, supplier form first)
     unsavedFieldsCount: '{count} unsaved changes',
+    fieldChanged: 'Changed, not saved',
     // completeness ring (owner 2026-11-05, suppliers list)
     completeness: 'Completeness',
     completenessSummary: '{percent}% complete ({filled} of {total} fields)',
