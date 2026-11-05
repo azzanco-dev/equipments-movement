@@ -25,7 +25,7 @@ test('every mapped logo is a file of public/banks/, every file is mapped', () =>
   const files = fs.readdirSync(path.join(ROOT, 'public', 'banks')).sort()
   const mapped = Object.values(lib.BANK_LOGOS).map((logo) => logo.src.replace('/banks/', '')).sort()
   assert.deepEqual(mapped, files)
-  for (const file of files) assert.match(file, /^[a-z0-9]+\.(svg|png)$/)
+  for (const file of files) assert.match(file, /^[a-z0-9]+\.(svg|png|webp)$/)
 })
 
 test('the SVG logos carry no script, handler or outside link', () => {
@@ -38,7 +38,10 @@ test('the SVG logos carry no script, handler or outside link', () => {
 test('the lookup by name, the white logos and the initials', () => {
   assert.equal(lib.bankLogoOf('مصرف الانماء').src, '/banks/alinma.svg')
   assert.equal(lib.bankLogoOf('مصرف  الانماء').onDark, true)
-  assert.equal(lib.bankLogoOf('مصرف الراجحي'), null)
+  // All 13 banks of 0177 have a logo since the owner's «جيبهم بطريقتك».
+  assert.equal(Object.keys(lib.BANK_LOGOS).length, 13)
+  assert.equal(lib.bankLogoOf('مصرف الراجحي').src, '/banks/rajhi.svg')
+  assert.equal(lib.bankLogoOf('بنك جديد'), null)
   assert.equal(lib.bankLogoOf(null), null)
   assert.equal(lib.bankInitials('مصرف الراجحي'), 'ر')
   assert.equal(lib.bankInitials('البنك العربي الوطني'), 'عو')

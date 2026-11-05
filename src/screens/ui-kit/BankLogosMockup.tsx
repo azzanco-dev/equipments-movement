@@ -66,11 +66,12 @@ export function BankLogosMockup() {
     <div className="space-y-4" dir="rtl">
       <Panel title={`الشعارات (${withLogo} من ${BANKS.length})`}>
         <p className="text-xs text-muted">
-          البنك بدون ملف شعار يظهر باول حرفين من اسمه، وكذلك اي بنك تضيفه من
-          الاعدادات.
+          كل بنوك القائمة لها شعار من موقعها الرسمي. اي بنك تضيفه من الاعدادات
+          يظهر باول حرف من اسمه حتى نضيف شعاره، مثل «بنك مثال جديد» في اخر
+          القائمة.
         </p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {BANKS.map((name) => (
+          {[...BANKS, 'بنك مثال جديد'].map((name) => (
             <div
               key={name}
               className="flex flex-col items-center gap-2 rounded-lg border bg-[var(--surface)] p-3 text-center"

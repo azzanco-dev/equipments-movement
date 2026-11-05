@@ -1,13 +1,13 @@
 /**
  * The Saudi banks' logos (owner 2026-11-05, «ابغاك تضيف شعارات البنوك، اول
  * سويها في ui-kit»; the files were downloaded with his OK from each bank's
- * own website into `public/banks/`). For review on /ui-kit only until he
+ * own website into `public/banks/`; Banque Saudi Fransi's from bsf.sa and
+ * Bank Aljazira's from aljazirabank.com.sa, their current sites). For review on /ui-kit only until he
  * approves: nothing outside the mockup reads this yet.
  *
  * Matched by the bank's name in the banks list (migration 0177), compared
- * without spaces; a bank without a file (Al Rajhi, Banque Saudi Fransi,
- * ANB and Bank Aljazira so far, and any bank added in Settings) shows its
- * initials instead.
+ * without spaces; a bank without a file (any bank added in Settings) shows
+ * its initials instead.
  */
 export interface BankLogo {
   src: string
@@ -18,9 +18,13 @@ export interface BankLogo {
 
 export const BANK_LOGOS: Readonly<Record<string, BankLogo>> = {
   'البنك الاهلي السعودي': { src: '/banks/snb.svg' },
+  'مصرف الراجحي': { src: '/banks/rajhi.svg' },
   'بنك الرياض': { src: '/banks/riyad.svg' },
   'البنك السعودي الاول': { src: '/banks/sab.svg' },
+  'البنك السعودي الفرنسي': { src: '/banks/fransi.svg' },
+  'البنك العربي الوطني': { src: '/banks/anb.png' },
   'بنك البلاد': { src: '/banks/bilad.png' },
+  'بنك الجزيرة': { src: '/banks/jazira.webp' },
   'مصرف الانماء': { src: '/banks/alinma.svg', onDark: true },
   'البنك السعودي للاستثمار': { src: '/banks/saib.png', onDark: true },
   'بنك الخليج الدولي': { src: '/banks/gib.png' },
