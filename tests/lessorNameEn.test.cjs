@@ -84,7 +84,7 @@ test('no screen reads or writes the supplier English name', () => {
   assert.doesNotMatch(lessorRef, /name_en/)
   assert.match(
     read('src', 'screens', 'lessors', 'LessorsListScreen.tsx'),
-    /'id,name,contact_person,contact_number,tax_number,commercial_register,address,short_address,city,email,bank_name,iban,created_at,updated_at'/,
+    /'id,name,contact_person,contact_number,tax_number,commercial_register,address,short_address,email,bank_name,iban,created_at,updated_at'/,
   )
   // 0175 added the two numbers the PO PDF prints, never an English name.
   assert.match(

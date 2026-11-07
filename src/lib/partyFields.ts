@@ -4,9 +4,10 @@ import type { DatabaseFieldRule } from '@/lib/formValidation'
 /**
  * The extra master-data fields of suppliers (`lessors`) and clients
  * (`companies`), migration 0175 (EM-260, owner 2026-11-03 / 2026-11-04):
- * the tax number, the commercial register, the address, the city and the
- * email on both tables; the contact person and number joined `companies`
- * (the lessors had them since 0001) and the IBAN is the suppliers' alone.
+ * the tax number, the commercial register, the address and the email on
+ * both tables (the city left with migration 0181); the contact person and
+ * number joined `companies` (the lessors had them since 0001) and the IBAN
+ * is the suppliers' alone.
  *
  * Pure helpers only (no runtime import): the normalisation the database
  * trigger applies, mirrored so the form validates what will be stored; the
@@ -19,7 +20,6 @@ export const PARTY_SHARED_FIELDS = [
   'tax_number',
   'commercial_register',
   'address',
-  'city',
   'email',
   // 0179 (owner 2026-11-05): the short national address, «RRRD2929».
   'short_address',
@@ -30,7 +30,6 @@ export const PARTY_TAX_NUMBER_LENGTH = 15
 export const PARTY_COMMERCIAL_REGISTER_MIN = 4
 export const PARTY_COMMERCIAL_REGISTER_MAX = 20
 export const PARTY_ADDRESS_MAX = 200
-export const PARTY_CITY_MAX = 60
 export const PARTY_EMAIL_MAX = 120
 export const PARTY_CONTACT_PERSON_MAX = 120
 export const PARTY_CONTACT_NUMBER_MAX = 30
@@ -110,7 +109,6 @@ export function partySharedPayload(
     tax_number: normalizeRegistryNumber(form.tax_number) || null,
     commercial_register: normalizeRegistryNumber(form.commercial_register) || null,
     address: optionalTextOrNull(form.address),
-    city: optionalTextOrNull(form.city),
     email: normalizeEmail(form.email) || null,
     short_address: normalizeShortAddress(form.short_address) || null,
   }
@@ -124,7 +122,6 @@ export function partySharedFormValues(
     tax_number: record.tax_number ?? '',
     commercial_register: record.commercial_register ?? '',
     address: record.address ?? '',
-    city: record.city ?? '',
     email: record.email ?? '',
     short_address: record.short_address ?? '',
   }
@@ -183,7 +180,6 @@ export function partySharedDatabaseRules<T extends Record<PartySharedField, stri
       field: 'address',
       key: 'addressTooLong',
     },
-    { on: 'check', match: `${table}_city_check`, field: 'city', key: 'cityTooLong' },
     {
       on: 'check',
       match: `${table}_email_check`,
@@ -226,7 +222,6 @@ export const PARTY_IMPORT_HEADERS = {
     'العنوان الوطني المختصر',
     'short address',
   ],
-  city: ['city', 'المدينة'],
   email: ['email', 'البريد', 'البريد الالكتروني', 'البريد الإلكتروني', 'e-mail'],
   bank_name: ['bank_name', 'البنك', 'اسم البنك', 'bank', 'bank name'],
   iban: ['iban', 'الايبان', 'الآيبان'],

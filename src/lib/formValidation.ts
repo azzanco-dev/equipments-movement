@@ -8,7 +8,6 @@ import {
   EMAIL_SHAPE_PATTERN,
   PARTY_ADDRESS_MAX,
   PARTY_BANK_NAME_MAX,
-  PARTY_CITY_MAX,
   PARTY_CONTACT_NUMBER_MAX,
   PARTY_CONTACT_PERSON_MAX,
   PARTY_EMAIL_MAX,
@@ -445,7 +444,7 @@ export function quickEquipmentFormSchema(workshopMode: boolean) {
  * The 0175 fields shared by the supplier and the client forms (EM-260): all
  * optional; the tax number and the CR are checked on their normalised text
  * (spaces and dashes stripped, as the database trigger stores them), the
- * email on its lenient shape, the address and the city on their length.
+ * email on its lenient shape, the address on its length.
  */
 const partySharedFieldsShape = {
   tax_number: z
@@ -466,7 +465,6 @@ const partySharedFieldsShape = {
       message('commercialRegisterFormatInvalid'),
     ),
   address: optionalText({ max: PARTY_ADDRESS_MAX, lengthKey: 'addressTooLong' }),
-  city: optionalText({ max: PARTY_CITY_MAX, lengthKey: 'cityTooLong' }),
   email: z
     .string()
     .trim()

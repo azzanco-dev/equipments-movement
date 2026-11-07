@@ -57,7 +57,7 @@ const OFFICIAL_FIELDS: readonly PartyFieldSpec<LessorFormValues>[] = [
     inputMode: 'numeric',
   },
   // Owner 2026-11-05 «شيل المدينة, العنوان خليه العنوان الكامل»: no city
-  // field (the column and its stored value stay, saved back unchanged).
+  // field (the column was dropped by migration 0181).
   // 0179: the short national address, split «RRRD | 2929».
   {
     field: 'short_address',

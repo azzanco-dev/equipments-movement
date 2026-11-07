@@ -24,7 +24,7 @@ import { LessorsTable } from './LessorsTable'
 // list row, so the row carries every field the form saves (a field left out
 // here would be saved back as empty).
 const LIST_SELECT =
-  'id,name,contact_person,contact_number,tax_number,commercial_register,address,short_address,city,email,bank_name,iban,created_at,updated_at'
+  'id,name,contact_person,contact_number,tax_number,commercial_register,address,short_address,email,bank_name,iban,created_at,updated_at'
 
 /** Orchestrator for the lessors list; same shape as the companies screen,
  *  with the details dialog and the Excel import of EM-260. */

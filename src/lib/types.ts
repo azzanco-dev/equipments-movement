@@ -82,7 +82,6 @@ export interface PartyFields {
   tax_number?: string | null
   commercial_register?: string | null
   address?: string | null
-  city?: string | null
   email?: string | null
   /** 0179: the short national address, «RRRD2929». */
   short_address?: string | null

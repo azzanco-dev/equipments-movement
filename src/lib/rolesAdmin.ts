@@ -233,13 +233,6 @@ export interface SelectionWarning {
 
 export type SelectionWarnings = Record<string, SelectionWarning[]>
 
-/** The movements.read scopes that cover a context fully. */
-const READ_COVERS: Readonly<Record<'site' | 'workshop' | 'all', string[]>> = {
-  site: ['site', 'all'],
-  workshop: ['workshop', 'all'],
-  all: ['all'],
-}
-
 /**
  * Non-blocking warnings about combinations the database accepts but that do
  * not give what they suggest, so the admin never builds a silently broken
@@ -286,22 +279,7 @@ export function selectionWarnings(
   } else if (has('home.foreman') && has('home.workshop'))
     warn('home.workshop', 'rolePermissionsWarnHomeShadowed', ['home.foreman'])
 
-  // 5. A report shows only the movements movements.read lets the user read.
-  const reports = selection['reports.view']
-  if (
-    read &&
-    (reports === 'site' || reports === 'workshop' || reports === 'all')
-  )
-    if (!READ_COVERS[reports].includes(read))
-      warn(
-        'reports.view',
-        reports === 'all'
-          ? 'rolePermissionsHintReportsNeedReadAll'
-          : reports === 'site'
-            ? 'rolePermissionsWarnSiteReportNeedsRead'
-            : 'rolePermissionsWarnWorkshopReportNeedsRead',
-        ['movements.read'],
-      )
+  // 5. (The reports warning left with the reports key, migration 0180.)
 
   // 6. The admin home counts the whole fleet's states from every movement.
   if (has('home.admin') && read && read !== 'all')

@@ -996,37 +996,18 @@ test('no warning about admin-shell pages under a field home any more', () => {
   )
 })
 
-test('warning 6: a report wider than movements.read is incomplete', () => {
-  const report = (reports, read) =>
-    warned({ 'reports.view': reports, 'movements.read': read })['reports.view']
-  assert.deepEqual(report('all', 'site'), [
-    'rolePermissionsHintReportsNeedReadAll',
-  ])
-  assert.deepEqual(report('all', 'workshop'), [
-    'rolePermissionsHintReportsNeedReadAll',
-  ])
-  assert.deepEqual(report('site', 'workshop'), [
-    'rolePermissionsWarnSiteReportNeedsRead',
-  ])
-  assert.deepEqual(report('site', 'own'), [
-    'rolePermissionsWarnSiteReportNeedsRead',
-  ])
-  assert.deepEqual(report('workshop', 'site'), [
-    'rolePermissionsWarnWorkshopReportNeedsRead',
-  ])
-  assert.deepEqual(report('workshop', 'companies'), [
-    'rolePermissionsWarnWorkshopReportNeedsRead',
-  ])
-  for (const [reports, read] of [
-    ['all', 'all'],
-    ['site', 'site'],
-    ['site', 'all'],
-    ['workshop', 'workshop'],
-    ['workshop', 'all'],
-  ])
-    assert.equal(report(reports, read), undefined, `${reports}/${read}`)
-  // A missing movements.read is the blocking requirement, not a warning.
-  assert.deepEqual(warned({ 'reports.view': 'all' }), {})
+test('no reports warning since 0180 retired reports.view', () => {
+  // The report pages were removed (1d1038f) and the key left the catalogue
+  // with migration 0180, so its warning and messages are gone.
+  assert.deepEqual(
+    warned({ 'reports.view': 'all', 'movements.read': 'site' }),
+    {},
+  )
+  assert.doesNotMatch(read('src', 'lib', 'rolesAdmin.ts'), /reports\.view/)
+  assert.doesNotMatch(
+    read('src', 'i18n', 'translations.ts'),
+    /rolePermissions(HintReportsNeedReadAll|Warn(Site|Workshop)ReportNeedsRead)/,
+  )
 })
 
 test('warning 7: the admin home needs movements.read all', () => {
@@ -1153,9 +1134,9 @@ test('every warning message is a roles-page key in both languages, with {names} 
       (m) => m[1],
     ),
   )
-  assert.ok(messages.size >= 14)
+  // 0180 retired reports.view and its three messages.
+  assert.ok(messages.size >= 11)
   for (const message of messages) {
-    if (message === 'rolePermissionsHintReportsNeedReadAll') continue
     for (const [, block] of page) {
       const entry = new RegExp(`^ {4}${message}:\\n? *'([^']*)'`, 'm').exec(
         block,

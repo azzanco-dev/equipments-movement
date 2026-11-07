@@ -109,7 +109,7 @@ test('the forms use the split control; lists, details, import and messages carry
   assert.ok(input.includes("inputMode={letter ? 'text' : 'numeric'}"))
   assert.match(input, /text-base/) // 16 px on phones: no iOS zoom
   for (const list of ['screens/lessors/LessorsListScreen.tsx', 'screens/companies/CompaniesListScreen.tsx'])
-    assert.match(read('src', ...list.split('/')), /address,short_address,city/)
+    assert.match(read('src', ...list.split('/')), /address,short_address,email/)
   for (const dialog of ['screens/lessors/LessorDetailsDialog.tsx', 'screens/companies/CompanyDetailsDialog.tsx'])
     assert.match(read('src', ...dialog.split('/')), /formatShortAddress\(/)
   const imports = read('src', 'lib', 'partyImport.ts')

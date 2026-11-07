@@ -706,7 +706,6 @@ export const translations = {
     taxNumber: 'الرقم الضريبي',
     commercialRegister: 'الرقم الوطني الموحد',
     address: 'العنوان الكامل',
-    city: 'المدينة',
     iban: 'الايبان (IBAN)',
     bankName: 'البنك',
     bankNamePlaceholder: 'اختر البنك',
@@ -726,7 +725,6 @@ export const translations = {
     ibanFormatInvalid: 'الايبان يبدا بـ SA ويتكون من 24 خانة',
     emailFormatInvalid: 'صيغة البريد غير صحيحة',
     addressTooLong: 'العنوان يجب الا يزيد عن 200 حرف',
-    cityTooLong: 'المدينة يجب الا تزيد عن 60 حرفا',
     contactPersonTooLong: 'جهة الاتصال يجب الا تزيد عن 120 حرفا',
     contactNumberTooLong: 'رقم التواصل يجب الا يزيد عن 30 خانة',
     taxNumberExistsLessor: 'الرقم الضريبي مستخدم لمورد اخر',
@@ -1164,7 +1162,7 @@ export const translations = {
     rolesErrGeneric: 'تعذر تنفيذ العملية، حاول مرة اخرى',
     permissionGroupHome: 'اللوحات',
     permissionGroupMovements: 'الحركات',
-    permissionGroupReports: 'التقارير والاستعلام',
+    permissionGroupReports: 'الاستعلام',
     permissionGroupEquipment: 'المعدات',
     permissionGroupDrivers: 'السائقون',
     permissionGroupMasterData: 'البيانات الاساسية',
@@ -1198,8 +1196,6 @@ export const translations = {
     rolePermissionsCount: '{count} صلاحية',
     rolePermissionsLoadError: 'تعذر تحميل الصلاحيات',
     rolePermissionsHasProblems: 'صحح الصلاحيات المعلمة قبل الحفظ',
-    rolePermissionsHintReportsNeedReadAll:
-      'تقرير المعدات يحتاج ايضا «عرض الحركات» بنطاق «الكل».',
     roleUsersTitle: 'تعيين الادوار',
     roleUsersDesc: 'الدور الجديد لكل مستخدم. لا يغير شيئا قبل التفعيل.',
     roleUsersSearch: 'البحث باسم المستخدم',
@@ -1355,10 +1351,6 @@ export const translations = {
       'لوحة الورشة لن تعرض حركات الورشة بدون «{names}». اضفها بنطاق «الورشة» او «الكل».',
     rolePermissionsWarnHomeShadowed:
       'لن تعمل: «{names}» تتقدم عليها ويفتح المستخدم تلك اللوحة فقط، فتضيع ميزات هذه اللوحة. اترك لوحة واحدة.',
-    rolePermissionsWarnSiteReportNeedsRead:
-      'تقرير الدخوليات يظهر ناقصا: اجعل نطاق «{names}» «المشاريع» او «الكل».',
-    rolePermissionsWarnWorkshopReportNeedsRead:
-      'تقرير الورشة يظهر فارغا او ناقصا: اجعل نطاق «{names}» «الورشة» او «الكل».',
     rolePermissionsWarnAdminHomeNeedsReadAll:
       'حالات الاسطول وارقام لوحة الادمن تظهر ناقصة او خاطئة: اجعل نطاق «{names}» «الكل».',
     rolePermissionsWarnDeleteNeedsPhotos:
@@ -3342,7 +3334,6 @@ export const translations = {
     taxNumber: 'Tax number',
     commercialRegister: 'Unified national number',
     address: 'Full address',
-    city: 'City',
     iban: 'IBAN',
     bankName: 'Bank',
     bankNamePlaceholder: 'Choose the bank',
@@ -3362,7 +3353,6 @@ export const translations = {
     ibanFormatInvalid: 'The IBAN starts with SA and has 24 characters.',
     emailFormatInvalid: 'The email address is not valid.',
     addressTooLong: 'The address must not exceed 200 characters.',
-    cityTooLong: 'The city must not exceed 60 characters.',
     contactPersonTooLong: 'The contact person must not exceed 120 characters.',
     contactNumberTooLong: 'The contact number must not exceed 30 characters.',
     taxNumberExistsLessor: 'This tax number belongs to another supplier.',
@@ -3809,7 +3799,7 @@ export const translations = {
     rolesErrGeneric: 'The operation failed; try again',
     permissionGroupHome: 'Home pages',
     permissionGroupMovements: 'Movements',
-    permissionGroupReports: 'Reports and inquiry',
+    permissionGroupReports: 'Inquiry',
     permissionGroupEquipment: 'Equipment',
     permissionGroupDrivers: 'Drivers',
     permissionGroupMasterData: 'Master data',
@@ -3844,8 +3834,6 @@ export const translations = {
     rolePermissionsCount: '{count} permissions',
     rolePermissionsLoadError: 'Could not load the permissions',
     rolePermissionsHasProblems: 'Fix the marked permissions before saving',
-    rolePermissionsHintReportsNeedReadAll:
-      'The equipment report also needs “View movements” with the “All” scope.',
     roleUsersTitle: 'Role assignments',
     roleUsersDesc:
       'The new role of each user. It changes nothing before activation.',
@@ -4009,10 +3997,6 @@ export const translations = {
       'The workshop home lists no workshop movement without “{names}”. Add it with the “Workshop” or “All” scope.',
     rolePermissionsWarnHomeShadowed:
       'Does not apply: “{names}” comes first and the user gets that home only, so this home’s features are lost. Keep one home.',
-    rolePermissionsWarnSiteReportNeedsRead:
-      'The entries report is incomplete: set the scope of “{names}” to “Projects” or “All”.',
-    rolePermissionsWarnWorkshopReportNeedsRead:
-      'The workshop report is empty or incomplete: set the scope of “{names}” to “Workshop” or “All”.',
     rolePermissionsWarnAdminHomeNeedsReadAll:
       'The admin home’s fleet states and figures are incomplete or wrong: set the scope of “{names}” to “All”.',
     rolePermissionsWarnDeleteNeedsPhotos:

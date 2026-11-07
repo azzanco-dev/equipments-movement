@@ -4,7 +4,6 @@ import {
   EMAIL_SHAPE_PATTERN,
   PARTY_ADDRESS_MAX,
   PARTY_BANK_NAME_MAX,
-  PARTY_CITY_MAX,
   PARTY_CONTACT_NUMBER_MAX,
   PARTY_CONTACT_PERSON_MAX,
   PARTY_EMAIL_MAX,
@@ -61,7 +60,6 @@ export const PARTY_LABEL_KEYS: Record<PartyImportField, TranslationKey> = {
   commercial_register: 'commercialRegister',
   address: 'address',
   short_address: 'shortAddress',
-  city: 'city',
   email: 'email',
   contact_person: 'contactPerson',
   contact_number: 'contactNumber',
@@ -74,7 +72,6 @@ const PARTY_TEXT_LIMITS: Partial<
   Record<PartyImportField, readonly [number, TranslationKey]>
 > = {
   address: [PARTY_ADDRESS_MAX, 'addressTooLong'],
-  city: [PARTY_CITY_MAX, 'cityTooLong'],
   contact_person: [PARTY_CONTACT_PERSON_MAX, 'contactPersonTooLong'],
   contact_number: [PARTY_CONTACT_NUMBER_MAX, 'contactNumberTooLong'],
   bank_name: [PARTY_BANK_NAME_MAX, 'bankNameTooLong'],
@@ -88,7 +85,6 @@ export const PARTY_TEMPLATE_SAMPLES: Record<PartyImportField, string> = {
   commercial_register: '7001234567',
   address: 'حي العليا، طريق الملك فهد',
   short_address: 'RRRD2929',
-  city: 'الرياض',
   email: 'info@example.com',
   bank_name: 'مصرف الراجحي',
   iban: 'SA0380000000608010167519',

@@ -100,10 +100,10 @@ test('every new field is optional; the shapes are messages under the field', () 
   assert.deepEqual(
     plain(
       companyForm.validateCompanyForm(
-        company({ contact_number: '0'.repeat(31), city: 'x'.repeat(61) }),
+        company({ contact_number: '0'.repeat(31) }),
       ),
     ),
-    { contact_number: 'contactNumberTooLong', city: 'cityTooLong' },
+    { contact_number: 'contactNumberTooLong' },
   )
 })
 
@@ -189,11 +189,11 @@ test('both lists search the two numbers, with no new column', () => {
 test('the list rows carry every field the dialogs save', () => {
   assert.match(
     read('src', 'screens', 'lessors', 'LessorsListScreen.tsx'),
-    /'id,name,contact_person,contact_number,tax_number,commercial_register,address,short_address,city,email,bank_name,iban,created_at,updated_at'/,
+    /'id,name,contact_person,contact_number,tax_number,commercial_register,address,short_address,email,bank_name,iban,created_at,updated_at'/,
   )
   assert.match(
     read('src', 'screens', 'companies', 'CompaniesListScreen.tsx'),
-    /'id,name_ar,name_en,tax_number,commercial_register,address,short_address,city,email,contact_person,contact_number,created_at,updated_at'/,
+    /'id,name_ar,name_en,tax_number,commercial_register,address,short_address,email,contact_person,contact_number,created_at,updated_at'/,
   )
 })
 
@@ -211,7 +211,7 @@ test('the import headers: Arabic, English, raw keys and the form labels', () => 
     tax_number: 'الرقم الضريبي',
     commercial_register: 'CR Number',
     address: 'العنوان',
-    // No city column since the owner took the city out (2026-11-05).
+    // No city column: the owner took it out (2026-11-05), 0181 dropped it.
     email: 'البريد',
     bank_name: 'اسم البنك',
     iban: 'IBAN',

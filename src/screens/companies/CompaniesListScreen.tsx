@@ -29,7 +29,7 @@ import { CompanyProjectsDialog } from './CompanyProjectsDialog'
 // list row, so the row carries every field the form saves (a field left out
 // here would be saved back as empty).
 const LIST_SELECT =
-  'id,name_ar,name_en,tax_number,commercial_register,address,short_address,city,email,contact_person,contact_number,created_at,updated_at'
+  'id,name_ar,name_en,tax_number,commercial_register,address,short_address,email,contact_person,contact_number,created_at,updated_at'
 
 /** Orchestrator for the companies list; same shape as the equipment and
  *  drivers screens. */
