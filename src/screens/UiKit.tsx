@@ -60,6 +60,7 @@ import { SalesMockup } from '@/screens/ui-kit/SalesMockup'
 import { ActivityMockup } from '@/screens/ui-kit/ActivityMockup'
 import { BankLogosMockup } from '@/screens/ui-kit/BankLogosMockup'
 import { BreadcrumbsMockup } from '@/screens/ui-kit/BreadcrumbsMockup'
+import { PartyDocumentsMockup } from '@/screens/ui-kit/PartyDocumentsMockup'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -126,6 +127,17 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // Owner 2026-11-07: «نبغى نضيف امكانية رفع الملفات pdf او صور في
+    // معلومات الموردين والشركات», then «ابدا» on the plan. Sample data only.
+    id: 'party-documents',
+    title: 'مستندات الموردين والشركات',
+    purpose:
+      'قسم «المستندات» في تفاصيل المورد والشركة: السجل التجاري وشهادة الضريبة وشهادة الايبان (للموردين) والعنوان الوطني ومستندات اخرى، PDF او صورة حتى 10 ميغا، مع تاريخ انتهاء اختياري.',
+    status: 'review',
+    defaultOpen: true,
+    element: <PartyDocumentsMockup />,
+  },
   {
     // Owner 2026-11-07: «نبغى نضبط ازرار الرجوع الي عندنا كلها» then
     // «ونضيف breadcrumbs». Approved the same day as variant «ب» (the trail
