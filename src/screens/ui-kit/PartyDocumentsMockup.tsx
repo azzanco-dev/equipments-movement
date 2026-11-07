@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
   Building2,
   Briefcase,
@@ -12,17 +12,18 @@ import {
   Upload,
   X,
 } from 'lucide-react'
-import { Badge, Button, IconButton } from '@/components/ui'
+import { Button, IconButton } from '@/components/ui'
 
 /**
  * Owner 2026-11-07: «نبغى نضيف امكانية رفع الملفات pdf او صور في معلومات
  * الموردين والشركات مثل السجل التجاري شهادة الضريبة شهادة الايبان العنوان
  * الوطني», then «ابدا» on the plan: one current file per document type
- * («مستندات اخرى» takes several), an optional expiry date with «منتهي» /
- * «ينتهي قريبا» (30 days), PDF or an image up to 10 MB, the documents are not
- * counted in the completeness ring, view for the readers of the list and
- * upload / replace / delete for its edit key. Sample data only: nothing is
- * uploaded or stored; a file picked here is previewed in this browser only.
+ * («مستندات اخرى» takes several, each named by the user), PDF or an image up
+ * to 10 MB, the documents are not counted in the completeness ring, view for
+ * the readers of the list and upload / replace / delete for its edit key.
+ * His review the same day: «بدون تاريخ الانتهاء ماعلينا منهم وبدون تاريخ
+ * الرفع ومين رفعه» — a tile shows the file only. Sample data only: nothing
+ * is uploaded or stored; a file picked here is previewed in this browser only.
  */
 
 type PartyKind = 'lessor' | 'company'
@@ -39,11 +40,8 @@ interface SampleDoc {
   name: string
   kind: 'pdf' | 'image'
   sizeMb: number
-  uploadedBy: string
-  uploadedAt: string
-  /** Days from today; negative = already ended. */
-  expiresInDays?: number
-  note?: string
+  /** The name of an extra document («مستندات اخرى»). */
+  title?: string
   /** A file picked in this mockup (an object URL), previewed locally. */
   previewUrl?: string
 }
@@ -75,9 +73,6 @@ const SAMPLE: Record<PartyKind, SampleDoc[]> = {
       name: 'CR-7001234567.pdf',
       kind: 'pdf',
       sizeMb: 0.8,
-      uploadedBy: 'مبارك بكرمان',
-      uploadedAt: '2026-11-05',
-      expiresInDays: 18,
     },
     {
       id: 'l2',
@@ -85,9 +80,6 @@ const SAMPLE: Record<PartyKind, SampleDoc[]> = {
       name: 'vat-certificate.jpg',
       kind: 'image',
       sizeMb: 2.4,
-      uploadedBy: 'مبارك بكرمان',
-      uploadedAt: '2026-10-29',
-      expiresInDays: -12,
     },
     {
       id: 'l3',
@@ -95,8 +87,6 @@ const SAMPLE: Record<PartyKind, SampleDoc[]> = {
       name: 'iban-alrajhi.pdf',
       kind: 'pdf',
       sizeMb: 0.3,
-      uploadedBy: 'الخضر العزاني',
-      uploadedAt: '2026-11-06',
     },
     {
       id: 'l4',
@@ -104,9 +94,7 @@ const SAMPLE: Record<PartyKind, SampleDoc[]> = {
       name: 'contract-2026.pdf',
       kind: 'pdf',
       sizeMb: 4.1,
-      uploadedBy: 'مبارك بكرمان',
-      uploadedAt: '2026-11-01',
-      note: 'عقد الايجار الموقع',
+      title: 'عقد الايجار الموقع',
     },
   ],
   company: [
@@ -116,9 +104,6 @@ const SAMPLE: Record<PartyKind, SampleDoc[]> = {
       name: 'cr-takween.pdf',
       kind: 'pdf',
       sizeMb: 1.1,
-      uploadedBy: 'مبارك بكرمان',
-      uploadedAt: '2026-11-02',
-      expiresInDays: 240,
     },
     {
       id: 'c2',
@@ -126,53 +111,15 @@ const SAMPLE: Record<PartyKind, SampleDoc[]> = {
       name: 'national-address.png',
       kind: 'image',
       sizeMb: 0.6,
-      uploadedBy: 'مبارك بكرمان',
-      uploadedAt: '2026-11-04',
     },
   ],
 }
 
 const MAX_MB = 10
-const SOON_DAYS = 30
 const ACCEPT = 'application/pdf,image/jpeg,image/png,image/webp'
-
-// The month names without alif with hamza (the browser's Arabic month names
-// carry it, as in October).
-const MONTHS = [
-  'يناير',
-  'فبراير',
-  'مارس',
-  'ابريل',
-  'مايو',
-  'يونيو',
-  'يوليو',
-  'اغسطس',
-  'سبتمبر',
-  'اكتوبر',
-  'نوفمبر',
-  'ديسمبر',
-]
-
-function dayLabel(iso: string) {
-  const [year, month, day] = iso.split('-').map(Number)
-  return `${day} ${MONTHS[month - 1]} ${year}`
-}
-
-function inDays(days: number) {
-  const date = new Date()
-  date.setDate(date.getDate() + days)
-  return date.toISOString().slice(0, 10)
-}
 
 function sizeLabel(mb: number) {
   return mb < 1 ? `${Math.round(mb * 1024)} كيلو` : `${mb.toFixed(1)} ميغا`
-}
-
-function ExpiryBadge({ days }: { days?: number }) {
-  if (days === undefined) return null
-  if (days < 0) return <Badge size="sm" tone="danger">منتهي</Badge>
-  if (days <= SOON_DAYS) return <Badge size="sm" tone="warning">ينتهي قريبا</Badge>
-  return <Badge size="sm" tone="success">ساري</Badge>
 }
 
 function Panel({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
@@ -220,12 +167,12 @@ function DocumentTile({
 }) {
   if (!doc)
     return (
-      <div className="flex min-h-28 flex-col justify-between gap-2 rounded-lg border border-dashed bg-bg p-3">
+      <div className="flex min-h-24 flex-col justify-between gap-2 rounded-lg border border-dashed bg-bg p-3">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium">{DOC_LABELS[type]}</span>
           <span className="text-xs text-placeholder">غير مرفوع</span>
         </div>
-        {canEdit ? (
+        {canEdit && (
           <Button
             size="sm"
             icon={<Upload size={14} aria-hidden="true" />}
@@ -234,23 +181,17 @@ function DocumentTile({
           >
             رفع ملف
           </Button>
-        ) : (
-          <span className="text-xs text-placeholder">لم يرفع بعد</span>
         )}
       </div>
     )
 
-  // An extra file is named by its note («عقد الايجار الموقع»), else «مستند اخر».
-  const title = type === 'other' ? (doc.note ?? 'مستند اخر') : DOC_LABELS[type]
-  const note = type === 'other' ? undefined : doc.note
+  // An extra file is named by the user («عقد الايجار الموقع»), else «مستند اخر».
+  const title = type === 'other' ? (doc.title ?? 'مستند اخر') : DOC_LABELS[type]
   return (
-    <div className="flex min-h-28 gap-3 rounded-lg border bg-bg p-3">
+    <div className="flex min-h-24 gap-3 rounded-lg border bg-bg p-3">
       <FileThumb doc={doc} />
       <div className="min-w-0 flex-1 space-y-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium">{title}</span>
-          <ExpiryBadge days={doc.expiresInDays} />
-        </div>
+        <span className="text-sm font-medium">{title}</span>
         <p className="truncate text-xs" title={doc.name}>
           <bdi dir="ltr">{doc.name}</bdi>
         </p>
@@ -258,15 +199,6 @@ function DocumentTile({
           {sizeLabel(doc.sizeMb)} ·{' '}
           {doc.kind === 'pdf' ? <bdi dir="ltr">PDF</bdi> : 'صورة'}
         </p>
-        <p className="text-xs text-muted">
-          رفعه {doc.uploadedBy} · {dayLabel(doc.uploadedAt)}
-        </p>
-        {doc.expiresInDays !== undefined && (
-          <p className="text-xs text-muted">
-            {doc.expiresInDays < 0 ? 'انتهى' : 'ينتهي'} {dayLabel(inDays(doc.expiresInDays))}
-          </p>
-        )}
-        {note && <p className="text-xs text-muted">{note}</p>}
       </div>
       <div className="flex shrink-0 flex-col gap-1">
         <IconButton size="sm" label="عرض" title="عرض" icon={<Eye size={15} />} />
@@ -306,9 +238,9 @@ function UploadForm({
   onSave: (doc: SampleDoc) => void
 }) {
   const [file, setFile] = useState<File | null>(null)
-  const [expiry, setExpiry] = useState('')
-  const [note, setNote] = useState('')
+  const [title, setTitle] = useState('')
   const [error, setError] = useState('')
+  const other = type === 'other'
 
   const pick = (picked: File | undefined) => {
     setError('')
@@ -329,19 +261,17 @@ function UploadForm({
       setError('اختر ملفا اولا')
       return
     }
-    const days = expiry
-      ? Math.round((new Date(expiry).getTime() - Date.now()) / 86_400_000)
-      : undefined
+    if (other && !title.trim()) {
+      setError('اكتب اسم المستند')
+      return
+    }
     onSave({
       id: `local-${Date.now()}`,
       type,
       name: file.name,
       kind: file.type === 'application/pdf' ? 'pdf' : 'image',
       sizeMb: file.size / 1024 / 1024,
-      uploadedBy: 'انت',
-      uploadedAt: new Date().toISOString().slice(0, 10),
-      expiresInDays: days,
-      note: note.trim() || undefined,
+      title: other ? title.trim() : undefined,
       previewUrl: URL.createObjectURL(file),
     })
   }
@@ -350,8 +280,7 @@ function UploadForm({
     <div className="space-y-3 rounded-xl border bg-[var(--surface)] p-4">
       <div className="flex items-center justify-between gap-2">
         <h4 className="text-sm font-semibold">
-          {replacing ? 'استبدال' : 'رفع'}{' '}
-          {type === 'other' ? 'مستند اخر' : DOC_LABELS[type]}
+          {replacing ? 'استبدال' : 'رفع'} {other ? 'مستند اخر' : DOC_LABELS[type]}
         </h4>
         <IconButton size="sm" label="اغلاق" icon={<X size={15} />} onClick={onCancel} />
       </div>
@@ -371,27 +300,16 @@ function UploadForm({
           onChange={(event) => pick(event.target.files?.[0])}
         />
       </label>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="space-y-1.5">
-          <span className="label">تاريخ الانتهاء (اختياري)</span>
+      {other && (
+        <label className="block space-y-1.5">
+          <span className="label">اسم المستند</span>
           <input
-            type="date"
-            value={expiry}
-            onChange={(event) => setExpiry(event.target.value)}
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
             className="input h-10 w-full text-base md:h-9 md:text-sm"
           />
         </label>
-        <label className="space-y-1.5">
-          <span className="label">
-            {type === 'other' ? 'اسم المستند' : 'ملاحظة (اختياري)'}
-          </span>
-          <input
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            className="input h-10 w-full text-base md:h-9 md:text-sm"
-          />
-        </label>
-      </div>
+      )}
       {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
       <div className="flex justify-end gap-2">
         <Button onClick={onCancel}>الغاء</Button>
@@ -423,13 +341,6 @@ export function PartyDocumentsMockup() {
   const types = DOC_TYPES[kind]
   const others = list.filter((doc) => doc.type === 'other')
   const filled = types.filter((type) => list.some((doc) => doc.type === type)).length
-  const attention = useMemo(
-    () =>
-      list.filter(
-        (doc) => doc.expiresInDays !== undefined && doc.expiresInDays <= SOON_DAYS,
-      ).length,
-    [list],
-  )
 
   const save = (doc: SampleDoc) => {
     setDocs((current) => {
@@ -484,7 +395,7 @@ export function PartyDocumentsMockup() {
 
       <Panel
         title="1. قسم «المستندات» في نافذة التفاصيل"
-        note="يظهر تحت اقسام البيانات في تفاصيل المورد والشركة. ملف واحد لكل نوع، والاستبدال يحل محله. «مستندات اخرى» تقبل اكثر من ملف. جرب الرفع بملف من جهازك: يظهر هنا فقط ولا يرفع لاي مكان."
+        note="يظهر تحت اقسام البيانات في تفاصيل المورد والشركة. ملف واحد لكل نوع، والاستبدال يحل محله. «مستندات اخرى» تقبل اكثر من ملف باسم تكتبه. جرب الرفع بملف من جهازك: يظهر هنا فقط ولا يرفع لاي مكان."
       >
         <div className="max-w-3xl rounded-xl border bg-[var(--surface)] p-4">
           <h4 className="mb-3 flex flex-wrap items-center gap-2 text-sm font-semibold">
@@ -493,11 +404,6 @@ export function PartyDocumentsMockup() {
             <span className="text-xs font-normal text-muted">
               {filled} من {types.length}
             </span>
-            {attention > 0 && (
-              <Badge size="sm" tone="warning">
-                {attention} تحتاج تجديد
-              </Badge>
-            )}
           </h4>
           <div className="grid gap-3 sm:grid-cols-2">
             {types.map((type) => {
@@ -560,30 +466,12 @@ export function PartyDocumentsMockup() {
         </div>
       </Panel>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="2. حالات تاريخ الانتهاء">
-          <div className="flex flex-wrap items-center gap-3 text-xs">
-            <span className="flex items-center gap-1.5">
-              <Badge size="sm" tone="success">ساري</Badge> اكثر من {SOON_DAYS} يوما
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Badge size="sm" tone="warning">ينتهي قريبا</Badge> خلال {SOON_DAYS} يوما
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Badge size="sm" tone="danger">منتهي</Badge> مضى تاريخه
-            </span>
-          </div>
-          <p className="text-xs text-muted">
-            التاريخ اختياري: مستند بدون تاريخ ما يظهر عليه شي. بدون اشعارات الحين.
-          </p>
-        </Panel>
-        <Panel title="3. العرض">
-          <p className="text-xs text-muted">
-            «عرض» يفتح الصورة في عارض الصور المعتمد بدون قص، والـ PDF في تبويب
-            جديد. الرابط مؤقت لدقائق، والملفات ما لها رابط عام.
-          </p>
-        </Panel>
-      </div>
+      <Panel title="2. العرض">
+        <p className="text-xs text-muted">
+          «عرض» يفتح الصورة في عارض الصور المعتمد بدون قص، والـ PDF في تبويب
+          جديد. الرابط مؤقت لدقائق، والملفات ما لها رابط عام.
+        </p>
+      </Panel>
     </div>
   )
 }

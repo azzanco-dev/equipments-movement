@@ -30,11 +30,16 @@ test('the document types: the IBAN certificate for suppliers only', () => {
 test('PDF or an image up to 10 MB, nothing leaves the browser', () => {
   assert.match(mockup, /const MAX_MB = 10\n/)
   assert.match(mockup, /const ACCEPT = 'application\/pdf,image\/jpeg,image\/png,image\/webp'/)
-  assert.match(mockup, /const SOON_DAYS = 30\n/)
   assert.doesNotMatch(mockup, /supabase|fetch\(|storage/i)
   // Evidence is never cropped.
   assert.match(mockup, /object-contain/)
   assert.doesNotMatch(mockup, /object-cover/)
+})
+
+test('no expiry date, upload date or uploader (owner 2026-11-07)', () => {
+  // «بدون تاريخ الانتهاء ماعلينا منهم وبدون تاريخ الرفع ومين رفعه»
+  assert.doesNotMatch(mockup, /expires|SOON_DAYS|uploadedBy|uploadedAt/)
+  assert.doesNotMatch(mockup, /'(منتهي|ينتهي قريبا|ساري)'|>(منتهي|ينتهي قريبا|ساري)<|رفعه |تاريخ الانتهاء \(/)
 })
 
 test('tokens only, no hamza alif, no letter-spacing', () => {
