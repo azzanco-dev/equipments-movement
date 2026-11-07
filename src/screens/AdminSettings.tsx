@@ -30,6 +30,7 @@ import {
   PageHeader,
   SearchInput,
   useConfirm,
+  usePageTrail,
 } from '@/components/ui'
 import type { DataTableColumn } from '@/components/ui'
 // Imported directly: Notice is not yet wired into the `ui` barrel
@@ -101,6 +102,9 @@ export function AdminSettings() {
   const { t } = useI18n()
   const router = useRouter()
   const pathname = usePathname()
+  // The one back rule of the page trail (App), else the Settings hub.
+  const pageTrail = usePageTrail()
+  const backToSettings = pageTrail?.back ?? (() => router.push('/settings'))
   const showEquipmentTypes = pathname === '/settings/equipment-types'
   const showWorkshopOpening = pathname === '/settings/workshop-opening-balance'
   // wave 17: the Afaqy tracker link.
@@ -394,7 +398,7 @@ export function AdminSettings() {
         <PageHeader
           title={t('workshopOpeningBalance')}
           description={t('workshopOpeningBalanceDesc')}
-          onBack={() => router.push('/settings')}
+          onBack={backToSettings}
           backLabel={t('backToSettings')}
         />
         {openingMessage && (
@@ -448,7 +452,7 @@ export function AdminSettings() {
         <PageHeader
           title={t('afaqySettingsTitle')}
           description={t('afaqySettingsDesc')}
-          onBack={() => router.push('/settings')}
+          onBack={backToSettings}
           backLabel={t('backToSettings')}
         />
         <AfaqySettings />
@@ -461,7 +465,7 @@ export function AdminSettings() {
         <PageHeader
           title={t('banks')}
           description={t('banksDesc')}
-          onBack={() => router.push('/settings')}
+          onBack={backToSettings}
           backLabel={t('backToSettings')}
         />
         <BanksSettings />
@@ -648,7 +652,7 @@ export function AdminSettings() {
       <PageHeader
         title={t('equipmentTypes')}
         description={t('equipmentTypesDesc')}
-        onBack={() => router.push('/settings')}
+        onBack={backToSettings}
         backLabel={t('backToSettings')}
         actions={
           <>

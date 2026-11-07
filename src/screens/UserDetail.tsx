@@ -47,7 +47,7 @@ import {
   type FieldErrors,
 } from '@/lib/formValidation'
 import {
-  BackButton,
+  PageTrailBar,
   Badge,
   Button,
   DetailHeader,
@@ -721,17 +721,21 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     if (currentUser?.id === userId) void reloadPermissions()
   }
 
-  async function handleBack() {
-    if (
-      hasUnsavedChanges &&
-      !(await confirm({
+  // Leaving with unsaved changes asks first: the back button and the
+  // trail's crumbs alike.
+  async function confirmLeave() {
+    return (
+      !hasUnsavedChanges ||
+      confirm({
         title: t('unsavedChanges'),
         description: t('dialogDescUnsavedChanges'),
         tone: 'danger',
-      }))
+      })
     )
-      return
-    onBack()
+  }
+
+  async function handleBack() {
+    if (await confirmLeave()) onBack()
   }
 
   // Skeleton only while there is no user to show yet.
@@ -742,7 +746,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   if (!user || loadedUserId !== userId)
     return (
       <div className="mx-auto max-w-3xl space-y-4">
-        <BackButton onClick={onBack} />
+        <PageTrailBar onBack={onBack} />
         <ErrorState
           description={errorMessage(loadFailure?.cause)}
           onRetry={() => setReloadKey((key) => key + 1)}
@@ -859,7 +863,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <BackButton onClick={handleBack} />
+      <PageTrailBar onBack={handleBack} confirmLeave={confirmLeave} />
       <div className="card space-y-5">
         <DetailHeader
           as="h1"

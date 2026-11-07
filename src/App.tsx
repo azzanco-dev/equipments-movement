@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { useEffect, useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
@@ -10,6 +10,20 @@ import { FullPageSpinner } from '@/components/Spinner'
 import { Layout } from '@/components/Layout'
 import { TabTitleProvider, useTabTitleRecord } from '@/components/TabTitle'
 import { tabTitle } from '@/lib/pageTitle'
+import { pageTrail } from '@/lib/pageTrail'
+import {
+  backTargetPath,
+  planBack,
+  readLastUrls,
+  readTrail,
+  recordVisit,
+  rememberedUrl,
+  type TrailEntry,
+} from '@/lib/backNavigation'
+import {
+  PageTrailProvider,
+  type PageTrailValue,
+} from '@/components/ui/PageTrail'
 import { AuthScreen } from '@/screens/AuthScreen'
 import {
   LayoutDashboard,
@@ -408,6 +422,17 @@ function AppContent() {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
   }, [pathname])
 
+  // The back rule (owner 2026-11-07, «نبغى نضبط ازرار الرجوع»): the app's
+  // own trail of the URLs shown in this tab (src/lib/backNavigation.ts).
+  const searchString = searchParams.toString()
+  const currentUrl = searchString ? `${pathname}?${searchString}` : pathname
+  const [navTrail, setNavTrail] = useState<readonly TrailEntry[]>([])
+  const firstVisitRef = useRef(true)
+  useEffect(() => {
+    setNavTrail(recordVisit(currentUrl, firstVisitRef.current))
+    firstVisitRef.current = false
+  }, [currentUrl])
+
   // Warm the screen's chunk as soon as a session is known, while the profile
   // is still loading.
   const signedIn = Boolean(session)
@@ -497,6 +522,16 @@ function AppContent() {
 
   const openMovement = (id: string) => router.push(`/movements/${id}`)
   const backToDashboard = () => router.push('/dashboard')
+  // Back: the page before in this tab, else the parent list with the filters
+  // it last had (the one back rule of every detail and settings page).
+  const goBackTo = (fallbackPath: string) => () => {
+    const plan = planBack(
+      readTrail(),
+      rememberedUrl(readLastUrls(), fallbackPath),
+    )
+    if (plan.kind === 'history') router.back()
+    else router.push(plan.url)
+  }
   const navigate = (target: string) => router.push(`/${target}`)
 
   // Every shell has the sidebar (owner 2026-10-28: «نبغى نضيف السايد بار
@@ -527,8 +562,37 @@ function AppContent() {
   const canCreateMovement = shell.pages.has('movements/new')
   const canOpenLogs = shell.pages.has('logs')
 
+  // The trail above a detail or settings page (approved on /ui-kit «المسار
+  // وازرار الرجوع», variant «ب»); a parent the shell does not open is text.
+  const trail = pageTrail(page, t, tabTitleRecord, {
+    fieldHome,
+    movementType,
+    opens: (path) =>
+      shell.pages.has(routePageOf(path.split('/').filter(Boolean))),
+  })
+  let trailValue: PageTrailValue | null = null
+  if (trail) {
+    const lastUrls = readLastUrls()
+    const toParent = backTargetPath(navTrail, trail.parentPath) === trail.parentPath
+    trailValue = {
+      trail: {
+        ...trail,
+        crumbs: trail.crumbs.map((crumb) =>
+          crumb.href
+            ? { ...crumb, href: rememberedUrl(lastUrls, crumb.href) }
+            : crumb,
+        ),
+      },
+      back: goBackTo(trail.parentPath),
+      backLabel: toParent
+        ? t('backToPage').replace('{name}', trail.parentLabel)
+        : t('back'),
+      phoneLabel: toParent ? trail.parentLabel : t('back'),
+    }
+  }
+
   return (
-    <>
+    <PageTrailProvider value={trailValue}>
       <Layout
         activePage={navKeyOfPage(page)}
         onNavigate={navigate}
@@ -548,20 +612,20 @@ function AppContent() {
               permissions.has('movements.workshop.create')
             }
             // A field home goes back to its home, the admin shell to the log.
-            onClose={fieldHome ? backToDashboard : () => router.push('/logs')}
+            onClose={goBackTo(fieldHome ? '/dashboard' : '/logs')}
             onViewMovement={openMovement}
             onGoHome={backToDashboard}
           />
         ) : page === 'movements/:id' ? (
           <MovementDetail
             movementId={detailId}
-            onBack={fieldHome ? backToDashboard : () => router.back()}
+            onBack={goBackTo(fieldHome ? '/dashboard' : '/logs')}
             onNavigateMovement={openMovement}
           />
         ) : page === 'equipment/:id' ? (
           <EquipmentDetail
             equipmentId={detailId}
-            onBack={() => router.push('/equipment')}
+            onBack={goBackTo('/equipment')}
             onEdit={(equipment) =>
               router.push(`/equipment?edit=${encodeURIComponent(equipment.id)}`)
             }
@@ -585,7 +649,7 @@ function AppContent() {
         ) : page === 'sales/:id' ? (
           <ClientPoDetail
             poId={detailId}
-            onBack={() => router.push('/sales/orders')}
+            onBack={goBackTo('/sales/orders')}
             onOpenEquipment={
               canOpenEquipment
                 ? (id) => router.push(`/equipment/${id}`)
@@ -595,7 +659,7 @@ function AppContent() {
         ) : page === 'sales/cards/:id' ? (
           <EquipmentCardDetail
             cardId={segments[2] ?? ''}
-            onBack={() => router.push('/sales/cards')}
+            onBack={goBackTo('/sales/prices')}
             onOpenEquipment={
               canOpenEquipment
                 ? (id) => router.push(`/equipment/${id}`)
@@ -614,7 +678,7 @@ function AppContent() {
         ) : page === 'purchasing/:id' ? (
           <SupplierPoDetail
             poId={detailId}
-            onBack={() => router.push('/purchasing/orders')}
+            onBack={goBackTo('/purchasing/orders')}
             onOpenEquipment={
               canOpenEquipment
                 ? (id) => router.push(`/equipment/${id}`)
@@ -624,10 +688,10 @@ function AppContent() {
         ) : page === 'drivers/:id' ? (
           <DriverDetail
             driverId={detailId}
-            onBack={() => router.push('/drivers')}
+            onBack={goBackTo('/drivers')}
           />
         ) : page === 'users/:id' ? (
-          <UserDetail userId={detailId} onBack={() => router.push('/users')} />
+          <UserDetail userId={detailId} onBack={goBackTo('/users')} />
         ) : (
           <>
             {page === 'dashboard' && fieldHome && (
@@ -743,7 +807,7 @@ function AppContent() {
         )}
       </Layout>
       {passwordDialog}
-    </>
+    </PageTrailProvider>
   )
 }
 

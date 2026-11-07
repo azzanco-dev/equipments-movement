@@ -38,7 +38,7 @@ import {
   SupplierPoStatusBadge,
 } from '@/components/purchasing/SupplierPoStatusBadge'
 import {
-  BackButton,
+  PageTrailBar,
   Badge,
   Button,
   Card,
@@ -252,7 +252,7 @@ export function SupplierPoDetail({
   if (!po)
     return (
       <div className="space-y-4">
-        <BackButton onClick={onBack} label={t('supplierPoBackToList')} />
+        <PageTrailBar onBack={onBack} fallbackLabel={t('supplierPoBackToList')} />
         {loadError ? (
           <ErrorState
             description={t('supplierPoLoadError')}
@@ -451,7 +451,7 @@ export function SupplierPoDetail({
 
   return (
     <div className="space-y-4">
-      <BackButton onClick={onBack} label={t('supplierPoBackToList')} />
+      <PageTrailBar onBack={onBack} fallbackLabel={t('supplierPoBackToList')} />
 
       {loadError && (
         <Notice tone="danger" size="compact">

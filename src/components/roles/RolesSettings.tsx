@@ -20,6 +20,7 @@ import {
   cn,
   useConfirm,
   useToast,
+  usePageTrail,
 } from '@/components/ui'
 import {
   fill,
@@ -231,8 +232,12 @@ function RolesSettingsPage() {
     navigate({ tab: next }, 'replace')
   }
 
+  // The one back rule of the page trail (App), else the Settings hub.
+  const pageTrail = usePageTrail()
   const goBack = async () => {
-    if (await confirmDiscard()) router.push('/settings')
+    if (!(await confirmDiscard())) return
+    if (pageTrail) pageTrail.back()
+    else router.push('/settings')
   }
 
   const toggleActive = async (role: RoleRow) => {
@@ -296,6 +301,7 @@ function RolesSettingsPage() {
       description={t('rolesSettingsDesc')}
       onBack={() => void goBack()}
       backLabel={t('backToSettings')}
+      confirmLeave={confirmDiscard}
       actions={
         access === 'allowed' ? (
           <Button

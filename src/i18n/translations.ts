@@ -1487,6 +1487,9 @@ export const translations = {
     required: 'مطلوب',
     optional: 'اختياري',
     back: 'رجوع',
+    // The page trail (owner 2026-11-07, /ui-kit «المسار وازرار الرجوع»).
+    backToPage: 'رجوع الى {name}',
+    breadcrumbLabel: 'مسار الصفحة',
     next: 'التالي',
     previous: 'السابق',
     saveChanges: 'حفظ التغييرات',
@@ -4138,6 +4141,8 @@ export const translations = {
     required: 'Required',
     optional: 'Optional',
     back: 'Back',
+    backToPage: 'Back to {name}',
+    breadcrumbLabel: 'Breadcrumb',
     next: 'Next',
     previous: 'Previous',
     saveChanges: 'Save Changes',

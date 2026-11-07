@@ -58,7 +58,7 @@ import {
 import { SaleAmountOrDash } from '@/components/sales/SalePrice'
 import {
   AppLink,
-  BackButton,
+  PageTrailBar,
   Badge,
   Button,
   Card,
@@ -426,7 +426,10 @@ function CardDetail({
   if (!card)
     return (
       <div className="space-y-4">
-        <BackButton onClick={onBack} label={t('equipmentCardBackToList')} />
+        <PageTrailBar
+        onBack={onBack}
+        fallbackLabel={t('equipmentCardBackToList')}
+      />
         {loadError ? (
           <ErrorState
             description={t('equipmentCardLoadError')}
@@ -969,7 +972,10 @@ function CardDetail({
 
   return (
     <div className="space-y-4">
-      <BackButton onClick={onBack} label={t('equipmentCardBackToList')} />
+      <PageTrailBar
+        onBack={onBack}
+        fallbackLabel={t('equipmentCardBackToList')}
+      />
 
       {loadError && (
         <Notice tone="danger" size="compact">

@@ -1,42 +1,22 @@
 import type { ReactNode } from 'react'
-import { ArrowLeft } from 'lucide-react'
-import { useI18n } from '@/i18n/I18nContext'
-import { Button } from './Button'
 import { cn } from './cn'
+import { PageTrailBar } from './PageTrail'
 
-export interface BackButtonProps {
-  onClick: () => void
-  /** Defaults to the shared "back" string. */
-  label?: string
-  className?: string
-}
-
-/** A ghost button with a direction-aware chevron (mirrored in RTL via the
- * shared `.rtl-flip` utility, same as the rest of the app). */
-export function BackButton({ onClick, label, className }: BackButtonProps) {
-  const { t } = useI18n()
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      onClick={onClick}
-      className={cn('-ms-2', className)}
-      icon={<ArrowLeft size={16} aria-hidden="true" className="rtl-flip" />}
-    >
-      {label ?? t('back')}
-    </Button>
-  )
-}
+export { BackButton } from './BackButton'
+export type { BackButtonProps } from './BackButton'
 
 export interface PageHeaderProps {
   title: ReactNode
   description?: ReactNode
   /** Action buttons, rendered at the end side and wrapping on mobile. */
   actions?: ReactNode
-  /** Renders a `BackButton` above the title when provided. */
+  /** Renders the page trail and its back button above the title when
+   *  provided (src/components/ui/PageTrail.tsx); outside a trail, a plain
+   *  `BackButton` labelled `backLabel`. */
   onBack?: () => void
   backLabel?: string
+  /** Asked before a crumb of the trail navigates (unsaved changes). */
+  confirmLeave?: () => Promise<boolean>
   className?: string
 }
 
@@ -46,6 +26,7 @@ export function PageHeader({
   actions,
   onBack,
   backLabel,
+  confirmLeave,
   className,
 }: PageHeaderProps) {
   return (
@@ -57,7 +38,12 @@ export function PageHeader({
     >
       <div className="min-w-0">
         {onBack && (
-          <BackButton onClick={onBack} label={backLabel} className="mb-1" />
+          <PageTrailBar
+            onBack={onBack}
+            fallbackLabel={backLabel}
+            confirmLeave={confirmLeave}
+            className="mb-1"
+          />
         )}
         {/* No letter-spacing: it breaks Arabic glyph joining. */}
         <h1 className="text-2xl font-bold sm:text-[28px]">{title}</h1>

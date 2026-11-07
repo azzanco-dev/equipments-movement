@@ -83,6 +83,13 @@ export type {
 } from './DescriptionList'
 export { BackButton, PageHeader } from './PageHeader'
 export type { BackButtonProps, PageHeaderProps } from './PageHeader'
+export {
+  Breadcrumbs,
+  PageTrailBar,
+  PageTrailProvider,
+  usePageTrail,
+} from './PageTrail'
+export type { PageTrailBarProps, PageTrailValue } from './PageTrail'
 // Named FloatingPopover.tsx because `popover.ts` (shared floating-panel classes)
 // already exists and the two names collide on case-insensitive filesystems.
 export {

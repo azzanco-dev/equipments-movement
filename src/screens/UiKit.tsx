@@ -128,12 +128,13 @@ type SectionDef = {
 const SCREEN_SECTIONS: SectionDef[] = [
   {
     // Owner 2026-11-07: «نبغى نضبط ازرار الرجوع الي عندنا كلها» then
-    // «ونضيف breadcrumbs». For review: no screen uses it yet.
+    // «ونضيف breadcrumbs». Approved the same day as variant «ب» (the trail
+    // with a small back button): src/components/ui/PageTrail.tsx.
     id: 'breadcrumbs',
     title: 'المسار وازرار الرجوع',
     purpose:
-      'مسار الصفحة فوق عنوان كل صفحة تفاصيل واعدادات، وسطر رجوع واحد على الجوال، وقاعدة رجوع وحدة لكل الصفحات ترجعك لنفس القائمة بفلاترها.',
-    status: 'review',
+      'مسار الصفحة فوق عنوان كل صفحة تفاصيل واعدادات، وسطر رجوع واحد على الجوال، وقاعدة رجوع وحدة لكل الصفحات ترجعك لنفس القائمة بفلاترها. المعتمد: «ب».',
+    status: 'approved',
     defaultOpen: true,
     element: <BreadcrumbsMockup />,
   },

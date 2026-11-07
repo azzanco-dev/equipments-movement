@@ -33,7 +33,7 @@ import {
   type ProfileName,
 } from '@/components/details/profileNames'
 import {
-  BackButton,
+  PageTrailBar,
   Badge,
   Button,
   DetailHeader,
@@ -246,7 +246,7 @@ export function EquipmentDetail({
   if (!equipment)
     return (
       <div className="space-y-4">
-        <BackButton onClick={onBack} label={t('backToEquipment')} />
+        <PageTrailBar onBack={onBack} fallbackLabel={t('backToEquipment')} />
         {error ? (
           <ErrorState description={error} onRetry={fetchData} />
         ) : (
@@ -390,7 +390,7 @@ export function EquipmentDetail({
 
   return (
     <div className="space-y-5">
-      <BackButton onClick={onBack} label={t('backToEquipment')} />
+      <PageTrailBar onBack={onBack} fallbackLabel={t('backToEquipment')} />
 
       {error && <Alert type="error">{error}</Alert>}
 

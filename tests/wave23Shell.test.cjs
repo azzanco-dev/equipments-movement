@@ -980,14 +980,16 @@ test('App.tsx renders each screen behind its page', () => {
   )
   assert.equal(content.match(/<HomeScreen\b/g).length, 1)
   assert.equal(content.match(/<AdminHomeScreen\b/g).length, 1)
-  // A field home keeps its way back from the movement pages.
+  // A field home keeps its way back from the movement pages: since
+  // 2026-11-07 the one back rule, falling back to the home (the log for the
+  // admin shell).
   assert.match(
     content,
-    /onClose=\{fieldHome \? backToDashboard : \(\) => router\.push\('\/logs'\)\}/,
+    /onClose=\{goBackTo\(fieldHome \? '\/dashboard' : '\/logs'\)\}/,
   )
   assert.match(
     content,
-    /onBack=\{fieldHome \? backToDashboard : \(\) => router\.back\(\)\}/,
+    /onBack=\{goBackTo\(fieldHome \? '\/dashboard' : '\/logs'\)\}/,
   )
   const components = {
     logs: 'LogsScreen',

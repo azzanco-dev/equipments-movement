@@ -34,7 +34,7 @@ import { ClientPoEventsTimeline } from '@/components/sales/EventTimeline'
 import { QuantityCell } from '@/components/sales/QuantityCell'
 import { SalePrice, SalePricesByUnit } from '@/components/sales/SalePrice'
 import {
-  BackButton,
+  PageTrailBar,
   Badge,
   Button,
   Card,
@@ -215,7 +215,7 @@ export function ClientPoDetail({
   if (!po)
     return (
       <div className="space-y-4">
-        <BackButton onClick={onBack} label={t('clientPoBackToList')} />
+        <PageTrailBar onBack={onBack} fallbackLabel={t('clientPoBackToList')} />
         {loadError ? (
           <ErrorState
             description={t('clientPoLoadError')}
@@ -409,7 +409,7 @@ export function ClientPoDetail({
 
   return (
     <div className="space-y-4">
-      <BackButton onClick={onBack} label={t('clientPoBackToList')} />
+      <PageTrailBar onBack={onBack} fallbackLabel={t('clientPoBackToList')} />
 
       {loadError && (
         <Notice tone="danger" size="compact">

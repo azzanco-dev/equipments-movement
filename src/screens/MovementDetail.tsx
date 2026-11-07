@@ -78,6 +78,7 @@ import {
 } from '@/lib/contractorCodeEdit'
 import {
   BackButton,
+  PageTrailBar,
   Button,
   ConfirmDialog,
   DescriptionList,
@@ -786,7 +787,7 @@ export function MovementDetail({
   if (error) {
     return (
       <div className="space-y-4">
-        <BackButton onClick={onBack} label={t('backToMovements')} />
+        <PageTrailBar onBack={onBack} fallbackLabel={t('backToMovements')} />
         <ErrorState title={error} />
       </div>
     )
