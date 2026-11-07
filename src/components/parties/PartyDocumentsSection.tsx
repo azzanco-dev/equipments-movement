@@ -2,12 +2,19 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Eye,
   FileText,
+  Files,
+  FolderOpen,
   ImageIcon,
+  Landmark,
+  MapPin,
   Paperclip,
   Plus,
+  ReceiptText,
   RefreshCw,
+  ScrollText,
   Trash2,
   Upload,
+  type LucideIcon,
 } from 'lucide-react'
 import {
   Button,
@@ -52,6 +59,15 @@ export interface PartyDocumentsSectionProps {
 }
 
 type UploadTarget = { type: PartyDocumentType; replacing?: PartyDocument }
+
+/** An icon per document type (owner 2026-11-07, «شعارات لكل نوع مستند»). */
+export const PARTY_DOCUMENT_ICONS: Readonly<Record<PartyDocumentType, LucideIcon>> = {
+  commercial_register: ScrollText,
+  tax_certificate: ReceiptText,
+  iban_certificate: Landmark,
+  national_address: MapPin,
+  other: Files,
+}
 
 const errorKeyOf = (error: unknown): TranslationKey =>
   error instanceof PartyDocumentError ? error.key : 'partyDocSaveFailed'
@@ -198,6 +214,7 @@ export function PartyDocumentsSection({
             {fixed.map(({ type, document }) => (
               <DocumentTile
                 key={type}
+                icon={PARTY_DOCUMENT_ICONS[type]}
                 title={t(PARTY_DOCUMENT_LABEL_KEYS[type])}
                 document={document}
                 canEdit={canEdit}
@@ -210,7 +227,10 @@ export function PartyDocumentsSection({
           </div>
           <div className="mt-4 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium">{t('partyDocOther')}</span>
+              <span className="flex items-center gap-1.5 text-sm font-medium">
+                <FolderOpen size={15} className="text-muted" aria-hidden="true" />
+                {t('partyDocOther')}
+              </span>
               {canEdit && (
                 <Button
                   size="sm"
@@ -228,6 +248,7 @@ export function PartyDocumentsSection({
                 {others.map((document) => (
                   <DocumentTile
                     key={document.id}
+                    icon={PARTY_DOCUMENT_ICONS.other}
                     title={document.title ?? t('partyDocOtherOne')}
                     document={document}
                     canEdit={canEdit}
@@ -265,7 +286,18 @@ export function PartyDocumentsSection({
   )
 }
 
+/** The type's icon beside its name. */
+function TileTitle({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
+  return (
+    <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
+      <Icon size={15} className="shrink-0 text-muted" aria-hidden="true" />
+      <span className="min-w-0 truncate">{title}</span>
+    </span>
+  )
+}
+
 function DocumentTile({
+  icon,
   title,
   document,
   canEdit,
@@ -274,6 +306,7 @@ function DocumentTile({
   onView,
   onRemove,
 }: {
+  icon: LucideIcon
   title: string
   document?: PartyDocument
   canEdit: boolean
@@ -288,8 +321,8 @@ function DocumentTile({
     return (
       <div className="flex min-h-24 flex-col justify-between gap-2 rounded-lg border border-dashed bg-bg p-3">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium">{title}</span>
-          <span className="text-xs text-placeholder">{t('partyDocNotUploaded')}</span>
+          <TileTitle icon={icon} title={title} />
+          <span className="shrink-0 text-xs text-placeholder">{t('partyDocNotUploaded')}</span>
         </div>
         {canEdit && onUpload && (
           <Button
@@ -321,7 +354,7 @@ function DocumentTile({
         )}
       </div>
       <div className="min-w-0 flex-1 space-y-1">
-        <span className="text-sm font-medium">{title}</span>
+        <TileTitle icon={icon} title={title} />
         <p className="truncate text-xs" title={document.file_name}>
           <bdi dir="ltr">{document.file_name}</bdi>
         </p>

@@ -27,8 +27,8 @@ test('the document types: the IBAN certificate for suppliers only', () => {
   assert.doesNotMatch(company, /iban_certificate/)
 })
 
-test('PDF or an image up to 10 MB, nothing leaves the browser', () => {
-  assert.match(mockup, /const MAX_MB = 10\n/)
+test('PDF or an image up to 5 MB, nothing leaves the browser', () => {
+  assert.match(mockup, /const MAX_MB = 5\n/)
   assert.match(mockup, /const ACCEPT = 'application\/pdf,image\/jpeg,image\/png,image\/webp'/)
   assert.doesNotMatch(mockup, /supabase|fetch\(|storage/i)
   // Evidence is never cropped.

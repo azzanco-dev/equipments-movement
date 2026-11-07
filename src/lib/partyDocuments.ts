@@ -57,8 +57,9 @@ export const PARTY_DOCUMENT_LABEL_KEYS: Readonly<
   other: 'partyDocOther',
 }
 
-/** The bucket's limits (0182): 10 MB, PDF or a JPEG / PNG / WEBP image. */
-export const PARTY_DOCUMENT_MAX_BYTES = 10 * 1024 * 1024
+/** The bucket's limits: 5 MB (0183, owner «خلي الحد الاقصى 5 ميقا»; 0182
+ *  had 10), PDF or a JPEG / PNG / WEBP image. */
+export const PARTY_DOCUMENT_MAX_BYTES = 5 * 1024 * 1024
 export const PARTY_DOCUMENT_MIME_TYPES = [
   'application/pdf',
   'image/jpeg',

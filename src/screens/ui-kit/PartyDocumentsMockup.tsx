@@ -4,13 +4,20 @@ import {
   Briefcase,
   Eye,
   FileText,
+  Files,
+  FolderOpen,
   ImageIcon,
+  Landmark,
+  MapPin,
   Paperclip,
   Plus,
+  ReceiptText,
   RefreshCw,
+  ScrollText,
   Trash2,
   Upload,
   X,
+  type LucideIcon,
 } from 'lucide-react'
 import { Button, IconButton } from '@/components/ui'
 
@@ -19,7 +26,7 @@ import { Button, IconButton } from '@/components/ui'
  * الموردين والشركات مثل السجل التجاري شهادة الضريبة شهادة الايبان العنوان
  * الوطني», then «ابدا» on the plan: one current file per document type
  * («مستندات اخرى» takes several, each named by the user), PDF or an image up
- * to 10 MB, the documents are not counted in the completeness ring, view for
+ * to 5 MB (owner «خلي الحد الاقصى 5 ميقا»), the documents are not counted in the completeness ring, view for
  * the readers of the list and upload / replace / delete for its edit key.
  * His review the same day: «بدون تاريخ الانتهاء ماعلينا منهم وبدون تاريخ
  * الرفع ومين رفعه» — a tile shows the file only. Sample data only: nothing
@@ -44,6 +51,25 @@ interface SampleDoc {
   title?: string
   /** A file picked in this mockup (an object URL), previewed locally. */
   previewUrl?: string
+}
+
+/** An icon per document type (owner 2026-11-07, «شعارات لكل نوع مستند»). */
+const DOC_ICONS: Record<DocType, LucideIcon> = {
+  commercial_register: ScrollText,
+  tax_certificate: ReceiptText,
+  iban_certificate: Landmark,
+  national_address: MapPin,
+  other: Files,
+}
+
+function TileTitle({ type, title }: { type: DocType; title: string }) {
+  const Icon = DOC_ICONS[type]
+  return (
+    <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
+      <Icon size={15} className="shrink-0 text-muted" aria-hidden="true" />
+      <span className="min-w-0 truncate">{title}</span>
+    </span>
+  )
 }
 
 const DOC_LABELS: Record<DocType, string> = {
@@ -115,7 +141,7 @@ const SAMPLE: Record<PartyKind, SampleDoc[]> = {
   ],
 }
 
-const MAX_MB = 10
+const MAX_MB = 5
 const ACCEPT = 'application/pdf,image/jpeg,image/png,image/webp'
 
 function sizeLabel(mb: number) {
@@ -169,7 +195,7 @@ function DocumentTile({
     return (
       <div className="flex min-h-24 flex-col justify-between gap-2 rounded-lg border border-dashed bg-bg p-3">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium">{DOC_LABELS[type]}</span>
+          <TileTitle type={type} title={DOC_LABELS[type]} />
           <span className="text-xs text-placeholder">غير مرفوع</span>
         </div>
         {canEdit && (
@@ -191,7 +217,7 @@ function DocumentTile({
     <div className="flex min-h-24 gap-3 rounded-lg border bg-bg p-3">
       <FileThumb doc={doc} />
       <div className="min-w-0 flex-1 space-y-1">
-        <span className="text-sm font-medium">{title}</span>
+        <TileTitle type={type} title={title} />
         <p className="truncate text-xs" title={doc.name}>
           <bdi dir="ltr">{doc.name}</bdi>
         </p>
@@ -423,7 +449,10 @@ export function PartyDocumentsMockup() {
 
           <div className="mt-4 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium">{DOC_LABELS.other}</span>
+              <span className="flex items-center gap-1.5 text-sm font-medium">
+                <FolderOpen size={15} className="text-muted" aria-hidden="true" />
+                {DOC_LABELS.other}
+              </span>
               {canEdit && (
                 <Button
                   size="sm"

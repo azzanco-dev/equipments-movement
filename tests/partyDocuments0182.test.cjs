@@ -119,8 +119,9 @@ test('the types per party: the clients have no IBAN certificate', () => {
 test('the file rules mirror the bucket', () => {
   const mb = 1024 * 1024
   assert.equal(lib.partyDocumentFileError({ type: 'application/pdf', size: mb }), null)
-  assert.equal(lib.partyDocumentFileError({ type: 'image/webp', size: 10 * mb }), null)
-  assert.equal(lib.partyDocumentFileError({ type: 'image/png', size: 10 * mb + 1 }), 'partyDocFileTooLarge')
+  // 0183: 5 MB.
+  assert.equal(lib.partyDocumentFileError({ type: 'image/webp', size: 5 * mb }), null)
+  assert.equal(lib.partyDocumentFileError({ type: 'image/png', size: 5 * mb + 1 }), 'partyDocFileTooLarge')
   assert.equal(lib.partyDocumentFileError({ type: 'image/heic', size: mb }), 'partyDocFileTypeInvalid')
   assert.equal(lib.partyDocumentFileError({ type: 'application/pdf', size: 0 }), 'partyDocFileEmpty')
   assert.equal(lib.PARTY_DOCUMENT_ACCEPT, 'application/pdf,image/jpeg,image/png,image/webp')
@@ -234,4 +235,39 @@ test('every new key in both languages, Arabic without alif with hamza', () => {
       .map((key) => key.slice(1, -1)),
   )
   for (const key of used) assert.ok(keys(blocks[0][1]).includes(key), key)
+})
+
+// --- 0183 and the icons (owner 2026-11-07) ----------------------------------------
+
+test('0183: 5 MB for new files, earlier rows kept (NOT VALID)', () => {
+  const file = fs
+    .readdirSync(path.join(ROOT, 'supabase', 'migrations'))
+    .find((name) => name.includes('_0183_'))
+  assert.ok(file, '0183 exists')
+  const sql = read('supabase', 'migrations', file)
+  assert.match(sql, /UPDATE storage\.buckets\nSET file_size_limit = 5242880\nWHERE id = 'party-documents';/)
+  assert.match(sql, /CHECK \(size_bytes BETWEEN 1 AND 5242880\) NOT VALID;/)
+  assert.equal(lib.PARTY_DOCUMENT_MAX_BYTES, 5 * 1024 * 1024)
+  const tr = read('src', 'i18n', 'translations.ts')
+  assert.match(tr, /partyDocLimits: 'PDF او صورة \(JPG، PNG، WEBP\) حتى 5 ميغا',/)
+  assert.match(tr, /partyDocFileTooLarge: 'The file is larger than 5 MB',/)
+  assert.doesNotMatch(tr, /partyDoc\w+: '[^']*10 (ميغا|MB)/)
+})
+
+test('an icon per document type, beside its name, in the section and the mockup', () => {
+  const section = read('src', 'components', 'parties', 'PartyDocumentsSection.tsx')
+  const mockup = read('src', 'screens', 'ui-kit', 'PartyDocumentsMockup.tsx')
+  for (const source of [section, mockup]) {
+    for (const [type, icon] of [
+      ['commercial_register', 'ScrollText'],
+      ['tax_certificate', 'ReceiptText'],
+      ['iban_certificate', 'Landmark'],
+      ['national_address', 'MapPin'],
+      ['other', 'Files'],
+    ])
+      assert.match(source, new RegExp(`  ${type}: ${icon},\n`))
+    assert.match(source, /<Icon size=\{15\} className="shrink-0 text-muted" aria-hidden="true" \/>/)
+    assert.match(source, /<FolderOpen size=\{15\}/)
+  }
+  assert.equal(section.match(/<TileTitle icon=\{icon\} title=\{title\} \/>/g).length, 2)
 })
