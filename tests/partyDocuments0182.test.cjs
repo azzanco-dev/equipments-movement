@@ -257,17 +257,21 @@ test('0183: 5 MB for new files, earlier rows kept (NOT VALID)', () => {
 test('an icon per document type, beside its name, in the section and the mockup', () => {
   const section = read('src', 'components', 'parties', 'PartyDocumentsSection.tsx')
   const mockup = read('src', 'screens', 'ui-kit', 'PartyDocumentsMockup.tsx')
-  for (const source of [section, mockup]) {
-    for (const [type, icon] of [
-      ['commercial_register', 'ScrollText'],
-      ['tax_certificate', 'ReceiptText'],
-      ['iban_certificate', 'Landmark'],
-      ['national_address', 'MapPin'],
-      ['other', 'Files'],
-    ])
-      assert.match(source, new RegExp(`  ${type}: ${icon},\n`))
-    assert.match(source, /<Icon size=\{15\} className="shrink-0 text-muted" aria-hidden="true" \/>/)
-    assert.match(source, /<FolderOpen size=\{15\}/)
-  }
+  const icons = [
+    ['commercial_register', 'ScrollText', 3],
+    ['tax_certificate', 'ReceiptText', 2],
+    ['iban_certificate', 'Landmark', 1],
+    ['national_address', 'MapPin', 5],
+    ['other', 'Files', 6],
+  ]
+  for (const [type, icon] of icons) assert.match(section, new RegExp(`  ${type}: ${icon},\n`))
+  assert.match(section, /<Icon size=\{15\} className="shrink-0 text-muted" aria-hidden="true" \/>/)
+  assert.match(section, /<FolderOpen size=\{15\}/)
   assert.equal(section.match(/<TileTitle icon=\{icon\} title=\{title\} \/>/g).length, 2)
+  // The mockup's «الوان وحياة» (owner 2026-11-07): an icon and a light chart
+  // shade per type, defined for both themes in src/index.css.
+  for (const [type, icon, tone] of icons)
+    assert.match(mockup, new RegExp(`  ${type}: \\{ icon: ${icon}, tone: ${tone} \\},`))
+  assert.match(mockup, /backgroundColor: `var\(--chart-\$\{tone\}\)`,\n  color: `var\(--chart-stroke-\$\{tone\}\)`,/)
+  assert.match(mockup, /motion-safe:hover:-translate-y-0\.5/)
 })

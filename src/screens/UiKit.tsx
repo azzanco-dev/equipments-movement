@@ -131,11 +131,12 @@ const SCREEN_SECTIONS: SectionDef[] = [
     // Owner 2026-11-07: «نبغى نضيف امكانية رفع الملفات pdf او صور في
     // معلومات الموردين والشركات», then «ابدا» on the plan; approved the same
     // day («الاولى ونفذ»): src/components/parties/PartyDocumentsSection.tsx.
+    // The colourful redesign («حسن الشكل … واضف الوان وحياة») is under review.
     id: 'party-documents',
     title: 'مستندات الموردين والشركات',
     purpose:
-      'قسم «المستندات» في تفاصيل المورد والشركة: السجل التجاري وشهادة الضريبة وشهادة الايبان (للموردين) والعنوان الوطني ومستندات اخرى، PDF او صورة حتى 5 ميغا.',
-    status: 'approved',
+      'قسم «المستندات» في تفاصيل المورد والشركة: السجل التجاري وشهادة الضريبة وشهادة الايبان (للموردين) والعنوان الوطني ومستندات اخرى، PDF او صورة حتى 5 ميغا. لكل نوع لونه وايقونته (التصميم الملون قيد المراجعة).',
+    status: 'review',
     defaultOpen: true,
     element: <PartyDocumentsMockup />,
   },

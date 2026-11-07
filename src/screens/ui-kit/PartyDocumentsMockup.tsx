@@ -1,7 +1,8 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react'
 import {
   Building2,
   Briefcase,
+  CheckCircle2,
   Eye,
   FileText,
   Files,
@@ -9,13 +10,12 @@ import {
   ImageIcon,
   Landmark,
   MapPin,
-  Paperclip,
   Plus,
   ReceiptText,
   RefreshCw,
   ScrollText,
   Trash2,
-  Upload,
+  UploadCloud,
   X,
   type LucideIcon,
 } from 'lucide-react'
@@ -26,11 +26,15 @@ import { Button, IconButton } from '@/components/ui'
  * الموردين والشركات مثل السجل التجاري شهادة الضريبة شهادة الايبان العنوان
  * الوطني», then «ابدا» on the plan: one current file per document type
  * («مستندات اخرى» takes several, each named by the user), PDF or an image up
- * to 5 MB (owner «خلي الحد الاقصى 5 ميقا»), the documents are not counted in the completeness ring, view for
- * the readers of the list and upload / replace / delete for its edit key.
- * His review the same day: «بدون تاريخ الانتهاء ماعلينا منهم وبدون تاريخ
- * الرفع ومين رفعه» — a tile shows the file only. Sample data only: nothing
- * is uploaded or stored; a file picked here is previewed in this browser only.
+ * to 5 MB (owner «خلي الحد الاقصى 5 ميقا»), the documents are not counted in
+ * the completeness ring, view for the readers of the list and upload /
+ * replace / delete for its edit key. His reviews the same day: «بدون تاريخ
+ * الانتهاء ماعلينا منهم وبدون تاريخ الرفع ومين رفعه», «شعارات لكل نوع
+ * مستند», then «حسن الشكل … واضف الوان وحياة»: every type has its own light
+ * colour (the chart shades, light and dark), a coloured icon tile, a
+ * progress bar, a lift on hover and a drop zone that lights up. Sample data
+ * only: nothing is uploaded or stored; a picked file is previewed in this
+ * browser only.
  */
 
 type PartyKind = 'lessor' | 'company'
@@ -53,24 +57,19 @@ interface SampleDoc {
   previewUrl?: string
 }
 
-/** An icon per document type (owner 2026-11-07, «شعارات لكل نوع مستند»). */
-const DOC_ICONS: Record<DocType, LucideIcon> = {
-  commercial_register: ScrollText,
-  tax_certificate: ReceiptText,
-  iban_certificate: Landmark,
-  national_address: MapPin,
-  other: Files,
+/** Each type: its icon and its light colour (a chart shade + its stroke). */
+const DOC_STYLE: Record<DocType, { icon: LucideIcon; tone: number }> = {
+  commercial_register: { icon: ScrollText, tone: 3 }, // blue
+  tax_certificate: { icon: ReceiptText, tone: 2 }, // amber
+  iban_certificate: { icon: Landmark, tone: 1 }, // green
+  national_address: { icon: MapPin, tone: 5 }, // violet
+  other: { icon: Files, tone: 6 }, // teal
 }
 
-function TileTitle({ type, title }: { type: DocType; title: string }) {
-  const Icon = DOC_ICONS[type]
-  return (
-    <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
-      <Icon size={15} className="shrink-0 text-muted" aria-hidden="true" />
-      <span className="min-w-0 truncate">{title}</span>
-    </span>
-  )
-}
+const toneBg = (tone: number): CSSProperties => ({
+  backgroundColor: `var(--chart-${tone})`,
+  color: `var(--chart-stroke-${tone})`,
+})
 
 const DOC_LABELS: Record<DocType, string> = {
   commercial_register: 'السجل التجاري',
@@ -93,27 +92,9 @@ const DOC_TYPES: Record<PartyKind, DocType[]> = {
 
 const SAMPLE: Record<PartyKind, SampleDoc[]> = {
   lessor: [
-    {
-      id: 'l1',
-      type: 'commercial_register',
-      name: 'CR-7001234567.pdf',
-      kind: 'pdf',
-      sizeMb: 0.8,
-    },
-    {
-      id: 'l2',
-      type: 'tax_certificate',
-      name: 'vat-certificate.jpg',
-      kind: 'image',
-      sizeMb: 2.4,
-    },
-    {
-      id: 'l3',
-      type: 'iban_certificate',
-      name: 'iban-alrajhi.pdf',
-      kind: 'pdf',
-      sizeMb: 0.3,
-    },
+    { id: 'l1', type: 'commercial_register', name: 'CR-7001234567.pdf', kind: 'pdf', sizeMb: 0.8 },
+    { id: 'l2', type: 'tax_certificate', name: 'vat-certificate.jpg', kind: 'image', sizeMb: 2.4 },
+    { id: 'l3', type: 'iban_certificate', name: 'iban-alrajhi.pdf', kind: 'pdf', sizeMb: 0.3 },
     {
       id: 'l4',
       type: 'other',
@@ -124,20 +105,8 @@ const SAMPLE: Record<PartyKind, SampleDoc[]> = {
     },
   ],
   company: [
-    {
-      id: 'c1',
-      type: 'commercial_register',
-      name: 'cr-takween.pdf',
-      kind: 'pdf',
-      sizeMb: 1.1,
-    },
-    {
-      id: 'c2',
-      type: 'national_address',
-      name: 'national-address.png',
-      kind: 'image',
-      sizeMb: 0.6,
-    },
+    { id: 'c1', type: 'commercial_register', name: 'cr-takween.pdf', kind: 'pdf', sizeMb: 1.1 },
+    { id: 'c2', type: 'national_address', name: 'national-address.png', kind: 'image', sizeMb: 0.6 },
   ],
 }
 
@@ -160,23 +129,51 @@ function Panel({ title, note, children }: { title: string; note?: string; childr
   )
 }
 
-/** The picture of the file: the image itself (never cropped) or a PDF sheet. */
-function FileThumb({ doc }: { doc: SampleDoc }) {
+/** The type's icon in its own colour. */
+function TypeIcon({ type, size = 'md' }: { type: DocType; size?: 'sm' | 'md' }) {
+  const { icon: Icon, tone } = DOC_STYLE[type]
   return (
-    <div className="flex h-20 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-bg">
+    <span
+      aria-hidden="true"
+      style={toneBg(tone)}
+      className={
+        size === 'md'
+          ? 'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl'
+          : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg'
+      }
+    >
+      <Icon size={size === 'md' ? 20 : 15} />
+    </span>
+  )
+}
+
+/** The file itself: an image (never cropped) or a PDF sheet in the type's colour. */
+function FileThumb({ doc }: { doc: SampleDoc }) {
+  const tone = DOC_STYLE[doc.type].tone
+  return (
+    <div
+      className="relative flex h-16 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-bg"
+      aria-hidden="true"
+    >
       {doc.previewUrl && doc.kind === 'image' ? (
         <img src={doc.previewUrl} alt="" className="h-full w-full object-contain" />
       ) : doc.kind === 'image' ? (
-        <ImageIcon size={22} className="text-muted" aria-hidden="true" />
+        <ImageIcon size={20} className="text-muted" />
       ) : (
-        <span className="flex flex-col items-center gap-1 text-muted">
-          <FileText size={22} aria-hidden="true" />
-          <span className="text-[10px] font-semibold">PDF</span>
-        </span>
+        <FileText size={20} style={{ color: `var(--chart-stroke-${tone})` }} />
       )}
+      <span
+        style={toneBg(tone)}
+        className="absolute inset-x-0 bottom-0 py-px text-center text-[9px] font-semibold"
+      >
+        {doc.kind === 'pdf' ? 'PDF' : 'IMG'}
+      </span>
     </div>
   )
 }
+
+const TILE =
+  'group rounded-xl border bg-bg p-3 transition duration-200 motion-safe:hover:-translate-y-0.5 hover:shadow-md'
 
 function DocumentTile({
   type,
@@ -193,15 +190,20 @@ function DocumentTile({
 }) {
   if (!doc)
     return (
-      <div className="flex min-h-24 flex-col justify-between gap-2 rounded-lg border border-dashed bg-bg p-3">
-        <div className="flex items-center justify-between gap-2">
-          <TileTitle type={type} title={DOC_LABELS[type]} />
-          <span className="text-xs text-placeholder">غير مرفوع</span>
+      <div className={`${TILE} flex min-h-28 flex-col justify-between gap-3 border-dashed`}>
+        <div className="flex items-center gap-3">
+          <span className="opacity-60 transition-opacity group-hover:opacity-100">
+            <TypeIcon type={type} />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-medium">{DOC_LABELS[type]}</p>
+            <p className="text-xs text-placeholder">غير مرفوع</p>
+          </div>
         </div>
         {canEdit && (
           <Button
             size="sm"
-            icon={<Upload size={14} aria-hidden="true" />}
+            icon={<UploadCloud size={14} aria-hidden="true" />}
             onClick={onUpload}
             className="self-start"
           >
@@ -214,38 +216,48 @@ function DocumentTile({
   // An extra file is named by the user («عقد الايجار الموقع»), else «مستند اخر».
   const title = type === 'other' ? (doc.title ?? 'مستند اخر') : DOC_LABELS[type]
   return (
-    <div className="flex min-h-24 gap-3 rounded-lg border bg-bg p-3">
-      <FileThumb doc={doc} />
-      <div className="min-w-0 flex-1 space-y-1">
-        <TileTitle type={type} title={title} />
-        <p className="truncate text-xs" title={doc.name}>
-          <bdi dir="ltr">{doc.name}</bdi>
-        </p>
-        <p className="text-xs text-muted">
-          {sizeLabel(doc.sizeMb)} ·{' '}
-          {doc.kind === 'pdf' ? <bdi dir="ltr">PDF</bdi> : 'صورة'}
-        </p>
+    <div className={`${TILE} flex min-h-28 flex-col gap-3`}>
+      <div className="flex items-start gap-3">
+        <TypeIcon type={type} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{title}</p>
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-[var(--success)]">
+            <CheckCircle2 size={13} aria-hidden="true" />
+            مرفوع
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-0.5">
+          <IconButton size="sm" label="عرض" title="عرض" icon={<Eye size={15} />} />
+          {canEdit && (
+            <>
+              <IconButton
+                size="sm"
+                label="استبدال"
+                title="استبدال"
+                icon={<RefreshCw size={15} />}
+                onClick={onUpload}
+              />
+              <IconButton
+                size="sm"
+                label="حذف"
+                title="حذف"
+                icon={<Trash2 size={15} />}
+                onClick={onRemove}
+              />
+            </>
+          )}
+        </div>
       </div>
-      <div className="flex shrink-0 flex-col gap-1">
-        <IconButton size="sm" label="عرض" title="عرض" icon={<Eye size={15} />} />
-        {canEdit && (
-          <>
-            <IconButton
-              size="sm"
-              label="استبدال"
-              title="استبدال"
-              icon={<RefreshCw size={15} />}
-              onClick={onUpload}
-            />
-            <IconButton
-              size="sm"
-              label="حذف"
-              title="حذف"
-              icon={<Trash2 size={15} />}
-              onClick={onRemove}
-            />
-          </>
-        )}
+      <div className="flex items-center gap-3 rounded-lg bg-[var(--surface)] p-2">
+        <FileThumb doc={doc} />
+        <div className="min-w-0">
+          <p className="truncate text-xs font-medium" title={doc.name}>
+            <bdi dir="ltr">{doc.name}</bdi>
+          </p>
+          <p className="mt-0.5 text-xs text-muted">
+            {sizeLabel(doc.sizeMb)} · {doc.kind === 'pdf' ? <bdi dir="ltr">PDF</bdi> : 'صورة'}
+          </p>
+        </div>
       </div>
     </div>
   )
@@ -266,7 +278,9 @@ function UploadForm({
   const [file, setFile] = useState<File | null>(null)
   const [title, setTitle] = useState('')
   const [error, setError] = useState('')
+  const [dragging, setDragging] = useState(false)
   const other = type === 'other'
+  const tone = DOC_STYLE[type].tone
 
   const pick = (picked: File | undefined) => {
     setError('')
@@ -280,6 +294,12 @@ function UploadForm({
       return
     }
     setFile(picked)
+  }
+
+  const drop = (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault()
+    setDragging(false)
+    pick(event.dataTransfer.files?.[0])
   }
 
   const save = () => {
@@ -303,22 +323,46 @@ function UploadForm({
   }
 
   return (
-    <div className="space-y-3 rounded-xl border bg-[var(--surface)] p-4">
-      <div className="flex items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold">
+    <div className="space-y-3 rounded-xl border bg-bg p-4 shadow-sm">
+      <div className="flex items-center gap-3">
+        <TypeIcon type={type} size="sm" />
+        <h4 className="flex-1 text-sm font-semibold">
           {replacing ? 'استبدال' : 'رفع'} {other ? 'مستند اخر' : DOC_LABELS[type]}
         </h4>
         <IconButton size="sm" label="اغلاق" icon={<X size={15} />} onClick={onCancel} />
       </div>
-      {replacing && (
-        <p className="text-xs text-muted">الملف الجديد يحل محل الحالي.</p>
-      )}
-      <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed bg-bg px-4 py-6 text-center">
-        <Paperclip size={20} className="text-muted" aria-hidden="true" />
-        <span className="text-sm">
-          {file ? <bdi dir="ltr">{file.name}</bdi> : 'اختر ملفا او صور المستند'}
+      {replacing && <p className="text-xs text-muted">الملف الجديد يحل محل الحالي.</p>}
+      <label
+        onDragOver={(event) => {
+          event.preventDefault()
+          setDragging(true)
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={drop}
+        style={
+          dragging || file
+            ? { backgroundColor: `var(--chart-${tone})`, borderColor: `var(--chart-stroke-${tone})` }
+            : undefined
+        }
+        className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed bg-[var(--surface)] px-4 py-7 text-center transition-colors duration-200"
+      >
+        {file ? (
+          <CheckCircle2 size={26} style={{ color: `var(--chart-stroke-${tone})` }} aria-hidden="true" />
+        ) : (
+          <UploadCloud
+            size={26}
+            className={`text-muted transition-transform duration-200 ${dragging ? 'motion-safe:-translate-y-1' : ''}`}
+            aria-hidden="true"
+          />
+        )}
+        <span className="text-sm font-medium">
+          {file ? <bdi dir="ltr">{file.name}</bdi> : dragging ? 'افلت الملف هنا' : 'اسحب الملف هنا او اختره'}
         </span>
-        <span className="text-xs text-muted">PDF او صورة (JPG، PNG، WEBP) حتى {MAX_MB} ميغا</span>
+        <span className="text-xs text-muted">
+          {file
+            ? `${sizeLabel(file.size / 1024 / 1024)} · اضغط لاختيار ملف اخر`
+            : `PDF او صورة (JPG، PNG، WEBP) حتى ${MAX_MB} ميغا · او صور المستند بالجوال`}
+        </span>
         <input
           type="file"
           accept={ACCEPT}
@@ -332,6 +376,7 @@ function UploadForm({
           <input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
+            placeholder="مثل: عقد الايجار"
             className="input h-10 w-full text-base md:h-9 md:text-sm"
           />
         </label>
@@ -367,6 +412,9 @@ export function PartyDocumentsMockup() {
   const types = DOC_TYPES[kind]
   const others = list.filter((doc) => doc.type === 'other')
   const filled = types.filter((type) => list.some((doc) => doc.type === type)).length
+  const percent = Math.round((filled / types.length) * 100)
+  const barColor =
+    percent >= 100 ? 'var(--progress-high)' : percent >= 50 ? 'var(--progress-mid)' : 'var(--progress-low)'
 
   const save = (doc: SampleDoc) => {
     setDocs((current) => {
@@ -421,16 +469,44 @@ export function PartyDocumentsMockup() {
 
       <Panel
         title="1. قسم «المستندات» في نافذة التفاصيل"
-        note="يظهر تحت اقسام البيانات في تفاصيل المورد والشركة. ملف واحد لكل نوع، والاستبدال يحل محله. «مستندات اخرى» تقبل اكثر من ملف باسم تكتبه. جرب الرفع بملف من جهازك: يظهر هنا فقط ولا يرفع لاي مكان."
+        note="يظهر تحت اقسام البيانات في تفاصيل المورد والشركة. لكل نوع لونه وايقونته. ملف واحد لكل نوع، والاستبدال يحل محله. «مستندات اخرى» تقبل اكثر من ملف باسم تكتبه. جرب الرفع بملف من جهازك (او اسحبه): يظهر هنا فقط ولا يرفع لاي مكان."
       >
         <div className="max-w-3xl rounded-xl border bg-[var(--surface)] p-4">
-          <h4 className="mb-3 flex flex-wrap items-center gap-2 text-sm font-semibold">
-            <FileText size={16} className="text-muted" aria-hidden="true" />
-            المستندات
-            <span className="text-xs font-normal text-muted">
-              {filled} من {types.length}
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <span
+              aria-hidden="true"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border bg-bg text-muted"
+            >
+              <FileText size={18} />
             </span>
-          </h4>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-sm font-semibold">المستندات</h4>
+              <p className="text-xs text-muted">
+                {filled === types.length
+                  ? 'كل المستندات الاساسية مرفوعة'
+                  : `باقي ${types.length - filled} من المستندات الاساسية`}
+              </p>
+            </div>
+            <div className="flex w-36 items-center gap-2">
+              <div
+                className="h-2 flex-1 overflow-hidden rounded-full bg-bg"
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={types.length}
+                aria-valuenow={filled}
+                aria-label="المستندات المرفوعة"
+              >
+                <div
+                  className="h-full rounded-full transition-[width] duration-500"
+                  style={{ width: `${percent}%`, backgroundColor: barColor }}
+                />
+              </div>
+              <span className="text-xs font-medium">
+                {filled}/{types.length}
+              </span>
+            </div>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2">
             {types.map((type) => {
               const doc = list.find((item) => item.type === type)
@@ -447,11 +523,20 @@ export function PartyDocumentsMockup() {
             })}
           </div>
 
-          <div className="mt-4 space-y-2">
+          <div className="mt-5 space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="flex items-center gap-1.5 text-sm font-medium">
-                <FolderOpen size={15} className="text-muted" aria-hidden="true" />
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <span
+                  aria-hidden="true"
+                  style={toneBg(DOC_STYLE.other.tone)}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg"
+                >
+                  <FolderOpen size={15} />
+                </span>
                 {DOC_LABELS.other}
+                {others.length > 0 && (
+                  <span className="rounded-full bg-bg px-2 text-xs text-muted">{others.length}</span>
+                )}
               </span>
               {canEdit && (
                 <Button
@@ -464,7 +549,9 @@ export function PartyDocumentsMockup() {
               )}
             </div>
             {others.length === 0 ? (
-              <p className="text-xs text-placeholder">لا توجد مستندات اخرى</p>
+              <p className="rounded-xl border border-dashed bg-bg p-4 text-center text-xs text-placeholder">
+                لا توجد مستندات اخرى
+              </p>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 {others.map((doc) => (
