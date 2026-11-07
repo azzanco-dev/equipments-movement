@@ -33,25 +33,8 @@ const PAGE_TITLES: Readonly<
   drivers: { kind: 'top', name: 'drivers' },
   users: { kind: 'top', name: 'users' },
   activity: { kind: 'top', name: 'activityLog' },
-  reports: { kind: 'top', name: 'reports' },
   'movement-import': { kind: 'top', name: 'movementImport' },
   settings: { kind: 'top', name: 'settings' },
-  'reports/entries': { kind: 'sub', name: 'entryReports', section: 'reports' },
-  'reports/entries/all': {
-    kind: 'sub',
-    name: 'entryReports',
-    section: 'reports',
-  },
-  'reports/equipment': {
-    kind: 'sub',
-    name: 'equipmentReports',
-    section: 'reports',
-  },
-  'reports/workshop': {
-    kind: 'sub',
-    name: 'workshopReports',
-    section: 'reports',
-  },
   'purchasing/orders': {
     kind: 'sub',
     name: 'supplierPos',

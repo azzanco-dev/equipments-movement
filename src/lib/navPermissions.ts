@@ -44,14 +44,10 @@ export type NavItemKey =
   | 'drivers'
   | 'users'
   | 'activity'
-  | 'reports'
   | 'movement-import'
   | 'settings'
 
 export type NavChildKey =
-  | 'reports/entries'
-  | 'reports/equipment'
-  | 'reports/workshop'
   | 'purchasing/orders'
   | 'purchasing/units'
   | 'sales/prices'
@@ -163,32 +159,6 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // Owner 2026-10-22: «سجل النشاط» left the sidebar for a Settings card
   // (/activity still opens by link for movements.activity).
   { key: 'activity', requires: [{ key: 'movements.activity' }], hidden: true },
-  {
-    key: 'reports',
-    requires: [{ key: 'reports.view' }],
-    children: [
-      {
-        key: 'reports/entries',
-        requires: [{ key: 'reports.view', scopes: ['site', 'all'] }],
-      },
-      {
-        key: 'reports/equipment',
-        // get_equipment_attention_report also requires movements.read all
-        // (2026-10-28), so the page opens only with both.
-        requires: [
-          {
-            key: 'reports.view',
-            scopes: ['all'],
-            with: [{ key: 'movements.read', scopes: ['all'] }],
-          },
-        ],
-      },
-      {
-        key: 'reports/workshop',
-        requires: [{ key: 'reports.view', scopes: ['workshop', 'all'] }],
-      },
-    ],
-  },
   // Owner 2026-10-22: the Excel import of movements is no longer needed in
   // the menu (the page stays reachable by URL for movements.import).
   {
@@ -315,7 +285,6 @@ export function visibleNavItems(
 export type RoutePage =
   | NavItemKey
   | NavChildKey
-  | 'reports/entries/all'
   | 'settings/equipment-types'
   | 'settings/workshop-opening-balance'
   | 'settings/afaqy'
@@ -335,8 +304,6 @@ type ExtraPage = Exclude<RoutePage, NavItemKey | NavChildKey>
 
 /** The gates of the routable pages that are not sidebar entries. */
 const PAGE_GATES: Readonly<Record<ExtraPage, readonly NavGate[]>> = {
-  // The full list behind the entries report (same gate as the report).
-  'reports/entries/all': [{ key: 'reports.view', scopes: ['site', 'all'] }],
   'settings/equipment-types': [{ key: 'settings.equipment_types' }],
   // add_workshop_opening_balance is gated on movements.import (0127).
   'settings/workshop-opening-balance': [{ key: 'movements.import' }],
@@ -405,7 +372,7 @@ export function routePageOf(segments: readonly string[]): RoutePage {
   if (first === 'drivers' && second) return 'drivers/:id'
   if (first === 'users' && second) return 'users/:id'
   if (first === 'purchasing') {
-    // /purchasing opens its first section, like /reports; any other second
+    // /purchasing opens its first section; any other second
     // segment is a PO id.
     if (!second || second === 'orders') return 'purchasing/orders'
     if (second === 'units') return 'purchasing/units'
@@ -422,12 +389,6 @@ export function routePageOf(segments: readonly string[]): RoutePage {
     if (second === 'timesheets') return 'sales/timesheets'
     if (second === 'months') return 'sales/months'
     return 'sales/:id'
-  }
-  if (first === 'reports') {
-    if (second === 'workshop') return 'reports/workshop'
-    if (second === 'equipment') return 'reports/equipment'
-    if (second === 'entries' && third === 'all') return 'reports/entries/all'
-    return 'reports/entries'
   }
   if (first === 'settings') {
     if (second === 'roles') return 'settings/roles'
@@ -501,11 +462,6 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'drivers',
   'users',
   'activity',
-  'reports',
-  'reports/entries',
-  'reports/entries/all',
-  'reports/equipment',
-  'reports/workshop',
   'movement-import',
   'settings',
   'settings/equipment-types',

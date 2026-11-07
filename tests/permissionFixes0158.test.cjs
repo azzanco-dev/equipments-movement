@@ -352,11 +352,6 @@ test('G: get_entry_report_summary is 0102 plus reports.view, its scope and profi
   )
 })
 
-test('G: the entry report still sends its context (the admin holds reports.view all)', () => {
-  const screen = read(path.join(root, 'src', 'screens', 'EntryReports.tsx'))
-  assert.match(screen, /\.rpc\('get_entry_report_summary', \{[\s\S]*?p_context: context,/)
-})
-
 // --- H. Catalogue text --------------------------------------------------------------
 
 test('H: the three descriptions are updated behind an existence guard, without hamza', () => {

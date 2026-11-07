@@ -128,10 +128,7 @@ test('withSupervisorNames keeps the former embed shape', () => {
 })
 
 test('detail screens no longer embed profiles for the recorder name', () => {
-  for (const file of [
-    'src/screens/EquipmentDetail.tsx',
-    'src/screens/EntryReportsAll.tsx',
-  ]) {
+  for (const file of ['src/screens/EquipmentDetail.tsx']) {
     const source = read(file)
     assert.doesNotMatch(source, /:profiles\(/, file)
     assert.match(source, /fetchProfileNames\(/, file)

@@ -23,7 +23,6 @@ import {
   Settings,
   FileUp,
   History,
-  BarChart3,
   Search,
   ShoppingCart,
   Receipt,
@@ -304,34 +303,9 @@ const ActivityScreen = dynamic(
     import('@/screens/ActivityScreen').then((module) => module.ActivityScreen),
   { loading: listLoading },
 )
-const EntryReports = dynamic(
-  () => import('@/screens/EntryReports').then((module) => module.EntryReports),
-  { loading: screenLoading },
-)
-const EntryReportsAll = dynamic(
-  () =>
-    import('@/screens/EntryReportsAll').then(
-      (module) => module.EntryReportsAll,
-    ),
-  { loading: screenLoading },
-)
-const EquipmentReports = dynamic(
-  () =>
-    import('@/screens/EquipmentReports').then(
-      (module) => module.EquipmentReports,
-    ),
-  { loading: screenLoading },
-)
 // wave-15-export: the print page of the PDF export, without the app chrome.
 const PrintExport = dynamic(
   () => import('@/screens/PrintExport').then((module) => module.PrintExport),
-  { loading: screenLoading },
-)
-const WorkshopReports = dynamic(
-  () =>
-    import('@/screens/WorkshopReports').then(
-      (module) => module.WorkshopReports,
-    ),
   { loading: screenLoading },
 )
 
@@ -354,15 +328,11 @@ const NAV_PRESENTATION: Record<
   drivers: { label: 'drivers', icon: <Contact size={18} /> },
   users: { label: 'users', icon: <Users size={18} /> },
   activity: { label: 'activityLog', icon: <History size={18} /> },
-  reports: { label: 'reports', icon: <BarChart3 size={18} /> },
   'movement-import': { label: 'movementImport', icon: <FileUp size={18} /> },
   settings: { label: 'settings', icon: <Settings size={18} /> },
 }
 
 const NAV_CHILD_LABELS: Record<NavChildKey, TranslationKey> = {
-  'reports/entries': 'entryReports',
-  'reports/equipment': 'equipmentReports',
-  'reports/workshop': 'workshopReports',
   'purchasing/orders': 'supplierPos',
   'purchasing/units': 'siteUnits',
   'sales/prices': 'cardPrices',
@@ -762,16 +732,6 @@ function AppContent() {
             )}
             {page === 'movement-import' && <MovementImport />}
             {page === 'activity' && <ActivityScreen />}
-            {page === 'reports/workshop' && (
-              <WorkshopReports onSelectMovement={openMovement} />
-            )}
-            {page === 'reports/equipment' && <EquipmentReports />}
-            {page === 'reports/entries/all' && (
-              <EntryReportsAll onSelectMovement={openMovement} />
-            )}
-            {page === 'reports/entries' && (
-              <EntryReports onSelectMovement={openMovement} />
-            )}
             {page === 'settings/roles' && <RolesSettings />}
             {/* AdminSettings picks its sub-page from the pathname. */}
             {(page === 'settings' ||

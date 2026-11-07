@@ -67,19 +67,6 @@ test('chart sections keep one skeleton and dim on a refetch', () => {
   )
 })
 
-test('report lists use the shared skeleton only before the first result', () => {
-  for (const file of [
-    'screens/EquipmentReports.tsx',
-    'screens/WorkshopReports.tsx',
-    'screens/EntryReportsAll.tsx',
-  ]) {
-    const source = read(file)
-    assert.doesNotMatch(source, /InlineSpinner/, file)
-    assert.match(source, /\{firstLoad \? \(\s*<ReportListSkeleton \/>/, file)
-    assert.match(source, /aria-busy=\{refreshing \|\| undefined\}/, file)
-  }
-})
-
 test('the field home keeps its numbers during a refresh', () => {
   const home = read('screens/HomeScreen.tsx')
   assert.doesNotMatch(home, /loading=\{statsLoading\}/)

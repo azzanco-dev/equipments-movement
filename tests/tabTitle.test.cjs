@@ -48,10 +48,6 @@ test('a sub-page: «name · section»', () => {
     tabTitle('settings/roles', t, null),
     '<rolesSettingsTitle> · <settings>',
   )
-  assert.equal(
-    tabTitle('reports/workshop', t, null),
-    '<workshopReports> · <reports>',
-  )
 })
 
 test('a detail page: «record · section», «section · app» while loading', () => {

@@ -409,9 +409,6 @@ test('the screens show placeholders that match their search', () => {
   // The movement form searches code, type, plate and chassis in all modes.
   const step = read('src/components/movement/EquipmentStep.tsx')
   assert.match(step, /placeholder=\{t\('searchEquipmentAnyField'\)\}/)
-  // The workshop report: equipment fields only.
-  const workshop = read('src/screens/WorkshopReports.tsx')
-  assert.match(workshop, /placeholder=\{t\('searchEquipmentAnyField'\)\}/)
   // The home log: the config placeholder for the foreman, equipment for the
   // workshop (its rows have no driver, company number, company or project).
   const home = read('src/components/home/HomeMovementsCard.tsx')

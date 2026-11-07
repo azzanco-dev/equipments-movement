@@ -119,10 +119,8 @@ const CAPTURED = {
     { key: 'users' },
     // 2026-10-22 (owner): «سجل النشاط» and the movement import left the
     // menu — hidden entries, still open by URL.
-    {
-      key: 'reports',
-      children: ['reports/entries', 'reports/equipment', 'reports/workshop'],
-    },
+    // 2026-11-07 (owner, «شيل صفحات التقارير كلها»): the reports section and
+    // its pages are gone.
     { key: 'settings' },
   ],
   monitor: [{ key: 'dashboard' }, { key: 'logs' }, { key: 'inquiry' }],
@@ -294,7 +292,6 @@ test('a field home lists every section its permissions pass', () => {
         key: 'purchasing',
         children: ['purchasing/orders', 'purchasing/units'],
       },
-      { key: 'reports', children: ['reports/workshop'] },
     ]
     assert.deepEqual(shownMenu(state), expected)
     // The same menu the permissions give without a shell limit: the field
@@ -318,34 +315,9 @@ test('scopes and any-of gates', () => {
     { key: 'dashboard' },
     { key: 'logs' },
   ])
-  // reports: each child follows its scope
-  assert.deepEqual(keys([['reports.view', 'workshop']]), [
-    { key: 'dashboard' },
-    { key: 'reports', children: ['reports/workshop'] },
-  ])
-  assert.deepEqual(keys([['reports.view', 'site']]), [
-    { key: 'dashboard' },
-    { key: 'reports', children: ['reports/entries'] },
-  ])
-  // the equipment report also needs movements.read all (its RPC checks it)
-  assert.deepEqual(keys([['reports.view', 'all']]), [
-    { key: 'dashboard' },
-    { key: 'reports', children: ['reports/entries', 'reports/workshop'] },
-  ])
-  assert.deepEqual(
-    keys([
-      ['reports.view', 'all'],
-      ['movements.read', 'all'],
-    ]),
-    [
-      { key: 'dashboard' },
-      { key: 'logs' },
-      {
-        key: 'reports',
-        children: ['reports/entries', 'reports/equipment', 'reports/workshop'],
-      },
-    ],
-  )
+  // 2026-11-07: the report pages are gone, reports.view lists nothing
+  for (const scope of ['site', 'workshop', 'all'])
+    assert.deepEqual(keys([['reports.view', scope]]), [{ key: 'dashboard' }])
   // settings: any of its three keys
   for (const key of [
     'settings.equipment_types',
@@ -363,12 +335,12 @@ test('scopes and any-of gates', () => {
 test('routable drops pages the current shell cannot open', () => {
   const items = nav.visibleNavItems(
     ready(LEGACY.get('admin')),
-    new Set(['dashboard', 'logs', 'reports', 'reports/workshop']),
+    new Set(['dashboard', 'logs', 'purchasing', 'purchasing/units']),
   )
   assert.deepEqual(plain(items), [
     { key: 'dashboard' },
     { key: 'logs' },
-    { key: 'reports', children: ['reports/workshop'] },
+    { key: 'purchasing', children: ['purchasing/units'] },
   ])
 })
 

@@ -154,27 +154,12 @@ test('5: the workshop home asks for the workshop form', () => {
   )
 })
 
-// --- 6. The equipment report needs movements.read all ------------------------
+// --- 6. The report pages are gone (owner 2026-11-07) ------------------------
 
-test('6: /reports/equipment needs reports.view all AND movements.read all', () => {
+test('6: reports.view alone opens no page, /reports is the home', () => {
   const only = ready([['reports.view', 'all']])
-  assert.ok(!nav.planShell(only).pages.has('reports/equipment'))
-  assert.equal(nav.planShell(only).landing, 'reports/entries')
-  const both = ready([
-    ['reports.view', 'all'],
-    ['movements.read', 'all'],
-  ])
-  assert.ok(nav.planShell(both).pages.has('reports/equipment'))
-  assert.ok(
-    !nav
-      .planShell(
-        ready([
-          ['reports.view', 'all'],
-          ['movements.read', 'site'],
-        ]),
-      )
-      .pages.has('reports/equipment'),
-  )
+  assert.equal(nav.planShell(only).kind, 'none')
+  assert.equal(nav.routePageOf(['reports', 'equipment']), 'dashboard')
 })
 
 // --- 7. The Settings hub cards follow their pages' gates ---------------------
@@ -268,13 +253,6 @@ test('9: links into other pages follow the shell', () => {
     app,
     /onViewAllMovements=\{\s*shell\.pages\.has\('logs'\)\s*\? \(code\) =>/,
   )
-  const report = read('src', 'screens', 'EquipmentReports.tsx')
-  assert.match(
-    report,
-    /planShell\(\{ status, permissions \}\)\.pages\.has\('equipment\/:id'\)/,
-  )
-  assert.match(report, /canOpenEquipment\s*\? \(\) => router\.push/)
-  assert.match(report, /\{onOpen && \(/)
   const driver = read('src', 'screens', 'drivers', 'DriverDetailDialog.tsx')
   assert.match(driver, /const canOpenLogs = shellPages\.has\('logs'\)/)
   assert.match(

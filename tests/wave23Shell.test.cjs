@@ -242,10 +242,6 @@ const NEW_ADMIN_SCREEN = {
   users: 'AdminUsers',
   'movement-import': 'MovementImport',
   activity: 'MovementActivity',
-  'reports/workshop': 'WorkshopReports',
-  'reports/equipment': 'EquipmentReports',
-  'reports/entries/all': 'EntryReportsAll',
-  'reports/entries': 'EntryReports',
   'settings/roles': 'RolesSettings',
   settings: 'AdminSettings',
   'settings/equipment-types': 'AdminSettings',
@@ -371,7 +367,16 @@ const LOG_DIFFERENCES = new Set(
     (role) => [`${role} /logs`, `${role} /logs/x`],
   ),
 )
-const KNOWN_DIFFERENCES = new Set([...PRINT_DIFFERENCES, ...LOG_DIFFERENCES])
+// - 2026-11-07 (owner, «شيل صفحات التقارير كلها»): the report pages are gone,
+//   so the admin's /reports URLs render his home like any unknown URL.
+const REPORT_DIFFERENCES = new Set(
+  URLS.filter((url) => url.startsWith('/reports')).map((url) => `admin ${url}`),
+)
+const KNOWN_DIFFERENCES = new Set([
+  ...PRINT_DIFFERENCES,
+  ...LOG_DIFFERENCES,
+  ...REPORT_DIFFERENCES,
+])
 
 // --- Equivalence with the roles system OFF ------------------------------------
 
@@ -385,6 +390,16 @@ for (const role of ROLES) {
     for (const url of URLS) {
       const now = after(ready(LEGACY.get(role)), url)
       const then = before(role, url)
+      if (REPORT_DIFFERENCES.has(`${role} ${url}`)) {
+        differences.push(`${role} ${url}`)
+        assert.equal(then.active, 'reports')
+        assert.deepEqual(now, {
+          shell: 'admin',
+          active: 'dashboard',
+          screen: ADMIN_SCREEN.dashboard,
+        })
+        continue
+      }
       if (KNOWN_DIFFERENCES.has(`${role} ${url}`)) {
         differences.push(`${role} ${url}`)
         assert.deepEqual(then.screen, 'Home')
@@ -607,27 +622,9 @@ test('movements.read scope all alone lands on the log', () => {
   })
 })
 
-test('reports.view scope workshop alone lands on the workshop report', () => {
-  const state = ready([['reports.view', 'workshop']])
-  const plan = nav.planShell(state)
-  assert.equal(plan.kind, 'admin')
-  assert.equal(plan.landing, 'reports/workshop')
-  assert.deepEqual(sorted(plan.pages), ['reports', 'reports/workshop'])
-  assert.deepEqual(menu(state), [
-    { key: 'reports', children: ['reports/workshop'] },
-  ])
-  assert.deepEqual(after(state, '/reports/workshop'), {
-    shell: 'admin',
-    active: 'reports',
-    screen: 'WorkshopReports',
-  })
-  // /reports asks for the entries report, which this scope does not open.
-  assert.deepEqual(after(state, '/reports'), {
-    shell: 'admin',
-    redirect: '/reports/workshop',
-  })
-  // A reports.view scope no child accepts opens no section at all.
-  for (const scope of ['own', 'companies'])
+test('reports.view alone opens no section since the reports are gone', () => {
+  // 2026-11-07 (owner, «شيل صفحات التقارير كلها»).
+  for (const scope of ['own', 'companies', 'site', 'workshop', 'all'])
     assert.equal(nav.planShell(ready([['reports.view', scope]])).kind, 'none')
 })
 
@@ -669,7 +666,6 @@ test('the landing is the first passing section in menu order', () => {
     'sales/prices',
     'drivers',
     'users',
-    'reports/entries',
     'settings',
   ])
 })
@@ -731,17 +727,14 @@ test('a field home keeps precedence and opens the sections it passes', () => {
     )
   const workshop = ready([
     ['home.workshop', 'workshop'],
-    ['reports.view', 'all'],
+    ['drivers.read', 'all'],
   ])
   assert.equal(nav.planShell(workshop).kind, 'workshop')
-  assert.deepEqual(menu(workshop), [
-    { key: 'dashboard' },
-    { key: 'reports', children: ['reports/entries', 'reports/workshop'] },
-  ])
-  assert.deepEqual(after(workshop, '/reports/workshop'), {
+  assert.deepEqual(menu(workshop), [{ key: 'dashboard' }, { key: 'drivers' }])
+  assert.deepEqual(after(workshop, '/drivers'), {
     shell: 'workshop',
-    active: 'reports',
-    screen: 'WorkshopReports',
+    active: 'drivers',
+    screen: 'AdminDrivers',
   })
   // Every page a field shell opens is a page the admin shell renders, and
   // the sidebar never lists a page the shell refuses.
@@ -842,7 +835,6 @@ test('the gates of the pages outside the sidebar', () => {
   assert.deepEqual(gate('settings/workshop-opening-balance'), [
     { key: 'movements.import' },
   ])
-  assert.deepEqual(gate('reports/entries/all'), gate('reports/entries'))
   assert.deepEqual(gate('settings'), [
     { key: 'settings.equipment_types' },
     { key: 'settings.integrations' },
@@ -870,8 +862,8 @@ test('routePageOf reads the URL as the old router did', () => {
   assert.equal(page('/movements/abc'), 'movements/:id')
   assert.equal(page('/equipment'), 'equipment')
   assert.equal(page('/equipment/abc'), 'equipment/:id')
-  assert.equal(page('/reports'), 'reports/entries')
-  assert.equal(page('/reports/entries/all'), 'reports/entries/all')
+  assert.equal(page('/reports'), 'dashboard')
+  assert.equal(page('/reports/entries/all'), 'dashboard')
   assert.equal(page('/settings/roles/x'), 'settings/roles')
   assert.equal(page('/settings/afaqy'), 'settings/afaqy')
   assert.equal(page('/settings/afaqy/x'), 'settings')
@@ -974,10 +966,6 @@ test('App.tsx renders each screen behind its page', () => {
     [/page === 'drivers\/:id' \? \(\s*<DriverDetail/g, 1],
     [/page === 'users\/:id' \? \(\s*<UserDetail/g, 1],
     [/page === 'settings\/roles' && <RolesSettings \/>/g, 1],
-    [/page === 'reports\/workshop' && \(\s*<WorkshopReports/g, 1],
-    [/page === 'reports\/equipment' && <EquipmentReports \/>/g, 1],
-    [/page === 'reports\/entries\/all' && \(\s*<EntryReportsAll/g, 1],
-    [/page === 'reports\/entries' && \(\s*<EntryReports /g, 1],
   ]
   for (const [re, count] of pairs)
     assert.equal(content.match(re)?.length, count, String(re))
