@@ -1479,8 +1479,10 @@ export const cardPricesListConfig: DataListConfig = {
     'equipment_chassis_number',
     'supplier_po_number',
   ],
-  defaultSort: 'equipment_code',
-  defaultDirection: 'asc',
+  // Owner 2026-11-07 (0184): the latest change of the card, its client PO or
+  // its supplier PO first.
+  defaultSort: 'last_modified_at',
+  defaultDirection: 'desc',
   filterFields: [
     {
       key: 'is_open',
@@ -1571,5 +1573,6 @@ export const cardPricesListConfig: DataListConfig = {
     { key: 'card_client_price', label: 'cardPriceClient' },
     { key: 'card_margin_pct', label: 'cardPriceMarginPct' },
     { key: 'pricing_status', label: 'cardPricingStatus' },
+    { key: 'last_modified_at', label: 'updatedAt' },
   ],
 }

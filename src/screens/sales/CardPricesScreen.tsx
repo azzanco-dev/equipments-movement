@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, Lock, Receipt, RotateCcw, Save } from 'lucide-react'
 import { usePermissions } from '@/auth/PermissionsContext'
+import { RelativeTime } from '@/components/RelativeTime'
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
@@ -412,6 +413,15 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
           approvedAt={row.pricing_approved_at}
         />
       ),
+    },
+    // 0184: the latest change of the card, its client PO or its supplier PO.
+    {
+      key: 'last_modified_at',
+      header: t('updatedAt'),
+      sortable: true,
+      className: 'text-muted',
+      hideBelow: 'md' as const,
+      cell: (row: CardPriceRow) => <RelativeTime value={row.last_modified_at} />,
     },
     ...(canApprove
       ? [

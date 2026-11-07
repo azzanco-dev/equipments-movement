@@ -143,8 +143,9 @@ test('cardPricesListConfig: search, the open cards by default, the owner / suppl
     'equipment_chassis_number',
     'supplier_po_number',
   ])
-  assert.equal(config.defaultSort, 'equipment_code')
-  assert.equal(config.defaultDirection, 'asc')
+  // Owner 2026-11-07 (0184): the latest modification first.
+  assert.equal(config.defaultSort, 'last_modified_at')
+  assert.equal(config.defaultDirection, 'desc')
   assert.deepEqual(plain(config.filterFields.map((field) => field.key)), [
     'is_open',
     'pricing_status',
@@ -183,6 +184,7 @@ test('cardPricesListConfig: search, the open cards by default, the owner / suppl
     'card_client_price',
     'card_margin_pct',
     'pricing_status',
+    'last_modified_at',
   ])
 })
 

@@ -260,9 +260,15 @@ export type CardPriceRow = Pick<
   | 'card_margin'
   | 'card_margin_pct'
   | 'supplier_po_approval_status'
->
+> & {
+  /**
+   * 0184: the latest of the card's, the client PO's and the supplier PO's
+   * `updated_at` — the page's default sort (newest first).
+   */
+  last_modified_at: string
+}
 
-export const CARD_PRICES_SELECT = `card_id,equipment_id,company_id,project_id,period_from,period_to,is_open,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_name_ar,company_name_en,project_name_ar,project_name_en,supplier_line_id,supplier_po_id,supplier_po_number,supplier_po_status,supplier_price,supplier_rate_unit,${CARD_PRICING_COLUMNS}`
+export const CARD_PRICES_SELECT = `card_id,equipment_id,company_id,project_id,period_from,period_to,is_open,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_name_ar,company_name_en,project_name_ar,project_name_en,supplier_line_id,supplier_po_id,supplier_po_number,supplier_po_status,supplier_price,supplier_rate_unit,${CARD_PRICING_COLUMNS},last_modified_at`
 
 /** The movement facts of a card's entry (`movement_visits`). */
 export interface CardVisitRow {
