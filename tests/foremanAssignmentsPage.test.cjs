@@ -111,6 +111,24 @@ test('the user page: a projects field under the companies, saved in one call', (
   has(page, "key: 'assignedProjects'")
 })
 
+test('a later save never drops the projects (owner 2026-11-07, «تختفي المشاريع»)', () => {
+  // manage-user changes only the companies that changed: deleting every
+  // link fired the 0176 prune trigger, which removed all the projects.
+  const fn = read('supabase', 'functions', 'manage-user', 'index.ts')
+  assert.match(fn, /const removedIds = \[\.\.\.currentIds\]\.filter\(\(id\) => !keptIds\.has\(id\)\)/)
+  assert.match(fn, /const addedIds = companyIds\.filter\(\(id\) => !currentIds\.has\(id\)\)/)
+  assert.match(fn, /\.delete\(\)\s*\.eq\('profile_id', userId\)\s*\.in\('company_id', removedIds\)/)
+  assert.doesNotMatch(fn, /\.delete\(\)\s*\.eq\('profile_id', userId\)\s*if/)
+  // The user page writes the projects again after every save of the record
+  // with the companies field, and saves nothing while nothing changed.
+  const page = read('src', 'screens', 'UserDetail.tsx')
+  assert.match(
+    page,
+    /const rewriteProjects =\s+saveMain && companiesApply && projectsState === 'loaded'\s+if \(projectsChanged \|\| rewriteProjects\) \{/,
+  )
+  assert.match(page, /disabled=\{!hasUnsavedChanges\}\s+onClick=\{handleSave\}/)
+})
+
 test('the Settings page is gone', () => {
   assert.ok(!fs.existsSync(path.join(ROOT, 'src', 'components', 'foremanAssignments')))
   for (const file of [

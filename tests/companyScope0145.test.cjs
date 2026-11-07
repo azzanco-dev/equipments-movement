@@ -100,7 +100,7 @@ test('the client keeps no trace of the scope: no token, no admin-only field chan
   // Roles stage 3 (2026-10-27): the field follows the role's permission
   // (`companiesApply`, tests/roles0152.test.cjs), still with no scope token.
   assert.match(page, /\{companiesApply && \(\s*<Field\s+label=\{t\('assignedCompanies'\)\}/)
-  assert.match(read('supabase', 'functions', 'manage-user', 'index.ts'), /if \(companyIds\.length > 0\) \{/)
+  assert.match(read('supabase', 'functions', 'manage-user', 'index.ts'), /if \(addedIds\.length > 0\) \{/)
 })
 
 test('the entry form filters its company and project selectors by the linked companies', () => {

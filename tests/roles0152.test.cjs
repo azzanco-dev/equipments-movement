@@ -102,7 +102,7 @@ test('the companies of a user follow the role permission', () => {
   assert.match(page, /\{companiesApply && \(/)
   assert.match(page, /\.\.\.\(savedCompaniesApply/)
   const fn = read('supabase', 'functions', 'manage-user', 'index.ts')
-  assert.match(fn, /if \(companyIds\.length > 0\) \{/)
+  assert.match(fn, /if \(addedIds\.length > 0\) \{/)
   assert.doesNotMatch(fn, /role === 'supervisor'/)
   // The last-admin count moved into admin_assign_profile_role (0153,
   // roles stage 4c-1): manage-user no longer changes the role at all.

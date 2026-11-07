@@ -165,22 +165,42 @@ Deno.serve(async (req: Request) => {
         .update(profileUpdate)
         .eq('id', userId)
       if (profileError) return json({ error: 'Could not update profile' }, 500)
-      const { error: clearAssignmentsError } = await adminClient
-        .from('profile_companies')
-        .delete()
-        .eq('profile_id', userId)
-      if (clearAssignmentsError)
-        return json({ error: 'Could not update company assignments' }, 500)
       // Roles stage 3 (owner 2026-10-27): every role that records project
       // movements may carry companies, so the screen decides when the field
       // applies and sends an empty list otherwise (it was the legacy
       // `supervisor` only). The links filter the entry form's selectors
       // only; they grant nothing.
-      if (companyIds.length > 0) {
+      // Owner 2026-11-07 («لما اسند 6 مشاريع … تختفي المشاريع»): only the
+      // companies that changed are written. Deleting every link and
+      // inserting them again fired the 0176 trigger
+      // `prune_profile_projects_on_company_unlink` for every company, which
+      // removed all the user's projects (`profile_projects`) on each save.
+      const { data: currentLinks, error: currentLinksError } = await adminClient
+        .from('profile_companies')
+        .select('company_id')
+        .eq('profile_id', userId)
+      if (currentLinksError)
+        return json({ error: 'Could not update company assignments' }, 500)
+      const currentIds = new Set(
+        (currentLinks ?? []).map((link) => String(link.company_id)),
+      )
+      const keptIds = new Set(companyIds)
+      const removedIds = [...currentIds].filter((id) => !keptIds.has(id))
+      const addedIds = companyIds.filter((id) => !currentIds.has(id))
+      if (removedIds.length > 0) {
+        const { error: clearAssignmentsError } = await adminClient
+          .from('profile_companies')
+          .delete()
+          .eq('profile_id', userId)
+          .in('company_id', removedIds)
+        if (clearAssignmentsError)
+          return json({ error: 'Could not update company assignments' }, 500)
+      }
+      if (addedIds.length > 0) {
         const { error: assignmentError } = await adminClient
           .from('profile_companies')
           .insert(
-            companyIds.map((company_id) => ({
+            addedIds.map((company_id) => ({
               profile_id: userId,
               company_id,
             })),

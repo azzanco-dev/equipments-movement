@@ -638,8 +638,14 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
 
       // 1c. The projects (0176), when they changed: one call with the
       //     companies on the form, so both sets agree. What step 1 saved
-      //     stays saved and is said to be saved.
-      if (projectsChanged) {
+      //     stays saved and is said to be saved. Also after every save of
+      //     the record with the companies field (owner 2026-11-07, «تختفي
+      //     المشاريع»): manage-user rewrote the company links, and the 0176
+      //     trigger dropped the projects with them, so the projects on the
+      //     form are written again. Never after a failed projects read.
+      const rewriteProjects =
+        saveMain && companiesApply && projectsState === 'loaded'
+      if (projectsChanged || rewriteProjects) {
         const { error: projectsError } = await supabase.rpc(
           'admin_set_profile_assignments',
           {
@@ -1079,7 +1085,14 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             {t('cancel')}
           </Button>
           {canManageUsers && (
-            <Button variant="primary" loading={saving} onClick={handleSave}>
+            <Button
+              variant="primary"
+              loading={saving}
+              // Nothing to save until something changed (owner 2026-11-07:
+              // a save with no change rewrote the company links).
+              disabled={!hasUnsavedChanges}
+              onClick={handleSave}
+            >
               {t('save')}
             </Button>
           )}
