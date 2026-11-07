@@ -43,16 +43,16 @@ import type { Lessor } from '@/lib/types'
 /** EM-260 (0175): «بيانات رسمية», then the contact details, then the bank. */
 const OFFICIAL_FIELDS: readonly PartyFieldSpec<LessorFormValues>[] = [
   {
-    field: 'tax_number',
-    label: 'taxNumber',
-    placeholder: 'taxNumberPlaceholder',
+    field: 'commercial_register',
+    label: 'commercialRegister',
+    placeholder: 'commercialRegisterPlaceholder',
     ltr: true,
     inputMode: 'numeric',
   },
   {
-    field: 'commercial_register',
-    label: 'commercialRegister',
-    placeholder: 'commercialRegisterPlaceholder',
+    field: 'tax_number',
+    label: 'taxNumber',
+    placeholder: 'taxNumberPlaceholder',
     ltr: true,
     inputMode: 'numeric',
   },

@@ -48,14 +48,14 @@ export function CompanyDetailsDialog({
           icon: <FileText size={16} />,
           items: [
             {
-              label: t('taxNumber'),
-              value: company?.tax_number,
+              label: t('commercialRegister'),
+              value: company?.commercial_register,
               ltr: true,
               copy: true,
             },
             {
-              label: t('commercialRegister'),
-              value: company?.commercial_register,
+              label: t('taxNumber'),
+              value: company?.tax_number,
               ltr: true,
               copy: true,
             },

@@ -45,14 +45,14 @@ export function LessorDetailsDialog({
           icon: <FileText size={16} />,
           items: [
             {
-              label: t('taxNumber'),
-              value: lessor?.tax_number,
+              label: t('commercialRegister'),
+              value: lessor?.commercial_register,
               ltr: true,
               copy: true,
             },
             {
-              label: t('commercialRegister'),
-              value: lessor?.commercial_register,
+              label: t('taxNumber'),
+              value: lessor?.tax_number,
               ltr: true,
               copy: true,
             },
