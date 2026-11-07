@@ -52,6 +52,8 @@ export interface PartyDetailsDialogProps {
   /** The dialog width; the supplier's is `lg` (owner 2026-11-05, «وسع
    *  dialog تفاصيل المورد»). */
   size?: 'md' | 'lg'
+  /** Shown after the sections: the «المستندات» of 0182. */
+  children?: ReactNode
 }
 
 /**
@@ -74,6 +76,7 @@ export function PartyDetailsDialog({
   sections,
   onEdit,
   size = 'md',
+  children,
 }: PartyDetailsDialogProps) {
   const { t } = useI18n()
   return (
@@ -138,6 +141,7 @@ export function PartyDetailsDialog({
             </dl>
           </section>
         ))}
+        {children}
       </div>
     </Dialog>
   )

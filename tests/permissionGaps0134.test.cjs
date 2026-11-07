@@ -438,7 +438,7 @@ test('the three list screens map a 23503 refusal to a safe message', () => {
       new RegExp(
         // 2026-10-28: the delete reads its rows back and answers a policy
         // refusal first (tests/masterDataActions.test.cjs).
-        `\\.from\\('${table}'\\)\\s+\\.delete\\(\\)\\s+\\.eq\\('id', \\w+\\.id\\)\\s+\\.select\\('id'\\)\\s+if \\(refusedByPolicy\\(error, data\\)\\) \\{[\\s\\S]*?return\\s+\\}\\s+if \\(error\\) \\{[\\s\\S]*?setLoadError\\(\\s+t\\(\\s+databaseErrorKind\\(error\\) === 'foreignKey'\\s+\\? '${key}'\\s+: 'deleteFailed',\\s+\\),\\s+\\)\\s+return\\s+\\}`,
+        `\\.from\\('${table}'\\)\\s+\\.delete\\(\\)\\s+\\.eq\\('id', \\w+\\.id\\)\\s+\\.select\\('id'\\)\\s+if \\(refusedByPolicy\\(error, data\\)\\) \\{[\\s\\S]*?return\\s+\\}\\s+if \\(error\\) \\{[\\s\\S]*?setLoadError\\(\\s+t\\(\\s+(?:blockedByPartyDocuments\\(error\\)\\s+\\? 'partyDeleteHasDocuments'\\s+: )?databaseErrorKind\\(error\\) === 'foreignKey'\\s+\\? '${key}'\\s+: 'deleteFailed',\\s+\\),\\s+\\)\\s+return\\s+\\}`,
       ),
       `${file} surfaces the refused delete`,
     )

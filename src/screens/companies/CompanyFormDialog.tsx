@@ -99,7 +99,8 @@ export interface CompanyFormDialogProps {
   onOpenChange: (open: boolean) => void
   /** Null adds a new company; a record edits it. */
   company: Company | null
-  onSaved: () => void
+  /** After a save; a NEW company passes its id (its details open next). */
+  onSaved: (createdId?: string) => void
 }
 
 export function CompanyFormDialog({
@@ -186,7 +187,8 @@ export function CompanyFormDialog({
       return
     }
     onOpenChange(false)
-    onSaved()
+    // 0182 (owner «الاولى»): a new company opens on its documents.
+    onSaved(company ? undefined : result.data?.[0]?.id)
   }
 
   const shownError = error ?? (canSave ? null : notAllowed)

@@ -14,6 +14,7 @@ import {
 } from '@/lib/actionPermissions'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { databaseErrorKind } from '@/lib/formValidation'
+import { blockedByPartyDocuments } from '@/lib/partyDocuments'
 import { companiesListConfig } from '@/lib/listConfigs'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
@@ -47,6 +48,7 @@ export function CompaniesListScreen() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Company | null>(null)
   const [viewing, setViewing] = useState<Company | null>(null)
+  const [justCreated, setJustCreated] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [projectsCompany, setProjectsCompany] = useState<Company | null>(null)
@@ -127,16 +129,36 @@ export function CompaniesListScreen() {
     if (error) {
       // 0134: a company referenced by a movement is refused by the database
       // (foreign key, ON DELETE RESTRICT); never show the raw error text.
+      // 0182: its documents block the delete too (RESTRICT), with their own
+      // message.
       setLoadError(
         t(
-          databaseErrorKind(error) === 'foreignKey'
-            ? 'companyDeleteBlocked'
-            : 'deleteFailed',
+          blockedByPartyDocuments(error)
+            ? 'partyDeleteHasDocuments'
+            : databaseErrorKind(error) === 'foreignKey'
+              ? 'companyDeleteBlocked'
+              : 'deleteFailed',
         ),
       )
       return
     }
     fetchCompanies()
+  }
+
+  // 0182 (owner «الاولى»): a new company is saved first, then its details
+  // open on «المستندات» so its files can be uploaded at once.
+  const saved = async (createdId?: string) => {
+    void fetchCompanies()
+    if (!createdId) return
+    const { data } = await supabase
+      .from('companies')
+      .select(LIST_SELECT)
+      .eq('id', createdId)
+      .maybeSingle()
+    if (data) {
+      setJustCreated(true)
+      setViewing(data as Company)
+    }
   }
 
   const addButton = canEdit ? (
@@ -200,7 +222,10 @@ export function CompaniesListScreen() {
         sort={list.sort}
         direction={list.direction}
         onSortChange={list.setSort}
-        onOpen={setViewing}
+        onOpen={(company) => {
+          setJustCreated(false)
+          setViewing(company)
+        }}
         onEdit={canEdit ? openEdit : undefined}
         onManageProjects={setProjectsCompany}
         onDelete={canEdit ? remove : undefined}
@@ -220,7 +245,7 @@ export function CompaniesListScreen() {
         open={formOpen}
         onOpenChange={setFormOpen}
         company={editing}
-        onSaved={fetchCompanies}
+        onSaved={(createdId) => void saved(createdId)}
       />
       <CompanyImportDialog
         open={importOpen && canEdit}
@@ -232,9 +257,14 @@ export function CompaniesListScreen() {
       <CompanyDetailsDialog
         company={viewing}
         onOpenChange={(open) => {
-          if (!open) setViewing(null)
+          if (!open) {
+            setViewing(null)
+            setJustCreated(false)
+          }
         }}
         onEdit={canEdit && viewing ? () => openEdit(viewing) : undefined}
+        canEditDocuments={canEdit}
+        justCreated={justCreated}
       />
       <CompanyProjectsDialog
         open={projectsCompany !== null}

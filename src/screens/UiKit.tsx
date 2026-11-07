@@ -129,12 +129,13 @@ type SectionDef = {
 const SCREEN_SECTIONS: SectionDef[] = [
   {
     // Owner 2026-11-07: «نبغى نضيف امكانية رفع الملفات pdf او صور في
-    // معلومات الموردين والشركات», then «ابدا» on the plan. Sample data only.
+    // معلومات الموردين والشركات», then «ابدا» on the plan; approved the same
+    // day («الاولى ونفذ»): src/components/parties/PartyDocumentsSection.tsx.
     id: 'party-documents',
     title: 'مستندات الموردين والشركات',
     purpose:
       'قسم «المستندات» في تفاصيل المورد والشركة: السجل التجاري وشهادة الضريبة وشهادة الايبان (للموردين) والعنوان الوطني ومستندات اخرى، PDF او صورة حتى 10 ميغا.',
-    status: 'review',
+    status: 'approved',
     defaultOpen: true,
     element: <PartyDocumentsMockup />,
   },

@@ -40,7 +40,8 @@ test('the supplier form: the count beside save, no empty save, ask before discar
   assert.match(form, /title: t\('unsavedChanges'\)/)
   assert.match(form, /\{confirmDialog\}/)
   // A successful save closes without asking.
-  assert.match(form, /onOpenChange\(false\)\s+onSaved\(\)/)
+  // 0182: a new supplier passes its id so its details open next.
+  assert.match(form, /onOpenChange\(false\)\s+(?:\/\/[^\n]*\s+)?onSaved\(lessor \? undefined : result\.data\?\.\[0\]\?\.id\)/)
   const tr = read('src', 'i18n', 'translations.ts')
   assert.equal(tr.match(/unsavedFieldsCount:/g).length, 2)
   assert.doesNotMatch(/unsavedFieldsCount: '([^']*)'/.exec(tr)[1], /[أإآ]/)

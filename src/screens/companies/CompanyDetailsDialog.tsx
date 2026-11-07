@@ -1,5 +1,6 @@
 import { Briefcase, FileText, Phone } from 'lucide-react'
 import { PartyDetailsDialog } from '@/components/parties/PartyDetailsDialog'
+import { PartyDocumentsSection } from '@/components/parties/PartyDocumentsSection'
 import { useI18n } from '@/i18n/I18nContext'
 import {
   COMPANY_COMPLETENESS_FIELDS,
@@ -14,6 +15,10 @@ export interface CompanyDetailsDialogProps {
   onOpenChange: (open: boolean) => void
   /** Omitted without `companies_projects.edit`. */
   onEdit?: () => void
+  /** `companies_projects.edit`: upload, replace and delete documents. */
+  canEditDocuments?: boolean
+  /** Just created: the documents section says it can be filled now. */
+  justCreated?: boolean
 }
 
 /** A client's facts (EM-260, 0175): both names, «بيانات رسمية» and
@@ -22,6 +27,8 @@ export function CompanyDetailsDialog({
   company,
   onOpenChange,
   onEdit,
+  canEditDocuments = false,
+  justCreated = false,
 }: CompanyDetailsDialogProps) {
   const { t } = useI18n()
   return (
@@ -94,6 +101,16 @@ export function CompanyDetailsDialog({
           ],
         },
       ]}
-    />
+    >
+      {company && (
+        <PartyDocumentsSection
+          key={company.id}
+          kind="company"
+          partyId={company.id}
+          canEdit={canEditDocuments}
+          notice={justCreated ? t('partyDocCreatedNotice') : undefined}
+        />
+      )}
+    </PartyDetailsDialog>
   )
 }

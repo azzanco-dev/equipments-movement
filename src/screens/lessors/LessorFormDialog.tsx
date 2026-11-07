@@ -103,7 +103,8 @@ export interface LessorFormDialogProps {
   onOpenChange: (open: boolean) => void
   /** Null adds a new lessor; a record edits it. */
   lessor: Lessor | null
-  onSaved: () => void
+  /** After a save; a NEW supplier passes its id (its details open next). */
+  onSaved: (createdId?: string) => void
 }
 
 export function LessorFormDialog({
@@ -200,7 +201,8 @@ export function LessorFormDialog({
       return
     }
     onOpenChange(false)
-    onSaved()
+    // 0182 (owner «الاولى»): a new supplier opens on its documents.
+    onSaved(lessor ? undefined : result.data?.[0]?.id)
   }
 
   const shownError = error ?? (canSave ? null : notAllowed)

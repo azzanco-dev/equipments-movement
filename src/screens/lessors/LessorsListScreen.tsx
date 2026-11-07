@@ -11,6 +11,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import { lessorsActions, refusedByPolicy } from '@/lib/actionPermissions'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { databaseErrorKind } from '@/lib/formValidation'
+import { blockedByPartyDocuments } from '@/lib/partyDocuments'
 import { lessorsListConfig } from '@/lib/listConfigs'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
@@ -41,6 +42,7 @@ export function LessorsListScreen() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Lessor | null>(null)
   const [viewing, setViewing] = useState<Lessor | null>(null)
+  const [justCreated, setJustCreated] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
 
@@ -119,16 +121,36 @@ export function LessorsListScreen() {
     if (error) {
       // 0134: a supplier referenced by equipment is refused by the database
       // (foreign key, ON DELETE RESTRICT); never show the raw error text.
+      // 0182: its documents block the delete too (RESTRICT), with their own
+      // message.
       setLoadError(
         t(
-          databaseErrorKind(error) === 'foreignKey'
-            ? 'lessorDeleteBlocked'
-            : 'deleteFailed',
+          blockedByPartyDocuments(error)
+            ? 'partyDeleteHasDocuments'
+            : databaseErrorKind(error) === 'foreignKey'
+              ? 'lessorDeleteBlocked'
+              : 'deleteFailed',
         ),
       )
       return
     }
     fetchLessors()
+  }
+
+  // 0182 (owner «الاولى»): a new supplier is saved first, then its details
+  // open on «المستندات» so its files can be uploaded at once.
+  const saved = async (createdId?: string) => {
+    void fetchLessors()
+    if (!createdId) return
+    const { data } = await supabase
+      .from('lessors')
+      .select(LIST_SELECT)
+      .eq('id', createdId)
+      .maybeSingle()
+    if (data) {
+      setJustCreated(true)
+      setViewing(data as Lessor)
+    }
   }
 
   const addButton = canEdit ? (
@@ -183,7 +205,10 @@ export function LessorsListScreen() {
         sort={list.sort}
         direction={list.direction}
         onSortChange={list.setSort}
-        onOpen={setViewing}
+        onOpen={(lessor) => {
+          setJustCreated(false)
+          setViewing(lessor)
+        }}
         onEdit={canEdit ? openEdit : undefined}
         onDelete={canEdit ? remove : undefined}
         emptyAction={addButton}
@@ -202,14 +227,19 @@ export function LessorsListScreen() {
         open={formOpen}
         onOpenChange={setFormOpen}
         lessor={editing}
-        onSaved={fetchLessors}
+        onSaved={(createdId) => void saved(createdId)}
       />
       <LessorDetailsDialog
         lessor={viewing}
         onOpenChange={(open) => {
-          if (!open) setViewing(null)
+          if (!open) {
+            setViewing(null)
+            setJustCreated(false)
+          }
         }}
         onEdit={canEdit && viewing ? () => openEdit(viewing) : undefined}
+        canEditDocuments={canEdit}
+        justCreated={justCreated}
       />
       <LessorImportDialog
         open={importOpen && canEdit}
