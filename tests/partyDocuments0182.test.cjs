@@ -264,14 +264,19 @@ test('an icon per document type, beside its name, in the section and the mockup'
     ['national_address', 'MapPin', 5],
     ['other', 'Files', 6],
   ]
-  for (const [type, icon] of icons) assert.match(section, new RegExp(`  ${type}: ${icon},\n`))
-  assert.match(section, /<Icon size=\{15\} className="shrink-0 text-muted" aria-hidden="true" \/>/)
-  assert.match(section, /<FolderOpen size=\{15\}/)
-  assert.equal(section.match(/<TileTitle icon=\{icon\} title=\{title\} \/>/g).length, 2)
-  // The mockup's «الوان وحياة» (owner 2026-11-07): an icon and a light chart
-  // shade per type, defined for both themes in src/index.css.
-  for (const [type, icon, tone] of icons)
-    assert.match(mockup, new RegExp(`  ${type}: \\{ icon: ${icon}, tone: ${tone} \\},`))
-  assert.match(mockup, /backgroundColor: `var\(--chart-\$\{tone\}\)`,\n  color: `var\(--chart-stroke-\$\{tone\}\)`,/)
-  assert.match(mockup, /motion-safe:hover:-translate-y-0\.5/)
+  // «الوان وحياة» (owner 2026-11-07, approved on /ui-kit): an icon and a
+  // light chart shade per type, defined for both themes in src/index.css,
+  // the same in the real section and the mockup.
+  for (const source of [section, mockup]) {
+    for (const [type, icon, tone] of icons)
+      assert.match(source, new RegExp(`  ${type}: \\{ icon: ${icon}, tone: ${tone} \\},`))
+    assert.match(source, /backgroundColor: `var\(--chart-\$\{tone\}\)`,\n  color: `var\(--chart-stroke-\$\{tone\}\)`,/)
+    assert.match(source, /motion-safe:hover:-translate-y-0\.5/)
+    assert.match(source, /<FolderOpen size=\{15\} \/>/)
+    assert.match(source, /onDrop=\{drop\}/)
+    assert.match(source, /role="progressbar"/)
+    assert.doesNotMatch(source, /#[0-9a-fA-F]{3,6}\b/)
+  }
+  // The bar uses the completeness ring's colours.
+  assert.match(section, /'var\(--progress-high\)'[\s\S]*?'var\(--progress-mid\)'[\s\S]*?'var\(--progress-low\)'/)
 })

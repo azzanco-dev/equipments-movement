@@ -10,12 +10,12 @@ const root = path.join(__dirname, '..')
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8')
 const mockup = read('src', 'screens', 'ui-kit', 'PartyDocumentsMockup.tsx')
 
-test('the mockup is a /ui-kit section, the colourful redesign under review', () => {
+test('the mockup is a /ui-kit section, the colourful look approved', () => {
   const kit = read('src', 'screens', 'UiKit.tsx')
   assert.match(kit, /import \{ PartyDocumentsMockup \} from '@\/screens\/ui-kit\/PartyDocumentsMockup'/)
   assert.match(
     kit,
-    /id: 'party-documents',\n    title: 'مستندات الموردين والشركات',[\s\S]*?status: 'review',[\s\S]*?element: <PartyDocumentsMockup \/>/,
+    /id: 'party-documents',\n    title: 'مستندات الموردين والشركات',[\s\S]*?status: 'approved',[\s\S]*?element: <PartyDocumentsMockup \/>/,
   )
 })
 

@@ -1,5 +1,14 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type DragEvent,
+  type ReactNode,
+} from 'react'
+import {
+  CheckCircle2,
   Eye,
   FileText,
   Files,
@@ -7,13 +16,12 @@ import {
   ImageIcon,
   Landmark,
   MapPin,
-  Paperclip,
   Plus,
   ReceiptText,
   RefreshCw,
   ScrollText,
   Trash2,
-  Upload,
+  UploadCloud,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -60,26 +68,38 @@ export interface PartyDocumentsSectionProps {
 
 type UploadTarget = { type: PartyDocumentType; replacing?: PartyDocument }
 
-/** An icon per document type (owner 2026-11-07, «شعارات لكل نوع مستند»). */
-export const PARTY_DOCUMENT_ICONS: Readonly<Record<PartyDocumentType, LucideIcon>> = {
-  commercial_register: ScrollText,
-  tax_certificate: ReceiptText,
-  iban_certificate: Landmark,
-  national_address: MapPin,
-  other: Files,
+/**
+ * Each type's icon (owner «شعارات لكل نوع مستند») and its light colour, one
+ * of the chart shades defined for both themes in src/index.css (owner «واضف
+ * الوان وحياة», approved on /ui-kit the same day): blue register, amber tax,
+ * green IBAN, violet national address, teal other.
+ */
+export const PARTY_DOCUMENT_STYLE: Readonly<
+  Record<PartyDocumentType, { icon: LucideIcon; tone: number }>
+> = {
+  commercial_register: { icon: ScrollText, tone: 3 },
+  tax_certificate: { icon: ReceiptText, tone: 2 },
+  iban_certificate: { icon: Landmark, tone: 1 },
+  national_address: { icon: MapPin, tone: 5 },
+  other: { icon: Files, tone: 6 },
 }
+
+const toneStyle = (tone: number): CSSProperties => ({
+  backgroundColor: `var(--chart-${tone})`,
+  color: `var(--chart-stroke-${tone})`,
+})
 
 const errorKeyOf = (error: unknown): TranslationKey =>
   error instanceof PartyDocumentError ? error.key : 'partyDocSaveFailed'
 
 /**
  * «المستندات» of a supplier or a client (owner 2026-11-07, migration 0182,
- * approved on /ui-kit «مستندات الموردين والشركات»): one tile per fixed type
- * and the named «مستندات اخرى». A file is saved the moment it is uploaded
- * (owner: «الاولى»), independent of the record's form; replacing keeps the
- * old file until the new one is stored; deleting asks first. Images open in
- * the Lightbox (never cropped), a PDF in a new tab through a five-minute
- * link.
+ * approved on /ui-kit «مستندات الموردين والشركات»): a progress bar of the
+ * fixed types, one tile per fixed type and the named «مستندات اخرى». A file
+ * is saved the moment it is uploaded (owner: «الاولى»), independent of the
+ * record's form; replacing keeps the old file until the new one is stored;
+ * deleting asks first. Images open in the Lightbox (never cropped), a PDF in
+ * a new tab through a five-minute link.
  */
 export function PartyDocumentsSection({
   kind,
@@ -174,23 +194,63 @@ export function PartyDocumentsSection({
   }
 
   const { fixed, others } = groupPartyDocuments(kind, documents)
+  const total = PARTY_DOCUMENT_TYPES[kind].length
   const filled = fixed.filter((slot) => slot.document).length
+  const percent = Math.round((filled / total) * 100)
+  // The completeness ring's colours (owner 2026-11-05).
+  const barColor =
+    percent >= 100
+      ? 'var(--progress-high)'
+      : percent >= 50
+        ? 'var(--progress-mid)'
+        : 'var(--progress-low)'
+  const ready = !loading && !loadError
 
   return (
     <section ref={sectionRef} className="rounded-xl border bg-[var(--surface)] p-4">
-      <h3 className="mb-3 flex flex-wrap items-center gap-2 text-sm font-semibold">
-        <FileText size={16} className="text-muted" aria-hidden="true" />
-        {t('partyDocumentsSection')}
-        {!loading && !loadError && (
-          <span className="text-xs font-normal text-muted">
-            {t('partyDocCount')
-              .replace('{filled}', String(filled))
-              .replace('{total}', String(PARTY_DOCUMENT_TYPES[kind].length))}
-          </span>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border bg-bg text-muted"
+        >
+          <FileText size={18} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-semibold">{t('partyDocumentsSection')}</h3>
+          {ready && (
+            <p className="text-xs text-muted">
+              {filled === total
+                ? t('partyDocAllUploaded')
+                : t('partyDocRemaining').replace('{count}', String(total - filled))}
+            </p>
+          )}
+        </div>
+        {ready && (
+          <div className="flex w-36 items-center gap-2">
+            <div
+              className="h-2 flex-1 overflow-hidden rounded-full bg-bg"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={total}
+              aria-valuenow={filled}
+              aria-label={t('partyDocProgressLabel')}
+            >
+              <div
+                className="h-full rounded-full transition-[width] duration-500"
+                style={{ width: `${percent}%`, backgroundColor: barColor }}
+              />
+            </div>
+            <span className="text-xs font-medium">
+              <bdi dir="ltr">
+                {filled}/{total}
+              </bdi>
+            </span>
+          </div>
         )}
-      </h3>
+      </div>
       {notice && (
-        <p className="mb-3 rounded-lg bg-[var(--success-soft)] px-3 py-2 text-sm text-[var(--success)]">
+        <p className="mb-3 flex items-center gap-2 rounded-lg bg-[var(--success-soft)] px-3 py-2 text-sm text-[var(--success)]">
+          <CheckCircle2 size={16} aria-hidden="true" />
           {notice}
         </p>
       )}
@@ -205,7 +265,7 @@ export function PartyDocumentsSection({
       ) : loading ? (
         <div className="grid gap-3 sm:grid-cols-2" aria-busy="true">
           {PARTY_DOCUMENT_TYPES[kind].map((type) => (
-            <div key={type} className="h-24 animate-pulse rounded-lg border bg-bg" />
+            <div key={type} className="h-28 animate-pulse rounded-xl border bg-bg" />
           ))}
         </div>
       ) : (
@@ -214,7 +274,7 @@ export function PartyDocumentsSection({
             {fixed.map(({ type, document }) => (
               <DocumentTile
                 key={type}
-                icon={PARTY_DOCUMENT_ICONS[type]}
+                type={type}
                 title={t(PARTY_DOCUMENT_LABEL_KEYS[type])}
                 document={document}
                 canEdit={canEdit}
@@ -225,11 +285,22 @@ export function PartyDocumentsSection({
               />
             ))}
           </div>
-          <div className="mt-4 space-y-2">
+          <div className="mt-5 space-y-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="flex items-center gap-1.5 text-sm font-medium">
-                <FolderOpen size={15} className="text-muted" aria-hidden="true" />
+              <span className="flex items-center gap-2 text-sm font-medium">
+                <span
+                  aria-hidden="true"
+                  style={toneStyle(PARTY_DOCUMENT_STYLE.other.tone)}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg"
+                >
+                  <FolderOpen size={15} />
+                </span>
                 {t('partyDocOther')}
+                {others.length > 0 && (
+                  <span className="rounded-full bg-bg px-2 text-xs text-muted">
+                    {others.length}
+                  </span>
+                )}
               </span>
               {canEdit && (
                 <Button
@@ -242,13 +313,15 @@ export function PartyDocumentsSection({
               )}
             </div>
             {others.length === 0 ? (
-              <p className="text-xs text-placeholder">{t('partyDocNoOthers')}</p>
+              <p className="rounded-xl border border-dashed bg-bg p-4 text-center text-xs text-placeholder">
+                {t('partyDocNoOthers')}
+              </p>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 {others.map((document) => (
                   <DocumentTile
                     key={document.id}
-                    icon={PARTY_DOCUMENT_ICONS.other}
+                    type="other"
                     title={document.title ?? t('partyDocOtherOne')}
                     document={document}
                     canEdit={canEdit}
@@ -286,18 +359,53 @@ export function PartyDocumentsSection({
   )
 }
 
-/** The type's icon beside its name. */
-function TileTitle({ icon: Icon, title }: { icon: LucideIcon; title: string }) {
+/** The type's icon on its own light colour. */
+function TypeIcon({ type, size = 'md' }: { type: PartyDocumentType; size?: 'sm' | 'md' }) {
+  const { icon: Icon, tone } = PARTY_DOCUMENT_STYLE[type]
   return (
-    <span className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
-      <Icon size={15} className="shrink-0 text-muted" aria-hidden="true" />
-      <span className="min-w-0 truncate">{title}</span>
+    <span
+      aria-hidden="true"
+      style={toneStyle(tone)}
+      className={
+        size === 'md'
+          ? 'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl'
+          : 'flex h-7 w-7 shrink-0 items-center justify-center rounded-lg'
+      }
+    >
+      <Icon size={size === 'md' ? 20 : 15} />
     </span>
   )
 }
 
+/** The file's kind in the type's colour: a PDF sheet or an image. */
+function FileThumb({ document, type }: { document: PartyDocument; type: PartyDocumentType }) {
+  const tone = PARTY_DOCUMENT_STYLE[type].tone
+  const image = isImageDocument(document)
+  return (
+    <div
+      aria-hidden="true"
+      className="relative flex h-16 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-bg"
+    >
+      {image ? (
+        <ImageIcon size={20} className="text-muted" />
+      ) : (
+        <FileText size={20} style={{ color: `var(--chart-stroke-${tone})` }} />
+      )}
+      <span
+        style={toneStyle(tone)}
+        className="absolute inset-x-0 bottom-0 py-px text-center text-[9px] font-semibold"
+      >
+        {image ? 'IMG' : 'PDF'}
+      </span>
+    </div>
+  )
+}
+
+const TILE =
+  'group rounded-xl border bg-bg p-3 transition duration-200 hover:shadow-md motion-safe:hover:-translate-y-0.5'
+
 function DocumentTile({
-  icon,
+  type,
   title,
   document,
   canEdit,
@@ -306,7 +414,7 @@ function DocumentTile({
   onView,
   onRemove,
 }: {
-  icon: LucideIcon
+  type: PartyDocumentType
   title: string
   document?: PartyDocument
   canEdit: boolean
@@ -319,15 +427,20 @@ function DocumentTile({
   const { t } = useI18n()
   if (!document)
     return (
-      <div className="flex min-h-24 flex-col justify-between gap-2 rounded-lg border border-dashed bg-bg p-3">
-        <div className="flex items-center justify-between gap-2">
-          <TileTitle icon={icon} title={title} />
-          <span className="shrink-0 text-xs text-placeholder">{t('partyDocNotUploaded')}</span>
+      <div className={`${TILE} flex min-h-28 flex-col justify-between gap-3 border-dashed`}>
+        <div className="flex items-center gap-3">
+          <span className="opacity-60 transition-opacity group-hover:opacity-100">
+            <TypeIcon type={type} />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">{title}</p>
+            <p className="text-xs text-placeholder">{t('partyDocNotUploaded')}</p>
+          </div>
         </div>
         {canEdit && onUpload && (
           <Button
             size="sm"
-            icon={<Upload size={14} aria-hidden="true" />}
+            icon={<UploadCloud size={14} aria-hidden="true" />}
             onClick={onUpload}
             className="self-start"
           >
@@ -339,59 +452,58 @@ function DocumentTile({
 
   const image = isImageDocument(document)
   return (
-    <div className="flex min-h-24 gap-3 rounded-lg border bg-bg p-3">
-      <div
-        aria-hidden="true"
-        className="flex h-20 w-16 shrink-0 items-center justify-center rounded-md border bg-[var(--surface)] text-muted"
-      >
-        {image ? (
-          <ImageIcon size={22} />
-        ) : (
-          <span className="flex flex-col items-center gap-1">
-            <FileText size={22} />
-            <span className="text-[10px] font-semibold">PDF</span>
-          </span>
-        )}
-      </div>
-      <div className="min-w-0 flex-1 space-y-1">
-        <TileTitle icon={icon} title={title} />
-        <p className="truncate text-xs" title={document.file_name}>
-          <bdi dir="ltr">{document.file_name}</bdi>
-        </p>
-        <p className="text-xs text-muted">
-          {formatDocumentSize(document.size_bytes, t)} ·{' '}
-          {image ? t('partyDocImage') : <bdi dir="ltr">PDF</bdi>}
-        </p>
-      </div>
-      <div className="flex shrink-0 flex-col gap-1">
-        <IconButton
-          size="sm"
-          label={t('partyDocView')}
-          title={t('partyDocView')}
-          icon={<Eye size={15} />}
-          onClick={onView}
-          disabled={busy}
-        />
-        {canEdit && onUpload && (
+    <div className={`${TILE} flex min-h-28 flex-col gap-3`}>
+      <div className="flex items-start gap-3">
+        <TypeIcon type={type} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{title}</p>
+          <p className="mt-0.5 flex items-center gap-1 text-xs text-[var(--success)]">
+            <CheckCircle2 size={13} aria-hidden="true" />
+            {t('partyDocUploaded')}
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-0.5">
           <IconButton
             size="sm"
-            label={t('partyDocReplace')}
-            title={t('partyDocReplace')}
-            icon={<RefreshCw size={15} />}
-            onClick={onUpload}
+            label={t('partyDocView')}
+            title={t('partyDocView')}
+            icon={<Eye size={15} />}
+            onClick={onView}
             disabled={busy}
           />
-        )}
-        {canEdit && onRemove && (
-          <IconButton
-            size="sm"
-            label={t('delete')}
-            title={t('delete')}
-            icon={<Trash2 size={15} />}
-            onClick={onRemove}
-            disabled={busy}
-          />
-        )}
+          {canEdit && onUpload && (
+            <IconButton
+              size="sm"
+              label={t('partyDocReplace')}
+              title={t('partyDocReplace')}
+              icon={<RefreshCw size={15} />}
+              onClick={onUpload}
+              disabled={busy}
+            />
+          )}
+          {canEdit && onRemove && (
+            <IconButton
+              size="sm"
+              label={t('delete')}
+              title={t('delete')}
+              icon={<Trash2 size={15} />}
+              onClick={onRemove}
+              disabled={busy}
+            />
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-3 rounded-lg bg-[var(--surface)] p-2">
+        <FileThumb document={document} type={type} />
+        <div className="min-w-0">
+          <p className="truncate text-xs font-medium" title={document.file_name}>
+            <bdi dir="ltr">{document.file_name}</bdi>
+          </p>
+          <p className="mt-0.5 text-xs text-muted">
+            {formatDocumentSize(document.size_bytes, t)} ·{' '}
+            {image ? t('partyDocImage') : <bdi dir="ltr">PDF</bdi>}
+          </p>
+        </div>
       </div>
     </div>
   )
@@ -417,7 +529,9 @@ function UploadDialog({
   const [titleError, setTitleError] = useState<TranslationKey | null>(null)
   const [error, setError] = useState<TranslationKey | null>(null)
   const [saving, setSaving] = useState(false)
+  const [dragging, setDragging] = useState(false)
   const other = target.type === 'other'
+  const tone = PARTY_DOCUMENT_STYLE[target.type].tone
   const label = other ? t('partyDocOtherOne') : t(PARTY_DOCUMENT_LABEL_KEYS[target.type])
 
   const pick = (picked: File | undefined) => {
@@ -426,6 +540,12 @@ function UploadDialog({
     const problem = partyDocumentFileError(picked)
     setFileError(problem)
     setFile(problem ? null : picked)
+  }
+
+  const drop = (event: DragEvent<HTMLLabelElement>) => {
+    event.preventDefault()
+    setDragging(false)
+    if (!saving) pick(event.dataTransfer.files?.[0])
   }
 
   const save = async () => {
@@ -459,13 +579,19 @@ function UploadDialog({
     }
   }
 
+  const lit = dragging || file !== null
   return (
     <Dialog
       open
       onOpenChange={(open) => {
         if (!open && !saving) onClose()
       }}
-      title={`${target.replacing ? t('partyDocReplace') : t('partyDocUpload')} · ${label}`}
+      title={
+        <span className="flex items-center gap-2">
+          <TypeIcon type={target.type} size="sm" />
+          {`${target.replacing ? t('partyDocReplace') : t('partyDocUpload')} · ${label}`}
+        </span>
+      }
       size="sm"
       footer={
         <>
@@ -483,15 +609,53 @@ function UploadDialog({
           <p className="text-xs text-muted">{t('partyDocReplaceHint')}</p>
         )}
         <label
-          className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed bg-bg px-4 py-6 text-center ${
+          onDragOver={(event) => {
+            event.preventDefault()
+            setDragging(true)
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={drop}
+          style={
+            lit && !fileError
+              ? {
+                  backgroundColor: `var(--chart-${tone})`,
+                  borderColor: `var(--chart-stroke-${tone})`,
+                }
+              : undefined
+          }
+          className={`flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed bg-[var(--surface)] px-4 py-7 text-center transition-colors duration-200 ${
             fileError ? 'border-[var(--danger)]' : ''
           }`}
         >
-          <Paperclip size={20} className="text-muted" aria-hidden="true" />
-          <span className="text-sm">
-            {file ? <bdi dir="ltr">{file.name}</bdi> : t('partyDocPick')}
+          {file ? (
+            <CheckCircle2
+              size={26}
+              style={{ color: `var(--chart-stroke-${tone})` }}
+              aria-hidden="true"
+            />
+          ) : (
+            <UploadCloud
+              size={26}
+              aria-hidden="true"
+              className={`text-muted transition-transform duration-200 ${
+                dragging ? 'motion-safe:-translate-y-1' : ''
+              }`}
+            />
+          )}
+          <span className="text-sm font-medium">
+            {file ? (
+              <bdi dir="ltr">{file.name}</bdi>
+            ) : dragging ? (
+              t('partyDocDrop')
+            ) : (
+              t('partyDocPick')
+            )}
           </span>
-          <span className="text-xs text-muted">{t('partyDocLimits')}</span>
+          <span className="text-xs text-muted">
+            {file
+              ? t('partyDocPickedHint').replace('{size}', formatDocumentSize(file.size, t))
+              : `${t('partyDocLimits')} · ${t('partyDocPhoneHint')}`}
+          </span>
           <input
             type="file"
             accept={PARTY_DOCUMENT_ACCEPT}
