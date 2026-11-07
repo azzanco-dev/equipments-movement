@@ -59,6 +59,7 @@ import { DenseDashboardMockup } from '@/screens/ui-kit/DenseDashboardMockup'
 import { SalesMockup } from '@/screens/ui-kit/SalesMockup'
 import { ActivityMockup } from '@/screens/ui-kit/ActivityMockup'
 import { BankLogosMockup } from '@/screens/ui-kit/BankLogosMockup'
+import { BreadcrumbsMockup } from '@/screens/ui-kit/BreadcrumbsMockup'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -125,6 +126,17 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // Owner 2026-11-07: «نبغى نضبط ازرار الرجوع الي عندنا كلها» then
+    // «ونضيف breadcrumbs». For review: no screen uses it yet.
+    id: 'breadcrumbs',
+    title: 'المسار وازرار الرجوع',
+    purpose:
+      'مسار الصفحة فوق عنوان كل صفحة تفاصيل واعدادات، وسطر رجوع واحد على الجوال، وقاعدة رجوع وحدة لكل الصفحات ترجعك لنفس القائمة بفلاترها.',
+    status: 'review',
+    defaultOpen: true,
+    element: <BreadcrumbsMockup />,
+  },
   {
     // Owner 2026-11-05: «ابغاك تضيف شعارات البنوك، اول سويها في ui-kit»; the
     // logos come from the banks' own websites (public/banks/, downloaded
