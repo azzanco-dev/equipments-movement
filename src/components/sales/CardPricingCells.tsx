@@ -8,6 +8,8 @@ import {
   CARD_PRICING_STATUS_BADGE,
   cardMarginBlocker,
   formatMarginPct,
+  isSaleRateUnit,
+  SALE_RATE_UNIT_LABEL_KEYS,
   type CardPricingStatus,
 } from '@/lib/sales'
 
@@ -60,16 +62,18 @@ export function CardPricingStatusBadge({
 
 /**
  * The margin of a card: the amount and the percentage under it, or «—» with
- * the reason it has no value (a missing price, or a daily supplier line,
- * which has no rule yet). The figures are the view's or the live mirror of
- * them (`cardMargin` / `cardMarginPct`). No unit beside the amount (owner
- * 2026-11-04, «شيل اي كلمة شهر جنب الارقام»): the prices here are monthly,
- * and a daily supplier price carries its own «(يومي)» mark.
+ * the reason it has no value (a missing price, or — 0185 — a client price
+ * and a supplier price in two different units, «وحدتان مختلفتان»). The
+ * figures are the view's or the live mirror of them (`cardMargin` /
+ * `cardMarginPct`). No unit beside the amount (owner 2026-11-04, «شيل اي
+ * كلمة شهر جنب الارقام»): the margin is in the unit both prices share, and
+ * a price in another unit than the month carries its own mark («(يومي)»).
  */
 export function CardMarginCell({
   margin,
   pct,
   clientPrice,
+  clientRateUnit,
   supplierPrice,
   supplierRateUnit,
   alignEnd = true,
@@ -77,6 +81,7 @@ export function CardMarginCell({
   margin: number | string | null | undefined
   pct: number | string | null | undefined
   clientPrice: number | string | null | undefined
+  clientRateUnit: string | null | undefined
   supplierPrice: number | string | null | undefined
   supplierRateUnit: string | null | undefined
   alignEnd?: boolean
@@ -86,15 +91,16 @@ export function CardMarginCell({
   if (margin === null || margin === undefined) {
     const blocker = cardMarginBlocker({
       clientPrice,
+      clientRateUnit,
       supplierPrice,
       supplierRateUnit,
     })
     return (
       <span className={`flex flex-col ${align}`}>
         <span className="text-muted">—</span>
-        {blocker === 'daily' && (
+        {blocker === 'units_differ' && (
           <span className="text-xs text-muted">
-            {t('cardPriceMarginDailyHint')}
+            {t('cardPriceMarginUnitsDiffer')}
           </span>
         )}
         {blocker === 'no_supplier_price' && (
@@ -138,9 +144,10 @@ export function CardMarginPctCell({
 }
 
 /**
- * The supplier price of a card, «تحتاج سعر» while NULL. No «/ شهر» beside
- * the amount (owner 2026-11-04): a monthly price is the rule here, and a
- * DAILY price is marked «(يومي)» after the amount instead.
+ * A price of a card (the supplier's, or the client's when read-only),
+ * «تحتاج سعر» while NULL. No «/ شهر» beside the amount (owner 2026-11-04): a
+ * monthly price is the rule here, and a price in another unit (0185: week,
+ * day, hour) is marked «(اسبوعي)» / «(يومي)» / «(بالساعة)» after it.
  */
 export function CardSupplierPriceCell({
   price,
@@ -164,8 +171,10 @@ export function CardSupplierPriceCell({
         value={formatSupplierPoPrice(price) === '—' ? null : price}
         className={className}
       />
-      {rateUnit === 'day' && (
-        <span className="text-xs text-muted">{t('cardPriceDailyMark')}</span>
+      {isSaleRateUnit(rateUnit) && rateUnit !== 'month' && (
+        <span className="text-xs text-muted">
+          ({t(SALE_RATE_UNIT_LABEL_KEYS[rateUnit])})
+        </span>
       )}
     </span>
   )

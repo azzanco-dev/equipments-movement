@@ -18,7 +18,8 @@ export function Price({
   className,
 }: {
   value: number | string | null | undefined
-  /** 0157: the price unit, shown after the currency («/ شهر», «/ يوم»). */
+  /** 0157 / 0185: the price unit, shown after the currency («/ شهر»,
+   *  «/ اسبوع», «/ يوم», «/ ساعة»). */
   unit?: SupplierPoRateUnit
   className?: string
 }) {
@@ -91,5 +92,7 @@ export function PricesByUnit({
 export function PricePreview({ value }: { value: string }) {
   if (!isValidSupplierPoPrice(value)) return null
   // Bold (owner 2026-10-20), so the formatted amount stands out from the hint.
-  return <Price value={Number(value.trim())} className="font-semibold text-fg" />
+  return (
+    <Price value={Number(value.trim())} className="font-semibold text-fg" />
+  )
 }

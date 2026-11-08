@@ -35,6 +35,8 @@ import {
   monthStartOf,
   shiftMonth,
   storedCardMonthFigures,
+  formatDaysText,
+  isDaysRateUnit,
 } from '@/lib/sales'
 import {
   CARD_MONTH_SLOTS_SELECT,
@@ -202,9 +204,19 @@ export function CardMonthsListScreen({
       sortable: true,
       align: 'center',
       className: 'tabular-nums',
+      // 0185: a daily or weekly line shows its days under the hours.
       cell: (row) =>
         row.recorded && row.hours !== null ? (
-          <bdi dir="ltr">{row.hours}</bdi>
+          <span className="inline-flex flex-col items-center">
+            <bdi dir="ltr">{row.hours}</bdi>
+            {row.days !== null &&
+              (isDaysRateUnit(row.client_rate_unit) ||
+                isDaysRateUnit(row.supplier_rate_unit)) && (
+                <span className="text-xs text-muted">
+                  {formatDaysText(row.days, lang)}
+                </span>
+              )}
+          </span>
         ) : (
           <span className="text-muted">—</span>
         ),

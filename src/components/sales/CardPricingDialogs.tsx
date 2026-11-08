@@ -14,13 +14,13 @@ import {
   cardPricingReturnSchema,
   validateWithSchema,
 } from '@/lib/formValidation'
-import type { SupplierPoRateUnit } from '@/lib/purchasing'
 import {
   CARD_MONTH_NOTE_MAX,
   cardMargin,
   cardMarginPct,
   cardPricingFormMessage,
   formatMarginPct,
+  type SaleRateUnit,
 } from '@/lib/sales'
 import {
   approveEquipmentCardPricing,
@@ -39,8 +39,10 @@ export interface CardPricingTarget {
   card_id: string
   equipment_code: string | null
   client_price?: number | string | null
+  /** 0185: the unit of the client price (month when unknown). */
+  client_price_unit?: SaleRateUnit | null
   supplier_price?: number | string | null
-  supplier_rate_unit?: SupplierPoRateUnit | null
+  supplier_rate_unit?: SaleRateUnit | null
   supplier_po_number?: string | null
 }
 
@@ -50,8 +52,10 @@ const poOf = (card: CardPricingTarget | null) => card?.supplier_po_number ?? 'â€
 /** The prices and the margin the decision is about, as a two-column list. */
 function PricingFacts({ card }: { card: CardPricingTarget }) {
   const { t } = useI18n()
+  const clientUnit = card.client_price_unit ?? 'month'
   const margin = cardMargin(
     card.client_price,
+    clientUnit,
     card.supplier_price,
     card.supplier_rate_unit,
   )
@@ -64,12 +68,16 @@ function PricingFacts({ card }: { card: CardPricingTarget }) {
       items={[
         {
           key: 'client',
-          label: t('cardPriceClientMonthly'),
+          label: t('cardPriceClient'),
           value:
             card.client_price === null || card.client_price === undefined ? (
               dash
             ) : (
-              <SalePrice value={card.client_price} className="font-semibold" />
+              <CardSupplierPriceCell
+                price={card.client_price}
+                rateUnit={clientUnit}
+                className="font-semibold"
+              />
             ),
         },
         {

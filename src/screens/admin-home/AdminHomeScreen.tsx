@@ -34,7 +34,7 @@ export interface AdminHomeScreenProps {
   canOpenLogs?: boolean
   /** Whether the shell opens a page («يحتاج انتباهك» links only then). */
   canOpenPage?: (
-    page: 'logs' | 'purchasing/units' | 'purchasing/orders',
+    page: 'logs' | 'purchasing/units' | 'purchasing/orders' | 'sales/cards',
   ) => boolean
   /** Admin only: the legacy dashboard's register entry/exit shortcuts. */
   onCreateMovement?: (type: 'entry' | 'exit') => void

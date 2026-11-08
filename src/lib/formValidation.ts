@@ -20,6 +20,7 @@ import {
 } from '@/lib/partyFields'
 import {
   CARD_MONTH_NOTE_MAX,
+  isValidCardMonthDays,
   isValidCardMonthHours,
   isValidCardPrice,
   isValidClientPoQuantity,
@@ -464,7 +465,10 @@ const partySharedFieldsShape = {
         COMMERCIAL_REGISTER_PATTERN.test(normalizeRegistryNumber(value)),
       message('commercialRegisterFormatInvalid'),
     ),
-  address: optionalText({ max: PARTY_ADDRESS_MAX, lengthKey: 'addressTooLong' }),
+  address: optionalText({
+    max: PARTY_ADDRESS_MAX,
+    lengthKey: 'addressTooLong',
+  }),
   email: z
     .string()
     .trim()
@@ -851,6 +855,14 @@ export const cardMonthFormSchema = z.object({
       (value) => !value || isValidCardMonthHours(value),
       message('cardMonthHoursInvalid'),
     ),
+  // 0185: the days, optional (0 to 31, two decimals).
+  days: z
+    .string()
+    .trim()
+    .refine(
+      (value) => !value || isValidCardMonthDays(value),
+      message('cardMonthDaysInvalid'),
+    ),
   note: optionalText({
     max: CARD_MONTH_NOTE_MAX,
     lengthKey: 'cardMonthNoteTooLong',
@@ -870,6 +882,20 @@ export const cardPriceSchema = z
     (value) => !value || isValidCardPrice(value),
     message('cardPriceInvalid'),
   )
+
+/**
+ * «انهاء الكرت» (end_equipment_card, 0185): the end day is chosen (the
+ * picker keeps it between the card's first day and today; the database
+ * re-checks with `invalid_period_to`), the note optional and at most 500
+ * characters.
+ */
+export const endCardFormSchema = z.object({
+  period_to: selected('equipmentCardEndDateRequired'),
+  note: optionalText({
+    max: CARD_MONTH_NOTE_MAX,
+    lengthKey: 'cardMonthNoteTooLong',
+  }),
+})
 
 /** The optional note of «رجوع للتعديل» (return_equipment_card_pricing). */
 export const cardPricingReturnSchema = z.object({

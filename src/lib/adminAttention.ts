@@ -6,11 +6,14 @@
  * `AttentionSection`; this module is pure.
  */
 
+import { CARDS_AWAITING_END_HREF } from '@/lib/cardsAwaitingEnd'
+
 export type AttentionId =
   | 'unclassified'
   | 'no_po'
   | 'awaiting_approval'
   | 'unpriced'
+  | 'awaiting_end'
   | 'no_signal'
   | 'out_of_service_long'
 
@@ -20,6 +23,7 @@ export const ATTENTION_ORDER: readonly AttentionId[] = [
   'no_po',
   'awaiting_approval',
   'unpriced',
+  'awaiting_end',
   'no_signal',
   'out_of_service_long',
 ]
@@ -105,6 +109,18 @@ export function unpricedHref(): string {
     OPEN_PO,
     { id: 'unpriced', field: 'unpriced_count', operator: 'gt', value: '0' },
   ])}`
+}
+
+/**
+ * «معدات خرجت بانتهاء عمل وكرتها مفتوح» (migration 0185): the rows of
+ * `sales_cards_awaiting_end`, read only by a `sales.view` holder (the view's
+ * RLS) and linked only when the shell opens `sales/cards`.
+ */
+export const AWAITING_END_PAGE = 'sales/cards' as const
+
+/** The «كروت المعدات» list restricted to the cards awaiting their end. */
+export function awaitingEndHref(): string {
+  return CARDS_AWAITING_END_HREF
 }
 
 /** The items with a count above zero, in strip order. */

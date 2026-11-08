@@ -27,8 +27,11 @@ import {
   cardMonthErrorOutcome,
   cardMonthFigures,
   cardMonthFormMessage,
+  formatDaysText,
+  isDaysRateUnit,
   monthLabel,
   monthShortLabel,
+  parseCardMonthDays,
   parseCardMonthHours,
   type CardMonthFormValues,
   type CardMonthSides,
@@ -52,17 +55,38 @@ export type RecordCardMonthCard = CardMonthSides & {
 export interface RecordCardMonthEditing {
   month: MonthKey
   hours: number | string
+  /** 0185: the stored days, or null. */
+  days: number | string | null
   note: string | null
 }
 
-const EMPTY_FORM: CardMonthFormValues = { month: '', hours: '', note: '' }
+/** A month without a record the dialog offers, with the unit's presence
+ *  days in it (0185, `sales_card_month_slots.presence_days`). */
+export interface RecordCardMonthOption {
+  month: MonthKey
+  state: CardMonthState
+  presence_days?: number | null
+}
+
+const EMPTY_FORM: CardMonthFormValues = {
+  month: '',
+  hours: '',
+  days: '',
+  note: '',
+}
+
+/** The days a new month starts with: the unit's presence in it, if known. */
+const presenceText = (value: number | null | undefined) =>
+  value === null || value === undefined ? '' : String(value)
 
 /**
  * «تسجيل شهر» of the card page (the approved mockup, owner 2026-11-04): a
  * month of the card without a record (newest first; the running month is
  * marked), or the recorded month being edited (locked), the hours with the
- * live «مستحق العميل» under them — the same rule as `card_month_due` —, a
- * note; «حذف» for a recorded month, confirmed inline. Saves through
+ * live «مستحق العميل» under them — the same rule as `card_month_due` —, the
+ * days (0185: optional, 0 to 31; a new month starts with the unit's presence
+ * days, an edited one with the stored days; a daily or weekly line is paid
+ * by them), a note; «حذف» for a recorded month, confirmed inline. Saves through
  * `record_equipment_card_month` (an upsert: the same call records and
  * edits) and deletes through `delete_equipment_card_month`; the database
  * checks `sales.manage`, the period and the current month again.
@@ -81,7 +105,7 @@ export function RecordCardMonthDialog({
   onOpenChange: (open: boolean) => void
   card: RecordCardMonthCard
   /** The months of the card without a record, newest first. */
-  openMonths: readonly { month: MonthKey; state: CardMonthState }[]
+  openMonths: readonly RecordCardMonthOption[]
   /** The recorded month being edited; null records a new month. */
   editing: RecordCardMonthEditing | null
   /** The month preselected for a new record (a pending row's «+»). */
@@ -99,17 +123,27 @@ export function RecordCardMonthDialog({
   const bodyRef = useRef<HTMLDivElement>(null)
   const editingMonth = editing?.month ?? null
   const editingHours = editing?.hours
+  const editingDays = editing?.days
   const editingNote = editing?.note
   const firstOpenMonth = openMonths[0]?.month ?? ''
+  const presenceOf = (month: MonthKey) =>
+    openMonths.find((row) => row.month === month)?.presence_days ?? null
+  const startMonth = editingMonth ?? initialMonth ?? firstOpenMonth
+  const startPresence = editingMonth ? null : presenceOf(startMonth)
 
   useEffect(() => {
     if (!open) return
     setForm({
-      month: editingMonth ?? initialMonth ?? firstOpenMonth,
+      month: startMonth,
       hours:
         editingHours === undefined || editingHours === null
           ? ''
           : String(editingHours),
+      days: editingMonth
+        ? editingDays === undefined || editingDays === null
+          ? ''
+          : String(editingDays)
+        : presenceText(startPresence),
       note: editingNote ?? '',
     })
     setErrors({})
@@ -121,9 +155,10 @@ export function RecordCardMonthDialog({
     open,
     editingMonth,
     editingHours,
+    editingDays,
     editingNote,
-    initialMonth,
-    firstOpenMonth,
+    startMonth,
+    startPresence,
   ])
 
   const update = (patch: Partial<CardMonthFormValues>) => {
@@ -137,22 +172,42 @@ export function RecordCardMonthDialog({
   }
 
   const parsed = parseCardMonthHours(form.hours)
-  const figures = cardMonthFigures(card, parsed)
+  const parsedDays = parseCardMonthDays(form.days)
+  const figures = cardMonthFigures(card, parsed, parsedDays)
+  // A daily or weekly client line is paid by the days: its due hint sits
+  // under the days field, else under the hours (0185).
+  const daysLine = isDaysRateUnit(card.client_rate_unit)
   const dueHint =
-    parsed === null ? (
-      t('cardMonthHoursHint')
-    ) : figures.client.value !== null ? (
+    figures.client.value !== null ? (
       <span className="inline-flex items-baseline gap-1">
         {t('cardMonthClientDueHint')}{' '}
         <SalePrice value={figures.client.value} className="text-fg" />
       </span>
-    ) : figures.client.blocker === 'daily' ? (
-      t('cardMonthDailyHint')
+    ) : figures.client.blocker === 'no_days' ? (
+      t('cardMonthEnterDays')
     ) : figures.client.blocker === 'unpriced' ? (
       t('cardMonthUnpricedHint')
-    ) : (
+    ) : figures.client.blocker === 'no_line' ? (
       t('cardMonthNoLineHint')
+    ) : (
+      t('cardMonthHoursHint')
     )
+  const presence = editing ? null : presenceOf(form.month)
+  const presenceHint =
+    presence === null
+      ? null
+      : t('cardMonthPresenceDays').replace(
+          '{days}',
+          formatDaysText(presence, lang),
+        )
+  const daysHint = daysLine ? (
+    <span className="flex flex-col gap-0.5">
+      <span>{dueHint}</span>
+      {presenceHint && <span>{presenceHint}</span>}
+    </span>
+  ) : (
+    (presenceHint ?? t('cardMonthDaysHint'))
+  )
 
   const save = async () => {
     const invalid = validateWithSchema(cardMonthFormSchema, form)
@@ -170,6 +225,7 @@ export function RecordCardMonthDialog({
       cardId: card.card_id,
       month: form.month,
       hours: Number(form.hours.trim()),
+      days: parsedDays,
       note: form.note,
     })
     setSaving(false)
@@ -306,7 +362,14 @@ export function RecordCardMonthDialog({
             <Select
               {...control}
               value={form.month}
-              onValueChange={(month) => update({ month })}
+              onValueChange={(month) =>
+                // A new month starts with the unit's presence days in it.
+                update(
+                  editing
+                    ? { month }
+                    : { month, days: presenceText(presenceOf(month)) },
+                )
+              }
               disabled={!!editing || openMonths.length === 0}
               placeholder={t('cardMonthMonthRequired')}
               options={monthOptions}
@@ -318,7 +381,7 @@ export function RecordCardMonthDialog({
           name="hours"
           required
           error={errors.hours ? t(errors.hours) : undefined}
-          hint={dueHint}
+          hint={daysLine ? t('cardMonthHoursHint') : dueHint}
         >
           {(control) => (
             <Input
@@ -335,6 +398,27 @@ export function RecordCardMonthDialog({
               )}
               className="tabular-nums"
               autoFocus
+            />
+          )}
+        </Field>
+        <Field
+          label={t('cardMonthDays')}
+          name="days"
+          error={errors.days ? t(errors.days) : undefined}
+          hint={daysHint}
+        >
+          {(control) => (
+            <Input
+              {...control}
+              type="number"
+              inputMode="decimal"
+              min={0}
+              max={31}
+              step={1}
+              value={form.days}
+              onChange={(event) => update({ days: event.target.value })}
+              placeholder="0"
+              className="tabular-nums"
             />
           )}
         </Field>

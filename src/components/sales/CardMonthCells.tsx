@@ -15,8 +15,9 @@ export type CardMonthDueSide = 'client' | 'supplier' | 'margin'
 
 /**
  * A month's amount of one side, or why there is none (the approved mockup):
- * «تحتاج سعر» for an unpriced line, «—» with its hint for a daily line (no
- * rule yet; the margin's dash is explained by the side beside it), the side's
+ * «تحتاج سعر» for an unpriced line, «—» with «ادخل الايام» for a daily or
+ * weekly line without the month's days (0185; the margin's dash is
+ * explained by the side beside it), the side's
  * «بدون PO …» without a line, a muted dash otherwise (no hours, the supplier
  * side of an owned unit).
  */
@@ -50,7 +51,7 @@ export function CardMonthDueCell({
           )}
         </span>
       )
-    case 'daily':
+    case 'no_days':
       if (side === 'margin') return dash
       return (
         <span
@@ -58,7 +59,7 @@ export function CardMonthDueCell({
         >
           {dash}
           <span className="text-[11px] leading-4 text-muted">
-            {t('cardMonthDailyHint')}
+            {t('cardMonthEnterDays')}
           </span>
         </span>
       )

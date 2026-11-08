@@ -84,11 +84,11 @@ test('the sales section: a parent with its children on sales.view, like purchasi
     key: 'sales',
     requires: [{ key: 'sales.view' }],
     children: [
-      // Card pricing (0174, owner 2026-11-04): the one listed page; the four
-      // earlier pages stay reachable by URL only.
+      // 0185 (owner 2026-11-08): the client POs and the cards are listed
+      // again, before the prices (0174).
+      { key: 'sales/orders', requires: [{ key: 'sales.view' }] },
+      { key: 'sales/cards', requires: [{ key: 'sales.view' }] },
       { key: 'sales/prices', requires: [{ key: 'sales.view' }] },
-      { key: 'sales/orders', requires: [{ key: 'sales.view' }], hidden: true },
-      { key: 'sales/cards', requires: [{ key: 'sales.view' }], hidden: true },
       // Phase 2 (0172): «كروت التشغيل» and «الشهور».
       {
         key: 'sales/timesheets',
@@ -106,8 +106,8 @@ test('the sales section: a parent with its children on sales.view, like purchasi
   assert.deepEqual(plain(nav.pageGate('sales/cards/:id')), [
     { key: 'sales.view' },
   ])
-  // /sales opens the prices (0174); /sales/cards/:id is a card.
-  assert.equal(nav.routePageOf(['sales']), 'sales/prices')
+  // /sales opens the client POs (0185); /sales/cards/:id is a card.
+  assert.equal(nav.routePageOf(['sales']), 'sales/orders')
   assert.equal(nav.routePageOf(['sales', 'orders']), 'sales/orders')
   assert.equal(nav.routePageOf(['sales', 'cards']), 'sales/cards')
   assert.equal(nav.routePageOf(['sales', 'cards', 'c1']), 'sales/cards/:id')
@@ -118,7 +118,7 @@ test('the sales section: a parent with its children on sales.view, like purchasi
     permissions: new Map([['sales.view', 'all']]),
   })
   assert.equal(plan.kind, 'admin')
-  assert.equal(plan.landing, 'sales/prices')
+  assert.equal(plan.landing, 'sales/orders')
   assert.deepEqual([...plan.pages].sort(), [
     'sales',
     'sales/:id',
@@ -253,14 +253,16 @@ const MIGRATION = read(
 
 // 0174 re-creates sales_equipment_cards with 0169's columns plus the
 // trailing pricing columns, so that view is read from 0174.
-const MIGRATION_0174 = read(
+// 0185 re-creates sales_equipment_cards with every earlier column (0174's
+// pricing, 0184's time stamps) plus card_client_price_unit.
+const MIGRATION_0185 = read(
   'supabase',
   'migrations',
-  '20261104110000_0174_equipment_card_pricing.sql',
+  '20261108100000_0185_price_units_days_card_end.sql',
 )
 
 function viewBody(name) {
-  const source = name === 'sales_equipment_cards' ? MIGRATION_0174 : MIGRATION
+  const source = name === 'sales_equipment_cards' ? MIGRATION_0185 : MIGRATION
   const start = source.indexOf(`CREATE OR REPLACE VIEW public.${name}`)
   assert.ok(start > 0, name)
   const end = source.indexOf('COMMENT ON VIEW', start)
@@ -476,7 +478,7 @@ test('the client PO page: the approved pattern, sales.manage actions, no approva
 
 // --- The pure helpers ----------------------------------------------------------------------
 
-test('clientPoTotalsByUnit: one total per unit, month → day → hour, unpriced counted', () => {
+test('clientPoTotalsByUnit: one total per unit, month → week → day → hour, unpriced counted', () => {
   assert.deepEqual(
     plain(
       sales.clientPoTotalsByUnit([
@@ -485,11 +487,13 @@ test('clientPoTotalsByUnit: one total per unit, month → day → hour, unpriced
         { price: null, rate_unit: 'day' },
         { price: 24000, rate_unit: 'month' },
         { price: 1400, rate_unit: 'day' },
+        { price: 5000, rate_unit: 'week' },
       ]),
     ),
     {
       parts: [
         { unit: 'month', total: 42500 },
+        { unit: 'week', total: 5000 },
         { unit: 'day', total: 1400 },
         { unit: 'hour', total: 950 },
       ],
@@ -505,9 +509,16 @@ test('clientPoTotalsByUnit: one total per unit, month → day → hour, unpriced
     vat: 150,
     inclVat: 1150,
   })
-  assert.deepEqual(plain(sales.SALE_RATE_UNITS), ['month', 'day', 'hour'])
+  // 0185: the four units.
+  assert.deepEqual(plain(sales.SALE_RATE_UNITS), [
+    'month',
+    'week',
+    'day',
+    'hour',
+  ])
   assert.equal(sales.saleRateUnitOf('hour'), 'hour')
-  assert.equal(sales.saleRateUnitOf('week'), 'month')
+  assert.equal(sales.saleRateUnitOf('week'), 'week')
+  assert.equal(sales.saleRateUnitOf('year'), 'month')
 })
 
 test('quantityLabel: the dual and the 3–10 plural in Arabic, the unit of the line', () => {

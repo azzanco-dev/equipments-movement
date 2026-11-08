@@ -39,11 +39,14 @@ import {
   cardMonthState,
   cardMonthTotalsByUnit,
   currentSaudiMonthKey,
+  formatDaysText,
+  isValidCardMonthDays,
   isValidCardMonthHours,
   monthKeyOf,
   monthLabel,
   monthStartOf,
   monthsCountLabel,
+  parseCardMonthDays,
   parseCardMonthHours,
   type CardMonthBatchItem,
   type CardMonthFigures,
@@ -71,8 +74,14 @@ const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/
 
 interface Draft {
   hours: string
+  /** 0185: the days, prefilled from the unit's presence in the month. */
+  days: string
   note: string
 }
+
+/** A number of the view as the text of a field ('' for none). */
+const numberText = (value: number | string | null | undefined) =>
+  value === null || value === undefined ? '' : String(value)
 
 /**
  * «كروت التشغيل» (/sales/timesheets, migration 0172, the /ui-kit mockup the
@@ -231,6 +240,11 @@ function BatchScreen({ onOpenCard }: CardMonthsBatchScreenProps) {
     (row: CardMonthSlotRow): Draft =>
       drafts[row.slot_id] ?? {
         hours: row.recorded && row.hours !== null ? String(row.hours) : '',
+        // A recorded month keeps its days; a new one starts with the
+        // unit's presence days in the month (0185).
+        days: row.recorded
+          ? numberText(row.days)
+          : numberText(row.presence_days),
         note: row.note ?? '',
       },
     [drafts],
@@ -248,20 +262,33 @@ function BatchScreen({ onOpenCard }: CardMonthsBatchScreenProps) {
   const filled = rows
     .map((row) => ({ row, draft: draftOf(row) }))
     .filter(({ draft }) => draft.hours.trim() !== '')
+  const daysValid = (draft: Draft) =>
+    draft.days.trim() === '' || isValidCardMonthDays(draft.days)
   const invalid = filled.filter(
-    ({ draft }) => !isValidCardMonthHours(draft.hours),
+    ({ draft }) => !isValidCardMonthHours(draft.hours) || !daysValid(draft),
   )
   const valid = filled
-    .filter(({ draft }) => isValidCardMonthHours(draft.hours))
-    .map((item) => ({ ...item, hours: Number(item.draft.hours.trim()) }))
+    .filter(
+      ({ draft }) => isValidCardMonthHours(draft.hours) && daysValid(draft),
+    )
+    .map((item) => ({
+      ...item,
+      hours: Number(item.draft.hours.trim()),
+      days: parseCardMonthDays(item.draft.days),
+    }))
   const changed = valid.filter(
-    ({ row, draft, hours }) =>
+    ({ row, draft, hours, days }) =>
       !row.recorded ||
       Number(row.hours) !== hours ||
+      (row.days === null ? null : Number(row.days)) !== days ||
       (row.note ?? '') !== draft.note.trim(),
   )
   const figuresOf = (row: CardMonthSlotRow): CardMonthFigures =>
-    cardMonthFigures(row, parseCardMonthHours(draftOf(row).hours))
+    cardMonthFigures(
+      row,
+      parseCardMonthHours(draftOf(row).hours),
+      parseCardMonthDays(draftOf(row).days),
+    )
   const validFigures = valid.map(({ row }) => ({
     row,
     figures: figuresOf(row),
@@ -290,9 +317,10 @@ function BatchScreen({ onOpenCard }: CardMonthsBatchScreenProps) {
     setSaving(true)
     setSaveError(null)
     const items: CardMonthBatchItem[] = changed.map(
-      ({ row, draft, hours }) => ({
+      ({ row, draft, hours, days }) => ({
         card_id: row.card_id,
         hours,
+        days,
         note: draft.note.trim() || null,
       }),
     )
@@ -318,7 +346,7 @@ function BatchScreen({ onOpenCard }: CardMonthsBatchScreenProps) {
     setSaveError(null)
     setDrafts(
       Object.fromEntries(
-        rows.map((row) => [row.slot_id, { hours: '', note: '' }]),
+        rows.map((row) => [row.slot_id, { hours: '', days: '', note: '' }]),
       ),
     )
   }
@@ -408,6 +436,58 @@ function BatchScreen({ onOpenCard }: CardMonthsBatchScreenProps) {
               </span>
             )}
             <CardMonthStateBadge state={cardMonthState(row, currentMonth)} />
+          </span>
+        )
+      },
+    },
+    // 0185: the days of the month (a daily or weekly line is paid by them),
+    // prefilled from the unit's presence; the presence shows muted under
+    // the field once the days differ from it.
+    {
+      key: 'days',
+      header: t('cardMonthDays'),
+      cell: (row) => {
+        const draft = draftOf(row)
+        const presence = row.presence_days
+        const differs =
+          presence !== null &&
+          presence !== undefined &&
+          draft.days.trim() !== String(presence)
+        return (
+          <span className="flex flex-col items-start gap-0.5">
+            {canManage ? (
+              <Input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={31}
+                step={1}
+                aria-label={`${t('cardMonthDays')} ${row.equipment_code ?? ''} · ${monthLabel(month, lang)}`}
+                value={draft.days}
+                onChange={(event) =>
+                  setDraft(row, { days: event.target.value })
+                }
+                placeholder="0"
+                invalid={!daysValid(draft)}
+                className="w-20 tabular-nums"
+              />
+            ) : (
+              <span className="tabular-nums">
+                {row.recorded && row.days !== null ? (
+                  <bdi dir="ltr">{row.days}</bdi>
+                ) : (
+                  <span className="text-muted">—</span>
+                )}
+              </span>
+            )}
+            {differs && (
+              <span className="text-xs text-muted">
+                {t('cardMonthPresenceDays').replace(
+                  '{days}',
+                  formatDaysText(presence, lang),
+                )}
+              </span>
+            )}
           </span>
         )
       },

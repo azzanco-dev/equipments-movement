@@ -64,22 +64,20 @@ const NEW_FILES = [
 
 // --- Navigation --------------------------------------------------------------------
 
-test('«اسعار المعدات» is the first child of «المبيعات»; the four earlier pages are hidden, still gated and routable', () => {
+test('«اسعار المعدات» is the third child of «المبيعات» (0185); the two phase 2 pages are hidden, still gated and routable', () => {
   const entry = nav.NAV_ENTRIES.find((item) => item.key === 'sales')
-  assert.deepEqual(plain(entry.children[0]), {
+  assert.deepEqual(plain(entry.children[2]), {
     key: 'sales/prices',
     requires: [{ key: 'sales.view' }],
   })
   const hidden = entry.children.filter((child) => child.hidden)
   assert.deepEqual(plain(hidden.map((child) => child.key)), [
-    'sales/orders',
-    'sales/cards',
     'sales/timesheets',
     'sales/months',
   ])
   for (const child of entry.children)
     assert.deepEqual(plain(child.requires), [{ key: 'sales.view' }])
-  // The sidebar lists the prices alone under the section.
+  // The sidebar lists the client POs, the cards and the prices (0185).
   const state = {
     status: 'ready',
     permissions: new Map([['sales.view', 'all']]),
@@ -87,10 +85,10 @@ test('«اسعار المعدات» is the first child of «المبيعات»; 
   const items = nav.visibleNavItems(state)
   assert.deepEqual(plain(items.find((item) => item.key === 'sales')), {
     key: 'sales',
-    children: ['sales/prices'],
+    children: ['sales/orders', 'sales/cards', 'sales/prices'],
   })
-  // /sales lands on the prices; the hidden pages still open by URL.
-  assert.equal(nav.routePageOf(['sales']), 'sales/prices')
+  // /sales lands on the client POs (0185); the hidden pages still open by URL.
+  assert.equal(nav.routePageOf(['sales']), 'sales/orders')
   assert.equal(nav.routePageOf(['sales', 'prices']), 'sales/prices')
   assert.equal(nav.routePageOf(['sales', 'orders']), 'sales/orders')
   assert.equal(nav.routePageOf(['sales', 'cards']), 'sales/cards')
@@ -98,7 +96,7 @@ test('«اسعار المعدات» is the first child of «المبيعات»; 
   assert.equal(nav.routePageOf(['sales', 'months']), 'sales/months')
   assert.equal(nav.routePageOf(['sales', 'p1']), 'sales/:id')
   const plan = nav.planShell(state)
-  assert.equal(plan.landing, 'sales/prices')
+  assert.equal(plan.landing, 'sales/orders')
   for (const page of [
     'sales/prices',
     'sales/orders',
@@ -230,7 +228,8 @@ test('the save sends only the changed, non-approved rows in ONE set_equipment_ca
   )
   assert.match(
     screen,
-    /const items: CardPriceBatchItem\[\] = changed\.map\(\(row\) => \(\{\s+card_id: row\.card_id,\s+price: parseCardPrice\(draftOf\(row\)\),\s+\}\)\)/,
+    // 0185: each item carries the chosen unit too.
+    /const items: CardPriceBatchItem\[\] = changed\.map\(\(row\) => \(\{\s+card_id: row\.card_id,\s+price: parseCardPrice\(draftOf\(row\)\),\s+rate_unit: unitOf\(row\),\s+\}\)\)/,
   )
   assert.match(screen, /await setEquipmentCardClientPrices\(items\)/)
   assert.equal(
@@ -276,7 +275,7 @@ test('the save sends only the changed, non-approved rows in ONE set_equipment_ca
     assert.match(data, new RegExp(`supabase\\.rpc\\('${fn}'`), fn)
   assert.match(
     data,
-    /p_items: items\.map\(\(item\) => \(\{\s+card_id: item\.card_id,\s+price: item\.price,\s+\}\)\)/,
+    /p_items: items\.map\(\(item\) => \(\{\s+card_id: item\.card_id,\s+price: item\.price,\s+rate_unit: item\.rate_unit,\s+\}\)\)/,
   )
   // The dialogs call the two approval functions.
   const dialogs = read('src', 'components', 'sales', 'CardPricingDialogs.tsx')
@@ -319,10 +318,11 @@ test('the card page hides the months behind SHOW_CARD_MONTHS = false and shows t
     /SHOW_CARD_MONTHS\s+\? supabase\s+\.from\('sales_card_month_slots'\)/,
   )
   assert.match(page, /<RecordCardMonthDialog/)
-  // The pricing: the monthly client price, the status badge with the
-  // approver, the approve / return actions for sales.approve.
+  // The pricing: the client price in its unit (0185), the status badge with
+  // the approver, the approve / return actions for sales.approve.
   assert.match(page, /const canApprove = can\('sales\.approve'\)/)
-  assert.match(page, /label: t\('cardPriceClientMonthly'\)/)
+  assert.match(page, /label: t\('cardPriceClient'\)/)
+  assert.match(page, /unit=\{card\.card_client_price_unit\}/)
   assert.match(
     page,
     /<CardPricingStatusBadge\s+status=\{pricingStatus\}\s+approvedBy=\{card\.pricing_approved_by_name\}\s+approvedAt=\{card\.pricing_approved_at\}/,
@@ -353,29 +353,32 @@ test('the card page hides the months behind SHOW_CARD_MONTHS = false and shows t
     client_price_changed: 'cardPricingEventPriceChanged',
     pricing_approved: 'cardPricingEventApproved',
     pricing_returned: 'cardPricingEventReturned',
+    card_ended: 'equipmentCardEventEnded',
+    card_reopened: 'equipmentCardEventReopened',
   })
   // The select carries the trailing columns of the view.
   const data = read('src', 'lib', 'salesData.ts')
   assert.match(
     data,
-    /export const CARD_PRICING_COLUMNS =\s+'card_client_price,pricing_status,pricing_approved_at,pricing_approved_by,pricing_approved_by_name,card_margin,card_margin_pct,supplier_po_approval_status'/,
+    /export const CARD_PRICING_COLUMNS =\s+'card_client_price,pricing_status,pricing_approved_at,pricing_approved_by,pricing_approved_by_name,card_margin,card_margin_pct,supplier_po_approval_status,card_client_price_unit'/,
   )
   assert.match(data, /has_supplier_po,\$\{CARD_PRICING_COLUMNS\}`/)
 })
 
 // --- The pure helpers ----------------------------------------------------------------
 
-test('cardMargin / cardMarginPct mirror the view: monthly supplier line only, over the client price', () => {
-  assert.equal(sales.cardMargin(1500, 1000, 'month'), 500)
-  assert.equal(sales.cardMargin('1500.00', '1000.00', 'month'), 500)
-  assert.equal(sales.cardMargin(1000, 1500, 'month'), -500)
+test('cardMargin / cardMarginPct mirror the view: the same unit on both sides (0185), over the client price', () => {
+  assert.equal(sales.cardMargin(1500, 'month', 1000, 'month'), 500)
+  assert.equal(sales.cardMargin('1500.00', 'month', '1000.00', 'month'), 500)
+  assert.equal(sales.cardMargin(1000, 'month', 1500, 'month'), -500)
   // An owned Al-Azani unit with a 0-priced line keeps the full client price.
-  assert.equal(sales.cardMargin(1200, 0, 'month'), 1200)
-  // A daily supplier price has no rule yet; a missing price no margin.
-  assert.equal(sales.cardMargin(1500, 100, 'day'), null)
-  assert.equal(sales.cardMargin(null, 1000, 'month'), null)
-  assert.equal(sales.cardMargin(1500, null, 'month'), null)
-  assert.equal(sales.cardMargin(1500.555, 1000, 'month'), 500.56)
+  assert.equal(sales.cardMargin(1200, 'month', 0, 'month'), 1200)
+  // 0185: two daily prices have a margin; two different units none.
+  assert.equal(sales.cardMargin(150, 'day', 100, 'day'), 50)
+  assert.equal(sales.cardMargin(1500, 'month', 100, 'day'), null)
+  assert.equal(sales.cardMargin(null, 'month', 1000, 'month'), null)
+  assert.equal(sales.cardMargin(1500, 'month', null, 'month'), null)
+  assert.equal(sales.cardMargin(1500.555, 'month', 1000, 'month'), 500.56)
   // The percentage: rounded to 2 decimals, null without a margin or at 0.
   assert.equal(sales.cardMarginPct(500, 1500), 33.33)
   assert.equal(sales.cardMarginPct(1200, 1200), 100)
@@ -387,6 +390,7 @@ test('cardMargin / cardMarginPct mirror the view: monthly supplier line only, ov
   assert.equal(
     sales.cardMarginBlocker({
       clientPrice: null,
+      clientRateUnit: 'month',
       supplierPrice: 1,
       supplierRateUnit: 'month',
     }),
@@ -395,6 +399,7 @@ test('cardMargin / cardMarginPct mirror the view: monthly supplier line only, ov
   assert.equal(
     sales.cardMarginBlocker({
       clientPrice: 1,
+      clientRateUnit: 'month',
       supplierPrice: null,
       supplierRateUnit: 'month',
     }),
@@ -403,16 +408,18 @@ test('cardMargin / cardMarginPct mirror the view: monthly supplier line only, ov
   assert.equal(
     sales.cardMarginBlocker({
       clientPrice: 1,
+      clientRateUnit: 'month',
       supplierPrice: 1,
       supplierRateUnit: 'day',
     }),
-    'daily',
+    'units_differ',
   )
   assert.equal(
     sales.cardMarginBlocker({
       clientPrice: 1,
+      clientRateUnit: 'day',
       supplierPrice: 1,
-      supplierRateUnit: 'month',
+      supplierRateUnit: 'day',
     }),
     null,
   )
@@ -470,7 +477,7 @@ test('cardPricingApprovalBlocker: the reasons in the order the user can fix them
     sales.cardPricingApprovalBlocker({ ...ok, supplier_price: 0 }),
     null,
   )
-  // A daily supplier line is approvable (a price, only no margin rule).
+  // Two different units are approvable (0185: no unit-match rule).
   assert.equal(
     sales.cardPricingApprovalBlocker({ ...ok, supplier_rate_unit: 'day' }),
     null,

@@ -139,13 +139,16 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   // بدال كروت المعدات, وتخفي الكروت لو احتجناها بعدين»): the section is
   // reduced to ONE listed page, «اسعار المعدات»; the four earlier pages stay
   // hidden (URL only, still gated) and /sales lands on the prices.
+  // Migration 0185 (owner 2026-11-08): «PO العملاء» and «كروت المعدات» are
+  // listed again, before «اسعار المعدات», and /sales lands on «PO العملاء»;
+  // «كروت التشغيل» and «الشهور» stay hidden.
   {
     key: 'sales',
     requires: [{ key: 'sales.view' }],
     children: [
+      { key: 'sales/orders', requires: [{ key: 'sales.view' }] },
+      { key: 'sales/cards', requires: [{ key: 'sales.view' }] },
       { key: 'sales/prices', requires: [{ key: 'sales.view' }] },
-      { key: 'sales/orders', requires: [{ key: 'sales.view' }], hidden: true },
-      { key: 'sales/cards', requires: [{ key: 'sales.view' }], hidden: true },
       {
         key: 'sales/timesheets',
         requires: [{ key: 'sales.view' }],
@@ -379,11 +382,11 @@ export function routePageOf(segments: readonly string[]): RoutePage {
     return 'purchasing/:id'
   }
   if (first === 'sales') {
-    // /sales opens its first section, like /purchasing — since 0174 the
-    // prices («اسعار المعدات»); /sales/cards/:id is an equipment card, any
-    // other second segment a client PO id.
-    if (!second || second === 'prices') return 'sales/prices'
-    if (second === 'orders') return 'sales/orders'
+    // /sales opens its first section, like /purchasing — since 0185 «PO
+    // العملاء» again (0174 had the prices); /sales/cards/:id is an equipment
+    // card, any other second segment a client PO id.
+    if (!second || second === 'orders') return 'sales/orders'
+    if (second === 'prices') return 'sales/prices'
     if (second === 'cards') return third ? 'sales/cards/:id' : 'sales/cards'
     // Phase 2 (0172): the batch entry and the months list.
     if (second === 'timesheets') return 'sales/timesheets'

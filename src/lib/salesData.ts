@@ -2,7 +2,7 @@ import type { AsyncSearchSelectOption } from '@/components/AsyncSearchSelect'
 import type { TranslationKey } from '@/i18n/translations'
 import type { CompanyProjectSource } from '@/lib/companyProject'
 import { formatDate } from '@/lib/dateFormat'
-import type { SupplierPoRateUnit, SupplierPoStatus } from '@/lib/purchasing'
+import type { SupplierPoStatus } from '@/lib/purchasing'
 import {
   type EquipmentCardRef,
   type NamedRef,
@@ -148,7 +148,8 @@ export interface SalesPoUnitRow {
   supplier_po_number: string | null
   supplier_po_status: SupplierPoStatus | null
   supplier_price: number | null
-  supplier_rate_unit: SupplierPoRateUnit | null
+  /** 0185: any of the four units (the purchasing type still names two). */
+  supplier_rate_unit: SaleRateUnit | null
 }
 
 /** Only what the «حسب المعدات» table shows and its row opens. */
@@ -201,7 +202,8 @@ export interface SalesEquipmentCardRow {
   supplier_po_number: string | null
   supplier_po_status: SupplierPoStatus | null
   supplier_price: number | null
-  supplier_rate_unit: SupplierPoRateUnit | null
+  /** 0185: any of the four units (the purchasing type still names two). */
+  supplier_rate_unit: SaleRateUnit | null
   has_supplier_po: boolean
   // 0174: the card's own client price («اسعار المعدات») and its approval.
   card_client_price: number | null
@@ -212,11 +214,14 @@ export interface SalesEquipmentCardRow {
   card_margin: number | null
   card_margin_pct: number | null
   supplier_po_approval_status: string | null
+  /** 0185: the unit of `card_client_price` (month for every earlier card). */
+  card_client_price_unit: SaleRateUnit
 }
 
-/** The 0174 trailing columns of `sales_equipment_cards`. */
+/** The 0174 trailing columns of `sales_equipment_cards` (and the 0185
+ *  unit of the card's client price). */
 export const CARD_PRICING_COLUMNS =
-  'card_client_price,pricing_status,pricing_approved_at,pricing_approved_by,pricing_approved_by_name,card_margin,card_margin_pct,supplier_po_approval_status'
+  'card_client_price,pricing_status,pricing_approved_at,pricing_approved_by,pricing_approved_by_name,card_margin,card_margin_pct,supplier_po_approval_status,card_client_price_unit'
 
 /** Every column of the view the cards list and the card page show. */
 export const EQUIPMENT_CARDS_SELECT = `card_id,equipment_id,company_id,project_id,period_from,period_to,is_open,rate_unit,standard_hours,note,entry_log_id,entry_at,created_at,updated_at,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_name_ar,company_name_en,project_name_ar,project_name_en,client_line_id,client_po_id,client_po_number,client_po_status,client_price,client_rate_unit,client_standard_hours,client_quantity,has_client_po,supplier_line_id,supplier_po_id,supplier_po_number,supplier_po_status,supplier_price,supplier_rate_unit,has_supplier_po,${CARD_PRICING_COLUMNS}`
@@ -260,6 +265,7 @@ export type CardPriceRow = Pick<
   | 'card_margin'
   | 'card_margin_pct'
   | 'supplier_po_approval_status'
+  | 'card_client_price_unit'
 > & {
   /**
    * 0184: the latest of the card's, the client PO's and the supplier PO's
@@ -553,6 +559,11 @@ export interface CardMonthSlotRow {
   recorded: boolean
   month_id: string | null
   hours: number | string | null
+  /** 0185: the recorded days (NULL while not recorded or none). */
+  days: number | string | null
+  /** 0185: the distinct Saudi days of the month the unit was inside the
+   *  card's company and project (0 without the movement rights). */
+  presence_days: number | null
   note: string | null
   card_id: string
   equipment_id: string
@@ -582,7 +593,8 @@ export interface CardMonthSlotRow {
   supplier_po_id: string | null
   supplier_po_number: string | null
   supplier_price: number | string | null
-  supplier_rate_unit: SupplierPoRateUnit | null
+  /** 0185: any of the four units (the purchasing type still names two). */
+  supplier_rate_unit: SaleRateUnit | null
   due_standard_hours: number | null
   client_due: number | string | null
   supplier_due: number | string | null
@@ -591,7 +603,7 @@ export interface CardMonthSlotRow {
 
 /** The slot columns the «الشهور» list and the batch screen show. */
 export const CARD_MONTH_SLOTS_SELECT =
-  'slot_id,month,recorded,month_id,hours,note,card_id,equipment_id,company_id,project_id,period_from,period_to,is_open,standard_hours,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,owned,company_name_ar,company_name_en,project_name_ar,project_name_en,client_line_id,client_po_id,client_po_number,client_price,client_rate_unit,client_standard_hours,supplier_line_id,supplier_po_id,supplier_po_number,supplier_price,supplier_rate_unit,due_standard_hours,client_due,supplier_due,margin'
+  'slot_id,month,recorded,month_id,hours,days,presence_days,note,card_id,equipment_id,company_id,project_id,period_from,period_to,is_open,standard_hours,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,owned,company_name_ar,company_name_en,project_name_ar,project_name_en,client_line_id,client_po_id,client_po_number,client_price,client_rate_unit,client_standard_hours,supplier_line_id,supplier_po_id,supplier_po_number,supplier_price,supplier_rate_unit,due_standard_hours,client_due,supplier_due,margin'
 
 /** One RECORDED month of a card (`sales_card_months`), as the card page
  *  lists it: the card's facts are already on the page, so only the record
@@ -600,6 +612,8 @@ export interface CardMonthRecordRow {
   id: string
   month: string
   hours: number | string
+  /** 0185: the recorded days, or NULL. */
+  days: number | string | null
   note: string | null
   created_by: string | null
   created_at: string
@@ -612,7 +626,7 @@ export interface CardMonthRecordRow {
 }
 
 export const CARD_MONTHS_SELECT =
-  'id,month,hours,note,created_by,created_at,updated_at,card_id,due_standard_hours,client_due,supplier_due,margin'
+  'id,month,hours,days,note,created_by,created_at,updated_at,card_id,due_standard_hours,client_due,supplier_due,margin'
 
 /** The months of one card the page shows at most (ten years). */
 export const CARD_MONTHS_LIMIT = 120
@@ -624,9 +638,12 @@ export interface CardPendingSlotRow {
   month: string
   recorded: boolean
   is_open: boolean
+  /** 0185: the dialog prefills the days of a new month with it. */
+  presence_days: number | null
 }
 
-export const CARD_PENDING_SLOTS_SELECT = 'slot_id,month,recorded,is_open'
+export const CARD_PENDING_SLOTS_SELECT =
+  'slot_id,month,recorded,is_open,presence_days'
 
 /** `equipment_card_events`: the card's own append-only audit (0172). */
 export interface EquipmentCardEventRow {
@@ -734,6 +751,8 @@ export async function recordEquipmentCardMonth(input: {
   cardId: string
   month: string
   hours: number
+  /** 0185: null = no days. */
+  days: number | null
   note: string
 }): Promise<RpcResult<string>> {
   return asResult<string>(
@@ -742,6 +761,7 @@ export async function recordEquipmentCardMonth(input: {
       p_month: monthStartOf(input.month),
       p_hours: input.hours,
       p_note: input.note.trim() || null,
+      p_days: input.days,
     }),
   )
 }
@@ -759,6 +779,7 @@ export async function recordEquipmentCardMonths(
       p_items: items.map((item) => ({
         card_id: item.card_id,
         hours: item.hours,
+        days: item.days,
         note: item.note?.trim() || null,
       })),
     }),
@@ -780,16 +801,18 @@ export async function deleteEquipmentCardMonth(input: {
 
 // --- Card pricing (the four functions of 0174) ----------------------------------------------
 
-/** `set_equipment_card_client_price`: the client's monthly price of ONE
- *  card; null = no price. */
+/** `set_equipment_card_client_price`: the client's price of ONE card;
+ *  null = no price; since 0185 its unit (null = unchanged). */
 export async function setEquipmentCardClientPrice(input: {
   cardId: string
   price: number | null
+  rateUnit: SaleRateUnit | null
 }): Promise<RpcResult<null>> {
   return asResult<null>(
     await supabase.rpc('set_equipment_card_client_price', {
       p_card_id: input.cardId,
       p_price: input.price,
+      p_rate_unit: input.rateUnit,
     }),
   )
 }
@@ -805,6 +828,7 @@ export async function setEquipmentCardClientPrices(
       p_items: items.map((item) => ({
         card_id: item.card_id,
         price: item.price,
+        rate_unit: item.rate_unit,
       })),
     }),
   )
@@ -831,5 +855,59 @@ export async function returnEquipmentCardPricing(input: {
       p_card_id: input.cardId,
       p_note: input.note.trim() || null,
     }),
+  )
+}
+
+// --- The manual card end (the two functions of 0185) -------------------------------------------
+
+/** `end_equipment_card` (sales.manage): ends an OPEN card on `periodTo`
+ *  (a date key, from its period_from to today Saudi), with an optional note. */
+export async function endEquipmentCard(input: {
+  cardId: string
+  periodTo: string
+  note: string
+}): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('end_equipment_card', {
+      p_card_id: input.cardId,
+      p_period_to: input.periodTo,
+      p_note: input.note.trim() || null,
+    }),
+  )
+}
+
+/** `reopen_equipment_card` (sales.manage): back to an open card. */
+export async function reopenEquipmentCard(input: {
+  cardId: string
+  note: string
+}): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('reopen_equipment_card', {
+      p_card_id: input.cardId,
+      p_note: input.note.trim() || null,
+    }),
+  )
+}
+
+/** At most this many card ids feed «بانتظار الانهاء» (one bounded read). */
+export const CARDS_AWAITING_END_LIMIT = 500
+
+/**
+ * The ids of the OPEN cards whose unit last left the card's project with
+ * «انتهاء عمل» (`sales_cards_awaiting_end`, 0185), one bounded read; the
+ * «كروت المعدات» list then filters `.in('card_id', ids)`.
+ */
+export async function fetchCardsAwaitingEndIds(
+  signal?: AbortSignal,
+): Promise<string[]> {
+  let request = supabase
+    .from('sales_cards_awaiting_end')
+    .select('card_id')
+    .order('exit_at', { ascending: false })
+    .order('card_id', { ascending: true })
+    .limit(CARDS_AWAITING_END_LIMIT)
+  if (signal) request = request.abortSignal(signal)
+  return unwrapRows<{ card_id: string }>(await request).map(
+    (row) => row.card_id,
   )
 }

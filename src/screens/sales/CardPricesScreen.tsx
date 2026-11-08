@@ -19,7 +19,6 @@ import {
   type CardPricingTarget,
 } from '@/components/sales/CardPricingDialogs'
 import { PoPill } from '@/components/sales/PoPill'
-import { SalePrice } from '@/components/sales/SalePrice'
 import { UnitIdentityCell } from '@/components/sales/UnitIdentityCell'
 import {
   AppLink,
@@ -31,6 +30,7 @@ import {
   Input,
   Notice,
   PageHeader,
+  Select,
   ToastProvider,
   Tooltip,
   useToast,
@@ -52,10 +52,15 @@ import {
   cardPricingApprovalBlocker,
   cardPricingFormMessage,
   cardPricingStatusOf,
+  isSaleRateUnit,
   isValidCardPrice,
   parseCardPrice,
   pricesCountLabel,
+  SALE_RATE_UNIT_LABEL_KEYS,
+  SALE_RATE_UNITS,
+  saleRateUnitOf,
   type CardPriceBatchItem,
+  type SaleRateUnit,
 } from '@/lib/sales'
 import {
   CARD_PRICES_SELECT,
@@ -85,8 +90,10 @@ const isOwned = (row: CardPriceRow) =>
  * supplier PO line (`sales_equipment_cards` WHERE supplier_line_id IS NOT
  * NULL, always) in the approved batch layout: the unit, «الشركة ·
  * المشروع», the supplier with its PO pill, the supplier price from the PO
- * line, the client's MONTHLY price typed inline, the margin and its
- * percentage live from the typed price, and the pricing state with
+ * line, the client's price typed inline with its unit (0185: month, week,
+ * day or hour; an unpriced card starts on the supplier line's unit), the
+ * margin and its percentage live from the typed price and unit (only when
+ * the two units match, as the view), and the pricing state with
  * «اعتماد» / «رجوع للتعديل» for `sales.approve`. Search, filters (the open
  * cards by default), sort and paging are server-side; the sticky bar saves
  * only the changed rows in ONE `set_equipment_card_client_prices` call
@@ -113,6 +120,7 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const [unitDrafts, setUnitDrafts] = useState<Record<string, SaleRateUnit>>({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<TranslationKey | null>(null)
   const [approving, setApproving] = useState<CardPricingTarget | null>(null)
@@ -160,6 +168,7 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
       setRows((data as unknown as CardPriceRow[] | null) ?? [])
       setTotal(count ?? 0)
       setDrafts({})
+      setUnitDrafts({})
     }
     setLoading(false)
   }, [
@@ -185,11 +194,32 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
     setSaveError(null)
     setDrafts((current) => ({ ...current, [row.card_id]: value }))
   }
-  const isChanged = (row: CardPriceRow) => {
+  // --- The unit of the client price (0185): the stored one, or for a card
+  // without a client price yet the supplier line's unit.
+  const savedUnit = (row: CardPriceRow): SaleRateUnit =>
+    saleRateUnitOf(row.card_client_price_unit)
+  const defaultUnit = (row: CardPriceRow): SaleRateUnit =>
+    row.card_client_price === null && isSaleRateUnit(row.supplier_rate_unit)
+      ? row.supplier_rate_unit
+      : savedUnit(row)
+  const unitOf = (row: CardPriceRow): SaleRateUnit =>
+    row.pricing_status === 'approved'
+      ? savedUnit(row)
+      : (unitDrafts[row.card_id] ?? defaultUnit(row))
+  const setUnitDraft = (row: CardPriceRow, unit: SaleRateUnit) => {
+    setSaveError(null)
+    setUnitDrafts((current) => ({ ...current, [row.card_id]: unit }))
+  }
+  const isPriceChanged = (row: CardPriceRow) => {
     const draft = draftOf(row).trim()
     if (draft === '') return row.card_client_price !== null
     return !isValidCardPrice(draft) || Number(draft) !== row.card_client_price
   }
+  /** A change of the price, or of the unit of a saved price (a unit alone
+   *  counts; an unpriced card's unit is saved with its first price). */
+  const isChanged = (row: CardPriceRow) =>
+    isPriceChanged(row) ||
+    (row.card_client_price !== null && unitOf(row) !== savedUnit(row))
   const invalid = rows.filter((row) => {
     const draft = draftOf(row).trim()
     return draft !== '' && !isValidCardPrice(draft)
@@ -210,6 +240,7 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
     const items: CardPriceBatchItem[] = changed.map((row) => ({
       card_id: row.card_id,
       price: parseCardPrice(draftOf(row)),
+      rate_unit: unitOf(row),
     }))
     const result = await setEquipmentCardClientPrices(items)
     setSaving(false)
@@ -229,6 +260,7 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
   const clear = () => {
     setSaveError(null)
     setDrafts({})
+    setUnitDrafts({})
   }
 
   // The dialog shows the SAVED prices (never a typed draft) and the PO.
@@ -236,6 +268,7 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
     card_id: row.card_id,
     equipment_code: row.equipment_code,
     client_price: row.card_client_price,
+    client_price_unit: savedUnit(row),
     supplier_price: row.supplier_price,
     supplier_rate_unit: row.supplier_rate_unit,
     supplier_po_number: row.supplier_po_number,
@@ -337,7 +370,7 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
     },
     {
       key: 'card_client_price',
-      header: t('cardPriceClientMonthly'),
+      header: t('cardPriceClient'),
       sortable: true,
       cell: (row) => {
         const approved = row.pricing_status === 'approved'
@@ -351,28 +384,39 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
                   className="shrink-0 text-muted"
                 />
               )}
-              {row.card_client_price === null ? (
-                <Badge tone="warning" size="sm">
-                  {t('cardMonthNeedsPrice')}
-                </Badge>
-              ) : (
-                <SalePrice value={row.card_client_price} />
-              )}
+              <CardSupplierPriceCell
+                price={row.card_client_price}
+                rateUnit={savedUnit(row)}
+              />
             </span>
           )
         const draft = draftOf(row)
+        const unit = unitOf(row)
         return (
           <span className="inline-flex items-center gap-1.5">
             <Input
               type="text"
               inputMode="decimal"
               dir="ltr"
-              aria-label={`${t('cardPriceClientMonthly')} ${row.equipment_code ?? ''}`}
+              aria-label={`${t('cardPriceClient')} ${row.equipment_code ?? ''}`}
               value={draft}
               onChange={(event) => setDraft(row, event.target.value)}
               placeholder="0.00"
               invalid={draft.trim() !== '' && !isValidCardPrice(draft)}
-              className={`w-28 tabular-nums ${isChanged(row) ? 'font-semibold' : ''}`}
+              className={`w-28 tabular-nums ${isPriceChanged(row) ? 'font-semibold' : ''}`}
+            />
+            <Select
+              size="sm"
+              aria-label={`${t('cardPriceClientUnit')} ${row.equipment_code ?? ''}`}
+              value={unit}
+              options={SALE_RATE_UNITS.map((value) => ({
+                value,
+                label: t(SALE_RATE_UNIT_LABEL_KEYS[value]),
+              }))}
+              onValueChange={(value) =>
+                setUnitDraft(row, saleRateUnitOf(value))
+              }
+              className={`w-24 ${row.card_client_price !== null && unit !== savedUnit(row) ? 'font-semibold' : ''}`}
             />
           </span>
         )
@@ -386,8 +430,10 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
       hideBelow: 'sm',
       cell: (row) => {
         const client = livePrice(row)
+        const unit = unitOf(row)
         const margin = cardMargin(
           client,
+          unit,
           row.supplier_price,
           row.supplier_rate_unit,
         )
@@ -396,6 +442,7 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
             margin={margin}
             pct={cardMarginPct(margin, client)}
             clientPrice={client}
+            clientRateUnit={unit}
             supplierPrice={row.supplier_price}
             supplierRateUnit={row.supplier_rate_unit}
           />
@@ -421,7 +468,9 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
       sortable: true,
       className: 'text-muted',
       hideBelow: 'md' as const,
-      cell: (row: CardPriceRow) => <RelativeTime value={row.last_modified_at} />,
+      cell: (row: CardPriceRow) => (
+        <RelativeTime value={row.last_modified_at} />
+      ),
     },
     ...(canApprove
       ? [
@@ -569,7 +618,11 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
             variant="ghost"
             className="h-11"
             onClick={clear}
-            disabled={saving || Object.keys(drafts).length === 0}
+            disabled={
+              saving ||
+              (Object.keys(drafts).length === 0 &&
+                Object.keys(unitDrafts).length === 0)
+            }
           >
             {t('cardMonthClear')}
           </Button>

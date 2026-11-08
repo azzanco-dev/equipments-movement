@@ -32,7 +32,10 @@ const sql = norm(read('supabase', 'migrations', MIGRATION))
 const fn = (source, head) => {
   const start = source.indexOf(head)
   assert.ok(start >= 0, head)
-  return source.slice(start, source.indexOf('$$;', source.indexOf('$$', start) + 2) + 3)
+  return source.slice(
+    start,
+    source.indexOf('$$;', source.indexOf('$$', start) + 2) + 3,
+  )
 }
 
 /** Loads src/lib/purchasing.ts (its only runtime import is pure). */
@@ -78,12 +81,24 @@ test('the column: month or day, month by default', () => {
 })
 
 test('add_supplier_po_equipment: the 0148 body plus the unit', () => {
-  const before = norm(read('supabase', 'migrations', '20261025100000_0148_supplier_po_same_entry_day.sql'))
+  const before = norm(
+    read(
+      'supabase',
+      'migrations',
+      '20261025100000_0148_supplier_po_same_entry_day.sql',
+    ),
+  )
   const head = 'CREATE OR REPLACE FUNCTION public.add_supplier_po_equipment('
   const body = fn(sql, head)
-  assert.match(sql, /DROP FUNCTION IF EXISTS public\.add_supplier_po_equipment\(uuid, uuid, numeric, text\);/)
+  assert.match(
+    sql,
+    /DROP FUNCTION IF EXISTS public\.add_supplier_po_equipment\(uuid, uuid, numeric, text\);/,
+  )
   const additions = [
-    ["p_note text DEFAULT NULL )", "p_note text DEFAULT NULL, p_rate_unit text DEFAULT 'month' )"],
+    [
+      'p_note text DEFAULT NULL )',
+      "p_note text DEFAULT NULL, p_rate_unit text DEFAULT 'month' )",
+    ],
     ['v_entry_date date; BEGIN', 'v_entry_date date; v_rate_unit text; BEGIN'],
     [
       "RAISE EXCEPTION 'invalid_price' USING ERRCODE = '22023'; END IF; IF NOT (",
@@ -91,7 +106,10 @@ test('add_supplier_po_equipment: the 0148 body plus the unit', () => {
     ],
     ['price, note ) VALUES', 'price, note, rate_unit ) VALUES'],
     ["NULLIF(btrim(p_note), '') )", "NULLIF(btrim(p_note), ''), v_rate_unit )"],
-    ["'price', p_price, 'entry_log_id'", "'price', p_price, 'rate_unit', v_rate_unit, 'entry_log_id'"],
+    [
+      "'price', p_price, 'entry_log_id'",
+      "'price', p_price, 'rate_unit', v_rate_unit, 'entry_log_id'",
+    ],
   ]
   let expected = fn(before, head)
   for (const [from, to] of additions) {
@@ -105,8 +123,14 @@ test('add_supplier_po_equipment: the 0148 body plus the unit', () => {
   )
 })
 
-test('create_supplier_po: the 0139 body, each item\'s unit passed on', () => {
-  const before = norm(read('supabase', 'migrations', '20261020110000_0139_supplier_po_is_internal_default.sql'))
+test("create_supplier_po: the 0139 body, each item's unit passed on", () => {
+  const before = norm(
+    read(
+      'supabase',
+      'migrations',
+      '20261020110000_0139_supplier_po_is_internal_default.sql',
+    ),
+  )
   const head = 'CREATE OR REPLACE FUNCTION public.create_supplier_po('
   const expected = fn(before, head).replace(
     "v_item->>'note' );",
@@ -116,12 +140,27 @@ test('create_supplier_po: the 0139 body, each item\'s unit passed on', () => {
 })
 
 test('update_supplier_po_equipment: the 0142 body plus the unit', () => {
-  const before = norm(read('supabase', 'migrations', '20261022100000_0142_supplier_po_update.sql'))
+  const before = norm(
+    read(
+      'supabase',
+      'migrations',
+      '20261022100000_0142_supplier_po_update.sql',
+    ),
+  )
   const head = 'CREATE OR REPLACE FUNCTION public.update_supplier_po_equipment('
-  assert.match(sql, /DROP FUNCTION IF EXISTS public\.update_supplier_po_equipment\(uuid, numeric, text\);/)
+  assert.match(
+    sql,
+    /DROP FUNCTION IF EXISTS public\.update_supplier_po_equipment\(uuid, numeric, text\);/,
+  )
   const additions = [
-    ['p_note text DEFAULT NULL )', 'p_note text DEFAULT NULL, p_rate_unit text DEFAULT NULL )'],
-    ['v_price_changed boolean; BEGIN', 'v_price_changed boolean; v_rate_unit text; BEGIN'],
+    [
+      'p_note text DEFAULT NULL )',
+      'p_note text DEFAULT NULL, p_rate_unit text DEFAULT NULL )',
+    ],
+    [
+      'v_price_changed boolean; BEGIN',
+      'v_price_changed boolean; v_rate_unit text; BEGIN',
+    ],
     [
       "RAISE EXCEPTION 'invalid_note' USING ERRCODE = '22023'; END IF;",
       "RAISE EXCEPTION 'invalid_note' USING ERRCODE = '22023'; END IF; v_rate_unit := COALESCE(NULLIF(btrim(p_rate_unit), ''), v_line.rate_unit); IF v_rate_unit NOT IN ('month', 'day') THEN RAISE EXCEPTION 'invalid_rate_unit' USING ERRCODE = '22023'; END IF;",
@@ -150,10 +189,17 @@ test('update_supplier_po_equipment: the 0142 body plus the unit', () => {
 
 test('totals per unit: a month and a day are never added', () => {
   const lib = loadLib('purchasing')
-  assert.deepEqual(plain(lib.SUPPLIER_PO_RATE_UNITS), ['month', 'day'])
+  // 0185 (owner 2026-11-08): four units, month / week / day / hour.
+  assert.deepEqual(plain(lib.SUPPLIER_PO_RATE_UNITS), [
+    'month',
+    'week',
+    'day',
+    'hour',
+  ])
   assert.equal(lib.supplierPoRateUnitOf('day'), 'day')
   assert.equal(lib.supplierPoRateUnitOf(null), 'month')
-  assert.equal(lib.supplierPoRateUnitOf('hour'), 'month')
+  assert.equal(lib.supplierPoRateUnitOf('hour'), 'hour')
+  assert.equal(lib.supplierPoRateUnitOf('year'), 'month')
   assert.deepEqual(plain(lib.supplierPoTotalsByUnit([])), {
     parts: [{ unit: 'month', total: 0 }],
     unpriced: 0,
@@ -176,9 +222,10 @@ test('totals per unit: a month and a day are never added', () => {
     },
   )
   // Only daily lines: one daily total, no empty monthly one.
-  assert.deepEqual(plain(lib.supplierPoTotalsByUnit([{ price: 300, rate_unit: 'day' }]).parts), [
-    { unit: 'day', total: 300 },
-  ])
+  assert.deepEqual(
+    plain(lib.supplierPoTotalsByUnit([{ price: 300, rate_unit: 'day' }]).parts),
+    [{ unit: 'day', total: 300 }],
+  )
   // The create payload carries the unit.
   assert.deepEqual(
     plain(
@@ -192,13 +239,27 @@ test('totals per unit: a month and a day are never added', () => {
 
 test('the screens send, edit and show the unit', () => {
   const data = read('src', 'lib', 'purchasingData.ts')
-  assert.match(data, /SUPPLIER_PO_LINE_SELECT = `id,supplier_po_id,equipment_card_id,price,rate_unit,/)
-  assert.match(data, /EQUIPMENT_PURCHASING_SELECT = `id,supplier_po_id,equipment_card_id,price,rate_unit,/)
+  assert.match(
+    data,
+    /SUPPLIER_PO_LINE_SELECT = `id,supplier_po_id,equipment_card_id,price,rate_unit,/,
+  )
+  assert.match(
+    data,
+    /EQUIPMENT_PURCHASING_SELECT = `id,supplier_po_id,equipment_card_id,price,rate_unit,/,
+  )
   assert.equal((data.match(/p_rate_unit: input\.rateUnit,/g) ?? []).length, 2)
 
-  const create = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
+  const create = read(
+    'src',
+    'components',
+    'purchasing',
+    'CreateSupplierPoDialog.tsx',
+  )
   assert.match(create, /const changeDefaultUnit = /)
-  assert.match(create, /line\.rate_unit === previous \? \{ \.\.\.line, rate_unit: next \} : line/)
+  assert.match(
+    create,
+    /line\.rate_unit === previous \? \{ \.\.\.line, rate_unit: next \} : line/,
+  )
   assert.match(create, /rate_unit: picked\[visit\.equipment_id\]\.rate_unit,/)
   assert.match(create, /<PricesByUnit/)
 
@@ -210,22 +271,43 @@ test('the screens send, edit and show the unit', () => {
   assert.match(edit, /rate_unit: supplierPoRateUnitOf\(lineRateUnit\),/)
 
   const detail = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
-  assert.match(detail, /const \{ parts: totalsByUnit, unpriced \} = supplierPoTotalsByUnit\(lines\)/)
-  assert.match(detail, /<PricesByUnit parts=\{totalsByUnit\} amount=\{vatOf\} \/>/)
-  assert.match(detail, /<PricesByUnit parts=\{totalsByUnit\} amount=\{withVat\} \/>/)
+  assert.match(
+    detail,
+    /const \{ parts: totalsByUnit, unpriced \} = supplierPoTotalsByUnit\(lines\)/,
+  )
+  assert.match(
+    detail,
+    /<PricesByUnit parts=\{totalsByUnit\} amount=\{vatOf\} \/>/,
+  )
+  assert.match(
+    detail,
+    /<PricesByUnit parts=\{totalsByUnit\} amount=\{withVat\} \/>/,
+  )
   assert.match(detail, /totals=\{totalsByUnit\}/)
   assert.match(detail, /unit=\{supplierPoRateUnitOf\(line\.rate_unit\)\}/)
   // The PDF says the unit in its own column (owner 2026-10-29).
   assert.ok(
-    read('src', 'components', 'purchasing', 'SupplierPoPrintSheet.tsx').includes(
+    read(
+      'src',
+      'components',
+      'purchasing',
+      'SupplierPoPrintSheet.tsx',
+    ).includes(
       'const unitKey = SUPPLIER_PO_RATE_UNIT_LABEL_KEYS[supplierPoRateUnitOf(line.rate_unit)]',
     ),
   )
   // The PO list's opened row: the unit in its own column (owner 2026-10-28).
-  const panel = read('src', 'components', 'purchasing', 'SupplierPoLinesPanel.tsx')
+  const panel = read(
+    'src',
+    'components',
+    'purchasing',
+    'SupplierPoLinesPanel.tsx',
+  )
   assert.ok(panel.includes("{t('supplierPoRateUnit')}"))
   assert.ok(
-    panel.includes('{t(SUPPLIER_PO_RATE_UNIT_LABEL_KEYS[supplierPoRateUnitOf(line.rate_unit)])}'),
+    panel.includes(
+      '{t(SUPPLIER_PO_RATE_UNIT_LABEL_KEYS[supplierPoRateUnitOf(line.rate_unit)])}',
+    ),
   )
   assert.match(
     read('src', 'components', 'purchasing', 'EquipmentPurchasingCard.tsx'),
@@ -237,10 +319,18 @@ test('the token and the labels, Arabic and English, plain alif', () => {
   const lib = read('src', 'lib', 'purchasing.ts')
   assert.match(lib, /^  'invalid_rate_unit', \/\/ 0157/m)
   assert.equal(
-    (lib.match(/match: 'invalid_rate_unit',\s+field: 'rate_unit',\s+key: 'supplierPoRateUnitInvalid'/g) ?? []).length,
+    (
+      lib.match(
+        /match: 'invalid_rate_unit',\s+field: 'rate_unit',\s+key: 'supplierPoRateUnitInvalidFour'/g,
+      ) ?? []
+    ).length,
     2,
   )
-  assert.match(lib, /invalid_rate_unit: 'supplierPoRateUnitInvalid', \/\/ create \(0157\)/)
+  // 0185: the message names the four units.
+  assert.match(
+    lib,
+    /invalid_rate_unit: 'supplierPoRateUnitInvalidFour', \/\/ create \(0157, four units 0185\)/,
+  )
   const translations = read('src', 'i18n', 'translations.ts')
   for (const key of [
     'supplierPoRateUnit',
@@ -249,6 +339,7 @@ test('the token and the labels, Arabic and English, plain alif', () => {
     'supplierPoPerMonth',
     'supplierPoPerDay',
     'supplierPoRateUnitInvalid',
+    'supplierPoRateUnitInvalidFour',
     'supplierPoDefaultRateUnit',
     'supplierPoDefaultRateUnitHint',
   ]) {

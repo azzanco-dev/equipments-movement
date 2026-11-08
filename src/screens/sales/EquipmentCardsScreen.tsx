@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { CreditCard } from 'lucide-react'
 import { RelativeTime } from '@/components/RelativeTime'
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
@@ -17,16 +18,24 @@ import {
   EmptyState,
   ErrorState,
   PageHeader,
+  PRIMARY_ACTIVE_TRIGGER,
+  Tabs,
+  TabsList,
+  TabsTrigger,
   type DataTableColumn,
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
 import { equipmentCardsListConfig } from '@/lib/listConfigs'
-import { supplierPoRateUnitOf } from '@/lib/purchasing'
-import { equipmentCardStatus } from '@/lib/sales'
+import {
+  cardsAwaitingEndHref,
+  isCardsAwaitingEnd,
+} from '@/lib/cardsAwaitingEnd'
+import { equipmentCardStatus, saleRateUnitOf } from '@/lib/sales'
 import {
   EQUIPMENT_CARDS_SELECT,
+  fetchCardsAwaitingEndIds,
   type SalesEquipmentCardRow,
 } from '@/lib/salesData'
 import { buildSearchFilter } from '@/lib/search'
@@ -48,12 +57,18 @@ const isOwned = (row: SalesEquipmentCardRow) =>
  * «بدون» or «مملوكة», the sale and purchase prices and the status; search,
  * filters (company, project, open / ended, without a client PO, without a
  * supplier PO), sort and paging server-side, the open cards first. A row
- * opens the card page.
+ * opens the card page. Since 0185 a segmented switch «كل الكروت» /
+ * «بانتظار الانهاء» (`?awaiting=1`, the home's deep link): the latter
+ * restricts the list to the ids of `sales_cards_awaiting_end` (one bounded
+ * read), the open cards whose unit left the project with «انتهاء عمل».
  */
 export function EquipmentCardsScreen({
   onSelectCard,
 }: EquipmentCardsScreenProps) {
   const { t } = useI18n()
+  const pathname = usePathname()
+  const params = useSearchParams()
+  const awaiting = isCardsAwaitingEnd(params)
   const list = useDataListState(equipmentCardsListConfig)
   const [rows, setRows] = useState<SalesEquipmentCardRow[]>([])
   const [total, setTotal] = useState(0)
@@ -71,6 +86,27 @@ export function EquipmentCardsScreen({
     const signal = startListRequest()
     setLoading(true)
     setLoadError(false)
+    // «بانتظار الانهاء»: the card ids of the 0185 view first (bounded).
+    let awaitingIds: string[] | null = null
+    if (awaiting) {
+      try {
+        awaitingIds = await fetchCardsAwaitingEndIds(signal)
+      } catch {
+        if (signal.aborted) return
+        setLoadError(true)
+        setRows([])
+        setTotal(0)
+        setLoading(false)
+        return
+      }
+      if (signal.aborted) return
+      if (awaitingIds.length === 0) {
+        setRows([])
+        setTotal(0)
+        setLoading(false)
+        return
+      }
+    }
     const ascending = list.direction === 'asc'
     let query = supabase
       .from('sales_equipment_cards')
@@ -86,6 +122,7 @@ export function EquipmentCardsScreen({
       list.search,
     )
     if (searchFilter) query = query.or(searchFilter)
+    if (awaitingIds) query = query.in('card_id', awaitingIds)
     query = applyListFilters(
       query,
       list.filters,
@@ -103,6 +140,7 @@ export function EquipmentCardsScreen({
     }
     setLoading(false)
   }, [
+    awaiting,
     list.direction,
     list.filters,
     list.page,
@@ -116,7 +154,17 @@ export function EquipmentCardsScreen({
     fetchRows()
   }, [fetchRows])
 
-  const filtered = Boolean(list.search.trim()) || list.filters.length > 0
+  const setAwaiting = (next: boolean) => {
+    const search = cardsAwaitingEndHref(params, next)
+    window.history.replaceState(
+      null,
+      '',
+      search ? `${pathname}?${search}` : pathname,
+    )
+  }
+
+  const filtered =
+    awaiting || Boolean(list.search.trim()) || list.filters.length > 0
 
   const without = (
     <Badge tone="warning" size="sm">
@@ -209,7 +257,7 @@ export function EquipmentCardsScreen({
         ) : (
           <SaleAmountOrDash
             value={row.supplier_price}
-            unit={supplierPoRateUnitOf(row.supplier_rate_unit)}
+            unit={saleRateUnitOf(row.supplier_rate_unit)}
           />
         ),
     },
@@ -237,6 +285,22 @@ export function EquipmentCardsScreen({
         title={t('equipmentCards')}
         description={t('equipmentCardsDesc')}
       />
+      <Tabs
+        value={awaiting ? 'awaiting' : 'all'}
+        onValueChange={(value) => setAwaiting(value === 'awaiting')}
+      >
+        <TabsList
+          variant="segmented"
+          aria-label={t('equipmentCardsAwaitingSwitch')}
+        >
+          <TabsTrigger value="all" className={PRIMARY_ACTIVE_TRIGGER}>
+            {t('equipmentCardsAll')}
+          </TabsTrigger>
+          <TabsTrigger value="awaiting" className={PRIMARY_ACTIVE_TRIGGER}>
+            {t('equipmentCardsAwaitingEnd')}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
       <DataListToolbar
         config={equipmentCardsListConfig}
         search={list.searchInput}
@@ -258,9 +322,11 @@ export function EquipmentCardsScreen({
         <EmptyState
           icon={<CreditCard size={28} aria-hidden="true" />}
           title={
-            filtered
-              ? t('equipmentCardsEmptyFiltered')
-              : t('equipmentCardsEmpty')
+            awaiting
+              ? t('equipmentCardsAwaitingEmpty')
+              : filtered
+                ? t('equipmentCardsEmptyFiltered')
+                : t('equipmentCardsEmpty')
           }
         />
       ) : (

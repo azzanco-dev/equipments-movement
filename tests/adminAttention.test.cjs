@@ -16,7 +16,19 @@ function loadLib(name) {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
   }).outputText
   const exports = {}
-  vm.runInNewContext(code, { exports }, { filename: file })
+  vm.runInNewContext(
+    code,
+    {
+      exports,
+      URLSearchParams,
+      require(request) {
+        const match = /^@\/lib\/(.+)$/.exec(request)
+        if (match) return loadLib(match[1])
+        throw new Error(`Unexpected module: ${request}`)
+      },
+    },
+    { filename: file },
+  )
   return exports
 }
 
@@ -114,4 +126,63 @@ test('the section gates its items and sits at the end of the home', () => {
     read('src', 'App.tsx'),
     /canOpenPage=\{\(target\) => shell\.pages\.has\(target\)\}/,
   )
+})
+
+// 0185 (owner go 2026-11-08): «معدات خرجت بانتهاء عمل وكرتها مفتوح».
+test('the cards awaiting their end: after the PO items, sales readers only', () => {
+  assert.deepEqual(
+    [...lib.ATTENTION_ORDER],
+    [
+      'unclassified',
+      'no_po',
+      'awaiting_approval',
+      'unpriced',
+      'awaiting_end',
+      'no_signal',
+      'out_of_service_long',
+    ],
+  )
+  assert.deepEqual(
+    [...lib.visibleAttentionItems({ awaiting_end: 3, no_signal: 0 })],
+    ['awaiting_end'],
+  )
+  assert.equal(lib.visibleAttentionItems({ awaiting_end: 0 }).length, 0)
+  const awaiting = loadLib('cardsAwaitingEnd')
+  assert.equal(lib.awaitingEndHref(), awaiting.CARDS_AWAITING_END_HREF)
+  assert.equal(lib.awaitingEndHref(), '/sales/cards?awaiting=1')
+  assert.equal(lib.AWAITING_END_PAGE, 'sales/cards')
+
+  const section = read(
+    'src',
+    'components',
+    'admin-home',
+    'AttentionSection.tsx',
+  )
+  assert.match(section, /const canSales = permissions\.can\('sales\.view'\)/)
+  assert.match(
+    section,
+    /canSales\s*\?\s*headCount\(\s*supabase\s*\.from\('sales_cards_awaiting_end'\)\s*\.select\('card_id', \{ count: 'exact', head: true \}\)/,
+  )
+  assert.match(section, /awaiting_end: awaitingEnd,/)
+  assert.match(section, /\[canPurchasing, canSales, cutoff\]/)
+  assert.match(
+    section,
+    /canOpenPage\(AWAITING_END_PAGE\) \? awaitingEndHref\(\) : null/,
+  )
+  assert.match(section, /label: 'adminAttentionAwaitingEnd'/)
+  // The shell's page list carries the gate the item links through.
+  assert.match(
+    read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx'),
+    /'purchasing\/orders' \| 'sales\/cards'/,
+  )
+  const translations = read('src', 'i18n', 'translations.ts')
+  for (const key of [
+    'adminAttentionAwaitingEnd',
+    'adminAttentionAwaitingEndHint',
+  ]) {
+    const matches =
+      translations.match(new RegExp(`^    ${key}: '[^'\n]+',$`, 'gm')) ?? []
+    assert.equal(matches.length, 2, key)
+    assert.doesNotMatch(matches[0], /[أإآ]/, key)
+  }
 })

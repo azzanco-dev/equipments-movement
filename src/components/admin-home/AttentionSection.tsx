@@ -2,6 +2,7 @@ import { useCallback, useMemo, type ReactNode } from 'react'
 import {
   ArrowUpLeft,
   BadgeCheck,
+  CalendarX2,
   CircleDollarSign,
   FileWarning,
   PowerOff,
@@ -14,8 +15,10 @@ import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import { canViewEquipmentLocation } from '@/lib/actionPermissions'
 import {
+  AWAITING_END_PAGE,
   OUT_OF_SERVICE_LONG_DAYS,
   awaitingApprovalHref,
+  awaitingEndHref,
   noPoHref,
   outOfServiceLongHref,
   saudiDayBefore,
@@ -58,6 +61,12 @@ const ITEM: Record<
     icon: <CircleDollarSign size={16} />,
     tone: 'warning',
   },
+  awaiting_end: {
+    label: 'adminAttentionAwaitingEnd',
+    hint: 'adminAttentionAwaitingEndHint',
+    icon: <CalendarX2 size={16} />,
+    tone: 'warning',
+  },
   no_signal: {
     label: 'adminAttentionNoSignal',
     hint: 'adminAttentionNoSignalHint',
@@ -84,7 +93,7 @@ async function headCount(
 export interface AttentionSectionProps {
   /** Whether the shell opens a page; an item links only when it does. */
   canOpenPage: (
-    page: 'logs' | 'purchasing/units' | 'purchasing/orders',
+    page: 'logs' | 'purchasing/units' | 'purchasing/orders' | 'sales/cards',
   ) => boolean
   /** Scrolls to the home's Afaqy section (the no-signal item). */
   onShowAfaqy: () => void
@@ -95,7 +104,8 @@ export interface AttentionSectionProps {
  * mockup): what needs action now, each a count that opens its list
  * filtered. An item shows only above zero and only for its readers —
  * the workshop items for every home reader (RLS decides the rows), the
- * purchasing ones with `purchasing.view`, the Afaqy one with
+ * purchasing ones with `purchasing.view`, the cards awaiting their end
+ * (0185) with `sales.view`, the Afaqy one with
  * `equipment.location.view` — and the whole card hides when nothing is
  * left. The database counts load together; Afaqy (an outside service) on
  * its own, so it never delays them. A failed count says so; it is never
@@ -108,6 +118,7 @@ export function AttentionSection({
   const { t } = useI18n()
   const permissions = usePermissions()
   const canPurchasing = permissions.can('purchasing.view')
+  const canSales = permissions.can('sales.view')
   const canAfaqy = canViewEquipmentLocation(permissions)
   const cutoff = useMemo(
     () => saudiDayBefore(new Date(), OUT_OF_SERVICE_LONG_DAYS),
@@ -129,41 +140,55 @@ export function AttentionSection({
           .select('id', { count: 'exact', head: true })
           .eq('status', 'open')
           .abortSignal(signal)
-      const [unclassified, outOfService, noPo, awaiting, unpriced] =
-        await Promise.all([
-          headCount(workshopOpen().is('workshop_purpose', null)),
-          headCount(
-            workshopOpen()
-              .eq('workshop_purpose', 'out_of_service')
-              .lt('entry_at', cutoff),
-          ),
-          canPurchasing
-            ? headCount(
-                supabase
-                  .from('purchasing_site_units')
-                  .select('entry_id', { count: 'exact', head: true })
-                  .eq('has_po', false)
-                  .abortSignal(signal),
-              )
-            : 0,
-          canPurchasing
-            ? headCount(
-                openPos()
-                  .eq('approval_status', 'draft')
-                  .eq('unpriced_count', 0),
-              )
-            : 0,
-          canPurchasing ? headCount(openPos().gt('unpriced_count', 0)) : 0,
-        ])
+      const [
+        unclassified,
+        outOfService,
+        noPo,
+        awaiting,
+        unpriced,
+        awaitingEnd,
+      ] = await Promise.all([
+        headCount(workshopOpen().is('workshop_purpose', null)),
+        headCount(
+          workshopOpen()
+            .eq('workshop_purpose', 'out_of_service')
+            .lt('entry_at', cutoff),
+        ),
+        canPurchasing
+          ? headCount(
+              supabase
+                .from('purchasing_site_units')
+                .select('entry_id', { count: 'exact', head: true })
+                .eq('has_po', false)
+                .abortSignal(signal),
+            )
+          : 0,
+        canPurchasing
+          ? headCount(
+              openPos().eq('approval_status', 'draft').eq('unpriced_count', 0),
+            )
+          : 0,
+        canPurchasing ? headCount(openPos().gt('unpriced_count', 0)) : 0,
+        // 0185: open cards whose unit left the project with «انتهاء عمل».
+        canSales
+          ? headCount(
+              supabase
+                .from('sales_cards_awaiting_end')
+                .select('card_id', { count: 'exact', head: true })
+                .abortSignal(signal),
+            )
+          : 0,
+      ])
       return {
         unclassified,
         out_of_service_long: outOfService,
         no_po: noPo,
         awaiting_approval: awaiting,
         unpriced,
+        awaiting_end: awaitingEnd,
       } satisfies Partial<Record<AttentionId, number>>
     },
-    [canPurchasing, cutoff],
+    [canPurchasing, canSales, cutoff],
   )
   const counts = useAdminHomeSection(loadCounts)
 
@@ -199,6 +224,8 @@ export function AttentionSection({
       return canOpenPage('purchasing/orders') ? awaitingApprovalHref() : null
     if (id === 'unpriced')
       return canOpenPage('purchasing/orders') ? unpricedHref() : null
+    if (id === 'awaiting_end')
+      return canOpenPage(AWAITING_END_PAGE) ? awaitingEndHref() : null
     return null
   }
 

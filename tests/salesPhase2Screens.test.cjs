@@ -90,16 +90,30 @@ function viewBody(name) {
   return MIGRATION.slice(start, end)
 }
 
+// 0185 re-creates both views with the trailing days and presence_days.
+const MIGRATION_0185 = read(
+  'supabase',
+  'migrations',
+  '20261108100000_0185_price_units_days_card_end.sql',
+)
+
+function viewBody0185(name) {
+  const start = MIGRATION_0185.indexOf(`CREATE VIEW public.${name}`)
+  assert.ok(start > 0, name)
+  const end = MIGRATION_0185.indexOf('COMMENT ON VIEW', start)
+  return MIGRATION_0185.slice(start, end)
+}
+
 // --- Routes, gates and titles --------------------------------------------------------
 
 test('the two new children of «المبيعات» on sales.view, their routes and tab titles', () => {
   const entry = nav.NAV_ENTRIES.find((item) => item.key === 'sales')
   const keys = plain(entry.children.map((child) => child.key))
-  // 0174: the prices page first; the phase 1 and 2 pages hidden (URL only).
+  // 0185: the client POs, the cards, the prices; the phase 2 pages hidden.
   assert.deepEqual(keys, [
-    'sales/prices',
     'sales/orders',
     'sales/cards',
+    'sales/prices',
     'sales/timesheets',
     'sales/months',
   ])
@@ -115,7 +129,7 @@ test('the two new children of «المبيعات» on sales.view, their routes a
   })
   assert.ok(plan.pages.has('sales/timesheets'))
   assert.ok(plan.pages.has('sales/months'))
-  assert.equal(plan.landing, 'sales/prices')
+  assert.equal(plan.landing, 'sales/orders')
   const none = nav.planShell({
     status: 'ready',
     permissions: new Map([['purchasing.view', 'all']]),
@@ -202,7 +216,9 @@ test('the selects and the «الشهور» config name only columns of the 0172 
     return match[1].split(',')
   }
   const check = (constant, view) => {
-    const sql = viewBody(view)
+    // The 0172 definition and the columns 0185 appended (days, presence_days).
+    const sql = `${viewBody(view)}
+${viewBody0185(view)}`
     for (const column of selectOf(constant))
       assert.match(
         sql,
@@ -447,10 +463,11 @@ test('cardMonthDue mirrors card_month_due: month ÷ standard hours, hour × hour
         100,
       ),
     ),
+    // 0185: a daily line without the days asks for them («ادخل الايام»).
     {
-      client: { value: null, blocker: 'daily' },
-      supplier: { value: null, blocker: 'daily' },
-      margin: { value: null, blocker: 'daily' },
+      client: { value: null, blocker: 'no_days' },
+      supplier: { value: null, blocker: 'no_days' },
+      margin: { value: null, blocker: 'no_days' },
     },
   )
   assert.deepEqual(
@@ -642,6 +659,9 @@ test('the card event details: «اكتوبر (10): 248 ساعة», «سبتمب�
     client_price_changed: 'cardPricingEventPriceChanged',
     pricing_approved: 'cardPricingEventApproved',
     pricing_returned: 'cardPricingEventReturned',
+    // 0185: the manual end and the reopening.
+    card_ended: 'equipmentCardEventEnded',
+    card_reopened: 'equipmentCardEventReopened',
   })
 })
 
@@ -651,6 +671,8 @@ test('every stable token of 0172 is known and mapped; the dialog schema', () => 
   const raised = new Set([
     ...[...MIGRATION.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g)].map((m) => m[1]),
     'sales_manage_required',
+    // 0185: the days of the month record.
+    'invalid_days',
   ])
   assert.match(MIGRATION, /PERFORM public\.assert_sales_manage\(\);/)
   assert.deepEqual(
@@ -727,8 +749,9 @@ test('every stable token of 0172 is known and mapped; the dialog schema', () => 
     assert.ok(enKeys.has(key), `en ${key}`)
   }
   // The Zod schema of «تسجيل شهر».
+  // 0185: the form always carries the days (empty = none).
   const errors = (values) =>
-    plain(v.validateWithSchema(v.cardMonthFormSchema, values))
+    plain(v.validateWithSchema(v.cardMonthFormSchema, { days: '', ...values }))
   assert.deepEqual(errors({ month: '', hours: '', note: '' }), {
     month: 'cardMonthMonthRequired',
     hours: 'cardMonthHoursRequired',
@@ -743,5 +766,15 @@ test('every stable token of 0172 is known and mapped; the dialog schema', () => 
   assert.deepEqual(
     errors({ month: '2026-10', hours: '12', note: 'x'.repeat(501) }),
     { note: 'cardMonthNoteTooLong' },
+  )
+  assert.deepEqual(
+    errors({ month: '2026-10', hours: '0', days: '22.5', note: '' }),
+    {},
+  )
+  assert.deepEqual(
+    errors({ month: '2026-10', hours: '0', days: '32', note: '' }),
+    {
+      days: 'cardMonthDaysInvalid',
+    },
   )
 })

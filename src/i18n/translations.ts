@@ -2546,7 +2546,6 @@ export const translations = {
     cardMonthStatePending: 'بانتظار',
     cardMonthStateRunning: 'جاري',
     cardMonthNeedsPrice: 'تحتاج سعر',
-    cardMonthDailyHint: 'سطر يومي: الحساب لاحقا',
     cardMonthPickPlace: 'اختر الشركة والمشروع والشهر',
     cardMonthPickPlaceDesc: 'يظهر جدول كل الكروت في ذلك المشروع خلال الشهر.',
     cardMonthNoCards: 'لا كروت في {project} خلال {month}',
@@ -2605,22 +2604,20 @@ export const translations = {
     cardMonthNoMonths: 'لا شهور بعد',
     cardMonthPendingCount: '{count} بانتظار',
     cardMonthsRuleNote:
-      'الساعات دائما كما سجلت. المستحق = السعر الشهري × الساعات ÷ الساعات القياسية، وبالساعة = السعر × الساعات؛ السطر اليومي بلا قاعدة بعد. مرفق التايم شيت لاحقا.',
+      'الساعات دائما كما سجلت. المستحق = السعر الشهري × الساعات ÷ الساعات القياسية، وبالساعة = السعر × الساعات، واليومي = السعر × الايام، والاسبوعي = السعر × الايام ÷ 7. مرفق التايم شيت لاحقا.',
     cardMonthActions: 'الاجراءات',
     clientPoContractHours: 'اجمالي الساعات التعاقدية',
     clientPoContractHoursShort: 'اجمالي الساعات',
     // card pricing (migration 0174, owner decisions 2026-11-04): «اسعار المعدات»
     cardPrices: 'اسعار المعدات',
     cardPricesDesc:
-      'سعر العميل الشهري لكل معدة على PO مورد، مع سعر المورد والهامش، واعتماد التسعير.',
+      'سعر العميل ووحدته لكل معدة على PO مورد، مع سعر المورد والهامش، واعتماد التسعير.',
     cardPricesEmpty: 'لا معدات تطابق البحث او الفلاتر.',
     cardPricesLoadError: 'تعذر تحميل اسعار المعدات.',
     cardPriceClient: 'سعر العميل',
     cardPriceClientMonthly: 'سعر العميل (شهري)',
     cardPriceSupplier: 'سعر المورد',
     cardPriceMarginPct: 'نسبة الهامش',
-    cardPriceMarginDailyHint: 'سعر المورد يومي: لا هامش بعد',
-    cardPriceDailyMark: '(يومي)',
     cardPriceOwnedHint: 'معدة مملوكة: الهامش سعر العميل كاملا',
     cardPricingStatus: 'حالة التسعير',
     cardPricingDraft: 'مسودة',
@@ -2646,7 +2643,6 @@ export const translations = {
     cardPricingBlockedNoSupplierPrice: 'سطر المورد بلا سعر بعد.',
     cardPricingBlockedNoSupplierLine: 'المعدة ليست على PO مورد مفتوح.',
     cardPricingBlockedUnsaved: 'احفظ السعر اولا.',
-    cardPricingBlockedDaily: 'سعر المورد يومي: لا قاعدة للهامش بعد.',
     cardPriceInvalid:
       'السعر رقم من 0 الى 9999999999.99 بخانتين عشريتين على الاكثر.',
     cardPriceInvalidRows: 'اسعار غير صالحة: {units}',
@@ -2654,7 +2650,7 @@ export const translations = {
     cardPricesSaved: 'تم حفظ {prices}',
     cardPricesChangedCount: '{count} تغيير غير محفوظ',
     cardPricesBatchNote:
-      'الصفوف التي لم تتغير لا تحفظ، والسعر المعتمد لا يتغير الا بعد رجوعه للتعديل. الهامش = سعر العميل − سعر المورد الشهري؛ معدة العزاني هامشها سعر العميل كاملا؛ سطر المورد اليومي بلا هامش بعد.',
+      'الصفوف التي لم تتغير لا تحفظ، والسعر المعتمد لا يتغير الا بعد رجوعه للتعديل. الهامش = سعر العميل − سعر المورد اذا كانا بنفس الوحدة؛ معدة العزاني هامشها سعر العميل كاملا؛ وحدتان مختلفتان بلا هامش.',
     cardPricesCounts: '{units} معدة · {approved} معتمد · {draft} مسودة',
     cardPricingErrorApprovedLocked: 'السعر معتمد: ارجعه للتعديل اولا.',
     cardPricingErrorNotDraft: 'التسعير معتمد مسبقا.',
@@ -2670,6 +2666,49 @@ export const translations = {
     supplierPoEventApprovalReturned: 'رجوع الاعتماد',
     supplierPoApprovedShort: 'PO معتمد',
     // sales-screens — end
+    // sales-0185 — start (migration 0185, owner decisions 2026-11-08)
+    saleRateUnitWeek: 'اسبوعي',
+    salePerWeek: '/ اسبوع',
+    cardPriceClientUnit: 'وحدة سعر العميل',
+    cardPriceMarginUnitsDiffer: 'وحدتان مختلفتان',
+    cardMonthDays: 'الايام',
+    cardMonthDaysInvalid: 'الايام رقم من 0 الى 31 بخانتين عشريتين على الاكثر.',
+    cardMonthDaysHint: 'اختياري: ايام الشهر للسطر اليومي او الاسبوعي.',
+    cardMonthPresenceDays: 'التواجد: {days}',
+    cardMonthEnterDays: 'ادخل الايام',
+    equipmentCardActions: 'اجراءات الكرت',
+    equipmentCardEnd: 'انهاء الكرت',
+    equipmentCardEndDesc:
+      'يغلق الكرت بتاريخ نهاية، ولا تسجل ساعات بعد شهره. يمكن اعادة فتحه لاحقا.',
+    equipmentCardEndDate: 'تاريخ الانهاء',
+    equipmentCardEndDateHint: 'من بداية الكرت الى اليوم.',
+    equipmentCardEndDateRequired: 'اختر تاريخ الانهاء.',
+    equipmentCardEndDateInvalid: 'تاريخ الانهاء بين بداية الكرت واليوم.',
+    equipmentCardEndHasLaterMonths:
+      'للكرت ساعات مسجلة بعد شهر هذا التاريخ: احذفها اولا.',
+    equipmentCardEndAlreadyEnded: 'الكرت منتهي مسبقا.',
+    equipmentCardEndedToast: 'تم انهاء كرت {unit}',
+    equipmentCardEndedOn: 'بتاريخ {date}',
+    equipmentCardReopen: 'اعادة فتح الكرت',
+    equipmentCardReopenDesc:
+      'يعود الكرت مفتوحا بدون تاريخ نهاية. هل انت متاكد؟',
+    equipmentCardReopenNotEnded: 'الكرت مفتوح.',
+    equipmentCardReopenOverlap: 'المعدة لها كرت لاحق، لا يمكن اعادة الفتح.',
+    equipmentCardReopenedToast: 'تم اعادة فتح كرت {unit}',
+    equipmentCardEventEnded: 'انهاء الكرت',
+    equipmentCardEventReopened: 'اعادة فتح الكرت',
+    equipmentCardsAll: 'كل الكروت',
+    equipmentCardsAwaitingEnd: 'بانتظار الانهاء',
+    equipmentCardsAwaitingSwitch: 'عرض الكروت',
+    equipmentCardsAwaitingEmpty:
+      'لا كروت مفتوحة لمعدات خرجت من مشروعها بانتهاء عمل.',
+    // sales-0185 — end
+    // purchasing-0185 — start (migration 0185, owner go 2026-11-08)
+    supplierPoRateUnitInvalidFour:
+      'اختر وحدة السعر: شهري او اسبوعي او يومي او بالساعة.',
+    adminAttentionAwaitingEnd: 'معدات خرجت بانتهاء عمل وكرتها مفتوح',
+    adminAttentionAwaitingEndHint: 'كروت تنتظر الانهاء في المبيعات',
+    // purchasing-0185 — end
   },
   en: {
     appName: 'Heavy Equipment Management',
@@ -5270,7 +5309,6 @@ export const translations = {
     cardMonthStatePending: 'Awaiting',
     cardMonthStateRunning: 'Running',
     cardMonthNeedsPrice: 'Needs a price',
-    cardMonthDailyHint: 'Daily line: computed later',
     cardMonthPickPlace: 'Pick the company, project and month',
     cardMonthPickPlaceDesc:
       'The table lists every card in that project during the month.',
@@ -5332,22 +5370,20 @@ export const translations = {
     cardMonthNoMonths: 'No months yet',
     cardMonthPendingCount: '{count} awaiting',
     cardMonthsRuleNote:
-      'Hours are always as recorded. Due = monthly price × hours ÷ standard hours, hourly = price × hours; a daily line has no rule yet. The timesheet attachment comes later.',
+      'Hours are always as recorded. Due = monthly price × hours ÷ standard hours, hourly = price × hours, daily = price × days, weekly = price × days ÷ 7. The timesheet attachment comes later.',
     cardMonthActions: 'Actions',
     clientPoContractHours: 'Total contract hours',
     clientPoContractHoursShort: 'Total hours',
     // card pricing (migration 0174, owner decisions 2026-11-04): equipment prices
     cardPrices: 'Equipment prices',
     cardPricesDesc:
-      "The client's monthly price of every unit on a supplier PO, with the supplier price and the margin, and the pricing approval.",
+      "The client's price and its unit for every unit on a supplier PO, with the supplier price and the margin, and the pricing approval.",
     cardPricesEmpty: 'No units match the search or filters.',
     cardPricesLoadError: 'Could not load the equipment prices.',
     cardPriceClient: 'Client price',
     cardPriceClientMonthly: 'Client price (monthly)',
     cardPriceSupplier: 'Supplier price',
     cardPriceMarginPct: 'Margin %',
-    cardPriceMarginDailyHint: 'Daily supplier price: no margin yet',
-    cardPriceDailyMark: '(daily)',
     cardPriceOwnedHint: "Owned unit: the margin is the full client price",
     cardPricingStatus: 'Pricing status',
     cardPricingDraft: 'Draft',
@@ -5373,7 +5409,6 @@ export const translations = {
     cardPricingBlockedNoSupplierPrice: 'The supplier line has no price yet.',
     cardPricingBlockedNoSupplierLine: 'The unit is not on an open supplier PO.',
     cardPricingBlockedUnsaved: 'Save the price first.',
-    cardPricingBlockedDaily: 'Daily supplier price: no margin rule yet.',
     cardPriceInvalid:
       'The price is a number from 0 to 9999999999.99 with at most two decimals.',
     cardPriceInvalidRows: 'Invalid prices: {units}',
@@ -5381,7 +5416,7 @@ export const translations = {
     cardPricesSaved: 'Saved {prices}',
     cardPricesChangedCount: '{count} unsaved changes',
     cardPricesBatchNote:
-      'Unchanged rows are not saved, and an approved price changes only after it is returned for editing. Margin = client price − monthly supplier price; an Al-Azani unit keeps the full client price; a daily supplier line has no margin yet.',
+      'Unchanged rows are not saved, and an approved price changes only after it is returned for editing. Margin = client price − supplier price when both are in the same unit; an Al-Azani unit keeps the full client price; two different units have no margin.',
     cardPricesCounts: '{units} units · {approved} approved · {draft} draft',
     cardPricingErrorApprovedLocked:
       'The price is approved: return it for editing first.',
@@ -5401,6 +5436,52 @@ export const translations = {
     supplierPoEventApprovalReturned: 'Approval returned',
     supplierPoApprovedShort: 'PO approved',
     // sales-screens — end
+    // sales-0185 — start (migration 0185, owner decisions 2026-11-08)
+    saleRateUnitWeek: 'Weekly',
+    salePerWeek: '/ week',
+    cardPriceClientUnit: 'Client price unit',
+    cardPriceMarginUnitsDiffer: 'Different units',
+    cardMonthDays: 'Days',
+    cardMonthDaysInvalid:
+      'Days are a number from 0 to 31 with at most two decimals.',
+    cardMonthDaysHint: 'Optional: the days of the month for a daily or weekly line.',
+    cardMonthPresenceDays: 'On site: {days}',
+    cardMonthEnterDays: 'Enter the days',
+    equipmentCardActions: 'Card actions',
+    equipmentCardEnd: 'End card',
+    equipmentCardEndDesc:
+      'Closes the card on an end date; no hours are recorded after its month. It can be reopened later.',
+    equipmentCardEndDate: 'End date',
+    equipmentCardEndDateHint: 'From the card start to today.',
+    equipmentCardEndDateRequired: 'Pick the end date.',
+    equipmentCardEndDateInvalid:
+      'The end date lies between the card start and today.',
+    equipmentCardEndHasLaterMonths:
+      'The card has hours recorded after this month: delete them first.',
+    equipmentCardEndAlreadyEnded: 'The card is already ended.',
+    equipmentCardEndedToast: 'Card {unit} ended',
+    equipmentCardEndedOn: 'on {date}',
+    equipmentCardReopen: 'Reopen card',
+    equipmentCardReopenDesc:
+      'The card becomes open again with no end date. Are you sure?',
+    equipmentCardReopenNotEnded: 'The card is open.',
+    equipmentCardReopenOverlap:
+      'The unit has a later card; this card cannot be reopened.',
+    equipmentCardReopenedToast: 'Card {unit} reopened',
+    equipmentCardEventEnded: 'Card ended',
+    equipmentCardEventReopened: 'Card reopened',
+    equipmentCardsAll: 'All cards',
+    equipmentCardsAwaitingEnd: 'Awaiting end',
+    equipmentCardsAwaitingSwitch: 'Cards shown',
+    equipmentCardsAwaitingEmpty:
+      'No open cards of units that left their project with work completed.',
+    // sales-0185 — end
+    // purchasing-0185 — start (migration 0185, owner go 2026-11-08)
+    supplierPoRateUnitInvalidFour:
+      'Pick the price unit: monthly, weekly, daily or hourly.',
+    adminAttentionAwaitingEnd: 'Units out on work completed, card still open',
+    adminAttentionAwaitingEndHint: 'Cards awaiting their end in sales',
+    // purchasing-0185 — end
   },
 } as const
 

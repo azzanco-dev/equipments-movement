@@ -4,6 +4,7 @@ import {
   BadgeCheck,
   Building2,
   Calendar,
+  CalendarX2,
   Check,
   Clock,
   Coins,
@@ -19,6 +20,7 @@ import {
   Plus,
   Receipt,
   RotateCcw,
+  SlidersHorizontal,
   Timer,
   Truck,
   User,
@@ -44,6 +46,10 @@ import {
 } from '@/components/sales/CardPricingDialogs'
 import { EquipmentCardStatusBadge } from '@/components/sales/ClientPoStatusBadge'
 import {
+  EndCardDialog,
+  ReopenCardDialog,
+} from '@/components/sales/EndCardDialog'
+import {
   EventTimeline,
   compareTimelineItems,
   useClientPoTimelineItems,
@@ -65,6 +71,10 @@ import {
   DataTable,
   DescriptionList,
   DetailHeader,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   EmptyState,
   ErrorState,
   IconButton,
@@ -87,7 +97,6 @@ import { localizedName } from '@/lib/localizedName'
 import {
   SUPPLIER_PO_EVENT_LABEL_KEYS,
   SUPPLIER_PO_EVENTS_LIMIT,
-  SUPPLIER_PO_RATE_UNIT_LABEL_KEYS,
   formatSupplierPoPrice,
 } from '@/lib/purchasing'
 import {
@@ -98,6 +107,8 @@ import {
 import {
   CLIENT_PO_EVENTS_LIMIT,
   EQUIPMENT_CARD_EVENT_LABEL_KEYS,
+  SALE_PER_UNIT_KEYS,
+  SALE_RATE_UNIT_LABEL_KEYS,
   SALES_SUPPLIER_PO_EVENT_LABEL_KEYS,
   cardMargin,
   cardMarginPct,
@@ -108,11 +119,14 @@ import {
   currentSaudiMonthKey,
   equipmentCardEventDetail,
   equipmentCardStatus,
+  formatDaysText,
   formatHours,
+  isDaysRateUnit,
   monthKeyOf,
   monthLabel,
   monthShortLabel,
   recordedHoursTotal,
+  saleRateUnitOf,
   storedCardMonthFigures,
   type CardMonthDue,
   type CardMonthSides,
@@ -208,6 +222,8 @@ interface CardMonthRow {
   month: MonthKey
   state: CardMonthState
   record: CardMonthRecordRow | null
+  /** 0185: the unit's presence days in an awaited month. */
+  presence_days?: number | null
 }
 
 /**
@@ -221,8 +237,10 @@ interface CardMonthRow {
  * of `sales_card_month_slots`, newest first, under the consumed hours
  * against the contract total), «تسجيل شهر» / edit / delete for
  * `sales.manage` through `RecordCardMonthDialog`, and the timeline from
- * both PO event tables plus the card's own events. «انهاء الكرت» does not
- * exist yet (no function). Reads through RLS: `sales.view` or
+ * both PO event tables plus the card's own events. Since 0185 «انهاء الكرت»
+ * (an open card) and «اعادة فتح الكرت» (an ended one) for `sales.manage`,
+ * in the header's «خيارات» and the mobile bar (`EndCardDialog` /
+ * `ReopenCardDialog`), and the card's client price shows its own unit. Reads through RLS: `sales.view` or
  * `purchasing.view` for the card, each side's own key (the other side is
  * simply NULL without it).
  */
@@ -251,6 +269,7 @@ function CardDetail({
   const [pricingDialog, setPricingDialog] = useState<
     'approve' | 'return' | null
   >(null)
+  const [endDialog, setEndDialog] = useState<'end' | 'reopen' | null>(null)
   useTabTitle(card?.equipment_code)
   const [visit, setVisit] = useState<CardVisitRow | null>(null)
   const [clientEvents, setClientEvents] = useState<ClientPoEventRow[]>([])
@@ -427,9 +446,9 @@ function CardDetail({
     return (
       <div className="space-y-4">
         <PageTrailBar
-        onBack={onBack}
-        fallbackLabel={t('equipmentCardBackToList')}
-      />
+          onBack={onBack}
+          fallbackLabel={t('equipmentCardBackToList')}
+        />
         {loadError ? (
           <ErrorState
             description={t('equipmentCardLoadError')}
@@ -485,7 +504,8 @@ function CardDetail({
         (value) =>
           formatSupplierPoPrice(value as number | string | null | undefined),
         formatDate,
-        (unit) => t(SUPPLIER_PO_RATE_UNIT_LABEL_KEYS[unit]),
+        // 0185: any of the four units (the purchasing labels name two).
+        (unit) => t(SALE_RATE_UNIT_LABEL_KEYS[saleRateUnitOf(unit)]),
       ),
       actor: event.actor_id ? (actorNames.get(event.actor_id) ?? null) : null,
       created_at: event.created_at,
@@ -507,6 +527,11 @@ function CardDetail({
         (price) => formatSupplierPoPrice(price),
         (po) => t('cardPricingPoApprovedDetail').replace('{po}', po ?? ''),
         () => t('cardPricingPoReturnedDetail'),
+        {
+          perUnit: (unit) => t(SALE_PER_UNIT_KEYS[unit]),
+          endedOn: (day) =>
+            t('equipmentCardEndedOn').replace('{date}', formatDate(day)),
+        },
       ),
       actor: event.actor_name,
       created_at: event.created_at,
@@ -548,6 +573,7 @@ function CardDetail({
         month: monthKeyOf(slot.month),
         state: cardMonthState(slot, currentMonth),
         record: null,
+        presence_days: slot.presence_days,
       })),
   ].sort((a, b) => b.month.localeCompare(a.month))
   const openMonths = monthRows.filter((row) => row.state !== 'recorded')
@@ -557,6 +583,7 @@ function CardDetail({
       ...sides,
       due_standard_hours: record.due_standard_hours ?? sides.due_standard_hours,
       hours: record.hours,
+      days: record.days,
       client_due: record.client_due,
       supplier_due: record.supplier_due,
       margin: record.margin,
@@ -596,7 +623,12 @@ function CardDetail({
   const openDialog = (row: CardMonthRow | null) =>
     setDialog({
       editing: row?.record
-        ? { month: row.month, hours: row.record.hours, note: row.record.note }
+        ? {
+            month: row.month,
+            hours: row.record.hours,
+            days: row.record.days,
+            note: row.record.note,
+          }
         : null,
       initialMonth: row && !row.record ? row.month : null,
     })
@@ -642,11 +674,12 @@ function CardDetail({
       ]
     : []
 
-  // Card pricing (0174): the card's own client price (monthly), its state
-  // and, for sales.approve, «اعتماد» / «رجوع للتعديل».
+  // Card pricing (0174): the card's own client price (in its unit since
+  // 0185), its state and, for sales.approve, «اعتماد» / «رجوع للتعديل».
   const pricingStatus = cardPricingStatusOf(card.pricing_status)
   const pricingMargin = cardMargin(
     card.card_client_price,
+    card.card_client_price_unit,
     card.supplier_price,
     card.supplier_rate_unit,
   )
@@ -655,10 +688,55 @@ function CardDetail({
     card_id: card.card_id,
     equipment_code: card.equipment_code,
     client_price: card.card_client_price,
+    client_price_unit: card.card_client_price_unit,
     supplier_price: card.supplier_price,
     supplier_rate_unit: card.supplier_rate_unit,
     supplier_po_number: card.supplier_po_number,
   }
+  // 0185: «انهاء الكرت» on an open card, «اعادة فتح الكرت» on an ended one.
+  const endTarget = {
+    card_id: card.card_id,
+    equipment_code: card.equipment_code,
+    period_from: card.period_from,
+  }
+  const cardOptions = (size: 'sm' | 'md') => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size={size}
+          className={size === 'md' ? 'h-11 flex-1' : undefined}
+          icon={
+            <SlidersHorizontal
+              size={size === 'sm' ? 14 : 16}
+              aria-hidden="true"
+            />
+          }
+          aria-label={t('equipmentCardActions')}
+        >
+          {t('options')}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        {open ? (
+          <DropdownMenuItem
+            icon={<CalendarX2 size={15} />}
+            tone="danger"
+            onSelect={() => setEndDialog('end')}
+          >
+            {t('equipmentCardEnd')}
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem
+            icon={<RotateCcw size={15} />}
+            onSelect={() => setEndDialog('reopen')}
+          >
+            {t('equipmentCardReopen')}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
   const pricingButton = (size: 'sm' | 'md') => {
     const className = size === 'md' ? 'h-11 flex-1' : undefined
     if (pricingStatus === 'approved')
@@ -697,7 +775,7 @@ function CardDetail({
     {
       key: 'clientPrice',
       icon: <Coins size={16} />,
-      label: t('cardPriceClientMonthly'),
+      label: t('cardPriceClient'),
       value:
         card.card_client_price === null ? (
           <Badge tone="warning" size="sm">
@@ -708,7 +786,10 @@ function CardDetail({
             {pricingStatus === 'approved' && (
               <Lock size={14} aria-hidden="true" className="text-muted" />
             )}
-            <SaleAmountOrDash value={card.card_client_price} />
+            <SaleAmountOrDash
+              value={card.card_client_price}
+              unit={card.card_client_price_unit}
+            />
           </span>
         ),
     },
@@ -724,6 +805,18 @@ function CardDetail({
         />
       ),
     },
+    // 0185: an ended card names its end day.
+    ...(card.period_to
+      ? [
+          {
+            key: 'periodTo',
+            icon: <CalendarX2 size={16} />,
+            label: t('equipmentCardEndDate'),
+            value: formatDate(card.period_to),
+            dir: 'ltr' as const,
+          },
+        ]
+      : []),
   ]
 
   const salesFacts: DescriptionListItem[] = card.client_po_number
@@ -841,6 +934,9 @@ function CardDetail({
           },
         ]
 
+  const daysShown =
+    isDaysRateUnit(card.client_rate_unit) ||
+    isDaysRateUnit(card.supplier_rate_unit)
   const monthColumns: DataTableColumn<CardMonthRow>[] = [
     {
       key: 'month',
@@ -855,9 +951,17 @@ function CardDetail({
       header: t('cardMonthHours'),
       align: 'center',
       className: 'tabular-nums',
+      // 0185: a daily or weekly line shows its days under the hours.
       cell: (row) =>
         row.record ? (
-          <bdi dir="ltr">{row.record.hours}</bdi>
+          <span className="inline-flex flex-col items-center">
+            <bdi dir="ltr">{row.record.hours}</bdi>
+            {daysShown && row.record.days !== null && (
+              <span className="text-xs text-muted">
+                {formatDaysText(row.record.days, lang)}
+              </span>
+            )}
+          </span>
         ) : (
           <span className="text-muted">—</span>
         ),
@@ -1008,6 +1112,7 @@ function CardDetail({
                 )}
                 {canApprove && pricingButton('sm')}
                 {canManage && SHOW_CARD_MONTHS && recordButton('sm')}
+                {canManage && cardOptions('sm')}
               </div>
             ) : undefined
           }
@@ -1019,12 +1124,15 @@ function CardDetail({
         {!SHOW_CARD_MONTHS && (
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <StatCard
-              label={t('cardPriceClientMonthly')}
+              label={t('cardPriceClient')}
               value={
                 card.card_client_price === null ? (
                   <span className="text-muted">—</span>
                 ) : (
-                  <SaleAmountOrDash value={card.card_client_price} />
+                  <SaleAmountOrDash
+                    value={card.card_client_price}
+                    unit={card.card_client_price_unit}
+                  />
                 )
               }
               hint={
@@ -1056,6 +1164,7 @@ function CardDetail({
                   margin={pricingMargin}
                   pct={cardMarginPct(pricingMargin, card.card_client_price)}
                   clientPrice={card.card_client_price}
+                  clientRateUnit={card.card_client_price_unit}
                   supplierPrice={card.supplier_price}
                   supplierRateUnit={card.supplier_rate_unit}
                   alignEnd={false}
@@ -1335,14 +1444,56 @@ function CardDetail({
       </p>
 
       {/* 6. The mobile action bar. */}
-      {((canManage && SHOW_CARD_MONTHS) || canApprove) && (
+      {(canManage || canApprove) && (
         <div
           className="sticky bottom-0 z-10 -mx-4 flex gap-2 border-t bg-bg p-3 sm:hidden"
           style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
           {canApprove && pricingButton('md')}
           {canManage && SHOW_CARD_MONTHS && recordButton('md')}
+          {canManage && cardOptions('md')}
         </div>
+      )}
+
+      {canManage && (
+        <>
+          <EndCardDialog
+            card={endTarget}
+            open={endDialog === 'end'}
+            onOpenChange={(next) => {
+              if (!next) setEndDialog(null)
+            }}
+            onEnded={() => {
+              setEndDialog(null)
+              void toast({
+                title: t('equipmentCardEndedToast').replace(
+                  '{unit}',
+                  card.equipment_code ?? '—',
+                ),
+                tone: 'success',
+              })
+              fetchData()
+            }}
+          />
+          <ReopenCardDialog
+            card={endTarget}
+            open={endDialog === 'reopen'}
+            onOpenChange={(next) => {
+              if (!next) setEndDialog(null)
+            }}
+            onReopened={() => {
+              setEndDialog(null)
+              void toast({
+                title: t('equipmentCardReopenedToast').replace(
+                  '{unit}',
+                  card.equipment_code ?? '—',
+                ),
+                tone: 'success',
+              })
+              fetchData()
+            }}
+          />
+        </>
       )}
 
       {canApprove && (

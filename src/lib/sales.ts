@@ -88,13 +88,20 @@ export function equipmentCardStatus(card: {
   return card.period_to ? 'ended' : 'open'
 }
 
-// --- The price unit: month, day or hour (0169) ------------------------------------
+// --- The price unit: month, week, day or hour (0169, 0185) -------------------------
 
 /** `client_po_equipment.rate_unit`: the SALE price is per month, per day or
- *  per hour (owner 2026-11-01); the supplier side has no hourly unit. */
-export type SaleRateUnit = 'month' | 'day' | 'hour'
+ *  per hour (owner 2026-11-01); since 0185 (owner 2026-11-08) also per week,
+ *  and the four units are allowed on every price (client and supplier lines,
+ *  the card's own client price). */
+export type SaleRateUnit = 'month' | 'week' | 'day' | 'hour'
 
-export const SALE_RATE_UNITS: readonly SaleRateUnit[] = ['month', 'day', 'hour']
+export const SALE_RATE_UNITS: readonly SaleRateUnit[] = [
+  'month',
+  'week',
+  'day',
+  'hour',
+]
 
 export const SALE_DEFAULT_RATE_UNIT: SaleRateUnit = 'month'
 
@@ -103,6 +110,7 @@ export const SALE_RATE_UNIT_LABEL_KEYS: Readonly<
   Record<SaleRateUnit, TranslationKey>
 > = {
   month: 'supplierPoRateUnitMonth',
+  week: 'saleRateUnitWeek',
   day: 'supplierPoRateUnitDay',
   hour: 'saleRateUnitHour',
 }
@@ -112,6 +120,7 @@ export const SALE_PER_UNIT_KEYS: Readonly<
   Record<SaleRateUnit, TranslationKey>
 > = {
   month: 'supplierPoPerMonth',
+  week: 'salePerWeek',
   day: 'supplierPoPerDay',
   hour: 'salePerHour',
 }
@@ -129,8 +138,8 @@ export function saleRateUnitOf(value: string | null | undefined): SaleRateUnit {
 
 /**
  * The PO's totals excluding VAT, one per unit present on its lines, month →
- * day → hour (the purchasing rule: a monthly, a daily and an hourly price
- * are never added together). Unpriced lines count towards their unit's
+ * week → day → hour (the purchasing rule: prices of two units are never
+ * added together). Unpriced lines count towards their unit's
  * presence but not its total; a PO without lines totals 0 per month.
  */
 export function clientPoTotalsByUnit(
@@ -196,6 +205,7 @@ const ARABIC_QUANTITY_WORDS: Readonly<
   Record<SaleRateUnit, { one: string; two: string; few: string; many: string }>
 > = {
   month: { one: 'شهر', two: 'شهرين', few: 'اشهر', many: 'شهرا' },
+  week: { one: 'اسبوع', two: 'اسبوعين', few: 'اسابيع', many: 'اسبوعا' },
   day: { one: 'يوم', two: 'يومين', few: 'ايام', many: 'يوما' },
   hour: { one: 'ساعة', two: 'ساعتين', few: 'ساعات', many: 'ساعة' },
 }
@@ -204,6 +214,7 @@ const ENGLISH_QUANTITY_WORDS: Readonly<
   Record<SaleRateUnit, { one: string; many: string }>
 > = {
   month: { one: 'month', many: 'months' },
+  week: { one: 'week', many: 'weeks' },
   day: { one: 'day', many: 'days' },
   hour: { one: 'hour', many: 'hours' },
 }
@@ -792,6 +803,32 @@ export function parseCardMonthHours(value: string): number | null {
   return Number(trimmed)
 }
 
+/** `equipment_card_months.days` (0185): numeric(5, 2) between 0 and 31,
+ *  optional — the days a daily or weekly line is paid for. */
+export const CARD_MONTH_DAYS_MAX = 31
+export const CARD_MONTH_DAYS_PATTERN = /^\d{1,2}(\.\d{1,2})?$/
+
+/** True for a trimmed days value the database accepts (empty = no days). */
+export function isValidCardMonthDays(value: string): boolean {
+  const trimmed = value.trim()
+  return (
+    CARD_MONTH_DAYS_PATTERN.test(trimmed) &&
+    Number(trimmed) <= CARD_MONTH_DAYS_MAX
+  )
+}
+
+/** The days typed in a field as a number, or null when empty or invalid. */
+export function parseCardMonthDays(value: string): number | null {
+  const trimmed = value.trim()
+  if (!trimmed || !isValidCardMonthDays(trimmed)) return null
+  return Number(trimmed)
+}
+
+/** A daily or weekly line: its dues need the DAYS of the month (0185). */
+export function isDaysRateUnit(unit: string | null | undefined): boolean {
+  return unit === 'day' || unit === 'week'
+}
+
 /** `equipment_card_months.note`: at most 500 characters. */
 export const CARD_MONTH_NOTE_MAX = 500
 
@@ -800,6 +837,13 @@ export function formatHours(hours: number | string): string {
   return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(
     Number(hours),
   )
+}
+
+/** «22 يوم» / «22 days»: the days of a month record as the tables show them. */
+export function formatDaysText(days: number | string, lang: Language): string {
+  const value = formatHours(days)
+  if (lang === 'en') return `${value} ${Number(days) === 1 ? 'day' : 'days'}`
+  return `${value} يوم`
 }
 
 /** The hours consumed so far: the sum of the recorded months' hours. */
@@ -818,41 +862,50 @@ export function recordedHoursTotal(
 const roundMoney = (value: number) => Math.round(value * 100) / 100
 
 /**
- * The ONE amount rule of 0172 (`card_month_due`), for the live preview in the
+ * The ONE amount rule of 0185 (`card_month_due`), for the live preview in the
  * batch screen and the dialog hint only — every stored month's amounts come
- * from the views: a monthly price × hours ÷ the standard hours; an hourly
- * price × hours; a DAILY price has no rule yet (null); no price or no hours
- * → null; rounded to 2 decimals.
+ * from the views: hour → price × hours; month → price × hours ÷ the standard
+ * hours (above 0); day → price × days; week → price × days ÷ 7; no price, a
+ * missing hours / days figure or another unit → null; rounded to 2 decimals.
  */
 export function cardMonthDue(
   price: number | string | null | undefined,
   rateUnit: string | null | undefined,
   hours: number | null | undefined,
   standardHours: number | null | undefined,
+  days: number | null | undefined = null,
 ): number | null {
-  if (
-    price === null ||
-    price === undefined ||
-    hours === null ||
-    hours === undefined
-  )
-    return null
+  if (price === null || price === undefined) return null
   const amount = Number(price)
   if (Number.isNaN(amount)) return null
-  if (rateUnit === 'hour') return roundMoney(amount * hours)
+  if (rateUnit === 'hour')
+    return hours === null || hours === undefined
+      ? null
+      : roundMoney(amount * hours)
   if (rateUnit === 'month' && standardHours && standardHours > 0)
-    return roundMoney((amount * hours) / standardHours)
+    return hours === null || hours === undefined
+      ? null
+      : roundMoney((amount * hours) / standardHours)
+  if (rateUnit === 'day')
+    return days === null || days === undefined
+      ? null
+      : roundMoney(amount * days)
+  if (rateUnit === 'week')
+    return days === null || days === undefined
+      ? null
+      : roundMoney((amount * days) / 7)
   return null
 }
 
 /**
  * Why one side of a month has no amount: `no_line` (no PO line on that
- * side), `unpriced` (the line has no price yet, «تحتاج سعر»), `daily` (a
- * daily line, whose rule comes later: «—» with the hint), `owned` (the
- * supplier side of an Al-Azani unit), `no_hours` (not recorded yet).
+ * side), `unpriced` (the line has no price yet, «تحتاج سعر»), `no_days` (a
+ * daily or weekly line without the month's days: «—» with «ادخل الايام»,
+ * 0185), `owned` (the supplier side of an Al-Azani unit), `no_hours` (not
+ * recorded yet).
  */
 export type CardMonthDueBlocker =
-  'no_line' | 'unpriced' | 'daily' | 'owned' | 'no_hours'
+  'no_line' | 'unpriced' | 'no_days' | 'owned' | 'no_hours'
 
 export interface CardMonthDue {
   value: number | null
@@ -866,18 +919,22 @@ export function cardMonthSideDue(side: {
   rateUnit: string | null | undefined
   hours: number | null | undefined
   standardHours: number | null | undefined
+  days?: number | null | undefined
 }): CardMonthDue {
   if (!side.hasLine) return { value: null, blocker: 'no_line' }
   if (side.price === null || side.price === undefined)
     return { value: null, blocker: 'unpriced' }
-  if (side.rateUnit === 'day') return { value: null, blocker: 'daily' }
-  if (side.hours === null || side.hours === undefined)
+  if (isDaysRateUnit(side.rateUnit)) {
+    if (side.days === null || side.days === undefined)
+      return { value: null, blocker: 'no_days' }
+  } else if (side.hours === null || side.hours === undefined)
     return { value: null, blocker: 'no_hours' }
   const value = cardMonthDue(
     side.price,
     side.rateUnit,
     side.hours,
     side.standardHours,
+    side.days,
   )
   return value === null
     ? { value: null, blocker: 'unpriced' }
@@ -904,15 +961,16 @@ export interface CardMonthFigures {
 }
 
 /**
- * The month's figures of a card for the given hours, exactly as the views
- * compute them: the client due, the supplier due (the SAME hours on the
- * supplier line's price ÷ the client line's standard hours — `due_standard_
- * hours` —; none for an owned unit) and the margin = client − COALESCE(
- * supplier, 0), null without a client due.
+ * The month's figures of a card for the given hours and days, exactly as the
+ * views compute them: the client due, the supplier due (the SAME hours and
+ * days on the supplier line's price, the monthly divisor the client line's
+ * standard hours — `due_standard_hours` —; none for an owned unit) and the
+ * margin = client − COALESCE(supplier, 0), null without a client due.
  */
 export function cardMonthFigures(
   card: CardMonthSides,
   hours: number | null,
+  days: number | null = null,
 ): CardMonthFigures {
   const client = cardMonthSideDue({
     hasLine: card.client_line_id !== null,
@@ -920,6 +978,7 @@ export function cardMonthFigures(
     rateUnit: card.client_rate_unit,
     hours,
     standardHours: card.due_standard_hours,
+    days,
   })
   const supplier: CardMonthDue = card.owned
     ? { value: null, blocker: 'owned' }
@@ -929,6 +988,7 @@ export function cardMonthFigures(
         rateUnit: card.supplier_rate_unit,
         hours,
         standardHours: card.due_standard_hours,
+        days,
       })
   const margin: CardMonthDue =
     client.value === null
@@ -945,13 +1005,16 @@ export function cardMonthFigures(
 export function storedCardMonthFigures(
   row: CardMonthSides & {
     hours: number | string | null
+    days?: number | string | null
     client_due: number | string | null
     supplier_due: number | string | null
     margin: number | string | null
   },
 ): CardMonthFigures {
   const hours = row.hours === null ? null : Number(row.hours)
-  const live = cardMonthFigures(row, hours)
+  const days =
+    row.days === null || row.days === undefined ? null : Number(row.days)
+  const live = cardMonthFigures(row, hours, days)
   const stored = (
     value: number | string | null,
     fallback: CardMonthDue,
@@ -968,7 +1031,7 @@ export function storedCardMonthFigures(
 
 /**
  * The totals of the batch screen's filled rows per price unit (a month, a
- * day and an hour are never added): each side's amounts in the unit of its
+ * week, a day and an hour are never added): each side's amounts in the unit of its
  * own line; the margin in the client's unit.
  */
 export function cardMonthTotalsByUnit(
@@ -988,8 +1051,8 @@ export function cardMonthTotalsByUnit(
  * الساعات الاجمالية = الكمية × الساعات القياسية»; the staff's Excel: 6
  * months × 260 = 1560 hours as the ceiling). One rule for the PO page and
  * the card page: a MONTHLY line → the quantity (months) × its standard
- * hours; an HOURLY line → the quantity itself; a DAILY line has no rule yet
- * (null, exactly as its dues show «—»); no quantity → null.
+ * hours; an HOURLY line → the quantity itself; a DAILY or (0185) WEEKLY
+ * line has no hours total (null, «—»); no quantity → null.
  */
 export function contractHours(line: {
   quantity: number | string | null | undefined
@@ -1002,7 +1065,7 @@ export function contractHours(line: {
       : Number(line.quantity)
   if (Number.isNaN(quantity) || quantity <= 0) return null
   const unit = saleRateUnitOf(line.rate_unit)
-  if (unit === 'day') return null
+  if (unit === 'day' || unit === 'week') return null
   if (unit === 'hour') return quantity
   if (!line.standard_hours || line.standard_hours <= 0) return null
   return roundMoney(quantity * line.standard_hours)
@@ -1063,6 +1126,9 @@ export type EquipmentCardEventType =
   | 'client_price_changed'
   | 'pricing_approved'
   | 'pricing_returned'
+  // 0185: the manual end and the reopening.
+  | 'card_ended'
+  | 'card_reopened'
 
 export const EQUIPMENT_CARD_EVENT_LABEL_KEYS: Readonly<
   Record<EquipmentCardEventType, TranslationKey>
@@ -1073,6 +1139,16 @@ export const EQUIPMENT_CARD_EVENT_LABEL_KEYS: Readonly<
   client_price_changed: 'cardPricingEventPriceChanged',
   pricing_approved: 'cardPricingEventApproved',
   pricing_returned: 'cardPricingEventReturned',
+  card_ended: 'equipmentCardEventEnded',
+  card_reopened: 'equipmentCardEventReopened',
+}
+
+/** The optional renderers of `equipmentCardEventDetail` (0185). */
+export interface EquipmentCardEventText {
+  /** «/ شهر»: the suffix of a price's unit, for a unit change. */
+  perUnit?: (unit: SaleRateUnit) => string
+  /** «بتاريخ 08/11/2026»: the end day of `card_ended`. */
+  endedOn?: (day: string) => string
 }
 
 /**
@@ -1089,6 +1165,7 @@ export function equipmentCardEventDetail(
     formatSupplierPoPrice(price),
   poApprovedText?: (po: string | null) => string,
   poReturnedText?: () => string,
+  text: EquipmentCardEventText = {},
 ): string | null {
   const payload = event.payload ?? {}
   const month =
@@ -1129,8 +1206,28 @@ export function equipmentCardEventDetail(
       const newPrice = number(payload.new_price)
       const price = (value: number | null) =>
         value === null ? '—' : priceText(value)
-      if (oldPrice === null && newPrice === null) return null
-      return `${price(oldPrice)} ${arrow} ${price(newPrice)}`
+      // 0185: «1,000.00 / شهر ← 1,200.00 / يوم» when the unit changed too.
+      const oldUnit = isSaleRateUnit(payload.old_unit as string | null)
+        ? (payload.old_unit as SaleRateUnit)
+        : null
+      const newUnit = isSaleRateUnit(payload.new_unit as string | null)
+        ? (payload.new_unit as SaleRateUnit)
+        : null
+      const perUnit = text.perUnit
+      const units =
+        perUnit && oldUnit && newUnit && oldUnit !== newUnit
+          ? { perUnit, oldUnit, newUnit }
+          : null
+      const withUnit = (value: number | null, unit: SaleRateUnit) =>
+        units && value !== null
+          ? `${price(value)} ${units.perUnit(unit)}`
+          : price(value)
+      if (oldPrice === null && newPrice === null) {
+        if (!units) return null
+        return `${units.perUnit(units.oldUnit)} ${arrow} ${units.perUnit(units.newUnit)}`
+      }
+      if (!units) return `${price(oldPrice)} ${arrow} ${price(newPrice)}`
+      return `${withUnit(oldPrice, units.oldUnit)} ${arrow} ${withUnit(newPrice, units.newUnit)}`
     }
     case 'pricing_approved': {
       const clientPrice = number(payload.client_price)
@@ -1156,6 +1253,22 @@ export function equipmentCardEventDetail(
       ].filter((part): part is string => Boolean(part))
       return parts.length ? parts.join(' · ') : null
     }
+    // 0185: «بتاريخ 08/11/2026 · الملاحظة» for an end, the note for a
+    // reopening.
+    case 'card_ended': {
+      const day =
+        typeof payload.period_to === 'string' ? payload.period_to : null
+      const note = typeof payload.note === 'string' ? payload.note : null
+      const parts = [
+        day ? (text.endedOn ? text.endedOn(day) : day) : null,
+        note,
+      ].filter((part): part is string => Boolean(part))
+      return parts.length ? parts.join(' · ') : null
+    }
+    case 'card_reopened':
+      return typeof payload.note === 'string' && payload.note
+        ? payload.note
+        : null
     default:
       return null
   }
@@ -1169,12 +1282,15 @@ export interface CardMonthFormValues {
   month: string
   /** As typed. */
   hours: string
+  /** As typed; empty = no days (0185). */
+  days: string
   note: string
 }
 
 export const CARD_MONTH_FIELD_ORDER: readonly (keyof CardMonthFormValues)[] = [
   'month',
   'hours',
+  'days',
   'note',
 ]
 
@@ -1207,6 +1323,12 @@ export const CARD_MONTH_FIELD_RULES: readonly DatabaseFieldRule<CardMonthFormVal
     },
     {
       on: 'raised',
+      match: 'invalid_days',
+      field: 'days',
+      key: 'cardMonthDaysInvalid',
+    },
+    {
+      on: 'raised',
       match: 'invalid_note',
       field: 'note',
       key: 'cardMonthNoteTooLong',
@@ -1225,6 +1347,7 @@ export const CARD_MONTH_FORM_MESSAGES: Readonly<
   invalid_card: 'equipmentCardNotFound',
   invalid_month: 'cardMonthMonthRequired',
   invalid_hours: 'cardMonthHoursInvalid',
+  invalid_days: 'cardMonthDaysInvalid',
   invalid_note: 'cardMonthNoteTooLong',
   invalid_items: 'cardMonthErrorInvalidItems',
   month_outside_card: 'cardMonthErrorOutsideCard',
@@ -1238,6 +1361,7 @@ export const CARD_MONTH_ERROR_TOKENS: readonly string[] = [
   'invalid_month',
   'invalid_card',
   'invalid_hours',
+  'invalid_days',
   'invalid_note',
   'invalid_items',
   'month_outside_card',
@@ -1269,10 +1393,12 @@ export function cardMonthErrorOutcome<T>(
   return { message: cardMonthFormMessage(error) }
 }
 
-/** The `p_items` of record_equipment_card_months: hours as a JSON number. */
+/** The `p_items` of record_equipment_card_months: hours (and, since 0185,
+ *  the days, null = none) as JSON numbers. */
 export interface CardMonthBatchItem {
   card_id: string
   hours: number
+  days: number | null
   note: string | null
 }
 
@@ -1328,19 +1454,26 @@ const toNumber = (value: number | string | null | undefined): number | null => {
 }
 
 /**
- * The view's `card_margin`: client price − supplier price, both set and the
- * supplier line MONTHLY (a daily supplier price has no rule yet → null); an
- * owned Al-Azani unit on a 0-priced line keeps the full client price.
- * Rounded to 2 decimals.
+ * The view's `card_margin` (0185): client price − supplier price, both set
+ * and in the SAME unit (the card's `client_price_unit` = the supplier line's
+ * `rate_unit`, any of the four; two different units → null); an owned
+ * Al-Azani unit on a 0-priced line keeps the full client price. Rounded to 2
+ * decimals.
  */
 export function cardMargin(
   clientPrice: number | string | null | undefined,
+  clientRateUnit: string | null | undefined,
   supplierPrice: number | string | null | undefined,
   supplierRateUnit: string | null | undefined,
 ): number | null {
   const client = toNumber(clientPrice)
   const supplier = toNumber(supplierPrice)
-  if (client === null || supplier === null || supplierRateUnit !== 'month')
+  if (
+    client === null ||
+    supplier === null ||
+    !isSaleRateUnit(clientRateUnit) ||
+    clientRateUnit !== supplierRateUnit
+  )
     return null
   return Math.round((client - supplier) * 100) / 100
 }
@@ -1371,16 +1504,17 @@ export function formatMarginPct(
 
 /** Why the margin has no value on this row (the hint beside «—»). */
 export type CardMarginBlocker =
-  'no_client_price' | 'no_supplier_price' | 'daily' | null
+  'no_client_price' | 'no_supplier_price' | 'units_differ' | null
 
 export function cardMarginBlocker(row: {
   clientPrice: number | string | null | undefined
+  clientRateUnit: string | null | undefined
   supplierPrice: number | string | null | undefined
   supplierRateUnit: string | null | undefined
 }): CardMarginBlocker {
   if (toNumber(row.clientPrice) === null) return 'no_client_price'
   if (toNumber(row.supplierPrice) === null) return 'no_supplier_price'
-  if (row.supplierRateUnit !== 'month') return 'daily'
+  if (row.clientRateUnit !== row.supplierRateUnit) return 'units_differ'
   return null
 }
 
@@ -1388,8 +1522,8 @@ export function cardMarginBlocker(row: {
  * Why «اعتماد» cannot run on this card right now, or null when it can: the
  * reasons `approve_equipment_card_pricing` checks, in the order the user can
  * fix them, plus the screen's own «save first» (the database re-checks every
- * one of them). A daily supplier line is approvable: it has a price, only
- * no margin rule yet.
+ * one of them). Two different units are approvable (0185: no unit-match
+ * rule), only without a margin.
  */
 export function cardPricingApprovalBlocker(row: {
   pricing_status: string | null | undefined
@@ -1422,10 +1556,12 @@ export function pricesCountLabel(count: number, lang: Language): string {
 }
 
 /** The `p_items` of set_equipment_card_client_prices: price as a JSON
- *  number, null = no price. */
+ *  number, null = no price; since 0185 the unit of the price (null =
+ *  unchanged). */
 export interface CardPriceBatchItem {
   card_id: string
   price: number | null
+  rate_unit: SaleRateUnit | null
 }
 
 /**
@@ -1449,6 +1585,7 @@ export const CARD_PRICING_FORM_MESSAGES: Readonly<
   sales_approve_required: 'cardPricingErrorApproveRequired',
   invalid_card: 'equipmentCardNotFound',
   invalid_price: 'cardPriceInvalid',
+  invalid_rate_unit: 'saleRateUnitInvalid',
   invalid_note: 'cardMonthNoteTooLong',
   invalid_items: 'cardMonthErrorInvalidItems',
   card_pricing_approved_locked: 'cardPricingErrorApprovedLocked',
@@ -1465,6 +1602,7 @@ export const CARD_PRICING_ERROR_TOKENS: readonly string[] = [
   'sales_approve_required',
   'invalid_card',
   'invalid_price',
+  'invalid_rate_unit',
   'invalid_note',
   'invalid_items',
   'card_pricing_approved_locked',
@@ -1488,4 +1626,96 @@ export function cardPricingFormMessage(
   ))
     if (text.includes(token)) return key
   return 'supplierPoSaveFailed'
+}
+
+// --- The manual card end («انهاء الكرت», migration 0185) ------------------------------------------
+//
+// Owner 2026-11-08, «انهاء الكرت خليه يدوي»: a sales.manage holder ends an
+// OPEN card on a day from its period_from to today (Saudi) with an optional
+// note (end_equipment_card), and reopens an ended one (reopen_equipment_card).
+
+/** The form values of «انهاء الكرت». */
+export interface EndCardFormValues {
+  /** A date key (YYYY-MM-DD). */
+  period_to: string
+  note: string
+}
+
+export const END_CARD_FIELD_ORDER: readonly (keyof EndCardFormValues)[] = [
+  'period_to',
+  'note',
+]
+
+/** Tokens of end_equipment_card that name a field of the dialog. */
+export const END_CARD_FIELD_RULES: readonly DatabaseFieldRule<EndCardFormValues>[] =
+  [
+    {
+      on: 'raised',
+      match: 'invalid_period_to',
+      field: 'period_to',
+      key: 'equipmentCardEndDateInvalid',
+    },
+    {
+      on: 'raised',
+      match: 'card_has_later_months',
+      field: 'period_to',
+      key: 'equipmentCardEndHasLaterMonths',
+    },
+    {
+      on: 'raised',
+      match: 'invalid_note',
+      field: 'note',
+      key: 'cardMonthNoteTooLong',
+    },
+  ]
+
+/** Every 0185 end / reopen token as a form-level message. */
+export const CARD_END_FORM_MESSAGES: Readonly<Record<string, TranslationKey>> =
+  {
+    sales_manage_required: 'clientPoErrorManageRequired',
+    invalid_card: 'equipmentCardNotFound',
+    invalid_note: 'cardMonthNoteTooLong',
+    invalid_period_to: 'equipmentCardEndDateInvalid',
+    card_already_ended: 'equipmentCardEndAlreadyEnded',
+    card_has_later_months: 'equipmentCardEndHasLaterMonths',
+    card_not_ended: 'equipmentCardReopenNotEnded',
+    card_overlap: 'equipmentCardReopenOverlap',
+  }
+
+/** Every stable token of the 0185 end / reopen functions, for the tests. */
+export const CARD_END_ERROR_TOKENS: readonly string[] = [
+  'sales_manage_required',
+  'invalid_card',
+  'invalid_note',
+  'invalid_period_to',
+  'card_already_ended',
+  'card_has_later_months',
+  'card_not_ended',
+  'card_overlap',
+]
+
+/** The safe message for a rejected end or reopening; never the raw text. */
+export function cardEndFormMessage(
+  error: PostgresLikeError | null | undefined,
+): TranslationKey {
+  if (!error) return 'supplierPoSaveFailed'
+  const text = errorText(error)
+  for (const [token, key] of Object.entries(CARD_END_FORM_MESSAGES).sort(
+    (a, b) => b[0].length - a[0].length,
+  ))
+    if (text.includes(token)) return key
+  return 'supplierPoSaveFailed'
+}
+
+/** The end dialog's outcome: a field message when a rule matches, else one
+ *  form-level message. */
+export function cardEndErrorOutcome<T>(
+  error: PostgresLikeError | null | undefined,
+  mapField: (error: PostgresLikeError) => FieldErrors<T> | null,
+): { fieldErrors: FieldErrors<T> } | { message: TranslationKey } {
+  if (error) {
+    const fieldErrors = mapField(error)
+    if (fieldErrors) return { fieldErrors }
+  }
+  return { message: cardEndFormMessage(error) }
 }

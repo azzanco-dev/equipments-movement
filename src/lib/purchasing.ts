@@ -71,7 +71,9 @@ export const SUPPLIER_PO_EVENT_LABEL_KEYS: Readonly<
 /** The label of the 0173 `renumbered` event, inline until the translation
  *  block gets `supplierPoEventRenumbered` (the sales session owns
  *  translations.ts today). */
-export const SUPPLIER_PO_RENUMBERED_LABEL: Readonly<Record<'ar' | 'en', string>> = {
+export const SUPPLIER_PO_RENUMBERED_LABEL: Readonly<
+  Record<'ar' | 'en', string>
+> = {
   ar: 'اعادة ترقيم الامر',
   en: 'Order renumbered',
 }
@@ -100,7 +102,10 @@ export type SupplierPoApprovalStatus = 'draft' | 'approved'
 /** The approval badge of the PO page: draft = amber, approved = blue (open
  *  stays the green status badge beside it). */
 export const SUPPLIER_PO_APPROVAL_BADGE: Readonly<
-  Record<SupplierPoApprovalStatus, { key: TranslationKey; tone: 'warning' | 'info' }>
+  Record<
+    SupplierPoApprovalStatus,
+    { key: TranslationKey; tone: 'warning' | 'info' }
+  >
 > = {
   draft: { key: 'supplierPoApprovalDraft', tone: 'warning' },
   approved: { key: 'supplierPoApprovalApproved', tone: 'info' },
@@ -205,29 +210,41 @@ export function formatSupplierPoPrice(
 
 // --- The price unit (0157) ---------------------------------------------------------
 
-/** `supplier_po_equipment.rate_unit`: the line's price is per month or per
- *  day with this supplier (owner 2026-10-28; no hourly unit, no standard
- *  hours, no quantity on the supplier side). */
-export type SupplierPoRateUnit = 'month' | 'day'
+/** `supplier_po_equipment.rate_unit`: the line's price is per month, week,
+ *  day or hour with this supplier (0157: month / day; 0185, owner
+ *  2026-11-08: the four units of the sales side; no standard hours and no
+ *  quantity on the supplier side). */
+export type SupplierPoRateUnit = 'month' | 'week' | 'day' | 'hour'
 
-export const SUPPLIER_PO_RATE_UNITS: readonly SupplierPoRateUnit[] = ['month', 'day']
+/** The four units in their fixed order (selects, totals). */
+export const SUPPLIER_PO_RATE_UNITS: readonly SupplierPoRateUnit[] = [
+  'month',
+  'week',
+  'day',
+  'hour',
+]
 
 export const SUPPLIER_PO_DEFAULT_RATE_UNIT: SupplierPoRateUnit = 'month'
 
-/** The unit's name in a select («شهري» / «يومي»). */
+/** The unit's name in a select and on the PDF («شهري» / «اسبوعي» / «يومي» /
+ *  «بالساعة»); week and hour reuse the sales side's keys. */
 export const SUPPLIER_PO_RATE_UNIT_LABEL_KEYS: Readonly<
   Record<SupplierPoRateUnit, TranslationKey>
 > = {
   month: 'supplierPoRateUnitMonth',
+  week: 'saleRateUnitWeek',
   day: 'supplierPoRateUnitDay',
+  hour: 'saleRateUnitHour',
 }
 
-/** The suffix after an amount («/ شهر» / «/ يوم»). */
+/** The suffix after an amount («/ شهر» / «/ اسبوع» / «/ يوم» / «/ ساعة»). */
 export const SUPPLIER_PO_PER_UNIT_KEYS: Readonly<
   Record<SupplierPoRateUnit, TranslationKey>
 > = {
   month: 'supplierPoPerMonth',
+  week: 'salePerWeek',
   day: 'supplierPoPerDay',
+  hour: 'salePerHour',
 }
 
 export function isSupplierPoRateUnit(
@@ -244,13 +261,16 @@ export function supplierPoRateUnitOf(
 }
 
 /**
- * The PO's totals excluding VAT, one per unit present on its lines, month
- * first (owner 2026-10-28: a monthly and a daily price are never added
- * together). Unpriced lines count towards their unit's presence but not its
+ * The PO's totals excluding VAT, one per unit present on its lines in the
+ * order month, week, day, hour (owner 2026-10-28: prices of two units are
+ * never added together). Unpriced lines count towards their unit's presence but not its
  * total; a PO without lines totals 0 per month.
  */
 export function supplierPoTotalsByUnit(
-  lines: readonly { price: number | string | null; rate_unit?: string | null }[],
+  lines: readonly {
+    price: number | string | null
+    rate_unit?: string | null
+  }[],
 ): { parts: { unit: SupplierPoRateUnit; total: number }[]; unpriced: number } {
   const totals = new Map<SupplierPoRateUnit, number>()
   let unpriced = 0
@@ -259,13 +279,21 @@ export function supplierPoTotalsByUnit(
     const price =
       line.price === null || line.price === undefined ? NaN : Number(line.price)
     if (Number.isNaN(price)) unpriced += 1
-    totals.set(unit, (totals.get(unit) ?? 0) + (Number.isNaN(price) ? 0 : price))
+    totals.set(
+      unit,
+      (totals.get(unit) ?? 0) + (Number.isNaN(price) ? 0 : price),
+    )
   }
   const parts = SUPPLIER_PO_RATE_UNITS.filter((unit) => totals.has(unit)).map(
-    (unit) => ({ unit, total: Math.round((totals.get(unit) ?? 0) * 100) / 100 }),
+    (unit) => ({
+      unit,
+      total: Math.round((totals.get(unit) ?? 0) * 100) / 100,
+    }),
   )
   return {
-    parts: parts.length ? parts : [{ unit: SUPPLIER_PO_DEFAULT_RATE_UNIT, total: 0 }],
+    parts: parts.length
+      ? parts
+      : [{ unit: SUPPLIER_PO_DEFAULT_RATE_UNIT, total: 0 }],
     unpriced,
   }
 }
@@ -275,10 +303,7 @@ export function supplierPoTotalsByUnit(
 /** `supplier_pos.owner_class`: the owner classes a PO can be addressed to
  *  without a lessor row (owner 2026-10-20: no new supplier rows). */
 export type SupplierPoOwnerClass =
-  | 'alazani'
-  | 'takween'
-  | 'third_party_f'
-  | 'third_party_partnership_b'
+  'alazani' | 'takween' | 'third_party_f' | 'third_party_partnership_b'
 
 export const SUPPLIER_PO_OWNER_CLASSES: readonly SupplierPoOwnerClass[] = [
   'alazani',
@@ -311,7 +336,8 @@ export function partyOptionValue(party: {
   lessor_id: string | null
   owner_class: string | null
 }): string {
-  if (party.owner_class) return `${SUPPLIER_PO_CLASS_OPTION_PREFIX}${party.owner_class}`
+  if (party.owner_class)
+    return `${SUPPLIER_PO_CLASS_OPTION_PREFIX}${party.owner_class}`
   return party.lessor_id ?? ''
 }
 
@@ -369,7 +395,10 @@ export function supplierPoSupplierNames(
   const name = po.lessor?.name?.trim()
   if (name) return { ar: name, en: null }
   return po.is_internal
-    ? { ar: ar('supplierPoInternalSupplier'), en: en('supplierPoInternalSupplier') }
+    ? {
+        ar: ar('supplierPoInternalSupplier'),
+        en: en('supplierPoInternalSupplier'),
+      }
     : { ar: '—', en: null }
 }
 
@@ -563,7 +592,7 @@ export const SUPPLIER_PO_LINE_FIELD_RULES: readonly DatabaseFieldRule<SupplierPo
       on: 'raised',
       match: 'invalid_rate_unit',
       field: 'rate_unit',
-      key: 'supplierPoRateUnitInvalid',
+      key: 'supplierPoRateUnitInvalidFour',
     },
   ]
 
@@ -604,7 +633,7 @@ export const SUPPLIER_PO_LINE_EDIT_FIELD_RULES: readonly DatabaseFieldRule<Suppl
       on: 'raised',
       match: 'invalid_rate_unit',
       field: 'rate_unit',
-      key: 'supplierPoRateUnitInvalid',
+      key: 'supplierPoRateUnitInvalidFour',
     },
   ]
 
@@ -637,23 +666,24 @@ export const SUPPLIER_PO_EDIT_FIELD_RULES: readonly DatabaseFieldRule<SupplierPo
  * page-level) message. `po_closed` and `purchasing_manage_required` can come
  * from every write; the rest from the function named in the comment.
  */
-export const SUPPLIER_PO_FORM_MESSAGES: Readonly<Record<string, TranslationKey>> =
-  {
-    card_overlap: 'supplierPoErrorCardOverlap', // add_supplier_po_equipment
-    equipment_already_on_open_po: 'supplierPoErrorAlreadyOnOpenPo', // add
-    po_closed: 'supplierPoErrorClosed',
-    purchasing_manage_required: 'supplierPoErrorManageRequired',
-    invalid_po: 'supplierPoNotFound', // add, close, update (0142)
-    invalid_line: 'supplierPoErrorInvalidLine', // update price / line (0142)
-    invalid_rate_unit: 'supplierPoRateUnitInvalid', // create (0157)
-    // 0160: approve_supplier_po, and the lock of an approved PO.
-    purchasing_approve_required: 'supplierPoErrorApproveRequired',
-    po_not_draft: 'supplierPoErrorNotDraft',
-    po_self_approval: 'supplierPoApproveBlockedSelf',
-    po_has_no_lines: 'supplierPoApproveBlockedNoLines',
-    po_has_unpriced_lines: 'supplierPoApproveBlockedUnpriced',
-    po_approved_locked: 'supplierPoErrorApprovedLocked',
-  }
+export const SUPPLIER_PO_FORM_MESSAGES: Readonly<
+  Record<string, TranslationKey>
+> = {
+  card_overlap: 'supplierPoErrorCardOverlap', // add_supplier_po_equipment
+  equipment_already_on_open_po: 'supplierPoErrorAlreadyOnOpenPo', // add
+  po_closed: 'supplierPoErrorClosed',
+  purchasing_manage_required: 'supplierPoErrorManageRequired',
+  invalid_po: 'supplierPoNotFound', // add, close, update (0142)
+  invalid_line: 'supplierPoErrorInvalidLine', // update price / line (0142)
+  invalid_rate_unit: 'supplierPoRateUnitInvalidFour', // create (0157, four units 0185)
+  // 0160: approve_supplier_po, and the lock of an approved PO.
+  purchasing_approve_required: 'supplierPoErrorApproveRequired',
+  po_not_draft: 'supplierPoErrorNotDraft',
+  po_self_approval: 'supplierPoApproveBlockedSelf',
+  po_has_no_lines: 'supplierPoApproveBlockedNoLines',
+  po_has_unpriced_lines: 'supplierPoApproveBlockedUnpriced',
+  po_approved_locked: 'supplierPoErrorApprovedLocked',
+}
 
 /** Every stable token of migrations 0136–0160 the client maps, for the tests. */
 export const SUPPLIER_PO_ERROR_TOKENS: readonly string[] = [

@@ -661,9 +661,9 @@ test('the landing is the first passing section in menu order', () => {
     'projects',
     'lessors',
     'purchasing/orders',
-    // Sales (0169; since 0174 «اسعار المعدات» is the section's one listed
-    // page and its landing).
-    'sales/prices',
+    // Sales (0169; 0174 had «اسعار المعدات» as the one listed page; since
+    // 0185 «PO العملاء» is listed first again and is the landing).
+    'sales/orders',
     'drivers',
     'users',
     'settings',
