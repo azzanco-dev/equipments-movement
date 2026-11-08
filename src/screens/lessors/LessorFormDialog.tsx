@@ -11,6 +11,7 @@ import {
   PartyFormSection,
   type PartyFieldSpec,
 } from '@/components/parties/PartyFormSection'
+import { PartyDocumentsSection } from '@/components/parties/PartyDocumentsSection'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import {
   CHANGED_CONTROL_CLASS,
@@ -358,6 +359,20 @@ export function LessorFormDialog({
             </Field>
           }
         />
+        {/* Owner 2026-11-08 («ليش ماتضيف اضافة المستندات لdialog التعديل»):
+            editing a record shows its documents too. Files are saved the
+            moment they are uploaded, apart from the form's save, so they
+            never count as unsaved changes. A new record has no id yet: it
+            uploads from its details after the first save. */}
+        {lessor && (
+          <PartyDocumentsSection
+            key={lessor.id}
+            kind="lessor"
+            partyId={lessor.id}
+            canEdit={canSave}
+            hint={t('partyDocSavedDirectly')}
+          />
+        )}
       </div>
       {confirmDialog}
     </Dialog>

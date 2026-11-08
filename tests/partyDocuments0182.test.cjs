@@ -280,3 +280,31 @@ test('an icon per document type, beside its name, in the section and the mockup'
   // The bar uses the completeness ring's colours.
   assert.match(section, /'var\(--progress-high\)'[\s\S]*?'var\(--progress-mid\)'[\s\S]*?'var\(--progress-low\)'/)
 })
+
+test('the edit forms show the documents too, saved apart from the form (owner 2026-11-08)', () => {
+  // «ليش ماتضيف اضافة المستندات لdialog التعديل الشركات والموردين؟» — «نعم، نفذ»
+  for (const [file, kind, record] of [
+    [['src', 'screens', 'lessors', 'LessorFormDialog.tsx'], 'lessor', 'lessor'],
+    [['src', 'screens', 'companies', 'CompanyFormDialog.tsx'], 'company', 'company'],
+  ]) {
+    const form = read(...file)
+    assert.match(form, /import \{ PartyDocumentsSection \} from '@\/components\/parties\/PartyDocumentsSection'/)
+    // Only while editing a record (a new one has no id), with the edit key,
+    // and the line that says the files never wait for «حفظ».
+    assert.match(
+      form,
+      new RegExp(
+        `\\{${record} && \\(\\n\\s*<PartyDocumentsSection\\n\\s*key=\\{${record}\\.id\\}\\n\\s*kind="${kind}"\\n\\s*partyId=\\{${record}\\.id\\}\\n\\s*canEdit=\\{canSave\\}\\n\\s*hint=\\{t\\('partyDocSavedDirectly'\\)\\}`,
+      ),
+    )
+    // The uploads are not form fields: the unsaved count stays the form's.
+    assert.match(form, /changedFields\(initial, form\)/)
+    assert.doesNotMatch(form, /documents.*changedSet|changedSet.*documents/)
+  }
+  const section = read('src', 'components', 'parties', 'PartyDocumentsSection.tsx')
+  assert.match(section, /  hint\?: ReactNode\n/)
+  assert.match(section, /\{hint && \(\n\s*<p className="[^"]*bg-\[var\(--info-soft\)\][^"]*text-\[var\(--info\)\]">/)
+  const translations = read('src', 'i18n', 'translations.ts')
+  assert.equal(translations.split("    partyDocSavedDirectly: '").length, 3)
+  assert.match(translations, /partyDocSavedDirectly: 'المستندات تحفظ مباشرة عند الرفع، بدون زر الحفظ\.'/)
+})

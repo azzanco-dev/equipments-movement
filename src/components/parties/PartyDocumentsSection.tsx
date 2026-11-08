@@ -14,6 +14,7 @@ import {
   Files,
   FolderOpen,
   ImageIcon,
+  Info,
   Landmark,
   MapPin,
   Plus,
@@ -64,6 +65,11 @@ export interface PartyDocumentsSectionProps {
   canEdit: boolean
   /** A line above the tiles (the «تم الحفظ، ارفع المستندات» of a new one). */
   notice?: ReactNode
+  /**
+   * A quiet line under the header, no scroll (the edit form's «تحفظ
+   * مباشرة عند الرفع»: the files never wait for the form's save).
+   */
+  hint?: ReactNode
 }
 
 type UploadTarget = { type: PartyDocumentType; replacing?: PartyDocument }
@@ -106,6 +112,7 @@ export function PartyDocumentsSection({
   partyId,
   canEdit,
   notice,
+  hint,
 }: PartyDocumentsSectionProps) {
   const { t } = useI18n()
   const [documents, setDocuments] = useState<PartyDocument[]>([])
@@ -248,6 +255,12 @@ export function PartyDocumentsSection({
           </div>
         )}
       </div>
+      {hint && (
+        <p className="mb-3 flex items-center gap-2 rounded-lg bg-[var(--info-soft)] px-3 py-2 text-sm text-[var(--info)]">
+          <Info size={16} aria-hidden="true" className="shrink-0" />
+          {hint}
+        </p>
+      )}
       {notice && (
         <p className="mb-3 flex items-center gap-2 rounded-lg bg-[var(--success-soft)] px-3 py-2 text-sm text-[var(--success)]">
           <CheckCircle2 size={16} aria-hidden="true" />

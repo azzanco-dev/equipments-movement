@@ -15,6 +15,7 @@ import {
   PartyFormSection,
   type PartyFieldSpec,
 } from '@/components/parties/PartyFormSection'
+import { PartyDocumentsSection } from '@/components/parties/PartyDocumentsSection'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import {
@@ -321,6 +322,20 @@ export function CompanyFormDialog({
           onChange={update}
           changed={changedSet}
         />
+        {/* Owner 2026-11-08 («ليش ماتضيف اضافة المستندات لdialog التعديل»):
+            editing a record shows its documents too. Files are saved the
+            moment they are uploaded, apart from the form's save, so they
+            never count as unsaved changes. A new record has no id yet: it
+            uploads from its details after the first save. */}
+        {company && (
+          <PartyDocumentsSection
+            key={company.id}
+            kind="company"
+            partyId={company.id}
+            canEdit={canSave}
+            hint={t('partyDocSavedDirectly')}
+          />
+        )}
       </div>
       {confirmDialog}
     </Dialog>
