@@ -12,6 +12,12 @@ import {
   type PartyFieldSpec,
 } from '@/components/parties/PartyFormSection'
 import { PartyDocumentsSection } from '@/components/parties/PartyDocumentsSection'
+import {
+  partyDocumentLabel,
+  type DraftPartyDocument,
+  type SavedDocumentUploads,
+} from '@/lib/partyDocuments'
+import { uploadDraftDocuments } from '@/lib/partyDocumentsData'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import {
   CHANGED_CONTROL_CLASS,
@@ -104,8 +110,11 @@ export interface LessorFormDialogProps {
   onOpenChange: (open: boolean) => void
   /** Null adds a new lessor; a record edits it. */
   lessor: Lessor | null
-  /** After a save; a NEW supplier passes its id (its details open next). */
-  onSaved: (createdId?: string) => void
+  /**
+   * After a save; a NEW supplier passes its id (its details open next)
+   * and what became of the files picked in the add form.
+   */
+  onSaved: (createdId?: string, uploads?: SavedDocumentUploads) => void
 }
 
 export function LessorFormDialog({
@@ -124,6 +133,12 @@ export function LessorFormDialog({
   const [initial, setInitial] = useState<LessorFormValues>(EMPTY_LESSOR_FORM)
   const { confirm, confirmDialog } = useConfirm()
   const [saving, setSaving] = useState(false)
+  // Owner 2026-11-08 («المورد ينحفظ, وبعده ترتفع الملفات مباشرة»): the add
+  // form only PICKS the files; they go up one by one after the save.
+  const [drafts, setDrafts] = useState<DraftPartyDocument[]>([])
+  const [uploading, setUploading] = useState<{ done: number; total: number } | null>(
+    null,
+  )
   const [error, setError] = useState<string | null>(null)
   const [errors, setErrors] = useState<FieldErrors<LessorFormValues>>({})
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -145,6 +160,8 @@ export function LessorFormDialog({
     setInitial(start)
     setError(null)
     setErrors({})
+    setDrafts([])
+    setUploading(null)
   }, [open, lessor])
 
   /** Editing a field clears its message; nothing is validated while typing. */
@@ -201,9 +218,24 @@ export function LessorFormDialog({
       setError(t('saveFailed'))
       return
     }
+    // The record is saved: its picked files go up now. A failed one never
+    // undoes the record — its details open and name it.
+    const createdId = lessor ? undefined : (result.data?.[0]?.id as string | undefined)
+    let uploads: SavedDocumentUploads | undefined
+    if (createdId && drafts.length > 0) {
+      setUploading({ done: 0, total: drafts.length })
+      const outcome = await uploadDraftDocuments('lessor', createdId, drafts, (done) =>
+        setUploading({ done, total: drafts.length }),
+      )
+      setUploading(null)
+      uploads = {
+        uploaded: outcome.uploaded,
+        failed: outcome.failed.map((draft) => partyDocumentLabel(draft.type, draft.title, t)),
+      }
+    }
     onOpenChange(false)
     // 0182 (owner «الاولى»): a new supplier opens on its documents.
-    onSaved(lessor ? undefined : result.data?.[0]?.id)
+    onSaved(createdId, uploads)
   }
 
   const shownError = error ?? (canSave ? null : notAllowed)
@@ -221,8 +253,10 @@ export function LessorFormDialog({
   const dirty = changed > 0
 
   const requestClose = async () => {
+    // Never while the record or its files are being saved.
+    if (saving || uploading) return
     if (
-      dirty &&
+      (dirty || (!lessor && drafts.length > 0)) &&
       canSave &&
       !(await confirm({
         title: t('unsavedChanges'),
@@ -243,7 +277,17 @@ export function LessorFormDialog({
       size="lg"
       footer={
         <>
-          {canSave && dirty && (
+          {uploading && (
+            <span
+              role="status"
+              className="me-auto self-center text-sm font-medium text-[var(--info)]"
+            >
+              {t('partyDocUploadingProgress')
+                .replace('{done}', String(Math.min(uploading.done + 1, uploading.total)))
+                .replace('{total}', String(uploading.total))}
+            </span>
+          )}
+          {canSave && dirty && !uploading && (
             <span
               role="status"
               className="me-auto flex items-center gap-2 self-center text-sm font-medium text-[var(--warning)]"
@@ -255,13 +299,17 @@ export function LessorFormDialog({
               {t('unsavedFieldsCount').replace('{count}', String(changed))}
             </span>
           )}
-          <Button variant="outline" onClick={() => void requestClose()}>
+          <Button
+            variant="outline"
+            disabled={saving || uploading !== null}
+            onClick={() => void requestClose()}
+          >
             {t('cancel')}
           </Button>
           {canSave && (
             <Button
               variant="primary"
-              loading={saving}
+              loading={saving || uploading !== null}
               disabled={!!lessor && !dirty}
               onClick={save}
             >
@@ -371,6 +419,15 @@ export function LessorFormDialog({
             partyId={lessor.id}
             canEdit={canSave}
             hint={t('partyDocSavedDirectly')}
+          />
+        )}
+        {!lessor && canSave && (
+          <PartyDocumentsSection
+            key="new"
+            kind="lessor"
+            draft={{ items: drafts, onChange: setDrafts }}
+            canEdit
+            hint={t('partyDocDraftHint')}
           />
         )}
       </div>

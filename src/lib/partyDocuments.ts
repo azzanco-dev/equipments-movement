@@ -165,3 +165,102 @@ export function blockedByPartyDocuments(
 ): boolean {
   return /party_documents/.test(`${error?.message ?? ''} ${error?.details ?? ''}`)
 }
+
+// --- Files picked in the add form (owner 2026-11-08) -----------------------
+// «المورد ينحفظ, وبعده ترتفع الملفات مباشرة»: a new supplier or client has no
+// id yet, so its files are only PICKED in the add form (they stay in the
+// browser) and uploaded one by one right after the record is saved. A failed
+// upload never undoes the saved record: its details open and name the files
+// to upload again.
+
+/** A file picked for a record that is not saved yet. */
+export interface DraftPartyDocument {
+  id: string
+  type: PartyDocumentType
+  file: { name: string; type: string; size: number }
+  /** The name of an «other» document. */
+  title?: string
+  /** When it was picked (orders the «other» documents). */
+  created_at: string
+}
+
+/** The picked file as a row, so the section draws it like a stored one. */
+export function draftDocumentRow(draft: DraftPartyDocument): PartyDocument {
+  return {
+    id: draft.id,
+    doc_type: draft.type,
+    title: draft.type === 'other' ? (draft.title ?? null) : null,
+    storage_path: '',
+    file_name: storedFileName(draft.file.name),
+    mime_type: draft.file.type,
+    size_bytes: draft.file.size,
+    created_at: draft.created_at,
+  }
+}
+
+/**
+ * Adds a picked file: a fixed type keeps one file (a new pick replaces the
+ * earlier one), an «other» document is added, or replaces `replacingId`.
+ */
+export function withDraftDocument(
+  drafts: readonly DraftPartyDocument[],
+  next: DraftPartyDocument,
+  replacingId?: string,
+): DraftPartyDocument[] {
+  const kept = drafts.filter(
+    (draft) =>
+      draft.id !== replacingId &&
+      (next.type === 'other' || draft.type !== next.type),
+  )
+  return [...kept, next]
+}
+
+/** The upload order: the fixed types in their order, then the others. */
+export function draftUploadOrder(
+  kind: PartyKind,
+  drafts: readonly DraftPartyDocument[],
+): DraftPartyDocument[] {
+  const { fixed, others } = groupPartyDocuments(kind, drafts.map(draftDocumentRow))
+  const ids = [
+    ...fixed.flatMap((slot) => (slot.document ? [slot.document.id] : [])),
+    ...others.map((row) => row.id),
+  ]
+  return ids.map((id) => drafts.find((draft) => draft.id === id)!)
+}
+
+/** The name a document is shown by: its type, or the «other» title. */
+export function partyDocumentLabel(
+  type: PartyDocumentType,
+  title: string | null | undefined,
+  t: (key: TranslationKey) => string,
+): string {
+  return type === 'other'
+    ? title?.trim() || t('partyDocOtherOne')
+    : t(PARTY_DOCUMENT_LABEL_KEYS[type])
+}
+
+/** What the add form's upload left: how many went up, which failed. */
+export interface SavedDocumentUploads {
+  uploaded: number
+  failed: readonly string[]
+}
+
+/**
+ * The line the details of a NEW record open with: saved and ready for
+ * documents; saved with its files; or saved with the files that failed
+ * (a warning, never a failure of the record).
+ */
+export function createdDocumentsNotice(
+  uploads: SavedDocumentUploads | undefined,
+  t: (key: TranslationKey) => string,
+): { notice?: string; warning?: string } {
+  if (uploads && uploads.failed.length > 0)
+    return {
+      warning: t('partyDocUploadFailedNotice')
+        .replace('{count}', String(uploads.failed.length))
+        .replace('{names}', uploads.failed.join('، ')),
+    }
+  if (uploads && uploads.uploaded > 0)
+    return { notice: t('partyDocCreatedUploadedNotice') }
+  return { notice: t('partyDocCreatedNotice') }
+}

@@ -14,7 +14,10 @@ import {
 } from '@/lib/actionPermissions'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { databaseErrorKind } from '@/lib/formValidation'
-import { blockedByPartyDocuments } from '@/lib/partyDocuments'
+import {
+  blockedByPartyDocuments,
+  type SavedDocumentUploads,
+} from '@/lib/partyDocuments'
 import { companiesListConfig } from '@/lib/listConfigs'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
@@ -48,7 +51,11 @@ export function CompaniesListScreen() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Company | null>(null)
   const [viewing, setViewing] = useState<Company | null>(null)
-  const [justCreated, setJustCreated] = useState(false)
+  // A new record opens on its documents; `uploads` says what became of
+  // the files picked in the add form (owner 2026-11-08).
+  const [justCreated, setJustCreated] = useState<{ uploads?: SavedDocumentUploads } | null>(
+    null,
+  )
   const [importOpen, setImportOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [projectsCompany, setProjectsCompany] = useState<Company | null>(null)
@@ -147,7 +154,7 @@ export function CompaniesListScreen() {
 
   // 0182 (owner «الاولى»): a new company is saved first, then its details
   // open on «المستندات» so its files can be uploaded at once.
-  const saved = async (createdId?: string) => {
+  const saved = async (createdId?: string, uploads?: SavedDocumentUploads) => {
     void fetchCompanies()
     if (!createdId) return
     const { data } = await supabase
@@ -156,7 +163,7 @@ export function CompaniesListScreen() {
       .eq('id', createdId)
       .maybeSingle()
     if (data) {
-      setJustCreated(true)
+      setJustCreated({ uploads })
       setViewing(data as Company)
     }
   }
@@ -223,7 +230,7 @@ export function CompaniesListScreen() {
         direction={list.direction}
         onSortChange={list.setSort}
         onOpen={(company) => {
-          setJustCreated(false)
+          setJustCreated(null)
           setViewing(company)
         }}
         onEdit={canEdit ? openEdit : undefined}
@@ -245,7 +252,7 @@ export function CompaniesListScreen() {
         open={formOpen}
         onOpenChange={setFormOpen}
         company={editing}
-        onSaved={(createdId) => void saved(createdId)}
+        onSaved={(createdId, uploads) => void saved(createdId, uploads)}
       />
       <CompanyImportDialog
         open={importOpen && canEdit}
@@ -259,12 +266,13 @@ export function CompaniesListScreen() {
         onOpenChange={(open) => {
           if (!open) {
             setViewing(null)
-            setJustCreated(false)
+            setJustCreated(null)
           }
         }}
         onEdit={canEdit && viewing ? () => openEdit(viewing) : undefined}
         canEditDocuments={canEdit}
-        justCreated={justCreated}
+        justCreated={justCreated !== null}
+        createdUploads={justCreated?.uploads}
       />
       <CompanyProjectsDialog
         open={projectsCompany !== null}

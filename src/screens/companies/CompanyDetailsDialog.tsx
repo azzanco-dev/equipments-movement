@@ -1,6 +1,10 @@
 import { Briefcase, FileText, Phone } from 'lucide-react'
 import { PartyDetailsDialog } from '@/components/parties/PartyDetailsDialog'
 import { PartyDocumentsSection } from '@/components/parties/PartyDocumentsSection'
+import {
+  createdDocumentsNotice,
+  type SavedDocumentUploads,
+} from '@/lib/partyDocuments'
 import { useI18n } from '@/i18n/I18nContext'
 import {
   COMPANY_COMPLETENESS_FIELDS,
@@ -19,6 +23,8 @@ export interface CompanyDetailsDialogProps {
   canEditDocuments?: boolean
   /** Just created: the documents section says it can be filled now. */
   justCreated?: boolean
+  /** What became of the files picked in the add form. */
+  createdUploads?: SavedDocumentUploads
 }
 
 /** A client's facts (EM-260, 0175): both names, «بيانات رسمية» and
@@ -29,6 +35,7 @@ export function CompanyDetailsDialog({
   onEdit,
   canEditDocuments = false,
   justCreated = false,
+  createdUploads,
 }: CompanyDetailsDialogProps) {
   const { t } = useI18n()
   return (
@@ -108,7 +115,7 @@ export function CompanyDetailsDialog({
           kind="company"
           partyId={company.id}
           canEdit={canEditDocuments}
-          notice={justCreated ? t('partyDocCreatedNotice') : undefined}
+          {...(justCreated ? createdDocumentsNotice(createdUploads, t) : {})}
         />
       )}
     </PartyDetailsDialog>

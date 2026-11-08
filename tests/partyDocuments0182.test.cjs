@@ -195,18 +195,22 @@ test('both details dialogs show the section with the edit key; new records open 
     const source = read(...dialog)
     assert.match(source, new RegExp(`<PartyDocumentsSection\\n\\s+key=\\{\\w+\\.id\\}\\n\\s+kind="${kind}"`))
     assert.match(source, /canEdit=\{canEditDocuments\}/)
-    assert.match(source, /notice=\{justCreated \? t\('partyDocCreatedNotice'\) : undefined\}/)
+    assert.match(source, /\{\.\.\.\(justCreated \? createdDocumentsNotice\(createdUploads, t\) : \{\}\)\}/)
     const screen = read(...list)
     assert.match(screen, /canEditDocuments=\{canEdit\}/)
-    assert.match(screen, /onSaved=\{\(createdId\) => void saved\(createdId\)\}/)
-    assert.match(screen, /setJustCreated\(true\)/)
+    assert.match(screen, /onSaved=\{\(createdId, uploads\) => void saved\(createdId, uploads\)\}/)
+    assert.match(screen, /setJustCreated\(\{ uploads \}\)/)
+    assert.match(screen, /createdUploads=\{justCreated\?\.uploads\}/)
     assert.match(screen, /blockedByPartyDocuments\(error\)\n\s+\? 'partyDeleteHasDocuments'/)
   }
   for (const form of [
     ['src', 'screens', 'lessors', 'LessorFormDialog.tsx'],
     ['src', 'screens', 'companies', 'CompanyFormDialog.tsx'],
   ])
-    assert.match(read(...form), /onSaved\(\w+ \? undefined : result\.data\?\.\[0\]\?\.id\)/)
+    assert.match(
+      read(...form),
+      /const createdId = \w+ \? undefined : \(result\.data\?\.\[0\]\?\.id[^\n]*\n[\s\S]*?onSaved\(createdId, uploads\)/,
+    )
 })
 
 test('the section shows no expiry, upload date or uploader; images are never cropped', () => {
@@ -307,4 +311,123 @@ test('the edit forms show the documents too, saved apart from the form (owner 20
   const translations = read('src', 'i18n', 'translations.ts')
   assert.equal(translations.split("    partyDocSavedDirectly: '").length, 3)
   assert.match(translations, /partyDocSavedDirectly: 'المستندات تحفظ مباشرة عند الرفع، بدون زر الحفظ\.'/)
+})
+
+// --- Files picked in the add form (owner 2026-11-08) --------------------------
+// «المورد ينحفظ, وبعده ترتفع الملفات مباشرة»
+
+const draftOf = (id, type, extra = {}) => ({
+  id,
+  type,
+  file: { name: `${id}.pdf`, type: 'application/pdf', size: 2048 },
+  created_at: `2026-11-08T10:00:0${id.length}Z`,
+  ...extra,
+})
+
+test('a picked file is drawn as a row; a fixed type keeps one file', () => {
+  const row = lib.draftDocumentRow(draftOf('a', 'other', { title: 'عقد' }))
+  assert.deepEqual(plain(row), {
+    id: 'a',
+    doc_type: 'other',
+    title: 'عقد',
+    storage_path: '',
+    file_name: 'a.pdf',
+    mime_type: 'application/pdf',
+    size_bytes: 2048,
+    created_at: '2026-11-08T10:00:01Z',
+  })
+  let drafts = lib.withDraftDocument([], draftOf('r1', 'commercial_register'))
+  drafts = lib.withDraftDocument(drafts, draftOf('t1', 'tax_certificate'))
+  drafts = lib.withDraftDocument(drafts, draftOf('r2', 'commercial_register'))
+  assert.deepEqual(plain(drafts.map((d) => d.id)), ['t1', 'r2'])
+  drafts = lib.withDraftDocument(drafts, draftOf('o1', 'other', { title: 'x' }))
+  drafts = lib.withDraftDocument(drafts, draftOf('o2', 'other', { title: 'y' }))
+  assert.deepEqual(plain(drafts.map((d) => d.id)), ['t1', 'r2', 'o1', 'o2'])
+  // Replacing an «other» document swaps that one only.
+  drafts = lib.withDraftDocument(drafts, draftOf('o3', 'other', { title: 'z' }), 'o1')
+  assert.deepEqual(plain(drafts.map((d) => d.id)), ['t1', 'r2', 'o2', 'o3'])
+})
+
+test('the picked files go up in the section order: fixed types, then the others', () => {
+  const drafts = [
+    draftOf('o', 'other', { title: 'x' }),
+    draftOf('na', 'national_address'),
+    draftOf('cr', 'commercial_register'),
+    draftOf('ib', 'iban_certificate'),
+  ]
+  assert.deepEqual(
+    plain(lib.draftUploadOrder('lessor', drafts).map((d) => d.id)),
+    ['cr', 'ib', 'na', 'o'],
+  )
+})
+
+test('the details of a new record say what became of its files', () => {
+  const t = (key) => key
+  assert.deepEqual(plain(lib.createdDocumentsNotice(undefined, t)), { notice: 'partyDocCreatedNotice' })
+  assert.deepEqual(plain(lib.createdDocumentsNotice({ uploaded: 0, failed: [] }, t)), {
+    notice: 'partyDocCreatedNotice',
+  })
+  assert.deepEqual(plain(lib.createdDocumentsNotice({ uploaded: 2, failed: [] }, t)), {
+    notice: 'partyDocCreatedUploadedNotice',
+  })
+  const ar = (key) =>
+    key === 'partyDocUploadFailedNotice' ? 'تعذر رفع {count}: {names}' : key
+  assert.deepEqual(plain(lib.createdDocumentsNotice({ uploaded: 1, failed: ['السجل', 'عقد'] }, ar)), {
+    warning: 'تعذر رفع 2: السجل، عقد',
+  })
+  assert.equal(lib.partyDocumentLabel('other', '  ', t), 'partyDocOtherOne')
+  assert.equal(lib.partyDocumentLabel('other', 'عقد', t), 'عقد')
+})
+
+test('the add forms pick files and upload them right after the save', () => {
+  const data = read('src', 'lib', 'partyDocumentsData.ts')
+  // One by one through the usual upload; a failure is reported, never thrown.
+  assert.match(
+    data,
+    /export async function uploadDraftDocuments\([\s\S]*?for \(const \[index, draft\] of ordered\.entries\(\)\) \{\n\s*try \{\n\s*await uploadPartyDocument\(\{[\s\S]*?\} catch \{\n\s*failed\.push\(draft\)/,
+  )
+  for (const [file, kind, record] of [
+    [['src', 'screens', 'lessors', 'LessorFormDialog.tsx'], 'lessor', 'lessor'],
+    [['src', 'screens', 'companies', 'CompanyFormDialog.tsx'], 'company', 'company'],
+  ]) {
+    const form = read(...file)
+    // The section in pick-only mode, for a new record with the edit key.
+    assert.match(
+      form,
+      new RegExp(
+        `\\{!${record} && canSave && \\(\\n\\s*<PartyDocumentsSection\\n\\s*key="new"\\n\\s*kind="${kind}"\\n\\s*draft=\\{\\{ items: drafts, onChange: setDrafts \\}\\}`,
+      ),
+    )
+    // The record is inserted first; the files go up only after it is saved.
+    const save = form.slice(form.indexOf('const save = async'), form.indexOf('const shownError'))
+    assert.ok(save.indexOf(".insert(payload)") < save.indexOf('uploadDraftDocuments('))
+    assert.match(save, new RegExp(`uploadDraftDocuments\\('${kind}', createdId, drafts`))
+    assert.ok(save.indexOf('uploadDraftDocuments(') < save.indexOf('onOpenChange(false)'))
+    // No closing while saving; picked files ask before they are dropped.
+    assert.match(form, /if \(saving \|\| uploading\) return/)
+    assert.match(form, new RegExp(`\\(dirty \\|\\| \\(!${record} && drafts\\.length > 0\\)\\) &&`))
+    assert.match(form, /t\('partyDocUploadingProgress'\)/)
+  }
+  const section = read('src', 'components', 'parties', 'PartyDocumentsSection.tsx')
+  // Nothing is stored in pick-only mode: no load, no upload, no delete.
+  assert.match(section, /\/\/ The add form has nothing stored yet\.\n\s*if \(!partyId\) return/)
+  assert.match(section, /if \(onPick\) \{\n\s*onPick\(target\.type, file, other \? trimmed : undefined, target\.replacing\)\n\s*return\n\s*\}/)
+  assert.match(section, /if \(draft\) \{\n\s*draft\.onChange\(draft\.items\.filter/)
+  // A picked file opens from the browser and its object URL is released.
+  assert.match(section, /URL\.createObjectURL\(picked\.file as File\)/)
+  assert.match(section, /URL\.revokeObjectURL\(objectUrlRef\.current\)/)
+  assert.match(section, /\{t\('partyDocPending'\)\}/)
+  const translations = read('src', 'i18n', 'translations.ts')
+  for (const key of [
+    'partyDocDraftHint',
+    'partyDocPending',
+    'partyDocPickConfirm',
+    'partyDocUploadingProgress',
+    'partyDocCreatedUploadedNotice',
+    'partyDocUploadFailedNotice',
+  ])
+    assert.equal(translations.split(`    ${key}: '`).length, 3, key)
+  const arabic = translations.slice(0, translations.indexOf('partyDocSavedDirectly: \'Documents'))
+  const added = arabic.slice(arabic.indexOf('    partyDocDraftHint:'), arabic.indexOf('    partyDocUploadFailedNotice:') + 120)
+  assert.doesNotMatch(added, /[أإآ]/)
 })

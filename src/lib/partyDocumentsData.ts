@@ -7,7 +7,9 @@ import {
   partyDocumentErrorKey,
   partyDocumentFileError,
   partyDocumentPath,
+  draftUploadOrder,
   storedFileName,
+  type DraftPartyDocument,
   type PartyDocument,
   type PartyDocumentType,
   type PartyKind,
@@ -140,4 +142,36 @@ export async function partyDocumentUrl(document: PartyDocument): Promise<string>
     .createSignedUrl(document.storage_path, 300)
   if (error || !data?.signedUrl) throw new PartyDocumentError('partyDocOpenFailed')
   return data.signedUrl
+}
+
+/**
+ * The files picked in an add form, uploaded one by one right after the
+ * record was saved (owner 2026-11-08). Each upload is the usual one (file,
+ * then its row); a failed one is reported and the rest still go up.
+ */
+export async function uploadDraftDocuments(
+  kind: PartyKind,
+  partyId: string,
+  drafts: readonly DraftPartyDocument[],
+  onProgress?: (done: number) => void,
+): Promise<{ uploaded: number; failed: DraftPartyDocument[] }> {
+  const failed: DraftPartyDocument[] = []
+  let uploaded = 0
+  const ordered = draftUploadOrder(kind, drafts)
+  for (const [index, draft] of ordered.entries()) {
+    try {
+      await uploadPartyDocument({
+        kind,
+        partyId,
+        type: draft.type,
+        file: draft.file as File,
+        title: draft.type === 'other' ? draft.title : undefined,
+      })
+      uploaded += 1
+    } catch {
+      failed.push(draft)
+    }
+    onProgress?.(index + 1)
+  }
+  return { uploaded, failed }
 }

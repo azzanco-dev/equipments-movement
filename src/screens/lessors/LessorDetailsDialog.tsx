@@ -1,6 +1,10 @@
 import { Building2, FileText, Landmark, Phone } from 'lucide-react'
 import { PartyDetailsDialog } from '@/components/parties/PartyDetailsDialog'
 import { PartyDocumentsSection } from '@/components/parties/PartyDocumentsSection'
+import {
+  createdDocumentsNotice,
+  type SavedDocumentUploads,
+} from '@/lib/partyDocuments'
 import { BankLogo } from '@/components/banks/BankLogo'
 import { useI18n } from '@/i18n/I18nContext'
 import {
@@ -20,6 +24,8 @@ export interface LessorDetailsDialogProps {
   canEditDocuments?: boolean
   /** Just created: the documents section says it can be filled now. */
   justCreated?: boolean
+  /** What became of the files picked in the add form. */
+  createdUploads?: SavedDocumentUploads
 }
 
 /** A supplier's facts (EM-260, 0175): «بيانات رسمية», «بيانات الاتصال»,
@@ -30,6 +36,7 @@ export function LessorDetailsDialog({
   onEdit,
   canEditDocuments = false,
   justCreated = false,
+  createdUploads,
 }: LessorDetailsDialogProps) {
   const { t } = useI18n()
   return (
@@ -125,7 +132,7 @@ export function LessorDetailsDialog({
           kind="lessor"
           partyId={lessor.id}
           canEdit={canEditDocuments}
-          notice={justCreated ? t('partyDocCreatedNotice') : undefined}
+          {...(justCreated ? createdDocumentsNotice(createdUploads, t) : {})}
         />
       )}
     </PartyDetailsDialog>

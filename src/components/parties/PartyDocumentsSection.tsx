@@ -8,7 +8,9 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  AlertTriangle,
   CheckCircle2,
+  Clock,
   Eye,
   FileText,
   Files,
@@ -42,10 +44,13 @@ import {
   PARTY_DOCUMENT_LABEL_KEYS,
   PARTY_DOCUMENT_TITLE_MAX,
   PARTY_DOCUMENT_TYPES,
+  draftDocumentRow,
   formatDocumentSize,
   groupPartyDocuments,
   isImageDocument,
   partyDocumentFileError,
+  withDraftDocument,
+  type DraftPartyDocument,
   type PartyDocument,
   type PartyDocumentType,
   type PartyKind,
@@ -60,7 +65,17 @@ import {
 
 export interface PartyDocumentsSectionProps {
   kind: PartyKind
-  partyId: string
+  /** The saved record; omitted in the add form, which passes `draft`. */
+  partyId?: string
+  /**
+   * The add form (owner 2026-11-08, «المورد ينحفظ, وبعده ترتفع الملفات
+   * مباشرة»): files are only PICKED here and kept in the browser; the form
+   * uploads them right after the record is saved.
+   */
+  draft?: {
+    items: readonly DraftPartyDocument[]
+    onChange: (items: DraftPartyDocument[]) => void
+  }
   /** `lessors.edit` / `companies_projects.edit`: upload, replace, delete. */
   canEdit: boolean
   /** A line above the tiles (the «تم الحفظ، ارفع المستندات» of a new one). */
@@ -70,6 +85,8 @@ export interface PartyDocumentsSectionProps {
    * مباشرة عند الرفع»: the files never wait for the form's save).
    */
   hint?: ReactNode
+  /** A warning line (the files a new record could not upload). */
+  warning?: ReactNode
 }
 
 type UploadTarget = { type: PartyDocumentType; replacing?: PartyDocument }
@@ -110,13 +127,15 @@ const errorKeyOf = (error: unknown): TranslationKey =>
 export function PartyDocumentsSection({
   kind,
   partyId,
+  draft,
   canEdit,
   notice,
   hint,
+  warning,
 }: PartyDocumentsSectionProps) {
   const { t } = useI18n()
   const [documents, setDocuments] = useState<PartyDocument[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!draft)
   const [loadError, setLoadError] = useState<TranslationKey | null>(null)
   const [actionError, setActionError] = useState<TranslationKey | null>(null)
   const [target, setTarget] = useState<UploadTarget | null>(null)
@@ -124,9 +143,18 @@ export function PartyDocumentsSection({
   const [preview, setPreview] = useState<{ src: string; alt: string } | null>(null)
   const { confirm, confirmDialog } = useConfirm()
   const sectionRef = useRef<HTMLElement>(null)
+  // A picked file opens from the browser itself, through an object URL.
+  const objectUrlRef = useRef<string | null>(null)
+  const releaseObjectUrl = () => {
+    if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current)
+    objectUrlRef.current = null
+  }
+  useEffect(() => releaseObjectUrl, [])
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
+      // The add form has nothing stored yet.
+      if (!partyId) return
       setLoading(true)
       setLoadError(null)
       try {
@@ -150,11 +178,20 @@ export function PartyDocumentsSection({
 
   // A new record opens here: bring the documents into view.
   useEffect(() => {
-    if (notice) sectionRef.current?.scrollIntoView({ block: 'nearest' })
-  }, [notice])
+    if (notice || warning) sectionRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [notice, warning])
 
   const view = async (document: PartyDocument) => {
     setActionError(null)
+    const picked = draft?.items.find((item) => item.id === document.id)
+    if (picked) {
+      releaseObjectUrl()
+      const url = URL.createObjectURL(picked.file as File)
+      objectUrlRef.current = url
+      if (isImageDocument(document)) setPreview({ src: url, alt: document.file_name })
+      else window.open(url, '_blank', 'noopener')
+      return
+    }
     // A PDF opens in a tab opened by the click itself, so no pop-up blocker
     // stops it; the link arrives a moment later.
     const tab = isImageDocument(document) ? null : window.open('', '_blank')
@@ -175,6 +212,11 @@ export function PartyDocumentsSection({
 
   const remove = async (document: PartyDocument) => {
     setActionError(null)
+    // A picked file is only dropped from the form: nothing is stored yet.
+    if (draft) {
+      draft.onChange(draft.items.filter((item) => item.id !== document.id))
+      return
+    }
     const ok = await confirm({
       title: t('partyDocDeleteTitle'),
       description: t('partyDocDeleteQuestion'),
@@ -200,7 +242,25 @@ export function PartyDocumentsSection({
     setTarget(null)
   }
 
-  const { fixed, others } = groupPartyDocuments(kind, documents)
+  const picked = (
+    type: PartyDocumentType,
+    file: File,
+    title: string | undefined,
+    replacing?: PartyDocument,
+  ) => {
+    if (!draft) return
+    draft.onChange(
+      withDraftDocument(
+        draft.items,
+        { id: crypto.randomUUID(), type, file, title, created_at: new Date().toISOString() },
+        replacing?.id,
+      ),
+    )
+    setTarget(null)
+  }
+
+  const shown = draft ? draft.items.map(draftDocumentRow) : documents
+  const { fixed, others } = groupPartyDocuments(kind, shown)
   const total = PARTY_DOCUMENT_TYPES[kind].length
   const filled = fixed.filter((slot) => slot.document).length
   const percent = Math.round((filled / total) * 100)
@@ -261,6 +321,15 @@ export function PartyDocumentsSection({
           {hint}
         </p>
       )}
+      {warning && (
+        <p
+          role="alert"
+          className="mb-3 flex items-start gap-2 rounded-lg bg-[var(--warning-soft)] px-3 py-2 text-sm text-[var(--warning)]"
+        >
+          <AlertTriangle size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
+          {warning}
+        </p>
+      )}
       {notice && (
         <p className="mb-3 flex items-center gap-2 rounded-lg bg-[var(--success-soft)] px-3 py-2 text-sm text-[var(--success)]">
           <CheckCircle2 size={16} aria-hidden="true" />
@@ -290,6 +359,7 @@ export function PartyDocumentsSection({
                 type={type}
                 title={t(PARTY_DOCUMENT_LABEL_KEYS[type])}
                 document={document}
+                pending={!!draft}
                 canEdit={canEdit}
                 busy={document ? busyId === document.id : false}
                 onUpload={() => setTarget({ type, replacing: document })}
@@ -337,6 +407,7 @@ export function PartyDocumentsSection({
                     type="other"
                     title={document.title ?? t('partyDocOtherOne')}
                     document={document}
+                    pending={!!draft}
                     canEdit={canEdit}
                     busy={busyId === document.id}
                     onView={() => void view(document)}
@@ -356,12 +427,15 @@ export function PartyDocumentsSection({
           target={target}
           onClose={() => setTarget(null)}
           onSaved={saved}
+          onPick={draft ? picked : undefined}
         />
       )}
       <Lightbox
         open={preview !== null}
         onOpenChange={(open) => {
-          if (!open) setPreview(null)
+          if (open) return
+          setPreview(null)
+          releaseObjectUrl()
         }}
         items={preview ? [{ id: 'document', src: preview.src, alt: preview.alt }] : []}
         index={0}
@@ -421,6 +495,7 @@ function DocumentTile({
   type,
   title,
   document,
+  pending = false,
   canEdit,
   busy,
   onUpload,
@@ -430,6 +505,8 @@ function DocumentTile({
   type: PartyDocumentType
   title: string
   document?: PartyDocument
+  /** A file picked in the add form, uploaded after the save. */
+  pending?: boolean
   canEdit: boolean
   busy: boolean
   /** A fixed type only: upload, or replace the current file. */
@@ -470,10 +547,17 @@ function DocumentTile({
         <TypeIcon type={type} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{title}</p>
-          <p className="mt-0.5 flex items-center gap-1 text-xs text-[var(--success)]">
-            <CheckCircle2 size={13} aria-hidden="true" />
-            {t('partyDocUploaded')}
-          </p>
+          {pending ? (
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-[var(--info)]">
+              <Clock size={13} aria-hidden="true" />
+              {t('partyDocPending')}
+            </p>
+          ) : (
+            <p className="mt-0.5 flex items-center gap-1 text-xs text-[var(--success)]">
+              <CheckCircle2 size={13} aria-hidden="true" />
+              {t('partyDocUploaded')}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 gap-0.5">
           <IconButton
@@ -528,12 +612,20 @@ function UploadDialog({
   target,
   onClose,
   onSaved,
+  onPick,
 }: {
   kind: PartyKind
-  partyId: string
+  partyId?: string
   target: UploadTarget
   onClose: () => void
   onSaved: (document: PartyDocument, replaced?: PartyDocument) => void
+  /** The add form: the file is only picked, uploaded after the save. */
+  onPick?: (
+    type: PartyDocumentType,
+    file: File,
+    title: string | undefined,
+    replacing?: PartyDocument,
+  ) => void
 }) {
   const { t } = useI18n()
   const [file, setFile] = useState<File | null>(null)
@@ -575,6 +667,11 @@ function UploadDialog({
     setFileError(missingFile)
     setTitleError(badTitle)
     if (!file || missingFile || badTitle) return
+    if (onPick) {
+      onPick(target.type, file, other ? trimmed : undefined, target.replacing)
+      return
+    }
+    if (!partyId) return
     setSaving(true)
     try {
       const document = await uploadPartyDocument({
@@ -612,7 +709,7 @@ function UploadDialog({
             {t('cancel')}
           </Button>
           <Button variant="primary" onClick={() => void save()} loading={saving}>
-            {t('save')}
+            {onPick ? t('partyDocPickConfirm') : t('save')}
           </Button>
         </>
       }

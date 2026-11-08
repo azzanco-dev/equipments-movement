@@ -11,7 +11,10 @@ import { useI18n } from '@/i18n/I18nContext'
 import { lessorsActions, refusedByPolicy } from '@/lib/actionPermissions'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { databaseErrorKind } from '@/lib/formValidation'
-import { blockedByPartyDocuments } from '@/lib/partyDocuments'
+import {
+  blockedByPartyDocuments,
+  type SavedDocumentUploads,
+} from '@/lib/partyDocuments'
 import { lessorsListConfig } from '@/lib/listConfigs'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
@@ -42,7 +45,11 @@ export function LessorsListScreen() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Lessor | null>(null)
   const [viewing, setViewing] = useState<Lessor | null>(null)
-  const [justCreated, setJustCreated] = useState(false)
+  // A new record opens on its documents; `uploads` says what became of
+  // the files picked in the add form (owner 2026-11-08).
+  const [justCreated, setJustCreated] = useState<{ uploads?: SavedDocumentUploads } | null>(
+    null,
+  )
   const [importOpen, setImportOpen] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
 
@@ -139,7 +146,7 @@ export function LessorsListScreen() {
 
   // 0182 (owner «الاولى»): a new supplier is saved first, then its details
   // open on «المستندات» so its files can be uploaded at once.
-  const saved = async (createdId?: string) => {
+  const saved = async (createdId?: string, uploads?: SavedDocumentUploads) => {
     void fetchLessors()
     if (!createdId) return
     const { data } = await supabase
@@ -148,7 +155,7 @@ export function LessorsListScreen() {
       .eq('id', createdId)
       .maybeSingle()
     if (data) {
-      setJustCreated(true)
+      setJustCreated({ uploads })
       setViewing(data as Lessor)
     }
   }
@@ -206,7 +213,7 @@ export function LessorsListScreen() {
         direction={list.direction}
         onSortChange={list.setSort}
         onOpen={(lessor) => {
-          setJustCreated(false)
+          setJustCreated(null)
           setViewing(lessor)
         }}
         onEdit={canEdit ? openEdit : undefined}
@@ -227,19 +234,20 @@ export function LessorsListScreen() {
         open={formOpen}
         onOpenChange={setFormOpen}
         lessor={editing}
-        onSaved={(createdId) => void saved(createdId)}
+        onSaved={(createdId, uploads) => void saved(createdId, uploads)}
       />
       <LessorDetailsDialog
         lessor={viewing}
         onOpenChange={(open) => {
           if (!open) {
             setViewing(null)
-            setJustCreated(false)
+            setJustCreated(null)
           }
         }}
         onEdit={canEdit && viewing ? () => openEdit(viewing) : undefined}
         canEditDocuments={canEdit}
-        justCreated={justCreated}
+        justCreated={justCreated !== null}
+        createdUploads={justCreated?.uploads}
       />
       <LessorImportDialog
         open={importOpen && canEdit}
