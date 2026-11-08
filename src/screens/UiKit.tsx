@@ -61,6 +61,7 @@ import { ActivityMockup } from '@/screens/ui-kit/ActivityMockup'
 import { BankLogosMockup } from '@/screens/ui-kit/BankLogosMockup'
 import { BreadcrumbsMockup } from '@/screens/ui-kit/BreadcrumbsMockup'
 import { PartyDocumentsMockup } from '@/screens/ui-kit/PartyDocumentsMockup'
+import { ClientPoPageMockup } from '@/screens/ui-kit/ClientPoPageMockup'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -127,6 +128,19 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // Owner 2026-11-08 (Notion EM-262): «صفحة /client-po-lab عجبتني ابغاك
+    // تستلهم منها لصفحة تفاصيل po العميل», with that day's decisions: no
+    // approval, four price units, a contract quantity or «حسب العمل», the
+    // contract value over the lines with both. Two variants to compare.
+    id: 'client-po-page',
+    title: 'نموذج صفحة PO العميل الجديدة',
+    purpose:
+      'صفحة تفاصيل PO العميل بروح صفحة التجربة: راس فيه حلقة مدة الامر، اربع بطاقات للقيمة والضريبة والمعدات، بنود بشريط المستهلك او «حسب العمل»، والتفاصيل والسجل بجانبها. نسختان: «ا» راس داكن و«ب» راس فاتح، ببيانات عينة.',
+    status: 'review',
+    defaultOpen: true,
+    element: <ClientPoPageMockup />,
+  },
   {
     // Owner 2026-11-07: «نبغى نضيف امكانية رفع الملفات pdf او صور في
     // معلومات الموردين والشركات», then «ابدا» on the plan; approved the same
