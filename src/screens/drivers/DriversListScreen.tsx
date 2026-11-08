@@ -218,7 +218,6 @@ export function DriversListScreen({ onSelectDriver }: DriversListScreenProps) {
         }
       />
       <DataListToolbar
-        compact
         config={driversListConfig}
         search={list.searchInput}
         onSearch={list.setSearchInput}
