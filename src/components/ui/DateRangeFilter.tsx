@@ -12,7 +12,7 @@ import {
   saudiMonthKeys,
   type MonthPreset,
 } from '@/lib/saudiTime'
-import { compareDateKeys, isValidDateKey } from '@/lib/calendar'
+import { compareDateKeys, nextCustomRange } from '@/lib/calendar'
 import { DatePicker } from './DatePicker'
 import { PRIMARY_ACTIVE_TRIGGER, Tabs, TabsList, TabsTrigger } from './Tabs'
 import { cn } from './cn'
@@ -21,7 +21,12 @@ export type DateRangePreset = MonthPreset | 'custom'
 
 export interface DateRangeValue {
   preset: DateRangePreset
-  /** Saudi calendar date keys (YYYY-MM-DD). Always a valid from <= to pair. */
+  /**
+   * Saudi calendar date keys (YYYY-MM-DD). A month preset is always a valid
+   * from <= to pair; in the custom preset either end may be '' (cleared with
+   * the date picker's X: an open-ended range, or no range at all when both
+   * are empty), and two set ends always keep from <= to.
+   */
   from: string
   to: string
 }
@@ -68,7 +73,8 @@ function translateFor(lang: Language) {
  * previous month and this month (1st → today), oldest first (owner
  * 2026-10-31) — plus a فترة مخصصة (custom) range. A month tab reads as the English month and its number,
  * "Oct (10)", in both UI languages. Presets always resolve to a valid
- * Saudi-time range; the custom range only calls `onChange` when from <= to.
+ * Saudi-time range; the custom range calls `onChange` when an end is cleared
+ * (an empty key) or when a picked date keeps from <= to (`nextCustomRange`).
  */
 export function DateRangeFilter({
   value,
@@ -95,17 +101,9 @@ export function DateRangeFilter({
     onChange({ preset: next, from, to })
   }
 
-  const setCustomFrom = (from: string) => {
-    if (!isValidDateKey(from)) return
-    if (isValidDateKey(value.to) && compareDateKeys(from, value.to) > 0) return
-    onChange({ preset: 'custom', from, to: value.to })
-  }
-
-  const setCustomTo = (to: string) => {
-    if (!isValidDateKey(to)) return
-    if (isValidDateKey(value.from) && compareDateKeys(value.from, to) > 0)
-      return
-    onChange({ preset: 'custom', from: value.from, to })
+  const setCustomEnd = (end: 'from' | 'to', key: string) => {
+    const next = nextCustomRange(value, end, key)
+    if (next) onChange({ preset: 'custom', ...next })
   }
 
   const fromMax = tighterMax(max, value.to || undefined)
@@ -139,7 +137,7 @@ export function DateRangeFilter({
             min={min}
             max={fromMax}
             lang={lang}
-            onChange={setCustomFrom}
+            onChange={(key) => setCustomEnd('from', key)}
             className="w-40"
           />
           <span aria-hidden="true" className="text-sm text-muted">
@@ -151,7 +149,7 @@ export function DateRangeFilter({
             min={toMin}
             max={max}
             lang={lang}
-            onChange={setCustomTo}
+            onChange={(key) => setCustomEnd('to', key)}
             className="w-40"
           />
         </div>

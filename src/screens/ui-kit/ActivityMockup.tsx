@@ -380,7 +380,9 @@ function matches(row: ActivityRow, filters: Filters, search: string): boolean {
   }
   if (filters.date) {
     const day = saudiDateKey(row.at)
-    if (day < filters.date.from || day > filters.date.to) return false
+    // A custom range may leave an end empty (cleared with the picker's X).
+    const { from, to } = filters.date
+    if ((from && day < from) || (to && day > to)) return false
   }
   const term = search.trim().toLowerCase()
   if (term) {

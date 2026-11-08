@@ -4,7 +4,6 @@ import {
   ChevronDown,
   Filter,
   MoreHorizontal,
-  Search,
 } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { countActiveFilters, type FilterBarAsyncField } from './FilterBar'
@@ -12,6 +11,7 @@ import { FilterDialog } from './FilterDialog'
 import { useListLabel } from './labels'
 import { type DataListConfig, type FilterField, type ListFilter } from './types'
 import { useI18n } from '@/i18n/I18nContext'
+import { SearchInput } from '@/components/ui'
 
 /**
  * Search, filters, sort and actions row of the shared list system.
@@ -119,20 +119,15 @@ export function DataListToolbar({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[220px] w-full sm:w-[360px] lg:w-[460px]">
-          <Search
-            size={compact ? 14 : 16}
-            className={`absolute top-1/2 -translate-y-1/2 text-muted ${config.id === 'equipment' ? 'left-3' : 'start-3'}`}
-          />
-          <input
-            className={`input ps-9 ${compact ? 'h-8 py-1 text-sm' : ''} ${config.id === 'equipment' ? 'text-left' : ''}`}
-            dir={config.id === 'equipment' ? 'ltr' : undefined}
-            value={search}
-            onChange={(event) => onSearch(event.target.value)}
-            placeholder={listLabel(config.searchPlaceholder)}
-            aria-label={listLabel(config.searchPlaceholder)}
-          />
-        </div>
+        <SearchInput
+          className="min-w-[220px] w-full sm:w-[360px] lg:w-[460px]"
+          size={compact ? 'sm' : 'md'}
+          dir={config.id === 'equipment' ? 'ltr' : undefined}
+          value={search}
+          onValueChange={onSearch}
+          placeholder={listLabel(config.searchPlaceholder)}
+          aria-label={listLabel(config.searchPlaceholder)}
+        />
         <div className="flex items-center gap-2 sm:ms-auto">
           {hasFilters && (
             <button

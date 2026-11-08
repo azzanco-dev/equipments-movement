@@ -58,6 +58,7 @@ import {
   type FieldErrors,
 } from '@/lib/formValidation'
 import { useListRequest } from '@/components/data-list/useListRequest'
+import { useUrlSearchPage } from '@/components/data-list/useUrlSearchPage'
 import { RelativeTime } from '@/components/RelativeTime'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { canOpenPage, type RoutePage } from '@/lib/navPermissions'
@@ -122,9 +123,10 @@ export function AdminSettings() {
   const [rows, setRows] = useState<EquipmentTypeRow[]>([])
   const [total, setTotal] = useState(0)
   const [typesCount, setTypesCount] = useState<number | null>(null)
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
-  const [searchInput, setSearchInput] = useState('')
+  // `q` and `page` live in the URL (EM-121), only while the equipment-types
+  // section is the one shown: the other /settings/* sections own their URL.
+  const { page, setPage, search, searchInput, setSearchInput } =
+    useUrlSearchPage(showEquipmentTypes)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -149,14 +151,6 @@ export function AdminSettings() {
   const { confirm, confirmDialog } = useConfirm()
 
   const startRequest = useListRequest()
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setSearch(searchInput.trim())
-      setPage(1)
-    }, 300)
-    return () => window.clearTimeout(timer)
-  }, [searchInput])
-
   const fetchRows = useCallback(async () => {
     const signal = startRequest()
     setLoading(true)

@@ -134,3 +134,32 @@ export function buildMonthGrid(
     cells.push({ dateKey: formatDateKey(year, month, day), day })
   return cells
 }
+
+export interface DateKeyRange {
+  from: string
+  to: string
+}
+
+/**
+ * The next custom range after one end's date picker changed, or null when the
+ * change is refused. An empty key clears that end (the picker's own X), which
+ * leaves an open-ended or empty range; a malformed key is ignored; a valid key
+ * is accepted only while it keeps from <= to against a valid other end.
+ */
+export function nextCustomRange(
+  range: DateKeyRange,
+  end: 'from' | 'to',
+  key: string,
+): DateKeyRange | null {
+  if (key === '') return { ...range, [end]: '' }
+  if (!isValidDateKey(key)) return null
+  const from = end === 'from' ? key : range.from
+  const to = end === 'to' ? key : range.to
+  if (
+    isValidDateKey(from) &&
+    isValidDateKey(to) &&
+    compareDateKeys(from, to) > 0
+  )
+    return null
+  return { from, to }
+}

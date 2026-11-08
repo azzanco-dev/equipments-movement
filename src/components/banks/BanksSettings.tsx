@@ -16,6 +16,7 @@ import type { DataTableColumn } from '@/components/ui'
 import { Notice } from '@/components/ui/Notice'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { useListRequest } from '@/components/data-list/useListRequest'
+import { useUrlSearchPage } from '@/components/data-list/useUrlSearchPage'
 import { RelativeTime } from '@/components/RelativeTime'
 import { BankLogo } from '@/components/banks/BankLogo'
 import { usePermissions } from '@/auth/PermissionsContext'
@@ -64,9 +65,9 @@ export function BanksSettings() {
   const canEdit = lessorsActions(usePermissions()).edit
   const [rows, setRows] = useState<BankRow[]>([])
   const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
-  const [searchInput, setSearchInput] = useState('')
+  // `q` and `page` live in the URL (EM-121), so Back and reload restore them.
+  const { page, setPage, search, searchInput, setSearchInput } =
+    useUrlSearchPage()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -79,14 +80,6 @@ export function BanksSettings() {
   const formRef = useRef<HTMLDivElement>(null)
   const { confirm, confirmDialog } = useConfirm()
   const startRequest = useListRequest()
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setSearch(searchInput.trim())
-      setPage(1)
-    }, 300)
-    return () => window.clearTimeout(timer)
-  }, [searchInput])
 
   const fetchRows = useCallback(async () => {
     const signal = startRequest()
