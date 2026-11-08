@@ -145,7 +145,7 @@ export function Layout({
         className="sticky top-0 z-40 border-b"
         style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}
       >
-        <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6">
+        <div className="mx-auto flex h-16 max-w-[1700px] items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
             {navItems.length > 0 && (
               <IconButton
@@ -266,7 +266,7 @@ export function Layout({
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-[1600px]">
+      <div className="mx-auto flex max-w-[1700px]">
         {/* Sidebar — desktop */}
         {navItems.length > 0 && (
           <aside
