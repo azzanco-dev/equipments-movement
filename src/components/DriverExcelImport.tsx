@@ -4,8 +4,7 @@ import { usePermissions } from '@/auth/PermissionsContext'
 import { driversActions, refusedByPolicy } from '@/lib/actionPermissions'
 import { supabase } from '@/lib/supabase'
 import { workbookReadErrorKey } from '@/lib/safeWorkbook'
-import { Alert } from '@/components/Alert'
-import { Button, Dialog } from '@/components/ui'
+import { Button, Dialog, Notice } from '@/components/ui'
 import {
   DRIVER_EMPLOYEE_NUMBER_IMPORT_ERROR,
   downloadDriverTemplate,
@@ -203,30 +202,28 @@ export function DriverExcelImport({
     >
       <div className="space-y-4">
         {(error || !canImport) && (
-          <Alert type="error">{error || t('driverImportNotAllowed')}</Alert>
+          <Notice tone="danger">{error || t('driverImportNotAllowed')}</Notice>
         )}
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="btn-outline"
-            onClick={downloadDriverTemplate}
-          >
+          <Button variant="outline" onClick={downloadDriverTemplate}>
             <Download size={17} />
             {t('downloadTemplate')}
-          </button>
-          <label className="btn-primary cursor-pointer">
-            <Upload size={17} />
-            {t('uploadExcel')}
-            <input
-              className="hidden"
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={(event) => {
-                chooseFile(event.target.files?.[0])
-                event.target.value = ''
-              }}
-            />
-          </label>
+          </Button>
+          <Button asChild variant="primary">
+            <label className="cursor-pointer">
+              <Upload size={17} />
+              {t('uploadExcel')}
+              <input
+                className="hidden"
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(event) => {
+                  chooseFile(event.target.files?.[0])
+                  event.target.value = ''
+                }}
+              />
+            </label>
+          </Button>
         </div>
         {!rows.length ? (
           <div className="rounded-lg border border-dashed py-12 text-center text-muted">

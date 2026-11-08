@@ -478,3 +478,24 @@ test('the /logs foreman filter is a bounded server-side search', () => {
   // No preloaded foreman list is injected into the config any more.
   assert.doesNotMatch(source, /setForemen|\.limit\(200\)/)
 })
+
+test('the shared list pieces render the shared Button, not legacy classes', () => {
+  for (const file of [
+    'src/components/data-list/DataListToolbar.tsx',
+    'src/components/data-list/DataListPagination.tsx',
+    'src/components/data-list/DataListActions.tsx',
+    'src/components/AsyncSearchSelect.tsx',
+    'src/components/AsyncMultiSelect.tsx',
+  ]) {
+    const source = read(file)
+    assert.doesNotMatch(source, /btn-(outline|ghost|primary)/, file)
+    assert.doesNotMatch(source, /\b(bg|text)-(gray|red)-\d/, file)
+  }
+  const toolbar = read('src/components/data-list/DataListToolbar.tsx')
+  // Main-row controls follow the search field's size.
+  assert.match(toolbar, /const controlSize = compact \? 'sm' : 'md'/)
+  // The sort direction is a pressed toggle on a token background.
+  assert.match(toolbar, /aria-pressed=\{direction === 'asc'\}/)
+  assert.match(toolbar, /aria-pressed=\{direction === 'desc'\}/)
+  assert.match(toolbar, /bg-surface-hover/)
+})

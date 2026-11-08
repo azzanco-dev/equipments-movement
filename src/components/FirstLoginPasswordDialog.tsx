@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react'
-import { Button, Dialog, Field } from '@/components/ui'
+import { Button, Dialog, Field, Notice } from '@/components/ui'
 import { PasswordInput } from '@/components/PasswordInput'
-import { Alert } from '@/components/Alert'
 import { useAuth } from '@/auth/AuthContext'
 import { useI18n } from '@/i18n/I18nContext'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
@@ -106,7 +105,7 @@ export function FirstLoginPasswordDialog() {
       }
     >
       <div ref={bodyRef} className="space-y-4">
-        {error && <Alert type="error">{error}</Alert>}
+        {error && <Notice tone="danger">{error}</Notice>}
         <Field
           label={t('newPassword')}
           name="password"

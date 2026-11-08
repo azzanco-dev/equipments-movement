@@ -92,3 +92,11 @@ export function Notice({
     </div>
   )
 }
+
+/** The legacy `Alert` type of a message, as kept in some screens' state. */
+export type AlertType = 'error' | 'success' | 'info' | 'warning'
+
+/** Maps a legacy `Alert` type to its `Notice` tone (error → danger). */
+export function alertTypeTone(type: AlertType): NoticeTone {
+  return type === 'error' ? 'danger' : type
+}

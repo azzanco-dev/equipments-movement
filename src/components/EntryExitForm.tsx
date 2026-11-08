@@ -4,10 +4,10 @@ import { useI18n } from '@/i18n/I18nContext'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { movementFormActions } from '@/lib/actionPermissions'
-import { Alert } from '@/components/Alert'
 import { AlertTriangle } from 'lucide-react'
 import type { Driver, Equipment, MovementType, LastMovement } from '@/lib/types'
 import {
+  Notice,
   BackButton,
   Button,
   DatePicker,
@@ -924,12 +924,12 @@ export function EntryExitForm({
             {/* Validation warning. The panel above already explains the
                 blocked entry, so the generic message is not repeated. */}
             {validationError && !notifyForemanMovement && (
-              <Alert type="error">
+              <Notice tone="danger">
                 <div className="flex items-start gap-2">
                   <AlertTriangle size={16} className="mt-0.5 shrink-0" />
                   <span>{validationError}</span>
                 </div>
-              </Alert>
+              </Notice>
             )}
 
             {/* Form fields */}
@@ -1177,10 +1177,10 @@ export function EntryExitForm({
             </div>
 
             <div ref={successRef} className="space-y-3">
-              {saveError && <Alert type="error">{saveError}</Alert>}
-              {saveWarning && <Alert type="warning">{saveWarning}</Alert>}
+              {saveError && <Notice tone="danger">{saveError}</Notice>}
+              {saveWarning && <Notice tone="warning">{saveWarning}</Notice>}
               {movementSaved && (
-                <Alert type="success">{t('movementSavedSuccess')}</Alert>
+                <Notice tone="success">{t('movementSavedSuccess')}</Notice>
               )}
 
               {/* Actions */}

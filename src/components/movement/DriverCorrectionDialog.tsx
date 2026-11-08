@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
-import { Alert } from '@/components/Alert'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/components/Select'
-import { Button, Dialog, Field } from '@/components/ui'
+import { Button, Dialog, Field, Notice } from '@/components/ui'
 import type { TranslationKey } from '@/i18n/translations'
 import {
   correctVisitDriver,
@@ -106,7 +105,7 @@ export function DriverCorrectionDialog({
             )}
           </p>
         </div>
-        {error && <Alert type="error">{t(error)}</Alert>}
+        {error && <Notice tone="danger">{t(error)}</Notice>}
         <Field
           label={t('driverCorrectionNew')}
           name="driver_id"

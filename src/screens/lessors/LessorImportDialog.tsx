@@ -6,8 +6,7 @@ import {
   FileSpreadsheet,
   XCircle,
 } from 'lucide-react'
-import { Button, Checkbox, Dialog } from '@/components/ui'
-import { Alert } from '@/components/Alert'
+import { Button, Checkbox, Dialog, Notice } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { refusedByPolicy } from '@/lib/actionPermissions'
 import {
@@ -53,9 +52,10 @@ export function LessorImportDialog({
   const [error, setError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [reading, setReading] = useState(false)
-  const [result, setResult] = useState<{ success: number; fail: number } | null>(
-    null,
-  )
+  const [result, setResult] = useState<{
+    success: number
+    fail: number
+  } | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -123,14 +123,17 @@ export function LessorImportDialog({
     setRows(parsed)
     setSelected(
       new Set(
-        parsed.filter((row) => row._errors.length === 0).map((r) => r._rowNumber),
+        parsed
+          .filter((row) => row._errors.length === 0)
+          .map((r) => r._rowNumber),
       ),
     )
   }
 
   const validRows = rows.filter((row) => row._errors.length === 0)
   const allValidSelected =
-    validRows.length > 0 && validRows.every((row) => selected.has(row._rowNumber))
+    validRows.length > 0 &&
+    validRows.every((row) => selected.has(row._rowNumber))
 
   const toggle = (rowNumber: number) => {
     const next = new Set(selected)
@@ -228,9 +231,9 @@ export function LessorImportDialog({
       }
     >
       <div className="space-y-4">
-        {error && <Alert type="error">{error}</Alert>}
+        {error && <Notice tone="danger">{error}</Notice>}
         {result && (
-          <Alert type={result.fail > 0 ? 'warning' : 'success'}>
+          <Notice tone={result.fail > 0 ? 'warning' : 'success'}>
             {result.fail > 0
               ? t('lessorsImportPartialSuccess')
                   .replace('{success}', String(result.success))
@@ -239,7 +242,7 @@ export function LessorImportDialog({
                   '{count}',
                   String(result.success),
                 )}
-          </Alert>
+          </Notice>
         )}
 
         {rows.length === 0 && !result && (
@@ -348,7 +351,9 @@ export function LessorImportDialog({
                             onCheckedChange={() => toggle(row._rowNumber)}
                           />
                         </td>
-                        <td className="px-3 py-2 text-muted">{row._rowNumber}</td>
+                        <td className="px-3 py-2 text-muted">
+                          {row._rowNumber}
+                        </td>
                         <td className="px-3 py-2 font-semibold">
                           {row.name || '—'}
                         </td>

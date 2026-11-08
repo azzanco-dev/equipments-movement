@@ -1,6 +1,7 @@
 import { MoreHorizontal } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useI18n } from '@/i18n/I18nContext'
+import { IconButton } from '@/components/ui/Button'
 
 export function DataListActions({
   menuActions,
@@ -25,13 +26,14 @@ export function DataListActions({
     <div className="flex items-center gap-2" ref={ref}>
       {menuActions && (
         <div className="relative">
-          <button
-            className="btn-outline px-2.5"
+          {/* Beside the page header's primary action (a default-size
+              Button), so it takes the same default height. */}
+          <IconButton
+            variant="outline"
             onClick={() => setOpen((value) => !value)}
-            aria-label={t('moreActions')}
-          >
-            <MoreHorizontal size={18} />
-          </button>
+            label={t('moreActions')}
+            icon={<MoreHorizontal size={18} />}
+          />
           {open && (
             <div
               className="absolute end-0 top-[calc(100%+6px)] z-40 min-w-[180px] space-y-1 rounded-lg border p-1.5 shadow-xl [&>button]:w-full [&>button]:justify-start"

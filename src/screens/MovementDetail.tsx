@@ -3,7 +3,6 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
 import { useTabTitle } from '@/components/TabTitle'
-import { Alert } from '@/components/Alert'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import {
@@ -1066,10 +1065,10 @@ export function MovementDetail({
         }
       />
 
-      {deleteError && <Alert type="error">{deleteError}</Alert>}
+      {deleteError && <Notice tone="danger">{deleteError}</Notice>}
       {/* Partial success: the correction was stored, a follow-up step was
           not. Never reported as a total failure. */}
-      {editWarning && <Alert type="warning">{editWarning}</Alert>}
+      {editWarning && <Notice tone="warning">{editWarning}</Notice>}
 
       {/* Movement type banner: same card surface as the sections below
           (owner decision 2026-09-30). */}
@@ -1127,7 +1126,7 @@ export function MovementDetail({
           </div>
           {photoActionError && (
             <div className="mb-3">
-              <Alert type="error">{photoActionError}</Alert>
+              <Notice tone="danger">{photoActionError}</Notice>
             </div>
           )}
           {/* The "no photo" state lives in the gallery's main box, so the
@@ -1283,7 +1282,7 @@ export function MovementDetail({
                 )}
               </Field>
               {driverChangeError && (
-                <Alert type="error">{driverChangeError}</Alert>
+                <Notice tone="danger">{driverChangeError}</Notice>
               )}
               <div className="flex gap-2">
                 <Button
@@ -1419,7 +1418,7 @@ export function MovementDetail({
             <Link2 size={16} /> {t('linkedExit')}
           </h3>
           {linkedError ? (
-            <Alert type="error">{linkedError}</Alert>
+            <Notice tone="danger">{linkedError}</Notice>
           ) : linkedLog ? (
             <div className="space-y-2">
               <DescriptionList
@@ -1458,7 +1457,7 @@ export function MovementDetail({
             <Link2 size={16} /> {t('linkedEntry')}
           </h3>
           {linkedError ? (
-            <Alert type="error">{linkedError}</Alert>
+            <Notice tone="danger">{linkedError}</Notice>
           ) : linkedLog ? (
             <div className="space-y-2">
               <DescriptionList
@@ -1566,7 +1565,7 @@ export function MovementDetail({
           }
         >
           <div className="space-y-3">
-            {codeEditError && <Alert type="error">{codeEditError}</Alert>}
+            {codeEditError && <Notice tone="danger">{codeEditError}</Notice>}
             <Field
               label={t('contractorEquipmentCode')}
               name="contractor_code"

@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react'
 import { Download, FileSpreadsheet, Upload } from 'lucide-react'
-import { Alert } from '@/components/Alert'
-import { Dialog } from '@/components/ui'
+import { Button, Dialog, Notice } from '@/components/ui'
 import { supabase } from '@/lib/supabase'
 import { workbookReadErrorKey } from '@/lib/safeWorkbook'
 import { useI18n } from '@/i18n/I18nContext'
@@ -284,9 +283,9 @@ export function EquipmentExcelUpdate({
       size="lg"
     >
       <div className="space-y-4">
-        {error && <Alert type="error">{error}</Alert>}
+        {error && <Notice tone="danger">{error}</Notice>}
         {result && (
-          <Alert type={result.fail ? 'warning' : 'success'}>
+          <Notice tone={result.fail ? 'warning' : 'success'}>
             {(result.fail
               ? t('equipmentUpdatePartial')
               : t('equipmentUpdateSuccess')
@@ -294,29 +293,33 @@ export function EquipmentExcelUpdate({
               .replace('{success}', String(result.success))
               .replace('{fail}', String(result.fail))
               .replace('{count}', String(result.success))}
-          </Alert>
+          </Notice>
         )}
         {!rows.length && !result ? (
           <>
-            <Alert type="info">{t('equipmentUpdateInstructionPreview')}</Alert>
+            <Notice tone="info">
+              {t('equipmentUpdateInstructionPreview')}
+            </Notice>
             <div className="grid gap-3 sm:grid-cols-2">
-              <button
-                className="btn-outline"
+              <Button
+                variant="outline"
                 disabled={busy}
                 onClick={exportWorkbook}
               >
                 <Download size={16} /> {t('exportEquipmentForUpdate')}
-              </button>
-              <label className="btn-primary cursor-pointer">
-                <Upload size={16} /> {t('uploadEquipmentUpdate')}
-                <input
-                  ref={inputRef}
-                  className="hidden"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={(event) => chooseFile(event.target.files?.[0])}
-                />
-              </label>
+              </Button>
+              <Button asChild variant="primary">
+                <label className="cursor-pointer">
+                  <Upload size={16} /> {t('uploadEquipmentUpdate')}
+                  <input
+                    ref={inputRef}
+                    className="hidden"
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={(event) => chooseFile(event.target.files?.[0])}
+                  />
+                </label>
+              </Button>
             </div>
           </>
         ) : rows.length ? (
@@ -409,28 +412,30 @@ export function EquipmentExcelUpdate({
               </table>
             </div>
             <div className="flex gap-3">
-              <button className="btn-outline flex-1" onClick={reset}>
+              <Button variant="outline" className="flex-1" onClick={reset}>
                 {t('cancel')}
-              </button>
-              <button
-                className="btn-primary flex-1"
+              </Button>
+              <Button
+                variant="primary"
+                className="flex-1"
                 disabled={busy || !selected.size}
                 onClick={applyUpdates}
               >
                 {t('applyEquipmentUpdates')} ({selected.size})
-              </button>
+              </Button>
             </div>
           </>
         ) : (
-          <button
-            className="btn-primary w-full"
+          <Button
+            variant="primary"
+            className="w-full"
             onClick={() => {
               reset()
               onClose()
             }}
           >
             {t('close')}
-          </button>
+          </Button>
         )}
         {!rows.length && (
           <div className="flex justify-center text-muted">

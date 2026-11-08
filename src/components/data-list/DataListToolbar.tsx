@@ -11,7 +11,7 @@ import { FilterDialog } from './FilterDialog'
 import { useListLabel } from './labels'
 import { type DataListConfig, type FilterField, type ListFilter } from './types'
 import { useI18n } from '@/i18n/I18nContext'
-import { SearchInput } from '@/components/ui'
+import { Button, IconButton, SearchInput } from '@/components/ui'
 
 /**
  * Search, filters, sort and actions row of the shared list system.
@@ -114,6 +114,9 @@ export function DataListToolbar({
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [])
+  // Controls in the main row take the search field's height: `md` beside the
+  // normal field, `sm` in the compact toolbar.
+  const controlSize = compact ? 'sm' : 'md'
   const toggle = (target: 'sort' | 'actions') =>
     setOpen((current) => (current === target ? null : target))
   return (
@@ -130,9 +133,9 @@ export function DataListToolbar({
         />
         <div className="flex items-center gap-2 sm:ms-auto">
           {hasFilters && (
-            <button
-              type="button"
-              className="btn-outline"
+            <Button
+              variant="outline"
+              size={controlSize}
               aria-haspopup="dialog"
               onClick={() => {
                 setOpen(null)
@@ -144,12 +147,13 @@ export function DataListToolbar({
                 {t('filters')}
                 {activeFilters > 0 ? ` (${activeFilters})` : ''}
               </span>
-            </button>
+            </Button>
           )}
           <div className="relative">
-            <button
+            <Button
+              variant="outline"
+              size={controlSize}
               data-list-trigger="true"
-              className="btn-outline"
               onClick={() => toggle('sort')}
             >
               {direction === 'asc' ? (
@@ -161,7 +165,7 @@ export function DataListToolbar({
                 {currentSort ? listLabel(currentSort.label) : t('sortBy')}
               </span>
               <ChevronDown size={14} />
-            </button>
+            </Button>
             {open === 'sort' && (
               // On a phone the sort button sits near the start edge, so the
               // box hangs from its start side and opens inward; from `sm`
@@ -179,30 +183,36 @@ export function DataListToolbar({
                   className="flex gap-1 border-b px-2 pb-2"
                   style={{ borderColor: 'var(--border)' }}
                 >
-                  <button
-                    className={`btn-ghost flex-1 ${direction === 'asc' ? 'bg-gray-100 dark:bg-gray-700' : ''}`}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-pressed={direction === 'asc'}
+                    className={`flex-1 ${direction === 'asc' ? 'bg-surface-hover' : ''}`}
                     onClick={() => {
                       onSort(sort, 'asc')
                       setOpen(null)
                     }}
                   >
                     {t('ascending')}
-                  </button>
-                  <button
-                    className={`btn-ghost flex-1 ${direction === 'desc' ? 'bg-gray-100 dark:bg-gray-700' : ''}`}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-pressed={direction === 'desc'}
+                    className={`flex-1 ${direction === 'desc' ? 'bg-surface-hover' : ''}`}
                     onClick={() => {
                       onSort(sort, 'desc')
                       setOpen(null)
                     }}
                   >
                     {t('descending')}
-                  </button>
+                  </Button>
                 </div>
                 <div className="max-h-72 overflow-y-auto p-1">
                   {config.sortableFields.map((field) => (
                     <button
                       key={field.key}
-                      className={`flex w-full items-center rounded-lg px-3 py-2 text-start text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${field.key === sort ? 'font-semibold' : ''}`}
+                      className={`flex w-full items-center rounded-lg px-3 py-2 text-start text-sm hover:bg-surface-hover ${field.key === sort ? 'font-semibold' : ''}`}
                       onClick={() => {
                         onSort(field.key, direction)
                         setOpen(null)
@@ -218,14 +228,14 @@ export function DataListToolbar({
         </div>
         {menuActions && (
           <div className="relative">
-            <button
+            <IconButton
+              variant="outline"
+              size={controlSize}
               data-list-trigger="true"
-              className="btn-outline px-2.5"
               onClick={() => toggle('actions')}
-              aria-label={t('moreActions')}
-            >
-              <MoreHorizontal size={18} />
-            </button>
+              label={t('moreActions')}
+              icon={<MoreHorizontal size={18} />}
+            />
             {open === 'actions' && (
               <div
                 data-list-popover="true"

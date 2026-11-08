@@ -4,8 +4,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import { useTheme } from '@/theme/ThemeContext'
 import { Sun, Moon, Languages } from 'lucide-react'
 import { PasswordInput } from '@/components/PasswordInput'
-import { Alert } from '@/components/Alert'
-import { Button, Field, IconButton, Input } from '@/components/ui'
+import { Button, Field, IconButton, Input, Notice } from '@/components/ui'
 import { useRouter } from 'next/navigation'
 import {
   clearFieldErrors,
@@ -160,7 +159,7 @@ export function AuthScreen() {
                 )}
               </Field>
 
-              {error && <Alert type="error">{error}</Alert>}
+              {error && <Notice tone="danger">{error}</Notice>}
 
               <Button
                 type="submit"

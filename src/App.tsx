@@ -7,6 +7,7 @@ import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import { FullPageSpinner } from '@/components/Spinner'
+import { Button } from '@/components/ui/Button'
 import { Layout } from '@/components/Layout'
 import { TabTitleProvider, useTabTitleRecord } from '@/components/TabTitle'
 import { tabTitle } from '@/lib/pageTitle'
@@ -367,9 +368,9 @@ function NoPermissionsPage({ onSignOut }: { onSignOut: () => void }) {
       <div className="card w-full max-w-md space-y-4 text-center">
         <h1 className="text-lg font-semibold">{t('noPermissionsTitle')}</h1>
         <p className="text-muted">{t('noPermissionsBody')}</p>
-        <button className="btn-primary mx-auto" onClick={onSignOut}>
+        <Button variant="primary" className="mx-auto" onClick={onSignOut}>
           {t('signOut')}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -479,9 +480,9 @@ function AppContent() {
       <div className="flex min-h-[100dvh] items-center justify-center p-4">
         <div className="card w-full max-w-md space-y-4 text-center">
           <p>{t('profileLoadError')}</p>
-          <button className="btn-primary mx-auto" onClick={retryProfile}>
+          <Button variant="primary" className="mx-auto" onClick={retryProfile}>
             {t('retry')}
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -504,15 +505,12 @@ function AppContent() {
         <div className="card w-full max-w-md space-y-4 text-center">
           <p>{t('permissionsLoadError')}</p>
           <div className="flex flex-wrap justify-center gap-2">
-            <button
-              className="btn-primary"
-              onClick={() => void reloadPermissions()}
-            >
+            <Button variant="primary" onClick={() => void reloadPermissions()}>
               {t('retry')}
-            </button>
-            <button className="btn-outline" onClick={() => void signOut()}>
+            </Button>
+            <Button variant="outline" onClick={() => void signOut()}>
               {t('signOut')}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -573,7 +571,8 @@ function AppContent() {
   let trailValue: PageTrailValue | null = null
   if (trail) {
     const lastUrls = readLastUrls()
-    const toParent = backTargetPath(navTrail, trail.parentPath) === trail.parentPath
+    const toParent =
+      backTargetPath(navTrail, trail.parentPath) === trail.parentPath
     trailValue = {
       trail: {
         ...trail,
@@ -686,10 +685,7 @@ function AppContent() {
             }
           />
         ) : page === 'drivers/:id' ? (
-          <DriverDetail
-            driverId={detailId}
-            onBack={goBackTo('/drivers')}
-          />
+          <DriverDetail driverId={detailId} onBack={goBackTo('/drivers')} />
         ) : page === 'users/:id' ? (
           <UserDetail userId={detailId} onBack={goBackTo('/users')} />
         ) : (

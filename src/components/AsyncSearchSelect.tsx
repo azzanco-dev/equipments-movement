@@ -11,6 +11,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import type { SelectOption } from '@/lib/selectOption'
 import { Badge, type BadgeTone } from '@/components/ui/Badge'
 import { cn } from '@/components/ui/cn'
+import { Button } from '@/components/ui/Button'
 import {
   Popover,
   PopoverContent,
@@ -302,13 +303,13 @@ export function AsyncSearchSelect({
           className="space-y-2 px-3 py-4 text-center text-sm text-muted"
         >
           <p>{t('optionsLoadError')}</p>
-          <button
-            type="button"
-            className="btn-outline"
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setRetry((current) => current + 1)}
           >
             {t('retry')}
-          </button>
+          </Button>
         </div>
       ) : options.length === 0 ? (
         <div className="px-3 py-5 text-center text-sm text-muted">

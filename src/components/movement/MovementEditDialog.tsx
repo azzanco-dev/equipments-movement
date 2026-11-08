@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useI18n } from '@/i18n/I18nContext'
-import { Alert } from '@/components/Alert'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/components/Select'
 import {
@@ -48,7 +47,6 @@ import {
   correctVisitDriver,
   driverCorrectionError,
 } from '@/lib/driverCorrection'
-
 
 export interface MovementEditDialogProps {
   open: boolean
@@ -407,7 +405,7 @@ export function MovementEditDialog({
       }
     >
       <div ref={bodyRef} className="space-y-4">
-        {error && <Alert type="error">{error}</Alert>}
+        {error && <Notice tone="danger">{error}</Notice>}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field
             label={t('equipmentNameLabel')}

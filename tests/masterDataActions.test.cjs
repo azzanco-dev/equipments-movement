@@ -383,7 +383,7 @@ const GATES = {
   ],
   'src/screens/companies/CompanyProjectsDialog.tsx': [
     /const canEdit = companiesProjectsActions\(usePermissions\(\)\)\.edit/,
-    /\{canEdit && \(\s*<button\s+onClick=\{\(\) => removeLink/,
+    /\{canEdit && \(\s*<IconButton[^>]*?onClick=\{\(\) => removeLink/,
     /\{canEdit && \(\s*<div[\s\S]*?addProjectLink/,
   ],
   'src/screens/projects/ProjectsListScreen.tsx': [

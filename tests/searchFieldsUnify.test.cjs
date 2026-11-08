@@ -85,7 +85,10 @@ const { dateRangeFilter } = loadModule(
 
 test('the list toolbar uses the shared SearchInput, not a raw input', () => {
   const source = read('src', 'components', 'data-list', 'DataListToolbar.tsx')
-  assert.match(source, /import \{ SearchInput \} from '@\/components\/ui'/)
+  assert.match(
+    source,
+    /import \{[^}]*\bSearchInput\b[^}]*\} from '@\/components\/ui'/,
+  )
   assert.match(source, /<SearchInput[\s\S]*?onValueChange=\{onSearch\}/)
   assert.doesNotMatch(source, /<input\s+className="input ps-9/)
   // The compact embedded lists keep a smaller box; the equipment list stays LTR.
@@ -99,7 +102,7 @@ test('the list toolbar uses the shared SearchInput, not a raw input', () => {
 
 test('Input keeps its default height and offers an opt-in small size', () => {
   const source = read('src', 'components', 'ui', 'Input.tsx')
-  assert.match(source, /size === 'sm' \? 'h-8 py-1 text-sm' : 'h-10 md:h-9'/)
+  assert.match(source, /size === 'sm' \? 'h-7 py-1 text-sm' : 'h-10 md:h-9'/)
   assert.match(source, /size = 'md'/)
   // The icon wrapper follows a forced field direction (the icon's side).
   assert.match(source, /dir=\{props\.dir\}/)

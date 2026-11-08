@@ -1,14 +1,16 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Download, FileSpreadsheet, Upload } from 'lucide-react'
-import { Alert } from '@/components/Alert'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import { Select, type SelectOption } from '@/components/Select'
 import {
+  Notice,
+  alertTypeTone,
   Badge,
   Button,
   DataTable,
   EmptyState,
   ErrorState,
+  Input,
   PageHeader,
   Skeleton,
   useConfirm,
@@ -456,8 +458,9 @@ export function MovementImport() {
       header: t('companyNumber'),
       width: '10rem',
       cell: (row) => (
-        <input
-          className="input"
+        <Input
+          size="sm"
+          aria-label={t('companyNumber')}
           value={row.contractor_equipment_code}
           onChange={(event) =>
             updateRow(row.row_number, {
@@ -472,9 +475,10 @@ export function MovementImport() {
       header: t('entryDate'),
       width: '10rem',
       cell: (row) => (
-        <input
+        <Input
+          size="sm"
+          aria-label={t('entryDate')}
           type="date"
-          className="input"
           value={row.entry_date}
           disabled={row.mode === 'exit'}
           onChange={(event) =>
@@ -488,9 +492,10 @@ export function MovementImport() {
       header: t('exitDate'),
       width: '10rem',
       cell: (row) => (
-        <input
+        <Input
+          size="sm"
+          aria-label={t('exitDate')}
           type="date"
-          className="input"
           value={row.exit_date}
           disabled={row.mode === 'entry'}
           onChange={(event) =>
@@ -504,8 +509,9 @@ export function MovementImport() {
       header: t('notes'),
       width: '15rem',
       cell: (row) => (
-        <input
-          className="input"
+        <Input
+          size="sm"
+          aria-label={t('notes')}
           value={row.notes}
           onChange={(event) =>
             updateRow(row.row_number, { notes: event.target.value })
@@ -580,7 +586,7 @@ export function MovementImport() {
       />
 
       {message && !readFailed && (
-        <Alert type={message.type}>{message.text}</Alert>
+        <Notice tone={alertTypeTone(message.type)}>{message.text}</Notice>
       )}
 
       {!rows.length ? (

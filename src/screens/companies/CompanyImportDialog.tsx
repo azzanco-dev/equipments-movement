@@ -6,8 +6,7 @@ import {
   FileSpreadsheet,
   XCircle,
 } from 'lucide-react'
-import { Dialog } from '@/components/ui'
-import { Alert } from '@/components/Alert'
+import { Button, Dialog, Notice } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { refusedByPolicy } from '@/lib/actionPermissions'
 import { supabase } from '@/lib/supabase'
@@ -194,12 +193,12 @@ export function CompanyImportDialog({
     >
       {importError && (
         <div className="mb-4">
-          <Alert type="error">{importError}</Alert>
+          <Notice tone="danger">{importError}</Notice>
         </div>
       )}
       {importResult && (
         <div className="mb-4">
-          <Alert type={importResult.fail > 0 ? 'warning' : 'success'}>
+          <Notice tone={importResult.fail > 0 ? 'warning' : 'success'}>
             {importResult.fail > 0
               ? t('importPartialSuccess')
                   .replace('{success}', String(importResult.success))
@@ -208,19 +207,20 @@ export function CompanyImportDialog({
                   '{count}',
                   String(importResult.success),
                 )}
-          </Alert>
+          </Notice>
         </div>
       )}
 
       {importData.length === 0 && !importResult ? (
         <div className="space-y-4">
           <div className="flex justify-end">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => downloadCompanyTemplate(t)}
-              className="btn-ghost text-sm"
             >
               <Download size={16} /> {t('downloadTemplate')}
-            </button>
+            </Button>
           </div>
           <div
             className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors ${dragOver ? 'border-primary bg-primary/5' : 'border-border'}`}
@@ -265,18 +265,19 @@ export function CompanyImportDialog({
               </span>
             </div>
             <div className="flex gap-2">
-              <button onClick={toggleAllValid} className="btn-ghost text-sm">
+              <Button variant="ghost" size="sm" onClick={toggleAllValid}>
                 {selectedRows.size ===
                 importData.filter((r) => r._errors.length === 0).length
                   ? t('deselectAll')
                   : t('selectAll')}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => downloadCompanyTemplate(t)}
-                className="btn-ghost text-sm"
               >
                 <Download size={16} /> {t('downloadTemplate')}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -358,31 +359,32 @@ export function CompanyImportDialog({
           </div>
 
           <div className="flex gap-3 pt-2">
-            <button onClick={resetImport} className="btn-outline flex-1">
+            <Button variant="outline" className="flex-1" onClick={resetImport}>
               {t('cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="primary"
+              className="flex-1"
               onClick={handleImport}
               disabled={importing || selectedRows.size === 0}
-              className="btn-primary flex-1"
             >
               {importing
                 ? t('importing')
                 : `${t('importSelected')} (${selectedRows.size})`}
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-4 py-8">
-          <button
+          <Button
+            variant="primary"
             onClick={() => {
               resetImport()
               onOpenChange(false)
             }}
-            className="btn-primary"
           >
             {t('close')}
-          </button>
+          </Button>
         </div>
       )}
     </Dialog>

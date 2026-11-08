@@ -16,7 +16,7 @@ export interface InputProps extends Omit<
 > {
   /**
    * Field height. `md` (default) is the approved 40 px on mobile / 36 px from
-   * md; `sm` is the 32 px of the legacy toolbar buttons, for the compact
+   * md; `sm` is 28 px, the height of Button `size="sm"`, for the compact
    * toolbars of the embedded lists. Replaces the native `size` attribute,
    * which no shared field uses.
    */
@@ -43,7 +43,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       aria-invalid={invalid || props['aria-invalid'] || undefined}
       className={cn(
         'input',
-        size === 'sm' ? 'h-8 py-1 text-sm' : 'h-10 md:h-9',
+        size === 'sm' ? 'h-7 py-1 text-sm' : 'h-10 md:h-9',
         !!startIcon && 'ps-9',
         !!endSlot && 'pe-9',
         !startIcon && !endSlot && className,

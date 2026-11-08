@@ -4,6 +4,7 @@ import { Check, ChevronDown, Loader2, Search, X } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import type { SelectOption } from '@/lib/selectOption'
 import { prepareFloatingMenu } from '@/lib/floatingMenu'
+import { Button } from '@/components/ui/Button'
 
 interface AsyncMultiSelectProps {
   value: SelectOption[]
@@ -170,12 +171,12 @@ export function AsyncMultiSelect({
       >
         <div className="flex min-w-0 flex-1 flex-wrap gap-1">
           {value.length === 0 ? (
-            <span className="px-1 text-gray-400">{placeholder}</span>
+            <span className="px-1 text-placeholder">{placeholder}</span>
           ) : (
             value.map((option) => (
               <span
                 key={option.value}
-                className="inline-flex max-w-full items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-xs dark:bg-gray-800"
+                className="inline-flex max-w-full items-center gap-1 rounded-md bg-surface-hover px-2 py-0.5 text-xs"
               >
                 {/* min-w-0: a long name shrinks and truncates inside the
                     chip instead of spilling past it on a phone. */}
@@ -183,7 +184,7 @@ export function AsyncMultiSelect({
                 <button
                   type="button"
                   aria-label={t('clear')}
-                  className="shrink-0 rounded hover:text-red-600"
+                  className="shrink-0 rounded hover:text-danger"
                   onClick={(event) => {
                     event.stopPropagation()
                     onChange(
@@ -260,13 +261,13 @@ export function AsyncMultiSelect({
                   className="space-y-2 px-3 py-4 text-center text-sm text-muted"
                 >
                   <p>{t('optionsLoadError')}</p>
-                  <button
-                    type="button"
-                    className="btn-outline"
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setRetry((value) => value + 1)}
                   >
                     {t('retry')}
-                  </button>
+                  </Button>
                 </div>
               ) : options.length === 0 ? (
                 <div className="px-3 py-5 text-center text-sm text-muted">
@@ -284,7 +285,7 @@ export function AsyncMultiSelect({
                       role="option"
                       aria-selected={selected}
                       onClick={() => toggle(option)}
-                      className={`flex w-full items-center justify-between gap-2 px-3.5 py-2 text-start text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${selected ? 'font-semibold' : ''}`}
+                      className={`flex w-full items-center justify-between gap-2 px-3.5 py-2 text-start text-sm hover:bg-surface-hover ${selected ? 'font-semibold' : ''}`}
                     >
                       <span>{option.label}</span>
                       {selected && <Check size={14} />}
@@ -298,22 +299,24 @@ export function AsyncMultiSelect({
                 className="flex items-center gap-2 border-t p-2"
                 style={{ borderColor: 'var(--border)' }}
               >
-                <button
-                  type="button"
-                  className="btn-ghost flex-1 justify-center text-xs"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1"
                   disabled={selectingAll}
                   onClick={() => void selectAll()}
                 >
                   {selectingAll ? t('loading') : t('selectAll')}
-                </button>
-                <button
-                  type="button"
-                  className="btn-ghost flex-1 justify-center text-xs"
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1"
                   disabled={selectingAll || value.length === 0}
                   onClick={() => onChange([])}
                 >
                   {t('deselectAll')}
-                </button>
+                </Button>
               </div>
             )}
           </div>,

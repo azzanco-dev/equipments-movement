@@ -25,7 +25,6 @@ import { EquipmentStateBadge } from '@/components/equipment/EquipmentStateBadge'
 import { EquipmentNewBadge } from '@/components/equipment/EquipmentNewBadge'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
-import { Alert } from '@/components/Alert'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import {
   fetchProfileNames,
@@ -33,6 +32,7 @@ import {
   type ProfileName,
 } from '@/components/details/profileNames'
 import {
+  Notice,
   PageTrailBar,
   Badge,
   Button,
@@ -392,7 +392,7 @@ export function EquipmentDetail({
     <div className="space-y-5">
       <PageTrailBar onBack={onBack} fallbackLabel={t('backToEquipment')} />
 
-      {error && <Alert type="error">{error}</Alert>}
+      {error && <Notice tone="danger">{error}</Notice>}
 
       {/* 16px padding, the same as the movements card below, so the two
           cards share one start edge. */}

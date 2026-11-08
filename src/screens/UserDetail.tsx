@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { usersActions } from '@/lib/actionPermissions'
-import { Alert } from '@/components/Alert'
 import { roleName } from '@/components/roles/roleRows'
 import { useActiveRoles } from '@/components/roles/useActiveRoles'
 import { foremanRoleKeys, isForemanRoleKey } from '@/lib/rolePermissionHolders'
@@ -897,7 +896,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       </div>
       <div className="card space-y-4">
         <SectionHeader title={t('editUser')} />
-        {error && <Alert type="error">{error}</Alert>}
+        {error && <Notice tone="danger">{error}</Notice>}
         {mobileNotSaved && (
           <Notice tone="warning">{t('userSavedMobileFailed')}</Notice>
         )}

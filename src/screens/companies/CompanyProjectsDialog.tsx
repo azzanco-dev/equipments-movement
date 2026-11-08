@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Plus, X } from 'lucide-react'
-import { Dialog, ErrorState } from '@/components/ui'
+import { Dialog, ErrorState, IconButton } from '@/components/ui'
 import { Spinner } from '@/components/ui/Spinner'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import type { SelectOption } from '@/components/Select'
@@ -194,13 +194,13 @@ export function CompanyProjectsDialog({
                         : link.project_id}
                     </span>
                     {canEdit && (
-                      <button
+                      <IconButton
+                        variant="danger"
+                        size="sm"
                         onClick={() => removeLink(link.id)}
-                        className="btn-ghost p-1 text-red-600 dark:text-red-400"
-                        title={t('removeProjectLink')}
-                      >
-                        <X size={16} />
-                      </button>
+                        label={t('removeProjectLink')}
+                        icon={<X size={16} />}
+                      />
                     )}
                   </div>
                 ))}
@@ -226,13 +226,13 @@ export function CompanyProjectsDialog({
                   loadOptions={loadAvailableProjects}
                   placeholder="—"
                 />
-                <button
+                <IconButton
+                  variant="primary"
                   onClick={addLink}
                   disabled={!addProjectId}
-                  className="btn-primary px-3"
-                >
-                  <Plus size={16} />
-                </button>
+                  label={t('addProjectLink')}
+                  icon={<Plus size={16} />}
+                />
               </div>
             </div>
           )}
