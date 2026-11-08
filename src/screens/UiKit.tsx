@@ -62,6 +62,7 @@ import { BankLogosMockup } from '@/screens/ui-kit/BankLogosMockup'
 import { BreadcrumbsMockup } from '@/screens/ui-kit/BreadcrumbsMockup'
 import { PartyDocumentsMockup } from '@/screens/ui-kit/PartyDocumentsMockup'
 import { ClientPoPageMockup } from '@/screens/ui-kit/ClientPoPageMockup'
+import { HomeDashboardV2Mockup } from '@/screens/ui-kit/HomeDashboardV2Mockup'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -128,6 +129,19 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // Owner 2026-11-08: «نبغى نشتغل على الرئيسية … خليه يعيد بناء الرئيسية
+    // بناء على استلهام من هذا الصور … خليه يسويها في ui-kit» (four reference
+    // dashboards; EM-252 «الارقام الحالية تاخذ كامل الصفحة»). Layout and
+    // density from the images, our data only. Two densities to compare.
+    id: 'home-dashboard-v2',
+    title: 'نموذج الرئيسية الجديدة v2 (من الصور المرجعية)',
+    purpose:
+      'شريط من 8 مربعات بارقام وشريط صغير، ثم حالة الاسطول والمشاريع الاكثر معدات والورشة حسب الغرض، ثم اخر الحركات ويحتاج انتباهك والورشة والموردون، ثم التوفر حسب النوع وافاقي والدخول والخروج اليومي. نسختان: «ا» مضغوطة و«ب» بمسافات الرئيسية الحالية، ببيانات عينة.',
+    status: 'review',
+    defaultOpen: true,
+    element: <HomeDashboardV2Mockup />,
+  },
   {
     // Owner 2026-11-08 (Notion EM-262): «صفحة /client-po-lab عجبتني ابغاك
     // تستلهم منها لصفحة تفاصيل po العميل», with that day's decisions: no
