@@ -128,14 +128,7 @@ export function useWhatsAppStatusPolling(enabled: boolean) {
  * 2026-10-05): a light green box with a green dot when connected, a light
  * red box with a red dot when the device is not linked, and a neutral box
  * while the status is unknown. Renders nothing when the status is not polled.
- * Owner 2026-11-08 («بوابة الواتس اضف عبارة تحتها ultramsg، وكبر الارتفاع
- * وخليه gradient noisy»): taller, the gateway's provider under the name, and
- * the state's tone as a grained diagonal wash (`.wa-gateway-card` in
- * index.css). Owner 2026-11-09, after a dark glowing card and three looks
- * compared on /ui-kit: «ج», one soft colour of the state with a fine grain.
  */
-const GATEWAY_PROVIDER = 'ultramsg'
-
 export function WhatsAppStatusIndicator({ className }: { className?: string }) {
   const { t } = useI18n()
   const view = useWhatsAppStatus()
@@ -153,29 +146,38 @@ export function WhatsAppStatusIndicator({ className }: { className?: string }) {
       role="status"
       title={label}
       aria-label={label}
-      data-tone={tone}
       className={cn(
-        'wa-gateway-card flex min-h-14 w-full items-center gap-2.5 rounded-xl px-3 py-3 text-xs font-normal',
+        'flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs font-normal',
+        tone === 'ok' && 'bg-success-soft',
+        tone === 'down' && 'bg-danger-soft',
+        tone === 'neutral' && 'bg-surface-hover',
         className,
       )}
     >
       {/* The dot sits in a soft halo of its own colour. */}
       <span
         aria-hidden="true"
-        className="wa-gateway-dot h-2 w-2 shrink-0 rounded-full"
+        className={cn(
+          'h-2 w-2 shrink-0 rounded-full',
+          tone === 'ok' &&
+            'bg-success shadow-[0_0_0_3px_color-mix(in_srgb,var(--success)_22%,transparent)]',
+          tone === 'down' &&
+            'bg-danger shadow-[0_0_0_3px_color-mix(in_srgb,var(--danger)_22%,transparent)]',
+          tone === 'neutral' && 'bg-muted',
+        )}
       />
-      <span aria-hidden="true" className="min-w-0 leading-tight">
-        <span className="block truncate text-sm font-medium">
-          {t('whatsappStatusName')}
-        </span>
-        <span
-          className="wa-gateway-sub mt-0.5 block font-latin text-[11px]"
-          dir="ltr"
-        >
-          {GATEWAY_PROVIDER}
-        </span>
+      <span aria-hidden="true" className="min-w-0 truncate text-fg">
+        {t('whatsappStatusName')}
       </span>
-      <span aria-hidden="true" className="wa-gateway-state ms-auto shrink-0">
+      <span
+        aria-hidden="true"
+        className={cn(
+          'ms-auto shrink-0',
+          tone === 'ok' && 'text-success',
+          tone === 'down' && 'text-danger',
+          tone === 'neutral' && 'text-muted',
+        )}
+      >
         {t(STATE_LABELS[view])}
       </span>
     </div>

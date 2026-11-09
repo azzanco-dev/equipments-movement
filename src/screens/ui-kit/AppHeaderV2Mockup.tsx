@@ -517,26 +517,15 @@ function PageStub({ variant }: { variant: Variant }) {
         {/* Owner 2026-11-08: «بوابة الواتس خليها نفس مكانها» — the gateway
             state stays at the foot of the sidebar, as today. */}
         <span className="mt-3 block border-t pt-3">
-          {/* The real card's look (`.wa-gateway-card`): taller, «ultramsg»
-              under the name, the state's grained wash. */}
-          <span
-            data-tone="ok"
-            className="wa-gateway-card flex min-h-14 w-full items-center gap-2.5 rounded-xl px-3 py-3 text-xs"
-          >
+          {/* The real card's look (owner 2026-11-09, «رجع البار حق الواتس
+              نفس ماكان اول»): the soft state tone, the dot and the name. */}
+          <span className="flex w-full items-center gap-2.5 rounded-lg bg-success-soft px-3 py-2.5 text-xs">
             <span
               aria-hidden="true"
-              className="wa-gateway-dot h-2 w-2 shrink-0 rounded-full"
+              className="h-2 w-2 shrink-0 rounded-full bg-success"
             />
-            <span className="min-w-0 leading-tight">
-              <span className="block text-sm font-medium">واتساب</span>
-              <span
-                className="wa-gateway-sub mt-0.5 block font-latin text-[11px]"
-                dir="ltr"
-              >
-                ultramsg
-              </span>
-            </span>
-            <span className="wa-gateway-state ms-auto">متصل</span>
+            <span className="min-w-0 truncate text-fg">واتساب</span>
+            <span className="ms-auto shrink-0 text-success">متصل</span>
           </span>
         </span>
       </nav>

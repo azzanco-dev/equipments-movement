@@ -46,10 +46,12 @@ test('the approved variant opens first; WhatsApp stays out of the header', () =>
     code.indexOf('const NAV = ['),
   )
   assert.doesNotMatch(header, /واتساب|MessageCircle|WhatsApp/)
-  // Shown in the sample sidebar with the real card's look (owner 2026-11-08,
-  // «اضف عبارة تحتها ultramsg … gradient noisy»).
-  assert.match(code, /wa-gateway-card/)
-  assert.ok(code.includes('ultramsg'))
+  // Shown in the sample sidebar in the real card's ORIGINAL look (owner
+  // 2026-11-09, «رجع البار حق الواتس نفس ماكان اول»): the soft state tone,
+  // the dot, «واتساب» and the state word; the «ultramsg» card is gone.
+  assert.doesNotMatch(code, /wa-gateway-card|ultramsg/)
+  assert.ok(code.includes('bg-success-soft'))
+  assert.ok(code.includes('واتساب'))
 })
 
 test('nothing the owner kept out of the bar, nothing we do not have', () => {
