@@ -54,6 +54,7 @@ import {
   Select,
   Skeleton,
   StatCard,
+  ToastProvider,
   useToast,
   type DescriptionListItem,
 } from '@/components/ui'
@@ -150,7 +151,17 @@ function PageSkeleton({ label }: { label: string }) {
  * (`purchasing.view`); every write goes through the 0136 functions, which
  * check `purchasing.manage` again.
  */
-export function SupplierPoDetail({
+/** The PO page mounts its own ToastProvider: the remove-line Toast (0187)
+ *  and every later one need it, and no shell provides one. */
+export function SupplierPoDetail(props: SupplierPoDetailProps) {
+  return (
+    <ToastProvider>
+      <SupplierPoDetailInner {...props} />
+    </ToastProvider>
+  )
+}
+
+function SupplierPoDetailInner({
   poId,
   onBack,
   onOpenEquipment,
