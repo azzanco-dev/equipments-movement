@@ -1,6 +1,6 @@
 // Migration 0188 and «المعدات في المشاريع» (owner 2026-11-09): the page lists
 // the site VISITS, open and closed — by default the units inside now or
-// exited within the last 60 Saudi days («60 يوم خليها») — and a closed visit
+// exited since 1 August 2026 («خليها الي خرجت من 1-8 وبعد») — and a closed visit
 // can join a supplier PO under the unchanged same-entry-day rule (0148); the
 // client side widens the same way (no entry-day rule).
 //
@@ -229,8 +229,16 @@ test('add_client_po_equipment: a visit there, open or closed, no day rule', () =
   assert.doesNotMatch(sql, /FUNCTION public\.create_(supplier|client)_po/)
 })
 
-test('the 60-day default: a visible removable filter, one PostgREST or', () => {
+test('the default window: a visible removable filter, one PostgREST or', () => {
   const now = new Date('2026-11-09T10:00:00Z')
+  // The default: exits since 1 August 2026 (Saudi day start 2026-07-31T21:00Z).
+  assert.equal(visits.SITE_VISITS_SINCE_DAY, '2026-08-01')
+  assert.equal(visits.defaultVisitsSince(), '2026-07-31T21:00:00.000Z')
+  assert.equal(
+    visits.recentVisitOrClause(),
+    'exit_id.is.null,exit_at.gte.2026-07-31T21:00:00.000Z',
+  )
+  // A rolling window in days still works from the URL.
   // 60 Saudi days before 2026-11-09 is 2026-09-10, whose day starts at
   // 2026-09-09T21:00:00Z.
   assert.equal(visits.recentVisitsSince(60, now), '2026-09-09T21:00:00.000Z')
@@ -245,10 +253,17 @@ test('the 60-day default: a visible removable filter, one PostgREST or', () => {
   )
   assert.equal(
     split.clause,
-    'exit_id.is.null,exit_at.gte.2026-09-09T21:00:00.000Z',
+    'exit_id.is.null,exit_at.gte.2026-07-31T21:00:00.000Z',
   )
   assert.deepEqual(plain(split.rest), [other])
-  // Removed, or a value that is not a whole number of days: no clause.
+  assert.equal(
+    visits.siteUnitsRecentOrFilter(
+      [{ ...visits.SITE_UNITS_RECENT_DEFAULT_FILTER, value: '60' }],
+      now,
+    ).clause,
+    'exit_id.is.null,exit_at.gte.2026-09-09T21:00:00.000Z',
+  )
+  // Removed, or a value that is neither a day key nor a number of days: no clause.
   assert.equal(visits.siteUnitsRecentOrFilter([other], now).clause, null)
   assert.equal(
     visits.siteUnitsRecentOrFilter(
@@ -261,7 +276,7 @@ test('the 60-day default: a visible removable filter, one PostgREST or', () => {
     id: 'default-recent-exit',
     field: 'recent_exit',
     operator: 'eq',
-    value: '60',
+    value: '2026-08-01',
   })
 
   const config = read('src', 'lib', 'listConfigs.ts')
@@ -273,7 +288,7 @@ test('the 60-day default: a visible removable filter, one PostgREST or', () => {
   assert.match(site, /labelI18n: 'siteUnitsInside'/)
   assert.match(site, /labelI18n: 'siteUnitsExited'/)
   assert.match(site, /key: SITE_UNITS_RECENT_FILTER_KEY,/)
-  assert.match(site, /label: 'خرجت خلال 60 يوما او داخل الان',/)
+  assert.match(site, /label: 'خرجت منذ 1 اغسطس 2026 او داخل الان',/)
   assert.match(site, /defaultFilters: \[SITE_UNITS_RECENT_DEFAULT_FILTER\],/)
 
   const screen = read('src', 'screens', 'purchasing', 'SiteUnitsScreen.tsx')
@@ -442,7 +457,7 @@ test('messages and translations: both languages, no hamza on alif', () => {
     'siteUnitsInside',
     'siteUnitsExited',
     'siteUnitsRecentFilter',
-    'siteUnitsRecent60',
+    'siteUnitsRecentSince',
     'supplierPoErrorNotAtProject',
     'clientPoErrorNotAtProject',
     'siteUnitsDesc',

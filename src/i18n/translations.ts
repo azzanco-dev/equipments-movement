@@ -2303,16 +2303,16 @@ export const translations = {
     siteUnitsInside: 'داخل الان',
     siteUnitsExited: 'خرجت',
     siteUnitsRecentFilter: 'الفترة',
-    siteUnitsRecent60: 'خرجت خلال 60 يوما او داخل الان',
+    siteUnitsRecentSince: 'خرجت منذ 1 اغسطس 2026 او داخل الان',
     supplierPoReceiptLines: 'مجموع المعدات',
     supplierPoNoPrice: 'بلا سعر',
     supplierPoUnpricedTotalNote: 'بلا سعر',
     supplierPoCreateEquipment: 'المعدات داخل المشروع',
     supplierPoCreateEquipmentDesc:
-      'معدات هذه الجهة داخل المشروع المختار الان او التي خرجت منه خلال 60 يوما. اختر ما يدخل في الامر واكتب سعره، او اتركه بلا سعر مؤقتا.',
+      'معدات هذه الجهة داخل المشروع المختار الان او التي خرجت منه منذ 1 اغسطس 2026. اختر ما يدخل في الامر واكتب سعره، او اتركه بلا سعر مؤقتا.',
     supplierPoPickProjectFirst: 'اختر المورد والشركة والمشروع اولا.',
     supplierPoNoUnitsAtProject:
-      'لا معدات لهذه الجهة داخل هذا المشروع الان ولا خرجت منه خلال 60 يوما.',
+      'لا معدات لهذه الجهة داخل هذا المشروع الان ولا خرجت منه منذ 1 اغسطس 2026.',
     supplierPoCompanyPlaceholder: 'الشركات التي للجهة معدات فيها',
     supplierPoProjectPlaceholder: 'مشاريع الشركة التي للجهة معدات فيها',
     supplierPoStartDateHint: 'عند اختيار معدة يصبح تاريخ البداية يوم دخولها.',
@@ -2459,18 +2459,18 @@ export const translations = {
     clientPoProjectPlaceholder: 'مشاريع الشركة التي فيها معدات الان',
     clientPoPickProjectFirst: 'اختر الشركة والمشروع اولا.',
     clientPoNoUnitsAtProject:
-      'لا معدات داخل هذا المشروع الان ولا خرجت منه خلال 60 يوما.',
+      'لا معدات داخل هذا المشروع الان ولا خرجت منه منذ 1 اغسطس 2026.',
     clientPoCreateEquipmentDesc:
-      'المعدات داخل المشروع المختار الان او التي خرجت منه خلال 60 يوما. اختر ما يدخل في الـ PO واكتب سعر بيعه، او اتركه بلا سعر مؤقتا.',
+      'المعدات داخل المشروع المختار الان او التي خرجت منه منذ 1 اغسطس 2026. اختر ما يدخل في الـ PO واكتب سعر بيعه، او اتركه بلا سعر مؤقتا.',
     clientPoBackToList: 'الرجوع الى PO العملاء',
     clientPoDetails: 'بيانات PO العميل',
     clientPoEquipmentDesc:
       'كل معدة بسعر بيعها بدون ضريبة ووحدته وساعاتها القياسية وكميتها التعاقدية.',
     clientPoNoEquipment: 'لا معدات على هذا الـ PO بعد.',
     clientPoAddEquipmentDesc:
-      'اختر المعدة التي زارت المشروع (داخل الان او خرجت خلال 60 يوما) وادخل سعر بيعها.',
+      'اختر المعدة التي زارت المشروع (داخل الان او خرجت منذ 1 اغسطس 2026) وادخل سعر بيعها.',
     clientPoEquipmentAtProjectHint:
-      'تظهر المعدات داخل شركة الـ PO ومشروعه الان او التي خرجت منه خلال 60 يوما.',
+      'تظهر المعدات داخل شركة الـ PO ومشروعه الان او التي خرجت منه منذ 1 اغسطس 2026.',
     clientPoErrorNotAtProject: 'لا زيارة للمعدة في مشروع الـ PO.',
     clientPoEditLineDesc:
       'سعر البيع ووحدته والساعات القياسية والكمية والملاحظة. يسجل تغيير السعر في السجل.',
@@ -5138,16 +5138,16 @@ export const translations = {
     siteUnitsInside: 'Inside now',
     siteUnitsExited: 'Exited',
     siteUnitsRecentFilter: 'Period',
-    siteUnitsRecent60: 'Exited within 60 days or inside now',
+    siteUnitsRecentSince: 'Exited since 1 Aug 2026 or inside now',
     supplierPoReceiptLines: 'Equipment subtotal',
     supplierPoNoPrice: 'No price',
     supplierPoUnpricedTotalNote: 'unpriced',
     supplierPoCreateEquipment: 'Equipment inside the project',
     supplierPoCreateEquipmentDesc:
-      "This party's units inside the chosen project now or exited from it within 60 days. Tick the ones on the order and enter a price, or leave it empty for now.",
+      "This party's units inside the chosen project now or exited from it since 1 Aug 2026. Tick the ones on the order and enter a price, or leave it empty for now.",
     supplierPoPickProjectFirst: 'Pick the party, company and project first.',
     supplierPoNoUnitsAtProject:
-      'This party has no units inside this project now or exited from it within 60 days.',
+      'This party has no units inside this project now or exited from it since 1 Aug 2026.',
     supplierPoCompanyPlaceholder: 'Companies where the party has units',
     supplierPoProjectPlaceholder: "The company's projects where the party has units",
     supplierPoStartDateHint: 'Once a unit is ticked, the start date becomes its entry day.',
@@ -5302,18 +5302,18 @@ export const translations = {
     clientPoProjectPlaceholder: "The company's projects with units inside now",
     clientPoPickProjectFirst: 'Pick the company and project first.',
     clientPoNoUnitsAtProject:
-      'No units inside this project now or exited from it within 60 days.',
+      'No units inside this project now or exited from it since 1 Aug 2026.',
     clientPoCreateEquipmentDesc:
-      'The units inside the chosen project now or exited from it within 60 days. Tick the ones on the PO and enter a sale price, or leave it empty for now.',
+      'The units inside the chosen project now or exited from it since 1 Aug 2026. Tick the ones on the PO and enter a sale price, or leave it empty for now.',
     clientPoBackToList: 'Back to client POs',
     clientPoDetails: 'Client PO details',
     clientPoEquipmentDesc:
       'Each unit with its sale price excluding VAT, its unit, standard hours and contract quantity.',
     clientPoNoEquipment: 'No units on this PO yet.',
     clientPoAddEquipmentDesc:
-      'Pick a unit that visited the project (inside now or exited within 60 days) and enter its sale price.',
+      'Pick a unit that visited the project (inside now or exited since 1 Aug 2026) and enter its sale price.',
     clientPoEquipmentAtProjectHint:
-      "Only the units inside the PO's company and project now or exited from it within 60 days are listed.",
+      "Only the units inside the PO's company and project now or exited from it since 1 Aug 2026 are listed.",
     clientPoErrorNotAtProject: "The unit has no visit to the PO's project.",
     clientPoEditLineDesc:
       'Sale price, its unit, standard hours, quantity and note. A price change is recorded in the log.',

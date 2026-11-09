@@ -25,8 +25,8 @@ import { localizedName } from '@/lib/localizedName'
 import { saudiDateKey, saudiDayStart } from '@/lib/saudiTime'
 import {
   latestVisitPerUnitDay,
+  defaultVisitsSince,
   recentVisitOrClause,
-  recentVisitsSince,
   type SiteVisitState,
 } from '@/lib/siteVisits'
 import type { Language } from '@/i18n/translations'
@@ -495,7 +495,7 @@ export async function fetchPartyVisits(
   party: SupplierPoParty,
   options: { sinceDay?: string | null } = {},
 ): Promise<PartyVisit[]> {
-  const recent = recentVisitsSince()
+  const recent = defaultVisitsSince()
   const preset = options.sinceDay ? saudiDayStart(options.sinceDay) : null
   const since = preset && preset < recent ? preset : recent
   const rows: PartyVisit[] = []
@@ -603,7 +603,7 @@ export function equipmentAtProjectOptionLoader(
       .order('exit_at', { ascending: false, nullsFirst: true })
       .limit(20)
     // 0148: only the units that entered on the PO's start date, inside now
-    // or exited (0188); without one, the last 60 days.
+    // or exited (0188); without one, the default window (since 1 August 2026).
     if (options.entryDay && nextDay)
       request = request
         .gte('entry_at', saudiDayStart(options.entryDay))

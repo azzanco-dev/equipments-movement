@@ -20,7 +20,7 @@ import { CARD_PRICES_DEFAULT_FILTER } from '@/lib/cardPricesList'
 import {
   SITE_UNITS_RECENT_DEFAULT_FILTER,
   SITE_UNITS_RECENT_FILTER_KEY,
-  SITE_VISITS_RECENT_DAYS,
+  SITE_VISITS_SINCE_DAY,
 } from '@/lib/siteVisits'
 import {
   MOVEMENT_COMPANY_PROJECT_SEARCH_FIELDS,
@@ -1140,7 +1140,7 @@ export const siteUnitsListConfig: DataListConfig = {
         { value: 'exited', label: 'خرجت', labelI18n: 'siteUnitsExited' },
       ],
     },
-    // 0188: the default window (owner «60 يوم خليها»), see above.
+    // 0188: the default window (owner «خليها الي خرجت من 1-8 وبعد»), see above.
     {
       key: SITE_UNITS_RECENT_FILTER_KEY,
       label: 'siteUnitsRecentFilter',
@@ -1148,9 +1148,9 @@ export const siteUnitsListConfig: DataListConfig = {
       operators: ['eq'],
       options: [
         {
-          value: String(SITE_VISITS_RECENT_DAYS),
-          label: 'خرجت خلال 60 يوما او داخل الان',
-          labelI18n: 'siteUnitsRecent60',
+          value: SITE_VISITS_SINCE_DAY,
+          label: 'خرجت منذ 1 اغسطس 2026 او داخل الان',
+          labelI18n: 'siteUnitsRecentSince',
         },
       ],
     },

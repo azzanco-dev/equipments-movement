@@ -1,16 +1,24 @@
 import type { DataListConfig, ListFilter } from '@/components/data-list/types'
-import { addDaysToDateKey } from '@/lib/calendar'
+import { addDaysToDateKey, isValidDateKey } from '@/lib/calendar'
 import { saudiDateKey, saudiDayStart } from '@/lib/saudiTime'
 
 /**
  * Migration 0188 (owner 2026-11-09, «60 يوم خليها»): «المعدات في المشاريع»
  * lists the site VISITS, open and closed (`purchasing_site_visits`), and a
  * closed visit can join a PO. By default the page shows the visits inside a
- * project now OR exited within the last 60 Saudi days; the PO and client PO
- * pickers read the same window. Pure, so the configs and tests import it
+ * project now OR exited since 1 August 2026 (owner the same day, «خليها الي
+ * خرجت من 1-8 وبعد»; it was the last 60 days for an hour); the PO and client
+ * PO pickers read the same window. Pure, so the configs and tests import it
  * without React.
  */
+export const SITE_VISITS_SINCE_DAY = '2026-08-01'
+/** A rolling window in days is still accepted in the URL (`recent_exit=60`). */
 export const SITE_VISITS_RECENT_DAYS = 60
+
+/** The first instant of the default day (Saudi time). */
+export function defaultVisitsSince(): string {
+  return saudiDayStart(SITE_VISITS_SINCE_DAY)
+}
 
 /** The «الحالة» filter of a visit (`purchasing_site_visits.visit_state`). */
 export const SITE_VISIT_STATES = ['inside', 'exited'] as const
@@ -19,12 +27,12 @@ export type SiteVisitState = (typeof SITE_VISIT_STATES)[number]
 /** The visible, removable default filter key of the page: not a column. */
 export const SITE_UNITS_RECENT_FILTER_KEY = 'recent_exit'
 
-/** The default filter: inside now, or exited within the last 60 days. */
+/** The default filter: inside now, or exited since 1 August 2026. */
 export const SITE_UNITS_RECENT_DEFAULT_FILTER: ListFilter = {
   id: 'default-recent-exit',
   field: SITE_UNITS_RECENT_FILTER_KEY,
   operator: 'eq',
-  value: String(SITE_VISITS_RECENT_DAYS),
+  value: SITE_VISITS_SINCE_DAY,
 }
 
 /** The first instant of the Saudi day `days` days before today. */
@@ -43,16 +51,17 @@ export function recentVisitsSince(
  * instant computed here, never user text.
  */
 export function recentVisitOrClause(
-  since: string = recentVisitsSince(),
+  since: string = defaultVisitsSince(),
 ): string {
   return `exit_id.is.null,exit_at.gte.${since}`
 }
 
 /**
- * Pulls the default «خرجت خلال 60 يوما او داخل الان» filter out of the list
- * filters (the `visitPeriodOrFilter` pattern): returns its `or` clause (null
- * when the filter is absent or its value is not a whole number of days) and
- * the filters left for `applyListFilters`, which never hold it.
+ * Pulls the default «خرجت منذ 1 اغسطس 2026 او داخل الان» filter out of the
+ * list filters (the `visitPeriodOrFilter` pattern): returns its `or` clause
+ * (null when the filter is absent or its value is neither a Saudi day key
+ * YYYY-MM-DD nor a whole number of days) and the filters left for
+ * `applyListFilters`, which never hold it.
  */
 export function siteUnitsRecentOrFilter(
   filters: readonly ListFilter[],
@@ -65,6 +74,8 @@ export function siteUnitsRecentOrFilter(
     (filter) => filter.field === SITE_UNITS_RECENT_FILTER_KEY,
   )
   if (!recent || recent.operator !== 'eq') return { clause: null, rest }
+  if (isValidDateKey(recent.value))
+    return { clause: recentVisitOrClause(saudiDayStart(recent.value)), rest }
   const days = Number(recent.value)
   if (!Number.isInteger(days) || days < 1 || days > 3650)
     return { clause: null, rest }
