@@ -160,7 +160,7 @@ export function WhatsAppStatusIndicator({ className }: { className?: string }) {
         className={cn(
           'h-2 w-2 shrink-0 rounded-full',
           tone === 'ok' &&
-            'bg-success shadow-[0_0_0_3px_color-mix(in_srgb,var(--success)_22%,transparent)]',
+            'wa-dot-live bg-success shadow-[0_0_0_3px_color-mix(in_srgb,var(--success)_22%,transparent)]',
           tone === 'down' &&
             'bg-danger shadow-[0_0_0_3px_color-mix(in_srgb,var(--danger)_22%,transparent)]',
           tone === 'neutral' && 'bg-muted',

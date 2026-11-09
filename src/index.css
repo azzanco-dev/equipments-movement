@@ -932,3 +932,25 @@ textarea::placeholder {
     animation: none;
   }
 }
+
+/* The connected dot of the WhatsApp gateway card at the foot of the sidebar
+   (owner 2026-11-09, «خلي النقطة الخضراء حق واتساب انيماتد وهج»): a soft
+   glow of the success tone that breathes out and fades, once every 2.4 s;
+   still under reduced motion. Tokens only. */
+@keyframes wa-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 28%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--success) 0%, transparent);
+  }
+}
+.wa-dot-live {
+  animation: wa-glow 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wa-dot-live {
+    animation: none;
+  }
+}
