@@ -63,6 +63,7 @@ import { BreadcrumbsMockup } from '@/screens/ui-kit/BreadcrumbsMockup'
 import { PartyDocumentsMockup } from '@/screens/ui-kit/PartyDocumentsMockup'
 import { ClientPoPageMockup } from '@/screens/ui-kit/ClientPoPageMockup'
 import { HomeDashboardV2Mockup } from '@/screens/ui-kit/HomeDashboardV2Mockup'
+import { AppHeaderV2Mockup } from '@/screens/ui-kit/AppHeaderV2Mockup'
 import {
   UiKitGroup,
   UiKitIndex,
@@ -129,6 +130,19 @@ type SectionDef = {
 }
 
 const SCREEN_SECTIONS: SectionDef[] = [
+  {
+    // Owner 2026-11-08: «طيب برضه ابغاك تسوي تصميم جديد للheader اللي فيه
+    // اللوقو والايقونات», after the home v2 mockup. Approved the same day as
+    // «ب» («اعتمد الشعار مع القائمة الجانبية»), the WhatsApp state staying
+    // in the sidebar («بوابة الواتس خليها نفس مكانها»).
+    id: 'app-header-v2',
+    title: 'نموذج الهيدر الجديد (من الصور المرجعية)',
+    purpose:
+      'الشريط العلوي: الشعار الكامل في مربع بعرض القائمة الجانبية، بحث عام بـ Ctrl K، التاريخ والوقت، ايقونات اللغة والمظهر، والمستخدم بقائمته. حالة واتساب تبقى في القائمة الجانبية. المعتمد: «ب»، وطبق على الهيدر.',
+    status: 'approved',
+    defaultOpen: true,
+    element: <AppHeaderV2Mockup />,
+  },
   {
     // Owner 2026-11-08: «نبغى نشتغل على الرئيسية … خليه يعيد بناء الرئيسية
     // بناء على استلهام من هذا الصور … خليه يسويها في ui-kit» (four reference

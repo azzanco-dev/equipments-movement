@@ -596,6 +596,7 @@ function AppContent() {
         activePage={navKeyOfPage(page)}
         onNavigate={navigate}
         navItems={navItems}
+        opens={(target) => shell.pages.has(target)}
       >
         {landingRedirect ? (
           <RouteFallback />

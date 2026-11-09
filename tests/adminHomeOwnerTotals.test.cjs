@@ -136,10 +136,17 @@ test('the cards read every owner and link to the filtered equipment list', () =>
     screen.indexOf('<OwnerTotalsSection') <
       screen.indexOf('<FleetStateSection'),
   )
-  assert.match(screen, /description=\{saudiDayLabel\(now, lang\)\}/)
+  // Owner 2026-11-08: no date under the greeting any more («شيل التاريخ تحت
+  // مساء الخير», the header shows it), a smaller greeting («صغّر خط
+  // التحية») and less room above it («قلل المسافة الي فوق»).
+  assert.doesNotMatch(screen, /saudiDayLabel/)
   assert.match(screen, /'adminHomeGreetingMorning'/)
   // Owner 2026-10-29: the greeting and the big numbers bold, full names.
-  assert.match(screen, /className="text-\[30px\] font-bold/)
+  assert.match(
+    screen,
+    /className="text-\[22px\] font-bold leading-tight sm:text-\[24px\]"/,
+  )
+  assert.match(screen, /className="-mt-1 space-y-4 sm:-mt-2 lg:-mt-4"/)
   assert.match(section, /text-3xl font-bold tabular-nums/)
   assert.match(section, /t\(ownershipBadge\(row\.owner\)\.key\)/)
 })

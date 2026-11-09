@@ -17,7 +17,7 @@ import { WhatsAppStatusAlert } from '@/components/WhatsAppGatewayStatus'
 import { useI18n } from '@/i18n/I18nContext'
 import { useAuth } from '@/auth/AuthContext'
 import { greetingName, greetingParts } from '@/lib/greetingName'
-import { saudiDayLabel, saudiGreetingPeriod } from '@/lib/homeGreeting'
+import { saudiGreetingPeriod } from '@/lib/homeGreeting'
 import {
   normalizeGranularity,
   type AdminHomeGranularity,
@@ -69,11 +69,12 @@ export function AdminHomeScreen({
   canOpenPage = () => false,
   onCreateMovement,
 }: AdminHomeScreenProps) {
-  const { t, lang } = useI18n()
+  const { t } = useI18n()
   const { profile } = useAuth()
   const name = greetingName(profile?.full_name)
   // Owner 2026-10-29 (the /ui-kit home mockup): «صباح الخير» / «مساء الخير»
-  // by Saudi time, and the Saudi day under it instead of the description.
+  // by Saudi time. The Saudi day under it left on 2026-11-08 («شيل التاريخ
+  // تحت مساء الخير»): the header shows the date and time now.
   const now = new Date()
   const parts = greetingParts(
     t(
@@ -84,10 +85,11 @@ export function AdminHomeScreen({
     name !== '',
   )
   // Owner 2026-10-26: the greeting and the name in one font (the heading's,
-  // through `h1 *` in index.css), larger than other page titles.
+  // through `h1 *` in index.css). Smaller since 2026-11-08 («صغّر خط
+  // التحية»; it was 30 / 36 px).
   const greeting = parts ? (
     // Bold since owner 2026-10-29 («التصبيحة خليها بولد»).
-    <span className="text-[30px] font-bold leading-tight sm:text-[36px]">
+    <span className="text-[22px] font-bold leading-tight sm:text-[24px]">
       {parts.before}
       <bdi>{name}</bdi>
       {parts.after}
@@ -121,10 +123,12 @@ export function AdminHomeScreen({
           gateway is known to be disconnected (the sidebar shows it on lg+).
           Outside the spaced column so a hidden alert leaves no gap. */}
       <WhatsAppStatusAlert className="mb-4" />
-      <div className="space-y-4">
+      {/* Less room above the greeting on this page only (owner 2026-11-08,
+          «قلل المسافة الي فوق»): the main column's top padding is 16 / 24 /
+          32 px; this takes it to 12 / 16 / 16 px. */}
+      <div className="-mt-1 space-y-4 sm:-mt-2 lg:-mt-4">
         <PageHeader
           title={greeting ?? t('adminHomeTitle')}
-          description={saudiDayLabel(now, lang)}
           actions={
             onCreateMovement ? (
               <div className="flex flex-wrap items-center gap-2">

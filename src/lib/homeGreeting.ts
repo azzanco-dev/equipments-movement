@@ -20,6 +20,28 @@ export function saudiGreetingPeriod(now: Date): 'morning' | 'evening' {
 }
 
 /**
+ * «10:24 م» / «10:24 PM»: the Saudi time on the 12-hour clock with Latin
+ * digits (the header, owner 2026-11-08, «وخلي الوقت بنظام 12»): the hour
+ * without a leading zero, «ص» / «م» in Arabic, AM / PM in English.
+ */
+export function saudiClockLabel(now: Date, lang: 'ar' | 'en'): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: SAUDI_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now)
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? '00'
+  const hour = Number(part('hour'))
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12
+  const morning = hour < 12
+  const suffix =
+    lang === 'ar' ? (morning ? 'ص' : 'م') : morning ? 'AM' : 'PM'
+  return `${hour12}:${part('minute')} ${suffix}`
+}
+
+/**
  * «الخميس 29 اكتوبر 2026» / «Thursday 29 October 2026» (the year since
  * owner 2026-10-29, «اضف السنة في التاريخ»): the Saudi day in the
  * Gregorian calendar with Latin digits, no comma, and the Arabic month

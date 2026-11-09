@@ -1,3 +1,4 @@
+import type { RoutePage } from '@/lib/navPermissions'
 import { type HTMLAttributes, type ReactNode } from 'react'
 import { useI18n } from '@/i18n/I18nContext'
 import {
@@ -7,14 +8,17 @@ import {
   LogOut,
   Menu,
   X,
-  CircleUserRound,
   ChevronDown,
+  CalendarDays,
+  Search,
 } from 'lucide-react'
 import { useTheme } from '@/theme/ThemeContext'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { canSeeIntegrationsStatus } from '@/lib/actionPermissions'
 import { localizedName } from '@/lib/localizedName'
+import { saudiClockLabel, saudiDayLabel } from '@/lib/homeGreeting'
+import { GlobalSearch } from '@/components/GlobalSearch'
 import { useEffect, useState } from 'react'
 import {
   AppLink,
@@ -69,6 +73,43 @@ interface LayoutProps {
     icon: ReactNode
     children?: { key: string; label: string }[]
   }[]
+  /** Whether the shell opens a page (route key): the general search offers
+   *  only the groups whose page passes. Without it there is no search. */
+  opens?: (page: RoutePage) => boolean
+}
+
+/** The Saudi day and time in the header, refreshed every 30 seconds. Drawn
+ *  after mount only, so the server and the first client render agree. */
+function HeaderClock({ lang }: { lang: 'ar' | 'en' }) {
+  const [now, setNow] = useState<Date | null>(null)
+  useEffect(() => {
+    setNow(new Date())
+    const timer = window.setInterval(() => setNow(new Date()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  if (!now) return null
+  return (
+    <span className="hidden items-center gap-2 rounded-full border px-3 py-1.5 text-xs xl:flex">
+      <CalendarDays size={15} aria-hidden="true" className="text-muted" />
+      <span className="text-muted">{saudiDayLabel(now, lang)}</span>
+      <span aria-hidden="true" className="h-3.5 w-px bg-border" />
+      {/* 12-hour clock (owner 2026-11-08, «وخلي الوقت بنظام 12»); the
+          isolate reads «10:24 م» right to left and «10:24 PM» left to
+          right. */}
+      <bdi className="font-semibold tabular-nums">
+        {saudiClockLabel(now, lang)}
+      </bdi>
+    </span>
+  )
+}
+
+function HeaderDivider() {
+  return (
+    <span
+      aria-hidden="true"
+      className="mx-1 hidden h-6 w-px bg-border sm:block"
+    />
+  )
 }
 
 export function Layout({
@@ -76,6 +117,7 @@ export function Layout({
   activePage,
   onNavigate,
   navItems,
+  opens,
 }: LayoutProps) {
   const { t, toggleLanguage, lang } = useI18n()
   const { theme, toggleTheme } = useTheme()
@@ -87,6 +129,7 @@ export function Layout({
   const [logoutOpen, setLogoutOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [phoneSearchOpen, setPhoneSearchOpen] = useState(false)
   const [pendingPage, setPendingPage] = useState<string | null>(null)
   const [expandedNavItems, setExpandedNavItems] = useState<
     Record<string, boolean>
@@ -95,6 +138,7 @@ export function Layout({
   useEffect(() => {
     setPendingPage(null)
     setMobileOpen(false)
+    setPhoneSearchOpen(false)
     setExpandedNavItems({})
   }, [pathname])
 
@@ -126,6 +170,14 @@ export function Layout({
     canSeeIntegrationsStatus(permissionState) && navItems.length > 0
   useWhatsAppStatusPolling(showWhatsAppStatus)
 
+  const hasSidebar = navItems.length > 0
+  const goHome = () => {
+    if (isCurrentPage('dashboard')) return
+    setPendingPage('dashboard')
+    onNavigate('dashboard')
+  }
+  const userInitial = profile?.full_name?.trim().charAt(0) || '?'
+
   return (
     <div
       className="min-h-screen"
@@ -141,13 +193,43 @@ export function Layout({
           <div className="h-full w-1/3 animate-nav-progress bg-[var(--primary)]" />
         </div>
       )}
+      {/* The header (owner 2026-11-08, approved on /ui-kit «نموذج الهيدر
+          الجديد» as variant «ب»): the full logo in a block as wide as the
+          sidebar, so the two read as one column (no collapse button, owner
+          «شيل زر الطي»); then the general search, the Saudi date and time,
+          the language and theme, and the user as one chip whose menu holds
+          the sign out (the theme and the language only on a phone, where
+          their icons are hidden: «مايحتاج تكرر الوضع الداكن والانقليزي في
+          قائمة البروفايل»). The
+          WhatsApp gateway state stays at the foot of the sidebar («بوابة
+          الواتس خليها نفس مكانها»). No movement buttons and no attention
+          count in the bar (owner 2026-11-01). */}
       <header
         className="sticky top-0 z-40 border-b"
         style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}
       >
-        <div className="mx-auto flex h-16 max-w-[1700px] items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            {navItems.length > 0 && (
+        <div className="mx-auto flex h-16 max-w-[1700px] items-stretch">
+          {hasSidebar && (
+            <div className="hidden w-60 shrink-0 items-center border-e px-4 lg:flex">
+              {/* Owner 2026-10-25: the logo and the menu entries are real
+                  links, so right click › new tab and Ctrl click work. On the
+                  white logo tile in both themes, so its dark lettering stays
+                  readable in the dark theme. */}
+              <AppLink
+                href="/dashboard"
+                className="flex h-12 items-center rounded-lg bg-[var(--logo-tile)] px-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                onNavigate={goHome}
+              >
+                <img
+                  src="/azzanco-logo-full.png"
+                  alt={t('appLogoAlt')}
+                  className="h-11 w-auto object-contain"
+                />
+              </AppLink>
+            </div>
+          )}
+          <div className="flex min-w-0 flex-1 items-center gap-3 px-4 sm:px-6">
+            {hasSidebar && (
               <IconButton
                 className="lg:hidden"
                 label={t('navigationMenu')}
@@ -157,16 +239,10 @@ export function Layout({
                 icon={mobileOpen ? <X size={20} /> : <Menu size={20} />}
               />
             )}
-            {/* Owner 2026-10-25: the logo and the menu entries are real
-                links, so right click › new tab and Ctrl click work. */}
             <AppLink
               href="/dashboard"
-              className="flex items-center gap-2 cursor-pointer"
-              onNavigate={() => {
-                if (isCurrentPage('dashboard')) return
-                setPendingPage('dashboard')
-                onNavigate('dashboard')
-              }}
+              className={`flex shrink-0 cursor-pointer items-center gap-2 ${hasSidebar ? 'lg:hidden' : ''}`}
+              onNavigate={goHome}
             >
               <img
                 src="/azzanco-logo.png"
@@ -174,7 +250,7 @@ export function Layout({
                 aria-hidden="true"
                 className="h-9 w-9 shrink-0 rounded-lg object-contain"
               />
-              <div className="hidden sm:block">
+              <div className={hasSidebar ? 'sr-only' : 'hidden sm:block'}>
                 <h1 className="text-sm font-bold leading-tight">
                   {t('appName')}
                 </h1>
@@ -183,92 +259,127 @@ export function Layout({
                 </p>
               </div>
             </AppLink>
-          </div>
+            {opens && (
+              <div className="hidden min-w-0 max-w-xl flex-1 md:block">
+                <GlobalSearch opens={opens} />
+              </div>
+            )}
 
-          <div className="hidden items-center gap-1.5 sm:flex">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleLanguage}
-              title={t('toggleLanguage')}
-              icon={<Languages size={16} />}
-            >
-              {lang === 'ar' ? 'EN' : 'ع'}
-            </Button>
-            <IconButton
-              label={t('toggleTheme')}
-              variant="ghost"
-              size="sm"
-              onClick={toggleTheme}
-              icon={theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-            />
-            <div
-              className="mx-1 h-6 w-px"
-              style={{ background: 'var(--border)' }}
-            />
-            <div className="hidden sm:block text-right">
-              <p className="text-xs font-medium">{profile?.full_name}</p>
-              <p className="text-xs text-muted">{roleLabel}</p>
-            </div>
-            <IconButton
-              label={t('signOut')}
-              variant="ghost"
-              size="sm"
-              onClick={() => setLogoutOpen(true)}
-              icon={<LogOut size={16} />}
-            />
-          </div>
-
-          <div className="sm:hidden">
-            <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
-              <DropdownMenuTrigger asChild>
+            <div className="ms-auto flex shrink-0 items-center gap-1">
+              {opens && (
                 <IconButton
-                  label={t('userMenu')}
+                  className="md:hidden"
+                  label={t(
+                    phoneSearchOpen ? 'globalSearchClose' : 'globalSearchOpen',
+                  )}
+                  variant="ghost"
+                  aria-expanded={phoneSearchOpen}
+                  onClick={() => setPhoneSearchOpen((value) => !value)}
+                  icon={
+                    phoneSearchOpen ? <X size={18} /> : <Search size={18} />
+                  }
+                />
+              )}
+              <HeaderClock lang={lang} />
+              <HeaderDivider />
+              <span className="hidden items-center gap-0.5 sm:flex">
+                <Button
                   variant="ghost"
                   size="sm"
-                  className="h-9 w-9 rounded-full"
-                  icon={<CircleUserRound size={25} />}
-                />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-64">
-                <DropdownMenuLabel>
-                  <p className="text-sm font-semibold text-fg">
-                    {profile?.full_name ?? '—'}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted">{roleLabel}</p>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
+                  onClick={toggleLanguage}
+                  title={t('toggleLanguage')}
+                  icon={<Languages size={16} />}
+                >
+                  {lang === 'ar' ? 'EN' : 'ع'}
+                </Button>
+                <IconButton
+                  label={t('toggleTheme')}
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleTheme}
                   icon={
                     theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />
                   }
-                  onSelect={toggleTheme}
-                >
-                  {theme === 'dark' ? t('lightMode') : t('darkMode')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  icon={<Languages size={16} />}
-                  onSelect={toggleLanguage}
-                >
-                  {t('language')}: {lang === 'ar' ? 'English' : 'العربية'}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  tone="danger"
-                  icon={<LogOut size={16} />}
-                  onSelect={() => setLogoutOpen(true)}
-                >
-                  {t('signOut')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                />
+              </span>
+              <HeaderDivider />
+              <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={t('userMenu')}
+                    className="flex items-center gap-2 rounded-full p-1 transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring sm:pe-2.5"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-contrast"
+                    >
+                      {userInitial}
+                    </span>
+                    <span className="hidden text-start leading-tight lg:block">
+                      <span className="block text-xs font-semibold">
+                        {profile?.full_name}
+                      </span>
+                      <span className="block text-[11px] text-muted">
+                        {roleLabel}
+                      </span>
+                    </span>
+                    <ChevronDown
+                      size={14}
+                      aria-hidden="true"
+                      className="hidden text-muted sm:block"
+                    />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-64">
+                  <DropdownMenuLabel>
+                    <p className="text-sm font-semibold text-fg">
+                      {profile?.full_name ?? '—'}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted">{roleLabel}</p>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {/* Phones only: from sm the bar shows these two icons. */}
+                  <DropdownMenuItem
+                    className="sm:hidden"
+                    icon={
+                      theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />
+                    }
+                    onSelect={toggleTheme}
+                  >
+                    {theme === 'dark' ? t('lightMode') : t('darkMode')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="sm:hidden"
+                    icon={<Languages size={16} />}
+                    onSelect={toggleLanguage}
+                  >
+                    {t('language')}:{' '}
+                    <bdi>{lang === 'ar' ? 'English' : 'العربية'}</bdi>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="sm:hidden" />
+                  <DropdownMenuItem
+                    tone="danger"
+                    icon={<LogOut size={16} />}
+                    onSelect={() => setLogoutOpen(true)}
+                  >
+                    {t('signOut')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
+        {opens && phoneSearchOpen && (
+          <div className="border-t px-3 py-2 md:hidden">
+            <GlobalSearch opens={opens} autoFocus />
+          </div>
+        )}
       </header>
 
       <div className="mx-auto flex max-w-[1700px]">
         {/* Sidebar — desktop */}
-        {navItems.length > 0 && (
+        {hasSidebar && (
           <aside
             className="hidden lg:flex w-60 shrink-0 flex-col border-e p-4 sticky top-16 h-[calc(100dvh-4rem)] overflow-y-auto"
             style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}

@@ -2709,6 +2709,21 @@ export const translations = {
     adminAttentionAwaitingEnd: 'معدات خرجت بانتهاء عمل وكرتها مفتوح',
     adminAttentionAwaitingEndHint: 'كروت تنتظر الانهاء في المبيعات',
     // purchasing-0185 — end
+    // app-header-v2 — start (owner 2026-11-08, approved on /ui-kit as «ب»)
+    appLogoAlt: 'شعار شركة العزاني',
+    globalSearchLabel: 'بحث عام',
+    globalSearchPlaceholder: 'ابحث عن معدة، سائق، مشروع او PO',
+    globalSearchOpen: 'فتح البحث',
+    globalSearchClose: 'اغلاق البحث',
+    globalSearchMinChars: 'اكتب حرفين على الاقل',
+    globalSearchSearching: 'نبحث…',
+    globalSearchNoResults: 'لا توجد نتائج',
+    globalSearchPartialError: 'تعذر تحميل بعض النتائج',
+    globalSearchError: 'تعذر البحث، حاول مرة اخرى',
+    globalSearchPurchaseOrders: 'اوامر الشراء',
+    globalSearchInquiry: 'استعلام',
+    globalSearchInquiryFor: 'استعلام عن المعدة {code}',
+    // app-header-v2 — end
   },
   en: {
     appName: 'Heavy Equipment Management',
@@ -5482,6 +5497,21 @@ export const translations = {
     adminAttentionAwaitingEnd: 'Units out on work completed, card still open',
     adminAttentionAwaitingEndHint: 'Cards awaiting their end in sales',
     // purchasing-0185 — end
+    // app-header-v2 — start (owner 2026-11-08, approved on /ui-kit as «ب»)
+    appLogoAlt: 'Al-Azani logo',
+    globalSearchLabel: 'Search everything',
+    globalSearchPlaceholder: 'Search units, drivers, projects or POs',
+    globalSearchOpen: 'Open search',
+    globalSearchClose: 'Close search',
+    globalSearchMinChars: 'Type at least two characters',
+    globalSearchSearching: 'Searching…',
+    globalSearchNoResults: 'No results',
+    globalSearchPartialError: 'Some results could not be loaded',
+    globalSearchError: 'Search failed, try again',
+    globalSearchPurchaseOrders: 'Purchase orders',
+    globalSearchInquiry: 'Inquiry',
+    globalSearchInquiryFor: 'Inquiry for unit {code}',
+    // app-header-v2 — end
   },
 } as const
 
