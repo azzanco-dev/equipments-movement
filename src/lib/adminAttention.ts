@@ -6,6 +6,8 @@
  * `AttentionSection`; this module is pure.
  */
 
+import type { AdminHomeOwner } from '@/lib/adminHomeStats'
+import { ownersFilter } from '@/lib/adminHomeLinks'
 import { CARDS_AWAITING_END_HREF } from '@/lib/cardsAwaitingEnd'
 
 export type AttentionId =
@@ -62,8 +64,13 @@ export function unclassifiedHref(): string {
   ])
 }
 
-/** Open workshop visits «خارج الخدمة» that entered before `cutoff`. */
-export function outOfServiceLongHref(cutoff: string): string {
+/** Open workshop visits «خارج الخدمة» that entered before `cutoff`, of the
+ *  chosen owners (empty = every owner; the home v2 workshop card passes its
+ *  owner filter). */
+export function outOfServiceLongHref(
+  cutoff: string,
+  owners: readonly AdminHomeOwner[] = [],
+): string {
   return workshopVisitsHref([
     {
       id: 'purpose',
@@ -72,6 +79,7 @@ export function outOfServiceLongHref(cutoff: string): string {
       value: 'out_of_service',
     },
     { id: 'since', field: 'entry_at', operator: 'lt', value: cutoff },
+    ...ownersFilter('equipment_ownership_status', owners),
   ])
 }
 

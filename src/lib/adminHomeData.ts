@@ -15,7 +15,9 @@
  */
 import { saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
 import { supabase } from '@/lib/supabase'
+import type { OpenProjectVisit } from '@/lib/adminHomeV2'
 import {
+  ALL_OWNERS,
   fleetEquipmentRpcArgs,
   fleetOwnerArgument,
   homeOwnerArgument,
@@ -329,6 +331,152 @@ export async function fetchRestUnitsPage(
   }
 }
 
+/**
+ * The daily entries and exits of EVERY owner (the KPI strip's «دخول اليوم»
+ * and its run of bars, owner 2026-11-09): the same function as the chart,
+ * with all five owners named explicitly, since an empty `p_owners` would be
+ * mapped to the home's three by `homeOwnerArgument`.
+ */
+export async function fetchEntriesSeriesAllOwners(
+  fromKey: string,
+  toKey: string,
+  signal: AbortSignal,
+): Promise<DailyMovementCount[]> {
+  const { data, error } = await supabase
+    .rpc('get_admin_entries_series', {
+      p_from: saudiDayStart(fromKey),
+      p_to: saudiDayEnd(toKey),
+      p_owners: [...ALL_OWNERS],
+      p_context: null,
+    })
+    .abortSignal(signal)
+  if (error) fail('entriesSeriesAll', error)
+  return parseDailySeries(data)
+}
+
+/** The read cap of the open project visits. The open visits are at most one
+ *  per unit of the fleet, so the cap is never reached in practice; when it
+ *  is, the card says the figures are partial. */
+export const OPEN_PROJECT_VISITS_CAP = 2000
+
+/**
+ * «المشاريع الاكثر معدات» (owner 2026-11-09): the open project visits of
+ * `movement_visits` (RLS of the movements), only the project columns, in ONE
+ * bounded read; `topProjects` groups them.
+ */
+export async function fetchOpenProjectVisits(
+  signal: AbortSignal,
+): Promise<{ rows: OpenProjectVisit[]; capped: boolean }> {
+  const { data, error } = await supabase
+    .from('movement_visits')
+    .select('entry_id, project_id, project_name_ar, project_name_en')
+    .eq('movement_context', 'site')
+    .eq('is_open', true)
+    .order('entry_id')
+    .limit(OPEN_PROJECT_VISITS_CAP)
+    .abortSignal(signal)
+  if (error) fail('openProjectVisits', error)
+  const rows = (data ?? []) as {
+    project_id: string | null
+    project_name_ar: string | null
+    project_name_en: string | null
+  }[]
+  return {
+    capped: rows.length >= OPEN_PROJECT_VISITS_CAP,
+    rows: rows.map((row) => ({
+      projectId: row.project_id,
+      nameAr: row.project_name_ar,
+      nameEn: row.project_name_en,
+    })),
+  }
+}
+
+/** One row of «اخر الحركات». */
+export interface LatestMovementRow {
+  id: string
+  type: 'entry' | 'exit'
+  context: 'site' | 'workshop'
+  recordedAt: string
+  code: string
+  equipmentType: string | null
+  driverFullName: string | null
+  driverName: string | null
+  projectNameAr: string | null
+  projectNameEn: string | null
+}
+
+/** Rows of «اخر الحركات». */
+export const LATEST_MOVEMENTS_LIMIT = 7
+
+/**
+ * The latest movements (`movement_log_search`, RLS of the movements), in the
+ * log's deterministic order: newest `recorded_at`, then `id`.
+ */
+export async function fetchLatestMovements(
+  signal: AbortSignal,
+  limit = LATEST_MOVEMENTS_LIMIT,
+): Promise<LatestMovementRow[]> {
+  const { data, error } = await supabase
+    .from('movement_log_search')
+    .select(
+      'id, movement_type, movement_context, recorded_at, equipment_code, equipment_type, driver_full_name, driver_name, project_name_ar, project_name_en',
+    )
+    .order('recorded_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(limit)
+    .abortSignal(signal)
+  if (error) fail('latestMovements', error)
+  return (
+    (data ?? []) as {
+      id: string
+      movement_type: 'entry' | 'exit'
+      movement_context: 'site' | 'workshop'
+      recorded_at: string
+      equipment_code: string | null
+      equipment_type: string | null
+      driver_full_name: string | null
+      driver_name: string | null
+      project_name_ar: string | null
+      project_name_en: string | null
+    }[]
+  ).map((row) => ({
+    id: row.id,
+    type: row.movement_type,
+    context: row.movement_context,
+    recordedAt: row.recorded_at,
+    code: row.equipment_code ?? '—',
+    equipmentType: row.equipment_type,
+    driverFullName: row.driver_full_name,
+    driverName: row.driver_name,
+    projectNameAr: row.project_name_ar,
+    projectNameEn: row.project_name_en,
+  }))
+}
+
+/**
+ * Open workshop visits «خارج الخدمة» that entered before `cutoff` (a Saudi
+ * day), for the chosen owners (empty = every owner): the line under «الورشة
+ * حسب الغرض». The same rule as the «يحتاج انتباهك» item.
+ */
+export async function fetchLongOutOfServiceCount(
+  cutoff: string,
+  owners: readonly AdminHomeOwner[],
+  signal: AbortSignal,
+): Promise<number> {
+  let query = supabase
+    .from('movement_visits')
+    .select('entry_id', { count: 'exact', head: true })
+    .eq('movement_context', 'workshop')
+    .eq('is_open', true)
+    .eq('workshop_purpose', 'out_of_service')
+    .lt('entry_at', cutoff)
+    .abortSignal(signal)
+  if (owners.length) query = query.in('equipment_ownership_status', [...owners])
+  const { count, error } = await query
+  if (error) fail('longOutOfService', error)
+  return count ?? 0
+}
+
 /** The suppliers inside projects (migration 0161). */
 export async function fetchSupplierSiteCounts(
   signal: AbortSignal,
@@ -338,17 +486,4 @@ export async function fetchSupplierSiteCounts(
     .abortSignal(signal)
   if (error) fail('supplierSiteCounts', error)
   return parseSupplierSiteCounts(data)
-}
-
-export async function fetchOwnerStateMatrix(
-  owners: AdminHomeOwner[],
-  signal: AbortSignal,
-): Promise<OwnerStateMatrix> {
-  const { data, error } = await supabase
-    .rpc('get_admin_owner_state_matrix', {
-      p_owners: homeOwnerArgument(owners),
-    })
-    .abortSignal(signal)
-  if (error) fail('ownerStateMatrix', error)
-  return parseOwnerStateMatrix(data)
 }

@@ -146,9 +146,11 @@ test('the fleet section titles, no «الان», Takween in its filter', () => {
   assert.doesNotMatch(section, /adminHomeNow/)
   assert.match(section, /<FleetOwnerFilter/)
   const home = read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx')
-  assert.match(home, /title="adminHomeFleetTablesTitle"/)
+  // Home v2 (owner 2026-11-09): the full fleet tables open in place from
+  // the workshop block's «عرض الكل».
+  assert.match(home, /title="homeV2FleetTables"/)
   const translations = read('src', 'i18n', 'translations.ts')
   assert.match(translations, /adminHomeStateTitle: 'حالة الاسطول'/)
-  assert.match(translations, /adminHomeFleetTablesTitle: 'الورشة والمتاحة'/)
+  assert.match(translations, /homeV2FleetTables: 'جداول الاسطول'/)
   assert.doesNotMatch(translations, /adminHomeStateTitle: 'الحالة الان'/)
 })

@@ -15,7 +15,8 @@ const code = mockup
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/^\s*\/\/.*$/gm, '')
 
-test('the mockup is a /ui-kit section under review, listed first', () => {
+// Approved 2026-11-09 («اعتمد الرئيسية الي في ui-kit»): variant «ب» is live.
+test('the mockup is an approved /ui-kit section, listed first', () => {
   const kit = read('src', 'screens', 'UiKit.tsx')
   assert.match(
     kit,
@@ -23,7 +24,7 @@ test('the mockup is a /ui-kit section under review, listed first', () => {
   )
   assert.match(
     kit,
-    /const SCREEN_SECTIONS: SectionDef\[\] = \[\r?\n  \{[\s\S]*?id: 'home-dashboard-v2',\r?\n    title: 'نموذج الرئيسية الجديدة v2 \(من الصور المرجعية\)',[\s\S]*?status: 'review',[\s\S]*?element: <HomeDashboardV2Mockup \/>/,
+    /const SCREEN_SECTIONS: SectionDef\[\] = \[\r?\n  \{[\s\S]*?id: 'home-dashboard-v2',\r?\n    title: 'نموذج الرئيسية الجديدة v2 \(من الصور المرجعية\)',[\s\S]*?status: 'approved',[\s\S]*?element: <HomeDashboardV2Mockup \/>/,
   )
 })
 

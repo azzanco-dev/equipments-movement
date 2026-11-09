@@ -9,7 +9,7 @@ import {
   Radio,
   Wrench,
 } from 'lucide-react'
-import { AppLink, Button, Card, SectionHeader } from '@/components/ui'
+import { AppLink, Badge, Button } from '@/components/ui'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
@@ -29,6 +29,7 @@ import {
 } from '@/lib/adminAttention'
 import { loadAfaqyStats } from '@/lib/afaqy'
 import { supabase } from '@/lib/supabase'
+import { HomeBlock } from './HomeBlock'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 type Tone = 'warning' | 'info' | 'danger'
@@ -40,43 +41,43 @@ const ITEM: Record<
   unclassified: {
     label: 'adminAttentionUnclassified',
     hint: 'adminAttentionUnclassifiedHint',
-    icon: <Wrench size={16} />,
+    icon: <Wrench size={14} />,
     tone: 'warning',
   },
   no_po: {
     label: 'adminAttentionNoPo',
     hint: 'adminAttentionNoPoHint',
-    icon: <FileWarning size={16} />,
+    icon: <FileWarning size={14} />,
     tone: 'warning',
   },
   awaiting_approval: {
     label: 'adminAttentionAwaitingApproval',
     hint: 'adminAttentionAwaitingApprovalHint',
-    icon: <BadgeCheck size={16} />,
+    icon: <BadgeCheck size={14} />,
     tone: 'info',
   },
   unpriced: {
     label: 'adminAttentionUnpriced',
     hint: 'adminAttentionUnpricedHint',
-    icon: <CircleDollarSign size={16} />,
+    icon: <CircleDollarSign size={14} />,
     tone: 'warning',
   },
   awaiting_end: {
     label: 'adminAttentionAwaitingEnd',
     hint: 'adminAttentionAwaitingEndHint',
-    icon: <CalendarX2 size={16} />,
+    icon: <CalendarX2 size={14} />,
     tone: 'warning',
   },
   no_signal: {
     label: 'adminAttentionNoSignal',
     hint: 'adminAttentionNoSignalHint',
-    icon: <Radio size={16} />,
+    icon: <Radio size={14} />,
     tone: 'danger',
   },
   out_of_service_long: {
     label: 'adminAttentionOutOfService',
     hint: 'adminAttentionOutOfServiceHint',
-    icon: <PowerOff size={16} />,
+    icon: <PowerOff size={14} />,
     tone: 'danger',
   },
 }
@@ -109,7 +110,10 @@ export interface AttentionSectionProps {
  * `equipment.location.view` — and the whole card hides when nothing is
  * left. The database counts load together; Afaqy (an outside service) on
  * its own, so it never delays them. A failed count says so; it is never
- * shown as nothing to do.
+ * shown as nothing to do. Since the home v2 (owner 2026-11-09, «اعتمد
+ * الرئيسية الي في ui-kit») it is the mockup's list block in the second row:
+ * an icon tile, the label and its hint, the count; with nothing left it
+ * says so in its place instead of leaving a hole in the grid.
  */
 export function AttentionSection({
   canOpenPage,
@@ -209,9 +213,9 @@ export function AttentionSection({
   }
   const items = visibleAttentionItems(values)
   const failed = counts.failed || afaqy.failed
-
-  // Nothing yet, or nothing to do: no card at all.
-  if (items.length === 0 && !failed) return null
+  // The home v2 grid keeps the block in its place (owner 2026-11-09, the
+  // approved mockup): nothing to do reads as such, never as a hole.
+  const firstLoad = counts.loading && counts.data === null
 
   const hrefOf = (id: AttentionId): string | null => {
     if (id === 'unclassified')
@@ -229,47 +233,50 @@ export function AttentionSection({
     return null
   }
 
-  const itemClass =
-    'group flex w-full items-center gap-3 rounded-xl border bg-bg p-3 text-start transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
+  const rowClass =
+    'group flex w-full items-center gap-2.5 rounded-md py-2.5 text-start transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring'
 
   return (
-    <Card className="space-y-3">
-      <SectionHeader
-        as="h2"
-        title={t('adminAttentionTitle')}
-        description={t('adminAttentionDescription')}
-      />
-      {items.length > 0 && (
-        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+    <HomeBlock
+      title="homeV2NeedsAttention"
+      action={
+        items.length > 0 ? (
+          <Badge size="sm" tone="danger" className="tabular-nums">
+            {items.length}
+          </Badge>
+        ) : undefined
+      }
+      state={firstLoad ? 'loading' : 'ready'}
+    >
+      {items.length === 0 && !failed ? (
+        <p className="text-sm text-muted">{t('homeV2AttentionNone')}</p>
+      ) : (
+        <ul className="divide-y">
           {items.map((id) => {
             const item = ITEM[id]
-            const color = `var(--${item.tone})`
             const body = (
               <>
                 <span
                   aria-hidden="true"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
                   style={{
-                    color,
+                    color: `var(--${item.tone})`,
                     backgroundColor: `var(--${item.tone}-soft)`,
                   }}
                 >
                   {item.icon}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-fg">
+                  <span className="truncate-safe block text-sm font-medium text-fg">
                     {t(item.label)}
                   </span>
-                  <span className="block text-xs text-muted">
+                  <span className="truncate-safe block text-[11px] leading-4 text-muted">
                     {t(item.hint)}
                   </span>
                 </span>
-                <span
-                  className="text-xl font-bold tabular-nums"
-                  style={{ color }}
-                >
+                <Badge size="sm" tone={item.tone} className="tabular-nums">
                   {values[id]}
-                </span>
+                </Badge>
                 <ArrowUpLeft
                   size={14}
                   aria-hidden="true"
@@ -281,19 +288,19 @@ export function AttentionSection({
             return (
               <li key={id}>
                 {href ? (
-                  <AppLink href={href} className={itemClass}>
+                  <AppLink href={href} className={rowClass}>
                     {body}
                   </AppLink>
                 ) : id === 'no_signal' ? (
                   <button
                     type="button"
-                    className={itemClass}
+                    className={rowClass}
                     onClick={onShowAfaqy}
                   >
                     {body}
                   </button>
                 ) : (
-                  <div className="flex w-full items-center gap-3 rounded-xl border bg-bg p-3">
+                  <div className="flex w-full items-center gap-2.5 py-2.5">
                     {body}
                   </div>
                 )}
@@ -303,7 +310,10 @@ export function AttentionSection({
         </ul>
       )}
       {failed && (
-        <p role="alert" className="flex items-center gap-2 text-xs text-danger">
+        <p
+          role="alert"
+          className="mt-2 flex items-center gap-2 text-xs text-danger"
+        >
           {t('adminAttentionLoadError')}
           <Button
             variant="ghost"
@@ -317,6 +327,6 @@ export function AttentionSection({
           </Button>
         </p>
       )}
-    </Card>
+    </HomeBlock>
   )
 }

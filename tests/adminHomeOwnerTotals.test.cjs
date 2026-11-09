@@ -97,58 +97,81 @@ test('ownerTotals covers all five owners and adds up', () => {
   assert.equal(sites.owners[0].count, 4)
 })
 
-test('the cards read every owner and link to the filtered equipment list', () => {
+test('the owners read every owner and link to the filtered lists', () => {
   const data = read('src', 'lib', 'adminHomeData.ts')
   assert.match(
     data,
     /fetchAllOwnersStateMatrix[\s\S]*?rpc\('get_admin_owner_state_matrix', \{\s*p_owners: owners\.length \? \[\.\.\.owners\] : null,?\s*\}\)/,
   )
-  const section = read(
-    'src',
-    'components',
-    'admin-home',
-    'OwnerTotalsSection.tsx',
-  )
-  assert.match(section, /ownerTotals\(data, FLEET_STATES\)/)
-  assert.match(section, /ownerTotals\(data, \['inside_site'\]\)/)
-  assert.match(section, /field: 'ownership_status'/)
-  assert.match(section, /canOpenEquipment\s*\?/)
-  // Owner 2026-10-29: «في المشاريع» and the suppliers open the log's open
-  // project visits of that owner / supplier; the fleet the equipment list.
+  // Home v2 (owner 2026-11-09): the owner boxes of 2026-10-29 live on as the
+  // «الملاك» tab of «حالة الاسطول», every owner's fleet and units on
+  // projects with the same links.
+  const card = read('src', 'components', 'admin-home', 'FleetStateCard.tsx')
+  assert.match(card, /ownerTotals\(matrix\.data, FLEET_STATES\)/)
+  assert.match(card, /ownerTotals\(matrix\.data, \['inside_site'\]\)/)
   assert.match(
-    section,
-    /canOpenLogs \? \(owner\) => insideProjectsLogHref\(owner\)/,
+    card,
+    /canOpenEquipment \? ownerEquipmentHref\(row\.owner\) : null/,
   )
-  assert.match(section, /insideProjectsLogHref\('external_supplier', row\.id\)/)
-  assert.match(section, /field: 'is_open', operator: 'eq', value: 'true'/)
-  assert.match(section, /field: SUPPLIER_FILTER_KEY/)
-  assert.match(section, /\/logs\?vfilters=/)
+  assert.match(
+    card,
+    /canOpenLogs \? insideProjectsLogHref\(row\.owner\) : null/,
+  )
+  assert.match(card, /t\(ownershipBadge\(row\.owner\)\.key\)/)
+  assert.match(card, /<CountUp value=\{value\} \/>/)
+  const links = loadLib('adminHomeLinks')
+  const filtersOf = (href, key) =>
+    JSON.parse(new URL(href, 'http://x').searchParams.get(key))
+  assert.deepEqual(filtersOf(links.ownerEquipmentHref('takween'), 'filters'), [
+    {
+      id: 'owner',
+      field: 'ownership_status',
+      operator: 'eq',
+      value: 'takween',
+    },
+    { id: 'status', field: 'status', operator: 'eq', value: 'active' },
+  ])
+  assert.deepEqual(
+    filtersOf(
+      links.insideProjectsLogHref('external_supplier', null),
+      'vfilters',
+    ),
+    [
+      { id: 'open', field: 'is_open', operator: 'eq', value: 'true' },
+      {
+        id: 'owner',
+        field: 'equipment_ownership_status',
+        operator: 'eq',
+        value: 'external_supplier',
+      },
+      {
+        id: 'supplier',
+        field: 'equipment_lessor_id',
+        operator: 'in',
+        value: '__empty__',
+      },
+    ],
+  )
   assert.match(
     read('src', 'App.tsx'),
     /const canOpenLogs = shell\.pages\.has\('logs'\)/,
   )
   const screen = read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx')
-  assert.match(
-    screen,
-    /<OwnerTotalsSection\s+canOpenEquipment=\{Boolean\(onSelectEquipment\)\}\s+canOpenLogs=\{canOpenLogs\}\s*\/>/,
-  )
-  assert.ok(
-    screen.indexOf('<OwnerTotalsSection') <
-      screen.indexOf('<FleetStateSection'),
-  )
   // Owner 2026-11-08: no date under the greeting any more («شيل التاريخ تحت
   // مساء الخير», the header shows it), a smaller greeting («صغّر خط
   // التحية») and less room above it («قلل المسافة الي فوق»).
   assert.doesNotMatch(screen, /saudiDayLabel/)
   assert.match(screen, /'adminHomeGreetingMorning'/)
-  // Owner 2026-10-29: the greeting and the big numbers bold, full names.
+  // Owner 2026-10-29: the greeting bold.
   assert.match(
     screen,
     /className="text-\[22px\] font-bold leading-tight sm:text-\[24px\]"/,
   )
   assert.match(screen, /className="-mt-1 space-y-4 sm:-mt-2 lg:-mt-4"/)
-  assert.match(section, /text-3xl font-bold tabular-nums/)
-  assert.match(section, /t\(ownershipBadge\(row\.owner\)\.key\)/)
+  // ONE snapshot over every owner feeds the KPI strip and the fleet card.
+  assert.match(screen, /fetchAllOwnersStateMatrix\(signal\)/)
+  assert.match(screen, /<KpiStrip\s+matrix=\{matrix\}/)
+  assert.match(screen, /<FleetStateCard\s+matrix=\{matrix\}/)
 })
 
 // Owner 2026-10-29: «اضف عمود في المشاريع تبع الموردين» (migration 0161).
@@ -177,7 +200,7 @@ test('0161 counts the supplier units inside projects, read-only', () => {
   assert.doesNotMatch(code, /\b(UPDATE|DELETE FROM|INSERT INTO|ALTER TABLE)\b/)
 })
 
-test('the suppliers card parses, loads on its own and follows the fleet tables', () => {
+test('the suppliers parse, load on their own and link to the log', () => {
   const stats = loadLib('adminHomeStats')
   const parsed = stats.parseSupplierSiteCounts({
     total: 5,
@@ -190,113 +213,78 @@ test('the suppliers card parses, loads on its own and follows the fleet tables',
   assert.equal(parsed.suppliers[1].id, null)
   assert.equal(parsed.suppliers[1].name, null)
   assert.equal(parsed.suppliers[0].count, 4)
-  const section = read(
+  assert.match(
+    read('src', 'lib', 'adminHomeData.ts'),
+    /rpc\('get_admin_supplier_site_counts'\)/,
+  )
+  // Home v2 (owner 2026-11-09): the suppliers are the second tab of the
+  // workshop block, each a link to the log's open visits of that supplier.
+  const card = read(
     'src',
     'components',
     'admin-home',
-    'OwnerTotalsSection.tsx',
+    'WorkshopSuppliersCard.tsx',
   )
-  assert.match(section, /export function SupplierSitesCard\(\{\s*canOpenLogs,?/)
-  assert.match(
-    section,
-    /useAdminHomeSection\(load\)[\s\S]*useAdminHomeSection\(load\)/,
-  )
-  // Owner 2026-10-29: the home renders it after the fleet tables, which sit
-  // right under the workshop states without the old state cards.
-  assert.doesNotMatch(section, /<SupplierSitesCard/)
-  const home = read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx')
-  // Owner boxes, «حالات المتبقي», the workshop and available tables, then
-  // the suppliers.
-  const order = [
-    '<OwnerTotalsSection',
-    '<RestStatesCard',
-    "tables={['workshop', 'available']}",
-    '<SupplierSitesCard canOpenLogs={canOpenLogs} />',
-  ].map((needle) => home.indexOf(needle))
-  assert.ok(
-    order.every(
-      (at, index) => at > 0 && (index === 0 || at > order[index - 1]),
-    ),
-  )
-  const fleetState = read(
+  assert.match(card, /fetchSupplierSiteCounts\(signal\)/)
+  assert.match(card, /insideProjectsLogHref\('external_supplier', row\.id\)/)
+  assert.match(card, /canOpenLogs \?/)
+  assert.match(card, /<CountUp value=\{row\.count\} \/>/)
+  assert.match(card, /t\('adminHomeSupplierSitesNone'\)/)
+  // The workshop tab opens its open workshop entry (owner 2026-10-29).
+  assert.match(card, /onSelectMovement\(row\.lastMovementId\)/)
+})
+
+// Owner 2026-10-29 «حالات المتبقي», kept by the home v2 workshop block.
+test('the workshop block keeps the remaining-states filter and export', () => {
+  const card = read(
     'src',
     'components',
     'admin-home',
-    'FleetStateSection.tsx',
+    'WorkshopPurposeCard.tsx',
   )
-  assert.match(
-    fleetState,
-    /showCards \? fetchFleetState\(owners, signal\) : Promise\.resolve\(null\)/,
-  )
-  assert.match(fleetState, /\{!showCards \? null : failed \?/)
-  // Owner 2026-10-29: «كاردز صغيرة» — a row per total, the total first.
-  assert.match(section, /function OwnerTotalsRow\(/)
-  assert.match(section, /grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5/)
-  // Owner 2026-10-29: «المتبقي» was the third row, then «حالات المتبقي»
-  // took its place («واستبدله بقسم المتبقي فوق»): two owner rows remain.
-  assert.equal(section.match(/<OwnerTotalsRow/g).length, 2)
-  assert.doesNotMatch(section, /adminHomeOwnerRestTitle|restEquipmentHref/)
-  // Owner 2026-10-29: «وشيل كروت الصيانة الي تحت المتبقي», then back as
-  // their own box at the page's end («حالات المتبقي», `RestStatesCard`).
-  assert.doesNotMatch(section, /extra=/)
-  assert.match(section, /export function RestStatesCard\(/)
+  // Its own owner filter over all five, Al-Azani by default.
+  assert.match(card, /useState<AdminHomeOwner\[\]>\(\['alazani'\]\)/)
+  assert.match(card, /<OwnerFilter\s/)
+  assert.match(card, /fetchAllOwnersStateMatrix\(signal, owners\)/)
+  // The Excel export of the units outside a project, for those owners.
+  assert.match(card, /restUnitExcelColumns\(/)
+  assert.match(card, /fetchRestUnitsPage\(owners, page, size/)
+  assert.match(card, /fileName: 'remaining-by-state'/)
+  // The links carry the chosen owners.
+  assert.match(card, /openWorkshopVisitsHref\(owners\)/)
+  assert.match(card, /availableEquipmentHref\(owners\)/)
+  assert.match(card, /outOfServiceLongHref\(cutoff, owners\)/)
   for (const state of [
     'workshop_maintenance',
     'workshop_parking',
     'workshop_out_of_service',
     'workshop_unclassified',
-    'available',
   ])
-    assert.match(section, new RegExp(`state: '${state}'`))
-  // The state links carry the box's chosen owners (owner 2026-10-29).
-  assert.match(section, /workshopStateLogHref\(item\.purpose, owners\)/)
-  assert.match(section, /availableEquipmentHref\(owners\)/)
-  // Its own owner filter over all five, Al-Azani by default, and the
-  // Excel export of its units.
-  assert.match(section, /useState<AdminHomeOwner\[\]>\(\['alazani'\]\)/)
-  assert.match(section, /<OwnerFilter\s/)
+    assert.match(card, new RegExp(`state: '${state}'`))
   // Owner 2026-10-29: «بالنسبة للارقام الاحصائية خليها counter».
-  for (const value of [
-    'total',
-    'row.count',
-    'data.total',
-    'rest.total',
-    'count',
-  ])
-    assert.match(
-      section,
-      new RegExp(`<CountUp value=\{${value.replace('.', '\.')}\} \/>`),
-      value,
-    )
+  assert.match(card, /<CountUp value=\{value\} \/>/)
   const counter = read('src', 'components', 'admin-home', 'CountUp.tsx')
   assert.match(counter, /prefers-reduced-motion: reduce/)
   assert.match(counter, /<span className="sr-only">\{value\}<\/span>/)
   assert.match(counter, /const from = shownRef\.current/)
-  assert.match(section, /fetchAllOwnersStateMatrix\(signal, owners\)/)
-  assert.match(section, /restUnitExcelColumns\(/)
-  assert.match(section, /fetchRestUnitsPage\(owners, page, size/)
-  assert.match(section, /<\/ul>\s*<\/section>\s*<\/Card>/)
-  // Light owner tints with the charts' readable text («بالوان فاتحة»).
-  assert.match(
-    section,
-    /color-mix\(in srgb, \$\{OWNER_STROKE\[row\.owner\]\} 18%, var\(--bg\)\)/,
+  // The workshop / available links of the chosen owners.
+  const links = loadLib('adminHomeLinks')
+  const filters = (href) =>
+    JSON.parse(new URL(href, 'http://x').searchParams.get('vfilters'))
+  assert.deepEqual(filters(links.workshopStateLogHref(null, ['alazani']))[1], {
+    id: 'purpose',
+    field: 'workshop_purpose',
+    operator: 'is_not_set',
+    value: '',
+  })
+  assert.deepEqual(
+    filters(links.openWorkshopVisitsHref(['alazani', 'takween']))[1],
+    {
+      id: 'owner',
+      field: 'equipment_ownership_status',
+      operator: 'in',
+      value: 'alazani,takween',
+    },
   )
-  assert.match(section, /color: 'var\(--chart-text\)'/)
-  assert.doesNotMatch(section, /#[0-9a-fA-F]{3,6}/)
-  // The title and hint, then the total under both; more room between the
-  // sections.
-  assert.match(
-    section,
-    /\{title\}<\/span>\s*<span className="block text-xs text-muted">\{hint\}<\/span>\s*<span className="mt-1 block text-3xl font-bold tabular-nums">\s*<CountUp value=\{total\} \/>/,
-  )
-  // The icon first in the total row, on the texts' right.
-  assert.match(
-    section,
-    /items-start gap-3 rounded-xl bg-surface p-3">\s*<span\s+aria-hidden="true"[^>]*>\s*\{icon\}/,
-  )
-  assert.match(section, /<div className="space-y-4">\s*<OwnerTotalsRow/)
-  assert.match(
-    read('src', 'lib', 'adminHomeData.ts'),
-    /rpc\('get_admin_supplier_site_counts'\)/,
-  )
+  assert.equal(filters(links.openWorkshopVisitsHref()).length, 1)
 })

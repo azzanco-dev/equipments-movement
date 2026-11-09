@@ -1,21 +1,25 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { LogIn, LogOut } from 'lucide-react'
 import { Button, PageHeader } from '@/components/ui'
+import { AfaqyCard } from '@/components/admin-home/AfaqyCard'
 import { AfaqySection } from '@/components/admin-home/AfaqySection'
 import { AttentionSection } from '@/components/admin-home/AttentionSection'
+import { AvailabilityCard } from '@/components/admin-home/AvailabilityCard'
 import { AvailabilitySection } from '@/components/admin-home/AvailabilitySection'
-import { EntriesFlowSection } from '@/components/admin-home/EntriesFlowSection'
-import { FleetDonutSection } from '@/components/admin-home/FleetDonutSection'
+import { EntriesCard } from '@/components/admin-home/EntriesCard'
+import { FleetStateCard } from '@/components/admin-home/FleetStateCard'
 import { FleetStateSection } from '@/components/admin-home/FleetStateSection'
-import {
-  OwnerTotalsSection,
-  RestStatesCard,
-  SupplierSitesCard,
-} from '@/components/admin-home/OwnerTotalsSection'
+import { KpiStrip } from '@/components/admin-home/KpiStrip'
+import { LatestMovementsCard } from '@/components/admin-home/LatestMovementsCard'
+import { TopProjectsCard } from '@/components/admin-home/TopProjectsCard'
+import { WorkshopPurposeCard } from '@/components/admin-home/WorkshopPurposeCard'
+import { WorkshopSuppliersCard } from '@/components/admin-home/WorkshopSuppliersCard'
+import { useAdminHomeSection } from '@/components/admin-home/useAdminHomeSection'
 import { WhatsAppStatusAlert } from '@/components/WhatsAppGatewayStatus'
 import { useI18n } from '@/i18n/I18nContext'
 import { useAuth } from '@/auth/AuthContext'
+import { fetchAllOwnersStateMatrix } from '@/lib/adminHomeData'
 import { greetingName, greetingParts } from '@/lib/greetingName'
 import { saudiGreetingPeriod } from '@/lib/homeGreeting'
 import {
@@ -23,14 +27,27 @@ import {
   type AdminHomeGranularity,
 } from '@/lib/adminHomeStats'
 
-/** The Afaqy section's anchor, for the «يحتاج انتباهك» no-signal item. */
+/** The Afaqy block's anchor, for the «يحتاج انتباهك» no-signal item. */
 const AFAQY_ANCHOR = 'home-afaqy'
+
+/** The full sections a block's «عرض الكل» opens in place, under its row. */
+type Panel = 'fleet-tables' | 'availability' | 'afaqy'
+
+const PANEL_ID: Record<Panel, string> = {
+  'fleet-tables': 'home-panel-fleet-tables',
+  availability: 'home-panel-availability',
+  afaqy: 'home-panel-afaqy',
+}
+
+/** A row of three blocks: stacked on a phone, two from md, three from xl
+ *  (the approved mockup's variant «ب»). */
+const ROW = 'grid gap-4 md:grid-cols-2 xl:grid-cols-3'
 
 export interface AdminHomeScreenProps {
   onSelectEquipment?: (id: string) => void
-  /** Opens a movement; the «داخل الورشة» table opens the open entry. */
+  /** Opens a movement: «اخر الحركات» and the workshop rows (its open entry). */
   onSelectMovement?: (id: string) => void
-  /** The shell opens /logs: the projects and suppliers cards link there. */
+  /** The shell opens /logs: the projects, workshop and suppliers link there. */
   canOpenLogs?: boolean
   /** Whether the shell opens a page («يحتاج انتباهك» links only then). */
   canOpenPage?: (
@@ -41,26 +58,21 @@ export interface AdminHomeScreenProps {
 }
 
 /**
- * The admin and monitor home page.
+ * The admin and monitor home page, rebuilt on the approved /ui-kit «نموذج
+ * الرئيسية الجديدة v2» (owner 2026-11-09, «اعتمد الرئيسية الي في ui-kit»,
+ * variant «ب بمسافات الحالية»: the mockup's arrangement on the current
+ * spacing; EM-252, «الارقام الحالية تاخذ كامل الصفحة»). Top to bottom: the
+ * greeting, the eight KPI tiles, then three rows of three blocks — the fleet
+ * state, the projects with the most units, the workshop by purpose; the
+ * latest movements, «يحتاج انتباهك», the workshop / suppliers; availability
+ * by type, Afaqy, the daily entries and exits.
  *
- * Order follows the owner's third review (2026-09-22), revised by the
- * approved design of 2026-09-30: the fleet's state right now across the full
- * width, with its mini tables under the cards (inside sites, in the workshop,
- * available — "متاحة" replaced the standalone "معدات بلا حركة" section), then
- * "التوفر حسب النوع", the two donuts and the entries chart. Owner 2026-10-27
- * removed the per-foreman activity section and the «اخر الدخوليات» and «اخر
- * المعدات المضافة» tables.
- *
- * There is no page-level owner filter any more (owner review, same session):
- * the owner is a dimension each section answers for itself. The sections that
- * list equipment carry their own owner multi-select (the fleet section's one
- * filter reaches its cards and its mini tables together), and the donuts carry
- * none at all because owner is already one of the two slices they draw.
- *
- * Every section owns its request and its own loading / failure state, so one
- * slow or broken section never blanks the page. The chart granularity is the
- * only state the screen still holds, and it lives in the URL (`?flow=`), so
- * Back restores the view the user was looking at.
+ * Every block owns its request and its own loading / failure state, so one
+ * slow or broken block never blanks the page; the KPI strip and the fleet
+ * card share one snapshot over every owner. What a block cannot hold (the
+ * full fleet tables with their sort and export, the full availability table,
+ * Afaqy's two tables) opens in place under its row from its «عرض الكل». The
+ * chart granularity lives in the URL (`?flow=`), so Back restores it.
  */
 export function AdminHomeScreen({
   onSelectEquipment,
@@ -98,9 +110,6 @@ export function AdminHomeScreen({
   const pathname = usePathname()
   const params = useSearchParams()
   const granularity = normalizeGranularity(params.get('flow'))
-  // Not worth a URL entry: it is a view toggle on one chart, not a filter that
-  // changes which data was requested.
-  const [showExits, setShowExits] = useState(false)
 
   const setGranularity = useCallback(
     (value: AdminHomeGranularity) => {
@@ -116,6 +125,47 @@ export function AdminHomeScreen({
     },
     [params, pathname],
   )
+
+  // ONE snapshot over every owner for the KPI strip and the fleet card.
+  const loadMatrix = useCallback(
+    (signal: AbortSignal) => fetchAllOwnersStateMatrix(signal),
+    [],
+  )
+  const matrix = useAdminHomeSection(loadMatrix)
+
+  const canOpenEquipment = Boolean(onSelectEquipment)
+  const [panel, setPanel] = useState<Panel | null>(null)
+  // A panel opened by «عرض الكل» comes into view; nothing else scrolls.
+  const [scrollTo, setScrollTo] = useState<Panel | null>(null)
+  useEffect(() => {
+    if (!scrollTo) return
+    const element = document.getElementById(PANEL_ID[scrollTo])
+    if (element) {
+      const reduce =
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      element.scrollIntoView({
+        behavior: reduce ? 'auto' : 'smooth',
+        block: 'start',
+      })
+    }
+    setScrollTo(null)
+  }, [scrollTo])
+  const openPanel = (next: Panel) => {
+    setPanel(next)
+    setScrollTo(next)
+  }
+  const panelBox = (id: Panel, children: ReactNode) =>
+    panel === id ? (
+      <div id={PANEL_ID[id]} className="scroll-mt-20 space-y-2">
+        <div className="flex justify-end">
+          <Button size="sm" variant="ghost" onClick={() => setPanel(null)}>
+            {t('adminHomeCollapse')}
+          </Button>
+        </div>
+        {children}
+      </div>
+    ) : null
 
   return (
     <>
@@ -150,62 +200,69 @@ export function AdminHomeScreen({
             ) : undefined
           }
         />
-        {/* Owner 2026-10-29: «الاسطول» and «في المشاريع» by owner, all five
-            owners, above the fleet state. */}
-        <OwnerTotalsSection
-          canOpenEquipment={Boolean(onSelectEquipment)}
-          canOpenLogs={canOpenLogs}
+        <KpiStrip
+          matrix={matrix}
+          links={{
+            equipment: canOpenEquipment,
+            logs: canOpenLogs,
+            purchasingUnits: canOpenPage('purchasing/units'),
+          }}
         />
-        {/* Owner 2026-10-29: «حالات المتبقي», with its owner filter and
-            export, in place of the «المتبقي» owner box. */}
-        <RestStatesCard
-          canOpenEquipment={Boolean(onSelectEquipment)}
-          canOpenLogs={canOpenLogs}
-        />
-        {/* Owner 2026-10-29: the tables right under the workshop states,
-            without the state cards the owner rows replace, then the
-            suppliers in projects. */}
-        <FleetStateSection
-          onSelectEquipment={onSelectEquipment}
-          onSelectMovement={onSelectMovement}
-          showCards={false}
-          tables={['workshop', 'available']}
-          title="adminHomeFleetTablesTitle"
-          description="adminHomeFleetTablesDescription"
-        />
-        <SupplierSitesCard canOpenLogs={canOpenLogs} />
-        {/* Owner 2026-10-26: the Afaqy tracker figures of the fleet, right
-            under its state in the program (location-view permission). */}
-        <div id={AFAQY_ANCHOR} className="scroll-mt-20">
-          <AfaqySection onSelectEquipment={onSelectEquipment} />
+        <div className={ROW}>
+          <FleetStateCard
+            matrix={matrix}
+            canOpenEquipment={canOpenEquipment}
+            canOpenLogs={canOpenLogs}
+          />
+          <TopProjectsCard canOpenLogs={canOpenLogs} />
+          <WorkshopPurposeCard
+            canOpenLogs={canOpenLogs}
+            canOpenEquipment={canOpenEquipment}
+          />
         </div>
-        {/* Its former neighbour "معدات بلا حركة" is now the "متاحة" mini table
-          under the state cards, so the availability table takes the full
-          width. */}
-        <AvailabilitySection />
-        <FleetDonutSection />
-        <EntriesFlowSection
-          granularity={granularity}
-          onGranularityChange={setGranularity}
-          showExits={showExits}
-          onShowExitsChange={setShowExits}
-        />
-        {/* Owner 2026-10-29: «اي شي حذفناه اليوم من الرئيسية رجعه وخليه اخر
-            الصفحة تحت» — the state cards with the «داخل المشاريع» table
-            («حالة الاسطول») and «يحتاج انتباهك», at the end. */}
-        <FleetStateSection
-          onSelectEquipment={onSelectEquipment}
-          onSelectMovement={onSelectMovement}
-          tables={['inside']}
-        />
-        <AttentionSection
-          canOpenPage={canOpenPage}
-          onShowAfaqy={() =>
-            document
-              .getElementById(AFAQY_ANCHOR)
-              ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          }
-        />
+        <div className={ROW}>
+          <LatestMovementsCard
+            canOpenLogs={canOpenLogs}
+            onSelectMovement={onSelectMovement}
+          />
+          <AttentionSection
+            canOpenPage={canOpenPage}
+            onShowAfaqy={() => openPanel('afaqy')}
+          />
+          <WorkshopSuppliersCard
+            canOpenLogs={canOpenLogs}
+            onSelectEquipment={onSelectEquipment}
+            onSelectMovement={onSelectMovement}
+            onShowFleetTables={() => openPanel('fleet-tables')}
+          />
+        </div>
+        {panelBox(
+          'fleet-tables',
+          <FleetStateSection
+            onSelectEquipment={onSelectEquipment}
+            onSelectMovement={onSelectMovement}
+            showCards={false}
+            title="homeV2FleetTables"
+            description="homeV2FleetTablesHint"
+          />,
+        )}
+        <div className={ROW}>
+          <AvailabilityCard onShowAll={() => openPanel('availability')} />
+          <AfaqyCard
+            id={AFAQY_ANCHOR}
+            canOpenEquipment={canOpenEquipment}
+            onShowAll={() => openPanel('afaqy')}
+          />
+          <EntriesCard
+            granularity={granularity}
+            onGranularityChange={setGranularity}
+          />
+        </div>
+        {panelBox('availability', <AvailabilitySection />)}
+        {panelBox(
+          'afaqy',
+          <AfaqySection onSelectEquipment={onSelectEquipment} />,
+        )}
       </div>
     </>
   )

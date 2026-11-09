@@ -51,14 +51,23 @@ test('the equipment search starts in the loading state', () => {
 })
 
 test('chart sections keep one skeleton and dim on a refetch', () => {
+  // The home v2 blocks (owner 2026-11-09): the first load is the block's
+  // skeleton, a refetch keeps the chart and dims it.
   for (const file of [
-    'components/admin-home/EntriesFlowSection.tsx',
-    'components/admin-home/FleetDonutSection.tsx',
+    'components/admin-home/EntriesCard.tsx',
+    'components/admin-home/WorkshopPurposeCard.tsx',
   ]) {
     const source = read(file)
-    assert.match(source, /loading=\{firstLoad\}/, file)
-    assert.match(source, /\(loading && data === null\) \|\| !chartReady/, file)
-    assert.match(source, /aria-busy=\{refreshing \|\| undefined\}/, file)
+    assert.match(
+      source,
+      /state=\{failed \? 'failed' : loading && !data \? 'loading' : 'ready'\}/,
+      file,
+    )
+    assert.match(
+      source,
+      /aria-busy=\{(refreshing|loading) \|\| undefined\}/,
+      file,
+    )
   }
   // The chart code is requested on mount, not behind next/dynamic.
   assert.doesNotMatch(

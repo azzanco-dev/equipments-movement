@@ -52,8 +52,10 @@ test('an expanded table still moves to the start of its own row', () => {
 })
 
 // Owner 2026-10-29: «وشيل داخل المشاريع», then «اي شي حذفناه اليوم من
-// الرئيسية رجعه وخليه اخر الصفحة تحت»: two copies split the tables.
-test('the home shows each table once, inside at the end', () => {
+// الرئيسية رجعه وخليه اخر الصفحة تحت»: two copies split the tables. Home v2
+// (owner 2026-11-09, «اعتمد الرئيسية الي في ui-kit»): ONE copy, all three
+// tables, opened in place by the workshop block's «عرض الكل».
+test('the home shows the three tables once, behind «عرض الكل»', () => {
   assert.match(source, /tables = FLEET_MINI_TABLES,/)
   for (const table of ['inside', 'workshop', 'available'])
     assert.match(
@@ -73,11 +75,18 @@ test('the home shows each table once, inside at the end', () => {
     ),
     'utf8',
   )
-  const top = home.indexOf("tables={['workshop', 'available']}")
-  const end = home.indexOf("tables={['inside']}")
-  assert.ok(top > 0 && end > top)
-  assert.ok(end > home.indexOf('<EntriesFlowSection'))
-  // «حالات المتبقي» moved up in place of «المتبقي» (owner 2026-10-29).
-  assert.ok(home.indexOf('<RestStatesCard') < top)
-  assert.ok(home.indexOf('<AttentionSection') > end)
+  assert.equal(home.match(/<FleetStateSection/g).length, 1)
+  assert.doesNotMatch(home, /tables=\{/)
+  assert.match(
+    home,
+    /panelBox\(\s*'fleet-tables',\s*<FleetStateSection[\s\S]*?showCards=\{false\}/,
+  )
+  assert.match(
+    home,
+    /onShowFleetTables=\{\(\) => openPanel\('fleet-tables'\)\}/,
+  )
+  // Under the row of the block that opens it, before the last row.
+  const panel = home.indexOf("'fleet-tables',\n")
+  assert.ok(panel > home.indexOf('<WorkshopSuppliersCard'))
+  assert.ok(panel < home.indexOf('<AvailabilityCard'))
 })

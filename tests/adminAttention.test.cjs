@@ -110,18 +110,29 @@ test('the section gates its items and sits at the end of the home', () => {
   )
   assert.match(section, /permissions\.can\('purchasing\.view'\)/)
   assert.match(section, /canViewEquipmentLocation\(permissions\)/)
-  assert.match(section, /if \(items\.length === 0 && !failed\) return null/)
+  // Home v2 (owner 2026-11-09): the block keeps its grid place and says
+  // there is nothing to do; a first load is the block's skeleton.
+  assert.match(section, /items\.length === 0 && !failed \? \(/)
+  assert.match(section, /t\('homeV2AttentionNone'\)/)
+  assert.match(section, /state=\{firstLoad \? 'loading' : 'ready'\}/)
   assert.match(section, /role="alert"/)
   assert.match(section, /canOpenPage\('logs'\)/)
   assert.match(section, /canOpenPage\('purchasing\/units'\)/)
   assert.match(section, /canOpenPage\('purchasing\/orders'\)/)
-  // Owner 2026-10-29: off the top («شيله من الرئيسية»), then back at the
-  // page's end with everything removed that day.
+  // Home v2 (owner 2026-11-09): the second row's middle block, between the
+  // latest movements and the workshop / suppliers; the no-signal item opens
+  // the Afaqy section in place.
   const screen = read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx')
   assert.ok(
-    screen.indexOf('<AttentionSection') > screen.indexOf('<EntriesFlowSection'),
+    screen.indexOf('<AttentionSection') >
+      screen.indexOf('<LatestMovementsCard'),
   )
-  assert.match(screen, /<div id=\{AFAQY_ANCHOR\}/)
+  assert.ok(
+    screen.indexOf('<AttentionSection') <
+      screen.indexOf('<WorkshopSuppliersCard'),
+  )
+  assert.match(screen, /onShowAfaqy=\{\(\) => openPanel\('afaqy'\)\}/)
+  assert.match(screen, /id=\{AFAQY_ANCHOR\}/)
   assert.match(
     read('src', 'App.tsx'),
     /canOpenPage=\{\(target\) => shell\.pages\.has\(target\)\}/,
