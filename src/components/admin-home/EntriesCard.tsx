@@ -25,6 +25,7 @@ import {
 } from '@/lib/adminHomeStats'
 import { CountUp } from './CountUp'
 import { HomeBlock } from './HomeBlock'
+import { AreaSkeleton } from './HomeSkeletons'
 import { HomeOwnerFilter } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
@@ -143,6 +144,7 @@ export function EntriesCard({
       }
       state={failed ? 'failed' : loading && !data ? 'loading' : 'ready'}
       onRetry={retry}
+      skeleton={<AreaSkeleton height={220} />}
     >
       <div
         aria-busy={refreshing || undefined}

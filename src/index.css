@@ -933,6 +933,35 @@ textarea::placeholder {
   }
 }
 
+/* Admin home bars grow in (owner 2026-11-09, «خلي الرسوم البيانية انيماتد»):
+   the hand-drawn share and stacked bars of the home blocks scale from the
+   start edge when they mount (the data arriving), in the charts' 900 ms
+   ease-out. A stacked bar animates its fill container only, so the segments
+   keep their proportions; a bar that stays mounted through a filter change
+   does not grow again. */
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.bar-grow {
+  animation: bar-grow 900ms ease-out both;
+}
+[dir='rtl'] .bar-grow {
+  transform-origin: right;
+}
+[dir='ltr'] .bar-grow {
+  transform-origin: left;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar-grow {
+    animation: none;
+  }
+}
+
 /* The connected dot of the WhatsApp gateway card at the foot of the sidebar
    (owner 2026-11-09, «خلي النقطة الخضراء حق واتساب انيماتد وهج»): a soft
    glow of the success tone that breathes out and fades, once every 2.4 s;

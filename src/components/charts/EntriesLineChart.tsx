@@ -19,6 +19,7 @@ import {
   useChartDirection,
   useChartText,
   type ChartBaseProps,
+  useChartAnimation,
 } from './chartShared'
 
 export interface EntriesLinePoint {
@@ -120,6 +121,7 @@ export function EntriesLineChart({
   className,
 }: EntriesLineChartProps) {
   const direction = useChartDirection(dir)
+  const animation = useChartAnimation()
   const t = useChartText(lang)
   const rtl = direction === 'rtl'
   const withExits = showExits && exitsLabel !== undefined
@@ -306,7 +308,7 @@ export function EntriesLineChart({
               }}
               activeDot={{ r: 5, fill: ENTRY_TINT, stroke: ENTRY_STROKE }}
               label={pointLabel(shownEntries, ENTRY_STROKE, false)}
-              isAnimationActive={false}
+              {...animation}
             />
             {withExits && (
               <Line
@@ -324,7 +326,7 @@ export function EntriesLineChart({
                 }}
                 activeDot={{ r: 5, fill: EXIT_TINT, stroke: EXIT_STROKE }}
                 label={pointLabel(shownExits, EXIT_STROKE, true)}
-                isAnimationActive={false}
+                {...animation}
               />
             )}
           </LineChart>

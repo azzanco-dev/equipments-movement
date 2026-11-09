@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import {
   AppLink,
   Badge,
@@ -24,6 +24,7 @@ import { formatDateTime } from '@/lib/dateFormat'
 import { elapsedInWords } from '@/lib/elapsedWords'
 import { CountUp } from './CountUp'
 import { BarRow, HomeBlock, ViewAllAction } from './HomeBlock'
+import { BarRowsSkeleton, ListRowsSkeleton } from './HomeSkeletons'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 /** Rows the block shows before «عرض الكل». */
@@ -195,14 +196,16 @@ export function WorkshopSuppliersCard({
       </Tabs>
       {current.failed ? (
         <HomeBlockFailure onRetry={current.retry} />
+      ) : tab === 'workshop' && !workshop.data ? (
+        <SkeletonBody>
+          <ListRowsSkeleton rows={ROWS} />
+        </SkeletonBody>
       ) : tab === 'workshop' ? (
         <DataTable
           size="md"
           columns={columns}
           rows={workshop.data?.rows ?? []}
           rowKey={(row) => row.id}
-          loading={workshop.loading && !workshop.data}
-          loadingRows={ROWS}
           caption={t('homeV2WorkshopNow')}
           stickyHeader={false}
           cellTextClassName="text-sm"
@@ -216,7 +219,9 @@ export function WorkshopSuppliersCard({
           }
         />
       ) : !suppliers.data ? (
-        <SkeletonRows />
+        <SkeletonBody>
+          <BarRowsSkeleton rows={ROWS} legend={false} />
+        </SkeletonBody>
       ) : supplierRows.length === 0 ? (
         <p className="text-sm text-muted">{t('adminHomeSupplierSitesEmpty')}</p>
       ) : (
@@ -266,16 +271,13 @@ function HomeBlockFailure({ onRetry }: { onRetry: () => void }) {
   )
 }
 
-function SkeletonRows() {
+/** A tab's first load: its shaped skeleton, announced once. The tabs stay
+ *  above it, so the block keeps its header while it loads. */
+function SkeletonBody({ children }: { children: ReactNode }) {
   const { t } = useI18n()
   return (
-    <div className="space-y-2">
-      {Array.from({ length: 4 }, (_, index) => (
-        <span
-          key={index}
-          className="block h-5 w-full animate-pulse rounded bg-surface-hover"
-        />
-      ))}
+    <div aria-busy="true">
+      {children}
       <span className="sr-only">{t('loading')}</span>
     </div>
   )

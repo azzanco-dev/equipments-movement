@@ -18,12 +18,16 @@ import { translations, type TranslationKey } from '@/i18n/translations'
  * while the page is Arabic (the reference images' header), and an action at
  * the end (a «عرض الكل», a filter). `state` keeps loading, failure and data
  * apart: a failed read is an `ErrorState` with retry, never an empty block.
+ * The first load shows the block's own `skeleton` (owner 2026-11-09, «واضف
+ * skeleton»: the shape of what is coming, at its height); a refetch keeps
+ * the body and dims it.
  */
 export function HomeBlock({
   title,
   action,
   state,
   onRetry,
+  skeleton,
   skeletonClassName = 'h-48 w-full',
   className,
   id,
@@ -34,6 +38,9 @@ export function HomeBlock({
   /** `loading` = the first load (a refetch keeps the body and dims it). */
   state?: 'loading' | 'failed' | 'ready'
   onRetry?: () => void
+  /** The placeholder shaped like the block's content (`HomeSkeletons`),
+   *  shown on the first load only; else one plain skeleton block. */
+  skeleton?: ReactNode
   skeletonClassName?: string
   className?: string
   id?: string
@@ -80,7 +87,7 @@ export function HomeBlock({
             />
           ) : state === 'loading' ? (
             <>
-              <Skeleton className={skeletonClassName} />
+              {skeleton ?? <Skeleton className={skeletonClassName} />}
               <span className="sr-only">{t('loading')}</span>
             </>
           ) : (
@@ -142,7 +149,7 @@ export function ShareBar({
       )}
     >
       <span
-        className="block h-full rounded-full"
+        className="bar-grow block h-full rounded-full"
         style={{
           width: `${width}%`,
           backgroundColor: deepTint(
@@ -218,7 +225,7 @@ export function BarRow({
         className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-hover"
       >
         <span
-          className="block h-full rounded-full"
+          className="bar-grow block h-full rounded-full"
           style={{
             width: `${Math.max(0, Math.min(100, width))}%`,
             backgroundColor: deepTint(

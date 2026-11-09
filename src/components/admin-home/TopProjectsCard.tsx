@@ -7,6 +7,7 @@ import { topProjects } from '@/lib/adminHomeV2'
 import { localizedName } from '@/lib/localizedName'
 import { CountUp } from './CountUp'
 import { HomeBlock, ViewAllAction } from './HomeBlock'
+import { VerticalBarsSkeleton } from './HomeSkeletons'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 /**
@@ -23,6 +24,19 @@ export function TopProjectsCard({ canOpenLogs }: { canOpenLogs: boolean }) {
   )
   const { data, loading, failed, retry } = useAdminHomeSection(load)
   const grouped = useMemo(() => (data ? topProjects(data.rows) : null), [data])
+  // One array per load, so the bars draw in when the data arrives and not
+  // on every render of the block.
+  const items = useMemo(
+    () =>
+      grouped
+        ? grouped.top.map((row) => ({
+            id: row.id,
+            label: localizedName(lang, row.nameAr, row.nameEn) || '—',
+            value: row.count,
+          }))
+        : [],
+    [grouped, lang],
+  )
 
   return (
     <HomeBlock
@@ -32,6 +46,7 @@ export function TopProjectsCard({ canOpenLogs }: { canOpenLogs: boolean }) {
       }
       state={failed ? 'failed' : loading && !data ? 'loading' : 'ready'}
       onRetry={retry}
+      skeleton={<VerticalBarsSkeleton height={210} />}
     >
       {grouped && grouped.top.length === 0 ? (
         <p className="text-sm text-muted">{t('homeV2NoProjects')}</p>
@@ -44,11 +59,7 @@ export function TopProjectsCard({ canOpenLogs }: { canOpenLogs: boolean }) {
             height={210}
             singleColor="var(--chart-1)"
             singleStroke="var(--chart-stroke-1)"
-            items={grouped.top.map((row) => ({
-              id: row.id,
-              label: localizedName(lang, row.nameAr, row.nameEn) || '—',
-              value: row.count,
-            }))}
+            items={items}
           />
           {grouped.otherProjects > 0 && (
             <p className="mt-1 text-sm text-muted">

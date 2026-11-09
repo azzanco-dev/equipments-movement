@@ -10,6 +10,7 @@ import {
   useChartDirection,
   useChartText,
   type ChartBaseProps,
+  useChartAnimation,
 } from './chartShared'
 import type { FleetDonutSlice } from './FleetDonut'
 
@@ -45,6 +46,7 @@ export function SoftDonut({
   className,
 }: SoftDonutProps) {
   const direction = useChartDirection(dir)
+  const animation = useChartAnimation()
   const t = useChartText(lang)
 
   const total = useMemo(
@@ -148,7 +150,7 @@ export function SoftDonut({
               // Owner 2026-11-01, «خفف الradius»: 3 instead of 6.
               cornerRadius={3}
               stroke="none"
-              isAnimationActive={false}
+              {...animation}
             >
               {slices.map((slice) => (
                 <Cell key={slice.id} fill={fillOf(slice)} />

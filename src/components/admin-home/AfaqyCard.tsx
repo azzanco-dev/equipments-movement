@@ -13,6 +13,7 @@ import { elapsedInWords } from '@/lib/elapsedWords'
 import { supabase } from '@/lib/supabase'
 import { CountUp } from './CountUp'
 import { HomeBlock, ViewAllAction } from './HomeBlock'
+import { AfaqySkeleton } from './HomeSkeletons'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 /** Units «غير متصلة» listed with their last signal, the oldest first. */
@@ -114,6 +115,7 @@ function AfaqyCardContent({ id, onShowAll, canOpenEquipment }: AfaqyCardProps) {
       action={stats ? <ViewAllAction onClick={onShowAll} /> : undefined}
       state={failed ? 'failed' : loading && !data ? 'loading' : 'ready'}
       onRetry={retry}
+      skeleton={<AfaqySkeleton />}
     >
       {data?.kind === 'not_configured' ? (
         <Notice tone="neutral">{t('afaqyStatusNotConfigured')}</Notice>
@@ -155,22 +157,25 @@ function AfaqyCardContent({ id, onShowAll, canOpenEquipment }: AfaqyCardProps) {
           </ul>
           <div
             aria-hidden="true"
-            className="mt-2.5 flex h-2 gap-px overflow-hidden rounded-full bg-surface-hover"
+            className="mt-2.5 h-2 overflow-hidden rounded-full bg-surface-hover"
           >
-            {stats.linked > 0 &&
-              segments.map((segment) => (
-                <span
-                  key={segment.id}
-                  style={{
-                    width: `${(segment.value / stats.linked) * 100}%`,
-                    // Light fills, never the saturated tone itself.
-                    backgroundColor: deepTint(
-                      `var(--${segment.tone}-soft)`,
-                      `var(--${segment.tone})`,
-                    ),
-                  }}
-                />
-              ))}
+            {stats.linked > 0 && (
+              <div className="bar-grow flex h-full w-full gap-px">
+                {segments.map((segment) => (
+                  <span
+                    key={segment.id}
+                    style={{
+                      width: `${(segment.value / stats.linked) * 100}%`,
+                      // Light fills, never the saturated tone itself.
+                      backgroundColor: deepTint(
+                        `var(--${segment.tone}-soft)`,
+                        `var(--${segment.tone})`,
+                      ),
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
           <p className="mt-1 text-[11px] text-muted">
             {t('homeV2AfaqyShare').replace(

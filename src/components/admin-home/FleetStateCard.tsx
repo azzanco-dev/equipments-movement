@@ -17,6 +17,7 @@ import { sharePercent } from '@/lib/adminHomeV2'
 import { ownershipBadge } from '@/lib/equipmentForm'
 import { CountUp } from './CountUp'
 import { HomeBlock } from './HomeBlock'
+import { DonutSkeleton } from './HomeSkeletons'
 import { OwnerFilter } from './OwnerFilter'
 import {
   useAdminHomeSection,
@@ -125,6 +126,7 @@ export function FleetStateCard({
             : 'ready'
       }
       onRetry={source.retry}
+      skeleton={<DonutSkeleton tabs legendRows={6} />}
     >
       <Tabs value={view} onValueChange={(value) => setView(value as View)}>
         <TabsList

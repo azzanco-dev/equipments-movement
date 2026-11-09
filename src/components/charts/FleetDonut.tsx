@@ -12,6 +12,7 @@ import {
   useChartDirection,
   useChartText,
   type ChartBaseProps,
+  useChartAnimation,
 } from './chartShared'
 
 export interface FleetDonutSlice {
@@ -101,6 +102,7 @@ export function FleetDonut({
   className,
 }: FleetDonutProps) {
   const direction = useChartDirection(dir)
+  const animation = useChartAnimation()
   const t = useChartText(lang)
 
   const total = useMemo(
@@ -252,7 +254,7 @@ export function FleetDonut({
                 outerRadius={outerRadius}
                 paddingAngle={1}
                 strokeWidth={1}
-                isAnimationActive={false}
+                {...animation}
                 label={renderSliceLabel}
                 labelLine={false}
                 onClick={

@@ -32,6 +32,7 @@ import {
 import { CountUp } from './CountUp'
 import { STATE_SHADE } from './FleetStateCard'
 import { HomeBlock, ViewAllAction } from './HomeBlock'
+import { DonutSkeleton } from './HomeSkeletons'
 import { OwnerFilter, useOwnerLabel } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
@@ -153,6 +154,7 @@ export function WorkshopPurposeCard({
       }
       state={failed ? 'failed' : loading && !data ? 'loading' : 'ready'}
       onRetry={retry}
+      skeleton={<DonutSkeleton footerRows={2} footerButton />}
     >
       {data && (
         <div

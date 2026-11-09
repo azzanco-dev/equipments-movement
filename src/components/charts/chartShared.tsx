@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useSyncExternalStore, type ReactNode } from 'react'
 import { AlertCircle } from 'lucide-react'
 import { useI18n } from '@/i18n/I18nContext'
 import {
@@ -123,6 +123,64 @@ export function deepTint(
  * Every chart passes this as the tooltip's `wrapperStyle`.
  */
 export const TOOLTIP_WRAPPER_STYLE = { zIndex: 20 } as const
+
+/** How long a series draws in, in milliseconds (the CountUp's 900 ms). */
+export const CHART_ANIMATION_MS = 900
+
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
+
+function subscribeReducedMotion(onChange: () => void): () => void {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function')
+    return () => {}
+  const query = window.matchMedia(REDUCED_MOTION_QUERY)
+  query.addEventListener('change', onChange)
+  return () => query.removeEventListener('change', onChange)
+}
+
+/** True when the reader allows motion; read on the client only. */
+function motionAllowed(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function')
+    return false
+  return !window.matchMedia(REDUCED_MOTION_QUERY).matches
+}
+
+/** The server (and hydration) never animates, so the markup matches. */
+function motionAllowedOnServer(): boolean {
+  return false
+}
+
+export interface ChartAnimationProps {
+  isAnimationActive: boolean
+  animationBegin: number
+  animationDuration: number
+  animationEasing: 'ease-out'
+}
+
+/**
+ * Recharts' animation props for a SERIES (owner 2026-11-09, «خلي الرسوم
+ * البيانية انيماتد»): the ring sweeps in, the bars rise, the area and the
+ * line draw in, over 900 ms `ease-out` from the first frame. Off under
+ * `prefers-reduced-motion: reduce`, and off on the server and during
+ * hydration (`useSyncExternalStore`'s server snapshot), so the markup never
+ * mismatches. A chart that renders on the client after its data arrives —
+ * every chart of the home, mounted through the lazy wrappers — reads the
+ * preference in its first render, so its entrance is animated (a flag
+ * flipped in an effect would let the series draw statically first and leave
+ * nothing to animate). Tooltips stay `isAnimationActive={false}`.
+ */
+export function useChartAnimation(): ChartAnimationProps {
+  const active = useSyncExternalStore(
+    subscribeReducedMotion,
+    motionAllowed,
+    motionAllowedOnServer,
+  )
+  return {
+    isAnimationActive: active,
+    animationBegin: 0,
+    animationDuration: CHART_ANIMATION_MS,
+    animationEasing: 'ease-out',
+  }
+}
 
 export function percentOf(value: number, total: number): number {
   if (total <= 0) return 0

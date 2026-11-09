@@ -30,6 +30,7 @@ import {
 import { loadAfaqyStats } from '@/lib/afaqy'
 import { supabase } from '@/lib/supabase'
 import { HomeBlock } from './HomeBlock'
+import { ListRowsSkeleton } from './HomeSkeletons'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 type Tone = 'warning' | 'info' | 'danger'
@@ -247,6 +248,7 @@ export function AttentionSection({
         ) : undefined
       }
       state={firstLoad ? 'loading' : 'ready'}
+      skeleton={<ListRowsSkeleton rows={5} icon />}
     >
       {items.length === 0 && !failed ? (
         <p className="text-sm text-muted">{t('homeV2AttentionNone')}</p>

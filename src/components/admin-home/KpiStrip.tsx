@@ -14,7 +14,6 @@ import {
   AppLink,
   Badge,
   ErrorState,
-  Skeleton,
   StatCard,
   cn,
   type BadgeTone,
@@ -44,6 +43,7 @@ import { saudiDateKey } from '@/lib/saudiTime'
 import { supabase } from '@/lib/supabase'
 import { CountUp } from './CountUp'
 import { MiniBars, ShareBar } from './HomeBlock'
+import { KpiStripSkeleton } from './HomeSkeletons'
 import type { AdminHomeSectionState } from './useAdminHomeSection'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
@@ -81,22 +81,27 @@ function PlacesBar({
   return (
     <span
       aria-hidden="true"
-      className="flex h-2 w-16 shrink-0 gap-px overflow-hidden rounded-full bg-surface-hover"
+      className="block h-2 w-16 shrink-0 overflow-hidden rounded-full bg-surface-hover"
     >
-      {total > 0 &&
-        parts.map((part, index) => (
-          <span
-            key={index}
-            className="block h-full"
-            style={{
-              width: `${(part.value / total) * 100}%`,
-              backgroundColor: deepTint(
-                `var(--chart-${part.shade})`,
-                `var(--chart-stroke-${part.shade})`,
-              ),
-            }}
-          />
-        ))}
+      {/* The fill grows in as one piece, so the three parts keep their
+          proportions. */}
+      {total > 0 && (
+        <span className="bar-grow flex h-full w-full gap-px">
+          {parts.map((part, index) => (
+            <span
+              key={index}
+              className="block h-full"
+              style={{
+                width: `${(part.value / total) * 100}%`,
+                backgroundColor: deepTint(
+                  `var(--chart-${part.shade})`,
+                  `var(--chart-stroke-${part.shade})`,
+                ),
+              }}
+            />
+          ))}
+        </span>
+      )}
     </span>
   )
 }
@@ -306,10 +311,8 @@ export function KpiStrip({
     )
   if (!data)
     return (
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {Array.from({ length: 8 }, (_, index) => (
-          <Skeleton key={index} className="h-[104px] w-full rounded-2xl" />
-        ))}
+      <div aria-busy="true">
+        <KpiStripSkeleton />
         <span className="sr-only">{t('loading')}</span>
       </div>
     )

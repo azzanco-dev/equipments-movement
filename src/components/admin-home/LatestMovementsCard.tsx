@@ -12,6 +12,7 @@ import { displayDriverName } from '@/lib/driverDisplayName'
 import { formatDateTime } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import { HomeBlock, ViewAllAction } from './HomeBlock'
+import { ListRowsSkeleton } from './HomeSkeletons'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 /**
@@ -115,6 +116,7 @@ export function LatestMovementsCard({
       action={<ViewAllAction href={canOpenLogs ? movementLogHref() : null} />}
       state={failed ? 'failed' : loading && !data ? 'loading' : 'ready'}
       onRetry={retry}
+      skeleton={<ListRowsSkeleton rows={7} />}
     >
       <DataTable
         size="md"

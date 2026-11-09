@@ -20,6 +20,7 @@ import {
   useChartDirection,
   useChartText,
   type ChartBaseProps,
+  useChartAnimation,
 } from './chartShared'
 import type { EntriesLinePoint } from './EntriesLineChart'
 
@@ -77,6 +78,7 @@ export function SoftAreaChart({
   className,
 }: SoftAreaChartProps) {
   const direction = useChartDirection(dir)
+  const animation = useChartAnimation()
   const t = useChartText(lang)
   const rtl = direction === 'rtl'
   const withExits = showExits && exitsLabel !== undefined
@@ -244,7 +246,7 @@ export function SoftAreaChart({
               dot={false}
               activeDot={{ r: 4, fill: ENTRY_STROKE, stroke: 'var(--bg)' }}
               label={pointLabel}
-              isAnimationActive={false}
+              {...animation}
             />
             {withExits && (
               <Area
@@ -257,7 +259,7 @@ export function SoftAreaChart({
                 fillOpacity={0.8}
                 dot={false}
                 activeDot={{ r: 4, fill: EXIT_STROKE, stroke: 'var(--bg)' }}
-                isAnimationActive={false}
+                {...animation}
               />
             )}
           </AreaChart>

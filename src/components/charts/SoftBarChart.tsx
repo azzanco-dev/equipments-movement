@@ -21,6 +21,7 @@ import {
   useChartDirection,
   useChartText,
   type ChartBaseProps,
+  useChartAnimation,
 } from './chartShared'
 import type { HorizontalBarItem } from './HorizontalBarList'
 
@@ -63,6 +64,7 @@ export function SoftBarChart({
   className,
 }: SoftBarChartProps) {
   const direction = useChartDirection(dir)
+  const animation = useChartAnimation()
   const t = useChartText(lang)
   const rtl = direction === 'rtl'
 
@@ -153,7 +155,7 @@ export function SoftBarChart({
               dataKey="value"
               radius={[3, 3, 0, 0]}
               strokeWidth={1}
-              isAnimationActive={false}
+              {...animation}
             >
               {items.map((item, index) => (
                 <Cell

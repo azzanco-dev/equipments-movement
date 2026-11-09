@@ -11,6 +11,7 @@ import {
 } from '@/lib/adminHomeStats'
 import { sharePercent } from '@/lib/adminHomeV2'
 import { HomeBlock, ViewAllAction } from './HomeBlock'
+import { BarRowsSkeleton } from './HomeSkeletons'
 import { HomeOwnerFilter } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
@@ -72,6 +73,7 @@ export function AvailabilityCard({ onShowAll }: { onShowAll: () => void }) {
       }
       state={failed ? 'failed' : loading && !data ? 'loading' : 'ready'}
       onRetry={retry}
+      skeleton={<BarRowsSkeleton rows={6} />}
     >
       {rows.length === 0 ? (
         <p className="text-sm text-muted">{t('adminHomeNoTypes')}</p>
@@ -98,7 +100,7 @@ export function AvailabilityCard({ onShowAll }: { onShowAll: () => void }) {
                   className="flex h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-hover"
                 >
                   <span
-                    className="flex h-full gap-px"
+                    className="bar-grow flex h-full gap-px"
                     style={{ width: `${(row.total / max) * 100}%` }}
                   >
                     {PARTS.map((part) => (
