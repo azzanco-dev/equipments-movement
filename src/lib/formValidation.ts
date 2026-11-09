@@ -740,6 +740,11 @@ export const supplierPoLineEditFormSchema = supplierPoLineFormSchema.pick({
   note: true,
 })
 
+/** «حذف المعدة» (remove_supplier_po_equipment, 0187): the optional note. */
+export const supplierPoRemoveLineFormSchema = supplierPoLineFormSchema.pick({
+  note: true,
+})
+
 /** «تعديل الامر» (update_supplier_po, 0142): the start date and the notes. */
 export const supplierPoEditFormSchema = supplierPoFormSchema.innerType().pick({
   start_date: true,

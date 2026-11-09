@@ -343,8 +343,10 @@ test('the card page hides the months behind SHOW_CARD_MONTHS = false and shows t
     page,
     /SALES_SUPPLIER_PO_EVENT_LABEL_KEYS\[event\.event_type\] \?\?\s+SUPPLIER_PO_EVENT_LABEL_KEYS\[event\.event_type\]/,
   )
+  // 0187: equipment_removed is named there too (purchasing lists it as well).
   assert.deepEqual(plain(sales.SALES_SUPPLIER_PO_EVENT_LABEL_KEYS), {
     approval_returned: 'supplierPoEventApprovalReturned',
+    equipment_removed: 'supplierPoEventEquipmentRemoved',
   })
   assert.deepEqual(plain(sales.EQUIPMENT_CARD_EVENT_LABEL_KEYS), {
     month_recorded: 'cardMonthEventRecorded',

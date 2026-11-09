@@ -15,6 +15,7 @@ import {
   Plus,
   Receipt,
   StickyNote,
+  Trash2,
   Truck,
   User,
 } from 'lucide-react'
@@ -27,6 +28,7 @@ import { ApproveSupplierPoDialog } from '@/components/purchasing/ApproveSupplier
 import { CloseSupplierPoDialog } from '@/components/purchasing/CloseSupplierPoDialog'
 import { EditLineDialog } from '@/components/purchasing/EditLineDialog'
 import { EditSupplierPoDialog } from '@/components/purchasing/EditSupplierPoDialog'
+import { RemoveEquipmentDialog } from '@/components/purchasing/RemoveEquipmentDialog'
 import { Price, PricesByUnit } from '@/components/purchasing/Price'
 import { PurchasingUnitCell } from '@/components/purchasing/PurchasingUnitCell'
 import { SupplierPoEventsTimeline } from '@/components/purchasing/SupplierPoEventsTimeline'
@@ -52,6 +54,7 @@ import {
   Select,
   Skeleton,
   StatCard,
+  useToast,
   type DescriptionListItem,
 } from '@/components/ui'
 import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
@@ -172,6 +175,9 @@ export function SupplierPoDetail({
   const [loadError, setLoadError] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [editing, setEditing] = useState<SupplierPoLineRow | null>(null)
+  // 0187: the line being removed (an open, draft PO only).
+  const [removing, setRemoving] = useState<SupplierPoLineRow | null>(null)
+  const toast = useToast()
   const [editOpen, setEditOpen] = useState(false)
   const [closeOpen, setCloseOpen] = useState(false)
   const [approveOpen, setApproveOpen] = useState(false)
@@ -252,7 +258,10 @@ export function SupplierPoDetail({
   if (!po)
     return (
       <div className="space-y-4">
-        <PageTrailBar onBack={onBack} fallbackLabel={t('supplierPoBackToList')} />
+        <PageTrailBar
+          onBack={onBack}
+          fallbackLabel={t('supplierPoBackToList')}
+        />
         {loadError ? (
           <ErrorState
             description={t('supplierPoLoadError')}
@@ -273,6 +282,9 @@ export function SupplierPoDetail({
   // (the database refuses them too); its notes and closing stay.
   const approved = po.approval_status === 'approved'
   const editable = showActions && !approved
+  // 0187 (owner 2026-11-09, «حذف المعدة بشرط مفتوح ومسودة»): a unit leaves
+  // only an OPEN, DRAFT PO; the database refuses anything else too.
+  const removable = showActions && po.approval_status === 'draft'
   const approveBlocker = supplierPoApprovalBlocker(po, lines, user?.id)
   const supplier = supplierPoSupplierLabel(po, t)
   const companyName = po.company
@@ -283,8 +295,7 @@ export function SupplierPoDetail({
     : '—'
   // 0157: one total per price unit (a month and a day are never added).
   const { parts: totalsByUnit, unpriced } = supplierPoTotalsByUnit(lines)
-  const createdByName =
-    (po.created_by && actorNames.get(po.created_by)) || '—'
+  const createdByName = (po.created_by && actorNames.get(po.created_by)) || '—'
   const codeOf = (equipmentId: string) =>
     lines.find((line) => line.card?.equipment?.id === equipmentId)?.card
       ?.equipment?.code ?? null
@@ -420,7 +431,9 @@ export function SupplierPoDetail({
       <IconButton
         size="sm"
         variant="outline"
-        label={sort.direction === 'asc' ? t('sortDescending') : t('sortAscending')}
+        label={
+          sort.direction === 'asc' ? t('sortDescending') : t('sortAscending')
+        }
         icon={
           sort.direction === 'asc' ? (
             <ArrowUp size={14} aria-hidden="true" />
@@ -573,7 +586,10 @@ export function SupplierPoDetail({
               {sortedLines.map((line) => {
                 const unit = line.card?.equipment ?? null
                 return (
-                  <li key={line.id} className="rounded-xl border bg-bg p-3 sm:p-4">
+                  <li
+                    key={line.id}
+                    className="rounded-xl border bg-bg p-3 sm:p-4"
+                  >
                     <div className="flex flex-wrap items-start gap-x-4 gap-y-3 sm:flex-nowrap">
                       <div className="min-w-0 flex-1 sm:basis-2/5">
                         {unit && onOpenEquipment ? (
@@ -593,7 +609,11 @@ export function SupplierPoDetail({
                       <div className="min-w-0 flex-1 space-y-1 sm:basis-3/5">
                         {line.card && (
                           <p className="flex items-center gap-1.5 text-sm text-muted">
-                            <Calendar size={14} aria-hidden="true" className="shrink-0" />
+                            <Calendar
+                              size={14}
+                              aria-hidden="true"
+                              className="shrink-0"
+                            />
                             <bdi dir="ltr">{periodLabel(line.card, t)}</bdi>
                           </p>
                         )}
@@ -604,16 +624,22 @@ export function SupplierPoDetail({
                               aria-hidden="true"
                               className="mt-0.5 shrink-0"
                             />
-                            <span className="min-w-0 break-words">{line.note}</span>
+                            <span className="min-w-0 break-words">
+                              {line.note}
+                            </span>
                           </p>
                         )}
                       </div>
                       <div className="flex w-full items-center justify-between gap-3 border-t pt-3 sm:w-44 sm:shrink-0 sm:flex-col sm:items-end sm:border-t-0 sm:pt-0">
                         <div className="text-start sm:text-end">
-                          <p className="text-xs text-muted">{t('supplierPoPrice')}</p>
+                          <p className="text-xs text-muted">
+                            {t('supplierPoPrice')}
+                          </p>
                           <p className="text-lg font-semibold">
                             {line.price === null ? (
-                              <Badge tone="warning">{t('supplierPoNoPrice')}</Badge>
+                              <Badge tone="warning">
+                                {t('supplierPoNoPrice')}
+                              </Badge>
                             ) : (
                               <Price
                                 value={line.price}
@@ -622,15 +648,29 @@ export function SupplierPoDetail({
                             )}
                           </p>
                         </div>
-                        {editable && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            icon={<Edit2 size={14} aria-hidden="true" />}
-                            onClick={() => setEditing(line)}
-                          >
-                            {t('edit')}
-                          </Button>
+                        {(editable || removable) && (
+                          <div className="flex items-center gap-2">
+                            {editable && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                icon={<Edit2 size={14} aria-hidden="true" />}
+                                onClick={() => setEditing(line)}
+                              >
+                                {t('edit')}
+                              </Button>
+                            )}
+                            {removable && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                icon={<Trash2 size={14} aria-hidden="true" />}
+                                onClick={() => setRemoving(line)}
+                              >
+                                {t('supplierPoRemoveLine')}
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -703,6 +743,17 @@ export function SupplierPoDetail({
         }}
         onSaved={() => {
           setEditing(null)
+          fetchData()
+        }}
+      />
+      <RemoveEquipmentDialog
+        line={removing}
+        onOpenChange={(next) => {
+          if (!next) setRemoving(null)
+        }}
+        onRemoved={() => {
+          setRemoving(null)
+          toast({ title: t('supplierPoRemovedToast'), tone: 'success' })
           fetchData()
         }}
       />

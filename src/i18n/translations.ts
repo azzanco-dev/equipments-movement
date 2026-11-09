@@ -2212,6 +2212,14 @@ export const translations = {
     supplierPoEditLine: 'تعديل المعدة',
     supplierPoEditLineDesc:
       'السعر والملاحظة. يسجل تغيير السعر في سجل الامر، واتركه فارغا اذا كانت المعدة تحتاج تسعير.',
+    // 0187: removing a unit from an open, draft PO.
+    supplierPoRemoveLine: 'حذف',
+    supplierPoRemoveLineTitle: 'حذف المعدة من الـ PO',
+    supplierPoRemoveLineDesc: 'سيحذف السطر من الـ PO.',
+    supplierPoRemoveLineCardNote:
+      'تعود المعدة بدون PO اذا لم يكن لكرتها استخدام اخر.',
+    supplierPoRemoveLineNote: 'ملاحظة الحذف',
+    supplierPoRemovedToast: 'تم حذف المعدة من الـ PO',
     supplierPoEdit: 'تعديل الامر',
     supplierPoEditDesc:
       'تاريخ البداية والملاحظات فقط. المورد والشركة والمشروع لا تتغير بعد الانشاء.',
@@ -2235,7 +2243,7 @@ export const translations = {
     supplierPoEventLineUpdated: 'تعديل ملاحظة معدة',
     supplierPoEventCardChanged: 'تعديل كرت المعدة',
     supplierPoEventClosed: 'اغلاق الامر',
-    supplierPoEventEquipmentRemoved: 'ازالة معدة',
+    supplierPoEventEquipmentRemoved: 'حذف معدة',
     supplierPoEventReopened: 'اعادة فتح الامر',
     supplierPoEventActor: 'بواسطة',
     supplierPoLoadError: 'تعذر تحميل امر الشراء.',
@@ -5030,6 +5038,14 @@ export const translations = {
     supplierPoEditLine: 'Edit equipment',
     supplierPoEditLineDesc:
       'Price and note. A price change is recorded in the log; leave it empty while the unit needs pricing.',
+    // 0187: removing a unit from an open, draft PO.
+    supplierPoRemoveLine: 'Remove',
+    supplierPoRemoveLineTitle: 'Remove the equipment from the PO',
+    supplierPoRemoveLineDesc: 'The line will be removed from the PO.',
+    supplierPoRemoveLineCardNote:
+      'The unit goes back to no PO when its card has no other use.',
+    supplierPoRemoveLineNote: 'Removal note',
+    supplierPoRemovedToast: 'The equipment was removed from the PO',
     supplierPoEdit: 'Edit order',
     supplierPoEditDesc:
       'Start date and notes only. The supplier, company and project do not change after creation.',

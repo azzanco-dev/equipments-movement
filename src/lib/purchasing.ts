@@ -55,7 +55,8 @@ export const SUPPLIER_PO_EVENT_LABEL_KEYS: Readonly<
   price_changed: 'supplierPoEventPriceChanged',
   line_updated: 'supplierPoEventLineUpdated',
   card_changed: 'supplierPoEventCardChanged',
-  // 0149: the one-off reopening of the first two POs (owner 2026-10-25).
+  // 0149: the one-off reopening of the first two POs (owner 2026-10-25);
+  // 0187: remove_supplier_po_equipment.
   equipment_removed: 'supplierPoEventEquipmentRemoved',
   // 0160: approve_supplier_po.
   approved: 'supplierPoEventApproved',
@@ -674,7 +675,7 @@ export const SUPPLIER_PO_FORM_MESSAGES: Readonly<
   po_closed: 'supplierPoErrorClosed',
   purchasing_manage_required: 'supplierPoErrorManageRequired',
   invalid_po: 'supplierPoNotFound', // add, close, update (0142)
-  invalid_line: 'supplierPoErrorInvalidLine', // update price / line (0142)
+  invalid_line: 'supplierPoErrorInvalidLine', // update price / line (0142), remove (0187)
   invalid_rate_unit: 'supplierPoRateUnitInvalidFour', // create (0157, four units 0185)
   // 0160: approve_supplier_po, and the lock of an approved PO.
   purchasing_approve_required: 'supplierPoErrorApproveRequired',
@@ -715,7 +716,7 @@ export const SUPPLIER_PO_ERROR_TOKENS: readonly string[] = [
   'po_self_approval', // 0160
   'po_has_no_lines', // 0160
   'po_has_unpriced_lines', // 0160
-  'po_approved_locked', // 0160 every write to an approved PO
+  'po_approved_locked', // 0160 every write to an approved PO (0187 remove too)
 ]
 
 function errorText(error: PostgresLikeError): string {

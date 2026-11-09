@@ -1574,6 +1574,8 @@ export const SALES_SUPPLIER_PO_EVENT_LABEL_KEYS: Readonly<
   Record<string, TranslationKey>
 > = {
   approval_returned: 'supplierPoEventApprovalReturned',
+  // 0187: a unit removed from a supplier PO (purchasing lists it too).
+  equipment_removed: 'supplierPoEventEquipmentRemoved',
 }
 
 /** The 0174 tokens as messages: the prices page has no field for an item's

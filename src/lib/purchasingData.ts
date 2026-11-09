@@ -351,13 +351,29 @@ export function supplierPoEventDetail(
     case 'line_updated':
       return [code, unitChange].filter(Boolean).join(' · ') || null
     // 0149: the line is gone from the page, so the payload carries the code.
-    case 'equipment_removed':
-      return (
+    // 0187: «A282 · 1,450 · شهري · the note» when the removal names them.
+    case 'equipment_removed': {
+      const removedCode =
         code ??
         (typeof payload.equipment_code === 'string'
           ? payload.equipment_code
           : null)
+      const priced = payload.price !== null && payload.price !== undefined
+      const note =
+        typeof payload.note === 'string' && payload.note.trim()
+          ? payload.note.trim()
+          : null
+      return (
+        [
+          removedCode,
+          priced ? formatPrice(payload.price) : null,
+          priced ? addedUnit : null,
+          note,
+        ]
+          .filter(Boolean)
+          .join(' · ') || null
       )
+    }
     case 'equipment_added':
       return [code, formatPrice(payload.price), addedUnit]
         .filter(Boolean)
@@ -681,6 +697,28 @@ export async function updateSupplierPoEquipment(input: {
       p_price: input.price,
       p_note: input.note.trim() || null,
       p_rate_unit: input.rateUnit,
+    }),
+  )
+}
+
+/** What `remove_supplier_po_equipment` (0187) did with the line's card. */
+export interface RemovedSupplierPoLine {
+  line_id: string
+  card_id: string
+  /** True when the card had no other use and went with the line. */
+  card_deleted: boolean
+}
+
+/** `remove_supplier_po_equipment` (0187): removes a line from an open, draft
+ *  PO with an optional note (the event `equipment_removed`). */
+export async function removeSupplierPoEquipment(input: {
+  lineId: string
+  note: string
+}): Promise<RpcResult<RemovedSupplierPoLine>> {
+  return asResult<RemovedSupplierPoLine>(
+    await supabase.rpc('remove_supplier_po_equipment', {
+      p_line_id: input.lineId,
+      p_note: input.note.trim() || null,
     }),
   )
 }
