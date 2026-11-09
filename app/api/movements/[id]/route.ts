@@ -4,6 +4,7 @@ import {
   movementAdminErrorStatus,
 } from '@/lib/movementErrors'
 import { requirePermission } from '@/lib/server/adminRequest'
+import { isExitPurpose } from '@/lib/exitPurpose'
 
 export const runtime = 'nodejs'
 
@@ -23,15 +24,18 @@ type RouteContext = { params: Promise<{ id: string }> }
  *
  * Body (every key is read; ids are strings, missing ids are null):
  *   { equipment_id, supervisor_id, recorded_at, company_id, project_id,
- *     contractor_equipment_code, driver_id, notes }
+ *     contractor_equipment_code, driver_id, notes, exit_purpose? }
  *
  * `admin_update_movement` (migration 0105) is authoritative: it re-checks the
  * admin role fail-closed, writes every field in one transaction, re-checks the
  * ENTRY/EXIT sequence and refuses an in-place driver change on an open site
  * visit (that change goes through `change_active_movement_driver`). `notes`
  * is always sent as the full note: '' clears it, a missing note keeps it.
+ * `exit_purpose` (0186) is sent only when the admin changed the purpose of a
+ * site exit: absent = keep, otherwise `maintenance` / `work_completed` only
+ * (400 `invalid_exit_purpose`); the database refuses it on any other row.
  * Every argument is passed by name so PostgREST resolves the single
- * nine-argument signature. Errors are mapped to stable safe codes.
+ * ten-argument signature. Errors are mapped to stable safe codes.
  */
 export async function PATCH(request: Request, context: RouteContext) {
   try {
@@ -58,6 +62,15 @@ export async function PATCH(request: Request, context: RouteContext) {
     const text = (key: string) =>
       typeof body[key] === 'string' && body[key] ? (body[key] as string) : null
     const notes = typeof body.notes === 'string' ? body.notes : null
+    const exitPurpose =
+      body.exit_purpose === undefined || body.exit_purpose === null
+        ? null
+        : body.exit_purpose
+    if (exitPurpose !== null && !isExitPurpose(exitPurpose))
+      return NextResponse.json(
+        { error: 'invalid_exit_purpose' },
+        { status: 400 },
+      )
 
     const { error } = await access.supabase.rpc('admin_update_movement', {
       p_movement_id: id,
@@ -69,6 +82,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       p_contractor_equipment_code: text('contractor_equipment_code'),
       p_driver_id: text('driver_id'),
       p_notes: notes,
+      p_exit_purpose: exitPurpose,
     })
     if (error) {
       console.error('Movement update failed', error.code ?? 'unknown_error')

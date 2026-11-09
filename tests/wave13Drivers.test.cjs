@@ -519,7 +519,7 @@ test('the admin correction cannot clear the driver of a site entry', () => {
   )
   assert.match(
     dialog,
-    /validateMovementEdit\(values, context, undefined, keepDriver\)/,
+    /validateMovementEdit\(\s*values,\s*context,\s*undefined,\s*keepDriver,/,
   )
   assert.match(dialog, /name="driver_id"\s+required=\{keepDriver\}/)
 })

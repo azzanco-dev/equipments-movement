@@ -1,5 +1,6 @@
 import type { TranslationKey } from '@/i18n/translations'
 import { fieldErrors, required, type FieldErrors } from '@/lib/formValidation'
+import { isExitPurpose } from '@/lib/exitPurpose'
 
 // wave6-J3/J4 — client helpers for the admin actions on a movement detail
 // page: the single correction dialog and the delete.
@@ -39,6 +40,11 @@ export interface MovementEditValues {
   contractor_code: string
   driver_id: string
   notes: string
+  /**
+   * 0186: the purpose of a SITE exit (`maintenance` / `work_completed`); ''
+   * on every other row and on a legacy exit recorded without one.
+   */
+  exit_purpose: string
 }
 
 /** Visual order of the dialog, used to focus the first invalid field. */
@@ -50,6 +56,7 @@ export const MOVEMENT_EDIT_FIELD_ORDER = [
   'project_id',
   'contractor_code',
   'driver_id',
+  'exit_purpose',
   'notes',
 ] as const satisfies readonly (keyof MovementEditValues)[]
 
@@ -70,6 +77,8 @@ export function validateMovementEdit(
   now: Date = new Date(),
   /** wave-13-drivers: see `movementEditKeepsDriver`. */
   keepDriver = false,
+  /** 0186: the row is a SITE exit, so its purpose is required. */
+  siteExit = false,
 ): FieldErrors<MovementEditValues> {
   const site = context === 'site'
   const date = values.movement_date.trim()
@@ -102,6 +111,13 @@ export function validateMovementEdit(
       keepDriver && !values.driver_id.trim()
         ? 'movementEditDriverRequired'
         : undefined,
+    exit_purpose: !siteExit
+      ? undefined
+      : !(values.exit_purpose ?? '').trim()
+        ? 'exitPurposeRequired'
+        : isExitPurpose(values.exit_purpose)
+          ? undefined
+          : 'exitPurposeInvalid',
     notes: isValidMovementNotes(values.notes)
       ? undefined
       : 'movementNotesTooLong',
@@ -138,7 +154,7 @@ export function movementEditUnchanged(
   initial: MovementEditValues,
 ): boolean {
   const same = (key: keyof MovementEditValues) =>
-    values[key].trim() === initial[key].trim()
+    (values[key] ?? '').trim() === (initial[key] ?? '').trim()
   return (
     same('equipment_id') &&
     same('supervisor_id') &&
@@ -146,6 +162,7 @@ export function movementEditUnchanged(
     same('company_id') &&
     same('project_id') &&
     same('contractor_code') &&
+    same('exit_purpose') &&
     (!values.driver_id || same('driver_id')) &&
     normalizeMovementNotes(values.notes) ===
       normalizeMovementNotes(initial.notes)
@@ -174,10 +191,7 @@ export function movementEditKeepsDriver(params: {
 }
 
 export type MovementDriverEditMode =
-  | 'unsupported'
-  | 'driver_change'
-  | 'entry'
-  | 'admin'
+  'unsupported' | 'driver_change' | 'entry' | 'admin'
 
 /**
  * Which path a driver correction takes:
@@ -219,6 +233,11 @@ export interface MovementEditPayload {
   driver_id: string | null
   /** Always the full note: '' clears it (the database stores NULL). */
   notes: string
+  /**
+   * 0186: present only when the admin changed the purpose of a site exit;
+   * absent keeps the stored purpose.
+   */
+  exit_purpose?: string
 }
 
 /**
@@ -233,6 +252,10 @@ export function buildMovementEditPayload(
     originalRecordedAt: string
     currentDriverId: string | null | undefined
     driverMode: MovementDriverEditMode
+    /** 0186: the row is a SITE exit. */
+    siteExit?: boolean
+    /** 0186: the stored purpose, '' or null when there is none. */
+    originalExitPurpose?: string | null
     now?: Date
   },
 ): MovementEditPayload {
@@ -258,6 +281,11 @@ export function buildMovementEditPayload(
         ? values.driver_id
         : null,
     notes: normalizeMovementNotes(values.notes) ?? '',
+    ...(params.siteExit &&
+    isExitPurpose(values.exit_purpose) &&
+    values.exit_purpose !== (params.originalExitPurpose ?? '')
+      ? { exit_purpose: values.exit_purpose }
+      : {}),
   }
 }
 
@@ -273,6 +301,8 @@ const MOVEMENT_ADMIN_ERROR_KEYS: Record<string, TranslationKey> = {
   open_visit_driver_change: 'movementAdminOpenVisitDriver',
   contractor_code_too_long: 'contractorCodeTooLong',
   movement_notes_too_long: 'movementNotesTooLong',
+  invalid_exit_purpose: 'exitPurposeInvalid',
+  exit_purpose_not_allowed: 'movementEditExitPurposeNotAllowed',
   entry_has_later_exit: 'movementDeleteEntryHasExit',
   movement_not_last: 'movementDeleteNotLast',
   movement_update_failed: 'movementEditFailed',
@@ -291,6 +321,7 @@ const MOVEMENT_EDIT_FIELD_CODES: Record<string, keyof MovementEditValues> = {
   open_visit_driver_change: 'driver_id',
   contractor_code_too_long: 'contractor_code',
   movement_notes_too_long: 'notes',
+  invalid_exit_purpose: 'exit_purpose',
 }
 
 export function movementEditFieldErrors(

@@ -149,6 +149,7 @@ test('the field order follows the dialog', () => {
       'project_id',
       'contractor_code',
       'driver_id',
+      'exit_purpose',
       'notes',
     ],
   )
@@ -376,6 +377,8 @@ test('a refused role is 403, a missing movement 404, bad input 400', () => {
     'invalid_movement_payload',
     'contractor_code_too_long',
     'movement_notes_too_long',
+    'invalid_exit_purpose',
+    'exit_purpose_not_allowed',
   ])
     assert.equal(movementAdminErrorStatus(code), 400)
   for (const code of [
@@ -405,6 +408,8 @@ test('every API code has a safe translation key, per operation', () => {
     open_visit_driver_change: 'movementAdminOpenVisitDriver',
     contractor_code_too_long: 'contractorCodeTooLong',
     movement_notes_too_long: 'movementNotesTooLong',
+    invalid_exit_purpose: 'exitPurposeInvalid',
+    exit_purpose_not_allowed: 'movementEditExitPurposeNotAllowed',
     entry_has_later_exit: 'movementDeleteEntryHasExit',
     movement_not_last: 'movementDeleteNotLast',
     movement_update_failed: 'movementEditFailed',

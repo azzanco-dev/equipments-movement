@@ -102,6 +102,9 @@ export const MOVEMENT_ADMIN_ERROR_CODES = [
   'open_visit_driver_change',
   'contractor_code_too_long',
   'movement_notes_too_long',
+  // 0186: the purpose of a site exit.
+  'invalid_exit_purpose',
+  'exit_purpose_not_allowed',
   'entry_has_later_exit',
   'movement_not_last',
   'movement_update_failed',
@@ -130,6 +133,9 @@ export function movementAdminErrorCode(
     return 'contractor_code_too_long'
   if (message.includes('movement_notes_too_long'))
     return 'movement_notes_too_long'
+  if (message.includes('invalid_exit_purpose')) return 'invalid_exit_purpose'
+  if (message.includes('exit_purpose_not_allowed'))
+    return 'exit_purpose_not_allowed'
   if (message.includes('entry_has_later_exit')) return 'entry_has_later_exit'
   if (message.includes('movement_not_last')) return 'movement_not_last'
   return fallback
@@ -143,7 +149,9 @@ export function movementAdminErrorStatus(code: MovementAdminErrorCode): number {
   if (
     code === 'invalid_movement_payload' ||
     code === 'contractor_code_too_long' ||
-    code === 'movement_notes_too_long'
+    code === 'movement_notes_too_long' ||
+    code === 'invalid_exit_purpose' ||
+    code === 'exit_purpose_not_allowed'
   )
     return 400
   return 409

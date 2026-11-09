@@ -41,8 +41,14 @@ import {
   Field,
   Input,
   Notice,
+  Select,
   Textarea,
 } from '@/components/ui'
+import {
+  EXIT_PURPOSES,
+  EXIT_PURPOSE_LABEL_KEYS,
+  isExitPurpose,
+} from '@/lib/exitPurpose'
 import {
   correctVisitDriver,
   driverCorrectionError,
@@ -106,6 +112,8 @@ export function MovementEditDialog({
   const context = movement.movement_context === 'workshop' ? 'workshop' : 'site'
   const site = context === 'site'
   const driverEditable = driverMode !== 'unsupported'
+  // 0186: only a SITE exit carries a purpose, and the admin may correct it.
+  const siteExit = site && movement.movement_type === 'exit'
 
   const initial = useMemo<MovementEditValues>(
     () => ({
@@ -117,8 +125,12 @@ export function MovementEditDialog({
       contractor_code: site ? (movement.contractor_equipment_code ?? '') : '',
       driver_id: driverEditable ? (driverId ?? '') : '',
       notes: movement.notes ?? '',
+      exit_purpose:
+        siteExit && isExitPurpose(movement.exit_purpose)
+          ? movement.exit_purpose
+          : '',
     }),
-    [movement, company, project, site, driverEditable, driverId],
+    [movement, company, project, site, siteExit, driverEditable, driverId],
   )
 
   const [values, setValues] = useState<MovementEditValues>(initial)
@@ -273,7 +285,13 @@ export function MovementEditDialog({
   const unchanged = movementEditUnchanged(values, initial) && !driverCleared
 
   const save = async () => {
-    const invalid = validateMovementEdit(values, context, undefined, keepDriver)
+    const invalid = validateMovementEdit(
+      values,
+      context,
+      undefined,
+      keepDriver,
+      siteExit,
+    )
     if (hasErrors(invalid)) {
       setErrors(invalid)
       setError(null)
@@ -315,6 +333,8 @@ export function MovementEditDialog({
               originalRecordedAt: movement.recorded_at,
               currentDriverId: initial.driver_id,
               driverMode,
+              siteExit,
+              originalExitPurpose: initial.exit_purpose,
             }),
           ),
         })
@@ -535,6 +555,29 @@ export function MovementEditDialog({
                   }
                   loadOptions={loadDrivers}
                   placeholder={t('selectDriver')}
+                />
+              )}
+            </Field>
+          )}
+          {siteExit && (
+            <Field
+              label={t('exitPurpose')}
+              name="exit_purpose"
+              required
+              error={fieldError('exit_purpose')}
+            >
+              {(control) => (
+                <Select
+                  {...control}
+                  value={values.exit_purpose}
+                  onValueChange={(value) =>
+                    update({ exit_purpose: isExitPurpose(value) ? value : '' })
+                  }
+                  placeholder={t('exitPurposePlaceholder')}
+                  options={EXIT_PURPOSES.map((purpose) => ({
+                    value: purpose,
+                    label: t(EXIT_PURPOSE_LABEL_KEYS[purpose]),
+                  }))}
                 />
               )}
             </Field>

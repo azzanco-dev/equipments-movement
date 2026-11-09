@@ -966,6 +966,7 @@ export const translations = {
     exitPurposeWorkCompleted: 'انتهاء عمل',
     exitPurposeRequired: 'اختر غرض الخروج.',
     exitPurposeInvalid: 'غرض الخروج غير صالح. اختره من القائمة.',
+    movementEditExitPurposeNotAllowed: 'غرض الخروج يخص خروج المشاريع فقط.',
     // wave-10-exit-purpose — end
     // wave-13-drivers — start
     driversExceptExternalSupplier: 'الكل عدا مورد خارجي',
@@ -3748,6 +3749,8 @@ export const translations = {
     exitPurposeRequired: 'Select the purpose of exit.',
     exitPurposeInvalid:
       'The purpose of exit is not valid. Select it from the list.',
+    movementEditExitPurposeNotAllowed:
+      'The purpose of exit applies to a project exit only.',
     // wave-10-exit-purpose — end
     // wave-13-drivers — start
     driversExceptExternalSupplier: 'All except external supplier',
