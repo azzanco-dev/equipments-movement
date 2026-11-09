@@ -98,9 +98,11 @@ export function AddEquipmentDialog({
         ? equipmentAtProjectOptionLoader(party, po.company_id, po.project_id, {
             excludeEquipmentIds: excludeKey ? excludeKey.split(',') : [],
             entryDay: po.start_date,
+            // 0188: a closed visit of that day is offered too, marked.
+            exitedLabel: t('siteUnitsExited'),
           })
         : async () => [],
-    [party, po.company_id, po.project_id, po.start_date, excludeKey],
+    [party, po.company_id, po.project_id, po.start_date, excludeKey, t],
   )
 
   useEffect(() => {

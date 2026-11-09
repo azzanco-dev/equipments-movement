@@ -18,6 +18,11 @@ import { EXIT_PURPOSE_FILTER_FIELD } from '@/lib/exitPurpose'
 import { SUPPLIER_FILTER_FIELD } from '@/lib/equipmentSupplier'
 import { CARD_PRICES_DEFAULT_FILTER } from '@/lib/cardPricesList'
 import {
+  SITE_UNITS_RECENT_DEFAULT_FILTER,
+  SITE_UNITS_RECENT_FILTER_KEY,
+  SITE_VISITS_RECENT_DAYS,
+} from '@/lib/siteVisits'
+import {
   MOVEMENT_COMPANY_PROJECT_SEARCH_FIELDS,
   MOVEMENT_SEARCH_FIELDS,
 } from '@/lib/movementLogSearch'
@@ -1030,6 +1035,12 @@ export const supplierPosListConfig: DataListConfig = {
  * «المعدات في المشاريع» (owner 2026-10-24, migration 0147): every unit
  * inside a project now, over `purchasing_site_units`. Server-side search,
  * filters and sort like every list; units without a PO first by default.
+ * Since 0188 (owner 2026-11-09) the page reads the VISITS, open and closed
+ * (`purchasing_site_visits`): «الحالة» (`visit_state`) filters them, and
+ * the visible, removable default `recent_exit` keeps the visits inside now
+ * or exited within the last 60 Saudi days — not a column: the screen turns
+ * it into one PostgREST `or` (`siteUnitsRecentOrFilter`) outside
+ * `applyListFilters` (`siteUnitsColumnFilterKeys`).
  */
 export const siteUnitsListConfig: DataListConfig = {
   id: 'siteUnits',
@@ -1118,7 +1129,33 @@ export const siteUnitsListConfig: DataListConfig = {
       options: [],
       multiple: true,
     },
+    // 0188: inside a project now, or exited.
+    {
+      key: 'visit_state',
+      label: 'siteUnitsStateFilter',
+      type: 'select',
+      operators: ['eq'],
+      options: [
+        { value: 'inside', label: 'داخل الان', labelI18n: 'siteUnitsInside' },
+        { value: 'exited', label: 'خرجت', labelI18n: 'siteUnitsExited' },
+      ],
+    },
+    // 0188: the default window (owner «60 يوم خليها»), see above.
+    {
+      key: SITE_UNITS_RECENT_FILTER_KEY,
+      label: 'siteUnitsRecentFilter',
+      type: 'select',
+      operators: ['eq'],
+      options: [
+        {
+          value: String(SITE_VISITS_RECENT_DAYS),
+          label: 'خرجت خلال 60 يوما او داخل الان',
+          labelI18n: 'siteUnitsRecent60',
+        },
+      ],
+    },
   ],
+  defaultFilters: [SITE_UNITS_RECENT_DEFAULT_FILTER],
   sortableFields: [
     { key: 'has_po', label: 'siteUnitsSortNoPoFirst' },
     { key: 'entry_at', label: 'siteUnitsSortEntry' },

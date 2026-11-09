@@ -80,7 +80,12 @@ test("the unit's open PO there, else its party's open PO there", () => {
 
 test('the page reads the view server-side and adds through the existing dialogs', () => {
   const screen = read('src', 'screens', 'purchasing', 'SiteUnitsScreen.tsx')
-  assert.match(screen, /\.from\('purchasing_site_units'\)/)
+  // 0188: the page reads every visit, open or closed (purchasing_site_visits).
+  assert.match(screen, /\.from\(SITE_VISITS_VIEW\)/)
+  assert.match(
+    read('src', 'lib', 'purchasingData.ts'),
+    /export const SITE_VISITS_VIEW = 'purchasing_site_visits'/,
+  )
   // The supplier columns only: the client stub of 0169 was removed on the
   // owner's word (2026-11-04), so the client columns are never selected here.
   assert.match(screen, /\.select\(SITE_UNITS_SELECT, \{ count: 'exact' \}\)/)
@@ -140,7 +145,12 @@ test('the page reads the view server-side and adds through the existing dialogs'
     /\{row\.party_po_id \? \(\s+<>\s+\{t\('siteUnitsAddTo'\)\}/,
   )
   assert.match(screen, /t\('siteUnitsNewPo'\)/)
-  assert.doesNotMatch(screen, /<Badge/)
+  // 0188: the only badge is «خرجت» on a closed visit.
+  assert.equal((screen.match(/<Badge/g) ?? []).length, 1)
+  assert.match(
+    screen,
+    /\{row\.visit_state === 'exited' && \(\s+<Badge tone="neutral" size="sm">\s+\{t\('siteUnitsExited'\)\}/,
+  )
   assert.match(screen, /grid grid-cols-2 gap-4 sm:grid-cols-3/)
   assert.doesNotMatch(screen, /bg-surface p-3 sm:grid-cols-3/)
   assert.doesNotMatch(screen, /lg:grid-cols-4|xl:grid-cols-4/)
@@ -204,7 +214,7 @@ test('the dialogs take the preset only when they open', () => {
   // 0157: the preset unit's line also carries the default price unit.
   assert.match(
     create,
-    /setPicked\(\s+preset\s+\? \{\s+\[preset\.equipmentId\]: \{\s+price: '',\s+note: '',\s+rate_unit: SUPPLIER_PO_DEFAULT_RATE_UNIT,\s+\},\s+\}\s+: \{\},\s+\)/,
+    /setPicked\(\s+preset\s+\? \{\s+\[preset\.equipmentId\]: \{\s+price: '',\s+note: '',\s+rate_unit: SUPPLIER_PO_DEFAULT_RATE_UNIT,\s+entry_day: preset\.startDate,\s+\},\s+\}\s+: \{\},\s+\)/,
   )
 })
 
@@ -224,7 +234,11 @@ test('the list config allowlists its filters and sorts, units without a PO first
     'company_id',
     'project_id',
     'entry_supervisor_id',
+    'visit_state',
   ])
+  // 0188: the 60-day window, a visible removable default (not a column).
+  assert.match(config, /key: SITE_UNITS_RECENT_FILTER_KEY,/)
+  assert.match(config, /defaultFilters: \[SITE_UNITS_RECENT_DEFAULT_FILTER\],/)
   assert.match(config, /SUPPLIER_FILTER_FIELD,/)
   assert.doesNotMatch(config, /pageSizeOptions/)
 })
@@ -282,16 +296,18 @@ test('the party visits are read whole, page by page, not capped (owner 2026-10-3
   // dropped the units after the 200th code of a large owner class.
   const data = read('src', 'lib', 'purchasingData.ts')
   const fetch = data.slice(
-    data.indexOf('export async function fetchPartyOpenVisits'),
-    data.indexOf('/** Distinct companies of some open visits'),
+    data.indexOf('export async function fetchPartyVisits'),
+    data.indexOf('/** Distinct companies of some visits'),
   )
+  assert.ok(fetch.length > 0)
   assert.doesNotMatch(fetch, /\.limit\(/)
-  assert.match(fetch, /\.range\(from, from \+ PARTY_OPEN_VISITS_PAGE - 1\)/)
+  assert.match(fetch, /\.range\(from, from \+ PARTY_VISITS_PAGE - 1\)/)
+  // 0188: one visit per unit, project and entry day.
   assert.match(
     fetch,
-    /if \(page\.length < PARTY_OPEN_VISITS_PAGE\) return rows/,
+    /if \(page\.length < PARTY_VISITS_PAGE\) return latestVisitPerUnitDay\(rows\)/,
   )
-  assert.match(data, /export const PARTY_OPEN_VISITS_PAGE = 500/)
+  assert.match(data, /export const PARTY_VISITS_PAGE = 500/)
 })
 
 test('the ticket shows the entry date under the foreman (owner 2026-10-31)', () => {

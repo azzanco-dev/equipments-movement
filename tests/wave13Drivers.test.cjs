@@ -331,6 +331,17 @@ test('the drivers list hides the external supplier by default, NULL kept', () =>
       assert.deepEqual(plain(config.defaultFilters), [
         { id: 'default-open', field: 'is_open', operator: 'eq', value: 'true' },
       ])
+    // 0188: «المعدات في المشاريع» opens on the visits inside now or
+    // exited within 60 days.
+    else if (config === configs.siteUnitsListConfig)
+      assert.deepEqual(plain(config.defaultFilters), [
+        {
+          id: 'default-recent-exit',
+          field: 'recent_exit',
+          operator: 'eq',
+          value: '60',
+        },
+      ])
     else if (config !== driversListConfig)
       assert.equal(config.defaultFilters, undefined, config.id)
 })

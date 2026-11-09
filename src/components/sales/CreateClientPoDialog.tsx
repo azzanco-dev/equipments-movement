@@ -35,7 +35,7 @@ import {
   staticOptionLoader,
   visitCompanyOptions,
   visitProjectOptions,
-  type PartyOpenVisit,
+  type PartyVisit,
 } from '@/lib/purchasingData'
 import {
   CLIENT_PO_CREATE_FIELD_RULES,
@@ -54,7 +54,7 @@ import {
   type ClientPoFormValues,
   type SaleRateUnit,
 } from '@/lib/sales'
-import { createClientPo, fetchOpenSiteVisits } from '@/lib/salesData'
+import { createClientPo, fetchRecentSiteVisits } from '@/lib/salesData'
 import { saudiDateKey } from '@/lib/saudiTime'
 
 const EMPTY_FORM: ClientPoFormValues = {
@@ -113,7 +113,7 @@ export function CreateClientPoDialog({
 }) {
   const { t, lang } = useI18n()
   const [form, setForm] = useState<ClientPoFormValues>(EMPTY_FORM)
-  const [visits, setVisits] = useState<PartyOpenVisit[]>([])
+  const [visits, setVisits] = useState<PartyVisit[]>([])
   const [visitsState, setVisitsState] = useState<
     'idle' | 'loading' | 'error' | 'ready'
   >('idle')
@@ -197,13 +197,14 @@ export function CreateClientPoDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  // Every open site visit drives the company, project and unit choices;
+  // Every site visit inside now or exited within 60 days (0188) drives the
+  // company, project and unit choices;
   // reloaded on every open (the purchasing lesson of 2026-10-31).
   useEffect(() => {
     if (!open) return
     let cancelled = false
     setVisitsState('loading')
-    fetchOpenSiteVisits()
+    fetchRecentSiteVisits()
       .then((rows) => {
         if (cancelled) return
         setVisits(rows)
@@ -229,7 +230,7 @@ export function CreateClientPoDialog({
     )
   }
 
-  const toggle = (visit: PartyOpenVisit, checked: boolean) => {
+  const toggle = (visit: PartyVisit, checked: boolean) => {
     setPicked((current) => {
       const next = { ...current }
       if (checked)
@@ -573,6 +574,16 @@ export function CreateClientPoDialog({
                               {visit.equipment_type ?? '—'} ·{' '}
                               {t('supplierPoEntryDate')}{' '}
                               <bdi dir="ltr">{formatDate(visit.entry_at)}</bdi>
+                              {/* 0188: a unit that left the project. */}
+                              {visit.exit_at && (
+                                <>
+                                  {' · '}
+                                  {t('siteUnitsExited')}{' '}
+                                  <bdi dir="ltr">
+                                    {formatDate(visit.exit_at)}
+                                  </bdi>
+                                </>
+                              )}
                             </span>
                           </span>
                         </label>

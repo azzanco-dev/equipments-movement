@@ -82,8 +82,10 @@ export function AddClientPoEquipmentDialog({
     () =>
       equipmentAtClientProjectOptionLoader(po.company_id, po.project_id, {
         excludeEquipmentIds: excludeKey ? excludeKey.split(',') : [],
+        // 0188: a unit that left the project within 60 days, marked.
+        exitedLabel: t('siteUnitsExited'),
       }),
-    [po.company_id, po.project_id, excludeKey],
+    [po.company_id, po.project_id, excludeKey, t],
   )
 
   useEffect(() => {

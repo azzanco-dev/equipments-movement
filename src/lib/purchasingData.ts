@@ -23,6 +23,12 @@ import {
 import { addDaysToDateKey } from '@/lib/calendar'
 import { localizedName } from '@/lib/localizedName'
 import { saudiDateKey, saudiDayStart } from '@/lib/saudiTime'
+import {
+  latestVisitPerUnitDay,
+  recentVisitOrClause,
+  recentVisitsSince,
+  type SiteVisitState,
+} from '@/lib/siteVisits'
 import type { Language } from '@/i18n/translations'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
@@ -138,9 +144,10 @@ export interface SupplierPoEventRow {
 
 /** One line of the equipment page's purchasing card: the line with its PO. */
 /**
- * One unit inside a project now (migration 0147, `purchasing_site_units`):
- * its open site visit, the open PO it sits on for that company and project,
- * else the open PO of its party there that it can join.
+ * One site visit of a unit (migration 0188, `purchasing_site_visits`; the
+ * open visits were `purchasing_site_units`, 0147): the visit, open or closed,
+ * the open PO the unit sits on for that company and project, else the open
+ * PO of its party there that it can join.
  */
 export interface SiteUnitRow {
   entry_id: string
@@ -167,13 +174,21 @@ export interface SiteUnitRow {
   has_po: boolean
   party_po_id: string | null
   party_po_number: string | null
-  // The view's trailing client columns (0169) are not selected here any more:
-  // the client stub left the tickets on 2026-11-04 (owner).
+  // The view's client columns (0169) are not selected here any more: the
+  // client stub left the tickets on 2026-11-04 (owner).
+  /** 0188: 'inside' while the visit is open, else 'exited'. */
+  visit_state: SiteVisitState
+  exit_at: string | null
+  /** 0188: the purpose of the site exit (0111), NULL while inside. */
+  exit_purpose: string | null
 }
+
+/** 0188: the view of «المعدات في المشاريع», every site visit. */
+export const SITE_VISITS_VIEW = 'purchasing_site_visits'
 
 /** Only what the «المعدات في المشاريع» tiles show and the add needs. */
 export const SITE_UNITS_SELECT =
-  'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,entry_at,contractor_equipment_code,supplier_po_id,po_number,has_po,party_po_id,party_po_number'
+  'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,entry_at,contractor_equipment_code,supplier_po_id,po_number,has_po,party_po_id,party_po_number,visit_state,exit_at,exit_purpose'
 
 /**
  * One unit on a supplier PO (migration 0167, `purchasing_po_units`): a line
@@ -400,24 +415,26 @@ export function supplierPoEventDetail(
 // --- Reads ---------------------------------------------------------------------
 
 /** The open-visit columns the purchasing pickers read. */
-const OPEN_VISIT_SEARCH_FIELDS = [
+const VISIT_SEARCH_FIELDS = [
   'equipment_code',
   'equipment_type_search',
   'equipment_plate_number',
   'equipment_plate_digits',
 ] as const
 
-const OPEN_VISIT_SELECT =
-  'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,entry_at,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en'
+const VISIT_SELECT =
+  'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,entry_at,exit_at,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en'
 
-/** One open site visit of a party's unit (`movement_visits`). */
-export interface PartyOpenVisit {
+/** One site visit of a party's unit (`movement_visits`), open or closed
+ *  (0188: `exit_at` NULL while inside). */
+export interface PartyVisit {
   entry_id: string
   equipment_id: string
   equipment_code: string
   equipment_type: string | null
   equipment_plate_number: string | null
   entry_at: string
+  exit_at: string | null
   company_id: string
   company_name_ar: string | null
   company_name_en: string | null
@@ -426,13 +443,13 @@ export interface PartyOpenVisit {
   project_name_en: string | null
 }
 
-/** The open site visits of the party's units: the party's lessor, or the
- *  party's owner class, on `movement_visits` (RLS of the movements). */
-function partyOpenVisits(party: SupplierPoParty) {
+/** The site visits of the party's units, open or closed (0188): the party's
+ *  lessor, or the party's owner class, on `movement_visits` (RLS of the
+ *  movements). Each caller bounds the closed ones (a window or a day). */
+function partySiteVisits(party: SupplierPoParty) {
   const base = supabase
     .from('movement_visits')
-    .select(OPEN_VISIT_SELECT)
-    .eq('is_open', true)
+    .select(VISIT_SELECT)
     .eq('movement_context', 'site')
   return party.owner_class
     ? base.eq('equipment_ownership_status', party.owner_class)
@@ -463,34 +480,41 @@ export function partyOptionLoader(
   }
 }
 
-/** A page of the party's open visits; the loop below reads them all. */
-export const PARTY_OPEN_VISITS_PAGE = 500
+/** A page of the party's visits; the loop below reads them all. */
+export const PARTY_VISITS_PAGE = 500
 
-/** The party's open visits, grouped: the companies (and under each, the
- *  projects) where the party has units right now. ALL of them, read page by
- *  page by equipment code then entry (owner 2026-10-31, «لما اختار معدة
- *  معينة ماتكون ظاهرة ضمن المعدات المتاحة»: a single request capped at 200
- *  dropped the units after the 200th code of an owner class with more units
- *  inside projects, the ticked unit included). */
-export async function fetchPartyOpenVisits(
+/** The party's visits, grouped: the companies (and under each, the
+ *  projects) where the party has units inside now OR that they left within
+ *  the last 60 Saudi days (0188, owner 2026-11-09), one visit per unit,
+ *  project and entry day (`latestVisitPerUnitDay`). `sinceDay` widens the
+ *  window back to an older Saudi day (the preset of a ticket whose visit is
+ *  older). ALL of them, read page by page by equipment code then entry
+ *  (owner 2026-10-31, «لما اختار معدة معينة ماتكون ظاهرة ضمن المعدات
+ *  المتاحة»: a single request capped at 200 dropped units). */
+export async function fetchPartyVisits(
   party: SupplierPoParty,
-): Promise<PartyOpenVisit[]> {
-  const rows: PartyOpenVisit[] = []
-  for (let from = 0; ; from += PARTY_OPEN_VISITS_PAGE) {
-    const page = unwrapRows<PartyOpenVisit>(
-      await partyOpenVisits(party)
+  options: { sinceDay?: string | null } = {},
+): Promise<PartyVisit[]> {
+  const recent = recentVisitsSince()
+  const preset = options.sinceDay ? saudiDayStart(options.sinceDay) : null
+  const since = preset && preset < recent ? preset : recent
+  const rows: PartyVisit[] = []
+  for (let from = 0; ; from += PARTY_VISITS_PAGE) {
+    const page = unwrapRows<PartyVisit>(
+      await partySiteVisits(party)
+        .or(recentVisitOrClause(since))
         .order('equipment_code')
         .order('entry_id')
-        .range(from, from + PARTY_OPEN_VISITS_PAGE - 1),
+        .range(from, from + PARTY_VISITS_PAGE - 1),
     )
     rows.push(...page)
-    if (page.length < PARTY_OPEN_VISITS_PAGE) return rows
+    if (page.length < PARTY_VISITS_PAGE) return latestVisitPerUnitDay(rows)
   }
 }
 
-/** Distinct companies of some open visits, as picker options. */
+/** Distinct companies of some visits, as picker options. */
 export function visitCompanyOptions(
-  visits: readonly PartyOpenVisit[],
+  visits: readonly PartyVisit[],
   lang: Language,
 ): AsyncSearchSelectOption[] {
   const seen = new Map<string, AsyncSearchSelectOption>()
@@ -507,9 +531,9 @@ export function visitCompanyOptions(
   return [...seen.values()].sort((a, b) => a.label.localeCompare(b.label, lang))
 }
 
-/** Distinct projects of one company among some open visits. */
+/** Distinct projects of one company among some visits. */
 export function visitProjectOptions(
-  visits: readonly PartyOpenVisit[],
+  visits: readonly PartyVisit[],
   companyId: string,
   lang: Language,
 ): AsyncSearchSelectOption[] {
@@ -543,49 +567,72 @@ export function staticOptionLoader(
 
 /** 0148 (owner 2026-10-25): the Saudi day a unit entered, as a date key —
  *  every unit of one PO entered on the same day, the PO's start date. */
-export function visitEntryDay(visit: Pick<PartyOpenVisit, 'entry_at'>): string {
+export function visitEntryDay(visit: Pick<PartyVisit, 'entry_at'>): string {
   return saudiDateKey(visit.entry_at)
 }
 
 /**
- * «اضافة معدة» (owner rules 2026-10-19/20/25, migrations 0137/0138/0148):
- * only the party's units INSIDE the PO's company and project right now that
- * entered on the PO's start date (a Saudi day), first 20 by code. The
- * database re-checks every rule in `add_supplier_po_equipment`.
+ * «اضافة معدة» (owner rules 2026-10-19/20/25, migrations 0137/0138/0148,
+ * 0188): only the party's units with a site visit of the PO's company and
+ * project — inside now or exited (0188, owner 2026-11-09) — that entered on
+ * the PO's start date (a Saudi day), one option per unit, first 20 by code;
+ * an exited visit is marked with `exitedLabel`. Without a start date the
+ * closed visits of the last 60 Saudi days. The database re-checks every rule
+ * in `add_supplier_po_equipment`.
  */
 export function equipmentAtProjectOptionLoader(
   party: SupplierPoParty,
   companyId: string,
   projectId: string,
-  options: { excludeEquipmentIds?: readonly string[]; entryDay?: string } = {},
+  options: {
+    excludeEquipmentIds?: readonly string[]
+    entryDay?: string
+    exitedLabel?: string
+  } = {},
 ): (query: string) => Promise<AsyncSearchSelectOption[]> {
   const excluded = options.excludeEquipmentIds ?? []
   const nextDay = options.entryDay
     ? addDaysToDateKey(options.entryDay, 1)
     : null
   return async (query) => {
-    let request = partyOpenVisits(party)
+    let request = partySiteVisits(party)
       .eq('company_id', companyId)
       .eq('project_id', projectId)
       .order('equipment_code')
+      // The open visit of a unit first, then its latest exit (0188).
+      .order('exit_at', { ascending: false, nullsFirst: true })
       .limit(20)
-    // 0148: only the units that entered on the PO's start date.
+    // 0148: only the units that entered on the PO's start date, inside now
+    // or exited (0188); without one, the last 60 days.
     if (options.entryDay && nextDay)
       request = request
         .gte('entry_at', saudiDayStart(options.entryDay))
         .lt('entry_at', saudiDayStart(nextDay))
+    else request = request.or(recentVisitOrClause())
     // Units already on the PO are not offered again (owner 2026-10-22).
     if (excluded.length)
       request = request.not('equipment_id', 'in', `(${excluded.join(',')})`)
-    const searchFilter = buildSearchFilter(OPEN_VISIT_SEARCH_FIELDS, query)
+    const searchFilter = buildSearchFilter(VISIT_SEARCH_FIELDS, query)
     if (searchFilter) request = request.or(searchFilter)
-    return unwrapRows<PartyOpenVisit>(await request).map((visit) => ({
-      value: visit.equipment_id,
-      label: visit.equipment_code,
-      description: [visit.equipment_type, visit.equipment_plate_number]
-        .filter(Boolean)
-        .join(' · '),
-    }))
+    const seen = new Set<string>()
+    return unwrapRows<PartyVisit>(await request)
+      .filter((visit) => {
+        // One option per unit: its open visit, else its latest exit.
+        if (seen.has(visit.equipment_id)) return false
+        seen.add(visit.equipment_id)
+        return true
+      })
+      .map((visit) => ({
+        value: visit.equipment_id,
+        label: visit.equipment_code,
+        description: [
+          visit.equipment_type,
+          visit.equipment_plate_number,
+          visit.exit_at ? options.exitedLabel : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      }))
   }
 }
 

@@ -147,7 +147,7 @@ test('the tokens map to field messages in Arabic and English', () => {
 
 test('the dialogs: same-day units, the start date follows them or is locked', () => {
   const data = read('src', 'lib', 'purchasingData.ts')
-  assert.match(data, /export function visitEntryDay\(visit: Pick<PartyOpenVisit, 'entry_at'>\): string \{\s+return saudiDateKey\(visit\.entry_at\)/)
+  assert.match(data, /export function visitEntryDay\(visit: Pick<PartyVisit, 'entry_at'>\): string \{\s+return saudiDateKey\(visit\.entry_at\)/)
   const loader = data.slice(data.indexOf('export function equipmentAtProjectOptionLoader'))
   assert.match(loader, /\.gte\('entry_at', saudiDayStart\(options\.entryDay\)\)\s+\.lt\('entry_at', saudiDayStart\(nextDay\)\)/)
 

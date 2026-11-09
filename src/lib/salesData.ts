@@ -6,7 +6,7 @@ import type { SupplierPoStatus } from '@/lib/purchasing'
 import {
   type EquipmentCardRef,
   type NamedRef,
-  type PartyOpenVisit,
+  type PartyVisit,
   PURCHASING_UNIT_SELECT,
   type RpcResult,
 } from '@/lib/purchasingData'
@@ -24,6 +24,7 @@ import {
   type SaleRateUnit,
 } from '@/lib/sales'
 import { buildSearchFilter } from '@/lib/search'
+import { latestVisitPerUnit, recentVisitOrClause } from '@/lib/siteVisits'
 import { supabase } from '@/lib/supabase'
 import { unwrapRows } from '@/lib/supabaseResult'
 import type { OwnershipStatus } from '@/lib/types'
@@ -345,80 +346,103 @@ export function cardPeriodLabel(
 
 // --- Reads ---------------------------------------------------------------------
 
-/** The open-visit columns the sales pickers read (the purchasing ones). */
-const OPEN_VISIT_SEARCH_FIELDS = [
+/** The visit columns the sales pickers search (the purchasing ones). */
+const VISIT_SEARCH_FIELDS = [
   'equipment_code',
   'equipment_type_search',
   'equipment_plate_number',
   'equipment_plate_digits',
 ] as const
 
-const OPEN_VISIT_SELECT =
-  'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,entry_at,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en'
-
-/** Every open site visit (`movement_visits`), whatever the unit's owner. */
-function openSiteVisits() {
-  return supabase
-    .from('movement_visits')
-    .select(OPEN_VISIT_SELECT)
-    .eq('is_open', true)
-    .eq('movement_context', 'site')
-}
-
-/** A page of open visits; the loop below reads them all. */
-export const OPEN_VISITS_PAGE = 500
+const VISIT_SELECT =
+  'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,entry_at,exit_at,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en'
 
 /**
- * Every unit inside a project right now, grouped by the create dialog into
- * the companies (and under each, the projects) that have units inside, and
- * the units of the chosen project. ALL of them, read page by page by
- * equipment code then entry (the purchasing lesson of 2026-10-31: a single
- * capped request dropped units).
+ * Every site visit (`movement_visits`), whatever the unit's owner, inside a
+ * project now OR exited within the last 60 Saudi days (0188, owner
+ * 2026-11-09: a unit that entered and left within a day can join a PO).
  */
-export async function fetchOpenSiteVisits(): Promise<PartyOpenVisit[]> {
-  const rows: PartyOpenVisit[] = []
-  for (let from = 0; ; from += OPEN_VISITS_PAGE) {
-    const page = unwrapRows<PartyOpenVisit>(
-      await openSiteVisits()
+function recentSiteVisits() {
+  return supabase
+    .from('movement_visits')
+    .select(VISIT_SELECT)
+    .eq('movement_context', 'site')
+    .or(recentVisitOrClause())
+}
+
+/** A page of visits; the loop below reads them all. */
+export const RECENT_VISITS_PAGE = 500
+
+/**
+ * Every unit inside a project now or exited from it within 60 days (0188),
+ * one visit per unit and project (`latestVisitPerUnit`: the open one, else
+ * the latest — the visit `add_client_po_equipment` picks), grouped by the
+ * create dialog into the companies (and under each, the projects) and the
+ * units of the chosen project. ALL of them, read page by page by equipment
+ * code then entry (the purchasing lesson of 2026-10-31: a single capped
+ * request dropped units).
+ */
+export async function fetchRecentSiteVisits(): Promise<PartyVisit[]> {
+  const rows: PartyVisit[] = []
+  for (let from = 0; ; from += RECENT_VISITS_PAGE) {
+    const page = unwrapRows<PartyVisit>(
+      await recentSiteVisits()
         .order('equipment_code')
         .order('entry_id')
-        .range(from, from + OPEN_VISITS_PAGE - 1),
+        .range(from, from + RECENT_VISITS_PAGE - 1),
     )
     rows.push(...page)
-    if (page.length < OPEN_VISITS_PAGE) return rows
+    if (page.length < RECENT_VISITS_PAGE) return latestVisitPerUnit(rows)
   }
 }
 
 /**
- * «اضافة معدة» on a client PO (the 0169 join rule): only the units INSIDE
- * the PO's company and project right now, first 20 by code; no entry-day
- * rule on the client side. The database re-checks in
- * `add_client_po_equipment`.
+ * «اضافة معدة» on a client PO (the 0169 join rule, widened by 0188): the
+ * units with a site visit of the PO's company and project, inside now or
+ * exited within the last 60 Saudi days, one option per unit (an exited one
+ * marked with `exitedLabel`), first 20 by code; no entry-day rule on the
+ * client side. The database re-checks in `add_client_po_equipment`.
  */
 export function equipmentAtClientProjectOptionLoader(
   companyId: string,
   projectId: string,
-  options: { excludeEquipmentIds?: readonly string[] } = {},
+  options: {
+    excludeEquipmentIds?: readonly string[]
+    exitedLabel?: string
+  } = {},
 ): (query: string) => Promise<AsyncSearchSelectOption[]> {
   const excluded = options.excludeEquipmentIds ?? []
   return async (query) => {
-    let request = openSiteVisits()
+    let request = recentSiteVisits()
       .eq('company_id', companyId)
       .eq('project_id', projectId)
       .order('equipment_code')
+      // The open visit of a unit first, then its latest exit.
+      .order('exit_at', { ascending: false, nullsFirst: true })
       .limit(20)
     // Units already on the PO are not offered again.
     if (excluded.length)
       request = request.not('equipment_id', 'in', `(${excluded.join(',')})`)
-    const searchFilter = buildSearchFilter(OPEN_VISIT_SEARCH_FIELDS, query)
+    const searchFilter = buildSearchFilter(VISIT_SEARCH_FIELDS, query)
     if (searchFilter) request = request.or(searchFilter)
-    return unwrapRows<PartyOpenVisit>(await request).map((visit) => ({
-      value: visit.equipment_id,
-      label: visit.equipment_code,
-      description: [visit.equipment_type, visit.equipment_plate_number]
-        .filter(Boolean)
-        .join(' · '),
-    }))
+    const seen = new Set<string>()
+    return unwrapRows<PartyVisit>(await request)
+      .filter((visit) => {
+        if (seen.has(visit.equipment_id)) return false
+        seen.add(visit.equipment_id)
+        return true
+      })
+      .map((visit) => ({
+        value: visit.equipment_id,
+        label: visit.equipment_code,
+        description: [
+          visit.equipment_type,
+          visit.equipment_plate_number,
+          visit.exit_at ? options.exitedLabel : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+      }))
   }
 }
 

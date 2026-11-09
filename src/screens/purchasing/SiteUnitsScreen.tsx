@@ -19,6 +19,7 @@ import {
 } from '@/components/purchasing/CreateSupplierPoDialog'
 import {
   AppLink,
+  Badge,
   EmptyState,
   ErrorState,
   PageHeader,
@@ -31,6 +32,7 @@ import {
   SUPPLIER_FILTER_KEY,
 } from '@/lib/equipmentSupplier'
 import { formatDate } from '@/lib/dateFormat'
+import { exitPurposeLabelKey } from '@/lib/exitPurpose'
 import { foremanFilterOptions } from '@/lib/foremanFilter'
 import { siteUnitsListConfig } from '@/lib/listConfigs'
 import { localizedName } from '@/lib/localizedName'
@@ -39,9 +41,17 @@ import {
   isSupplierPoOwnerClass,
   SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS,
 } from '@/lib/purchasing'
-import { SITE_UNITS_SELECT, type SiteUnitRow } from '@/lib/purchasingData'
+import {
+  SITE_UNITS_SELECT,
+  SITE_VISITS_VIEW,
+  type SiteUnitRow,
+} from '@/lib/purchasingData'
 import { saudiDateKey } from '@/lib/saudiTime'
 import { buildSearchFilter } from '@/lib/search'
+import {
+  siteUnitsColumnFilterKeys,
+  siteUnitsRecentOrFilter,
+} from '@/lib/siteVisits'
 import { supabase } from '@/lib/supabase'
 
 /** The plate's digits, then its letters spaced by letter-spacing (owner
@@ -94,6 +104,10 @@ const SPO_BUTTON_STYLE: CSSProperties = {
   backgroundColor: 'var(--success-soft)',
 }
 
+/** 0188: the config's filter keys that are view columns (the 60-day window
+ *  is applied apart, as one `or`). */
+const COLUMN_FILTER_KEYS = siteUnitsColumnFilterKeys(siteUnitsListConfig)
+
 /** The add target: the party's open PO there, else a new PO for the unit. */
 type AddTarget =
   | { kind: 'existing'; row: SiteUnitRow }
@@ -113,6 +127,13 @@ type AddTarget =
  * phase 1 (0169) was shown here for a day and removed on the owner's word
  * (2026-11-04, «شيل PO العميل من صفحة المشتريات/المعدات في المشاريع»); the
  * client side lives in «المبيعات».
+ * Since 0188 (owner 2026-11-09) the page lists the VISITS, open and closed
+ * (`purchasing_site_visits`): by default the units inside now or exited
+ * within the last 60 Saudi days (a visible, removable default filter, one
+ * PostgREST `or` shared by the list and the two counts); a closed visit's
+ * ticket carries «خرجت» and its exit day and purpose instead of the foreman,
+ * and its «+» works as an open one's (a closed visit can join a PO under the
+ * same-entry-day rule, `add_supplier_po_equipment` re-checks).
  */
 export function SiteUnitsScreen({
   onSelectPo,
@@ -140,9 +161,11 @@ export function SiteUnitsScreen({
     setLoading(true)
     setLoadError(false)
     let query = supabase
-      .from('purchasing_site_units')
+      .from(SITE_VISITS_VIEW)
       .select(SITE_UNITS_SELECT, { count: 'exact' })
       .order(list.sort, { ascending: list.direction === 'asc' })
+      // 0188: the units inside first, then the latest exit.
+      .order('exit_at', { ascending: false, nullsFirst: true })
       // Newest entry next, then the entry id: deterministic paging.
       .order('entry_at', { ascending: false })
       .order('entry_id', { ascending: true })
@@ -152,11 +175,10 @@ export function SiteUnitsScreen({
       list.search,
     )
     if (searchFilter) query = query.or(searchFilter)
-    query = applyListFilters(
-      query,
-      list.filters,
-      new Set(siteUnitsListConfig.filterFields.map((field) => field.key)),
-    )
+    // 0188: the 60-day window, one more `or` AND-ed with the search's.
+    const recent = siteUnitsRecentOrFilter(list.filters)
+    if (recent.clause) query = query.or(recent.clause)
+    query = applyListFilters(query, recent.rest, COLUMN_FILTER_KEYS)
     const { data, error, count } = await query.abortSignal(signal)
     if (signal.aborted) return
     if (error) setLoadError(true)
@@ -187,21 +209,21 @@ export function SiteUnitsScreen({
   } | null>(null)
   const loadPoCounts = useCallback(async () => {
     const filterKeys = new Set(
-      siteUnitsListConfig.filterFields
-        .map((field) => field.key)
-        .filter((key) => key !== 'has_po'),
+      [...COLUMN_FILTER_KEYS].filter((key) => key !== 'has_po'),
     )
+    const recent = siteUnitsRecentOrFilter(list.filters)
     const searchFilter = buildSearchFilter(
       siteUnitsListConfig.searchFields,
       list.search,
     )
     const countOf = async (hasPo: boolean) => {
       let query = supabase
-        .from('purchasing_site_units')
+        .from(SITE_VISITS_VIEW)
         .select('entry_id', { count: 'exact', head: true })
         .eq('has_po', hasPo)
       if (searchFilter) query = query.or(searchFilter)
-      query = applyListFilters(query, list.filters, filterKeys)
+      if (recent.clause) query = query.or(recent.clause)
+      query = applyListFilters(query, recent.rest, filterKeys)
       const { count, error } = await query
       if (error) throw error
       return count ?? 0
@@ -231,6 +253,23 @@ export function SiteUnitsScreen({
   }
 
   const filtered = Boolean(list.search.trim()) || list.filters.length > 0
+
+  /** 0188: «خرجت 09/11/2026 · للصيانة» for a closed visit. */
+  const exitLine = (row: SiteUnitRow) => {
+    const purpose = exitPurposeLabelKey(row.exit_purpose)
+    return (
+      <>
+        {t('siteUnitsExited')}{' '}
+        <span className="font-medium text-fg">
+          {/* The Saudi day of the exit. */}
+          {row.exit_at && (
+            <bdi dir="ltr">{formatDate(saudiDateKey(row.exit_at))}</bdi>
+          )}
+          {purpose && <> · {t(purpose)}</>}
+        </span>
+      </>
+    )
+  }
 
   const ownerLine = (row: SiteUnitRow) =>
     row.equipment_ownership_status === 'external_supplier'
@@ -424,8 +463,14 @@ export function SiteUnitsScreen({
                         button to the unit's entry movement — round like the
                         «+», filled with the surface-hover grey. */}
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-lg font-bold leading-6">
+                      <p className="flex flex-wrap items-center gap-2 text-lg font-bold leading-6">
                         <bdi dir="ltr">{row.equipment_code ?? '—'}</bdi>
+                        {/* 0188: a closed visit. */}
+                        {row.visit_state === 'exited' && (
+                          <Badge tone="neutral" size="sm">
+                            {t('siteUnitsExited')}
+                          </Badge>
+                        )}
                       </p>
                       {/* Owner 2026-10-25 (a trial): a round arrow that widens
                           on hover or keyboard focus to show «انتقل للحركة»;
@@ -502,13 +547,19 @@ export function SiteUnitsScreen({
                       )}
                     </p>
                     <p className="break-words text-xs leading-5 text-muted">
-                      {t('logsColForeman')}{' '}
-                      <span className="font-medium text-fg">
-                        {row.entry_supervisor_name ?? '—'}
-                      </span>
+                      {row.visit_state === 'exited' ? (
+                        exitLine(row)
+                      ) : (
+                        <>
+                          {t('logsColForeman')}{' '}
+                          <span className="font-medium text-fg">
+                            {row.entry_supervisor_name ?? '—'}
+                          </span>
+                        </>
+                      )}
                     </p>
                     {/* Owner 2026-10-31 («اضف برضه في الكارد تاريخ الدخول»):
-                        the open entry's day, the PO's start date (0148). */}
+                        the entry's day, the PO's start date (0148). */}
                     <p className="break-words text-xs leading-5 text-muted">
                       {t('supplierPoEntryDate')}{' '}
                       <bdi dir="ltr" className="font-medium text-fg">

@@ -775,13 +775,14 @@ test('the real screens read through RLS and write only through the 0136 function
     'section button + mobile bar',
   )
   const dataLib = read('src', 'lib', 'purchasingData.ts')
-  // 0138: the party's open site visits (its lessor, or its owner class)...
+  // 0138: the party's site visits (its lessor, or its owner class); 0188:
+  // open or closed, each caller bounds the closed ones...
   const visitsFn = dataLib.slice(
-    dataLib.indexOf('function partyOpenVisits('),
+    dataLib.indexOf('function partySiteVisits('),
     dataLib.indexOf('export function partyOptionLoader('),
   )
   assert.match(visitsFn, /\.from\('movement_visits'\)/)
-  assert.match(visitsFn, /\.eq\('is_open', true\)/)
+  assert.doesNotMatch(visitsFn, /\.eq\('is_open', true\)/)
   assert.match(visitsFn, /\.eq\('movement_context', 'site'\)/)
   assert.match(
     visitsFn,
@@ -792,7 +793,7 @@ test('the real screens read through RLS and write only through the 0136 function
   const loader = dataLib.slice(
     dataLib.indexOf('export function equipmentAtProjectOptionLoader'),
   )
-  assert.match(loader, /partyOpenVisits\(party\)/)
+  assert.match(loader, /partySiteVisits\(party\)/)
   assert.match(loader, /\.eq\('company_id', companyId\)/)
   assert.match(loader, /\.eq\('project_id', projectId\)/)
   assert.match(loader, /\.not\('equipment_id', 'in', /)
@@ -816,7 +817,10 @@ test('the real screens read through RLS and write only through the 0136 function
   assert.match(createDialog, /grid-rows-\[0fr\] opacity-0/)
   assert.match(createDialog, /aria-hidden=\{!external\}/)
   assert.match(createDialog, /disabled=\{!external\}/)
-  assert.match(createDialog, /fetchPartyOpenVisits\(current\)/)
+  assert.match(
+    createDialog,
+    /fetchPartyVisits\(current, \{ sinceDay: preset\?\.startDate \}\)/,
+  )
   assert.match(createDialog, /visitCompanyOptions\(visits, lang\)/)
   assert.match(
     createDialog,

@@ -52,13 +52,13 @@ import {
 } from '@/lib/purchasing'
 import {
   createSupplierPo,
-  fetchPartyOpenVisits,
+  fetchPartyVisits,
   staticOptionLoader,
   supplierPoParty,
   visitCompanyOptions,
   visitEntryDay,
   visitProjectOptions,
-  type PartyOpenVisit,
+  type PartyVisit,
 } from '@/lib/purchasingData'
 import { saudiDateKey } from '@/lib/saudiTime'
 
@@ -71,10 +71,24 @@ const EMPTY_FORM: SupplierPoFormValues = {
   notes: '',
 }
 
+/** By unit; `entry_day` is the Saudi day of the visit it was ticked on
+ *  (0188: a unit may have visits of the project on several days). */
 type Picked = Record<
   string,
-  { price: string; note: string; rate_unit: SupplierPoRateUnit }
+  {
+    price: string
+    note: string
+    rate_unit: SupplierPoRateUnit
+    entry_day: string
+  }
 >
+
+/** Whether this visit is the one its unit was ticked on (its unit and its
+ *  entry day, 0188). */
+function isPicked(picked: Picked, visit: PartyVisit): boolean {
+  const line = picked[visit.equipment_id]
+  return Boolean(line) && line.entry_day === visitEntryDay(visit)
+}
 
 /**
  * «المعدات في المشاريع» (2026-10-24): a new PO for one unit with no PO and
@@ -136,7 +150,7 @@ export function CreateSupplierPoDialog({
     ],
     [t],
   )
-  const [visits, setVisits] = useState<PartyOpenVisit[]>([])
+  const [visits, setVisits] = useState<PartyVisit[]>([])
   const [visitsState, setVisitsState] = useState<'idle' | 'loading' | 'error' | 'ready'>(
     'idle',
   )
@@ -191,7 +205,7 @@ export function CreateSupplierPoDialog({
   /** 0148: the entry day of the ticked units (they all share it), or null
    *  while none is ticked. */
   const pickedDay = useMemo(() => {
-    const first = unitsAtProject.find((visit) => picked[visit.equipment_id])
+    const first = unitsAtProject.find((visit) => isPicked(picked, visit))
     return first ? visitEntryDay(first) : null
   }, [unitsAtProject, picked])
   // Owner 2026-10-31 («اظهر الي في نفس اليوم بعد»): once a unit is ticked
@@ -234,6 +248,7 @@ export function CreateSupplierPoDialog({
               price: '',
               note: '',
               rate_unit: SUPPLIER_PO_DEFAULT_RATE_UNIT,
+              entry_day: preset.startDate,
             },
           }
         : {},
@@ -264,7 +279,7 @@ export function CreateSupplierPoDialog({
     }
     let cancelled = false
     setVisitsState('loading')
-    fetchPartyOpenVisits(current)
+    fetchPartyVisits(current, { sinceDay: preset?.startDate })
       .then((rows) => {
         if (cancelled) return
         setVisits(rows)
@@ -302,11 +317,16 @@ export function CreateSupplierPoDialog({
     setErrors((current) => clearFieldErrors(current, ['start_date']))
   }, [pickedDay])
 
-  const toggle = (visit: PartyOpenVisit, checked: boolean) => {
+  const toggle = (visit: PartyVisit, checked: boolean) => {
     setPicked((current) => {
       const next = { ...current }
       if (checked)
-        next[visit.equipment_id] = { price: '', note: '', rate_unit: defaultUnit }
+        next[visit.equipment_id] = {
+          price: '',
+          note: '',
+          rate_unit: defaultUnit,
+          entry_day: visitEntryDay(visit),
+        }
       else delete next[visit.equipment_id]
       return next
     })
@@ -369,7 +389,7 @@ export function CreateSupplierPoDialog({
     setSaving(true)
     setMessage(null)
     const lines: SupplierPoCreateLine[] = unitsAtProject
-      .filter((visit) => picked[visit.equipment_id])
+      .filter((visit) => isPicked(picked, visit))
       .map((visit) => ({
         equipment_id: visit.equipment_id,
         price: picked[visit.equipment_id].price,
@@ -601,13 +621,15 @@ export function CreateSupplierPoDialog({
             </Field>
             <ul className="space-y-2">
               {sameDayUnits.map((visit) => {
-                const line = picked[visit.equipment_id]
-                const id = `po-unit-${visit.equipment_id}`
+                const line = isPicked(picked, visit)
+                  ? picked[visit.equipment_id]
+                  : undefined
+                const id = `po-unit-${visit.entry_id}`
                 // 0148: once a unit is ticked, only the units of its entry
                 // day are listed (sameDayUnits), so every row can be ticked.
                 return (
                   <li
-                    key={visit.equipment_id}
+                    key={visit.entry_id}
                     className="rounded-xl border bg-bg p-3"
                   >
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -634,6 +656,14 @@ export function CreateSupplierPoDialog({
                           <span className="text-xs text-muted">
                             {visit.equipment_type ?? '—'} · {t('supplierPoEntryDate')}{' '}
                             <bdi dir="ltr">{formatDate(visit.entry_at)}</bdi>
+                            {/* 0188: a unit that left the project. */}
+                            {visit.exit_at && (
+                              <>
+                                {' · '}
+                                {t('siteUnitsExited')}{' '}
+                                <bdi dir="ltr">{formatDate(visit.exit_at)}</bdi>
+                              </>
+                            )}
                           </span>
                         </span>
                       </label>

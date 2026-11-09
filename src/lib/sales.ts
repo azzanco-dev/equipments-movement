@@ -417,7 +417,8 @@ export const CLIENT_PO_LINE_FIELD_RULES: readonly DatabaseFieldRule<ClientPoLine
       on: 'raised',
       match: 'equipment_not_at_po_project',
       field: 'equipment_id',
-      key: 'supplierPoErrorNotAtProject',
+      // 0188: the client side has no entry-day rule, so its own words.
+      key: 'clientPoErrorNotAtProject',
     },
     {
       on: 'raised',
@@ -529,7 +530,7 @@ export const CLIENT_PO_FORM_MESSAGES: Readonly<Record<string, TranslationKey>> =
     client_po_closed: 'clientPoErrorClosed',
     card_overlap: 'supplierPoErrorCardOverlap',
     equipment_already_on_open_client_po: 'clientPoErrorAlreadyOnOpenPo',
-    equipment_not_at_po_project: 'supplierPoErrorNotAtProject',
+    equipment_not_at_po_project: 'clientPoErrorNotAtProject',
     invalid_equipment: 'supplierPoErrorInvalidEquipment',
     invalid_price: 'supplierPoPriceInvalid',
     invalid_rate_unit: 'saleRateUnitInvalid',
