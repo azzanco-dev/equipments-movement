@@ -32,9 +32,9 @@ const MAX_ROWS = 500
 const NAMES_CHUNK = 100
 /** Rows the first-load skeleton draws. */
 const ROWS = 6
-/** The table's fixed height; the rows scroll inside it under a sticky
- *  header. */
-const TABLE_HEIGHT_CLASS = 'max-h-[320px]'
+/** The table's fixed height (`DataTable`'s own `maxHeight`); the rows
+ *  scroll inside it under the sticky header. */
+const TABLE_MAX_HEIGHT = '320px'
 
 /** A fleet row with the foreman of its last site exit (null when the unit
  *  last left the workshop, never moved, or the lookup failed). */
@@ -222,25 +222,27 @@ export function AvailableCard({
           aria-busy={loading || undefined}
           className={loading ? 'opacity-60' : undefined}
         >
-          <div className={`${TABLE_HEIGHT_CLASS} overflow-y-auto`}>
-            <DataTable
-              size="md"
-              columns={columns}
-              rows={data.rows}
-              rowKey={(row) => row.id}
-              caption={t('homeV2AvailableNow')}
-              stickyHeader
-              cellTextClassName="text-xs"
-              cellClassName="py-1.5"
-              empty={t('adminHomeFleetAvailableEmpty')}
-              onRowClick={
-                onSelectEquipment
-                  ? (row: AvailableRow) => onSelectEquipment(row.id)
-                  : undefined
-              }
-              rowHref={(row) => `/equipment/${row.id}`}
-            />
-          </div>
+          <DataTable
+            size="md"
+            columns={columns}
+            rows={data.rows}
+            rowKey={(row) => row.id}
+            caption={t('homeV2AvailableNow')}
+            // The table's own scroll box (a wrapper of its own would nest
+            // two scrollers and the header would scroll away with the inner
+            // one): the rows scroll under the sticky header.
+            maxHeight={TABLE_MAX_HEIGHT}
+            stickyHeader
+            cellTextClassName="text-xs"
+            cellClassName="py-1.5"
+            empty={t('adminHomeFleetAvailableEmpty')}
+            onRowClick={
+              onSelectEquipment
+                ? (row: AvailableRow) => onSelectEquipment(row.id)
+                : undefined
+            }
+            rowHref={(row) => `/equipment/${row.id}`}
+          />
           {data.total > data.rows.length && (
             <p className="mt-1 text-xs text-muted">{t('homeV2Capped')}</p>
           )}
