@@ -111,12 +111,16 @@ test('the section gates its items and sits at the end of the home', () => {
   assert.match(section, /state=\{firstLoad \? 'loading' : 'ready'\}/)
   assert.match(section, /role="alert"/)
   assert.match(section, /canOpenPage\('purchasing\/orders'\)/)
-  // Home v2 (owner 2026-11-09): the second row's middle block, between the
-  // latest movements and the workshop card.
+  // Home v2 (owner 2026-11-09): in the second row; since the owner's «اخر
+  // الحركات جنب الورشة» of 2026-11-10 it opens the row and the latest
+  // movements sit between it and the workshop card.
   const screen = read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx')
   assert.ok(
-    screen.indexOf('<AttentionSection') >
+    screen.indexOf('<AttentionSection') <
       screen.indexOf('<LatestMovementsCard'),
+  )
+  assert.ok(
+    screen.indexOf('<LatestMovementsCard') < screen.indexOf('<WorkshopCard'),
   )
   assert.ok(
     screen.indexOf('<AttentionSection') < screen.indexOf('<WorkshopCard'),

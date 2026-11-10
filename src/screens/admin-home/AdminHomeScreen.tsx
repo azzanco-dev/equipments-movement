@@ -69,7 +69,8 @@ export interface AdminHomeScreenProps {
  * spacing; EM-252, «الارقام الحالية تاخذ كامل الصفحة»). Top to bottom: the
  * greeting, the eight KPI tiles, then three rows of three blocks — the fleet
  * state, the projects with the most units, the workshop by purpose; the
- * latest movements, «يحتاج انتباهك», the workshop now; availability by
+ * «يحتاج انتباهك», the latest movements beside the workshop now (owner
+ * 2026-11-10, «اخر الحركات جنب الورشة»); availability by
  * type, Afaqy, the daily entries and exits. The owner's review of 2026-11-10:
  * the KPI strip counts Al-Azani only (no «بدون PO»), the fleet card is four
  * owner tabs (each a donut), «يحتاج انتباهك» three items, the workshop card
@@ -235,14 +236,14 @@ export function AdminHomeScreen({
           />
         </div>
         <div className={ROW}>
-          <LatestMovementsCard
-            canOpenLogs={canOpenLogs}
-            onSelectMovement={onSelectMovement}
-          />
           <AttentionSection
             matrix={matrix}
             canOpenPage={canOpenPage}
             canOpenEquipment={canOpenEquipment}
+          />
+          <LatestMovementsCard
+            canOpenLogs={canOpenLogs}
+            onSelectMovement={onSelectMovement}
           />
           <WorkshopCard
             matrix={matrix}
