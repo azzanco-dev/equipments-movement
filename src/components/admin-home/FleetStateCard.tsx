@@ -112,6 +112,7 @@ export function FleetStateCard({
       state={matrix.failed ? 'failed' : !data ? 'loading' : 'ready'}
       onRetry={matrix.retry}
       skeleton={<DonutSkeleton tabs legendRows={5} />}
+      bodyClassName="flex flex-col"
     >
       <Tabs value={tab} onValueChange={(value) => setTab(value as FleetTab)}>
         <TabsList
@@ -143,6 +144,7 @@ export function FleetStateCard({
           centerLabel={t('adminHomeDonutTotal')}
           height={190}
           legend="side"
+          fill
           slices={slices}
         />
       )}

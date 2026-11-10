@@ -180,6 +180,7 @@ export function AvailableCard({
   return (
     <HomeBlock
       title="homeV2AvailableNow"
+      count={data?.total ?? null}
       action={
         <>
           <OwnerFilter

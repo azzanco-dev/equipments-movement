@@ -388,8 +388,13 @@ test('the fleet card: four owner tabs over the snapshot, each a donut', () => {
   assert.match(card, /href: hrefOf\(row\.owner\),/)
   assert.match(card, /<SoftDonut[\s\S]*legend="side"[\s\S]*slices=\{slices\}/)
   assert.match(card, /skeleton=\{<DonutSkeleton tabs legendRows=\{5\} \/>\}/)
-  // The shared donut's legend renders a slice's `href` as a real link.
   const donut = read('src', 'components', 'charts', 'SoftDonut.tsx')
+  // «فيه مساحة فاضية تحت الدونات»: the donut fills the stretched card.
+  assert.match(card, /bodyClassName="flex flex-col"/)
+  assert.match(card, /legend="side"\s*fill\s*slices=\{slices\}/)
+  assert.match(donut, /fill && 'min-h-0 flex-1'/)
+  assert.match(donut, /style=\{fill \? \{ minHeight: height \} : \{ height \}\}/)
+  // The shared donut's legend renders a slice's `href` as a real link.
   assert.match(donut, /slice\.href \? \(\s*<AppLink\s+href=\{slice\.href\}/)
   assert.match(
     read('src', 'components', 'charts', 'FleetDonut.tsx'),
@@ -423,6 +428,11 @@ test('the available card: the latest available units of the chosen owners', () =
   assert.match(card, /row\.lastMovementType === 'exit'/)
   assert.match(card, /fetchMovementRecorderNames\(ids, signal\)/)
   assert.match(card, /<ExitPurposeBadge purpose=\{row\.exitPurpose\} \/>/)
+  // «اضف عدد للمتاحة»: the owners' total beside the title.
+  assert.match(card, /count=\{data\?\.total \?\? null\}/)
+  const block = component('HomeBlock')
+  assert.match(block, /count\?: number \| null/)
+  assert.match(block, /<CountUp value=\{count\} \/>/)
   assert.match(
     screen,
     /<AvailableCard\s+canOpenEquipment=\{canOpenEquipment\}\s+onSelectEquipment=\{onSelectEquipment\}\s*\/>/,

@@ -10,6 +10,7 @@ import {
 import { deepTint } from '@/components/charts'
 import { useI18n } from '@/i18n/I18nContext'
 import { translations, type TranslationKey } from '@/i18n/translations'
+import { CountUp } from './CountUp'
 
 /**
  * One block of the admin home v2 (owner 2026-11-09, the approved /ui-kit
@@ -31,10 +32,15 @@ export function HomeBlock({
   skeleton,
   skeletonClassName = 'h-48 w-full',
   className,
+  bodyClassName,
+  count,
   id,
   children,
 }: {
   title: TranslationKey
+  /** A figure beside the title (owner 2026-11-10, «اضف عدد للمتاحة»):
+   *  the block's total, counting up; nothing while null. */
+  count?: number | null
   action?: ReactNode
   /** `loading` = the first load (a refetch keeps the body and dims it). */
   state?: 'loading' | 'failed' | 'ready'
@@ -44,6 +50,9 @@ export function HomeBlock({
   skeleton?: ReactNode
   skeletonClassName?: string
   className?: string
+  /** Classes of the body (opt-in: a block whose content should fill the
+   *  card's height passes `flex flex-col`). */
+  bodyClassName?: string
   id?: string
   children?: ReactNode
 }) {
@@ -63,7 +72,14 @@ export function HomeBlock({
       >
         <div className="mb-1.5 flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold leading-tight">{t(title)}</h2>
+            <h2 className="text-sm font-semibold leading-tight">
+              {t(title)}
+              {count !== undefined && count !== null && (
+                <span className="ms-1.5 tabular-nums text-muted">
+                  <CountUp value={count} />
+                </span>
+              )}
+            </h2>
             {lang === 'ar' && (
               <p
                 className="font-latin text-[11px] leading-tight text-muted"
@@ -79,7 +95,7 @@ export function HomeBlock({
             </div>
           )}
         </div>
-        <div className="min-w-0 flex-1">
+        <div className={cn('min-w-0 flex-1', bodyClassName)}>
           {state === 'failed' ? (
             <ErrorState
               title={t('adminHomeSectionError')}

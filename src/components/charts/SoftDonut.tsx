@@ -24,6 +24,10 @@ export interface SoftDonutProps extends ChartBaseProps {
   height?: number
   /** `under` lists the slices below the ring; `side` puts them beside it. */
   legend?: 'under' | 'side'
+  /** Opt-in (owner 2026-11-10, «فيه مساحة فاضية تحت الدونات»): the chart
+   *  grows to the height its flex-column parent gives it, `height` being
+   *  the minimum, so a card stretched by its row has no empty foot. */
+  fill?: boolean
 }
 
 /**
@@ -42,6 +46,7 @@ export function SoftDonut({
   lang,
   height = 200,
   legend = 'under',
+  fill = false,
   loading,
   error,
   className,
@@ -139,7 +144,10 @@ export function SoftDonut({
       role="img"
       aria-label={ariaLabel}
     >
-      <div style={{ height }}>
+      <div
+        className={fill ? 'h-full' : undefined}
+        style={fill ? { minHeight: height } : { height }}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             {/* No slide of the tooltip from the previous point to the next
@@ -186,6 +194,7 @@ export function SoftDonut({
       minHeight={height}
       className={cn(
         legend === 'side' ? 'flex items-stretch gap-3' : 'space-y-2',
+        fill && 'min-h-0 flex-1',
         className,
       )}
     >
