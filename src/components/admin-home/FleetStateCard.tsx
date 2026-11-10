@@ -4,12 +4,7 @@ import { SoftDonut } from '@/components/charts/lazy'
 import type { FleetDonutSlice } from '@/components/charts/lazy'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
-import {
-  availableEquipmentHref,
-  insideProjectsLogHref,
-  openWorkshopVisitsHref,
-  ownerEquipmentHref,
-} from '@/lib/adminHomeLinks'
+import { insideProjectsLogHref, ownerEquipmentHref } from '@/lib/adminHomeLinks'
 import {
   FLEET_STATES,
   ownerTotals,
@@ -41,16 +36,9 @@ const OWNER_SHADE: Record<AdminHomeOwner, number> = {
   external_supplier: 4,
 }
 
-const WORKSHOP_STATES = [
-  'workshop_maintenance',
-  'workshop_parking',
-  'workshop_out_of_service',
-  'workshop_unclassified',
-] as const
+export type FleetTab = 'fleet' | 'projects'
 
-export type FleetTab = 'fleet' | 'projects' | 'workshop' | 'available'
-
-/** The four tabs in order, each with its label and the states it sums. */
+/** The two tabs in order, each with its label and the states it sums. */
 export const FLEET_TABS: readonly {
   id: FleetTab
   label: TranslationKey
@@ -58,21 +46,19 @@ export const FLEET_TABS: readonly {
 }[] = [
   { id: 'fleet', label: 'homeV2TabFleetTotal', states: FLEET_STATES },
   { id: 'projects', label: 'homeV2OnProjects', states: ['inside_site'] },
-  { id: 'workshop', label: 'homeV2TabWorkshop', states: WORKSHOP_STATES },
-  { id: 'available', label: 'equipmentStateAvailable', states: ['available'] },
 ]
 
 /**
- * «حالة الاسطول» (owner 2026-11-09, the v2 mockup). Since the owner's review
- * of 2026-11-10 («بالنسبة للاسطول يكون فيه تابين، اول تاب اجمالي الاسطول حسب
- * الملاك، والثاني داخل المشاريع حسب الملاك برضه، وثاني جدول الورشة، وثالث
- * جدول المتاحة», then «حالة الاسطول خليه دونات») it is four tabs over the
- * page's ONE snapshot (no request of its own, no owner filter): the fleet, on
- * projects, the workshop (its four purposes summed) and available, each a
- * `SoftDonut` of the five owners — the tab's total in the middle, the owners
- * beside it with their count and share, an owner without units 0. An owner's
- * name links to that owner's rows: the equipment list (fleet, available) or
- * the log's open visits (projects, workshop), when the shell opens the page.
+ * «الاسطول» (owner 2026-11-09, the v2 mockup, as «حالة الاسطول»). Since the
+ * owner's review of 2026-11-10 («بالنسبة للاسطول يكون فيه تابين، اول تاب
+ * اجمالي الاسطول حسب الملاك، والثاني داخل المشاريع حسب الملاك برضه», then
+ * «حالة الاسطول خليه دونات», then «خليها "الاسطول" وشيل منه تاب الورشة
+ * والمتاحة») it is two tabs over the page's ONE snapshot (no request of its
+ * own, no owner filter): «الاجمالي» and «في المشاريع», each a `SoftDonut` of
+ * the five owners — the tab's total in the middle, the owners beside it with
+ * their count and share, an owner without units 0. An owner's name links to
+ * that owner's rows: the equipment list or the log's open project visits,
+ * when the shell opens the page.
  */
 export function FleetStateCard({
   matrix,
@@ -100,15 +86,14 @@ export function FleetStateCard({
   const label =
     FLEET_TABS.find((item) => item.id === tab)?.label ?? 'homeV2FleetStatus'
 
-  const hrefOf = (owner: AdminHomeOwner): string | undefined => {
-    if (tab === 'fleet')
-      return canOpenEquipment ? ownerEquipmentHref(owner) : undefined
-    if (tab === 'projects')
-      return canOpenLogs ? insideProjectsLogHref(owner) : undefined
-    if (tab === 'workshop')
-      return canOpenLogs ? openWorkshopVisitsHref([owner]) : undefined
-    return canOpenEquipment ? availableEquipmentHref([owner]) : undefined
-  }
+  const hrefOf = (owner: AdminHomeOwner): string | undefined =>
+    tab === 'fleet'
+      ? canOpenEquipment
+        ? ownerEquipmentHref(owner)
+        : undefined
+      : canOpenLogs
+        ? insideProjectsLogHref(owner)
+        : undefined
 
   const slices: FleetDonutSlice[] = current
     ? current.owners.map((row) => ({

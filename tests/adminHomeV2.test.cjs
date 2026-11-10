@@ -373,22 +373,18 @@ test('the fleet card: four owner tabs over the snapshot, each a donut', () => {
   const tabs = [...card.matchAll(/\{ id: '(\w+)', label: '\w+'/g)].map(
     (match) => match[1],
   )
-  assert.deepEqual(tabs, ['fleet', 'projects', 'workshop', 'available'])
-  assert.doesNotMatch(card, /OwnerFilter|fetchAllOwnersStateMatrix|<table/)
+  // Then «خليها "الاسطول" وشيل منه تاب الورشة والمتاحة»: two tabs.
+  assert.deepEqual(tabs, ['fleet', 'projects'])
+  assert.doesNotMatch(
+    card,
+    /OwnerFilter|fetchAllOwnersStateMatrix|<table|openWorkshopVisitsHref|availableEquipmentHref/,
+  )
   assert.match(card, /ownerTotals\(data, item\.states\)/)
-  assert.match(
-    card,
-    /canOpenEquipment \? ownerEquipmentHref\(owner\) : undefined/,
-  )
-  assert.match(card, /canOpenLogs \? insideProjectsLogHref\(owner\) : undefined/)
-  assert.match(
-    card,
-    /canOpenLogs \? openWorkshopVisitsHref\(\[owner\]\) : undefined/,
-  )
-  assert.match(
-    card,
-    /canOpenEquipment \? availableEquipmentHref\(\[owner\]\) : undefined/,
-  )
+  assert.match(card, /\? ownerEquipmentHref\(owner\)\s*: undefined/)
+  assert.match(card, /\? insideProjectsLogHref\(owner\)\s*: undefined/)
+  const ar = read('src', 'i18n', 'translations.ts')
+  assert.match(ar, /homeV2FleetStatus: 'الاسطول',/)
+  assert.match(ar, /homeV2TabFleetTotal: 'الاجمالي',/)
   assert.match(card, /href: hrefOf\(row\.owner\),/)
   assert.match(card, /<SoftDonut[\s\S]*legend="side"[\s\S]*slices=\{slices\}/)
   assert.match(card, /skeleton=\{<DonutSkeleton tabs legendRows=\{5\} \/>\}/)
@@ -417,6 +413,16 @@ test('the available card: the latest available units of the chosen owners', () =
   )
   assert.match(card, /rowHref=\{\(row\) => `\/equipment\/\$\{row\.id\}`\}/)
   assert.match(card, /empty=\{t\('adminHomeFleetAvailableEmpty'\)\}/)
+  // «صغر الخط واضف تفاصيل اكثر، مثل اخر شركة ومشروع، اخر فورمين»: 12 px
+  // cells, the last company and project (or «الورشة»), the foreman of the
+  // last site exit from one bounded recorder lookup, the exit purpose.
+  assert.match(card, /cellTextClassName="text-xs"/)
+  assert.match(card, /header: t\('adminHomeColLastSite'\)/)
+  assert.match(card, /t\('adminHomeLastSiteWorkshop'\)/)
+  assert.match(card, /header: t\('adminHomeColForeman'\)/)
+  assert.match(card, /row\.lastMovementType === 'exit'/)
+  assert.match(card, /fetchMovementRecorderNames\(ids, signal\)/)
+  assert.match(card, /<ExitPurposeBadge purpose=\{row\.exitPurpose\} \/>/)
   assert.match(
     screen,
     /<AvailableCard\s+canOpenEquipment=\{canOpenEquipment\}\s+onSelectEquipment=\{onSelectEquipment\}\s*\/>/,
