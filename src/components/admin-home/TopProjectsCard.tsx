@@ -11,10 +11,13 @@ import { VerticalBarsSkeleton } from './HomeSkeletons'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
 /**
- * «المشاريع الاكثر معدات» (owner 2026-11-09, the v2 mockup): the units inside
- * each project now — the open project visits of `movement_visits`, read
- * once (bounded) and grouped by `topProjects` — the six largest as bars, the
- * rest summed under them. «عرض الكل» opens the log's open project visits.
+ * «توزيع المعدات على المشاريع» (owner 2026-11-09, the v2 mockup, as «المشاريع
+ * الاكثر معدات»; renamed, moved to the foot of the page across its full width
+ * and widened to twelve bars on 2026-11-10, «المسمى مو كويس غيره وخلي الجدول
+ * تحت اخر شي»): the units inside each project now — the open project visits
+ * of `movement_visits`, read once (bounded) and grouped by `topProjects` —
+ * the largest as bars, the rest summed under them. «عرض الكل» opens the
+ * log's open project visits.
  */
 export function TopProjectsCard({ canOpenLogs }: { canOpenLogs: boolean }) {
   const { t, lang, dir } = useI18n()

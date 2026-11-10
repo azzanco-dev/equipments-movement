@@ -115,10 +115,13 @@ test('the owners read every owner and link to the filtered lists', () => {
     card,
     /\{ id: 'projects', label: 'homeV2OnProjects', states: \['inside_site'\] \}/,
   )
-  assert.match(card, /canOpenEquipment \? ownerEquipmentHref\(owner\) : null/)
-  assert.match(card, /canOpenLogs \? insideProjectsLogHref\(owner\) : null/)
-  assert.match(card, /t\(ownershipBadge\(row\.owner\)\.key\)/)
-  assert.match(card, /<CountUp value=\{row\.count\} \/>/)
+  assert.match(
+    card,
+    /canOpenEquipment \? ownerEquipmentHref\(owner\) : undefined/,
+  )
+  assert.match(card, /canOpenLogs \? insideProjectsLogHref\(owner\) : undefined/)
+  assert.match(card, /label: t\(ownershipBadge\(row\.owner\)\.key\)/)
+  assert.match(card, /value: row\.count,/)
   const links = loadLib('adminHomeLinks')
   const filtersOf = (href, key) =>
     JSON.parse(new URL(href, 'http://x').searchParams.get(key))

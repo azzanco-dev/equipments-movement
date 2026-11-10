@@ -5,6 +5,7 @@ import { Button, PageHeader } from '@/components/ui'
 import { AfaqyCard } from '@/components/admin-home/AfaqyCard'
 import { AfaqySection } from '@/components/admin-home/AfaqySection'
 import { AttentionSection } from '@/components/admin-home/AttentionSection'
+import { AvailableCard } from '@/components/admin-home/AvailableCard'
 import { AvailabilityCard } from '@/components/admin-home/AvailabilityCard'
 import { AvailabilitySection } from '@/components/admin-home/AvailabilitySection'
 import { EntriesCard } from '@/components/admin-home/EntriesCard'
@@ -43,6 +44,9 @@ const PANEL_ID: Record<Panel, string> = {
  *  (the approved mockup's variant «ب»). Tighter since the owner's review of
  *  2026-11-10 («قلل المسافات شوي، والمساحات، عشان الصفحة تستوعب اكثر»). */
 const ROW = 'grid gap-3 md:grid-cols-2 xl:grid-cols-3'
+/** The last block alone across the width (the projects chart since
+ *  2026-11-10, «خلي الجدول تحت اخر شي»). */
+const FULL_ROW = 'grid gap-3'
 
 export interface AdminHomeScreenProps {
   onSelectEquipment?: (id: string) => void
@@ -68,8 +72,11 @@ export interface AdminHomeScreenProps {
  * latest movements, «يحتاج انتباهك», the workshop now; availability by
  * type, Afaqy, the daily entries and exits. The owner's review of 2026-11-10:
  * the KPI strip counts Al-Azani only (no «بدون PO»), the fleet card is four
- * owner tabs, «يحتاج انتباهك» three items, the workshop card tabs by
- * purpose (no suppliers), and the spacing is tighter.
+ * owner tabs (each a donut), «يحتاج انتباهك» three items, the workshop card
+ * tabs by purpose (no suppliers) with an owner filter, the available units
+ * table in the first row where the projects chart was, the projects chart
+ * («توزيع المعدات على المشاريع») last across the width, and the spacing is
+ * tighter.
  *
  * Every block owns its request and its own loading / failure state, so one
  * slow or broken block never blanks the page; the KPI strip, the fleet card,
@@ -218,7 +225,10 @@ export function AdminHomeScreen({
             canOpenEquipment={canOpenEquipment}
             canOpenLogs={canOpenLogs}
           />
-          <TopProjectsCard canOpenLogs={canOpenLogs} />
+          <AvailableCard
+            canOpenEquipment={canOpenEquipment}
+            onSelectEquipment={onSelectEquipment}
+          />
           <WorkshopPurposeCard
             canOpenLogs={canOpenLogs}
             canOpenEquipment={canOpenEquipment}
@@ -268,6 +278,9 @@ export function AdminHomeScreen({
           'afaqy',
           <AfaqySection onSelectEquipment={onSelectEquipment} />,
         )}
+        <div className={FULL_ROW}>
+          <TopProjectsCard canOpenLogs={canOpenLogs} />
+        </div>
       </div>
     </>
   )

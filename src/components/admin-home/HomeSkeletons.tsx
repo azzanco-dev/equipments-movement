@@ -191,33 +191,6 @@ export function ListRowsSkeleton({
   )
 }
 
-/**
- * The fleet card (owner 2026-11-10): its four tabs over a table of the five
- * owners — a dot and the owner, the count, the share — and the total row.
- */
-export function OwnerTableSkeleton({ rows = 5 }: { rows?: number }) {
-  return (
-    <div aria-hidden="true">
-      <Skeleton className="mb-1.5 h-7 w-64 max-w-full" />
-      <div className="flex justify-between pb-1">
-        <Skeleton className="h-2.5 w-12" />
-        <Skeleton className="h-2.5 w-16" />
-      </div>
-      <ul className="divide-y">
-        {Array.from({ length: rows + 1 }, (_, index) => (
-          <li key={index} className="flex h-8 items-center gap-2">
-            <Skeleton variant="circle" className="h-2 w-2 shrink-0" />
-            <Skeleton className={cn('h-3', widthAt(index))} />
-            <span className="flex-1" />
-            <Skeleton className="h-3 w-8 shrink-0" />
-            <Skeleton className="h-3 w-8 shrink-0" />
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
 /** The Afaqy block: four small figures, the state bar and three units. */
 export function AfaqySkeleton() {
   return (

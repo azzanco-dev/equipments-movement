@@ -14,6 +14,7 @@ import { fetchFleetEquipment } from '@/lib/adminHomeData'
 import { movementHref } from '@/lib/adminHomeLinks'
 import {
   FLEET_FILTER_OWNERS,
+  type AdminHomeOwner,
   type AdminHomePage,
   type FleetEquipmentRow,
   type OwnerStateMatrix,
@@ -22,6 +23,7 @@ import { formatDateTime } from '@/lib/dateFormat'
 import { elapsedInWords } from '@/lib/elapsedWords'
 import { HomeBlock, ViewAllAction } from './HomeBlock'
 import { ListRowsSkeleton } from './HomeSkeletons'
+import { OwnerFilter } from './OwnerFilter'
 import type { AdminHomeSectionState } from './useAdminHomeSection'
 
 /** Rows the block shows before «عرض الكل». */
@@ -63,11 +65,13 @@ type Page = AdminHomePage<FleetEquipmentRow>
  * التصنيف») the suppliers tab is gone and the tabs are the workshop
  * purposes: maintenance, standby, out of service and unclassified. Each tab
  * is the latest six units in the workshop with that purpose
- * (`get_admin_fleet_equipment`, the fleet tables' four owners), read once
- * and kept while the reader switches tabs; each row opens its open workshop
- * entry (owner 2026-10-29). The count in each tab comes from the page's
- * snapshot (`matrix`, the same four owners). «عرض الكل» opens the full
- * fleet tables in place.
+ * (`get_admin_fleet_equipment`) for the owners of its own filter (owner
+ * 2026-11-10, «اضف في جدول الورشة فلتر المالك وافتراضي على العزاني»: the
+ * fleet tables' four owners, Al-Azani by default, empty = the four), read
+ * once per tab and kept while the reader switches tabs (a new owner choice
+ * reads again); each row opens its open workshop entry (owner 2026-10-29).
+ * The count in each tab comes from the page's snapshot (`matrix`) over the
+ * same owners. «عرض الكل» opens the full fleet tables in place.
  */
 export function WorkshopCard({
   matrix,
@@ -83,13 +87,20 @@ export function WorkshopCard({
 }) {
   const { t, lang } = useI18n()
   const [tab, setTab] = useState<WorkshopTab>('maintenance')
-  // One read per tab, kept so switching back never refetches.
+  const [owners, setOwners] = useState<AdminHomeOwner[]>(['alazani'])
+  // One read per tab and owner choice, kept so switching back never refetches.
   const [pages, setPages] = useState<Partial<Record<WorkshopTab, Page>>>({})
   const [failed, setFailed] = useState<Partial<Record<WorkshopTab, boolean>>>(
     {},
   )
   const [attempt, setAttempt] = useState(0)
   const loaded = pages[tab] !== undefined
+
+  const chooseOwners = useCallback((value: AdminHomeOwner[]) => {
+    setOwners(value)
+    setPages({})
+    setFailed({})
+  }, [])
 
   useEffect(() => {
     if (loaded) return
@@ -100,7 +111,7 @@ export function WorkshopCard({
       {
         state: 'workshop',
         purpose: current,
-        owners: [],
+        owners,
         page: 1,
         pageSize: ROWS,
         sort: null,
@@ -117,13 +128,16 @@ export function WorkshopCard({
       },
     )
     return () => controller.abort()
+    // `owners` is read through the reset of `pages` in `chooseOwners`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, loaded, attempt])
 
   const retry = useCallback(() => setAttempt((value) => value + 1), [])
 
+  const countedOwners = owners.length ? owners : FLEET_FILTER_OWNERS
   const countOf = (state: string): number | null =>
     matrix.data
-      ? FLEET_FILTER_OWNERS.reduce(
+      ? countedOwners.reduce(
           (sum, owner) => sum + (matrix.data?.count(owner, state) ?? 0),
           0,
         )
@@ -180,7 +194,18 @@ export function WorkshopCard({
   return (
     <HomeBlock
       title="homeV2WorkshopNow"
-      action={<ViewAllAction onClick={onShowFleetTables} />}
+      action={
+        <>
+          <OwnerFilter
+            size="sm"
+            className="w-32"
+            options={FLEET_FILTER_OWNERS}
+            value={owners}
+            onChange={chooseOwners}
+          />
+          <ViewAllAction onClick={onShowFleetTables} />
+        </>
+      }
     >
       <Tabs value={tab} onValueChange={(value) => setTab(value as WorkshopTab)}>
         <TabsList

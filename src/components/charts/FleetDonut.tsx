@@ -23,6 +23,9 @@ export interface FleetDonutSlice {
   color: string
   /** Outline for the slice; pass the matching `var(--chart-stroke-N)`. */
   strokeColor?: string
+  /** Opt-in (owner 2026-11-10, «حالة الاسطول خليه دونات»): the legend's
+   *  label becomes a real link to the rows the slice counts. */
+  href?: string
 }
 
 export interface FleetDonutProps extends ChartBaseProps {

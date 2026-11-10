@@ -141,7 +141,8 @@ test('every home block passes a skeleton shaped like its content', () => {
   assert.equal((homeBlock.match(/t\('loading'\)/g) ?? []).length, 1)
 
   const expected = {
-    'FleetStateCard.tsx': /skeleton=\{<OwnerTableSkeleton \/>\}/,
+    'FleetStateCard.tsx': /skeleton=\{<DonutSkeleton tabs legendRows=\{5\} \/>\}/,
+    'AvailableCard.tsx': /skeleton=\{<ListRowsSkeleton rows=\{ROWS\} \/>\}/,
     'TopProjectsCard.tsx':
       /skeleton=\{<VerticalBarsSkeleton height=\{210\} \/>\}/,
     'WorkshopPurposeCard.tsx':

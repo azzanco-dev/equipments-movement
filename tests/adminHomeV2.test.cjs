@@ -36,10 +36,13 @@ function loadLib(name, cache = new Map()) {
 }
 
 const screen = read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx')
+// Owner 2026-11-10: the available table took the projects chart's place in
+// the first row («وبداله خليه جدول المتاحة») and the chart is last («خلي
+// الجدول تحت اخر شي»).
 const BLOCKS = [
   'KpiStrip',
   'FleetStateCard',
-  'TopProjectsCard',
+  'AvailableCard',
   'WorkshopPurposeCard',
   'LatestMovementsCard',
   'AttentionSection',
@@ -47,11 +50,13 @@ const BLOCKS = [
   'AvailabilityCard',
   'AfaqyCard',
   'EntriesCard',
+  'TopProjectsCard',
 ]
 const NEW_FILES = [
   'HomeBlock',
   'KpiStrip',
   'FleetStateCard',
+  'AvailableCard',
   'TopProjectsCard',
   'WorkshopPurposeCard',
   'LatestMovementsCard',
@@ -76,6 +81,19 @@ test('the page composes the mockup blocks in order, three rows of three', () => 
   // Owner 2026-11-10 («قلل المسافات شوي»): gap-3.
   assert.match(screen, /const ROW = 'grid gap-3 md:grid-cols-2 xl:grid-cols-3'/)
   assert.equal(screen.match(/<div className=\{ROW\}>/g).length, 3)
+  // The projects chart alone across the width, under the in-place panels.
+  assert.match(screen, /const FULL_ROW = 'grid gap-3'/)
+  assert.match(
+    screen,
+    /<div className=\{FULL_ROW\}>\s*<TopProjectsCard canOpenLogs=\{canOpenLogs\} \/>/,
+  )
+  assert.ok(
+    screen.indexOf('<div className={FULL_ROW}>') >
+      screen.indexOf("panelBox(\n          'afaqy'"),
+  )
+  const projects = component('TopProjectsCard')
+  assert.match(projects, /title="homeV2TopProjects"/)
+  assert.match(loadLib('adminHomeV2').TOP_PROJECTS_LIMIT + '', /^12$/)
   // The KPI strip two per row on a phone.
   assert.match(
     component('KpiStrip'),
@@ -255,7 +273,6 @@ test('the data: one snapshot, bounded reads, every owner for the KPIs', () => {
   // Figures count up; charts only through the lazy wrappers.
   for (const name of [
     'KpiStrip',
-    'FleetStateCard',
     'TopProjectsCard',
     'WorkshopPurposeCard',
     'AfaqyCard',
@@ -349,25 +366,61 @@ test('tokens only, no hamza alif in the new copy, no uppercase', () => {
 // Owner 2026-11-10: «بالنسبة للاسطول يكون فيه تابين، اول تاب اجمالي الاسطول
 // حسب الملاك، والثاني داخل المشاريع حسب الملاك برضه، وثاني جدول الورشة،
 // وثالث جدول المتاحة».
-test('the fleet card: four owner tabs over the snapshot, no donut or filter', () => {
+// Then «حالة الاسطول خليه دونات»: each tab a donut of the five owners whose
+// legend names link to that owner's rows.
+test('the fleet card: four owner tabs over the snapshot, each a donut', () => {
   const card = component('FleetStateCard')
   const tabs = [...card.matchAll(/\{ id: '(\w+)', label: '\w+'/g)].map(
     (match) => match[1],
   )
   assert.deepEqual(tabs, ['fleet', 'projects', 'workshop', 'available'])
-  assert.doesNotMatch(card, /SoftDonut|OwnerFilter|fetchAllOwnersStateMatrix/)
+  assert.doesNotMatch(card, /OwnerFilter|fetchAllOwnersStateMatrix|<table/)
   assert.match(card, /ownerTotals\(data, item\.states\)/)
-  assert.match(card, /canOpenEquipment \? ownerEquipmentHref\(owner\) : null/)
-  assert.match(card, /canOpenLogs \? insideProjectsLogHref\(owner\) : null/)
   assert.match(
     card,
-    /canOpenLogs \? openWorkshopVisitsHref\(\[owner\]\) : null/,
+    /canOpenEquipment \? ownerEquipmentHref\(owner\) : undefined/,
+  )
+  assert.match(card, /canOpenLogs \? insideProjectsLogHref\(owner\) : undefined/)
+  assert.match(
+    card,
+    /canOpenLogs \? openWorkshopVisitsHref\(\[owner\]\) : undefined/,
   )
   assert.match(
     card,
-    /canOpenEquipment \? availableEquipmentHref\(\[owner\]\) : null/,
+    /canOpenEquipment \? availableEquipmentHref\(\[owner\]\) : undefined/,
   )
-  assert.match(card, /skeleton=\{<OwnerTableSkeleton \/>\}/)
+  assert.match(card, /href: hrefOf\(row\.owner\),/)
+  assert.match(card, /<SoftDonut[\s\S]*legend="side"[\s\S]*slices=\{slices\}/)
+  assert.match(card, /skeleton=\{<DonutSkeleton tabs legendRows=\{5\} \/>\}/)
+  // The shared donut's legend renders a slice's `href` as a real link.
+  const donut = read('src', 'components', 'charts', 'SoftDonut.tsx')
+  assert.match(donut, /slice\.href \? \(\s*<AppLink\s+href=\{slice\.href\}/)
+  assert.match(
+    read('src', 'components', 'charts', 'FleetDonut.tsx'),
+    /href\?: string/,
+  )
+})
+
+// Owner 2026-11-10: «وبداله خليه جدول المتاحة» — the latest available units
+// for the owner filter (the fleet tables' four owners, Al-Azani by default).
+test('the available card: the latest available units of the chosen owners', () => {
+  const card = component('AvailableCard')
+  assert.match(card, /useState<AdminHomeOwner\[\]>\(\['alazani'\]\)/)
+  assert.match(card, /options=\{FLEET_FILTER_OWNERS\}/)
+  assert.match(card, /state: 'available',\s*owners,/)
+  assert.match(card, /pageSize: ROWS,/)
+  assert.match(card, /const ROWS = 6/)
+  assert.match(card, /title="homeV2AvailableNow"/)
+  assert.match(
+    card,
+    /href=\{canOpenEquipment \? availableEquipmentHref\(owners\) : null\}/,
+  )
+  assert.match(card, /rowHref=\{\(row\) => `\/equipment\/\$\{row\.id\}`\}/)
+  assert.match(card, /empty=\{t\('adminHomeFleetAvailableEmpty'\)\}/)
+  assert.match(
+    screen,
+    /<AvailableCard\s+canOpenEquipment=\{canOpenEquipment\}\s+onSelectEquipment=\{onSelectEquipment\}\s*\/>/,
+  )
 })
 
 // Owner 2026-11-10: «جدول الورشة تحت شيل الموردين، وخلي التابات حسب التصنيف».
@@ -403,7 +456,18 @@ test('the workshop card: tabs by purpose, no suppliers', () => {
   assert.match(card, /useState<WorkshopTab>\('maintenance'\)/)
   assert.match(card, /purpose: current,/)
   assert.match(card, /if \(loaded\) return/)
-  assert.match(card, /FLEET_FILTER_OWNERS\.reduce/)
+  // Owner 2026-11-10, «اضف في جدول الورشة فلتر المالك وافتراضي على
+  // العزاني»: the four fleet owners, Al-Azani by default; the tab counts
+  // follow the chosen owners and a new choice reads the tabs again.
+  assert.match(card, /useState<AdminHomeOwner\[\]>\(\['alazani'\]\)/)
+  assert.match(card, /options=\{FLEET_FILTER_OWNERS\}/)
+  assert.match(
+    card,
+    /const countedOwners = owners\.length \? owners : FLEET_FILTER_OWNERS/,
+  )
+  assert.match(card, /countedOwners\.reduce/)
+  assert.match(card, /purpose: current,\s*owners,/)
+  assert.match(card, /setOwners\(value\)\s*setPages\(\{\}\)\s*setFailed\(\{\}\)/)
   assert.match(card, /title="homeV2WorkshopNow"/)
   assert.match(card, /<ViewAllAction onClick=\{onShowFleetTables\} \/>/)
   assert.doesNotMatch(card, /fetchSupplierSiteCounts|homeV2TabSuppliers/)

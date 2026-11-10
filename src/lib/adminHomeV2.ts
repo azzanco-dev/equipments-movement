@@ -36,7 +36,7 @@ export interface TopProjects {
 }
 
 /** Rows shown by «المشاريع الاكثر معدات». */
-export const TOP_PROJECTS_LIMIT = 6
+export const TOP_PROJECTS_LIMIT = 12
 
 /**
  * The open visits grouped by project, the largest first (ties by name, then

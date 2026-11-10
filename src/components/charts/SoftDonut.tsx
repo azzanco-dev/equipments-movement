@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
+import { AppLink } from '@/components/ui/AppLink'
 import { cn } from '@/components/ui/cn'
 import {
   ChartShell,
@@ -109,9 +110,18 @@ export function SoftDonut({
               backgroundColor: fillOf(slice),
             }}
           />
-          <span className="truncate-safe min-w-0 flex-1 text-fg">
-            {slice.label}
-          </span>
+          {slice.href ? (
+            <AppLink
+              href={slice.href}
+              className="truncate-safe min-w-0 flex-1 rounded text-fg underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              {slice.label}
+            </AppLink>
+          ) : (
+            <span className="truncate-safe min-w-0 flex-1 text-fg">
+              {slice.label}
+            </span>
+          )}
           <span className="font-semibold tabular-nums text-fg">
             {slice.value}
           </span>
