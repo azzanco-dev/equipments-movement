@@ -141,42 +141,6 @@ export function VerticalBarsSkeleton({ height = 210 }: { height?: number }) {
   )
 }
 
-/** Horizontal bar rows: a label, a bar of varying length, two figures. */
-export function BarRowsSkeleton({
-  rows = 6,
-  legend = true,
-}: {
-  rows?: number
-  legend?: boolean
-}) {
-  return (
-    <div aria-hidden="true">
-      <ul className="space-y-2.5">
-        {Array.from({ length: rows }, (_, index) => (
-          <li key={index} className="flex h-5 items-center gap-2">
-            <Skeleton className={cn('h-3 shrink-0 sm:w-28', widthAt(index))} />
-            <span className="flex h-2.5 min-w-0 flex-1">
-              <Skeleton
-                className="h-2.5 rounded-full"
-                style={{ width: `${BAR_SIZES[index % BAR_SIZES.length]}%` }}
-              />
-            </span>
-            <Skeleton className="h-3 w-7 shrink-0" />
-            <Skeleton className="h-3 w-7 shrink-0" />
-          </li>
-        ))}
-      </ul>
-      {legend && (
-        <div className="mt-2.5 flex gap-3 border-t pt-2">
-          {[0, 1, 2].map((index) => (
-            <Skeleton key={index} className="h-2.5 w-14" />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 /**
  * Rows of a list or a small table: two lines each (a title and its muted
  * line), with an optional icon tile at the start and a figure at the end.

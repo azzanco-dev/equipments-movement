@@ -47,11 +47,11 @@ const BLOCKS = [
   'AttentionSection',
   'LatestMovementsCard',
   'WorkshopCard',
-  'AvailabilityCard',
   'AfaqyCard',
   'EntriesCard',
   'TopProjectsCard',
 ]
+// «التوفر حسب النوع» left the page (owner 2026-11-10, «خلاص شيل الجدول»).
 const NEW_FILES = [
   'HomeBlock',
   'KpiStrip',
@@ -62,7 +62,6 @@ const NEW_FILES = [
   'LatestMovementsCard',
   'WorkshopCard',
   'AttentionSection',
-  'AvailabilityCard',
   'AfaqyCard',
   'EntriesCard',
 ]
@@ -80,7 +79,19 @@ test('the page composes the mockup blocks in order, three rows of three', () => 
   // Phone: one column; two from md; the mockup's three from xl.
   // Owner 2026-11-10 («قلل المسافات شوي»): gap-3.
   assert.match(screen, /const ROW = 'grid gap-3 md:grid-cols-2 xl:grid-cols-3'/)
-  assert.equal(screen.match(/<div className=\{ROW\}>/g).length, 3)
+  assert.equal(screen.match(/<div className=\{ROW\}>/g).length, 2)
+  // The third row holds two blocks (Afaqy, the entries) since «خلاص شيل
+  // الجدول».
+  assert.match(screen, /const TWO_ROW = 'grid gap-3 md:grid-cols-2'/)
+  assert.match(screen, /<div className=\{TWO_ROW\}>\s*<AfaqyCard/)
+  assert.doesNotMatch(
+    screen,
+    /AvailabilityCard|AvailabilitySection|'availability'/,
+  )
+  assert.doesNotMatch(
+    read('src', 'lib', 'adminHomeData.ts'),
+    /fetchAvailabilityByType/,
+  )
   // The projects chart alone across the width, under the in-place panels.
   assert.match(screen, /const FULL_ROW = 'grid gap-3'/)
   assert.match(
@@ -107,7 +118,6 @@ test('the page composes the mockup blocks in order, three rows of three', () => 
 test('what a block cannot hold opens in place from its «عرض الكل»', () => {
   for (const [panel, element] of [
     ['fleet-tables', '<FleetStateSection'],
-    ['availability', '<AvailabilitySection />'],
     ['afaqy', '<AfaqySection onSelectEquipment={onSelectEquipment} />'],
   ]) {
     const call =

@@ -8,10 +8,10 @@
  * loader throws a plain `Error` and the section renders its own translated
  * failure with a retry.
  *
- * The paginated tables (the fleet mini tables, availability by type) take a
- * page descriptor rather than a limit: pages are 1-based here and in
- * the pagination control, and `pageOffset` is the single place that turns one
- * into the database's 0-based OFFSET.
+ * The paginated tables (the fleet mini tables) take a page descriptor rather
+ * than a limit: pages are 1-based here and in the pagination control, and
+ * `pageOffset` (in `adminHomeStats`) is the single place that turns one into
+ * the database's 0-based OFFSET.
  */
 import { saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
 import { supabase } from '@/lib/supabase'
@@ -20,8 +20,6 @@ import {
   fleetEquipmentRpcArgs,
   fleetOwnerArgument,
   homeOwnerArgument,
-  pageOffset,
-  parseAvailabilityPage,
   parseDailySeries,
   parseFleetState,
   parseFleetEquipmentPage,
@@ -29,7 +27,6 @@ import {
   parseYearlySeries,
   type AdminHomeOwner,
   type AdminHomePage,
-  type AvailabilityRow,
   type DailyMovementCount,
   type FleetEquipmentRow,
   type FleetListState,
@@ -47,13 +44,6 @@ export interface AdminHomePageRequest {
   /** 1-based, like the pagination control. */
   page: number
   pageSize: number
-}
-
-/** The database caps a search term itself; this only keeps a pathological
- *  value out of the request and turns "nothing typed" into no search. */
-function searchArgument(search: string | null | undefined): string | null {
-  const term = (search ?? '').trim().slice(0, 80)
-  return term === '' ? null : term
 }
 
 /**
@@ -153,26 +143,6 @@ export async function fetchMovementRecorderNames(
     // The foreman column is secondary; the table must still render.
   }
   return names
-}
-
-/**
- * One page of the per-type availability. The search is the database's too, so
- * it reaches types that live on pages the browser never downloaded.
- */
-export async function fetchAvailabilityByType(
-  params: AdminHomePageRequest & { search: string | null },
-  signal: AbortSignal,
-): Promise<AdminHomePage<AvailabilityRow>> {
-  const { data, error } = await supabase
-    .rpc('get_admin_availability_by_type', {
-      p_owners: homeOwnerArgument(params.owners),
-      p_search: searchArgument(params.search),
-      p_limit: params.pageSize,
-      p_offset: pageOffset(params.page, params.pageSize),
-    })
-    .abortSignal(signal)
-  if (error) fail('availability', error)
-  return parseAvailabilityPage(data)
 }
 
 export async function fetchEntriesSeries(

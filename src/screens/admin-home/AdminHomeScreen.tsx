@@ -6,8 +6,6 @@ import { AfaqyCard } from '@/components/admin-home/AfaqyCard'
 import { AfaqySection } from '@/components/admin-home/AfaqySection'
 import { AttentionSection } from '@/components/admin-home/AttentionSection'
 import { AvailableCard } from '@/components/admin-home/AvailableCard'
-import { AvailabilityCard } from '@/components/admin-home/AvailabilityCard'
-import { AvailabilitySection } from '@/components/admin-home/AvailabilitySection'
 import { EntriesCard } from '@/components/admin-home/EntriesCard'
 import { FleetStateCard } from '@/components/admin-home/FleetStateCard'
 import { FleetStateSection } from '@/components/admin-home/FleetStateSection'
@@ -32,11 +30,10 @@ import {
 const AFAQY_ANCHOR = 'home-afaqy'
 
 /** The full sections a block's «عرض الكل» opens in place, under its row. */
-type Panel = 'fleet-tables' | 'availability' | 'afaqy'
+type Panel = 'fleet-tables' | 'afaqy'
 
 const PANEL_ID: Record<Panel, string> = {
   'fleet-tables': 'home-panel-fleet-tables',
-  availability: 'home-panel-availability',
   afaqy: 'home-panel-afaqy',
 }
 
@@ -44,6 +41,9 @@ const PANEL_ID: Record<Panel, string> = {
  *  (the approved mockup's variant «ب»). Tighter since the owner's review of
  *  2026-11-10 («قلل المسافات شوي، والمساحات، عشان الصفحة تستوعب اكثر»). */
 const ROW = 'grid gap-3 md:grid-cols-2 xl:grid-cols-3'
+/** The third row holds two blocks since the owner's «خلاص شيل الجدول» of
+ *  2026-11-10 took «التوفر حسب النوع» out: half the width each from md. */
+const TWO_ROW = 'grid gap-3 md:grid-cols-2'
 /** The last block alone across the width (the projects chart since
  *  2026-11-10, «خلي الجدول تحت اخر شي»). */
 const FULL_ROW = 'grid gap-3'
@@ -70,8 +70,8 @@ export interface AdminHomeScreenProps {
  * greeting, the eight KPI tiles, then three rows of three blocks — the fleet
  * state, the projects with the most units, the workshop by purpose; the
  * «يحتاج انتباهك», the latest movements beside the workshop now (owner
- * 2026-11-10, «اخر الحركات جنب الورشة»); availability by
- * type, Afaqy, the daily entries and exits. The owner's review of 2026-11-10:
+ * 2026-11-10, «اخر الحركات جنب الورشة»); Afaqy and the daily entries and
+ * exits («التوفر حسب النوع» left the page the same day, «خلاص شيل الجدول»). The owner's review of 2026-11-10:
  * the KPI strip counts Al-Azani only (no «بدون PO»), the fleet card is four
  * owner tabs (each a donut), «يحتاج انتباهك» three items, the workshop card
  * tabs by purpose (no suppliers) with an owner filter, the available units
@@ -82,7 +82,7 @@ export interface AdminHomeScreenProps {
  * Every block owns its request and its own loading / failure state, so one
  * slow or broken block never blanks the page; the KPI strip, the fleet card,
  * «يحتاج انتباهك» and the workshop tabs share one snapshot over every owner. What a block cannot hold (the
- * full fleet tables with their sort and export, the full availability table,
+ * full fleet tables with their sort and export,
  * Afaqy's two tables) opens in place under its row from its «عرض الكل». The
  * chart granularity lives in the URL (`?flow=`), so Back restores it.
  */
@@ -262,8 +262,7 @@ export function AdminHomeScreen({
             description="homeV2FleetTablesHint"
           />,
         )}
-        <div className={ROW}>
-          <AvailabilityCard onShowAll={() => openPanel('availability')} />
+        <div className={TWO_ROW}>
           <AfaqyCard
             id={AFAQY_ANCHOR}
             canOpenEquipment={canOpenEquipment}
@@ -274,7 +273,6 @@ export function AdminHomeScreen({
             onGranularityChange={setGranularity}
           />
         </div>
-        {panelBox('availability', <AvailabilitySection />)}
         {panelBox(
           'afaqy',
           <AfaqySection onSelectEquipment={onSelectEquipment} />,

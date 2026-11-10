@@ -118,10 +118,6 @@ test('the home bars use bar-grow', () => {
     read(...dir, 'AfaqyCard.tsx'),
     /bar-grow flex h-full w-full gap-px/,
   )
-  assert.match(
-    read(...dir, 'AvailabilityCard.tsx'),
-    /bar-grow flex h-full gap-px/,
-  )
 })
 
 test('the top projects chart gets one items array per load', () => {
@@ -151,7 +147,6 @@ test('every home block passes a skeleton shaped like its content', () => {
     'LatestMovementsCard.tsx': /skeleton=\{<ListRowsSkeleton rows=\{7\} \/>\}/,
     'AttentionSection.tsx':
       /skeleton=\{<ListRowsSkeleton rows=\{3\} icon \/>\}/,
-    'AvailabilityCard.tsx': /skeleton=\{<BarRowsSkeleton rows=\{6\} \/>\}/,
     'AfaqyCard.tsx': /skeleton=\{<AfaqySkeleton \/>\}/,
     'EntriesCard.tsx': /skeleton=\{<AreaSkeleton height=\{220\} \/>\}/,
   }
@@ -182,7 +177,6 @@ test('the skeletons use the shared Skeleton and tokens only, without hamza', () 
     'KpiStripSkeleton',
     'DonutSkeleton',
     'VerticalBarsSkeleton',
-    'BarRowsSkeleton',
     'ListRowsSkeleton',
     'AfaqySkeleton',
     'AreaSkeleton',
