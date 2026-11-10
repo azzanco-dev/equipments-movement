@@ -47,13 +47,16 @@ export function recentVisitsSince(
 
 /**
  * The PostgREST `or` of «inside now or exited since `since`»: an open visit
- * has no exit (`exit_id` NULL), a closed one its `exit_at`. `since` is an ISO
- * instant computed here, never user text.
+ * has no exit (`exit_at` NULL), a closed one its `exit_at`. It tests
+ * `exit_at` alone because `purchasing_site_visits` does not expose
+ * `exit_id` (the page answered «تعذر» with a 42703 on 2026-11-10 while the
+ * clause named it); `movement_visits`, which the pickers read, has both.
+ * `since` is an ISO instant computed here, never user text.
  */
 export function recentVisitOrClause(
   since: string = defaultVisitsSince(),
 ): string {
-  return `exit_id.is.null,exit_at.gte.${since}`
+  return `exit_at.is.null,exit_at.gte.${since}`
 }
 
 /**

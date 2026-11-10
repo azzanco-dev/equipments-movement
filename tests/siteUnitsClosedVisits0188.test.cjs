@@ -236,7 +236,7 @@ test('the default window: a visible removable filter, one PostgREST or', () => {
   assert.equal(visits.defaultVisitsSince(), '2026-07-31T21:00:00.000Z')
   assert.equal(
     visits.recentVisitOrClause(),
-    'exit_id.is.null,exit_at.gte.2026-07-31T21:00:00.000Z',
+    'exit_at.is.null,exit_at.gte.2026-07-31T21:00:00.000Z',
   )
   // A rolling window in days still works from the URL.
   // 60 Saudi days before 2026-11-09 is 2026-09-10, whose day starts at
@@ -244,7 +244,7 @@ test('the default window: a visible removable filter, one PostgREST or', () => {
   assert.equal(visits.recentVisitsSince(60, now), '2026-09-09T21:00:00.000Z')
   assert.equal(
     visits.recentVisitOrClause('2026-09-09T21:00:00.000Z'),
-    'exit_id.is.null,exit_at.gte.2026-09-09T21:00:00.000Z',
+    'exit_at.is.null,exit_at.gte.2026-09-09T21:00:00.000Z',
   )
   const other = { id: 'x', field: 'has_po', operator: 'eq', value: 'false' }
   const split = visits.siteUnitsRecentOrFilter(
@@ -253,7 +253,7 @@ test('the default window: a visible removable filter, one PostgREST or', () => {
   )
   assert.equal(
     split.clause,
-    'exit_id.is.null,exit_at.gte.2026-07-31T21:00:00.000Z',
+    'exit_at.is.null,exit_at.gte.2026-07-31T21:00:00.000Z',
   )
   assert.deepEqual(plain(split.rest), [other])
   assert.equal(
@@ -261,10 +261,17 @@ test('the default window: a visible removable filter, one PostgREST or', () => {
       [{ ...visits.SITE_UNITS_RECENT_DEFAULT_FILTER, value: '60' }],
       now,
     ).clause,
-    'exit_id.is.null,exit_at.gte.2026-09-09T21:00:00.000Z',
+    'exit_at.is.null,exit_at.gte.2026-09-09T21:00:00.000Z',
   )
   // Removed, or a value that is neither a day key nor a number of days: no clause.
   assert.equal(visits.siteUnitsRecentOrFilter([other], now).clause, null)
+  // purchasing_site_visits exposes exit_at but not exit_id: a clause naming
+  // exit_id made the page fail with 42703 (owner 2026-11-10, «يطلع تعذر»).
+  assert.doesNotMatch(visits.recentVisitOrClause(), /exit_id/)
+  assert.doesNotMatch(
+    read('supabase', 'migrations', '20261109120000_0188_site_units_closed_visits.sql'),
+    /^s*v.exit_id,?s*$/m,
+  )
   assert.equal(
     visits.siteUnitsRecentOrFilter(
       [{ ...visits.SITE_UNITS_RECENT_DEFAULT_FILTER, value: '60),x' }],
