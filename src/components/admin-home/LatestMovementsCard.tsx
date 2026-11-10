@@ -75,7 +75,7 @@ export function LatestMovementsCard({
             {row.code}
           </bdi>
           {row.equipmentType && (
-            <span className="block text-[11px] leading-4 text-muted" dir="ltr">
+            <span className="block text-[11px] leading-4 text-muted">
               {row.equipmentType}
             </span>
           )}

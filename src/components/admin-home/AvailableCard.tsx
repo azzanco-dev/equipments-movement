@@ -115,7 +115,7 @@ export function AvailableCard({
             <EquipmentNewBadge isNew={row.isNew} />
             <ExitPurposeBadge purpose={row.exitPurpose} />
           </span>
-          <span className="block text-[11px] leading-4 text-muted" dir="ltr">
+          <span className="block text-[11px] leading-4 text-muted">
             {row.type}
           </span>
         </span>

@@ -155,7 +155,7 @@ export function WorkshopCard({
             </bdi>
             <EquipmentNewBadge isNew={row.isNew} />
           </span>
-          <span className="block text-[11px] leading-4 text-muted" dir="ltr">
+          <span className="block text-[11px] leading-4 text-muted">
             {row.type}
           </span>
         </span>
