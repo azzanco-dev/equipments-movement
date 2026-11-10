@@ -1,12 +1,21 @@
-import { useCallback, useMemo, type ReactNode } from 'react'
+import { useCallback, useState, type ReactNode } from 'react'
 import { Ban, CheckCircle2, Radio, WifiOff } from 'lucide-react'
-import { AppLink, Notice, type BadgeTone } from '@/components/ui'
+import {
+  DataTable,
+  Notice,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  type BadgeTone,
+  type DataTableColumn,
+} from '@/components/ui'
 import { deepTint } from '@/components/charts'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import { canViewEquipmentLocation } from '@/lib/actionPermissions'
 import { loadAfaqyStats, type AfaqyStatsAnswer } from '@/lib/afaqy'
+import type { AfaqyStats, AfaqyStatsUnit } from '@/lib/afaqyStats'
 import { sharePercent } from '@/lib/adminHomeV2'
 import { formatDateTime } from '@/lib/dateFormat'
 import { elapsedInWords } from '@/lib/elapsedWords'
@@ -16,8 +25,36 @@ import { HomeBlock, ViewAllAction } from './HomeBlock'
 import { AfaqySkeleton } from './HomeSkeletons'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
-/** Units «غير متصلة» listed with their last signal, the oldest first. */
-const LONGEST_ROWS = 3
+type ListKey = keyof AfaqyStats['lists']
+
+/** The two tables of the 2026-10-26 section, as tabs (owner 2026-11-10,
+ *  «بالنسبة للتتبع اضف البيانات الي كان في الجداول القديمة»): the units
+ *  not connected with their last signal, and the units without a signal,
+ *  each with its count and its one-line description. */
+const LIST_TABS: {
+  key: ListKey
+  title: TranslationKey
+  description: TranslationKey
+  withSignal: boolean
+}[] = [
+  {
+    key: 'offline',
+    title: 'afaqyHomeOfflineList',
+    description: 'afaqyHomeOfflineListDesc',
+    withSignal: true,
+  },
+  {
+    key: 'noSignal',
+    title: 'afaqyHomeNoSignalList',
+    description: 'afaqyHomeNoSignalListDesc',
+    withSignal: false,
+  },
+]
+
+/** The tables' fixed height (`DataTable`'s own `maxHeight`): every row the
+ *  stats hold (at most `AFAQY_STATS_LIST_MAX`) scrolls under the sticky
+ *  header. */
+const TABLE_MAX_HEIGHT = '220px'
 
 export interface AfaqyCardProps {
   /** The «يحتاج انتباهك» no-signal item scrolls here. */
@@ -31,9 +68,12 @@ export interface AfaqyCardProps {
  * «التتبع في افاقي» (owner 2026-11-09, the v2 mockup): the figures of the
  * Afaqy section of 2026-10-26 in one block — linked, connected, not
  * connected, no signal — a bar of the three states of the linked units, and
- * the three units silent the longest, each opening its unit. «عرض الكل»
- * opens the full section in place (its two tables, `AfaqySection`). Shown
- * with `equipment.location.view` only; the route checks it again.
+ * (owner 2026-11-10, «اضف البيانات الي كان في الجداول القديمة») the two
+ * tables of that section as tabs — «غير متصلة» with the last signal in words
+ * and «بدون اشارة», each row opening its unit, every row the stats hold in a
+ * fixed-height scroll box. «عرض الكل» still opens the full section in place
+ * (`AfaqySection`). Shown with `equipment.location.view` only; the route
+ * checks it again.
  */
 export function AfaqyCard(props: AfaqyCardProps) {
   const permissionState = usePermissions()
@@ -53,19 +93,42 @@ function AfaqyCardContent({ id, onShowAll, canOpenEquipment }: AfaqyCardProps) {
   }, [])
   const { data, loading, failed, retry } = useAdminHomeSection(load)
   const stats = data?.kind === 'ok' ? data.stats : null
+  const [tab, setTab] = useState<ListKey>('offline')
+  const list = LIST_TABS.find((item) => item.key === tab) ?? LIST_TABS[0]
 
-  const longest = useMemo(
-    () =>
-      stats
-        ? [...stats.lists.offline]
-            .filter((row) => row.lastSignal)
-            .sort((a, b) =>
-              (a.lastSignal ?? '').localeCompare(b.lastSignal ?? ''),
-            )
-            .slice(0, LONGEST_ROWS)
-        : [],
-    [stats],
-  )
+  const codeColumn: DataTableColumn<AfaqyStatsUnit> = {
+    key: 'code',
+    header: t('homeV2ColUnit'),
+    cell: (row) => (
+      <span className="block">
+        <bdi dir="ltr" className="block text-[13px] font-semibold">
+          {row.code}
+        </bdi>
+        <span className="block text-[11px] leading-4 text-muted">
+          {row.type ?? '—'}
+        </span>
+      </span>
+    ),
+  }
+  // The last signal in full words («7 شهور», «سنتين»), the exact time on
+  // hover (owner 2026-10-26).
+  const signalColumn: DataTableColumn<AfaqyStatsUnit> = {
+    key: 'signal',
+    header: t('afaqyLastSignal'),
+    align: 'end',
+    cell: (row) =>
+      row.lastSignal ? (
+        <time
+          dateTime={row.lastSignal}
+          title={formatDateTime(row.lastSignal, false)}
+          className="whitespace-nowrap text-muted"
+        >
+          {elapsedInWords(row.lastSignal, lang) ?? '—'}
+        </time>
+      ) : (
+        <span className="text-muted">—</span>
+      ),
+  }
 
   const cells: {
     label: TranslationKey
@@ -183,51 +246,46 @@ function AfaqyCardContent({ id, onShowAll, canOpenEquipment }: AfaqyCardProps) {
               String(sharePercent(stats.connection.online, stats.linked)),
             )}
           </p>
-          {longest.length > 0 && (
-            <ul className="mt-2 divide-y border-t text-sm">
-              {longest.map((row) => {
-                const body = (
-                  <>
-                    <bdi dir="ltr" className="font-semibold">
-                      {row.code}
-                    </bdi>
-                    <time
-                      dateTime={row.lastSignal ?? undefined}
-                      title={
-                        row.lastSignal
-                          ? formatDateTime(row.lastSignal, false)
-                          : undefined
-                      }
-                      className="text-muted"
-                    >
-                      {t('homeV2AfaqyLast').replace(
-                        '{time}',
-                        (row.lastSignal &&
-                          elapsedInWords(row.lastSignal, lang)) ||
-                          '—',
-                      )}
-                    </time>
-                  </>
-                )
-                const rowClass =
-                  'flex items-center justify-between gap-2 rounded py-1.5'
-                return (
-                  <li key={row.id}>
-                    {canOpenEquipment ? (
-                      <AppLink
-                        href={`/equipment/${row.id}`}
-                        className={`${rowClass} transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring`}
-                      >
-                        {body}
-                      </AppLink>
-                    ) : (
-                      <span className={rowClass}>{body}</span>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
+          <Tabs value={tab} onValueChange={(value) => setTab(value as ListKey)}>
+            <TabsList
+              variant="segmented"
+              aria-label={t('homeV2Afaqy')}
+              className="mb-1.5 mt-2.5"
+            >
+              {LIST_TABS.map((item) => (
+                <TabsTrigger
+                  key={item.key}
+                  value={item.key}
+                  className="!h-7 !px-2.5 text-xs"
+                >
+                  {t(item.title)}
+                  <span className="ms-1 tabular-nums text-muted">
+                    {stats.listTotals[item.key]}
+                  </span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <p className="mb-1.5 text-[11px] leading-4 text-muted">
+            {t(list.description)}
+          </p>
+          <DataTable
+            size="md"
+            columns={
+              list.withSignal ? [codeColumn, signalColumn] : [codeColumn]
+            }
+            rows={stats.lists[list.key]}
+            rowKey={(row) => row.id}
+            caption={`${t('homeV2Afaqy')} · ${t(list.title)}`}
+            maxHeight={TABLE_MAX_HEIGHT}
+            stickyHeader
+            cellTextClassName="text-xs"
+            cellClassName="py-1.5"
+            empty={t('afaqyHomeNone')}
+            rowHref={
+              canOpenEquipment ? (row) => `/equipment/${row.id}` : undefined
+            }
+          />
         </div>
       ) : null}
     </HomeBlock>

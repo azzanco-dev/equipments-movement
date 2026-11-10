@@ -242,6 +242,17 @@ test('the attention gates: purchasing and sales items only for their readers', (
     component('AfaqyCard'),
     /if \(!canViewEquipmentLocation\(permissionState\)\) return null/,
   )
+  // Owner 2026-11-10 («اضف البيانات الي كان في الجداول القديمة»): the two
+  // tables of the old section as tabs in the card, every row in a scroll
+  // box, the rows opening the unit.
+  const afaqy = component('AfaqyCard')
+  assert.match(afaqy, /key: 'offline',[\s\S]*withSignal: true/)
+  assert.match(afaqy, /key: 'noSignal',[\s\S]*withSignal: false/)
+  assert.match(afaqy, /rows=\{stats\.lists\[list\.key\]\}/)
+  assert.match(afaqy, /\{stats\.listTotals\[item\.key\]\}/)
+  assert.match(afaqy, /maxHeight=\{TABLE_MAX_HEIGHT\}/)
+  assert.match(afaqy, /t\(list\.description\)/)
+  assert.doesNotMatch(afaqy, /LONGEST_ROWS|homeV2AfaqyLast\b/)
   // A failed read is an ErrorState with retry in its block, never «no data».
   const block = component('HomeBlock')
   assert.match(block, /state === 'failed' \? \(\s*<ErrorState/)

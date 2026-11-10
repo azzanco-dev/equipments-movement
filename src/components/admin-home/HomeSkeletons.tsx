@@ -229,11 +229,19 @@ export function AfaqySkeleton() {
       </ul>
       <Skeleton className="mt-2.5 h-2 w-full rounded-full" />
       <Skeleton className="mt-1.5 h-2.5 w-32" />
-      <ul className="mt-2 divide-y border-t">
-        {[0, 1, 2].map((index) => (
-          <li key={index} className="flex justify-between gap-2 py-2">
-            <Skeleton className="h-3 w-12" />
-            <Skeleton className={cn('h-3', widthAt(index + 1))} />
+      <Skeleton className="mb-1.5 mt-2.5 h-7 w-44" />
+      <Skeleton className="mb-1.5 h-2.5 w-56 max-w-full" />
+      <ul className="divide-y rounded-xl border">
+        {[0, 1, 2, 3, 4].map((index) => (
+          <li
+            key={index}
+            className="flex items-center justify-between gap-2 px-3 py-2"
+          >
+            <span className="space-y-1">
+              <Skeleton className="h-3 w-12" />
+              <Skeleton className={cn('h-2.5', widthAt(index + 1))} />
+            </span>
+            <Skeleton className="h-3 w-14" />
           </li>
         ))}
       </ul>
