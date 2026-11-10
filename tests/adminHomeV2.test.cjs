@@ -386,14 +386,23 @@ test('the fleet card: four owner tabs over the snapshot, each a donut', () => {
   assert.match(ar, /homeV2FleetStatus: 'الاسطول',/)
   assert.match(ar, /homeV2TabFleetTotal: 'الاجمالي',/)
   assert.match(card, /href: hrefOf\(row\.owner\),/)
-  assert.match(card, /<SoftDonut[\s\S]*legend="side"[\s\S]*slices=\{slices\}/)
-  assert.match(card, /skeleton=\{<DonutSkeleton tabs legendRows=\{5\} \/>\}/)
+  // «لو كبرت الدونات وخليت النصوص تحت» → «الجديد»: a 230 px ring, the
+  // owners under it in two columns.
+  assert.match(card, /<SoftDonut[\s\S]*legend="under"[\s\S]*slices=\{slices\}/)
+  assert.match(card, /height=\{230\}/)
+  assert.match(
+    card,
+    /skeleton=\{<DonutSkeleton tabs legendRows=\{5\} under \/>\}/,
+  )
   const donut = read('src', 'components', 'charts', 'SoftDonut.tsx')
   // «فيه مساحة فاضية تحت الدونات»: the donut fills the stretched card.
   assert.match(card, /bodyClassName="flex flex-col"/)
-  assert.match(card, /legend="side"\s*fill\s*slices=\{slices\}/)
+  assert.match(card, /legend="under"\s*fill\s*slices=\{slices\}/)
   assert.match(donut, /fill && 'min-h-0 flex-1'/)
-  assert.match(donut, /style=\{fill \? \{ minHeight: height \} : \{ height \}\}/)
+  assert.match(
+    donut,
+    /style=\{fill \? \{ minHeight: height \} : \{ height \}\}/,
+  )
   // The shared donut's legend renders a slice's `href` as a real link.
   assert.match(donut, /slice\.href \? \(\s*<AppLink\s+href=\{slice\.href\}/)
   assert.match(
@@ -483,7 +492,10 @@ test('the workshop card: tabs by purpose, no suppliers', () => {
   )
   assert.match(card, /countedOwners\.reduce/)
   assert.match(card, /purpose: current,\s*owners,/)
-  assert.match(card, /setOwners\(value\)\s*setPages\(\{\}\)\s*setFailed\(\{\}\)/)
+  assert.match(
+    card,
+    /setOwners\(value\)\s*setPages\(\{\}\)\s*setFailed\(\{\}\)/,
+  )
   assert.match(card, /title="homeV2WorkshopNow"/)
   assert.match(card, /<ViewAllAction onClick=\{onShowFleetTables\} \/>/)
   assert.doesNotMatch(card, /fetchSupplierSiteCounts|homeV2TabSuppliers/)

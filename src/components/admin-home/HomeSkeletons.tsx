@@ -58,20 +58,38 @@ export function DonutSkeleton({
   legendRows = 4,
   footerRows = 0,
   footerButton = false,
+  under = false,
 }: {
   tabs?: boolean
   legendRows?: number
   footerRows?: number
   footerButton?: boolean
+  /** The legend under a bigger ring in two columns (the fleet card). */
+  under?: boolean
 }) {
   return (
     <div aria-hidden="true">
       {tabs && <TabsSkeleton />}
-      <div className="flex h-[190px] items-center gap-4">
+      <div
+        className={cn(
+          'flex items-center gap-4',
+          under ? 'h-[300px] flex-col justify-center' : 'h-[190px]',
+        )}
+      >
         <span className="flex min-w-0 flex-1 items-center justify-center">
-          <span className="block h-[150px] w-[150px] shrink-0 animate-pulse rounded-full border-[22px] border-surface" />
+          <span
+            className={cn(
+              'block shrink-0 animate-pulse rounded-full border-[22px] border-surface',
+              under ? 'h-[190px] w-[190px]' : 'h-[150px] w-[150px]',
+            )}
+          />
         </span>
-        <ul className="shrink-0 space-y-2.5">
+        <ul
+          className={cn(
+            'shrink-0',
+            under ? 'grid w-full grid-cols-2 gap-x-3 gap-y-2.5' : 'space-y-2.5',
+          )}
+        >
           {Array.from({ length: legendRows }, (_, index) => (
             <li key={index} className="flex items-center gap-2">
               <Skeleton variant="circle" className="h-2.5 w-2.5 shrink-0" />

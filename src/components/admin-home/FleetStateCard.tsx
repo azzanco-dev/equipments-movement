@@ -55,8 +55,10 @@ export const FLEET_TABS: readonly {
  * «حالة الاسطول خليه دونات», then «خليها "الاسطول" وشيل منه تاب الورشة
  * والمتاحة») it is two tabs over the page's ONE snapshot (no request of its
  * own, no owner filter): «الاجمالي» and «في المشاريع», each a `SoftDonut` of
- * the five owners — the tab's total in the middle, the owners beside it with
- * their count and share, an owner without units 0. An owner's name links to
+ * the five owners — a 230 px ring with the tab's total in the middle and the
+ * owners under it in two columns with their count and share (owner the same
+ * day, «لو كبرت الدونات وخليت النصوص تحت» → «الجديد»), an owner without
+ * units 0. An owner's name links to
  * that owner's rows: the equipment list or the log's open project visits,
  * when the shell opens the page.
  */
@@ -111,7 +113,7 @@ export function FleetStateCard({
       title="homeV2FleetStatus"
       state={matrix.failed ? 'failed' : !data ? 'loading' : 'ready'}
       onRetry={matrix.retry}
-      skeleton={<DonutSkeleton tabs legendRows={5} />}
+      skeleton={<DonutSkeleton tabs legendRows={5} under />}
       bodyClassName="flex flex-col"
     >
       <Tabs value={tab} onValueChange={(value) => setTab(value as FleetTab)}>
@@ -142,8 +144,8 @@ export function FleetStateCard({
           dir={dir}
           lang={lang}
           centerLabel={t('adminHomeDonutTotal')}
-          height={190}
-          legend="side"
+          height={230}
+          legend="under"
           fill
           slices={slices}
         />
