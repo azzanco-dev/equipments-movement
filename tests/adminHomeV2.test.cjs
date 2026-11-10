@@ -418,8 +418,17 @@ test('the available card: the latest available units of the chosen owners', () =
   assert.match(card, /useState<AdminHomeOwner\[\]>\(\['alazani'\]\)/)
   assert.match(card, /options=\{FLEET_FILTER_OWNERS\}/)
   assert.match(card, /state: 'available',\s*owners,/)
-  assert.match(card, /pageSize: ROWS,/)
-  assert.match(card, /const ROWS = 6/)
+  // «حدد طول معين للجدول، بحيث تستعرض كل المتاح ويكون فيه سكرول»: every
+  // unit up to the function's cap, a fixed-height scroll box with a sticky
+  // header, the recorder lookup in slices of 100 ids.
+  assert.match(card, /pageSize: MAX_ROWS,/)
+  assert.match(card, /const MAX_ROWS = 500/)
+  assert.match(card, /const NAMES_CHUNK = 100/)
+  assert.match(card, /const TABLE_HEIGHT_CLASS = 'max-h-\[320px\]'/)
+  assert.match(card, /overflow-y-auto/)
+  assert.match(card, /stickyHeader\s/)
+  assert.doesNotMatch(card, /stickyHeader=\{false\}/)
+  assert.match(card, /data\.total > data\.rows\.length/)
   assert.match(card, /title="homeV2AvailableNow"/)
   assert.match(
     card,
@@ -435,7 +444,7 @@ test('the available card: the latest available units of the chosen owners', () =
   assert.match(card, /t\('adminHomeLastSiteWorkshop'\)/)
   assert.match(card, /header: t\('adminHomeColForeman'\)/)
   assert.match(card, /row\.lastMovementType === 'exit'/)
-  assert.match(card, /fetchMovementRecorderNames\(ids, signal\)/)
+  assert.match(card, /fetchMovementRecorderNames\(chunk, signal\)/)
   assert.match(card, /<ExitPurposeBadge purpose=\{row\.exitPurpose\} \/>/)
   // «اضف عدد للمتاحة»: the owners' total beside the title.
   assert.match(card, /count=\{data\?\.total \?\? null\}/)

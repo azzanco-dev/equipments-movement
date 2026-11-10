@@ -22,8 +22,19 @@ import { ListRowsSkeleton } from './HomeSkeletons'
 import { OwnerFilter } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
-/** Rows the block shows before «عرض الكل». */
+/** Every available unit of the chosen owners in ONE read, up to the fleet
+ *  function's own cap (owner 2026-11-10, «حدد طول معين للجدول، بحيث تستعرض
+ *  كل المتاح ويكون فيه سكرول»); past the cap the card says the list is
+ *  partial and «عرض الكل» has the rest. */
+const MAX_ROWS = 500
+/** The recorder lookup goes in slices of this many movement ids, so the
+ *  request URL stays short. */
+const NAMES_CHUNK = 100
+/** Rows the first-load skeleton draws. */
 const ROWS = 6
+/** The table's fixed height; the rows scroll inside it under a sticky
+ *  header. */
+const TABLE_HEIGHT_CLASS = 'max-h-[320px]'
 
 /** A fleet row with the foreman of its last site exit (null when the unit
  *  last left the workshop, never moved, or the lookup failed). */
@@ -46,9 +57,14 @@ async function withForemen(
         row.lastMovementId,
     )
     .map((row) => row.lastMovementId as string)
-  const names = ids.length
-    ? await fetchMovementRecorderNames(ids, signal)
-    : new Map<string, string>()
+  const names = new Map<string, string>()
+  const chunks: string[][] = []
+  for (let at = 0; at < ids.length; at += NAMES_CHUNK)
+    chunks.push(ids.slice(at, at + NAMES_CHUNK))
+  for (const found of await Promise.all(
+    chunks.map((chunk) => fetchMovementRecorderNames(chunk, signal)),
+  ))
+    found.forEach((name, id) => names.set(id, name))
   return {
     ...page,
     rows: page.rows.map((row) => ({
@@ -67,7 +83,9 @@ async function withForemen(
  * اكثر، مثل اخر شركة ومشروع، اخر فورمين»): the latest six available units —
  * outside every project and the workshop — of the owners of its own filter
  * (the fleet tables' four owners, Al-Azani by default, empty = the four),
- * from `get_admin_fleet_equipment` with state `available`, in 12 px text:
+ * from `get_admin_fleet_equipment` with state `available` — ALL of them in
+ * one bounded read (`MAX_ROWS`), scrolling inside a fixed-height table under
+ * a sticky header —, in 12 px text:
  * the unit with its type and the purpose of its last exit, the last company
  * and project (or «الورشة» when it last left the workshop), the foreman who
  * recorded that exit, and how long it has been available. A row opens the
@@ -91,7 +109,7 @@ export function AvailableCard({
             state: 'available',
             owners,
             page: 1,
-            pageSize: ROWS,
+            pageSize: MAX_ROWS,
             sort: null,
           },
           signal,
@@ -204,23 +222,28 @@ export function AvailableCard({
           aria-busy={loading || undefined}
           className={loading ? 'opacity-60' : undefined}
         >
-          <DataTable
-            size="md"
-            columns={columns}
-            rows={data.rows}
-            rowKey={(row) => row.id}
-            caption={t('homeV2AvailableNow')}
-            stickyHeader={false}
-            cellTextClassName="text-xs"
-            cellClassName="py-1.5"
-            empty={t('adminHomeFleetAvailableEmpty')}
-            onRowClick={
-              onSelectEquipment
-                ? (row: AvailableRow) => onSelectEquipment(row.id)
-                : undefined
-            }
-            rowHref={(row) => `/equipment/${row.id}`}
-          />
+          <div className={`${TABLE_HEIGHT_CLASS} overflow-y-auto`}>
+            <DataTable
+              size="md"
+              columns={columns}
+              rows={data.rows}
+              rowKey={(row) => row.id}
+              caption={t('homeV2AvailableNow')}
+              stickyHeader
+              cellTextClassName="text-xs"
+              cellClassName="py-1.5"
+              empty={t('adminHomeFleetAvailableEmpty')}
+              onRowClick={
+                onSelectEquipment
+                  ? (row: AvailableRow) => onSelectEquipment(row.id)
+                  : undefined
+              }
+              rowHref={(row) => `/equipment/${row.id}`}
+            />
+          </div>
+          {data.total > data.rows.length && (
+            <p className="mt-1 text-xs text-muted">{t('homeV2Capped')}</p>
+          )}
         </div>
       )}
     </HomeBlock>
