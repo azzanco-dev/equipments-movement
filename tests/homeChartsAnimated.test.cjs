@@ -141,15 +141,14 @@ test('every home block passes a skeleton shaped like its content', () => {
   assert.equal((homeBlock.match(/t\('loading'\)/g) ?? []).length, 1)
 
   const expected = {
-    'FleetStateCard.tsx':
-      /skeleton=\{<DonutSkeleton tabs legendRows=\{6\} \/>\}/,
+    'FleetStateCard.tsx': /skeleton=\{<OwnerTableSkeleton \/>\}/,
     'TopProjectsCard.tsx':
       /skeleton=\{<VerticalBarsSkeleton height=\{210\} \/>\}/,
     'WorkshopPurposeCard.tsx':
       /skeleton=\{<DonutSkeleton footerRows=\{2\} footerButton \/>\}/,
     'LatestMovementsCard.tsx': /skeleton=\{<ListRowsSkeleton rows=\{7\} \/>\}/,
     'AttentionSection.tsx':
-      /skeleton=\{<ListRowsSkeleton rows=\{5\} icon \/>\}/,
+      /skeleton=\{<ListRowsSkeleton rows=\{3\} icon \/>\}/,
     'AvailabilityCard.tsx': /skeleton=\{<BarRowsSkeleton rows=\{6\} \/>\}/,
     'AfaqyCard.tsx': /skeleton=\{<AfaqySkeleton \/>\}/,
     'EntriesCard.tsx': /skeleton=\{<AreaSkeleton height=\{220\} \/>\}/,
@@ -157,17 +156,16 @@ test('every home block passes a skeleton shaped like its content', () => {
   for (const [file, pattern] of Object.entries(expected))
     assert.match(read(...dir, file), pattern, file)
 
-  // The KPI strip and the tabbed workshop / suppliers block draw theirs
-  // themselves (the tabs stay above the skeleton).
+  // The KPI strip and the tabbed workshop block draw theirs themselves
+  // (the tabs stay above the skeleton).
   assert.match(read(...dir, 'KpiStrip.tsx'), /<KpiStripSkeleton \/>/)
-  const suppliers = read(...dir, 'WorkshopSuppliersCard.tsx')
-  assert.match(suppliers, /<ListRowsSkeleton rows=\{ROWS\} \/>/)
-  assert.match(suppliers, /<BarRowsSkeleton rows=\{ROWS\} legend=\{false\} \/>/)
+  const workshop = read(...dir, 'WorkshopCard.tsx')
+  assert.match(workshop, /<ListRowsSkeleton rows=\{ROWS\} \/>/)
 
   // No home block falls back to the generic block any more.
   for (const file of fs.readdirSync(path.join(ROOT, ...dir))) {
     const source = read(...dir, file)
-    if (/<HomeBlock\b/.test(source) && file !== 'WorkshopSuppliersCard.tsx')
+    if (/<HomeBlock\b/.test(source) && file !== 'WorkshopCard.tsx')
       assert.match(source, /skeleton=\{</, file)
   }
 })

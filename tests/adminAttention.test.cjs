@@ -36,10 +36,16 @@ const lib = loadLib('adminAttention')
 const filtersOf = (href, param) =>
   JSON.parse(new URL(href, 'http://x').searchParams.get(param))
 
-test('only items above zero show, in the strip order', () => {
+test('only items above zero show, in the block order', () => {
   assert.deepEqual(
-    [...lib.visibleAttentionItems({ unpriced: 2, unclassified: 1, no_po: 0 })],
-    ['unclassified', 'unpriced'],
+    [
+      ...lib.visibleAttentionItems({
+        available_alazani: 2,
+        awaiting_approval: 1,
+        awaiting_end: 0,
+      }),
+    ],
+    ['awaiting_approval', 'available_alazani'],
   )
   assert.equal(lib.visibleAttentionItems({}).length, 0)
 })
@@ -57,12 +63,6 @@ test('the cutoff is the Saudi day', () => {
 })
 
 test('every item opens its list with allowlisted filters', () => {
-  const unclassified = lib.unclassifiedHref()
-  assert.match(unclassified, /^\/logs\?context=workshop&vfilters=/)
-  assert.deepEqual(
-    filtersOf(unclassified, 'vfilters').map((f) => `${f.field}:${f.operator}`),
-    ['is_open:eq', 'workshop_purpose:is_not_set'],
-  )
   const outOfService = filtersOf(
     lib.outOfServiceLongHref('2026-09-29'),
     'vfilters',
@@ -75,26 +75,19 @@ test('every item opens its list with allowlisted filters', () => {
       'entry_at:lt:2026-09-29',
     ],
   )
-  assert.match(lib.noPoHref(), /^\/purchasing\/units\?filters=/)
-  assert.deepEqual(filtersOf(lib.noPoHref(), 'filters')[0].field, 'has_po')
   assert.deepEqual(
     filtersOf(lib.awaitingApprovalHref(), 'filters').map(
       (f) => `${f.field}:${f.operator}:${f.value}`,
     ),
     ['status:eq:open', 'approval_status:eq:draft', 'unpriced_count:eq:0'],
   )
-  assert.deepEqual(
-    filtersOf(lib.unpricedHref(), 'filters').map(
-      (f) => `${f.field}:${f.operator}:${f.value}`,
-    ),
-    ['status:eq:open', 'unpriced_count:gt:0'],
-  )
+  // Owner 2026-11-10: the items that left the block took their links along.
+  for (const gone of ['unclassifiedHref', 'noPoHref', 'unpricedHref'])
+    assert.equal(lib[gone], undefined, gone)
   // Each field and operator is offered by the target list's config.
   const visits = read('src', 'lib', 'visitsList.ts')
   assert.match(visits, /key: 'is_open'/)
-  assert.match(visits, /'is_not_set'/)
   const configs = read('src', 'lib', 'listConfigs.ts')
-  assert.match(configs, /key: 'has_po'/)
   assert.match(
     configs,
     /key: 'unpriced_count'[\s\S]*?operators: \['gt', 'eq'\]/,
@@ -109,29 +102,26 @@ test('the section gates its items and sits at the end of the home', () => {
     'AttentionSection.tsx',
   )
   assert.match(section, /permissions\.can\('purchasing\.view'\)/)
-  assert.match(section, /canViewEquipmentLocation\(permissions\)/)
+  // Owner 2026-11-10: no Afaqy item any more.
+  assert.doesNotMatch(section, /canViewEquipmentLocation|loadAfaqyStats/)
   // Home v2 (owner 2026-11-09): the block keeps its grid place and says
   // there is nothing to do; a first load is the block's skeleton.
   assert.match(section, /items\.length === 0 && !failed \? \(/)
   assert.match(section, /t\('homeV2AttentionNone'\)/)
   assert.match(section, /state=\{firstLoad \? 'loading' : 'ready'\}/)
   assert.match(section, /role="alert"/)
-  assert.match(section, /canOpenPage\('logs'\)/)
-  assert.match(section, /canOpenPage\('purchasing\/units'\)/)
   assert.match(section, /canOpenPage\('purchasing\/orders'\)/)
   // Home v2 (owner 2026-11-09): the second row's middle block, between the
-  // latest movements and the workshop / suppliers; the no-signal item opens
-  // the Afaqy section in place.
+  // latest movements and the workshop card.
   const screen = read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx')
   assert.ok(
     screen.indexOf('<AttentionSection') >
       screen.indexOf('<LatestMovementsCard'),
   )
   assert.ok(
-    screen.indexOf('<AttentionSection') <
-      screen.indexOf('<WorkshopSuppliersCard'),
+    screen.indexOf('<AttentionSection') < screen.indexOf('<WorkshopCard'),
   )
-  assert.match(screen, /onShowAfaqy=\{\(\) => openPanel\('afaqy'\)\}/)
+  assert.doesNotMatch(screen, /onShowAfaqy/)
   assert.match(screen, /id=\{AFAQY_ANCHOR\}/)
   assert.match(
     read('src', 'App.tsx'),
@@ -140,21 +130,15 @@ test('the section gates its items and sits at the end of the home', () => {
 })
 
 // 0185 (owner go 2026-11-08): «معدات خرجت بانتهاء عمل وكرتها مفتوح».
-test('the cards awaiting their end: after the PO items, sales readers only', () => {
+test('the cards awaiting their end: after the PO item, sales readers only', () => {
+  // Owner 2026-11-10: «ويحتاج انتباهك يكون اوامر شراء موردين بحاجة لتعميد،
+  // معدات خرجت بانتهاء عمل وكرتها مفتوح، معدات متاحة (العزاني)».
   assert.deepEqual(
     [...lib.ATTENTION_ORDER],
-    [
-      'unclassified',
-      'no_po',
-      'awaiting_approval',
-      'unpriced',
-      'awaiting_end',
-      'no_signal',
-      'out_of_service_long',
-    ],
+    ['awaiting_approval', 'awaiting_end', 'available_alazani'],
   )
   assert.deepEqual(
-    [...lib.visibleAttentionItems({ awaiting_end: 3, no_signal: 0 })],
+    [...lib.visibleAttentionItems({ awaiting_end: 3, awaiting_approval: 0 })],
     ['awaiting_end'],
   )
   assert.equal(lib.visibleAttentionItems({ awaiting_end: 0 }).length, 0)
@@ -175,7 +159,7 @@ test('the cards awaiting their end: after the PO items, sales readers only', () 
     /canSales\s*\?\s*headCount\(\s*supabase\s*\.from\('sales_cards_awaiting_end'\)\s*\.select\('card_id', \{ count: 'exact', head: true \}\)/,
   )
   assert.match(section, /awaiting_end: awaitingEnd,/)
-  assert.match(section, /\[canPurchasing, canSales, cutoff\]/)
+  assert.match(section, /\[canPurchasing, canSales\]/)
   assert.match(
     section,
     /canOpenPage\(AWAITING_END_PAGE\) \? awaitingEndHref\(\) : null/,
@@ -190,6 +174,44 @@ test('the cards awaiting their end: after the PO items, sales readers only', () 
   for (const key of [
     'adminAttentionAwaitingEnd',
     'adminAttentionAwaitingEndHint',
+  ]) {
+    const matches =
+      translations.match(new RegExp(`^    ${key}: '[^'\n]+',$`, 'gm')) ?? []
+    assert.equal(matches.length, 2, key)
+    assert.doesNotMatch(matches[0], /[أإآ]/, key)
+  }
+})
+
+// Owner 2026-11-10: «معدات متاحة (العزاني)» from the page's snapshot.
+test('the available Al-Azani item reads the snapshot and opens the list', () => {
+  const section = read(
+    'src',
+    'components',
+    'admin-home',
+    'AttentionSection.tsx',
+  )
+  assert.match(
+    section,
+    /available_alazani: matrix\.data\?\.count\('alazani', 'available'\) \?\? 0/,
+  )
+  assert.match(
+    section,
+    /canOpenEquipment \? availableEquipmentHref\(\['alazani'\]\) : null/,
+  )
+  assert.match(section, /label: 'adminAttentionAvailableAlazani'/)
+  // Only the two database counts; no workshop, PO-less or unpriced reads.
+  assert.doesNotMatch(
+    section,
+    /movement_visits|purchasing_site_units|gt\('unpriced_count'/,
+  )
+  // A failed snapshot is an error with retry, never zero.
+  assert.match(section, /const failed = counts\.failed \|\| matrix\.failed/)
+  const screen = read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx')
+  assert.match(screen, /<AttentionSection\s+matrix=\{matrix\}/)
+  const translations = read('src', 'i18n', 'translations.ts')
+  for (const key of [
+    'adminAttentionAvailableAlazani',
+    'adminAttentionAvailableAlazaniHint',
   ]) {
     const matches =
       translations.match(new RegExp(`^    ${key}: '[^'\n]+',$`, 'gm')) ?? []

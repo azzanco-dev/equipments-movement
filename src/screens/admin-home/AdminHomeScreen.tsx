@@ -14,7 +14,7 @@ import { KpiStrip } from '@/components/admin-home/KpiStrip'
 import { LatestMovementsCard } from '@/components/admin-home/LatestMovementsCard'
 import { TopProjectsCard } from '@/components/admin-home/TopProjectsCard'
 import { WorkshopPurposeCard } from '@/components/admin-home/WorkshopPurposeCard'
-import { WorkshopSuppliersCard } from '@/components/admin-home/WorkshopSuppliersCard'
+import { WorkshopCard } from '@/components/admin-home/WorkshopCard'
 import { useAdminHomeSection } from '@/components/admin-home/useAdminHomeSection'
 import { WhatsAppStatusAlert } from '@/components/WhatsAppGatewayStatus'
 import { useI18n } from '@/i18n/I18nContext'
@@ -27,7 +27,7 @@ import {
   type AdminHomeGranularity,
 } from '@/lib/adminHomeStats'
 
-/** The Afaqy block's anchor, for the «يحتاج انتباهك» no-signal item. */
+/** The Afaqy block's anchor. */
 const AFAQY_ANCHOR = 'home-afaqy'
 
 /** The full sections a block's «عرض الكل» opens in place, under its row. */
@@ -40,8 +40,9 @@ const PANEL_ID: Record<Panel, string> = {
 }
 
 /** A row of three blocks: stacked on a phone, two from md, three from xl
- *  (the approved mockup's variant «ب»). */
-const ROW = 'grid gap-4 md:grid-cols-2 xl:grid-cols-3'
+ *  (the approved mockup's variant «ب»). Tighter since the owner's review of
+ *  2026-11-10 («قلل المسافات شوي، والمساحات، عشان الصفحة تستوعب اكثر»). */
+const ROW = 'grid gap-3 md:grid-cols-2 xl:grid-cols-3'
 
 export interface AdminHomeScreenProps {
   onSelectEquipment?: (id: string) => void
@@ -64,12 +65,15 @@ export interface AdminHomeScreenProps {
  * spacing; EM-252, «الارقام الحالية تاخذ كامل الصفحة»). Top to bottom: the
  * greeting, the eight KPI tiles, then three rows of three blocks — the fleet
  * state, the projects with the most units, the workshop by purpose; the
- * latest movements, «يحتاج انتباهك», the workshop / suppliers; availability
- * by type, Afaqy, the daily entries and exits.
+ * latest movements, «يحتاج انتباهك», the workshop now; availability by
+ * type, Afaqy, the daily entries and exits. The owner's review of 2026-11-10:
+ * the KPI strip counts Al-Azani only (no «بدون PO»), the fleet card is four
+ * owner tabs, «يحتاج انتباهك» three items, the workshop card tabs by
+ * purpose (no suppliers), and the spacing is tighter.
  *
  * Every block owns its request and its own loading / failure state, so one
- * slow or broken block never blanks the page; the KPI strip and the fleet
- * card share one snapshot over every owner. What a block cannot hold (the
+ * slow or broken block never blanks the page; the KPI strip, the fleet card,
+ * «يحتاج انتباهك» and the workshop tabs share one snapshot over every owner. What a block cannot hold (the
  * full fleet tables with their sort and export, the full availability table,
  * Afaqy's two tables) opens in place under its row from its «عرض الكل». The
  * chart granularity lives in the URL (`?flow=`), so Back restores it.
@@ -126,7 +130,8 @@ export function AdminHomeScreen({
     [params, pathname],
   )
 
-  // ONE snapshot over every owner for the KPI strip and the fleet card.
+  // ONE snapshot over every owner for the KPI strip, the fleet card, the
+  // attention block and the workshop tabs.
   const loadMatrix = useCallback(
     (signal: AbortSignal) => fetchAllOwnersStateMatrix(signal),
     [],
@@ -176,7 +181,7 @@ export function AdminHomeScreen({
       {/* Less room above the greeting on this page only (owner 2026-11-08,
           «قلل المسافة الي فوق»): the main column's top padding is 16 / 24 /
           32 px; this takes it to 12 / 16 / 16 px. */}
-      <div className="-mt-1 space-y-4 sm:-mt-2 lg:-mt-4">
+      <div className="-mt-1 space-y-3 sm:-mt-2 lg:-mt-4">
         <PageHeader
           title={greeting ?? t('adminHomeTitle')}
           actions={
@@ -205,7 +210,6 @@ export function AdminHomeScreen({
           links={{
             equipment: canOpenEquipment,
             logs: canOpenLogs,
-            purchasingUnits: canOpenPage('purchasing/units'),
           }}
         />
         <div className={ROW}>
@@ -226,11 +230,12 @@ export function AdminHomeScreen({
             onSelectMovement={onSelectMovement}
           />
           <AttentionSection
+            matrix={matrix}
             canOpenPage={canOpenPage}
-            onShowAfaqy={() => openPanel('afaqy')}
+            canOpenEquipment={canOpenEquipment}
           />
-          <WorkshopSuppliersCard
-            canOpenLogs={canOpenLogs}
+          <WorkshopCard
+            matrix={matrix}
             onSelectEquipment={onSelectEquipment}
             onSelectMovement={onSelectMovement}
             onShowFleetTables={() => openPanel('fleet-tables')}

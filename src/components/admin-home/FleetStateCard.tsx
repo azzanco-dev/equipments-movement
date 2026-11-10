@@ -1,11 +1,13 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { AppLink, Tabs, TabsList, TabsTrigger } from '@/components/ui'
-import { SoftDonut } from '@/components/charts/lazy'
-import type { FleetDonutSlice } from '@/components/charts/lazy'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
-import { fetchAllOwnersStateMatrix } from '@/lib/adminHomeData'
-import { insideProjectsLogHref, ownerEquipmentHref } from '@/lib/adminHomeLinks'
+import {
+  availableEquipmentHref,
+  insideProjectsLogHref,
+  openWorkshopVisitsHref,
+  ownerEquipmentHref,
+} from '@/lib/adminHomeLinks'
 import {
   FLEET_STATES,
   ownerTotals,
@@ -17,12 +19,8 @@ import { sharePercent } from '@/lib/adminHomeV2'
 import { ownershipBadge } from '@/lib/equipmentForm'
 import { CountUp } from './CountUp'
 import { HomeBlock } from './HomeBlock'
-import { DonutSkeleton } from './HomeSkeletons'
-import { OwnerFilter } from './OwnerFilter'
-import {
-  useAdminHomeSection,
-  type AdminHomeSectionState,
-} from './useAdminHomeSection'
+import { OwnerTableSkeleton } from './HomeSkeletons'
+import type { AdminHomeSectionState } from './useAdminHomeSection'
 
 /** The light chart shade of each state (the approved v2 mockup's). */
 export const STATE_SHADE: Record<FleetStateId, number> = {
@@ -34,15 +32,6 @@ export const STATE_SHADE: Record<FleetStateId, number> = {
   available: 6,
 }
 
-const STATE_LABEL: Record<FleetStateId, TranslationKey> = {
-  inside_site: 'homeV2OnProjects',
-  workshop_maintenance: 'maintenancePurpose',
-  workshop_parking: 'parkingPurpose',
-  workshop_out_of_service: 'workshopPurposeOutOfService',
-  workshop_unclassified: 'equipmentStateUnclassified',
-  available: 'equipmentStateAvailable',
-}
-
 /** One tone per owner (the chart outline shades, as the owner cards had). */
 const OWNER_STROKE: Record<AdminHomeOwner, string> = {
   alazani: 'var(--chart-stroke-1)',
@@ -52,15 +41,38 @@ const OWNER_STROKE: Record<AdminHomeOwner, string> = {
   external_supplier: 'var(--chart-stroke-4)',
 }
 
-type View = 'state' | 'owner'
+const WORKSHOP_STATES = [
+  'workshop_maintenance',
+  'workshop_parking',
+  'workshop_out_of_service',
+  'workshop_unclassified',
+] as const
+
+export type FleetTab = 'fleet' | 'projects' | 'workshop' | 'available'
+
+/** The four tabs in order, each with its label and the states it sums. */
+export const FLEET_TABS: readonly {
+  id: FleetTab
+  label: TranslationKey
+  states: readonly string[]
+}[] = [
+  { id: 'fleet', label: 'homeV2TabFleetTotal', states: FLEET_STATES },
+  { id: 'projects', label: 'homeV2OnProjects', states: ['inside_site'] },
+  { id: 'workshop', label: 'homeV2TabWorkshop', states: WORKSHOP_STATES },
+  { id: 'available', label: 'equipmentStateAvailable', states: ['available'] },
+]
 
 /**
- * «حالة الاسطول» (owner 2026-11-09, the v2 mockup): the fleet by state as a
- * donut with count and share, for the owners of its own filter (all five,
- * empty = every owner, the KPI strip's snapshot then). The «الملاك» tab keeps
- * what the owner boxes of 2026-10-29 showed: every owner's fleet and units
- * on projects, each a link to the equipment list of that owner or the log's
- * open project visits of that owner.
+ * «حالة الاسطول» (owner 2026-11-09, the v2 mockup). Since the owner's review
+ * of 2026-11-10 («بالنسبة للاسطول يكون فيه تابين، اول تاب اجمالي الاسطول حسب
+ * الملاك، والثاني داخل المشاريع حسب الملاك برضه، وثاني جدول الورشة، وثالث
+ * جدول المتاحة») it is four tabs, each a table of the five owners over the
+ * page's ONE snapshot (no request of its own, no owner filter, no donut):
+ * the fleet, on projects, the workshop (its four purposes summed) and
+ * available — every owner's count with its share of the tab's total, the
+ * total in the tab and in the last row. A count links to that owner's rows:
+ * the equipment list (fleet, available) or the log's open visits (projects,
+ * workshop), when the shell opens the page. An owner without units shows 0.
  */
 export function FleetStateCard({
   matrix,
@@ -72,130 +84,81 @@ export function FleetStateCard({
   canOpenEquipment: boolean
   canOpenLogs: boolean
 }) {
-  const { t, lang, dir } = useI18n()
-  const [owners, setOwners] = useState<AdminHomeOwner[]>([])
-  const [view, setView] = useState<View>('state')
-  // Only a narrowed selection costs a request of its own.
-  const load = useCallback(
-    (signal: AbortSignal) =>
-      owners.length
-        ? fetchAllOwnersStateMatrix(signal, owners)
-        : Promise.resolve(null),
-    [owners],
-  )
-  const own = useAdminHomeSection(load)
-  const source = owners.length ? own : matrix
-  const data = owners.length ? own.data : matrix.data
+  const { t } = useI18n()
+  const [tab, setTab] = useState<FleetTab>('fleet')
+  const data = matrix.data
+  const totals = data
+    ? (Object.fromEntries(
+        FLEET_TABS.map((item) => [item.id, ownerTotals(data, item.states)]),
+      ) as Record<FleetTab, ReturnType<typeof ownerTotals>>)
+    : null
+  const current = totals ? totals[tab] : null
+  const label =
+    FLEET_TABS.find((item) => item.id === tab)?.label ?? 'homeV2FleetStatus'
 
-  const slices: FleetDonutSlice[] = useMemo(
-    () =>
-      data
-        ? FLEET_STATES.map((state) => ({
-            id: state,
-            label: t(STATE_LABEL[state]),
-            value: ownerTotals(data, [state]).total,
-            color: `var(--chart-${STATE_SHADE[state]})`,
-            strokeColor: `var(--chart-stroke-${STATE_SHADE[state]})`,
-          }))
-        : [],
-    [data, t],
-  )
-
-  // The owners tab always reads every owner (the page's snapshot).
-  const fleet = matrix.data ? ownerTotals(matrix.data, FLEET_STATES) : null
-  const sites = matrix.data ? ownerTotals(matrix.data, ['inside_site']) : null
+  const hrefOf = (owner: AdminHomeOwner): string | null => {
+    if (tab === 'fleet')
+      return canOpenEquipment ? ownerEquipmentHref(owner) : null
+    if (tab === 'projects')
+      return canOpenLogs ? insideProjectsLogHref(owner) : null
+    if (tab === 'workshop')
+      return canOpenLogs ? openWorkshopVisitsHref([owner]) : null
+    return canOpenEquipment ? availableEquipmentHref([owner]) : null
+  }
 
   return (
     <HomeBlock
       title="homeV2FleetStatus"
-      action={
-        view === 'state' ? (
-          <OwnerFilter
-            size="sm"
-            className="w-36"
-            value={owners}
-            onChange={setOwners}
-          />
-        ) : undefined
-      }
-      state={
-        source.failed
-          ? 'failed'
-          : !data && (view === 'state' || !matrix.data)
-            ? 'loading'
-            : 'ready'
-      }
-      onRetry={source.retry}
-      skeleton={<DonutSkeleton tabs legendRows={6} />}
+      state={matrix.failed ? 'failed' : !data ? 'loading' : 'ready'}
+      onRetry={matrix.retry}
+      skeleton={<OwnerTableSkeleton />}
     >
-      <Tabs value={view} onValueChange={(value) => setView(value as View)}>
+      <Tabs value={tab} onValueChange={(value) => setTab(value as FleetTab)}>
         <TabsList
           variant="segmented"
           aria-label={t('homeV2FleetStatus')}
-          className="mb-2"
+          className="mb-1.5"
         >
-          <TabsTrigger value="state" className="!h-7 !px-2.5 text-xs">
-            {t('homeV2ByState')}
-          </TabsTrigger>
-          <TabsTrigger value="owner" className="!h-7 !px-2.5 text-xs">
-            {t('homeV2ByOwner')}
-          </TabsTrigger>
+          {FLEET_TABS.map((item) => (
+            <TabsTrigger
+              key={item.id}
+              value={item.id}
+              className="!h-7 !px-2.5 text-xs"
+            >
+              {t(item.label)}
+              {totals && (
+                <span className="ms-1 tabular-nums text-muted">
+                  {totals[item.id].total}
+                </span>
+              )}
+            </TabsTrigger>
+          ))}
         </TabsList>
       </Tabs>
-      {view === 'state' ? (
-        <div
-          aria-busy={(own.loading && Boolean(own.data)) || undefined}
-          className={own.loading && own.data ? 'opacity-60' : undefined}
-        >
-          <SoftDonut
-            ariaLabel={t('homeV2FleetStatus')}
-            dir={dir}
-            lang={lang}
-            centerLabel={t('adminHomeDonutTotal')}
-            height={190}
-            legend="side"
-            slices={slices}
-          />
-        </div>
-      ) : fleet && sites ? (
+      {current && (
         <table className="w-full text-sm">
-          <caption className="sr-only">{t('homeV2ByOwner')}</caption>
+          <caption className="sr-only">{t(label)}</caption>
           <thead>
             <tr className="text-xs text-muted">
               <th scope="col" className="pb-1 text-start font-normal">
                 {t('adminHomeColOwner')}
               </th>
               <th scope="col" className="pb-1 text-end font-normal">
-                {t('homeV2Fleet')}
+                {t('homeV2ColCount')}
               </th>
               <th scope="col" className="pb-1 text-end font-normal">
-                {t('homeV2OnProjects')}
+                {t('homeV2ColShare')}
               </th>
             </tr>
           </thead>
           <tbody className="divide-y">
-            {fleet.owners.map((row) => {
-              const inside =
-                sites.owners.find((site) => site.owner === row.owner)?.count ??
-                0
-              const cell = (value: number, href: string | null) =>
-                href ? (
-                  <AppLink
-                    href={href}
-                    className="rounded font-semibold tabular-nums underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-                  >
-                    <CountUp value={value} />
-                  </AppLink>
-                ) : (
-                  <span className="font-semibold tabular-nums">
-                    <CountUp value={value} />
-                  </span>
-                )
+            {current.owners.map((row) => {
+              const href = hrefOf(row.owner)
               return (
                 <tr key={row.owner}>
                   <th
                     scope="row"
-                    className="py-2 text-start text-[13px] font-normal"
+                    className="py-1.5 text-start text-[13px] font-normal"
                   >
                     <span className="flex items-start gap-1.5">
                       <span
@@ -206,30 +169,45 @@ export function FleetStateCard({
                       {t(ownershipBadge(row.owner).key)}
                     </span>
                   </th>
-                  <td className="py-2 text-end">
-                    {cell(
-                      row.count,
-                      canOpenEquipment ? ownerEquipmentHref(row.owner) : null,
+                  <td className="py-1.5 text-end">
+                    {href ? (
+                      <AppLink
+                        href={href}
+                        className="rounded font-semibold tabular-nums underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+                      >
+                        <CountUp value={row.count} />
+                      </AppLink>
+                    ) : (
+                      <span className="font-semibold tabular-nums">
+                        <CountUp value={row.count} />
+                      </span>
                     )}
-                    <span className="ms-1.5 text-xs tabular-nums text-muted">
-                      {sharePercent(row.count, fleet.total)}%
-                    </span>
                   </td>
-                  <td className="py-2 text-end">
-                    {cell(
-                      inside,
-                      canOpenLogs ? insideProjectsLogHref(row.owner) : null,
-                    )}
-                    <span className="ms-1.5 text-xs tabular-nums text-muted">
-                      {sharePercent(inside, sites.total)}%
-                    </span>
+                  <td className="py-1.5 text-end text-xs tabular-nums text-muted">
+                    {sharePercent(row.count, current.total)}%
                   </td>
                 </tr>
               )
             })}
           </tbody>
+          <tfoot>
+            <tr className="border-t">
+              <th
+                scope="row"
+                className="pt-1.5 text-start text-[13px] font-semibold"
+              >
+                {t('homeV2Total')}
+              </th>
+              <td className="pt-1.5 text-end font-semibold tabular-nums">
+                <CountUp value={current.total} />
+              </td>
+              <td className="pt-1.5 text-end text-xs tabular-nums text-muted">
+                {current.total > 0 ? '100%' : '0%'}
+              </td>
+            </tr>
+          </tfoot>
         </table>
-      ) : null}
+      )}
     </HomeBlock>
   )
 }

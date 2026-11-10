@@ -1,37 +1,25 @@
-import { useCallback, useMemo, type ReactNode } from 'react'
-import {
-  ArrowUpLeft,
-  BadgeCheck,
-  CalendarX2,
-  CircleDollarSign,
-  FileWarning,
-  PowerOff,
-  Radio,
-  Wrench,
-} from 'lucide-react'
+import { useCallback, type ReactNode } from 'react'
+import { ArrowUpLeft, BadgeCheck, CalendarX2, CheckCircle2 } from 'lucide-react'
 import { AppLink, Badge, Button } from '@/components/ui'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
-import { canViewEquipmentLocation } from '@/lib/actionPermissions'
 import {
   AWAITING_END_PAGE,
-  OUT_OF_SERVICE_LONG_DAYS,
   awaitingApprovalHref,
   awaitingEndHref,
-  noPoHref,
-  outOfServiceLongHref,
-  saudiDayBefore,
-  unclassifiedHref,
-  unpricedHref,
   visibleAttentionItems,
   type AttentionId,
 } from '@/lib/adminAttention'
-import { loadAfaqyStats } from '@/lib/afaqy'
+import { availableEquipmentHref } from '@/lib/adminHomeLinks'
+import type { OwnerStateMatrix } from '@/lib/adminHomeStats'
 import { supabase } from '@/lib/supabase'
 import { HomeBlock } from './HomeBlock'
 import { ListRowsSkeleton } from './HomeSkeletons'
-import { useAdminHomeSection } from './useAdminHomeSection'
+import {
+  useAdminHomeSection,
+  type AdminHomeSectionState,
+} from './useAdminHomeSection'
 
 type Tone = 'warning' | 'info' | 'danger'
 
@@ -39,29 +27,11 @@ const ITEM: Record<
   AttentionId,
   { label: TranslationKey; hint: TranslationKey; icon: ReactNode; tone: Tone }
 > = {
-  unclassified: {
-    label: 'adminAttentionUnclassified',
-    hint: 'adminAttentionUnclassifiedHint',
-    icon: <Wrench size={14} />,
-    tone: 'warning',
-  },
-  no_po: {
-    label: 'adminAttentionNoPo',
-    hint: 'adminAttentionNoPoHint',
-    icon: <FileWarning size={14} />,
-    tone: 'warning',
-  },
   awaiting_approval: {
     label: 'adminAttentionAwaitingApproval',
     hint: 'adminAttentionAwaitingApprovalHint',
     icon: <BadgeCheck size={14} />,
     tone: 'info',
-  },
-  unpriced: {
-    label: 'adminAttentionUnpriced',
-    hint: 'adminAttentionUnpricedHint',
-    icon: <CircleDollarSign size={14} />,
-    tone: 'warning',
   },
   awaiting_end: {
     label: 'adminAttentionAwaitingEnd',
@@ -69,17 +39,11 @@ const ITEM: Record<
     icon: <CalendarX2 size={14} />,
     tone: 'warning',
   },
-  no_signal: {
-    label: 'adminAttentionNoSignal',
-    hint: 'adminAttentionNoSignalHint',
-    icon: <Radio size={14} />,
-    tone: 'danger',
-  },
-  out_of_service_long: {
-    label: 'adminAttentionOutOfService',
-    hint: 'adminAttentionOutOfServiceHint',
-    icon: <PowerOff size={14} />,
-    tone: 'danger',
+  available_alazani: {
+    label: 'adminAttentionAvailableAlazani',
+    hint: 'adminAttentionAvailableAlazaniHint',
+    icon: <CheckCircle2 size={14} />,
+    tone: 'info',
   },
 }
 
@@ -93,87 +57,53 @@ async function headCount(
 }
 
 export interface AttentionSectionProps {
+  /** The page's snapshot over every owner: the available Al-Azani units. */
+  matrix: AdminHomeSectionState<OwnerStateMatrix>
   /** Whether the shell opens a page; an item links only when it does. */
   canOpenPage: (
     page: 'logs' | 'purchasing/units' | 'purchasing/orders' | 'sales/cards',
   ) => boolean
-  /** Scrolls to the home's Afaqy section (the no-signal item). */
-  onShowAfaqy: () => void
+  /** Whether the shell opens the equipment list. */
+  canOpenEquipment: boolean
 }
 
 /**
  * «يحتاج انتباهك» (owner 2026-10-29, from the approved /ui-kit home
  * mockup): what needs action now, each a count that opens its list
- * filtered. An item shows only above zero and only for its readers —
- * the workshop items for every home reader (RLS decides the rows), the
- * purchasing ones with `purchasing.view`, the cards awaiting their end
- * (0185) with `sales.view`, the Afaqy one with
- * `equipment.location.view` — and the whole card hides when nothing is
- * left. The database counts load together; Afaqy (an outside service) on
- * its own, so it never delays them. A failed count says so; it is never
- * shown as nothing to do. Since the home v2 (owner 2026-11-09, «اعتمد
- * الرئيسية الي في ui-kit») it is the mockup's list block in the second row:
- * an icon tile, the label and its hint, the count; with nothing left it
- * says so in its place instead of leaving a hole in the grid.
+ * filtered. Since the owner's review of 2026-11-10 («ويحتاج انتباهك يكون
+ * اوامر شراء موردين بحاجة لتعميد، معدات خرجت بانتهاء عمل وكرتها مفتوح،
+ * معدات متاحة (العزاني)») exactly three items: the supplier POs awaiting
+ * approval (`purchasing.view`), the cards whose unit left with «انتهاء عمل»
+ * (0185, `sales.view`) and the Al-Azani units available now — the last from
+ * the page's ONE snapshot (`matrix`), no request of its own. An item shows
+ * only above zero and only for its readers. A failed count says so with a
+ * retry; it is never shown as nothing to do. In the home v2 grid the block
+ * keeps its place: with nothing left it says so.
  */
 export function AttentionSection({
+  matrix,
   canOpenPage,
-  onShowAfaqy,
+  canOpenEquipment,
 }: AttentionSectionProps) {
   const { t } = useI18n()
   const permissions = usePermissions()
   const canPurchasing = permissions.can('purchasing.view')
   const canSales = permissions.can('sales.view')
-  const canAfaqy = canViewEquipmentLocation(permissions)
-  const cutoff = useMemo(
-    () => saudiDayBefore(new Date(), OUT_OF_SERVICE_LONG_DAYS),
-    [],
-  )
 
   const loadCounts = useCallback(
     async (signal: AbortSignal) => {
-      const workshopOpen = () =>
-        supabase
-          .from('movement_visits')
-          .select('entry_id', { count: 'exact', head: true })
-          .eq('movement_context', 'workshop')
-          .eq('is_open', true)
-          .abortSignal(signal)
-      const openPos = () =>
-        supabase
-          .from('supplier_pos')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'open')
-          .abortSignal(signal)
-      const [
-        unclassified,
-        outOfService,
-        noPo,
-        awaiting,
-        unpriced,
-        awaitingEnd,
-      ] = await Promise.all([
-        headCount(workshopOpen().is('workshop_purpose', null)),
-        headCount(
-          workshopOpen()
-            .eq('workshop_purpose', 'out_of_service')
-            .lt('entry_at', cutoff),
-        ),
+      const [awaiting, awaitingEnd] = await Promise.all([
         canPurchasing
           ? headCount(
               supabase
-                .from('purchasing_site_units')
-                .select('entry_id', { count: 'exact', head: true })
-                .eq('has_po', false)
+                .from('supplier_pos')
+                .select('id', { count: 'exact', head: true })
+                .eq('status', 'open')
+                .eq('approval_status', 'draft')
+                .eq('unpriced_count', 0)
                 .abortSignal(signal),
             )
           : 0,
-        canPurchasing
-          ? headCount(
-              openPos().eq('approval_status', 'draft').eq('unpriced_count', 0),
-            )
-          : 0,
-        canPurchasing ? headCount(openPos().gt('unpriced_count', 0)) : 0,
         // 0185: open cards whose unit left the project with «انتهاء عمل».
         canSales
           ? headCount(
@@ -185,57 +115,34 @@ export function AttentionSection({
           : 0,
       ])
       return {
-        unclassified,
-        out_of_service_long: outOfService,
-        no_po: noPo,
         awaiting_approval: awaiting,
-        unpriced,
         awaiting_end: awaitingEnd,
       } satisfies Partial<Record<AttentionId, number>>
     },
-    [canPurchasing, canSales, cutoff],
+    [canPurchasing, canSales],
   )
   const counts = useAdminHomeSection(loadCounts)
 
-  const loadAfaqy = useCallback(
-    async (signal: AbortSignal) => {
-      if (!canAfaqy) return 0
-      const answer = await loadAfaqyStats(supabase, signal)
-      if (!answer || answer.kind === 'error') throw new Error('afaqy_stats')
-      return answer.kind === 'ok' ? answer.stats.connection.offline : 0
-    },
-    [canAfaqy],
-  )
-  const afaqy = useAdminHomeSection(loadAfaqy)
-
   const values: Partial<Record<AttentionId, number>> = {
     ...(counts.data ?? {}),
-    no_signal: afaqy.data ?? 0,
+    available_alazani: matrix.data?.count('alazani', 'available') ?? 0,
   }
   const items = visibleAttentionItems(values)
-  const failed = counts.failed || afaqy.failed
-  // The home v2 grid keeps the block in its place (owner 2026-11-09, the
-  // approved mockup): nothing to do reads as such, never as a hole.
-  const firstLoad = counts.loading && counts.data === null
+  const failed = counts.failed || matrix.failed
+  const firstLoad =
+    (counts.loading && counts.data === null) ||
+    (matrix.loading && matrix.data === null)
 
   const hrefOf = (id: AttentionId): string | null => {
-    if (id === 'unclassified')
-      return canOpenPage('logs') ? unclassifiedHref() : null
-    if (id === 'out_of_service_long')
-      return canOpenPage('logs') ? outOfServiceLongHref(cutoff) : null
-    if (id === 'no_po')
-      return canOpenPage('purchasing/units') ? noPoHref() : null
     if (id === 'awaiting_approval')
       return canOpenPage('purchasing/orders') ? awaitingApprovalHref() : null
-    if (id === 'unpriced')
-      return canOpenPage('purchasing/orders') ? unpricedHref() : null
     if (id === 'awaiting_end')
       return canOpenPage(AWAITING_END_PAGE) ? awaitingEndHref() : null
-    return null
+    return canOpenEquipment ? availableEquipmentHref(['alazani']) : null
   }
 
   const rowClass =
-    'group flex w-full items-center gap-2.5 rounded-md py-2.5 text-start transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring'
+    'group flex w-full items-center gap-2.5 rounded-md py-1.5 text-start transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring'
 
   return (
     <HomeBlock
@@ -248,7 +155,7 @@ export function AttentionSection({
         ) : undefined
       }
       state={firstLoad ? 'loading' : 'ready'}
-      skeleton={<ListRowsSkeleton rows={5} icon />}
+      skeleton={<ListRowsSkeleton rows={3} icon />}
     >
       {items.length === 0 && !failed ? (
         <p className="text-sm text-muted">{t('homeV2AttentionNone')}</p>
@@ -293,16 +200,8 @@ export function AttentionSection({
                   <AppLink href={href} className={rowClass}>
                     {body}
                   </AppLink>
-                ) : id === 'no_signal' ? (
-                  <button
-                    type="button"
-                    className={rowClass}
-                    onClick={onShowAfaqy}
-                  >
-                    {body}
-                  </button>
                 ) : (
-                  <div className="flex w-full items-center gap-2.5 py-2.5">
+                  <div className="flex w-full items-center gap-2.5 py-1.5">
                     {body}
                   </div>
                 )}
@@ -322,7 +221,7 @@ export function AttentionSection({
             size="sm"
             onClick={() => {
               if (counts.failed) counts.retry()
-              if (afaqy.failed) afaqy.retry()
+              if (matrix.failed) matrix.retry()
             }}
           >
             {t('retry')}

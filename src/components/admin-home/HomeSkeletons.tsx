@@ -19,7 +19,7 @@ function widthAt(index: number): string {
 
 /** The segmented tabs some blocks carry above their body. */
 function TabsSkeleton() {
-  return <Skeleton className="mb-2 h-7 w-40" />
+  return <Skeleton className="mb-1.5 h-7 w-40" />
 }
 
 /** The eight KPI tiles: a label, the wide figure, a thin bar under it. */
@@ -27,12 +27,12 @@ export function KpiStripSkeleton() {
   return (
     <div
       aria-hidden="true"
-      className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
+      className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
     >
       {Array.from({ length: 8 }, (_, index) => (
         <div
           key={index}
-          className="flex h-[104px] min-w-0 flex-col justify-between rounded-2xl border bg-bg p-4"
+          className="flex h-[96px] min-w-0 flex-col justify-between rounded-2xl border bg-bg p-3"
         >
           <span className="flex items-center gap-2">
             <Skeleton variant="circle" className="h-7 w-7 shrink-0" />
@@ -177,13 +177,40 @@ export function ListRowsSkeleton({
       {tabs && <TabsSkeleton />}
       <ul className="divide-y">
         {Array.from({ length: rows }, (_, index) => (
-          <li key={index} className="flex items-center gap-2.5 py-2.5">
+          <li key={index} className="flex items-center gap-2.5 py-1.5">
             {icon && <Skeleton className="h-7 w-7 shrink-0" />}
             <span className="min-w-0 flex-1 space-y-1.5">
               <Skeleton className={cn('h-3', widthAt(index))} />
               <Skeleton className={cn('h-2.5', widthAt(index + 2))} />
             </span>
             <Skeleton className="h-4 w-10 shrink-0" />
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/**
+ * The fleet card (owner 2026-11-10): its four tabs over a table of the five
+ * owners — a dot and the owner, the count, the share — and the total row.
+ */
+export function OwnerTableSkeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <div aria-hidden="true">
+      <Skeleton className="mb-1.5 h-7 w-64 max-w-full" />
+      <div className="flex justify-between pb-1">
+        <Skeleton className="h-2.5 w-12" />
+        <Skeleton className="h-2.5 w-16" />
+      </div>
+      <ul className="divide-y">
+        {Array.from({ length: rows + 1 }, (_, index) => (
+          <li key={index} className="flex h-8 items-center gap-2">
+            <Skeleton variant="circle" className="h-2 w-2 shrink-0" />
+            <Skeleton className={cn('h-3', widthAt(index))} />
+            <span className="flex-1" />
+            <Skeleton className="h-3 w-8 shrink-0" />
+            <Skeleton className="h-3 w-8 shrink-0" />
           </li>
         ))}
       </ul>

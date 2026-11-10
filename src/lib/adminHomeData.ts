@@ -17,7 +17,6 @@ import { saudiDayEnd, saudiDayStart } from '@/lib/saudiTime'
 import { supabase } from '@/lib/supabase'
 import type { OpenProjectVisit } from '@/lib/adminHomeV2'
 import {
-  ALL_OWNERS,
   fleetEquipmentRpcArgs,
   fleetOwnerArgument,
   homeOwnerArgument,
@@ -27,7 +26,6 @@ import {
   parseFleetState,
   parseFleetEquipmentPage,
   parseOwnerStateMatrix,
-  parseSupplierSiteCounts,
   parseYearlySeries,
   type AdminHomeOwner,
   type AdminHomePage,
@@ -38,7 +36,6 @@ import {
   type FleetSortKey,
   type FleetState,
   type OwnerStateMatrix,
-  type SupplierSiteCounts,
   type WorkshopPurposeFilter,
   type YearlyMovementCount,
 } from '@/lib/adminHomeStats'
@@ -331,29 +328,6 @@ export async function fetchRestUnitsPage(
   }
 }
 
-/**
- * The daily entries and exits of EVERY owner (the KPI strip's «دخول اليوم»
- * and its run of bars, owner 2026-11-09): the same function as the chart,
- * with all five owners named explicitly, since an empty `p_owners` would be
- * mapped to the home's three by `homeOwnerArgument`.
- */
-export async function fetchEntriesSeriesAllOwners(
-  fromKey: string,
-  toKey: string,
-  signal: AbortSignal,
-): Promise<DailyMovementCount[]> {
-  const { data, error } = await supabase
-    .rpc('get_admin_entries_series', {
-      p_from: saudiDayStart(fromKey),
-      p_to: saudiDayEnd(toKey),
-      p_owners: [...ALL_OWNERS],
-      p_context: null,
-    })
-    .abortSignal(signal)
-  if (error) fail('entriesSeriesAll', error)
-  return parseDailySeries(data)
-}
-
 /** The read cap of the open project visits. The open visits are at most one
  *  per unit of the fleet, so the cap is never reached in practice; when it
  *  is, the card says the figures are partial. */
@@ -475,15 +449,4 @@ export async function fetchLongOutOfServiceCount(
   const { count, error } = await query
   if (error) fail('longOutOfService', error)
   return count ?? 0
-}
-
-/** The suppliers inside projects (migration 0161). */
-export async function fetchSupplierSiteCounts(
-  signal: AbortSignal,
-): Promise<SupplierSiteCounts> {
-  const { data, error } = await supabase
-    .rpc('get_admin_supplier_site_counts')
-    .abortSignal(signal)
-  if (error) fail('supplierSiteCounts', error)
-  return parseSupplierSiteCounts(data)
 }

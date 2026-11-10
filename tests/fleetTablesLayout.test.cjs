@@ -87,6 +87,6 @@ test('the home shows the three tables once, behind «عرض الكل»', () => {
   )
   // Under the row of the block that opens it, before the last row.
   const panel = home.indexOf("'fleet-tables',\n")
-  assert.ok(panel > home.indexOf('<WorkshopSuppliersCard'))
+  assert.ok(panel > home.indexOf('<WorkshopCard'))
   assert.ok(panel < home.indexOf('<AvailabilityCard'))
 })

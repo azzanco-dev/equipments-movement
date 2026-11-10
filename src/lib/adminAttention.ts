@@ -4,6 +4,12 @@
  * الجديدة»): the items, their gates and the lists they open, each with the
  * list's own URL filter format (`useDataListState`). Counts are read by
  * `AttentionSection`; this module is pure.
+ *
+ * Since the owner's review of 2026-11-10 («ويحتاج انتباهك يكون اوامر شراء
+ * موردين بحاجة لتعميد، معدات خرجت بانتهاء عمل وكرتها مفتوح، معدات متاحة
+ * (العزاني)»): exactly three items. The workshop without a purpose, the
+ * units on projects without a PO, the POs that need prices, the Afaqy
+ * signal and the long out-of-service units left the list.
  */
 
 import type { AdminHomeOwner } from '@/lib/adminHomeStats'
@@ -11,26 +17,16 @@ import { ownersFilter } from '@/lib/adminHomeLinks'
 import { CARDS_AWAITING_END_HREF } from '@/lib/cardsAwaitingEnd'
 
 export type AttentionId =
-  | 'unclassified'
-  | 'no_po'
-  | 'awaiting_approval'
-  | 'unpriced'
-  | 'awaiting_end'
-  | 'no_signal'
-  | 'out_of_service_long'
+  'awaiting_approval' | 'awaiting_end' | 'available_alazani'
 
-/** Every item in the order the strip shows them. */
+/** Every item in the order the block shows them. */
 export const ATTENTION_ORDER: readonly AttentionId[] = [
-  'unclassified',
-  'no_po',
   'awaiting_approval',
-  'unpriced',
   'awaiting_end',
-  'no_signal',
-  'out_of_service_long',
+  'available_alazani',
 ]
 
-/** «خارج الخدمة اكثر من 30 يوم». */
+/** «خارج الخدمة اكثر من 30 يوم» (the line of «الورشة حسب الغرض»). */
 export const OUT_OF_SERVICE_LONG_DAYS = 30
 
 type UrlFilter = { id: string; field: string; operator: string; value: string }
@@ -52,18 +48,6 @@ function workshopVisitsHref(filters: UrlFilter[]): string {
   ])}`
 }
 
-/** Open workshop visits with no purpose yet. */
-export function unclassifiedHref(): string {
-  return workshopVisitsHref([
-    {
-      id: 'purpose',
-      field: 'workshop_purpose',
-      operator: 'is_not_set',
-      value: '',
-    },
-  ])
-}
-
 /** Open workshop visits «خارج الخدمة» that entered before `cutoff`, of the
  *  chosen owners (empty = every owner; the home v2 workshop card passes its
  *  owner filter). */
@@ -81,13 +65,6 @@ export function outOfServiceLongHref(
     { id: 'since', field: 'entry_at', operator: 'lt', value: cutoff },
     ...ownersFilter('equipment_ownership_status', owners),
   ])
-}
-
-/** «المعدات في المشاريع» without a PO. */
-export function noPoHref(): string {
-  return `/purchasing/units?filters=${filtersParam([
-    { id: 'po', field: 'has_po', operator: 'eq', value: 'false' },
-  ])}`
 }
 
 const OPEN_PO: UrlFilter = {
@@ -111,14 +88,6 @@ export function awaitingApprovalHref(): string {
   ])}`
 }
 
-/** Open POs with at least one unpriced line. */
-export function unpricedHref(): string {
-  return `/purchasing/orders?filters=${filtersParam([
-    OPEN_PO,
-    { id: 'unpriced', field: 'unpriced_count', operator: 'gt', value: '0' },
-  ])}`
-}
-
 /**
  * «معدات خرجت بانتهاء عمل وكرتها مفتوح» (migration 0185): the rows of
  * `sales_cards_awaiting_end`, read only by a `sales.view` holder (the view's
@@ -131,7 +100,7 @@ export function awaitingEndHref(): string {
   return CARDS_AWAITING_END_HREF
 }
 
-/** The items with a count above zero, in strip order. */
+/** The items with a count above zero, in the block's order. */
 export function visibleAttentionItems(
   counts: Partial<Record<AttentionId, number>>,
 ): AttentionId[] {

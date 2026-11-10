@@ -103,22 +103,22 @@ test('the owners read every owner and link to the filtered lists', () => {
     data,
     /fetchAllOwnersStateMatrix[\s\S]*?rpc\('get_admin_owner_state_matrix', \{\s*p_owners: owners\.length \? \[\.\.\.owners\] : null,?\s*\}\)/,
   )
-  // Home v2 (owner 2026-11-09): the owner boxes of 2026-10-29 live on as the
-  // «الملاك» tab of «حالة الاسطول», every owner's fleet and units on
-  // projects with the same links.
+  // Home v2 (owner 2026-11-09): the owner boxes of 2026-10-29 live on in
+  // «حالة الاسطول»; since 2026-11-10 its four tabs are each a table of every
+  // owner (the fleet, on projects, the workshop, available) with the links.
   const card = read('src', 'components', 'admin-home', 'FleetStateCard.tsx')
-  assert.match(card, /ownerTotals\(matrix\.data, FLEET_STATES\)/)
-  assert.match(card, /ownerTotals\(matrix\.data, \['inside_site'\]\)/)
   assert.match(
     card,
-    /canOpenEquipment \? ownerEquipmentHref\(row\.owner\) : null/,
+    /\{ id: 'fleet', label: 'homeV2TabFleetTotal', states: FLEET_STATES \}/,
   )
   assert.match(
     card,
-    /canOpenLogs \? insideProjectsLogHref\(row\.owner\) : null/,
+    /\{ id: 'projects', label: 'homeV2OnProjects', states: \['inside_site'\] \}/,
   )
+  assert.match(card, /canOpenEquipment \? ownerEquipmentHref\(owner\) : null/)
+  assert.match(card, /canOpenLogs \? insideProjectsLogHref\(owner\) : null/)
   assert.match(card, /t\(ownershipBadge\(row\.owner\)\.key\)/)
-  assert.match(card, /<CountUp value=\{value\} \/>/)
+  assert.match(card, /<CountUp value=\{row\.count\} \/>/)
   const links = loadLib('adminHomeLinks')
   const filtersOf = (href, key) =>
     JSON.parse(new URL(href, 'http://x').searchParams.get(key))
@@ -167,7 +167,7 @@ test('the owners read every owner and link to the filtered lists', () => {
     screen,
     /className="text-\[22px\] font-bold leading-tight sm:text-\[24px\]"/,
   )
-  assert.match(screen, /className="-mt-1 space-y-4 sm:-mt-2 lg:-mt-4"/)
+  assert.match(screen, /className="-mt-1 space-y-3 sm:-mt-2 lg:-mt-4"/)
   // ONE snapshot over every owner feeds the KPI strip and the fleet card.
   assert.match(screen, /fetchAllOwnersStateMatrix\(signal\)/)
   assert.match(screen, /<KpiStrip\s+matrix=\{matrix\}/)
@@ -200,37 +200,18 @@ test('0161 counts the supplier units inside projects, read-only', () => {
   assert.doesNotMatch(code, /\b(UPDATE|DELETE FROM|INSERT INTO|ALTER TABLE)\b/)
 })
 
-test('the suppliers parse, load on their own and link to the log', () => {
+// Owner 2026-11-10 («جدول الورشة تحت شيل الموردين»): the suppliers tab and
+// its loader are gone; the database function (0161) stays.
+test('the suppliers tab is gone, the workshop rows open their entry', () => {
   const stats = loadLib('adminHomeStats')
-  const parsed = stats.parseSupplierSiteCounts({
-    total: 5,
-    suppliers: [
-      { lessor_id: 'a', name: 'مورد', count: 4 },
-      { lessor_id: null, name: null, count: 1 },
-    ],
-  })
-  assert.equal(parsed.total, 5)
-  assert.equal(parsed.suppliers[1].id, null)
-  assert.equal(parsed.suppliers[1].name, null)
-  assert.equal(parsed.suppliers[0].count, 4)
-  assert.match(
+  assert.equal(stats.parseSupplierSiteCounts, undefined)
+  assert.doesNotMatch(
     read('src', 'lib', 'adminHomeData.ts'),
-    /rpc\('get_admin_supplier_site_counts'\)/,
+    /get_admin_supplier_site_counts/,
   )
-  // Home v2 (owner 2026-11-09): the suppliers are the second tab of the
-  // workshop block, each a link to the log's open visits of that supplier.
-  const card = read(
-    'src',
-    'components',
-    'admin-home',
-    'WorkshopSuppliersCard.tsx',
-  )
-  assert.match(card, /fetchSupplierSiteCounts\(signal\)/)
-  assert.match(card, /insideProjectsLogHref\('external_supplier', row\.id\)/)
-  assert.match(card, /canOpenLogs \?/)
-  assert.match(card, /<CountUp value=\{row\.count\} \/>/)
-  assert.match(card, /t\('adminHomeSupplierSitesNone'\)/)
-  // The workshop tab opens its open workshop entry (owner 2026-10-29).
+  const card = read('src', 'components', 'admin-home', 'WorkshopCard.tsx')
+  assert.doesNotMatch(card, /fetchSupplierSiteCounts|adminHomeSupplierSites/)
+  // The workshop rows open their open workshop entry (owner 2026-10-29).
   assert.match(card, /onSelectMovement\(row\.lastMovementId\)/)
 })
 

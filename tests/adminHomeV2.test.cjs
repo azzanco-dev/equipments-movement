@@ -43,7 +43,7 @@ const BLOCKS = [
   'WorkshopPurposeCard',
   'LatestMovementsCard',
   'AttentionSection',
-  'WorkshopSuppliersCard',
+  'WorkshopCard',
   'AvailabilityCard',
   'AfaqyCard',
   'EntriesCard',
@@ -55,7 +55,8 @@ const NEW_FILES = [
   'TopProjectsCard',
   'WorkshopPurposeCard',
   'LatestMovementsCard',
-  'WorkshopSuppliersCard',
+  'WorkshopCard',
+  'AttentionSection',
   'AvailabilityCard',
   'AfaqyCard',
   'EntriesCard',
@@ -72,12 +73,13 @@ test('the page composes the mockup blocks in order, three rows of three', () => 
     String(at),
   )
   // Phone: one column; two from md; the mockup's three from xl.
-  assert.match(screen, /const ROW = 'grid gap-4 md:grid-cols-2 xl:grid-cols-3'/)
+  // Owner 2026-11-10 («قلل المسافات شوي»): gap-3.
+  assert.match(screen, /const ROW = 'grid gap-3 md:grid-cols-2 xl:grid-cols-3'/)
   assert.equal(screen.match(/<div className=\{ROW\}>/g).length, 3)
   // The KPI strip two per row on a phone.
   assert.match(
     component('KpiStrip'),
-    /className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"/,
+    /className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"/,
   )
   // The greeting stays (22 / 24 px, no date).
   assert.match(screen, /text-\[22px\] font-bold leading-tight sm:text-\[24px\]/)
@@ -103,17 +105,20 @@ test('what a block cannot hold opens in place from its «عرض الكل»', () 
 test('every link comes from the pure helpers, gated on the shell', () => {
   const kpi = component('KpiStrip')
   for (const call of [
-    'links.equipment ? activeFleetHref() : null',
-    'links.logs ? openProjectVisitsHref() : null',
-    "links.logs ? workshopStateLogHref('maintenance') : null",
-    "links.logs ? workshopStateLogHref('parking') : null",
-    "links.logs ? workshopStateLogHref('out_of_service') : null",
-    'links.equipment ? availableEquipmentHref() : null',
+    'links.equipment ? ownerEquipmentHref(STRIP_OWNER) : null',
+    'links.logs ? insideProjectsLogHref(STRIP_OWNER) : null',
+    "links.logs ? workshopStateLogHref('maintenance', STRIP_OWNERS) : null",
+    "links.logs ? workshopStateLogHref('parking', STRIP_OWNERS) : null",
+    'links.equipment ? availableEquipmentHref(STRIP_OWNERS) : null',
     'links.logs ? movementLogHref() : null',
-    'links.purchasingUnits ? noPoHref() : null',
+    'links.logs ? workshopStateLogHref(null, STRIP_OWNERS) : null',
   ])
     assert.ok(kpi.includes(call), call)
-  assert.match(screen, /purchasingUnits: canOpenPage\('purchasing\/units'\)/)
+  assert.match(
+    kpi,
+    /links\.logs\s*\?\s*workshopStateLogHref\('out_of_service', STRIP_OWNERS\)\s*:\s*null/,
+  )
+  assert.doesNotMatch(screen, /purchasingUnits/)
   assert.match(
     component('TopProjectsCard'),
     /canOpenLogs \? openProjectVisitsHref\(\) : null/,
@@ -177,24 +182,44 @@ test('every link comes from the pure helpers, gated on the shell', () => {
     operator: 'eq',
     value: 'alazani',
   })
-  // Without owners the attention item's link is unchanged.
+  // Without owners the link carries no owner filter.
   assert.equal(
     param(attention.outOfServiceLongHref('2026-10-10'), 'vfilters').length,
     3,
   )
 })
 
-test('the KPI gates: purchasing, sales and Afaqy figures only for their readers', () => {
+// Owner 2026-11-10: «خلي الارقام الي فوق تخص العزاني فقط … وشيل بدون PO من
+// فوق».
+test('the KPI strip counts Al-Azani only, from the snapshot, without «بدون PO»', () => {
   const kpi = component('KpiStrip')
-  assert.match(kpi, /usePermissions\(\)\.can\('purchasing\.view'\)/)
-  assert.match(kpi, /if \(!canPurchasing\) return null/)
-  // A reader without purchasing sees «غير مصنفة» in that place.
-  assert.match(kpi, /canPurchasing\s*\?\s*\{\s*id: 'no_po'/)
-  assert.match(kpi, /'equipmentStateUnclassified'/)
+  assert.match(kpi, /const STRIP_OWNER: AdminHomeOwner = 'alazani'/)
+  assert.match(kpi, /data\.count\(STRIP_OWNER, state\)/)
+  assert.doesNotMatch(kpi, /ownerTotals/)
+  // The entries of Al-Azani, through the chart's function.
+  assert.match(
+    kpi,
+    /fetchEntriesSeries\(\s*from,\s*today,\s*STRIP_OWNERS,\s*null,\s*signal,?\s*\)/,
+  )
+  assert.doesNotMatch(kpi, /fetchEntriesSeriesAllOwners/)
+  // No «بدون PO» tile and no purchasing read; «غير مصنفة» for everyone.
+  assert.doesNotMatch(kpi, /purchasing_site_units|noPo|no_po|canPurchasing/)
+  assert.doesNotMatch(kpi, /\.from\(|supabase/)
+  assert.match(kpi, /'unclassified',\s*'equipmentStateUnclassified'/)
+  assert.match(kpi, /chip: t\('homeV2AlazaniOnly'\)/)
+  assert.match(kpi, /'h-full rounded-2xl p-3'/)
+  const data = read('src', 'lib', 'adminHomeData.ts')
+  assert.doesNotMatch(
+    data,
+    /fetchEntriesSeriesAllOwners|fetchSupplierSiteCounts/,
+  )
+})
+
+test('the attention gates: purchasing and sales items only for their readers', () => {
   const attention = component('AttentionSection')
   assert.match(attention, /permissions\.can\('purchasing\.view'\)/)
   assert.match(attention, /permissions\.can\('sales\.view'\)/)
-  assert.match(attention, /canViewEquipmentLocation\(permissions\)/)
+  assert.doesNotMatch(attention, /loadAfaqyStats|canViewEquipmentLocation/)
   assert.match(
     component('AfaqyCard'),
     /if \(!canViewEquipmentLocation\(permissionState\)\) return null/,
@@ -210,10 +235,6 @@ test('the KPI gates: purchasing, sales and Afaqy figures only for their readers'
 
 test('the data: one snapshot, bounded reads, every owner for the KPIs', () => {
   const data = read('src', 'lib', 'adminHomeData.ts')
-  assert.match(
-    data,
-    /fetchEntriesSeriesAllOwners[\s\S]*?p_owners: \[\.\.\.ALL_OWNERS\]/,
-  )
   const visits = data.slice(
     data.indexOf('export async function fetchOpenProjectVisits'),
   )
@@ -237,7 +258,6 @@ test('the data: one snapshot, bounded reads, every owner for the KPIs', () => {
     'FleetStateCard',
     'TopProjectsCard',
     'WorkshopPurposeCard',
-    'WorkshopSuppliersCard',
     'AfaqyCard',
     'EntriesCard',
   ])
@@ -324,4 +344,85 @@ test('tokens only, no hamza alif in the new copy, no uppercase', () => {
     [...block.matchAll(/^ {4}(\w+): /gm)].map((match) => match[1])
   assert.deepEqual(keys(ar), keys(en))
   assert.ok(keys(ar).length > 30)
+})
+
+// Owner 2026-11-10: «بالنسبة للاسطول يكون فيه تابين، اول تاب اجمالي الاسطول
+// حسب الملاك، والثاني داخل المشاريع حسب الملاك برضه، وثاني جدول الورشة،
+// وثالث جدول المتاحة».
+test('the fleet card: four owner tabs over the snapshot, no donut or filter', () => {
+  const card = component('FleetStateCard')
+  const tabs = [...card.matchAll(/\{ id: '(\w+)', label: '\w+'/g)].map(
+    (match) => match[1],
+  )
+  assert.deepEqual(tabs, ['fleet', 'projects', 'workshop', 'available'])
+  assert.doesNotMatch(card, /SoftDonut|OwnerFilter|fetchAllOwnersStateMatrix/)
+  assert.match(card, /ownerTotals\(data, item\.states\)/)
+  assert.match(card, /canOpenEquipment \? ownerEquipmentHref\(owner\) : null/)
+  assert.match(card, /canOpenLogs \? insideProjectsLogHref\(owner\) : null/)
+  assert.match(
+    card,
+    /canOpenLogs \? openWorkshopVisitsHref\(\[owner\]\) : null/,
+  )
+  assert.match(
+    card,
+    /canOpenEquipment \? availableEquipmentHref\(\[owner\]\) : null/,
+  )
+  assert.match(card, /skeleton=\{<OwnerTableSkeleton \/>\}/)
+})
+
+// Owner 2026-11-10: «جدول الورشة تحت شيل الموردين، وخلي التابات حسب التصنيف».
+test('the workshop card: tabs by purpose, no suppliers', () => {
+  assert.ok(
+    !fs.existsSync(
+      path.join(
+        ROOT,
+        'src',
+        'components',
+        'admin-home',
+        'WorkshopSuppliersCard.tsx',
+      ),
+    ),
+  )
+  const card = component('WorkshopCard')
+  const tabs = [
+    ...card.matchAll(/id: '(\w+)',\s*label: '\w+',\s*state: '(\w+)'/g),
+  ]
+  assert.deepEqual(
+    tabs.map((match) => match[1]),
+    ['maintenance', 'parking', 'out_of_service', 'unclassified'],
+  )
+  assert.deepEqual(
+    tabs.map((match) => match[2]),
+    [
+      'workshop_maintenance',
+      'workshop_parking',
+      'workshop_out_of_service',
+      'workshop_unclassified',
+    ],
+  )
+  assert.match(card, /useState<WorkshopTab>\('maintenance'\)/)
+  assert.match(card, /purpose: current,/)
+  assert.match(card, /if \(loaded\) return/)
+  assert.match(card, /FLEET_FILTER_OWNERS\.reduce/)
+  assert.match(card, /title="homeV2WorkshopNow"/)
+  assert.match(card, /<ViewAllAction onClick=\{onShowFleetTables\} \/>/)
+  assert.doesNotMatch(card, /fetchSupplierSiteCounts|homeV2TabSuppliers/)
+  // The tabs send values the fleet tables' purpose filter accepts.
+  const stats = loadLib('adminHomeStats')
+  for (const purpose of [
+    'maintenance',
+    'parking',
+    'out_of_service',
+    'unclassified',
+  ])
+    assert.ok(stats.WORKSHOP_PURPOSE_FILTERS.includes(purpose), purpose)
+})
+
+test('tighter spacing (owner 2026-11-10, «قلل المسافات شوي»)', () => {
+  assert.match(screen, /className="-mt-1 space-y-3 sm:-mt-2 lg:-mt-4"/)
+  const block = component('HomeBlock')
+  assert.match(block, /rounded-2xl p-3"/)
+  assert.match(block, /"mb-1\.5 flex items-start justify-between gap-2"/)
+  for (const name of ['WorkshopCard', 'LatestMovementsCard'])
+    assert.match(component(name), /cellClassName="py-1\.5"/, name)
 })

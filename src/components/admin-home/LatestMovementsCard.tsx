@@ -126,7 +126,7 @@ export function LatestMovementsCard({
         caption={t('homeV2LatestMovements')}
         stickyHeader={false}
         cellTextClassName="text-sm"
-        cellClassName="py-2"
+        cellClassName="py-1.5"
         empty={t('homeV2NoMovements')}
         onRowClick={
           onSelectMovement ? (row) => onSelectMovement(row.id) : undefined

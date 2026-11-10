@@ -3,7 +3,6 @@ import {
   Ban,
   CheckCircle2,
   ClipboardList,
-  FileWarning,
   HardHat,
   LogIn,
   ParkingCircle,
@@ -20,27 +19,24 @@ import {
   type StatCardAccent,
 } from '@/components/ui'
 import { deepTint } from '@/components/charts'
-import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
-import { fetchEntriesSeriesAllOwners } from '@/lib/adminHomeData'
-import { noPoHref } from '@/lib/adminAttention'
+import { fetchEntriesSeries } from '@/lib/adminHomeData'
 import {
-  activeFleetHref,
   availableEquipmentHref,
+  insideProjectsLogHref,
   movementLogHref,
-  openProjectVisitsHref,
+  ownerEquipmentHref,
   workshopStateLogHref,
 } from '@/lib/adminHomeLinks'
 import {
   FLEET_STATES,
-  ownerTotals,
+  type AdminHomeOwner,
   type OwnerStateMatrix,
 } from '@/lib/adminHomeStats'
 import { KPI_SPARK_DAYS, dailyRun, sharePercent } from '@/lib/adminHomeV2'
 import { addDaysToDateKey } from '@/lib/calendar'
 import { saudiDateKey } from '@/lib/saudiTime'
-import { supabase } from '@/lib/supabase'
 import { CountUp } from './CountUp'
 import { MiniBars, ShareBar } from './HomeBlock'
 import { KpiStripSkeleton } from './HomeSkeletons'
@@ -51,8 +47,12 @@ import { useAdminHomeSection } from './useAdminHomeSection'
 export interface KpiLinks {
   equipment: boolean
   logs: boolean
-  purchasingUnits: boolean
 }
+
+/** The one owner the strip counts (owner 2026-11-10, «خلي الارقام الي فوق
+ *  تخص العزاني فقط»). */
+const STRIP_OWNER: AdminHomeOwner = 'alazani'
+const STRIP_OWNERS: AdminHomeOwner[] = [STRIP_OWNER]
 
 interface Kpi {
   id: string
@@ -109,15 +109,18 @@ function PlacesBar({
 /**
  * The eight KPI tiles of the admin home v2 (owner 2026-11-09, «اعتمد
  * الرئيسية الي في ui-kit», variant «ب»): the fleet, on projects, the three
- * workshop purposes, available — from ONE `get_admin_owner_state_matrix`
- * snapshot over every owner (the screen's `matrix`) —, the entries of the
- * Saudi today with the exits as its chip and the real run of the last 14
- * days (`get_admin_entries_series` over all five owners), and the units on
- * projects without a PO (`purchasing_site_units`, `purchasing.view` only; a
- * reader without it sees «غير مصنفة» in that place). Every figure counts up;
- * every tile is a link to the list it stands for when the shell opens it.
- * The tiles without a daily series carry the share bar of their figure,
- * never an invented trend.
+ * workshop purposes, available, the entries of the Saudi today with the
+ * exits as its chip and the real run of the last 14 days, and the workshop
+ * units without a purpose. Since the owner's review of 2026-11-10 («خلي
+ * الارقام الي فوق تخص العزاني فقط … وشيل بدون PO من فوق») every tile counts
+ * the Al-Azani fleet only: the state tiles from the page's ONE
+ * `get_admin_owner_state_matrix` snapshot (`count('alazani', state)`, no
+ * request of their own), the entries from `get_admin_entries_series` for
+ * Al-Azani, and the «بدون PO» tile is gone («غير مصنفة» in its place for
+ * everyone). The fleet tile's chip says «العزاني». Every figure counts up;
+ * every tile is a link to the Al-Azani rows of the list it stands for when
+ * the shell opens it. The tiles without a daily series carry the share bar
+ * of their figure, never an invented trend.
  */
 export function KpiStrip({
   matrix,
@@ -127,12 +130,17 @@ export function KpiStrip({
   links: KpiLinks
 }) {
   const { t } = useI18n()
-  const canPurchasing = usePermissions().can('purchasing.view')
 
   const loadFlow = useCallback(async (signal: AbortSignal) => {
     const today = saudiDateKey()
     const from = addDaysToDateKey(today, -(KPI_SPARK_DAYS - 1)) ?? today
-    const rows = await fetchEntriesSeriesAllOwners(from, today, signal)
+    const rows = await fetchEntriesSeries(
+      from,
+      today,
+      STRIP_OWNERS,
+      null,
+      signal,
+    )
     return {
       entries: dailyRun(rows, 'entries', today),
       exits: dailyRun(rows, 'exits', today),
@@ -140,26 +148,11 @@ export function KpiStrip({
   }, [])
   const flow = useAdminHomeSection(loadFlow)
 
-  const loadNoPo = useCallback(
-    async (signal: AbortSignal) => {
-      if (!canPurchasing) return null
-      const { count, error } = await supabase
-        .from('purchasing_site_units')
-        .select('entry_id', { count: 'exact', head: true })
-        .eq('has_po', false)
-        .abortSignal(signal)
-      if (error) throw new Error('noPo')
-      return count ?? 0
-    },
-    [canPurchasing],
-  )
-  const noPo = useAdminHomeSection(loadNoPo)
-
   const data = matrix.data
   const kpis: Kpi[] = useMemo(() => {
     if (!data) return []
-    const of = (state: string) => ownerTotals(data, [state]).total
-    const fleet = ownerTotals(data, FLEET_STATES).total
+    const of = (state: string) => data.count(STRIP_OWNER, state)
+    const fleet = FLEET_STATES.reduce((sum, state) => sum + of(state), 0)
     const inside = of('inside_site')
     const maintenance = of('workshop_maintenance')
     const parking = of('workshop_parking')
@@ -197,7 +190,7 @@ export function KpiStrip({
         value: fleet,
         accent: 'chart-1',
         icon: <Truck size={ICON} />,
-        chip: t('homeV2FleetHint'),
+        chip: t('homeV2AlazaniOnly'),
         visual: (
           <PlacesBar
             total={fleet}
@@ -208,7 +201,7 @@ export function KpiStrip({
             ]}
           />
         ),
-        href: links.equipment ? activeFleetHref() : null,
+        href: links.equipment ? ownerEquipmentHref(STRIP_OWNER) : null,
       },
       stateTile(
         'projects',
@@ -217,7 +210,7 @@ export function KpiStrip({
         'chart-1',
         1,
         <HardHat size={ICON} />,
-        links.logs ? openProjectVisitsHref() : null,
+        links.logs ? insideProjectsLogHref(STRIP_OWNER) : null,
       ),
       stateTile(
         'maintenance',
@@ -226,7 +219,7 @@ export function KpiStrip({
         'warning',
         2,
         <Wrench size={ICON} />,
-        links.logs ? workshopStateLogHref('maintenance') : null,
+        links.logs ? workshopStateLogHref('maintenance', STRIP_OWNERS) : null,
       ),
       stateTile(
         'parking',
@@ -235,7 +228,7 @@ export function KpiStrip({
         'info',
         3,
         <ParkingCircle size={ICON} />,
-        links.logs ? workshopStateLogHref('parking') : null,
+        links.logs ? workshopStateLogHref('parking', STRIP_OWNERS) : null,
       ),
       stateTile(
         'out_of_service',
@@ -244,7 +237,9 @@ export function KpiStrip({
         'danger',
         5,
         <Ban size={ICON} />,
-        links.logs ? workshopStateLogHref('out_of_service') : null,
+        links.logs
+          ? workshopStateLogHref('out_of_service', STRIP_OWNERS)
+          : null,
       ),
       stateTile(
         'available',
@@ -253,7 +248,7 @@ export function KpiStrip({
         'chart-6',
         6,
         <CheckCircle2 size={ICON} />,
-        links.equipment ? availableEquipmentHref() : null,
+        links.equipment ? availableEquipmentHref(STRIP_OWNERS) : null,
       ),
       {
         id: 'today',
@@ -270,36 +265,17 @@ export function KpiStrip({
         ) : null,
         href: links.logs ? movementLogHref() : null,
       },
-      canPurchasing
-        ? {
-            id: 'no_po',
-            label: 'homeV2WithoutPo',
-            value: noPo.data ?? 0,
-            accent: 'warning',
-            icon: <FileWarning size={ICON} />,
-            chip: t('homeV2OfCount').replace('{count}', String(inside)),
-            chipTone: 'warning',
-            visual: (
-              <ShareBar
-                value={noPo.data ?? 0}
-                total={inside}
-                shade={2}
-                className="w-16"
-              />
-            ),
-            href: links.purchasingUnits ? noPoHref() : null,
-          }
-        : stateTile(
-            'unclassified',
-            'equipmentStateUnclassified',
-            unclassified,
-            'chart-5',
-            5,
-            <ClipboardList size={ICON} />,
-            links.logs ? workshopStateLogHref(null) : null,
-          ),
+      stateTile(
+        'unclassified',
+        'equipmentStateUnclassified',
+        unclassified,
+        'chart-5',
+        5,
+        <ClipboardList size={ICON} />,
+        links.logs ? workshopStateLogHref(null, STRIP_OWNERS) : null,
+      ),
     ]
-  }, [canPurchasing, data, flow.data, links, noPo.data, t])
+  }, [data, flow.data, links, t])
 
   if (matrix.failed)
     return (
@@ -317,29 +293,26 @@ export function KpiStrip({
       </div>
     )
 
-  // The two secondary reads fail on their own: their tile says so and
-  // offers a retry, the six snapshot tiles stay.
-  const tileFailed = (id: string) =>
-    (id === 'today' && flow.failed) || (id === 'no_po' && noPo.failed)
+  // The entries read fails on its own: its tile says so and offers a
+  // retry, the snapshot tiles stay.
+  const tileFailed = (id: string) => id === 'today' && flow.failed
 
   return (
     <ul
       aria-label={t('adminHomeTitle')}
       aria-busy={matrix.loading || undefined}
-      className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"
+      className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
     >
       {kpis.map((kpi) => {
         const failed = tileFailed(kpi.id)
-        const pending =
-          (kpi.id === 'today' && flow.loading && !flow.data) ||
-          (kpi.id === 'no_po' && noPo.loading && noPo.data === null)
+        const pending = kpi.id === 'today' && flow.loading && !flow.data
         const card = (
           <StatCard
             accent={kpi.accent}
             icon={kpi.icon}
             loading={pending}
             className={cn(
-              'h-full rounded-2xl p-4',
+              'h-full rounded-2xl p-3',
               kpi.href && 'transition-colors group-hover:bg-surface-hover',
             )}
             label={t(kpi.label)}
@@ -378,7 +351,7 @@ export function KpiStrip({
               <button
                 type="button"
                 className="block h-full w-full rounded-2xl text-start focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                onClick={kpi.id === 'today' ? flow.retry : noPo.retry}
+                onClick={flow.retry}
                 aria-label={`${t(kpi.label)} · ${t('retry')}`}
               >
                 {card}

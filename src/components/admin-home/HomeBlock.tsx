@@ -18,6 +18,7 @@ import { translations, type TranslationKey } from '@/i18n/translations'
  * while the page is Arabic (the reference images' header), and an action at
  * the end (a «عرض الكل», a filter). `state` keeps loading, failure and data
  * apart: a failed read is an `ErrorState` with retry, never an empty block.
+ * Tighter since the owner's review of 2026-11-10 («قلل المسافات شوي»).
  * The first load shows the block's own `skeleton` (owner 2026-11-09, «واضف
  * skeleton»: the shape of what is coming, at its height); a refetch keeps
  * the body and dims it.
@@ -49,7 +50,7 @@ export function HomeBlock({
   const { t, lang } = useI18n()
   return (
     // `Card` takes no id or aria-label, so the section carries them (the
-    // Afaqy block is the «يحتاج انتباهك» no-signal item's anchor).
+    // Afaqy block keeps its anchor).
     <section
       id={id}
       aria-label={t(title)}
@@ -58,9 +59,9 @@ export function HomeBlock({
       <Card
         as="div"
         padded={false}
-        className="flex w-full min-w-0 flex-col rounded-2xl p-4"
+        className="flex w-full min-w-0 flex-col rounded-2xl p-3"
       >
-        <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="mb-1.5 flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h2 className="text-sm font-semibold leading-tight">{t(title)}</h2>
             {lang === 'ar' && (
