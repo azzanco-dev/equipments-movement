@@ -395,14 +395,13 @@ test('the fleet card: four owner tabs over the snapshot, each a donut', () => {
     /skeleton=\{<DonutSkeleton tabs legendRows=\{5\} under \/>\}/,
   )
   const donut = read('src', 'components', 'charts', 'SoftDonut.tsx')
-  // «فيه مساحة فاضية تحت الدونات»: the donut fills the stretched card.
-  assert.match(card, /bodyClassName="flex flex-col"/)
-  assert.match(card, /legend="under"\s*fill\s*slices=\{slices\}/)
-  assert.match(donut, /fill && 'min-h-0 flex-1'/)
-  assert.match(
-    donut,
-    /style=\{fill \? \{ minHeight: height \} : \{ height \}\}/,
-  )
+  // The ring keeps a definite height (owner «الدائرة مش موجودة لسى»: a
+  // «fill the card» mode left the ring box auto-height under the legend
+  // and Recharts drew nothing).
+  assert.match(card, /legend="under"\s*slices=\{slices\}/)
+  assert.doesNotMatch(card, /bodyClassName|\bfill\b/)
+  assert.match(donut, /<div style=\{\{ height \}\}>/)
+  assert.doesNotMatch(donut, /fill\?: boolean|minHeight: height/)
   // The shared donut's legend renders a slice's `href` as a real link.
   assert.match(donut, /slice\.href \? \(\s*<AppLink\s+href=\{slice\.href\}/)
   assert.match(

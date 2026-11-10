@@ -32,7 +32,6 @@ export function HomeBlock({
   skeleton,
   skeletonClassName = 'h-48 w-full',
   className,
-  bodyClassName,
   count,
   id,
   children,
@@ -50,9 +49,6 @@ export function HomeBlock({
   skeleton?: ReactNode
   skeletonClassName?: string
   className?: string
-  /** Classes of the body (opt-in: a block whose content should fill the
-   *  card's height passes `flex flex-col`). */
-  bodyClassName?: string
   id?: string
   children?: ReactNode
 }) {
@@ -95,7 +91,7 @@ export function HomeBlock({
             </div>
           )}
         </div>
-        <div className={cn('min-w-0 flex-1', bodyClassName)}>
+        <div className="min-w-0 flex-1">
           {state === 'failed' ? (
             <ErrorState
               title={t('adminHomeSectionError')}
