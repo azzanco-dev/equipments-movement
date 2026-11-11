@@ -352,7 +352,7 @@ test('the ticket of a closed visit: «خرجت», its exit day and purpose', () 
   const data = read('src', 'lib', 'purchasingData.ts')
   assert.match(
     data,
-    /party_po_id,party_po_number,visit_state,exit_at,exit_purpose'/,
+    /party_po_id,party_po_number,visit_state,exit_at,exit_purpose,entry_created_at'/,
   )
 })
 
@@ -496,4 +496,41 @@ test('messages and translations: both languages, no hamza on alif', () => {
   // No hamza in the new SQL copy or the new library either.
   assert.doesNotMatch(raw, /[أإآ]/)
   assert.doesNotMatch(read('src', 'lib', 'siteVisits.ts'), /[أإآ]/)
+})
+
+// Owner 2026-11-11 («الي سويناه بخصوص تاريخ انشاء الدخولية ابغاه يكون في
+// المعدات في المشاريع», then «انشاء الدخول فقط»; migration 0192).
+test('0192: the tickets show and sort by the entry registration only', () => {
+  const fs = require('node:fs')
+  const path = require('node:path')
+  const root = path.join(__dirname, '..')
+  const readFile = (...parts) =>
+    fs.readFileSync(path.join(root, ...parts), 'utf8').replace(/\r\n/g, '\n')
+  const sql = readFile('supabase', 'migrations', '20261111130000_0192_site_visits_created_at.sql')
+  assert.match(sql, /CREATE OR REPLACE VIEW public\.purchasing_site_visits\nWITH \(security_invoker = true\)/)
+  // ONE column, appended last; the exit's registration is not exposed.
+  assert.match(sql, /v\.exit_at,\n  v\.exit_purpose,\n(?:  --.*\n)+  v\.entry_created_at\nFROM public\.movement_visits v/)
+  assert.doesNotMatch(sql, /exit_created_at/)
+  assert.match(sql, /WHERE v\.movement_context = 'site';/)
+  assert.match(sql, /REVOKE ALL ON public\.purchasing_site_visits FROM PUBLIC, anon;/)
+  assert.match(sql, /GRANT SELECT ON public\.purchasing_site_visits TO authenticated;/)
+
+  const data = readFile('src', 'lib', 'purchasingData.ts')
+  const select = /export const SITE_UNITS_SELECT =\s+'([^']+)'/.exec(data)[1].split(',')
+  assert.equal(select[select.length - 1], 'entry_created_at')
+  assert.ok(!select.includes('exit_created_at'))
+
+  const configs = readFile('src', 'lib', 'listConfigs.ts')
+  const config = configs
+    .split('export const siteUnitsListConfig: DataListConfig')[1]
+    .split('\n}\n')[0]
+  assert.match(config, /\{ key: 'entry_created_at', label: \{ ar: 'تاريخ الانشاء', en: 'Created' \} \},/)
+  // The default stays «بدون PO اولا».
+  assert.match(config, /defaultSort: 'has_po',\s+defaultDirection: 'asc',/)
+
+  const screen = readFile('src', 'screens', 'purchasing', 'SiteUnitsScreen.tsx')
+  assert.match(screen, /formatVisitCreatedAgo\(row\.entry_created_at, lang\)/)
+  assert.match(screen, /<bdi dir="ltr">\{formatSaudiDateTime\(row\.entry_created_at\)\}<\/bdi>/)
+  assert.match(screen, /\{createdLine\(row\)\}/)
+  assert.doesNotMatch(screen, /exit_created_at/)
 })

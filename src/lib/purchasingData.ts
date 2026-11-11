@@ -180,6 +180,9 @@ export interface SiteUnitRow {
   exit_at: string | null
   /** 0188: the purpose of the site exit (0111), NULL while inside. */
   exit_purpose: string | null
+  /** 0192: when the visit's ENTRY was registered in the system (the «الانشاء»
+   *  of the visits table), as opposed to `entry_at`, the movement's date. */
+  entry_created_at: string | null
 }
 
 /** 0188: the view of «المعدات في المشاريع», every site visit. */
@@ -187,7 +190,7 @@ export const SITE_VISITS_VIEW = 'purchasing_site_visits'
 
 /** Only what the «المعدات في المشاريع» tiles show and the add needs. */
 export const SITE_UNITS_SELECT =
-  'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,entry_at,contractor_equipment_code,supplier_po_id,po_number,has_po,party_po_id,party_po_number,visit_state,exit_at,exit_purpose'
+  'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,entry_at,contractor_equipment_code,supplier_po_id,po_number,has_po,party_po_id,party_po_number,visit_state,exit_at,exit_purpose,entry_created_at'
 
 /**
  * One unit on a supplier PO (migration 0167, `purchasing_po_units`): a line

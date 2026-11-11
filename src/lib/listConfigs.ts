@@ -1126,6 +1126,10 @@ export const siteUnitsListConfig: DataListConfig = {
   sortableFields: [
     { key: 'has_po', label: 'siteUnitsSortNoPoFirst' },
     { key: 'entry_at', label: 'siteUnitsSortEntry' },
+    // Owner 2026-11-11 («الي سويناه بخصوص تاريخ انشاء الدخولية ابغاه يكون في
+    // المعدات في المشاريع», «انشاء الدخول فقط»): when the entry was registered
+    // (`entry_created_at`, migration 0192), as in the visits of /logs.
+    { key: 'entry_created_at', label: { ar: 'تاريخ الانشاء', en: 'Created' } },
     { key: 'equipment_code', label: 'equipmentCode' },
     { key: 'equipment_lessor_name', label: 'supplierPoSupplier' },
   ],

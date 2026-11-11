@@ -25,6 +25,7 @@ import {
   ErrorState,
   PageHeader,
   Skeleton,
+  Tooltip,
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
@@ -37,6 +38,7 @@ import { exitPurposeLabelKey } from '@/lib/exitPurpose'
 import { foremanFilterOptions } from '@/lib/foremanFilter'
 import { siteUnitsListConfig } from '@/lib/listConfigs'
 import { localizedName } from '@/lib/localizedName'
+import { formatSaudiDateTime } from '@/lib/printExport'
 import { splitPlateForDisplay } from '@/lib/plate'
 import {
   isSupplierPoOwnerClass,
@@ -54,6 +56,7 @@ import {
   siteUnitsRecentOrFilter,
 } from '@/lib/siteVisits'
 import { supabase } from '@/lib/supabase'
+import { formatVisitCreatedAgo } from '@/lib/visitsList'
 
 /** The plate's digits, then its letters spaced by letter-spacing (owner
  *  2026-10-25); the negative end margin drops the space after the last
@@ -248,6 +251,29 @@ export function SiteUnitsScreen({
   }
 
   const filtered = Boolean(list.search.trim()) || list.filters.length > 0
+
+  /** 0192: «الانشاء منذ 7 ساعات» at the end of the entry date line: when the
+   *  ENTRY was registered (the entry's only), with its exact time on hover or
+   *  focus; nothing for a row without it. */
+  const createdLine = (row: SiteUnitRow) => {
+    const ago = formatVisitCreatedAgo(row.entry_created_at, lang)
+    if (!ago) return null
+    return (
+      <Tooltip
+        content={
+          <bdi dir="ltr">{formatSaudiDateTime(row.entry_created_at)}</bdi>
+        }
+      >
+        <span
+          tabIndex={0}
+          className="rounded text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+        >
+          {t('visitCreatedAt')}{' '}
+          {t('visitCreatedAgo').replace('{duration}', ago)}
+        </span>
+      </Tooltip>
+    )
+  }
 
   /** 0188: «خرجت 09/11/2026 · للصيانة» for a closed visit. */
   const exitLine = (row: SiteUnitRow) => {
@@ -551,11 +577,19 @@ export function SiteUnitsScreen({
                     )}
                     {/* Owner 2026-10-31 («اضف برضه في الكارد تاريخ الدخول»):
                         the entry's day, the PO's start date (0148). */}
-                    <p className="break-words text-xs leading-5 text-muted">
-                      {t('supplierPoEntryDate')}{' '}
-                      <bdi dir="ltr" className="font-medium text-fg">
-                        {formatDate(row.entry_at)}
-                      </bdi>
+                    <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-xs leading-5 text-muted">
+                      <span>
+                        {t('supplierPoEntryDate')}{' '}
+                        <bdi dir="ltr" className="font-medium text-fg">
+                          {formatDate(row.entry_at)}
+                        </bdi>
+                      </span>
+                      {/* Owner 2026-11-11 («الي سويناه بخصوص تاريخ انشاء
+                          الدخولية ابغاه يكون في المعدات في المشاريع», «انشاء
+                          الدخول فقط»): when the entry was registered, as the
+                          «الانشاء» of the visits table — the time since, the
+                          exact Saudi date-time in the shared Tooltip. */}
+                      {createdLine(row)}
                     </p>
                     {/* Owner 2026-11-11 («الخروج تحت الدخول»): the exit line
                         of an exited visit sits under the entry date. */}
