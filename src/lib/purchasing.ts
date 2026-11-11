@@ -796,3 +796,42 @@ export function supplierPoPartyOrFilter(
     rest: filters.filter((filter) => filter !== party && filter !== lessor),
   }
 }
+
+/** A PO line of a unit in a company and project, as the duplicate warning
+ *  reads it from `purchasing_po_units` (owner 2026-11-11). */
+export interface ExistingUnitPo {
+  equipment_id: string
+  supplier_po_id: string
+  po_number: string
+  start_date: string
+  approval_status: string
+}
+
+/** The existing POs grouped by unit, each unit's newest start date first
+ *  (then the greater PO number). */
+export function existingPosByUnit(
+  rows: readonly ExistingUnitPo[],
+): Map<string, ExistingUnitPo[]> {
+  const byUnit = new Map<string, ExistingUnitPo[]>()
+  for (const row of rows) {
+    const list = byUnit.get(row.equipment_id)
+    if (list) list.push(row)
+    else byUnit.set(row.equipment_id, [row])
+  }
+  byUnit.forEach((list) =>
+    list.sort(
+      (a, b) =>
+        b.start_date.localeCompare(a.start_date) ||
+        b.po_number.localeCompare(a.po_number),
+    ),
+  )
+  return byUnit
+}
+
+/** The ticked units that already sit on a PO, in ticked order. */
+export function unitsWithExistingPo(
+  tickedEquipmentIds: readonly string[],
+  byUnit: ReadonlyMap<string, readonly ExistingUnitPo[]>,
+): string[] {
+  return tickedEquipmentIds.filter((id) => (byUnit.get(id)?.length ?? 0) > 0)
+}

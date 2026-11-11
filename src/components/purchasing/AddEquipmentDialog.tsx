@@ -15,6 +15,7 @@ import {
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
+import { formatDate } from '@/lib/dateFormat'
 import {
   clearFieldErrors,
   focusFirstError,
@@ -30,13 +31,16 @@ import {
   SUPPLIER_PO_LINE_FIELD_RULES,
   SUPPLIER_PO_RATE_UNIT_LABEL_KEYS,
   SUPPLIER_PO_RATE_UNITS,
+  existingPosByUnit,
   supplierPoErrorOutcome,
   supplierPoRateUnitOf,
+  type ExistingUnitPo,
   type SupplierPoLineFormValues,
 } from '@/lib/purchasing'
 import {
   addSupplierPoEquipment,
   equipmentAtProjectOptionLoader,
+  fetchExistingUnitPos,
   supplierPoParty,
   type SupplierPoRow,
 } from '@/lib/purchasingData'
@@ -88,6 +92,10 @@ export function AddEquipmentDialog({
   const [message, setMessage] = useState<TranslationKey | null>(null)
   const [saving, setSaving] = useState(false)
   const bodyRef = useRef<HTMLDivElement>(null)
+  // Owner 2026-11-11: the unit's other POs of this company and project, a
+  // warning only (saving stays allowed).
+  const [existing, setExisting] = useState<ExistingUnitPo[]>([])
+  const [existingFailed, setExistingFailed] = useState(false)
   const party = useMemo(() => supplierPoParty(po), [po])
   // The exclusion list is keyed by content so a parent re-render with the
   // same lines does not rebuild the loader (and refetch).
@@ -115,6 +123,29 @@ export function AddEquipmentDialog({
     // Read only when the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  const chosenUnit = open ? form.equipment_id : ''
+  useEffect(() => {
+    setExisting([])
+    setExistingFailed(false)
+    if (!chosenUnit || !party) return
+    const controller = new AbortController()
+    fetchExistingUnitPos(
+      party,
+      po.company_id,
+      po.project_id,
+      { excludePoId: po.id, equipmentId: chosenUnit },
+      controller.signal,
+    )
+      .then((rows) => {
+        if (!controller.signal.aborted) setExisting(rows)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setExistingFailed(true)
+      })
+    return () => controller.abort()
+  }, [chosenUnit, party, po.id, po.company_id, po.project_id])
+  const newestExisting = existingPosByUnit(existing).get(chosenUnit)?.[0]
 
   const update = (patch: Partial<SupplierPoLineFormValues>) => {
     setForm((current) => ({ ...current, ...patch }))
@@ -206,6 +237,24 @@ export function AddEquipmentDialog({
             />
           )}
         </Field>
+        {newestExisting && (
+          <Notice tone="warning" size="compact">
+            {t('supplierPoDupAddNotice')
+              .replace('{po}', newestExisting.po_number)
+              .replace('{date}', formatDate(newestExisting.start_date))
+              .replace(
+                '{more}',
+                existing.length > 1
+                  ? ` ${t('supplierPoDupMore').replace('{count}', String(existing.length - 1))}`
+                  : '',
+              )}
+          </Notice>
+        )}
+        {existingFailed && (
+          <Notice tone="info" size="compact">
+            {t('supplierPoDupCheckFailed')}
+          </Notice>
+        )}
         <Field
           label={t('supplierPoPrice')}
           name="price"

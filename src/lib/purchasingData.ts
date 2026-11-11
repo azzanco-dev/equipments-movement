@@ -3,6 +3,7 @@ import type { TranslationKey } from '@/i18n/translations'
 import type { CompanyProjectSource } from '@/lib/companyProject'
 import type { PostgresLikeError } from '@/lib/formValidation'
 import type {
+  ExistingUnitPo,
   SupplierPoApprovalStatus,
   SupplierPoCreateLine,
   SupplierPoEventType,
@@ -810,4 +811,37 @@ export async function returnSupplierPoApproval(input: {
       p_note: input.note.trim() || null,
     }),
   )
+}
+
+/**
+ * The duplicate warning's read (owner 2026-11-11): the party's lines on
+ * `purchasing_po_units` in one company and project — optionally without one
+ * PO and for one unit. Newest start date first, bounded; THROWS on a failed
+ * query, so a failed check is never «no existing PO».
+ */
+export async function fetchExistingUnitPos(
+  party: SupplierPoParty,
+  companyId: string,
+  projectId: string,
+  options: { excludePoId?: string; equipmentId?: string } = {},
+  signal?: AbortSignal,
+): Promise<ExistingUnitPo[]> {
+  let request = supabase
+    .from('purchasing_po_units')
+    .select('equipment_id,supplier_po_id,po_number,start_date,approval_status')
+    .eq('company_id', companyId)
+    .eq('project_id', projectId)
+  request = party.owner_class
+    ? request.eq('owner_class', party.owner_class)
+    : request.eq('lessor_id', party.lessor_id)
+  if (options.excludePoId)
+    request = request.neq('supplier_po_id', options.excludePoId)
+  if (options.equipmentId)
+    request = request.eq('equipment_id', options.equipmentId)
+  request = request
+    .order('start_date', { ascending: false })
+    .order('po_number', { ascending: false })
+    .limit(1000)
+  if (signal) request = request.abortSignal(signal)
+  return unwrapRows<ExistingUnitPo>(await request)
 }

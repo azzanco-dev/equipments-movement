@@ -38,6 +38,7 @@ import {
   SUPPLIER_PO_FIELD_ORDER,
   SUPPLIER_PO_OWNER_CLASSES,
   SUPPLIER_PO_OWNER_CLASS_LABEL_KEYS,
+  existingPosByUnit,
   isValidSupplierPoPrice,
   SUPPLIER_PO_DEFAULT_RATE_UNIT,
   SUPPLIER_PO_RATE_UNIT_LABEL_KEYS,
@@ -46,12 +47,15 @@ import {
   supplierPoTotalsByUnit,
   type SupplierPoRateUnit,
   supplierPoErrorOutcome,
+  unitsWithExistingPo,
+  type ExistingUnitPo,
   type SupplierPoCreateLine,
   type SupplierPoFormValues,
   type SupplierPoOwnerClass,
 } from '@/lib/purchasing'
 import {
   createSupplierPo,
+  fetchExistingUnitPos,
   fetchPartyVisits,
   staticOptionLoader,
   supplierPoParty,
@@ -155,6 +159,10 @@ export function CreateSupplierPoDialog({
     'idle',
   )
   const [picked, setPicked] = useState<Picked>({})
+  // Owner 2026-11-11: the party's lines in the chosen company and project,
+  // for the duplicate warning (a warning only; saving is never blocked).
+  const [existingPos, setExistingPos] = useState<ExistingUnitPo[]>([])
+  const [existingFailed, setExistingFailed] = useState(false)
   // 0157 (owner 2026-10-28): the unit a newly ticked unit's price takes;
   // each unit can still be changed next to its price.
   const [defaultUnit, setDefaultUnit] = useState<SupplierPoRateUnit>(
@@ -295,6 +303,51 @@ export function CreateSupplierPoDialog({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, partyKey])
+
+  // The duplicate check: reloaded when the party, company or project changes
+  // and on every open; a stale answer is ignored, a failure is never read as
+  // «no existing PO».
+  useEffect(() => {
+    setExistingPos([])
+    setExistingFailed(false)
+    if (!open || !form.company_id || !form.project_id) return
+    const current = supplierPoParty({
+      lessor_id: form.lessor_id || null,
+      owner_class: form.owner_class || null,
+    })
+    if (!current) return
+    const controller = new AbortController()
+    fetchExistingUnitPos(
+      current,
+      form.company_id,
+      form.project_id,
+      {},
+      controller.signal,
+    )
+      .then((rows) => {
+        if (!controller.signal.aborted) setExistingPos(rows)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setExistingFailed(true)
+      })
+    return () => controller.abort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, partyKey, form.company_id, form.project_id])
+  const existingByUnit = useMemo(() => existingPosByUnit(existingPos), [existingPos])
+  const duplicateUnits = useMemo(() => {
+    const ids = unitsWithExistingPo(Object.keys(picked), existingByUnit)
+    return ids.map((id) => ({
+      id,
+      code:
+        unitsAtProject.find((visit) => visit.equipment_id === id)
+          ?.equipment_code ?? id,
+    }))
+  }, [picked, existingByUnit, unitsAtProject])
+  const duplicateNames = duplicateUnits.slice(0, 5).map(({ id, code }) => {
+    const first = existingByUnit.get(id)?.[0]
+    return first ? `${code} (${first.po_number})` : code
+  })
+  const duplicateRest = duplicateUnits.length - duplicateNames.length
 
   const update = (patch: Partial<SupplierPoFormValues>) => {
     setForm((current) => ({ ...current, ...patch }))
@@ -665,6 +718,27 @@ export function CreateSupplierPoDialog({
                               </>
                             )}
                           </span>
+                          {(() => {
+                            const existing = existingByUnit.get(visit.equipment_id)
+                            if (!existing?.length) return null
+                            return (
+                              <span className="text-xs text-warning">
+                                {t('supplierPoDupUnitLine')
+                                  .replace('{date}', formatDate(existing[0].start_date))
+                                  .split('{po}')
+                                  .map((part, index) => (
+                                    <span key={index}>
+                                      {index > 0 && (
+                                        <bdi dir="ltr">{existing[0].po_number}</bdi>
+                                      )}
+                                      {part}
+                                    </span>
+                                  ))}
+                                {existing.length > 1 &&
+                                  ` · ${t('supplierPoDupMore').replace('{count}', String(existing.length - 1))}`}
+                              </span>
+                            )
+                          })()}
                         </span>
                       </label>
                       {line && (
@@ -764,6 +838,24 @@ export function CreateSupplierPoDialog({
             />
           )}
         </Field>
+        {duplicateUnits.length > 0 && (
+          <Notice tone="warning" size="compact">
+            {t('supplierPoDupCreateNotice')
+              .replace('{count}', String(duplicateUnits.length))
+              .replace(
+                '{units}',
+                duplicateNames.join('، ') +
+                  (duplicateRest > 0
+                    ? ` ${t('supplierPoDupMore').replace('{count}', String(duplicateRest))}`
+                    : ''),
+              )}
+          </Notice>
+        )}
+        {existingFailed && (
+          <Notice tone="info" size="compact">
+            {t('supplierPoDupCheckFailed')}
+          </Notice>
+        )}
         {pickedCount > 0 && (
           <p className="text-sm text-muted">
             {t('supplierPoSummaryTotal')}:{' '}

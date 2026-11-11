@@ -2308,6 +2308,15 @@ export const translations = {
     supplierPoOtherEntryDay: 'دخلت في يوم اخر',
     supplierPoOtherDayHidden:
       'تظهر معدات يوم دخول المعدة المختارة فقط؛ {count} معدة اخرى دخلت في ايام اخرى لا تظهر.',
+    // po-duplicate-warning — start
+    supplierPoDupUnitLine: 'عليها {po} · بداية {date}',
+    supplierPoDupMore: 'و{count} اخرى',
+    supplierPoDupCreateNotice:
+      '{count} من المعدات المختارة عليها PO لنفس الشركة والمشروع: {units}. يمكنك المتابعة اذا كان التكرار مقصودا.',
+    supplierPoDupAddNotice:
+      'المعدة عليها {po} لنفس الشركة والمشروع (بداية {date}){more}. يمكنك المتابعة اذا كان التكرار مقصودا.',
+    supplierPoDupCheckFailed: 'تعذر التحقق من الاوامر السابقة للمعدات.',
+    // po-duplicate-warning — end
     supplierPoEquipmentSameDayHint:
       'تظهر معدات هذه الجهة الموجودة الان داخل شركة الامر ومشروعه والتي دخلت في تاريخ بداية الامر فقط.',
     supplierPoStartDateLockedHint: 'مقفل ما دام في الامر معدات: هو يوم دخولها.',
@@ -5132,6 +5141,15 @@ export const translations = {
     supplierPoOtherEntryDay: 'Entered on another day',
     supplierPoOtherDayHidden:
       "Only the units that entered on the ticked unit's day are listed; {count} other units entered on other days and are hidden.",
+    // po-duplicate-warning — start
+    supplierPoDupUnitLine: 'On {po} · starts {date}',
+    supplierPoDupMore: 'and {count} more',
+    supplierPoDupCreateNotice:
+      '{count} of the chosen units already sit on a PO of the same company and project: {units}. You can continue if the duplicate is intended.',
+    supplierPoDupAddNotice:
+      'The unit is already on {po} for the same company and project (starts {date}){more}. You can continue if the duplicate is intended.',
+    supplierPoDupCheckFailed: "Could not check the units' earlier POs.",
+    // po-duplicate-warning — end
     supplierPoEquipmentSameDayHint:
       "Only this party's units currently inside the order's company and project that entered on the order start date are listed.",
     supplierPoStartDateLockedHint: 'Locked while the order has equipment: it is their entry day.',
