@@ -248,3 +248,14 @@ test('the column copy exists in Arabic and English without hamza forms', () => {
   for (const line of source.split('\n').filter((l) => /visitCreatedA/.test(l)))
     assert.doesNotMatch(line, /[أإآ]/)
 })
+
+// Owner 2026-11-11 («احسه مختلف عن تاريخ الدخول, شوف كيف 11/11»): the exit
+// date is a button, which does not inherit the page's equal-width figures.
+test('the exit date button draws equal-width figures like the entry date', () => {
+  const source = read('src/components/visits/VisitsTable.tsx')
+  const button = source.slice(
+    source.indexOf('// Nested control: the row opens the ENTRY'),
+    source.indexOf("aria-label={t('openExitMovement')}"),
+  )
+  assert.match(button, /className="whitespace-nowrap rounded tabular-nums text-muted/)
+})

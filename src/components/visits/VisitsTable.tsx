@@ -560,9 +560,12 @@ export function VisitsTable({
         visit.exit_at && visit.exit_id ? (
           onSelectMovement ? (
             // Nested control: the row opens the ENTRY, this opens the EXIT.
+            // `tabular-nums`: a button does not inherit the page's equal-width
+            // figures, so 11/11 read narrower here than in the entry date
+            // (owner 2026-11-11).
             <button
               type="button"
-              className="whitespace-nowrap rounded text-muted underline-offset-4 hover:text-fg hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="whitespace-nowrap rounded tabular-nums text-muted underline-offset-4 hover:text-fg hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               aria-label={t('openExitMovement')}
               onClick={(event) => {
                 event.stopPropagation()
