@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type CSSProperties,
-} from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Truck } from 'lucide-react'
 import { RelativeTime } from '@/components/RelativeTime'
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
@@ -15,6 +9,7 @@ import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { Price } from '@/components/purchasing/Price'
 import { SupplierPoApprovalBadge } from '@/components/purchasing/SupplierPoStatusBadge'
+import { poPillStyle } from '@/components/sales/PoPill'
 import {
   Badge,
   DataTable,
@@ -40,12 +35,6 @@ import { supabase } from '@/lib/supabase'
  *  /logs): «حسب المعدات» is the default view, while «حسب الاوامر» keeps the
  *  unprefixed parameters the home's deep links carry. */
 export const PO_UNITS_URL_PREFIX = 'u'
-
-/** The green PO pill of «المعدات في المشاريع». */
-const SPO_PILL_STYLE: CSSProperties = {
-  color: 'var(--success)',
-  backgroundColor: 'var(--success-soft)',
-}
 
 /** The plate's digits, then its letters spaced by letter-spacing (as on the
  *  «المعدات في المشاريع» tickets); a plate not in the stored form, or the
@@ -181,7 +170,8 @@ export function PoUnitsList({ onSelectPo }: PoUnitsListProps) {
         </span>
       ),
     },
-    // The row's link cell (rowLinkColumn): the green PO pill.
+    // The row's link cell (rowLinkColumn): the PO pill, green for an issued
+    // number and grey for a draft reference (`poPillStyle`).
     {
       key: 'po_number',
       header: t('siteUnitsPoNumber'),
@@ -189,7 +179,7 @@ export function PoUnitsList({ onSelectPo }: PoUnitsListProps) {
       cell: (row) => (
         <span
           className="inline-flex h-7 items-center rounded-full px-2.5 text-xs font-semibold"
-          style={SPO_PILL_STYLE}
+          style={poPillStyle(row.po_number)}
         >
           <bdi dir="ltr">{row.po_number}</bdi>
         </span>

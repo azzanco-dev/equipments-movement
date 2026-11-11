@@ -5,8 +5,8 @@ import {
   supplierPoApprovalListBadge,
 } from '@/lib/purchasing'
 
-/** 0160 (owner 2026-10-28): the approval badge, draft = grey, approved =
- *  green (owner 2026-11-11; it was amber / blue); on a list row a draft reads «بانتظار الاعتماد». It is the PO's only
+/** 0160 (owner 2026-10-28): the approval badge, draft = amber, approved =
+ *  blue; on a list row a draft reads «بانتظار الاعتماد». It is the PO's only
  *  state badge since 0189 (owner 2026-11-11: a supplier PO is neither open
  *  nor closed, so the open / closed badge that lived here is gone). */
 export function SupplierPoApprovalBadge({

@@ -13,6 +13,7 @@ import { useCompanyProjectFilters } from '@/components/data-list/relationFilters
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { AddEquipmentDialog } from '@/components/purchasing/AddEquipmentDialog'
+import { poPillStyle } from '@/components/sales/PoPill'
 import {
   CreateSupplierPoDialog,
   type CreateSupplierPoPreset,
@@ -96,12 +97,6 @@ const ADD_BUTTON_STYLE: CSSProperties = {
   color: 'var(--bg)',
   borderColor: 'var(--warning)',
   backgroundColor: 'var(--warning)',
-}
-
-/** The PO number on a ticket with a PO: a round green pill that opens the PO. */
-const SPO_BUTTON_STYLE: CSSProperties = {
-  color: 'var(--success)',
-  backgroundColor: 'var(--success-soft)',
 }
 
 /** 0188: the config's filter keys that are view columns (the 60-day window
@@ -317,7 +312,7 @@ export function SiteUnitsScreen({
         href={`/purchasing/${row.supplier_po_id}`}
         onNavigate={() => onSelectPo(row.supplier_po_id!)}
         className="inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs font-semibold underline-offset-2 hover:underline"
-        style={SPO_BUTTON_STYLE}
+        style={poPillStyle(row.po_number)}
       >
         <bdi dir="ltr">{row.po_number}</bdi>
       </AppLink>

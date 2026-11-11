@@ -131,3 +131,26 @@ test('the new keys exist once per language and the Arabic has no hamza alif', ()
   assert.doesNotMatch(confirm, /[أإآ]/)
   assert.match(confirm, /يصدر رقم/)
 })
+
+// Owner 2026-11-11 («غير لون بادج الدرافت … البادج الي عبارة عن DRAFT-0565»):
+// the pill of a draft reference is grey, an issued number stays green.
+test('a draft reference pill is grey on every screen that draws the PO pill', () => {
+  const pill = read('src/components/sales/PoPill.tsx')
+  assert.match(pill, /import \{ isSupplierPoDraftRef \} from '@\/lib\/purchasing'/)
+  const draft = pill
+    .split('const DRAFT_PILL_STYLE: CSSProperties = {')[1]
+    .split('}')[0]
+  assert.match(draft, /color: 'var\(--fg\)'/)
+  assert.match(draft, /backgroundColor: 'var\(--surface-hover\)'/)
+  assert.match(
+    pill,
+    /return isSupplierPoDraftRef\(number\) \? DRAFT_PILL_STYLE : PO_PILL_STYLE/,
+  )
+  // The other side's PO stays muted whatever its number.
+  assert.match(pill, /muted \? MUTED_PILL_STYLE : poPillStyle\(number\)/)
+  for (const screen of ['PoUnitsList.tsx', 'SiteUnitsScreen.tsx']) {
+    const src = read('src', 'screens', 'purchasing', screen)
+    assert.match(src, /style=\{poPillStyle\(row\.po_number\)\}/, screen)
+    assert.doesNotMatch(src, /SPO_(PILL|BUTTON)_STYLE/, screen)
+  }
+})

@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import { AppLink } from '@/components/ui'
+import { isSupplierPoDraftRef } from '@/lib/purchasing'
 
 /** The green pill of a PO number (the SPO pill of «المعدات في المشاريع»). */
 const PO_PILL_STYLE: CSSProperties = {
@@ -12,6 +13,20 @@ const PO_PILL_STYLE: CSSProperties = {
 const MUTED_PILL_STYLE: CSSProperties = {
   color: 'var(--muted)',
   backgroundColor: 'var(--surface-hover)',
+}
+
+/** A supplier PO's DRAFT REFERENCE (`DRAFT-0565`, migration 0190): grey, so
+ *  it never reads as an issued PO number (owner 2026-11-11, «غير لون بادج
+ *  الدرافت … البادج الي عبارة عن DRAFT-0565»). The neutral badge's colours. */
+const DRAFT_PILL_STYLE: CSSProperties = {
+  color: 'var(--fg)',
+  backgroundColor: 'var(--surface-hover)',
+}
+
+/** The colours of a PO number pill: green for an issued number, grey for a
+ *  draft reference. Shared by every screen that draws the pill itself. */
+export function poPillStyle(number: string | null | undefined): CSSProperties {
+  return isSupplierPoDraftRef(number) ? DRAFT_PILL_STYLE : PO_PILL_STYLE
 }
 
 const PILL =
@@ -35,7 +50,7 @@ export function PoPill({
   muted?: boolean
   className?: string
 }) {
-  const style = muted ? MUTED_PILL_STYLE : PO_PILL_STYLE
+  const style = muted ? MUTED_PILL_STYLE : poPillStyle(number)
   if (!href)
     return (
       <span className={`${PILL} ${className ?? ''}`} style={style}>

@@ -228,16 +228,16 @@ test('the pure helpers: why approval cannot run, and the list badge', () => {
 
   assert.deepEqual(plain(lib.supplierPoApprovalListBadge({ status: 'open', approval_status: 'approved' })), {
     key: 'supplierPoApprovalApproved',
-    tone: 'success',
+    tone: 'info',
   })
   assert.deepEqual(plain(lib.supplierPoApprovalListBadge({ status: 'open', approval_status: 'draft' })), {
     key: 'supplierPoApprovalPending',
-    tone: 'neutral',
+    tone: 'warning',
   })
   // Until 0189 a CLOSED draft read a quiet «مسودة»; every draft waits now.
   assert.deepEqual(plain(lib.supplierPoApprovalListBadge({ status: 'closed', approval_status: 'draft' })), {
     key: 'supplierPoApprovalPending',
-    tone: 'neutral',
+    tone: 'warning',
   })
   for (const token of [
     'purchasing_approve_required',
