@@ -1125,7 +1125,8 @@ test('poUnitsListConfig: unit and PO number search, allowlisted filters, no stat
   )
   assert.match(
     config,
-    /defaultSort: 'equipment_code',\s+defaultDirection: 'asc',/,
+    // Owner 2026-11-11: the latest change first.
+    /defaultSort: 'updated_at',\s+defaultDirection: 'desc',/,
   )
   const filterKeys = [...config.matchAll(/^\s{6}key: '(\w+)',$/gm)].map(
     (m) => m[1],

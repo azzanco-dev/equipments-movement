@@ -154,3 +154,14 @@ test('a draft reference pill is grey on every screen that draws the PO pill', ()
     assert.doesNotMatch(src, /SPO_(PILL|BUTTON)_STYLE/, screen)
   }
 })
+
+// Owner 2026-11-11 («خلي السورت الافتراضي لاوامر الشراء اخر تعديل»).
+test('both purchase order views open on the latest change first', () => {
+  const configs = read('src/lib/listConfigs.ts')
+  for (const name of ['supplierPosListConfig', 'poUnitsListConfig']) {
+    const block = configs
+      .split('export const ' + name + ': DataListConfig')[1]
+      .split('filterFields:')[0]
+    assert.match(block, /defaultSort: 'updated_at',\s+defaultDirection: 'desc',/, name)
+  }
+})

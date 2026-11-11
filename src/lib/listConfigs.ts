@@ -765,8 +765,10 @@ export const poUnitsListConfig: DataListConfig = {
     'equipment_plate_digits',
     'po_number',
   ],
-  defaultSort: 'equipment_code',
-  defaultDirection: 'asc',
+  // Owner 2026-11-11 («خلي السورت الافتراضي لاوامر الشراء اخر تعديل»): the
+  // latest change first (`updated_at`, moved by the PO row and its lines).
+  defaultSort: 'updated_at',
+  defaultDirection: 'desc',
   filterFields: [
     {
       key: 'approval_status',
@@ -881,7 +883,9 @@ export const supplierPosListConfig: DataListConfig = {
   id: 'supplierPos',
   searchPlaceholder: 'supplierPoSearchPlaceholder',
   searchFields: ['po_number'],
-  defaultSort: 'created_at',
+  // Owner 2026-11-11 («خلي السورت الافتراضي لاوامر الشراء اخر تعديل»): the
+  // latest change first (`updated_at`, moved by the PO row and its lines).
+  defaultSort: 'updated_at',
   defaultDirection: 'desc',
   filterFields: [
     // 0160 (owner 2026-10-28, EM-107): draft or approved. 0189: the open /
