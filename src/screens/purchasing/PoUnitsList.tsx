@@ -14,10 +14,7 @@ import { useCompanyProjectFilters } from '@/components/data-list/relationFilters
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { Price } from '@/components/purchasing/Price'
-import {
-  SupplierPoApprovalBadge,
-  SupplierPoStatusBadge,
-} from '@/components/purchasing/SupplierPoStatusBadge'
+import { SupplierPoApprovalBadge } from '@/components/purchasing/SupplierPoStatusBadge'
 import {
   Badge,
   DataTable,
@@ -245,17 +242,11 @@ export function PoUnitsList({ onSelectPo }: PoUnitsListProps) {
       header: t('supplierPoApproval'),
       hideBelow: 'sm',
       cell: (row) => (
-        <span className="flex flex-wrap items-center gap-1">
-          <SupplierPoApprovalBadge
-            po={{ status: row.po_status, approval_status: row.approval_status }}
-            list
-            size="sm"
-          />
-          {/* Only once the open-PO default filter is removed. */}
-          {row.po_status === 'closed' && (
-            <SupplierPoStatusBadge status={row.po_status} size="sm" />
-          )}
-        </span>
+        <SupplierPoApprovalBadge
+          po={{ approval_status: row.approval_status }}
+          list
+          size="sm"
+        />
       ),
     },
     // The same «اخر تعديل» column as the other lists, last: the line's.

@@ -3,10 +3,7 @@ import { usePermissions } from '@/auth/PermissionsContext'
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { Price } from '@/components/purchasing/Price'
-import {
-  SupplierPoApprovalBadge,
-  SupplierPoStatusBadge,
-} from '@/components/purchasing/SupplierPoStatusBadge'
+import { SupplierPoApprovalBadge } from '@/components/purchasing/SupplierPoStatusBadge'
 import {
   Badge,
   Card,
@@ -67,15 +64,11 @@ export function EquipmentPurchasingCard({
     setError(Boolean(loadError))
     const list = ((data as unknown as EquipmentPurchasingRow[] | null) ?? [])
       .slice()
-      // Open card first, then the latest period first.
-      .sort((a, b) => {
-        const openA = a.card?.period_to ? 1 : 0
-        const openB = b.card?.period_to ? 1 : 0
-        if (openA !== openB) return openA - openB
-        return (b.card?.period_from ?? '').localeCompare(
-          a.card?.period_from ?? '',
-        )
-      })
+      // The latest start date first (0189: a card has no period and a PO
+      // is not open or closed; the date is the PO's start date).
+      .sort((a, b) =>
+        (b.po?.start_date ?? '').localeCompare(a.po?.start_date ?? ''),
+      )
     setRows(list)
     setLoading(false)
   }, [allowed, equipmentId, startRequest])
@@ -106,7 +99,6 @@ export function EquipmentPurchasingCard({
                 {row.po.po_number}
               </bdi>
             )}
-            <SupplierPoStatusBadge status={row.po.status} size="sm" />
             {/* 0160: draft or approved, as on the PO list. */}
             <SupplierPoApprovalBadge po={row.po} list size="sm" />
           </span>
@@ -132,18 +124,14 @@ export function EquipmentPurchasingCard({
         ),
     },
     {
-      key: 'period',
-      header: t('equipmentPurchasingPeriod'),
+      key: 'start_date',
+      header: t('supplierPoStartDate'),
       hideBelow: 'md',
       className: 'tabular-nums',
       cell: (row) =>
-        row.card ? (
+        row.po ? (
           <bdi dir="ltr" className="whitespace-nowrap">
-            {formatDate(row.card.period_from)}
-            {' – '}
-            {row.card.period_to
-              ? formatDate(row.card.period_to)
-              : t('equipmentPurchasingOpenEnd')}
+            {formatDate(row.po.start_date)}
           </bdi>
         ) : (
           '—'

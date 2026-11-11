@@ -1,13 +1,11 @@
 import { useCallback, type ReactNode } from 'react'
-import { ArrowUpLeft, BadgeCheck, CalendarX2, CheckCircle2 } from 'lucide-react'
+import { ArrowUpLeft, BadgeCheck, CheckCircle2 } from 'lucide-react'
 import { AppLink, Badge, Button } from '@/components/ui'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import {
-  AWAITING_END_PAGE,
   awaitingApprovalHref,
-  awaitingEndHref,
   visibleAttentionItems,
   type AttentionId,
 } from '@/lib/adminAttention'
@@ -33,12 +31,6 @@ const ITEM: Record<
     icon: <BadgeCheck size={14} />,
     tone: 'info',
   },
-  awaiting_end: {
-    label: 'adminAttentionAwaitingEnd',
-    hint: 'adminAttentionAwaitingEndHint',
-    icon: <CalendarX2 size={14} />,
-    tone: 'warning',
-  },
   available_alazani: {
     label: 'adminAttentionAvailableAlazani',
     hint: 'adminAttentionAvailableAlazaniHint',
@@ -61,7 +53,7 @@ export interface AttentionSectionProps {
   matrix: AdminHomeSectionState<OwnerStateMatrix>
   /** Whether the shell opens a page; an item links only when it does. */
   canOpenPage: (
-    page: 'logs' | 'purchasing/units' | 'purchasing/orders' | 'sales/cards',
+    page: 'logs' | 'purchasing/units' | 'purchasing/orders',
   ) => boolean
   /** Whether the shell opens the equipment list. */
   canOpenEquipment: boolean
@@ -70,12 +62,12 @@ export interface AttentionSectionProps {
 /**
  * «يحتاج انتباهك» (owner 2026-10-29, from the approved /ui-kit home
  * mockup): what needs action now, each a count that opens its list
- * filtered. Since the owner's review of 2026-11-10 («ويحتاج انتباهك يكون
- * اوامر شراء موردين بحاجة لتعميد، معدات خرجت بانتهاء عمل وكرتها مفتوح،
- * معدات متاحة (العزاني)») exactly three items: the supplier POs awaiting
- * approval (`purchasing.view`), the cards whose unit left with «انتهاء عمل»
- * (0185, `sales.view`) and the Al-Azani units available now — the last from
- * the page's ONE snapshot (`matrix`), no request of its own. An item shows
+ * filtered. Since the owner's review of 2026-11-10 it was three items; since
+ * migration 0189 (owner 2026-11-11: a card is neither open nor ended) TWO:
+ * the supplier POs awaiting approval (`purchasing.view`; every draft with
+ * all its lines priced — a PO has no open / closed state) and the Al-Azani
+ * units available now — the last from the page's ONE snapshot (`matrix`),
+ * no request of its own. An item shows
  * only above zero and only for its readers. A failed count says so with a
  * retry; it is never shown as nothing to do. In the home v2 grid the block
  * keeps its place: with nothing left it says so.
@@ -88,38 +80,24 @@ export function AttentionSection({
   const { t } = useI18n()
   const permissions = usePermissions()
   const canPurchasing = permissions.can('purchasing.view')
-  const canSales = permissions.can('sales.view')
 
   const loadCounts = useCallback(
     async (signal: AbortSignal) => {
-      const [awaiting, awaitingEnd] = await Promise.all([
-        canPurchasing
-          ? headCount(
-              supabase
-                .from('supplier_pos')
-                .select('id', { count: 'exact', head: true })
-                .eq('status', 'open')
-                .eq('approval_status', 'draft')
-                .eq('unpriced_count', 0)
-                .abortSignal(signal),
-            )
-          : 0,
-        // 0185: open cards whose unit left the project with «انتهاء عمل».
-        canSales
-          ? headCount(
-              supabase
-                .from('sales_cards_awaiting_end')
-                .select('card_id', { count: 'exact', head: true })
-                .abortSignal(signal),
-            )
-          : 0,
-      ])
+      const awaiting = canPurchasing
+        ? await headCount(
+            supabase
+              .from('supplier_pos')
+              .select('id', { count: 'exact', head: true })
+              .eq('approval_status', 'draft')
+              .eq('unpriced_count', 0)
+              .abortSignal(signal),
+          )
+        : 0
       return {
         awaiting_approval: awaiting,
-        awaiting_end: awaitingEnd,
       } satisfies Partial<Record<AttentionId, number>>
     },
-    [canPurchasing, canSales],
+    [canPurchasing],
   )
   const counts = useAdminHomeSection(loadCounts)
 
@@ -136,8 +114,6 @@ export function AttentionSection({
   const hrefOf = (id: AttentionId): string | null => {
     if (id === 'awaiting_approval')
       return canOpenPage('purchasing/orders') ? awaitingApprovalHref() : null
-    if (id === 'awaiting_end')
-      return canOpenPage(AWAITING_END_PAGE) ? awaitingEndHref() : null
     return canOpenEquipment ? availableEquipmentHref(['alazani']) : null
   }
 

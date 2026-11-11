@@ -12,10 +12,7 @@ import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { CreateSupplierPoDialog } from '@/components/purchasing/CreateSupplierPoDialog'
 import { SupplierPoLinesPanel } from '@/components/purchasing/SupplierPoLinesPanel'
-import {
-  SupplierPoApprovalBadge,
-  SupplierPoStatusBadge,
-} from '@/components/purchasing/SupplierPoStatusBadge'
+import { SupplierPoApprovalBadge } from '@/components/purchasing/SupplierPoStatusBadge'
 import {
   AppLink,
   Badge,
@@ -85,7 +82,7 @@ export interface SupplierPosListScreenProps {
 
 /**
  * «اوامر الشراء» (/purchasing): the supplier POs, server-side searched by
- * number, filtered by status / supplier / company / project, sorted and
+ * number, filtered by approval / supplier / company / project, sorted and
  * paged through the unified list system; a row opens the PO page. The
  * «امر شراء جديد» button needs `purchasing.manage` (the database checks it
  * again in `create_supplier_po`).
@@ -217,13 +214,16 @@ export function SupplierPosListScreen({
       className: 'tabular-nums',
       cell: (row) => supplierPoLineCount(row),
     },
+    // 0160 (owner 2026-10-28, EM-107): «معتمد», or «بانتظار الاعتماد» for a
+    // draft. 0189 (owner 2026-11-11): a PO is neither open nor closed, so
+    // the status column is gone and «تحتاج اسعار» sits beside the approval.
     {
-      key: 'status',
-      header: t('status'),
+      key: 'approval_status',
+      header: t('supplierPoApproval'),
       sortable: true,
       cell: (row) => (
         <span className="flex flex-wrap items-center gap-1">
-          <SupplierPoStatusBadge status={row.status} />
+          <SupplierPoApprovalBadge po={row} list size="sm" />
           {(row.unpriced_count ?? 0) > 0 && (
             <Badge tone="warning" size="sm">
               {t('supplierPoNeedsPrices')} ({row.unpriced_count})
@@ -231,14 +231,6 @@ export function SupplierPosListScreen({
           )}
         </span>
       ),
-    },
-    // 0160 (owner 2026-10-28, EM-107): «معتمد», «بانتظار الاعتماد» for an
-    // open draft, or «مسودة» for a closed one.
-    {
-      key: 'approval_status',
-      header: t('supplierPoApproval'),
-      sortable: true,
-      cell: (row) => <SupplierPoApprovalBadge po={row} list size="sm" />,
     },
     // 0146: the same «اخر تعديل» column as the other lists, last.
     {

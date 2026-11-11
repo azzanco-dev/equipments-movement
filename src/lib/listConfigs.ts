@@ -16,7 +16,6 @@ import {
 } from '@/lib/driverExcel'
 import { EXIT_PURPOSE_FILTER_FIELD } from '@/lib/exitPurpose'
 import { SUPPLIER_FILTER_FIELD } from '@/lib/equipmentSupplier'
-import { CARD_PRICES_DEFAULT_FILTER } from '@/lib/cardPricesList'
 import {
   SITE_UNITS_RECENT_DEFAULT_FILTER,
   SITE_UNITS_RECENT_FILTER_KEY,
@@ -747,9 +746,10 @@ export const activityListConfig: DataListConfig = {
 /**
  * «حسب المعدات» of the PO list (owner 2026-10-31, migration 0167): one row
  * per unit on a supplier PO, over `purchasing_po_units`, with its PO number.
- * Server-side search, filters, sort and paging like every list; the open POs
- * by default (a visible, removable default filter). Placed before the orders
- * config: the purchasing tests slice the configs that follow it.
+ * Server-side search, filters, sort and paging like every list. Until
+ * migration 0189 it opened on the OPEN POs (a default filter); a supplier PO
+ * has no open / closed state any more (owner 2026-11-11). Placed before the
+ * orders config: the purchasing tests slice the configs that follow it.
  */
 export const poUnitsListConfig: DataListConfig = {
   id: 'poUnits',
@@ -768,20 +768,6 @@ export const poUnitsListConfig: DataListConfig = {
   defaultSort: 'equipment_code',
   defaultDirection: 'asc',
   filterFields: [
-    {
-      key: 'po_status',
-      label: 'status',
-      type: 'select',
-      operators: ['eq', 'neq'],
-      options: [
-        { value: 'open', label: 'مفتوح', labelI18n: 'supplierPoStatusOpen' },
-        {
-          value: 'closed',
-          label: 'مغلق',
-          labelI18n: 'supplierPoStatusClosed',
-        },
-      ],
-    },
     {
       key: 'approval_status',
       label: 'supplierPoApproval',
@@ -873,15 +859,6 @@ export const poUnitsListConfig: DataListConfig = {
       ],
     },
   ],
-  // Owner 2026-10-31: the open POs by default.
-  defaultFilters: [
-    {
-      id: 'default-po-status',
-      field: 'po_status',
-      operator: 'eq',
-      value: 'open',
-    },
-  ],
   sortableFields: [
     { key: 'equipment_code', label: 'equipmentCode' },
     { key: 'po_number', label: 'siteUnitsPoNumber' },
@@ -894,7 +871,7 @@ export const poUnitsListConfig: DataListConfig = {
 /**
  * purchasing-screens (migration 0136): the supplier purchase orders list
  * («قائمة اوامر الشراء»), over `supplier_pos`. Search is the PO number only;
- * the allowlisted filters are the status, the supplier (`lessor_id`, an
+ * the allowlisted filters are the approval, the supplier (`lessor_id`, an
  * `in` multi-select searched server-side through `asyncFields`), and the
  * company and project (the same pattern as `/logs`). Rendered as a MOCKUP on
  * /ui-kit first (owner decision 2026-10-19); the real `/purchasing` list
@@ -907,21 +884,8 @@ export const supplierPosListConfig: DataListConfig = {
   defaultSort: 'created_at',
   defaultDirection: 'desc',
   filterFields: [
-    {
-      key: 'status',
-      label: 'status',
-      type: 'select',
-      operators: ['eq', 'neq'],
-      options: [
-        { value: 'open', label: 'مفتوح', labelI18n: 'supplierPoStatusOpen' },
-        {
-          value: 'closed',
-          label: 'مغلق',
-          labelI18n: 'supplierPoStatusClosed',
-        },
-      ],
-    },
-    // 0160 (owner 2026-10-28, EM-107): draft or approved.
+    // 0160 (owner 2026-10-28, EM-107): draft or approved. 0189: the open /
+    // closed filter that came first is gone with the state itself.
     {
       key: 'approval_status',
       label: 'supplierPoApproval',
@@ -1024,7 +988,6 @@ export const supplierPosListConfig: DataListConfig = {
     { key: 'created_at', label: 'supplierPoCreatedAt' },
     { key: 'po_number', label: 'supplierPoNumber' },
     { key: 'start_date', label: 'supplierPoStartDate' },
-    { key: 'status', label: 'status' },
     { key: 'approval_status', label: 'supplierPoApproval' },
     // 0146: supplier_pos.updated_at, moved by the PO row and its lines.
     { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
@@ -1239,7 +1202,7 @@ export const clientPoUnitsListConfig: DataListConfig = {
   sortableFields: [
     { key: 'equipment_code', label: 'equipmentCode' },
     { key: 'po_number', label: 'clientPoNumber' },
-    { key: 'card_period_from', label: 'supplierPoStartDate' },
+    { key: 'issue_date', label: 'clientPoIssueDate' },
     { key: 'price', label: 'salePrice' },
     { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
   ],
@@ -1340,7 +1303,9 @@ export const equipmentCardsListConfig: DataListConfig = {
     'client_po_number',
     'supplier_po_number',
   ],
-  defaultSort: 'is_open',
+  // 0189: a card is its visit — the newest entry first (it was the open
+  // cards first; a card is neither open nor ended any more).
+  defaultSort: 'entry_at',
   defaultDirection: 'desc',
   filterFields: [
     {
@@ -1358,24 +1323,6 @@ export const equipmentCardsListConfig: DataListConfig = {
       operators: ['in'],
       options: [],
       multiple: true,
-    },
-    {
-      key: 'is_open',
-      label: 'status',
-      type: 'select',
-      operators: ['eq'],
-      options: [
-        {
-          value: 'true',
-          label: 'مفتوح',
-          labelI18n: 'equipmentCardStatusOpen',
-        },
-        {
-          value: 'false',
-          label: 'منتهي',
-          labelI18n: 'equipmentCardStatusEnded',
-        },
-      ],
     },
     {
       key: 'has_client_po',
@@ -1415,9 +1362,8 @@ export const equipmentCardsListConfig: DataListConfig = {
     },
   ],
   sortableFields: [
-    { key: 'is_open', label: 'equipmentCardsSortOpenFirst' },
+    { key: 'entry_at', label: 'supplierPoEntryDate' },
     { key: 'equipment_code', label: 'equipmentCode' },
-    { key: 'period_from', label: 'equipmentPurchasingPeriod' },
     { key: 'updated_at', label: { ar: 'تاريخ التعديل', en: 'Last updated' } },
   ],
 }
@@ -1520,25 +1466,9 @@ export const cardPricesListConfig: DataListConfig = {
   // its supplier PO first.
   defaultSort: 'last_modified_at',
   defaultDirection: 'desc',
+  // 0189: no open / ended filter (and no «open cards» default): a card has
+  // no such state any more.
   filterFields: [
-    {
-      key: 'is_open',
-      label: 'status',
-      type: 'select',
-      operators: ['eq'],
-      options: [
-        {
-          value: 'true',
-          label: 'مفتوح',
-          labelI18n: 'equipmentCardStatusOpen',
-        },
-        {
-          value: 'false',
-          label: 'منتهي',
-          labelI18n: 'equipmentCardStatusEnded',
-        },
-      ],
-    },
     {
       key: 'pricing_status',
       label: 'cardPricingStatus',
@@ -1602,7 +1532,6 @@ export const cardPricesListConfig: DataListConfig = {
       multiple: true,
     },
   ],
-  defaultFilters: [CARD_PRICES_DEFAULT_FILTER],
   sortableFields: [
     { key: 'equipment_code', label: 'equipmentCode' },
     { key: 'company_name_ar', label: 'company' },

@@ -3,7 +3,6 @@ import { PurchasingUnitCell } from '@/components/purchasing/PurchasingUnitCell'
 import { SalePrice } from '@/components/sales/SalePrice'
 import { Badge, Skeleton } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
-import { formatDate } from '@/lib/dateFormat'
 import { SALE_RATE_UNIT_LABEL_KEYS, saleRateUnitOf } from '@/lib/sales'
 import { CLIENT_PO_LINE_SELECT, type ClientPoLineRow } from '@/lib/salesData'
 import { supabase } from '@/lib/supabase'
@@ -75,9 +74,6 @@ export function ClientPoLinesPanel({ poId }: { poId: string }) {
             <th className="hidden pb-2 text-start font-normal sm:table-cell">
               {t('equipmentType')}
             </th>
-            <th className="hidden pb-2 text-start font-normal md:table-cell">
-              {t('equipmentPurchasingPeriod')}
-            </th>
             <th className="pb-2 pe-3 text-start font-normal">
               {t('supplierPoRateUnit')}
             </th>
@@ -94,18 +90,6 @@ export function ClientPoLinesPanel({ poId }: { poId: string }) {
                 </td>
                 <td className="hidden py-2.5 pe-3 text-muted sm:table-cell">
                   {unit?.type ?? '—'}
-                </td>
-                <td className="hidden whitespace-nowrap py-2.5 pe-3 text-muted md:table-cell">
-                  {line.card ? (
-                    <bdi dir="ltr">
-                      {formatDate(line.card.period_from)} –{' '}
-                      {line.card.period_to
-                        ? formatDate(line.card.period_to)
-                        : t('equipmentPurchasingOpenEnd')}
-                    </bdi>
-                  ) : (
-                    '—'
-                  )}
                 </td>
                 <td className="whitespace-nowrap py-2.5 pe-3 text-muted">
                   {t(SALE_RATE_UNIT_LABEL_KEYS[saleRateUnitOf(line.rate_unit)])}

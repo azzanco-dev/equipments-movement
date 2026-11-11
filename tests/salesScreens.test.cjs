@@ -534,8 +534,9 @@ test('quantityLabel: the dual and the 3–10 plural in Arabic, the unit of the l
   assert.equal(ar(2.5, 'month'), '2.5 شهر')
   assert.equal(sales.quantityLabel(1, 'month', 'en'), '1 month')
   assert.equal(sales.quantityLabel(400, 'hour', 'en'), '400 hours')
-  assert.equal(sales.equipmentCardStatus({ is_open: true }), 'open')
-  assert.equal(sales.equipmentCardStatus({ period_to: '2026-09-30' }), 'ended')
+  // 0189 (owner 2026-11-11): a card is neither open nor ended.
+  assert.equal(sales.equipmentCardStatus, undefined)
+  assert.equal(sales.EQUIPMENT_CARD_STATUS_BADGE, undefined)
 })
 
 test('the Zod schemas of the four forms', () => {
@@ -675,6 +676,18 @@ test('the Zod schemas of the four forms', () => {
 test('every stable token of 0169 is known and mapped to a field or a message', () => {
   const raised = new Set(
     [...MIGRATION.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g)].map((m) => m[1]),
+  )
+  // 0189 re-created add_client_po_equipment without the card period: a card
+  // is the visit, so no card ever overlaps another.
+  assert.ok(raised.has('card_overlap'))
+  raised.delete('card_overlap')
+  assert.doesNotMatch(
+    read(
+      'supabase',
+      'migrations',
+      '20261111100000_0189_po_start_date_only.sql',
+    ),
+    /card_overlap'/,
   )
   assert.deepEqual([...raised].sort(), [...sales.CLIENT_PO_ERROR_TOKENS].sort())
   const fieldTokens = new Set(

@@ -243,10 +243,12 @@ test('the KPI strip counts Al-Azani only, from the snapshot, without «بدون 
   )
 })
 
-test('the attention gates: purchasing and sales items only for their readers', () => {
+test('the attention gates: the purchasing item only for its readers', () => {
   const attention = component('AttentionSection')
   assert.match(attention, /permissions\.can\('purchasing\.view'\)/)
-  assert.match(attention, /permissions\.can\('sales\.view'\)/)
+  // 0189: the sales item (cards awaiting their end) is gone with the
+  // card's period.
+  assert.doesNotMatch(attention, /permissions\.can\('sales\.view'\)/)
   assert.doesNotMatch(attention, /loadAfaqyStats|canViewEquipmentLocation/)
   assert.match(
     component('AfaqyCard'),

@@ -67,26 +67,10 @@ export const CLIENT_PO_EVENT_LABEL_KEYS: Readonly<
 /** The PO page shows the latest events only, never a full list. */
 export const CLIENT_PO_EVENTS_LIMIT = 20
 
-/** «كرت المعدة»: open while `period_to` is NULL, else ended. */
-export type EquipmentCardStatus = 'open' | 'ended'
-
-export const EQUIPMENT_CARD_STATUS_BADGE: Readonly<
-  Record<
-    EquipmentCardStatus,
-    { key: TranslationKey; tone: 'success' | 'neutral' }
-  >
-> = {
-  open: { key: 'equipmentCardStatusOpen', tone: 'success' },
-  ended: { key: 'equipmentCardStatusEnded', tone: 'neutral' },
-}
-
-export function equipmentCardStatus(card: {
-  is_open?: boolean | null
-  period_to?: string | null
-}): EquipmentCardStatus {
-  if (typeof card.is_open === 'boolean') return card.is_open ? 'open' : 'ended'
-  return card.period_to ? 'ended' : 'open'
-}
+// «كرت المعدة» has no state of its own since migration 0189 (owner
+// 2026-11-11, «وحتى المعدة نشيل منها البداية والنهاية ومفتوح»): no period,
+// neither open nor ended. It is the unit's visit; the visit's dates are the
+// movements' and the date of the supplier side is the PO's start date.
 
 // --- The price unit: month, week, day or hour (0169, 0185) -------------------------
 
@@ -528,7 +512,6 @@ export const CLIENT_PO_FORM_MESSAGES: Readonly<Record<string, TranslationKey>> =
     invalid_client_po: 'clientPoNotFound',
     invalid_line: 'supplierPoErrorInvalidLine',
     client_po_closed: 'clientPoErrorClosed',
-    card_overlap: 'supplierPoErrorCardOverlap',
     equipment_already_on_open_client_po: 'clientPoErrorAlreadyOnOpenPo',
     equipment_not_at_po_project: 'clientPoErrorNotAtProject',
     invalid_equipment: 'supplierPoErrorInvalidEquipment',
@@ -550,7 +533,6 @@ export const CLIENT_PO_ERROR_TOKENS: readonly string[] = [
   'invalid_quantity',
   'invalid_note',
   'equipment_not_at_po_project',
-  'card_overlap',
   'equipment_already_on_open_client_po',
   'invalid_company',
   'invalid_project',
@@ -1106,7 +1088,9 @@ export const CARD_MONTH_STATE_BADGE: Readonly<
   running: { key: 'cardMonthStateRunning', tone: 'info' },
 }
 
-/** The state of one slot of `sales_card_month_slots`. */
+/** The state of one slot of `sales_card_month_slots`. `is_open` is whether
+ *  the unit is still inside (the card's visit has no exit; the callers pass
+ *  `exit_at === null` since 0189, when the card lost its own open state). */
 export function cardMonthState(
   slot: { recorded: boolean; month: string; is_open?: boolean | null },
   currentMonth: MonthKey = currentSaudiMonthKey(),
@@ -1531,7 +1515,6 @@ export function cardPricingApprovalBlocker(row: {
   /** The SAVED client price (never the typed draft). */
   card_client_price: number | string | null | undefined
   supplier_line_id: string | null | undefined
-  supplier_po_status: string | null | undefined
   supplier_price: number | string | null | undefined
   /** The typed value differs from the saved one. */
   unsaved?: boolean
@@ -1540,8 +1523,8 @@ export function cardPricingApprovalBlocker(row: {
   if (row.unsaved) return 'cardPricingBlockedUnsaved'
   if (toNumber(row.card_client_price) === null)
     return 'cardPricingBlockedNoClientPrice'
-  if (!row.supplier_line_id || row.supplier_po_status !== 'open')
-    return 'cardPricingBlockedNoSupplierLine'
+  // 0189: any supplier line (a supplier PO is neither open nor closed).
+  if (!row.supplier_line_id) return 'cardPricingBlockedNoSupplierLine'
   if (toNumber(row.supplier_price) === null)
     return 'cardPricingBlockedNoSupplierPrice'
   return null
@@ -1629,96 +1612,4 @@ export function cardPricingFormMessage(
   ))
     if (text.includes(token)) return key
   return 'supplierPoSaveFailed'
-}
-
-// --- The manual card end («انهاء الكرت», migration 0185) ------------------------------------------
-//
-// Owner 2026-11-08, «انهاء الكرت خليه يدوي»: a sales.manage holder ends an
-// OPEN card on a day from its period_from to today (Saudi) with an optional
-// note (end_equipment_card), and reopens an ended one (reopen_equipment_card).
-
-/** The form values of «انهاء الكرت». */
-export interface EndCardFormValues {
-  /** A date key (YYYY-MM-DD). */
-  period_to: string
-  note: string
-}
-
-export const END_CARD_FIELD_ORDER: readonly (keyof EndCardFormValues)[] = [
-  'period_to',
-  'note',
-]
-
-/** Tokens of end_equipment_card that name a field of the dialog. */
-export const END_CARD_FIELD_RULES: readonly DatabaseFieldRule<EndCardFormValues>[] =
-  [
-    {
-      on: 'raised',
-      match: 'invalid_period_to',
-      field: 'period_to',
-      key: 'equipmentCardEndDateInvalid',
-    },
-    {
-      on: 'raised',
-      match: 'card_has_later_months',
-      field: 'period_to',
-      key: 'equipmentCardEndHasLaterMonths',
-    },
-    {
-      on: 'raised',
-      match: 'invalid_note',
-      field: 'note',
-      key: 'cardMonthNoteTooLong',
-    },
-  ]
-
-/** Every 0185 end / reopen token as a form-level message. */
-export const CARD_END_FORM_MESSAGES: Readonly<Record<string, TranslationKey>> =
-  {
-    sales_manage_required: 'clientPoErrorManageRequired',
-    invalid_card: 'equipmentCardNotFound',
-    invalid_note: 'cardMonthNoteTooLong',
-    invalid_period_to: 'equipmentCardEndDateInvalid',
-    card_already_ended: 'equipmentCardEndAlreadyEnded',
-    card_has_later_months: 'equipmentCardEndHasLaterMonths',
-    card_not_ended: 'equipmentCardReopenNotEnded',
-    card_overlap: 'equipmentCardReopenOverlap',
-  }
-
-/** Every stable token of the 0185 end / reopen functions, for the tests. */
-export const CARD_END_ERROR_TOKENS: readonly string[] = [
-  'sales_manage_required',
-  'invalid_card',
-  'invalid_note',
-  'invalid_period_to',
-  'card_already_ended',
-  'card_has_later_months',
-  'card_not_ended',
-  'card_overlap',
-]
-
-/** The safe message for a rejected end or reopening; never the raw text. */
-export function cardEndFormMessage(
-  error: PostgresLikeError | null | undefined,
-): TranslationKey {
-  if (!error) return 'supplierPoSaveFailed'
-  const text = errorText(error)
-  for (const [token, key] of Object.entries(CARD_END_FORM_MESSAGES).sort(
-    (a, b) => b[0].length - a[0].length,
-  ))
-    if (text.includes(token)) return key
-  return 'supplierPoSaveFailed'
-}
-
-/** The end dialog's outcome: a field message when a rule matches, else one
- *  form-level message. */
-export function cardEndErrorOutcome<T>(
-  error: PostgresLikeError | null | undefined,
-  mapField: (error: PostgresLikeError) => FieldErrors<T> | null,
-): { fieldErrors: FieldErrors<T> } | { message: TranslationKey } {
-  if (error) {
-    const fieldErrors = mapField(error)
-    if (fieldErrors) return { fieldErrors }
-  }
-  return { message: cardEndFormMessage(error) }
 }

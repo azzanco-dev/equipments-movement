@@ -7,22 +7,22 @@
  *
  * Since the owner's review of 2026-11-10 («ويحتاج انتباهك يكون اوامر شراء
  * موردين بحاجة لتعميد، معدات خرجت بانتهاء عمل وكرتها مفتوح، معدات متاحة
- * (العزاني)»): exactly three items. The workshop without a purpose, the
- * units on projects without a PO, the POs that need prices, the Afaqy
- * signal and the long out-of-service units left the list.
+ * (العزاني)») it was exactly three items; the workshop without a purpose,
+ * the units on projects without a PO, the POs that need prices, the Afaqy
+ * signal and the long out-of-service units had left the list. Since
+ * migration 0189 (owner 2026-11-11: a card is neither open nor ended, so
+ * nothing «awaits its end») TWO items: the supplier POs awaiting approval
+ * and the Al-Azani units available now.
  */
 
 import type { AdminHomeOwner } from '@/lib/adminHomeStats'
 import { ownersFilter } from '@/lib/adminHomeLinks'
-import { CARDS_AWAITING_END_HREF } from '@/lib/cardsAwaitingEnd'
 
-export type AttentionId =
-  'awaiting_approval' | 'awaiting_end' | 'available_alazani'
+export type AttentionId = 'awaiting_approval' | 'available_alazani'
 
 /** Every item in the order the block shows them. */
 export const ATTENTION_ORDER: readonly AttentionId[] = [
   'awaiting_approval',
-  'awaiting_end',
   'available_alazani',
 ]
 
@@ -67,17 +67,10 @@ export function outOfServiceLongHref(
   ])
 }
 
-const OPEN_PO: UrlFilter = {
-  id: 'status',
-  field: 'status',
-  operator: 'eq',
-  value: 'open',
-}
-
-/** Open drafts with every line priced: ready for approval. */
+/** Drafts with every line priced: ready for approval (0189: a supplier PO
+ *  has no open / closed state, so no status filter). */
 export function awaitingApprovalHref(): string {
   return `/purchasing/orders?filters=${filtersParam([
-    OPEN_PO,
     {
       id: 'approval',
       field: 'approval_status',
@@ -86,18 +79,6 @@ export function awaitingApprovalHref(): string {
     },
     { id: 'priced', field: 'unpriced_count', operator: 'eq', value: '0' },
   ])}`
-}
-
-/**
- * «معدات خرجت بانتهاء عمل وكرتها مفتوح» (migration 0185): the rows of
- * `sales_cards_awaiting_end`, read only by a `sales.view` holder (the view's
- * RLS) and linked only when the shell opens `sales/cards`.
- */
-export const AWAITING_END_PAGE = 'sales/cards' as const
-
-/** The «كروت المعدات» list restricted to the cards awaiting their end. */
-export function awaitingEndHref(): string {
-  return CARDS_AWAITING_END_HREF
 }
 
 /** The items with a count above zero, in the block's order. */

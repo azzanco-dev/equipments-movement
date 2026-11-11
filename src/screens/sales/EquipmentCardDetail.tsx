@@ -4,7 +4,6 @@ import {
   BadgeCheck,
   Building2,
   Calendar,
-  CalendarX2,
   Check,
   Clock,
   Coins,
@@ -20,7 +19,6 @@ import {
   Plus,
   Receipt,
   RotateCcw,
-  SlidersHorizontal,
   Timer,
   Truck,
   User,
@@ -44,11 +42,6 @@ import {
   ReturnCardPricingDialog,
   type CardPricingTarget,
 } from '@/components/sales/CardPricingDialogs'
-import { EquipmentCardStatusBadge } from '@/components/sales/ClientPoStatusBadge'
-import {
-  EndCardDialog,
-  ReopenCardDialog,
-} from '@/components/sales/EndCardDialog'
 import {
   EventTimeline,
   compareTimelineItems,
@@ -71,10 +64,6 @@ import {
   DataTable,
   DescriptionList,
   DetailHeader,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   EmptyState,
   ErrorState,
   IconButton,
@@ -118,7 +107,6 @@ import {
   contractHours,
   currentSaudiMonthKey,
   equipmentCardEventDetail,
-  equipmentCardStatus,
   formatDaysText,
   formatHours,
   isDaysRateUnit,
@@ -230,17 +218,20 @@ interface CardMonthRow {
  * «صفحة كرت المعدة» (/sales/cards/:id, migration 0169, the /ui-kit mockup
  * the owner approved on 2026-11-02, phase 1; phase 2 «كروت التشغيل»,
  * migration 0172, approved 2026-11-04): the header (the unit with its plate
- * and type, «الشركة · المشروع», the period, the status), the summary strip
+ * and type, «الشركة · المشروع», the days of its visit and whether the unit
+ * is still inside), the summary strip
  * with the LATEST RECORDED month's figures, the three cards الحركة /
  * المبيعات / المشتريات with real data, the «الشهور» table (the recorded
  * months of `sales_card_months` with their amounts and the awaited months
  * of `sales_card_month_slots`, newest first, under the consumed hours
  * against the contract total), «تسجيل شهر» / edit / delete for
  * `sales.manage` through `RecordCardMonthDialog`, and the timeline from
- * both PO event tables plus the card's own events. Since 0185 «انهاء الكرت»
- * (an open card) and «اعادة فتح الكرت» (an ended one) for `sales.manage`,
- * in the header's «خيارات» and the mobile bar (`EndCardDialog` /
- * `ReopenCardDialog`), and the card's client price shows its own unit. Reads through RLS: `sales.view` or
+ * both PO event tables plus the card's own events. The card's client price
+ * shows its own unit (0185). Since migration 0189 (owner 2026-11-11, «وحتى
+ * المعدة نشيل منها البداية والنهاية ومفتوح») a card has NO period and is
+ * neither open nor ended: «انهاء الكرت» / «اعادة فتح الكرت» (0185) are gone
+ * (their past events stay on the timeline) and the dates shown are the
+ * visit's, from the movements. Reads through RLS: `sales.view` or
  * `purchasing.view` for the card, each side's own key (the other side is
  * simply NULL without it).
  */
@@ -269,7 +260,6 @@ function CardDetail({
   const [pricingDialog, setPricingDialog] = useState<
     'approve' | 'return' | null
   >(null)
-  const [endDialog, setEndDialog] = useState<'end' | 'reopen' | null>(null)
   useTabTitle(card?.equipment_code)
   const [visit, setVisit] = useState<CardVisitRow | null>(null)
   const [clientEvents, setClientEvents] = useState<ClientPoEventRow[]>([])
@@ -463,8 +453,6 @@ function CardDetail({
       </div>
     )
 
-  const status = equipmentCardStatus(card)
-  const open = status === 'open'
   const owned = card.equipment_ownership_status === 'alazani'
   const companyName = localizedName(
     lang,
@@ -476,9 +464,14 @@ function CardDetail({
     card.project_name_ar,
     card.project_name_en,
   )
-  const periodLabel = card.period_to
-    ? `${formatDate(card.period_from)} – ${formatDate(card.period_to)}`
-    : `${formatDate(card.period_from)} · ${t('equipmentPurchasingOpenEnd')}`
+  // 0189: the card has no period; the header shows its VISIT — the entry
+  // day and, once the unit left, the exit day (from the movement read; a
+  // reader without the movement rights sees neither).
+  const visitLabel = card.entry_at
+    ? visit?.exit_at
+      ? `${formatDate(card.entry_at)} – ${formatDate(visit.exit_at)}`
+      : formatDate(card.entry_at)
+    : null
 
   const supplierItems: TimelineItem[] = supplierEvents
     .filter((event) =>
@@ -571,7 +564,12 @@ function CardDetail({
       )
       .map((slot) => ({
         month: monthKeyOf(slot.month),
-        state: cardMonthState(slot, currentMonth),
+        // «جاري» while the unit is still inside (0189: the visit's exit;
+        // it was the card's own open state).
+        state: cardMonthState(
+          { ...slot, is_open: slot.exit_at === null },
+          currentMonth,
+        ),
         record: null,
         presence_days: slot.presence_days,
       })),
@@ -693,50 +691,6 @@ function CardDetail({
     supplier_rate_unit: card.supplier_rate_unit,
     supplier_po_number: card.supplier_po_number,
   }
-  // 0185: «انهاء الكرت» on an open card, «اعادة فتح الكرت» on an ended one.
-  const endTarget = {
-    card_id: card.card_id,
-    equipment_code: card.equipment_code,
-    period_from: card.period_from,
-  }
-  const cardOptions = (size: 'sm' | 'md') => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size={size}
-          className={size === 'md' ? 'h-11 flex-1' : undefined}
-          icon={
-            <SlidersHorizontal
-              size={size === 'sm' ? 14 : 16}
-              aria-hidden="true"
-            />
-          }
-          aria-label={t('equipmentCardActions')}
-        >
-          {t('options')}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        {open ? (
-          <DropdownMenuItem
-            icon={<CalendarX2 size={15} />}
-            tone="danger"
-            onSelect={() => setEndDialog('end')}
-          >
-            {t('equipmentCardEnd')}
-          </DropdownMenuItem>
-        ) : (
-          <DropdownMenuItem
-            icon={<RotateCcw size={15} />}
-            onSelect={() => setEndDialog('reopen')}
-          >
-            {t('equipmentCardReopen')}
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
   const pricingButton = (size: 'sm' | 'md') => {
     const className = size === 'md' ? 'h-11 flex-1' : undefined
     if (pricingStatus === 'approved')
@@ -805,18 +759,6 @@ function CardDetail({
         />
       ),
     },
-    // 0185: an ended card names its end day.
-    ...(card.period_to
-      ? [
-          {
-            key: 'periodTo',
-            icon: <CalendarX2 size={16} />,
-            label: t('equipmentCardEndDate'),
-            value: formatDate(card.period_to),
-            dir: 'ltr' as const,
-          },
-        ]
-      : []),
   ]
 
   const salesFacts: DescriptionListItem[] = card.client_po_number
@@ -1067,10 +1009,12 @@ function CardDetail({
         <Building2 size={16} aria-hidden="true" className="text-muted" />
         {companyName} · {projectName}
       </span>
-      <span className="flex items-center gap-1.5 text-sm text-muted">
-        <Calendar size={14} aria-hidden="true" />
-        <bdi dir="ltr">{periodLabel}</bdi>
-      </span>
+      {visitLabel && (
+        <span className="flex items-center gap-1.5 text-sm text-muted">
+          <Calendar size={14} aria-hidden="true" />
+          <bdi dir="ltr">{visitLabel}</bdi>
+        </span>
+      )}
     </span>
   )
 
@@ -1087,15 +1031,21 @@ function CardDetail({
         </Notice>
       )}
 
-      {/* 1. The header card: the unit, the company and project, the period,
-          the status; no action in phase 1. */}
+      {/* 1. The header card: the unit, the company and project, the days of
+          its visit and whether the unit is still inside. */}
       <div className="card space-y-4 p-4">
         <DetailHeader
           as="h1"
           identifier={card.equipment_code ?? '—'}
           identifierLtr
           subtitle={unitCell}
-          badges={<EquipmentCardStatusBadge status={status} />}
+          badges={
+            visit ? (
+              <Badge tone={visit.is_open ? 'success' : 'neutral'}>
+                {t(visit.is_open ? 'siteUnitsInside' : 'siteUnitsExited')}
+              </Badge>
+            ) : undefined
+          }
           actions={
             onOpenEquipment || canManage || canApprove ? (
               <div className="hidden gap-2 sm:flex">
@@ -1112,7 +1062,6 @@ function CardDetail({
                 )}
                 {canApprove && pricingButton('sm')}
                 {canManage && SHOW_CARD_MONTHS && recordButton('sm')}
-                {canManage && cardOptions('sm')}
               </div>
             ) : undefined
           }
@@ -1258,12 +1207,6 @@ function CardDetail({
           </div>
         )}
       </div>
-
-      {!open && (
-        <Notice tone="neutral" size="compact" icon={<Lock size={16} />}>
-          {t('equipmentCardEndedNotice')}
-        </Notice>
-      )}
 
       {/* The visibility rule (owner 2026-10-15): nothing is hidden. */}
       <Notice tone="info" size="compact" icon={<Eye size={16} />}>
@@ -1444,56 +1387,14 @@ function CardDetail({
       </p>
 
       {/* 6. The mobile action bar. */}
-      {(canManage || canApprove) && (
+      {(canApprove || (canManage && SHOW_CARD_MONTHS)) && (
         <div
           className="sticky bottom-0 z-10 -mx-4 flex gap-2 border-t bg-bg p-3 sm:hidden"
           style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
           {canApprove && pricingButton('md')}
           {canManage && SHOW_CARD_MONTHS && recordButton('md')}
-          {canManage && cardOptions('md')}
         </div>
-      )}
-
-      {canManage && (
-        <>
-          <EndCardDialog
-            card={endTarget}
-            open={endDialog === 'end'}
-            onOpenChange={(next) => {
-              if (!next) setEndDialog(null)
-            }}
-            onEnded={() => {
-              setEndDialog(null)
-              void toast({
-                title: t('equipmentCardEndedToast').replace(
-                  '{unit}',
-                  card.equipment_code ?? '—',
-                ),
-                tone: 'success',
-              })
-              fetchData()
-            }}
-          />
-          <ReopenCardDialog
-            card={endTarget}
-            open={endDialog === 'reopen'}
-            onOpenChange={(next) => {
-              if (!next) setEndDialog(null)
-            }}
-            onReopened={() => {
-              setEndDialog(null)
-              void toast({
-                title: t('equipmentCardReopenedToast').replace(
-                  '{unit}',
-                  card.equipment_code ?? '—',
-                ),
-                tone: 'success',
-              })
-              fetchData()
-            }}
-          />
-        </>
       )}
 
       {canApprove && (

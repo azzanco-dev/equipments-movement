@@ -243,7 +243,8 @@ test('no screen assumes the SPO shape; the number is data everywhere', () => {
     ['src', 'screens', 'purchasing', 'SiteUnitsScreen.tsx'],
     ['src', 'screens', 'purchasing', 'PoUnitsList.tsx'],
     ['src', 'components', 'purchasing', 'SupplierPoPrintSheet.tsx'],
-    ['src', 'components', 'purchasing', 'CloseSupplierPoDialog.tsx'],
+    // 0189: «رجوع للتعديل» took the place of the close dialog.
+    ['src', 'components', 'purchasing', 'ReturnSupplierPoDialog.tsx'],
     ['src', 'components', 'purchasing', 'EquipmentPurchasingCard.tsx'],
     ['src', 'lib', 'purchasing.ts'],
     ['src', 'lib', 'purchasingData.ts'],

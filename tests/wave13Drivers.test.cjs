@@ -290,14 +290,13 @@ test('the drivers list hides the external supplier by default, NULL kept', () =>
     allowed,
   )
   assert.deepEqual(plain(calls), [['in', 'employment_type', [EXTERNAL]]])
-  // Only the drivers list has a default, and (owner 2026-10-31, migration
-  // 0167) the PO list's «حسب المعدات» view: the open POs — and, mirrored
-  // on the sales side (0169), the client PO list's two views.
+  // Only the drivers list has a default, and the client PO list's two
+  // views (0169): the open POs. The supplier PO list's «حسب المعدات» view
+  // (0167) and «اسعار المعدات» (0174) had theirs — the open POs, the open
+  // cards — until migration 0189 took the two states away (owner
+  // 2026-11-11); they fall under the last branch now: no default.
   for (const config of Object.values(configs))
-    if (
-      config === configs.poUnitsListConfig ||
-      config === configs.clientPoUnitsListConfig
-    )
+    if (config === configs.clientPoUnitsListConfig)
       assert.deepEqual(plain(config.defaultFilters), [
         {
           id: 'default-po-status',
@@ -325,11 +324,6 @@ test('the drivers list hides the external supplier by default, NULL kept', () =>
           operator: 'eq',
           value: lib('cardMonthsList').CARD_MONTHS_DEFAULT_MONTH,
         },
-      ])
-    // Card pricing (0174): «اسعار المعدات» opens on the open cards.
-    else if (config === configs.cardPricesListConfig)
-      assert.deepEqual(plain(config.defaultFilters), [
-        { id: 'default-open', field: 'is_open', operator: 'eq', value: 'true' },
       ])
     // 0188: «المعدات في المشاريع» opens on the visits inside now or
     // exited since 1 August 2026 (owner 2026-11-09).

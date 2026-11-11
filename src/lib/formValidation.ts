@@ -745,6 +745,11 @@ export const supplierPoRemoveLineFormSchema = supplierPoLineFormSchema.pick({
   note: true,
 })
 
+/** «رجوع للتعديل» (return_supplier_po_approval, 0189): the optional note. */
+export const supplierPoReturnSchema = supplierPoLineFormSchema.pick({
+  note: true,
+})
+
 /** «تعديل الامر» (update_supplier_po, 0142): the start date and the notes. */
 export const supplierPoEditFormSchema = supplierPoFormSchema.innerType().pick({
   start_date: true,
@@ -887,20 +892,6 @@ export const cardPriceSchema = z
     (value) => !value || isValidCardPrice(value),
     message('cardPriceInvalid'),
   )
-
-/**
- * «انهاء الكرت» (end_equipment_card, 0185): the end day is chosen (the
- * picker keeps it between the card's first day and today; the database
- * re-checks with `invalid_period_to`), the note optional and at most 500
- * characters.
- */
-export const endCardFormSchema = z.object({
-  period_to: selected('equipmentCardEndDateRequired'),
-  note: optionalText({
-    max: CARD_MONTH_NOTE_MAX,
-    lengthKey: 'cardMonthNoteTooLong',
-  }),
-})
 
 /** The optional note of «رجوع للتعديل» (return_equipment_card_pricing). */
 export const cardPricingReturnSchema = z.object({

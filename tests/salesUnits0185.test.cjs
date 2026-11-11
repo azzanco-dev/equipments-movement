@@ -52,7 +52,6 @@ const plain = (value) => JSON.parse(JSON.stringify(value ?? null))
 const v = loadLibModule('formValidation')
 const sales = loadLibModule('sales')
 const nav = loadLibModule('navPermissions')
-const awaiting = loadLibModule('cardsAwaitingEnd')
 
 const MIGRATION = read(
   'supabase',
@@ -349,59 +348,32 @@ test('«اسعار المعدات»: the unit select, the supplier unit for an u
   )
 })
 
-// --- The card end ----------------------------------------------------------------------
+// --- The card end: built for 0185, removed by 0189 -----------------------------------------
 
-test('«انهاء الكرت» / «اعادة فتح الكرت»: the RPCs, the dialog, the tokens and the events', () => {
+test('«انهاء الكرت» is gone since 0189; its past events still read', () => {
+  // Owner 2026-11-11 («وحتى المعدة نشيل منها البداية والنهاية ومفتوح»): a
+  // card has no period, so nothing ends or reopens it.
   const data = read('src', 'lib', 'salesData.ts')
-  assert.match(
-    data,
-    /supabase\.rpc\('end_equipment_card', \{\s+p_card_id: input\.cardId,\s+p_period_to: input\.periodTo,\s+p_note: input\.note\.trim\(\) \|\| null,/,
+  assert.doesNotMatch(data, /end_equipment_card|reopen_equipment_card/)
+  assert.ok(
+    !fs.existsSync(
+      path.join(ROOT, 'src', 'components', 'sales', 'EndCardDialog.tsx'),
+    ),
   )
-  assert.match(
-    data,
-    /supabase\.rpc\('reopen_equipment_card', \{\s+p_card_id: input\.cardId,\s+p_note: input\.note\.trim\(\) \|\| null,/,
-  )
-  const dialog = read('src', 'components', 'sales', 'EndCardDialog.tsx')
-  assert.match(dialog, /min=\{card\.period_from\}/)
-  assert.match(dialog, /max=\{today\}/)
-  assert.match(dialog, /validateWithSchema\(endCardFormSchema, form\)/)
-  assert.match(dialog, /mapDatabaseErrorToField\(error, END_CARD_FIELD_RULES\)/)
-  assert.doesNotMatch(dialog, HAMZA_ALIF)
   const page = read('src', 'screens', 'sales', 'EquipmentCardDetail.tsx')
-  assert.match(page, /\{canManage && cardOptions\('sm'\)\}/)
-  assert.match(page, /\{canManage && cardOptions\('md'\)\}/)
-  assert.match(page, /onSelect=\{\(\) => setEndDialog\('end'\)\}/)
-  assert.match(page, /onSelect=\{\(\) => setEndDialog\('reopen'\)\}/)
-  // Every token of the two functions is mapped.
-  const body = MIGRATION.slice(
-    MIGRATION.indexOf('CREATE OR REPLACE FUNCTION public.end_equipment_card('),
-    MIGRATION.indexOf('CREATE OR REPLACE VIEW public.sales_cards_awaiting_end'),
+  assert.doesNotMatch(page, /cardOptions|setEndDialog|EndCardDialog|period_to/)
+  assert.equal(sales.CARD_END_ERROR_TOKENS, undefined)
+  assert.equal(sales.cardEndFormMessage, undefined)
+  assert.equal(sales.END_CARD_FIELD_RULES, undefined)
+  assert.equal(v.endCardFormSchema, undefined)
+  const dropped = read(
+    'supabase',
+    'migrations',
+    '20261111100000_0189_po_start_date_only.sql',
   )
-  const raised = new Set([
-    ...[...body.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g)].map((m) => m[1]),
-    'sales_manage_required',
-  ])
-  assert.deepEqual([...raised].sort(), [...sales.CARD_END_ERROR_TOKENS].sort())
-  for (const token of raised)
-    assert.ok(token in sales.CARD_END_FORM_MESSAGES, token)
-  assert.equal(
-    sales.cardEndFormMessage({ code: '23P01', message: 'card_overlap' }),
-    'equipmentCardReopenOverlap',
-  )
-  assert.deepEqual(
-    plain(
-      v.mapDatabaseErrorToField(
-        { code: '55000', message: 'card_has_later_months' },
-        sales.END_CARD_FIELD_RULES,
-      ),
-    ),
-    { period_to: 'equipmentCardEndHasLaterMonths' },
-  )
-  assert.deepEqual(
-    plain(
-      v.validateWithSchema(v.endCardFormSchema, { period_to: '', note: '' }),
-    ),
-    { period_to: 'equipmentCardEndDateRequired' },
+  assert.match(
+    dropped,
+    /DROP FUNCTION public\.end_equipment_card\(uuid, date, text\);\s+DROP FUNCTION public\.reopen_equipment_card\(uuid, text\);/,
   )
   // The other 0185 tokens: the unit on the setter, the days on the month.
   assert.equal(
@@ -462,51 +434,27 @@ test('«انهاء الكرت» / «اعادة فتح الكرت»: the RPCs, th
   )
 })
 
-// --- The cards awaiting their end ---------------------------------------------------------
+// --- The cards awaiting their end: built for 0185, removed by 0189 -------------------------
 
-test('«بانتظار الانهاء»: awaiting=1 in the URL, one bounded read of ids, then .in(card_id)', () => {
-  assert.equal(awaiting.CARDS_AWAITING_END_HREF, '/sales/cards?awaiting=1')
-  assert.equal(
-    awaiting.isCardsAwaitingEnd(new URLSearchParams('awaiting=1')),
-    true,
-  )
-  assert.equal(
-    awaiting.isCardsAwaitingEnd(new URLSearchParams('awaiting=0')),
-    false,
-  )
-  assert.equal(
-    awaiting.cardsAwaitingEndHref(
-      new URLSearchParams('q=A1&page=3&size=50'),
-      true,
-    ),
-    'q=A1&size=50&awaiting=1',
-  )
-  assert.equal(
-    awaiting.cardsAwaitingEndHref(
-      new URLSearchParams('awaiting=1&page=2'),
-      false,
-    ),
-    '',
-  )
+test('«بانتظار الانهاء» is gone since 0189: no switch, no view read', () => {
+  assert.ok(!fs.existsSync(path.join(ROOT, 'src', 'lib', 'cardsAwaitingEnd.ts')))
   const data = read('src', 'lib', 'salesData.ts')
-  assert.match(
-    data,
-    /\.from\('sales_cards_awaiting_end'\)\s+\.select\('card_id'\)/,
-  )
-  assert.match(data, /\.limit\(CARDS_AWAITING_END_LIMIT\)/)
-  assert.match(data, /export const CARDS_AWAITING_END_LIMIT = 500/)
+  assert.doesNotMatch(data, /sales_cards_awaiting_end|CARDS_AWAITING_END_LIMIT/)
   const screen = read('src', 'screens', 'sales', 'EquipmentCardsScreen.tsx')
-  assert.match(
-    screen,
-    /if \(awaitingIds\) query = query\.in\('card_id', awaitingIds\)/,
-  )
+  assert.doesNotMatch(screen, /awaiting|is_open|period_from|period_to/)
+  // The list shows the entry day of the card's visit instead of a period.
+  assert.match(screen, /key: 'entry_at',\s+header: t\('supplierPoEntryDate'\),/)
   assert.match(
     screen,
     /rowHref=\{\(row\) => `\/sales\/cards\/\$\{row\.card_id\}`\}/,
   )
   assert.match(
-    MIGRATION,
-    /CREATE OR REPLACE VIEW public\.sales_cards_awaiting_end/,
+    read(
+      'supabase',
+      'migrations',
+      '20261111100000_0189_po_start_date_only.sql',
+    ),
+    /DROP VIEW public\.sales_cards_awaiting_end;/,
   )
 })
 

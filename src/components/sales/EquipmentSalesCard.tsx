@@ -69,15 +69,10 @@ export function EquipmentSalesCard({
     setError(Boolean(loadError))
     const list = ((data as unknown as EquipmentSalesRow[] | null) ?? [])
       .slice()
-      // Open card first, then the latest period first.
-      .sort((a, b) => {
-        const openA = a.card?.period_to ? 1 : 0
-        const openB = b.card?.period_to ? 1 : 0
-        if (openA !== openB) return openA - openB
-        return (b.card?.period_from ?? '').localeCompare(
-          a.card?.period_from ?? '',
-        )
-      })
+      // The latest issue date first (0189: a card has no period).
+      .sort((a, b) =>
+        (b.po?.issue_date ?? '').localeCompare(a.po?.issue_date ?? ''),
+      )
     setRows(list)
     setLoading(false)
   }, [allowed, equipmentId, startRequest])
@@ -117,18 +112,14 @@ export function EquipmentSalesCard({
         ),
     },
     {
-      key: 'since',
-      header: t('clientPoSince'),
+      key: 'issue_date',
+      header: t('clientPoIssueDate'),
       hideBelow: 'sm',
       className: 'tabular-nums',
       cell: (row) =>
-        row.card ? (
+        row.po ? (
           <bdi dir="ltr" className="whitespace-nowrap">
-            {formatDate(row.card.period_from)}
-            {' – '}
-            {row.card.period_to
-              ? formatDate(row.card.period_to)
-              : t('equipmentPurchasingOpenEnd')}
+            {formatDate(row.po.issue_date)}
           </bdi>
         ) : (
           '—'

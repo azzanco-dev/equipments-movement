@@ -79,7 +79,8 @@ test('every item opens its list with allowlisted filters', () => {
     filtersOf(lib.awaitingApprovalHref(), 'filters').map(
       (f) => `${f.field}:${f.operator}:${f.value}`,
     ),
-    ['status:eq:open', 'approval_status:eq:draft', 'unpriced_count:eq:0'],
+    // 0189 (owner 2026-11-11): a supplier PO has no open / closed state.
+    ['approval_status:eq:draft', 'unpriced_count:eq:0'],
   )
   // Owner 2026-11-10: the items that left the block took their links along.
   for (const gone of ['unclassifiedHref', 'noPoHref', 'unpricedHref'])
@@ -133,23 +134,18 @@ test('the section gates its items and sits at the end of the home', () => {
   )
 })
 
-// 0185 (owner go 2026-11-08): «معدات خرجت بانتهاء عمل وكرتها مفتوح».
-test('the cards awaiting their end: after the PO item, sales readers only', () => {
-  // Owner 2026-11-10: «ويحتاج انتباهك يكون اوامر شراء موردين بحاجة لتعميد،
-  // معدات خرجت بانتهاء عمل وكرتها مفتوح، معدات متاحة (العزاني)».
+// 0185 added «معدات خرجت بانتهاء عمل وكرتها مفتوح»; migration 0189 (owner
+// 2026-11-11, «وحتى المعدة نشيل منها البداية والنهاية ومفتوح») took the
+// card's period away, so nothing «awaits its end» any more.
+test('0189: no cards awaiting their end — two items, no sales read', () => {
   assert.deepEqual(
     [...lib.ATTENTION_ORDER],
-    ['awaiting_approval', 'awaiting_end', 'available_alazani'],
+    ['awaiting_approval', 'available_alazani'],
   )
-  assert.deepEqual(
-    [...lib.visibleAttentionItems({ awaiting_end: 3, awaiting_approval: 0 })],
-    ['awaiting_end'],
-  )
-  assert.equal(lib.visibleAttentionItems({ awaiting_end: 0 }).length, 0)
-  const awaiting = loadLib('cardsAwaitingEnd')
-  assert.equal(lib.awaitingEndHref(), awaiting.CARDS_AWAITING_END_HREF)
-  assert.equal(lib.awaitingEndHref(), '/sales/cards?awaiting=1')
-  assert.equal(lib.AWAITING_END_PAGE, 'sales/cards')
+  assert.equal(lib.visibleAttentionItems({ awaiting_end: 3 }).length, 0)
+  assert.equal(lib.awaitingEndHref, undefined)
+  assert.equal(lib.AWAITING_END_PAGE, undefined)
+  assert.ok(!fs.existsSync(path.join(ROOT, 'src', 'lib', 'cardsAwaitingEnd.ts')))
 
   const section = read(
     'src',
@@ -157,33 +153,17 @@ test('the cards awaiting their end: after the PO item, sales readers only', () =
     'admin-home',
     'AttentionSection.tsx',
   )
-  assert.match(section, /const canSales = permissions\.can\('sales\.view'\)/)
+  assert.doesNotMatch(
+    section,
+    /sales_cards_awaiting_end|awaiting_end|canSales|adminAttentionAwaitingEnd/,
+  )
+  // The approval count: every draft with all its lines priced (no status).
   assert.match(
     section,
-    /canSales\s*\?\s*headCount\(\s*supabase\s*\.from\('sales_cards_awaiting_end'\)\s*\.select\('card_id', \{ count: 'exact', head: true \}\)/,
+    /\.from\('supplier_pos'\)\s+\.select\('id', \{ count: 'exact', head: true \}\)\s+\.eq\('approval_status', 'draft'\)\s+\.eq\('unpriced_count', 0\)/,
   )
-  assert.match(section, /awaiting_end: awaitingEnd,/)
-  assert.match(section, /\[canPurchasing, canSales\]/)
-  assert.match(
-    section,
-    /canOpenPage\(AWAITING_END_PAGE\) \? awaitingEndHref\(\) : null/,
-  )
-  assert.match(section, /label: 'adminAttentionAwaitingEnd'/)
-  // The shell's page list carries the gate the item links through.
-  assert.match(
-    read('src', 'screens', 'admin-home', 'AdminHomeScreen.tsx'),
-    /'purchasing\/orders' \| 'sales\/cards'/,
-  )
-  const translations = read('src', 'i18n', 'translations.ts')
-  for (const key of [
-    'adminAttentionAwaitingEnd',
-    'adminAttentionAwaitingEndHint',
-  ]) {
-    const matches =
-      translations.match(new RegExp(`^    ${key}: '[^'\n]+',$`, 'gm')) ?? []
-    assert.equal(matches.length, 2, key)
-    assert.doesNotMatch(matches[0], /[أإآ]/, key)
-  }
+  assert.doesNotMatch(section, /\.eq\('status', 'open'\)/)
+  assert.match(section, /\[canPurchasing\],/)
 })
 
 // Owner 2026-11-10: «معدات متاحة (العزاني)» from the page's snapshot.

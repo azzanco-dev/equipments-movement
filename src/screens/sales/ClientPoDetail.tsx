@@ -68,7 +68,6 @@ import {
   CLIENT_PO_EVENT_SELECT,
   CLIENT_PO_LINE_SELECT,
   CLIENT_PO_SELECT,
-  cardPeriodLabel,
   type ClientPoEventRow,
   type ClientPoLineRow,
   type ClientPoRow,
@@ -81,7 +80,7 @@ export interface ClientPoDetailProps {
   onOpenEquipment?: (equipmentId: string) => void
 }
 
-type SortKey = 'equipment' | 'period' | 'price'
+type SortKey = 'equipment' | 'price'
 type SortDirection = 'asc' | 'desc'
 
 /** The list the page returns to (the «PO العملاء» child of «المبيعات»). */
@@ -246,8 +245,6 @@ export function ClientPoDetail({
 
   const sortValue = (line: ClientPoLineRow): string | number => {
     switch (sort.key) {
-      case 'period':
-        return line.card?.period_from ?? ''
       case 'price':
         return line.price === null ? -1 : Number(line.price)
       default:
@@ -358,7 +355,6 @@ export function ClientPoDetail({
 
   const sortOptions: { value: SortKey; label: string }[] = [
     { value: 'equipment', label: t('supplierPoEquipmentField') },
-    { value: 'period', label: t('equipmentPurchasingPeriod') },
     { value: 'price', label: t('salePrice') },
   ]
   const sortControls = (
@@ -557,16 +553,6 @@ export function ClientPoDetail({
                         )}
                       </div>
                       <div className="min-w-0 flex-1 space-y-1 sm:basis-3/5">
-                        {line.card && (
-                          <p className="flex items-center gap-1.5 text-xs text-muted">
-                            <Calendar
-                              size={12}
-                              aria-hidden="true"
-                              className="shrink-0"
-                            />
-                            <bdi dir="ltr">{cardPeriodLabel(line.card, t)}</bdi>
-                          </p>
-                        )}
                         <p className="flex items-center gap-1.5 text-xs text-muted">
                           <Timer
                             size={12}

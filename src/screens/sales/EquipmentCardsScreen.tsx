@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
 import { CreditCard } from 'lucide-react'
 import { RelativeTime } from '@/components/RelativeTime'
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
@@ -9,7 +8,6 @@ import { useCompanyProjectFilters } from '@/components/data-list/relationFilters
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { PurchasingUnitCell } from '@/components/purchasing/PurchasingUnitCell'
-import { EquipmentCardStatusBadge } from '@/components/sales/ClientPoStatusBadge'
 import { PoPill } from '@/components/sales/PoPill'
 import { SaleAmountOrDash } from '@/components/sales/SalePrice'
 import {
@@ -18,24 +16,15 @@ import {
   EmptyState,
   ErrorState,
   PageHeader,
-  PRIMARY_ACTIVE_TRIGGER,
-  Tabs,
-  TabsList,
-  TabsTrigger,
   type DataTableColumn,
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
 import { equipmentCardsListConfig } from '@/lib/listConfigs'
-import {
-  cardsAwaitingEndHref,
-  isCardsAwaitingEnd,
-} from '@/lib/cardsAwaitingEnd'
-import { equipmentCardStatus, saleRateUnitOf } from '@/lib/sales'
+import { saleRateUnitOf } from '@/lib/sales'
 import {
   EQUIPMENT_CARDS_SELECT,
-  fetchCardsAwaitingEndIds,
   type SalesEquipmentCardRow,
 } from '@/lib/salesData'
 import { buildSearchFilter } from '@/lib/search'
@@ -53,22 +42,18 @@ const isOwned = (row: SalesEquipmentCardRow) =>
  * «كروت المعدات» (/sales/cards, migration 0169, the /ui-kit mockup the
  * owner approved on 2026-11-02): every «كرت المعدة» with both sides over
  * `sales_equipment_cards` in the main-list look — the unit, «الشركة ·
- * المشروع», the period, the client PO pill or «بدون», the supplier PO pill,
- * «بدون» or «مملوكة», the sale and purchase prices and the status; search,
- * filters (company, project, open / ended, without a client PO, without a
- * supplier PO), sort and paging server-side, the open cards first. A row
- * opens the card page. Since 0185 a segmented switch «كل الكروت» /
- * «بانتظار الانهاء» (`?awaiting=1`, the home's deep link): the latter
- * restricts the list to the ids of `sales_cards_awaiting_end` (one bounded
- * read), the open cards whose unit left the project with «انتهاء عمل».
+ * المشروع», the entry day of its visit, the client PO pill or «بدون», the
+ * supplier PO pill, «بدون» or «مملوكة», the sale and purchase prices;
+ * search, filters (company, project, without a client PO, without a
+ * supplier PO), sort and paging server-side, the newest entry first. A row
+ * opens the card page. Since migration 0189 (owner 2026-11-11) a card has
+ * no period and is neither open nor ended: the period and status columns,
+ * the open / ended filter and the 0185 switch «بانتظار الانهاء» are gone.
  */
 export function EquipmentCardsScreen({
   onSelectCard,
 }: EquipmentCardsScreenProps) {
   const { t } = useI18n()
-  const pathname = usePathname()
-  const params = useSearchParams()
-  const awaiting = isCardsAwaitingEnd(params)
   const list = useDataListState(equipmentCardsListConfig)
   const [rows, setRows] = useState<SalesEquipmentCardRow[]>([])
   const [total, setTotal] = useState(0)
@@ -86,35 +71,14 @@ export function EquipmentCardsScreen({
     const signal = startListRequest()
     setLoading(true)
     setLoadError(false)
-    // «بانتظار الانهاء»: the card ids of the 0185 view first (bounded).
-    let awaitingIds: string[] | null = null
-    if (awaiting) {
-      try {
-        awaitingIds = await fetchCardsAwaitingEndIds(signal)
-      } catch {
-        if (signal.aborted) return
-        setLoadError(true)
-        setRows([])
-        setTotal(0)
-        setLoading(false)
-        return
-      }
-      if (signal.aborted) return
-      if (awaitingIds.length === 0) {
-        setRows([])
-        setTotal(0)
-        setLoading(false)
-        return
-      }
-    }
     const ascending = list.direction === 'asc'
     let query = supabase
       .from('sales_equipment_cards')
       .select(EQUIPMENT_CARDS_SELECT, { count: 'exact' })
-      .order(list.sort, { ascending })
-      // Within the sort key the newest period first, then the card id:
+      .order(list.sort, { ascending, nullsFirst: false })
+      // Within the sort key the newest card first, then the card id:
       // deterministic paging.
-      .order('period_from', { ascending: false })
+      .order('created_at', { ascending: false })
       .order('card_id', { ascending: true })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
     const searchFilter = buildSearchFilter(
@@ -122,7 +86,6 @@ export function EquipmentCardsScreen({
       list.search,
     )
     if (searchFilter) query = query.or(searchFilter)
-    if (awaitingIds) query = query.in('card_id', awaitingIds)
     query = applyListFilters(
       query,
       list.filters,
@@ -140,7 +103,6 @@ export function EquipmentCardsScreen({
     }
     setLoading(false)
   }, [
-    awaiting,
     list.direction,
     list.filters,
     list.page,
@@ -154,17 +116,7 @@ export function EquipmentCardsScreen({
     fetchRows()
   }, [fetchRows])
 
-  const setAwaiting = (next: boolean) => {
-    const search = cardsAwaitingEndHref(params, next)
-    window.history.replaceState(
-      null,
-      '',
-      search ? `${pathname}?${search}` : pathname,
-    )
-  }
-
-  const filtered =
-    awaiting || Boolean(list.search.trim()) || list.filters.length > 0
+  const filtered = Boolean(list.search.trim()) || list.filters.length > 0
 
   const without = (
     <Badge tone="warning" size="sm">
@@ -195,20 +147,20 @@ export function EquipmentCardsScreen({
       hideBelow: 'md',
       cell: (row) => <CompanyProjectCell row={row} />,
     },
+    // 0189: the entry day of the card's visit (a card has no period).
     {
-      key: 'period_from',
-      header: t('equipmentPurchasingPeriod'),
+      key: 'entry_at',
+      header: t('supplierPoEntryDate'),
       sortable: true,
       className: 'tabular-nums',
-      cell: (row) => (
-        <bdi dir="ltr" className="whitespace-nowrap">
-          {formatDate(row.period_from)}
-          {' – '}
-          {row.period_to
-            ? formatDate(row.period_to)
-            : t('equipmentPurchasingOpenEnd')}
-        </bdi>
-      ),
+      cell: (row) =>
+        row.entry_at ? (
+          <bdi dir="ltr" className="whitespace-nowrap">
+            {formatDate(row.entry_at)}
+          </bdi>
+        ) : (
+          <span className="text-muted">—</span>
+        ),
     },
     {
       key: 'client_po',
@@ -228,10 +180,7 @@ export function EquipmentCardsScreen({
         isOwned(row) ? (
           <span className="text-xs text-muted">{t('equipmentCardOwned')}</span>
         ) : row.supplier_po_number ? (
-          <PoPill
-            number={row.supplier_po_number}
-            muted={!row.has_supplier_po}
-          />
+          <PoPill number={row.supplier_po_number} />
         ) : (
           without
         ),
@@ -262,14 +211,6 @@ export function EquipmentCardsScreen({
         ),
     },
     {
-      key: 'is_open',
-      header: t('status'),
-      sortable: true,
-      cell: (row) => (
-        <EquipmentCardStatusBadge status={equipmentCardStatus(row)} size="sm" />
-      ),
-    },
-    {
       key: 'updated_at',
       header: t('updatedAt'),
       sortable: true,
@@ -285,22 +226,6 @@ export function EquipmentCardsScreen({
         title={t('equipmentCards')}
         description={t('equipmentCardsDesc')}
       />
-      <Tabs
-        value={awaiting ? 'awaiting' : 'all'}
-        onValueChange={(value) => setAwaiting(value === 'awaiting')}
-      >
-        <TabsList
-          variant="segmented"
-          aria-label={t('equipmentCardsAwaitingSwitch')}
-        >
-          <TabsTrigger value="all" className={PRIMARY_ACTIVE_TRIGGER}>
-            {t('equipmentCardsAll')}
-          </TabsTrigger>
-          <TabsTrigger value="awaiting" className={PRIMARY_ACTIVE_TRIGGER}>
-            {t('equipmentCardsAwaitingEnd')}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
       <DataListToolbar
         config={equipmentCardsListConfig}
         search={list.searchInput}
@@ -322,11 +247,9 @@ export function EquipmentCardsScreen({
         <EmptyState
           icon={<CreditCard size={28} aria-hidden="true" />}
           title={
-            awaiting
-              ? t('equipmentCardsAwaitingEmpty')
-              : filtered
-                ? t('equipmentCardsEmptyFiltered')
-                : t('equipmentCardsEmpty')
+            filtered
+              ? t('equipmentCardsEmptyFiltered')
+              : t('equipmentCardsEmpty')
           }
         />
       ) : (

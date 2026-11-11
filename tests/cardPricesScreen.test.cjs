@@ -132,7 +132,7 @@ test('«اسعار المعدات» is the third child of «المبيعات» (
 
 // --- The list config and the always-on condition ------------------------------------------
 
-test('cardPricesListConfig: search, the open cards by default, the owner / supplier / company / project / status filters, the sorts', () => {
+test('cardPricesListConfig: search, no default filter since 0189, the owner / supplier / company / project / status filters, the sorts', () => {
   const config = configs.cardPricesListConfig
   assert.equal(config.id, 'cardPrices')
   assert.deepEqual(plain(config.searchFields), [
@@ -144,8 +144,9 @@ test('cardPricesListConfig: search, the open cards by default, the owner / suppl
   // Owner 2026-11-07 (0184): the latest modification first.
   assert.equal(config.defaultSort, 'last_modified_at')
   assert.equal(config.defaultDirection, 'desc')
+  // 0189 (owner 2026-11-11): a card is neither open nor ended — no
+  // `is_open` filter.
   assert.deepEqual(plain(config.filterFields.map((field) => field.key)), [
-    'is_open',
     'pricing_status',
     'equipment_ownership_status',
     'equipment_lessor_id',
@@ -168,13 +169,9 @@ test('cardPricesListConfig: search, the open cards by default, the owner / suppl
     'draft',
     'approved',
   ])
-  // The open cards by default: visible and removable.
-  assert.deepEqual(plain(config.defaultFilters), [
-    { id: 'default-open', field: 'is_open', operator: 'eq', value: 'true' },
-  ])
-  assert.deepEqual(plain(config.defaultFilters), [
-    plain(pricesList.CARD_PRICES_DEFAULT_FILTER),
-  ])
+  // It opened on the open cards until 0189; now every card on a supplier PO.
+  assert.equal(config.defaultFilters, undefined)
+  assert.equal(pricesList.CARD_PRICES_DEFAULT_FILTER, undefined)
   assert.deepEqual(plain(config.sortableFields.map((field) => field.key)), [
     'equipment_code',
     'company_name_ar',
@@ -446,7 +443,6 @@ test('cardPricingApprovalBlocker: the reasons in the order the user can fix them
     pricing_status: 'draft',
     card_client_price: 1500,
     supplier_line_id: 'l1',
-    supplier_po_status: 'open',
     supplier_price: 1000,
   }
   assert.equal(sales.cardPricingApprovalBlocker(ok), null)
@@ -466,9 +462,10 @@ test('cardPricingApprovalBlocker: the reasons in the order the user can fix them
     sales.cardPricingApprovalBlocker({ ...ok, supplier_line_id: null }),
     'cardPricingBlockedNoSupplierLine',
   )
+  // 0189: a supplier PO is neither open nor closed; a line is enough.
   assert.equal(
     sales.cardPricingApprovalBlocker({ ...ok, supplier_po_status: 'closed' }),
-    'cardPricingBlockedNoSupplierLine',
+    null,
   )
   assert.equal(
     sales.cardPricingApprovalBlocker({ ...ok, supplier_price: null }),

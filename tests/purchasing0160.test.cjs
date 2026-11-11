@@ -214,10 +214,11 @@ test('the site units view offers a party PO only while it is a draft', () => {
 
 test('the pure helpers: why approval cannot run, and the list badge', () => {
   const lib = loadLib('purchasing')
-  const po = { status: 'open', approval_status: 'draft', created_by: 'creator' }
+  const po = { approval_status: 'draft', created_by: 'creator' }
   const priced = [{ price: 100 }, { price: '50' }]
   assert.equal(lib.supplierPoApprovalBlocker(po, priced, 'approver'), null)
-  assert.equal(lib.supplierPoApprovalBlocker({ ...po, status: 'closed' }, priced, 'approver'), 'supplierPoErrorClosed')
+  // 0189 (owner 2026-11-11): a PO has no open / closed state to block on.
+  assert.equal(lib.supplierPoApprovalBlocker({ ...po, status: 'closed' }, priced, 'approver'), null)
   assert.equal(lib.supplierPoApprovalBlocker({ ...po, approval_status: 'approved' }, priced, 'approver'), 'supplierPoErrorNotDraft')
   assert.equal(lib.supplierPoApprovalBlocker(po, priced, 'creator'), 'supplierPoApproveBlockedSelf')
   assert.equal(lib.supplierPoApprovalBlocker(po, [], 'approver'), 'supplierPoApproveBlockedNoLines')
@@ -233,9 +234,10 @@ test('the pure helpers: why approval cannot run, and the list badge', () => {
     key: 'supplierPoApprovalPending',
     tone: 'warning',
   })
+  // Until 0189 a CLOSED draft read a quiet «مسودة»; every draft waits now.
   assert.deepEqual(plain(lib.supplierPoApprovalListBadge({ status: 'closed', approval_status: 'draft' })), {
-    key: 'supplierPoApprovalDraft',
-    tone: 'neutral',
+    key: 'supplierPoApprovalPending',
+    tone: 'warning',
   })
   for (const token of [
     'purchasing_approve_required',
@@ -252,7 +254,7 @@ test('the pure helpers: why approval cannot run, and the list badge', () => {
 
 test('the screens: approve for approvers, locked when approved, a draft PDF marked as a draft', () => {
   const data = read('src', 'lib', 'purchasingData.ts')
-  assert.match(data, /SUPPLIER_PO_SELECT = `id,po_number,lessor_id,owner_class,is_internal,company_id,project_id,start_date,status,closed_at,approval_status,approved_at,approved_by,/)
+  assert.match(data, /SUPPLIER_PO_SELECT = `id,po_number,lessor_id,owner_class,is_internal,company_id,project_id,start_date,approval_status,approved_at,approved_by,/)
   assert.match(data, /supabase\.rpc\('approve_supplier_po', \{ p_po_id: poId \}\)/)
 
   const detail = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
@@ -306,7 +308,7 @@ test('the screens: approve for approvers, locked when approved, a draft PDF mark
   assert.match(sheet, /@page \{ size: A4 portrait; margin: 0; \}/)
   assert.match(sheet, /<Price value=\{line\.price\} \/>/)
   assert.match(sheet, /showUnit=\{mixedUnits\}/)
-  assert.match(detail, /canApprove && open && !approved \? \(\) => setApproveOpen\(true\) : undefined/)
+  assert.match(detail, /canApprove && !approved \? \(\) => setApproveOpen\(true\) : undefined/)
   assert.match(detail, /approveBlockedReason=\{approveBlocker\}/)
   assert.match(detail, /\{editable && addButton\}/)
   assert.match(detail, /\{editable && \(\s+<Button\s+size="sm"\s+variant="outline"/)

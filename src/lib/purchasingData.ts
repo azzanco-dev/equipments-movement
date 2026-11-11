@@ -9,7 +9,6 @@ import type {
   SupplierPoFormValues,
   SupplierPoOwnerClass,
   SupplierPoRateUnit,
-  SupplierPoStatus,
 } from '@/lib/purchasing'
 import {
   SUPPLIER_PO_CLASS_OPTION_PREFIX,
@@ -73,9 +72,8 @@ export interface SupplierPoRow {
   is_internal: boolean
   company_id: string
   project_id: string
+  /** The PO's one date (0189: no open / closed state, no closing). */
   start_date: string
-  status: SupplierPoStatus
-  closed_at: string | null
   /** 0160: draft until approved; an approved PO is locked. */
   approval_status: SupplierPoApprovalStatus
   approved_at: string | null
@@ -105,12 +103,11 @@ export interface PurchasingUnit {
   lessor: LessorRef | null
 }
 
-/** The card behind a line (`equipment_cards`), with its unit embedded. */
+/** The card behind a line (`equipment_cards`), with its unit embedded. A
+ *  card has no period since 0189: it is the unit's visit (`entry_log_id`). */
 export interface EquipmentCardRef {
   id: string
   equipment_id: string
-  period_from: string
-  period_to: string | null
   /** 0137: the site entry that brought the unit (set by the database). */
   entry_log_id?: string | null
   equipment: PurchasingUnit | null
@@ -146,8 +143,9 @@ export interface SupplierPoEventRow {
 /**
  * One site visit of a unit (migration 0188, `purchasing_site_visits`; the
  * open visits were `purchasing_site_units`, 0147): the visit, open or closed,
- * the open PO the unit sits on for that company and project, else the open
- * PO of its party there that it can join.
+ * the PO of the visit (0189: through the visit's own card, else a PO of that
+ * company and project that started on or before its entry day), else the
+ * draft PO of its party there that it can join.
  */
 export interface SiteUnitRow {
   entry_id: string
@@ -207,7 +205,6 @@ export interface PoUnitRow {
   is_priced: boolean
   supplier_po_id: string
   po_number: string
-  po_status: SupplierPoStatus
   approval_status: SupplierPoApprovalStatus
   start_date: string
   lessor_id: string | null
@@ -227,13 +224,11 @@ export interface PoUnitRow {
   equipment_plate_number: string | null
   equipment_chassis_number: string | null
   equipment_ownership_status: OwnershipStatus | null
-  card_period_from: string
-  card_period_to: string | null
 }
 
 /** Only what the «حسب المعدات» table shows and its row opens. */
 export const PO_UNITS_SELECT =
-  'line_id,price,rate_unit,line_note,line_created_at,updated_at,is_priced,supplier_po_id,po_number,po_status,approval_status,start_date,lessor_id,owner_class,party_class,lessor_name,lessor_is_internal,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,equipment_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,card_period_from,card_period_to'
+  'line_id,price,rate_unit,line_note,line_created_at,updated_at,is_priced,supplier_po_id,po_number,approval_status,start_date,lessor_id,owner_class,party_class,lessor_name,lessor_is_internal,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,equipment_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status'
 
 export interface EquipmentPurchasingRow extends SupplierPoLineRow {
   po: SupplierPoRow | null
@@ -243,7 +238,7 @@ export interface EquipmentPurchasingRow extends SupplierPoLineRow {
 
 const NAMED = 'id,name_ar,name_en'
 
-export const SUPPLIER_PO_SELECT = `id,po_number,lessor_id,owner_class,is_internal,company_id,project_id,start_date,status,closed_at,approval_status,approved_at,approved_by,notes,created_by,created_at,unpriced_count,lessor:lessors(id,name,tax_number,commercial_register),company:companies(${NAMED}),project:projects(${NAMED})`
+export const SUPPLIER_PO_SELECT = `id,po_number,lessor_id,owner_class,is_internal,company_id,project_id,start_date,approval_status,approved_at,approved_by,notes,created_by,created_at,unpriced_count,lessor:lessors(id,name,tax_number,commercial_register),company:companies(${NAMED}),project:projects(${NAMED})`
 
 /** The list adds the line count (one embedded count per row). */
 export const SUPPLIER_PO_LIST_SELECT = `${SUPPLIER_PO_SELECT},updated_at,supplier_po_equipment(count)`
@@ -251,13 +246,14 @@ export const SUPPLIER_PO_LIST_SELECT = `${SUPPLIER_PO_SELECT},updated_at,supplie
 export const PURCHASING_UNIT_SELECT =
   'id,code,type,plate_number,chassis_number,ownership_status,lessor:lessors(id,name,is_internal)'
 
-export const SUPPLIER_PO_LINE_SELECT = `id,supplier_po_id,equipment_card_id,price,rate_unit,note,created_at,updated_at,card:equipment_cards(id,equipment_id,period_from,period_to,entry_log_id,equipment:equipment(${PURCHASING_UNIT_SELECT}))`
+export const SUPPLIER_PO_LINE_SELECT = `id,supplier_po_id,equipment_card_id,price,rate_unit,note,created_at,updated_at,card:equipment_cards(id,equipment_id,entry_log_id,equipment:equipment(${PURCHASING_UNIT_SELECT}))`
 
 export const SUPPLIER_PO_EVENT_SELECT =
   'id,supplier_po_id,event_type,payload,actor_id,created_at,seq'
 
-/** The equipment page shows the unit's lines with their POs, open card first. */
-export const EQUIPMENT_PURCHASING_SELECT = `id,supplier_po_id,equipment_card_id,price,rate_unit,note,created_at,updated_at,card:equipment_cards!inner(id,equipment_id,period_from,period_to,equipment:equipment(${PURCHASING_UNIT_SELECT})),po:supplier_pos(${SUPPLIER_PO_SELECT})`
+/** The equipment page shows the unit's lines with their POs, the latest
+ *  start date first. */
+export const EQUIPMENT_PURCHASING_SELECT = `id,supplier_po_id,equipment_card_id,price,rate_unit,note,created_at,updated_at,card:equipment_cards!inner(id,equipment_id,equipment:equipment(${PURCHASING_UNIT_SELECT})),po:supplier_pos(${SUPPLIER_PO_SELECT})`
 
 /** The equipment page shows this many purchasing lines at most. */
 export const EQUIPMENT_PURCHASING_LIMIT = 10
@@ -401,6 +397,11 @@ export function supplierPoEventDetail(
       ]
         .filter(Boolean)
         .join(' · ')
+    // 0174 / 0189: the note of a return to draft, when one was written.
+    case 'approval_returned':
+      return typeof payload.note === 'string' && payload.note.trim()
+        ? payload.note.trim()
+        : null
     // 0173: the one-off renumbering, «SPO260046 → PO-2026100046».
     case 'renumbered':
       return typeof payload.old_number === 'string' &&
@@ -756,8 +757,8 @@ export interface RemovedSupplierPoLine {
   card_deleted: boolean
 }
 
-/** `remove_supplier_po_equipment` (0187): removes a line from an open, draft
- *  PO with an optional note (the event `equipment_removed`). */
+/** `remove_supplier_po_equipment` (0187): removes a line from a draft PO
+ *  with an optional note (the event `equipment_removed`). */
 export async function removeSupplierPoEquipment(input: {
   lineId: string
   note: string
@@ -770,7 +771,7 @@ export async function removeSupplierPoEquipment(input: {
   )
 }
 
-/** `update_supplier_po` (0142): the start date and the notes of an open PO. */
+/** `update_supplier_po` (0142): the start date and the notes of a PO. */
 export async function updateSupplierPo(input: {
   poId: string
   startDate: string
@@ -785,7 +786,6 @@ export async function updateSupplierPo(input: {
   )
 }
 
-/** `close_supplier_po`. */
 /** `approve_supplier_po` (0160): a draft PO becomes approved and locked;
  *  the database checks the permission, the creator and the prices. */
 export async function approveSupplierPo(
@@ -796,8 +796,18 @@ export async function approveSupplierPo(
   )
 }
 
-export async function closeSupplierPo(poId: string): Promise<RpcResult<null>> {
+/** `return_supplier_po_approval` (0189, «رجوع للتعديل»): an APPROVED PO
+ *  goes back to draft with an optional note, so it can be changed — the way
+ *  to change an approved PO now that a PO is never closed. The database
+ *  checks `purchasing.approve`. */
+export async function returnSupplierPoApproval(input: {
+  poId: string
+  note: string
+}): Promise<RpcResult<null>> {
   return asResult<null>(
-    await supabase.rpc('close_supplier_po', { p_po_id: poId }),
+    await supabase.rpc('return_supplier_po_approval', {
+      p_po_id: input.poId,
+      p_note: input.note.trim() || null,
+    }),
   )
 }

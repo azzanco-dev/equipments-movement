@@ -167,9 +167,9 @@ export function SupplierPoPrintSheet({
   // The unit column says the unit; the totals name it only when a PO mixes
   // monthly and daily prices.
   const mixedUnits = totals.length > 1
+  // 0189: the state is the approval alone (a PO is never closed).
   const stateKeys: TranslationKey[] = [
     draft ? 'supplierPoApprovalDraft' : 'supplierPoApprovalApproved',
-    ...(po.status === 'closed' ? (['supplierPoStatusClosed'] as const) : []),
   ]
   const headerFacts: { key: TranslationKey; value: ReactNode }[] = [
     { key: 'supplierPoPrintNumber', value: po.po_number },
@@ -191,23 +191,10 @@ export function SupplierPoPrintSheet({
           { key: 'supplierPoApprovedBy' as const, value: approvedBy ?? '—' },
         ]
       : []),
-    ...(po.closed_at
-      ? [
-          {
-            key: 'supplierPoClosedAt' as const,
-            value: <bdi dir="ltr">{formatSaudiDateTime(po.closed_at)}</bdi>,
-          },
-        ]
-      : []),
   ]
-  // The day the rent starts; an ended card adds its last day (no «مفتوح»).
-  const startOf = (line: SupplierPoLineRow) => {
-    if (!line.card) return '—'
-    const from = formatDate(line.card.period_from)
-    return line.card.period_to
-      ? `${from} – ${formatDate(line.card.period_to)}`
-      : from
-  }
+  // The day the rent starts: the PO's start date for every line (0189: a
+  // card has no period; the units of a PO entered on its start date).
+  const lineStart = formatDate(po.start_date)
   const cell = 'border px-2 py-1.5 align-top'
   const rate = String(Math.round(SUPPLIER_PO_VAT_RATE * 100))
   const vatLabel: [string, string] = [
@@ -381,7 +368,7 @@ export function SupplierPoPrintSheet({
                     )}
                   </td>
                   <td className={cell}>
-                    <bdi dir="ltr">{startOf(line)}</bdi>
+                    <bdi dir="ltr">{lineStart}</bdi>
                   </td>
                   <td className={cell}>
                     <Stacked k={unitKey} />

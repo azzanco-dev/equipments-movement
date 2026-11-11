@@ -1,8 +1,5 @@
 import type { AsyncSearchSelectOption } from '@/components/AsyncSearchSelect'
-import type { TranslationKey } from '@/i18n/translations'
 import type { CompanyProjectSource } from '@/lib/companyProject'
-import { formatDate } from '@/lib/dateFormat'
-import type { SupplierPoStatus } from '@/lib/purchasing'
 import {
   type EquipmentCardRef,
   type NamedRef,
@@ -23,6 +20,7 @@ import {
   type EquipmentCardEventType,
   type SaleRateUnit,
 } from '@/lib/sales'
+import { saudiDateKey, saudiDayStart } from '@/lib/saudiTime'
 import { buildSearchFilter } from '@/lib/search'
 import { latestVisitPerUnit, recentVisitOrClause } from '@/lib/siteVisits'
 import { supabase } from '@/lib/supabase'
@@ -143,11 +141,8 @@ export interface SalesPoUnitRow {
   equipment_ownership_status: OwnershipStatus | null
   equipment_lessor_id: string | null
   equipment_lessor_name: string | null
-  card_period_from: string
-  card_period_to: string | null
   supplier_po_id: string | null
   supplier_po_number: string | null
-  supplier_po_status: SupplierPoStatus | null
   supplier_price: number | null
   /** 0185: any of the four units (the purchasing type still names two). */
   supplier_rate_unit: SaleRateUnit | null
@@ -155,22 +150,20 @@ export interface SalesPoUnitRow {
 
 /** Only what the «حسب المعدات» table shows and its row opens. */
 export const SALES_PO_UNITS_SELECT =
-  'line_id,price,rate_unit,standard_hours,quantity,line_note,line_created_at,updated_at,is_priced,client_po_id,po_number,po_status,issue_date,expiry_date,po_standard_hours,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,equipment_card_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,card_period_from,card_period_to,supplier_po_id,supplier_po_number,supplier_po_status,supplier_price,supplier_rate_unit'
+  'line_id,price,rate_unit,standard_hours,quantity,line_note,line_created_at,updated_at,is_priced,client_po_id,po_number,po_status,issue_date,expiry_date,po_standard_hours,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,equipment_card_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,supplier_po_id,supplier_po_number,supplier_price,supplier_rate_unit'
 
 /**
  * One «كرت المعدة» with both sides (`sales_equipment_cards`): the unit, the
- * company and project, the period, the entry it was created from, the
- * client PO line (the open PO's first, else the latest) and the supplier PO
- * line likewise.
+ * company and project, the entry it was created from (its visit; a card has
+ * no period and no open / ended state since 0189), the client PO line (the
+ * open PO's first, else the latest) and the supplier PO line (the line of
+ * the card's latest supplier PO).
  */
 export interface SalesEquipmentCardRow {
   card_id: string
   equipment_id: string
   company_id: string
   project_id: string
-  period_from: string
-  period_to: string | null
-  is_open: boolean
   rate_unit: string
   standard_hours: number
   note: string | null
@@ -201,7 +194,6 @@ export interface SalesEquipmentCardRow {
   supplier_line_id: string | null
   supplier_po_id: string | null
   supplier_po_number: string | null
-  supplier_po_status: SupplierPoStatus | null
   supplier_price: number | null
   /** 0185: any of the four units (the purchasing type still names two). */
   supplier_rate_unit: SaleRateUnit | null
@@ -225,7 +217,7 @@ export const CARD_PRICING_COLUMNS =
   'card_client_price,pricing_status,pricing_approved_at,pricing_approved_by,pricing_approved_by_name,card_margin,card_margin_pct,supplier_po_approval_status,card_client_price_unit'
 
 /** Every column of the view the cards list and the card page show. */
-export const EQUIPMENT_CARDS_SELECT = `card_id,equipment_id,company_id,project_id,period_from,period_to,is_open,rate_unit,standard_hours,note,entry_log_id,entry_at,created_at,updated_at,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_name_ar,company_name_en,project_name_ar,project_name_en,client_line_id,client_po_id,client_po_number,client_po_status,client_price,client_rate_unit,client_standard_hours,client_quantity,has_client_po,supplier_line_id,supplier_po_id,supplier_po_number,supplier_po_status,supplier_price,supplier_rate_unit,has_supplier_po,${CARD_PRICING_COLUMNS}`
+export const EQUIPMENT_CARDS_SELECT = `card_id,equipment_id,company_id,project_id,rate_unit,standard_hours,note,entry_log_id,entry_at,created_at,updated_at,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_name_ar,company_name_en,project_name_ar,project_name_en,client_line_id,client_po_id,client_po_number,client_po_status,client_price,client_rate_unit,client_standard_hours,client_quantity,has_client_po,supplier_line_id,supplier_po_id,supplier_po_number,supplier_price,supplier_rate_unit,has_supplier_po,${CARD_PRICING_COLUMNS}`
 
 /**
  * One row of «اسعار المعدات» (`sales_equipment_cards` WHERE supplier_line_id
@@ -238,9 +230,6 @@ export type CardPriceRow = Pick<
   | 'equipment_id'
   | 'company_id'
   | 'project_id'
-  | 'period_from'
-  | 'period_to'
-  | 'is_open'
   | 'equipment_code'
   | 'equipment_type'
   | 'equipment_plate_number'
@@ -255,7 +244,6 @@ export type CardPriceRow = Pick<
   | 'supplier_line_id'
   | 'supplier_po_id'
   | 'supplier_po_number'
-  | 'supplier_po_status'
   | 'supplier_price'
   | 'supplier_rate_unit'
   | 'card_client_price'
@@ -275,7 +263,7 @@ export type CardPriceRow = Pick<
   last_modified_at: string
 }
 
-export const CARD_PRICES_SELECT = `card_id,equipment_id,company_id,project_id,period_from,period_to,is_open,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_name_ar,company_name_en,project_name_ar,project_name_en,supplier_line_id,supplier_po_id,supplier_po_number,supplier_po_status,supplier_price,supplier_rate_unit,${CARD_PRICING_COLUMNS},last_modified_at`
+export const CARD_PRICES_SELECT = `card_id,equipment_id,company_id,project_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_name_ar,company_name_en,project_name_ar,project_name_en,supplier_line_id,supplier_po_id,supplier_po_number,supplier_price,supplier_rate_unit,${CARD_PRICING_COLUMNS},last_modified_at`
 
 /** The movement facts of a card's entry (`movement_visits`). */
 export interface CardVisitRow {
@@ -301,13 +289,14 @@ export const CLIENT_PO_SELECT = `id,po_number,company_id,project_id,issue_date,e
 /** The list adds the line count (one embedded count per row). */
 export const CLIENT_PO_LIST_SELECT = `${CLIENT_PO_SELECT},client_po_equipment(count)`
 
-export const CLIENT_PO_LINE_SELECT = `id,client_po_id,equipment_card_id,price,rate_unit,standard_hours,quantity,note,created_at,updated_at,card:equipment_cards(id,equipment_id,period_from,period_to,entry_log_id,equipment:equipment(${PURCHASING_UNIT_SELECT}))`
+export const CLIENT_PO_LINE_SELECT = `id,client_po_id,equipment_card_id,price,rate_unit,standard_hours,quantity,note,created_at,updated_at,card:equipment_cards(id,equipment_id,entry_log_id,equipment:equipment(${PURCHASING_UNIT_SELECT}))`
 
 export const CLIENT_PO_EVENT_SELECT =
   'id,client_po_id,event_type,payload,actor_id,actor_name,created_at,seq'
 
-/** The equipment page shows the unit's lines with their POs, open card first. */
-export const EQUIPMENT_SALES_SELECT = `id,client_po_id,equipment_card_id,price,rate_unit,standard_hours,quantity,note,created_at,updated_at,card:equipment_cards!inner(id,equipment_id,period_from,period_to,equipment:equipment(${PURCHASING_UNIT_SELECT})),po:client_pos(${CLIENT_PO_SELECT})`
+/** The equipment page shows the unit's lines with their POs, the latest
+ *  issue date first. */
+export const EQUIPMENT_SALES_SELECT = `id,client_po_id,equipment_card_id,price,rate_unit,standard_hours,quantity,note,created_at,updated_at,card:equipment_cards!inner(id,equipment_id,equipment:equipment(${PURCHASING_UNIT_SELECT})),po:client_pos(${CLIENT_PO_SELECT})`
 
 /** The equipment page shows this many sales lines at most. */
 export const EQUIPMENT_SALES_LIMIT = 10
@@ -331,17 +320,6 @@ export function clientPoCompanyProject(
     project_name_ar: po.project?.name_ar ?? null,
     project_name_en: po.project?.name_en ?? null,
   }
-}
-
-/** The card period behind a line: «from – to», or «from – مفتوح». */
-export function cardPeriodLabel(
-  card: { period_from: string; period_to: string | null },
-  t: (key: TranslationKey) => string,
-): string {
-  const to = card.period_to
-    ? formatDate(card.period_to)
-    : t('equipmentPurchasingOpenEnd')
-  return `${formatDate(card.period_from)} – ${to}`
 }
 
 // --- Reads ---------------------------------------------------------------------
@@ -593,9 +571,10 @@ export interface CardMonthSlotRow {
   equipment_id: string
   company_id: string
   project_id: string
-  period_from: string
-  period_to: string | null
-  is_open: boolean
+  /** 0189: the card's visit (it has no period): the entry and the exit that
+   *  closes it, NULL while the unit is inside. */
+  entry_at: string | null
+  exit_at: string | null
   standard_hours: number
   equipment_code: string | null
   equipment_type: string | null
@@ -627,7 +606,7 @@ export interface CardMonthSlotRow {
 
 /** The slot columns the «الشهور» list and the batch screen show. */
 export const CARD_MONTH_SLOTS_SELECT =
-  'slot_id,month,recorded,month_id,hours,days,presence_days,note,card_id,equipment_id,company_id,project_id,period_from,period_to,is_open,standard_hours,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,owned,company_name_ar,company_name_en,project_name_ar,project_name_en,client_line_id,client_po_id,client_po_number,client_price,client_rate_unit,client_standard_hours,supplier_line_id,supplier_po_id,supplier_po_number,supplier_price,supplier_rate_unit,due_standard_hours,client_due,supplier_due,margin'
+  'slot_id,month,recorded,month_id,hours,days,presence_days,note,card_id,equipment_id,company_id,project_id,entry_at,exit_at,standard_hours,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,owned,company_name_ar,company_name_en,project_name_ar,project_name_en,client_line_id,client_po_id,client_po_number,client_price,client_rate_unit,client_standard_hours,supplier_line_id,supplier_po_id,supplier_po_number,supplier_price,supplier_rate_unit,due_standard_hours,client_due,supplier_due,margin'
 
 /** One RECORDED month of a card (`sales_card_months`), as the card page
  *  lists it: the card's facts are already on the page, so only the record
@@ -655,19 +634,20 @@ export const CARD_MONTHS_SELECT =
 /** The months of one card the page shows at most (ten years). */
 export const CARD_MONTHS_LIMIT = 120
 
-/** A pending slot of the card page: the month and whether the card is open
- *  (the running month of an open card is «جاري», not «بانتظار»). */
+/** A pending slot of the card page: the month and the exit of the card's
+ *  visit (0189; the running month of a unit still inside is «جاري», not
+ *  «بانتظار»). */
 export interface CardPendingSlotRow {
   slot_id: string
   month: string
   recorded: boolean
-  is_open: boolean
+  exit_at: string | null
   /** 0185: the dialog prefills the days of a new month with it. */
   presence_days: number | null
 }
 
 export const CARD_PENDING_SLOTS_SELECT =
-  'slot_id,month,recorded,is_open,presence_days'
+  'slot_id,month,recorded,exit_at,presence_days'
 
 /** `equipment_card_events`: the card's own append-only audit (0172). */
 export interface EquipmentCardEventRow {
@@ -688,8 +668,6 @@ export const EQUIPMENT_CARD_EVENT_SELECT =
 /** A company and project a card sits in (the batch screen's pickers). */
 export interface CardPlaceRow {
   card_id: string
-  period_from: string
-  period_to: string | null
   company_id: string
   company_name_ar: string | null
   company_name_en: string | null
@@ -699,7 +677,7 @@ export interface CardPlaceRow {
 }
 
 export const CARD_PLACES_SELECT =
-  'card_id,period_from,period_to,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en'
+  'card_id,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en'
 
 /** At most this many cards feed the batch screen's pickers. */
 export const CARD_PLACES_LIMIT = 1000
@@ -710,10 +688,12 @@ export const CARD_MONTH_BATCH_LIMIT = 500
 // --- Reads -------------------------------------------------------------------
 
 /**
- * The companies and projects the batch screen offers: the cards OPEN now
- * plus the cards ended on or after `sinceDay` (the first day of the oldest
- * month preset, so a card ended last month still takes its late timesheet),
- * one bounded read; the dialog groups them into companies → projects.
+ * The companies and projects the batch screen offers: the cards whose unit
+ * is INSIDE now plus the cards whose unit left on or after `sinceDay` (the
+ * first day of the oldest month preset, so a unit that left last month still
+ * takes its late timesheet), one bounded read; the dialog groups them into
+ * companies → projects. 0189: by the card's visit (`exit_at`), the card
+ * having no period of its own any more.
  */
 export async function fetchCardPlaces(
   sinceDay: string,
@@ -722,7 +702,7 @@ export async function fetchCardPlaces(
   let request = supabase
     .from('sales_equipment_cards')
     .select(CARD_PLACES_SELECT)
-    .or(`is_open.eq.true,period_to.gte.${sinceDay}`)
+    .or(recentVisitOrClause(saudiDayStart(sinceDay)))
     .order('company_id')
     .order('project_id')
     .order('card_id')
@@ -731,18 +711,20 @@ export async function fetchCardPlaces(
   return unwrapRows<CardPlaceRow>(await request)
 }
 
-/** The earliest `period_from` of any card: where the month pickers stop. */
+/** The Saudi day of the earliest entry of any card (0189: the card's visit;
+ *  it was the card's own start day): where the month pickers stop. */
 export async function fetchEarliestCardDay(
   signal?: AbortSignal,
 ): Promise<string | null> {
   let request = supabase
     .from('sales_equipment_cards')
-    .select('period_from')
-    .order('period_from', { ascending: true })
+    .select('entry_at')
+    .not('entry_at', 'is', null)
+    .order('entry_at', { ascending: true })
     .limit(1)
   if (signal) request = request.abortSignal(signal)
-  const rows = unwrapRows<{ period_from: string }>(await request)
-  return rows[0]?.period_from ?? null
+  const rows = unwrapRows<{ entry_at: string }>(await request)
+  return rows[0]?.entry_at ? saudiDateKey(rows[0].entry_at) : null
 }
 
 /**
@@ -879,59 +861,5 @@ export async function returnEquipmentCardPricing(input: {
       p_card_id: input.cardId,
       p_note: input.note.trim() || null,
     }),
-  )
-}
-
-// --- The manual card end (the two functions of 0185) -------------------------------------------
-
-/** `end_equipment_card` (sales.manage): ends an OPEN card on `periodTo`
- *  (a date key, from its period_from to today Saudi), with an optional note. */
-export async function endEquipmentCard(input: {
-  cardId: string
-  periodTo: string
-  note: string
-}): Promise<RpcResult<null>> {
-  return asResult<null>(
-    await supabase.rpc('end_equipment_card', {
-      p_card_id: input.cardId,
-      p_period_to: input.periodTo,
-      p_note: input.note.trim() || null,
-    }),
-  )
-}
-
-/** `reopen_equipment_card` (sales.manage): back to an open card. */
-export async function reopenEquipmentCard(input: {
-  cardId: string
-  note: string
-}): Promise<RpcResult<null>> {
-  return asResult<null>(
-    await supabase.rpc('reopen_equipment_card', {
-      p_card_id: input.cardId,
-      p_note: input.note.trim() || null,
-    }),
-  )
-}
-
-/** At most this many card ids feed «بانتظار الانهاء» (one bounded read). */
-export const CARDS_AWAITING_END_LIMIT = 500
-
-/**
- * The ids of the OPEN cards whose unit last left the card's project with
- * «انتهاء عمل» (`sales_cards_awaiting_end`, 0185), one bounded read; the
- * «كروت المعدات» list then filters `.in('card_id', ids)`.
- */
-export async function fetchCardsAwaitingEndIds(
-  signal?: AbortSignal,
-): Promise<string[]> {
-  let request = supabase
-    .from('sales_cards_awaiting_end')
-    .select('card_id')
-    .order('exit_at', { ascending: false })
-    .order('card_id', { ascending: true })
-    .limit(CARDS_AWAITING_END_LIMIT)
-  if (signal) request = request.abortSignal(signal)
-  return unwrapRows<{ card_id: string }>(await request).map(
-    (row) => row.card_id,
   )
 }

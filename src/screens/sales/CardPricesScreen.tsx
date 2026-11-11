@@ -343,7 +343,6 @@ function PricesScreen({ onOpenCard, onOpenSupplierPo }: CardPricesScreenProps) {
                     ? () => onOpenSupplierPo(row.supplier_po_id!)
                     : undefined
                 }
-                muted={row.supplier_po_status !== 'open'}
               />
               {row.supplier_po_approval_status === 'approved' && (
                 <Badge tone="success" size="sm">

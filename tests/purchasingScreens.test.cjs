@@ -320,13 +320,35 @@ const MIGRATIONS = [
   '20261028160000_0160_supplier_po_approval.sql',
 ]
 
-test('every stable token of migrations 0136 to 0138 is known and mapped', () => {
+const RETIRED_0189 = ['po_closed', 'card_overlap', 'equipment_already_on_open_po']
+const MIGRATION_0189 = read(
+  'supabase',
+  'migrations',
+  '20261111100000_0189_po_start_date_only.sql',
+)
+
+test('every stable token of migrations 0136 to 0189 is known and mapped', () => {
   const sql = MIGRATIONS.map((file) =>
     read('supabase', 'migrations', file),
   ).join('\n')
   const raised = new Set(
     [...sql.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g)].map((m) => m[1]),
   )
+  // Migration 0189 (owner 2026-11-11: no closing, no card period, a unit on
+  // several POs) retired three of them and raises two new ones.
+  for (const token of RETIRED_0189) {
+    assert.ok(raised.has(token), `${token} was raised before 0189`)
+    raised.delete(token)
+    assert.doesNotMatch(
+      MIGRATION_0189,
+      new RegExp(`RAISE EXCEPTION '${token}'`),
+      `${token} is not raised by 0189`,
+    )
+  }
+  for (const token of ['equipment_already_on_po', 'po_not_approved']) {
+    assert.match(MIGRATION_0189, new RegExp(`RAISE EXCEPTION '${token}'`))
+    raised.add(token)
+  }
   assert.deepEqual(
     [...raised].sort(),
     [...purchasing.SUPPLIER_PO_ERROR_TOKENS].sort(),
@@ -401,9 +423,8 @@ test('the token → field mapping of the three dialogs', () => {
   )
   // Form-level tokens map to no field…
   for (const [token, code] of [
-    ['card_overlap', '23P01'],
-    ['equipment_already_on_open_po', '23505'],
-    ['po_closed', '55000'],
+    ['equipment_already_on_po', '23505'],
+    ['po_not_approved', '55000'],
     ['purchasing_manage_required', '42501'],
   ]) {
     assert.equal(
@@ -418,20 +439,26 @@ test('the token → field mapping of the three dialogs', () => {
     )
   }
   // …and to their safe messages.
+  // 0189: the same card twice on ONE PO (its pre-0189 name stays mapped
+  // for a database that has not been migrated yet); the two tokens the
+  // migration retired fall back to the generic message.
+  for (const token of ['equipment_already_on_po', 'equipment_already_on_open_po'])
+    assert.equal(
+      purchasing.supplierPoFormMessage(raisedError(token, '23505')),
+      'supplierPoErrorAlreadyOnPo',
+    )
   assert.equal(
-    purchasing.supplierPoFormMessage(raisedError('card_overlap', '23P01')),
-    'supplierPoErrorCardOverlap',
+    purchasing.supplierPoFormMessage(raisedError('po_not_approved', '55000')),
+    'supplierPoErrorNotApproved',
   )
-  assert.equal(
-    purchasing.supplierPoFormMessage(
-      raisedError('equipment_already_on_open_po', '23505'),
-    ),
-    'supplierPoErrorAlreadyOnOpenPo',
-  )
-  assert.equal(
-    purchasing.supplierPoFormMessage(raisedError('po_closed', '55000')),
-    'supplierPoErrorClosed',
-  )
+  for (const [token, code] of [
+    ['card_overlap', '23P01'],
+    ['po_closed', '55000'],
+  ])
+    assert.equal(
+      purchasing.supplierPoFormMessage(raisedError(token, code)),
+      'supplierPoSaveFailed',
+    )
   assert.equal(
     purchasing.supplierPoFormMessage(
       raisedError('purchasing_manage_required', '42501'),
@@ -473,27 +500,33 @@ test('the token → field mapping of the three dialogs', () => {
   )
   assert.deepEqual(
     outcome(
-      raisedError('card_overlap', '23P01'),
+      raisedError('equipment_already_on_po', '23505'),
       purchasing.SUPPLIER_PO_LINE_FIELD_RULES,
     ),
-    { message: 'supplierPoErrorCardOverlap' },
+    { message: 'supplierPoErrorAlreadyOnPo' },
   )
 })
 
-test('status badge, event labels and the price format', () => {
-  assert.deepEqual(plain(purchasing.SUPPLIER_PO_STATUS_BADGE), {
-    open: { key: 'supplierPoStatusOpen', tone: 'success' },
-    closed: { key: 'supplierPoStatusClosed', tone: 'neutral' },
-  })
-  // The event types of the CHECK as 0173 re-created it (the 0136 five, 0142's
+test('no status badge since 0189, event labels and the price format', () => {
+  // 0189 (owner 2026-11-11): a supplier PO is neither open nor closed; the
+  // badge lives on in the /ui-kit mockup's own data only.
+  assert.equal(purchasing.SUPPLIER_PO_STATUS_BADGE, undefined)
+  assert.match(
+    read('src', 'screens', 'ui-kit', 'purchasingMockupData.ts'),
+    /export const SUPPLIER_PO_STATUS_BADGE/,
+  )
+  // The event types of the CHECK as 0174 re-created it (the 0136 five, 0142's
   // updated and line_updated, 0149's equipment_removed and reopened, 0160's
-  // approved, 0173's renumbered).
+  // approved, 0173's renumbered, 0174's approval_returned).
   const sql = read(
     'supabase',
     'migrations',
-    '20261104100000_0173_supplier_po_number_format.sql',
+    '20261104110000_0174_equipment_card_pricing.sql',
   )
-  const check = /event_type IN \(([^)]+)\)/.exec(sql)
+  const check =
+    /supplier_po_events_type_check CHECK \(\s*event_type IN \(([^)]+)\)/.exec(
+      sql,
+    )
   const types = [...check[1].matchAll(/'(\w+)'/g)].map((m) => m[1]).sort()
   assert.deepEqual(
     Object.keys(purchasing.SUPPLIER_PO_EVENT_LABEL_KEYS).sort(),
@@ -534,8 +567,8 @@ test('supplierPosListConfig: PO number search, allowlisted filters, standard siz
     (m) => m[1],
   )
   assert.deepEqual(filterKeys, [
-    'status',
-    // 0160: draft or approved.
+    // 0160: draft or approved (0189: the open / closed filter before it is
+    // gone with the state).
     'approval_status',
     // 0140: «المالك ثم المورد» like the log (party_class computed column).
     'party_class',
@@ -726,9 +759,11 @@ test('the real screens read through RLS and write only through the 0136 function
     'create_supplier_po',
     'add_supplier_po_equipment',
     'update_supplier_po_equipment_price',
-    'close_supplier_po',
+    // 0189: «رجوع للتعديل» took the place of closing.
+    'return_supplier_po_approval',
   ])
     assert.match(data, new RegExp(`supabase\\.rpc\\('${fn}'`), fn)
+  assert.doesNotMatch(data, /close_supplier_po|closeSupplierPo/)
   // No direct insert / update / delete on a purchasing table.
   assert.doesNotMatch(data, /\.(insert|update|upsert|delete)\(/)
   for (const file of [
@@ -768,7 +803,8 @@ test('the real screens read through RLS and write only through the 0136 function
   // Owner 2026-10-22: one PO has one party — no supplier on the line cards
   // or in the sort, and one «اضافة معدة» button (the section's, primary).
   assert.doesNotMatch(poPage, /lineSupplierName/)
-  assert.match(poPage, /type SortKey = 'equipment' \| 'period' \| 'price'/)
+  // 0189: no period on a line (a card has none): code or price.
+  assert.match(poPage, /type SortKey = 'equipment' \| 'price'/)
   assert.equal(
     (poPage.match(/setAddOpen\(true\)/g) ?? []).length,
     2,
@@ -943,12 +979,14 @@ test('supplierPoPartyOrFilter: the owner and supplier filters are OR-ed in the P
   assert.match(screen, /partyOr \? partyOr\.rest : list\.filters/)
 })
 
-// --- «خيارات» and the close confirmation (owner 2026-10-22) ------------------------
+// --- «خيارات» (owner 2026-10-22) and, since 0189, «رجوع للتعديل» -------------------
 
-test('the PO page closes through a typed order number, from the options menu', () => {
+test('the PO page: no closing since 0189; an approver returns an approved PO to draft', () => {
   const page = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
-  // No bare close button and no plain confirm any more.
-  assert.doesNotMatch(page, /useConfirm|closeSupplierPo|variant="danger"/)
+  assert.doesNotMatch(
+    page,
+    /useConfirm|closeSupplierPo|CloseSupplierPoDialog|variant="danger"|po\.status|closed_at|supplierPoClosedNotice/,
+  )
   // One menu element, rendered in the header and in the mobile bar.
   assert.equal((page.match(/<SupplierPoOptionsMenu/g) ?? []).length, 1)
   assert.equal(
@@ -957,7 +995,22 @@ test('the PO page closes through a typed order number, from the options menu', (
     'desktop header + mobile bar',
   )
   assert.match(page, /<EditSupplierPoDialog/)
-  assert.match(page, /<CloseSupplierPoDialog/)
+  // A manager always has the actions (no open / closed state to wait on).
+  assert.match(page, /const showActions = canManage/)
+  assert.match(
+    page,
+    /onEdit=\{showActions \? \(\) => setEditOpen\(true\) : undefined\}/,
+  )
+  assert.match(
+    page,
+    /onReturn=\{\s*canApprove && approved \? \(\) => setReturnOpen\(true\) : undefined\s*\}/,
+  )
+  assert.match(
+    page,
+    /<ReturnSupplierPoDialog[\s\S]*?toast\(\{ title: t\('supplierPoReturnedToast'\), tone: 'success' \}\)/,
+  )
+  // The line cards carry no period (a card has none).
+  assert.doesNotMatch(page, /period_from|period_to|periodLabel/)
   const menu = read(
     'src',
     'components',
@@ -966,28 +1019,37 @@ test('the PO page closes through a typed order number, from the options menu', (
   )
   assert.match(menu, /DropdownMenuTrigger asChild/)
   assert.match(menu, /t\('supplierPoEdit'\)/)
-  assert.match(menu, /tone="danger"[\s\S]*t\('supplierPoClose'\)/)
-  // Owner 2026-10-22: «تصدير PDF» is the first item, for every reader; the
-  // management items only with their handlers.
+  assert.match(menu, /\{onReturn && \([\s\S]*?t\('supplierPoReturn'\)/)
+  assert.doesNotMatch(menu, /supplierPoClose|onClose|tone="danger"/)
+  // Owner 2026-10-22: «تصدير PDF» is the first item, for every reader.
   assert.ok(
     menu.indexOf("t('supplierPoPdf')") < menu.indexOf("t('supplierPoEdit')"),
   )
-  assert.match(menu, /const manage = Boolean\(onEdit && onClose\)/)
-  assert.match(
-    page,
-    /onEdit=\{showActions \? \(\) => setEditOpen\(true\) : undefined\}/,
+  assert.ok(
+    !fs.existsSync(
+      path.join(
+        ROOT,
+        'src',
+        'components',
+        'purchasing',
+        'CloseSupplierPoDialog.tsx',
+      ),
+    ),
   )
-  const close = read(
+  const dialog = read(
     'src',
     'components',
     'purchasing',
-    'CloseSupplierPoDialog.tsx',
+    'ReturnSupplierPoDialog.tsx',
   )
-  assert.match(close, /closeSupplierPo\(po\.id\)/)
-  assert.match(close, /disabled=\{!matches\}/)
-  assert.match(close, /if \(!matches \|\| saving\) return/)
-  // The matcher ignores case, spaces and dashes (0173: «PO-2026110001»),
-  // nothing else; an empty entry never matches.
+  assert.match(dialog, /validateWithSchema\(supplierPoReturnSchema, \{ note \}\)/)
+  assert.match(dialog, /await returnSupplierPoApproval\(\{ poId: po\.id, note \}\)/)
+  assert.match(dialog, /setMessage\(supplierPoFormMessage\(result\.error\)\)/)
+  assert.doesNotMatch(dialog, HAMZA_ALIF)
+  // The number matcher of the typed confirmation moved to the client PO's
+  // close dialog (the client PO keeps its closing): case, spaces and dashes
+  // ignored, nothing else; an empty entry never matches.
+  const close = read('src', 'components', 'sales', 'CloseClientPoDialog.tsx')
   const src = close.slice(
     close.indexOf('export function closeConfirmationMatches'),
     close.indexOf(
@@ -1049,7 +1111,7 @@ test('the PO PDF prints a hidden sheet from the PO page itself', () => {
 
 // --- «حسب المعدات» (owner 2026-10-31, migration 0167) --------------------------------
 
-test('poUnitsListConfig: unit and PO number search, allowlisted filters, open POs by default', () => {
+test('poUnitsListConfig: unit and PO number search, allowlisted filters, no status since 0189', () => {
   const source = read('src', 'lib', 'listConfigs.ts')
   const start = source.indexOf('export const poUnitsListConfig')
   assert.ok(start > 0)
@@ -1069,7 +1131,6 @@ test('poUnitsListConfig: unit and PO number search, allowlisted filters, open PO
     (m) => m[1],
   )
   assert.deepEqual(filterKeys, [
-    'po_status',
     'approval_status',
     'party_class',
     'lessor_id',
@@ -1081,11 +1142,9 @@ test('poUnitsListConfig: unit and PO number search, allowlisted filters, open PO
     config.replace(/\s+/g, ' '),
     /key: 'lessor_id', label: 'supplierPoSupplier', type: 'select', operators: \['in'\], options: \[\], multiple: true, visibleWhen: \{ field: 'party_class', includes: 'external_supplier' \},/,
   )
-  // The owner decided: the open POs by default, a visible removable filter.
-  assert.match(
-    config.replace(/\s+/g, ' '),
-    /defaultFilters: \[ \{ id: 'default-po-status', field: 'po_status', operator: 'eq', value: 'open', \}, \],/,
-  )
+  // It opened on the open POs until 0189 (owner 2026-11-11: a supplier PO
+  // has no open / closed state): no default filter, no status key.
+  assert.doesNotMatch(config, /defaultFilters|po_status/)
   const sorts = [...config.matchAll(/\{ key: '(\w+)', label:/g)].map(
     (m) => m[1],
   )

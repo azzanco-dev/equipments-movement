@@ -189,9 +189,10 @@ test('the dialog: danger button, the card line, the note schema', () => {
   )
 })
 
-test('the page offers «حذف» only on an open draft PO for purchasing.manage', () => {
+test('the page offers «حذف» only on a draft PO for purchasing.manage', () => {
   const page = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
-  assert.match(page, /const showActions = open && canManage/)
+  // 0189: no open / closed state — a manager, a draft.
+  assert.match(page, /const showActions = canManage/)
   assert.match(
     page,
     /const removable = showActions && po\.approval_status === 'draft'/,
@@ -214,7 +215,8 @@ test('labels and messages in both languages, no hamza on alif', () => {
     /equipment_removed: 'supplierPoEventEquipmentRemoved'/,
   )
   assert.match(purchasing, /invalid_line: 'supplierPoErrorInvalidLine'/)
-  assert.match(purchasing, /po_closed: 'supplierPoErrorClosed'/)
+  // 0189 retired po_closed (a PO is never closed).
+  assert.doesNotMatch(purchasing, /po_closed: /)
   assert.match(
     purchasing,
     /po_approved_locked: 'supplierPoErrorApprovedLocked'/,

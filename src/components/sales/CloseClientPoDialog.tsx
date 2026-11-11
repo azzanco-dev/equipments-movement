@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react'
-import { closeConfirmationMatches } from '@/components/purchasing/CloseSupplierPoDialog'
 import { Button, Dialog, Field, Input, Notice } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import { clientPoFormMessage } from '@/lib/sales'
 import { closeClientPo, type ClientPoRow } from '@/lib/salesData'
+
+/** The typed number matches the PO's, whatever the case, spaces or dashes.
+ *  It lived in the supplier PO's close dialog until migration 0189 removed
+ *  closing from the supplier side (owner 2026-11-11). */
+export function closeConfirmationMatches(typed: string, poNumber: string): boolean {
+  const bare = (value: string) => value.replace(/[\s-]+/g, '').toUpperCase()
+  return bare(typed) !== '' && bare(typed) === bare(poNumber)
+}
 
 /**
  * «اقفال PO العميل»: closing is final (no further line or price change), so

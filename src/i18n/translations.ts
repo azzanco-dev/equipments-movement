@@ -2333,9 +2333,20 @@ export const translations = {
     supplierPoApprove: 'اعتماد',
     supplierPoApproveConfirmTitle: 'اعتماد امر الشراء؟',
     supplierPoApproveConfirmDesc:
-      'بعد الاعتماد يقفل الامر: لا تضاف معدات ولا تتغير الاسعار ولا تاريخ البداية، وتبقى الملاحظات والاغلاق. ويفتح تصدير PDF.',
+      'بعد الاعتماد يقفل الامر: لا تضاف معدات ولا تتغير الاسعار ولا تاريخ البداية، وتبقى الملاحظات. وللتعديل بعدها استخدم «رجوع للتعديل».',
     supplierPoApprovedLockedNotice:
-      'هذا الامر معتمد ومقفل. لتعديل امر معتمد اقفله وانشئ امر جديد.',
+      'هذا الامر معتمد ومقفل. لتعديله استخدم «رجوع للتعديل» من الخيارات.',
+    // 0189 (owner 2026-11-11): a PO is never closed; an approved PO is
+    // returned to draft to be changed.
+    supplierPoReturn: 'رجوع للتعديل',
+    supplierPoReturnConfirmTitle: 'رجوع امر الشراء للتعديل؟',
+    supplierPoReturnConfirmDesc:
+      'يعود الامر مسودة: تعود معداته واسعاره وتاريخ بدايته قابلة للتعديل حتى يعتمد من جديد.',
+    supplierPoReturnConfirmButton: 'نعم، ارجعه للتعديل',
+    supplierPoReturnNote: 'ملاحظة (اختياري)',
+    supplierPoReturnedToast: 'رجع الامر للتعديل',
+    supplierPoErrorAlreadyOnPo: 'المعدة موجودة في هذا الامر.',
+    supplierPoErrorNotApproved: 'الامر ليس معتمدا.',
     // Owner 2026-10-29: the PDF's buyer box and line columns.
     supplierPoPrintBuyer: 'المشتري',
     supplierPoPrintBuyerName: 'شركة عبدالله احمد العزاني للمقاولات',
@@ -2364,7 +2375,7 @@ export const translations = {
     supplierPoErrorApproveRequired: 'ليس لديك صلاحية اعتماد اوامر الشراء.',
     supplierPoErrorNotDraft: 'الامر معتمد مسبقا.',
     supplierPoErrorApprovedLocked:
-      'الامر معتمد ومقفل. لتعديله اقفله وانشئ امر جديد.',
+      'الامر معتمد ومقفل. ارجعه للتعديل اولا.',
     supplierPoApprovedAt: 'تاريخ الاعتماد',
     supplierPoApprovedBy: 'اعتمد بواسطة',
     supplierPoEventApproved: 'اعتماد الامر',
@@ -5146,9 +5157,20 @@ export const translations = {
     supplierPoApprove: 'Approve',
     supplierPoApproveConfirmTitle: 'Approve this purchase order?',
     supplierPoApproveConfirmDesc:
-      'Approval locks the order: no units are added and no price or start date changes; notes and closing stay. It also opens the PDF export.',
+      'Approval locks the order: no units are added and no price or start date changes; the notes stay editable. To change it afterwards use “Return for editing”.',
     supplierPoApprovedLockedNotice:
-      'This order is approved and locked. To change an approved order, close it and create a new one.',
+      'This order is approved and locked. To change it, use “Return for editing” in the options.',
+    // 0189 (owner 2026-11-11): a PO is never closed; an approved PO is
+    // returned to draft to be changed.
+    supplierPoReturn: 'Return for editing',
+    supplierPoReturnConfirmTitle: 'Return this purchase order for editing?',
+    supplierPoReturnConfirmDesc:
+      'The order becomes a draft again: its units, prices and start date are editable until it is approved again.',
+    supplierPoReturnConfirmButton: 'Yes, return it',
+    supplierPoReturnNote: 'Note (optional)',
+    supplierPoReturnedToast: 'The order was returned for editing',
+    supplierPoErrorAlreadyOnPo: 'The equipment is already on this order.',
+    supplierPoErrorNotApproved: 'The order is not approved.',
     // Owner 2026-10-29: the PDF's buyer box and line columns.
     supplierPoPrintBuyer: 'Buyer',
     supplierPoPrintBuyerName: 'Abdullah Ahmed Al Azani Contracting Co.',
@@ -5178,7 +5200,7 @@ export const translations = {
     supplierPoErrorApproveRequired: 'You do not have permission to approve purchase orders.',
     supplierPoErrorNotDraft: 'The order is already approved.',
     supplierPoErrorApprovedLocked:
-      'The order is approved and locked. To change it, close it and create a new one.',
+      'The order is approved and locked. Return it for editing first.',
     supplierPoApprovedAt: 'Approved on',
     supplierPoApprovedBy: 'Approved by',
     supplierPoEventApproved: 'Order approved',

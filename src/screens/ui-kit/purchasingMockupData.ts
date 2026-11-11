@@ -1,4 +1,17 @@
-import type { SupplierPoEventType, SupplierPoStatus } from '@/lib/purchasing'
+import type { TranslationKey } from '@/i18n/translations'
+import type { SupplierPoEventType } from '@/lib/purchasing'
+
+/** The open / closed state the supplier PO had when this mockup was approved
+ *  (2026-10-19). Migration 0189 dropped it from the real PO (owner
+ *  2026-11-11); the mockup keeps its own copy as history. */
+export type SupplierPoStatus = 'open' | 'closed'
+
+export const SUPPLIER_PO_STATUS_BADGE: Readonly<
+  Record<SupplierPoStatus, { key: TranslationKey; tone: 'success' | 'neutral' }>
+> = {
+  open: { key: 'supplierPoStatusOpen', tone: 'success' },
+  closed: { key: 'supplierPoStatusClosed', tone: 'neutral' },
+}
 
 // purchasing-screens — SAMPLE DATA of the purchasing mockups on /ui-kit
 // (owner decision 2026-10-19: the three screens are reviewed as mockups

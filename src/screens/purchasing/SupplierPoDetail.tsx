@@ -25,20 +25,17 @@ import { useListRequest } from '@/components/data-list/useListRequest'
 import { fetchProfileNames } from '@/components/details/profileNames'
 import { AddEquipmentDialog } from '@/components/purchasing/AddEquipmentDialog'
 import { ApproveSupplierPoDialog } from '@/components/purchasing/ApproveSupplierPoDialog'
-import { CloseSupplierPoDialog } from '@/components/purchasing/CloseSupplierPoDialog'
 import { EditLineDialog } from '@/components/purchasing/EditLineDialog'
 import { EditSupplierPoDialog } from '@/components/purchasing/EditSupplierPoDialog'
 import { RemoveEquipmentDialog } from '@/components/purchasing/RemoveEquipmentDialog'
+import { ReturnSupplierPoDialog } from '@/components/purchasing/ReturnSupplierPoDialog'
 import { Price, PricesByUnit } from '@/components/purchasing/Price'
 import { PurchasingUnitCell } from '@/components/purchasing/PurchasingUnitCell'
 import { SupplierPoEventsTimeline } from '@/components/purchasing/SupplierPoEventsTimeline'
 import { SupplierPoOptionsMenu } from '@/components/purchasing/SupplierPoOptionsMenu'
 import { SupplierPoPrintSheet } from '@/components/purchasing/SupplierPoPrintSheet'
 import { SupplierPoReceipt } from '@/components/purchasing/SupplierPoReceipt'
-import {
-  SupplierPoApprovalBadge,
-  SupplierPoStatusBadge,
-} from '@/components/purchasing/SupplierPoStatusBadge'
+import { SupplierPoApprovalBadge } from '@/components/purchasing/SupplierPoStatusBadge'
 import {
   PageTrailBar,
   Badge,
@@ -61,7 +58,6 @@ import {
 import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
 import { useI18n } from '@/i18n/I18nContext'
 import { useTabTitle } from '@/components/TabTitle'
-import type { TranslationKey } from '@/i18n/translations'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import {
@@ -89,22 +85,11 @@ export interface SupplierPoDetailProps {
   onOpenEquipment?: (equipmentId: string) => void
 }
 
-type SortKey = 'equipment' | 'period' | 'price'
+type SortKey = 'equipment' | 'price'
 type SortDirection = 'asc' | 'desc'
 
 /** The list the page returns to (the «اوامر الشراء» child of «المشتريات»). */
 export const SUPPLIER_POS_PATH = '/purchasing/orders'
-
-/** The card period behind a line: «from – to», or «from – مفتوح». */
-function periodLabel(
-  card: { period_from: string; period_to: string | null },
-  t: (key: TranslationKey) => string,
-): string {
-  const to = card.period_to
-    ? formatDate(card.period_to)
-    : t('equipmentPurchasingOpenEnd')
-  return `${formatDate(card.period_from)} – ${to}`
-}
 
 function PageSkeleton({ label }: { label: string }) {
   return (
@@ -186,11 +171,12 @@ function SupplierPoDetailInner({
   const [loadError, setLoadError] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [editing, setEditing] = useState<SupplierPoLineRow | null>(null)
-  // 0187: the line being removed (an open, draft PO only).
+  // 0187: the line being removed (a draft PO only).
   const [removing, setRemoving] = useState<SupplierPoLineRow | null>(null)
   const toast = useToast()
   const [editOpen, setEditOpen] = useState(false)
-  const [closeOpen, setCloseOpen] = useState(false)
+  // 0189: «رجوع للتعديل» of an approved PO (a PO is never closed).
+  const [returnOpen, setReturnOpen] = useState(false)
   const [approveOpen, setApproveOpen] = useState(false)
   // «تصدير PDF»: the hidden print sheet is mounted only while the browser's
   // print dialog is up (owner 2026-10-22: no tab, no page of the site).
@@ -287,14 +273,16 @@ function SupplierPoDetailInner({
       </div>
     )
 
-  const open = po.status === 'open'
-  const showActions = open && canManage
+  // 0189 (owner 2026-11-11): a PO has no open / closed state — it is its
+  // start date and its approval — so a manager always has the actions.
+  const showActions = canManage
   // 0160: an approved PO is locked — no unit, price or start-date change
-  // (the database refuses them too); its notes and closing stay.
+  // (the database refuses them too); its notes stay editable, and an
+  // approver returns it to draft to change it (0189).
   const approved = po.approval_status === 'approved'
   const editable = showActions && !approved
-  // 0187 (owner 2026-11-09, «حذف المعدة بشرط مفتوح ومسودة»): a unit leaves
-  // only an OPEN, DRAFT PO; the database refuses anything else too.
+  // 0187 (owner 2026-11-09): a unit leaves only a DRAFT PO; the database
+  // refuses anything else too.
   const removable = showActions && po.approval_status === 'draft'
   const approveBlocker = supplierPoApprovalBlocker(po, lines, user?.id)
   const supplier = supplierPoSupplierLabel(po, t)
@@ -313,8 +301,6 @@ function SupplierPoDetailInner({
 
   const sortValue = (line: SupplierPoLineRow): string | number => {
     switch (sort.key) {
-      case 'period':
-        return line.card?.period_from ?? ''
       case 'price':
         // Unpriced lines sort before every price.
         return line.price === null ? -1 : Number(line.price)
@@ -385,17 +371,6 @@ function SupplierPoDetailInner({
           },
         ]
       : []),
-    ...(po.closed_at
-      ? [
-          {
-            key: 'closedAt',
-            icon: <Lock size={16} />,
-            label: t('supplierPoClosedAt'),
-            value: formatDateTime(po.closed_at),
-            dir: 'ltr' as const,
-          },
-        ]
-      : []),
     {
       key: 'notes',
       icon: <StickyNote size={16} />,
@@ -404,8 +379,9 @@ function SupplierPoDetailInner({
     },
   ]
 
-  // «خيارات» (owner 2026-10-22): «تصدير PDF» for every reader, plus edit
-  // and close for a manager while the PO is open.
+  // «خيارات» (owner 2026-10-22): «تصدير PDF» for every reader, edit for a
+  // manager, «اعتماد» on a draft and «رجوع للتعديل» on an approved PO for an
+  // approver (0189: no closing).
   const optionsMenu = (className?: string) => (
     <SupplierPoOptionsMenu
       className={className}
@@ -414,17 +390,18 @@ function SupplierPoDetailInner({
       // on every page (SupplierPoPrintSheet); an approved PO prints clean.
       onExport={() => setPrinting(true)}
       onApprove={
-        canApprove && open && !approved ? () => setApproveOpen(true) : undefined
+        canApprove && !approved ? () => setApproveOpen(true) : undefined
       }
       approveBlockedReason={approveBlocker}
+      onReturn={
+        canApprove && approved ? () => setReturnOpen(true) : undefined
+      }
       onEdit={showActions ? () => setEditOpen(true) : undefined}
-      onClose={showActions ? () => setCloseOpen(true) : undefined}
     />
   )
 
   const sortOptions: { value: SortKey; label: string }[] = [
     { value: 'equipment', label: t('supplierPoEquipmentField') },
-    { value: 'period', label: t('equipmentPurchasingPeriod') },
     { value: 'price', label: t('supplierPoPrice') },
   ]
   const sortControls = (
@@ -497,7 +474,6 @@ function SupplierPoDetailInner({
           }
           badges={
             <>
-              <SupplierPoStatusBadge status={po.status} />
               <SupplierPoApprovalBadge po={po} />
               {unpriced > 0 && (
                 <Badge tone="warning">
@@ -545,14 +521,9 @@ function SupplierPoDetailInner({
         </div>
       </div>
 
-      {open && approved && (
+      {approved && (
         <Notice tone="info" size="compact" icon={<Lock size={16} />}>
           {t('supplierPoApprovedLockedNotice')}
-        </Notice>
-      )}
-      {!open && (
-        <Notice tone="neutral" size="compact" icon={<Lock size={16} />}>
-          {t('supplierPoClosedNotice')}
         </Notice>
       )}
 
@@ -617,17 +588,10 @@ function SupplierPoDetailInner({
                       </div>
                       {/* Owner 2026-10-22: no supplier on the line — the PO has
                           exactly one party, shown in the header. */}
+                      {/* 0189: no period on the line — a card has none, and
+                          every unit of the PO starts on the PO's start date
+                          (the facts card). */}
                       <div className="min-w-0 flex-1 space-y-1 sm:basis-3/5">
-                        {line.card && (
-                          <p className="flex items-center gap-1.5 text-sm text-muted">
-                            <Calendar
-                              size={14}
-                              aria-hidden="true"
-                              className="shrink-0"
-                            />
-                            <bdi dir="ltr">{periodLabel(line.card, t)}</bdi>
-                          </p>
-                        )}
                         {line.note && (
                           <p className="flex items-start gap-1.5 text-xs text-muted">
                             <StickyNote
@@ -796,12 +760,13 @@ function SupplierPoDetailInner({
           fetchData()
         }}
       />
-      <CloseSupplierPoDialog
+      <ReturnSupplierPoDialog
         po={po}
-        open={closeOpen}
-        onOpenChange={setCloseOpen}
-        onClosed={() => {
-          setCloseOpen(false)
+        open={returnOpen}
+        onOpenChange={setReturnOpen}
+        onReturned={() => {
+          setReturnOpen(false)
+          toast({ title: t('supplierPoReturnedToast'), tone: 'success' })
           fetchData()
         }}
       />

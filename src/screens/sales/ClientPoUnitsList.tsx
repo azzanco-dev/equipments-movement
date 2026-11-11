@@ -148,13 +148,14 @@ export function ClientPoUnitsList({ onSelectPo }: ClientPoUnitsListProps) {
       hideBelow: 'md',
       cell: (row) => <CompanyProjectCell row={row} />,
     },
+    // 0189: the PO's issue date (the card has no period to show).
     {
-      key: 'card_period_from',
-      header: t('supplierPoStartDate'),
+      key: 'issue_date',
+      header: t('clientPoIssueDate'),
       sortable: true,
       hideBelow: 'md',
       className: 'tabular-nums',
-      cell: (row) => formatDate(row.card_period_from),
+      cell: (row) => formatDate(row.issue_date),
     },
     {
       key: 'price',
