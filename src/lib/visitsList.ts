@@ -136,7 +136,13 @@ export function visitContextFilter(
 }
 
 /** Sort keys the visits tab may ask the server for; anything else is ignored. */
-export const VISIT_SORT_FIELDS = ['entry_at', 'exit_at'] as const
+export const VISIT_SORT_FIELDS = [
+  'entry_at',
+  'exit_at',
+  // Owner 2026-11-11 («سورت حسب تاريخ الانشاء في الدخوليات»): when the ENTRY
+  // was registered (`entry_created_at`, migration 0159).
+  'entry_created_at',
+] as const
 export type VisitSortField = (typeof VISIT_SORT_FIELDS)[number]
 
 export function visitSortField(
@@ -181,6 +187,10 @@ export const visitsListConfig: DataListConfig = {
   sortableFields: [
     { key: 'entry_at', label: { ar: 'وقت الدخول', en: 'Entry time' } },
     { key: 'exit_at', label: { ar: 'وقت الخروج', en: 'Exit time' } },
+    {
+      key: 'entry_created_at',
+      label: { ar: 'تاريخ الانشاء', en: 'Created' },
+    },
   ],
 }
 

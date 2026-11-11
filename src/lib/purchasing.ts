@@ -101,15 +101,17 @@ export function supplierPoEventLabel(
  *  (`return_supplier_po_approval`, 0189). */
 export type SupplierPoApprovalStatus = 'draft' | 'approved'
 
-/** The approval badge of the PO page: draft = amber, approved = blue. */
+/** The approval badge of the PO page: draft = grey, approved = green (owner
+ *  2026-11-11, «غير لون بادج الدرافت» → «رمادي + المعتمد اخضر»; it was amber /
+ *  blue), as the pricing badge of «اسعار المعدات». */
 export const SUPPLIER_PO_APPROVAL_BADGE: Readonly<
   Record<
     SupplierPoApprovalStatus,
-    { key: TranslationKey; tone: 'warning' | 'info' }
+    { key: TranslationKey; tone: 'neutral' | 'success' }
   >
 > = {
-  draft: { key: 'supplierPoApprovalDraft', tone: 'warning' },
-  approved: { key: 'supplierPoApprovalApproved', tone: 'info' },
+  draft: { key: 'supplierPoApprovalDraft', tone: 'neutral' },
+  approved: { key: 'supplierPoApprovalApproved', tone: 'success' },
 }
 
 /**
@@ -119,10 +121,10 @@ export const SUPPLIER_PO_APPROVAL_BADGE: Readonly<
  */
 export function supplierPoApprovalListBadge(po: {
   approval_status?: string | null
-}): { key: TranslationKey; tone: 'warning' | 'info' } {
+}): { key: TranslationKey; tone: 'neutral' | 'success' } {
   if (po.approval_status === 'approved')
     return SUPPLIER_PO_APPROVAL_BADGE.approved
-  return { key: 'supplierPoApprovalPending', tone: 'warning' }
+  return { key: 'supplierPoApprovalPending', tone: 'neutral' }
 }
 
 /**

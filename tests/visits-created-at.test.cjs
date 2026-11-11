@@ -163,7 +163,9 @@ test('«الانشاء» is the last column of every variant, in the duration st
   assert.match(column, /key: 'entry_created_at'/)
   assert.match(column, /header: t\('visitCreatedAt'\)/)
   assert.match(column, /align: 'end'/)
-  assert.doesNotMatch(column, /sortable:|hideBelow:/)
+  // Sortable since 2026-11-11 (owner: «سورت حسب تاريخ الانشاء في الدخوليات»).
+  assert.match(column, /sortable: true/)
+  assert.doesNotMatch(column, /hideBelow:/)
   // The same span as the duration cell, through the duration's words.
   assert.match(column, /className="text-\[11px\] text-muted"/)
   assert.match(column, /formatVisitCreatedAgo\(visit\.entry_created_at, lang\)/)
@@ -175,8 +177,11 @@ test('«الانشاء» is the last column of every variant, in the duration st
   )
   assert.match(duration, /align: 'end'/)
   assert.doesNotMatch(duration, /sortable:|hideBelow:/)
-  // Not a server sort key.
-  assert.deepEqual([...visits.VISIT_SORT_FIELDS], ['entry_at', 'exit_at'])
+  // A server sort key since 2026-11-11.
+  assert.deepEqual(
+    [...visits.VISIT_SORT_FIELDS],
+    ['entry_at', 'exit_at', 'entry_created_at'],
+  )
 })
 
 test('the visits export lists the creation time last, as a date', () => {

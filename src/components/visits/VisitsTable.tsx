@@ -595,11 +595,13 @@ export function VisitsTable({
     // Owner 2026-10-28: «الانشاء», the LAST column, «بنفس نمط مدة الزيارة»:
     // the same 11 px muted text at the end (owner 2026-10-31), as the time since the ENTRY was
     // registered (`entry_created_at`, migration 0159), with the exact Saudi
-    // date-time on hover. Not sortable.
+    // date-time on hover. Sortable since 2026-11-11 (owner: «سورت حسب تاريخ
+    // الانشاء في الدخوليات»).
     const createdAt: DataTableColumn<EquipmentVisitRow> = {
       key: 'entry_created_at',
       header: t('visitCreatedAt'),
       align: 'end',
+      sortable: true,
       cell: (visit) => {
         const ago = formatVisitCreatedAgo(visit.entry_created_at, lang)
         return (

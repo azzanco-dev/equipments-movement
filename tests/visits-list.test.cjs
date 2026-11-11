@@ -272,6 +272,13 @@ test('a missing or impossible duration has no text at all', () => {
 test('sorting is an allowlist, defaulting to the entry instant', () => {
   assert.equal(visitSortField('entry_at'), 'entry_at')
   assert.equal(visitSortField('exit_at'), 'exit_at')
+  // Owner 2026-11-11: the visits sort by when the entry was registered too.
+  assert.equal(visitSortField('entry_created_at'), 'entry_created_at')
+  assert.ok(
+    visitsListConfig.sortableFields.some(
+      (field) => field.key === 'entry_created_at',
+    ),
+  )
   assert.equal(visitSortField('duration_minutes'), 'entry_at')
   assert.equal(visitSortField('id; drop table'), 'entry_at')
   assert.equal(visitSortField(null), 'entry_at')
