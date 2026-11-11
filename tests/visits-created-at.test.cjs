@@ -169,7 +169,10 @@ test('«الانشاء» is the last column of every variant, in the duration st
   // The same span as the duration cell, through the duration's words.
   assert.match(column, /className="text-\[11px\] text-muted"/)
   assert.match(column, /formatVisitCreatedAgo\(visit\.entry_created_at, lang\)/)
-  assert.match(column, /title=\{formatSaudiDateTime\(visit\.entry_created_at\)/)
+  // The hover names both registrations; the cell stays the entry's.
+  assert.match(column, /formatSaudiDateTime\(visit\.entry_created_at\)/)
+  assert.match(column, /formatSaudiDateTime\(visit\.exit_created_at\)/)
+  assert.match(column, /title=\{title \|\| undefined\}/)
   assert.match(column, /t\('visitCreatedAgo'\)\.replace\('\{duration\}', ago\)/)
   const duration = source.slice(
     source.indexOf('const duration: DataTableColumn'),
@@ -200,8 +203,9 @@ test('the visits export lists the creation time last, as a date', () => {
 })
 
 // 0191 is applied: the view also carries the exit's and the latest creation
-// time. The screens read the ENTRY's only (owner 2026-11-11, «خل تاريخ الانشاء
-// حسب الدخول وليس الدخول والخروج»), so the select must not name them.
+// time. The column and the sort are the ENTRY's only (owner 2026-11-11, «خل
+// تاريخ الانشاء حسب الدخول وليس الدخول والخروج»); the hover alone names the
+// exit's registration.
 test('migration 0191 appends the exit and latest creation times to the view', () => {
   const sql = read('supabase/migrations/20261111120000_0191_visits_last_created_at.sql')
   assert.match(sql, /CREATE OR REPLACE VIEW public\.movement_visits\nWITH \(security_invoker = true\)/)
@@ -222,10 +226,13 @@ test('migration 0191 appends the exit and latest creation times to the view', ()
   assert.match(sql, /GRANT SELECT ON public\.movement_visits TO authenticated;/)
 })
 
-test('the visits select does not read the unused 0191 columns', () => {
+test('the visits select reads the exit registration for the hover only', () => {
   const columns = visits.EQUIPMENT_VISITS_LOG_SELECT.split(',')
-  assert.ok(!columns.includes('exit_created_at'))
+  assert.ok(columns.includes('exit_created_at'))
   assert.ok(!columns.includes('last_created_at'))
+  // Never a sort key.
+  assert.equal(visits.visitSortField('exit_created_at'), 'entry_at')
+  assert.equal(visits.visitSortField('last_created_at'), 'entry_at')
 })
 
 test('the column copy exists in Arabic and English without hamza forms', () => {

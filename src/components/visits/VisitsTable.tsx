@@ -604,11 +604,19 @@ export function VisitsTable({
       sortable: true,
       cell: (visit) => {
         const ago = formatVisitCreatedAgo(visit.entry_created_at, lang)
+        // The hover names both registrations (owner 2026-11-11, «خل الhover
+        // نفس ماهو … وقت الدخول ووقت الخروج (الانشاء)»); the cell and the
+        // sort stay the entry's.
+        const entryCreated = formatSaudiDateTime(visit.entry_created_at)
+        const exitCreated = formatSaudiDateTime(visit.exit_created_at)
+        const title = [
+          entryCreated && `${t('entry')}: ${entryCreated}`,
+          exitCreated && `${t('exit')}: ${exitCreated}`,
+        ]
+          .filter(Boolean)
+          .join(' · ')
         return (
-          <span
-            className="text-[11px] text-muted"
-            title={formatSaudiDateTime(visit.entry_created_at) || undefined}
-          >
+          <span className="text-[11px] text-muted" title={title || undefined}>
             {ago ? t('visitCreatedAgo').replace('{duration}', ago) : '—'}
           </span>
         )

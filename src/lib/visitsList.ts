@@ -59,10 +59,11 @@ export const EQUIPMENT_VISITS_VIEW = 'movement_visits'
  * that migration must be applied before this select is shipped. The same
  * holds for `exit_purpose`, appended by migration 0118, and for
  * `driver_full_name`, appended by migration 0124 (wave 19), and for
- * `entry_created_at`, appended by migration 0159.
+ * `entry_created_at`, appended by migration 0159, and for `exit_created_at`,
+ * appended by migration 0191.
  */
 export const EQUIPMENT_VISITS_SELECT =
-  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code,equipment_ownership_status,exit_purpose,driver_full_name,entry_created_at'
+  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code,equipment_ownership_status,exit_purpose,driver_full_name,entry_created_at,exit_created_at'
 
 /**
  * The admin log's visits view (and the workshop managers' embedded log): the
@@ -123,6 +124,9 @@ export interface EquipmentVisitRow {
    * «الانشاء» column, shown in the duration's style (owner 2026-10-28).
    */
   entry_created_at?: string | null
+  /** When the EXIT that closed the visit was registered (migration 0191);
+   *  NULL while the visit is open. Named in the «الانشاء» hover only. */
+  exit_created_at?: string | null
 }
 
 /** Which visits a table lists; `all` applies no context predicate. */
@@ -143,7 +147,8 @@ export const VISIT_SORT_FIELDS = [
   // was registered (`entry_created_at`, migration 0159). The entry's ONLY: a
   // sort by the later of the entry's and the exit's registration (0191's
   // `last_created_at`) shipped and was taken back the same day («خل تاريخ
-  // الانشاء حسب الدخول وليس الدخول والخروج»); the view keeps the columns unread.
+  // الانشاء حسب الدخول وليس الدخول والخروج»); the hover still names the
+  // exit's registration (`exit_created_at`), `last_created_at` stays unread.
   'entry_created_at',
 ] as const
 export type VisitSortField = (typeof VISIT_SORT_FIELDS)[number]
