@@ -333,9 +333,13 @@ test('the ticket of a closed visit: «خرجت», its exit day and purpose', () 
     screen,
     /\{row\.visit_state === 'exited' && \(\s+<Badge tone="neutral" size="sm">/,
   )
-  assert.match(
-    screen,
-    /\{row\.visit_state === 'exited' \? \(\s+exitLine\(row\)/,
+  // Owner 2026-11-11: the exit line sits UNDER the entry date; the foreman
+  // is still shown for a visit that is not exited.
+  assert.match(screen, /\{row\.visit_state === 'exited' && \(\s+<p [^>]*>\s+\{exitLine\(row\)\}/)
+  assert.match(screen, /\{row\.visit_state !== 'exited' && \(\s+<p [^>]*>\s+\{t\('logsColForeman'\)\}/)
+  assert.ok(
+    screen.indexOf('formatDate(row.entry_at)') <
+      screen.indexOf('{exitLine(row)}'),
   )
   assert.match(screen, /exitPurposeLabelKey\(row\.exit_purpose\)/)
   // The Saudi day of the exit.

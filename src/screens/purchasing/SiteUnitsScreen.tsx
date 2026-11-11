@@ -546,18 +546,14 @@ export function SiteUnitsScreen({
                         row.project_name_en,
                       )}
                     </p>
-                    <p className="break-words text-xs leading-5 text-muted">
-                      {row.visit_state === 'exited' ? (
-                        exitLine(row)
-                      ) : (
-                        <>
-                          {t('logsColForeman')}{' '}
-                          <span className="font-medium text-fg">
-                            {row.entry_supervisor_name ?? '—'}
-                          </span>
-                        </>
-                      )}
-                    </p>
+                    {row.visit_state !== 'exited' && (
+                      <p className="break-words text-xs leading-5 text-muted">
+                        {t('logsColForeman')}{' '}
+                        <span className="font-medium text-fg">
+                          {row.entry_supervisor_name ?? '—'}
+                        </span>
+                      </p>
+                    )}
                     {/* Owner 2026-10-31 («اضف برضه في الكارد تاريخ الدخول»):
                         the entry's day, the PO's start date (0148). */}
                     <p className="break-words text-xs leading-5 text-muted">
@@ -566,6 +562,13 @@ export function SiteUnitsScreen({
                         {formatDate(row.entry_at)}
                       </bdi>
                     </p>
+                    {/* Owner 2026-11-11 («الخروج تحت الدخول»): the exit line
+                        of an exited visit sits under the entry date. */}
+                    {row.visit_state === 'exited' && (
+                      <p className="break-words text-xs leading-5 text-muted">
+                        {exitLine(row)}
+                      </p>
+                    )}
                   </div>
                 </div>
                 {/* The perforation (no side notches). */}
