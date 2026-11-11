@@ -334,11 +334,13 @@ test('the card page hides the months behind SHOW_CARD_MONTHS = false and shows t
   )
   assert.match(page, /<ApproveCardPricingDialog/)
   assert.match(page, /<ReturnCardPricingDialog/)
-  // The timeline labels the three card events and purchasing's
-  // approval_returned through the sales table first.
+  // The timeline labels a supplier PO event exactly as the PO page does.
+  assert.match(page, /supplierPoEventLabel\(event\.event_type, t, lang\)/)
+  assert.doesNotMatch(page, /SUPPLIER_PO_EVENT_LABEL_KEYS\[event\.event_type\]/)
+  // An unknown event type falls back to the generic update label.
   assert.match(
-    page,
-    /SALES_SUPPLIER_PO_EVENT_LABEL_KEYS\[event\.event_type\] \?\?\s+SUPPLIER_PO_EVENT_LABEL_KEYS\[event\.event_type\]/,
+    read('src', 'lib', 'purchasing.ts'),
+    /SUPPLIER_PO_EVENT_LABEL_KEYS\[eventType\] \?\? 'supplierPoEventUpdated'/,
   )
   // 0187: equipment_removed is named there too (purchasing lists it as well).
   assert.deepEqual(plain(sales.SALES_SUPPLIER_PO_EVENT_LABEL_KEYS), {

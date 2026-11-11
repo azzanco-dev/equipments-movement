@@ -84,9 +84,9 @@ import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { displayDriverName } from '@/lib/driverDisplayName'
 import { localizedName } from '@/lib/localizedName'
 import {
-  SUPPLIER_PO_EVENT_LABEL_KEYS,
   SUPPLIER_PO_EVENTS_LIMIT,
   formatSupplierPoPrice,
+  supplierPoEventLabel,
 } from '@/lib/purchasing'
 import {
   SUPPLIER_PO_EVENT_SELECT,
@@ -98,7 +98,6 @@ import {
   EQUIPMENT_CARD_EVENT_LABEL_KEYS,
   SALE_PER_UNIT_KEYS,
   SALE_RATE_UNIT_LABEL_KEYS,
-  SALES_SUPPLIER_PO_EVENT_LABEL_KEYS,
   cardMargin,
   cardMarginPct,
   cardMonthState,
@@ -485,12 +484,8 @@ function CardDetail({
     .slice(0, SUPPLIER_PO_EVENTS_LIMIT)
     .map((event) => ({
       id: event.id,
-      // 0174's approval_returned is labelled here until purchasing lists it.
-      label: `${t('supplierPo')} · ${t(
-        SALES_SUPPLIER_PO_EVENT_LABEL_KEYS[event.event_type] ??
-          SUPPLIER_PO_EVENT_LABEL_KEYS[event.event_type] ??
-          'supplierPoEventUpdated',
-      )}`,
+      // The same label as the PO page's timeline (`renumbered` included).
+      label: `${t('supplierPo')} · ${supplierPoEventLabel(event.event_type, t, lang)}`,
       detail: supplierPoEventDetail(
         event,
         () => card.equipment_code,

@@ -88,7 +88,9 @@ export function supplierPoEventLabel(
   lang: 'ar' | 'en',
 ): string {
   if (eventType === 'renumbered') return SUPPLIER_PO_RENUMBERED_LABEL[lang]
-  return t(SUPPLIER_PO_EVENT_LABEL_KEYS[eventType])
+  // An event type this build does not know reads as a generic update, never
+  // as the translation of `undefined`.
+  return t(SUPPLIER_PO_EVENT_LABEL_KEYS[eventType] ?? 'supplierPoEventUpdated')
 }
 
 // --- Approval (0160) -----------------------------------------------------------
