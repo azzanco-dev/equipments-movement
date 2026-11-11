@@ -273,12 +273,10 @@ test('sorting is an allowlist, defaulting to the entry instant', () => {
   assert.equal(visitSortField('entry_at'), 'entry_at')
   assert.equal(visitSortField('exit_at'), 'exit_at')
   // Owner 2026-11-11: the visits sort by when the entry was registered too.
-  // (its latest registration, the exit's or the entry's: migration 0191).
-  assert.equal(visitSortField('last_created_at'), 'last_created_at')
-  assert.equal(visitSortField('entry_created_at'), 'entry_at')
+  assert.equal(visitSortField('entry_created_at'), 'entry_created_at')
   assert.ok(
     visitsListConfig.sortableFields.some(
-      (field) => field.key === 'last_created_at',
+      (field) => field.key === 'entry_created_at',
     ),
   )
   assert.equal(visitSortField('duration_minutes'), 'entry_at')
