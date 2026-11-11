@@ -11,6 +11,7 @@ import {
   ErrorState,
   Notice,
   SearchInput,
+  Tooltip,
   WorkshopPurposeBadge,
   type DataTableColumn,
 } from '@/components/ui'
@@ -604,21 +605,37 @@ export function VisitsTable({
       sortable: true,
       cell: (visit) => {
         const ago = formatVisitCreatedAgo(visit.entry_created_at, lang)
-        // The hover names both registrations (owner 2026-11-11, «خل الhover
-        // نفس ماهو … وقت الدخول ووقت الخروج (الانشاء)»); the cell and the
-        // sort stay the entry's.
+        // The tooltip names both registrations (owner 2026-11-11, «خل الhover
+        // نفس ماهو … وقت الدخول ووقت الخروج (الانشاء)», then the shared
+        // Tooltip instead of the browser's own `title`, «شي اسمه tips»); the
+        // cell and the sort stay the entry's.
         const entryCreated = formatSaudiDateTime(visit.entry_created_at)
         const exitCreated = formatSaudiDateTime(visit.exit_created_at)
-        const title = [
-          entryCreated && `${t('entry')}: ${entryCreated}`,
-          exitCreated && `${t('exit')}: ${exitCreated}`,
-        ]
-          .filter(Boolean)
-          .join(' · ')
+        const registrations = [
+          { label: t('entry'), at: entryCreated },
+          { label: t('exit'), at: exitCreated },
+        ].filter((item) => item.at)
         return (
-          <span className="text-[11px] text-muted" title={title || undefined}>
-            {ago ? t('visitCreatedAgo').replace('{duration}', ago) : '—'}
-          </span>
+          <Tooltip
+            disabled={registrations.length === 0}
+            content={
+              <span className="grid gap-0.5">
+                {registrations.map((item) => (
+                  <span key={item.label} className="flex justify-between gap-3">
+                    <span className="text-muted">{item.label}</span>
+                    <bdi dir="ltr">{item.at}</bdi>
+                  </span>
+                ))}
+              </span>
+            }
+          >
+            <span
+              tabIndex={0}
+              className="rounded text-[11px] text-muted outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+            >
+              {ago ? t('visitCreatedAgo').replace('{duration}', ago) : '—'}
+            </span>
+          </Tooltip>
         )
       },
     }

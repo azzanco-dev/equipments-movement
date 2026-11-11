@@ -167,12 +167,16 @@ test('«الانشاء» is the last column of every variant, in the duration st
   assert.match(column, /sortable: true/)
   assert.doesNotMatch(column, /hideBelow:/)
   // The same span as the duration cell, through the duration's words.
-  assert.match(column, /className="text-\[11px\] text-muted"/)
+  assert.match(column, /text-\[11px\] text-muted/)
   assert.match(column, /formatVisitCreatedAgo\(visit\.entry_created_at, lang\)/)
   // The hover names both registrations; the cell stays the entry's.
   assert.match(column, /formatSaudiDateTime\(visit\.entry_created_at\)/)
   assert.match(column, /formatSaudiDateTime\(visit\.exit_created_at\)/)
-  assert.match(column, /title=\{title \|\| undefined\}/)
+  // Through the shared Tooltip, never the browser's own title.
+  assert.match(column, /<Tooltip\n\s+disabled=\{registrations\.length === 0\}/)
+  assert.doesNotMatch(column, /title=/)
+  assert.match(column, /\{ label: t\('entry'\), at: entryCreated \}/)
+  assert.match(column, /\{ label: t\('exit'\), at: exitCreated \}/)
   assert.match(column, /t\('visitCreatedAgo'\)\.replace\('\{duration\}', ago\)/)
   const duration = source.slice(
     source.indexOf('const duration: DataTableColumn'),
