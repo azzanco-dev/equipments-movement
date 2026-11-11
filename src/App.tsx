@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
@@ -17,7 +17,8 @@ import {
   planBack,
   readLastUrls,
   readTrail,
-  recordVisit,
+  noteBackPush,
+  recordCurrentVisit,
   rememberedUrl,
   type TrailEntry,
 } from '@/lib/backNavigation'
@@ -427,11 +428,11 @@ function AppContent() {
   // own trail of the URLs shown in this tab (src/lib/backNavigation.ts).
   const searchString = searchParams.toString()
   const currentUrl = searchString ? `${pathname}?${searchString}` : pathname
+  // The router remounts this component on every path change, so whether this
+  // is the tab's first render is kept by the module, not by a ref here.
   const [navTrail, setNavTrail] = useState<readonly TrailEntry[]>([])
-  const firstVisitRef = useRef(true)
   useEffect(() => {
-    setNavTrail(recordVisit(currentUrl, firstVisitRef.current))
-    firstVisitRef.current = false
+    setNavTrail(recordCurrentVisit(currentUrl))
   }, [currentUrl])
 
   // Warm the screen's chunk as soon as a session is known, while the profile
@@ -528,7 +529,10 @@ function AppContent() {
       rememberedUrl(readLastUrls(), fallbackPath),
     )
     if (plan.kind === 'history') router.back()
-    else router.push(plan.url)
+    else {
+      noteBackPush(plan.url)
+      router.push(plan.url)
+    }
   }
   const navigate = (target: string) => router.push(`/${target}`)
 

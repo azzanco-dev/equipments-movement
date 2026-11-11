@@ -26,7 +26,7 @@ const plain = (value) => JSON.parse(JSON.stringify(value))
 const visit = (urls) => {
   let stack = []
   urls.forEach((url, index) => {
-    stack = back.nextTrail(stack, url, index === 0)
+    stack = back.nextTrail(stack, url, index === 0 ? 'first' : 'push')
   })
   return stack
 }
@@ -38,21 +38,21 @@ test('the trail: push, back, a query change and a fresh start', () => {
     plain(stack.map((entry) => entry.url)),
     [list, '/purchasing/p1'],
   )
-  // back to the list: the page before is popped
-  stack = back.nextTrail(stack, list, false)
+  // back to the list (the browser's back): the page before is popped
+  stack = back.nextTrail(stack, list, 'pop')
   assert.deepEqual(plain(stack), [
     { url: list, path: '/purchasing/orders', merged: false },
   ])
   // a filter change on the same page replaces its entry
-  stack = back.nextTrail(stack, '/purchasing/orders?page=4', false)
+  stack = back.nextTrail(stack, '/purchasing/orders?page=4', 'push')
   assert.deepEqual(plain(stack), [
     { url: '/purchasing/orders?page=4', path: '/purchasing/orders', merged: true },
   ])
   // a reload keeps the trail, a new tab or an outside link starts over
   const two = visit(['/equipment', '/equipment/e1'])
-  assert.equal(back.nextTrail(two, '/equipment/e1', true).length, 2)
+  assert.equal(back.nextTrail(two, '/equipment/e1', 'first').length, 2)
   assert.deepEqual(
-    plain(back.nextTrail(two, '/users/u1', true)),
+    plain(back.nextTrail(two, '/users/u1', 'first')),
     [{ url: '/users/u1', path: '/users/u1', merged: false }],
   )
   // bounded
@@ -76,7 +76,7 @@ test('back: the page before, else the parent list with its last filters', () => 
   const merged = back.nextTrail(
     visit(['/settings', '/settings/roles']),
     '/settings/roles?role=admin',
-    false,
+    'push',
   )
   assert.deepEqual(plain(back.planBack(merged, '/settings')), {
     kind: 'push',
@@ -144,9 +144,86 @@ test('the crumbs of every page with a trail', () => {
     assert.equal(trail.pageTrail(page, t, null), null, page)
 })
 
+// Owner 2026-11-11 («ازرار الرجوع مازالت فيها مشاكل … ابغاها ترجعني للصفحة الي
+// قبل بنفس الفلاتر فقط»): the router remounts the app on every path change,
+// so the trail never held more than one page and back always went to the
+// parent list. A visit is now told apart by how it happened.
+test('the trail tells a link, the browser back and our back button apart', () => {
+  const list = '/purchasing/orders?filters=draft'
+  const urls = (stack) => plain(stack.map((entry) => entry.url))
+  // PO → unit → the same PO again through a link: three pages, not a "back"
+  let stack = visit(['/purchasing/p1', '/equipment/e1', '/purchasing/p1'])
+  assert.deepEqual(urls(stack), ['/purchasing/p1', '/equipment/e1', '/purchasing/p1'])
+  assert.deepEqual(plain(back.planBack(stack, '/purchasing/orders')), { kind: 'history' })
+  // the browser's back from there returns to the unit, then to the PO
+  stack = back.nextTrail(stack, '/equipment/e1', 'pop')
+  assert.deepEqual(urls(stack), ['/purchasing/p1', '/equipment/e1'])
+  stack = back.nextTrail(stack, '/purchasing/p1', 'pop')
+  assert.deepEqual(urls(stack), ['/purchasing/p1'])
+  // the browser's forward appends again
+  stack = back.nextTrail(stack, '/equipment/e1', 'pop')
+  assert.deepEqual(urls(stack), ['/purchasing/p1', '/equipment/e1'])
+
+  // a list that changed its filters, then a detail: back is the browser's
+  // back, and the list returns with the URL it last had
+  stack = visit([list, '/purchasing/orders?filters=approved', '/purchasing/p1'])
+  assert.deepEqual(urls(stack), ['/purchasing/orders?filters=approved', '/purchasing/p1'])
+  assert.deepEqual(plain(back.planBack(stack, '/purchasing/orders')), { kind: 'history' })
+  stack = back.nextTrail(stack, '/purchasing/orders?filters=approved', 'pop')
+  assert.deepEqual(plain(stack), [
+    { url: '/purchasing/orders?filters=approved', path: '/purchasing/orders', merged: true },
+  ])
+  // the browser's back lands on an EARLIER entry of that list (it pushed its
+  // own query): still that page, with the URL the browser shows
+  stack = visit([list, '/purchasing/orders?view=orders', '/purchasing/p1'])
+  stack = back.nextTrail(stack, list, 'pop')
+  assert.deepEqual(plain(stack), [{ url: list, path: '/purchasing/orders', merged: true }])
+  // the page on top steps through its own entries
+  stack = visit(['/logs', '/settings/roles', '/settings/roles?role=admin'])
+  stack = back.nextTrail(stack, '/settings/roles', 'pop')
+  assert.deepEqual(urls(stack), ['/logs', '/settings/roles'])
+  assert.equal(stack[1].merged, true)
+
+  // our button pushing the page before: that page is on top again
+  stack = visit(['/logs?q=A3', '/settings/roles', '/settings/roles?role=admin'])
+  assert.deepEqual(plain(back.planBack(stack, '/settings')), { kind: 'push', url: '/logs?q=A3' })
+  stack = back.nextTrail(stack, '/logs?q=A3', 'back')
+  assert.deepEqual(urls(stack), ['/logs?q=A3'])
+  // our button with no page before: the parent list starts the trail
+  stack = back.nextTrail(visit(['/equipment/e1']), '/equipment?q=A2', 'back')
+  assert.deepEqual(urls(stack), ['/equipment?q=A2'])
+})
+
+test('back never returns to the movement form', () => {
+  // home → the form → the saved movement: back is the home, by a push (the
+  // browser's own back would reopen the form)
+  let stack = visit(['/dashboard', '/movements/new?type=entry', '/movements/m1'])
+  assert.equal(back.isTransientPath('/movements/new'), true)
+  assert.equal(back.isTransientPath('/movements/m1'), false)
+  assert.deepEqual(plain(back.planBack(stack, '/logs')), { kind: 'push', url: '/dashboard' })
+  assert.equal(back.backTargetPath(stack, '/logs'), '/dashboard')
+  stack = back.nextTrail(stack, '/dashboard', 'back')
+  assert.deepEqual(plain(stack.map((entry) => entry.url)), ['/dashboard'])
+  // the form opened directly: the parent list
+  stack = visit(['/movements/new?type=exit', '/movements/m2'])
+  assert.deepEqual(plain(back.planBack(stack, '/logs?q=1')), { kind: 'push', url: '/logs?q=1' })
+  assert.equal(back.backTargetPath(stack, '/logs'), '/logs')
+})
+
+test('the first render of the tab is kept by the module, not by the app', () => {
+  const lib = read('src', 'lib', 'backNavigation.ts')
+  assert.match(lib, /\nlet firstVisit = true\n/)
+  assert.match(lib, /window\.addEventListener\('popstate', \(\) => \{\n\s+poppedUrl = locationUrl\(\)/)
+  assert.match(lib, /export function recordCurrentVisit\(url: string\): TrailEntry\[\]/)
+  const app = read('src', 'App.tsx')
+  // The router remounts the app on every path change: a ref would reset.
+  assert.doesNotMatch(app, /firstVisitRef/)
+  assert.match(app, /noteBackPush\(plan\.url\)\n\s+router\.push\(plan\.url\)/)
+})
+
 test('App feeds the trail and every detail page uses the back rule', () => {
   const app = read('src', 'App.tsx')
-  assert.match(app, /setNavTrail\(recordVisit\(currentUrl, firstVisitRef\.current\)\)/)
+  assert.match(app, /setNavTrail\(recordCurrentVisit\(currentUrl\)\)/)
   assert.match(app, /<PageTrailProvider value=\{trailValue\}>/)
   for (const fallback of ['/equipment', '/sales/orders', '/sales/prices', '/purchasing/orders', '/drivers', '/users'])
     assert.ok(app.includes(`onBack={goBackTo('${fallback}')}`), fallback)

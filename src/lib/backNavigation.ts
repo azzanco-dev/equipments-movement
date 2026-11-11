@@ -14,6 +14,16 @@
  * entry before it belongs to the app. The pure functions below decide; the
  * storage wrappers never throw (private mode, blocked storage) and the rule
  * then falls back to the parent list.
+ *
+ * Owner 2026-11-11 («ازرار الرجوع مازالت فيها مشاكل … ابغاها ترجعني للصفحة
+ * الي قبل بنفس الفلاتر فقط»): the router REMOUNTS the whole app on every
+ * path change (the catch-all route is keyed by its path), so "is this the
+ * first render of the tab" cannot live in a component — it did, every page
+ * looked like a fresh start, the trail never held more than one page and
+ * back always went to the parent list. That state now lives at module level
+ * (`recordCurrentVisit`), and a visit is told apart by HOW it happened:
+ * a link (`push`), the browser's back / forward (`pop`, seen on
+ * `popstate`), or our own back button pushing a URL (`back`).
  */
 
 export interface TrailEntry {
@@ -38,46 +48,87 @@ export function pathOf(url: string): string {
 }
 
 /**
- * The trail after the app shows `url`. `first` is the app's first render in
- * this tab load: a reload of the same URL keeps the trail, anything else (a
- * new tab that copied the opener's storage, a link from outside) starts over.
+ * How the app came to show a URL:
+ * - `first`: the first render of this tab load (a reload, a new tab, a link
+ *   from outside);
+ * - `push`: a link or a navigation by code;
+ * - `pop`: the browser's back or forward (also our button's `history` plan);
+ * - `back`: our back button pushed this URL (the page before, or the parent
+ *   list when there was none).
+ */
+export type VisitKind = 'first' | 'push' | 'pop' | 'back'
+
+/** A page that only leads somewhere else (the movement form opens the saved
+ *  movement): back never returns to it. */
+const TRANSIENT_PATHS: readonly string[] = ['/movements/new']
+
+export function isTransientPath(path: string): boolean {
+  return TRANSIENT_PATHS.includes(path)
+}
+
+/** The trail entry back leads to: the nearest page before the current one
+ *  that is not transient; -1 when there is none. */
+function backIndex(trail: readonly TrailEntry[]): number {
+  let index = trail.length - 2
+  while (index >= 0 && isTransientPath(trail[index].path)) index -= 1
+  return index
+}
+
+/**
+ * The trail after the app shows `url`. On `first` a reload of the same URL
+ * keeps the trail and anything else (a new tab that copied the opener's
+ * storage, a link from outside) starts over.
  */
 export function nextTrail(
   trail: readonly TrailEntry[],
   url: string,
-  first: boolean,
+  kind: VisitKind,
 ): TrailEntry[] {
   const path = pathOf(url)
   const top = trail[trail.length - 1]
-  if (first)
-    return top && top.url === url
-      ? [...trail]
-      : [{ url, path, merged: false }]
+  const entry: TrailEntry = { url, path, merged: false }
+  if (kind === 'first') return top && top.url === url ? [...trail] : [entry]
   if (top && top.url === url) return [...trail]
-  const previous = trail[trail.length - 2]
-  // Back (the browser's button or ours): the page before is shown again.
-  if (previous && previous.url === url) return trail.slice(0, -1)
+  if (kind === 'back' || kind === 'pop') {
+    // Another browser entry of the page on top (it pushed its own query).
+    if (kind === 'pop' && top && top.path === path)
+      return [...trail.slice(0, -1), { url, path, merged: top.merged }]
+    // A page of the trail is shown again: everything after it is left.
+    for (let index = trail.length - 2; index >= 0; index -= 1)
+      if (trail[index].url === url) return trail.slice(0, index + 1)
+    // An earlier browser entry of a page that changed its query since.
+    for (let index = trail.length - 2; index >= 0; index -= 1)
+      if (trail[index].path === path && trail[index].merged)
+        return [...trail.slice(0, index), { url, path, merged: true }]
+    // Our button with no page before: the parent list starts the trail.
+    if (kind === 'back') return [entry]
+    // The browser's forward to a page the trail had left.
+    return [...trail, entry].slice(-BACK_TRAIL_MAX)
+  }
   // The same page with another query: the page itself changed.
   if (top && top.path === path)
     return [...trail.slice(0, -1), { url, path, merged: true }]
-  return [...trail, { url, path, merged: false }].slice(-BACK_TRAIL_MAX)
+  // A link, even to the page before (PO → unit → the same PO again): the
+  // browser adds an entry, so the trail does too.
+  return [...trail, entry].slice(-BACK_TRAIL_MAX)
 }
 
 export type BackPlan = { kind: 'history' } | { kind: 'push'; url: string }
 
-/** What the back button does: the browser's back to the page before, or a
- *  push of the parent list. */
+/** What the back button does: the browser's back to the page before (it
+ *  returns as it was, with its filters), a push of that page's URL when the
+ *  browser's own back would not land on it (this page changed its query, or a
+ *  transient page sits in between), or a push of the parent list. */
 export function planBack(
   trail: readonly TrailEntry[],
   fallbackUrl: string,
 ): BackPlan {
   const top = trail[trail.length - 1]
-  const previous = trail[trail.length - 2]
-  if (top && previous)
-    return top.merged
-      ? { kind: 'push', url: previous.url }
-      : { kind: 'history' }
-  return { kind: 'push', url: fallbackUrl }
+  const index = backIndex(trail)
+  if (!top || index < 0) return { kind: 'push', url: fallbackUrl }
+  return index === trail.length - 2 && !top.merged
+    ? { kind: 'history' }
+    : { kind: 'push', url: trail[index].url }
 }
 
 /** The path back leads to: the page before, else the parent list. */
@@ -85,7 +136,8 @@ export function backTargetPath(
   trail: readonly TrailEntry[],
   fallbackPath: string,
 ): string {
-  return trail.length >= 2 ? trail[trail.length - 2].path : fallbackPath
+  const index = backIndex(trail)
+  return index >= 0 ? trail[index].path : fallbackPath
 }
 
 /** The URL a list was last shown with in this tab (its filters), else the
@@ -134,11 +186,61 @@ export function readLastUrls(): Record<string, string> {
 }
 
 /** Records that the app shows `url`; returns the new trail. */
-export function recordVisit(url: string, first: boolean): TrailEntry[] {
-  const trail = nextTrail(readTrail(), url, first)
+export function recordVisit(url: string, kind: VisitKind): TrailEntry[] {
+  const trail = nextTrail(readTrail(), url, kind)
   writeJson(BACK_TRAIL_KEY, trail)
   writeJson(LAST_URLS_KEY, nextLastUrls(readLastUrls(), url))
   return trail
+}
+
+// --- This tab load (module level: it survives the app's remounts) ------------
+
+let firstVisit = true
+/** The URL the browser's back / forward last landed on, until it is recorded. */
+let poppedUrl: string | null = null
+/** The URL our back button pushed, until it is recorded. */
+let backPushUrl: string | null = null
+let listening = false
+
+/** Path plus query in the form the app builds its URL (`URLSearchParams`'s
+ *  own encoding), so the two compare equal. */
+function locationUrl(): string {
+  const query = new URLSearchParams(window.location.search).toString()
+  return query
+    ? `${window.location.pathname}?${query}`
+    : window.location.pathname
+}
+
+function listenForPop() {
+  if (listening || typeof window === 'undefined') return
+  listening = true
+  window.addEventListener('popstate', () => {
+    poppedUrl = locationUrl()
+  })
+}
+
+/** The back button is about to push `url` (`planBack`'s push plan). */
+export function noteBackPush(url: string) {
+  backPushUrl = url
+}
+
+/**
+ * Records that the app shows `url` now, working out how it got there. Called
+ * from the app's effect on every URL change; safe to call twice for one URL.
+ */
+export function recordCurrentVisit(url: string): TrailEntry[] {
+  listenForPop()
+  const kind: VisitKind = firstVisit
+    ? 'first'
+    : backPushUrl === url
+      ? 'back'
+      : poppedUrl === url
+        ? 'pop'
+        : 'push'
+  firstVisit = false
+  poppedUrl = null
+  backPushUrl = null
+  return recordVisit(url, kind)
 }
 
 /** The latest URL of each path, the newest last, at most 100 paths. */
