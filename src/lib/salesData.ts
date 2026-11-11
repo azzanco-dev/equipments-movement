@@ -457,7 +457,7 @@ export async function createClientPo(
     await supabase.rpc('create_client_po', {
       p_company_id: values.company_id,
       p_project_id: values.project_id,
-      p_po_number: values.po_number.trim(),
+      p_po_number: values.po_number.trim() || null,
       p_issue_date: values.issue_date,
       p_expiry_date: values.expiry_date || null,
       p_standard_hours: values.standard_hours.trim()

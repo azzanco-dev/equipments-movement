@@ -61,6 +61,7 @@ import { useTabTitle } from '@/components/TabTitle'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import {
+  isSupplierPoDraftRef,
   SUPPLIER_PO_EVENTS_LIMIT,
   supplierPoApprovalBlocker,
   supplierPoRateUnitOf,
@@ -520,6 +521,12 @@ function SupplierPoDetailInner({
           />
         </div>
       </div>
+
+      {isSupplierPoDraftRef(po.po_number) && (
+        <Notice tone="info" size="compact">
+          {t('supplierPoNumberAtApprovalNotice')}
+        </Notice>
+      )}
 
       {approved && (
         <Notice tone="info" size="compact" icon={<Lock size={16} />}>

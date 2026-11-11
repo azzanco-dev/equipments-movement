@@ -799,7 +799,6 @@ export const clientPoFormSchema = z
     po_number: z
       .string()
       .trim()
-      .min(1, message('clientPoNumberRequired'))
       .max(CLIENT_PO_NUMBER_MAX, message('clientPoNumberInvalid')),
     issue_date: selected('clientPoIssueDateRequired'),
     expiry_date: z.string().trim(),

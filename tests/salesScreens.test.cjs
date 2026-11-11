@@ -554,7 +554,6 @@ test('the Zod schemas of the four forms', () => {
     {
       company_id: 'supplierPoCompanyRequired',
       project_id: 'supplierPoProjectRequired',
-      po_number: 'clientPoNumberRequired',
       issue_date: 'clientPoIssueDateRequired',
       standard_hours: 'clientPoStandardHoursRequired',
     },

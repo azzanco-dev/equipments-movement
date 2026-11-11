@@ -154,6 +154,20 @@ export const SUPPLIER_PO_EVENTS_LIMIT = 20
  *  2026-10-21); invoices are issued elsewhere. */
 export const SUPPLIER_PO_VAT_RATE = 0.15
 
+/**
+ * A supplier PO that has no official number yet carries a DRAFT REFERENCE in
+ * `po_number` (`DRAFT-0558`); the official number is issued at the first
+ * approval (owner 2026-11-11, migration 0190). Mirrors the 0190 CHECK
+ * `^DRAFT-[0-9]{4,}$`. A PO returned to draft keeps its official number.
+ */
+export const SUPPLIER_PO_DRAFT_REF_PATTERN = /^DRAFT-[0-9]{4,}$/
+
+export function isSupplierPoDraftRef(
+  value: string | null | undefined,
+): boolean {
+  return typeof value === 'string' && SUPPLIER_PO_DRAFT_REF_PATTERN.test(value)
+}
+
 /** «الشروط والاحكام» under the PDF's table (owner 2026-10-29), in order.
  *  A first draft for the owner to replace with the company's own terms. */
 export const SUPPLIER_PO_TERMS_KEYS: readonly TranslationKey[] = [

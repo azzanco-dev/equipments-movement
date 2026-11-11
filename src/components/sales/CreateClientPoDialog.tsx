@@ -429,8 +429,7 @@ export function CreateClientPoDialog({
           <Field
             label={t('clientPoNumber')}
             name="po_number"
-            required
-            hint={t('clientPoNumberHint')}
+            hint={t('clientPoNumberOptionalHint')}
             error={errors.po_number && t(errors.po_number)}
           >
             {(control) => (

@@ -352,6 +352,11 @@ export function supplierPoEventDetail(
   switch (event.event_type) {
     case 'created':
       return typeof payload.po_number === 'string' ? payload.po_number : null
+    // 0190: the number issued at this approval (older events carry none).
+    case 'approved':
+      return typeof payload.po_number === 'string' && payload.po_number
+        ? payload.po_number
+        : null
     // 0142: the start date change when there was one (a notes-only change
     // shows the label alone).
     case 'updated':

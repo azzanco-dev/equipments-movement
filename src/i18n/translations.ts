@@ -2342,7 +2342,7 @@ export const translations = {
     supplierPoApprove: 'اعتماد',
     supplierPoApproveConfirmTitle: 'اعتماد امر الشراء؟',
     supplierPoApproveConfirmDesc:
-      'بعد الاعتماد يقفل الامر: لا تضاف معدات ولا تتغير الاسعار ولا تاريخ البداية، وتبقى الملاحظات. وللتعديل بعدها استخدم «رجوع للتعديل».',
+      'عند الاعتماد يصدر رقم الـ PO ويقفل الامر: لا تضاف معدات ولا تتغير الاسعار ولا تاريخ البداية، وتبقى الملاحظات. وللتعديل بعدها استخدم «رجوع للتعديل».',
     supplierPoApprovedLockedNotice:
       'هذا الامر معتمد ومقفل. لتعديله استخدم «رجوع للتعديل» من الخيارات.',
     // 0189 (owner 2026-11-11): a PO is never closed; an approved PO is
@@ -2425,6 +2425,12 @@ export const translations = {
     clientPoNumber: 'رقم PO العميل',
     clientPoNumberHint: 'رقم الامر كما ورد من العميل.',
     clientPoNumberRequired: 'ادخل رقم PO العميل.',
+    // po-number-at-approval — start
+    supplierPoNumberAtApprovalNotice:
+      'هذا مرجع مسودة. رقم الـ PO يصدر عند الاعتماد.',
+    clientPoNumberOptionalHint:
+      'اختياري: اتركه فارغا اذا لم يصدر العميل رقما، وياخذ الامر مرجعا داخليا.',
+    // po-number-at-approval — end
     clientPoNumberInvalid: 'رقم PO العميل حتى 60 حرفا.',
     clientPoErrorDuplicateNumber: 'لهذا العميل PO بهذا الرقم مسبقا.',
     clientPoCompany: 'الشركة (العميل)',
@@ -5175,7 +5181,7 @@ export const translations = {
     supplierPoApprove: 'Approve',
     supplierPoApproveConfirmTitle: 'Approve this purchase order?',
     supplierPoApproveConfirmDesc:
-      'Approval locks the order: no units are added and no price or start date changes; the notes stay editable. To change it afterwards use “Return for editing”.',
+      'On approval the PO number is issued and the order is locked: no units are added and no price or start date changes; the notes stay editable. To change it afterwards use “Return for editing”.',
     supplierPoApprovedLockedNotice:
       'This order is approved and locked. To change it, use “Return for editing” in the options.',
     // 0189 (owner 2026-11-11): a PO is never closed; an approved PO is
@@ -5262,6 +5268,12 @@ export const translations = {
     clientPoNumber: 'Client PO number',
     clientPoNumberHint: "The number as it appears on the client's PO.",
     clientPoNumberRequired: 'Enter the client PO number.',
+    // po-number-at-approval — start
+    supplierPoNumberAtApprovalNotice:
+      'This is a draft reference. The PO number is issued on approval.',
+    clientPoNumberOptionalHint:
+      'Optional: leave it empty when the client issued no number; the PO gets an internal reference.',
+    // po-number-at-approval — end
     clientPoNumberInvalid: 'The client PO number is at most 60 characters.',
     clientPoErrorDuplicateNumber:
       'This client already has a PO with this number.',

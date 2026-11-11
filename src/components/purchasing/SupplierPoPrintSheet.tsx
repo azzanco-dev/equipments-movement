@@ -7,6 +7,7 @@ import { splitPlateForDisplay } from '@/lib/plate'
 import { formatSaudiDateTime } from '@/lib/printExport'
 import {
   SUPPLIER_PO_RATE_UNIT_LABEL_KEYS,
+  isSupplierPoDraftRef,
   SUPPLIER_PO_TERMS_KEYS,
   SUPPLIER_PO_VAT_RATE,
   supplierPoRateUnitOf,
@@ -172,7 +173,10 @@ export function SupplierPoPrintSheet({
     draft ? 'supplierPoApprovalDraft' : 'supplierPoApprovalApproved',
   ]
   const headerFacts: { key: TranslationKey; value: ReactNode }[] = [
-    { key: 'supplierPoPrintNumber', value: po.po_number },
+    // A draft reference is not a PO number: the number is issued on approval.
+    ...(isSupplierPoDraftRef(po.po_number)
+      ? []
+      : [{ key: 'supplierPoPrintNumber' as TranslationKey, value: po.po_number }]),
     {
       key: 'supplierPoPrintIssueDate',
       value: formatDate(saudiDateKey(new Date().toISOString())),
