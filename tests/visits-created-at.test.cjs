@@ -123,6 +123,11 @@ test('the visits select reads entry_created_at, never *', () => {
   assert.ok(
     visits.EQUIPMENT_VISITS_LOG_SELECT.split(',').includes('entry_created_at'),
   )
+  // 0191: the exit's creation time and the later of the two.
+  for (const column of ['exit_created_at', 'last_created_at']) {
+    assert.ok(columns.includes(column), column)
+    assert.ok(visits.EQUIPMENT_VISITS_LOG_SELECT.split(',').includes(column))
+  }
 })
 
 test('the creation age uses the duration words, the largest unit alone', () => {
@@ -160,7 +165,7 @@ test('«الانشاء» is the last column of every variant, in the duration st
     source.indexOf('const createdAt: DataTableColumn'),
     source.indexOf("if (context === 'workshop')"),
   )
-  assert.match(column, /key: 'entry_created_at'/)
+  assert.match(column, /key: 'last_created_at'/)
   assert.match(column, /header: t\('visitCreatedAt'\)/)
   assert.match(column, /align: 'end'/)
   // Sortable since 2026-11-11 (owner: «سورت حسب تاريخ الانشاء في الدخوليات»).
@@ -168,8 +173,11 @@ test('«الانشاء» is the last column of every variant, in the duration st
   assert.doesNotMatch(column, /hideBelow:/)
   // The same span as the duration cell, through the duration's words.
   assert.match(column, /className="text-\[11px\] text-muted"/)
-  assert.match(column, /formatVisitCreatedAgo\(visit\.entry_created_at, lang\)/)
-  assert.match(column, /title=\{formatSaudiDateTime\(visit\.entry_created_at\)/)
+  assert.match(column, /formatVisitCreatedAgo\(visitLastCreatedAt\(visit\), lang\)/)
+  // The hover names both registrations.
+  assert.match(column, /formatSaudiDateTime\(visit\.entry_created_at\)/)
+  assert.match(column, /formatSaudiDateTime\(visit\.exit_created_at\)/)
+  assert.match(column, /title=\{title \|\| undefined\}/)
   assert.match(column, /t\('visitCreatedAgo'\)\.replace\('\{duration\}', ago\)/)
   const duration = source.slice(
     source.indexOf('const duration: DataTableColumn'),
@@ -180,7 +188,7 @@ test('«الانشاء» is the last column of every variant, in the duration st
   // A server sort key since 2026-11-11.
   assert.deepEqual(
     [...visits.VISIT_SORT_FIELDS],
-    ['entry_at', 'exit_at', 'entry_created_at'],
+    ['entry_at', 'exit_at', 'last_created_at'],
   )
 })
 
@@ -196,7 +204,36 @@ test('the visits export lists the creation time last, as a date', () => {
     last.value({ entry_created_at: '2026-10-28T09:00:00Z' }),
     '2026-10-28T09:00:00Z',
   )
+  // 0191: the latest registration wins (the exit's when it is later).
+  assert.equal(
+    last.value({
+      entry_created_at: '2026-10-28T09:00:00Z',
+      exit_created_at: '2026-11-02T10:00:00Z',
+      last_created_at: '2026-11-02T10:00:00Z',
+    }),
+    '2026-11-02T10:00:00Z',
+  )
   assert.equal(last.value({}), null)
+})
+
+test('migration 0191 appends the exit and latest creation times to the view', () => {
+  const sql = read('supabase/migrations/20261111120000_0191_visits_last_created_at.sql')
+  assert.match(sql, /CREATE OR REPLACE VIEW public\.movement_visits\nWITH \(security_invoker = true\)/)
+  assert.match(sql, /LEAD\(l\.created_at\) OVER visit_order AS next_created_at\n/)
+  // The two columns come LAST, after 0159's, in this order.
+  assert.match(
+    sql,
+    /p\.created_at AS entry_created_at,[\s\S]*?END AS exit_created_at,[\s\S]*?\) AS last_created_at\nFROM paired p/,
+  )
+  assert.match(
+    sql,
+    /GREATEST\(\n\s+p\.created_at,\n\s+CASE WHEN p\.next_movement_type = 'exit' THEN p\.next_created_at END\n\s+\) AS last_created_at/,
+  )
+  // The pairing itself is untouched.
+  assert.match(sql, /PARTITION BY l\.equipment_id, l\.movement_context\n\s+ORDER BY l\.recorded_at, l\.id/)
+  assert.match(sql, /WHERE p\.movement_type = 'entry';/)
+  assert.match(sql, /REVOKE ALL ON public\.movement_visits FROM PUBLIC, anon;/)
+  assert.match(sql, /GRANT SELECT ON public\.movement_visits TO authenticated;/)
 })
 
 test('the column copy exists in Arabic and English without hamza forms', () => {

@@ -59,10 +59,11 @@ export const EQUIPMENT_VISITS_VIEW = 'movement_visits'
  * that migration must be applied before this select is shipped. The same
  * holds for `exit_purpose`, appended by migration 0118, and for
  * `driver_full_name`, appended by migration 0124 (wave 19), and for
- * `entry_created_at`, appended by migration 0159.
+ * `entry_created_at`, appended by migration 0159, and for `exit_created_at`
+ * and `last_created_at`, appended by migration 0191.
  */
 export const EQUIPMENT_VISITS_SELECT =
-  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code,equipment_ownership_status,exit_purpose,driver_full_name,entry_created_at'
+  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code,equipment_ownership_status,exit_purpose,driver_full_name,entry_created_at,exit_created_at,last_created_at'
 
 /**
  * The admin log's visits view (and the workshop managers' embedded log): the
@@ -123,6 +124,24 @@ export interface EquipmentVisitRow {
    * «الانشاء» column, shown in the duration's style (owner 2026-10-28).
    */
   entry_created_at?: string | null
+  /** When the EXIT that closed the visit was registered (migration 0191);
+   *  NULL while the visit is open. */
+  exit_created_at?: string | null
+  /**
+   * The visit's latest registration: its exit's creation time when it has
+   * one, else its entry's (migration 0191; owner 2026-11-11, «ترتيب حسب اخر
+   * انشاء, قد يكون انشاء الدخول او الخروج»). What «الانشاء» shows and sorts by.
+   */
+  last_created_at?: string | null
+}
+
+/** The instant the «الانشاء» column shows: the latest registration, falling
+ *  back to the entry's for a row read without the 0191 columns. */
+export function visitLastCreatedAt(row: {
+  entry_created_at?: string | null
+  last_created_at?: string | null
+}): string | null {
+  return row.last_created_at ?? row.entry_created_at ?? null
 }
 
 /** Which visits a table lists; `all` applies no context predicate. */
@@ -139,9 +158,10 @@ export function visitContextFilter(
 export const VISIT_SORT_FIELDS = [
   'entry_at',
   'exit_at',
-  // Owner 2026-11-11 («سورت حسب تاريخ الانشاء في الدخوليات»): when the ENTRY
-  // was registered (`entry_created_at`, migration 0159).
-  'entry_created_at',
+  // Owner 2026-11-11 («سورت حسب تاريخ الانشاء في الدخوليات», then «ترتيب حسب
+  // اخر انشاء, قد يكون انشاء الدخول او الخروج»): the visit's latest
+  // registration, its exit's or its entry's (`last_created_at`, 0191).
+  'last_created_at',
 ] as const
 export type VisitSortField = (typeof VISIT_SORT_FIELDS)[number]
 
@@ -188,8 +208,8 @@ export const visitsListConfig: DataListConfig = {
     { key: 'entry_at', label: { ar: 'وقت الدخول', en: 'Entry time' } },
     { key: 'exit_at', label: { ar: 'وقت الخروج', en: 'Exit time' } },
     {
-      key: 'entry_created_at',
-      label: { ar: 'تاريخ الانشاء', en: 'Created' },
+      key: 'last_created_at',
+      label: { ar: 'اخر انشاء', en: 'Last created' },
     },
   ],
 }
@@ -958,14 +978,14 @@ export function visitExportColumns(
       value: (row) => formatVisitDuration(row.duration_minutes, lang) ?? '',
     },
     {
-      // Last, like the table (owner 2026-10-28): when the ENTRY was
-      // registered in the system (migration 0159), as an exact instant.
+      // Last, like the table (owner 2026-10-28): the visit's latest
+      // registration, its exit's or its entry's (0191), as an exact instant.
       key: 'created_at',
       group: recording,
       header: t('visitCreatedAt'),
       width: 18,
       type: 'date',
-      value: (row) => row.entry_created_at ?? null,
+      value: (row) => visitLastCreatedAt(row),
     },
   ]
 }

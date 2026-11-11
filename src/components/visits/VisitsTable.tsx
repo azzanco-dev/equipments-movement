@@ -60,6 +60,7 @@ import {
   distinctEquipmentIds,
   foremanVisitsListConfig,
   formatVisitCreatedAgo,
+  visitLastCreatedAt,
   formatVisitDuration,
   siteEntryIds,
   visitColumnFilterKeys,
@@ -593,22 +594,29 @@ export function VisitsTable({
       ),
     }
     // Owner 2026-10-28: «الانشاء», the LAST column, «بنفس نمط مدة الزيارة»:
-    // the same 11 px muted text at the end (owner 2026-10-31), as the time since the ENTRY was
-    // registered (`entry_created_at`, migration 0159), with the exact Saudi
-    // date-time on hover. Sortable since 2026-11-11 (owner: «سورت حسب تاريخ
-    // الانشاء في الدخوليات»).
+    // the same 11 px muted text at the end (owner 2026-10-31), as the time
+    // since the visit was LAST registered — its exit's creation when it has
+    // one, else its entry's (`last_created_at`, migration 0191; owner
+    // 2026-11-11, «ترتيب حسب اخر انشاء, قد يكون انشاء الدخول او الخروج») —
+    // and sortable by it. The hover names the exact Saudi date-time of the
+    // entry's registration and, for a closed visit, of the exit's.
     const createdAt: DataTableColumn<EquipmentVisitRow> = {
-      key: 'entry_created_at',
+      key: 'last_created_at',
       header: t('visitCreatedAt'),
       align: 'end',
       sortable: true,
       cell: (visit) => {
-        const ago = formatVisitCreatedAgo(visit.entry_created_at, lang)
+        const ago = formatVisitCreatedAgo(visitLastCreatedAt(visit), lang)
+        const entryCreated = formatSaudiDateTime(visit.entry_created_at)
+        const exitCreated = formatSaudiDateTime(visit.exit_created_at)
+        const title = [
+          entryCreated && `${t('entry')}: ${entryCreated}`,
+          exitCreated && `${t('exit')}: ${exitCreated}`,
+        ]
+          .filter(Boolean)
+          .join(' · ')
         return (
-          <span
-            className="text-[11px] text-muted"
-            title={formatSaudiDateTime(visit.entry_created_at) || undefined}
-          >
+          <span className="text-[11px] text-muted" title={title || undefined}>
             {ago ? t('visitCreatedAgo').replace('{duration}', ago) : '—'}
           </span>
         )
