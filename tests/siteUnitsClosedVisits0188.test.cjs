@@ -352,7 +352,7 @@ test('the ticket of a closed visit: «خرجت», its exit day and purpose', () 
   const data = read('src', 'lib', 'purchasingData.ts')
   assert.match(
     data,
-    /party_po_id,party_po_number,visit_state,exit_at,exit_purpose,entry_created_at'/,
+    /supplier_po_id,po_number,has_po,visit_state,exit_at,exit_purpose,entry_created_at'/,
   )
 })
 
@@ -548,8 +548,9 @@ test('the add button of a ticket shows its label in full, without animation', ()
     screen.indexOf('<Plus size={15}'),
   )
   assert.match(button, /<span className="whitespace-nowrap pe-1 ps-2 text-xs font-normal">/)
-  assert.match(button, /\{t\('siteUnitsAddTo'\)\}/)
-  assert.match(button, /t\('siteUnitsNewPo'\)/)
+  // «PO جديد» only (owner the same day): never «اضافة الى PO-…».
+  assert.match(button, /\{t\('siteUnitsNewPo'\)\}/)
+  assert.doesNotMatch(button, /siteUnitsAddTo|party_po/)
   assert.doesNotMatch(button, /max-w-0|opacity-0|group-hover|group-focus-visible|transition|duration-/)
   assert.doesNotMatch(screen, /group\/add/)
 })

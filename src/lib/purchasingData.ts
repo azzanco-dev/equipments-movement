@@ -171,8 +171,9 @@ export interface SiteUnitRow {
   supplier_po_id: string | null
   po_number: string | null
   has_po: boolean
-  party_po_id: string | null
-  party_po_number: string | null
+  // The view's `party_po_id` / `party_po_number` (the party's draft PO of
+  // that day) are not selected any more: the ticket's button always opens a
+  // new PO (owner 2026-11-12).
   // The view's client columns (0169) are not selected here any more: the
   // client stub left the tickets on 2026-11-04 (owner).
   /** 0188: 'inside' while the visit is open, else 'exited'. */
@@ -190,7 +191,7 @@ export const SITE_VISITS_VIEW = 'purchasing_site_visits'
 
 /** Only what the «المعدات في المشاريع» tiles show and the add needs. */
 export const SITE_UNITS_SELECT =
-  'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,entry_at,contractor_equipment_code,supplier_po_id,po_number,has_po,party_po_id,party_po_number,visit_state,exit_at,exit_purpose,entry_created_at'
+  'entry_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,equipment_chassis_number,equipment_ownership_status,equipment_lessor_id,equipment_lessor_name,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,entry_at,contractor_equipment_code,supplier_po_id,po_number,has_po,visit_state,exit_at,exit_purpose,entry_created_at'
 
 /**
  * One unit on a supplier PO (migration 0167, `purchasing_po_units`): a line

@@ -12,7 +12,6 @@ import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
-import { AddEquipmentDialog } from '@/components/purchasing/AddEquipmentDialog'
 import { poPillStyle } from '@/components/sales/PoPill'
 import {
   CreateSupplierPoDialog,
@@ -106,10 +105,6 @@ const ADD_BUTTON_STYLE: CSSProperties = {
  *  is applied apart, as one `or`). */
 const COLUMN_FILTER_KEYS = siteUnitsColumnFilterKeys(siteUnitsListConfig)
 
-/** The add target: the party's open PO there, else a new PO for the unit. */
-type AddTarget =
-  | { kind: 'existing'; row: SiteUnitRow }
-  | { kind: 'new'; preset: CreateSupplierPoPreset }
 
 /**
  * «المعدات في المشاريع» (/purchasing/units, owner 2026-10-24, design
@@ -145,7 +140,10 @@ export function SiteUnitsScreen({
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
-  const [target, setTarget] = useState<AddTarget | null>(null)
+  /** The new PO the «+» of a ticket opens, preset to its unit. Owner
+   *  2026-11-12 («خلي الزر يعرض اضافة PO جديد فقط, بدون اضافة لPO موجود»):
+   *  the button never adds to the party's existing draft any more. */
+  const [preset, setPreset] = useState<CreateSupplierPoPreset | null>(null)
 
   const companyProjectFilters = useCompanyProjectFilters()
   const asyncFields = useMemo(
@@ -300,34 +298,27 @@ export function SiteUnitsScreen({
         : '—'
 
   const openAdd = (row: SiteUnitRow) => {
-    if (row.party_po_id) {
-      setTarget({ kind: 'existing', row })
-      return
-    }
     const ownerClass = isSupplierPoOwnerClass(row.equipment_ownership_status)
       ? row.equipment_ownership_status
       : null
-    setTarget({
-      kind: 'new',
-      preset: {
-        ownerClass,
-        lessor:
-          !ownerClass && row.equipment_lessor_id
-            ? {
-                value: row.equipment_lessor_id,
-                label: row.equipment_lessor_name ?? '',
-              }
-            : null,
-        companyId: row.company_id ?? '',
-        projectId: row.project_id ?? '',
-        equipmentId: row.equipment_id,
-        startDate: saudiDateKey(row.entry_at),
-      },
+    setPreset({
+      ownerClass,
+      lessor:
+        !ownerClass && row.equipment_lessor_id
+          ? {
+              value: row.equipment_lessor_id,
+              label: row.equipment_lessor_name ?? '',
+            }
+          : null,
+      companyId: row.company_id ?? '',
+      projectId: row.project_id ?? '',
+      equipmentId: row.equipment_id,
+      startDate: saudiDateKey(row.entry_at),
     })
   }
 
   const closeAdd = (open: boolean) => {
-    if (!open) setTarget(null)
+    if (!open) setPreset(null)
   }
 
   /** The supplier stub's control: the PO pill that opens the PO, else the
@@ -343,12 +334,11 @@ export function SiteUnitsScreen({
         <bdi dir="ltr">{row.po_number}</bdi>
       </AppLink>
     ) : (
-      // The add button, shown in FULL: the «+» with its label, which says what
-      // it will do — «اضافة الى PO-…» on the party's draft PO there, else «PO
-      // جديد». Owner 2026-11-12 («خليه ينعرض كامل بدون انيماشن»): it widened
-      // on hover or keyboard focus since 2026-10-25; no animation now. 0148:
-      // the view gives `party_po_id` only for a PO whose start date is this
-      // unit's entry day.
+      // The add button, shown in FULL: «PO جديد» with the «+». Owner
+      // 2026-11-12: «خليه ينعرض كامل بدون انيماشن» (it widened on hover or
+      // keyboard focus since 2026-10-25), then «خلي الزر يعرض اضافة PO جديد
+      // فقط, بدون اضافة لPO موجود» (it added to the party's draft PO of that
+      // day when there was one): it always opens a new PO for the unit.
       canManage && (
         <button
           type="button"
@@ -357,49 +347,12 @@ export function SiteUnitsScreen({
           style={ADD_BUTTON_STYLE}
         >
           <span className="whitespace-nowrap pe-1 ps-2 text-xs font-normal">
-            {row.party_po_id ? (
-              <>
-                {t('siteUnitsAddTo')}{' '}
-                <bdi dir="ltr">{row.party_po_number}</bdi>
-              </>
-            ) : (
-              t('siteUnitsNewPo')
-            )}
+            {t('siteUnitsNewPo')}
           </span>
           <Plus size={15} strokeWidth={2.5} aria-hidden="true" className="shrink-0" />
         </button>
       )
     )
-
-  const existing = target?.kind === 'existing' ? target.row : null
-  // Stable while the dialog is open, so its unit search does not reload.
-  const existingPo = useMemo(
-    () =>
-      existing && {
-        id: existing.party_po_id!,
-        lessor_id:
-          existing.equipment_ownership_status === 'external_supplier'
-            ? existing.equipment_lessor_id
-            : null,
-        owner_class: isSupplierPoOwnerClass(existing.equipment_ownership_status)
-          ? existing.equipment_ownership_status
-          : null,
-        company_id: existing.company_id ?? '',
-        project_id: existing.project_id ?? '',
-        // 0148: the view offers a party PO only when its start date is the
-        // unit's entry day, so that day is the PO's start date.
-        start_date: saudiDateKey(existing.entry_at),
-      },
-    [existing],
-  )
-  const existingUnit = useMemo(
-    () =>
-      existing && {
-        value: existing.equipment_id,
-        label: existing.equipment_code ?? '',
-      },
-    [existing],
-  )
 
   return (
     <div className="space-y-4">
@@ -630,24 +583,12 @@ export function SiteUnitsScreen({
           onPageSize={list.setPageSize}
         />
       )}
-      {existingPo && (
-        <AddEquipmentDialog
-          open
-          onOpenChange={closeAdd}
-          po={existingPo}
-          initialUnit={existingUnit}
-          onAdded={() => {
-            setTarget(null)
-            refresh()
-          }}
-        />
-      )}
       <CreateSupplierPoDialog
-        open={target?.kind === 'new'}
+        open={preset !== null}
         onOpenChange={closeAdd}
-        preset={target?.kind === 'new' ? target.preset : null}
+        preset={preset}
         onCreated={() => {
-          setTarget(null)
+          setPreset(null)
           refresh()
         }}
       />

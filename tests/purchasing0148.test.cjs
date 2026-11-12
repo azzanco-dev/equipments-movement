@@ -178,6 +178,8 @@ test('the dialogs: same-day units, the start date follows them or is locked', ()
   // «المعدات في المشاريع»: the «+» says «اضافة الى PO-…» only for the
   // party PO the view returns (same day), and the add dialog filters on it.
   const screen = read('src', 'screens', 'purchasing', 'SiteUnitsScreen.tsx')
-  assert.match(screen, /start_date: saudiDateKey\(existing\.entry_at\),/)
-  assert.match(screen, /\{row\.party_po_id \? \(\s+<>\s+\{t\('siteUnitsAddTo'\)\}/)
+  // Since 2026-11-12 the «+» always opens a NEW PO, whose start date is the
+  // unit's entry day (the same-day rule of 0148 on the new PO).
+  assert.match(screen, /startDate: saudiDateKey\(row\.entry_at\),/)
+  assert.doesNotMatch(screen, /party_po_id|siteUnitsAddTo/)
 })

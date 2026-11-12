@@ -100,19 +100,16 @@ test('the page reads the view server-side and adds through the existing dialogs'
   assert.match(screen, /\.order\('entry_id', \{ ascending: true \}\)/)
   // No direct write: the dialogs call the purchasing functions.
   assert.doesNotMatch(screen, /\.insert\(|\.update\(|\.delete\(|\.rpc\(/)
-  // The party's open PO when there is one, else a new PO with the unit.
+  // Owner 2026-11-12 («خلي الزر يعرض اضافة PO جديد فقط, بدون اضافة لPO
+  // موجود»): the button always opens a NEW PO preset to the unit; it added to
+  // the party's draft PO of that day before.
+  assert.match(screen, /setPreset\(\{\s+ownerClass,/)
+  assert.match(screen, /equipmentId: row\.equipment_id,\s+startDate: saudiDateKey\(row\.entry_at\),/)
+  assert.match(screen, /<CreateSupplierPoDialog\s+open=\{preset !== null\}/)
+  assert.doesNotMatch(screen, /AddEquipmentDialog|party_po_id|kind: 'existing'/)
   assert.match(
     screen,
-    /if \(row\.party_po_id\) \{\s+setTarget\(\{ kind: 'existing', row \}\)/,
-  )
-  assert.match(screen, /kind: 'new',\s+preset: \{/)
-  assert.match(
-    screen,
-    /<AddEquipmentDialog[\s\S]*?initialUnit=\{existingUnit\}/,
-  )
-  assert.match(
-    screen,
-    /<CreateSupplierPoDialog[\s\S]*?preset=\{target\?\.kind === 'new' \? target\.preset : null\}/,
+    /<CreateSupplierPoDialog[\s\S]*?preset=\{preset\}/,
   )
   // The add needs purchasing.manage; readers see the state only.
   assert.match(screen, /const canManage = can\('purchasing\.manage'\)/)
@@ -141,11 +138,8 @@ test('the page reads the view server-side and adds through the existing dialogs'
   // بدون انيماشن»): the label is always shown, it no longer widens on hover.
   assert.doesNotMatch(screen, /group-hover\/add|group-focus-visible\/add/)
   assert.match(screen, /<span className="whitespace-nowrap pe-1 ps-2 text-xs font-normal">/)
-  assert.match(
-    screen,
-    /\{row\.party_po_id \? \(\s+<>\s+\{t\('siteUnitsAddTo'\)\}/,
-  )
-  assert.match(screen, /t\('siteUnitsNewPo'\)/)
+  assert.doesNotMatch(screen, /siteUnitsAddTo/)
+  assert.match(screen, /\{t\('siteUnitsNewPo'\)\}/)
   // 0188: the only badge is «خرجت» on a closed visit.
   assert.equal((screen.match(/<Badge/g) ?? []).length, 1)
   assert.match(
@@ -189,7 +183,7 @@ test('the page reads the view server-side and adds through the existing dialogs'
     /\{ key: 'siteUnitsHasPo', tone: 'success', value: poCounts\.withPo \}/,
   )
   assert.match(screen, /\{poCounts && !loadError && \(/)
-  assert.match(screen, /setTarget\(null\)\s+refresh\(\)/)
+  assert.match(screen, /setPreset\(null\)\s+refresh\(\)/)
   const app = read('src', 'App.tsx')
   assert.match(
     app,
