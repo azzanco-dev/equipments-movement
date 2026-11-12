@@ -343,19 +343,20 @@ export function SiteUnitsScreen({
         <bdi dir="ltr">{row.po_number}</bdi>
       </AppLink>
     ) : (
-      // Owner 2026-10-25: like «انتقل للحركة», the «+» widens on hover or
-      // keyboard focus, and its label says what it will do: «اضافة الى
-      // PO-…» on the party's open PO there, else «PO جديد». 0148: the view
-      // gives `party_po_id` only for a PO whose start date is this unit's
-      // entry day.
+      // The add button, shown in FULL: the «+» with its label, which says what
+      // it will do — «اضافة الى PO-…» on the party's draft PO there, else «PO
+      // جديد». Owner 2026-11-12 («خليه ينعرض كامل بدون انيماشن»): it widened
+      // on hover or keyboard focus since 2026-10-25; no animation now. 0148:
+      // the view gives `party_po_id` only for a PO whose start date is this
+      // unit's entry day.
       canManage && (
         <button
           type="button"
           onClick={() => openAdd(row)}
-          className="group/add inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full px-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          className="inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full px-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
           style={ADD_BUTTON_STYLE}
         >
-          <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-normal opacity-0 group-hover/add:max-w-40 group-hover/add:pe-1 group-hover/add:ps-2 group-hover/add:opacity-100 group-focus-visible/add:max-w-40 group-focus-visible/add:pe-1 group-focus-visible/add:ps-2 group-focus-visible/add:opacity-100 motion-safe:transition-all motion-safe:duration-300 motion-safe:ease-out">
+          <span className="whitespace-nowrap pe-1 ps-2 text-xs font-normal">
             {row.party_po_id ? (
               <>
                 {t('siteUnitsAddTo')}{' '}

@@ -534,3 +534,22 @@ test('0192: the tickets show and sort by the entry registration only', () => {
   assert.match(screen, /\{createdLine\(row\)\}/)
   assert.doesNotMatch(screen, /exit_created_at/)
 })
+
+// Owner 2026-11-12 («زر الاضافة في المعدات في المشاريع خليه ينعرض كامل بدون
+// انيماشن»): the label is always there, no hover widening, no transition.
+test('the add button of a ticket shows its label in full, without animation', () => {
+  const fs = require('node:fs')
+  const path = require('node:path')
+  const screen = fs
+    .readFileSync(path.join(__dirname, '..', 'src', 'screens', 'purchasing', 'SiteUnitsScreen.tsx'), 'utf8')
+    .replace(/\r\n/g, '\n')
+  const button = screen.slice(
+    screen.indexOf('onClick={() => openAdd(row)}'),
+    screen.indexOf('<Plus size={15}'),
+  )
+  assert.match(button, /<span className="whitespace-nowrap pe-1 ps-2 text-xs font-normal">/)
+  assert.match(button, /\{t\('siteUnitsAddTo'\)\}/)
+  assert.match(button, /t\('siteUnitsNewPo'\)/)
+  assert.doesNotMatch(button, /max-w-0|opacity-0|group-hover|group-focus-visible|transition|duration-/)
+  assert.doesNotMatch(screen, /group\/add/)
+})

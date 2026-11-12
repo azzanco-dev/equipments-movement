@@ -137,9 +137,10 @@ test('the page reads the view server-side and adds through the existing dialogs'
   )
   assert.match(screen, /rounded-full px-2\.5 text-xs font-semibold/)
   // `!` because the shared button's rounded-lg wins over a plain rounded-full.
-  // 2026-10-25: the «+» widens on hover / focus and says what it will do.
-  assert.match(screen, /group-hover\/add:max-w-40/)
-  assert.match(screen, /group-focus-visible\/add:max-w-40/)
+  // 2026-10-25: the «+» says what it will do. 2026-11-12 (owner: «ينعرض كامل
+  // بدون انيماشن»): the label is always shown, it no longer widens on hover.
+  assert.doesNotMatch(screen, /group-hover\/add|group-focus-visible\/add/)
+  assert.match(screen, /<span className="whitespace-nowrap pe-1 ps-2 text-xs font-normal">/)
   assert.match(
     screen,
     /\{row\.party_po_id \? \(\s+<>\s+\{t\('siteUnitsAddTo'\)\}/,
