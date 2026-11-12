@@ -822,6 +822,25 @@ export async function returnSupplierPoApproval(input: {
   )
 }
 
+/** What `delete_supplier_po` (0193) removed. */
+export interface DeletedSupplierPo {
+  po_id: string
+  po_number: string
+  line_count: number
+  cards_deleted: number
+}
+
+/** `delete_supplier_po` (0193): deletes a DRAFT PO that still carries its
+ *  draft reference, with its lines (and the cards nothing else uses). The
+ *  database checks `purchasing.manage`, the draft state and the number. */
+export async function deleteSupplierPo(
+  poId: string,
+): Promise<RpcResult<DeletedSupplierPo>> {
+  return asResult<DeletedSupplierPo>(
+    await supabase.rpc('delete_supplier_po', { p_po_id: poId }),
+  )
+}
+
 /**
  * The duplicate warning's read (owner 2026-11-11): the party's lines on
  * `purchasing_po_units` in one company and project — optionally without one

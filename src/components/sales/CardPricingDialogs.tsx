@@ -183,10 +183,7 @@ export function ApproveCardPricingDialog({
           {t('cardPricingApproveConfirmTitle').replace('{unit}', unitOf(card))}
         </span>
       }
-      description={t('cardPricingApproveConfirmDesc').replace(
-        '{po}',
-        poOf(card),
-      )}
+      description={t('cardPricingApproveConfirmDesc')}
       size="md"
       footer={
         <>

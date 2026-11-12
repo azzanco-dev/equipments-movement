@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import {
   movementAdminErrorCode,
   movementAdminErrorStatus,
+  movementOnPoNumbers,
 } from '@/lib/movementErrors'
 import { requirePermission } from '@/lib/server/adminRequest'
 import { isExitPurpose } from '@/lib/exitPurpose'
@@ -88,7 +89,12 @@ export async function PATCH(request: Request, context: RouteContext) {
       console.error('Movement update failed', error.code ?? 'unknown_error')
       const code = movementAdminErrorCode(error.message, 'update')
       return NextResponse.json(
-        { error: code },
+        {
+          error: code,
+          ...(code === 'movement_on_po'
+            ? { po_numbers: movementOnPoNumbers(error.details) }
+            : {}),
+        },
         { status: movementAdminErrorStatus(code) },
       )
     }
@@ -135,7 +141,12 @@ export async function DELETE(request: Request, context: RouteContext) {
       console.error('Movement delete failed', error)
       const code = movementAdminErrorCode(error.message, 'delete')
       return NextResponse.json(
-        { error: code },
+        {
+          error: code,
+          ...(code === 'movement_on_po'
+            ? { po_numbers: movementOnPoNumbers(error.details) }
+            : {}),
+        },
         { status: movementAdminErrorStatus(code) },
       )
     }

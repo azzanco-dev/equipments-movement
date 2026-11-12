@@ -1507,8 +1507,10 @@ export function cardMarginBlocker(row: {
  * Why «اعتماد» cannot run on this card right now, or null when it can: the
  * reasons `approve_equipment_card_pricing` checks, in the order the user can
  * fix them, plus the screen's own «save first» (the database re-checks every
- * one of them). Two different units are approvable (0185: no unit-match
- * rule), only without a margin.
+ * one of them). 0193 (owner: «اذا اختلفت الوحدة يرفض»): the client price's
+ * unit must equal the supplier line's unit (the same unit on both sides,
+ * daily included, is accepted); the check reads the SAVED values, since an
+ * unsaved change is refused first.
  */
 export function cardPricingApprovalBlocker(row: {
   pricing_status: string | null | undefined
@@ -1516,6 +1518,10 @@ export function cardPricingApprovalBlocker(row: {
   card_client_price: number | string | null | undefined
   supplier_line_id: string | null | undefined
   supplier_price: number | string | null | undefined
+  /** The unit of the saved client price (0185). */
+  card_client_price_unit?: string | null | undefined
+  /** The unit of the supplier line's price. */
+  supplier_rate_unit?: string | null | undefined
   /** The typed value differs from the saved one. */
   unsaved?: boolean
 }): TranslationKey | null {
@@ -1527,6 +1533,12 @@ export function cardPricingApprovalBlocker(row: {
   if (!row.supplier_line_id) return 'cardPricingBlockedNoSupplierLine'
   if (toNumber(row.supplier_price) === null)
     return 'cardPricingBlockedNoSupplierPrice'
+  if (
+    row.card_client_price_unit &&
+    row.supplier_rate_unit &&
+    row.card_client_price_unit !== row.supplier_rate_unit
+  )
+    return 'cardPricingBlockedUnitMismatch'
   return null
 }
 
@@ -1580,6 +1592,8 @@ export const CARD_PRICING_FORM_MESSAGES: Readonly<
   card_pricing_no_client_price: 'cardPricingErrorNoClientPrice',
   card_pricing_no_supplier_line: 'cardPricingBlockedNoSupplierLine',
   card_pricing_no_supplier_price: 'cardPricingErrorNoSupplierPrice',
+  // 0193: the client price's unit differs from the supplier line's.
+  card_pricing_unit_mismatch: 'cardPricingBlockedUnitMismatch',
 }
 
 /** Every stable token of migration 0174 the client maps, for the tests. */
@@ -1597,6 +1611,7 @@ export const CARD_PRICING_ERROR_TOKENS: readonly string[] = [
   'card_pricing_no_client_price',
   'card_pricing_no_supplier_line',
   'card_pricing_no_supplier_price',
+  'card_pricing_unit_mismatch', // 0193
 ]
 
 /** The safe message for a rejected pricing write; never the raw text. */

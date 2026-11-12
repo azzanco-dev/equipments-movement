@@ -683,6 +683,7 @@ function AppContent() {
           <SupplierPoDetail
             poId={detailId}
             onBack={goBackTo('/purchasing/orders')}
+            onDeleted={() => router.replace('/purchasing/orders')}
             onOpenEquipment={
               canOpenEquipment
                 ? (id) => router.push(`/equipment/${id}`)

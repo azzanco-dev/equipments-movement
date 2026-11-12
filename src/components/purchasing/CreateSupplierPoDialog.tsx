@@ -66,6 +66,17 @@ import {
 } from '@/lib/purchasingData'
 import { saudiDateKey } from '@/lib/saudiTime'
 
+/** `create_supplier_po` refuses an empty unit list with `po_has_no_lines`
+ *  (0193); the approval's message for the same token does not fit here. */
+function isNoLinesError(
+  error: { message?: string | null; details?: string | null } | null | undefined,
+): boolean {
+  return Boolean(
+    error &&
+      `${error.message ?? ''} ${error.details ?? ''}`.includes('po_has_no_lines'),
+  )
+}
+
 const EMPTY_FORM: SupplierPoFormValues = {
   lessor_id: '',
   owner_class: '',
@@ -172,6 +183,7 @@ export function CreateSupplierPoDialog({
   const [lineErrors, setLineErrors] = useState<Record<string, TranslationKey>>({})
   const [message, setMessage] = useState<TranslationKey | null>(null)
   const [saving, setSaving] = useState(false)
+  const [visitsRetry, setVisitsRetry] = useState(0)
   const bodyRef = useRef<HTMLDivElement>(null)
 
   const companyOptions = useMemo(
@@ -202,6 +214,14 @@ export function CreateSupplierPoDialog({
     [visits, form.company_id, form.project_id],
   )
   const pickedCount = Object.keys(picked).length
+  // Only the ticked visits that are actually loaded are sent; the button and
+  // its count follow these lines, never the ticks alone (a preset unit
+  // ticked before its units load would otherwise create an EMPTY PO).
+  const sendLines = useMemo(
+    () => unitsAtProject.filter((visit) => isPicked(picked, visit)),
+    [unitsAtProject, picked],
+  )
+  const sendCount = sendLines.length
   const rateUnitOptions = useMemo(
     () =>
       SUPPLIER_PO_RATE_UNITS.map((unit) => ({
@@ -302,7 +322,7 @@ export function CreateSupplierPoDialog({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, partyKey])
+  }, [open, partyKey, visitsRetry])
 
   // The duplicate check: reloaded when the party, company or project changes
   // and on every open; a stale answer is ignored, a failure is never read as
@@ -425,6 +445,7 @@ export function CreateSupplierPoDialog({
   }
 
   const save = async () => {
+    if (saving || visitsState !== 'ready' || sendCount === 0) return
     const invalid = validateWithSchema(supplierPoFormSchema, form)
     const badLines: Record<string, TranslationKey> = {}
     for (const [equipmentId, line] of Object.entries(picked))
@@ -441,8 +462,7 @@ export function CreateSupplierPoDialog({
     }
     setSaving(true)
     setMessage(null)
-    const lines: SupplierPoCreateLine[] = unitsAtProject
-      .filter((visit) => isPicked(picked, visit))
+    const lines: SupplierPoCreateLine[] = sendLines
       .map((visit) => ({
         equipment_id: visit.equipment_id,
         price: picked[visit.equipment_id].price,
@@ -463,7 +483,9 @@ export function CreateSupplierPoDialog({
       focusFirstError(outcome.fieldErrors, SUPPLIER_PO_FIELD_ORDER, {
         root: bodyRef.current,
       })
-    } else setMessage(outcome.message)
+    } else if (isNoLinesError(result.error))
+      setMessage('supplierPoErrorPickOneUnit')
+    else setMessage(outcome.message)
   }
 
   const hasParty = Boolean(form.lessor_id || form.owner_class)
@@ -499,9 +521,14 @@ export function CreateSupplierPoDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('cancel')}
           </Button>
-          <Button variant="primary" loading={saving} onClick={save}>
+          <Button
+            variant="primary"
+            loading={saving}
+            disabled={visitsState !== 'ready' || sendCount === 0}
+            onClick={save}
+          >
             {t('supplierPoCreate')}
-            {pickedCount > 0 ? ` (${pickedCount})` : ''}
+            {sendCount > 0 ? ` (${sendCount})` : ''}
           </Button>
         </>
       }
@@ -642,7 +669,11 @@ export function CreateSupplierPoDialog({
               section keeps its hint, whatever the visits request is doing
               (owner 2026-10-21: no loading flash on picking the owner). */}
           {visitsState === 'error' ? (
-            <ErrorState description={t('supplierPoListLoadError')} className="p-4" />
+            <ErrorState
+              description={t('supplierPoUnitsLoadError')}
+              className="p-4"
+              onRetry={() => setVisitsRetry((count) => count + 1)}
+            />
           ) : !form.project_id ? (
             <p className="rounded-xl border border-dashed p-3 text-sm text-muted">
               {t('supplierPoPickProjectFirst')}

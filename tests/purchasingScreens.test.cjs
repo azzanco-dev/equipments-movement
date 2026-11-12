@@ -349,6 +349,8 @@ test('every stable token of migrations 0136 to 0189 is known and mapped', () => 
     assert.match(MIGRATION_0189, new RegExp(`RAISE EXCEPTION '${token}'`))
     raised.add(token)
   }
+  // 0193: delete_supplier_po refuses a PO that carries an official number.
+  raised.add('po_number_issued')
   assert.deepEqual(
     [...raised].sort(),
     [...purchasing.SUPPLIER_PO_ERROR_TOKENS].sort(),
@@ -1020,7 +1022,8 @@ test('the PO page: no closing since 0189; an approver returns an approved PO to 
   assert.match(menu, /DropdownMenuTrigger asChild/)
   assert.match(menu, /t\('supplierPoEdit'\)/)
   assert.match(menu, /\{onReturn && \([\s\S]*?t\('supplierPoReturn'\)/)
-  assert.doesNotMatch(menu, /supplierPoClose|onClose|tone="danger"/)
+  // 0193: the one danger item is «حذف الامر».
+  assert.doesNotMatch(menu, /supplierPoClose|onClose/)
   // Owner 2026-10-22: «تصدير PDF» is the first item, for every reader.
   assert.ok(
     menu.indexOf("t('supplierPoPdf')") < menu.indexOf("t('supplierPoEdit')"),

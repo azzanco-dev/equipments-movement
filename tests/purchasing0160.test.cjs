@@ -312,7 +312,9 @@ test('the screens: approve for approvers, locked when approved, a draft PDF mark
   assert.match(detail, /approveBlockedReason=\{approveBlocker\}/)
   assert.match(detail, /\{editable && addButton\}/)
   assert.match(detail, /\{editable && \(\s+<Button\s+size="sm"\s+variant="outline"/)
-  assert.match(detail, /t\('supplierPoApprovedLockedNotice'\)/)
+  assert.match(detail, /'supplierPoApprovedLockedNotice'/)
+  // 0193: a user without purchasing.approve reads another sentence.
+  assert.match(detail, /'supplierPoApprovedLockedNoticeNoApprove'/)
   assert.match(detail, /<SupplierPoApprovalBadge po=\{po\} \/>/)
   assert.doesNotMatch(detail, /\{showActions && addButton\}/)
 

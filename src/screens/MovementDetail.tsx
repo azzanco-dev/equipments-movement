@@ -104,7 +104,7 @@ import { MovementDetailSkeleton } from '@/components/movement/MovementDetailSkel
 import { MovementEditDialog } from '@/components/movement/MovementEditDialog'
 import { DriverCorrectionDialog } from '@/components/movement/DriverCorrectionDialog'
 import {
-  movementAdminErrorKey,
+  movementAdminErrorText,
   movementDriverEditMode,
 } from '@/lib/movementAdmin'
 
@@ -618,9 +618,12 @@ export function MovementDetail({
     if (!response.ok) {
       const result = (await response.json().catch(() => null)) as {
         error?: string
+        po_numbers?: unknown[]
       } | null
       setDeleteOpen(false)
-      setDeleteError(t(movementAdminErrorKey(result?.error, 'delete')))
+      setDeleteError(
+        movementAdminErrorText(t, result?.error, 'delete', result?.po_numbers),
+      )
       return
     }
 

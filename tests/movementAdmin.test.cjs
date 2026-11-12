@@ -412,6 +412,8 @@ test('every API code has a safe translation key, per operation', () => {
     exit_purpose_not_allowed: 'movementEditExitPurposeNotAllowed',
     entry_has_later_exit: 'movementDeleteEntryHasExit',
     movement_not_last: 'movementDeleteNotLast',
+    // 0193: the edit message; the delete one is picked by the operation.
+    movement_on_po: 'movementEditOnPo',
     movement_update_failed: 'movementEditFailed',
     movement_delete_failed: 'movementDeleteFailed',
   }

@@ -4,6 +4,7 @@ import {
   Pencil,
   RotateCcw,
   SlidersHorizontal,
+  Trash2,
 } from 'lucide-react'
 import {
   Button,
@@ -51,6 +52,7 @@ export function SupplierPoOptionsMenu({
   approveBlockedReason = null,
   onReturn,
   onEdit,
+  onDelete,
   busy = false,
   className,
 }: {
@@ -67,6 +69,9 @@ export function SupplierPoOptionsMenu({
   onReturn?: () => void
   /** «تعديل الامر»; omitted for a reader. */
   onEdit?: () => void
+  /** «حذف الامر» (0193); omitted unless the PO is a draft with its draft
+   *  reference and the caller may manage purchasing. */
+  onDelete?: () => void
   busy?: boolean
   /** Extra classes of the trigger (the mobile bar makes it 44 px tall). */
   className?: string
@@ -119,6 +124,16 @@ export function SupplierPoOptionsMenu({
             onSelect={onEdit}
           >
             {t('supplierPoEdit')}
+          </DropdownMenuItem>
+        )}
+        {onDelete && (
+          <DropdownMenuItem
+            icon={<Trash2 size={15} />}
+            tone="danger"
+            disabled={busy}
+            onSelect={onDelete}
+          >
+            {t('supplierPoDelete')}
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>

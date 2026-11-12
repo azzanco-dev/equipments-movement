@@ -278,7 +278,8 @@ test('the create dialog reloads the party visits on every open (owner 2026-10-31
     create.indexOf('const update = '),
   )
   assert.match(effect, /if \(!open\) return/)
-  assert.match(effect, /\}, \[open, partyKey\]\)/)
+  // 0193: the units load has a retry counter in its dependencies.
+  assert.match(effect, /\}, \[open, partyKey, visitsRetry\]\)/)
   const reset = create.slice(
     create.indexOf('useEffect(() => {\n    if (!open) return\n    setForm('),
     create.indexOf('const partyKey ='),

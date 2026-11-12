@@ -107,6 +107,8 @@ export const MOVEMENT_ADMIN_ERROR_CODES = [
   'exit_purpose_not_allowed',
   'entry_has_later_exit',
   'movement_not_last',
+  // 0193: the entry's card sits on a supplier or client PO.
+  'movement_on_po',
   'movement_update_failed',
   'movement_delete_failed',
 ] as const
@@ -138,7 +140,33 @@ export function movementAdminErrorCode(
     return 'exit_purpose_not_allowed'
   if (message.includes('entry_has_later_exit')) return 'entry_has_later_exit'
   if (message.includes('movement_not_last')) return 'movement_not_last'
+  if (message.includes('movement_on_po')) return 'movement_on_po'
   return fallback
+}
+
+/** PO numbers shown by the movement lock message: `DRAFT-0558` or
+ *  `PO-2026110012`, nothing else. */
+const PO_NUMBER_PATTERN = /^[A-Z]+-[0-9]+$/
+const PO_NUMBERS_LIMIT = 5
+
+/**
+ * The PO numbers of a `movement_on_po` refusal (0193): the error's
+ * `details` carries them comma separated. Each part is validated against
+ * `^[A-Z]+-[0-9]+$` before it is returned — raw database text is never
+ * passed on — duplicates dropped, at most five kept.
+ */
+export function movementOnPoNumbers(
+  details: string | null | undefined,
+): string[] {
+  if (!details) return []
+  const numbers: string[] = []
+  for (const part of details.split(',')) {
+    const value = part.trim()
+    if (PO_NUMBER_PATTERN.test(value) && !numbers.includes(value))
+      numbers.push(value)
+    if (numbers.length >= PO_NUMBERS_LIMIT) break
+  }
+  return numbers
 }
 
 // A missing movement is 404; a refused role is 403; malformed input is 400;

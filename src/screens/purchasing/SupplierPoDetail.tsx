@@ -28,6 +28,7 @@ import { ApproveSupplierPoDialog } from '@/components/purchasing/ApproveSupplier
 import { EditLineDialog } from '@/components/purchasing/EditLineDialog'
 import { EditSupplierPoDialog } from '@/components/purchasing/EditSupplierPoDialog'
 import { RemoveEquipmentDialog } from '@/components/purchasing/RemoveEquipmentDialog'
+import { DeleteSupplierPoDialog } from '@/components/purchasing/DeleteSupplierPoDialog'
 import { ReturnSupplierPoDialog } from '@/components/purchasing/ReturnSupplierPoDialog'
 import { Price, PricesByUnit } from '@/components/purchasing/Price'
 import { PurchasingUnitCell } from '@/components/purchasing/PurchasingUnitCell'
@@ -83,6 +84,9 @@ import { supabase } from '@/lib/supabase'
 export interface SupplierPoDetailProps {
   poId: string
   onBack: () => void
+  /** After the PO was deleted (0193): the app opens the PO list. The page
+   *  has no Toast to show there (its provider goes with it). */
+  onDeleted?: () => void
   onOpenEquipment?: (equipmentId: string) => void
 }
 
@@ -150,6 +154,7 @@ export function SupplierPoDetail(props: SupplierPoDetailProps) {
 function SupplierPoDetailInner({
   poId,
   onBack,
+  onDeleted,
   onOpenEquipment,
 }: SupplierPoDetailProps) {
   const { t, lang } = useI18n()
@@ -178,6 +183,7 @@ function SupplierPoDetailInner({
   const [editOpen, setEditOpen] = useState(false)
   // 0189: «رجوع للتعديل» of an approved PO (a PO is never closed).
   const [returnOpen, setReturnOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [approveOpen, setApproveOpen] = useState(false)
   // «تصدير PDF»: the hidden print sheet is mounted only while the browser's
   // print dialog is up (owner 2026-10-22: no tab, no page of the site).
@@ -398,6 +404,16 @@ function SupplierPoDetailInner({
         canApprove && approved ? () => setReturnOpen(true) : undefined
       }
       onEdit={showActions ? () => setEditOpen(true) : undefined}
+      // 0193: only a draft that still has its draft reference is deleted.
+      // The same item in the phone bar's menu: a manager has no other menu
+      // on a phone (the header's is hidden there).
+      onDelete={
+        canManage &&
+        !approved &&
+        isSupplierPoDraftRef(po.po_number)
+          ? () => setDeleteOpen(true)
+          : undefined
+      }
     />
   )
 
@@ -530,7 +546,11 @@ function SupplierPoDetailInner({
 
       {approved && (
         <Notice tone="info" size="compact" icon={<Lock size={16} />}>
-          {t('supplierPoApprovedLockedNotice')}
+          {t(
+            canApprove
+              ? 'supplierPoApprovedLockedNotice'
+              : 'supplierPoApprovedLockedNoticeNoApprove',
+          )}
         </Notice>
       )}
 
@@ -765,6 +785,18 @@ function SupplierPoDetailInner({
         onApproved={() => {
           setApproveOpen(false)
           fetchData()
+        }}
+      />
+      <DeleteSupplierPoDialog
+        po={po}
+        lineCount={lines.length}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onStale={fetchData}
+        onDeleted={() => {
+          setDeleteOpen(false)
+          if (onDeleted) onDeleted()
+          else onBack()
         }}
       />
       <ReturnSupplierPoDialog

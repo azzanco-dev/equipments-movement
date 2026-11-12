@@ -473,13 +473,13 @@ test('the 0185 translation block: Arabic and English, no hamza on alif', () => {
     'saleRateUnitWeek',
     'salePerWeek',
     'cardMonthDays',
+  ])
+    assert.ok(keys(blocks[0]).includes(key), key)
+  // 0193 (owner «شيل النصوص الباقية»): the card end / reopen keys are gone.
+  for (const key of [
     'equipmentCardEnd',
     'equipmentCardReopenOverlap',
     'equipmentCardsAwaitingEnd',
   ])
-    assert.ok(keys(blocks[0]).includes(key), key)
-  assert.match(
-    blocks[0],
-    /equipmentCardReopenOverlap: 'المعدة لها كرت لاحق، لا يمكن اعادة الفتح\.'/,
-  )
+    assert.ok(!keys(blocks[0]).includes(key), key)
 })

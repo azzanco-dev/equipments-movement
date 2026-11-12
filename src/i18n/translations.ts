@@ -2213,7 +2213,6 @@ export const translations = {
     supplierPoClose: 'اغلاق الامر',
     supplierPoActions: 'خيارات الامر',
     supplierPoPdf: 'تصدير PDF',
-    supplierPoCloseTypeNumber: 'رقم الامر للتاكيد',
     supplierPoCloseTypeNumberHint: 'اكتب رقم الامر كما هو:',
     supplierPoCloseConfirmTitle: 'اغلاق امر الشراء؟',
     supplierPoCloseConfirmDesc:
@@ -2236,9 +2235,6 @@ export const translations = {
     supplierPoNotFound: 'امر الشراء غير موجود.',
     supplierPoErrorCardOverlap:
       'للمعدة كرت لشركة او مشروع اخر في هذه الفترة.',
-    supplierPoErrorAlreadyOnOpenPo:
-      'المعدة موجودة على امر شراء اخر.',
-    supplierPoErrorClosed: 'الامر مغلق ولا يقبل تعديلا.',
     supplierPoErrorManageRequired: 'ليس لديك صلاحية ادارة المشتريات.',
     supplierPoErrorInvalidSupplier: 'المورد المختار غير موجود.',
     supplierPoErrorInvalidCompany: 'الشركة المختارة غير موجودة.',
@@ -2278,7 +2274,6 @@ export const translations = {
     siteUnitsSortNoPoFirst: 'بدون PO اول',
     siteUnitsSortEntry: 'تاريخ الدخول',
     siteUnitsAddToPo: 'اضافة الى PO',
-    siteUnitsAddTo: 'اضافة الى',
     siteUnitsNewPo: 'PO جديد',
     siteUnitsOpenMovement: 'انتقل للحركة',
     siteUnitsCount: 'معدة',
@@ -2345,6 +2340,7 @@ export const translations = {
       'عند الاعتماد يصدر رقم الـ PO ويقفل الامر: لا تضاف معدات ولا تتغير الاسعار ولا تاريخ البداية، وتبقى الملاحظات. وللتعديل بعدها استخدم «رجوع للتعديل».',
     supplierPoApprovedLockedNotice:
       'هذا الامر معتمد ومقفل. لتعديله استخدم «رجوع للتعديل» من الخيارات.',
+    supplierPoApprovedLockedNoticeNoApprove: 'هذا الامر معتمد ومقفل. لتعديله يرجعه صاحب صلاحية الاعتماد للتعديل اولا.',
     // 0189 (owner 2026-11-11): a PO is never closed; an approved PO is
     // returned to draft to be changed.
     supplierPoReturn: 'رجوع للتعديل',
@@ -2356,6 +2352,15 @@ export const translations = {
     supplierPoReturnedToast: 'رجع الامر للتعديل',
     supplierPoErrorAlreadyOnPo: 'المعدة موجودة في هذا الامر.',
     supplierPoErrorNotApproved: 'الامر ليس معتمدا.',
+    supplierPoUnitsLoadError: 'تعذر تحميل معدات المشروع.',
+    supplierPoErrorPickOneUnit: 'اختر معدة واحدة على الاقل.',
+    supplierPoErrorNumberIssued: 'لا يمكن حذف امر صدر له رقم PO.',
+    supplierPoDelete: 'حذف الامر',
+    supplierPoDeleteTitle: 'حذف امر الشراء',
+    supplierPoDeleteDesc: 'سيحذف الامر ومعداته ({count}) ولا يمكن التراجع. المعدات ترجع «بدون PO».',
+    supplierPoDeleteDescEmpty: 'سيحذف الامر ولا يمكن التراجع.',
+    movementEditOnPo: 'لا يمكن تغيير المعدة او الشركة او المشروع او يوم الدخول: هذه الدخولية عليها امر شراء ({numbers}). احذف المعدة من الامر او احذف الامر اولا، ثم عدل الحركة.',
+    movementDeleteOnPo: 'لا يمكن حذف هذه الدخولية: عليها امر شراء ({numbers}). احذف المعدة من الامر او احذف الامر اولا.',
     // Owner 2026-10-29: the PDF's buyer box and line columns.
     supplierPoPrintBuyer: 'المشتري',
     supplierPoPrintBuyerName: 'شركة عبدالله احمد العزاني للمقاولات',
@@ -2516,13 +2521,10 @@ export const translations = {
     equipmentCardsDesc:
       'كل معدة في شركة ومشروع خلال فترة، مع سطر PO العميل وسطر PO المورد.',
     equipmentCard: 'كرت المعدة',
-    equipmentCardStatusOpen: 'مفتوح',
-    equipmentCardStatusEnded: 'منتهي',
     equipmentCardNoClientPo: 'بدون PO عميل',
     equipmentCardHasClientPo: 'عليها PO عميل',
     equipmentCardNoSupplierPo: 'بدون PO مورد',
     equipmentCardHasSupplierPo: 'عليها PO مورد',
-    equipmentCardsSortOpenFirst: 'المفتوحة اولا',
     equipmentCardsEmpty: 'لا كروت معدات بعد.',
     equipmentCardsEmptyFiltered: 'لا كروت تطابق البحث او الفلاتر.',
     equipmentCardsLoadError: 'تعذر تحميل كروت المعدات.',
@@ -2532,8 +2534,6 @@ export const translations = {
     equipmentCardBackToList: 'الرجوع الى كروت المعدات',
     equipmentCardLoadError: 'تعذر تحميل كرت المعدة.',
     equipmentCardNotFound: 'كرت المعدة غير موجود.',
-    equipmentCardEndedNotice:
-      'كرت منتهي: بياناته للقراءة فقط، وشهوره الماضية ما زالت تقبل الساعات.',
     equipmentCardVisibilityNote:
       'المبيعات ترى سعر الشراء والمشتريات ترى سعر البيع (قرار 2026-10-15): لا اخفاء بين الجانبين.',
     equipmentCardClientDue: 'مستحق العميل هذا الشهر',
@@ -2617,7 +2617,7 @@ export const translations = {
     cardMonthDeleteConfirmYes: 'تاكيد الحذف',
     cardMonthDeleted: 'تم حذف ساعات {month}',
     cardMonthRecorded: 'تم تسجيل ساعات {month}',
-    cardMonthErrorOutsideCard: 'الشهر خارج فترة الكرت.',
+    cardMonthErrorOutsideCard: 'الشهر خارج زيارة المعدة للمشروع.',
     cardMonthErrorInFuture: 'لا تسجل ساعات لشهر لم يبدا بعد.',
     cardMonthErrorNotFound: 'لا ساعات مسجلة لهذا الشهر.',
     cardMonthErrorInvalidItems: 'بيانات الحفظ غير صالحة.',
@@ -2656,7 +2656,7 @@ export const translations = {
     cardPricingReturn: 'رجوع للتعديل',
     cardPricingApproveConfirmTitle: 'اعتماد سعر المعدة {unit}',
     cardPricingApproveConfirmDesc:
-      'هل انت متاكد من اعتماد السعر؟ يترتب عليه اعتماد PO المورد {po}.',
+      'هل انت متاكد من اعتماد السعر؟ اذا اعتمدت اسعار كل معدات الـ PO وكانت كلها مسعرة، يعتمد PO المورد تلقائيا ويصدر له رقم.',
     cardPricingApproveConfirmButton: 'نعم، اعتمد',
     cardPricingApproveConsequence:
       'بعد الاعتماد يُقفل سعر العميل. يُعتمد PO المورد تلقائيا عندما تكون كل معداته معتمدة؛ وللتعديل بعدها استخدم «رجوع للتعديل».',
@@ -2671,7 +2671,8 @@ export const translations = {
     cardPricingReturnedToast: 'رجع سعر {unit} للتعديل',
     cardPricingBlockedNoClientPrice: 'ادخل سعر العميل اولا.',
     cardPricingBlockedNoSupplierPrice: 'سطر المورد بلا سعر بعد.',
-    cardPricingBlockedNoSupplierLine: 'المعدة ليست على PO مورد مفتوح.',
+    cardPricingBlockedNoSupplierLine: 'المعدة ليست على PO مورد.',
+    cardPricingBlockedUnitMismatch: 'وحدة سعر العميل تختلف عن وحدة سعر المورد',
     cardPricingBlockedUnsaved: 'احفظ السعر اولا.',
     cardPriceInvalid:
       'السعر رقم من 0 الى 9999999999.99 بخانتين عشريتين على الاكثر.',
@@ -2706,38 +2707,13 @@ export const translations = {
     cardMonthDaysHint: 'اختياري: ايام الشهر للسطر اليومي او الاسبوعي.',
     cardMonthPresenceDays: 'التواجد: {days}',
     cardMonthEnterDays: 'ادخل الايام',
-    equipmentCardActions: 'اجراءات الكرت',
-    equipmentCardEnd: 'انهاء الكرت',
-    equipmentCardEndDesc:
-      'يغلق الكرت بتاريخ نهاية، ولا تسجل ساعات بعد شهره. يمكن اعادة فتحه لاحقا.',
-    equipmentCardEndDate: 'تاريخ الانهاء',
-    equipmentCardEndDateHint: 'من بداية الكرت الى اليوم.',
-    equipmentCardEndDateRequired: 'اختر تاريخ الانهاء.',
-    equipmentCardEndDateInvalid: 'تاريخ الانهاء بين بداية الكرت واليوم.',
-    equipmentCardEndHasLaterMonths:
-      'للكرت ساعات مسجلة بعد شهر هذا التاريخ: احذفها اولا.',
-    equipmentCardEndAlreadyEnded: 'الكرت منتهي مسبقا.',
-    equipmentCardEndedToast: 'تم انهاء كرت {unit}',
     equipmentCardEndedOn: 'بتاريخ {date}',
-    equipmentCardReopen: 'اعادة فتح الكرت',
-    equipmentCardReopenDesc:
-      'يعود الكرت مفتوحا بدون تاريخ نهاية. هل انت متاكد؟',
-    equipmentCardReopenNotEnded: 'الكرت مفتوح.',
-    equipmentCardReopenOverlap: 'المعدة لها كرت لاحق، لا يمكن اعادة الفتح.',
-    equipmentCardReopenedToast: 'تم اعادة فتح كرت {unit}',
     equipmentCardEventEnded: 'انهاء الكرت',
     equipmentCardEventReopened: 'اعادة فتح الكرت',
-    equipmentCardsAll: 'كل الكروت',
-    equipmentCardsAwaitingEnd: 'بانتظار الانهاء',
-    equipmentCardsAwaitingSwitch: 'عرض الكروت',
-    equipmentCardsAwaitingEmpty:
-      'لا كروت مفتوحة لمعدات خرجت من مشروعها بانتهاء عمل.',
     // sales-0185 — end
     // purchasing-0185 — start (migration 0185, owner go 2026-11-08)
     supplierPoRateUnitInvalidFour:
       'اختر وحدة السعر: شهري او اسبوعي او يومي او بالساعة.',
-    adminAttentionAwaitingEnd: 'معدات خرجت بانتهاء عمل وكرتها مفتوح',
-    adminAttentionAwaitingEndHint: 'كروت تنتظر الانهاء في المبيعات',
     // purchasing-0185 — end
     // app-header-v2 — start (owner 2026-11-08, approved on /ui-kit as «ب»)
     appLogoAlt: 'شعار شركة العزاني',
@@ -5052,7 +5028,6 @@ export const translations = {
     supplierPoClose: 'Close order',
     supplierPoActions: 'Order options',
     supplierPoPdf: 'Export PDF',
-    supplierPoCloseTypeNumber: 'Order number to confirm',
     supplierPoCloseTypeNumberHint: 'Type the order number exactly:',
     supplierPoCloseConfirmTitle: 'Close this purchase order?',
     supplierPoCloseConfirmDesc:
@@ -5075,9 +5050,6 @@ export const translations = {
     supplierPoNotFound: 'This purchase order does not exist.',
     supplierPoErrorCardOverlap:
       'The equipment has a card for another company or project in this period.',
-    supplierPoErrorAlreadyOnOpenPo:
-      'The equipment is already on another open purchase order.',
-    supplierPoErrorClosed: 'The order is closed and cannot be changed.',
     supplierPoErrorManageRequired:
       'You do not have permission to manage purchasing.',
     supplierPoErrorInvalidSupplier: 'The selected supplier does not exist.',
@@ -5117,7 +5089,6 @@ export const translations = {
     siteUnitsSortNoPoFirst: 'No PO first',
     siteUnitsSortEntry: 'Entry date',
     siteUnitsAddToPo: 'Add to PO',
-    siteUnitsAddTo: 'Add to',
     siteUnitsNewPo: 'New PO',
     siteUnitsOpenMovement: 'Go to movement',
     siteUnitsCount: 'units',
@@ -5184,6 +5155,7 @@ export const translations = {
       'On approval the PO number is issued and the order is locked: no units are added and no price or start date changes; the notes stay editable. To change it afterwards use “Return for editing”.',
     supplierPoApprovedLockedNotice:
       'This order is approved and locked. To change it, use “Return for editing” in the options.',
+    supplierPoApprovedLockedNoticeNoApprove: 'This order is approved and locked. To change it, someone who can approve must return it for editing first.',
     // 0189 (owner 2026-11-11): a PO is never closed; an approved PO is
     // returned to draft to be changed.
     supplierPoReturn: 'Return for editing',
@@ -5195,6 +5167,15 @@ export const translations = {
     supplierPoReturnedToast: 'The order was returned for editing',
     supplierPoErrorAlreadyOnPo: 'The equipment is already on this order.',
     supplierPoErrorNotApproved: 'The order is not approved.',
+    supplierPoUnitsLoadError: 'The project equipment could not be loaded.',
+    supplierPoErrorPickOneUnit: 'Select at least one unit.',
+    supplierPoErrorNumberIssued: 'An order that has been issued a PO number cannot be deleted.',
+    supplierPoDelete: 'Delete order',
+    supplierPoDeleteTitle: 'Delete purchase order',
+    supplierPoDeleteDesc: 'The order and its units ({count}) will be deleted. This cannot be undone. The units go back to No PO.',
+    supplierPoDeleteDescEmpty: 'The order will be deleted. This cannot be undone.',
+    movementEditOnPo: 'The unit, company, project or entry day cannot be changed: this entry is on a purchase order ({numbers}). Remove the unit from the order or delete the order first, then edit the movement.',
+    movementDeleteOnPo: 'This entry cannot be deleted: it is on a purchase order ({numbers}). Remove the unit from the order or delete the order first.',
     // Owner 2026-10-29: the PDF's buyer box and line columns.
     supplierPoPrintBuyer: 'Buyer',
     supplierPoPrintBuyerName: 'Abdullah Ahmed Al Azani Contracting Co.',
@@ -5364,13 +5345,10 @@ export const translations = {
     equipmentCardsDesc:
       'Every unit in a company and project over a period, with its client PO line and its supplier PO line.',
     equipmentCard: 'Equipment card',
-    equipmentCardStatusOpen: 'Open',
-    equipmentCardStatusEnded: 'Ended',
     equipmentCardNoClientPo: 'No client PO',
     equipmentCardHasClientPo: 'On a client PO',
     equipmentCardNoSupplierPo: 'No supplier PO',
     equipmentCardHasSupplierPo: 'On a supplier PO',
-    equipmentCardsSortOpenFirst: 'Open first',
     equipmentCardsEmpty: 'No equipment cards yet.',
     equipmentCardsEmptyFiltered: 'No cards match the search or filters.',
     equipmentCardsLoadError: 'Could not load the equipment cards.',
@@ -5380,8 +5358,6 @@ export const translations = {
     equipmentCardBackToList: 'Back to equipment cards',
     equipmentCardLoadError: 'Could not load the equipment card.',
     equipmentCardNotFound: 'This equipment card does not exist.',
-    equipmentCardEndedNotice:
-      'Ended card: its details are read-only; its past months still take hours.',
     equipmentCardVisibilityNote:
       'Sales see the purchase price and purchasing sees the sale price (decision 2026-10-15): nothing is hidden between the two sides.',
     equipmentCardClientDue: "Client's due this month",
@@ -5468,7 +5444,7 @@ export const translations = {
     cardMonthDeleteConfirmYes: 'Confirm deletion',
     cardMonthDeleted: 'Deleted the hours of {month}',
     cardMonthRecorded: 'Recorded the hours of {month}',
-    cardMonthErrorOutsideCard: "The month lies outside the card's period.",
+    cardMonthErrorOutsideCard: "The month lies outside the unit's visit to the project.",
     cardMonthErrorInFuture: 'Hours cannot be recorded for a month that has not started.',
     cardMonthErrorNotFound: 'No hours are recorded for this month.',
     cardMonthErrorInvalidItems: 'The data to save is invalid.',
@@ -5507,7 +5483,7 @@ export const translations = {
     cardPricingReturn: 'Return for editing',
     cardPricingApproveConfirmTitle: 'Approve the price of {unit}',
     cardPricingApproveConfirmDesc:
-      'Are you sure you want to approve the price? It entails approving supplier PO {po}.',
+      'Are you sure you want to approve the price? Once every unit of the PO has an approved price and all of them are priced, the supplier PO is approved automatically and issued a number.',
     cardPricingApproveConfirmButton: 'Yes, approve',
     cardPricingApproveConsequence:
       'After approval the client price is locked. The supplier PO becomes approved automatically once every one of its units is approved; to change it afterwards use “Return for editing”.',
@@ -5522,7 +5498,8 @@ export const translations = {
     cardPricingReturnedToast: 'Returned the pricing of {unit} for editing',
     cardPricingBlockedNoClientPrice: 'Enter the client price first.',
     cardPricingBlockedNoSupplierPrice: 'The supplier line has no price yet.',
-    cardPricingBlockedNoSupplierLine: 'The unit is not on an open supplier PO.',
+    cardPricingBlockedNoSupplierLine: 'The unit is not on a supplier PO.',
+    cardPricingBlockedUnitMismatch: "The client price's unit differs from the supplier price's unit",
     cardPricingBlockedUnsaved: 'Save the price first.',
     cardPriceInvalid:
       'The price is a number from 0 to 9999999999.99 with at most two decimals.',
@@ -5562,40 +5539,13 @@ export const translations = {
     cardMonthDaysHint: 'Optional: the days of the month for a daily or weekly line.',
     cardMonthPresenceDays: 'On site: {days}',
     cardMonthEnterDays: 'Enter the days',
-    equipmentCardActions: 'Card actions',
-    equipmentCardEnd: 'End card',
-    equipmentCardEndDesc:
-      'Closes the card on an end date; no hours are recorded after its month. It can be reopened later.',
-    equipmentCardEndDate: 'End date',
-    equipmentCardEndDateHint: 'From the card start to today.',
-    equipmentCardEndDateRequired: 'Pick the end date.',
-    equipmentCardEndDateInvalid:
-      'The end date lies between the card start and today.',
-    equipmentCardEndHasLaterMonths:
-      'The card has hours recorded after this month: delete them first.',
-    equipmentCardEndAlreadyEnded: 'The card is already ended.',
-    equipmentCardEndedToast: 'Card {unit} ended',
     equipmentCardEndedOn: 'on {date}',
-    equipmentCardReopen: 'Reopen card',
-    equipmentCardReopenDesc:
-      'The card becomes open again with no end date. Are you sure?',
-    equipmentCardReopenNotEnded: 'The card is open.',
-    equipmentCardReopenOverlap:
-      'The unit has a later card; this card cannot be reopened.',
-    equipmentCardReopenedToast: 'Card {unit} reopened',
     equipmentCardEventEnded: 'Card ended',
     equipmentCardEventReopened: 'Card reopened',
-    equipmentCardsAll: 'All cards',
-    equipmentCardsAwaitingEnd: 'Awaiting end',
-    equipmentCardsAwaitingSwitch: 'Cards shown',
-    equipmentCardsAwaitingEmpty:
-      'No open cards of units that left their project with work completed.',
     // sales-0185 — end
     // purchasing-0185 — start (migration 0185, owner go 2026-11-08)
     supplierPoRateUnitInvalidFour:
       'Pick the price unit: monthly, weekly, daily or hourly.',
-    adminAttentionAwaitingEnd: 'Units out on work completed, card still open',
-    adminAttentionAwaitingEndHint: 'Cards awaiting their end in sales',
     // purchasing-0185 — end
     // app-header-v2 — start (owner 2026-11-08, approved on /ui-kit as «ب»)
     appLogoAlt: 'Al-Azani logo',

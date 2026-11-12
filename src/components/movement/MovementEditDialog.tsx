@@ -26,7 +26,7 @@ import {
   buildMovementEditPayload,
   correctsVisitDriver,
   localDateKey,
-  movementAdminErrorKey,
+  movementAdminErrorText,
   movementEditFieldErrors,
   movementEditKeepsDriver,
   movementEditUnchanged,
@@ -343,11 +343,17 @@ export function MovementEditDialog({
         } else {
           const result = (await response.json().catch(() => null)) as {
             error?: string
+            po_numbers?: unknown[]
           } | null
           // A refusal about one field goes under it; the rest is form-level.
           fieldFailure = movementEditFieldErrors(result?.error)
           if (!fieldFailure)
-            failure = t(movementAdminErrorKey(result?.error, 'update'))
+            failure = movementAdminErrorText(
+              t,
+              result?.error,
+              'update',
+              result?.po_numbers,
+            )
         }
       }
 

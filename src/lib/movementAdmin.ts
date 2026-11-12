@@ -305,6 +305,7 @@ const MOVEMENT_ADMIN_ERROR_KEYS: Record<string, TranslationKey> = {
   exit_purpose_not_allowed: 'movementEditExitPurposeNotAllowed',
   entry_has_later_exit: 'movementDeleteEntryHasExit',
   movement_not_last: 'movementDeleteNotLast',
+  movement_on_po: 'movementEditOnPo',
   movement_update_failed: 'movementEditFailed',
   movement_delete_failed: 'movementDeleteFailed',
 }
@@ -345,5 +346,34 @@ export function movementAdminErrorKey(
   const fallback: TranslationKey =
     operation === 'delete' ? 'movementDeleteFailed' : 'movementEditFailed'
   if (!code) return fallback
+  // 0193: the entry sits on a PO; the edit and the delete read differently.
+  if (code === 'movement_on_po')
+    return operation === 'delete' ? 'movementDeleteOnPo' : 'movementEditOnPo'
   return MOVEMENT_ADMIN_ERROR_KEYS[code] ?? fallback
+}
+
+/**
+ * The message of a failed admin edit or delete as text: the key's message,
+ * and for `movement_on_po` (0193) the PO numbers of the API's
+ * `po_numbers` put into its `{numbers}` place (LTR-isolated; numbers
+ * that do not look like a PO number are dropped, and with none the
+ * parenthesis goes too).
+ */
+export function movementAdminErrorText(
+  t: (key: TranslationKey) => string,
+  code: string | null | undefined,
+  operation: 'update' | 'delete' = 'update',
+  poNumbers?: readonly unknown[] | null,
+): string {
+  const text = t(movementAdminErrorKey(code, operation))
+  if (!text.includes('{numbers}')) return text
+  const numbers = (poNumbers ?? []).filter(
+    (value): value is string =>
+      typeof value === 'string' && /^[A-Z]+-[0-9]+$/.test(value),
+  )
+  if (!numbers.length) return text.replace(' ({numbers})', '')
+  return text.replace(
+    '{numbers}',
+    '⁦' + numbers.join('⁩، ⁦') + '⁩',
+  )
 }

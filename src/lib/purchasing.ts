@@ -698,6 +698,11 @@ export const SUPPLIER_PO_FORM_MESSAGES: Readonly<
   po_approved_locked: 'supplierPoErrorApprovedLocked',
   // 0189: return_supplier_po_approval.
   po_not_approved: 'supplierPoErrorNotApproved',
+  // 0193: delete_supplier_po, and the lines of a create / add.
+  po_number_issued: 'supplierPoErrorNumberIssued',
+  invalid_equipment: 'supplierPoErrorInvalidEquipment',
+  equipment_not_at_po_project: 'supplierPoErrorNotAtProject',
+  equipment_not_of_po_supplier: 'supplierPoErrorNotOfSupplier',
 }
 
 /** Every stable token of migrations 0136–0189 the client maps, for the tests. */
@@ -730,6 +735,7 @@ export const SUPPLIER_PO_ERROR_TOKENS: readonly string[] = [
   'po_has_unpriced_lines', // 0160
   'po_approved_locked', // 0160 every write to an approved PO (0187 remove too)
   'po_not_approved', // 0189 return_supplier_po_approval
+  'po_number_issued', // 0193 delete_supplier_po
 ]
 
 function errorText(error: PostgresLikeError): string {
