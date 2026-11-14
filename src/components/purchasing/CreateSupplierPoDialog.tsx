@@ -77,6 +77,9 @@ function isNoLinesError(
   )
 }
 
+/** The line note's limit, as the line dialogs' schema (500). */
+const SUPPLIER_PO_LINE_NOTE_MAX = 500
+
 const EMPTY_FORM: SupplierPoFormValues = {
   lessor_id: '',
   owner_class: '',
@@ -442,6 +445,16 @@ export function CreateSupplierPoDialog({
       delete next[equipmentId]
       return next
     })
+  }
+
+  /** The unit's own note on the PO (owner 2026-11-14, «لما اضيف معدة لPO
+   *  ابغى اضيف الملاحظة من صفحة انشاء الPO»): the line's note, the one the
+   *  PO page shows and edits; sent with the unit in the same call. */
+  const setLineNote = (equipmentId: string, note: string) => {
+    setPicked((current) => ({
+      ...current,
+      [equipmentId]: { ...current[equipmentId], note },
+    }))
   }
 
   const save = async () => {
@@ -813,6 +826,17 @@ export function CreateSupplierPoDialog({
                               t('supplierPoNoPrice')
                             )}
                           </p>
+                          <Input
+                            aria-label={`${t('supplierPoLineNote')} ${visit.equipment_code}`}
+                            placeholder={t('supplierPoLineNoteOptional')}
+                            maxLength={SUPPLIER_PO_LINE_NOTE_MAX}
+                            value={line.note}
+                            data-line-note=""
+                            className="mt-1"
+                            onChange={(event) =>
+                              setLineNote(visit.equipment_id, event.target.value)
+                            }
+                          />
                         </div>
                       )}
                     </div>

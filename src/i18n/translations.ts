@@ -2192,6 +2192,7 @@ export const translations = {
     supplierPoPriceInternalMustBeZero:
       'هذه معدة داخلية (العزاني) وسعرها يجب ان يكون صفرا.',
     supplierPoLineNote: 'ملاحظة',
+    supplierPoLineNoteOptional: 'ملاحظة (اختياري)',
     supplierPoLineNoteTooLong: 'الملاحظة اطول من 500 حرف.',
     supplierPoEditPrice: 'تعديل السعر',
     supplierPoEditPriceDesc: 'يسجل السعر القديم والجديد في سجل الامر.',
@@ -5007,6 +5008,7 @@ export const translations = {
     supplierPoPriceInternalMustBeZero:
       'This is an internal (Al-Azani) unit; its price must be zero.',
     supplierPoLineNote: 'Note',
+    supplierPoLineNoteOptional: 'Note (optional)',
     supplierPoLineNoteTooLong: 'The note is longer than 500 characters.',
     supplierPoEditPrice: 'Edit price',
     supplierPoEditPriceDesc: 'The old and new price are recorded in the log.',

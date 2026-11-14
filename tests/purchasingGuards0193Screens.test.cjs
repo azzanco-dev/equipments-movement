@@ -288,3 +288,18 @@ test('PO page: every line shows its unit entry date', () => {
   // The Saudi day of the movement, not the browser's.
   assert.match(page, /formatDate\(saudiDateKey\(entryAt\)\)/)
 })
+
+// Owner 2026-11-14 («لما اضيف معدة لPO ابغى اضيف الملاحظة من صفحة انشاء
+// الPO»): every ticked unit of the create dialog takes its own note, sent as
+// the line's note in the one create call.
+test('create dialog: a note per ticked unit, sent with the line', () => {
+  const dialog = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
+  assert.match(dialog, /const setLineNote = \(equipmentId: string, note: string\) =>/)
+  assert.match(dialog, /placeholder=\{t\('supplierPoLineNoteOptional'\)\}/)
+  assert.match(dialog, /maxLength=\{SUPPLIER_PO_LINE_NOTE_MAX\}/)
+  assert.match(dialog, /setLineNote\(visit\.equipment_id, event\.target\.value\)/)
+  assert.match(dialog, /note: picked\[visit\.equipment_id\]\.note,/)
+  const translations = read('src', 'i18n', 'translations.ts')
+  assert.match(translations, /supplierPoLineNoteOptional: 'ملاحظة \(اختياري\)'/)
+  assert.match(translations, /supplierPoLineNoteOptional: 'Note \(optional\)'/)
+})
