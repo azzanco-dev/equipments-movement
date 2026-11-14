@@ -17,7 +17,6 @@ import {
   Notice,
   Select,
   Skeleton,
-  Textarea,
   cn,
 } from '@/components/ui'
 import { EquipmentIdentifierTag } from '@/components/data-list/EquipmentIdentifierTag'
@@ -879,20 +878,9 @@ export function CreateSupplierPoDialog({
             />
           )}
         </Field>
-        <Field
-          label={t('notes')}
-          name="notes"
-          error={errors.notes && t(errors.notes)}
-        >
-          {(control) => (
-            <Textarea
-              {...control}
-              value={form.notes}
-              placeholder={t('notesPlaceholder')}
-              onChange={(event) => update({ notes: event.target.value })}
-            />
-          )}
-        </Field>
+        {/* Owner 2026-11-14 («اخفي ملاحظة الPO من انشاء الPO ومن صفحة تفاصيل
+            الPO»): no PO-level note here — each unit carries its own note
+            above. `form.notes` stays empty and is sent as NULL. */}
         {duplicateUnits.length > 0 && (
           <Notice tone="warning" size="compact">
             {t('supplierPoDupCreateNotice')

@@ -379,12 +379,8 @@ function SupplierPoDetailInner({
           },
         ]
       : []),
-    {
-      key: 'notes',
-      icon: <StickyNote size={16} />,
-      label: t('notes'),
-      value: po.notes,
-    },
+    // Owner 2026-11-14: the PO-level note is not shown on this page (the
+    // units carry their own notes); the column stays in the database.
   ]
 
   // «خيارات» (owner 2026-10-22): «تصدير PDF» for every reader, edit for a

@@ -303,3 +303,15 @@ test('create dialog: a note per ticked unit, sent with the line', () => {
   assert.match(translations, /supplierPoLineNoteOptional: 'ملاحظة \(اختياري\)'/)
   assert.match(translations, /supplierPoLineNoteOptional: 'Note \(optional\)'/)
 })
+
+// Owner 2026-11-14 («اخفي ملاحظة الPO من انشاء الPO ومن صفحة تفاصيل الPO»).
+test('the PO-level note is hidden from the create dialog and the PO page facts', () => {
+  const dialog = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
+  assert.doesNotMatch(dialog, /name="notes"/)
+  assert.doesNotMatch(dialog, /update\(\{ notes:/)
+  // The per-unit note stays.
+  assert.match(dialog, /data-line-note=""/)
+  const page = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
+  assert.doesNotMatch(page, /key: 'notes'/)
+  assert.doesNotMatch(page, /value: po\.notes/)
+})
