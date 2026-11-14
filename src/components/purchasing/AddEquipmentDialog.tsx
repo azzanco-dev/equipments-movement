@@ -42,6 +42,7 @@ import {
   equipmentAtProjectOptionLoader,
   fetchExistingUnitPos,
   supplierPoParty,
+  type EquipmentVisitOption,
   type SupplierPoRow,
 } from '@/lib/purchasingData'
 
@@ -55,8 +56,8 @@ const EMPTY_FORM: SupplierPoLineFormValues = {
 /**
  * «اضافة معدة» on an open PO: the unit (server-side search, limited to the
  * PO party's units inside the PO's company and project right now that
- * entered on the PO's start date — owner rules 2026-10-19/20/25, migrations
- * 0137/0138/0148), an optional price excluding
+ * entered on the day the PO's units entered — owner rules 2026-10-19/20/25,
+ * 2026-11-14, migrations 0137/0138/0148/0194), an optional price excluding
  * VAT («تحتاج سعر» while empty) and a note. Saves through
  * `add_supplier_po_equipment`, which re-checks the rules and creates or
  * reuses the unit's card behind the scenes.
@@ -66,6 +67,7 @@ export function AddEquipmentDialog({
   onOpenChange,
   po,
   excludeEquipmentIds = [],
+  unitsEntryDay = null,
   initialUnit = null,
   onAdded,
 }: {
@@ -78,6 +80,10 @@ export function AddEquipmentDialog({
   /** Units already on the PO (owner 2026-10-22): the search leaves them out
    *  instead of offering them and failing on `equipment_already_on_open_po`. */
   excludeEquipmentIds?: readonly string[]
+  /** 2026-11-14 (0194): the Saudi day (yyyy-mm-dd) the PO's units entered
+   *  on, when they all share one; null (no units, or several days) offers
+   *  every visit and the database decides. The start date is not used. */
+  unitsEntryDay?: string | null
   /** «المعدات في المشاريع» (2026-10-24): the unit the dialog opens with,
    *  already chosen; the user adds the optional price and note. */
   initialUnit?: AsyncSearchSelectOption | null
@@ -105,12 +111,12 @@ export function AddEquipmentDialog({
       party
         ? equipmentAtProjectOptionLoader(party, po.company_id, po.project_id, {
             excludeEquipmentIds: excludeKey ? excludeKey.split(',') : [],
-            entryDay: po.start_date,
+            entryDay: unitsEntryDay ?? undefined,
             // 0188: a closed visit of that day is offered too, marked.
             exitedLabel: t('siteUnitsExited'),
           })
         : async () => [],
-    [party, po.company_id, po.project_id, po.start_date, excludeKey, t],
+    [party, po.company_id, po.project_id, unitsEntryDay, excludeKey, t],
   )
 
   useEffect(() => {
@@ -175,6 +181,9 @@ export function AddEquipmentDialog({
       price: form.price.trim() ? Number(form.price.trim()) : null,
       rateUnit: form.rate_unit,
       note: form.note,
+      // 0194: the visit the unit was picked on (not known for `initialUnit`).
+      entryLogId:
+        (option as Partial<EquipmentVisitOption> | null)?.entryLogId ?? null,
     })
     setSaving(false)
     if (!result.error) {

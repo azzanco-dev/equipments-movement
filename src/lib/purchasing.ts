@@ -439,9 +439,26 @@ export interface SupplierPoLineFormValues {
   note: string
 }
 
+/**
+ * 2026-11-14 (migration 0194): the units of one PO still entered on the same
+ * Saudi day, but that day is no longer the PO's start date. The day the
+ * existing lines share, or null when there are no lines, a line's entry is
+ * unknown, or the lines entered on several days (the database decides then).
+ */
+export function sharedEntryDay(
+  days: readonly (string | null | undefined)[],
+): string | null {
+  if (days.length === 0) return null
+  const first = days[0]
+  if (!first) return null
+  return days.every((day) => day === first) ? first : null
+}
+
 /** One unit picked in «امر شراء جديد» (0138: created with the PO). */
 export interface SupplierPoCreateLine {
   equipment_id: string
+  /** 0194: the visit's entry the unit joins the PO through. */
+  entry_log_id: string | null
   /** As typed; optional. */
   price: string
   /** 0157: per month or per day. */
@@ -454,12 +471,14 @@ export function supplierPoEquipmentPayload(
   lines: readonly SupplierPoCreateLine[],
 ): {
   equipment_id: string
+  entry_log_id: string | null
   price: number | null
   note: string | null
   rate_unit: SupplierPoRateUnit
 }[] {
   return lines.map((line) => ({
     equipment_id: line.equipment_id,
+    entry_log_id: line.entry_log_id,
     price: line.price.trim() ? Number(line.price.trim()) : null,
     note: line.note.trim() || null,
     rate_unit: line.rate_unit,
@@ -546,13 +565,8 @@ export const SUPPLIER_PO_CREATE_FIELD_RULES: readonly DatabaseFieldRule<Supplier
       field: 'start_date',
       key: 'supplierPoStartDateRequired',
     },
-    // 0148: every unit of one PO entered on its start date (a Saudi day).
-    {
-      on: 'raised',
-      match: 'entry_date_mismatch',
-      field: 'start_date',
-      key: 'supplierPoErrorEntryDateMismatch',
-    },
+    // `entry_date_mismatch` (0194) is about the units, not the start date: it
+    // is the form-level message in `SUPPLIER_PO_FORM_MESSAGES`.
   ]
 
 /** Tokens of add_supplier_po_equipment that name a field of the line form. */
@@ -590,7 +604,7 @@ export const SUPPLIER_PO_LINE_FIELD_RULES: readonly DatabaseFieldRule<SupplierPo
       field: 'equipment_id',
       key: 'supplierPoErrorNotOfSupplier',
     },
-    // 0148: the unit must have entered on the PO's start date.
+    // 0194: the unit must have entered on the same day as the PO's units.
     {
       on: 'raised',
       match: 'entry_date_mismatch',
@@ -662,13 +676,8 @@ export const SUPPLIER_PO_EDIT_FIELD_RULES: readonly DatabaseFieldRule<SupplierPo
       field: 'notes',
       key: 'supplierPoNotesTooLong',
     },
-    // 0148: while the PO has lines, its start date is their entry day.
-    {
-      on: 'raised',
-      match: 'po_start_date_locked',
-      field: 'start_date',
-      key: 'supplierPoErrorStartDateLocked',
-    },
+    // `po_start_date_locked` is raised by nothing since 0194 (a draft's start
+    // date is free); its rule and message were removed.
   ]
 
 /**
@@ -703,6 +712,8 @@ export const SUPPLIER_PO_FORM_MESSAGES: Readonly<
   invalid_equipment: 'supplierPoErrorInvalidEquipment',
   equipment_not_at_po_project: 'supplierPoErrorNotAtProject',
   equipment_not_of_po_supplier: 'supplierPoErrorNotOfSupplier',
+  // 0194: a unit that entered on another day than the PO's units.
+  entry_date_mismatch: 'supplierPoErrorEntryDateMismatch',
 }
 
 /** Every stable token of migrations 0136–0189 the client maps, for the tests. */
@@ -725,8 +736,8 @@ export const SUPPLIER_PO_ERROR_TOKENS: readonly string[] = [
   'invalid_note', // 0142 update_supplier_po_equipment
   'internal_price_must_be_zero',
   'equipment_already_on_po', // 0189 add: the same card twice on one PO
-  'entry_date_mismatch', // 0148 add_supplier_po_equipment (and create)
-  'po_start_date_locked', // 0148 update_supplier_po
+  'entry_date_mismatch', // 0148/0194 add_supplier_po_equipment (and create)
+  'po_start_date_locked', // 0148 update_supplier_po (raised by nothing since 0194; no screen rule)
   'invalid_rate_unit', // 0157 add / create / update a line
   'purchasing_approve_required', // 0160 approve_supplier_po
   'po_not_draft', // 0160

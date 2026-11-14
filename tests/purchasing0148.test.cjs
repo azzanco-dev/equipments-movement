@@ -120,17 +120,22 @@ test('purchasing_site_units: the 0147 view plus the same-day party PO', () => {
 
 test('the tokens map to field messages in Arabic and English', () => {
   const lib = read('src', 'lib', 'purchasing.ts')
-  for (const token of ['entry_date_mismatch', 'po_start_date_locked'])
-    assert.match(lib, new RegExp(`^  '${token}', // 0148`, 'm'), token)
-  assert.match(lib, /match: 'entry_date_mismatch',\s+field: 'start_date',\s+key: 'supplierPoErrorEntryDateMismatch'/)
+  assert.match(lib, /^  'entry_date_mismatch', \/\/ 0148/m)
+  // 0194 (owner 2026-11-14): the start date is free, so the mismatch names
+  // the unit, never the start date, and po_start_date_locked has no rule.
+  assert.doesNotMatch(lib, /match: 'entry_date_mismatch',\s+field: 'start_date'/)
   assert.match(lib, /match: 'entry_date_mismatch',\s+field: 'equipment_id',\s+key: 'supplierPoErrorEntryDateMismatch'/)
-  assert.match(lib, /match: 'po_start_date_locked',\s+field: 'start_date',\s+key: 'supplierPoErrorStartDateLocked'/)
+  assert.match(lib, /entry_date_mismatch: 'supplierPoErrorEntryDateMismatch'/)
+  assert.doesNotMatch(lib, /match: 'po_start_date_locked'|supplierPoErrorStartDateLocked/)
   const translations = read('src', 'i18n', 'translations.ts')
   for (const key of [
-    'supplierPoErrorEntryDateMismatch',
-    'supplierPoErrorStartDateLocked',
     'supplierPoStartDateLockedHint',
     'supplierPoStartDateFollowsEntry',
+    'supplierPoErrorStartDateLocked',
+  ])
+    assert.doesNotMatch(translations, new RegExp(`^    ${key}:`, 'm'), key)
+  for (const key of [
+    'supplierPoErrorEntryDateMismatch',
     'supplierPoOtherEntryDay',
     'supplierPoEquipmentSameDayHint',
     'supplierPoStartDateHint',
@@ -145,14 +150,14 @@ test('the tokens map to field messages in Arabic and English', () => {
   }
 })
 
-test('the dialogs: same-day units, the start date follows them or is locked', () => {
+test('the dialogs: same-day units, the start date is free (0194)', () => {
   const data = read('src', 'lib', 'purchasingData.ts')
   assert.match(data, /export function visitEntryDay\(visit: Pick<PartyVisit, 'entry_at'>\): string \{\s+return saudiDateKey\(visit\.entry_at\)/)
   const loader = data.slice(data.indexOf('export function equipmentAtProjectOptionLoader'))
   assert.match(loader, /\.gte\('entry_at', saudiDayStart\(options\.entryDay\)\)\s+\.lt\('entry_at', saudiDayStart\(nextDay\)\)/)
 
   const add = read('src', 'components', 'purchasing', 'AddEquipmentDialog.tsx')
-  assert.match(add, /entryDay: po\.start_date,/)
+  assert.match(add, /entryDay: unitsEntryDay \?\? undefined,/)
   assert.match(add, /hint=\{t\('supplierPoEquipmentSameDayHint'\)\}/)
 
   const create = read('src', 'components', 'purchasing', 'CreateSupplierPoDialog.tsx')
@@ -164,16 +169,15 @@ test('the dialogs: same-day units, the start date follows them or is locked', ()
   assert.match(create, /otherDayCount > 0 && \(/)
   assert.match(create, /t\('supplierPoOtherDayHidden'\)\.replace\(/)
   assert.doesNotMatch(create, /disabled=\{otherDay\}|supplierPoOtherEntryDay/)
-  assert.match(create, /disabled=\{pickedDay !== null\}/)
+  assert.doesNotMatch(create, /disabled=\{pickedDay !== null\}/)
   assert.match(create, /current\.start_date === pickedDay/)
-  assert.doesNotMatch(create, /dateTouched|suggestStartDate/)
 
   const edit = read('src', 'components', 'purchasing', 'EditSupplierPoDialog.tsx')
-  assert.match(edit, /disabled=\{hasLines\}/)
-  assert.match(edit, /hint=\{hasLines \? t\('supplierPoStartDateLockedHint'\) : undefined\}/)
+  assert.match(edit, /disabled=\{approved\}/)
+  assert.doesNotMatch(edit, /hasLines/)
   assert.match(edit, /SUPPLIER_PO_EDIT_FIELD_RULES/)
   const detail = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
-  assert.match(detail, /<EditSupplierPoDialog\s+po=\{po\}\s+hasLines=\{lines\.length > 0\}/)
+  assert.match(detail, /<EditSupplierPoDialog\s+po=\{po\}\s+approved=\{approved\}/)
 
   // «المعدات في المشاريع»: the «+» says «اضافة الى PO-…» only for the
   // party PO the view returns (same day), and the add dialog filters on it.

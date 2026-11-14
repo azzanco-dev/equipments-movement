@@ -64,6 +64,7 @@ import { saudiDateKey } from '@/lib/saudiTime'
 import { localizedName } from '@/lib/localizedName'
 import {
   isSupplierPoDraftRef,
+  sharedEntryDay,
   SUPPLIER_PO_EVENTS_LIMIT,
   supplierPoApprovalBlocker,
   supplierPoRateUnitOf,
@@ -288,6 +289,15 @@ function SupplierPoDetailInner({
   // (the database refuses them too); its notes stay editable, and an
   // approver returns it to draft to change it (0189).
   const approved = po.approval_status === 'approved'
+  // 2026-11-14: the add dialog offers the units that entered on the day the
+  // PO's units share (none when it has no lines or they differ).
+  const unitsEntryDay = sharedEntryDay(
+    lines.map((line) =>
+      line.card?.entry?.recorded_at
+        ? saudiDateKey(line.card.entry.recorded_at)
+        : null,
+    ),
+  )
   const editable = showActions && !approved
   // 0187 (owner 2026-11-09): a unit leaves only a DRAFT PO; the database
   // refuses anything else too.
@@ -748,6 +758,7 @@ function SupplierPoDetailInner({
         excludeEquipmentIds={lines.flatMap((line) =>
           line.card?.equipment?.id ? [line.card.equipment.id] : [],
         )}
+        unitsEntryDay={unitsEntryDay}
         onAdded={() => {
           setAddOpen(false)
           fetchData()
@@ -776,7 +787,7 @@ function SupplierPoDetailInner({
       />
       <EditSupplierPoDialog
         po={po}
-        hasLines={lines.length > 0}
+        approved={approved}
         open={editOpen}
         onOpenChange={setEditOpen}
         onSaved={() => {

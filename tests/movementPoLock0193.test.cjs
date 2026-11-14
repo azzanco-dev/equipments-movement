@@ -43,6 +43,11 @@ test('LF line endings and no later migration re-creates the functions', () => {
   assert.ok(!SQL.includes('\r'), 'LF only')
   const dir = path.join(ROOT, 'supabase', 'migrations')
   const later = fs.readdirSync(dir).filter((f) => f > FILE)
+  // 0194 (free start date) re-creates two of them on purpose; its own test
+  // checks they are the 0193 bodies plus its change.
+  const recreatedBy = {
+    '20261114100000_0194_po_free_start_date.sql': ['guard_movement_with_po', 'create_supplier_po'],
+  }
   for (const f of later) {
     const text = fs.readFileSync(path.join(dir, f), 'utf8')
     for (const name of [
@@ -51,6 +56,7 @@ test('LF line endings and no later migration re-creates the functions', () => {
       'create_supplier_po',
       'approve_equipment_card_pricing',
     ]) {
+      if ((recreatedBy[f] || []).includes(name)) continue
       assert.ok(
         !new RegExp(`FUNCTION public\\.${name}\\(`).test(text),
         `${f} re-creates ${name}`,

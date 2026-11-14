@@ -585,11 +585,17 @@ export function visitEntryDay(visit: Pick<PartyVisit, 'entry_at'>): string {
   return saudiDateKey(visit.entry_at)
 }
 
+/** An option of the unit picker that also carries its visit's entry id. */
+export interface EquipmentVisitOption extends AsyncSearchSelectOption {
+  entryLogId: string
+}
+
 /**
  * «اضافة معدة» (owner rules 2026-10-19/20/25, migrations 0137/0138/0148,
- * 0188): only the party's units with a site visit of the PO's company and
- * project — inside now or exited (0188, owner 2026-11-09) — that entered on
- * the PO's start date (a Saudi day), one option per unit, first 20 by code;
+ * 0188, 0194): only the party's units with a site visit of the PO's company
+ * and project — inside now or exited (0188, owner 2026-11-09) — that entered
+ * on `entryDay` when given (the day the PO's units share, 2026-11-14; the
+ * start date is free), one option per unit, first 20 by code;
  * an exited visit is marked with `exitedLabel`. Without a start date the
  * closed visits of the last 60 Saudi days. The database re-checks every rule
  * in `add_supplier_po_equipment`.
@@ -636,8 +642,10 @@ export function equipmentAtProjectOptionLoader(
         seen.add(visit.equipment_id)
         return true
       })
-      .map((visit) => ({
+      .map((visit): EquipmentVisitOption => ({
         value: visit.equipment_id,
+        // 0194: the visit the unit joins the PO through.
+        entryLogId: visit.entry_id,
         label: visit.equipment_code,
         description: [
           visit.equipment_type,
@@ -719,6 +727,8 @@ export async function addSupplierPoEquipment(input: {
   /** 0157: per month or per day. */
   rateUnit: SupplierPoRateUnit
   note: string
+  /** 0194: the visit's entry the unit joins through; sent only when known. */
+  entryLogId?: string | null
 }): Promise<RpcResult<string>> {
   return asResult<string>(
     await supabase.rpc('add_supplier_po_equipment', {
@@ -727,6 +737,7 @@ export async function addSupplierPoEquipment(input: {
       p_price: input.price,
       p_note: input.note.trim() || null,
       p_rate_unit: input.rateUnit,
+      ...(input.entryLogId ? { p_entry_log_id: input.entryLogId } : {}),
     }),
   )
 }

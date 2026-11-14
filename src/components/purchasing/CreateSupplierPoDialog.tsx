@@ -133,10 +133,10 @@ type OwnerChoice = '' | SupplierPoOwnerClass | typeof EXTERNAL
  * «امر شراء جديد» (owner review 2026-10-20): the party first (a supplier
  * from the list or one of the fixed owners), then only the companies and
  * projects where that party has units right now, then those units ticked
- * with an optional price each, and notes. 0148 (owner 2026-10-25): every
- * unit of one PO entered on the same Saudi day, the start date — once a unit
- * is ticked only the units of its entry day stay selectable and the start
- * date is that day (locked while units are ticked). Saved in ONE call
+ * with an optional price each, and notes. Every unit of one PO still entered
+ * on the same Saudi day — once a unit is ticked only the units of ITS entry
+ * day stay selectable — but since 2026-11-14 (0194) the start date is free:
+ * pre-filled with that day, editable. Saved in ONE call
  * (`create_supplier_po` with `p_equipment`): the PO and its lines, or
  * nothing.
  */
@@ -187,6 +187,10 @@ export function CreateSupplierPoDialog({
   const [saving, setSaving] = useState(false)
   const [visitsRetry, setVisitsRetry] = useState(0)
   const bodyRef = useRef<HTMLDivElement>(null)
+  // Whether the user picked the start date himself (a later tick of a unit
+  // does not overwrite it). Cleared by a reset of the party, company or
+  // project and when the dialog opens.
+  const startTouched = useRef(false)
 
   const companyOptions = useMemo(
     () => visitCompanyOptions(visits, lang),
@@ -254,6 +258,7 @@ export function CreateSupplierPoDialog({
 
   useEffect(() => {
     if (!open) return
+    startTouched.current = false
     setForm(
       preset
         ? {
@@ -381,9 +386,10 @@ export function CreateSupplierPoDialog({
     )
   }
 
-  // 0148: the start date is the entry day of the ticked units.
+  // 2026-11-14 (0194): the start date is pre-filled with the entry day of the
+  // first ticked unit, never overwritten once the user set it himself.
   useEffect(() => {
-    if (!pickedDay) return
+    if (!pickedDay || startTouched.current) return
     setForm((current) =>
       current.start_date === pickedDay
         ? current
@@ -477,6 +483,7 @@ export function CreateSupplierPoDialog({
     const lines: SupplierPoCreateLine[] = sendLines
       .map((visit) => ({
         equipment_id: visit.equipment_id,
+        entry_log_id: visit.entry_id,
         price: picked[visit.equipment_id].price,
         rate_unit: picked[visit.equipment_id].rate_unit,
         note: picked[visit.equipment_id].note,
@@ -569,6 +576,7 @@ export function CreateSupplierPoDialog({
               onValueChange={(value) => {
                 setOwner(value as OwnerChoice)
                 setSupplier(null)
+                startTouched.current = false
                 // A new owner resets the party, the places and the units.
                 update({
                   lessor_id: '',
@@ -612,6 +620,7 @@ export function CreateSupplierPoDialog({
                   disabled={!external}
                   onChange={(value, option) => {
                     setSupplier(option)
+                    startTouched.current = false
                     update({ lessor_id: value, company_id: '', project_id: '' })
                     setPicked({})
                   }}
@@ -639,6 +648,7 @@ export function CreateSupplierPoDialog({
                 loadOptions={loadCompanies}
                 disabled={!hasParty || visitsState !== 'ready'}
                 onChange={(value) => {
+                  startTouched.current = false
                   update({ company_id: value, project_id: '' })
                   setPicked({})
                 }}
@@ -663,6 +673,7 @@ export function CreateSupplierPoDialog({
                 loadOptions={loadProjects}
                 disabled={!form.company_id}
                 onChange={(value) => {
+                  startTouched.current = false
                   update({ project_id: value })
                   setPicked({})
                 }}
@@ -864,17 +875,17 @@ export function CreateSupplierPoDialog({
           label={t('supplierPoStartDate')}
           name="start_date"
           required
-          hint={t(
-            pickedDay ? 'supplierPoStartDateFollowsEntry' : 'supplierPoStartDateHint',
-          )}
+          hint={t('supplierPoStartDateHint')}
           error={errors.start_date && t(errors.start_date)}
         >
           {(control) => (
             <DatePicker
               {...control}
-              disabled={pickedDay !== null}
               value={form.start_date}
-              onChange={(value) => update({ start_date: value })}
+              onChange={(value) => {
+                startTouched.current = true
+                update({ start_date: value })
+              }}
             />
           )}
         </Field>

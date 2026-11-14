@@ -2297,10 +2297,8 @@ export const translations = {
       'لا معدات لهذه الجهة داخل هذا المشروع الان ولا خرجت منه منذ 1 اغسطس 2026.',
     supplierPoCompanyPlaceholder: 'الشركات التي للجهة معدات فيها',
     supplierPoProjectPlaceholder: 'مشاريع الشركة التي للجهة معدات فيها',
-    supplierPoStartDateHint: 'عند اختيار معدة يصبح تاريخ البداية يوم دخولها.',
-    // 0148 (owner 2026-10-25): every unit of one PO entered on the same day.
-    supplierPoStartDateFollowsEntry:
-      'يوم دخول المعدات المختارة. كل معدات الامر دخلت في نفس اليوم.',
+    // 2026-11-14 (0194): the start date is free; it is only pre-filled.
+    supplierPoStartDateHint: 'يتعبا بتاريخ دخول المعدة، ويمكنك تغييره.',
     supplierPoOtherEntryDay: 'دخلت في يوم اخر',
     supplierPoOtherDayHidden:
       'تظهر معدات يوم دخول المعدة المختارة فقط؛ {count} معدة اخرى دخلت في ايام اخرى لا تظهر.',
@@ -2314,12 +2312,10 @@ export const translations = {
     supplierPoDupCheckFailed: 'تعذر التحقق من الاوامر السابقة للمعدات.',
     // po-duplicate-warning — end
     supplierPoEquipmentSameDayHint:
-      'تظهر معدات هذه الجهة الموجودة الان داخل شركة الامر ومشروعه والتي دخلت في تاريخ بداية الامر فقط.',
-    supplierPoStartDateLockedHint: 'مقفل ما دام في الامر معدات: هو يوم دخولها.',
+      'تظهر معدات هذه الجهة في شركة الامر ومشروعه. كل معدات الامر تدخل في نفس اليوم.',
     supplierPoErrorEntryDateMismatch:
-      'المعدة دخلت المشروع في يوم غير تاريخ بداية الامر. كل معدات الامر يجب ان تكون دخلت في نفس اليوم.',
-    supplierPoErrorStartDateLocked:
-      'تاريخ البداية هو يوم دخول معدات الامر ولا يتغير ما دام فيه معدات.',
+      'المعدة دخلت المشروع في يوم غير يوم دخول معدات هذا الامر.',
+    supplierPoStartDateApprovedHint: 'الامر معتمد: ارجعه للتعديل اولا لتغيير تاريخ البداية.',
     // 0157 (owner 2026-10-28): the price is per month or per day.
     supplierPoRateUnit: 'وحدة السعر',
     supplierPoRateUnitMonth: 'شهري',
@@ -5113,10 +5109,7 @@ export const translations = {
       'This party has no units inside this project now or exited from it since 1 Aug 2026.',
     supplierPoCompanyPlaceholder: 'Companies where the party has units',
     supplierPoProjectPlaceholder: "The company's projects where the party has units",
-    supplierPoStartDateHint: 'Once a unit is ticked, the start date becomes its entry day.',
-    // 0148 (owner 2026-10-25): every unit of one PO entered on the same day.
-    supplierPoStartDateFollowsEntry:
-      'The entry day of the ticked units. All units of one order entered on the same day.',
+    supplierPoStartDateHint: "Filled with the unit's entry day; you can change it.",
     supplierPoOtherEntryDay: 'Entered on another day',
     supplierPoOtherDayHidden:
       "Only the units that entered on the ticked unit's day are listed; {count} other units entered on other days and are hidden.",
@@ -5130,12 +5123,10 @@ export const translations = {
     supplierPoDupCheckFailed: "Could not check the units' earlier POs.",
     // po-duplicate-warning — end
     supplierPoEquipmentSameDayHint:
-      "Only this party's units currently inside the order's company and project that entered on the order start date are listed.",
-    supplierPoStartDateLockedHint: 'Locked while the order has equipment: it is their entry day.',
+      "This party's units in the order's company and project are listed. All units of one order enter on the same day.",
     supplierPoErrorEntryDateMismatch:
-      'The equipment entered the project on a day other than the order start date. All units of one order must have entered on the same day.',
-    supplierPoErrorStartDateLocked:
-      "The start date is the entry day of the order's equipment and cannot change while the order has equipment.",
+      "The unit entered the project on a day other than the entry day of this order's units.",
+    supplierPoStartDateApprovedHint: 'The order is approved: return it for editing first to change the start date.',
     // 0157 (owner 2026-10-28): the price is per month or per day.
     supplierPoRateUnit: 'Price unit',
     supplierPoRateUnitMonth: 'Monthly',

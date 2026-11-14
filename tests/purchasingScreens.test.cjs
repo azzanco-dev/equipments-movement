@@ -364,9 +364,12 @@ test('every stable token of migrations 0136 to 0189 is known and mapped', () => 
       ...purchasing.SUPPLIER_PO_EDIT_FIELD_RULES,
     ].map((rule) => rule.match),
   )
+  // 0194 (owner 2026-11-14): `po_start_date_locked` is raised by nothing any
+  // more, so the screens keep no rule or message for it.
   for (const token of raised)
     assert.ok(
-      fieldTokens.has(token) || token in purchasing.SUPPLIER_PO_FORM_MESSAGES,
+      token === 'po_start_date_locked' ||
+        fieldTokens.has(token) || token in purchasing.SUPPLIER_PO_FORM_MESSAGES,
       `${token} maps to a field or a form message`,
     )
 })
