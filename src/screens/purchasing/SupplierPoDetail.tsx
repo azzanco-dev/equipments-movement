@@ -60,6 +60,7 @@ import { InfoGridSkeleton } from '@/components/ui/InfoGrid'
 import { useI18n } from '@/i18n/I18nContext'
 import { useTabTitle } from '@/components/TabTitle'
 import { formatDate, formatDateTime } from '@/lib/dateFormat'
+import { saudiDateKey } from '@/lib/saudiTime'
 import { localizedName } from '@/lib/localizedName'
 import {
   isSupplierPoDraftRef,
@@ -594,6 +595,11 @@ function SupplierPoDetailInner({
             <ul className="space-y-2 p-4 pt-3">
               {sortedLines.map((line) => {
                 const unit = line.card?.equipment ?? null
+                // The unit's own entry day (owner 2026-11-14, «تاريخ الدخول
+                // في كل سطر معدة»): the Saudi day of the visit's entry, which
+                // an older PO with mixed units may not share with its start
+                // date. Nothing is shown when the movement is not readable.
+                const entryAt = line.card?.entry?.recorded_at ?? null
                 return (
                   <li
                     key={line.id}
@@ -619,6 +625,19 @@ function SupplierPoDetailInner({
                           every unit of the PO starts on the PO's start date
                           (the facts card). */}
                       <div className="min-w-0 flex-1 space-y-1 sm:basis-3/5">
+                        {entryAt && (
+                          <p className="flex items-center gap-1.5 text-xs text-muted">
+                            <Calendar
+                              size={12}
+                              aria-hidden="true"
+                              className="shrink-0"
+                            />
+                            <span>{t('entryDate')}</span>
+                            <bdi dir="ltr" className="tabular-nums text-fg">
+                              {formatDate(saudiDateKey(entryAt))}
+                            </bdi>
+                          </p>
+                        )}
                         {line.note && (
                           <p className="flex items-start gap-1.5 text-xs text-muted">
                             <StickyNote

@@ -272,3 +272,19 @@ test('the removed-feature keys are gone from both languages', () => {
   assert.match(ar, /^    supplierPoCloseTypeNumberHint:/m)
   assert.match(ar, /^    supplierPoClosedAt:/m)
 })
+
+// Owner 2026-11-14 («هل تقدر تظهر لي تاريخ الدخول في كل سطر معدة؟», on the PO
+// page): every line card shows its unit's own entry day.
+test('PO page: every line shows its unit entry date', () => {
+  const data = read('src', 'lib', 'purchasingData.ts')
+  assert.match(
+    data,
+    /card:equipment_cards\(id,equipment_id,entry_log_id,entry:entry_exit_logs\(recorded_at\),equipment:/,
+  )
+  const page = read('src', 'screens', 'purchasing', 'SupplierPoDetail.tsx')
+  assert.match(page, /const entryAt = line\.card\?\.entry\?\.recorded_at \?\? null/)
+  assert.match(page, /\{entryAt && \(/)
+  assert.match(page, /\{t\('entryDate'\)\}/)
+  // The Saudi day of the movement, not the browser's.
+  assert.match(page, /formatDate\(saudiDateKey\(entryAt\)\)/)
+})

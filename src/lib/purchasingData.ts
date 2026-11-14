@@ -111,6 +111,9 @@ export interface EquipmentCardRef {
   equipment_id: string
   /** 0137: the site entry that brought the unit (set by the database). */
   entry_log_id?: string | null
+  /** The visit's entry movement, for its date on the PO page's line (owner
+   *  2026-11-14). NULL when the reader may not read the movement (RLS). */
+  entry?: { recorded_at: string } | null
   equipment: PurchasingUnit | null
 }
 
@@ -251,7 +254,7 @@ export const SUPPLIER_PO_LIST_SELECT = `${SUPPLIER_PO_SELECT},updated_at,supplie
 export const PURCHASING_UNIT_SELECT =
   'id,code,type,plate_number,chassis_number,ownership_status,lessor:lessors(id,name,is_internal)'
 
-export const SUPPLIER_PO_LINE_SELECT = `id,supplier_po_id,equipment_card_id,price,rate_unit,note,created_at,updated_at,card:equipment_cards(id,equipment_id,entry_log_id,equipment:equipment(${PURCHASING_UNIT_SELECT}))`
+export const SUPPLIER_PO_LINE_SELECT = `id,supplier_po_id,equipment_card_id,price,rate_unit,note,created_at,updated_at,card:equipment_cards(id,equipment_id,entry_log_id,entry:entry_exit_logs(recorded_at),equipment:equipment(${PURCHASING_UNIT_SELECT}))`
 
 export const SUPPLIER_PO_EVENT_SELECT =
   'id,supplier_po_id,event_type,payload,actor_id,created_at,seq'
