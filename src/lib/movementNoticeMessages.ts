@@ -1,5 +1,6 @@
-// The three fixed WhatsApp notices exchanged between the workshop and the site
-// foremen (migration 0110). Pure: no I/O, so the texts are unit-tested.
+// The fixed WhatsApp notices exchanged between the workshop and the site
+// foremen (migration 0110; `workshop_entry` and `workshop_return` came with the
+// nested workshop stays of 2026-11-14). Pure: no I/O, so the texts are unit-tested.
 //
 // The texts are server-side templates. A client never supplies message text;
 // only facts resolved by the database are interpolated. Each message is
@@ -28,6 +29,10 @@ export const MOVEMENT_NOTICE_KINDS = [
   'workshop_arrival',
   'site_exit',
   'workshop_exit',
+  // Nested workshop stays: the foreman of the OPEN project visit is told when
+  // his unit enters the workshop and when it comes back; his visit stays open.
+  'workshop_entry',
+  'workshop_return',
 ] as const
 
 export type MovementNoticeKind = (typeof MOVEMENT_NOTICE_KINDS)[number]
@@ -164,5 +169,31 @@ export function movementNoticeMessage(
         '✅ خرجت من الورشة. اذا عادت لمشروعك سجل دخولها.',
         'Left the workshop. If it returns to your project, record its entry.',
       ])
+    case 'workshop_entry': {
+      // The project of the visit that stays open: Arabic name first, English
+      // under it, so each line reads in one language.
+      const projectAr = firstOf(facts.projectNameAr, facts.projectNameEn)
+      const projectEn = firstOf(facts.projectNameEn, facts.projectNameAr)
+      return block(facts1, [
+        projectAr
+          ? `🔧 دخلت الورشة. زيارتها في مشروع ${projectAr} تبقى قائمة، ولا تحتاج تسجيل خروج.`
+          : '🔧 دخلت الورشة. زيارتها في المشروع تبقى قائمة، ولا تحتاج تسجيل خروج.',
+        projectEn
+          ? `Entered the workshop. Its visit in project ${projectEn} stays open; no exit needs to be recorded.`
+          : 'Entered the workshop. Its project visit stays open; no exit needs to be recorded.',
+      ])
+    }
+    case 'workshop_return': {
+      const projectAr = firstOf(facts.projectNameAr, facts.projectNameEn)
+      const projectEn = firstOf(facts.projectNameEn, facts.projectNameAr)
+      return block(facts1, [
+        projectAr
+          ? `✅ خرجت من الورشة وعادت الى مشروع ${projectAr}. لا تحتاج تسجيل دخول جديد.`
+          : '✅ خرجت من الورشة وعادت الى المشروع. لا تحتاج تسجيل دخول جديد.',
+        projectEn
+          ? `Left the workshop and is back in project ${projectEn}. No new entry needs to be recorded.`
+          : 'Left the workshop and is back in the project. No new entry needs to be recorded.',
+      ])
+    }
   }
 }

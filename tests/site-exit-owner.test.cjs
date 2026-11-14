@@ -48,15 +48,17 @@ test('the site exit owner rule maps to its own code and 403', () => {
   assert.equal(movementErrorStatus('exit_not_entry_owner'), 403)
 })
 
-test('a site exit on equipment inside the workshop maps to its own code and 403', () => {
-  // Migration 0088 raises this token with SQLSTATE 42501.
+test('a site exit on equipment inside the workshop maps to its own code and 409', () => {
+  // Nested workshop stays (2026-11-14): a state conflict (55000), no longer a
+  // permission failure: the unit has no open project visit and is inside the
+  // workshop.
   assert.equal(
     movementErrorCode(
       'exit_equipment_in_workshop\nHINT: The equipment is inside the workshop; a site exit cannot close a workshop entry.',
     ),
     'exit_equipment_in_workshop',
   )
-  assert.equal(movementErrorStatus('exit_equipment_in_workshop'), 403)
+  assert.equal(movementErrorStatus('exit_equipment_in_workshop'), 409)
 })
 
 test('the existing trigger messages keep their codes and 409', () => {

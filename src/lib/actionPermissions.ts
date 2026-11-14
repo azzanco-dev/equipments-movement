@@ -194,8 +194,6 @@ export interface MovementFormActions {
   workshopMode: boolean
   /** A site EXIT may close any foreman's visit (the list is not own-only). */
   exitAnyVisit: boolean
-  /** The «ابلاغ الفورمان» panel on a blocked ENTRY. */
-  notifyForeman: boolean
   /** The «اضافة معدة +» button of the form's context. */
   quickCreateEquipment: boolean
   /** The «اضافة سائق +» option of the site ENTRY driver field. */
@@ -218,7 +216,6 @@ export function movementFormActionsFromPermissions(
     exitAnyVisit:
       permissions.has('movements.exit_cross_context') ||
       permissions.get('movements.site.create') === 'all',
-    notifyForeman: permissions.has('movements.notify_foreman'),
     quickCreateEquipment:
       quickEquipmentScope === 'all' ||
       quickEquipmentScope === (workshopMode ? 'workshop' : 'site'),

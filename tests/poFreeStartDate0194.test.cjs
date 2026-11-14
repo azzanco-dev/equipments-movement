@@ -178,6 +178,15 @@ test('F: the closing guard and the schema reload', () => {
 
 test('no later migration re-creates the 0194 objects', () => {
   const later = fs.readdirSync(DIR).filter((f) => f > FILE)
+  // 0195 (nested workshop stays) re-creates the two views on purpose, with
+  // one trailing column; tests/nestedWorkshop0195.test.cjs checks they are
+  // the 0194 bodies plus that column.
+  const recreatedBy = {
+    '20261114120000_0195_nested_workshop_visits.sql': [
+      String.raw`VIEW public\.purchasing_site_visits\b`,
+      String.raw`VIEW public\.purchasing_site_units\b`,
+    ],
+  }
   for (const f of later) {
     const text = read(f)
     for (const re of [
@@ -188,6 +197,7 @@ test('no later migration re-creates the 0194 objects', () => {
       /VIEW public\.purchasing_site_visits\b/,
       /VIEW public\.purchasing_site_units\b/,
     ]) {
+      if ((recreatedBy[f] || []).includes(re.source)) continue
       assert.ok(!re.test(text), `${f}: ${re}`)
     }
   }

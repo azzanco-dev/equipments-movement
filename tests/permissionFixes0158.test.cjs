@@ -285,15 +285,13 @@ test('D: the clients read only the state fields from the inquiry call', () => {
   const inquiry = read(
     path.join(root, 'src', 'screens', 'inquiry', 'EquipmentInquiryScreen.tsx'),
   )
-  const call = inquiry.indexOf(".rpc('get_last_movement'")
+  // Nested workshop stays (2026-11-14): the state comes from the presence row
+  // (`get_equipment_presence`), parsed by `parseEquipmentPresence`; the state
+  // itself uses none of the name fields.
+  const call = inquiry.indexOf(".rpc('get_equipment_presence'")
   assert.ok(call > 0)
-  const use = inquiry.slice(call, inquiry.indexOf('equipmentStateFromMovement(latest)', call))
-  // Plus `recorded_at` since 2026-11-02 (the «مباعة» state starts at the
-  // last movement); still none of the name fields.
-  assert.match(
-    use,
-    /movement_type: string \| null\s+movement_context: string \| null\s+workshop_purpose: string \| null\s+recorded_at: string \| null\s+\}/,
-  )
+  const use = inquiry.slice(call, inquiry.indexOf('equipmentStateFromPresence({', call))
+  assert.match(use, /parseEquipmentPresence\(presenceResult\.data\)/)
   assert.doesNotMatch(use, /supervisor_name|driver_name|project_name/)
 })
 

@@ -44,7 +44,6 @@ const ROUTE_KEYS = {
   // Owner 2026-10-26: the admin home's «افاقي» figures, the same key.
   'app/api/afaqy/stats/route.ts': 'equipment.location.view',
   'app/api/notifications/whatsapp-status/route.ts': 'settings.integrations',
-  'app/api/notifications/workshop-arrival/route.ts': 'movements.notify_foreman',
   // Audit run-1 hardening (2026-10-18): the admin correction and delete of a
   // movement decide by the key their database functions re-check.
   'app/api/movements/[id]/route.ts': 'movements.edit_delete',

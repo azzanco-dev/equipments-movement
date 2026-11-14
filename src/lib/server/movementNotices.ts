@@ -1,8 +1,9 @@
 // SERVER ONLY. Orchestrates one WhatsApp movement notice (migration 0110):
 // build the fixed text, send it through the gateway, record the outcome.
 //
-// Shared by `POST /api/notifications/workshop-arrival` (manual notice) and the
-// movement creation route (automatic notices after an EXIT). Every call uses
+// Used by the movement creation route: the automatic notice after every saved
+// movement except a project ENTRY (a workshop entry / exit tells the foreman of
+// the open project visit; a project / workshop exit as before). Every call uses
 // the signed-in user's Supabase client, so the database functions stay
 // authoritative: they resolve the recipient and re-check the caller.
 //
@@ -21,7 +22,7 @@ import { sendWhatsAppText } from '@/lib/server/ultramsg'
 export type MovementNoticeStatus =
   'sent' | 'failed' | 'not_configured' | 'no_mobile'
 
-/** One row of `request_workshop_arrival_notice` / `prepare_movement_exit_notice`. */
+/** One row of `prepare_movement_notice` (older stored kinds stay readable). */
 export interface MovementNoticeRow {
   noticeId: string
   kind: MovementNoticeKind
@@ -110,7 +111,8 @@ export async function deliverMovementNotice(
   row: MovementNoticeRow,
   options: {
     /** The site origin the arrival notice links to (`resolveAppBaseUrl`:
-     *  APP_BASE_URL only). Absent or `null`: the notice has no link line. */
+     *  APP_BASE_URL only). Only the old arrival kind links; absent or `null`:
+     *  the notice has no link line. */
     appBaseUrl?: string | null
   } = {},
 ): Promise<MovementNoticeDelivery> {
@@ -173,23 +175,25 @@ export async function deliverMovementNotice(
 }
 
 /**
- * The automatic notice after an EXIT was saved (site exit -> the workshop
- * officer who reported the unit; workshop exit -> the foreman the unit left
- * from). The database decides whether there is anything to send and to whom.
+ * The automatic notice after a movement was saved (workshop entry / exit of a
+ * unit whose project visit is open -> the foreman of that visit; a project exit
+ * or a plain workshop exit as before; a project entry -> nothing). The database
+ * (`prepare_movement_notice`) decides whether there is anything to send and to
+ * whom.
  *
  * Runs after the movement response was sent. It never throws: a notice that
  * cannot be prepared or sent must never affect the saved movement.
  */
-export async function sendMovementExitNotice(
+export async function sendMovementNotice(
   supabase: SupabaseClient,
   movementId: string,
 ): Promise<void> {
   try {
-    const { data, error } = await supabase.rpc('prepare_movement_exit_notice', {
+    const { data, error } = await supabase.rpc('prepare_movement_notice', {
       p_movement_id: movementId,
     })
     if (error) {
-      console.error('Movement exit notice skipped', {
+      console.error('Movement notice skipped', {
         movementId,
         code: 'prepare_failed',
       })
@@ -199,7 +203,7 @@ export async function sendMovementExitNotice(
     if (!row) return
     await deliverMovementNotice(supabase, row)
   } catch {
-    console.error('Movement exit notice skipped', {
+    console.error('Movement notice skipped', {
       movementId,
       code: 'prepare_threw',
     })

@@ -440,6 +440,13 @@ export function SiteUnitsScreen({
                     <div className="flex items-start justify-between gap-2">
                       <p className="flex flex-wrap items-center gap-2 text-lg font-bold leading-6">
                         <bdi dir="ltr">{row.equipment_code ?? '—'}</bdi>
+                        {/* 0195: an open visit whose unit is in the workshop now
+                            (nested workshop stays); a closed visit never. */}
+                        {row.visit_state !== 'exited' && row.in_workshop === true && (
+                          <Badge tone="warning" size="sm">
+                            {t('siteUnitInWorkshopBadge')}
+                          </Badge>
+                        )}
                         {/* 0188: a closed visit. */}
                         {row.visit_state === 'exited' && (
                           <Badge tone="neutral" size="sm">

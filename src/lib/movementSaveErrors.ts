@@ -13,6 +13,7 @@ const MOVEMENT_SAVE_ERROR_KEYS: Record<string, TranslationKey> = {
   exit_not_entry_owner: 'siteExitNotEntryOwner',
   exit_equipment_in_workshop: 'siteExitEquipmentInWorkshop',
   exit_equipment_on_site: 'workshopExitEquipmentOnSite',
+  equipment_in_workshop: 'entryBlockedInWorkshopMsg',
   // wave-10-exit-purpose (migration 0111)
   exit_purpose_required: 'exitPurposeRequired',
   invalid_exit_purpose: 'exitPurposeInvalid',

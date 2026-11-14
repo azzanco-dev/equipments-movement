@@ -49,9 +49,15 @@ import {
   inquiryRise,
   inquiryStateIcon,
 } from '@/components/inquiry/inquiryStyle'
-import { buildEquipmentVisits, type TimelineMovement } from '@/lib/visitTimeline'
+import {
+  buildEquipmentVisits,
+  groupWorkshopStops,
+  type TimelineMovement,
+} from '@/lib/visitTimeline'
+import { parseEquipmentPresence, type EquipmentPresence } from '@/lib/equipmentPresence'
 import {
   inquiryCountFrom,
+  inquiryOpenVisitLine,
   inquirySoldOf,
   inquiryYearMarkers,
   inquiryYearChoices,
@@ -79,7 +85,7 @@ import { fetchCompanyNumberMatches } from '@/lib/companyNumberSearch'
 import { EquipmentLocationCard } from '@/components/afaqy/EquipmentLocationCard'
 import { preferRecordName } from '@/lib/driverDisplayName'
 import {
-  equipmentStateFromMovement,
+  equipmentStateFromPresence,
   equipmentStateText,
   isEquipmentNew,
   parseEquipmentState,
@@ -106,7 +112,7 @@ import type { OwnershipStatus } from '@/lib/types'
  * Every signed-in role can open it — `entry_exit_logs` RLS decides which
  * movement rows come back, so a foreman only ever sees his own site visits
  * and a workshop role only workshop visits, exactly as everywhere else; the
- * state itself comes from `get_last_movement`.
+ * state itself comes from `get_equipment_presence`.
  */
 
 interface InquiryEquipmentRow {
@@ -196,20 +202,24 @@ function writeRecent(units: RecentUnit[]) {
 }
 
 /**
- * wave 20 (migration 0125): the one equipment state of the brief. It is read
- * through `get_last_movement` (SECURITY DEFINER), not the `equipment_state`
- * computed field, because a foreman's RLS hides other people's movements and
- * the computed field would then see only part of the chain. `error` keeps a
- * failed read visible instead of showing a state. The «جديدة» mark is not
+ * wave 20 (migration 0125): the one equipment state of the brief. Since the
+ * nested workshop stays (2026-11-14) it is read through
+ * `get_equipment_presence` (SECURITY DEFINER: two open visits, project and
+ * workshop), not the `equipment_state` computed field, because a foreman's RLS
+ * hides other people's movements and the computed field would then see only
+ * part of the chain. `error` keeps a failed read visible instead of showing a
+ * state. The «جديدة» mark is not
  * part of it: it is the row's age (`isEquipmentNew`, migration 0129) and
  * sits next to the code (owner decision 2026-10-14).
  */
 type InquiryState =
   | {
       state: EquipmentState
-      /** The instant of the latest movement (`get_last_movement`), for the
-       *  «مباعة» state of a sold unit: sold since its last exit. */
+      /** The instant of the latest movement (`get_equipment_presence`), for
+       *  the «مباعة» state of a sold unit: sold since its last exit. */
       lastMovementAt: number | null
+      /** The two open visits and their facts. */
+      presence: EquipmentPresence
     }
   | 'error'
   | null
@@ -271,6 +281,9 @@ export function EquipmentInquiryScreen({
   const startMovementsRequest = useListRequest()
   const startYearRequest = useListRequest()
   const startPoRequest = useListRequest()
+  const startOpenRowsRequest = useListRequest()
+  // The open visits' entries already looked up for the history (`unit:ids`).
+  const openRowsMergedFor = useRef<string | null>(null)
 
   const equipmentId = parseEquipmentIdParam(searchParams.get('equipment'))
 
@@ -319,7 +332,8 @@ export function EquipmentInquiryScreen({
   // The stay the 12-month strip opened in the history.
   const [highlightedKey, setHighlightedKey] = useState<string | null>(null)
   // The PO card under the facts: `undefined` hides it (no purchasing
-  // access, a failed read, or the unit is not inside a project).
+  // access, a failed read, or no project visit is open; it shows while the
+  // unit is in the workshop with its project visit open).
   const [po, setPo] = useState<InquiryPo | undefined>(undefined)
 
   useEffect(() => setRecent(readRecent()), [])
@@ -478,8 +492,8 @@ export function EquipmentInquiryScreen({
       const signal = startDetailRequest()
       // Identity, `created_at` for the «جديدة» mark (migration 0129) and the
       // owner with its supplier for the facts; the state comes from
-      // `get_last_movement`, the rest from the movements.
-      const [equipmentResult, codeChangesResult, lastMovementResult] =
+      // `get_equipment_presence`, the rest from the movements.
+      const [equipmentResult, codeChangesResult, presenceResult] =
         await Promise.all([
           supabase
             .from('equipment')
@@ -498,34 +512,36 @@ export function EquipmentInquiryScreen({
             .order('id', { ascending: false })
             .limit(EQUIPMENT_CODE_CHANGES_LIMIT)
             .abortSignal(signal),
-          // wave 20: the latest movement across both contexts, for the state.
+          // Nested workshop stays: the open project and workshop visits.
           supabase
-            .rpc('get_last_movement', {
-              p_equipment_id: id,
-              p_movement_context: 'site',
-            })
+            .rpc('get_equipment_presence', { p_equipment_id: id })
             .abortSignal(signal),
         ])
       if (signal.aborted) return
       setDetailLoadedId(id)
       const row = equipmentResult.data as InquiryEquipmentRow | null
-      if (lastMovementResult.error) setInquiryState('error')
+      // A failed or malformed presence read is the page's error state, never
+      // a guessed state.
+      const presence = presenceResult.error
+        ? null
+        : parseEquipmentPresence(presenceResult.data)
+      if (!presence) setInquiryState('error')
       else {
-        const latest =
-          (
-            lastMovementResult.data as Array<{
-              movement_type: string | null
-              movement_context: string | null
-              workshop_purpose: string | null
-              recorded_at: string | null
-            }> | null
-          )?.[0] ?? null
         // Migration 0129: «جديدة» is the row's age, not "no movement"; the
         // header derives it from `created_at` next to the code.
-        const lastAt = latest?.recorded_at ? Date.parse(latest.recorded_at) : Number.NaN
+        const lastAt = presence.lastMovementAt
+          ? Date.parse(presence.lastMovementAt)
+          : Number.NaN
         setInquiryState({
-          state: equipmentStateFromMovement(latest),
+          state:
+            presence.state ??
+            equipmentStateFromPresence({
+              workshop_open: presence.workshopOpen,
+              workshop_purpose: presence.workshopPurpose,
+              site_open: presence.siteOpen,
+            }),
           lastMovementAt: Number.isFinite(lastAt) ? lastAt : null,
+          presence,
         })
       }
       setCodeChangesError(Boolean(codeChangesResult.error))
@@ -562,7 +578,11 @@ export function EquipmentInquiryScreen({
   const fetchMovements = useCallback(
     async (id: string, offset: number, append: boolean) => {
       if (append) setMovementsLoadingMore(true)
-      else setMovementsLoading(true)
+      else {
+        setMovementsLoading(true)
+        // A reload merges the open visits' rows again.
+        openRowsMergedFor.current = null
+      }
       setMovementsError(false)
       const signal = startMovementsRequest()
       const { data, error } = await supabase
@@ -580,7 +600,12 @@ export function EquipmentInquiryScreen({
         if (!append) setMovements([])
       } else {
         const rows = (data as MovementLogTimelineRow[] | null) ?? []
-        setMovements((prev) => (append ? [...prev, ...rows] : rows))
+        setMovements((prev) => {
+          if (!append) return rows
+          // A row merged in by id (the open visits) may come again.
+          const known = new Set(prev.map((row) => row.id))
+          return [...prev, ...rows.filter((row) => !known.has(row.id))]
+        })
         setHasMoreMovements(rows.length === MOVEMENTS_PAGE_SIZE)
         setMovementsOffset(offset + rows.length)
       }
@@ -598,7 +623,18 @@ export function EquipmentInquiryScreen({
       const range = inquiryYearRange(year, at)
       const start = new Date(range.startMs).toISOString()
       const end = new Date(range.endMs).toISOString()
-      const [inside, before, first] = await Promise.all([
+      const latestBefore = (context: 'site' | 'workshop') =>
+        supabase
+          .from('movement_log_search')
+          .select(TIMELINE_SELECT)
+          .eq('equipment_id', id)
+          .eq('movement_context', context)
+          .lt('recorded_at', start)
+          .order('recorded_at', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(1)
+          .abortSignal(signal)
+      const [inside, beforeSite, beforeWorkshop, first] = await Promise.all([
         supabase
           .from('movement_log_search')
           .select(TIMELINE_SELECT)
@@ -609,16 +645,11 @@ export function EquipmentInquiryScreen({
           .order('id', { ascending: true })
           .limit(YEAR_MOVEMENTS_LIMIT)
           .abortSignal(signal),
-        // The movement just before the window: an entry still open then.
-        supabase
-          .from('movement_log_search')
-          .select(TIMELINE_SELECT)
-          .eq('equipment_id', id)
-          .lt('recorded_at', start)
-          .order('recorded_at', { ascending: false })
-          .order('id', { ascending: false })
-          .limit(1)
-          .abortSignal(signal),
+        // The movement just before the window, PER CONTEXT (nested workshop
+        // stays): a project visit opened in an earlier year must not be lost
+        // behind a later workshop exit.
+        latestBefore('site'),
+        latestBefore('workshop'),
         // The unit's first movement, once per unit: counting starts there.
         withFirst
           ? supabase
@@ -638,19 +669,75 @@ export function EquipmentInquiryScreen({
         const firstAt = (first.data as { recorded_at: string }[] | null)?.[0]?.recorded_at
         setFirstMovementAt(firstAt && !first.error ? Date.parse(firstAt) : Number.NaN)
       }
-      if (inside.error || before.error) {
+      if (inside.error || beforeSite.error || beforeWorkshop.error) {
         setYearError(true)
         setYearMovements([])
         return
       }
       setYearError(false)
       setYearMovements([
-        ...((before.data as MovementLogTimelineRow[] | null) ?? []),
+        ...((beforeSite.data as MovementLogTimelineRow[] | null) ?? []),
+        ...((beforeWorkshop.data as MovementLogTimelineRow[] | null) ?? []),
         ...((inside.data as MovementLogTimelineRow[] | null) ?? []),
       ])
     },
     [startYearRequest],
   )
+
+  // --- The open visits' entries are always on the first page -----------
+  // The history is paged newest first; a project visit that stays open while
+  // the unit has many workshop stops would have its entry on a later page. The
+  // open project and workshop entries named by `get_equipment_presence` are
+  // fetched by id and merged when the first page does not hold them, so the
+  // open visit is always complete (a failed read is the movements error).
+
+  const openPresence =
+    inquiryState && inquiryState !== 'error' ? inquiryState.presence : null
+  useEffect(() => {
+    if (
+      !equipmentId ||
+      !openPresence ||
+      detailLoadedId !== equipmentId ||
+      movementsLoadedId !== equipmentId ||
+      movementsError
+    )
+      return
+    const missing = [openPresence.siteEntryId, openPresence.workshopEntryId].filter(
+      (id): id is string => Boolean(id) && !movements.some((row) => row.id === id),
+    )
+    if (missing.length === 0) return
+    const marker = `${equipmentId}:${missing.join(',')}`
+    if (openRowsMergedFor.current === marker) return
+    openRowsMergedFor.current = marker
+    const signal = startOpenRowsRequest()
+    void supabase
+      .from('movement_log_search')
+      .select(TIMELINE_SELECT)
+      .eq('equipment_id', equipmentId)
+      .in('id', missing)
+      .abortSignal(signal)
+      .then(({ data, error }) => {
+        if (signal.aborted) return
+        if (error) {
+          openRowsMergedFor.current = null
+          setMovementsError(true)
+          return
+        }
+        const rows = (data as MovementLogTimelineRow[] | null) ?? []
+        setMovements((prev) => {
+          const known = new Set(prev.map((row) => row.id))
+          return [...prev, ...rows.filter((row) => !known.has(row.id))]
+        })
+      })
+  }, [
+    equipmentId,
+    openPresence,
+    detailLoadedId,
+    movementsLoadedId,
+    movementsError,
+    movements,
+    startOpenRowsRequest,
+  ])
 
   // --- The PO of the open project visit (purchasing readers only) -------
 
@@ -803,12 +890,20 @@ export function EquipmentInquiryScreen({
     const days = inquiryYearDays(yearVisits, countFrom, now, selectedYear, sold)
     return {
       days,
+      // The open project visit that holds workshop stops, as a line under the
+      // strip (the history's visits: its entry and stops are always loaded).
+      openVisitLine: inquiryOpenVisitLine(
+        days,
+        visits,
+        groupWorkshopStops(visits).stopsByVisit,
+        now,
+      ),
       months: inquiryYearMonths(days),
       summary: summarizeInquiryYear(days),
       // The code changes of the year as thin markers («التحويلات»).
       markers: inquiryYearMarkers(codeChanges, days),
     }
-  }, [yearMovements, lang, countFrom, now, selectedYear, sold, codeChanges])
+  }, [yearMovements, visits, lang, countFrom, now, selectedYear, sold, codeChanges])
   // From this year back to the year counting starts in.
   const yearChoices = inquiryYearChoices(
     Number.isFinite(countFrom) ? saudiYear(countFrom) : null,
@@ -1084,7 +1179,13 @@ export function EquipmentInquiryScreen({
                     </Button>
                   </div>
                 </div>
-                <InquiryNow visits={visits} state={state} now={now} sold={sold} />
+                <InquiryNow
+                  visits={visits}
+                  state={state}
+                  presence={openPresence}
+                  now={now}
+                  sold={sold}
+                />
               </section>
 
               {(visits.length > 0 || sold) && (
@@ -1145,6 +1246,7 @@ export function EquipmentInquiryScreen({
                         days={year.days}
                         months={year.months}
                         markers={year.markers}
+                        openVisitLine={year.openVisitLine}
                         index={6}
                         onSelectVisit={selectVisit}
                       />
@@ -1176,7 +1278,9 @@ export function EquipmentInquiryScreen({
                   {/* The PO in a small card of its own under the facts
                       (owner 2026-10-27: «خليه في كرت مصغر يسار تحت بيانات
                       المعدة»). */}
-                  {po !== undefined && <InquiryPoCard po={po} index={7} />}
+                  {po !== undefined && openPresence?.siteOpen && (
+                    <InquiryPoCard po={po} index={7} />
+                  )}
                   {/* wave 17: admin only (the card renders nothing for any
                       other role and never requests the position then). */}
                   <EquipmentLocationCard

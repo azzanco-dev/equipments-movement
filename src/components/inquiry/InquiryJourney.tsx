@@ -16,6 +16,8 @@ import { formatDate } from '@/lib/dateFormat'
 import { formatElapsedDuration } from '@/lib/duration'
 import {
   buildTimelineItems,
+  groupWorkshopStops,
+  nestedWorkshopDays,
   visitDurationMs,
   type EquipmentVisit,
   type OutsideGap,
@@ -81,6 +83,76 @@ function MovementDay({
   )
 }
 
+/** A workshop stop inside a project visit's tile (nested workshop stays,
+ *  2026-11-14): a row in the stop's own state colour with its purpose, its
+ *  dates, who is responsible and how long it lasted. */
+function StopRow({
+  stop,
+  now,
+  highlighted,
+  onSelectMovement,
+}: {
+  stop: EquipmentVisit
+  now: number
+  highlighted: boolean
+  onSelectMovement: (id: string) => void
+}) {
+  const { t, lang } = useI18n()
+  const key = visitStateKey(stop)
+  const colors = INQUIRY_STATE_COLORS[key]
+  const duration = visitDurationMs(stop, now)
+  const entry = stop.entry
+  const exit = stop.exit
+  const owner = (entry ?? exit)?.supervisor_name
+  return (
+    <li
+      id={inquiryVisitAnchor(stop.key)}
+      className="flex scroll-mt-24 flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-xl px-3 py-2.5 transition-shadow"
+      style={{
+        backgroundColor: colors.fill,
+        boxShadow: highlighted ? `0 0 0 2px ${colors.stroke}` : undefined,
+      }}
+    >
+      <InquiryIconTile colors={colors} size={26}>
+        {inquiryStateIcon(key, 13)}
+      </InquiryIconTile>
+      <span className="text-[13px] font-bold">{t('workshopLocation')}</span>
+      <span
+        className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+        style={inquiryInnerFill(colors)}
+      >
+        {t(INQUIRY_STATE_LABEL[key])}
+      </span>
+      {stop.open && (
+        <span
+          className="rounded-full px-2 py-0.5 text-[11px] font-bold"
+          style={{ backgroundColor: colors.tint, color: colors.stroke }}
+        >
+          {t('inquiryStopOpenNow')}
+        </span>
+      )}
+      <span className="text-xs">
+        {entry ? <MovementDay movement={entry} onSelectMovement={onSelectMovement} /> : '—'}
+        {' ← '}
+        {exit ? (
+          <MovementDay movement={exit} onSelectMovement={onSelectMovement} />
+        ) : (
+          <span className="text-muted">{t('inquiryStopUntilNow')}</span>
+        )}
+      </span>
+      {owner && (
+        <span className="text-xs text-muted">
+          {'· '}
+          {t('inquiryMovementOwner')}: {owner}
+        </span>
+      )}
+      <span className="ms-auto text-[13px] font-bold">
+        {duration !== null ? formatElapsedDuration(duration, t, lang) : '—'}
+      </span>
+    </li>
+  )
+}
+
 /**
  * One stay as a tile in its state's colour (owner: «تلون المربعات بحيث كل
  * لون يرمز لحالة معينة»), everything about it in view without a click
@@ -91,14 +163,20 @@ function MovementDay({
  */
 function StayTile({
   visit,
+  stops = [],
   now,
   highlighted,
+  highlightedKey = null,
   onSelectMovement,
 }: {
   visit: EquipmentVisit
+  /** The workshop stops that started inside this project visit, newest first. */
+  stops?: readonly EquipmentVisit[]
   now: number
   /** Ringed when the 12-month strip opened it. */
   highlighted: boolean
+  /** The stop the strip opened, if it is one of `stops`. */
+  highlightedKey?: string | null
   onSelectMovement: (id: string) => void
 }) {
   const { t, lang } = useI18n()
@@ -114,6 +192,7 @@ function StayTile({
   const company = site ? (entry ?? exit)?.company_name : null
   const entryDriver = entry?.driver_name || null
   const exitDriver = exit?.driver_name || null
+  const stopDays = site && stops.length > 0 ? nestedWorkshopDays(visit, stops, now) : 0
 
   return (
     <article
@@ -154,6 +233,17 @@ function StayTile({
           <p className="text-[11px] text-muted">
             {visit.open ? t('inquiryUntilNow') : t('inquiryDuration')}
           </p>
+          {stopDays > 0 && (
+            <p
+              className="text-[11px] font-semibold"
+              style={{ color: INQUIRY_STATE_COLORS.maintenance.stroke }}
+            >
+              {t(stopDays === 1 ? 'inquiryNestedWorkshopDaysOne' : 'inquiryNestedWorkshopDays').replace(
+                '{count}',
+                String(stopDays),
+              )}
+            </p>
+          )}
         </div>
       </div>
 
@@ -174,7 +264,10 @@ function StayTile({
               {site && <ExitPurposeBadge purpose={exit.exit_purpose} />}
             </span>
           ) : visit.open ? (
-            <span className="text-muted">{t('inquiryStillInside')}</span>
+            // An open project visit may have its unit in the workshop.
+            <span className="text-muted">
+              {t(site ? 'inquiryVisitStillOpen' : 'inquiryStillInside')}
+            </span>
           ) : (
             '—'
           )}
@@ -207,6 +300,25 @@ function StayTile({
           </StayFact>
         )}
       </dl>
+
+      {site && stops.length > 0 && (
+        <div className="mt-3">
+          <p className="mb-1.5 text-xs font-semibold text-muted">
+            {t('inquiryWorkshopStops').replace('{count}', String(stops.length))}
+          </p>
+          <ul className="space-y-2">
+            {stops.map((stop) => (
+              <StopRow
+                key={stop.key}
+                stop={stop}
+                now={now}
+                highlighted={highlightedKey === stop.key}
+                onSelectMovement={onSelectMovement}
+              />
+            ))}
+          </ul>
+        </div>
+      )}
     </article>
   )
 }
@@ -335,7 +447,14 @@ export function InquiryJourney({
   footer?: ReactNode
 }) {
   const { t } = useI18n()
-  const items = inquiryJourneyItems(buildTimelineItems(visits, now), codeChanges, sold)
+  // A workshop stop that started inside a project visit is shown in that
+  // visit's tile, not as an item of its own (nested workshop stays).
+  const { nestedKeys, stopsByVisit } = groupWorkshopStops(visits)
+  const items = inquiryJourneyItems(
+    buildTimelineItems(visits, now, nestedKeys),
+    codeChanges,
+    sold,
+  )
   return (
     <section className={cn(INQUIRY_SURFACE, 'inq-rise p-4')} style={inquiryRise(index)}>
       <div className="mb-4 flex items-center justify-between gap-2">
@@ -378,8 +497,10 @@ export function InquiryJourney({
                   </span>
                   <StayTile
                     visit={item.visit}
+                    stops={stopsByVisit.get(item.visit.key)}
                     now={now}
                     highlighted={highlightedKey === item.visit.key}
+                    highlightedKey={highlightedKey}
                     onSelectMovement={onSelectMovement}
                   />
                 </>

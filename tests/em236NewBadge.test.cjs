@@ -251,7 +251,10 @@ test('nothing else is recreated: the fleet RPC reads is_new from the view', () =
     functionBlock(migration('0127'), 'get_admin_fleet_equipment'),
   )
   assert.match(fleet, /s\.is_new\n  FROM public\.admin_equipment_state s/)
-  // 0129 is the only migration after 0125 that defines is_new.
+  // 0129 is the only migration after 0125 that defines is_new. 0195 (nested
+  // workshop stays) re-creates admin_equipment_state with appended columns
+  // and carries the 0129 is_new expression over verbatim.
+  const NESTED_0195 = '20261114120000_0195_nested_workshop_visits.sql'
   const number = (file) => Number((file.match(/_(\d{4})_/) ?? [])[1])
   const later = fs
     .readdirSync(MIGRATIONS)
@@ -259,6 +262,15 @@ test('nothing else is recreated: the fleet RPC reads is_new from the view', () =
   assert.ok(later.length >= 3, 'the migrations after 0125 are read')
   for (const file of later) {
     const text = code(fs.readFileSync(path.join(MIGRATIONS, file), 'utf8'))
+    if (file === NESTED_0195) {
+      const defs = text.match(/[^\n]*AS is_new\b/g) ?? []
+      assert.deepEqual(
+        defs.map((line) => line.trim()),
+        ['(e.created_at >= now() - public.equipment_new_window()) AS is_new'],
+        `${file} carries the 0129 is_new over`,
+      )
+      continue
+    }
     assert.ok(!/AS is_new\b/.test(text), `${file} does not define is_new`)
   }
 })

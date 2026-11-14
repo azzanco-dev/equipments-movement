@@ -548,6 +548,17 @@ export interface FleetEquipmentRow {
    *  (`admin_equipment_state.is_new`; 0125 meant "never moved"). `false`
    *  against an older database that does not return `is_new`. */
   isNew: boolean
+  /**
+   * The OPEN project visit's company and project (nested workshop stays,
+   * 2026-11-14; the four trailing columns of `get_admin_fleet_equipment`):
+   * set for a unit in the workshop while its project visit is open, so the
+   * table can say «تابعة لمشروع …». `null` when no project visit is open and
+   * against an older database that does not return the columns.
+   */
+  siteCompanyNameAr: string | null
+  siteCompanyNameEn: string | null
+  siteProjectNameAr: string | null
+  siteProjectNameEn: string | null
 }
 
 /** A boolean column; anything but `true` is `false`. */
@@ -614,6 +625,10 @@ export function parseFleetEquipmentRows(source: unknown): FleetEquipmentRow[] {
       // An unknown value is dropped rather than rendered as a badge.
       exitPurpose: exitPurposeOrNull(optionalText(row, 'last_exit_purpose')),
       isNew: flag(row, 'is_new'),
+      siteCompanyNameAr: optionalText(row, 'site_company_name_ar'),
+      siteCompanyNameEn: optionalText(row, 'site_company_name_en'),
+      siteProjectNameAr: optionalText(row, 'site_project_name_ar'),
+      siteProjectNameEn: optionalText(row, 'site_project_name_en'),
     }))
     .filter((row) => row.id !== '')
 }

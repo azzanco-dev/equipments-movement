@@ -413,14 +413,33 @@ export const translations = {
     noMovementHistoryDesc: 'لم تسجل اي حركة لهذه المعدة حتى الان.',
     entryAllowed: 'يمكن تسجيل الدخول',
     exitAllowed: 'يمكن تسجيل الخروج',
-    entryBlockedMsg: 'لا يمكن تسجيل دخول جديد لأن آخر حركة للمعدة كانت دخول.',
+    entryBlockedMsg:
+      'لا يمكن تسجيل دخول جديد لان للمعدة زيارة مشروع مفتوحة لم يسجل خروجها.',
+    entryBlockedInWorkshopMsg:
+      'المعدة داخل الورشة حاليا. سجل خروجها من الورشة اولا، ثم سجل دخولها للمشروع.',
+    workshopEntryBlockedMsg:
+      'لا يمكن تسجيل دخول جديد للورشة لان المعدة داخل الورشة حاليا.',
+    workshopExitBlockedMsg:
+      'لا يمكن تسجيل خروج من الورشة لان المعدة ليست داخل الورشة حاليا.',
+    movementTiedToProject: 'تابعة لمشروع {project}',
+    movementTiedToProjectUnnamed: 'تابعة لمشروع',
+    workshopEntryNestedNotice:
+      'المعدة تابعة لمشروع {project} (الفورمان: {foreman}). زيارة المشروع تبقى قائمة ولا تحتاج تسجيل خروج، وسيصل الفورمان اشعار بدخولها الورشة.',
+    workshopEntryNestedNoticeNoForeman:
+      'المعدة تابعة لمشروع {project}. زيارة المشروع تبقى قائمة ولا تحتاج تسجيل خروج، وسيصل الفورمان اشعار بدخولها الورشة.',
+    workshopEntryNestedNoticeNoProject:
+      'المعدة تابعة لمشروع (الفورمان: {foreman}). زيارة المشروع تبقى قائمة ولا تحتاج تسجيل خروج، وسيصل الفورمان اشعار بدخولها الورشة.',
+    workshopEntryNestedNoticeBare:
+      'المعدة تابعة لمشروع. زيارة المشروع تبقى قائمة ولا تحتاج تسجيل خروج، وسيصل الفورمان اشعار بدخولها الورشة.',
+    siteExitWhileInWorkshopNotice:
+      'المعدة داخل الورشة حاليا. تسجيل الخروج ينهي زيارة المشروع فقط، وتبقى المعدة في الورشة.',
     exitBlockedMsg: 'لا يمكن تسجيل خروج لأن المعدة ليست داخل مشروع حاليًا.',
     workshopExitOwner:
       'يمكن تسجيل خروج المعدة فقط بواسطة المستخدم الذي سجل دخولها.',
     siteExitNotEntryOwner:
       'لا يمكن تسجيل الخروج: الدخول سجله مستخدم اخر. يسجل الخروج صاحب الدخول او المدير فقط.',
     siteExitEquipmentInWorkshop:
-      'لا يمكن تسجيل الخروج: المعدة داخل الورشة حاليا، وخروجها يسجل من الورشة.',
+      'لا يمكن تسجيل الخروج من المشروع: لا توجد زيارة مشروع مفتوحة لهذه المعدة، وهي داخل الورشة حاليا.',
     siteExitOwnEquipmentOnly:
       'تظهر هنا المعدات التي سجلت دخولها انت فقط وما زالت داخل المشروع.',
     exitNoPreviousMsg: 'لا يمكن تسجيل خروج لأنه لا توجد حركة سابقة للمعدة.',
@@ -854,7 +873,7 @@ export const translations = {
     userDeleteHasRecords:
       'لا يمكن حذف المستخدم لان له حركات او صور او تغييرات سائقين مسجلة باسمه.',
     workshopExitEquipmentOnSite:
-      'لا يمكن تسجيل الخروج: المعدة داخل مشروع حاليا، وخروجها يسجله من سجل دخولها او المدير.',
+      'لا يمكن تسجيل الخروج من الورشة: المعدة ليست داخل الورشة، وهي داخل مشروع حاليا.',
     // wave-8-security — end
     // wave-9-greeting — start
     homeGreeting: 'اهلاً، {name}',
@@ -881,41 +900,6 @@ export const translations = {
     adminAttentionAvailableAlazaniHint: 'معدات العزاني المتاحة الان خارج المشاريع والورشة',
     // wave-9-greeting — end
     // wave-9-notices — start
-    notifyForemanTitle: 'المعدة ما زالت مسجلة داخل مشروع',
-    notifyForemanExplain:
-      'لا يمكن تسجيل دخول جديد لها حتى يسجل الفورمان خروجها من المشروع. يمكنك ابلاغه برسالة واتساب.',
-    notifyForemanForemanLabel: 'الفورمان',
-    notifyForemanFallbackName: 'الفورمان',
-    notifyForeman: 'ابلاغ الفورمان',
-    refreshEquipmentStatus: 'تحديث الحالة',
-    notifyForemanRefreshHint:
-      'بعد ان يسجل الفورمان خروج المعدة اضغط "تحديث الحالة" لتتمكن من تسجيل دخولها.',
-    notifyForemanSent: 'تم ابلاغ {name} عبر واتساب',
-    notifyForemanNotSent:
-      'تعذر ارسال رسالة واتساب الى {name}. حاول مرة اخرى او تواصل معه مباشرة.',
-    notifyForemanOpenWhatsapp: 'فتح واتساب',
-    notifyForemanNoMobile:
-      'رقم جوال {name} غير مسجل. تواصل معه مباشرة او اطلب من المدير اضافة رقمه.',
-    notifyForemanErrNotOnSite:
-      'المعدة لم تعد مسجلة داخل مشروع. حدث حالتها ثم سجل دخولها.',
-    notifyForemanErrRecentlySent:
-      'تم ابلاغ الفورمان عن هذه المعدة قبل اقل من 10 دقائق. انتظر قليلا ثم حاول مرة اخرى.',
-    notifyForemanErrForbidden: 'ليس لديك صلاحية ابلاغ الفورمان.',
-    notifyForemanErrInvalid:
-      'تعذر تحديد المعدة. اخترها من جديد ثم حاول مرة اخرى.',
-    notifyForemanErrFailed: 'تعذر تنفيذ الابلاغ. حاول مرة اخرى.',
-    notifyForemanPrevious: 'تم الابلاغ {ago} بواسطة {name}',
-    notifyForemanPreviousNoName: 'تم الابلاغ {ago}',
-    notifyForemanPreviousFailed:
-      'اخر محاولة ابلاغ كانت {ago} بواسطة {name} ولم تصل الرسالة',
-    notifyForemanPreviousFailedNoName:
-      'اخر محاولة ابلاغ كانت {ago} ولم تصل الرسالة',
-    notifyForemanPreviousLoadError:
-      'تعذر التحقق من الابلاغات السابقة لهذه المعدة. يمكنك الابلاغ على اي حال.',
-    noticeAgoNow: 'قبل لحظات',
-    noticeAgoMinutes: 'قبل {count} دقيقة',
-    noticeAgoHours: 'قبل {count} ساعة',
-    noticeAgoDays: 'قبل {count} يوم',
     userMobileHint:
       'يستخدم لاشعارات واتساب. يكتب بصيغة 05XXXXXXXX او +9665XXXXXXXX.',
     userMobileInvalid:
@@ -1704,6 +1688,19 @@ export const translations = {
     inquiryLooking: 'جار البحث عن',
     inquiryNow: 'الوضع الحالي',
     inquiryOpenStay: 'قائمة',
+    // Nested workshop stays (2026-11-14).
+    inquiryNestedUnder: 'تابعة لمشروع',
+    inquiryOpenVisit: 'زيارة قائمة',
+    inquiryVisitStillOpen: 'الزيارة قائمة',
+    inquiryReturnedFromWorkshop: 'رجعت من الورشة منذ {words} · {purpose} {duration}',
+    inquiryYearOpenVisitCaption: 'زيارة واحدة قائمة لمشروع {project}: {total} يوم، منها {workshop} في الورشة',
+    inquiryWorkshopStops: 'وقفات الورشة داخل هذه الزيارة ({count})',
+    inquiryStopOpenNow: 'داخل الان',
+    inquiryStopUntilNow: 'الان',
+    inquiryNestedWorkshopDays: 'منها {count} ايام في الورشة',
+    inquiryNestedWorkshopDaysOne: 'منها يوم في الورشة',
+    nestedUnderProjectLine: 'تابعة لمشروع {project}',
+    siteUnitInWorkshopBadge: 'في الورشة',
     inquiryInside: 'داخل',
     inquiryInWorkshop: 'في الورشة',
     inquiryLastRecordedExit: 'اخر حركة مسجلة: خروج من {place}.',
@@ -3189,7 +3186,25 @@ export const translations = {
     entryAllowed: 'Entry is allowed',
     exitAllowed: 'Exit is allowed',
     entryBlockedMsg:
-      "Cannot register a new entry because the equipment's last movement was an entry.",
+      'Cannot register a new entry because the equipment has an open project visit without an exit.',
+    entryBlockedInWorkshopMsg:
+      'The equipment is currently inside the workshop. Record its exit from the workshop first, then its entry to the project.',
+    workshopEntryBlockedMsg:
+      'Cannot register a workshop entry because the equipment is already inside the workshop.',
+    workshopExitBlockedMsg:
+      'Cannot register a workshop exit because the equipment is not currently inside the workshop.',
+    movementTiedToProject: 'Belongs to project {project}',
+    movementTiedToProjectUnnamed: 'Belongs to a project',
+    workshopEntryNestedNotice:
+      'The equipment belongs to project {project} (foreman: {foreman}). The project visit stays open and needs no exit; the foreman will get a notice that it entered the workshop.',
+    workshopEntryNestedNoticeNoForeman:
+      'The equipment belongs to project {project}. The project visit stays open and needs no exit; the foreman will get a notice that it entered the workshop.',
+    workshopEntryNestedNoticeNoProject:
+      'The equipment belongs to a project (foreman: {foreman}). The project visit stays open and needs no exit; the foreman will get a notice that it entered the workshop.',
+    workshopEntryNestedNoticeBare:
+      'The equipment belongs to a project. The project visit stays open and needs no exit; the foreman will get a notice that it entered the workshop.',
+    siteExitWhileInWorkshopNotice:
+      'The equipment is currently inside the workshop. This exit ends the project visit only; the equipment stays in the workshop.',
     exitBlockedMsg:
       'Cannot register an exit because the equipment is not currently inside a project.',
     workshopExitOwner:
@@ -3197,7 +3212,7 @@ export const translations = {
     siteExitNotEntryOwner:
       'This exit cannot be registered: another user registered the entry. Only that user or an admin can register the exit.',
     siteExitEquipmentInWorkshop:
-      'This exit cannot be registered: the equipment is currently inside the workshop and must be released from there.',
+      'This project exit cannot be registered: the equipment has no open project visit and is currently inside the workshop.',
     siteExitOwnEquipmentOnly:
       'This list shows only equipment you registered the entry for and that is still inside the project.',
     exitNoPreviousMsg:
@@ -3630,7 +3645,7 @@ export const translations = {
     userDeleteHasRecords:
       'This user cannot be deleted because movements, photos or driver changes are recorded under their name.',
     workshopExitEquipmentOnSite:
-      'This exit cannot be registered: the equipment is currently inside a project, and its exit is registered by the user who registered its entry or by an admin.',
+      'This workshop exit cannot be registered: the equipment is not inside the workshop and is currently inside a project.',
     // wave-8-security — end
     // wave-9-greeting — start
     homeGreeting: 'Welcome, {name}',
@@ -3655,42 +3670,6 @@ export const translations = {
     adminAttentionAvailableAlazaniHint: 'Al-Azani units available now, outside projects and the workshop',
     // wave-9-greeting — end
     // wave-9-notices — start
-    notifyForemanTitle: 'The equipment is still recorded inside a project',
-    notifyForemanExplain:
-      'A new entry cannot be registered until the foreman records its exit from the project. You can notify the foreman by WhatsApp.',
-    notifyForemanForemanLabel: 'Foreman',
-    notifyForemanFallbackName: 'the foreman',
-    notifyForeman: 'Notify the foreman',
-    refreshEquipmentStatus: 'Refresh status',
-    notifyForemanRefreshHint:
-      'Once the foreman records the exit from the project, press "Refresh status" to register the entry.',
-    notifyForemanSent: '{name} was notified by WhatsApp',
-    notifyForemanNotSent:
-      'The WhatsApp message to {name} could not be sent. Try again or contact them directly.',
-    notifyForemanOpenWhatsapp: 'Open WhatsApp',
-    notifyForemanNoMobile:
-      'No mobile number is on file for {name}. Contact them directly or ask the admin to add it.',
-    notifyForemanErrNotOnSite:
-      'The equipment is no longer recorded inside a project. Refresh its status, then register its entry.',
-    notifyForemanErrRecentlySent:
-      'The foreman was notified about this equipment less than 10 minutes ago. Wait a little, then try again.',
-    notifyForemanErrForbidden:
-      'You do not have permission to notify the foreman.',
-    notifyForemanErrInvalid:
-      'The equipment could not be identified. Select it again, then retry.',
-    notifyForemanErrFailed: 'The notice could not be processed. Try again.',
-    notifyForemanPrevious: 'Notified {ago} by {name}',
-    notifyForemanPreviousNoName: 'Notified {ago}',
-    notifyForemanPreviousFailed:
-      'The last notice attempt, {ago} by {name}, was not delivered',
-    notifyForemanPreviousFailedNoName:
-      'The last notice attempt, {ago}, was not delivered',
-    notifyForemanPreviousLoadError:
-      'Earlier notices for this equipment could not be checked. You can still notify the foreman.',
-    noticeAgoNow: 'moments ago',
-    noticeAgoMinutes: '{count} min ago',
-    noticeAgoHours: '{count} h ago',
-    noticeAgoDays: '{count} d ago',
     userMobileHint:
       'Used for WhatsApp notices. Write it as 05XXXXXXXX or +9665XXXXXXXX.',
     userMobileInvalid:
@@ -4498,6 +4477,19 @@ export const translations = {
     inquiryLooking: 'Searching for',
     inquiryNow: 'Current status',
     inquiryOpenStay: 'Ongoing',
+    // Nested workshop stays (2026-11-14).
+    inquiryNestedUnder: 'Part of project',
+    inquiryOpenVisit: 'Open visit',
+    inquiryVisitStillOpen: 'Visit is open',
+    inquiryReturnedFromWorkshop: 'Back from the workshop {words} ago · {purpose} {duration}',
+    inquiryYearOpenVisitCaption: 'One open visit to project {project}: {total} days, {workshop} of them in the workshop',
+    inquiryWorkshopStops: 'Workshop stops in this visit ({count})',
+    inquiryStopOpenNow: 'Inside now',
+    inquiryStopUntilNow: 'now',
+    inquiryNestedWorkshopDays: '{count} days of it in the workshop',
+    inquiryNestedWorkshopDaysOne: '1 day of it in the workshop',
+    nestedUnderProjectLine: 'Part of project {project}',
+    siteUnitInWorkshopBadge: 'In the workshop',
     inquiryInside: 'Inside',
     inquiryInWorkshop: 'In the workshop',
     inquiryLastRecordedExit: 'Last recorded movement: exit from {place}.',

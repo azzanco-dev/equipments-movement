@@ -101,7 +101,10 @@ test('the fleet tables share one code column and have no local badge', () => {
   )
   // The inside-sites and workshop tables build on the same column.
   assert.match(source, /const insideColumns = \[codeColumn,/)
-  assert.match(source, /const workshopColumns = \[\s*codeColumn,/)
+  // The workshop one adds the «تابعة لمشروع» line under the same column
+  // (nested workshop stays, 2026-11-14).
+  assert.match(source, /const workshopCodeColumn: DataTableColumn<FleetEquipmentRow> = \{\s*\.\.\.codeColumn,/)
+  assert.match(source, /const workshopColumns = \[\s*workshopCodeColumn,/)
 })
 
 test('the inquiry no longer carries isNew in its state object', () => {
@@ -110,7 +113,7 @@ test('the inquiry no longer carries isNew in its state object', () => {
   // instant for the «مباعة» state; still no «جديدة» in it.
   assert.match(
     source,
-    /type InquiryState =\s+\| \{\s+state: EquipmentState\s+(?:\/\*\*[\s\S]*?\*\/\s+)?lastMovementAt: number \| null\s+\}\s+\| 'error'\s+\| null/,
+    /type InquiryState =\s+\| \{\s+state: EquipmentState\s+(?:\/\*\*[\s\S]*?\*\/\s+)?lastMovementAt: number \| null\s+(?:\/\*\*[\s\S]*?\*\/\s+)?presence: EquipmentPresence\s+\}\s+\| 'error'\s+\| null/,
   )
   assert.ok(!/isNew: isEquipmentNew/.test(source))
   assert.match(

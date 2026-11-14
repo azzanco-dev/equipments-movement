@@ -462,6 +462,10 @@ test('no later migration redefines the 0133 objects', () => {
   // every caller without movements.photos.delete_any; tests/
   // permissionFixes0158.test.cjs pins that carry-over.
   const DELETE_POLICY_0158 = '20261028140000_0158_permission_scope_fixes.sql'
+  // 0195 (nested workshop stays) re-creates admin_delete_movement with the
+  // neighbours taken per context; the 0133 photo_url cleanup rule is carried
+  // over verbatim, pinned below and in tests/nestedWorkshop0195.test.cjs.
+  const DELETE_MOVEMENT_0195 = '20261114120000_0195_nested_workshop_visits.sql'
   for (const file of later) {
     const text = read('supabase', 'migrations', file)
     assert.doesNotMatch(
@@ -473,9 +477,22 @@ test('no later migration redefines the 0133 objects', () => {
     )
     assert.doesNotMatch(
       text,
-      /FUNCTION public\.(?:admin_delete_movement|enforce_movement_photo_url|enforce_pending_photo_batch_shape|protect_pending_photo_batch_identity)\(/,
+      file === DELETE_MOVEMENT_0195
+        ? /FUNCTION public\.(?:enforce_movement_photo_url|enforce_pending_photo_batch_shape|protect_pending_photo_batch_identity)\(/
+        : /FUNCTION public\.(?:admin_delete_movement|enforce_movement_photo_url|enforce_pending_photo_batch_shape|protect_pending_photo_batch_identity)\(/,
       `${file} redefines a 0133 function`,
     )
+    if (file === DELETE_MOVEMENT_0195) {
+      // The legacy photo_url is still handed to the cleanup only from this
+      // movement's own folder.
+      for (const piece of [
+        "split_part(btrim(v_log.photo_url), '/', 1) = v_log.supervisor_id::text",
+        "split_part(btrim(v_log.photo_url), '/', 2) = p_log_id::text",
+        "PERFORM set_config('app.movement_delete', p_log_id::text, true);",
+      ]) {
+        assert.ok(text.includes(piece), `${file}: ${piece}`)
+      }
+    }
     assert.doesNotMatch(
       text,
       /TRIGGER (?:enforce_movement_photo_url|enforce_pending_photo_batch_shape|protect_pending_photo_batch_identity)\b/,

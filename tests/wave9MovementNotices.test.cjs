@@ -551,12 +551,18 @@ test('the number normaliser produces the international form or null', () => {
   assert.equal(waMeUrl(null, 'x'), null)
 })
 
-test('the three templates are fixed, short, bilingual and follow the Arabic rule', () => {
+test('the five templates are fixed, short, bilingual and follow the Arabic rule', () => {
   const { MOVEMENT_NOTICE_KINDS, movementNoticeMessage, isMovementNoticeKind } =
     createLoader()('movementNoticeMessages')
   assert.deepEqual(
     [...MOVEMENT_NOTICE_KINDS],
-    ['workshop_arrival', 'site_exit', 'workshop_exit'],
+    [
+      'workshop_arrival',
+      'site_exit',
+      'workshop_exit',
+      'workshop_entry',
+      'workshop_return',
+    ],
   )
   assert.equal(isMovementNoticeKind('site_exit'), true)
   assert.equal(isMovementNoticeKind('other'), false)
@@ -598,6 +604,28 @@ test('the three templates are fixed, short, bilingual and follow the Arabic rule
     assert.ok(!message.includes('PROJECT'))
     assert.ok(!message.includes('OFFICER'))
   }
+  // Nested workshop stays (2026-11-14): the foreman of the OPEN project visit
+  // is told his visit stays open (workshop_entry) or that the unit is back in
+  // his project (workshop_return); the project is named in each language, and
+  // no notice carries a link or the officer's name.
+  const entered = movementNoticeMessage('workshop_entry', facts)
+  assert.ok(entered.includes('زيارتها في مشروع PROJECT-AR تبقى قائمة'))
+  assert.ok(entered.includes('ولا تحتاج تسجيل خروج'))
+  assert.ok(entered.includes('Its visit in project PROJECT-EN stays open'))
+  const returned = movementNoticeMessage('workshop_return', facts)
+  assert.ok(returned.includes('وعادت الى مشروع PROJECT-AR'))
+  assert.ok(returned.includes('لا تحتاج تسجيل دخول جديد'))
+  assert.ok(returned.includes('back in project PROJECT-EN'))
+  for (const message of [entered, returned]) {
+    assert.ok(!message.includes('OFFICER'))
+    assert.ok(!message.includes('COMPANY'))
+  }
+  // Without a project name the sentences still read.
+  for (const kind of ['workshop_entry', 'workshop_return']) {
+    const bare = movementNoticeMessage(kind, { equipmentCode: 'TK-104' })
+    assert.match(bare, /المشروع/)
+    assert.ok(!/undefined|null/.test(bare))
+  }
 })
 
 test('the templates tolerate missing facts and cannot be broken by stored text', () => {
@@ -624,27 +652,6 @@ test('the templates tolerate missing facts and cannot be broken by stored text',
   assert.equal(hostile.split('\n\n').length, 2)
   assert.ok(!hostile.includes('IGNORE\n'))
   assert.ok(hostile.length < 1000)
-})
-
-test('database codes map to safe API codes and statuses', () => {
-  const { noticeRequestErrorCode, noticeRequestErrorStatus } = createLoader()(
-    'movementNoticeErrors',
-  )
-  for (const [message, expected, status] of [
-    [
-      'equipment_not_on_site\nHINT: The equipment has no open site entry.',
-      'not_on_site',
-      409,
-    ],
-    ['notice_recently_sent', 'recently_sent', 429],
-    ['notice_role_required', 'forbidden', 403],
-    ['equipment_not_found', 'invalid', 400],
-    ['relation "secret" does not exist', 'failed', 500],
-    [null, 'failed', 500],
-  ]) {
-    assert.equal(noticeRequestErrorCode(message), expected)
-    assert.equal(noticeRequestErrorStatus(expected), status)
-  }
 })
 
 // --- The UltraMsg sender -----------------------------------------------------
@@ -985,9 +992,9 @@ test('the automatic notice never throws, whatever fails', async () => {
   {
     const { load, calls, logs } = gateway({ respond: () => jsonResponse({}) })
     const supabase = fakeSupabase({
-      prepare_movement_exit_notice: { data: [], error: null },
+      prepare_movement_notice: { data: [], error: null },
     })
-    await load('server/movementNotices').sendMovementExitNotice(supabase, 'm-1')
+    await load('server/movementNotices').sendMovementNotice(supabase, 'm-1')
     assert.equal(supabase.rpcCalls.length, 1)
     assert.deepEqual({ ...supabase.rpcCalls[0].args }, { p_movement_id: 'm-1' })
     assert.equal(calls.length, 0)
@@ -996,21 +1003,21 @@ test('the automatic notice never throws, whatever fails', async () => {
   // The database refuses, the client throws, the completion throws.
   for (const results of [
     {
-      prepare_movement_exit_notice: {
+      prepare_movement_notice: {
         data: null,
         error: { message: `secret ${TOKEN}` },
       },
     },
-    { prepare_movement_exit_notice: new Error(`boom ${TOKEN}`) },
+    { prepare_movement_notice: new Error(`boom ${TOKEN}`) },
     {
-      prepare_movement_exit_notice: {
+      prepare_movement_notice: {
         data: [noticeRow({ notice_kind: 'site_exit' })],
         error: null,
       },
       complete_movement_notice: new Error(`boom ${TOKEN}`),
     },
     {
-      prepare_movement_exit_notice: {
+      prepare_movement_notice: {
         data: [noticeRow({ notice_kind: 'not_a_kind' })],
         error: null,
       },
@@ -1023,7 +1030,7 @@ test('the automatic notice never throws, whatever fails', async () => {
     })
     const supabase = fakeSupabase(results)
     await assert.doesNotReject(
-      load('server/movementNotices').sendMovementExitNotice(supabase, 'm-1'),
+      load('server/movementNotices').sendMovementNotice(supabase, 'm-1'),
     )
     assertNothingSensitive(logs)
   }
@@ -1049,27 +1056,28 @@ test('the orchestration never logs a raw error, a number or a text', () => {
 
 // --- The API routes ----------------------------------------------------------
 
-test('the movement route schedules the exit notice with after(), without awaiting it', () => {
+test('the movement route schedules the notice with after(), without awaiting it', () => {
   const route = read('app', 'api', 'movements', 'route.ts')
   assert.match(route, /import \{ after, NextResponse \} from 'next\/server'/)
   assert.match(
     route,
-    /import \{ sendMovementExitNotice \} from '@\/lib\/server\/movementNotices'/,
+    /import \{ sendMovementNotice \} from '@\/lib\/server\/movementNotices'/,
   )
+  // Nested workshop stays: every movement except a project ENTRY.
   assert.match(
     route,
-    /if \(movementType === 'exit'\) \{\s+const savedMovementId: string = insertedLog\.id\s+try \{\s+after\(\(\) => sendMovementExitNotice\(supabase, savedMovementId\)\)\s+\} catch \{/,
+    /if \(!isSiteEntry\) \{\s+const savedMovementId: string = insertedLog\.id\s+try \{\s+after\(\(\) => sendMovementNotice\(supabase, savedMovementId\)\)\s+\} catch \{/,
   )
-  assert.ok(!/await sendMovementExitNotice/.test(route))
+  assert.ok(!/await sendMovementNotice/.test(route))
   assert.ok(!/await after\(/.test(route))
   // Scheduled only once the row exists, and before any photo work that may
   // return early.
   const insertFailedAt = route.indexOf("console.error('Movement insert failed'")
-  const scheduledAt = route.indexOf('after(() => sendMovementExitNotice')
+  const scheduledAt = route.indexOf('after(() => sendMovementNotice')
   const photosAt = route.indexOf('if (pendingPaths.length) {')
   assert.ok(insertFailedAt > 0 && scheduledAt > insertFailedAt)
   assert.ok(photosAt > scheduledAt)
-  assert.equal((route.match(/sendMovementExitNotice\(/g) ?? []).length, 1)
+  assert.equal((route.match(/sendMovementNotice\(/g) ?? []).length, 1)
   // Next.js really exports after().
   assert.match(
     read('node_modules', 'next', 'server.d.ts'),
@@ -1077,62 +1085,24 @@ test('the movement route schedules the exit notice with after(), without awaitin
   )
 })
 
-test('the workshop-arrival route authenticates, sends no recipient and hides raw errors', () => {
-  const route = read(
-    'app',
-    'api',
-    'notifications',
-    'workshop-arrival',
-    'route.ts',
-  )
-  // wave 24: the shared check (the caller's token, has_permission(), fail
-  // closed) requires «ابلاغ الفورمان» = movements.notify_foreman before the
-  // database function re-checks it.
-  assert.match(
-    route,
-    /const access = await requirePermission\(\s*request,\s*'movements\.notify_foreman',?\s*\)/,
-  )
-  assert.match(
-    route,
-    /if \(!access\.ok\) \{\s+return NextResponse\.json\(\s+\{ error: access\.error \},\s+\{ status: access\.error === 'unauthorized' \? 401 : 403 \},\s+\)/,
-  )
+test('«ابلاغ الفورمان» is gone: no route, no panel, no request helper', () => {
   assert.ok(
-    route.indexOf('requirePermission(') <
-      route.indexOf("'request_workshop_arrival_notice'"),
+    !fs.existsSync(
+      path.join(root, 'app', 'api', 'notifications', 'workshop-arrival', 'route.ts'),
+    ),
   )
-  assert.ok(!/SERVICE_ROLE|is_admin|requireAdmin|createClient/i.test(route))
-  // The only thing forwarded to the database is the equipment id.
+  for (const gone of [
+    ['src', 'components', 'movement', 'NotifyForemanPanel.tsx'],
+    ['src', 'lib', 'workshopArrivalNotice.ts'],
+    ['src', 'lib', 'movementNoticeErrors.ts'],
+  ]) {
+    assert.ok(!fs.existsSync(path.join(root, ...gone)), gone.join('/'))
+  }
+  // The old kind stays readable for the notices already stored.
   assert.match(
-    route,
-    /supabase\.rpc\(\s+'request_workshop_arrival_notice',\s+\{ p_equipment_id: equipmentId \},\s+\)/,
+    read('src', 'lib', 'movementNoticeMessages.ts'),
+    /'workshop_arrival',/,
   )
-  assert.equal((route.match(/\.rpc\(/g) ?? []).length, 1)
-  // A raw PostgreSQL message is only ever mapped, never returned or logged.
-  assert.equal((route.match(/error\.message/g) ?? []).length, 1)
-  assert.match(route, /noticeRequestErrorCode\(error\.message\)/)
-  assert.ok(!/console\.error\([^)]*\berror\b[^')]*\)/.test(route))
-  // The only extra fact is the site origin, resolved on the server from
-  // APP_BASE_URL alone (owner request 2026-10-15: the notice links to the
-  // EXIT form; audit lead D-16: never from the request, whose origin is the
-  // caller's Host header). Unconfigured: one warning without secrets, and the
-  // notice still goes out, without its link.
-  assert.match(route, /const appBaseUrl = resolveAppBaseUrl\(\)/)
-  assert.ok(!/resolveAppBaseUrl\([^)]/.test(route), 'no argument to resolve')
-  const routeCode = route.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
-  assert.ok(!/request\.url|request\.headers|nextUrl|\bhost\b/i.test(routeCode))
-  assert.match(
-    route,
-    /if \(!appBaseUrl\) \{\s+console\.warn\(\s*'APP_BASE_URL not configured; notice sent without link',?\s*\)\s+\}/,
-  )
-  assert.match(
-    route,
-    /deliverMovementNotice\(supabase, row, \{\s+appBaseUrl,\s+\}\)/,
-  )
-  assert.match(
-    route,
-    /import \{ resolveAppBaseUrl \} from '@\/lib\/server\/appBaseUrl'/,
-  )
-  assert.match(route, /export const runtime = 'nodejs'/)
 })
 
 test('.env.example lists the gateway variables as placeholders only', () => {

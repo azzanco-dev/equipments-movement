@@ -442,7 +442,8 @@ test('the form requires a driver on a site entry and focuses it in order', () =>
     form,
     /<Field\s+label=\{t\('driverName'\)\}\s+name="driver"\s+required\s+error=\{movementErrors\.driver && t\(movementErrors\.driver\)\}/,
   )
-  assert.match(form, /'company',\s+'project',\s+'driver',\s+'exit_purpose',/)
+  // The purpose field is gone (nested workshop stays, 2026-11-14).
+  assert.match(form, /'company',\s+'project',\s+'driver',\s+'recorded_at',/)
   // Workshop movements never show the driver field.
   assert.equal((form.match(/name="driver"/g) ?? []).length, 1)
   assert.match(

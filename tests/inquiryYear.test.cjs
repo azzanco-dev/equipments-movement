@@ -154,13 +154,15 @@ test('the screen: AI-style start, rings, journey in full, no filter', () => {
   // a stay on it opens its tile in the history.
   assert.match(
     screen,
-    /<InquiryYearStrip\s+days=\{year\.days\}\s+months=\{year\.months\}\s+markers=\{year\.markers\}\s+index=\{\d+\}\s+onSelectVisit=\{selectVisit\}/,
+    /<InquiryYearStrip\s+days=\{year\.days\}\s+months=\{year\.months\}\s+markers=\{year\.markers\}\s+openVisitLine=\{year\.openVisitLine\}\s+index=\{\d+\}\s+onSelectVisit=\{selectVisit\}/,
   )
   assert.doesNotMatch(screen, /<InquiryYearRings/)
   assert.match(screen, /getElementById\(inquiryVisitAnchor\(key\)\)/)
   // The chosen year is read for its days plus the movement before it.
   assert.match(screen, /\.gte\('recorded_at', start\)\s+\.lt\('recorded_at', end\)/)
   assert.match(screen, /\.lt\('recorded_at', start\)[\s\S]*?\.limit\(1\)/)
+  // Nested workshop stays: the movement before the window, per context.
+  assert.match(screen, /latestBefore\('site'\),\s+latestBefore\('workshop'\)/)
   // Recent units: this browser only, and storage failures are swallowed.
   assert.match(screen, /const RECENT_KEY = 'inquiry:recent'/)
   assert.match(screen, /try \{\s+window\.localStorage\.setItem/)
@@ -170,7 +172,7 @@ test('the screen: AI-style start, rings, journey in full, no filter', () => {
   assert.doesNotMatch(read('src', 'components', 'inquiry', 'InquiryNow.tsx'), /inquiryNoPo|\/purchasing\//)
   assert.match(screen, /permissions\.can\('purchasing\.view'\)/)
   assert.match(screen, /if \(!equipmentId \|\| !canSeePurchasing\) return/)
-  assert.match(screen, /<\/section>\s+\{\/\*[\s\S]*?\*\/\}\s+\{po !== undefined && <InquiryPoCard po=\{po\}/)
+  assert.match(screen, /<\/section>\s+\{\/\*[\s\S]*?\*\/\}\s+\{po !== undefined && openPresence\?\.siteOpen && \(\s+<InquiryPoCard po=\{po\}/)
   // The supplier of an external unit.
   assert.match(screen, /ownership_status === 'external_supplier' \? equipment\.lessor\?\.name/)
   // 2026-10-27: the state dot of each suggestion and recent unit, and the

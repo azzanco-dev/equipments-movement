@@ -246,9 +246,11 @@ test('the API allowlists the purpose and forwards it for site exits only', () =>
     route,
     /const isSiteExit = movementType === 'exit' && movementContext === 'site'/,
   )
+  // Nested workshop stays (2026-11-14): a NEW project exit is always
+  // 'work_completed'; 'maintenance' is refused like an unknown value.
   assert.match(
     route,
-    /if \(movementType === 'exit' && exitPurpose && !isExitPurpose\(exitPurpose\)\) \{\s+return NextResponse\.json\(\s+\{ error: 'invalid_exit_purpose' \},\s+\{ status: 400 \},/,
+    /\(!isExitPurpose\(exitPurpose\) \|\|\s+\(isSiteExit && exitPurpose !== 'work_completed'\)\)\s+\) \{\s+return NextResponse\.json\(\s+\{ error: 'invalid_exit_purpose' \},\s+\{ status: 400 \},/,
   )
   assert.match(
     route,
@@ -265,34 +267,20 @@ test('the API allowlists the purpose and forwards it for site exits only', () =>
 
 // --- Form and detail page --------------------------------------------------------
 
-test('the form shows a required purpose select on site exits only', () => {
+test('the form has no purpose select: a new site exit is always work_completed', () => {
+  // Nested workshop stays (2026-11-14): the workshop stop is nested in the
+  // project visit, so «للصيانة» is no longer offered on a NEW project exit.
   const form = read('src', 'components', 'EntryExitForm.tsx')
   assert.match(form, /const siteExitMode = !workshopMode && !isEntry/)
+  assert.ok(!/name="exit_purpose"/.test(form))
+  assert.ok(!/exitPurposeRequired/.test(form))
+  assert.ok(!/ExitPurpose/.test(form))
   assert.match(
     form,
-    /\{siteExitMode && \(\s+<Field\s+label=\{t\('exitPurpose'\)\}\s+name="exit_purpose"\s+required/,
+    /if \(siteExitMode\) payload\.exit_purpose = 'work_completed'/,
   )
-  assert.match(form, /<Select\s+\{\.\.\.control\}\s+value=\{exitPurpose\}/)
-  assert.match(form, /placeholder=\{t\('exitPurposePlaceholder'\)\}/)
-  // No default selection, cleared on reset.
-  assert.match(form, /useState<ExitPurpose \| ''>\(''\)/)
-  assert.match(form, /setExitPurpose\(''\)/)
-  // Submit is blocked with a field error, in the visual order of the form.
-  assert.match(
-    form,
-    /exit_purpose:\s+siteExitMode && !exitPurpose \? 'exitPurposeRequired' : undefined,/,
-  )
-  // wave 13 put the (again required) driver between project and purpose.
-  assert.match(
-    form,
-    /'project',\s+'driver',\s+'exit_purpose',\s+'recorded_at',/,
-  )
-  assert.match(
-    form,
-    /if \(siteExitMode && exitPurpose\) payload\.exit_purpose = exitPurpose/,
-  )
-  // The field appears exactly once and never in the workshop/entry branches.
-  assert.equal((form.match(/name="exit_purpose"/g) ?? []).length, 1)
+  // Sent for a site exit only.
+  assert.equal((form.match(/payload\.exit_purpose/g) ?? []).length, 1)
 })
 
 test('the detail page shows the purpose on site exits with the dash for NULL', () => {

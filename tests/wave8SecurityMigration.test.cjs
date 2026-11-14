@@ -800,7 +800,7 @@ function loadLibModule(name, cache = new Map()) {
   return exports
 }
 
-test('H1: the new exit code maps to 403 and to a translated message', () => {
+test('H1: the new exit code maps to 409 (a state conflict since the nested workshop stays) and to a translated message', () => {
   const { movementErrorCode, movementErrorStatus, MOVEMENT_ERROR_CODES } =
     loadLibModule('movementErrors')
   const { movementSaveErrorKey } = loadLibModule('movementSaveErrors')
@@ -811,7 +811,7 @@ test('H1: the new exit code maps to 403 and to a translated message', () => {
     'exit_equipment_on_site',
   )
   assert.ok(MOVEMENT_ERROR_CODES.includes('exit_equipment_on_site'))
-  assert.equal(movementErrorStatus('exit_equipment_on_site'), 403)
+  assert.equal(movementErrorStatus('exit_equipment_on_site'), 409)
   assert.equal(
     movementSaveErrorKey('exit_equipment_on_site', false),
     'workshopExitEquipmentOnSite',

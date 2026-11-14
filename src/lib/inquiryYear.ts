@@ -179,6 +179,74 @@ export function inquiryYearDays(
   return days
 }
 
+/** The line under the year strip for a project visit that is still open and
+ *  holds workshop stops (nested workshop stays, 2026-11-14): one visit, however
+ *  many stops it had. */
+export interface InquiryOpenVisitLine {
+  /** The open project visit. */
+  visit: EquipmentVisit
+  /** Index in `days` of the visit's first day shown in the year. */
+  startPosition: number
+  /** Index in `days` of the last day drawn (today, or the year's end). */
+  endPosition: number
+  /** The visit's days, its entry day through today. */
+  totalDays: number
+  /** Those days that sit in a workshop stop of the visit. */
+  workshopDays: number
+}
+
+/**
+ * The open project visit with at least one workshop stop, as a line from its
+ * first day shown in the year to today (positions follow `days`, so the strip
+ * and the line share one scale). `totalDays` counts the entry day through
+ * today like the strip counts days, `workshopDays` the days of those that a
+ * stop covers (each day once). `null` when no open project visit holds a stop
+ * or the visit is not inside the year's days. `visits` is newest first and
+ * `stopsByVisit` is `groupWorkshopStops(visits).stopsByVisit` (passed in so
+ * this module keeps no value import).
+ */
+export function inquiryOpenVisitLine(
+  days: readonly InquiryDay[],
+  visits: readonly EquipmentVisit[],
+  stopsByVisit: ReadonlyMap<string, readonly EquipmentVisit[]>,
+  now: number,
+): InquiryOpenVisitLine | null {
+  if (days.length === 0) return null
+  const visit = visits.find(
+    (item) =>
+      item.context === 'site' &&
+      item.open &&
+      item.startedAt &&
+      (stopsByVisit.get(item.key)?.length ?? 0) > 0,
+  )
+  if (!visit || !visit.startedAt) return null
+  const started = Date.parse(visit.startedAt)
+  if (Number.isNaN(started)) return null
+  const today = saudiDay(now)
+  const entryDay = saudiDay(started)
+  const firstDay = days[0].day
+  const lastShown = Math.min(days[days.length - 1].day, today)
+  const from = Math.max(entryDay, firstDay)
+  if (from > lastShown) return null
+  const covered = new Set<number>()
+  for (const stop of stopsByVisit.get(visit.key) ?? []) {
+    if (!stop.startedAt) continue
+    const stopStart = Date.parse(stop.startedAt)
+    if (Number.isNaN(stopStart)) continue
+    const stopEnd = stop.endedAt ? Date.parse(stop.endedAt) : now
+    const to = Math.min(Number.isNaN(stopEnd) ? today : saudiDay(stopEnd), today)
+    for (let day = Math.max(saudiDay(stopStart), entryDay); day <= to; day += 1)
+      covered.add(day)
+  }
+  return {
+    visit,
+    startPosition: from - firstDay,
+    endPosition: lastShown - firstDay,
+    totalDays: Math.max(0, today - entryDay + 1),
+    workshopDays: covered.size,
+  }
+}
+
 /** A code change («التحويلات», owner 2026-11-02) placed on the year strip:
  *  `position` is the index of its Saudi day in `days`. */
 export interface InquiryYearMarker {

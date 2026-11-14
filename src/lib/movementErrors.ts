@@ -11,6 +11,9 @@ export const MOVEMENT_ERROR_CODES = [
   'exit_not_entry_owner',
   'exit_equipment_in_workshop',
   'exit_equipment_on_site',
+  // Nested workshop stays (2026-11-14): a project entry for a unit inside the
+  // workshop.
+  'equipment_in_workshop',
   // wave-10-exit-purpose (migration 0111)
   'exit_purpose_required',
   'invalid_exit_purpose',
@@ -46,6 +49,8 @@ export function movementErrorCode(message: string): MovementErrorCode {
   // on a unit whose open entry is a site entry.
   if (message.includes('exit_equipment_on_site'))
     return 'exit_equipment_on_site'
+  // Checked after `exit_equipment_in_workshop`, which contains this text.
+  if (message.includes('equipment_in_workshop')) return 'equipment_in_workshop'
   // wave-10-exit-purpose (migration 0111): a site exit needs its purpose.
   if (message.includes('exit_purpose_required')) return 'exit_purpose_required'
   if (
@@ -67,7 +72,10 @@ export function movementErrorCode(message: string): MovementErrorCode {
 
 // Closing somebody else's visit is a permission failure (403), not a state
 // conflict (409). A missing or unknown exit purpose, and a site entry without
-// a driver, are invalid input (400).
+// a driver, are invalid input (400). Since the nested workshop stays
+// (2026-11-14) `exit_equipment_in_workshop` / `exit_equipment_on_site` /
+// `equipment_in_workshop` describe the unit's state, so they are conflicts
+// (409), not permission failures.
 export function movementErrorStatus(code: MovementErrorCode): number {
   if (
     code === 'exit_purpose_required' ||
@@ -76,8 +84,6 @@ export function movementErrorStatus(code: MovementErrorCode): number {
   )
     return 400
   return code === 'exit_not_entry_owner' ||
-    code === 'exit_equipment_in_workshop' ||
-    code === 'exit_equipment_on_site' ||
     code === 'workshop_exit_owner' ||
     code === 'access_denied'
     ? 403

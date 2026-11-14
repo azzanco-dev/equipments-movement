@@ -5,7 +5,7 @@ import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { movementFormActions } from '@/lib/actionPermissions'
 import { AlertTriangle } from 'lucide-react'
-import type { Driver, Equipment, MovementType, LastMovement } from '@/lib/types'
+import type { Driver, Equipment, MovementType } from '@/lib/types'
 import {
   Notice,
   BackButton,
@@ -13,7 +13,6 @@ import {
   DatePicker,
   Field,
   Input,
-  Select,
   Textarea,
 } from '@/components/ui'
 import {
@@ -27,7 +26,6 @@ import { EquipmentStep } from '@/components/movement/EquipmentStep'
 import { MovementFormShell } from '@/components/movement/MovementFormShell'
 import { MovementPhotosSection } from '@/components/movement/MovementPhotosSection'
 import { MovementStatusCard } from '@/components/movement/MovementStatusCard'
-import { NotifyForemanPanel } from '@/components/movement/NotifyForemanPanel'
 import {
   EMPTY_QUICK_DRIVER,
   QuickDriverForm,
@@ -57,11 +55,11 @@ import {
 } from '@/lib/movementFormTime'
 import { movementSaveErrorKey } from '@/lib/movementSaveErrors'
 import {
-  EXIT_PURPOSES,
-  EXIT_PURPOSE_LABEL_KEYS,
-  isExitPurpose,
-  type ExitPurpose,
-} from '@/lib/exitPurpose'
+  decideMovement,
+  parseEquipmentPresence,
+  presenceMode,
+  type EquipmentPresence,
+} from '@/lib/equipmentPresence'
 import { loadDriverNames } from '@/lib/exportFields'
 import { preferRecordName } from '@/lib/driverDisplayName'
 import {
@@ -99,14 +97,13 @@ import {
  * (`site_entry_driver_required`) and the database rule follows in migration
  * 0120 once this form is live. Workshop movements never carry a driver.
  *
- * `exit_purpose` is required on a SITE exit only (wave-10-exit-purpose,
- * migration 0111); the workshop form and every ENTRY never show it.
+ * A new SITE exit has no purpose field any more (nested workshop stays,
+ * 2026-11-14): it is always `work_completed`, sent by this form.
  */
 interface MovementFields {
   company: string
   project: string
   driver: string
-  exit_purpose: string
   recorded_at: string
   photos: string
 }
@@ -115,7 +112,6 @@ const MOVEMENT_FIELD_ORDER = [
   'company',
   'project',
   'driver',
-  'exit_purpose',
   'recorded_at',
   'photos',
 ] as const
@@ -171,11 +167,14 @@ export function EntryExitForm({
   // false start would flash the "no equipment found" state before it.
   const [loadingEquipment, setLoadingEquipment] = useState(true)
   const [equipmentError, setEquipmentError] = useState(false)
-  const [lastMovement, setLastMovement] = useState<LastMovement | null>(null)
-  // The equipment `lastMovement` was read for. It stays on the previous unit
-  // until the next read answers, so anything that acts on the movement (the
-  // notify panel) checks it against the selected unit first.
-  const [lastMovementFor, setLastMovementFor] = useState<string | null>(null)
+  // Where the selected unit is now (`get_equipment_presence`): the open
+  // project visit and the open workshop visit, not the latest movement.
+  const [presence, setPresence] = useState<EquipmentPresence | null>(null)
+  // The CURRENT name of the open project visit's driver (his record), looked
+  // up after the presence read; the snapshot in `presence` is the fallback.
+  const [siteDriverFullName, setSiteDriverFullName] = useState<string | null>(
+    null,
+  )
   const [loadingMovement, setLoadingMovement] = useState(false)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [driverId, setDriverId] = useState('')
@@ -195,8 +194,6 @@ export function EntryExitForm({
   const [selectedProject, setSelectedProject] =
     useState<AsyncSearchSelectOption | null>(null)
   const [contractorCode, setContractorCode] = useState('')
-  // No default: the user must choose the purpose of a site exit.
-  const [exitPurpose, setExitPurpose] = useState<ExitPurpose | ''>('')
   const [recordedAt, setRecordedAt] = useState('')
   const [quickDriver, setQuickDriver] = useState(EMPTY_QUICK_DRIVER)
   const [quickEquipment, setQuickEquipment] = useState(EMPTY_QUICK_EQUIPMENT)
@@ -213,6 +210,9 @@ export function EntryExitForm({
   const [quickEquipmentErrors, setQuickEquipmentErrors] = useState<
     FieldErrors<QuickEquipmentFormValues>
   >({})
+  // Counts the presence reads, so a driver-name lookup of an older read
+  // never lands on a newer one.
+  const presenceReadRef = useRef(0)
   const detailsRef = useRef<HTMLDivElement>(null)
   const quickDriverRef = useRef<HTMLDivElement>(null)
   const equipmentListRef = useRef<HTMLDivElement>(null)
@@ -288,8 +288,8 @@ export function EntryExitForm({
     setOwnerFilter('')
     setEquipmentError(false)
     setSelected(null)
-    setLastMovement(null)
-    setLastMovementFor(null)
+    setPresence(null)
+    setSiteDriverFullName(null)
     setLoadingMovement(false)
     setValidationError(null)
     setDriverId('')
@@ -306,7 +306,6 @@ export function EntryExitForm({
     setSelectedCompany(null)
     setSelectedProject(null)
     setContractorCode('')
-    setExitPurpose('')
     setRecordedAt('')
     setQuickDriver(EMPTY_QUICK_DRIVER)
     setQuickEquipment(EMPTY_QUICK_EQUIPMENT)
@@ -411,40 +410,42 @@ export function EntryExitForm({
     movementType,
   ])
 
-  // Check last movement when equipment is selected
-  const checkLastMovement = useCallback(
-    async (eq: Equipment): Promise<LastMovement | null> => {
+  // Where the unit is, read once when it is selected (and again after a
+  // failed save). The database trigger stays authoritative; this only tells
+  // the user before the save what the rule will say.
+  const checkPresence = useCallback(
+    async (eq: Equipment): Promise<EquipmentPresence | null> => {
       setLoadingMovement(true)
       setValidationError(null)
+      presenceReadRef.current += 1
 
-      const { data, error } = await supabase.rpc('get_last_movement', {
+      const { data, error } = await supabase.rpc('get_equipment_presence', {
         p_equipment_id: eq.id,
-        p_movement_context: workshopMode ? 'workshop' : 'site',
       })
+      const next = error ? null : parseEquipmentPresence(data)
 
       setLoadingMovement(false)
 
-      if (error) {
-        console.error(error)
+      if (!next) {
+        if (error) console.error(error)
+        setPresence(null)
         setSaveError(t('saveFailed'))
         return null
       }
 
-      const last = (data as LastMovement[])[0] ?? null
-      setLastMovement(last)
-      setLastMovementFor(eq.id)
+      setPresence(next)
+      setSiteDriverFullName(null)
+      const readId = ++presenceReadRef.current
       // wave 19: the summary names the current driver by his record's
-      // CURRENT name; `get_last_movement` returns the snapshot with the id.
+      // CURRENT name; the presence row returns the snapshot with the id.
       // Secondary and non-blocking: on failure the snapshot stays.
-      const lastDriverId = last?.driver_id
-      if (lastDriverId) {
-        loadDriverNames(supabase, [lastDriverId])
+      const siteDriverId = next.siteDriverId
+      if (siteDriverId) {
+        loadDriverNames(supabase, [siteDriverId])
           .then((nameByDriver) => {
-            const name = nameByDriver.get(lastDriverId)
+            const name = nameByDriver.get(siteDriverId)
             if (!name) return
-            setLastMovement((current) =>
-              current === last ? { ...last, driver_full_name: name } : current,
-            )
+            if (presenceReadRef.current === readId) setSiteDriverFullName(name)
           })
           .catch(() => {
             // The stored snapshot stays.
@@ -453,24 +454,13 @@ export function EntryExitForm({
       // An EXIT carries no driver field: the database inherits the latest
       // current driver of the open visit when the exit row is written.
 
-      // Validation logic
-      if (isEntry) {
-        if (last && last.movement_type === 'entry') {
-          setValidationError(t('entryBlockedMsg'))
-        } else {
-          setValidationError(null)
-        }
-      } else {
-        if (!last) {
-          setValidationError(t('exitNoPreviousMsg'))
-        } else if (last.movement_type === 'exit') {
-          setValidationError(t('exitBlockedMsg'))
-        } else {
-          setValidationError(null)
-        }
-      }
+      const decision = decideMovement(
+        next,
+        presenceMode(workshopMode, isEntry ? 'entry' : 'exit'),
+      )
+      setValidationError(decision.allowed ? null : t(decision.messageKey))
 
-      return last
+      return next
     },
     [isEntry, t, workshopMode],
   )
@@ -517,13 +507,13 @@ export function EntryExitForm({
     setValidationError(null)
     setStep('details')
     // Fire async; don't block UI
-    checkLastMovement(eq)
+    checkPresence(eq)
   }
 
   // An EXIT opened from the «ابلاغ الفورمان» link (owner request 2026-10-15):
   // the search above ran with the linked code, exactly as if the user had
   // typed it. Exactly one result with that CURRENT code is selected through
-  // the normal handler (get_last_movement, then the save through the API and
+  // the normal handler (get_equipment_presence, then the save through the API and
   // the database decide as always); otherwise the list stays for the user.
   useEffect(() => {
     const linkedCode = linkedCodeRef.current
@@ -646,7 +636,7 @@ export function EntryExitForm({
     const movementInstant = resolveMovementInstant(
       movementDate,
       new Date(),
-      lastMovement?.recorded_at,
+      presence?.lastMovementAt,
     )
     const invalid = fieldErrors<MovementFields>({
       company:
@@ -655,8 +645,6 @@ export function EntryExitForm({
         siteEntry && !selectedProjectId ? 'projectRequiredForEntry' : undefined,
       // wave-13-drivers: required on every site entry again (2026-10-05).
       driver: siteEntry && !driverId ? 'driverRequired' : undefined,
-      exit_purpose:
-        siteExitMode && !exitPurpose ? 'exitPurposeRequired' : undefined,
       recorded_at: !recordedAt.trim()
         ? 'movementDateRequired'
         : isNaN(movementInstant.getTime()) ||
@@ -709,7 +697,9 @@ export function EntryExitForm({
         if (contractorCode.trim())
           payload.contractor_equipment_code = contractorCode.trim()
       }
-      if (siteExitMode && exitPurpose) payload.exit_purpose = exitPurpose
+      // A new project exit is always «انتهاء عمل» (nested workshop stays): the
+      // workshop stop is a nested visit, not a reason to leave the project.
+      if (siteExitMode) payload.exit_purpose = 'work_completed'
 
       const submitMovement = (token: string) =>
         fetch('/api/movements', {
@@ -756,30 +746,46 @@ export function EntryExitForm({
       console.error(err)
       const code = err instanceof Error ? err.message : 'movement_save_failed'
       setSaveError(t(movementSaveErrorKey(code, isEntry)))
-      checkLastMovement(selected)
+      checkPresence(selected)
     } finally {
       setSaving(false)
     }
   }
 
-  // wave 9 — an ENTRY for a unit whose latest movement is an open SITE
-  // entry. The sequence is global per equipment, so this entry stays blocked
-  // until the foreman who recorded the site entry records its exit; the
-  // officer may notify him instead of phoning. Workshop roles see it in the
-  // workshop form, and (owner decision 2026-10-03) an admin sees it in his
-  // site form; the server route accepts both. A supervisor never sees it and
-  // a monitor has no movement form at all. wave 24: the holders of
-  // `movements.notify_foreman` (the workshop roles and the admin).
-  const canNotifyForeman = formActions.notifyForeman
-  const notifyForemanMovement =
-    canNotifyForeman &&
+  // Nested workshop stays (2026-11-14): a workshop ENTRY is allowed while the
+  // unit's project visit is open, so the old «ابلاغ الفورمان» panel is gone.
+  // The form says what happens instead; the foreman is told by the server.
+  const nestedWorkshopEntry =
+    workshopMode &&
     isEntry &&
-    selected &&
-    lastMovementFor === selected.id &&
-    lastMovement?.movement_type === 'entry' &&
-    lastMovement.movement_context === 'site'
-      ? lastMovement
-      : null
+    !validationError &&
+    !loadingMovement &&
+    presence?.siteOpen === true
+  const siteExitInWorkshop =
+    siteExitMode &&
+    !validationError &&
+    !loadingMovement &&
+    presence?.workshopOpen === true
+
+  // The notice of a workshop entry nested in an open project visit: the
+  // project and, when known, its foreman.
+  const nestedWorkshopEntryText = (visit: EquipmentPresence): string => {
+    const project = optionalLocalizedName(
+      visit.siteProjectNameAr,
+      visit.siteProjectNameEn,
+    )
+    const foreman = visit.siteSupervisorName?.trim() || null
+    const key = project
+      ? foreman
+        ? 'workshopEntryNestedNotice'
+        : 'workshopEntryNestedNoticeNoForeman'
+      : foreman
+        ? 'workshopEntryNestedNoticeNoProject'
+        : 'workshopEntryNestedNoticeBare'
+    return t(key)
+      .replace('{project}', project ?? '')
+      .replace('{foreman}', foreman ?? '')
+  }
 
   // `localizedName` falls back to an em dash, but the last-entry summary needs
   // a missing name to stay empty so it does not render "— - project".
@@ -897,33 +903,13 @@ export function EntryExitForm({
 
             <MovementStatusCard
               loading={loadingMovement}
-              lastMovement={lastMovement}
+              presence={presence}
               isEntry={isEntry}
               blocked={!!validationError}
             />
 
-            {/* The unit is still inside a site: say why the entry is blocked
-                and let the officer notify the foreman. It stays mounted while
-                the status is re-read, so its result is not lost. */}
-            {notifyForemanMovement && (
-              <NotifyForemanPanel
-                key={selected.id}
-                equipmentId={selected.id}
-                projectName={optionalLocalizedName(
-                  notifyForemanMovement.project_name_ar,
-                  notifyForemanMovement.project_name_en,
-                )}
-                foremanName={
-                  notifyForemanMovement.supervisor_name?.trim() || null
-                }
-                refreshing={loadingMovement}
-                onRefresh={() => checkLastMovement(selected)}
-              />
-            )}
-
-            {/* Validation warning. The panel above already explains the
-                blocked entry, so the generic message is not repeated. */}
-            {validationError && !notifyForemanMovement && (
+            {/* Validation warning. */}
+            {validationError && (
               <Notice tone="danger">
                 <div className="flex items-start gap-2">
                   <AlertTriangle size={16} className="mt-0.5 shrink-0" />
@@ -932,26 +918,37 @@ export function EntryExitForm({
               </Notice>
             )}
 
+            {/* A workshop entry for a unit that belongs to an open project
+                visit: nothing to close, and the foreman is told by the server. */}
+            {nestedWorkshopEntry && presence && (
+              <Notice tone="info">{nestedWorkshopEntryText(presence)}</Notice>
+            )}
+
+            {/* A project exit while the unit is inside the workshop. */}
+            {siteExitInWorkshop && (
+              <Notice tone="info">{t('siteExitWhileInWorkshopNotice')}</Notice>
+            )}
+
             {/* Form fields */}
             {!workshopMode &&
               !isEntry &&
-              (loadingMovement || (lastMovement && !validationError)) && (
+              (loadingMovement || (presence?.siteOpen && !validationError)) && (
                 <LastEntrySummary
                   loading={loadingMovement}
-                  recordedAt={lastMovement?.recorded_at}
+                  recordedAt={presence?.siteEntryAt}
                   driverName={preferRecordName(
-                    lastMovement?.driver_full_name,
-                    lastMovement?.driver_name,
+                    siteDriverFullName,
+                    presence?.siteDriverName,
                   )}
-                  driverMobile={lastMovement?.driver_mobile_number}
-                  contractorCode={lastMovement?.contractor_equipment_code}
+                  driverMobile={presence?.siteDriverMobileNumber}
+                  contractorCode={presence?.siteContractorEquipmentCode}
                   companyName={optionalLocalizedName(
-                    lastMovement?.company_name_ar,
-                    lastMovement?.company_name_en,
+                    presence?.siteCompanyNameAr,
+                    presence?.siteCompanyNameEn,
                   )}
                   projectName={optionalLocalizedName(
-                    lastMovement?.project_name_ar,
-                    lastMovement?.project_name_en,
+                    presence?.siteProjectNameAr,
+                    presence?.siteProjectNameEn,
                   )}
                 />
               )}
@@ -1087,36 +1084,6 @@ export function EntryExitForm({
                     onSave={createQuickDriver}
                   />
                 </div>
-              )}
-
-              {/* wave-10-exit-purpose: required on a SITE exit only, with no
-                  default selection. */}
-              {siteExitMode && (
-                <Field
-                  label={t('exitPurpose')}
-                  name="exit_purpose"
-                  required
-                  error={
-                    movementErrors.exit_purpose &&
-                    t(movementErrors.exit_purpose)
-                  }
-                >
-                  {(control) => (
-                    <Select
-                      {...control}
-                      value={exitPurpose}
-                      onValueChange={(value) => {
-                        clearMovementErrors('exit_purpose')
-                        setExitPurpose(isExitPurpose(value) ? value : '')
-                      }}
-                      placeholder={t('exitPurposePlaceholder')}
-                      options={EXIT_PURPOSES.map((purpose) => ({
-                        value: purpose,
-                        label: t(EXIT_PURPOSE_LABEL_KEYS[purpose]),
-                      }))}
-                    />
-                  )}
-                </Field>
               )}
 
               <Field

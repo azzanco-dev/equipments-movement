@@ -23,6 +23,7 @@ import { formatDateTime } from '@/lib/dateFormat'
 import { elapsedInWords } from '@/lib/elapsedWords'
 import { HomeBlock, ViewAllAction } from './HomeBlock'
 import { ListRowsSkeleton } from './HomeSkeletons'
+import { NestedProjectLine } from './NestedProjectLine'
 import { OwnerFilter } from './OwnerFilter'
 import type { AdminHomeSectionState } from './useAdminHomeSection'
 
@@ -158,6 +159,7 @@ export function WorkshopCard({
           <span className="block text-[11px] leading-4 text-muted">
             {row.type}
           </span>
+          <NestedProjectLine row={row} />
         </span>
       ),
     },

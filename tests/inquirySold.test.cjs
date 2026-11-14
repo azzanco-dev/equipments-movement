@@ -228,13 +228,16 @@ test('the journey: changes in time order among the stays, «مباعة» last', 
 test('the screen reads status and the last movement, and passes them on', () => {
   const screen = read('src', 'screens', 'inquiry', 'EquipmentInquiryScreen.tsx')
   // The equipment row already carried `status`; the last movement's instant
-  // comes from `get_last_movement` (SECURITY DEFINER, like the state).
+  // comes from `get_equipment_presence` (SECURITY DEFINER, like the state).
   assert.match(screen, /created_at,ownership_status,status,lessor:lessors\(id,name\)/)
-  assert.match(screen, /recorded_at: string \| null\s+\}> \| null/)
+  assert.match(screen, /\.rpc\('get_equipment_presence', \{ p_equipment_id: id \}\)/)
   assert.match(screen, /inquirySoldOf\(equipment\?\.status, lastMovementAt\)/)
   assert.match(screen, /inquiryYearDays\(yearVisits, countFrom, now, selectedYear, sold\)/)
   assert.match(screen, /markers: inquiryYearMarkers\(codeChanges, days\)/)
-  assert.match(screen, /<InquiryNow visits=\{visits\} state=\{state\} now=\{now\} sold=\{sold\} \/>/)
+  assert.match(
+    screen,
+    /<InquiryNow\s+visits=\{visits\}\s+state=\{state\}\s+presence=\{openPresence\}\s+now=\{now\}\s+sold=\{sold\}\s+\/>/,
+  )
   assert.match(screen, /markers=\{year\.markers\}/)
   assert.match(screen, /codeChanges=\{codeChanges\}\s+sold=\{sold\}/)
   // The header: «مباعة» over the derived state; «منتهية» still through the
@@ -247,7 +250,10 @@ test('the screen reads status and the last movement, and passes them on', () => 
   assert.match(now, /if \(sold\) \{\s+key = 'sold'/)
   assert.match(now, /t\('inquirySoldNoMovements'\)/)
   const journey = read('src', 'components', 'inquiry', 'InquiryJourney.tsx')
-  assert.match(journey, /inquiryJourneyItems\(buildTimelineItems\(visits, now\), codeChanges, sold\)/)
+  assert.match(
+    journey,
+    /inquiryJourneyItems\(\s+buildTimelineItems\(visits, now, nestedKeys\),\s+codeChanges,\s+sold,?\s+\)/,
+  )
   assert.match(journey, /item\.kind === 'code_change' \?/)
   assert.match(journey, /<SoldTile since=\{item\.since\} \/>/)
   assert.match(journey, /t\('inquiryCodeChangeReason'\)/)

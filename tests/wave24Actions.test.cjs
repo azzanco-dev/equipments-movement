@@ -158,7 +158,6 @@ function beforeForm(role) {
   return {
     workshopMode,
     exitAnyVisit: role === 'admin',
-    notifyForeman: workshopMode || role === 'admin',
   }
 }
 // src/screens/HomeScreen.tsx: scope from the role; the managers' embedded
@@ -285,7 +284,7 @@ for (const role of ROLES) {
     const state = legacyState(role)
     const now = actions.movementFormActions(state)
     assert.deepEqual(
-      pick(now, ['workshopMode', 'exitAnyVisit', 'notifyForeman']),
+      pick(now, ['workshopMode', 'exitAnyVisit']),
       beforeForm(role),
     )
     const permissions = LEGACY.get(role)
@@ -380,7 +379,6 @@ test('while loading or after a failed load nothing is granted', () => {
     assert.deepEqual(plain(actions.movementFormActions(state)), {
       workshopMode: false,
       exitAnyVisit: false,
-      notifyForeman: false,
       quickCreateEquipment: false,
       quickCreateDriver: false,
       quickCreateLessor: false,
@@ -451,7 +449,6 @@ test('custom role foreman_lead (0126 seed): its scopes widen the foreman', () =>
   const form = actions.movementFormActions(state)
   assert.equal(form.workshopMode, false)
   assert.equal(form.exitAnyVisit, true) // site.create scope all
-  assert.equal(form.notifyForeman, false)
   assert.equal(form.quickCreateEquipment, true) // scope site, site form
   assert.equal(form.quickCreateDriver, true)
   assert.equal(form.quickCreateLessor, true)
@@ -490,7 +487,6 @@ test('a custom workshop role with the classify key classifies on its own card', 
   assert.equal(form.workshopMode, true)
   // Its quick-create scope is the site's: no button in the workshop form.
   assert.equal(form.quickCreateEquipment, false)
-  assert.equal(form.notifyForeman, false)
 })
 
 test('scopes are mirrored for display', () => {
@@ -594,7 +590,8 @@ test('the movement form wires each decision', () => {
     form,
     /const workshopMode = forcedWorkshopForm \|\| formActions\.workshopMode/,
   )
-  assert.match(form, /const canNotifyForeman = formActions\.notifyForeman/)
+  // «ابلاغ الفورمان» is gone (nested workshop stays, 2026-11-14).
+  assert.ok(!/notifyForeman/.test(form))
   assert.match(form, /exitAnyVisit=\{formActions\.exitAnyVisit\}/)
   assert.match(
     form,

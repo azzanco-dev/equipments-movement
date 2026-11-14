@@ -263,10 +263,14 @@ function trailingGap(exitAt: string, now: number): OutsideGap {
 
 /**
  * All outside-gaps for one equipment's visits (any context, any order),
- * oldest first. Visits are compared in the order they started (entry
- * instant, or the exit instant for a lone legacy exit) so a workshop visit
- * sitting between two site visits breaks the pairing on both sides instead
- * of leaving a gap straight across it.
+ * oldest first. Nested workshop stays (2026-11-14): a workshop stop sits
+ * INSIDE an open project visit, so a gap exists only where NO visit of either
+ * context covers the days. The visits are walked by start and the furthest end
+ * seen so far is kept (an open visit covers through today); a gap is the full
+ * days between that furthest end and the next visit's start. For serial data
+ * (every visit ends before the next starts) this is exactly the gap between
+ * one exit and the next entry, as before. The trailing «بدون تسجيل» stretch
+ * exists only when no visit is open, counted from the furthest end.
  */
 export function buildOutsideGaps(
   visits: readonly EquipmentVisit[],
@@ -274,32 +278,128 @@ export function buildOutsideGaps(
 ): OutsideGap[] {
   const chronological = [...visits].reverse()
   const gaps: OutsideGap[] = []
+  // `iso` is the instant a gap may start from; null when no gap can start
+  // there (an open visit, which covers through today).
+  let furthestMs = Number.NEGATIVE_INFINITY
+  let furthestIso: string | null = null
+  let seen = false
 
-  chronological.forEach((visit, index) => {
-    if (!visit.endedAt) return
-    const next = chronological[index + 1]
-    if (next) {
-      if (!next.startedAt) return
-      const gap = gapBetween(visit.endedAt, next.startedAt)
+  for (let index = 0; index < chronological.length; index += 1) {
+    const visit = chronological[index]
+    if (visit.startedAt && seen && furthestIso !== null) {
+      const gap = gapBetween(furthestIso, visit.startedAt)
       if (gap) gaps.push(gap)
-    } else {
-      // Same-day exit relative to `now` is not a gap yet, same as a same-day
-      // or next-day closed re-entry.
-      const gap = trailingGap(visit.endedAt, now)
-      if (gap.days > 0) gaps.push(gap)
     }
-  })
+    let endMs: number
+    let endIso: string | null
+    if (visit.endedAt) {
+      endMs = instant(visit.endedAt)
+      endIso = visit.endedAt
+    } else if (visit.startedAt) {
+      // Open: covers through today. A stale open entry that a later entry of
+      // the same context followed (legacy data) covers only up to that entry.
+      const later = chronological
+        .slice(index + 1)
+        .find((other) => other.context === visit.context && other.startedAt)
+      endMs = later ? instant(later.startedAt as string) : Number.POSITIVE_INFINITY
+      endIso = null
+    } else {
+      continue
+    }
+    if (!seen || endMs > furthestMs) {
+      furthestMs = endMs
+      furthestIso = endIso
+      seen = true
+    }
+  }
+
+  if (seen && furthestIso !== null) {
+    // Same-day exit relative to `now` is not a gap yet, same as a same-day
+    // or next-day closed re-entry.
+    const gap = trailingGap(furthestIso, now)
+    if (gap.days > 0) gaps.push(gap)
+  }
 
   return gaps
 }
 
+/** A project visit's nested workshop stops (nested workshop stays). */
+export interface NestedWorkshopStops {
+  /** Keys of the workshop visits that sit inside a project visit. */
+  nestedKeys: Set<string>
+  /** Project visit key to its stops, newest first. */
+  stopsByVisit: Map<string, EquipmentVisit[]>
+}
+
+/**
+ * A workshop visit that STARTED inside a project visit of the same unit (the
+ * project entry is at or before the workshop entry in `(recorded_at, id)`
+ * order, and before the project exit when there is one) belongs to that
+ * project visit. Old data (project exit, then a separate workshop visit) is
+ * not nested. `visits` is newest first; the stops keep that order.
+ */
+export function groupWorkshopStops(
+  visits: readonly EquipmentVisit[],
+): NestedWorkshopStops {
+  const nestedKeys = new Set<string>()
+  const stopsByVisit = new Map<string, EquipmentVisit[]>()
+  const projects = visits.filter(
+    (visit) => visit.context === 'site' && visit.entry,
+  )
+  for (const stop of visits) {
+    if (stop.context !== 'workshop' || !stop.entry) continue
+    const workshopEntry = stop.entry
+    const parent = projects.find(
+      (project) =>
+        compareMovements(project.entry as TimelineMovement, workshopEntry) <= 0 &&
+        (!project.exit || compareMovements(workshopEntry, project.exit) < 0),
+    )
+    if (!parent) continue
+    nestedKeys.add(stop.key)
+    const list = stopsByVisit.get(parent.key)
+    if (list) list.push(stop)
+    else stopsByVisit.set(parent.key, [stop])
+  }
+  return { nestedKeys, stopsByVisit }
+}
+
+/** A stop's milliseconds inside its project visit (clipped to the project's
+ *  end; open ends count up to `now`). */
+function nestedStopMs(
+  project: EquipmentVisit,
+  stop: EquipmentVisit,
+  now: number,
+): number {
+  if (!stop.startedAt) return 0
+  const projectEnd = project.endedAt ? instant(project.endedAt) : now
+  const stopEnd = stop.endedAt ? instant(stop.endedAt) : now
+  return Math.max(0, Math.min(stopEnd, projectEnd) - instant(stop.startedAt))
+}
+
+/** The whole days a project visit's stops add up to (each stop through
+ *  `msToDays`, clipped to the project visit's end): «منها N ايام في الورشة». */
+export function nestedWorkshopDays(
+  project: EquipmentVisit,
+  stops: readonly EquipmentVisit[],
+  now: number = Date.now(),
+): number {
+  return stops.reduce(
+    (sum, stop) => sum + msToDays(nestedStopMs(project, stop, now)),
+    0,
+  )
+}
+
 /**
  * Visits merged with the outside-gaps between them, newest first, ready for
- * the timeline to render as one list.
+ * the timeline to render as one list. `omit` holds visit keys that are not
+ * drawn as their own item (the nested workshop stops); the gaps are still
+ * computed from every visit, and a gap that closes after an omitted visit is
+ * emitted at that visit's place.
  */
 export function buildTimelineItems(
   visits: readonly EquipmentVisit[],
   now: number = Date.now(),
+  omit?: ReadonlySet<string>,
 ): TimelineItem[] {
   const gapsByExit = new Map<string, OutsideGap>()
   for (const gap of buildOutsideGaps(visits, now))
@@ -307,10 +407,15 @@ export function buildTimelineItems(
 
   const chronological = [...visits].reverse()
   const items: TimelineItem[] = []
+  const placed = new Set<string>()
   for (const visit of chronological) {
-    items.push({ kind: 'visit', key: visit.key, sortAt: visit.sortAt, visit })
+    if (!omit?.has(visit.key))
+      items.push({ kind: 'visit', key: visit.key, sortAt: visit.sortAt, visit })
     const gap = visit.endedAt ? gapsByExit.get(visit.endedAt) : undefined
-    if (gap) items.push({ kind: 'gap', key: gap.key, sortAt: gap.sortAt, gap })
+    if (gap && !placed.has(gap.key)) {
+      placed.add(gap.key)
+      items.push({ kind: 'gap', key: gap.key, sortAt: gap.sortAt, gap })
+    }
   }
 
   return items.reverse()
@@ -342,6 +447,14 @@ export function summarizeVisits(
     )
       latestOpen = visit
   }
+
+  // A workshop stop nested in a project visit is counted once, as workshop.
+  for (const [projectKey, stops] of groupWorkshopStops(visits).stopsByVisit) {
+    const project = visits.find((visit) => visit.key === projectKey)
+    if (!project) continue
+    for (const stop of stops) siteMs -= nestedStopMs(project, stop, now)
+  }
+  siteMs = Math.max(0, siteMs)
 
   const status: EquipmentPresence = !latestOpen
     ? 'outside'

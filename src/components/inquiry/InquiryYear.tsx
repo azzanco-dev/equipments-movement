@@ -7,6 +7,7 @@ import {
   INQUIRY_STATE_ORDER,
   type InquiryDay,
   type InquiryMonth,
+  type InquiryOpenVisitLine,
   type InquiryYearMarker,
   type InquiryYearSummary,
 } from '@/lib/inquiryYear'
@@ -265,17 +266,22 @@ export function codeChangeMarkerLabel(
  * stay opens its tile in the visit history below. A sold unit ends in a
  * dark grey «مباعة» block, and every code change («التحويلات», owner
  * 2026-11-02) is a thin marker on its day with the change as its tooltip.
+ * An open project visit that holds workshop stops (nested workshop stays,
+ * 2026-11-14) gets a thin line under the bar from its first day shown to
+ * today, captioned «زيارة واحدة قائمة لمشروع …».
  */
 export function InquiryYearStrip({
   days,
   months,
   markers = [],
+  openVisitLine = null,
   index,
   onSelectVisit,
 }: {
   days: InquiryDay[]
   months: InquiryMonth[]
   markers?: InquiryYearMarker[]
+  openVisitLine?: InquiryOpenVisitLine | null
   index: number
   onSelectVisit: (key: string) => void
 }) {
@@ -374,6 +380,36 @@ export function InquiryYearStrip({
             )
           })}
         </div>
+        {openVisitLine && (
+          <div className="space-y-1">
+            <div className="relative h-[3px]" aria-hidden="true">
+              <span
+                className="absolute inset-y-0 rounded-full"
+                style={{
+                  insetInlineStart: `${pct(openVisitLine.startPosition)}%`,
+                  width: `${pct(openVisitLine.endPosition - openVisitLine.startPosition + 1)}%`,
+                  backgroundColor: INQUIRY_STATE_COLORS.site.stroke,
+                }}
+              />
+            </div>
+            <p
+              className="text-xs font-medium"
+              style={{
+                color: INQUIRY_STATE_COLORS.site.stroke,
+                marginInlineStart: `min(${pct(openVisitLine.startPosition)}%, 45%)`,
+              }}
+            >
+              {t('inquiryYearOpenVisitCaption')
+                .replace(
+                  '{project}',
+                  (openVisitLine.visit.entry ?? openVisitLine.visit.exit)?.project_name ||
+                    t('inquiryStateSite'),
+                )
+                .replace('{total}', String(openVisitLine.totalDays))
+                .replace('{workshop}', String(openVisitLine.workshopDays))}
+            </p>
+          </div>
+        )}
         <div className="relative h-4 text-[11px] text-muted" aria-hidden="true">
           {labels.map(({ month, start }, position) => (
             <span

@@ -137,6 +137,29 @@ export function equipmentStateFromMovement(
   return 'working'
 }
 
+/** The two open visits of a unit (`get_equipment_presence`, nested workshop stays). */
+export interface StatePresence {
+  workshop_open?: boolean | null
+  workshop_purpose?: string | null
+  site_open?: boolean | null
+}
+
+/**
+ * Mirror of the state rule of the nested workshop stays (2026-11-14): an open
+ * workshop visit decides first (its purpose, or unclassified), else an open
+ * project visit is `working`, else `available`. A unit inside the workshop
+ * whose project visit is open is counted in the workshop.
+ */
+export function equipmentStateFromPresence(
+  presence: StatePresence | null | undefined,
+): EquipmentState {
+  if (!presence) return 'available'
+  if (presence.workshop_open)
+    return workshopPurposeOrNull(presence.workshop_purpose) ?? 'unclassified'
+  if (presence.site_open) return 'working'
+  return 'available'
+}
+
 export const EQUIPMENT_STATE_LABEL_KEYS: Record<
   EquipmentState,
   TranslationKey

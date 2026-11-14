@@ -62,6 +62,7 @@ import {
   type WorkshopPurposeFilter,
 } from '@/lib/adminHomeStats'
 import type { ExcelColumn } from '@/lib/excel'
+import { NestedProjectLine } from './NestedProjectLine'
 import { useOwnerLabel } from './OwnerFilter'
 import { useAdminHomeSection } from './useAdminHomeSection'
 
@@ -634,6 +635,20 @@ export function FleetMiniTables({
       </span>
     ),
   }
+  // The workshop table's identity: a unit in the workshop whose project visit
+  // is open says so under its code («تابعة لمشروع …», nested workshop stays).
+  const workshopCodeColumn: DataTableColumn<FleetEquipmentRow> = {
+    ...codeColumn,
+    cell: (row) => (
+      <span className="block">
+        <span className="inline-flex flex-wrap items-center gap-1">
+          <span className="font-semibold">{row.code}</span>
+          <EquipmentNewBadge isNew={row.isNew} />
+        </span>
+        <NestedProjectLine row={row} />
+      </span>
+    ),
+  }
   const sinceColumn: DataTableColumn<FleetEquipmentRow> = {
     key: 'since',
     header: t('adminHomeColSince'),
@@ -694,7 +709,7 @@ export function FleetMiniTables({
   }
   // Owner 2026-10-27: the type in the workshop card too, on every width.
   const workshopColumns = [
-    codeColumn,
+    workshopCodeColumn,
     { ...typeColumn, hideBelow: undefined },
     purposeColumn,
     sinceColumn,

@@ -140,8 +140,9 @@ test('the page reads the view server-side and adds through the existing dialogs'
   assert.match(screen, /<span className="whitespace-nowrap pe-1 ps-2 text-xs font-normal">/)
   assert.doesNotMatch(screen, /siteUnitsAddTo/)
   assert.match(screen, /\{t\('siteUnitsNewPo'\)\}/)
-  // 0188: the only badge is «خرجت» on a closed visit.
-  assert.equal((screen.match(/<Badge/g) ?? []).length, 1)
+  // 0188: «خرجت» on a closed visit; 0195 (nested workshop stays): «في الورشة»
+  // on an open visit whose unit is in the workshop. No other badge.
+  assert.equal((screen.match(/<Badge/g) ?? []).length, 2)
   assert.match(
     screen,
     /\{row\.visit_state === 'exited' && \(\s+<Badge tone="neutral" size="sm">\s+\{t\('siteUnitsExited'\)\}/,

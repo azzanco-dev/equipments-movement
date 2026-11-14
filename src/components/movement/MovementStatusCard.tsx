@@ -3,12 +3,12 @@ import { useI18n } from '@/i18n/I18nContext'
 import { Skeleton, cn } from '@/components/ui'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
-import type { LastMovement } from '@/lib/types'
+import type { EquipmentPresence } from '@/lib/equipmentPresence'
 import { workshopPurposeLabelKey } from '@/lib/equipmentState'
 
 export interface MovementStatusCardProps {
   loading: boolean
-  lastMovement: LastMovement | null
+  presence: EquipmentPresence | null
   isEntry: boolean
   /** True while a validation error blocks the movement. */
   blocked: boolean
@@ -16,12 +16,14 @@ export interface MovementStatusCardProps {
 
 /**
  * "Current status" summary above the movement form: where the equipment is
- * now, its last movement, and whether the requested movement is allowed. The
- * rule itself stays in the database; this only mirrors `get_last_movement`.
+ * now (inside the workshop, with its open project visit under it when there
+ * is one; inside a project; outside), its last movement, and whether the
+ * requested movement is allowed. The rule itself stays in the database; this
+ * only mirrors `get_equipment_presence`.
  */
 export function MovementStatusCard({
   loading,
-  lastMovement,
+  presence,
   isEntry,
   blocked,
 }: MovementStatusCardProps) {
@@ -35,11 +37,21 @@ export function MovementStatusCard({
       </div>
     )
 
-  const currentStatus: 'inside' | 'outside' | 'none' = !lastMovement
+  const currentStatus: 'workshop' | 'site' | 'outside' | 'none' = !presence
     ? 'none'
-    : lastMovement.movement_type === 'entry'
-      ? 'inside'
-      : 'outside'
+    : presence.workshopOpen
+      ? 'workshop'
+      : presence.siteOpen
+        ? 'site'
+        : presence.lastMovementId
+          ? 'outside'
+          : 'none'
+  const hasProjectName = Boolean(
+    presence?.siteProjectNameAr || presence?.siteProjectNameEn,
+  )
+  const projectName = presence
+    ? localizedName(lang, presence.siteProjectNameAr, presence.siteProjectNameEn)
+    : ''
 
   return (
     <div
@@ -49,42 +61,27 @@ export function MovementStatusCard({
       )}
     >
       <div className="flex items-center gap-2 text-sm font-medium">
-        {currentStatus === 'inside' ? (
+        {currentStatus === 'workshop' || currentStatus === 'site' ? (
           <>
             <CheckCircle size={16} className="text-success" />
             <span>
               {t('currentStatus')}:{' '}
-              {t(
-                lastMovement?.movement_context === 'workshop'
-                  ? 'insideWorkshop'
-                  : 'insideSite',
-              )}
-              {lastMovement?.movement_context === 'workshop' && (
+              {t(currentStatus === 'workshop' ? 'insideWorkshop' : 'insideSite')}
+              {currentStatus === 'workshop' && (
                 <>
                   {' '}
                   —{' '}
                   {t(
-                    workshopPurposeLabelKey(lastMovement.workshop_purpose) ??
+                    workshopPurposeLabelKey(presence?.workshopPurpose) ??
                       'pendingClassification',
                   )}
                 </>
               )}
-              {lastMovement?.movement_context === 'site' && (
+              {currentStatus === 'site' && (
                 <>
-                  {(lastMovement.project_name_ar ||
-                    lastMovement.project_name_en) && (
-                    <>
-                      {' '}
-                      —{' '}
-                      {localizedName(
-                        lang,
-                        lastMovement.project_name_ar,
-                        lastMovement.project_name_en,
-                      )}
-                    </>
-                  )}
-                  {lastMovement.supervisor_name && (
-                    <> — {lastMovement.supervisor_name}</>
+                  {hasProjectName && <> — {projectName}</>}
+                  {presence?.siteSupervisorName && (
+                    <> — {presence.siteSupervisorName}</>
                   )}
                 </>
               )}
@@ -96,7 +93,7 @@ export function MovementStatusCard({
             <span>
               {t('currentStatus')}:{' '}
               {t(
-                lastMovement?.movement_context === 'workshop'
+                presence?.lastMovementContext === 'workshop'
                   ? 'outsideWorkshop'
                   : 'outsideSite',
               )}
@@ -110,13 +107,22 @@ export function MovementStatusCard({
         )}
       </div>
 
-      {lastMovement && (
+      {currentStatus === 'workshop' && presence?.siteOpen && (
+        <p className="text-xs text-muted">
+          {hasProjectName
+            ? t('movementTiedToProject').replace('{project}', projectName)
+            : t('movementTiedToProjectUnnamed')}
+          {presence.siteSupervisorName && <> — {presence.siteSupervisorName}</>}
+        </p>
+      )}
+
+      {presence?.lastMovementAt && (
         <div className="flex items-center gap-2 text-xs text-muted">
           <Clock size={14} />
           <span>
             {t('lastMovement')}:{' '}
-            {lastMovement.movement_type === 'entry' ? t('entry') : t('exit')} —{' '}
-            {formatDate(lastMovement.recorded_at)}
+            {presence.lastMovementType === 'entry' ? t('entry') : t('exit')} —{' '}
+            {formatDate(presence.lastMovementAt)}
           </span>
         </div>
       )}

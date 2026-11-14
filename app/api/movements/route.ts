@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { after, NextResponse } from 'next/server'
 import { isExitPurpose } from '@/lib/exitPurpose'
 import { movementErrorCode, movementErrorStatus } from '@/lib/movementErrors'
-import { sendMovementExitNotice } from '@/lib/server/movementNotices'
+import { sendMovementNotice } from '@/lib/server/movementNotices'
 
 export const runtime = 'nodejs'
 
@@ -84,11 +84,18 @@ export async function POST(request: Request) {
     }
     // wave-10-exit-purpose (migration 0111): a SITE exit must state its
     // purpose, from the allowlist only. Workshop exits and entries never
-    // carry one, so the value is not forwarded for them. The database
-    // requirement follows once this form is live (supabase/pending/0112).
+    // carry one, so the value is not forwarded for them. Nested workshop
+    // stays (2026-11-14): a NEW project exit is always «انتهاء عمل», because a
+    // workshop stop no longer ends the project visit; `maintenance` is refused
+    // (old rows keep it, the admin edit and the Excel import are unchanged).
     const exitPurpose = value('exit_purpose')
     const isSiteExit = movementType === 'exit' && movementContext === 'site'
-    if (movementType === 'exit' && exitPurpose && !isExitPurpose(exitPurpose)) {
+    if (
+      movementType === 'exit' &&
+      exitPurpose &&
+      (!isExitPurpose(exitPurpose) ||
+        (isSiteExit && exitPurpose !== 'work_completed'))
+    ) {
       return NextResponse.json(
         { error: 'invalid_exit_purpose' },
         { status: 400 },
@@ -274,15 +281,16 @@ export async function POST(request: Request) {
       )
     }
 
-    // wave 9 (migration 0110): the automatic WhatsApp notice of an EXIT runs
-    // AFTER the response is sent, so it can neither delay nor fail the saved
-    // movement. The database decides whether there is anything to send.
-    if (movementType === 'exit') {
+    // wave 9 (migration 0110, nested workshop stays 2026-11-14): the automatic
+    // WhatsApp notice runs AFTER the response is sent, so it can neither delay
+    // nor fail the saved movement. It follows every movement except a project
+    // ENTRY; the database decides whether there is anything to send and to whom.
+    if (!isSiteEntry) {
       const savedMovementId: string = insertedLog.id
       try {
-        after(() => sendMovementExitNotice(supabase, savedMovementId))
+        after(() => sendMovementNotice(supabase, savedMovementId))
       } catch {
-        console.error('Movement exit notice was not scheduled')
+        console.error('Movement notice was not scheduled')
       }
     }
 

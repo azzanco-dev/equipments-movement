@@ -352,7 +352,7 @@ test('the ticket of a closed visit: «خرجت», its exit day and purpose', () 
   const data = read('src', 'lib', 'purchasingData.ts')
   assert.match(
     data,
-    /supplier_po_id,po_number,has_po,visit_state,exit_at,exit_purpose,entry_created_at'/,
+    /supplier_po_id,po_number,has_po,visit_state,exit_at,exit_purpose,entry_created_at(?:,in_workshop)?'/,
   )
 })
 
@@ -517,7 +517,9 @@ test('0192: the tickets show and sort by the entry registration only', () => {
 
   const data = readFile('src', 'lib', 'purchasingData.ts')
   const select = /export const SITE_UNITS_SELECT =\s+'([^']+)'/.exec(data)[1].split(',')
-  assert.equal(select[select.length - 1], 'entry_created_at')
+  // 0195 appends in_workshop after it (nested workshop stays).
+  assert.equal(select[select.indexOf('entry_created_at')], 'entry_created_at')
+  assert.ok(select.slice(select.indexOf('entry_created_at')).every((column) => column === 'entry_created_at' || column === 'in_workshop'))
   assert.ok(!select.includes('exit_created_at'))
 
   const configs = readFile('src', 'lib', 'listConfigs.ts')
