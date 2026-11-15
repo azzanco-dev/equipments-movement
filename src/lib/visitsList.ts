@@ -162,6 +162,22 @@ export function visitSortField(
 }
 
 /**
+ * The direction a click on a visits column header asks for (owner 2026-11-15,
+ * «لما اسوي سورت في الزيارات ليش يبدا اول شي بالترتيب بالتصاعدي» → «الزيارات
+ * فقط»): every sortable visits column is a date, so a newly picked column
+ * starts with the newest first, and another click on the active column flips
+ * it. The shared table's own rule (a new column starts ascending) is unchanged
+ * for every other list.
+ */
+export function visitHeaderSortDirection(
+  key: string,
+  current: { key: string; direction: 'asc' | 'desc' },
+): 'asc' | 'desc' {
+  if (key !== current.key) return 'desc'
+  return current.direction === 'desc' ? 'asc' : 'desc'
+}
+
+/**
  * The `movement_visits` columns the visits search matches, in filter order:
  * the equipment code, type and plate, the driver snapshot, the ENTRY's
  * company number (`contractor_equipment_code`, migration 0106) and, for a

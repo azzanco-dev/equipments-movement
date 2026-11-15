@@ -69,6 +69,7 @@ import {
   visitExitPurpose,
   visitExportFileName,
   visitPeriodOrFilter,
+  visitHeaderSortDirection,
   visitSortField,
   visitStateView,
   visitsListConfig,
@@ -795,7 +796,16 @@ export function VisitsTable({
             rowHref={(visit) => `/movements/${visit.entry_id}`}
             rowLinkColumn="equipment_code"
             sort={{ key: sortKey, direction: ascending ? 'asc' : 'desc' }}
-            onSortChange={(key, direction) => list.setSort(key, direction)}
+            // The columns are dates: a newly picked one starts newest first.
+            onSortChange={(key) =>
+              list.setSort(
+                key,
+                visitHeaderSortDirection(key, {
+                  key: sortKey,
+                  direction: ascending ? 'asc' : 'desc',
+                }),
+              )
+            }
             loading={loading}
             loadingRows={isLog ? 8 : 5}
             empty={

@@ -43,6 +43,7 @@ const {
   visitExportFileName,
   visitOwnerLabel,
   visitPeriodOrFilter,
+  visitHeaderSortDirection,
   visitSortField,
   visitStateView,
   visitsListConfig,
@@ -283,6 +284,31 @@ test('sorting is an allowlist, defaulting to the entry instant', () => {
   assert.equal(visitSortField('id; drop table'), 'entry_at')
   assert.equal(visitSortField(null), 'entry_at')
   assert.equal(visitSortField(undefined), 'entry_at')
+})
+
+test('a visits column header starts newest first, then flips', () => {
+  // Owner 2026-11-15: a newly picked column is descending on the first click.
+  const onEntryDesc = { key: 'entry_at', direction: 'desc' }
+  assert.equal(visitHeaderSortDirection('exit_at', onEntryDesc), 'desc')
+  assert.equal(
+    visitHeaderSortDirection('entry_created_at', {
+      key: 'entry_at',
+      direction: 'asc',
+    }),
+    'desc',
+  )
+  // The active column flips on each click.
+  assert.equal(visitHeaderSortDirection('entry_at', onEntryDesc), 'asc')
+  assert.equal(
+    visitHeaderSortDirection('entry_at', { key: 'entry_at', direction: 'asc' }),
+    'desc',
+  )
+  // The table uses it for its header clicks.
+  const table = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'components', 'visits', 'VisitsTable.tsx'),
+    'utf8',
+  )
+  assert.match(table, /visitHeaderSortDirection\(key, \{/)
 })
 
 test('the visits list defaults to the newest visit first', () => {
