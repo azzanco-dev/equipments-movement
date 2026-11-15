@@ -185,17 +185,9 @@ export function movementNoticeMessage(
           : 'Entered the workshop from the project.',
       ])
     }
-    case 'workshop_return': {
-      const projectAr = firstOf(facts.projectNameAr, facts.projectNameEn)
-      const projectEn = firstOf(facts.projectNameEn, facts.projectNameAr)
-      return block(facts1, [
-        projectAr
-          ? `✅ خرجت من الورشة وعادت الى مشروع ${projectAr}.`
-          : '✅ خرجت من الورشة وعادت الى المشروع.',
-        projectEn
-          ? `Left the workshop and is back in project ${projectEn}.`
-          : 'Left the workshop and is back in the project.',
-      ])
-    }
+    case 'workshop_return':
+      // No project here (owner 2026-11-15, «رسالة الخروج مو شرط لنفس الموقع,
+      // خليها خرجت من الورشة»): the unit may go elsewhere after the workshop.
+      return block(facts1, ['✅ خرجت من الورشة.', 'Left the workshop.'])
   }
 }

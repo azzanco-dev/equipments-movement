@@ -617,11 +617,10 @@ test('the five templates are fixed, short, bilingual and follow the Arabic rule'
       'Entered the workshop from project PROJECT-EN.',
   )
   const returned = movementNoticeMessage('workshop_return', facts)
+  // The return names no project: the unit may go elsewhere after the workshop.
   assert.equal(
     returned,
-    '🚜 TK-104 (Excavator)\n\n' +
-      '✅ خرجت من الورشة وعادت الى مشروع PROJECT-AR.\n' +
-      'Left the workshop and is back in project PROJECT-EN.',
+    '🚜 TK-104 (Excavator)\n\n✅ خرجت من الورشة.\nLeft the workshop.',
   )
   for (const message of [entered, returned]) {
     assert.ok(!message.includes('OFFICER'))
@@ -631,7 +630,7 @@ test('the five templates are fixed, short, bilingual and follow the Arabic rule'
   // Without a project name the sentences still read.
   for (const kind of ['workshop_entry', 'workshop_return']) {
     const bare = movementNoticeMessage(kind, { equipmentCode: 'TK-104' })
-    assert.match(bare, /المشروع/)
+    if (kind === 'workshop_entry') assert.match(bare, /المشروع/)
     assert.ok(!/undefined|null/.test(bare))
   }
 })
