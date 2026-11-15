@@ -605,20 +605,28 @@ test('the five templates are fixed, short, bilingual and follow the Arabic rule'
     assert.ok(!message.includes('OFFICER'))
   }
   // Nested workshop stays (2026-11-14): the foreman of the OPEN project visit
-  // is told his visit stays open (workshop_entry) or that the unit is back in
-  // his project (workshop_return); the project is named in each language, and
-  // no notice carries a link or the officer's name.
+  // is told his unit entered the workshop (workshop_entry) or that it is back
+  // in his project (workshop_return); the project is named in each language,
+  // and no notice carries a link or the officer's name. Owner 2026-11-15: the
+  // notices are short and say nothing about what to record or not to record.
   const entered = movementNoticeMessage('workshop_entry', facts)
-  assert.ok(entered.includes('زيارتها في مشروع PROJECT-AR تبقى قائمة'))
-  assert.ok(entered.includes('ولا تحتاج تسجيل خروج'))
-  assert.ok(entered.includes('Its visit in project PROJECT-EN stays open'))
+  assert.equal(
+    entered,
+    '🚜 TK-104 (Excavator)\n\n' +
+      '🔧 دخلت الورشة من مشروع PROJECT-AR.\n' +
+      'Entered the workshop from project PROJECT-EN.',
+  )
   const returned = movementNoticeMessage('workshop_return', facts)
-  assert.ok(returned.includes('وعادت الى مشروع PROJECT-AR'))
-  assert.ok(returned.includes('لا تحتاج تسجيل دخول جديد'))
-  assert.ok(returned.includes('back in project PROJECT-EN'))
+  assert.equal(
+    returned,
+    '🚜 TK-104 (Excavator)\n\n' +
+      '✅ خرجت من الورشة وعادت الى مشروع PROJECT-AR.\n' +
+      'Left the workshop and is back in project PROJECT-EN.',
+  )
   for (const message of [entered, returned]) {
     assert.ok(!message.includes('OFFICER'))
     assert.ok(!message.includes('COMPANY'))
+    assert.ok(!/تسجيل|record/i.test(message))
   }
   // Without a project name the sentences still read.
   for (const kind of ['workshop_entry', 'workshop_return']) {

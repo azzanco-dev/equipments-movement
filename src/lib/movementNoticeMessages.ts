@@ -171,16 +171,18 @@ export function movementNoticeMessage(
       ])
     case 'workshop_entry': {
       // The project of the visit that stays open: Arabic name first, English
-      // under it, so each line reads in one language.
+      // under it, so each line reads in one language. Short on purpose (owner
+      // 2026-11-15, «مختصرة بدون اشعار عدم التسجيل»): the foremen are told the
+      // new procedure themselves, so the notice states the fact only.
       const projectAr = firstOf(facts.projectNameAr, facts.projectNameEn)
       const projectEn = firstOf(facts.projectNameEn, facts.projectNameAr)
       return block(facts1, [
         projectAr
-          ? `🔧 دخلت الورشة. زيارتها في مشروع ${projectAr} تبقى قائمة، ولا تحتاج تسجيل خروج.`
-          : '🔧 دخلت الورشة. زيارتها في المشروع تبقى قائمة، ولا تحتاج تسجيل خروج.',
+          ? `🔧 دخلت الورشة من مشروع ${projectAr}.`
+          : '🔧 دخلت الورشة من المشروع.',
         projectEn
-          ? `Entered the workshop. Its visit in project ${projectEn} stays open; no exit needs to be recorded.`
-          : 'Entered the workshop. Its project visit stays open; no exit needs to be recorded.',
+          ? `Entered the workshop from project ${projectEn}.`
+          : 'Entered the workshop from the project.',
       ])
     }
     case 'workshop_return': {
@@ -188,11 +190,11 @@ export function movementNoticeMessage(
       const projectEn = firstOf(facts.projectNameEn, facts.projectNameAr)
       return block(facts1, [
         projectAr
-          ? `✅ خرجت من الورشة وعادت الى مشروع ${projectAr}. لا تحتاج تسجيل دخول جديد.`
-          : '✅ خرجت من الورشة وعادت الى المشروع. لا تحتاج تسجيل دخول جديد.',
+          ? `✅ خرجت من الورشة وعادت الى مشروع ${projectAr}.`
+          : '✅ خرجت من الورشة وعادت الى المشروع.',
         projectEn
-          ? `Left the workshop and is back in project ${projectEn}. No new entry needs to be recorded.`
-          : 'Left the workshop and is back in the project. No new entry needs to be recorded.',
+          ? `Left the workshop and is back in project ${projectEn}.`
+          : 'Left the workshop and is back in the project.',
       ])
     }
   }
