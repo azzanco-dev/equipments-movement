@@ -27,30 +27,28 @@ export function RadioCard({
       value={value}
       disabled={disabled}
       className={cn(
-        // The approved Figma card: the icon tile and the radio on one row, the
-        // name and its line under them.
-        'group flex w-full flex-col gap-2.5 rounded-lg border bg-bg p-3 text-start transition-colors',
+        // One row (owner 2026-11-15, «النصوص بجانب الايقونة مش تحت»): the icon
+        // tile, the name with its line beside it, the radio at the end.
+        'group flex w-full items-center gap-3 rounded-lg border bg-bg p-3 text-start transition-colors',
         'hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50',
         'data-[state=checked]:border-[1.5px] data-[state=checked]:border-primary',
       )}
     >
-      <span className="flex w-full items-center justify-between">
-        <span
-          aria-hidden="true"
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-hover text-muted group-data-[state=checked]:bg-success-soft group-data-[state=checked]:text-success"
-        >
-          {icon}
-        </span>
-        <span
-          aria-hidden="true"
-          className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-bg group-data-[state=checked]:border-primary"
-        >
-          <RadixRadioGroup.Indicator className="h-2.5 w-2.5 rounded-full bg-primary" />
-        </span>
+      <span
+        aria-hidden="true"
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-hover text-muted group-data-[state=checked]:bg-success-soft group-data-[state=checked]:text-success"
+      >
+        {icon}
       </span>
-      <span className="min-w-0">
+      <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold">{title}</span>
         <span className="block text-xs text-muted">{hint}</span>
+      </span>
+      <span
+        aria-hidden="true"
+        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-bg group-data-[state=checked]:border-primary"
+      >
+        <RadixRadioGroup.Indicator className="h-2.5 w-2.5 rounded-full bg-primary" />
       </span>
     </RadixRadioGroup.Item>
   )
