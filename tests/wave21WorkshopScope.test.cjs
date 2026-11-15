@@ -180,7 +180,7 @@ test('/logs keeps opening on the projects tab for admin and monitor', () => {
 
 test('the embedded log keeps the admin filters, visits view and export', () => {
   const logs = read('src', 'screens', 'admin-home', 'LogsScreen.tsx')
-  assert.match(logs, /\{!embedded && \(\s*<PageHeader title=\{t\('logs'\)\}/)
+  assert.match(logs, /\{!embedded && \(\s*<PageHeader\s+title=\{t\('logs'\)\}/)
   assert.match(logs, /config=\{logsListConfig\}/)
   assert.match(logs, /filterFields=\{logsListConfig\.filterFields\}/)
   assert.match(logs, /<ExportDialog<MovementExportRow>/)

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
-import { Download } from 'lucide-react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { Download, Plus } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -30,7 +30,9 @@ import {
   type FilterBarAsyncField,
 } from '@/components/data-list/FilterBar'
 import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
+import { AddPastVisitDialog } from '@/components/movement/AddPastVisitDialog'
 import { MovementTypeBadge } from '@/components/movement/ExitPurposeBadge'
+import { PAST_VISIT_PERMISSION } from '@/lib/pastVisit'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useI18n } from '@/i18n/I18nContext'
@@ -272,6 +274,11 @@ export function LogsScreen({
   // The Excel export is for the holders of `movements.export` only.
   const permissions = usePermissions()
   const canExport = permissions.can('movements.export')
+  // «اضافة زيارة كاملة» (0197): the page header only, never the embedded copy.
+  const canAddPastVisit =
+    !embedded && permissions.can(PAST_VISIT_PERMISSION)
+  const [pastVisitOpen, setPastVisitOpen] = useState(false)
+  const router = useRouter()
   // The context tabs follow the `movements.read` scope (owner 2026-10-29);
   // a URL or default naming a tab the scope does not offer falls back to
   // the first one offered.
@@ -730,7 +737,29 @@ export function LogsScreen({
   return (
     <div ref={listTopRef} className="scroll-mt-20 space-y-4">
       {!embedded && (
-        <PageHeader title={t('logs')} description={t('logsDesc')} />
+        <PageHeader
+          title={t('logs')}
+          description={t('logsDesc')}
+          actions={
+            canAddPastVisit ? (
+              <Button variant="outline" onClick={() => setPastVisitOpen(true)}>
+                <Plus size={16} aria-hidden="true" />
+                {t('pastVisitButton')}
+              </Button>
+            ) : undefined
+          }
+        />
+      )}
+      {canAddPastVisit && (
+        <AddPastVisitDialog
+          open={pastVisitOpen}
+          onOpenChange={setPastVisitOpen}
+          onSaved={(entryId) =>
+            onSelectMovement
+              ? onSelectMovement(entryId)
+              : router.push(`/movements/${entryId}`)
+          }
+        />
       )}
 
       <div className="flex flex-wrap items-center gap-2">

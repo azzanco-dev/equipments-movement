@@ -19,6 +19,11 @@ import {
   normalizeRegistryNumber,
 } from '@/lib/partyFields'
 import {
+  PAST_VISIT_CONTRACTOR_CODE_MAX_LENGTH,
+  PAST_VISIT_NOTES_MAX_LENGTH,
+  pastVisitTodayKey,
+} from '@/lib/pastVisit'
+import {
   CARD_MONTH_NOTE_MAX,
   isValidCardMonthDays,
   isValidCardMonthHours,
@@ -1059,3 +1064,52 @@ export function focusFirstError<T>(
     if (!focus()) window.requestAnimationFrame(focus)
   })
 }
+
+/**
+ * «اضافة زيارة كاملة» (0197): the unit, the foreman, the company, the project
+ * and both days are required; the exit is not before the entry and neither
+ * day is after today (the database re-checks all of it).
+ */
+export const pastVisitFormSchema = z
+  .object({
+    equipment_id: selected('pastVisitEquipmentRequired'),
+    supervisor_id: selected('pastVisitSupervisorRequired'),
+    company_id: selected('pastVisitCompanyRequired'),
+    project_id: selected('pastVisitProjectRequired'),
+    entry_date: z.string().trim().min(1, message('pastVisitEntryDateRequired')),
+    exit_date: z.string().trim().min(1, message('pastVisitExitDateRequired')),
+    driver_id: z.string(),
+    contractor_code: optionalText({
+      max: PAST_VISIT_CONTRACTOR_CODE_MAX_LENGTH,
+      lengthKey: 'pastVisitContractorCodeTooLong',
+    }),
+    notes: optionalText({
+      max: PAST_VISIT_NOTES_MAX_LENGTH,
+      lengthKey: 'pastVisitNotesTooLong',
+    }),
+  })
+  .superRefine((values, context) => {
+    const today = pastVisitTodayKey()
+    if (values.entry_date && values.entry_date > today)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['entry_date'],
+        message: 'pastVisitEntryInFuture',
+      })
+    if (values.exit_date && values.exit_date > today)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['exit_date'],
+        message: 'pastVisitExitInFuture',
+      })
+    if (
+      values.entry_date &&
+      values.exit_date &&
+      values.exit_date < values.entry_date
+    )
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['exit_date'],
+        message: 'pastVisitExitBeforeEntry',
+      })
+  })

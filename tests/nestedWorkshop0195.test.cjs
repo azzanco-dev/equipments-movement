@@ -519,11 +519,15 @@ test('the closing guard and the schema reload', () => {
 })
 
 test('no later migration re-creates the 0195 objects', () => {
+  // 0197 («اضافة زيارة كاملة») re-creates enforce_movement_sequence as 0195
+  // verbatim plus its past-visit marker; tests/pastVisit0197.test.cjs proves
+  // the verbatim part. That one function of that one file is exempt here.
+  const M0197 = '20261115100000_0197_add_past_site_visit.sql'
   const later = FILES.filter((f) => f > FILE)
   for (const f of later) {
     const text = strip(read(f))
     for (const re of [
-      /FUNCTION public\.enforce_movement_sequence\(/i,
+      ...(f === M0197 ? [] : [/FUNCTION public\.enforce_movement_sequence\(/i]),
       /FUNCTION public\.movement_sequence_violations\(/i,
       /FUNCTION public\.equipment_state_from_presence\(/i,
       /FUNCTION public\.equipment_state\(/i,

@@ -2768,6 +2768,53 @@ export const translations = {
     homeV2FleetTables: 'جداول الاسطول',
     homeV2FleetTablesHint: 'داخل المشاريع والورشة والمتاحة، كل جدول يفتح كاملا مع التصدير.',
     // admin-home-v2 — end
+    // past-visit — start
+    pastVisitButton: 'اضافة زيارة كاملة',
+    pastVisitTitle: 'اضافة زيارة كاملة',
+    pastVisitDesc: 'تسجيل زيارة مشروع انتهت في الماضي: الدخول والخروج معا.',
+    pastVisitNotice:
+      'الخروج يسجل «انتهاء عمل». الصور غير مطلوبة هنا، وتضاف لاحقا من صفحة الحركة.',
+    pastVisitSupervisor: 'الفورمان',
+    pastVisitSupervisorHint: 'تسجل الزيارة باسمه.',
+    pastVisitEntryDate: 'تاريخ الدخول',
+    pastVisitExitDate: 'تاريخ الخروج',
+    pastVisitDurationLine:
+      'مدة الزيارة: {duration} · تسجل الحركتان الساعة 12 ظهرا، ويضبط الوقت تلقائيا اذا كانت للمعدة حركة اخرى في اليوم نفسه.',
+    pastVisitSameDay: 'اقل من يوم',
+    pastVisitDriverPlaceholder: 'ابحث عن سائق',
+    pastVisitSubmit: 'اضافة الزيارة',
+    pastVisitEquipmentRequired: 'اختر المعدة.',
+    pastVisitSupervisorRequired: 'اختر الفورمان.',
+    pastVisitCompanyRequired: 'اختر الشركة.',
+    pastVisitProjectRequired: 'اختر المشروع.',
+    pastVisitEntryDateRequired: 'اختر تاريخ الدخول.',
+    pastVisitExitDateRequired: 'اختر تاريخ الخروج.',
+    pastVisitEntryInFuture: 'تاريخ الدخول لا يكون بعد اليوم.',
+    pastVisitExitInFuture: 'تاريخ الخروج لا يكون بعد اليوم.',
+    pastVisitExitBeforeEntry: 'تاريخ الخروج قبل تاريخ الدخول.',
+    pastVisitContractorCodeTooLong: 'ترقيم الشركة طويل: 50 حرفا على الاكثر.',
+    pastVisitNotesTooLong: 'الملاحظات طويلة: 1000 حرف على الاكثر.',
+    pastVisitDatesInvalid: 'التاريخ غير صحيح.',
+    pastVisitErrorEquipment: 'المعدة غير موجودة.',
+    pastVisitErrorSupervisor: 'اختر فورمان يسجل حركات المشاريع.',
+    pastVisitErrorCompany: 'الشركة غير موجودة.',
+    pastVisitErrorProject: 'المشروع غير موجود.',
+    pastVisitErrorDriver: 'السائق غير موجود.',
+    pastVisitErrorInWorkshop:
+      'المعدة كانت داخل الورشة في هذا التاريخ. اختر تاريخ دخول اخر.',
+    pastVisitErrorNotAllowed: 'ليست لديك صلاحية اضافة زيارة كاملة.',
+    pastVisitErrorSequence:
+      'تسلسل حركات المعدة لا يسمح بهذه الزيارة في هذه الفترة. راجع حركات المعدة.',
+    pastVisitErrorNoGap:
+      'لا يوجد وقت كاف بين حركات المعدة في ذلك اليوم لهذه الزيارة. راجع حركات المعدة.',
+    pastVisitConflictTitle:
+      'لم تحفظ الزيارة: الفترة تتعارض مع زيارة اخرى لهذه المعدة.',
+    pastVisitConflictProject: 'مشروع {project}',
+    pastVisitConflictRange: 'من {from} الى {to}',
+    pastVisitConflictRangeOngoing: 'من {from} وما زالت قائمة',
+    pastVisitConflictLink: 'فتح الزيارة المتعارضة',
+    pastVisitConflictDateHint: 'غير التاريخين، او عدل الزيارة المتعارضة اولا.',
+    // past-visit — end
   },
   en: {
     appName: 'Heavy Equipment Management',
@@ -5596,6 +5643,53 @@ export const translations = {
     homeV2FleetTables: 'Fleet tables',
     homeV2FleetTablesHint: 'Inside projects, the workshop and available; each table opens in full with its export.',
     // admin-home-v2 — end
+    // past-visit — start
+    pastVisitButton: 'Add a whole visit',
+    pastVisitTitle: 'Add a whole visit',
+    pastVisitDesc: 'Record a project visit that ended in the past: the entry and the exit together.',
+    pastVisitNotice:
+      'The exit is recorded as "work completed". Photos are not required here and can be added later from the movement page.',
+    pastVisitSupervisor: 'Foreman',
+    pastVisitSupervisorHint: 'The visit is recorded in his name.',
+    pastVisitEntryDate: 'Entry date',
+    pastVisitExitDate: 'Exit date',
+    pastVisitDurationLine:
+      'Visit length: {duration} · both movements are recorded at 12 noon; the time is adjusted when the equipment has another movement on the same day.',
+    pastVisitSameDay: 'less than a day',
+    pastVisitDriverPlaceholder: 'Search for a driver',
+    pastVisitSubmit: 'Add the visit',
+    pastVisitEquipmentRequired: 'Choose the equipment.',
+    pastVisitSupervisorRequired: 'Choose the foreman.',
+    pastVisitCompanyRequired: 'Choose the company.',
+    pastVisitProjectRequired: 'Choose the project.',
+    pastVisitEntryDateRequired: 'Choose the entry date.',
+    pastVisitExitDateRequired: 'Choose the exit date.',
+    pastVisitEntryInFuture: 'The entry date cannot be after today.',
+    pastVisitExitInFuture: 'The exit date cannot be after today.',
+    pastVisitExitBeforeEntry: 'The exit date is before the entry date.',
+    pastVisitContractorCodeTooLong: 'The company number is too long: 50 characters at most.',
+    pastVisitNotesTooLong: 'The notes are too long: 1000 characters at most.',
+    pastVisitDatesInvalid: 'The date is not valid.',
+    pastVisitErrorEquipment: 'The equipment does not exist.',
+    pastVisitErrorSupervisor: 'Choose a foreman who records project movements.',
+    pastVisitErrorCompany: 'The company does not exist.',
+    pastVisitErrorProject: 'The project does not exist.',
+    pastVisitErrorDriver: 'The driver does not exist.',
+    pastVisitErrorInWorkshop:
+      'The equipment was inside the workshop on this date. Choose another entry date.',
+    pastVisitErrorNotAllowed: 'You are not allowed to add a whole visit.',
+    pastVisitErrorSequence:
+      "The equipment's movement sequence does not allow this visit in this period. Check the equipment's movements.",
+    pastVisitErrorNoGap:
+      "There is not enough time between the equipment's movements on that day for this visit. Check the equipment's movements.",
+    pastVisitConflictTitle:
+      'The visit was not saved: the period overlaps another visit of this equipment.',
+    pastVisitConflictProject: 'Project {project}',
+    pastVisitConflictRange: 'from {from} to {to}',
+    pastVisitConflictRangeOngoing: 'from {from}, still open',
+    pastVisitConflictLink: 'Open the overlapping visit',
+    pastVisitConflictDateHint: 'Change both dates, or edit the overlapping visit first.',
+    // past-visit — end
   },
 } as const
 
