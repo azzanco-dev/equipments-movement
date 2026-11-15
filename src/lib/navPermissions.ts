@@ -175,6 +175,10 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
       { key: 'settings.equipment_types' },
       { key: 'settings.integrations' },
       { key: 'settings.roles' },
+      // 0197 (owner 2026-11-15, «خلي الزر في الاعدادات»): «اضافة زيارة كاملة»
+      // is a card of the Settings hub, so its holders reach the hub too; every
+      // other card there keeps its own gate.
+      { key: 'movements.site.add_past_visit' },
     ],
   },
 ]

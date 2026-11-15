@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
+  CalendarPlus,
   ChevronRight,
   Download,
   Edit2,
@@ -64,6 +65,8 @@ import { usePermissions } from '@/auth/PermissionsContext'
 import { canOpenPage, type RoutePage } from '@/lib/navPermissions'
 import { AfaqySettings } from '@/components/afaqy/AfaqySettings'
 import { BanksSettings } from '@/components/banks/BanksSettings'
+import { AddPastVisitDialog } from '@/components/movement/AddPastVisitDialog'
+import { PAST_VISIT_PERMISSION } from '@/lib/pastVisit'
 
 type EquipmentTypeRow = {
   id: string
@@ -120,6 +123,11 @@ export function AdminSettings() {
   const opens = (page: RoutePage) =>
     permissionStatus === 'ready' && canOpenPage(permissions, page)
   const canSeeActivity = opens('activity')
+  // «اضافة زيارة كاملة» (0197; owner 2026-11-15, «خلي الزر في الاعدادات»): a
+  // hub card that opens the dialog, for the holders of its key only.
+  const canAddPastVisit =
+    permissionStatus === 'ready' && permissions.has(PAST_VISIT_PERMISSION)
+  const [pastVisitOpen, setPastVisitOpen] = useState(false)
   const [rows, setRows] = useState<EquipmentTypeRow[]>([])
   const [total, setTotal] = useState(0)
   const [typesCount, setTypesCount] = useState<number | null>(null)
@@ -525,6 +533,26 @@ export function AdminSettings() {
               <p className="mt-1 text-sm text-muted">{t('activityLogDesc')}</p>
             </button>
           )}
+          {/* Opens a dialog, not a page: a plus instead of the chevron. */}
+          {canAddPastVisit && (
+            <button
+              type="button"
+              onClick={() => setPastVisitOpen(true)}
+              className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
+            >
+              <div className="mb-4 flex w-full items-start justify-between gap-3">
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  <CalendarPlus size={18} />
+                </span>
+                <Plus size={18} className="text-muted" aria-hidden="true" />
+              </div>
+              <h2 className="font-semibold">{t('pastVisitButton')}</h2>
+              <p className="mt-1 text-sm text-muted">{t('pastVisitDesc')}</p>
+            </button>
+          )}
           {opens('settings/afaqy') && (
             <button
               type="button"
@@ -596,6 +624,13 @@ export function AdminSettings() {
             </button>
           )}
         </div>
+        {canAddPastVisit && (
+          <AddPastVisitDialog
+            open={pastVisitOpen}
+            onOpenChange={setPastVisitOpen}
+            onSaved={(entryId) => router.push(`/movements/${entryId}`)}
+          />
+        )}
       </div>
     )
 

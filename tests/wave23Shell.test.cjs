@@ -86,7 +86,8 @@ function catalogueKeys() {
     for (const insert of sql.matchAll(
       /INSERT INTO public\.permissions \([\s\S]*?\) VALUES([\s\S]*?);\n/g,
     ))
-      for (const row of insert[1].matchAll(/^\s*\('([\w.]+)', '(\w+)',/gm))
+      // `\(\s*`: 0197 opens its row on the VALUES line and names the key on the next.
+      for (const row of insert[1].matchAll(/^\s*\(\s*'([\w.]+)', '(\w+)',/gm))
         keys.add(row[1])
   return keys
 }
@@ -839,6 +840,8 @@ test('the gates of the pages outside the sidebar', () => {
     { key: 'settings.equipment_types' },
     { key: 'settings.integrations' },
     { key: 'settings.roles' },
+    // 0197: «اضافة زيارة كاملة» is a card of the Settings hub.
+    { key: 'movements.site.add_past_visit' },
   ])
   // A detail page with only the settings key it needs.
   const afaqy = nav.planShell(

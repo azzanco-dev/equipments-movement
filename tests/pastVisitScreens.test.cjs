@@ -223,17 +223,33 @@ test('the schema is Zod, with required fields and the date rules', () => {
   assert.match(schema, /PAST_VISIT_NOTES_MAX_LENGTH/)
 })
 
-test('the button: gated on the key, in the page header only', () => {
-  const s = read('src', 'screens', 'admin-home', 'LogsScreen.tsx')
-  assert.match(s, /!embedded && permissions\.can\(PAST_VISIT_PERMISSION\)/)
+test('the entry point: a Settings hub card gated on the key, not the log', () => {
+  // Owner 2026-11-15, «خلي الزر في الاعدادات»: the button left the /logs header.
+  const logs = read('src', 'screens', 'admin-home', 'LogsScreen.tsx')
+  assert.ok(!logs.includes('AddPastVisitDialog'))
+  assert.ok(!logs.includes('pastVisit'))
+
+  const s = read('src', 'screens', 'AdminSettings.tsx')
   assert.equal(lib.PAST_VISIT_PERMISSION, 'movements.site.add_past_visit')
-  const header = s.slice(s.indexOf('<PageHeader'), s.indexOf('<AddPastVisitDialog'))
-  assert.match(header, /canAddPastVisit/)
-  assert.match(header, /variant="outline"/)
-  assert.match(header, /<Plus /)
-  assert.match(header, /pastVisitButton/)
+  assert.match(
+    s,
+    /permissionStatus === 'ready' && permissions\.has\(PAST_VISIT_PERMISSION\)/,
+  )
+  const card = s.slice(s.indexOf('{canAddPastVisit && ('), s.indexOf("{opens('settings/afaqy')"))
+  assert.match(card, /setPastVisitOpen\(true\)/)
+  assert.match(card, /<CalendarPlus /)
+  assert.match(card, /pastVisitButton/)
+  assert.match(card, /pastVisitDesc/)
   assert.equal((s.match(/<AddPastVisitDialog/g) ?? []).length, 1)
   assert.match(s, /router\.push\(`\/movements\/\$\{entryId\}`\)/)
+
+  // A holder of the key alone reaches the Settings hub.
+  const nav = read('src', 'lib', 'navPermissions.ts')
+  const settings = nav.slice(nav.indexOf("key: 'settings',"))
+  assert.match(
+    settings.slice(0, settings.indexOf(']')),
+    /\{ key: 'movements\.site\.add_past_visit' \}/,
+  )
 })
 
 test('the dialog: fields, the RPC, the conflict link', () => {
@@ -278,7 +294,7 @@ test('both languages carry every past-visit key, without hamza alif', () => {
     read('src', 'lib', 'pastVisit.ts'),
     read('src', 'lib', 'formValidation.ts'),
     read('src', 'components', 'movement', 'AddPastVisitDialog.tsx'),
-    read('src', 'screens', 'admin-home', 'LogsScreen.tsx'),
+    read('src', 'screens', 'AdminSettings.tsx'),
   ])
     for (const m of file.matchAll(/'(pastVisit\w+)'/g)) used.add(m[1])
   for (const key of used) assert.ok(keys[0].includes(key), key)

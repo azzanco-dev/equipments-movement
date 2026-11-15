@@ -78,7 +78,8 @@ function catalogueKeys() {
     for (const insert of sql.matchAll(
       /INSERT INTO public\.permissions \([\s\S]*?\) VALUES([\s\S]*?);\n/g,
     ))
-      for (const row of insert[1].matchAll(/^\s*\('([\w.]+)', '(\w+)',/gm))
+      // `\(\s*`: 0197 opens its row on the VALUES line and names the key on the next.
+      for (const row of insert[1].matchAll(/^\s*\(\s*'([\w.]+)', '(\w+)',/gm))
         keys.add(row[1])
   for (const sql of migrationTexts)
     for (const [, key] of sql.matchAll(
