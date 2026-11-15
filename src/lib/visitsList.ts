@@ -63,7 +63,7 @@ export const EQUIPMENT_VISITS_VIEW = 'movement_visits'
  * appended by migration 0191.
  */
 export const EQUIPMENT_VISITS_SELECT =
-  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code,equipment_ownership_status,exit_purpose,driver_full_name,entry_created_at,exit_created_at'
+  'entry_id,exit_id,equipment_id,equipment_code,equipment_type,equipment_plate_number,movement_context,workshop_purpose,company_id,company_name_ar,company_name_en,project_id,project_name_ar,project_name_en,entry_supervisor_id,entry_supervisor_name,exit_supervisor_id,driver_id,driver_name,entry_at,exit_at,is_open,duration_minutes,contractor_equipment_code,equipment_ownership_status,exit_purpose,driver_full_name,entry_created_at,exit_created_at,equipment_chassis_number'
 
 /**
  * The admin log's visits view (and the workshop managers' embedded log): the
@@ -80,6 +80,8 @@ export interface EquipmentVisitRow {
   equipment_code: string | null
   equipment_type: string | null
   equipment_plate_number?: string | null
+  /** 0198: shown in the plate's place for a unit without a plate. */
+  equipment_chassis_number?: string | null
   movement_context: 'site' | 'workshop'
   workshop_purpose: 'maintenance' | 'parking' | 'out_of_service' | null
   company_id: string | null
@@ -189,6 +191,8 @@ export const VISIT_SEARCH_FIELDS = [
   'equipment_code',
   'equipment_type_search',
   'equipment_plate_number',
+  // 0198 (owner 2026-11-15, «اضف البحث بالشاصي»).
+  'equipment_chassis_number',
   'driver_name_search',
   'contractor_equipment_code',
   'equipment_plate_digits',
@@ -197,8 +201,8 @@ export const VISIT_SEARCH_FIELDS = [
 export const visitsListConfig: DataListConfig = {
   id: 'visits',
   searchPlaceholder: {
-    ar: 'البحث بالمعدة (كود او نوع او لوحة) او ترقيم الشركة او السائق',
-    en: 'Search by equipment (code, type or plate), company number or driver',
+    ar: 'البحث بالمعدة (كود او نوع او لوحة او شاصي) او ترقيم الشركة او السائق',
+    en: 'Search by equipment (code, type, plate or chassis), company number or driver',
   },
   searchFields: [...VISIT_SEARCH_FIELDS],
   // Newest visit first; `entry_id` breaks ties so paging is deterministic.

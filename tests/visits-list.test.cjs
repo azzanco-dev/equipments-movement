@@ -78,14 +78,16 @@ test('the search term cannot break out of the PostgREST or() filter', () => {
   }
 })
 
-test('a text term probes code, type, plate, driver and company number only', () => {
+test('a text term probes code, type, plate, chassis, driver and company number only', () => {
   // The type and the driver are matched through their normalized columns
-  // (migration 0116), which get the normalized (lower-case) term.
+  // (migration 0116), which get the normalized (lower-case) term. The chassis
+  // joined them with migration 0198 (owner 2026-11-15).
   assert.equal(
     buildVisitSearchFilter('A12'),
     'equipment_code.ilike.%A12%,' +
       'equipment_type_search.ilike.%a12%,' +
       'equipment_plate_number.ilike.%A12%,' +
+      'equipment_chassis_number.ilike.%A12%,' +
       'driver_name_search.ilike.%a12%,' +
       'contractor_equipment_code.ilike.%A12%',
   )
