@@ -1,13 +1,14 @@
 import { useEffect, useId, useMemo, useState } from 'react'
+import { Download, FileSpreadsheet, FileText, List } from 'lucide-react'
 import {
   Button,
   Checkbox,
   Dialog,
   Notice,
-  RadioGroup,
-  RadioGroupItem,
   Spinner,
+  Switch,
 } from '@/components/ui'
+import { RadioCard, RadioCardGroup } from './ExportFileTypeCards'
 import { useI18n } from '@/i18n/I18nContext'
 import type { ExcelColumn } from '@/lib/excelSheet'
 import {
@@ -211,6 +212,22 @@ export function ExportDialog<T>({
     return parts.join(' · ')
   }, [activeFilters, contextLabel, scope, search, t])
 
+  // The switch's second line: the applied search and filters, without the
+  // context label the description already carries.
+  const scopeNote = useMemo(() => {
+    if (scope === 'all') return t('exportScopeAll')
+    const parts: string[] = []
+    const term = search.trim()
+    if (term) parts.push(t('exportSummarySearch').replace('{term}', term))
+    if (activeFilters > 0)
+      parts.push(
+        t('exportSummaryFilters').replace('{count}', String(activeFilters)),
+      )
+    if (!term && activeFilters === 0) return t('exportSummaryNone')
+    if (!term) parts.push(t('exportSummaryNoSearch'))
+    return parts.join(' · ')
+  }, [activeFilters, scope, search, t])
+
   const runExport = async () => {
     setError(null)
     // The print tab is opened now, inside the press, so it is not blocked as
@@ -285,9 +302,19 @@ export function ExportDialog<T>({
   }
 
   const columnsLabelId = useId()
+  const fileTypeLabelId = useId()
+  const scopeLabelId = useId()
+  const scopeNoteId = useId()
   const chosen = new Set(selection)
   const basicKeys = mandatoryColumnKeys(columns)
   const columnGroups = groupExportColumns(columns)
+  const countText = (value: number) => value.toLocaleString('en-US')
+  const description =
+    count.status === 'ready'
+      ? t('exportContextCount')
+          .replace('{context}', contextLabel)
+          .replace('{count}', countText(count.value))
+      : contextLabel
 
   return (
     <Dialog
@@ -297,99 +324,74 @@ export function ExportDialog<T>({
       }}
       size="lg"
       title={t('exportDialogTitle')}
-      description={t('exportDialogDesc')}
+      description={description}
       footer={
-        <>
-          <Button
-            variant="outline"
-            disabled={exporting}
-            onClick={() => onOpenChange(false)}
+        <div className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <div
+            className="flex items-center gap-1.5 text-xs text-muted"
+            aria-live="polite"
           >
-            {t('cancel')}
-          </Button>
-          <Button
-            variant="primary"
-            loading={exporting}
-            disabled={!canExport}
-            onClick={() => void runExport()}
-          >
-            {t('exportSubmit').replace(
-              '{count}',
-              String(count.status === 'ready' ? exportCount : 0),
-            )}
-          </Button>
-        </>
+            {count.status === 'loading' ? (
+              <>
+                <Spinner size="sm" label={t('exportCountLoading')} />
+                {t('exportCountLoading')}
+              </>
+            ) : count.status === 'ready' ? (
+              <>
+                <List className="h-3.5 w-3.5" aria-hidden="true" />
+                {t('exportFooterCount').replace(
+                  '{count}',
+                  countText(count.value),
+                )}
+              </>
+            ) : null}
+          </div>
+          <div className="ms-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              disabled={exporting}
+              onClick={() => onOpenChange(false)}
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              variant="primary"
+              loading={exporting}
+              disabled={!canExport}
+              icon={<Download className="h-4 w-4" aria-hidden="true" />}
+              onClick={() => void runExport()}
+            >
+              {t(fileType === 'xlsx' ? 'exportSubmitExcel' : 'exportSubmitPdf')}
+            </Button>
+          </div>
+        </div>
       }
     >
       <div className="space-y-5">
-        <fieldset className="space-y-1">
-          <legend className="mb-1 text-sm font-medium">
+        <div className="space-y-2">
+          <p id={fileTypeLabelId} className="text-sm font-medium">
             {t('exportFileType')}
-          </legend>
-          <RadioGroup
+          </p>
+          <RadioCardGroup
+            aria-labelledby={fileTypeLabelId}
             value={fileType}
             onValueChange={(value) => setFileType(value as ExportFileType)}
             disabled={exporting}
           >
-            <RadioGroupItem value="xlsx" label={t('exportFileExcel')} />
-            <RadioGroupItem value="pdf" label={t('exportFilePdf')} />
-          </RadioGroup>
-        </fieldset>
-
-        <fieldset className="space-y-1">
-          <legend className="mb-1 text-sm font-medium">
-            {t('exportScope')}
-          </legend>
-          <RadioGroup
-            value={scope}
-            onValueChange={(value) => setScope(value as ExportScope)}
-            disabled={exporting}
-          >
-            <RadioGroupItem value="current" label={t('exportScopeCurrent')} />
-            <RadioGroupItem value="all" label={t('exportScopeAll')} />
-          </RadioGroup>
-          <p className="text-xs text-muted">{summary}</p>
-          <div className="pt-1" aria-live="polite">
-            {count.status === 'loading' ? (
-              <span className="inline-flex items-center gap-2 text-sm text-muted">
-                <Spinner size="sm" label={t('exportCountLoading')} />
-                {t('exportCountLoading')}
-              </span>
-            ) : count.status === 'error' ? (
-              <Notice
-                tone="danger"
-                size="compact"
-                action={
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setCountAttempt((value) => value + 1)}
-                  >
-                    {t('retry')}
-                  </Button>
-                }
-              >
-                {t('exportCountError')}
-              </Notice>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">
-                  {t('exportCountValue').replace(
-                    '{count}',
-                    String(count.value),
-                  )}
-                </p>
-                {count.value > cap && (
-                  <Notice tone="warning" size="compact">
-                    {t('exportCappedBefore')
-                      .replace('{count}', String(exportCount))
-                      .replace('{total}', String(count.value))}
-                  </Notice>
-                )}
-              </div>
-            )}
-          </div>
-        </fieldset>
+            <RadioCard
+              value="xlsx"
+              icon={<FileSpreadsheet className="h-4 w-4" />}
+              title={t('exportFileExcel')}
+              hint={t('exportFileExcelHint')}
+            />
+            <RadioCard
+              value="pdf"
+              icon={<FileText className="h-4 w-4" />}
+              title={t('exportFilePdf')}
+              hint={t('exportFilePdfHint')}
+            />
+          </RadioCardGroup>
+        </div>
 
         <div
           role="group"
@@ -397,38 +399,37 @@ export function ExportDialog<T>({
           className="space-y-2"
         >
           <div className="flex flex-wrap items-center gap-1">
-            <span id={columnsLabelId} className="me-auto text-sm font-medium">
+            <span id={columnsLabelId} className="text-sm font-medium">
               {t('exportColumns')}
             </span>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={exporting}
-              onClick={() => updateSelection(allColumnKeys(columns))}
-            >
-              {t('exportSelectAll')}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={exporting}
-              onClick={() => updateSelection(basicKeys)}
-            >
-              {t('exportBasicOnly')}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={exporting}
-              onClick={() => updateSelection([])}
-            >
-              {t('exportClearAll')}
-            </Button>
+            <span className="ms-1 text-xs text-muted">
+              {t('exportColumnsCount')
+                .replace('{selected}', String(selection.length))
+                .replace('{total}', String(allColumnKeys(columns).length))}
+            </span>
+            <span className="ms-auto inline-flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={exporting}
+                onClick={() => updateSelection(allColumnKeys(columns))}
+              >
+                {t('exportSelectAll')}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={exporting}
+                onClick={() => updateSelection(basicKeys)}
+              >
+                {t('exportBasicOnly')}
+              </Button>
+            </span>
           </div>
           {/* wave-15-export-fields: every field, so the list is dense — 12 px
               labels, small boxes, two columns on a phone and three from
               `sm` up, under one heading per group. */}
-          <div className="space-y-2 rounded-lg border px-3 py-2">
+          <div className="space-y-2 rounded-lg bg-surface-hover px-3 py-2.5">
             {columnGroups.map((group, groupIndex) => (
               <div
                 key={`${groupIndex}-${group.label}`}
@@ -469,6 +470,49 @@ export function ExportDialog<T>({
           <p className="text-xs text-muted">{t('exportMandatoryHint')}</p>
         </div>
 
+        <div className="flex items-start gap-3">
+          <Switch
+            aria-labelledby={scopeLabelId}
+            aria-describedby={scopeNoteId}
+            checked={scope === 'current'}
+            onCheckedChange={(checked) => setScope(checked ? 'current' : 'all')}
+            disabled={exporting}
+            className="mt-0.5"
+          />
+          <div className="min-w-0">
+            <p id={scopeLabelId} className="text-sm font-medium">
+              {t('exportScopeCurrent')}
+            </p>
+            <p id={scopeNoteId} className="text-xs text-muted">
+              {scopeNote}
+            </p>
+          </div>
+        </div>
+
+        {count.status === 'error' && (
+          <Notice
+            tone="danger"
+            size="compact"
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setCountAttempt((value) => value + 1)}
+              >
+                {t('retry')}
+              </Button>
+            }
+          >
+            {t('exportCountError')}
+          </Notice>
+        )}
+        {count.status === 'ready' && count.value > cap && (
+          <Notice tone="warning" size="compact">
+            {t('exportCappedBefore')
+              .replace('{count}', countText(exportCount))
+              .replace('{total}', countText(count.value))}
+          </Notice>
+        )}
         {error && (
           <Notice tone="danger" size="compact" onDismiss={() => setError(null)}>
             {error}

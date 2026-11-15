@@ -562,14 +562,15 @@ test('the wave-15 strings exist in both languages and follow the Arabic rule', (
   const arabic = blocks.find((block) => /[؀-ۿ]/.test(block))
   assert.ok(arabic)
   assert.ok(!/[أإآ]/.test(arabic))
-  assert.match(arabic, /exportScopeCurrent: 'السجلات حسب الفلتر الحالي'/)
+  assert.match(arabic, /exportScopeCurrent: 'حسب البحث والفلاتر الحالية'/)
   assert.match(arabic, /exportScopeAll: 'كل السجلات'/)
   assert.match(arabic, /exportSelectAll: 'تحديد الكل'/)
   assert.match(arabic, /exportBasicOnly: 'الاساسية فقط'/)
-  assert.match(arabic, /exportClearAll: 'الغاء الكل'/)
+  assert.doesNotMatch(arabic, /exportClearAll/)
   assert.match(arabic, /printAction: 'طباعة \/ حفظ PDF'/)
   for (const key of [
-    'exportSubmit',
+    'exportSubmitExcel',
+    'exportSubmitPdf',
     'exportCappedBefore',
     'printMissingTitle',
     'printMissingDesc',
