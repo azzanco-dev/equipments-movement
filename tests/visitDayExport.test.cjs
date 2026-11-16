@@ -236,6 +236,37 @@ test('the file: three right-to-left sheets, numbers as numbers', () => {
   // The file really writes.
   const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
   assert.ok(buffer.length > 1000)
+  // Beside a real date column the day cells stay plain numbers: the writer
+  // stores a date's format on the style object, so they must not share one
+  // (the owner saw 10 as «10/01/1900 00:00» on 2026-11-16).
+  const dated = writer.buildExportWorkbookSheets(
+    [
+      sheetLib.sheetSpec(
+        'Visits',
+        [
+          {
+            header: 'Entry',
+            type: 'date',
+            value: (row) => row.entry_at,
+          },
+          ...built.trailingColumns,
+        ],
+        [s1, s2, old],
+      ),
+    ],
+    { rtl: true },
+  )
+  const back = XLSX.read(
+    XLSX.write(dated, { type: 'buffer', bookType: 'xlsx' }),
+    { cellNF: true, cellStyles: true },
+  ).Sheets.Visits
+  assert.equal(back.A2.z, 'dd/mm/yyyy hh:mm')
+  // B = hours, C = workshop days, D = day 1, E = day 2 (a Friday, empty).
+  for (const address of ['B2', 'C2', 'D2', 'E2', 'D3', 'B3']) {
+    assert.equal(back[address].z, 'General', address)
+  }
+  assert.equal(back.B2.w, '230')
+  assert.equal(back.D2.w, '10')
   // A repeated sheet name gets its number instead of failing.
   const twice = writer.buildExportWorkbookSheets([
     sheetLib.sheetSpec('Same', visitColumns, []),

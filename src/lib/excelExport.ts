@@ -61,28 +61,36 @@ function buildExportSheet<T>(
   // Every second data row is banded, as an Excel table is.
   const bandText = exportCellStyle('text', rtl, false, true)
   const bandDate = exportCellStyle('date', rtl, false, true)
+  // A centered column (the day columns) has the date cells' centered look but
+  // its OWN style objects: the writer stores a date cell's number format on
+  // the style object it carries, so a shared object would show a centered
+  // number (10) as a date.
+  const bodyCenter = exportCellStyle('date', rtl)
+  const bandCenter = exportCellStyle('date', rtl, false, true)
 
   columns.forEach((column, columnIndex) => {
     const isDate = column.type === 'date'
-    // A centered column (the day columns) takes the date cells' centered look
-    // without their number format.
-    const centered = isDate || column.align === 'center'
+    const centered = !isDate && column.align === 'center'
     for (let rowIndex = 0; rowIndex < aoa.length; rowIndex += 1) {
       const address = XLSX.utils.encode_cell({ c: columnIndex, r: rowIndex })
       // An empty value writes no cell; it still needs the border and height.
       const cell = (sheet[address] ??= { t: 's', v: '' }) as XLSX.CellObject
       if (rowIndex === 0) {
-        cell.s = centered ? headerDate : headerText
+        cell.s = isDate || centered ? headerDate : headerText
         continue
       }
       const banded = rowIndex % 2 === 0
-      cell.s = centered
+      cell.s = isDate
         ? banded
           ? bandDate
           : bodyDate
-        : banded
-          ? bandText
-          : bodyText
+        : centered
+          ? banded
+            ? bandCenter
+            : bodyCenter
+          : banded
+            ? bandText
+            : bodyText
       // Date cells carry the display format; `aoa_to_sheet` wrote them as
       // plain numbers, which would otherwise show as a five-digit serial.
       if (isDate && typeof cell.v === 'number') {
