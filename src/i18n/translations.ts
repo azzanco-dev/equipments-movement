@@ -1010,10 +1010,7 @@ export const translations = {
     exportDaysLegendMeaning: 'المعنى',
     exportDaysLegendSite:
       'يوم داخل مشروع (10 ساعات). يوم الدخول ويوم الخروج محسوبان، والجمعة داخل المشروع تبقى فارغة.',
-    exportDaysLegendMaintenance: 'يوم في الورشة: صيانة',
-    exportDaysLegendParking: 'يوم في الورشة: وقوف',
-    exportDaysLegendOutOfService: 'يوم في الورشة: خارج الخدمة',
-    exportDaysLegendUnclassified: 'يوم في الورشة بدون تصنيف',
+    exportDaysLegendWorkshop: 'يوم في الورشة',
     exportDaysLegendUnrecorded:
       'بدون تسجيل: المعدة ليست مسجلة في مشروع ولا في الورشة',
     exportDaysLegendEmptyCode: 'فارغ',
@@ -3865,10 +3862,7 @@ export const translations = {
     exportDaysLegendMeaning: 'Meaning',
     exportDaysLegendSite:
       'A day inside a project (10 hours). The entry and exit days count; a Friday inside a project stays empty.',
-    exportDaysLegendMaintenance: 'A workshop day: maintenance',
-    exportDaysLegendParking: 'A workshop day: standby',
-    exportDaysLegendOutOfService: 'A workshop day: out of service',
-    exportDaysLegendUnclassified: 'A workshop day without a purpose',
+    exportDaysLegendWorkshop: 'A day in the workshop',
     exportDaysLegendUnrecorded:
       'Unrecorded: the unit is in no project and not in the workshop',
     exportDaysLegendEmptyCode: 'Empty',

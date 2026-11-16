@@ -99,9 +99,9 @@ test('the visits sheet: the counts, then one column per day, last', () => {
     10,
     10,
     10,
-    'ص',
-    'ص',
-    'ص',
+    'W',
+    'W',
+    'W',
     null,
   ])
   // 31 days of October less its 5 Fridays and the 3 days of the stop.
@@ -139,7 +139,7 @@ test('«المستخلص»: one row per unit with the three counts', () => {
     unrecordedDays: 24,
   })
   assert.equal(u2.cells[0], '')
-  assert.equal(u2.cells[7], '-')
+  assert.equal(u2.cells[7], 'A')
   const [units, legend] = built.extraSheets
   assert.equal(units.name, 'exportDaysSheetUnits')
   assert.deepEqual(
@@ -157,7 +157,7 @@ test('«المستخلص»: one row per unit with the three counts', () => {
   assert.equal(units.columns.length, 7 + 31)
   assert.equal(legend.name, 'exportDaysSheetLegend')
   assert.ok(legend.rows.some((row) => row.code === '10'))
-  assert.ok(legend.rows.some((row) => row.code === 'ص'))
+  assert.ok(legend.rows.some((row) => row.code === 'W'))
 })
 
 test('a unit seen before the month is «بدون تسجيل» from the first day', () => {
@@ -210,7 +210,7 @@ test('the projects export draws the workshop days on the project rows', () => {
   const both = build([a, b])
   // A ended in September, yet the workshop days that followed it are its:
   // 1–3 October (the letter shows on a Friday too), nothing after.
-  assert.deepEqual(cellsOf(both, a).slice(0, 5), ['ص', 'ص', 'ص', null, null])
+  assert.deepEqual(cellsOf(both, a).slice(0, 5), ['W', 'W', 'W', null, null])
   assert.equal(both.trailingColumns[0].value(a), 0)
   assert.equal(both.trailingColumns[1].value(a), 3)
   // B: its own days only, 4–10 October less Friday the 9th.
@@ -231,7 +231,7 @@ test('the projects export draws the workshop days on the project rows', () => {
   // With A out of the file (and of the month), the stay goes to the next
   // project visit instead of vanishing.
   const alone = build([b])
-  assert.deepEqual(cellsOf(alone, b).slice(0, 5), ['ص', 'ص', 'ص', 10, 10])
+  assert.deepEqual(cellsOf(alone, b).slice(0, 5), ['W', 'W', 'W', 10, 10])
   assert.equal(alone.trailingColumns[1].value(b), 3)
   // «المستخلص» is the unit's whole month either way.
   assert.deepEqual(JSON.parse(JSON.stringify(both.unitRows[0].summary)), {
@@ -293,7 +293,7 @@ test('the file: three right-to-left sheets, numbers as numbers', () => {
   assert.equal(visits.D2.s.alignment.horizontal, 'center')
   assert.equal(visits.D1.v, '1')
   // I2 = 6 October, the workshop letter.
-  assert.equal(visits.I2.v, 'ص')
+  assert.equal(visits.I2.v, 'W')
   // The file really writes.
   const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
   assert.ok(buffer.length > 1000)
@@ -441,10 +441,7 @@ test('both languages carry the new keys', () => {
     'exportDaysLegendCode',
     'exportDaysLegendMeaning',
     'exportDaysLegendSite',
-    'exportDaysLegendMaintenance',
-    'exportDaysLegendParking',
-    'exportDaysLegendOutOfService',
-    'exportDaysLegendUnclassified',
+    'exportDaysLegendWorkshop',
     'exportDaysLegendUnrecorded',
     'exportDaysLegendEmptyCode',
     'exportDaysLegendEmpty',

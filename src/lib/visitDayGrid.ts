@@ -9,8 +9,8 @@
  *
  * The rules, decided with the owner:
  *   - a day inside a project counts 10 hours, a Friday stays empty;
- *   - a day in the workshop shows the purpose's letter, Fridays included;
- *   - a day no visit covers is «-» (بدون تسجيل) on the units sheet;
+ *   - a day in the workshop shows W whatever its purpose, Fridays included;
+ *   - a day no visit covers is A (بدون تسجيل) on the units sheet;
  *   - when several visits cover one day, the one that STARTED LAST owns it
  *     (the inquiry page's rule): a workshop stop nested in a project visit
  *     takes its days, and a unit that left one project and entered another
@@ -267,25 +267,23 @@ export function unitMonthDays(
 
 // --- Cells ------------------------------------------------------------------
 
-export type DayCodes = Record<WorkshopDayKind | 'unrecorded', string>
+export interface DayCodes {
+  /** A day in the workshop, whatever its purpose. */
+  workshop: string
+  /** A day no visit covers («بدون تسجيل»). */
+  unrecorded: string
+}
 
-/** The letters of the sheet: Arabic for the Arabic file, Latin otherwise. */
-export function dayCodes(lang: 'ar' | 'en'): DayCodes {
-  return lang === 'ar'
-    ? {
-        maintenance: 'ص',
-        parking: 'ق',
-        out_of_service: 'خ',
-        unclassified: 'و',
-        unrecorded: '-',
-      }
-    : {
-        maintenance: 'M',
-        parking: 'S',
-        out_of_service: 'O',
-        unclassified: 'W',
-        unrecorded: '-',
-      }
+/**
+ * The letters of the sheet, the same in both languages (owner 2026-11-16,
+ * «الورشة "W" بدون تسجيل "A" بدون صيانة ووقوف»): W = the workshop, with no
+ * letter per purpose, and A = no record. The first version had ص / ق / خ / و
+ * per purpose and «-».
+ */
+export const DAY_CODES: DayCodes = { workshop: 'W', unrecorded: 'A' }
+
+export function dayCodes(): DayCodes {
+  return DAY_CODES
 }
 
 function isWorkshopKind(kind: DayKind): kind is WorkshopDayKind {
@@ -295,7 +293,7 @@ function isWorkshopKind(kind: DayKind): kind is WorkshopDayKind {
 /** The units sheet: the whole month of one unit. */
 export function unitDayCell(day: GridDay, codes: DayCodes): DayCell {
   if (day.kind === 'site') return day.friday ? '' : DAY_HOURS
-  if (isWorkshopKind(day.kind)) return codes[day.kind]
+  if (isWorkshopKind(day.kind)) return codes.workshop
   if (day.kind === 'unrecorded') return codes.unrecorded
   return ''
 }
@@ -359,7 +357,7 @@ export function visitDayCell(
         ? day.ownerEntryId !== null &&
           parents.get(day.ownerEntryId) === visit.entryId
         : inside
-      return mine ? codes[day.kind] : ''
+      return mine ? codes.workshop : ''
     }
     return inside &&
       day.kind === 'site' &&
@@ -371,7 +369,7 @@ export function visitDayCell(
   return inside &&
     isWorkshopKind(day.kind) &&
     day.ownerEntryId === visit.entryId
-    ? codes[day.kind]
+    ? codes.workshop
     : ''
 }
 
@@ -391,16 +389,13 @@ export function summarizeDayCells(
   cells: readonly DayCell[],
   codes: DayCodes,
 ): DaySummary {
-  const workshop = new Set<string>(
-    WORKSHOP_DAY_KINDS.map((kind) => codes[kind]),
-  )
   let hours = 0
   let workshopDays = 0
   let unrecordedDays = 0
   for (const cell of cells) {
     if (typeof cell === 'number') hours += cell
     else if (cell === codes.unrecorded) unrecordedDays += 1
-    else if (workshop.has(cell)) workshopDays += 1
+    else if (cell === codes.workshop) workshopDays += 1
   }
   return { hours, workshopDays, unrecordedDays }
 }

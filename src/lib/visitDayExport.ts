@@ -136,7 +136,7 @@ export function buildVisitDayExport({
   t: Translate
   lang: Language
 }): VisitDayExport {
-  const codes = dayCodes(lang)
+  const codes = dayCodes()
   const days = monthDayKeys(monthKey)
   const firstDay = days[0] ?? ''
   const lastDay = days[days.length - 1] ?? ''
@@ -242,10 +242,7 @@ export function buildVisitDayExport({
   const legendRows: Array<{ code: string; meaning: string }> = [
     { code: t('exportDaysMonth'), meaning: monthLabel(monthKey, lang) },
     { code: String(DAY_HOURS), meaning: t('exportDaysLegendSite') },
-    { code: codes.maintenance, meaning: t('exportDaysLegendMaintenance') },
-    { code: codes.parking, meaning: t('exportDaysLegendParking') },
-    { code: codes.out_of_service, meaning: t('exportDaysLegendOutOfService') },
-    { code: codes.unclassified, meaning: t('exportDaysLegendUnclassified') },
+    { code: codes.workshop, meaning: t('exportDaysLegendWorkshop') },
     { code: codes.unrecorded, meaning: t('exportDaysLegendUnrecorded') },
     {
       code: t('exportDaysLegendEmptyCode'),
