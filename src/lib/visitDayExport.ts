@@ -26,6 +26,7 @@ import {
   unitMonthDays,
   visitDayCell,
   visitsByUnit,
+  workshopParents,
   type DayCell,
   type DaySummary,
   type GridVisit,
@@ -140,7 +141,13 @@ export function buildVisitDayExport({
   const firstDay = days[0] ?? ''
   const lastDay = days[days.length - 1] ?? ''
   const todayKey = saudiDayKeyOf(now)
-  const byUnit = visitsByUnit(monthVisits.map(gridVisitOf))
+  // The month's visits plus the exported rows themselves (a row may lie
+  // outside the month and still be the project a workshop stay came from).
+  const known = new Map<string, GridVisit>()
+  for (const visit of monthVisits) known.set(visit.entry_id, gridVisitOf(visit))
+  for (const row of rows)
+    if (!known.has(row.entry_id)) known.set(row.entry_id, gridVisitOf(row))
+  const byUnit = visitsByUnit([...known.values()])
 
   // Each unit once, in the order of its code.
   const units = new Map<string, EquipmentVisitRow>()
@@ -153,19 +160,27 @@ export function buildVisitDayExport({
       unitMonthDays(byUnit.get(id) ?? [], monthKey, now, seenBefore.has(id)),
     ]),
   )
+  // Which project row each workshop stay of a unit is drawn on.
+  const unitParents = new Map(
+    [...units.keys()].map((id) => [id, workshopParents(byUnit.get(id) ?? [])]),
+  )
 
-  // The visits sheet: a visit outside the month keeps its cells empty and
-  // its counts blank (not 0: it has no part in the month).
+  // The visits sheet: a visit with no part in the month — outside it, and no
+  // workshop day of its own there — keeps its cells empty and its counts
+  // blank (not 0).
   const visitCells = new Map<string, DayCell[]>()
   const visitSummary = new Map<string, DaySummary>()
   for (const row of rows) {
     const from = saudiDayKeyOf(row.entry_at)
+    if (!from) continue
     const to = row.exit_at ? saudiDayKeyOf(row.exit_at) : todayKey
-    if (!from || from > lastDay || to < firstDay) continue
     const visit = gridVisitOf(row)
+    const parents = unitParents.get(row.equipment_id)
     const cells = (unitDays.get(row.equipment_id) ?? []).map((day) =>
-      visitDayCell(day, visit, codes, now),
+      visitDayCell(day, visit, codes, now, parents),
     )
+    const touches = from <= lastDay && to >= firstDay
+    if (!touches && cells.every((cell) => cell === '')) continue
     visitCells.set(row.entry_id, cells)
     visitSummary.set(row.entry_id, summarizeDayCells(cells, codes))
   }

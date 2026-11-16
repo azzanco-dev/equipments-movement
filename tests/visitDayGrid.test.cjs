@@ -190,3 +190,63 @@ test('a visit row is empty outside its own span', () => {
   })
   assert.equal(grid.visitsByUnit(visits).get('u1').length, 1)
 })
+
+// Owner 2026-11-16: «ضمّن ايام الورشة في تصدير المشاريع, فقط في اعمدة الايام».
+test('a workshop stay after a project exit shows on that project row', () => {
+  // Project A 5–10, the workshop 10–13, project B 13–20.
+  const a = visit('a', 'site', '2026-10-05', '2026-10-10')
+  const w = {
+    ...visit('w', 'workshop', '2026-10-10', '2026-10-13', {
+      workshopPurpose: 'maintenance',
+    }),
+    entryAt: at('2026-10-10', '12:30'),
+  }
+  const b = {
+    ...visit('b', 'site', '2026-10-13', '2026-10-20'),
+    entryAt: at('2026-10-13', '12:30'),
+  }
+  const visits = [a, w, b]
+  const parents = grid.workshopParents(visits)
+  assert.deepEqual([...parents], [['w', 'a']])
+  const days = grid.unitMonthDays(visits, '2026-10', NOW, false)
+  const rowOf = (one) =>
+    days.map((day) => grid.visitDayCell(day, one, AR, NOW, parents))
+  // A: 10 on 5–8, Friday the 9th empty, then the workshop days 10–12, which
+  // lie after its exit; the 13th is project B's.
+  assert.deepEqual(rowOf(a).slice(4, 14), [
+    10,
+    10,
+    10,
+    10,
+    '',
+    'ص',
+    'ص',
+    'ص',
+    '',
+    '',
+  ])
+  // B shows none of them: a workshop day is on one project row only.
+  assert.deepEqual(rowOf(b).slice(9, 14), ['', '', '', 10, 10])
+  // The workshop row keeps its own days.
+  assert.deepEqual(rowOf(w).slice(9, 13), ['ص', 'ص', 'ص', ''])
+  // Without the map (the old call) a project row shows only the stops
+  // inside its own span.
+  const plain = days.map((day) => grid.visitDayCell(day, a, AR, NOW))
+  assert.deepEqual(plain.slice(9, 12), ['ص', '', ''])
+})
+
+test('a workshop stay with no project before it goes to the next one', () => {
+  const w = visit('w', 'workshop', '2026-10-01', '2026-10-03', {
+    workshopPurpose: 'parking',
+  })
+  const b = visit('b', 'site', '2026-10-05', '2026-10-06')
+  const c = visit('c', 'site', '2026-10-20', null)
+  // A nested stop of the open visit c belongs to c, not to b.
+  const n = visit('n', 'workshop', '2026-10-22', '2026-10-23')
+  assert.deepEqual([...grid.workshopParents([w, b, c, n])].sort(), [
+    ['n', 'c'],
+    ['w', 'b'],
+  ])
+  // A unit that never entered a project: nothing to draw it on.
+  assert.equal(grid.workshopParents([w]).size, 0)
+})

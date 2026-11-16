@@ -180,6 +180,67 @@ test('a unit seen before the month is «بدون تسجيل» from the first day
   )
 })
 
+// Owner 2026-11-16: «ضمّن ايام الورشة في تصدير المشاريع, فقط في اعمدة الايام».
+test('the projects export draws the workshop days on the project rows', () => {
+  // u3: project A until 28 September, the workshop until 4 October, then
+  // project B 4–10 October. Only the project visits are exported.
+  const a = visitRow('pa', 'u3', 'B7', 'site', '2026-09-10', '2026-09-28')
+  const w = {
+    ...visitRow('pw', 'u3', 'B7', 'workshop', '2026-09-28', '2026-10-04', {
+      workshop_purpose: 'maintenance',
+    }),
+    entry_at: at('2026-09-28', '12:30'),
+  }
+  const b = {
+    ...visitRow('pb', 'u3', 'B7', 'site', '2026-10-04', '2026-10-10'),
+    entry_at: at('2026-10-04', '12:30'),
+  }
+  const build = (rows) =>
+    dayExport.buildVisitDayExport({
+      rows,
+      monthVisits: [w, b],
+      seenBefore: new Set(['u3']),
+      monthKey: '2026-10',
+      now: NOW,
+      t,
+      lang: 'ar',
+    })
+  const cellsOf = (built, row) =>
+    built.trailingColumns.slice(2).map((column) => column.value(row))
+  const both = build([a, b])
+  // A ended in September, yet the workshop days that followed it are its:
+  // 1–3 October (the letter shows on a Friday too), nothing after.
+  assert.deepEqual(cellsOf(both, a).slice(0, 5), ['ص', 'ص', 'ص', null, null])
+  assert.equal(both.trailingColumns[0].value(a), 0)
+  assert.equal(both.trailingColumns[1].value(a), 3)
+  // B: its own days only, 4–10 October less Friday the 9th.
+  assert.deepEqual(cellsOf(both, b).slice(0, 10), [
+    null,
+    null,
+    null,
+    10,
+    10,
+    10,
+    10,
+    10,
+    null,
+    10,
+  ])
+  assert.equal(both.trailingColumns[0].value(b), 60)
+  assert.equal(both.trailingColumns[1].value(b), 0)
+  // With A out of the file (and of the month), the stay goes to the next
+  // project visit instead of vanishing.
+  const alone = build([b])
+  assert.deepEqual(cellsOf(alone, b).slice(0, 5), ['ص', 'ص', 'ص', 10, 10])
+  assert.equal(alone.trailingColumns[1].value(b), 3)
+  // «المستخلص» is the unit's whole month either way.
+  assert.deepEqual(JSON.parse(JSON.stringify(both.unitRows[0].summary)), {
+    hours: 60,
+    workshopDays: 3,
+    unrecordedDays: 21,
+  })
+})
+
 test('the month a list filter names', () => {
   const range = (filter) =>
     JSON.parse(JSON.stringify(dayExport.filterDayRange(filter)))

@@ -301,26 +301,76 @@ export function unitDayCell(day: GridDay, codes: DayCodes): DayCell {
 }
 
 /**
- * The visits sheet: the days of ONE visit's row. Outside the visit the cell
- * is empty; inside it, a project visit shows 10 on the days it owns and the
- * workshop letter on the days a workshop stop took, a workshop visit shows
- * its letter on the days it owns.
+ * Which project visit each workshop visit of ONE unit is shown on (owner
+ * 2026-11-16, «ضمّن ايام الورشة في تصدير المشاريع»): the project visit the
+ * unit came from — the one that started last at or before the workshop
+ * entry, whether the workshop stay is a stop nested in it or follows its
+ * exit — and, when the unit has none before it, the first project visit
+ * after it. So a workshop day appears on ONE project row, never on two.
+ * Keys are workshop entry ids, values project entry ids.
+ */
+export function workshopParents(
+  visits: readonly GridVisit[],
+): Map<string, string> {
+  const startOf = (visit: GridVisit) => Date.parse(visit.entryAt)
+  const before = (a: GridVisit, b: GridVisit) => {
+    const diff = startOf(a) - startOf(b)
+    return diff !== 0 ? diff < 0 : a.entryId < b.entryId
+  }
+  const sites = visits.filter(
+    (visit) => visit.context === 'site' && Number.isFinite(startOf(visit)),
+  )
+  const parents = new Map<string, string>()
+  for (const stop of visits) {
+    if (stop.context !== 'workshop' || !Number.isFinite(startOf(stop))) continue
+    let previous: GridVisit | null = null
+    let next: GridVisit | null = null
+    for (const site of sites) {
+      if (before(site, stop)) {
+        if (previous === null || before(previous, site)) previous = site
+      } else if (next === null || before(site, next)) next = site
+    }
+    const parent = previous ?? next
+    if (parent) parents.set(stop.entryId, parent.entryId)
+  }
+  return parents
+}
+
+/**
+ * The visits sheet: the days of ONE visit's row. A project visit shows 10 on
+ * the days it owns and the workshop letter on the days of the workshop
+ * visits that belong to it (`workshopParents`: inside the visit or after its
+ * exit; without `parents`, only the stops inside its own span); a workshop
+ * visit shows its letter on the days it owns. Every other cell is empty.
  */
 export function visitDayCell(
   day: GridDay,
   visit: Pick<GridVisit, 'entryId' | 'context' | 'entryAt' | 'exitAt'>,
   codes: DayCodes,
   now: number | Date = Date.now(),
+  parents?: ReadonlyMap<string, string>,
 ): DayCell {
   const from = saudiDayKeyOf(visit.entryAt)
   const to = visit.exitAt ? saudiDayKeyOf(visit.exitAt) : saudiDayKeyOf(now)
-  if (!from || day.day < from || day.day > to) return ''
+  const inside = Boolean(from) && day.day >= from && day.day <= to
   if (visit.context === 'site') {
-    if (day.kind === 'site')
-      return day.ownerEntryId === visit.entryId && !day.friday ? DAY_HOURS : ''
-    return isWorkshopKind(day.kind) ? codes[day.kind] : ''
+    if (isWorkshopKind(day.kind)) {
+      const mine = parents
+        ? day.ownerEntryId !== null &&
+          parents.get(day.ownerEntryId) === visit.entryId
+        : inside
+      return mine ? codes[day.kind] : ''
+    }
+    return inside &&
+      day.kind === 'site' &&
+      day.ownerEntryId === visit.entryId &&
+      !day.friday
+      ? DAY_HOURS
+      : ''
   }
-  return isWorkshopKind(day.kind) && day.ownerEntryId === visit.entryId
+  return inside &&
+    isWorkshopKind(day.kind) &&
+    day.ownerEntryId === visit.entryId
     ? codes[day.kind]
     : ''
 }
