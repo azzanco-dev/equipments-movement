@@ -5,12 +5,17 @@ import {
   Checkbox,
   Dialog,
   Notice,
+  Select,
   Spinner,
   Switch,
 } from '@/components/ui'
 import { RadioCard, RadioCardGroup } from './ExportFileTypeCards'
 import { useI18n } from '@/i18n/I18nContext'
-import type { ExcelColumn } from '@/lib/excelSheet'
+import {
+  sheetSpec,
+  type ExcelColumn,
+  type ExportSheetSpec,
+} from '@/lib/excelSheet'
 import {
   allColumnKeys,
   exportedRowCount,
@@ -47,6 +52,27 @@ export interface ExportCollected<T> {
   total: number
   /** True when the cap stopped the walk before the end of the set. */
   capped: boolean
+  /**
+   * Excel only: columns written after the chosen ones and never listed in
+   * the checklist (the counts and the day columns of the visits export).
+   */
+  trailingColumns?: ExcelColumn<T>[]
+  /** Excel only: more sheets after the rows' own (the units, the legend). */
+  extraSheets?: ExportSheetSpec[]
+}
+
+/** What the dialog asks for beyond the scope and the cap. */
+export interface ExportExtras {
+  /** The month (`YYYY-MM`) of the day columns, or `null` without them. */
+  dayMonth: string | null
+}
+
+/** The day-columns option of the visits export (owner 2026-11-16). */
+export interface ExportDayColumnsOption {
+  /** The month the dialog opens on (`YYYY-MM`). */
+  defaultMonth: string
+  /** The months offered, newest first. */
+  months: ReadonlyArray<{ value: string; label: string }>
 }
 
 export interface ExportResult {
@@ -80,7 +106,15 @@ export interface ExportDialogProps<T> {
   collectRows: (
     scope: ExportScope,
     maxRows: number,
+    extras: ExportExtras,
   ) => Promise<ExportCollected<T>>
+  /** The file types offered; both by default. One type hides the choice. */
+  fileTypes?: readonly ExportFileType[]
+  /**
+   * Offers «اعمدة ايام الشهر والمستخلص» for the Excel file: a switch (on by
+   * default) and the month. The chosen month reaches `collectRows`.
+   */
+  dayColumns?: ExportDayColumnsOption
   /** Called after a successful export, so the screen can note a cap. */
   onExported?: (result: ExportResult) => void
 }
@@ -95,6 +129,8 @@ function sessionStore(
     return null
   }
 }
+
+const BOTH_FILE_TYPES: readonly ExportFileType[] = ['xlsx', 'pdf']
 
 type CountState =
   | { status: 'loading' }
@@ -140,9 +176,16 @@ export function ExportDialog<T>({
   countRows,
   collectRows,
   onExported,
+  fileTypes = BOTH_FILE_TYPES,
+  dayColumns,
 }: ExportDialogProps<T>) {
   const { t, lang } = useI18n()
-  const [fileType, setFileType] = useState<ExportFileType>('xlsx')
+  const [fileType, setFileType] = useState<ExportFileType>(
+    fileTypes[0] ?? 'xlsx',
+  )
+  const [daysOn, setDaysOn] = useState(true)
+  const [dayMonth, setDayMonth] = useState(dayColumns?.defaultMonth ?? '')
+  const defaultDayMonth = dayColumns?.defaultMonth ?? ''
   const [scope, setScope] = useState<ExportScope>('current')
   const [selection, setSelection] = useState<string[]>(() =>
     allColumnKeys(columns),
@@ -159,7 +202,9 @@ export function ExportDialog<T>({
     if (!open) return
     setScope('current')
     setError(null)
-  }, [open])
+    setDaysOn(true)
+    setDayMonth(defaultDayMonth)
+  }, [open, defaultDayMonth])
 
   // The remembered column choice of this list and file type.
   useEffect(() => {
@@ -194,6 +239,9 @@ export function ExportDialog<T>({
     writeColumnSelection(localStore(), listId, fileType, normalized, columns)
   }
 
+  // The day columns exist in the Excel file only.
+  const withDays =
+    Boolean(dayColumns) && fileType === 'xlsx' && daysOn && Boolean(dayMonth)
   const cap = exportRowCap(fileType)
   const total = count.status === 'ready' ? count.value : 0
   const exportCount = exportedRowCount(total, cap)
@@ -248,17 +296,27 @@ export function ExportDialog<T>({
     }
     setExporting(true)
     try {
-      const collected = await collectRows(scope, cap)
+      const collected = await collectRows(scope, cap, {
+        dayMonth: withDays ? dayMonth : null,
+      })
       const chosen = selectExportColumns(collected.columns, selection)
       // The user closed the print tab while the rows were loading: nothing
       // to show, and nothing failed.
       if (printWindow?.closed) return
       if (fileType === 'xlsx') {
-        const { exportRowsToExcel } = await import('@/lib/excelExport')
-        exportRowsToExcel(title, chosen, collected.rows, {
-          fileName,
-          rtl: lang === 'ar',
-        })
+        const { exportRowsToExcel, exportSheetsToExcel } =
+          await import('@/lib/excelExport')
+        const written = [...chosen, ...(collected.trailingColumns ?? [])]
+        const options = { fileName, rtl: lang === 'ar' }
+        if (collected.extraSheets?.length)
+          exportSheetsToExcel(
+            [
+              sheetSpec(title, written, collected.rows),
+              ...collected.extraSheets,
+            ],
+            options,
+          )
+        else exportRowsToExcel(title, written, collected.rows, options)
       } else if (printWindow) {
         const payload = buildPrintPayload({
           title,
@@ -305,6 +363,8 @@ export function ExportDialog<T>({
   const fileTypeLabelId = useId()
   const scopeLabelId = useId()
   const scopeNoteId = useId()
+  const daysLabelId = useId()
+  const daysNoteId = useId()
   const chosen = new Set(selection)
   const basicKeys = mandatoryColumnKeys(columns)
   const columnGroups = groupExportColumns(columns)
@@ -368,30 +428,32 @@ export function ExportDialog<T>({
       }
     >
       <div className="space-y-5">
-        <div className="space-y-2">
-          <p id={fileTypeLabelId} className="text-sm font-medium">
-            {t('exportFileType')}
-          </p>
-          <RadioCardGroup
-            aria-labelledby={fileTypeLabelId}
-            value={fileType}
-            onValueChange={(value) => setFileType(value as ExportFileType)}
-            disabled={exporting}
-          >
-            <RadioCard
-              value="xlsx"
-              icon={<FileSpreadsheet className="h-4 w-4" />}
-              title={t('exportFileExcel')}
-              hint={t('exportFileExcelHint')}
-            />
-            <RadioCard
-              value="pdf"
-              icon={<FileText className="h-4 w-4" />}
-              title={t('exportFilePdf')}
-              hint={t('exportFilePdfHint')}
-            />
-          </RadioCardGroup>
-        </div>
+        {fileTypes.length > 1 && (
+          <div className="space-y-2">
+            <p id={fileTypeLabelId} className="text-sm font-medium">
+              {t('exportFileType')}
+            </p>
+            <RadioCardGroup
+              aria-labelledby={fileTypeLabelId}
+              value={fileType}
+              onValueChange={(value) => setFileType(value as ExportFileType)}
+              disabled={exporting}
+            >
+              <RadioCard
+                value="xlsx"
+                icon={<FileSpreadsheet className="h-4 w-4" />}
+                title={t('exportFileExcel')}
+                hint={t('exportFileExcelHint')}
+              />
+              <RadioCard
+                value="pdf"
+                icon={<FileText className="h-4 w-4" />}
+                title={t('exportFilePdf')}
+                hint={t('exportFilePdfHint')}
+              />
+            </RadioCardGroup>
+          </div>
+        )}
 
         <div
           role="group"
@@ -488,6 +550,48 @@ export function ExportDialog<T>({
             </p>
           </div>
         </div>
+
+        {dayColumns && fileType === 'xlsx' && (
+          <div className="flex items-start gap-3">
+            <Switch
+              aria-labelledby={daysLabelId}
+              aria-describedby={daysNoteId}
+              checked={daysOn}
+              onCheckedChange={setDaysOn}
+              disabled={exporting}
+              className="mt-0.5"
+            />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div>
+                <p id={daysLabelId} className="text-sm font-medium">
+                  {t('exportDaysSwitch')}
+                </p>
+                <p id={daysNoteId} className="text-xs text-muted">
+                  {t('exportDaysSwitchHint')}
+                </p>
+              </div>
+              {daysOn && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted">
+                    {t('exportDaysMonth')}
+                  </span>
+                  <Select
+                    size="sm"
+                    aria-label={t('exportDaysMonth')}
+                    className="w-44"
+                    value={dayMonth}
+                    onValueChange={setDayMonth}
+                    disabled={exporting}
+                    options={dayColumns.months.map((month) => ({
+                      value: month.value,
+                      label: month.label,
+                    }))}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {count.status === 'error' && (
           <Notice

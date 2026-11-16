@@ -23,6 +23,8 @@ import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import {
   ExportDialog,
   type ExportCollected,
+  type ExportDayColumnsOption,
+  type ExportExtras,
   type ExportResult,
 } from '@/components/data-list/ExportDialog'
 import {
@@ -51,8 +53,18 @@ import {
   loadEquipmentExportDetails,
   loadProfileNames,
 } from '@/lib/exportFields'
+import { monthLabel } from '@/lib/sales'
+import {
+  buildVisitDayExport,
+  filterDayRange,
+  unitsNeedingHistory,
+  type VisitDayExport,
+} from '@/lib/visitDayExport'
+import { loadMonthVisits, loadUnitsSeenBefore } from '@/lib/visitDayExportData'
+import { exportDaysMonth, recentMonthKeys } from '@/lib/visitDayGrid'
 import {
   EQUIPMENT_VISITS_LOG_SELECT,
+  VISIT_PERIOD_FILTER_KEY,
   EQUIPMENT_VISITS_SELECT,
   EQUIPMENT_VISITS_VIEW,
   adminVisitsListConfig,
@@ -353,6 +365,7 @@ export function VisitsTable({
     async (
       scope: ExportScope,
       maxRows: number,
+      extras?: ExportExtras,
     ): Promise<ExportCollected<EquipmentVisitRow>> => {
       const previousIds = await exportPreviousIds(scope)
       const { collectAllPages, OUTSIDE_EXPORT_PAGE_SIZE } =
@@ -395,6 +408,31 @@ export function VisitsTable({
           exportRows.map((row) => row.exit_supervisor_id),
         ),
       ])
+      // The day columns and «المستخلص» (owner 2026-11-16): every visit of the
+      // exported units that touches the month, both contexts, so a unit's day
+      // is known whatever the list's own filters hide.
+      let dayExport: VisitDayExport | null = null
+      if (extras?.dayMonth) {
+        const unitIds = distinctEquipmentIds(exportRows)
+        const monthVisits = await loadMonthVisits(
+          supabase,
+          unitIds,
+          extras.dayMonth,
+        )
+        const seenBefore = await loadUnitsSeenBefore(
+          supabase,
+          unitsNeedingHistory(unitIds, monthVisits, extras.dayMonth),
+          extras.dayMonth,
+        )
+        dayExport = buildVisitDayExport({
+          rows: exportRows,
+          monthVisits,
+          seenBefore,
+          monthKey: extras.dayMonth,
+          t,
+          lang,
+        })
+      }
       return {
         ...collected,
         rows: exportRows,
@@ -404,10 +442,35 @@ export function VisitsTable({
           mobileByDriver,
           nameByProfile,
         }),
+        trailingColumns: dayExport?.trailingColumns,
+        extraSheets: dayExport?.extraSheets,
       }
     },
     [buildQuery, exportPreviousIds, lang, t],
   )
+
+  /**
+   * The month of the day columns: a date filter of the list that lies inside
+   * one month («الفترة», then the entry, then the exit), else the previous
+   * Saudi month; the last twelve months are offered, with that one.
+   */
+  const dayColumnsOption = useMemo<ExportDayColumnsOption>(() => {
+    const now = Date.now()
+    const ranges = [VISIT_PERIOD_FILTER_KEY, 'entry_at', 'exit_at']
+      .map((field) => filters.find((filter) => filter.field === field))
+      .filter((filter) => filter !== undefined)
+      .map((filter) => filterDayRange(filter))
+    const defaultMonth = exportDaysMonth(ranges, now)
+    const keys = recentMonthKeys(now, 12)
+    if (!keys.includes(defaultMonth)) keys.push(defaultMonth)
+    return {
+      defaultMonth,
+      months: keys.map((key) => ({
+        value: key,
+        label: monthLabel(key, lang),
+      })),
+    }
+  }, [filters, lang])
 
   const onExported = (result: ExportResult) => {
     if (result.capped)
@@ -737,6 +800,7 @@ export function VisitsTable({
             countRows={countVisits}
             collectRows={collectVisits}
             onExported={onExported}
+            dayColumns={dayColumnsOption}
           />
         </div>
       ) : (

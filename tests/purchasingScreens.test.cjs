@@ -1252,7 +1252,8 @@ test('the PO list switches between «حسب المعدات» (the default) and �
   )
   assert.match(
     units,
-    /\.from\('purchasing_po_units'\)\s+\.select\(PO_UNITS_SELECT, \{ count: 'exact' \}\)/,
+    // One builder for the table, the export count (`head`) and the export.
+    /\.from\('purchasing_po_units'\)\s+\.select\(head \? 'line_id' : PO_UNITS_SELECT, \{ count: 'exact', head \}\)/,
   )
   assert.match(units, /\.order\('line_id', \{ ascending \}\)/)
   assert.match(units, /buildSearchFilter\(\s+poUnitsListConfig\.searchFields,/)

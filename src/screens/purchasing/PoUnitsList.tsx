@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Truck } from 'lucide-react'
+import { Download, Truck } from 'lucide-react'
 import { RelativeTime } from '@/components/RelativeTime'
 import { CompanyProjectCell } from '@/components/data-list/CompanyProjectCell'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
+import {
+  ExportDialog,
+  type ExportCollected,
+} from '@/components/data-list/ExportDialog'
+import { countActiveFilters } from '@/components/data-list/FilterBar'
 import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
@@ -12,6 +17,7 @@ import { SupplierPoApprovalBadge } from '@/components/purchasing/SupplierPoStatu
 import { poPillStyle } from '@/components/sales/PoPill'
 import {
   Badge,
+  Button,
   DataTable,
   EmptyState,
   ErrorState,
@@ -21,8 +27,13 @@ import { useI18n } from '@/i18n/I18nContext'
 import { applyListFilters } from '@/lib/applyListFilters'
 import { formatDate } from '@/lib/dateFormat'
 import { lessorFilterOptions } from '@/lib/equipmentSupplier'
+import type { ExportFileType, ExportScope } from '@/lib/exportOptions'
 import { poUnitsListConfig } from '@/lib/listConfigs'
 import { splitPlateForDisplay } from '@/lib/plate'
+import {
+  PO_UNITS_EXPORT_FILE_NAME,
+  poUnitsExportColumns,
+} from '@/lib/poUnitsExport'
 import {
   supplierPoPartyOrFilter,
   supplierPoSupplierLabel,
@@ -35,6 +46,9 @@ import { supabase } from '@/lib/supabase'
  *  /logs): «حسب المعدات» is the default view, while «حسب الاوامر» keeps the
  *  unprefixed parameters the home's deep links carry. */
 export const PO_UNITS_URL_PREFIX = 'u'
+
+/** The PO list exports to Excel only: no print page for it. */
+const EXCEL_ONLY: readonly ExportFileType[] = ['xlsx']
 
 /** The plate's digits, then its letters spaced by letter-spacing (as on the
  *  «المعدات في المشاريع» tickets); a plate not in the stored form, or the
@@ -74,7 +88,7 @@ export interface PoUnitsListProps {
  * active, so it fetches only then.
  */
 export function PoUnitsList({ onSelectPo }: PoUnitsListProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const list = useDataListState(poUnitsListConfig, PO_UNITS_URL_PREFIX)
   const [rows, setRows] = useState<PoUnitRow[]>([])
   const [total, setTotal] = useState(0)
@@ -90,33 +104,50 @@ export function PoUnitsList({ onSelectPo }: PoUnitsListProps) {
     [companyProjectFilters],
   )
 
+  /**
+   * Search + filters + sort as one query, shared by the table, the export
+   * count and the export, so the file never disagrees with the screen.
+   * `scope: 'all'` (export only) drops the search and the filters; `head`
+   * asks for the count alone.
+   */
+  const buildQuery = useCallback(
+    ({
+      scope = 'current',
+      head = false,
+    }: { scope?: ExportScope; head?: boolean } = {}) => {
+      const ascending = list.direction === 'asc'
+      let query = supabase
+        .from('purchasing_po_units')
+        .select(head ? 'line_id' : PO_UNITS_SELECT, { count: 'exact', head })
+        .order(list.sort, { ascending })
+        // A stable order for paging when the sort key repeats.
+        .order('line_id', { ascending })
+      if (scope === 'all') return query
+      const searchFilter = buildSearchFilter(
+        poUnitsListConfig.searchFields,
+        list.search,
+      )
+      if (searchFilter) query = query.or(searchFilter)
+      // The owner OR the supplier, like the orders list.
+      const partyOr = supplierPoPartyOrFilter(list.filters)
+      if (partyOr) query = query.or(partyOr.clause)
+      return applyListFilters(
+        query,
+        partyOr ? partyOr.rest : list.filters,
+        new Set(poUnitsListConfig.filterFields.map((field) => field.key)),
+      )
+    },
+    [list.direction, list.filters, list.search, list.sort],
+  )
+
   const startListRequest = useListRequest()
   const fetchRows = useCallback(async () => {
     const signal = startListRequest()
     setLoading(true)
     setLoadError(false)
-    const ascending = list.direction === 'asc'
-    let query = supabase
-      .from('purchasing_po_units')
-      .select(PO_UNITS_SELECT, { count: 'exact' })
-      .order(list.sort, { ascending })
-      // A stable order for paging when the sort key repeats.
-      .order('line_id', { ascending })
+    const { data, error, count } = await buildQuery()
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
-    const searchFilter = buildSearchFilter(
-      poUnitsListConfig.searchFields,
-      list.search,
-    )
-    if (searchFilter) query = query.or(searchFilter)
-    // The owner OR the supplier, like the orders list.
-    const partyOr = supplierPoPartyOrFilter(list.filters)
-    if (partyOr) query = query.or(partyOr.clause)
-    query = applyListFilters(
-      query,
-      partyOr ? partyOr.rest : list.filters,
-      new Set(poUnitsListConfig.filterFields.map((field) => field.key)),
-    )
-    const { data, error, count } = await query.abortSignal(signal)
+      .abortSignal(signal)
     if (signal.aborted) return
     if (error) {
       setLoadError(true)
@@ -127,19 +158,56 @@ export function PoUnitsList({ onSelectPo }: PoUnitsListProps) {
       setTotal(count ?? 0)
     }
     setLoading(false)
-  }, [
-    list.direction,
-    list.filters,
-    list.page,
-    list.pageSize,
-    list.search,
-    list.sort,
-    startListRequest,
-  ])
+  }, [buildQuery, list.page, list.pageSize, startListRequest])
 
   useEffect(() => {
     fetchRows()
   }, [fetchRows])
+
+  // ============ EXCEL EXPORT (owner 2026-11-16) ============
+
+  const [exportOpen, setExportOpen] = useState(false)
+  const exportColumns = useMemo(() => poUnitsExportColumns(t, lang), [t, lang])
+
+  const countRows = useCallback(
+    async (scope: ExportScope, signal: AbortSignal) => {
+      const { count, error } = await buildQuery({
+        scope,
+        head: true,
+      }).abortSignal(signal)
+      if (error) throw error
+      return count ?? 0
+    },
+    [buildQuery],
+  )
+
+  /** Walks the chosen scope in bounded pages up to the cap; a failed page
+   *  throws, so the dialog reports it rather than writing a short file. */
+  const collectRows = useCallback(
+    async (
+      scope: ExportScope,
+      maxRows: number,
+    ): Promise<ExportCollected<PoUnitRow>> => {
+      const { collectAllPages, OUTSIDE_EXPORT_PAGE_SIZE } =
+        await import('@/lib/adminHomeExport')
+      const collected = await collectAllPages<PoUnitRow>(
+        async (page, pageSize) => {
+          const { data, error, count } = await buildQuery({ scope }).range(
+            (page - 1) * pageSize,
+            page * pageSize - 1,
+          )
+          if (error) throw error
+          return {
+            rows: (data ?? []) as unknown as PoUnitRow[],
+            total: count ?? 0,
+          }
+        },
+        { pageSize: OUTSIDE_EXPORT_PAGE_SIZE, maxRows },
+      )
+      return { ...collected, columns: exportColumns }
+    },
+    [buildQuery, exportColumns],
+  )
 
   const filtered = Boolean(list.search.trim()) || list.filters.length > 0
 
@@ -252,18 +320,45 @@ export function PoUnitsList({ onSelectPo }: PoUnitsListProps) {
 
   return (
     <>
-      <DataListToolbar
-        config={poUnitsListConfig}
-        search={list.searchInput}
-        onSearch={list.setSearchInput}
-        sort={list.sort}
-        direction={list.direction}
-        onSort={list.setSort}
-        filterFields={poUnitsListConfig.filterFields}
-        filters={list.filters}
-        onFilters={list.setFilters}
-        asyncFields={asyncFields}
-      />
+      <div className="flex flex-wrap items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <DataListToolbar
+            config={poUnitsListConfig}
+            search={list.searchInput}
+            onSearch={list.setSearchInput}
+            sort={list.sort}
+            direction={list.direction}
+            onSort={list.setSort}
+            filterFields={poUnitsListConfig.filterFields}
+            filters={list.filters}
+            onFilters={list.setFilters}
+            asyncFields={asyncFields}
+          />
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setExportOpen(true)}
+          disabled={loadError}
+        >
+          <Download size={14} aria-hidden="true" />
+          {t('exportButton')}
+        </Button>
+        <ExportDialog<PoUnitRow>
+          open={exportOpen}
+          onOpenChange={setExportOpen}
+          listId={poUnitsListConfig.id}
+          title={t('poUnitsExportTitle')}
+          fileName={PO_UNITS_EXPORT_FILE_NAME}
+          columns={exportColumns}
+          contextLabel={t('poUnitsExportContext')}
+          search={list.search}
+          activeFilters={countActiveFilters(list.filters)}
+          countRows={countRows}
+          collectRows={collectRows}
+          fileTypes={EXCEL_ONLY}
+        />
+      </div>
       {loadError ? (
         <ErrorState description={t('poUnitsLoadError')} onRetry={fetchRows} />
       ) : !loading && rows.length === 0 ? (

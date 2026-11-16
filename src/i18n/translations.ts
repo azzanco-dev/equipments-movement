@@ -995,6 +995,36 @@ export const translations = {
     exportSummaryFilters: 'الفلاتر: {count}',
     exportSummaryNone: 'بدون بحث او فلاتر',
     exportSummaryNoSearch: 'بدون بحث',
+    // --- export-days (2026-11-16) ---
+    exportDaysSwitch: 'اعمدة ايام الشهر والمستخلص',
+    exportDaysSwitchHint:
+      'في اخر الملف عمود لكل يوم: 10 لليوم داخل مشروع ورمز ليوم الورشة، وقبلها عدد الساعات وايام الورشة، مع ورقة «المستخلص» لكل معدة وفيها عدد ايام بدون تسجيل.',
+    exportDaysMonth: 'الشهر',
+    exportDaysHours: 'عدد الساعات',
+    exportDaysWorkshop: 'عدد ايام الورشة',
+    exportDaysUnrecorded: 'عدد ايام بدون تسجيل',
+    exportDaysPlateOrChassis: 'اللوحة او الشاصي',
+    exportDaysSheetUnits: 'المستخلص',
+    exportDaysSheetLegend: 'الرموز',
+    exportDaysLegendCode: 'الرمز',
+    exportDaysLegendMeaning: 'المعنى',
+    exportDaysLegendSite:
+      'يوم داخل مشروع (10 ساعات). يوم الدخول ويوم الخروج محسوبان، والجمعة داخل المشروع تبقى فارغة.',
+    exportDaysLegendMaintenance: 'يوم في الورشة: صيانة',
+    exportDaysLegendParking: 'يوم في الورشة: وقوف',
+    exportDaysLegendOutOfService: 'يوم في الورشة: خارج الخدمة',
+    exportDaysLegendUnclassified: 'يوم في الورشة بدون تصنيف',
+    exportDaysLegendUnrecorded:
+      'بدون تسجيل: المعدة ليست مسجلة في مشروع ولا في الورشة',
+    exportDaysLegendEmptyCode: 'فارغ',
+    exportDaysLegendEmpty:
+      'جمعة داخل مشروع، او يوم قبل اول حركة للمعدة، او يوم لم يحن بعد، او يوم خارج الزيارة في ورقة الزيارات',
+    exportDaysLegendHours: 'عدد ايام المشروع × 10 ساعات، بدون الجمعة',
+    exportDaysLegendUnits:
+      'صف لكل معدة عن الشهر كله في كل المشاريع والورشة، وليس للزيارات المصدرة فقط',
+    poUnitsExportTitle: 'اوامر الشراء حسب المعدات',
+    poUnitsExportContext: 'اوامر الشراء · حسب المعدات',
+    // --- /export-days ---
     exportPopupBlocked:
       'تعذر فتح صفحة الطباعة. اسمح بالنوافذ المنبثقة لهذا الموقع ثم حاول مرة اخرى.',
     printPreparing: 'جار تجهيز صفحة الطباعة',
@@ -3820,6 +3850,36 @@ export const translations = {
     exportSummaryFilters: 'Filters: {count}',
     exportSummaryNone: 'No search or filters',
     exportSummaryNoSearch: 'No search',
+    // --- export-days (2026-11-16) ---
+    exportDaysSwitch: 'Month day columns and summary',
+    exportDaysSwitchHint:
+      'A column per day at the end of the file: 10 for a day inside a project and a letter for a workshop day, with the hours and workshop days before them, plus a «Summary» sheet per unit with its unrecorded days.',
+    exportDaysMonth: 'Month',
+    exportDaysHours: 'Hours',
+    exportDaysWorkshop: 'Workshop days',
+    exportDaysUnrecorded: 'Unrecorded days',
+    exportDaysPlateOrChassis: 'Plate or chassis',
+    exportDaysSheetUnits: 'Summary',
+    exportDaysSheetLegend: 'Legend',
+    exportDaysLegendCode: 'Code',
+    exportDaysLegendMeaning: 'Meaning',
+    exportDaysLegendSite:
+      'A day inside a project (10 hours). The entry and exit days count; a Friday inside a project stays empty.',
+    exportDaysLegendMaintenance: 'A workshop day: maintenance',
+    exportDaysLegendParking: 'A workshop day: standby',
+    exportDaysLegendOutOfService: 'A workshop day: out of service',
+    exportDaysLegendUnclassified: 'A workshop day without a purpose',
+    exportDaysLegendUnrecorded:
+      'Unrecorded: the unit is in no project and not in the workshop',
+    exportDaysLegendEmptyCode: 'Empty',
+    exportDaysLegendEmpty:
+      'A Friday inside a project, a day before the unit’s first movement, a day still to come, or a day outside the visit on the visits sheet',
+    exportDaysLegendHours: 'Project days × 10 hours, Fridays excluded',
+    exportDaysLegendUnits:
+      'One row per unit for the whole month across every project and the workshop, not only the exported visits',
+    poUnitsExportTitle: 'Purchase orders by unit',
+    poUnitsExportContext: 'Purchase orders · by unit',
+    // --- /export-days ---
     exportPopupBlocked:
       'The print page could not be opened. Allow pop-ups for this site and try again.',
     printPreparing: 'Preparing the print page',

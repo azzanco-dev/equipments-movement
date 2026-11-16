@@ -73,7 +73,35 @@ export interface ExcelColumn<T> {
   /** Column width in characters; a sensible default is used when omitted. */
   width?: number
   type?: 'text' | 'date'
+  /**
+   * Centers the header and the cells (the narrow day columns of the visits
+   * export). A date column is centered whatever this says.
+   */
+  align?: 'center'
   value: (row: T) => ExcelCellValue
+}
+
+/**
+ * One sheet of a file with several sheets (the visits export with its day
+ * columns: the visits, one row per unit, the legend). The row type is erased
+ * so sheets of different rows travel in one array; build it with `sheetSpec`.
+ */
+export interface ExportSheetSpec {
+  name: string
+  columns: ExcelColumn<unknown>[]
+  rows: unknown[]
+}
+
+export function sheetSpec<T>(
+  name: string,
+  columns: ExcelColumn<T>[],
+  rows: T[],
+): ExportSheetSpec {
+  return {
+    name,
+    columns: columns as unknown as ExcelColumn<unknown>[],
+    rows,
+  }
 }
 
 export interface ExportRowsOptions {

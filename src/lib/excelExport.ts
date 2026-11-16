@@ -1,5 +1,5 @@
 /**
- * Builds and downloads one formatted export sheet.
+ * Builds and downloads a formatted export file: one sheet, or several.
  *
  * This is the only module that imports `xlsx-js-style` (a drop-in fork of
  * SheetJS that can write cell styles); the parsers in `@/lib/excel` stay on
@@ -26,6 +26,7 @@ import {
   sheetAoa,
   type ExcelColumn,
   type ExportRowsOptions,
+  type ExportSheetSpec,
 } from '@/lib/excelSheet'
 
 /** Excel rejects a sheet name longer than 31 characters or containing []:*?/\ */
@@ -33,14 +34,12 @@ function safeSheetName(name: string): string {
   return name.replace(/[[\]:*?/\\]/g, ' ').slice(0, 31) || 'Sheet1'
 }
 
-/** The styled workbook, before it is written; exposed so tests can inspect it. */
-export function buildExportWorkbook<T>(
-  sheetName: string,
+/** One styled sheet: the cells, the widths, the look. */
+function buildExportSheet<T>(
   columns: ExcelColumn<T>[],
   rows: T[],
-  options: Pick<ExportRowsOptions, 'rtl'> = {},
-): XLSX.WorkBook {
-  const rtl = Boolean(options.rtl)
+  rtl: boolean,
+): XLSX.WorkSheet {
   const aoa = sheetAoa(columns, rows)
   const sheet = XLSX.utils.aoa_to_sheet(aoa)
 
@@ -65,16 +64,19 @@ export function buildExportWorkbook<T>(
 
   columns.forEach((column, columnIndex) => {
     const isDate = column.type === 'date'
+    // A centered column (the day columns) takes the date cells' centered look
+    // without their number format.
+    const centered = isDate || column.align === 'center'
     for (let rowIndex = 0; rowIndex < aoa.length; rowIndex += 1) {
       const address = XLSX.utils.encode_cell({ c: columnIndex, r: rowIndex })
       // An empty value writes no cell; it still needs the border and height.
       const cell = (sheet[address] ??= { t: 's', v: '' }) as XLSX.CellObject
       if (rowIndex === 0) {
-        cell.s = isDate ? headerDate : headerText
+        cell.s = centered ? headerDate : headerText
         continue
       }
       const banded = rowIndex % 2 === 0
-      cell.s = isDate
+      cell.s = centered
         ? banded
           ? bandDate
           : bodyDate
@@ -91,12 +93,57 @@ export function buildExportWorkbook<T>(
   })
   // The cells added above may extend nothing, but keep the used range exact.
   sheet['!ref'] = `A1:${lastColumn}${aoa.length}`
+  return sheet
+}
 
+/** The styled workbook, before it is written; exposed so tests can inspect it. */
+export function buildExportWorkbook<T>(
+  sheetName: string,
+  columns: ExcelColumn<T>[],
+  rows: T[],
+  options: Pick<ExportRowsOptions, 'rtl'> = {},
+): XLSX.WorkBook {
+  const rtl = Boolean(options.rtl)
   const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, sheet, safeSheetName(sheetName))
+  XLSX.utils.book_append_sheet(
+    workbook,
+    buildExportSheet(columns, rows, rtl),
+    safeSheetName(sheetName),
+  )
   // `!rtl` on the sheet is ignored by SheetJS; the view lives on the workbook.
   workbook.Workbook = { Views: [{ RTL: rtl }] }
   return workbook
+}
+
+/**
+ * The styled workbook of several sheets, before it is written; exposed so
+ * tests can inspect it. Two sheets never share a name: a repeated one gets
+ * its number.
+ */
+export function buildExportWorkbookSheets(
+  sheets: readonly ExportSheetSpec[],
+  options: Pick<ExportRowsOptions, 'rtl'> = {},
+): XLSX.WorkBook {
+  const rtl = Boolean(options.rtl)
+  const workbook = XLSX.utils.book_new()
+  const used = new Set<string>()
+  sheets.forEach((spec, index) => {
+    let name = safeSheetName(spec.name)
+    if (used.has(name)) name = `${name.slice(0, 28)} ${index + 1}`
+    used.add(name)
+    XLSX.utils.book_append_sheet(
+      workbook,
+      buildExportSheet(spec.columns, spec.rows, rtl),
+      name,
+    )
+  })
+  // One view per sheet, so every sheet opens right-to-left.
+  workbook.Workbook = { Views: sheets.map(() => ({ RTL: rtl })) }
+  return workbook
+}
+
+function withXlsxSuffix(fileName: string): string {
+  return fileName.endsWith('.xlsx') ? fileName : `${fileName}.xlsx`
 }
 
 export function exportRowsToExcel<T>(
@@ -106,10 +153,14 @@ export function exportRowsToExcel<T>(
   options: ExportRowsOptions,
 ) {
   const workbook = buildExportWorkbook(sheetName, columns, rows, options)
-  XLSX.writeFile(
-    workbook,
-    options.fileName.endsWith('.xlsx')
-      ? options.fileName
-      : `${options.fileName}.xlsx`,
-  )
+  XLSX.writeFile(workbook, withXlsxSuffix(options.fileName))
+}
+
+/** A file with several sheets (the visits export with its day columns). */
+export function exportSheetsToExcel(
+  sheets: readonly ExportSheetSpec[],
+  options: ExportRowsOptions,
+) {
+  const workbook = buildExportWorkbookSheets(sheets, options)
+  XLSX.writeFile(workbook, withXlsxSuffix(options.fileName))
 }
