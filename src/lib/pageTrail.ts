@@ -51,6 +51,10 @@ const SPECS: Partial<Record<RoutePage, TrailSpec>> = {
   'sales/:id': { parents: [SALES, ['clientPos', '/sales/orders']] },
   // Since 0174 the cards are reached from «اسعار المعدات».
   'sales/cards/:id': { parents: [SALES, ['cardPrices', '/sales/prices']] },
+  // 0199: «المبيعات › عروض الاسعار › QT-…».
+  'sales/quotations/:id': {
+    parents: [SALES, ['quotations', '/sales/quotations']],
+  },
   'settings/equipment-types': { parents: [SETTINGS], name: 'equipmentTypes' },
   'settings/workshop-opening-balance': {
     parents: [SETTINGS],
@@ -58,6 +62,10 @@ const SPECS: Partial<Record<RoutePage, TrailSpec>> = {
   },
   'settings/afaqy': { parents: [SETTINGS], name: 'afaqySettingsTitle' },
   'settings/banks': { parents: [SETTINGS], name: 'banks' },
+  'settings/quotation-terms': {
+    parents: [SETTINGS],
+    name: 'quotationTermsSettings',
+  },
   'settings/roles': { parents: [SETTINGS], name: 'rolesSettingsTitle' },
 }
 

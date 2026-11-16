@@ -55,6 +55,7 @@ export type NavChildKey =
   | 'sales/cards'
   | 'sales/timesheets'
   | 'sales/months'
+  | 'sales/quotations'
 
 /** One permission key, optionally limited to some of its scopes. */
 export interface NavGate {
@@ -149,6 +150,9 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
       { key: 'sales/orders', requires: [{ key: 'sales.view' }] },
       { key: 'sales/cards', requires: [{ key: 'sales.view' }] },
       { key: 'sales/prices', requires: [{ key: 'sales.view' }] },
+      // «عروض الاسعار» (0199, owner 2026-11-16): listed LAST, so /sales and
+      // every earlier landing stay as they are.
+      { key: 'sales/quotations', requires: [{ key: 'sales.view' }] },
       {
         key: 'sales/timesheets',
         requires: [{ key: 'sales.view' }],
@@ -296,6 +300,7 @@ export type RoutePage =
   | 'settings/workshop-opening-balance'
   | 'settings/afaqy'
   | 'settings/banks'
+  | 'settings/quotation-terms'
   | 'settings/roles'
   | 'movements/new'
   | 'movements/:id'
@@ -305,6 +310,7 @@ export type RoutePage =
   | 'purchasing/:id'
   | 'sales/:id'
   | 'sales/cards/:id'
+  | 'sales/quotations/:id'
   | 'print/export'
 
 type ExtraPage = Exclude<RoutePage, NavItemKey | NavChildKey>
@@ -317,6 +323,8 @@ const PAGE_GATES: Readonly<Record<ExtraPage, readonly NavGate[]>> = {
   'settings/afaqy': [{ key: 'settings.integrations' }],
   // 0177: the banks list is edited by whoever edits the suppliers.
   'settings/banks': [{ key: 'lessors.edit' }],
+  // 0199: the quotation terms template, written by the approvers only.
+  'settings/quotation-terms': [{ key: 'sales.quotations.approve' }],
   'settings/roles': [{ key: 'settings.roles' }],
   'movements/new': [
     { key: 'movements.site.create' },
@@ -331,6 +339,8 @@ const PAGE_GATES: Readonly<Record<ExtraPage, readonly NavGate[]>> = {
   // Sales phase 1 (0169): the client PO page and the equipment card page.
   'sales/:id': [{ key: 'sales.view' }],
   'sales/cards/:id': [{ key: 'sales.view' }],
+  // 0199: the quotation page.
+  'sales/quotations/:id': [{ key: 'sales.view' }],
   'print/export': [{ key: 'movements.export' }],
 }
 
@@ -361,6 +371,7 @@ const SETTINGS_SUBPAGES: ReadonlySet<string> = new Set([
   'workshop-opening-balance',
   'afaqy',
   'banks',
+  'quotation-terms',
 ])
 
 /**
@@ -395,6 +406,9 @@ export function routePageOf(segments: readonly string[]): RoutePage {
     // Phase 2 (0172): the batch entry and the months list.
     if (second === 'timesheets') return 'sales/timesheets'
     if (second === 'months') return 'sales/months'
+    // 0199: the quotations, before the client PO id fallback.
+    if (second === 'quotations')
+      return third ? 'sales/quotations/:id' : 'sales/quotations'
     return 'sales/:id'
   }
   if (first === 'settings') {
@@ -475,6 +489,7 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'settings/workshop-opening-balance',
   'settings/afaqy',
   'settings/banks',
+  'settings/quotation-terms',
   'settings/roles',
   'movements/new',
   'movements/:id',
@@ -493,6 +508,8 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'sales/months',
   'sales/:id',
   'sales/cards/:id',
+  'sales/quotations',
+  'sales/quotations/:id',
 ]
 /**
  * The field home's own pages (its home, the inquiry, the movement form and

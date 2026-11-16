@@ -89,6 +89,8 @@ test('the sales section: a parent with its children on sales.view, like purchasi
       { key: 'sales/orders', requires: [{ key: 'sales.view' }] },
       { key: 'sales/cards', requires: [{ key: 'sales.view' }] },
       { key: 'sales/prices', requires: [{ key: 'sales.view' }] },
+      // 0199: «عروض الاسعار», listed last.
+      { key: 'sales/quotations', requires: [{ key: 'sales.view' }] },
       // Phase 2 (0172): «كروت التشغيل» and «الشهور».
       {
         key: 'sales/timesheets',
@@ -127,6 +129,8 @@ test('the sales section: a parent with its children on sales.view, like purchasi
     'sales/months',
     'sales/orders',
     'sales/prices',
+    'sales/quotations',
+    'sales/quotations/:id',
     'sales/timesheets',
   ])
   // Nothing without the key.

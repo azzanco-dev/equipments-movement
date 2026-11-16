@@ -764,6 +764,21 @@ textarea::placeholder {
 }
 /* ===== purchasing: PO print sheet — end ===== */
 
+/* ===== quotations (0199): quotation print sheet — start =====
+   «تصدير PDF» of a quotation prints from the quotation page exactly as the
+   PO sheet does: while the sheet is mounted (portaled to body, hidden on
+   screen) it is the only child of body that prints, and its .print-export
+   class applies the light tokens. */
+@media print {
+  html:has(.quotation-print-sheet) body > :not(.quotation-print-sheet) {
+    display: none !important;
+  }
+  .quotation-print-sheet {
+    display: block !important;
+  }
+}
+/* ===== quotations (0199): quotation print sheet — end ===== */
+
 /* Inquiry page background (owner 2026-10-27: «تقدر تسوي gradient للخلفية
    حق الصفحة؟»): the one gradient of the page, behind everything; the cards
    on it stay flat. In use: the two glows at the top corners, blue on the

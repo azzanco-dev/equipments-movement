@@ -85,7 +85,13 @@ test('«اسعار المعدات» is the third child of «المبيعات» (
   const items = nav.visibleNavItems(state)
   assert.deepEqual(plain(items.find((item) => item.key === 'sales')), {
     key: 'sales',
-    children: ['sales/orders', 'sales/cards', 'sales/prices'],
+    // 0199: «عروض الاسعار» is listed last.
+    children: [
+      'sales/orders',
+      'sales/cards',
+      'sales/prices',
+      'sales/quotations',
+    ],
   })
   // /sales lands on the client POs (0185); the hidden pages still open by URL.
   assert.equal(nav.routePageOf(['sales']), 'sales/orders')

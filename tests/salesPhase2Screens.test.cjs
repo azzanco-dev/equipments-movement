@@ -114,6 +114,8 @@ test('the two new children of «المبيعات» on sales.view, their routes a
     'sales/orders',
     'sales/cards',
     'sales/prices',
+    // 0199: «عروض الاسعار», listed last.
+    'sales/quotations',
     'sales/timesheets',
     'sales/months',
   ])

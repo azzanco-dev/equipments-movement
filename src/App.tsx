@@ -272,6 +272,22 @@ const CardPricesScreen = dynamic(
     ),
   { loading: listLoading },
 )
+// «عروض الاسعار» (migration 0199, owner 2026-11-16): the quotation list and
+// page, behind the `sales.view` gates.
+const QuotationsListScreen = dynamic(
+  () =>
+    import('@/screens/sales/QuotationsListScreen').then(
+      (module) => module.QuotationsListScreen,
+    ),
+  { loading: listLoading },
+)
+const QuotationDetail = dynamic(
+  () =>
+    import('@/screens/sales/QuotationDetail').then(
+      (module) => module.QuotationDetail,
+    ),
+  { loading: screenLoading },
+)
 const UserDetail = dynamic(
   () => import('@/screens/UserDetail').then((module) => module.UserDetail),
   { loading: screenLoading },
@@ -356,6 +372,7 @@ const NAV_CHILD_LABELS: Record<NavChildKey, TranslationKey> = {
   'sales/cards': 'equipmentCards',
   'sales/timesheets': 'cardTimesheets',
   'sales/months': 'cardMonths',
+  'sales/quotations': 'quotations',
 }
 
 /**
@@ -679,6 +696,13 @@ function AppContent() {
                 : undefined
             }
           />
+        ) : page === 'sales/quotations/:id' ? (
+          <QuotationDetail
+            quotationId={segments[2] ?? ''}
+            onBack={goBackTo('/sales/quotations')}
+            onDeleted={() => router.replace('/sales/quotations')}
+            onOpenQuotation={(id) => router.push(`/sales/quotations/${id}`)}
+          />
         ) : page === 'purchasing/:id' ? (
           <SupplierPoDetail
             poId={detailId}
@@ -788,6 +812,13 @@ function AppContent() {
                 onSelectCard={(id) => router.push(`/sales/cards/${id}`)}
               />
             )}
+            {page === 'sales/quotations' && (
+              <QuotationsListScreen
+                onSelectQuotation={(id) =>
+                  router.push(`/sales/quotations/${id}`)
+                }
+              />
+            )}
             {page === 'drivers' && (
               <AdminDrivers
                 onSelectDriver={(id) => router.push(`/drivers/${id}`)}
@@ -804,7 +835,8 @@ function AppContent() {
               page === 'settings/equipment-types' ||
               page === 'settings/workshop-opening-balance' ||
               page === 'settings/afaqy' ||
-              page === 'settings/banks') && <AdminSettings />}
+              page === 'settings/banks' ||
+              page === 'settings/quotation-terms') && <AdminSettings />}
           </>
         )}
       </Layout>

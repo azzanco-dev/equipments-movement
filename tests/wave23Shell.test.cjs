@@ -1015,7 +1015,7 @@ test('App.tsx renders each screen behind its page', () => {
     )
   assert.match(
     content,
-    /\(page === 'settings' \|\|\s*page === 'settings\/equipment-types' \|\|\s*page === 'settings\/workshop-opening-balance' \|\|\s*page === 'settings\/afaqy' \|\|\s*page === 'settings\/banks'\) && <AdminSettings \/>/,
+    /\(page === 'settings' \|\|\s*page === 'settings\/equipment-types' \|\|\s*page === 'settings\/workshop-opening-balance' \|\|\s*page === 'settings\/afaqy' \|\|\s*page === 'settings\/banks' \|\|\s*page === 'settings\/quotation-terms'\) && <AdminSettings \/>/,
   )
   // The admin home's shortcuts follow the pages they open.
   assert.match(

@@ -82,6 +82,8 @@ test('«المبيعات»: PO العملاء, كروت المعدات, اسعا
       ['sales/orders', false],
       ['sales/cards', false],
       ['sales/prices', false],
+      // 0199: «عروض الاسعار», listed last.
+      ['sales/quotations', false],
       ['sales/timesheets', true],
       ['sales/months', true],
     ],
@@ -94,7 +96,12 @@ test('«المبيعات»: PO العملاء, كروت المعدات, اسعا
     plain(nav.visibleNavItems(state).find((item) => item.key === 'sales')),
     {
       key: 'sales',
-      children: ['sales/orders', 'sales/cards', 'sales/prices'],
+      children: [
+        'sales/orders',
+        'sales/cards',
+        'sales/prices',
+        'sales/quotations',
+      ],
     },
   )
   assert.equal(nav.routePageOf(['sales']), 'sales/orders')

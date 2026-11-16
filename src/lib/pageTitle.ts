@@ -49,6 +49,8 @@ const PAGE_TITLES: Readonly<
   // Sales phase 2 (migration 0172): «كروت التشغيل» and «الشهور».
   'sales/timesheets': { kind: 'sub', name: 'cardTimesheets', section: 'sales' },
   'sales/months': { kind: 'sub', name: 'cardMonths', section: 'sales' },
+  // 0199: «عروض الاسعار · المبيعات».
+  'sales/quotations': { kind: 'sub', name: 'quotations', section: 'sales' },
   'settings/equipment-types': {
     kind: 'sub',
     name: 'equipmentTypes',
@@ -65,6 +67,12 @@ const PAGE_TITLES: Readonly<
     section: 'settings',
   },
   'settings/banks': { kind: 'sub', name: 'banks', section: 'settings' },
+  // 0199: «شروط عروض الاسعار · الاعدادات».
+  'settings/quotation-terms': {
+    kind: 'sub',
+    name: 'quotationTermsSettings',
+    section: 'settings',
+  },
   'settings/roles': {
     kind: 'sub',
     name: 'rolesSettingsTitle',
@@ -77,6 +85,8 @@ const PAGE_TITLES: Readonly<
   'purchasing/:id': { kind: 'detail', section: 'supplierPos' },
   'sales/:id': { kind: 'detail', section: 'clientPos' },
   'sales/cards/:id': { kind: 'detail', section: 'equipmentCards' },
+  // 0199: «QT-2026110001 · عروض الاسعار».
+  'sales/quotations/:id': { kind: 'detail', section: 'quotations' },
 }
 
 const join = (...parts: string[]) => parts.join(TAB_TITLE_SEPARATOR)

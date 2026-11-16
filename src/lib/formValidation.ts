@@ -23,6 +23,7 @@ import {
   PAST_VISIT_NOTES_MAX_LENGTH,
   pastVisitTodayKey,
 } from '@/lib/pastVisit'
+import { parseQuotationPrice, type QuotationFormValues } from '@/lib/quotations'
 import {
   CARD_MONTH_NOTE_MAX,
   isValidCardMonthDays,
@@ -1113,3 +1114,188 @@ export const pastVisitFormSchema = z
         message: 'pastVisitExitBeforeEntry',
       })
   })
+
+// --- quotations (migration 0199) ---------------------------------------------
+
+/** The 0199 length checks and the numeric(12, 2) bound of a price. */
+export const QUOTATION_NOTES_MAX = 1000
+export const QUOTATION_LINE_NOTE_MAX = 500
+export const QUOTATION_COST_NAME_MAX = 80
+export const QUOTATION_PRICE_MAX = 9999999999.99
+export const QUOTATION_TERM_TITLE_MAX = 120
+export const QUOTATION_TERM_BODY_MAX = 1000
+
+/** A typed price: empty (no price) or a number from 0 to the bound. */
+export function isValidQuotationPrice(value: string): boolean {
+  const amount = parseQuotationPrice(value)
+  return (
+    amount === null ||
+    (Number.isFinite(amount) && amount >= 0 && amount <= QUOTATION_PRICE_MAX)
+  )
+}
+
+const quotationPrice = z
+  .string()
+  .refine(isValidQuotationPrice, message('quotationErrInvalidPrice'))
+
+/** One price row: a type, valid prices, at least one of them, a note of at
+ *  most 500 characters (save_quotation re-checks every rule). */
+const quotationLineSchema = z
+  .object({
+    equipment_type: selected('quotationLineTypeRequired'),
+    daily_price: quotationPrice,
+    monthly_price: quotationPrice,
+    mob_demob_price: quotationPrice,
+    note: optionalText({
+      max: QUOTATION_LINE_NOTE_MAX,
+      lengthKey: 'quotationErrLineNoteTooLong',
+    }),
+  })
+  .superRefine((line, context) => {
+    const prices = [line.daily_price, line.monthly_price, line.mob_demob_price]
+    if (prices.every((price) => parseQuotationPrice(price) === null))
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['daily_price'],
+        message: 'quotationLinePriceRequired',
+      })
+  })
+
+const quotationCostSchema = z.object({
+  name: requiredText('quotationErrCostName', {
+    max: QUOTATION_COST_NAME_MAX,
+    lengthKey: 'quotationErrCostName',
+  }),
+  borne_by: z
+    .string()
+    .refine(
+      (value) => value === 'client' || value === 'lessor',
+      message('quotationErrBorneBy'),
+    ),
+})
+
+/**
+ * «عرض سعر جديد» / «تعديل العرض» (save_quotation, 0199): the company and
+ * both dates are required, «صالح لغاية» is not before the issue date, at
+ * least one price row, each type once, the costs named. NO quantity or
+ * total. The row issues carry their index (`lines.N`, `costs.N`):
+ * `quotationFormErrors` turns them into per-row messages.
+ */
+export const quotationFormSchema = z
+  .object({
+    company_id: selected('quotationCompanyRequired'),
+    project_id: z.string(),
+    issue_date: selected('quotationIssueDateRequired'),
+    valid_until: selected('quotationValidUntilRequired'),
+    notes: optionalText({
+      max: QUOTATION_NOTES_MAX,
+      lengthKey: 'quotationErrNotesTooLong',
+    }),
+    lines: z.array(quotationLineSchema).min(1, message('quotationErrNoLines')),
+    costs: z.array(quotationCostSchema),
+    term_template_ids: z.array(z.string()),
+    keep_term_ids: z.array(z.string()),
+  })
+  .superRefine((form, context) => {
+    if (
+      form.issue_date &&
+      form.valid_until &&
+      form.valid_until < form.issue_date
+    )
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['valid_until'],
+        message: 'quotationErrInvalidDates',
+      })
+    const seen = new Set<string>()
+    form.lines.forEach((line, index) => {
+      const type = line.equipment_type.trim()
+      if (!type) return
+      if (seen.has(type))
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['lines', index, 'equipment_type'],
+          message: 'quotationErrDuplicateType',
+        })
+      seen.add(type)
+    })
+  })
+
+/** The quotation form's messages: the fields, and one per row. */
+export interface QuotationFormErrors {
+  fields: FieldErrors<QuotationFormValues>
+  lines: Record<number, TranslationKey>
+  costs: Record<number, TranslationKey>
+}
+
+/** `quotationFormSchema` as the field and row messages the form renders
+ *  (the first issue of a field or a row wins). */
+export function quotationFormErrors(
+  values: QuotationFormValues,
+): QuotationFormErrors {
+  const errors: QuotationFormErrors = { fields: {}, lines: {}, costs: {} }
+  const result = quotationFormSchema.safeParse(values)
+  if (result.success) return errors
+  for (const issue of result.error.issues) {
+    const [field, index] = issue.path
+    const key = (
+      issue.code === z.ZodIssueCode.invalid_type ? 'required' : issue.message
+    ) as TranslationKey
+    if ((field === 'lines' || field === 'costs') && typeof index === 'number') {
+      const rows = errors[field]
+      if (!rows[index]) rows[index] = key
+      continue
+    }
+    const name = field as keyof QuotationFormValues | undefined
+    if (name !== undefined && !errors.fields[name]) errors.fields[name] = key
+  }
+  return errors
+}
+
+/** True when the quotation form has any message. */
+export function quotationFormHasErrors(errors: QuotationFormErrors): boolean {
+  return (
+    hasErrors(errors.fields) ||
+    Object.keys(errors.lines).length > 0 ||
+    Object.keys(errors.costs).length > 0
+  )
+}
+
+/** Settings › «شروط عروض الاسعار» (quotation_term_templates, 0199): the
+ *  four texts within their limits, an optional whole positive position. */
+export const quotationTermTemplateSchema = z.object({
+  title_ar: requiredText('quotationTermTitleRequired', {
+    max: QUOTATION_TERM_TITLE_MAX,
+    lengthKey: 'quotationTermTitleTooLong',
+  }),
+  title_en: requiredText('quotationTermTitleRequired', {
+    max: QUOTATION_TERM_TITLE_MAX,
+    lengthKey: 'quotationTermTitleTooLong',
+  }),
+  body_ar: requiredText('quotationTermBodyRequired', {
+    max: QUOTATION_TERM_BODY_MAX,
+    lengthKey: 'quotationTermBodyTooLong',
+  }),
+  body_en: requiredText('quotationTermBodyRequired', {
+    max: QUOTATION_TERM_BODY_MAX,
+    lengthKey: 'quotationTermBodyTooLong',
+  }),
+  position: z
+    .string()
+    .trim()
+    .refine(
+      (value) => !value || /^[0-9٠-٩]+$/.test(value),
+      message('quotationTermPositionInvalid'),
+    )
+    .refine(
+      (value) =>
+        !value ||
+        Number(
+          value.replace(/[٠-٩]/g, (digit) =>
+            String(digit.charCodeAt(0) - 0x0660),
+          ),
+        ) >= 1,
+      message('quotationTermPositionInvalid'),
+    ),
+  is_default: z.boolean(),
+})
