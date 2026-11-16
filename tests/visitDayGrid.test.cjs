@@ -76,14 +76,14 @@ test('the month: a filter inside one month, else the previous month', () => {
   assert.equal(grid.exportDaysMonth([], NOW), '2026-10')
 })
 
-test('a project visit: 10 a day, Fridays empty, the rest unrecorded or before', () => {
+test('a project visit: 10 a day, F on a Friday, the rest unrecorded or before', () => {
   // 5 to 9 October; the 9th is a Friday.
   const only = [visit('s1', 'site', '2026-10-05', '2026-10-09')]
   const days = grid.unitMonthDays(only, '2026-10', NOW, false)
   const row = cells(days)
   assert.deepEqual(row.slice(0, 4), ['', '', '', ''])
   assert.equal(days[0].kind, 'before')
-  assert.deepEqual(row.slice(4, 9), [10, 10, 10, 10, ''])
+  assert.deepEqual(row.slice(4, 9), [10, 10, 10, 10, 'F'])
   assert.equal(days[8].kind, 'site')
   assert.equal(days[8].friday, true)
   // After the exit the unit is known, so the days are «بدون تسجيل».
@@ -103,10 +103,10 @@ test('a workshop stop nested in an open project visit takes its days', () => {
   ]
   const days = grid.unitMonthDays(visits, '2026-10', NOW, false)
   const row = cells(days)
-  assert.deepEqual(row.slice(3, 9), [10, 10, 'W', 'W', 'W', ''])
+  assert.deepEqual(row.slice(3, 9), [10, 10, 'W', 'W', 'W', 'F'])
   // The visits sheet: the project row shows the letters, the stop its own days.
   const site = days.map((day) => grid.visitDayCell(day, visits[0], AR, NOW))
-  assert.deepEqual(site.slice(3, 9), [10, 10, 'W', 'W', 'W', ''])
+  assert.deepEqual(site.slice(3, 9), [10, 10, 'W', 'W', 'W', 'F'])
   const stop = days.map((day) => grid.visitDayCell(day, visits[1], AR, NOW))
   assert.deepEqual(stop.slice(3, 9), ['', '', 'W', 'W', 'W', ''])
   assert.deepEqual(grid.summarizeDayCells(site, AR), {
@@ -168,8 +168,23 @@ test('workshop purposes, the open visit and the future', () => {
     workshopDays: 4,
     unrecordedDays: 8,
   })
-  // One letter for the workshop whatever the purpose, A for no record.
-  assert.deepEqual(grid.dayCodes(), { workshop: 'W', unrecorded: 'A' })
+  // One letter for the workshop whatever the purpose, A for no record, F
+  // for a Friday inside a project.
+  assert.deepEqual(grid.dayCodes(), {
+    workshop: 'W',
+    unrecorded: 'A',
+    friday: 'F',
+  })
+  // The colours of the file follow the cell.
+  assert.equal(grid.dayCellTone(10), 'hours')
+  assert.equal(grid.dayCellTone('W'), 'workshop')
+  assert.equal(grid.dayCellTone('A'), 'unrecorded')
+  assert.equal(grid.dayCellTone('F'), 'friday')
+  assert.equal(grid.dayCellTone(''), null)
+  assert.equal(grid.dayCellTone(null), null)
+  // A Friday in the workshop stays W, an unrecorded Friday stays A.
+  assert.equal(days[12].friday, true)
+  assert.equal(row[12], 'A')
 })
 
 test('a visit row is empty outside its own span', () => {
@@ -205,14 +220,14 @@ test('a workshop stay after a project exit shows on that project row', () => {
   const days = grid.unitMonthDays(visits, '2026-10', NOW, false)
   const rowOf = (one) =>
     days.map((day) => grid.visitDayCell(day, one, AR, NOW, parents))
-  // A: 10 on 5–8, Friday the 9th empty, then the workshop days 10–12, which
+  // A: 10 on 5–8, Friday the 9th F, then the workshop days 10–12, which
   // lie after its exit; the 13th is project B's.
   assert.deepEqual(rowOf(a).slice(4, 14), [
     10,
     10,
     10,
     10,
-    '',
+    'F',
     'W',
     'W',
     'W',

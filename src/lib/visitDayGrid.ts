@@ -8,7 +8,7 @@
  * is a SAUDI day (UTC+03:00, no daylight saving).
  *
  * The rules, decided with the owner:
- *   - a day inside a project counts 10 hours, a Friday stays empty;
+ *   - a day inside a project counts 10 hours, a Friday there shows F;
  *   - a day in the workshop shows W whatever its purpose, Fridays included;
  *   - a day no visit covers is A (بدون تسجيل) on the units sheet;
  *   - when several visits cover one day, the one that STARTED LAST owns it
@@ -272,15 +272,36 @@ export interface DayCodes {
   workshop: string
   /** A day no visit covers («بدون تسجيل»). */
   unrecorded: string
+  /** A Friday inside a project: no hours. */
+  friday: string
 }
 
 /**
  * The letters of the sheet, the same in both languages (owner 2026-11-16,
  * «الورشة "W" بدون تسجيل "A" بدون صيانة ووقوف»): W = the workshop, with no
  * letter per purpose, and A = no record. The first version had ص / ق / خ / و
- * per purpose and «-».
+ * per purpose and «-». F = a Friday inside a project («الجمعة حط F», the
+ * same day; it was an empty cell): it counts no hours.
  */
-export const DAY_CODES: DayCodes = { workshop: 'W', unrecorded: 'A' }
+export const DAY_CODES: DayCodes = {
+  workshop: 'W',
+  unrecorded: 'A',
+  friday: 'F',
+}
+
+/** How a day cell is coloured in the file (light fills, owner 2026-11-16). */
+export type DayCellTone = 'hours' | 'workshop' | 'unrecorded' | 'friday'
+
+export function dayCellTone(
+  cell: DayCell | null | undefined,
+  codes: DayCodes = DAY_CODES,
+): DayCellTone | null {
+  if (typeof cell === 'number') return 'hours'
+  if (cell === codes.workshop) return 'workshop'
+  if (cell === codes.unrecorded) return 'unrecorded'
+  if (cell === codes.friday) return 'friday'
+  return null
+}
 
 export function dayCodes(): DayCodes {
   return DAY_CODES
@@ -292,7 +313,7 @@ function isWorkshopKind(kind: DayKind): kind is WorkshopDayKind {
 
 /** The units sheet: the whole month of one unit. */
 export function unitDayCell(day: GridDay, codes: DayCodes): DayCell {
-  if (day.kind === 'site') return day.friday ? '' : DAY_HOURS
+  if (day.kind === 'site') return day.friday ? codes.friday : DAY_HOURS
   if (isWorkshopKind(day.kind)) return codes.workshop
   if (day.kind === 'unrecorded') return codes.unrecorded
   return ''
@@ -359,12 +380,9 @@ export function visitDayCell(
         : inside
       return mine ? codes.workshop : ''
     }
-    return inside &&
-      day.kind === 'site' &&
-      day.ownerEntryId === visit.entryId &&
-      !day.friday
-      ? DAY_HOURS
-      : ''
+    if (!inside || day.kind !== 'site' || day.ownerEntryId !== visit.entryId)
+      return ''
+    return day.friday ? codes.friday : DAY_HOURS
   }
   return inside &&
     isWorkshopKind(day.kind) &&

@@ -18,6 +18,7 @@ import { exportOwnerLabel } from '@/lib/exportFields'
 import { monthLabel } from '@/lib/sales'
 import {
   DAY_HOURS,
+  dayCellTone,
   dayCodes,
   monthDayKeys,
   saudiDayKeyOf,
@@ -106,6 +107,7 @@ function dayColumns<T>(
     width: 2,
     align: 'center' as const,
     value: (row: T) => cellValue(cellsOf(row)?.[index]),
+    tone: (row: T) => dayCellTone(cellsOf(row)?.[index]),
   }))
 }
 
@@ -244,6 +246,7 @@ export function buildVisitDayExport({
     { code: String(DAY_HOURS), meaning: t('exportDaysLegendSite') },
     { code: codes.workshop, meaning: t('exportDaysLegendWorkshop') },
     { code: codes.unrecorded, meaning: t('exportDaysLegendUnrecorded') },
+    { code: codes.friday, meaning: t('exportDaysLegendFriday') },
     {
       code: t('exportDaysLegendEmptyCode'),
       meaning: t('exportDaysLegendEmpty'),
@@ -257,6 +260,9 @@ export function buildVisitDayExport({
       width: 16,
       align: 'center',
       value: (row) => row.code,
+      // The legend's own cells wear the colours they explain.
+      tone: (row) =>
+        row.code === String(DAY_HOURS) ? 'hours' : dayCellTone(row.code),
     },
     {
       header: t('exportDaysLegendMeaning'),

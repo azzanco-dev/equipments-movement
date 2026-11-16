@@ -22,9 +22,12 @@ import {
   EXPORT_ROW_HEIGHT_PT,
   exportCellStyle,
   exportColumnWidth,
+  exportToneStyle,
   excelColumnLetter,
   sheetAoa,
   type ExcelColumn,
+  type ExportCellStyle,
+  type ExportCellTone,
   type ExportRowsOptions,
   type ExportSheetSpec,
 } from '@/lib/excelSheet'
@@ -67,6 +70,16 @@ function buildExportSheet<T>(
   // number (10) as a date.
   const bodyCenter = exportCellStyle('date', rtl)
   const bandCenter = exportCellStyle('date', rtl, false, true)
+  // One style object per tone (the coloured day cells), made when first met.
+  const toneStyles = new Map<ExportCellTone, ExportCellStyle>()
+  const toneStyle = (tone: ExportCellTone) => {
+    let style = toneStyles.get(tone)
+    if (!style) {
+      style = exportToneStyle(tone)
+      toneStyles.set(tone, style)
+    }
+    return style
+  }
 
   columns.forEach((column, columnIndex) => {
     const isDate = column.type === 'date'
@@ -77,6 +90,11 @@ function buildExportSheet<T>(
       const cell = (sheet[address] ??= { t: 's', v: '' }) as XLSX.CellObject
       if (rowIndex === 0) {
         cell.s = isDate || centered ? headerDate : headerText
+        continue
+      }
+      const tone = centered ? (column.tone?.(rows[rowIndex - 1]) ?? null) : null
+      if (tone) {
+        cell.s = toneStyle(tone)
         continue
       }
       const banded = rowIndex % 2 === 0

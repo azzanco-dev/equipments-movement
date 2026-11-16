@@ -78,8 +78,16 @@ export interface ExcelColumn<T> {
    * export). A date column is centered whatever this says.
    */
   align?: 'center'
+  /**
+   * A light fill for a cell of a centered column, by what it holds (the day
+   * columns: hours, workshop, no record, Friday); `null` = the plain look.
+   */
+  tone?: (row: T) => ExportCellTone | null
   value: (row: T) => ExcelCellValue
 }
+
+/** The fills of the day columns (owner 2026-11-16, «والوان فاتحة»). */
+export type ExportCellTone = 'hours' | 'workshop' | 'unrecorded' | 'friday'
 
 /**
  * One sheet of a file with several sheets (the visits export with its day
@@ -230,6 +238,28 @@ export function exportCellStyle(
   else if (banded)
     style.fill = { patternType: 'solid', fgColor: { rgb: BAND_FILL } }
   return style
+}
+
+/**
+ * Light fills with a darker text of the same hue (owner 2026-11-16: «الساعات
+ * اخضر, الصيانة برتقالي, بدون تسجيل احمر والجمعة مطفي, والوان فاتحة»).
+ */
+const TONE_COLORS: Record<ExportCellTone, { fill: string; text: string }> = {
+  hours: { fill: 'DCFCE7', text: '166534' },
+  workshop: { fill: 'FFEDD5', text: '9A3412' },
+  unrecorded: { fill: 'FEE2E2', text: '991B1B' },
+  friday: { fill: 'E5E7EB', text: '9CA3AF' },
+}
+
+/** The style of a toned cell: centered, bordered, its fill and text colour. */
+export function exportToneStyle(tone: ExportCellTone): ExportCellStyle {
+  const colors = TONE_COLORS[tone]
+  return {
+    font: { name: 'Calibri', sz: 11, color: { rgb: colors.text } },
+    alignment: { horizontal: 'center', vertical: 'center' },
+    border: thinBorder(),
+    fill: { patternType: 'solid', fgColor: { rgb: colors.fill } },
+  }
 }
 
 /** A column's width in characters, with room for the indent. */

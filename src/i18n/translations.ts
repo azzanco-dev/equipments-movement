@@ -1009,13 +1009,14 @@ export const translations = {
     exportDaysLegendCode: 'الرمز',
     exportDaysLegendMeaning: 'المعنى',
     exportDaysLegendSite:
-      'يوم داخل مشروع (10 ساعات). يوم الدخول ويوم الخروج محسوبان، والجمعة داخل المشروع تبقى فارغة.',
+      'يوم داخل مشروع (10 ساعات). يوم الدخول ويوم الخروج محسوبان.',
     exportDaysLegendWorkshop: 'يوم في الورشة',
     exportDaysLegendUnrecorded:
       'بدون تسجيل: المعدة ليست مسجلة في مشروع ولا في الورشة',
+    exportDaysLegendFriday: 'جمعة داخل مشروع، لا تحسب لها ساعات',
     exportDaysLegendEmptyCode: 'فارغ',
     exportDaysLegendEmpty:
-      'جمعة داخل مشروع، او يوم قبل اول حركة للمعدة، او يوم لم يحن بعد، او يوم خارج الزيارة في ورقة الزيارات',
+      'يوم قبل اول حركة للمعدة، او يوم لم يحن بعد، او يوم خارج الزيارة في ورقة الزيارات',
     exportDaysLegendHours: 'عدد ايام المشروع × 10 ساعات، بدون الجمعة',
     exportDaysLegendUnits:
       'صف لكل معدة عن الشهر كله في كل المشاريع والورشة، وليس للزيارات المصدرة فقط',
@@ -3861,13 +3862,14 @@ export const translations = {
     exportDaysLegendCode: 'Code',
     exportDaysLegendMeaning: 'Meaning',
     exportDaysLegendSite:
-      'A day inside a project (10 hours). The entry and exit days count; a Friday inside a project stays empty.',
+      'A day inside a project (10 hours). The entry and exit days count.',
     exportDaysLegendWorkshop: 'A day in the workshop',
     exportDaysLegendUnrecorded:
       'Unrecorded: the unit is in no project and not in the workshop',
+    exportDaysLegendFriday: 'A Friday inside a project: no hours counted',
     exportDaysLegendEmptyCode: 'Empty',
     exportDaysLegendEmpty:
-      'A Friday inside a project, a day before the unit’s first movement, a day still to come, or a day outside the visit on the visits sheet',
+      'A day before the unit’s first movement, a day still to come, or a day outside the visit on the visits sheet',
     exportDaysLegendHours: 'Project days × 10 hours, Fridays excluded',
     exportDaysLegendUnits:
       'One row per unit for the whole month across every project and the workshop, not only the exported visits',

@@ -91,19 +91,26 @@ test('the visits sheet: the counts, then one column per day, last', () => {
   )
   const cells = (row) =>
     built.trailingColumns.slice(2).map((column) => column.value(row))
-  // The project row: 10 a day, the stop's letter on 6–8, Fridays empty.
+  // The project row: 10 a day, the stop's letter on 6–8, F on Fridays.
   const first = cells(s1)
-  assert.deepEqual(first.slice(0, 9), [
-    10,
-    null,
-    10,
-    10,
-    10,
-    'W',
-    'W',
-    'W',
-    null,
+  assert.deepEqual(first.slice(0, 9), [10, 'F', 10, 10, 10, 'W', 'W', 'W', 'F'])
+  // Each day cell names its colour; the counts have none.
+  const tones = built.trailingColumns
+    .slice(2, 11)
+    .map((column) => column.tone(s1))
+  assert.deepEqual(tones, [
+    'hours',
+    'friday',
+    'hours',
+    'hours',
+    'hours',
+    'workshop',
+    'workshop',
+    'workshop',
+    'friday',
   ])
+  assert.equal(built.trailingColumns[0].tone, undefined)
+  assert.equal(built.trailingColumns[2].tone(old), null)
   // 31 days of October less its 5 Fridays and the 3 days of the stop.
   assert.equal(built.trailingColumns[0].value(s1), 230)
   assert.equal(built.trailingColumns[1].value(s1), 3)
@@ -223,7 +230,7 @@ test('the projects export draws the workshop days on the project rows', () => {
     10,
     10,
     10,
-    null,
+    'F',
     10,
   ])
   assert.equal(both.trailingColumns[0].value(b), 60)
@@ -292,6 +299,26 @@ test('the file: three right-to-left sheets, numbers as numbers', () => {
   assert.equal(visits.D2.t, 'n')
   assert.equal(visits.D2.s.alignment.horizontal, 'center')
   assert.equal(visits.D1.v, '1')
+  // Light fills by what the cell holds (owner 2026-11-16): hours green, the
+  // workshop orange, no record red, a Friday muted grey.
+  assert.equal(visits.D2.s.fill.fgColor.rgb, 'DCFCE7')
+  assert.equal(visits.E2.v, 'F')
+  assert.equal(visits.E2.s.fill.fgColor.rgb, 'E5E7EB')
+  assert.equal(visits.I2.s.fill.fgColor.rgb, 'FFEDD5')
+  // «المستخلص»: O2 = 8 October of the first unit (A2), a day without a record.
+  const unitsSheet = workbook.Sheets.exportDaysSheetUnits
+  assert.equal(unitsSheet.O2.v, 'A')
+  assert.equal(unitsSheet.O2.s.fill.fgColor.rgb, 'FEE2E2')
+  // An empty day cell and a count keep the plain look.
+  assert.equal(visits.B2.s.fill, undefined)
+  // The legend wears the colours it explains.
+  const legendSheet = workbook.Sheets.exportDaysSheetLegend
+  assert.equal(legendSheet.A3.v, '10')
+  assert.equal(legendSheet.A3.s.fill.fgColor.rgb, 'DCFCE7')
+  assert.equal(legendSheet.A4.s.fill.fgColor.rgb, 'FFEDD5')
+  assert.equal(legendSheet.A5.s.fill.fgColor.rgb, 'FEE2E2')
+  assert.equal(legendSheet.A6.v, 'F')
+  assert.equal(legendSheet.A6.s.fill.fgColor.rgb, 'E5E7EB')
   // I2 = 6 October, the workshop letter.
   assert.equal(visits.I2.v, 'W')
   // The file really writes.
@@ -443,6 +470,7 @@ test('both languages carry the new keys', () => {
     'exportDaysLegendSite',
     'exportDaysLegendWorkshop',
     'exportDaysLegendUnrecorded',
+    'exportDaysLegendFriday',
     'exportDaysLegendEmptyCode',
     'exportDaysLegendEmpty',
     'exportDaysLegendHours',
