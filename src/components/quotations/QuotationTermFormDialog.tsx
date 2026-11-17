@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Button,
   Dialog,
@@ -65,15 +65,12 @@ export function QuotationTermFormDialog({
   open,
   onOpenChange,
   term = null,
-  note,
   onSaved,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   /** The template term to edit; null adds a new one. */
   term?: QuotationTermTemplate | null
-  /** A line above the fields (the quotation form says where the term goes). */
-  note?: ReactNode
   onSaved: (id: string) => void
 }) {
   const { t } = useI18n()
@@ -169,11 +166,6 @@ export function QuotationTermFormDialog({
         {formError && (
           <Notice tone="danger" size="compact">
             {t(formError)}
-          </Notice>
-        )}
-        {note && (
-          <Notice tone="info" size="compact">
-            {note}
           </Notice>
         )}
         <Field

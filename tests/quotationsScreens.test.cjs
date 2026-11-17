@@ -336,12 +336,10 @@ test('«خيارات» of the list links to the terms template page', () => {
   const menu = read('src', 'components', 'ui', 'DropdownMenu.tsx')
   assert.match(menu, /if \(props\.asChild\)/)
   const translations = read('src', 'i18n', 'translations.ts')
-  for (const key of ['quotationListOptions', 'quotationTermAddNote'])
-    assert.equal(
-      (translations.match(new RegExp(`^    ${key}:`, 'gm')) ?? []).length,
-      2,
-      key,
-    )
+  assert.equal(
+    (translations.match(/^    quotationListOptions:/gm) ?? []).length,
+    2,
+  )
 })
 
 test('the quotation form adds a term to the template and ticks it', () => {
@@ -352,12 +350,17 @@ test('the quotation form adds a term to the template and ticks it', () => {
     form,
     /\{canAddTerm && \(\s+<Button[\s\S]*?onClick=\{\(\) => setTermDialogOpen\(true\)\}[\s\S]*?\{t\('quotationTermAdd'\)\}/,
   )
-  // A new term only (no `term` prop), with the line saying where it goes.
+  // A new term only (no `term` prop) and no explaining line (owner
+  // 2026-11-17: «وشيل النص حق يضاف الشرط الى قالب الشروط»).
   const start = form.indexOf('<QuotationTermFormDialog')
   assert.ok(start > 0)
   const dialog = form.slice(start, form.indexOf('/>', start))
   assert.doesNotMatch(dialog, /\bterm=/)
-  assert.match(dialog, /note=\{t\('quotationTermAddNote'\)\}/)
+  assert.doesNotMatch(dialog, /note=/)
+  assert.doesNotMatch(
+    read('src', 'i18n', 'translations.ts'),
+    /quotationTermAddNote/,
+  )
   // After the save: ticked, then the template read again without a flash.
   assert.match(
     dialog,
@@ -562,10 +565,8 @@ test('quotationTermTemplateSchema: texts and an optional position', () => {
   const none = (result) => assert.equal(Object.keys(result).length, 0)
   none(v.validateWithSchema(v.quotationTermTemplateSchema, values()))
   assert.equal(
-    v.validateWithSchema(
-      v.quotationTermTemplateSchema,
-      values({ body_en: '' }),
-    ).body_en,
+    v.validateWithSchema(v.quotationTermTemplateSchema, values({ body_en: '' }))
+      .body_en,
     'quotationTermBodyRequired',
   )
   assert.equal(

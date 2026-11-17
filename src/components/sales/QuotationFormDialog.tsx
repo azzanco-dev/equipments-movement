@@ -1075,7 +1075,6 @@ export function QuotationFormDialog({
         <QuotationTermFormDialog
           open={termDialogOpen}
           onOpenChange={setTermDialogOpen}
-          note={t('quotationTermAddNote')}
           onSaved={(id) => {
             setTermDialogOpen(false)
             // The new term is ticked for this quotation, then the template
