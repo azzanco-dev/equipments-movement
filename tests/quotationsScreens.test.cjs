@@ -664,6 +664,16 @@ test('the page: PDF for every reader, three options for a manager', () => {
   const termsAt = page.indexOf("title={t('quotationTermsTitle')}")
   assert.ok(prices > 0 && costsAt > prices && termsAt > costsAt)
   assert.equal((page.match(/xl:grid-cols-3/g) ?? []).length, 2)
+  // The prices and the costs share one height: their row stretches its
+  // cards (no `items-start`); the terms row keeps each card its own height.
+  assert.match(
+    page,
+    /<div className="grid gap-4 xl:grid-cols-3">\s+<Card padded=\{false\} className="min-w-0 xl:col-span-2">/,
+  )
+  assert.equal(
+    (page.match(/grid items-start gap-4 xl:grid-cols-3/g) ?? []).length,
+    1,
+  )
   assert.match(page, /quotation\.notes \? 'xl:col-span-2' : 'xl:col-span-3'/)
   const translations2 = read('src', 'i18n', 'translations.ts')
   assert.match(translations2, /quotationPricesTitle: 'التسعيرات',/)

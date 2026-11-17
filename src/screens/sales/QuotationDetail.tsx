@@ -444,8 +444,9 @@ function QuotationDetailInner({
       </Card>
 
       {/* 2. «التسعيرات» by equipment type (two thirds from xl) beside the
-          costs. */}
-      <div className="grid items-start gap-4 xl:grid-cols-3">
+          costs; the two boxes share one height (owner 2026-11-17, «خلي
+          صندوق التكاليف نفس طول التسعيرات»: the row stretches its cards). */}
+      <div className="grid gap-4 xl:grid-cols-3">
         <Card padded={false} className="min-w-0 xl:col-span-2">
           <div className="p-4 pb-3">
             <SectionHeader title={t('quotationPricesTitle')} />
