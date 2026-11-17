@@ -1122,7 +1122,6 @@ export const QUOTATION_NOTES_MAX = 1000
 export const QUOTATION_LINE_NOTE_MAX = 500
 export const QUOTATION_COST_NAME_MAX = 80
 export const QUOTATION_PRICE_MAX = 9999999999.99
-export const QUOTATION_TERM_TITLE_MAX = 120
 export const QUOTATION_TERM_BODY_MAX = 1000
 
 /** A typed price: empty (no price) or a number from 0 to the bound. */
@@ -1261,17 +1260,10 @@ export function quotationFormHasErrors(errors: QuotationFormErrors): boolean {
   )
 }
 
-/** Settings › «شروط عروض الاسعار» (quotation_term_templates, 0199): the
- *  four texts within their limits, an optional whole positive position. */
+/** Settings › «شروط عروض الاسعار» (quotation_term_templates, 0199; no
+ *  title since 0201): the two texts within their limit, an optional whole
+ *  positive position. */
 export const quotationTermTemplateSchema = z.object({
-  title_ar: requiredText('quotationTermTitleRequired', {
-    max: QUOTATION_TERM_TITLE_MAX,
-    lengthKey: 'quotationTermTitleTooLong',
-  }),
-  title_en: requiredText('quotationTermTitleRequired', {
-    max: QUOTATION_TERM_TITLE_MAX,
-    lengthKey: 'quotationTermTitleTooLong',
-  }),
   body_ar: requiredText('quotationTermBodyRequired', {
     max: QUOTATION_TERM_BODY_MAX,
     lengthKey: 'quotationTermBodyTooLong',

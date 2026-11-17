@@ -84,8 +84,6 @@ export interface QuotationTerm {
   quotation_id: string
   /** The template row it was copied from; null once that row is gone. */
   template_id: string | null
-  title_ar: string
-  title_en: string
   body_ar: string
   body_en: string
   position: number
@@ -98,8 +96,6 @@ export const QUOTATION_TERMS_PERMISSION = 'sales.quotations.approve'
 /** A row of the Settings template `quotation_term_templates`. */
 export interface QuotationTermTemplate {
   id: string
-  title_ar: string
-  title_en: string
   body_ar: string
   body_en: string
   position: number
@@ -273,8 +269,6 @@ export function quotationFormValuesOf(
 
 /** The values of the Settings template dialog. */
 export interface QuotationTermTemplateFormValues {
-  title_ar: string
-  title_en: string
   body_ar: string
   body_en: string
   /** Empty = at the end (the database places it). */
@@ -286,8 +280,6 @@ export interface QuotationTermTemplateFormValues {
 export function quotationTermTemplatePayload(
   values: QuotationTermTemplateFormValues,
 ): {
-  title_ar: string
-  title_en: string
   body_ar: string
   body_en: string
   position: number
@@ -295,8 +287,6 @@ export function quotationTermTemplatePayload(
 } {
   const position = Number(latinDigits(values.position).trim())
   return {
-    title_ar: values.title_ar.trim(),
-    title_en: values.title_en.trim(),
     body_ar: values.body_ar.trim(),
     body_en: values.body_en.trim(),
     position: Number.isInteger(position) && position > 0 ? position : 0,

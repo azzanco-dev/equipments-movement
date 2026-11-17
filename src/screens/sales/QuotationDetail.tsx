@@ -491,15 +491,14 @@ function QuotationDetailInner({
                     {index + 1}
                   </span>
                   <div className="min-w-0 flex-1 space-y-0.5">
-                    <p className="font-medium">{term.title_ar}</p>
-                    <p className="whitespace-pre-wrap break-words text-sm text-muted">
+                    <p className="whitespace-pre-wrap break-words text-sm">
                       {term.body_ar}
                     </p>
                     <p
                       dir="ltr"
                       className="whitespace-pre-wrap break-words text-start text-xs text-muted"
                     >
-                      {term.title_en}: {term.body_en}
+                      {term.body_en}
                     </p>
                   </div>
                 </li>

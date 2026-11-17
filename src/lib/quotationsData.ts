@@ -40,10 +40,10 @@ export const QUOTATION_LINE_SELECT =
 export const QUOTATION_COST_SELECT = 'id,quotation_id,name,borne_by,position'
 
 export const QUOTATION_TERM_SELECT =
-  'id,quotation_id,template_id,title_ar,title_en,body_ar,body_en,position'
+  'id,quotation_id,template_id,body_ar,body_en,position'
 
 export const QUOTATION_TERM_TEMPLATE_SELECT =
-  'id,title_ar,title_en,body_ar,body_en,position,is_default,created_at,updated_at'
+  'id,body_ar,body_en,position,is_default,created_at,updated_at'
 
 /** The client's official numbers the PDF prints under its name (0175). */
 export const QUOTATION_COMPANY_SELECT = 'id,tax_number,commercial_register'

@@ -382,14 +382,15 @@ export function QuotationPrintSheet({
             <ol className="m-0 list-none space-y-1.5 p-0">
               {terms.map((term, index) => (
                 <li key={term.id} className="break-inside-avoid">
-                  <p>
+                  <p className="whitespace-pre-wrap">
                     <span className="tabular-nums">{index + 1}. </span>
-                    <span className="font-semibold">{term.title_ar}</span>
-                    {term.body_ar && <>: {term.body_ar}</>}
+                    {term.body_ar}
                   </p>
-                  <p dir="ltr" className="text-start text-[10px] text-muted">
-                    {index + 1}. {term.title_en}
-                    {term.body_en && <>: {term.body_en}</>}
+                  <p
+                    dir="ltr"
+                    className="whitespace-pre-wrap text-start text-[10px] text-muted"
+                  >
+                    {index + 1}. {term.body_en}
                   </p>
                 </li>
               ))}

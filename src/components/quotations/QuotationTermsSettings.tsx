@@ -31,8 +31,9 @@ import {
 
 /**
  * Settings › «شروط عروض الاسعار» (/settings/quotation-terms, migration 0199):
- * the terms template every new quotation starts from — a title and a text in
- * Arabic and English, an order, and whether the term is ticked by default.
+ * the terms template every new quotation starts from — a text in Arabic and
+ * in English (no title since migration 0201), an order, and whether the term
+ * is ticked by default.
  * Written directly under RLS (`sales.quotations.approve`) and read back.
  * Saved quotations keep their own copies, so an edit here never changes
  * them. The term form is `QuotationTermFormDialog` (the quotation form
@@ -105,18 +106,6 @@ export function QuotationTermsSettings({
       header: '#',
       className: 'tabular-nums text-muted',
       cell: (row) => row.position,
-    },
-    {
-      key: 'title',
-      header: t('quotationTermColTitle'),
-      cell: (row) => (
-        <span className="flex flex-col text-start">
-          <span className="font-semibold">{row.title_ar}</span>
-          <bdi dir="ltr" className="text-xs text-muted">
-            {row.title_en}
-          </bdi>
-        </span>
-      ),
     },
     {
       key: 'body',

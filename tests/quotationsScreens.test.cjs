@@ -267,6 +267,50 @@ test('the Settings page sits in AdminSettings like the banks', () => {
   assert.match(form, /insertQuotationTermTemplate\(form\)/)
 })
 
+// --- A term is its text alone (owner 2026-11-17, migration 0201) -------------
+
+test('no term title is left in the client code', () => {
+  for (const parts of [
+    ...QUOTATION_FILES,
+    ['src', 'components', 'quotations', 'QuotationTermsSettings.tsx'],
+    ['src', 'components', 'quotations', 'QuotationTermFormDialog.tsx'],
+    ['src', 'lib', 'formValidation.ts'],
+  ])
+    assert.doesNotMatch(
+      codeOf(read(...parts)),
+      /title_ar|title_en|QUOTATION_TERM_TITLE_MAX|quotationTermTitle|quotationTermColTitle/,
+      parts.join('/'),
+    )
+  assert.doesNotMatch(
+    read('src', 'i18n', 'translations.ts'),
+    /quotationTermTitle|quotationTermColTitle/,
+  )
+  const data = read('src', 'lib', 'quotationsData.ts')
+  assert.match(data, /'id,quotation_id,template_id,body_ar,body_en,position'/)
+  assert.match(
+    data,
+    /'id,body_ar,body_en,position,is_default,created_at,updated_at'/,
+  )
+  // The payload of a template term: the two texts, the order, the switch.
+  const q = loadLibModule('quotations')
+  assert.deepEqual(
+    JSON.parse(
+      JSON.stringify(
+        q.quotationTermTemplatePayload({
+          body_ar: ' نص ',
+          body_en: ' Text ',
+          position: '',
+          is_default: false,
+        }),
+      ),
+    ),
+    { body_ar: 'نص', body_en: 'Text', position: 0, is_default: false },
+  )
+  // The page, the form and the PDF show the text under its number.
+  const sheet = read('src', 'components', 'sales', 'QuotationPrintSheet.tsx')
+  assert.match(sheet, /\{index \+ 1\}\. \{term\.body_en\}/)
+})
+
 // --- The terms from the list and from the form (owner 2026-11-17) ------------
 
 test('«خيارات» of the list links to the terms template page', () => {
@@ -509,8 +553,6 @@ test('quotationFormSchema: the rules of the form', () => {
 test('quotationTermTemplateSchema: texts and an optional position', () => {
   const v = loadLibModule('formValidation')
   const values = (patch = {}) => ({
-    title_ar: 'الدفع',
-    title_en: 'Payment',
     body_ar: 'خلال 30 يوم',
     body_en: 'Within 30 days',
     position: '',
@@ -522,9 +564,9 @@ test('quotationTermTemplateSchema: texts and an optional position', () => {
   assert.equal(
     v.validateWithSchema(
       v.quotationTermTemplateSchema,
-      values({ title_en: '' }),
-    ).title_en,
-    'quotationTermTitleRequired',
+      values({ body_en: '' }),
+    ).body_en,
+    'quotationTermBodyRequired',
   )
   assert.equal(
     v.validateWithSchema(
@@ -771,8 +813,6 @@ test('an edit keeps the stored terms; the wrapper sends p_keep_term_ids', () => 
     {
       id: 't1',
       template_id: 'a',
-      title_ar: 'x',
-      title_en: 'x',
       body_ar: 'x',
       body_en: 'x',
       position: 1,
@@ -780,8 +820,6 @@ test('an edit keeps the stored terms; the wrapper sends p_keep_term_ids', () => 
     {
       id: 't2',
       template_id: null,
-      title_ar: 'y',
-      title_en: 'y',
       body_ar: 'y',
       body_en: 'y',
       position: 2,

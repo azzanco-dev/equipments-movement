@@ -14,7 +14,6 @@ import {
   focusFirstError,
   hasErrors,
   QUOTATION_TERM_BODY_MAX,
-  QUOTATION_TERM_TITLE_MAX,
   quotationTermTemplateSchema,
   validateWithSchema,
   type FieldErrors,
@@ -30,8 +29,6 @@ import {
 } from '@/lib/quotationsData'
 
 const FIELD_ORDER: readonly (keyof QuotationTermTemplateFormValues)[] = [
-  'title_ar',
-  'title_en',
   'body_ar',
   'body_en',
   'position',
@@ -39,8 +36,6 @@ const FIELD_ORDER: readonly (keyof QuotationTermTemplateFormValues)[] = [
 ]
 
 const EMPTY_FORM: QuotationTermTemplateFormValues = {
-  title_ar: '',
-  title_en: '',
   body_ar: '',
   body_en: '',
   position: '',
@@ -56,8 +51,9 @@ export function quotationTermWriteMessage(
 }
 
 /**
- * «شرط جديد» / «تعديل الشرط»: one term of the quotation terms template — a
- * title and a text in Arabic and English, its order and whether a new
+ * «شرط جديد» / «تعديل الشرط»: one term of the quotation terms template — its
+ * text in Arabic and in English (no title: owner 2026-11-17, «شيل العنوان
+ * العربي والانجليزي في الشروط», migration 0201), its order and whether a new
  * quotation ticks it. Written directly under RLS (`sales.quotations.approve`)
  * and read back. Opened from Settings › «شروط عروض الاسعار» (add and edit)
  * and from the quotation form (owner 2026-11-17, «اقدر من اضافة عرض سعر جديد
@@ -94,8 +90,6 @@ export function QuotationTermFormDialog({
     setForm(
       term
         ? {
-            title_ar: term.title_ar,
-            title_en: term.title_en,
             body_ar: term.body_ar,
             body_en: term.body_en,
             // The current position: sent back unchanged, the term stays.
@@ -182,39 +176,6 @@ export function QuotationTermFormDialog({
             {note}
           </Notice>
         )}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field
-            label={t('quotationTermTitleAr')}
-            name="title_ar"
-            required
-            error={fieldError('title_ar')}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                maxLength={QUOTATION_TERM_TITLE_MAX}
-                value={form.title_ar}
-                onChange={(event) => update({ title_ar: event.target.value })}
-              />
-            )}
-          </Field>
-          <Field
-            label={t('quotationTermTitleEn')}
-            name="title_en"
-            required
-            error={fieldError('title_en')}
-          >
-            {(control) => (
-              <Input
-                {...control}
-                dir="ltr"
-                maxLength={QUOTATION_TERM_TITLE_MAX}
-                value={form.title_en}
-                onChange={(event) => update({ title_en: event.target.value })}
-              />
-            )}
-          </Field>
-        </div>
         <Field
           label={t('quotationTermBodyAr')}
           name="body_ar"

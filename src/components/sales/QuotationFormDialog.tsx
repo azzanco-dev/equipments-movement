@@ -102,16 +102,13 @@ const PRICE_FIELDS = [
   ['mob_demob_price', 'quotationMobDemob'],
 ] as const
 
-/** A stored copy whose four texts differ from its template row now. */
+/** A stored copy whose two texts differ from its template row now. */
 function termTextDiffers(
   stored: QuotationTerm,
   template: QuotationTermTemplate,
 ): boolean {
   return (
-    stored.title_ar !== template.title_ar ||
-    stored.title_en !== template.title_en ||
-    stored.body_ar !== template.body_ar ||
-    stored.body_en !== template.body_en
+    stored.body_ar !== template.body_ar || stored.body_en !== template.body_en
   )
 }
 
@@ -975,13 +972,8 @@ export function QuotationFormDialog({
                               if (!on) setCopied(template.id, false)
                             }}
                           />
-                          <span className="min-w-0 flex-1 space-y-0.5 text-start">
-                            <span className="block text-sm font-medium">
-                              {shown.title_ar}
-                            </span>
-                            <span className="block whitespace-pre-wrap break-words text-xs text-muted">
-                              {shown.body_ar}
-                            </span>
+                          <span className="block min-w-0 flex-1 whitespace-pre-wrap break-words text-start text-sm">
+                            {shown.body_ar}
                           </span>
                         </label>
                         {stored && differs && (
@@ -1045,10 +1037,7 @@ export function QuotationFormDialog({
                             <span className="block text-xs text-muted">
                               {t('quotationOrphanTerm')}
                             </span>
-                            <span className="block text-sm font-medium">
-                              {term.title_ar}
-                            </span>
-                            <span className="block whitespace-pre-wrap break-words text-xs text-muted">
+                            <span className="block whitespace-pre-wrap break-words text-sm">
                               {term.body_ar}
                             </span>
                           </span>
