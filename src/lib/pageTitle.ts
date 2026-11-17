@@ -85,7 +85,7 @@ const PAGE_TITLES: Readonly<
   'purchasing/:id': { kind: 'detail', section: 'supplierPos' },
   'sales/:id': { kind: 'detail', section: 'clientPos' },
   'sales/cards/:id': { kind: 'detail', section: 'equipmentCards' },
-  // 0199: «QT-2026110001 · عروض الاسعار».
+  // 0199: «QT-202611001 · عروض الاسعار».
   'sales/quotations/:id': { kind: 'detail', section: 'quotations' },
 }
 

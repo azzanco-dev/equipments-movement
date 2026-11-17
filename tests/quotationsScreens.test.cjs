@@ -712,10 +712,13 @@ test('the list: no state column or tabs, a plain date, a plain number', () => {
   )
   const q = loadLibModule('quotations')
   const purchasing = loadLibModule('purchasing')
-  assert.ok(q.QUOTATION_NUMBER_PATTERN.test('QT-2026110001'))
+  // Three digits of sequence since migration 0202, more past 999.
+  assert.ok(q.QUOTATION_NUMBER_PATTERN.test('QT-202611001'))
+  assert.ok(q.QUOTATION_NUMBER_PATTERN.test('QT-2026111000'))
+  assert.equal(q.QUOTATION_NUMBER_PATTERN.test('QT-20261101'), false)
   assert.equal(q.QUOTATION_NUMBER_PATTERN.test('QD-0001'), false)
   // A quotation number is never read as a PO draft reference (grey).
-  assert.equal(purchasing.isSupplierPoDraftRef('QT-2026110001'), false)
+  assert.equal(purchasing.isSupplierPoDraftRef('QT-202611001'), false)
 })
 
 test('the data module calls only the three functions that remain', () => {

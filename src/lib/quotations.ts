@@ -16,7 +16,7 @@ import { saudiDateKey } from '@/lib/saudiTime'
  * bears each, and the terms copied from the Settings template. No
  * quantities, no totals. Since migration 0200 (owner 2026-11-17, «مايحتاج
  * التصنيف او الدورة, شيلها») a quotation is a plain document: NO states, no
- * approval, no client answer. Its official number `QT-YYYYMM####` is issued
+ * approval, no client answer. Its official number `QT-YYYYMM###` is issued
  * when it is created, and any quotation can be edited, copied or deleted.
  *
  * The labels, the form → RPC payloads and the mapping of every error token
@@ -27,9 +27,11 @@ import { saudiDateKey } from '@/lib/saudiTime'
 
 // --- Numbers -------------------------------------------------------------------
 
-/** A quotation number `QT-YYYYMM####` (mirrors the database CHECK). Every
- *  quotation carries one from its creation (0200). */
-export const QUOTATION_NUMBER_PATTERN = /^QT-[0-9]{10,}$/
+/** A quotation number `QT-YYYYMM###` — the Saudi year and month, then a
+ *  global sequence of at least three digits, e.g. `QT-202611001` (migration
+ *  0202; mirrors the database CHECK). Every quotation carries one from its
+ *  creation (0200). */
+export const QUOTATION_NUMBER_PATTERN = /^QT-[0-9]{9,}$/
 
 // --- Rows ----------------------------------------------------------------------
 
