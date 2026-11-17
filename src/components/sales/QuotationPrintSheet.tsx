@@ -165,7 +165,14 @@ export function QuotationPrintSheet({
     },
   ]
   const cell = 'border px-2 py-1.5 align-top'
-  const head = `${cell} bg-surface-hover font-semibold`
+  // The weights of the sheet (owner 2026-11-17, «قلل من البولد في ملف
+  // الPDF»): the title alone is semibold; the names, the table heads and the
+  // section titles are medium; every value is regular.
+  const head = `${cell} bg-surface-hover font-medium`
+  // The three price columns («يومي», «شهري», «النقل»): the head and the
+  // amounts centred under each other (owner 2026-11-17, «واضبط محاذاة
+  // الاعمدة»), middle-aligned with the two-line type cell.
+  const priceCell = 'border px-2 py-1.5 align-middle text-center'
   const price = (value: QuotationLine['daily_price']) =>
     value === null || value === undefined || value === '' ? (
       <span className="text-muted">
@@ -198,10 +205,10 @@ export function QuotationPrintSheet({
             className="h-[18mm] w-auto justify-self-start object-contain"
           />
           <div className="text-center">
-            <h1 className="text-xl font-bold leading-tight">
+            <h1 className="text-xl font-semibold leading-tight">
               {ar('quotationPrintTitle')}
             </h1>
-            <p className="text-sm font-semibold" dir="ltr">
+            <p className="text-sm" dir="ltr">
               {en('quotationPrintTitle')}
             </p>
             {project && (
@@ -224,7 +231,7 @@ export function QuotationPrintSheet({
             {headerFacts.map((fact) => (
               <div key={fact.key} className="flex gap-1.5">
                 <dt className="text-muted">{en(fact.key)}:</dt>
-                <dd className="m-0 font-semibold">{fact.value}</dd>
+                <dd className="m-0">{fact.value}</dd>
               </div>
             ))}
           </dl>
@@ -236,7 +243,7 @@ export function QuotationPrintSheet({
             <h2 className="text-[11px] text-muted">
               <Inline k="quotationPrintFrom" />
             </h2>
-            <p className="font-semibold">
+            <p className="font-medium">
               <Stacked k="supplierPoPrintBuyerName" />
             </p>
           </section>
@@ -244,7 +251,7 @@ export function QuotationPrintSheet({
             <h2 className="text-[11px] text-muted">
               <Inline k="quotationPrintTo" />
             </h2>
-            <p className="font-semibold">
+            <p className="font-medium">
               {client.ar}
               {client.en && client.en !== client.ar && (
                 <>
@@ -264,9 +271,7 @@ export function QuotationPrintSheet({
                   <span className="text-muted">
                     <Inline k={key} />:
                   </span>{' '}
-                  <bdi dir="ltr" className="font-semibold">
-                    {value}
-                  </bdi>
+                  <bdi dir="ltr">{value}</bdi>
                 </p>
               ) : null,
             )}
@@ -296,7 +301,7 @@ export function QuotationPrintSheet({
                   'quotationPrintMobDemob',
                 ] as const
               ).map((key) => (
-                <th key={key} scope="col" className={`${head} text-end`}>
+                <th key={key} scope="col" className={`${head} text-center`}>
                   <Stacked k={key} />
                 </th>
               ))}
@@ -309,20 +314,14 @@ export function QuotationPrintSheet({
                   {index + 1}
                 </td>
                 <td className={`${cell} break-words`}>
-                  <p className="font-semibold">{line.equipment_type}</p>
+                  <p className="font-medium">{line.equipment_type}</p>
                   {line.note && (
                     <p className="text-[11px] text-muted">{line.note}</p>
                   )}
                 </td>
-                <td className={`${cell} text-end font-medium`}>
-                  {price(line.daily_price)}
-                </td>
-                <td className={`${cell} text-end font-medium`}>
-                  {price(line.monthly_price)}
-                </td>
-                <td className={`${cell} text-end font-medium`}>
-                  {price(line.mob_demob_price)}
-                </td>
+                <td className={priceCell}>{price(line.daily_price)}</td>
+                <td className={priceCell}>{price(line.monthly_price)}</td>
+                <td className={priceCell}>{price(line.mob_demob_price)}</td>
               </tr>
             ))}
           </tbody>
@@ -333,7 +332,7 @@ export function QuotationPrintSheet({
 
         {costs.length > 0 && (
           <section className="mt-4 break-inside-avoid">
-            <h2 className="mb-1 font-semibold">
+            <h2 className="mb-1 font-medium">
               <Inline k="quotationPrintCosts" />
             </h2>
             <table className="w-full max-w-[120mm] table-fixed border-collapse">
@@ -367,7 +366,7 @@ export function QuotationPrintSheet({
 
         {quotation.notes && (
           <section className="mt-4 break-inside-avoid">
-            <h2 className="mb-1 font-semibold">
+            <h2 className="mb-1 font-medium">
               <Inline k="quotationPrintNotes" />
             </h2>
             <p className="whitespace-pre-wrap break-words">{quotation.notes}</p>
@@ -376,7 +375,7 @@ export function QuotationPrintSheet({
 
         {terms.length > 0 && (
           <section className="mt-4">
-            <h2 className="mb-1 font-semibold">
+            <h2 className="mb-1 font-medium">
               <Inline k="quotationPrintTerms" />
             </h2>
             <ol className="m-0 list-none space-y-1.5 p-0">
@@ -403,7 +402,7 @@ export function QuotationPrintSheet({
         <footer className="mt-6 break-inside-avoid border-t pt-2 text-[10px] text-muted">
           {companyFacts.length > 0 && (
             <div className="mb-1.5">
-              <p className="font-semibold text-fg">
+              <p className="font-medium text-fg">
                 {profile.nameAr} <span className="text-border">/</span>{' '}
                 <En>{profile.nameEn}</En>
               </p>
@@ -411,7 +410,7 @@ export function QuotationPrintSheet({
                 {companyFacts.map((fact) => (
                   <span key={fact.key}>
                     <Inline k={fact.label} />:{' '}
-                    <bdi dir={fact.dir} className="font-semibold text-fg">
+                    <bdi dir={fact.dir} className="text-fg">
                       {fact.value}
                     </bdi>
                   </span>

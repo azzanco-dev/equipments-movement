@@ -259,3 +259,44 @@ test('the supplier PO sheet is untouched', () => {
   assert.match(po, /@page \{ size: A4 portrait; margin: 0; \}/)
   assert.doesNotMatch(po, /companyProfile|quotationPrint|quotationPageCss/)
 })
+
+// --- Weights and the price columns (owner 2026-11-17) ------------------------
+
+test('the sheet is light: one semibold title, the rest medium or regular', () => {
+  // «قلل من البولد في ملف الPDF».
+  assert.doesNotMatch(SHEET, /font-bold/)
+  assert.equal((SHEET.match(/font-semibold/g) ?? []).length, 1)
+  assert.match(SHEET, /<h1 className="text-xl font-semibold leading-tight">/)
+  // The table heads, the two names, the type and the section titles: medium.
+  assert.match(SHEET, /const head = `\$\{cell\} bg-surface-hover font-medium`/)
+  assert.equal(
+    (SHEET.match(/<h2 className="mb-1 font-medium">/g) ?? []).length,
+    3,
+  )
+  assert.match(
+    SHEET,
+    /<p className="font-medium">\{line\.equipment_type\}<\/p>/,
+  )
+  // The values (the header facts, the client's numbers, the prices): regular.
+  assert.match(SHEET, /<dd className="m-0">\{fact\.value\}<\/dd>/)
+})
+
+test('the three price columns are centred, head over amount', () => {
+  // «واضبط محاذاة الاعمدة حق يومي شهري النقل».
+  assert.match(
+    SHEET,
+    /const priceCell = 'border px-2 py-1\.5 align-middle text-center'/,
+  )
+  assert.match(
+    SHEET,
+    /<th key=\{key\} scope="col" className=\{`\$\{head\} text-center`\}>/,
+  )
+  for (const field of ['daily_price', 'monthly_price', 'mob_demob_price'])
+    assert.match(
+      SHEET,
+      new RegExp(
+        `<td className=\\{priceCell\\}>\\{price\\(line\\.${field}\\)\\}</td>`,
+      ),
+    )
+  assert.doesNotMatch(SHEET, /text-end/)
+})
