@@ -817,6 +817,7 @@ function AppContent() {
                 onSelectQuotation={(id) =>
                   router.push(`/sales/quotations/${id}`)
                 }
+                canOpenTerms={shell.pages.has('settings/quotation-terms')}
               />
             )}
             {page === 'drivers' && (

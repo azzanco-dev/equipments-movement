@@ -7,10 +7,12 @@ import {
   type ReactNode,
 } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
+import { usePermissions } from '@/auth/PermissionsContext'
 import {
   AsyncSearchSelect,
   type AsyncSearchSelectOption,
 } from '@/components/AsyncSearchSelect'
+import { QuotationTermFormDialog } from '@/components/quotations/QuotationTermFormDialog'
 import {
   Button,
   Checkbox,
@@ -46,6 +48,7 @@ import {
   QUOTATION_BORNE_BY,
   QUOTATION_FIELD_ORDER,
   QUOTATION_FIELD_RULES,
+  QUOTATION_TERMS_PERMISSION,
   quotationDefaultValidUntil,
   quotationErrorOutcome,
   quotationFormValuesOf,
@@ -205,10 +208,12 @@ function QuotationTypeSelect({
  * the issue date until the user changes it), one price row per equipment
  * TYPE (daily, monthly, transport; at least one, each type once; NO quantity
  * or total), the costs with who bears each, the template terms to copy and
- * the notes. Saved in ONE `save_quotation` call: a new quotation takes its
- * official number then, and ANY saved quotation can be edited (migration
- * 0200: no stages, no lock). A refusal names its field or shows its
- * message, never the raw error.
+ * the notes. A holder of the template's key also adds a NEW term from here
+ * (owner 2026-11-17): it is saved to the template at once, apart from the
+ * quotation, and ticked. Saved in ONE `save_quotation` call: a new quotation
+ * takes its official number then, and ANY saved quotation can be edited
+ * (migration 0200: no stages, no lock). A refusal names its field or shows
+ * its message, never the raw error.
  */
 export function QuotationFormDialog({
   open,
@@ -227,6 +232,11 @@ export function QuotationFormDialog({
   onStale?: (message: TranslationKey) => void
 }) {
   const { t, lang } = useI18n()
+  const { can } = usePermissions()
+  // «اضافة شرط»: a new term of the template, written under the template's
+  // own key (RLS re-checks it).
+  const canAddTerm = can(QUOTATION_TERMS_PERMISSION)
+  const [termDialogOpen, setTermDialogOpen] = useState(false)
   const editing = quotation !== null
   const [companyId, setCompanyId] = useState('')
   const [companyOption, setCompanyOption] =
@@ -263,6 +273,7 @@ export function QuotationFormDialog({
   useEffect(() => {
     if (!open) return
     defaultsApplied.current = false
+    setTermDialogOpen(false)
     setErrors(NO_ERRORS)
     setMessage(null)
     setSaving(false)
@@ -325,25 +336,30 @@ export function QuotationFormDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const loadTemplates = useCallback(async () => {
-    const request = ++templatesRequest.current
-    setTemplatesState('loading')
-    try {
-      const rows = await fetchQuotationTermTemplates()
-      if (request !== templatesRequest.current) return
-      setTemplates(rows)
-      setTemplatesState('ready')
-      if (!editing && !defaultsApplied.current) {
-        defaultsApplied.current = true
-        setTicked(
-          new Set(rows.filter((row) => row.is_default).map((row) => row.id)),
-        )
+  // `quiet`: the list stays on screen while it is read again (after a term
+  // was added from this form).
+  const loadTemplates = useCallback(
+    async (quiet = false) => {
+      const request = ++templatesRequest.current
+      if (!quiet) setTemplatesState('loading')
+      try {
+        const rows = await fetchQuotationTermTemplates()
+        if (request !== templatesRequest.current) return
+        setTemplates(rows)
+        setTemplatesState('ready')
+        if (!editing && !defaultsApplied.current) {
+          defaultsApplied.current = true
+          setTicked(
+            new Set(rows.filter((row) => row.is_default).map((row) => row.id)),
+          )
+        }
+      } catch {
+        if (request !== templatesRequest.current) return
+        setTemplatesState('error')
       }
-    } catch {
-      if (request !== templatesRequest.current) return
-      setTemplatesState('error')
-    }
-  }, [editing])
+    },
+    [editing],
+  )
 
   // The template is read again on every opening (it may have changed).
   useEffect(() => {
@@ -876,11 +892,26 @@ export function QuotationFormDialog({
           hint={t('quotationFormTermsHint')}
           error={fieldError('term_template_ids')}
           aside={
-            templatesState === 'ready' && termsTotal > 0 ? (
-              <span className="text-xs text-muted">
-                {t('quotationTermsSelectedCount')
-                  .replace('{count}', String(tickedCount))
-                  .replace('{total}', String(termsTotal))}
+            templatesState === 'ready' && (termsTotal > 0 || canAddTerm) ? (
+              <span className="flex flex-wrap items-center gap-3">
+                {termsTotal > 0 && (
+                  <span className="text-xs text-muted">
+                    {t('quotationTermsSelectedCount')
+                      .replace('{count}', String(tickedCount))
+                      .replace('{total}', String(termsTotal))}
+                  </span>
+                )}
+                {canAddTerm && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    icon={<Plus size={14} aria-hidden="true" />}
+                    disabled={saving}
+                    onClick={() => setTermDialogOpen(true)}
+                  >
+                    {t('quotationTermAdd')}
+                  </Button>
+                )}
               </span>
             ) : undefined
           }
@@ -900,7 +931,11 @@ export function QuotationFormDialog({
             <>
               {templates.length === 0 ? (
                 <p className="rounded-xl border border-dashed p-3 text-sm text-muted">
-                  {t('quotationTermsTemplateEmpty')}
+                  {t(
+                    canAddTerm
+                      ? 'quotationTermsTemplateNone'
+                      : 'quotationTermsTemplateEmpty',
+                  )}
                 </p>
               ) : (
                 <ul className="space-y-2">
@@ -1047,6 +1082,20 @@ export function QuotationFormDialog({
           )}
         </Field>
       </div>
+      {canAddTerm && (
+        <QuotationTermFormDialog
+          open={termDialogOpen}
+          onOpenChange={setTermDialogOpen}
+          note={t('quotationTermAddNote')}
+          onSaved={(id) => {
+            setTermDialogOpen(false)
+            // The new term is ticked for this quotation, then the template
+            // is read again so it shows in its place.
+            setCopied(id, true)
+            void loadTemplates(true)
+          }}
+        />
+      )}
     </Dialog>
   )
 }

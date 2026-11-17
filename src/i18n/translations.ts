@@ -2871,6 +2871,8 @@ export const translations = {
     quotationTermsSettingsDesc:
       'قالب الشروط والاحكام اللي تنزل في كل عرض سعر جديد.',
     quotationTermAdd: 'اضافة شرط',
+    quotationTermAddNote: 'يضاف الشرط الى قالب الشروط، ويتحدد في هذا العرض.',
+    quotationListOptions: 'خيارات عروض الاسعار',
     quotationTermNewTitle: 'شرط جديد',
     quotationTermEditTitle: 'تعديل الشرط',
     quotationTermTitleAr: 'العنوان بالعربي',
@@ -5930,6 +5932,9 @@ export const translations = {
     quotationTermsSettingsDesc:
       'The terms & conditions template every new quotation starts from.',
     quotationTermAdd: 'Add term',
+    quotationTermAddNote:
+      'The term is added to the terms template and ticked in this quotation.',
+    quotationListOptions: 'Quotation options',
     quotationTermNewTitle: 'New term',
     quotationTermEditTitle: 'Edit term',
     quotationTermTitleAr: 'Title in Arabic',

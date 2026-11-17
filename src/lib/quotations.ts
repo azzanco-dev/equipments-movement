@@ -91,6 +91,10 @@ export interface QuotationTerm {
   position: number
 }
 
+/** The permission of the terms template: its Settings page and every write
+ *  of a template term (RLS re-checks it). */
+export const QUOTATION_TERMS_PERMISSION = 'sales.quotations.approve'
+
 /** A row of the Settings template `quotation_term_templates`. */
 export interface QuotationTermTemplate {
   id: string

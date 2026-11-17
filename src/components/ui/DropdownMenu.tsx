@@ -48,16 +48,21 @@ export const DropdownMenuItem = forwardRef<
   { className, icon, tone = 'default', children, ...props },
   ref,
 ) {
+  const itemClassName = cn(
+    floatingItem,
+    tone === 'danger' && 'text-danger data-[highlighted]:bg-danger-soft',
+    className,
+  )
+  // `asChild`: the one child IS the item (an `AppLink` for an item that
+  // opens a page), so it carries its own icon inside.
+  if (props.asChild)
+    return (
+      <RadixMenu.Item ref={ref} className={itemClassName} {...props}>
+        {children}
+      </RadixMenu.Item>
+    )
   return (
-    <RadixMenu.Item
-      ref={ref}
-      className={cn(
-        floatingItem,
-        tone === 'danger' && 'text-danger data-[highlighted]:bg-danger-soft',
-        className,
-      )}
-      {...props}
-    >
+    <RadixMenu.Item ref={ref} className={itemClassName} {...props}>
       {icon && (
         <span aria-hidden="true" className="inline-flex shrink-0">
           {icon}

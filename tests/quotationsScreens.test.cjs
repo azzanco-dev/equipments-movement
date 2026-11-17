@@ -141,6 +141,7 @@ test('every file of the feature exists', () => {
     ['src', 'components', 'sales', 'QuotationFormDialog.tsx'],
     ['src', 'components', 'sales', 'DeleteQuotationDialog.tsx'],
     ['src', 'components', 'quotations', 'QuotationTermsSettings.tsx'],
+    ['src', 'components', 'quotations', 'QuotationTermFormDialog.tsx'],
   ])
     assert.ok(exists(...parts), parts.join('/'))
 })
@@ -243,12 +244,82 @@ test('the Settings page sits in AdminSettings like the banks', () => {
     'quotations',
     'QuotationTermsSettings.tsx',
   )
-  assert.match(page, /'sales\.quotations\.approve'/)
-  assert.match(page, /quotationTermTemplateSchema/)
+  // The gate: the one constant of the lib (the quotation form reads it too).
+  assert.match(
+    read('src', 'lib', 'quotations.ts'),
+    /export const QUOTATION_TERMS_PERMISSION = 'sales\.quotations\.approve'/,
+  )
+  assert.match(page, /const canEdit = can\(QUOTATION_TERMS_PERMISSION\)/)
   assert.match(page, /useConfirm\(\)/)
   assert.match(page, /<ErrorState/)
+  // The term form is the shared dialog (add and edit).
+  assert.match(page, /<QuotationTermFormDialog[\s\S]*?term=\{editing\}/)
+  const form = read(
+    'src',
+    'components',
+    'quotations',
+    'QuotationTermFormDialog.tsx',
+  )
+  assert.match(form, /quotationTermTemplateSchema/)
   // Edit sends the term's current position back, so it does not move.
-  assert.match(page, /position: String\(row\.position\)/)
+  assert.match(form, /position: String\(term\.position\)/)
+  assert.match(form, /updateQuotationTermTemplate\(term\.id, form\)/)
+  assert.match(form, /insertQuotationTermTemplate\(form\)/)
+})
+
+// --- The terms from the list and from the form (owner 2026-11-17) ------------
+
+test('«خيارات» of the list links to the terms template page', () => {
+  const list = read('src', 'screens', 'sales', 'QuotationsListScreen.tsx')
+  assert.match(
+    list,
+    /export const QUOTATION_TERMS_HREF = '\/settings\/quotation-terms'/,
+  )
+  // Shown only when the shell opens that page for the user.
+  assert.match(list, /const optionsMenu = canOpenTerms \? \(/)
+  assert.match(list, /canOpenTerms = false,/)
+  // A real link inside the menu, labelled «الشروط والاحكام».
+  assert.match(
+    list,
+    /<DropdownMenuItem asChild>\s+<AppLink href=\{QUOTATION_TERMS_HREF\}>[\s\S]*?\{t\('quotationTermsTitle'\)\}\s+<\/AppLink>/,
+  )
+  assert.match(list, /\{t\('options'\)\}/)
+  assert.match(
+    read('src', 'App.tsx'),
+    /<QuotationsListScreen[\s\S]*?canOpenTerms=\{shell\.pages\.has\('settings\/quotation-terms'\)\}/,
+  )
+  // The shared menu item passes an `asChild` child through untouched.
+  const menu = read('src', 'components', 'ui', 'DropdownMenu.tsx')
+  assert.match(menu, /if \(props\.asChild\)/)
+  const translations = read('src', 'i18n', 'translations.ts')
+  for (const key of ['quotationListOptions', 'quotationTermAddNote'])
+    assert.equal(
+      (translations.match(new RegExp(`^    ${key}:`, 'gm')) ?? []).length,
+      2,
+      key,
+    )
+})
+
+test('the quotation form adds a term to the template and ticks it', () => {
+  const form = read('src', 'components', 'sales', 'QuotationFormDialog.tsx')
+  // Only for a holder of the template's key (RLS decides in the end).
+  assert.match(form, /const canAddTerm = can\(QUOTATION_TERMS_PERMISSION\)/)
+  assert.match(
+    form,
+    /\{canAddTerm && \(\s+<Button[\s\S]*?onClick=\{\(\) => setTermDialogOpen\(true\)\}[\s\S]*?\{t\('quotationTermAdd'\)\}/,
+  )
+  // A new term only (no `term` prop), with the line saying where it goes.
+  const start = form.indexOf('<QuotationTermFormDialog')
+  assert.ok(start > 0)
+  const dialog = form.slice(start, form.indexOf('/>', start))
+  assert.doesNotMatch(dialog, /\bterm=/)
+  assert.match(dialog, /note=\{t\('quotationTermAddNote'\)\}/)
+  // After the save: ticked, then the template read again without a flash.
+  assert.match(
+    dialog,
+    /onSaved=\{\(id\) => \{\s+setTermDialogOpen\(false\)[\s\S]*?setCopied\(id, true\)\s+void loadTemplates\(true\)/,
+  )
+  assert.match(form, /if \(!quiet\) setTemplatesState\('loading'\)/)
 })
 
 // --- List config -------------------------------------------------------------

@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FileSpreadsheet, Plus } from 'lucide-react'
+import {
+  FileSpreadsheet,
+  Plus,
+  ScrollText,
+  SlidersHorizontal,
+} from 'lucide-react'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { RelativeTime } from '@/components/RelativeTime'
-import { DataListActions } from '@/components/data-list/DataListActions'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
@@ -11,8 +15,13 @@ import { useListRequest } from '@/components/data-list/useListRequest'
 import { PoPill } from '@/components/sales/PoPill'
 import { QuotationFormDialog } from '@/components/sales/QuotationFormDialog'
 import {
+  AppLink,
   Button,
   DataTable,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   EmptyState,
   ErrorState,
   PageHeader,
@@ -35,8 +44,14 @@ import { supabase } from '@/lib/supabase'
 /** The dialogs the list opens. */
 export type QuotationsListDialogKind = 'create'
 
+/** Settings › «شروط عروض الاسعار», the page «خيارات» opens. */
+export const QUOTATION_TERMS_HREF = '/settings/quotation-terms'
+
 export interface QuotationsListScreenProps {
   onSelectQuotation: (id: string) => void
+  /** The shell opens the terms template page for this user (its gate is
+   *  `sales.quotations.approve`): «خيارات» then lists it. */
+  canOpenTerms?: boolean
 }
 
 /**
@@ -48,10 +63,14 @@ export interface QuotationsListScreenProps {
  * document (owner 2026-11-17, migration 0200): the list has no stage
  * column, filter or tabs, and every number is the official `QT-…` in the
  * issued-number pill. «عرض سعر جديد» needs `sales.manage` (the database
- * checks it again in `save_quotation`).
+ * checks it again in `save_quotation`). «خيارات» (owner 2026-11-17, «خلي
+ * الوصول للشروط والاحكام من قائمة عروض السعر») is a menu beside it whose
+ * item «الشروط والاحكام» is a real link to the terms template page; it is
+ * shown only to a user that page opens for.
  */
 export function QuotationsListScreen({
   onSelectQuotation,
+  canOpenTerms = false,
 }: QuotationsListScreenProps) {
   const { t, lang } = useI18n()
   const { can } = usePermissions()
@@ -193,12 +212,41 @@ export function QuotationsListScreen({
     </Button>
   ) : undefined
 
+  const optionsMenu = canOpenTerms ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          icon={<SlidersHorizontal size={16} aria-hidden="true" />}
+          aria-label={t('quotationListOptions')}
+        >
+          {t('options')}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuItem asChild>
+          <AppLink href={QUOTATION_TERMS_HREF}>
+            <ScrollText size={15} aria-hidden="true" className="shrink-0" />
+            {t('quotationTermsTitle')}
+          </AppLink>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : undefined
+
   return (
     <div className="space-y-4">
       <PageHeader
         title={t('quotations')}
         description={t('quotationsDesc')}
-        actions={addButton && <DataListActions primaryAction={addButton} />}
+        actions={
+          (optionsMenu || addButton) && (
+            <div className="flex items-center gap-2">
+              {optionsMenu}
+              {addButton}
+            </div>
+          )
+        }
       />
       <DataListToolbar
         config={quotationsListConfig}
