@@ -698,13 +698,13 @@ test('the list: no state column or tabs, a plain date, a plain number', () => {
   assert.deepEqual([...chips.shown], ['A', 'B', 'C'])
   assert.deepEqual([...chips.rest], ['D', 'E'])
   assert.equal(q0.quotationTypeChips(null).shown.length, 0)
-  // The number: plain bold text, not a pill (owner 2026-11-17), over the
-  // issue date.
+  // The number: plain bold text alone — not a pill, no issue date under it
+  // (owner 2026-11-17).
   assert.match(
     list,
-    /key: 'quote_number',[\s\S]*?cell: \(row\) => \(\s+<span className="flex flex-col items-start gap-0\.5">\s+<bdi dir="ltr" className="font-semibold tabular-nums">\s+\{row\.quote_number\}\s+<\/bdi>\s+<span className="text-xs tabular-nums text-muted">\s+\{formatDate\(row\.issue_date\)\}/,
+    /key: 'quote_number',[\s\S]*?cell: \(row\) => \(\s+<bdi dir="ltr" className="font-semibold tabular-nums">\s+\{row\.quote_number\}\s+<\/bdi>\s+\),/,
   )
-  assert.doesNotMatch(list, /PoPill/)
+  assert.doesNotMatch(list, /PoPill|row\.issue_date/)
   const pill = read('src', 'components', 'sales', 'PoPill.tsx')
   assert.match(
     pill,

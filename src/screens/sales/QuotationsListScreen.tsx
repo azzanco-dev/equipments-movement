@@ -63,7 +63,7 @@ export interface QuotationsListScreenProps {
  * list system; a row opens the quotation page. A quotation is a plain
  * document (owner 2026-11-17, migration 0200): the list has no stage
  * column, filter or tabs, and every number is the official `QT-…`, shown
- * as plain bold text (not a pill) over the issue date; the types are chips
+ * as plain bold text alone (not a pill, no date under it); the types are chips
  * and «صالح لغاية» carries the display-only «ساري» / «منتهي» badge. «عرض سعر جديد» needs `sales.manage` (the database
  * checks it again in `save_quotation`). «خيارات» (owner 2026-11-17, «خلي
  * الوصول للشروط والاحكام من قائمة عروض السعر») is a menu beside it whose
@@ -141,17 +141,13 @@ export function QuotationsListScreen({
       key: 'quote_number',
       header: t('quotationNumber'),
       sortable: true,
-      // Plain bold text, not a pill (owner 2026-11-17, «خلي الرقم مش
-      // بادج»), with the issue date under it.
+      // Plain bold text alone: not a pill, and no issue date under it
+      // (owner 2026-11-17, «خلي الرقم مش بادج», «شيل التاريخ من تحت رقم
+      // عرض السعر»).
       cell: (row) => (
-        <span className="flex flex-col items-start gap-0.5">
-          <bdi dir="ltr" className="font-semibold tabular-nums">
-            {row.quote_number}
-          </bdi>
-          <span className="text-xs tabular-nums text-muted">
-            {formatDate(row.issue_date)}
-          </span>
-        </span>
+        <bdi dir="ltr" className="font-semibold tabular-nums">
+          {row.quote_number}
+        </bdi>
       ),
     },
     {
