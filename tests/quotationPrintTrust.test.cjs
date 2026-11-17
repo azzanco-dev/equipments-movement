@@ -268,7 +268,13 @@ test('the sheet is light: one semibold title, the rest medium or regular', () =>
   assert.equal((SHEET.match(/font-semibold/g) ?? []).length, 1)
   assert.match(SHEET, /<h1 className="text-xl font-semibold leading-tight">/)
   // The table heads, the two names, the type and the section titles: medium.
-  assert.match(SHEET, /const head = `\$\{cell\} bg-surface-hover font-medium`/)
+  // … on a black bar with white text (owner 2026-11-17, «خلي الHEADERS بلون
+  // خلفية سوداء»), from the sheet's own tokens.
+  assert.match(
+    SHEET,
+    /const head = `\$\{cell\} border-fg bg-fg font-medium text-bg \[&_bdi\]:text-bg \[&_bdi\]:opacity-80`/,
+  )
+  assert.match(SHEET, /\[print-color-adjust:exact\]/)
   assert.equal(
     (SHEET.match(/<h2 className="mb-1 font-medium">/g) ?? []).length,
     3,

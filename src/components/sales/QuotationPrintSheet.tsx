@@ -168,7 +168,11 @@ export function QuotationPrintSheet({
   // The weights of the sheet (owner 2026-11-17, «قلل من البولد في ملف
   // الPDF»): the title alone is semibold; the names, the table heads and the
   // section titles are medium; every value is regular.
-  const head = `${cell} bg-surface-hover font-medium`
+  // The table heads are a black bar with white text (owner 2026-11-17,
+  // «خلي الHEADERS بلون خلفية سوداء»): the sheet's own near-black and white
+  // tokens (`print-export` forces the light ones), the English half under
+  // each label a little dimmer.
+  const head = `${cell} border-fg bg-fg font-medium text-bg [&_bdi]:text-bg [&_bdi]:opacity-80`
   // The three price columns («يومي», «شهري», «النقل»): the head and the
   // amounts centred under each other (owner 2026-11-17, «واضبط محاذاة
   // الاعمدة»), middle-aligned with the two-line type cell.
