@@ -2,7 +2,13 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Price } from '@/components/purchasing/Price'
 import { translations, type TranslationKey } from '@/i18n/translations'
+import {
+  COMPANY_PROFILE,
+  companyProfileFacts,
+  type CompanyProfile,
+} from '@/lib/companyProfile'
 import { formatDate } from '@/lib/dateFormat'
+import { printIssuedAtLabel, quotationPageCss } from '@/lib/quotationPrint'
 import {
   BORNE_BY_PRINT_KEYS,
   type QuotationCost,
@@ -25,6 +31,8 @@ export interface QuotationPrintSheetProps {
   /** The client and the project in Arabic and English. */
   client: { ar: string; en: string | null }
   project: { ar: string; en: string | null } | null
+  /** The company's own data of the footer (the one profile by default). */
+  profile?: CompanyProfile
   /** The print dialog closed (or never opened): the sheet is unmounted. */
   onDone: () => void
 }
@@ -79,7 +87,16 @@ function Stacked({ k }: { k: TranslationKey }) {
  * «العميل / To» boxes, the prices table (a missing price reads «غير
  * مسعر»), the VAT line, the costs, the notes and the copied terms (Arabic,
  * the English under each).
- * 12 px text; no page margin, the sheet's own padding instead.
+ * 12 px text; no side or top page margin, the sheet's own padding instead.
+ *
+ * Trust pieces (owner 2026-11-17, «نبغى نضيف موثوقية اكثر لمستند الـ PDF»,
+ * the quotation sheet only; no signature, stamp, QR or check code): the
+ * sheet ends with the company's official data — only the fields of
+ * `COMPANY_PROFILE` that hold a value — and the line «هذا المستند صادر
+ * الكترونيا … ولا يحتاج توقيع او ختم» in Arabic then English; and EVERY
+ * page carries, in its bottom margin, «صفحة 1 من 2 / Page 1 of 2» and the
+ * Saudi time the file was issued (`quotationPageCss`: CSS page-margin
+ * boxes, which also keep the browser's own header and footer off the page).
  */
 export function QuotationPrintSheet({
   quotation,
@@ -89,6 +106,7 @@ export function QuotationPrintSheet({
   company,
   client,
   project,
+  profile = COMPANY_PROFILE,
   onDone,
 }: QuotationPrintSheetProps) {
   const logoRef = useRef<HTMLImageElement>(null)
@@ -97,6 +115,11 @@ export function QuotationPrintSheet({
   const doneRef = useRef(onDone)
   doneRef.current = onDone
   const number = quotation.quote_number
+  // The time the file is issued: this print, fixed for all its pages.
+  const [issuedAt] = useState(() => printIssuedAtLabel(new Date()))
+  const companyFacts = companyProfileFacts(profile)
+  const electronic = (text: string, company: string) =>
+    text.replace('{company}', company)
 
   useEffect(() => {
     // Once per mount: the ref survives React's development double-mount.
@@ -159,10 +182,12 @@ export function QuotationPrintSheet({
       lang="ar"
       aria-hidden="true"
     >
-      {/* No page margin, so the browser prints no header or footer; the
-          sheet's own padding is the margin, repeated on every page. */}
-      <style>{'@page { size: A4 portrait; margin: 0; }'}</style>
-      <div className="mx-auto max-w-[210mm] px-[10mm] py-[12mm] text-[12px] leading-snug [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">
+      {/* No side or top page margin: the sheet's own padding is the margin,
+          repeated on every page. The bottom margin holds the page number
+          and the issue time (margin boxes), so the browser adds no footer
+          of its own. */}
+      <style>{quotationPageCss(issuedAt)}</style>
+      <div className="mx-auto max-w-[210mm] px-[10mm] pb-[2mm] pt-[12mm] text-[12px] leading-snug [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">
         <header className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-4 border-b pb-3">
           <img
             ref={logoRef}
@@ -371,6 +396,33 @@ export function QuotationPrintSheet({
             </ol>
           </section>
         )}
+
+        {/* The end of the sheet: the company's official data (only what is
+            filled in) and the electronic-issue line. */}
+        <footer className="mt-6 break-inside-avoid border-t pt-2 text-[10px] text-muted">
+          {companyFacts.length > 0 && (
+            <div className="mb-1.5">
+              <p className="font-semibold text-fg">
+                {profile.nameAr} <span className="text-border">/</span>{' '}
+                <En>{profile.nameEn}</En>
+              </p>
+              <p className="flex flex-wrap gap-x-4 gap-y-0.5">
+                {companyFacts.map((fact) => (
+                  <span key={fact.key}>
+                    <Inline k={fact.label} />:{' '}
+                    <bdi dir={fact.dir} className="font-semibold text-fg">
+                      {fact.value}
+                    </bdi>
+                  </span>
+                ))}
+              </p>
+            </div>
+          )}
+          <p>{electronic(ar('quotationPrintElectronic'), profile.nameAr)}</p>
+          <p dir="ltr" className="text-start">
+            {electronic(en('quotationPrintElectronic'), profile.nameEn)}
+          </p>
+        </footer>
       </div>
     </div>,
     document.body,
