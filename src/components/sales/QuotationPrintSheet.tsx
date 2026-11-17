@@ -60,6 +60,10 @@ function Inline({ k }: { k: TranslationKey }) {
   )
 }
 
+/** The dark bar of a table head: three parts near-black, one part white. */
+const HEAD_TONE =
+  'border-[color-mix(in_srgb,var(--fg)_75%,var(--bg))] bg-[color-mix(in_srgb,var(--fg)_75%,var(--bg))]'
+
 /** The Arabic label with the English one under it. */
 function Stacked({ k }: { k: TranslationKey }) {
   return (
@@ -85,8 +89,8 @@ function Stacked({ k }: { k: TranslationKey }) {
  * always printed since 0200 issues it at creation, the issue date and
  * «Valid Until»; nothing about a stage), the «مقدم العرض / From» and
  * «العميل / To» boxes, the prices table (a missing price reads «غير
- * مسعر»), the VAT line, the costs, the notes and the copied terms (Arabic,
- * the English under each).
+ * مسعر»), the VAT line, the costs, the notes and the copied terms (the
+ * Arabic list, then the English list under it).
  * 12 px text; no side or top page margin, the sheet's own padding instead.
  *
  * Trust pieces (owner 2026-11-17, «نبغى نضيف موثوقية اكثر لمستند الـ PDF»,
@@ -168,11 +172,12 @@ export function QuotationPrintSheet({
   // The weights of the sheet (owner 2026-11-17, «قلل من البولد في ملف
   // الPDF»): the title alone is semibold; the names, the table heads and the
   // section titles are medium; every value is regular.
-  // The table heads are a black bar with white text (owner 2026-11-17,
-  // «خلي الHEADERS بلون خلفية سوداء»): the sheet's own near-black and white
-  // tokens (`print-export` forces the light ones), the English half under
-  // each label a little dimmer.
-  const head = `${cell} border-fg bg-fg font-medium text-bg [&_bdi]:text-bg [&_bdi]:opacity-80`
+  // The table heads are a dark bar with white text (owner 2026-11-17,
+  // «خلي الHEADERS بلون خلفية سوداء», then «خلي الاسود افتح»): a charcoal
+  // mixed from the sheet's own near-black and white tokens (`print-export`
+  // forces the light ones), the English half under each label a little
+  // dimmer.
+  const head = `${cell} ${HEAD_TONE} font-medium text-bg [&_bdi]:text-bg [&_bdi]:opacity-80`
   // The three price columns («يومي», «شهري», «النقل»): the head and the
   // amounts centred under each other (owner 2026-11-17, «واضبط محاذاة
   // الاعمدة»), middle-aligned with the two-line type cell.
@@ -377,28 +382,40 @@ export function QuotationPrintSheet({
           </section>
         )}
 
+        {/* The terms: the Arabic list alone, then the English list under it
+            (owner 2026-11-17, «خلي الشروط العربية لحالها, وتحتها الشروط
+            الانجليزية»; each English text stood under its Arabic one). */}
         {terms.length > 0 && (
-          <section className="mt-4">
-            <h2 className="mb-1 font-medium">
-              <Inline k="quotationPrintTerms" />
-            </h2>
-            <ol className="m-0 list-none space-y-1.5 p-0">
-              {terms.map((term, index) => (
-                <li key={term.id} className="break-inside-avoid">
-                  <p className="whitespace-pre-wrap">
+          <>
+            <section className="mt-4">
+              <h2 className="mb-1 font-medium">{ar('quotationPrintTerms')}</h2>
+              <ol className="m-0 list-none space-y-1 p-0">
+                {terms.map((term, index) => (
+                  <li
+                    key={term.id}
+                    className="break-inside-avoid whitespace-pre-wrap"
+                  >
                     <span className="tabular-nums">{index + 1}. </span>
                     {term.body_ar}
-                  </p>
-                  <p
-                    dir="ltr"
-                    className="whitespace-pre-wrap text-start text-[10px] text-muted"
+                  </li>
+                ))}
+              </ol>
+            </section>
+            <section className="mt-3 text-start" dir="ltr" lang="en">
+              <h2 className="mb-1 font-medium">{en('quotationPrintTerms')}</h2>
+              <ol className="m-0 list-none space-y-1 p-0">
+                {terms.map((term, index) => (
+                  <li
+                    key={term.id}
+                    className="break-inside-avoid whitespace-pre-wrap"
                   >
-                    {index + 1}. {term.body_en}
-                  </p>
-                </li>
-              ))}
-            </ol>
-          </section>
+                    <span className="tabular-nums">{index + 1}. </span>
+                    {term.body_en}
+                  </li>
+                ))}
+              </ol>
+            </section>
+          </>
         )}
 
         {/* The end of the sheet: the company's official data (only what is

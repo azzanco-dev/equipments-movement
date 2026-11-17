@@ -268,16 +268,37 @@ test('the sheet is light: one semibold title, the rest medium or regular', () =>
   assert.equal((SHEET.match(/font-semibold/g) ?? []).length, 1)
   assert.match(SHEET, /<h1 className="text-xl font-semibold leading-tight">/)
   // The table heads, the two names, the type and the section titles: medium.
-  // … on a black bar with white text (owner 2026-11-17, «خلي الHEADERS بلون
-  // خلفية سوداء»), from the sheet's own tokens.
+  // … on a dark bar with white text (owner 2026-11-17, «خلي الHEADERS بلون
+  // خلفية سوداء», then «خلي الاسود افتح»): a charcoal mixed from the sheet's
+  // own near-black and white tokens, never a hex.
   assert.match(
     SHEET,
-    /const head = `\$\{cell\} border-fg bg-fg font-medium text-bg \[&_bdi\]:text-bg \[&_bdi\]:opacity-80`/,
+    /const HEAD_TONE =\s+'border-\[color-mix\(in_srgb,var\(--fg\)_75%,var\(--bg\)\)\] bg-\[color-mix\(in_srgb,var\(--fg\)_75%,var\(--bg\)\)\]'/,
   )
+  assert.match(
+    SHEET,
+    /const head = `\$\{cell\} \$\{HEAD_TONE\} font-medium text-bg \[&_bdi\]:text-bg \[&_bdi\]:opacity-80`/,
+  )
+  assert.doesNotMatch(SHEET, /#[0-9a-fA-F]{6}\b/)
   assert.match(SHEET, /\[print-color-adjust:exact\]/)
+  // The costs, the notes and the two term lists.
   assert.equal(
     (SHEET.match(/<h2 className="mb-1 font-medium">/g) ?? []).length,
-    3,
+    4,
+  )
+  // The terms: the Arabic list alone, then the English list under it (owner
+  // 2026-11-17, «خلي الشروط العربية لحالها, وتحتها الشروط الانجليزية»).
+  const arTerms = SHEET.indexOf("{ar('quotationPrintTerms')}</h2>")
+  const enTerms = SHEET.indexOf("{en('quotationPrintTerms')}</h2>")
+  const arBody = SHEET.indexOf('{term.body_ar}')
+  const enBody = SHEET.indexOf('{term.body_en}')
+  assert.ok(
+    arTerms > 0 && arBody > arTerms && enTerms > arBody && enBody > enTerms,
+  )
+  assert.equal((SHEET.match(/\{term\.body_(ar|en)\}/g) ?? []).length, 2)
+  assert.match(
+    SHEET,
+    /<section className="mt-3 text-start" dir="ltr" lang="en">\s+<h2 className="mb-1 font-medium">\{en\('quotationPrintTerms'\)\}<\/h2>/,
   )
   assert.match(
     SHEET,

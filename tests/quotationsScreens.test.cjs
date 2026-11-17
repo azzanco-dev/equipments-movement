@@ -308,7 +308,10 @@ test('no term title is left in the client code', () => {
   )
   // The page, the form and the PDF show the text under its number.
   const sheet = read('src', 'components', 'sales', 'QuotationPrintSheet.tsx')
-  assert.match(sheet, /\{index \+ 1\}\. \{term\.body_en\}/)
+  assert.match(
+    sheet,
+    /<span className="tabular-nums">\{index \+ 1\}\. <\/span>\s+\{term\.body_en\}/,
+  )
 })
 
 // --- The terms from the list and from the form (owner 2026-11-17) ------------
