@@ -2769,9 +2769,7 @@ export const translations = {
     quotationCopyConfirmDesc:
       'ينشا عرض جديد برقم جديد وبنفس العميل والاسعار والتكاليف والشروط، ثم تفتح صفحته.',
     quotationDelete: 'حذف العرض',
-    quotationCreatedBy: 'انشاه',
-    quotationPricesTitle: 'اسعار المعدات',
-    quotationPricesDesc: 'الاسعار بدون ضريبة القيمة المضافة.',
+    quotationPricesTitle: 'التسعيرات',
     quotationEquipmentType: 'نوع المعدة',
     quotationDaily: 'يومي',
     quotationMonthly: 'شهري',
@@ -5824,9 +5822,7 @@ export const translations = {
     quotationCopyConfirmDesc:
       'A new quotation is created with a new number and the same client, prices, costs and terms, then its page opens.',
     quotationDelete: 'Delete quotation',
-    quotationCreatedBy: 'Created by',
-    quotationPricesTitle: 'Equipment prices',
-    quotationPricesDesc: 'Prices exclude VAT.',
+    quotationPricesTitle: 'Prices',
     quotationEquipmentType: 'Equipment type',
     quotationDaily: 'Daily',
     quotationMonthly: 'Monthly',

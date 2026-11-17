@@ -640,15 +640,34 @@ test('the page: PDF for every reader, three options for a manager', () => {
   )
   // «تصدير PDF» sits outside the manager's menu.
   assert.match(page, /\{optionsMenu\}\s+<Button[\s\S]*?t\('quotationPdf'\)/)
-  // The one row of facts: the two dates, the creator, the last change.
-  const facts = page.slice(
-    page.indexOf('const facts: DescriptionListItem[] = ['),
-    page.indexOf('const priceCell'),
+  // No row of facts (owner 2026-11-17: «تاريخ العرض شوف له مكان ثاني
+  // وتاريخ الصلاحية», «شيل انشاه واخر تعديل»): the two dates sit in the
+  // header under the client and the project, with the validity badge.
+  assert.doesNotMatch(
+    page,
+    /DescriptionList|quotationCreatedBy|created_by_name|updated_at|formatDateTime/,
   )
-  assert.deepEqual(
-    [...facts.matchAll(/key: '([A-Za-z]+)'/g)].map((match) => match[1]),
-    ['issue', 'valid', 'createdBy', 'updatedAt'],
+  const header = page.slice(
+    page.indexOf('<DetailHeader'),
+    page.indexOf('actions={', page.indexOf('<DetailHeader')),
   )
+  assert.match(
+    header,
+    /\{t\('quotationIssueDate'\)\}[\s\S]*?formatDate\(quotation\.issue_date\)[\s\S]*?\{t\('quotationValidUntil'\)\}[\s\S]*?formatDate\(quotation\.valid_until\)[\s\S]*?<QuotationValidityBadge validUntil=\{quotation\.valid_until\} \/>/,
+  )
+  // «التسعيرات» (no «بدون الضريبة» line) beside the costs, then the terms
+  // beside the notes when there are any.
+  const prices = page.indexOf(
+    "<SectionHeader title={t('quotationPricesTitle')} />",
+  )
+  const costsAt = page.indexOf("title={t('quotationCostsTitle')}")
+  const termsAt = page.indexOf("title={t('quotationTermsTitle')}")
+  assert.ok(prices > 0 && costsAt > prices && termsAt > costsAt)
+  assert.equal((page.match(/xl:grid-cols-3/g) ?? []).length, 2)
+  assert.match(page, /quotation\.notes \? 'xl:col-span-2' : 'xl:col-span-3'/)
+  const translations2 = read('src', 'i18n', 'translations.ts')
+  assert.match(translations2, /quotationPricesTitle: 'التسعيرات',/)
+  assert.doesNotMatch(translations2, /quotationPricesDesc|quotationCreatedBy/)
   // No badge beside the number, no primary button, no phone bar.
   assert.doesNotMatch(page, /badges=|primaryButton|phoneBar/)
   // No timeline (owner: «شيل سجل العرض»).

@@ -6,11 +6,9 @@ import {
   Copy,
   FileDown,
   FileSpreadsheet,
-  History,
   Pencil,
   SlidersHorizontal,
   Trash2,
-  User,
 } from 'lucide-react'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useListRequest } from '@/components/data-list/useListRequest'
@@ -25,7 +23,6 @@ import {
   Button,
   Card,
   DataTable,
-  DescriptionList,
   DetailHeader,
   DropdownMenu,
   DropdownMenuContent,
@@ -41,11 +38,11 @@ import {
   useConfirm,
   useToast,
   type DataTableColumn,
-  type DescriptionListItem,
 } from '@/components/ui'
+import { cn } from '@/components/ui/cn'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
-import { formatDate, formatDateTime } from '@/lib/dateFormat'
+import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import {
   BORNE_BY,
@@ -325,41 +322,6 @@ function QuotationDetailInner({
       </DropdownMenu>
     )
 
-  const facts: DescriptionListItem[] = [
-    {
-      key: 'issue',
-      icon: <Calendar size={16} />,
-      label: t('quotationIssueDate'),
-      value: formatDate(quotation.issue_date),
-      dir: 'ltr',
-    },
-    {
-      key: 'valid',
-      icon: <CalendarClock size={16} />,
-      label: t('quotationValidUntil'),
-      // The date with «ساري» / «منتهي» beside it (display only).
-      value: (
-        <span className="inline-flex flex-wrap items-center gap-2">
-          <bdi dir="ltr">{formatDate(quotation.valid_until)}</bdi>
-          <QuotationValidityBadge validUntil={quotation.valid_until} />
-        </span>
-      ),
-    },
-    {
-      key: 'createdBy',
-      icon: <User size={16} />,
-      label: t('quotationCreatedBy'),
-      value: quotation.created_by_name ?? '—',
-    },
-    {
-      key: 'updatedAt',
-      icon: <History size={16} />,
-      label: t('updatedAt'),
-      value: formatDateTime(quotation.updated_at ?? quotation.created_at),
-      dir: 'ltr',
-    },
-  ]
-
   const priceCell = (value: QuotationLine['daily_price']) =>
     value === null || value === undefined || value === '' ? (
       <span className="text-muted">{t('quotationNoPrice')}</span>
@@ -420,15 +382,16 @@ function QuotationDetailInner({
         </Notice>
       )}
 
-      {/* 1. Header card: the number, the client and the project, the
-          actions; then the four facts. */}
-      <Card className="space-y-3 p-4">
+      {/* 1. Header card: the number, the client and the project, then the
+          two dates on one small line (owner 2026-11-17: no row of facts,
+          no creator, no last change), and the actions. */}
+      <Card className="p-4">
         <DetailHeader
           as="h1"
           identifier={quotation.quote_number}
           identifierLtr
           subtitle={
-            <span className="flex flex-col">
+            <span className="flex flex-col gap-1">
               <span className="flex items-center gap-1.5 text-base font-semibold text-fg">
                 <Building2
                   size={16}
@@ -439,6 +402,27 @@ function QuotationDetailInner({
               </span>
               <span className="text-sm text-muted">
                 {projectName ?? t('quotationNoProject')}
+              </span>
+              <span className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar size={14} aria-hidden="true" className="shrink-0" />
+                  {t('quotationIssueDate')}
+                  <bdi dir="ltr" className="tabular-nums text-fg">
+                    {formatDate(quotation.issue_date)}
+                  </bdi>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarClock
+                    size={14}
+                    aria-hidden="true"
+                    className="shrink-0"
+                  />
+                  {t('quotationValidUntil')}
+                  <bdi dir="ltr" className="tabular-nums text-fg">
+                    {formatDate(quotation.valid_until)}
+                  </bdi>
+                  <QuotationValidityBadge validUntil={quotation.valid_until} />
+                </span>
               </span>
             </span>
           }
@@ -457,40 +441,66 @@ function QuotationDetailInner({
             </div>
           }
         />
-        <DescriptionList
-          items={facts}
-          className="border-t pt-1 sm:grid-cols-2 lg:grid-cols-4"
-        />
       </Card>
 
-      {/* 2. The prices by equipment type. */}
-      <Card padded={false} className="min-w-0">
-        <div className="p-4 pb-3">
-          <SectionHeader
-            title={t('quotationPricesTitle')}
-            description={t('quotationPricesDesc')}
-          />
-        </div>
-        {lineCount === 0 ? (
-          <div className="p-4 pt-0">
-            <EmptyState title={t('quotationNoLines')} className="p-6" />
+      {/* 2. «التسعيرات» by equipment type (two thirds from xl) beside the
+          costs. */}
+      <div className="grid items-start gap-4 xl:grid-cols-3">
+        <Card padded={false} className="min-w-0 xl:col-span-2">
+          <div className="p-4 pb-3">
+            <SectionHeader title={t('quotationPricesTitle')} />
           </div>
-        ) : (
-          <DataTable
-            size="md"
-            columns={priceColumns}
-            rows={lines}
-            rowKey={(line) => line.id}
-            caption={t('quotationPricesTitle')}
-            cellTextClassName="text-[13px]"
-            cellClassName="py-2"
+          {lineCount === 0 ? (
+            <div className="p-4 pt-0">
+              <EmptyState title={t('quotationNoLines')} className="p-6" />
+            </div>
+          ) : (
+            <DataTable
+              size="md"
+              columns={priceColumns}
+              rows={lines}
+              rowKey={(line) => line.id}
+              caption={t('quotationPricesTitle')}
+              cellTextClassName="text-[13px]"
+              cellClassName="py-2"
+            />
+          )}
+        </Card>
+        <Card className="space-y-3 p-4">
+          <SectionHeader
+            title={t('quotationCostsTitle')}
+            description={t('quotationCostsDesc')}
           />
-        )}
-      </Card>
+          {costs.length === 0 ? (
+            <p className="text-sm text-muted">{t('quotationNoCosts')}</p>
+          ) : (
+            <ul className="m-0 list-none divide-y p-0">
+              {costs.map((cost) => (
+                <li
+                  key={cost.id}
+                  className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
+                >
+                  <span className="min-w-0 break-words text-sm">
+                    {cost.name}
+                  </span>
+                  <Badge tone={BORNE_BY[cost.borne_by].tone} size="sm">
+                    {t(BORNE_BY[cost.borne_by].key)}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
 
-      {/* 3. The terms (two thirds from xl) beside the costs and the notes. */}
-      <div className="grid gap-4 xl:grid-cols-3">
-        <Card className="space-y-3 p-4 xl:col-span-2">
+      {/* 3. The terms, beside the notes when the quotation has any. */}
+      <div className="grid items-start gap-4 xl:grid-cols-3">
+        <Card
+          className={cn(
+            'space-y-3 p-4',
+            quotation.notes ? 'xl:col-span-2' : 'xl:col-span-3',
+          )}
+        >
           <SectionHeader
             title={t('quotationTermsTitle')}
             description={t('quotationTermsDesc')}
@@ -523,41 +533,14 @@ function QuotationDetailInner({
             </ol>
           )}
         </Card>
-        <div className="space-y-4">
-          <Card className="space-y-3 p-4">
-            <SectionHeader
-              title={t('quotationCostsTitle')}
-              description={t('quotationCostsDesc')}
-            />
-            {costs.length === 0 ? (
-              <p className="text-sm text-muted">{t('quotationNoCosts')}</p>
-            ) : (
-              <ul className="m-0 list-none divide-y p-0">
-                {costs.map((cost) => (
-                  <li
-                    key={cost.id}
-                    className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0"
-                  >
-                    <span className="min-w-0 break-words text-sm">
-                      {cost.name}
-                    </span>
-                    <Badge tone={BORNE_BY[cost.borne_by].tone} size="sm">
-                      {t(BORNE_BY[cost.borne_by].key)}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
+        {quotation.notes && (
+          <Card className="space-y-2 p-4">
+            <SectionHeader title={t('notes')} />
+            <p className="whitespace-pre-wrap break-words text-sm">
+              {quotation.notes}
+            </p>
           </Card>
-          {quotation.notes && (
-            <Card className="space-y-2 p-4">
-              <SectionHeader title={t('notes')} />
-              <p className="whitespace-pre-wrap break-words text-sm">
-                {quotation.notes}
-              </p>
-            </Card>
-          )}
-        </div>
+        )}
       </div>
 
       {printing && (
