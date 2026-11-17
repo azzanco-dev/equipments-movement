@@ -7,11 +7,12 @@ import { quotationErrorMessage, type QuotationRow } from '@/lib/quotations'
 import { deleteQuotation } from '@/lib/quotationsData'
 
 /**
- * «حذف العرض» of a DRAFT quotation that still carries its draft reference
- * (migration 0199): a destructive confirm, no typing. Saves through
- * `delete_quotation` (`sales.manage`; an approved quotation or one that
- * holds an official number is refused). After it the app opens the list; a
- * refusal shows its mapped message and asks the page to refetch.
+ * «حذف العرض» of ANY quotation (migration 0200: a quotation is a plain
+ * document): a destructive confirm, no typing, that says the quotation is
+ * deleted for good and that its number is not used again (the sequence
+ * keeps the gap). Saves through `delete_quotation` (`sales.manage`). After
+ * it the app opens the list; a refusal shows its mapped message and asks
+ * the page to refetch.
  */
 export function DeleteQuotationDialog({
   quotation,
@@ -25,7 +26,7 @@ export function DeleteQuotationDialog({
   onOpenChange: (open: boolean) => void
   onDeleted: () => void
   /** Refused: the mapped message (the page closes the dialog
-   *  and shows it itself when the quotation changed meanwhile). */
+   *  and shows it itself when the quotation is gone meanwhile). */
   onRefused?: (message: TranslationKey) => void
 }) {
   const { t } = useI18n()

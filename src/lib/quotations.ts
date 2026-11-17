@@ -14,101 +14,22 @@ import { saudiDateKey } from '@/lib/saudiTime'
  * one line per equipment TYPE with three optional prices excluding VAT
  * (daily, monthly, transport «النقل mob/demob»), a list of costs with who
  * bears each, and the terms copied from the Settings template. No
- * quantities, no totals. A draft carries the reference `QD-####`; the first
- * approval issues the official number `QT-YYYYMM####`.
+ * quantities, no totals. Since migration 0200 (owner 2026-11-17, «مايحتاج
+ * التصنيف او الدورة, شيلها») a quotation is a plain document: NO states, no
+ * approval, no client answer. Its official number `QT-YYYYMM####` is issued
+ * when it is created, and any quotation can be edited, copied or deleted.
  *
- * The labels, the badge tones, the days-left words, the form → RPC payloads
- * and the mapping of every 0199 error token live here. Nothing here calls
+ * The labels, the form → RPC payloads and the mapping of every error token
+ * the quotation functions raise live here. Nothing here calls
  * the database (the data side is `src/lib/quotationsData.ts`), so the node
  * tests can load it directly.
  */
 
-// --- States --------------------------------------------------------------------
-
-/** `quotations.status` (the stored state). */
-export type QuotationStatus = 'draft' | 'approved'
-
-/** The client's answer of an approved quotation. */
-export type QuotationOutcome = 'accepted' | 'rejected'
-
-/** `quotation_list.state`: the stored state with the answer and «منتهي»
- *  (approved, no answer, `valid_until` before the Saudi today). */
-export type QuotationState =
-  'draft' | 'approved' | 'accepted' | 'rejected' | 'expired'
-
-export const QUOTATION_STATES: readonly QuotationState[] = [
-  'draft',
-  'approved',
-  'accepted',
-  'rejected',
-  'expired',
-]
-
-/** The shared badge of each state: مسودة neutral, معتمد info, مقبول
- *  success, مرفوض danger, منتهي warning. */
-export const QUOTATION_STATE_BADGE: Readonly<
-  Record<QuotationState, { key: TranslationKey; tone: BadgeTone }>
-> = {
-  draft: { key: 'quotationStateDraft', tone: 'neutral' },
-  approved: { key: 'quotationStateApproved', tone: 'info' },
-  accepted: { key: 'quotationStateAccepted', tone: 'success' },
-  rejected: { key: 'quotationStateRejected', tone: 'danger' },
-  expired: { key: 'quotationStateExpired', tone: 'warning' },
-}
-
-/** The English state of the PDF corner («Status: Draft»). */
-export const QUOTATION_PRINT_STATE_KEYS: Readonly<
-  Record<QuotationState, TranslationKey>
-> = {
-  draft: 'quotationStateDraft',
-  approved: 'quotationStateApproved',
-  accepted: 'quotationStateAccepted',
-  rejected: 'quotationStateRejected',
-  // The sheet prints the stored state; an expired quotation is approved.
-  expired: 'quotationStateApproved',
-}
-
-function isQuotationState(value: unknown): value is QuotationState {
-  return (
-    typeof value === 'string' &&
-    (QUOTATION_STATES as readonly string[]).includes(value)
-  )
-}
-
-/**
- * The state of a quotation: the view's `state` when it carries one, else the
- * same rule computed from the row (accepted / rejected win, then expired).
- */
-export function quotationStateOf(
-  row: Pick<QuotationRow, 'status' | 'outcome' | 'valid_until'> & {
-    state?: string | null
-  },
-  today: string = saudiDateKey(),
-): QuotationState {
-  if (isQuotationState(row.state)) return row.state
-  if (row.status !== 'approved') return 'draft'
-  if (row.outcome === 'accepted' || row.outcome === 'rejected')
-    return row.outcome
-  return row.valid_until < today ? 'expired' : 'approved'
-}
-
-/** The days-left words are shown while the quotation waits for the
- *  client's answer: approved without one, or expired. */
-export function showsDaysLeft(state: QuotationState): boolean {
-  return state === 'approved' || state === 'expired'
-}
-
 // --- Numbers -------------------------------------------------------------------
 
-/** A draft reference `QD-####` (mirrors the 0199 CHECK). */
-export const QUOTATION_DRAFT_REF_PATTERN = /^QD-[0-9]{4,}$/
-
-/** An issued number `QT-YYYYMM####` (mirrors the 0199 CHECK). */
+/** A quotation number `QT-YYYYMM####` (mirrors the database CHECK). Every
+ *  quotation carries one from its creation (0200). */
 export const QUOTATION_NUMBER_PATTERN = /^QT-[0-9]{10,}$/
-
-export function isQuotationDraftRef(value: string | null | undefined): boolean {
-  return typeof value === 'string' && QUOTATION_DRAFT_REF_PATTERN.test(value)
-}
 
 // --- Rows ----------------------------------------------------------------------
 
@@ -118,16 +39,9 @@ export interface QuotationRow {
   company_id: string
   project_id: string | null
   quote_number: string
-  status: QuotationStatus
   issue_date: string
   valid_until: string
   notes: string | null
-  approved_at: string | null
-  approved_by: string | null
-  outcome: QuotationOutcome | null
-  outcome_at: string | null
-  outcome_by: string | null
-  outcome_note: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -136,8 +50,6 @@ export interface QuotationRow {
   project_name_ar: string | null
   project_name_en: string | null
   created_by_name: string | null
-  approved_by_name: string | null
-  state: QuotationState
   line_count: number | null
   /** The lines' types joined with «، » in position order. */
   type_names: string | null
@@ -239,7 +151,7 @@ export interface QuotationCostInput {
   borne_by: QuotationBorneBy
 }
 
-/** The values of the quotation form (create and edit of a draft). */
+/** The values of the quotation form (create and edit). */
 export interface QuotationFormValues {
   company_id: string
   /** Empty = no project. */
@@ -392,13 +304,6 @@ export function quotationTermTemplatePayload(
 
 const DAY_MS = 86_400_000
 
-/** Whole days from `from` to `to` (two `YYYY-MM-DD` keys). */
-export function daysBetween(from: string, to: string): number {
-  return Math.round(
-    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS,
-  )
-}
-
 /** A new quotation is valid for 30 days from its issue date (B2). */
 export const QUOTATION_VALIDITY_DAYS = 30
 
@@ -414,36 +319,6 @@ export function quotationDefaultValidUntil(issueDate: string): string {
   return issueDate ? addDaysToKey(issueDate, QUOTATION_VALIDITY_DAYS) : ''
 }
 
-/** «يوم», «يومين», «5 ايام», «27 يوم»; «1 day», «5 days». */
-export function dayCountWords(count: number, lang: Language): string {
-  if (lang === 'en') return `${count} ${count === 1 ? 'day' : 'days'}`
-  if (count === 1) return 'يوم'
-  if (count === 2) return 'يومين'
-  if (count >= 3 && count <= 10) return `${count} ايام`
-  return `${count} يوم`
-}
-
-/**
- * The days left of a quotation (owner 2026-11-16): «باقي 27 يوم», «ينتهي
- * اليوم», «انتهى قبل 5 ايام»; «27 days left», «Ends today», «Ended 5 days
- * ago». `today` is the Saudi today.
- */
-export function daysLeftLabel(
-  validUntil: string,
-  today: string = saudiDateKey(),
-  lang: Language = 'ar',
-): string {
-  const days = daysBetween(today, validUntil)
-  if (days === 0) return lang === 'en' ? 'Ends today' : 'ينتهي اليوم'
-  if (days > 0)
-    return lang === 'en'
-      ? `${dayCountWords(days, lang)} left`
-      : `باقي ${dayCountWords(days, lang)}`
-  return lang === 'en'
-    ? `Ended ${dayCountWords(-days, lang)} ago`
-    : `انتهى قبل ${dayCountWords(-days, lang)}`
-}
-
 /** «نوع واحد», «نوعين», «3 انواع», «12 نوع»; «1 type», «3 types». */
 export function quotationTypeCountLabel(count: number, lang: Language): string {
   if (lang === 'en') return `${count} ${count === 1 ? 'type' : 'types'}`
@@ -451,23 +326,6 @@ export function quotationTypeCountLabel(count: number, lang: Language): string {
   if (count === 2) return 'نوعين'
   if (count >= 3 && count <= 10) return `${count} انواع`
   return `${count} نوع`
-}
-
-// --- Rules of the page ---------------------------------------------------------
-
-/** Why «اعتماد» cannot run now (a quotation without lines), or null. */
-export function quotationApprovalBlocker(
-  lineCount: number,
-): TranslationKey | null {
-  return lineCount > 0 ? null : 'quotationErrNoLines'
-}
-
-/** Only a draft that still carries its draft reference is deleted
- *  (`delete_quotation`: an issued number is never given back). */
-export function canDeleteQuotation(
-  row: Pick<QuotationRow, 'status' | 'quote_number'>,
-): boolean {
-  return row.status === 'draft' && isQuotationDraftRef(row.quote_number)
 }
 
 // --- List filters --------------------------------------------------------------
@@ -506,43 +364,7 @@ export function quotationDateFilters(
   )
 }
 
-/** The id of the quick state filter of the list's segmented tabs. */
-export const QUOTATION_QUICK_STATE_FILTER_ID = 'quick-state'
-
-/** The quick tab a filter list selects: «الكل» without a state filter, the
- *  state when exactly one state is filtered, else null (a mixed filter). */
-export function quotationQuickState(
-  filters: readonly ListFilter[],
-): QuotationState | 'all' | null {
-  const stateFilters = filters.filter((filter) => filter.field === 'state')
-  if (stateFilters.length === 0) return 'all'
-  if (stateFilters.length > 1) return null
-  const [only] = stateFilters
-  if (only.operator !== 'in' && only.operator !== 'eq') return null
-  const values = only.value.split(',').filter(Boolean)
-  return values.length === 1 && isQuotationState(values[0]) ? values[0] : null
-}
-
-/** The filters after a quick tab: the state filters replaced by the one
- *  state, or removed for «الكل». */
-export function withQuickState(
-  filters: readonly ListFilter[],
-  state: QuotationState | 'all',
-): ListFilter[] {
-  const rest = filters.filter((filter) => filter.field !== 'state')
-  if (state === 'all') return rest
-  return [
-    ...rest,
-    {
-      id: QUOTATION_QUICK_STATE_FILTER_ID,
-      field: 'state',
-      operator: 'in',
-      value: state,
-    },
-  ]
-}
-
-// --- The 0199 error tokens -----------------------------------------------------
+// --- The error tokens ----------------------------------------------------------
 
 /** Tokens of `save_quotation` that name one field of the form. `invalid_notes`
  *  comes before `invalid_note`: the shorter token is part of the longer. */
@@ -640,16 +462,12 @@ export const QUOTATION_FIELD_RULES: readonly DatabaseFieldRule<QuotationFormValu
     },
   ]
 
-/** Every token of migration 0199 → its safe message. */
+/** Every token the quotation functions raise (0199 as left by 0200) → its
+ *  safe message. */
 export const QUOTATION_FORM_MESSAGES: Readonly<Record<string, TranslationKey>> =
   {
     sales_manage_required: 'quotationErrManageRequired',
-    quotation_approve_required: 'quotationErrApproveRequired',
     invalid_quotation: 'quotationErrNotFound',
-    quotation_approved_locked: 'quotationErrApprovedLocked',
-    quotation_not_draft: 'quotationErrNotDraft',
-    quotation_not_approved: 'quotationErrNotApproved',
-    quotation_number_issued: 'quotationErrNumberIssued',
     quotation_has_no_lines: 'quotationErrNoLines',
     invalid_company: 'quotationErrInvalidCompany',
     invalid_project: 'quotationErrInvalidProject',
@@ -660,17 +478,15 @@ export const QUOTATION_FORM_MESSAGES: Readonly<Record<string, TranslationKey>> =
     duplicate_equipment_type: 'quotationErrDuplicateType',
     invalid_price: 'quotationErrInvalidPrice',
     line_has_no_price: 'quotationErrLineNoPrice',
-    // The line note of save_quotation, the note of the return and of the
-    // client's answer: one length rule.
-    invalid_note: 'quotationErrNoteTooLong',
+    // The note of a price row (the only note left since 0200).
+    invalid_note: 'quotationErrLineNoteTooLong',
     invalid_costs: 'quotationErrInvalidCosts',
     invalid_cost_name: 'quotationErrCostName',
     invalid_borne_by: 'quotationErrBorneBy',
     invalid_terms: 'quotationErrInvalidTerms',
-    invalid_outcome: 'quotationErrInvalidOutcome',
   }
 
-/** Every stable token of migration 0199, for the tests. */
+/** Every stable token of the quotation functions, for the tests. */
 export const QUOTATION_ERROR_TOKENS: readonly string[] = Object.keys(
   QUOTATION_FORM_MESSAGES,
 )

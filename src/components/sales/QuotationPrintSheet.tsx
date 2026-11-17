@@ -5,12 +5,9 @@ import { translations, type TranslationKey } from '@/i18n/translations'
 import { formatDate } from '@/lib/dateFormat'
 import {
   BORNE_BY_PRINT_KEYS,
-  isQuotationDraftRef,
-  QUOTATION_PRINT_STATE_KEYS,
   type QuotationCost,
   type QuotationLine,
   type QuotationRow,
-  type QuotationState,
   type QuotationTerm,
 } from '@/lib/quotations'
 import type { QuotationCompanyNumbers } from '@/lib/quotationsData'
@@ -20,7 +17,6 @@ const AFTERPRINT_FALLBACK_MS = 120_000
 
 export interface QuotationPrintSheetProps {
   quotation: QuotationRow
-  state: QuotationState
   lines: readonly QuotationLine[]
   costs: readonly QuotationCost[]
   terms: readonly QuotationTerm[]
@@ -77,15 +73,16 @@ function Stacked({ k }: { k: TranslationKey }) {
  * fetched or stored.
  *
  * One bilingual A4 sheet: a three-part header (the full logo; «عرض سعر /
- * Quotation» with the project under it; the English facts, the number
- * omitted for a draft reference), the «مقدم العرض / From» and «العميل / To»
- * boxes, the prices table (a missing price reads «غير مسعر»), the VAT line,
- * the costs, the notes and the copied terms (Arabic, the English under each).
+ * Quotation» with the project under it; the English facts — the number,
+ * always printed since 0200 issues it at creation, the issue date and
+ * «Valid Until»; nothing about a stage), the «مقدم العرض / From» and
+ * «العميل / To» boxes, the prices table (a missing price reads «غير
+ * مسعر»), the VAT line, the costs, the notes and the copied terms (Arabic,
+ * the English under each).
  * 12 px text; no page margin, the sheet's own padding instead.
  */
 export function QuotationPrintSheet({
   quotation,
-  state,
   lines,
   costs,
   terms,
@@ -100,7 +97,6 @@ export function QuotationPrintSheet({
   const doneRef = useRef(onDone)
   doneRef.current = onDone
   const number = quotation.quote_number
-  const draftRef = isQuotationDraftRef(number)
 
   useEffect(() => {
     // Once per mount: the ref survives React's development double-mount.
@@ -138,18 +134,11 @@ export function QuotationPrintSheet({
   }, [logoSettled, number])
 
   const headerFacts: { key: TranslationKey; value: string }[] = [
-    // A draft reference is not a quotation number: it is issued on approval.
-    ...(draftRef
-      ? []
-      : [{ key: 'quotationPrintNumber' as TranslationKey, value: number }]),
+    { key: 'quotationPrintNumber', value: number },
     { key: 'quotationPrintIssueDate', value: formatDate(quotation.issue_date) },
     {
       key: 'quotationPrintValidUntil',
       value: formatDate(quotation.valid_until),
-    },
-    {
-      key: 'quotationPrintStatus',
-      value: en(QUOTATION_PRINT_STATE_KEYS[state]),
     },
   ]
   const cell = 'border px-2 py-1.5 align-top'

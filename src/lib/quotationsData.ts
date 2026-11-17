@@ -7,7 +7,6 @@ import {
   type QuotationCost,
   type QuotationFormValues,
   type QuotationLine,
-  type QuotationOutcome,
   type QuotationRow,
   type QuotationTerm,
   type QuotationTermTemplate,
@@ -19,18 +18,21 @@ import { supabase } from '@/lib/supabase'
  * quotations (0199) — the DATA side of «عروض الاسعار»: the rows the screens
  * select and the functions they call. Every read goes through PostgREST
  * with the signed-in user's token (RLS: `sales.view`); every write of a
- * quotation through the SECURITY DEFINER functions of 0199 (no insert /
- * update policy on the quotation tables). The terms template of Settings is
- * written directly under its RLS (`sales.quotations.approve`) and read back
- * with `.select('id')`, as the banks are. The pure labels and the token map
- * live in `src/lib/quotations.ts`.
+ * quotation through the three SECURITY DEFINER functions migration 0200
+ * left — `save_quotation`, `delete_quotation`, `copy_quotation`
+ * (`sales.manage`; no insert / update policy on the quotation tables). A
+ * quotation is a plain document without states. The terms template of
+ * Settings is written directly under its RLS (`sales.quotations.approve`)
+ * and read back with `.select('id')`, as the banks are. The pure labels and
+ * the token map live in `src/lib/quotations.ts`.
  */
 
 // --- Selects -------------------------------------------------------------------
 
-/** The columns of `quotation_list` the list and the page read. */
+/** The columns of `quotation_list` the list and the page read (the view
+ *  after 0200). */
 export const QUOTATION_LIST_SELECT =
-  'id,company_id,project_id,quote_number,status,issue_date,valid_until,notes,approved_at,approved_by,outcome,outcome_at,outcome_by,outcome_note,created_by,created_at,updated_at,company_name_ar,company_name_en,project_name_ar,project_name_en,created_by_name,approved_by_name,state,line_count,type_names'
+  'id,company_id,project_id,quote_number,issue_date,valid_until,notes,created_by,created_at,updated_at,company_name_ar,company_name_en,project_name_ar,project_name_en,created_by_name,line_count,type_names'
 
 export const QUOTATION_LINE_SELECT =
   'id,quotation_id,equipment_type,daily_price,monthly_price,mob_demob_price,note,position'
@@ -153,7 +155,7 @@ export async function fetchQuotationTermTemplates(
   return (data as unknown as QuotationTermTemplate[] | null) ?? []
 }
 
-// --- Writes of a quotation (0199 functions) ------------------------------------
+// --- Writes of a quotation (the three functions) -------------------------------
 
 function asResult<T>(result: {
   data: unknown
@@ -178,8 +180,10 @@ function asResult<T>(result: {
 }
 
 /**
- * `save_quotation`: `id` null creates a draft, else replaces the draft's
- * fields, lines, costs and terms wholesale. Returns the quotation id.
+ * `save_quotation`: `id` null creates a quotation (its official number is
+ * issued then), else replaces that quotation's fields, lines, costs and
+ * terms wholesale — any quotation, there is no lock. Returns the quotation
+ * id.
  */
 export async function saveQuotation(input: {
   id: string | null
@@ -204,47 +208,14 @@ export async function saveQuotation(input: {
   )
 }
 
-/** `approve_quotation`: returns the quotation's number (issued at the
- *  first approval). */
-export async function approveQuotation(id: string): Promise<RpcResult<string>> {
-  return asResult<string>(await supabase.rpc('approve_quotation', { p_id: id }))
-}
-
-/** `return_quotation_approval`: back to draft (the number stays, the
- *  client's answer is cleared). */
-export async function returnQuotationApproval(input: {
-  id: string
-  note: string
-}): Promise<RpcResult<null>> {
-  return asResult<null>(
-    await supabase.rpc('return_quotation_approval', {
-      p_id: input.id,
-      p_note: input.note.trim() || null,
-    }),
-  )
-}
-
-/** `set_quotation_outcome`: null clears the client's answer. */
-export async function setQuotationOutcome(input: {
-  id: string
-  outcome: QuotationOutcome | null
-  note: string
-}): Promise<RpcResult<null>> {
-  return asResult<null>(
-    await supabase.rpc('set_quotation_outcome', {
-      p_id: input.id,
-      p_outcome: input.outcome,
-      p_note: input.note.trim() || null,
-    }),
-  )
-}
-
-/** `delete_quotation`: a draft that still carries its draft reference. */
+/** `delete_quotation`: any quotation, for good; its number is never used
+ *  again. */
 export async function deleteQuotation(id: string): Promise<RpcResult<null>> {
   return asResult<null>(await supabase.rpc('delete_quotation', { p_id: id }))
 }
 
-/** `copy_quotation`: a new draft from any quotation; returns its id. */
+/** `copy_quotation`: a new quotation (a new official number, dated today,
+ *  the same validity in days); returns its id. */
 export async function copyQuotation(id: string): Promise<RpcResult<string>> {
   return asResult<string>(await supabase.rpc('copy_quotation', { p_id: id }))
 }

@@ -8,17 +8,14 @@ import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
+import { PoPill } from '@/components/sales/PoPill'
 import { QuotationFormDialog } from '@/components/sales/QuotationFormDialog'
 import {
-  Badge,
   Button,
   DataTable,
   EmptyState,
   ErrorState,
   PageHeader,
-  Tabs,
-  TabsList,
-  TabsTrigger,
   type DataTableColumn,
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
@@ -27,53 +24,16 @@ import { formatDate } from '@/lib/dateFormat'
 import { quotationsListConfig } from '@/lib/listConfigs'
 import { localizedName } from '@/lib/localizedName'
 import {
-  daysLeftLabel,
-  isQuotationDraftRef,
-  QUOTATION_STATE_BADGE,
-  QUOTATION_STATES,
   quotationDateFilters,
-  quotationQuickState,
-  quotationStateOf,
   quotationTypeCountLabel,
-  showsDaysLeft,
-  withQuickState,
   type QuotationRow,
-  type QuotationState,
 } from '@/lib/quotations'
 import { QUOTATION_LIST_SELECT } from '@/lib/quotationsData'
-import { saudiDateKey } from '@/lib/saudiTime'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 
-/** The quick state tabs above the table: «الكل» then the five states. */
-const QUICK_TABS: readonly (QuotationState | 'all')[] = [
-  'all',
-  ...QUOTATION_STATES,
-]
-
 /** The dialogs the list opens. */
 export type QuotationsListDialogKind = 'create'
-
-/**
- * A quotation number as a round pill (the PO pill's look): grey for a draft
- * reference `QD-####`, green for an issued number `QT-…`. Plain text, so it
- * can sit inside the row's link cell.
- */
-export function QuotationNumberPill({ number }: { number: string }) {
-  const draft = isQuotationDraftRef(number)
-  return (
-    <span
-      className="inline-flex h-7 shrink-0 items-center rounded-full px-2.5 text-xs font-semibold"
-      style={
-        draft
-          ? { color: 'var(--fg)', backgroundColor: 'var(--surface-hover)' }
-          : { color: 'var(--success)', backgroundColor: 'var(--success-soft)' }
-      }
-    >
-      <bdi dir="ltr">{number}</bdi>
-    </span>
-  )
-}
 
 export interface QuotationsListScreenProps {
   onSelectQuotation: (id: string) => void
@@ -82,10 +42,13 @@ export interface QuotationsListScreenProps {
 /**
  * «عروض الاسعار» (/sales/quotations, migration 0199, the Figma design the
  * owner approved on 2026-11-16): every quotation over `quotation_list`,
- * server-side searched by number and client, filtered by state / company /
- * dates, sorted (the latest change first) and paged through the unified
- * list system; a row opens the quotation page. «عرض سعر جديد» needs
- * `sales.manage` (the database checks it again in `save_quotation`).
+ * server-side searched by number and client, filtered by company and the
+ * two dates, sorted (the latest change first) and paged through the unified
+ * list system; a row opens the quotation page. A quotation is a plain
+ * document (owner 2026-11-17, migration 0200): the list has no stage
+ * column, filter or tabs, and every number is the official `QT-…` in the
+ * issued-number pill. «عرض سعر جديد» needs `sales.manage` (the database
+ * checks it again in `save_quotation`).
  */
 export function QuotationsListScreen({
   onSelectQuotation,
@@ -150,8 +113,6 @@ export function QuotationsListScreen({
     fetchRows()
   }, [fetchRows])
 
-  const today = saudiDateKey()
-  const quickState = quotationQuickState(list.filters)
   const filtered = Boolean(list.search.trim()) || list.filters.length > 0
 
   const columns: DataTableColumn<QuotationRow>[] = [
@@ -161,7 +122,7 @@ export function QuotationsListScreen({
       sortable: true,
       cell: (row) => (
         <span className="flex flex-col items-start gap-0.5">
-          <QuotationNumberPill number={row.quote_number} />
+          <PoPill number={row.quote_number} />
           <span className="text-xs tabular-nums text-muted">
             {formatDate(row.issue_date)}
           </span>
@@ -208,31 +169,9 @@ export function QuotationsListScreen({
       header: t('quotationValidUntil'),
       sortable: true,
       hideBelow: 'sm',
-      cell: (row) => {
-        const state = quotationStateOf(row, today)
-        return (
-          <span className="flex flex-col text-start">
-            <span className="tabular-nums">{formatDate(row.valid_until)}</span>
-            {showsDaysLeft(state) && (
-              <span className="text-xs text-muted">
-                {daysLeftLabel(row.valid_until, today, lang)}
-              </span>
-            )}
-          </span>
-        )
-      },
-    },
-    {
-      key: 'state',
-      header: t('status'),
-      cell: (row) => {
-        const badge = QUOTATION_STATE_BADGE[quotationStateOf(row, today)]
-        return (
-          <Badge tone={badge.tone} size="sm">
-            {t(badge.key)}
-          </Badge>
-        )
-      },
+      cell: (row) => (
+        <span className="tabular-nums">{formatDate(row.valid_until)}</span>
+      ),
     },
     {
       key: 'updated_at',
@@ -273,28 +212,6 @@ export function QuotationsListScreen({
         onFilters={list.setFilters}
         asyncFields={asyncFields}
       />
-      {/* The quick state filter: sets or clears the `state` filter. Six
-          tabs scroll sideways on a phone instead of widening the page. */}
-      <div className="-mx-1 overflow-x-auto px-1">
-        <Tabs
-          value={quickState ?? ''}
-          onValueChange={(value) =>
-            list.setFilters(
-              withQuickState(list.filters, value as QuotationState | 'all'),
-            )
-          }
-        >
-          <TabsList variant="segmented" aria-label={t('quotationStateFilter')}>
-            {QUICK_TABS.map((value) => (
-              <TabsTrigger key={value} value={value}>
-                {value === 'all'
-                  ? t('quotationStateAll')
-                  : t(QUOTATION_STATE_BADGE[value].key)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-      </div>
       {loadError ? (
         <ErrorState description={loadError} onRetry={fetchRows} />
       ) : !loading && rows.length === 0 ? (

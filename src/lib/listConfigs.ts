@@ -1554,7 +1554,8 @@ export const cardPricesListConfig: DataListConfig = {
 /**
  * quotations (0199), «عروض الاسعار»: every quotation over the
  * security_invoker view `quotation_list`. Server-side search by number and
- * client, filters by state / company / dates, the latest change first.
+ * client, filters by company and the two dates (a quotation has no stage
+ * since 0200), the latest change first.
  * `issue_date` and `valid_until` are plain dates: the screen turns the date
  * range bounds into days (`quotationDateFilters`).
  */
@@ -1565,36 +1566,6 @@ export const quotationsListConfig: DataListConfig = {
   defaultSort: 'updated_at',
   defaultDirection: 'desc',
   filterFields: [
-    {
-      key: 'state',
-      label: 'status',
-      type: 'select',
-      operators: ['in'],
-      multiple: true,
-      options: [
-        { value: 'draft', label: 'مسودة', labelI18n: 'quotationStateDraft' },
-        {
-          value: 'approved',
-          label: 'معتمد',
-          labelI18n: 'quotationStateApproved',
-        },
-        {
-          value: 'accepted',
-          label: 'مقبول',
-          labelI18n: 'quotationStateAccepted',
-        },
-        {
-          value: 'rejected',
-          label: 'مرفوض',
-          labelI18n: 'quotationStateRejected',
-        },
-        {
-          value: 'expired',
-          label: 'منتهي',
-          labelI18n: 'quotationStateExpired',
-        },
-      ],
-    },
     {
       key: 'company_id',
       label: 'company',

@@ -8,6 +8,12 @@ const ts = require('typescript')
 // «عروض الاسعار» (migration 0199), the screens: the list, the quotation
 // page, the print sheet, the dialogs, the terms template in Settings, the
 // navigation, the token map and the form rules.
+//
+// Since migration 0200 (owner 2026-11-17, «مايحتاج التصنيف او الدورة,
+// شيلها») a quotation is a plain document: no states, no approval, no
+// client answer, and its official number QT-… is issued when it is created.
+// The second half of this file asserts that none of that is left in the
+// client code.
 
 const ROOT = path.join(__dirname, '..')
 const read = (...parts) =>
@@ -69,6 +75,60 @@ function quotationBlocks() {
 const keysOf = (block) =>
   [...block.matchAll(/^\s+([A-Za-z0-9_]+):/gm)].map((match) => match[1])
 
+/** A source without its comments (they may say what is NOT there). */
+const codeOf = (source) =>
+  source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+/** The client files of the feature (the terms template page apart: it keeps
+ *  its gate `sales.quotations.approve`). */
+const QUOTATION_FILES = [
+  ['src', 'lib', 'quotations.ts'],
+  ['src', 'lib', 'quotationsData.ts'],
+  ['src', 'screens', 'sales', 'QuotationsListScreen.tsx'],
+  ['src', 'screens', 'sales', 'QuotationDetail.tsx'],
+  ['src', 'components', 'sales', 'QuotationPrintSheet.tsx'],
+  ['src', 'components', 'sales', 'QuotationFormDialog.tsx'],
+  ['src', 'components', 'sales', 'DeleteQuotationDialog.tsx'],
+]
+
+/** The dialogs migration 0200 made pointless. */
+const REMOVED_DIALOGS = [
+  'ApproveQuotationDialog',
+  'ReturnQuotationDialog',
+  'QuotationOutcomeDialog',
+]
+
+/** The tokens the quotation functions still raise (0199 as left by 0200). */
+const TOKENS = [
+  'sales_manage_required',
+  'invalid_quotation',
+  'invalid_company',
+  'invalid_project',
+  'invalid_dates',
+  'invalid_notes',
+  'quotation_has_no_lines',
+  'invalid_lines',
+  'invalid_equipment_type',
+  'duplicate_equipment_type',
+  'invalid_price',
+  'line_has_no_price',
+  'invalid_note',
+  'invalid_costs',
+  'invalid_cost_name',
+  'invalid_borne_by',
+  'invalid_terms',
+]
+
+/** The tokens that went with the states. */
+const GONE_TOKENS = [
+  'quotation_approve_required',
+  'invalid_outcome',
+  'quotation_approved_locked',
+  'quotation_not_draft',
+  'quotation_not_approved',
+  'quotation_number_issued',
+]
+
 // --- Files -------------------------------------------------------------------
 
 test('every file of the feature exists', () => {
@@ -79,13 +139,24 @@ test('every file of the feature exists', () => {
     ['src', 'screens', 'sales', 'QuotationDetail.tsx'],
     ['src', 'components', 'sales', 'QuotationPrintSheet.tsx'],
     ['src', 'components', 'sales', 'QuotationFormDialog.tsx'],
-    ['src', 'components', 'sales', 'ApproveQuotationDialog.tsx'],
-    ['src', 'components', 'sales', 'ReturnQuotationDialog.tsx'],
-    ['src', 'components', 'sales', 'QuotationOutcomeDialog.tsx'],
     ['src', 'components', 'sales', 'DeleteQuotationDialog.tsx'],
     ['src', 'components', 'quotations', 'QuotationTermsSettings.tsx'],
   ])
     assert.ok(exists(...parts), parts.join('/'))
+})
+
+test('the dialogs of the removed states are deleted and imported nowhere', () => {
+  for (const name of REMOVED_DIALOGS)
+    assert.equal(
+      exists('src', 'components', 'sales', `${name}.tsx`),
+      false,
+      name,
+    )
+  const removed = new RegExp(
+    `${REMOVED_DIALOGS.join('|')}|ClearQuotationOutcomeDialog`,
+  )
+  for (const parts of [...QUOTATION_FILES, ['src', 'App.tsx']])
+    assert.doesNotMatch(read(...parts), removed, parts.join('/'))
 })
 
 // --- Navigation --------------------------------------------------------------
@@ -119,7 +190,7 @@ test('the routes: quotations before the client PO id fallback', () => {
   const fallback = nav.indexOf("return 'sales/:id'")
   assert.ok(quotations > 0 && fallback > quotations)
   assert.match(nav, /'sales\/quotations\/:id': \[\{ key: 'sales\.view' \}\]/)
-  // The terms template page: approvers only.
+  // The terms template page keeps its gate (the key's only use since 0200).
   assert.match(
     nav,
     /'settings\/quotation-terms': \[\{ key: 'sales\.quotations\.approve' \}\]/,
@@ -182,7 +253,7 @@ test('the Settings page sits in AdminSettings like the banks', () => {
 
 // --- List config -------------------------------------------------------------
 
-test('the list config: search, filters, sorts', () => {
+test('the list config: search, company and date filters, sorts', () => {
   const configs = read('src', 'lib', 'listConfigs.ts')
   const start = configs.indexOf('export const quotationsListConfig')
   assert.ok(start > 0)
@@ -193,10 +264,19 @@ test('the list config: search, filters, sorts', () => {
   )
   assert.match(config, /defaultSort: 'updated_at'/)
   assert.match(config, /defaultDirection: 'desc'/)
-  for (const key of ['state', 'company_id', 'issue_date', 'valid_until'])
-    assert.match(config, new RegExp(`key: '${key}'`))
-  for (const state of ['draft', 'approved', 'accepted', 'rejected', 'expired'])
-    assert.match(config, new RegExp(`value: '${state}'`))
+  // The filters: the company and the two dates, nothing about a state.
+  const filters = config.slice(
+    config.indexOf('filterFields:'),
+    config.indexOf('sortableFields:'),
+  )
+  assert.deepEqual(
+    [...filters.matchAll(/key: '([a-z_]+)'/g)].map((match) => match[1]),
+    ['company_id', 'issue_date', 'valid_until'],
+  )
+  assert.doesNotMatch(
+    codeOf(config),
+    /state|status|draft|approved|accepted|rejected|expired/,
+  )
   for (const sort of [
     'updated_at',
     'issue_date',
@@ -208,20 +288,32 @@ test('the list config: search, filters, sorts', () => {
 
 // --- Tokens ------------------------------------------------------------------
 
-test('the token map covers every token of the migration', () => {
+test('the token map: every remaining token, none of the removed ones', () => {
   const q = loadLibModule('quotations')
+  assert.deepEqual([...q.QUOTATION_ERROR_TOKENS].sort(), [...TOKENS].sort())
+  // Each remaining token is one migration 0199 raises.
   const raised = new Set(
     [...MIGRATION.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g)].map((m) => m[1]),
   )
-  // The internal counters are never reached by a screen.
-  raised.delete('quotation_number_sequence_missing')
-  raised.delete('quotation_draft_sequence_missing')
   raised.add('sales_manage_required')
-  for (const token of raised)
-    assert.ok(
+  for (const token of TOKENS) assert.ok(raised.has(token), token)
+  for (const token of GONE_TOKENS) {
+    assert.equal(
       Object.prototype.hasOwnProperty.call(q.QUOTATION_FORM_MESSAGES, token),
+      false,
       token,
     )
+    assert.equal(
+      q.quotationErrorMessage({ message: token }),
+      'quotationSaveFailed',
+      token,
+    )
+  }
+  // The only note left is a price row's.
+  assert.equal(
+    q.quotationErrorMessage({ message: 'invalid_note' }),
+    'quotationErrLineNoteTooLong',
+  )
   // `invalid_note` never answers for `invalid_notes`.
   assert.equal(
     q.quotationErrorMessage({ message: 'invalid_notes' }),
@@ -256,6 +348,12 @@ test('the form: no quantity or total, one save_quotation call', () => {
   )
   const data = read('src', 'lib', 'quotationsData.ts')
   assert.equal((data.match(/supabase\.rpc\('save_quotation'/g) ?? []).length, 1)
+  // Create and edit alike: no wording of a draft, one save button each.
+  assert.match(
+    dialog,
+    /editing \? t\('quotationSaveChanges'\) : t\('quotationSaveNew'\)/,
+  )
+  assert.doesNotMatch(dialog, /quotationFormDraftNotice|quotationSaveDraft/)
 })
 
 test('quotationFormSchema: the rules of the form', () => {
@@ -390,22 +488,42 @@ test('«صالح لغاية» starts 30 days after the issue date', () => {
 
 // --- Page and dialogs ----------------------------------------------------------
 
-test('the page wires every dialog; the placeholders are gone', () => {
+test('the page: PDF for every reader, three options for a manager', () => {
   const page = read('src', 'screens', 'sales', 'QuotationDetail.tsx')
   assert.doesNotMatch(page, /&& null\}/)
-  for (const name of [
-    'QuotationFormDialog',
-    'ApproveQuotationDialog',
-    'ReturnQuotationDialog',
-    'QuotationOutcomeDialog',
-    'ClearQuotationOutcomeDialog',
-    'DeleteQuotationDialog',
-  ])
+  for (const name of ['QuotationFormDialog', 'DeleteQuotationDialog'])
     assert.match(page, new RegExp(`<${name}\\b`), name)
+  assert.match(page, /export type QuotationDialogKind = 'edit' \| 'delete'/)
   assert.match(page, /if \(onDeleted\) onDeleted\(\)/)
-  assert.match(page, /onRefused=\{refused\}/)
   assert.match(page, /can\('sales\.manage'\)/)
-  assert.match(page, /can\('sales\.quotations\.approve'\)/)
+  // The approval key gates the terms template page only.
+  assert.doesNotMatch(page, /sales\.quotations\.approve|canApprove/)
+  // «خيارات»: edit, copy, delete — in that order, each for any quotation,
+  // none with a blocker reason.
+  const menu = page.slice(
+    page.indexOf('const menuItems: MenuItem[] = canManage'),
+    page.indexOf('const optionsMenu'),
+  )
+  assert.deepEqual(
+    [...menu.matchAll(/label: '([A-Za-z]+)'/g)].map((match) => match[1]),
+    ['quotationEdit', 'quotationCopy', 'quotationDelete'],
+  )
+  assert.doesNotMatch(page, /reason|Blocker|canDeleteQuotation/)
+  assert.match(page, /await copyQuotation\(quotation\.id\)/)
+  assert.match(page, /onOpenQuotation\(result\.data\)/)
+  // «تصدير PDF» sits outside the manager's menu.
+  assert.match(page, /\{optionsMenu\}\s+<Button[\s\S]*?t\('quotationPdf'\)/)
+  // The one row of facts: the two dates, the creator, the last change.
+  const facts = page.slice(
+    page.indexOf('const facts: DescriptionListItem[] = ['),
+    page.indexOf('const priceCell'),
+  )
+  assert.deepEqual(
+    [...facts.matchAll(/key: '([A-Za-z]+)'/g)].map((match) => match[1]),
+    ['issue', 'valid', 'createdBy', 'updatedAt'],
+  )
+  // No badge beside the number, no primary button, no phone bar.
+  assert.doesNotMatch(page, /badges=|primaryButton|phoneBar/)
   // No timeline (owner: «شيل سجل العرض»).
   assert.doesNotMatch(page, /EventTimeline|quotation_events/)
   const list = read('src', 'screens', 'sales', 'QuotationsListScreen.tsx')
@@ -414,27 +532,130 @@ test('the page wires every dialog; the placeholders are gone', () => {
   assert.match(list, /onSelectQuotation\(id\)/)
 })
 
-test('the dialogs call their functions and map the tokens', () => {
-  const dir = ['src', 'components', 'sales']
-  const approve = read(...dir, 'ApproveQuotationDialog.tsx')
-  assert.match(approve, /approveQuotation\(/)
-  assert.match(approve, /quotationApproveDescDraftRef/)
-  const back = read(...dir, 'ReturnQuotationDialog.tsx')
-  assert.match(back, /returnQuotationApproval\(/)
-  const outcome = read(...dir, 'QuotationOutcomeDialog.tsx')
-  assert.match(outcome, /<RadioGroup/)
-  assert.match(outcome, /outcome: null/)
-  const remove = read(...dir, 'DeleteQuotationDialog.tsx')
-  assert.match(remove, /deleteQuotation\(/)
-  assert.match(remove, /variant="danger"/)
-  for (const source of [approve, back, outcome, remove])
-    assert.match(source, /quotationErrorMessage\(result\.error\)/)
+test('the list: no state column or tabs, a plain date, one pill look', () => {
+  const list = read('src', 'screens', 'sales', 'QuotationsListScreen.tsx')
+  assert.deepEqual(
+    [...list.matchAll(/^\s{6}key: '([a-z_]+)',$/gm)].map((match) => match[1]),
+    ['quote_number', 'client', 'types', 'valid_until', 'updated_at'],
+  )
+  assert.doesNotMatch(list, /<Tabs|TabsTrigger|<Badge|QUICK_TABS/)
+  // «صالح لغاية»: the date alone.
+  assert.match(
+    list,
+    /key: 'valid_until',[\s\S]*?cell: \(row\) => \(\s+<span className="tabular-nums">\{formatDate\(row\.valid_until\)\}<\/span>\s+\),/,
+  )
+  // Every number in the issued-number pill of the PO lists.
+  assert.match(list, /<PoPill number=\{row\.quote_number\} \/>/)
+  const pill = read('src', 'components', 'sales', 'PoPill.tsx')
+  assert.match(
+    pill,
+    /isSupplierPoDraftRef\(number\) \? DRAFT_PILL_STYLE : PO_PILL_STYLE/,
+  )
+  const q = loadLibModule('quotations')
+  const purchasing = loadLibModule('purchasing')
+  assert.ok(q.QUOTATION_NUMBER_PATTERN.test('QT-2026110001'))
+  assert.equal(q.QUOTATION_NUMBER_PATTERN.test('QD-0001'), false)
+  // A quotation number is never read as a PO draft reference (grey).
+  assert.equal(purchasing.isSupplierPoDraftRef('QT-2026110001'), false)
 })
 
-test('the print sheet omits the number for a draft reference', () => {
+test('the data module calls only the three functions that remain', () => {
+  const data = read('src', 'lib', 'quotationsData.ts')
+  assert.deepEqual(
+    [...data.matchAll(/supabase\.rpc\('([a-z_]+)'/g)].map((match) => match[1]),
+    ['save_quotation', 'delete_quotation', 'copy_quotation'],
+  )
+  assert.doesNotMatch(
+    data,
+    /approve_quotation|return_quotation_approval|set_quotation_outcome/,
+  )
+  // The select is the view after 0200, column for column.
+  const select = /QUOTATION_LIST_SELECT =\s+'([^']+)'/.exec(data)[1]
+  assert.deepEqual(select.split(','), [
+    'id',
+    'company_id',
+    'project_id',
+    'quote_number',
+    'issue_date',
+    'valid_until',
+    'notes',
+    'created_by',
+    'created_at',
+    'updated_at',
+    'company_name_ar',
+    'company_name_en',
+    'project_name_ar',
+    'project_name_en',
+    'created_by_name',
+    'line_count',
+    'type_names',
+  ])
+})
+
+test('no state, approval or client answer is left in the client code', () => {
+  const gone =
+    /QuotationState|QuotationStatus|QuotationOutcome|QUOTATION_STATE|quotationStateOf|showsDaysLeft|daysLeftLabel|isQuotationDraftRef|QUOTATION_DRAFT_REF|quotationApprovalBlocker|canDeleteQuotation|quotationQuickState|withQuickState|approveQuotation|returnQuotationApproval|setQuotationOutcome|\bapproved_(at|by)|approved_by_name|\boutcome_(at|by|note)\b|\.outcome\b(?!\.)|\.status\b|\bstate=|QD-/
+  for (const parts of QUOTATION_FILES)
+    assert.doesNotMatch(codeOf(read(...parts)), gone, parts.join('/'))
+  const q = loadLibModule('quotations')
+  for (const name of [
+    'QUOTATION_STATES',
+    'QUOTATION_STATE_BADGE',
+    'QUOTATION_PRINT_STATE_KEYS',
+    'QUOTATION_DRAFT_REF_PATTERN',
+    'quotationStateOf',
+    'showsDaysLeft',
+    'daysLeftLabel',
+    'isQuotationDraftRef',
+    'quotationApprovalBlocker',
+    'canDeleteQuotation',
+    'quotationQuickState',
+    'withQuickState',
+  ])
+    assert.equal(name in q, false, name)
+})
+
+test('the delete dialog: any quotation, for good, a simple confirm', () => {
+  const remove = read('src', 'components', 'sales', 'DeleteQuotationDialog.tsx')
+  assert.match(remove, /deleteQuotation\(/)
+  assert.match(remove, /variant="danger"/)
+  assert.match(remove, /description=\{t\('quotationDeleteDesc'\)\}/)
+  assert.match(remove, /quotationErrorMessage\(result\.error\)/)
+  // No typing, no confirmation field.
+  assert.doesNotMatch(remove, /<Input|<Field|closeConfirmationMatches/)
+  // The text says it plainly, in both languages.
+  const source = read('src', 'i18n', 'translations.ts')
+  assert.match(
+    source,
+    /quotationDeleteDesc:\s+'يحذف العرض نهائيا[^']*رقم هذا العرض لن يستخدم مرة اخرى\.'/,
+  )
+  assert.match(
+    source,
+    /quotationDeleteDesc:\s+'Deletes the quotation for good[^']*its number will not be used again\.'/,
+  )
+})
+
+test('the print sheet always prints the number and never a state', () => {
   const sheet = read('src', 'components', 'sales', 'QuotationPrintSheet.tsx')
-  assert.match(sheet, /const draftRef = isQuotationDraftRef\(number\)/)
-  assert.match(sheet, /\.\.\.\(draftRef\s+\? \[\]/)
+  const facts = sheet.slice(
+    sheet.indexOf('const headerFacts'),
+    sheet.indexOf('const cell ='),
+  )
+  assert.match(facts, /\[\s+\{ key: 'quotationPrintNumber', value: number \},/)
+  assert.deepEqual(
+    [...facts.matchAll(/key: '([A-Za-z]+)'/g)].map((match) => match[1]),
+    [
+      'quotationPrintNumber',
+      'quotationPrintIssueDate',
+      'quotationPrintValidUntil',
+    ],
+  )
+  assert.doesNotMatch(codeOf(sheet), /draft|Draft|state|Status|\.\.\.\(/)
+  // The suggested file name is the number alone.
+  assert.match(sheet, /document\.title = number\n/)
+  const page = read('src', 'screens', 'sales', 'QuotationDetail.tsx')
+  const usage = page.slice(page.indexOf('<QuotationPrintSheet'))
+  assert.doesNotMatch(usage.slice(0, usage.indexOf('/>')), /state=/)
 })
 
 // --- Translations ------------------------------------------------------------
@@ -444,6 +665,24 @@ test('the quotation keys: Arabic and English together, no hamza', () => {
   assert.ok(ar && en)
   assert.deepEqual(keysOf(ar).sort(), keysOf(en).sort())
   assert.doesNotMatch(ar, /[أإآ]/)
+})
+
+test('the keys of the removed pieces are gone from both languages', () => {
+  const [ar, en] = quotationBlocks()
+  const removed =
+    /quotationState|quotationApprov|quotationReturn|Outcome|quotationDraftRef|quotationAccepted|quotationRejected|quotationPrintStatus|quotationErrNotDraft|quotationErrNotApproved|quotationErrNumberIssued|quotationErrNoteTooLong|quotationFormDraftNotice|quotationSaveDraft/
+  for (const block of [ar, en])
+    for (const key of keysOf(block)) assert.doesNotMatch(key, removed, key)
+  // No wording of a draft, an approval, an answer or an expiry in the texts
+  // of the quotation itself. (The terms template lines are not about a
+  // quotation's stage.)
+  assert.doesNotMatch(ar, /مسودة|اعتماد|معتمد|رد العميل|منتهي|مقبول|مرفوض/)
+  assert.doesNotMatch(en, /\bdraft\b|approv|client's answer|\bexpired\b/i)
+  for (const block of [ar, en]) {
+    const keys = new Set(keysOf(block))
+    for (const key of ['quotationSaveNew', 'quotationDeleteDesc'])
+      assert.ok(keys.has(key), key)
+  }
 })
 
 // --- Review fixes (2026-11-16) -----------------------------------------------
@@ -510,29 +749,24 @@ test('the print sheet does not tear down the started print', () => {
 
 test('a stale refusal closes its dialog and reaches the page notice', () => {
   const page = read('src', 'screens', 'sales', 'QuotationDetail.tsx')
-  for (const key of [
-    'quotationErrNotDraft',
-    'quotationErrNotApproved',
-    'quotationErrApprovedLocked',
-    'quotationErrNumberIssued',
-    'quotationErrNotFound',
-  ])
-    assert.match(page, new RegExp(`'${key}'`), key)
+  // The one refusal that means the quotation is gone meanwhile.
+  assert.match(
+    page,
+    /QUOTATION_STALE_MESSAGES: ReadonlySet<TranslationKey> = new Set\(\[\s+'quotationErrNotFound',\s+\]\)/,
+  )
   assert.match(
     page,
     /if \(QUOTATION_STALE_MESSAGES\.has\(message\)\) \{\s+setDialog\(null\)\s+setActionError\(message\)/,
   )
-  assert.equal((page.match(/onRefused=\{refused\}/g) ?? []).length, 5)
+  assert.equal((page.match(/onRefused=\{refused\}/g) ?? []).length, 1)
   assert.match(page, /onStale=\{refused\}/)
-  assert.match(page, /if \(!renders\) setDialog\(null\)/)
-  for (const name of [
-    'ApproveQuotationDialog',
-    'ReturnQuotationDialog',
-    'QuotationOutcomeDialog',
-    'DeleteQuotationDialog',
-  ]) {
-    const source = read('src', 'components', 'sales', `${name}.tsx`)
-    assert.match(source, /onRefused\?\.\(key\)/, name)
-    assert.doesNotMatch(source, /onRefused\?\.\(\)/, name)
-  }
+  assert.match(page, /if \(dialog && !canManage\) setDialog\(null\)/)
+  const remove = read('src', 'components', 'sales', 'DeleteQuotationDialog.tsx')
+  assert.match(remove, /onRefused\?\.\(key\)/)
+  assert.doesNotMatch(remove, /onRefused\?\.\(\)/)
+  const form = read('src', 'components', 'sales', 'QuotationFormDialog.tsx')
+  assert.match(
+    form,
+    /STALE_MESSAGES: ReadonlySet<TranslationKey> = new Set\(\[\s+'quotationErrNotFound',\s+\]\)/,
+  )
 })

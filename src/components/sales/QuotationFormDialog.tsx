@@ -87,9 +87,9 @@ const emptyLine = (): LineRow => ({
 
 const NO_ERRORS: QuotationFormErrors = { fields: {}, lines: {}, costs: {} }
 
-/** Refusals that mean the quotation changed under the page. */
+/** The refusal that means the quotation is gone under the page
+ *  (`invalid_quotation`: somebody deleted it). */
 const STALE_MESSAGES: ReadonlySet<TranslationKey> = new Set([
-  'quotationErrApprovedLocked',
   'quotationErrNotFound',
 ])
 
@@ -205,8 +205,10 @@ function QuotationTypeSelect({
  * the issue date until the user changes it), one price row per equipment
  * TYPE (daily, monthly, transport; at least one, each type once; NO quantity
  * or total), the costs with who bears each, the template terms to copy and
- * the notes. Saved in ONE `save_quotation` call, always a draft; a refusal
- * names its field or shows its message, never the raw error.
+ * the notes. Saved in ONE `save_quotation` call: a new quotation takes its
+ * official number then, and ANY saved quotation can be edited (migration
+ * 0200: no stages, no lock). A refusal names its field or shows its
+ * message, never the raw error.
  */
 export function QuotationFormDialog({
   open,
@@ -217,11 +219,11 @@ export function QuotationFormDialog({
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** The draft to edit; null creates a new quotation. */
+  /** The quotation to edit; null creates a new one. */
   quotation?: QuotationDetailData | null
   onSaved: (id: string) => void
-  /** The quotation changed under the page (approved, deleted): the page
-   *  closes the dialog and shows the message itself. */
+  /** The quotation is gone under the page (deleted): the page closes the
+   *  dialog and shows the message itself. */
   onStale?: (message: TranslationKey) => void
 }) {
   const { t, lang } = useI18n()
@@ -613,17 +615,12 @@ export function QuotationFormDialog({
             disabled={templatesState !== 'ready'}
             onClick={save}
           >
-            {editing ? t('quotationSaveChanges') : t('quotationSaveDraft')}
+            {editing ? t('quotationSaveChanges') : t('quotationSaveNew')}
           </Button>
         </>
       }
     >
       <div ref={bodyRef} className="space-y-4">
-        {!editing && (
-          <Notice tone="info" size="compact">
-            {t('quotationFormDraftNotice')}
-          </Notice>
-        )}
         {message && (
           <Notice tone="danger" size="compact">
             {t(message)}
