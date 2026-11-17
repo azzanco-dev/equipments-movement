@@ -18,6 +18,7 @@ import { Price } from '@/components/purchasing/Price'
 import { DeleteQuotationDialog } from '@/components/sales/DeleteQuotationDialog'
 import { QuotationFormDialog } from '@/components/sales/QuotationFormDialog'
 import { QuotationPrintSheet } from '@/components/sales/QuotationPrintSheet'
+import { QuotationValidityBadge } from '@/components/sales/QuotationValidityBadge'
 import { useTabTitle } from '@/components/TabTitle'
 import {
   Badge,
@@ -37,6 +38,7 @@ import {
   SectionHeader,
   Skeleton,
   ToastProvider,
+  useConfirm,
   useToast,
   type DataTableColumn,
   type DescriptionListItem,
@@ -64,7 +66,7 @@ export interface QuotationDetailProps {
   onBack: () => void
   /** After the quotation was deleted: the app opens the list. */
   onDeleted?: () => void
-  /** Opens another quotation (the one «نسخ العرض» made). */
+  /** Opens another quotation (the one «تكرار العرض» made). */
   onOpenQuotation: (id: string) => void
 }
 
@@ -113,7 +115,7 @@ function PageSkeleton({ label }: { label: string }) {
  * A quotation is a plain document (owner 2026-11-17, «مايحتاج التصنيف او
  * الدورة, شيلها», migration 0200): nothing marks its stage and no step
  * follows its creation. «تصدير PDF» is for every reader; «خيارات» = تعديل /
- * نسخ العرض / حذف العرض for `sales.manage`, always available. Reads go
+ * تكرار العرض / حذف العرض for `sales.manage`, always available. Reads go
  * through RLS (`sales.view`); every write through `save_quotation`,
  * `copy_quotation` and `delete_quotation`, which check the key again.
  */
@@ -135,6 +137,7 @@ function QuotationDetailInner({
 }: QuotationDetailProps) {
   const { t, lang } = useI18n()
   const toast = useToast()
+  const { confirm, confirmDialog } = useConfirm()
   const { can } = usePermissions()
   // Fails closed: `can` answers false until the permissions are ready.
   const canManage = can('sales.manage')
@@ -235,8 +238,17 @@ function QuotationDetailInner({
     toast({ title: t(title), tone: 'success' })
   }
 
-  // «نسخ العرض» needs no dialog: a new quotation, then its page.
+  // «تكرار العرض» (owner 2026-11-17: the name, and «يطلع dialog قبل يقول هل
+  // انت متاكد»): after the confirmation, a new quotation, then its page.
   const copy = async () => {
+    if (
+      !(await confirm({
+        title: t('quotationCopyConfirmTitle'),
+        description: t('quotationCopyConfirmDesc'),
+        confirmLabel: t('quotationCopy'),
+      }))
+    )
+      return
     setActionError(null)
     setCopying(true)
     const result = await copyQuotation(quotation.id)
@@ -325,8 +337,13 @@ function QuotationDetailInner({
       key: 'valid',
       icon: <CalendarClock size={16} />,
       label: t('quotationValidUntil'),
-      value: formatDate(quotation.valid_until),
-      dir: 'ltr',
+      // The date with «ساري» / «منتهي» beside it (display only).
+      value: (
+        <span className="inline-flex flex-wrap items-center gap-2">
+          <bdi dir="ltr">{formatDate(quotation.valid_until)}</bdi>
+          <QuotationValidityBadge validUntil={quotation.valid_until} />
+        </span>
+      ),
     },
     {
       key: 'createdBy',
@@ -589,6 +606,7 @@ function QuotationDetailInner({
             }}
             onRefused={refused}
           />
+          {confirmDialog}
         </>
       )}
     </div>

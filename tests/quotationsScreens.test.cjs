@@ -623,8 +623,21 @@ test('the page: PDF for every reader, three options for a manager', () => {
     ['quotationEdit', 'quotationCopy', 'quotationDelete'],
   )
   assert.doesNotMatch(page, /reason|Blocker|canDeleteQuotation/)
-  assert.match(page, /await copyQuotation\(quotation\.id\)/)
-  assert.match(page, /onOpenQuotation\(result\.data\)/)
+  // «تكرار العرض»: a confirmation first, then the copy, then the new
+  // quotation's page (owner 2026-11-17).
+  assert.match(
+    page,
+    /const copy = async \(\) => \{\s+if \(\s+!\(await confirm\(\{\s+title: t\('quotationCopyConfirmTitle'\),\s+description: t\('quotationCopyConfirmDesc'\),\s+confirmLabel: t\('quotationCopy'\),\s+\}\)\)\s+\)\s+return\s[\s\S]*?await copyQuotation\(quotation\.id\)[\s\S]*?onOpenQuotation\(result\.data\)/,
+  )
+  assert.match(page, /\{confirmDialog\}/)
+  const translations = read('src', 'i18n', 'translations.ts')
+  assert.match(translations, /quotationCopy: 'تكرار العرض',/)
+  assert.match(translations, /quotationCopy: 'Duplicate quotation',/)
+  assert.doesNotMatch(translations, /نسخ العرض/)
+  assert.match(
+    read('src', 'App.tsx'),
+    /onOpenQuotation=\{\(id\) => router\.push\(`\/sales\/quotations\/\$\{id\}`\)\}/,
+  )
   // «تصدير PDF» sits outside the manager's menu.
   assert.match(page, /\{optionsMenu\}\s+<Button[\s\S]*?t\('quotationPdf'\)/)
   // The one row of facts: the two dates, the creator, the last change.
@@ -646,20 +659,52 @@ test('the page: PDF for every reader, three options for a manager', () => {
   assert.match(list, /onSelectQuotation\(id\)/)
 })
 
-test('the list: no state column or tabs, a plain date, one pill look', () => {
+test('the list: no state column or tabs, a plain date, a plain number', () => {
   const list = read('src', 'screens', 'sales', 'QuotationsListScreen.tsx')
   assert.deepEqual(
     [...list.matchAll(/^\s{6}key: '([a-z_]+)',$/gm)].map((match) => match[1]),
     ['quote_number', 'client', 'types', 'valid_until', 'updated_at'],
   )
   assert.doesNotMatch(list, /<Tabs|TabsTrigger|<Badge|QUICK_TABS/)
-  // «صالح لغاية»: the date alone.
+  // «صالح لغاية»: the date with the display-only «ساري» / «منتهي» badge under
+  // it (owner 2026-11-17); still no column, filter or tab of a stage.
   assert.match(
     list,
-    /key: 'valid_until',[\s\S]*?cell: \(row\) => \(\s+<span className="tabular-nums">\{formatDate\(row\.valid_until\)\}<\/span>\s+\),/,
+    /key: 'valid_until',[\s\S]*?<span className="tabular-nums">\{formatDate\(row\.valid_until\)\}<\/span>\s+<QuotationValidityBadge validUntil=\{row\.valid_until\} \/>/,
   )
-  // Every number in the issued-number pill of the PO lists.
-  assert.match(list, /<PoPill number=\{row\.quote_number\} \/>/)
+  const q0 = loadLibModule('quotations')
+  assert.equal(q0.quotationValidity('2026-11-17', '2026-11-17'), 'valid')
+  assert.equal(q0.quotationValidity('2026-11-16', '2026-11-17'), 'expired')
+  assert.equal(q0.quotationValidity('2026-12-01', '2026-11-17'), 'valid')
+  assert.equal(q0.quotationValidity(null, '2026-11-17'), null)
+  const badge = read('src', 'components', 'sales', 'QuotationValidityBadge.tsx')
+  assert.match(badge, /tone=\{validity === 'valid' \? 'success' : 'neutral'\}/)
+  assert.match(
+    read('src', 'screens', 'sales', 'QuotationDetail.tsx'),
+    /<QuotationValidityBadge validUntil=\{quotation\.valid_until\} \/>/,
+  )
+  // The PDF prints no such badge.
+  assert.doesNotMatch(
+    read('src', 'components', 'sales', 'QuotationPrintSheet.tsx'),
+    /QuotationValidityBadge|quotationValidity/,
+  )
+  // The types: chips of the first three names, then «+N» with the rest.
+  assert.match(
+    list,
+    /const \{ shown, rest \} = quotationTypeChips\(row\.type_names\)/,
+  )
+  assert.match(list, /<Tooltip content=\{rest\.join\('، '\)\}>/)
+  const chips = q0.quotationTypeChips('A، B، C، D، E')
+  assert.deepEqual([...chips.shown], ['A', 'B', 'C'])
+  assert.deepEqual([...chips.rest], ['D', 'E'])
+  assert.equal(q0.quotationTypeChips(null).shown.length, 0)
+  // The number: plain bold text, not a pill (owner 2026-11-17), over the
+  // issue date.
+  assert.match(
+    list,
+    /key: 'quote_number',[\s\S]*?cell: \(row\) => \(\s+<span className="flex flex-col items-start gap-0\.5">\s+<bdi dir="ltr" className="font-semibold tabular-nums">\s+\{row\.quote_number\}\s+<\/bdi>\s+<span className="text-xs tabular-nums text-muted">\s+\{formatDate\(row\.issue_date\)\}/,
+  )
+  assert.doesNotMatch(list, /PoPill/)
   const pill = read('src', 'components', 'sales', 'PoPill.tsx')
   assert.match(
     pill,
@@ -787,11 +832,14 @@ test('the keys of the removed pieces are gone from both languages', () => {
     /quotationState|quotationApprov|quotationReturn|Outcome|quotationDraftRef|quotationAccepted|quotationRejected|quotationPrintStatus|quotationErrNotDraft|quotationErrNotApproved|quotationErrNumberIssued|quotationErrNoteTooLong|quotationFormDraftNotice|quotationSaveDraft/
   for (const block of [ar, en])
     for (const key of keysOf(block)) assert.doesNotMatch(key, removed, key)
-  // No wording of a draft, an approval, an answer or an expiry in the texts
-  // of the quotation itself. (The terms template lines are not about a
-  // quotation's stage.)
-  assert.doesNotMatch(ar, /مسودة|اعتماد|معتمد|رد العميل|منتهي|مقبول|مرفوض/)
-  assert.doesNotMatch(en, /\bdraft\b|approv|client's answer|\bexpired\b/i)
+  // No wording of a draft, an approval or an answer in the texts of the
+  // quotation itself. (The terms template lines are not about a quotation's
+  // stage; «منتهي» / "Expired" came back on 2026-11-17 as the display-only
+  // validity badge, its one key.)
+  assert.doesNotMatch(ar, /مسودة|اعتماد|معتمد|رد العميل|مقبول|مرفوض/)
+  assert.doesNotMatch(en, /\bdraft\b|approv|client's answer/i)
+  assert.equal((ar.match(/منتهي/g) ?? []).length, 1)
+  assert.match(ar, /quotationValidityExpired: 'منتهي',/)
   for (const block of [ar, en]) {
     const keys = new Set(keysOf(block))
     for (const key of ['quotationSaveNew', 'quotationDeleteDesc'])

@@ -322,6 +322,36 @@ export function quotationTypeCountLabel(count: number, lang: Language): string {
   return `${count} نوع`
 }
 
+/** The type names a list row shows as chips before «+N». */
+export const QUOTATION_TYPE_CHIPS = 3
+
+/** The types of a list row (`quotation_list.type_names`, joined with «، » in
+ *  line order) split for the chips: the first ones, then the rest. */
+export function quotationTypeChips(
+  typeNames: string | null | undefined,
+  limit: number = QUOTATION_TYPE_CHIPS,
+): { shown: string[]; rest: string[] } {
+  const names = (typeNames ?? '')
+    .split('، ')
+    .map((name) => name.trim())
+    .filter(Boolean)
+  return { shown: names.slice(0, limit), rest: names.slice(limit) }
+}
+
+/** «ساري» or «منتهي» of a quotation, from «صالح لغاية» alone. */
+export type QuotationValidity = 'valid' | 'expired'
+
+/** `valid` while the Saudi today is on or before «صالح لغاية» (its last day
+ *  included), `expired` after it, null without a date. Display only: the
+ *  database stores, filters and locks nothing by it. */
+export function quotationValidity(
+  validUntil: string | null | undefined,
+  today: string = saudiDateKey(),
+): QuotationValidity | null {
+  if (!validUntil) return null
+  return validUntil.slice(0, 10) < today ? 'expired' : 'valid'
+}
+
 // --- List filters --------------------------------------------------------------
 
 /** The `date` columns of `quotation_list` the list filters by range. */

@@ -12,8 +12,8 @@ import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
-import { PoPill } from '@/components/sales/PoPill'
 import { QuotationFormDialog } from '@/components/sales/QuotationFormDialog'
+import { QuotationValidityBadge } from '@/components/sales/QuotationValidityBadge'
 import {
   AppLink,
   Button,
@@ -25,6 +25,7 @@ import {
   EmptyState,
   ErrorState,
   PageHeader,
+  Tooltip,
   type DataTableColumn,
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
@@ -34,7 +35,7 @@ import { quotationsListConfig } from '@/lib/listConfigs'
 import { localizedName } from '@/lib/localizedName'
 import {
   quotationDateFilters,
-  quotationTypeCountLabel,
+  quotationTypeChips,
   type QuotationRow,
 } from '@/lib/quotations'
 import { QUOTATION_LIST_SELECT } from '@/lib/quotationsData'
@@ -61,8 +62,9 @@ export interface QuotationsListScreenProps {
  * two dates, sorted (the latest change first) and paged through the unified
  * list system; a row opens the quotation page. A quotation is a plain
  * document (owner 2026-11-17, migration 0200): the list has no stage
- * column, filter or tabs, and every number is the official `QT-…` in the
- * issued-number pill. «عرض سعر جديد» needs `sales.manage` (the database
+ * column, filter or tabs, and every number is the official `QT-…`, shown
+ * as plain bold text (not a pill) over the issue date; the types are chips
+ * and «صالح لغاية» carries the display-only «ساري» / «منتهي» badge. «عرض سعر جديد» needs `sales.manage` (the database
  * checks it again in `save_quotation`). «خيارات» (owner 2026-11-17, «خلي
  * الوصول للشروط والاحكام من قائمة عروض السعر») is a menu beside it whose
  * item «الشروط والاحكام» is a real link to the terms template page; it is
@@ -139,9 +141,13 @@ export function QuotationsListScreen({
       key: 'quote_number',
       header: t('quotationNumber'),
       sortable: true,
+      // Plain bold text, not a pill (owner 2026-11-17, «خلي الرقم مش
+      // بادج»), with the issue date under it.
       cell: (row) => (
         <span className="flex flex-col items-start gap-0.5">
-          <PoPill number={row.quote_number} />
+          <bdi dir="ltr" className="font-semibold tabular-nums">
+            {row.quote_number}
+          </bdi>
           <span className="text-xs tabular-nums text-muted">
             {formatDate(row.issue_date)}
           </span>
@@ -169,19 +175,33 @@ export function QuotationsListScreen({
       key: 'types',
       header: t('quotationTypes'),
       hideBelow: 'md',
-      cell: (row) => (
-        <span className="flex max-w-64 flex-col text-start">
-          <span>{quotationTypeCountLabel(row.line_count ?? 0, lang)}</span>
-          {row.type_names && (
-            <span
-              className="truncate text-xs text-muted"
-              title={row.type_names}
-            >
-              {row.type_names}
-            </span>
-          )}
-        </span>
-      ),
+      // The first types as chips, then «+N» naming the rest (owner
+      // 2026-11-17, «عمود انواع المعدات شكله مش كويس»: it was a count over
+      // one cut line of names).
+      cell: (row) => {
+        const { shown, rest } = quotationTypeChips(row.type_names)
+        if (shown.length === 0) return <span className="text-muted">—</span>
+        return (
+          <span className="flex max-w-80 flex-wrap items-center gap-1">
+            {shown.map((name) => (
+              <span
+                key={name}
+                dir="auto"
+                className="max-w-full truncate rounded-md bg-surface-hover px-1.5 py-0.5 text-xs leading-4"
+              >
+                {name}
+              </span>
+            ))}
+            {rest.length > 0 && (
+              <Tooltip content={rest.join('، ')}>
+                <span className="rounded-md border px-1.5 py-0.5 text-xs leading-4 text-muted">
+                  +{rest.length}
+                </span>
+              </Tooltip>
+            )}
+          </span>
+        )
+      },
     },
     {
       key: 'valid_until',
@@ -189,7 +209,10 @@ export function QuotationsListScreen({
       sortable: true,
       hideBelow: 'sm',
       cell: (row) => (
-        <span className="tabular-nums">{formatDate(row.valid_until)}</span>
+        <span className="flex flex-col items-start gap-0.5">
+          <span className="tabular-nums">{formatDate(row.valid_until)}</span>
+          <QuotationValidityBadge validUntil={row.valid_until} />
+        </span>
       ),
     },
     {
