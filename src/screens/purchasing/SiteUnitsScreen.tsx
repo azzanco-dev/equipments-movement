@@ -432,14 +432,16 @@ export function SiteUnitsScreen({
                 className="flex flex-col rounded-xl border bg-bg text-[13px]"
               >
                 <div className="space-y-2 p-3">
-                  <div>
+                  <div className="min-w-0">
                     {/* RTL paragraphs, so the LTR numbers sit at the start. */}
                     {/* Owner 2026-10-25: at the end of the code's row, a
                         button to the unit's entry movement — round like the
                         «+», filled with the surface-hover grey. */}
                     <div className="flex items-start justify-between gap-2">
-                      <p className="flex flex-wrap items-center gap-2 text-lg font-bold leading-6">
-                        <bdi dir="ltr">{row.equipment_code ?? '—'}</bdi>
+                      <p className="flex min-w-0 flex-wrap items-center gap-2 text-lg font-bold leading-6">
+                        <bdi dir="ltr" className="[overflow-wrap:anywhere]">
+                          {row.equipment_code ?? '—'}
+                        </bdi>
                         {/* 0195: an open visit whose unit is in the workshop now
                             (nested workshop stays); a closed visit never. */}
                         {row.visit_state !== 'exited' && row.in_workshop === true && (
@@ -485,7 +487,7 @@ export function SiteUnitsScreen({
                         letters spaced by letter-spacing (or the chassis), a
                         dot, then the company's number (a dash when there is
                         none). */}
-                    <p className="text-xs leading-5 text-muted">
+                    <p className="break-words text-xs leading-5 text-muted [overflow-wrap:anywhere]">
                       {(row.equipment_plate_number ||
                         row.equipment_chassis_number) && (
                         <>
@@ -516,17 +518,20 @@ export function SiteUnitsScreen({
                       {ownerLine(row)}
                     </p>
                     <p className="break-words text-xs leading-5 text-muted">
-                      {localizedName(
-                        lang,
-                        row.company_name_ar,
-                        row.company_name_en,
-                      )}{' '}
-                      ·{' '}
-                      {localizedName(
-                        lang,
-                        row.project_name_ar,
-                        row.project_name_en,
-                      )}
+                      {[
+                        localizedName(
+                          lang,
+                          row.company_name_ar,
+                          row.company_name_en,
+                        ),
+                        localizedName(
+                          lang,
+                          row.project_name_ar,
+                          row.project_name_en,
+                        ),
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </p>
                     {row.visit_state !== 'exited' && (
                       <p className="break-words text-xs leading-5 text-muted">
@@ -564,11 +569,11 @@ export function SiteUnitsScreen({
                 {/* The perforation (no side notches). */}
                 <div className="mx-3 mt-auto border-t border-dashed" />
                 <div
-                  className="flex items-center justify-between gap-2 rounded-b-xl px-3 py-2.5"
+                  className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 rounded-b-xl px-3 py-2.5"
                   style={{ backgroundColor: `var(--${toneOf(row)}-soft)` }}
                 >
                   <span
-                    className="text-xs font-medium"
+                    className="whitespace-nowrap text-xs font-medium"
                     style={{ color: `var(--${toneOf(row)})` }}
                   >
                     {/* Owner 2026-10-25: «رقم PO» beside the PO pill. */}
