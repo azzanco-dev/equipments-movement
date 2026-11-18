@@ -19,6 +19,10 @@ import {
  * of migration 0203 it stands for, rule by rule, on the pure module
  * `src/lib/installments.ts`, and answers a refusal with the token the
  * database would raise. Nothing here reads or writes the database.
+ *
+ * The contract page's history is DERIVED (`historyOf`): 0203 keeps no event
+ * table, so the store only remembers who did what and in which order — the
+ * creation, each payment, each void, the cancellation.
  */
 
 export interface MockFinancier {
@@ -51,6 +55,13 @@ export interface MockContract {
   createdOn: string
   /** A counter: the greater, the later the contract changed. */
   touched: number
+  /** The store clock when the contract was created (the history order). */
+  createdSeq: number
+  /** The day the contract was paid off or cancelled; null while active. */
+  closedOn: string | null
+  /** The store clock of that closing. */
+  closedSeq: number | null
+  cancelledBy: string | null
   rows: MockRow[]
 }
 
@@ -66,6 +77,13 @@ export interface MockPayment {
   status: 'posted' | 'voided'
   voidReason: string | null
   by: string
+  /** The day the payment was recorded (it may be after `paidOn`). */
+  recordedOn: string
+  /** The store clock when it was recorded (the history order). */
+  recordedSeq: number
+  voidedBy: string | null
+  voidedOn: string | null
+  voidedSeq: number | null
   allocations: { seq: number; amount: number }[]
 }
 
@@ -95,6 +113,11 @@ export const MOCK_UNITS: readonly { code: string; type: string }[] = [
   { code: 'A420', type: 'قلاب' },
   { code: 'A377', type: 'بوكلين' },
 ]
+
+/** The unit of a linked code, or null for a code the list does not know. */
+export function unitOf(code: string): { code: string; type: string } | null {
+  return MOCK_UNITS.find((unit) => unit.code === code) ?? null
+}
 
 const DAY_MS = 86_400_000
 
@@ -128,6 +151,10 @@ export function paidOf(contract: MockContract): number {
 
 export const isRowPaid = (row: MockRow) =>
   toHalalas(row.paidAmount) >= toHalalas(row.amount)
+
+/** What a row still asks for, in halalas so no float dust shows. */
+export const rowRemaining = (row: MockRow) =>
+  fromHalalas(toHalalas(row.amount) - toHalalas(row.paidAmount))
 
 /** The next unpaid row of a contract (the oldest), or null. */
 export function nextRowOf(contract: MockContract): MockRow | null {
@@ -201,6 +228,10 @@ export function saveContract(
       createdBy: MOCK_USER,
       createdOn: today,
       touched: clock,
+      createdSeq: clock,
+      closedOn: null,
+      closedSeq: null,
+      cancelledBy: null,
       rows: rowsOfTerms(draft.terms),
     }
     return {
@@ -245,6 +276,8 @@ export function cancelContract(
   store: MockStore,
   id: string,
   reason: string,
+  today: string | null = null,
+  by: string = MOCK_USER,
 ): MockResult {
   const contract = store.contracts.find((item) => item.id === id)
   if (!reason.trim() || reason.trim().length > 500)
@@ -268,6 +301,9 @@ export function cancelContract(
               status: 'cancelled',
               cancelReason: reason.trim(),
               touched: clock,
+              closedOn: today,
+              closedSeq: clock,
+              cancelledBy: by,
             }
           : item,
       ),
@@ -290,6 +326,7 @@ export function recordPayment(
   draft: PaymentDraft,
   today: string,
   by: string = MOCK_USER,
+  recordedOn: string = today,
 ): MockResult {
   const contract = store.contracts.find((item) => item.id === contractId)
   if (!contract) return { ok: false, token: 'invalid_contract' }
@@ -333,6 +370,11 @@ export function recordPayment(
     status: 'posted',
     voidReason: null,
     by,
+    recordedOn,
+    recordedSeq: clock,
+    voidedBy: null,
+    voidedOn: null,
+    voidedSeq: null,
     allocations: allocations.map((item) => ({
       seq: Number(item.id),
       amount: item.amount,
@@ -353,6 +395,8 @@ export function recordPayment(
               rows,
               status: paidOff ? 'paid_off' : 'active',
               touched: clock,
+              closedOn: paidOff ? draft.paidOn : null,
+              closedSeq: paidOff ? clock : null,
             }
           : item,
       ),
@@ -365,6 +409,8 @@ export function voidPayment(
   store: MockStore,
   paymentId: string,
   reason: string,
+  today: string | null = null,
+  by: string = MOCK_USER,
 ): MockResult {
   if (!reason.trim() || reason.trim().length > 500)
     return { ok: false, token: 'reason_required' }
@@ -399,12 +445,26 @@ export function voidPayment(
       clock,
       payments: store.payments.map((item) =>
         item.id === paymentId
-          ? { ...item, status: 'voided', voidReason: reason.trim() }
+          ? {
+              ...item,
+              status: 'voided',
+              voidReason: reason.trim(),
+              voidedBy: by,
+              voidedOn: today ?? item.recordedOn,
+              voidedSeq: clock,
+            }
           : item,
       ),
       contracts: store.contracts.map((item) =>
         item.id === contract.id
-          ? { ...item, rows, status: 'active', touched: clock }
+          ? {
+              ...item,
+              rows,
+              status: 'active',
+              touched: clock,
+              closedOn: null,
+              closedSeq: null,
+            }
           : item,
       ),
     },
@@ -493,9 +553,7 @@ export function openDues(store: MockStore, today: string): DueItem[] {
         contract,
         financierName: names.get(contract.financierId) ?? '',
         row,
-        remaining: fromHalalas(
-          toHalalas(row.amount) - toHalalas(row.paidAmount),
-        ),
+        remaining: rowRemaining(row),
         isPartial: row.paidAmount > 0,
         state: installmentState(row.dueDate, row.amount, row.paidAmount, today),
         days: dayNumber(row.dueDate) - dayNumber(today),
@@ -543,6 +601,227 @@ export function overviewOf(dues: readonly DueItem[]): Overview {
   }
 }
 
+const sumRemaining = (items: readonly DueItem[]) =>
+  fromHalalas(
+    items.reduce((total, item) => total + toHalalas(item.remaining), 0),
+  )
+
+/** What a list of dues still asks for. */
+export function sumDues(items: readonly DueItem[]): number {
+  return sumRemaining(items)
+}
+
+/** yyyy-mm of a day key. */
+export const monthKeyOf = (dateKey: string) => dateKey.slice(0, 7)
+
+export type DuesView = 'overdue' | 'month' | 'next30' | 'all'
+
+/** The sub-tabs of «الاستحقاقات»: overdue, due in today's month (its overdue
+ *  rows included), due today or within 30 days, every unpaid row. */
+export function duesInView(
+  dues: readonly DueItem[],
+  view: DuesView,
+  today: string,
+): DueItem[] {
+  switch (view) {
+    case 'overdue':
+      return dues.filter((item) => item.days < 0)
+    case 'month':
+      return dues.filter(
+        (item) => monthKeyOf(item.row.dueDate) === monthKeyOf(today),
+      )
+    case 'next30':
+      return dues.filter((item) => item.days >= 0 && item.days <= 30)
+    default:
+      return [...dues]
+  }
+}
+
+export interface MonthBucket {
+  /** yyyy-mm */
+  key: string
+  total: number
+  count: number
+}
+
+/** What is still to pay in each of the coming months, this month first.
+ *  Overdue rows are left out: the chart shows what is coming, not what is
+ *  late. */
+export function monthlyDues(
+  dues: readonly DueItem[],
+  today: string,
+  months = 12,
+): MonthBucket[] {
+  const first = `${monthKeyOf(today)}-01`
+  return Array.from({ length: months }, (_, index) => {
+    const key = monthKeyOf(addMonths(first, index))
+    const rows = dues.filter(
+      (item) => item.days >= 0 && monthKeyOf(item.row.dueDate) === key,
+    )
+    return { key, total: sumRemaining(rows), count: rows.length }
+  })
+}
+
+export interface ContractSummary {
+  financed: number
+  paid: number
+  remaining: number
+  /** Paid out of financed, 0–100. */
+  percent: number
+  paidCount: number
+  rowCount: number
+  /** Overdue rows of an ACTIVE contract; 0 for a closed one. */
+  overdueCount: number
+  overdueAmount: number
+  /** The oldest unpaid row, whatever the status. */
+  next: MockRow | null
+  firstDue: string | null
+  lastDue: string | null
+}
+
+/** `installment_contract_summary` for one contract. */
+export function summaryOf(
+  contract: MockContract,
+  today: string,
+): ContractSummary {
+  const financed = financedAmount(contract.terms)
+  const paid = paidOf(contract)
+  const overdue =
+    contract.status === 'active'
+      ? contract.rows.filter((row) => !isRowPaid(row) && row.dueDate < today)
+      : []
+  return {
+    financed,
+    paid,
+    remaining: remainingOf(contract),
+    percent:
+      financed > 0 ? Math.min(100, Math.round((paid / financed) * 100)) : 0,
+    paidCount: contract.rows.filter(isRowPaid).length,
+    rowCount: contract.rows.length,
+    overdueCount: overdue.length,
+    overdueAmount: fromHalalas(
+      overdue.reduce(
+        (sum, row) => sum + toHalalas(row.amount) - toHalalas(row.paidAmount),
+        0,
+      ),
+    ),
+    next: nextRowOf(contract),
+    firstDue: contract.rows[0]?.dueDate ?? null,
+    lastDue: contract.rows[contract.rows.length - 1]?.dueDate ?? null,
+  }
+}
+
+/** A financier's contracts: all of them (what blocks its deletion), the
+ *  active ones and what those still owe. */
+export function financierStats(
+  store: MockStore,
+  financierId: string,
+): { contracts: number; activeContracts: number; remaining: number } {
+  const mine = store.contracts.filter(
+    (contract) => contract.financierId === financierId,
+  )
+  const active = mine.filter((contract) => contract.status === 'active')
+  return {
+    contracts: mine.length,
+    activeContracts: active.length,
+    remaining: fromHalalas(
+      active.reduce(
+        (sum, contract) => sum + toHalalas(remainingOf(contract)),
+        0,
+      ),
+    ),
+  }
+}
+
+export type HistoryKind =
+  'created' | 'payment_recorded' | 'payment_voided' | 'paid_off' | 'cancelled'
+
+export interface HistoryEvent {
+  key: string
+  kind: HistoryKind
+  /** yyyy-mm-dd, or null when the store does not know the day. */
+  on: string | null
+  by: string
+  /** The payment's amount, for the two payment events. */
+  amount: number | null
+  /** The void or cancel reason. */
+  detail: string | null
+  /** The store clock of the event: the greater, the later. */
+  order: number
+}
+
+/**
+ * The contract's history, the newest first, DERIVED from what the store
+ * keeps: the creation, every payment, every void with its reason, the full
+ * payment that closed the contract (only while it is still paid off) and the
+ * cancellation. Migration 0203 has no event table.
+ */
+export function historyOf(
+  store: MockStore,
+  contractId: string,
+): HistoryEvent[] {
+  const contract = store.contracts.find((item) => item.id === contractId)
+  if (!contract) return []
+  const events: HistoryEvent[] = [
+    {
+      key: 'created',
+      kind: 'created',
+      on: contract.createdOn,
+      by: contract.createdBy,
+      amount: null,
+      detail: null,
+      order: contract.createdSeq,
+    },
+  ]
+  for (const payment of store.payments) {
+    if (payment.contractId !== contractId) continue
+    events.push({
+      key: `${payment.id}:recorded`,
+      kind: 'payment_recorded',
+      on: payment.recordedOn,
+      by: payment.by,
+      amount: payment.amount,
+      detail: null,
+      order: payment.recordedSeq,
+    })
+    if (payment.status === 'voided' && payment.voidedSeq !== null)
+      events.push({
+        key: `${payment.id}:voided`,
+        kind: 'payment_voided',
+        on: payment.voidedOn,
+        by: payment.voidedBy ?? '',
+        amount: payment.amount,
+        detail: payment.voidReason,
+        order: payment.voidedSeq,
+      })
+    if (
+      contract.status === 'paid_off' &&
+      contract.closedSeq === payment.recordedSeq
+    )
+      events.push({
+        key: 'paid_off',
+        kind: 'paid_off',
+        on: contract.closedOn,
+        by: payment.by,
+        amount: null,
+        detail: null,
+        // Right after the payment that closed it.
+        order: payment.recordedSeq + 0.5,
+      })
+  }
+  if (contract.status === 'cancelled' && contract.closedSeq !== null)
+    events.push({
+      key: 'cancelled',
+      kind: 'cancelled',
+      on: contract.closedOn,
+      by: contract.cancelledBy ?? '',
+      amount: null,
+      detail: contract.cancelReason,
+      order: contract.closedSeq,
+    })
+  return events.sort((a, b) => b.order - a.order)
+}
+
 // --- The sample data ----------------------------------------------------------------
 
 interface Seed {
@@ -561,6 +840,8 @@ interface Seed {
   partial?: number
   equipment?: string[]
   notes?: string
+  /** Cancelled with this reason, three days after it was entered. */
+  cancelled?: string
 }
 
 const SEEDS: readonly Seed[] = [
@@ -624,7 +905,7 @@ const SEEDS: readonly Seed[] = [
     totalAmount: 261_333.24,
     installmentCount: 12,
     frequencyMonths: 1,
-    nextInDays: 22,
+    nextInDays: -12,
     paidRows: 1,
     equipment: ['A377'],
   },
@@ -636,6 +917,17 @@ const SEEDS: readonly Seed[] = [
     frequencyMonths: 1,
     nextInDays: -200,
     paidRows: 24,
+  },
+  {
+    description: 'مولد كهرباء 500 ك.ف',
+    financier: 'الجبر التجارية',
+    totalAmount: 180_000,
+    downPayment: 30_000,
+    installmentCount: 12,
+    frequencyMonths: 1,
+    nextInDays: 40,
+    paidRows: 0,
+    cancelled: 'ادخل العقد مرتين بالخطا',
   },
 ]
 
@@ -674,6 +966,10 @@ export function seedStore(today: string): MockStore {
         -seed.paidRows * seed.frequencyMonths,
       ),
     }
+    const createdOn =
+      terms.firstDueDate < today
+        ? shiftDays(terms.firstDueDate, -12)
+        : shiftDays(today, -9)
     const saved = saveContract(
       store,
       null,
@@ -684,25 +980,38 @@ export function seedStore(today: string): MockStore {
         notes: seed.notes ?? '',
         equipment: seed.equipment ?? [],
       },
-      terms.firstDueDate < today ? shiftDays(terms.firstDueDate, -12) : today,
+      createdOn,
     )
     if (!saved.ok) continue
     store = saved.store
     const contractId = saved.id
+    if (seed.cancelled) {
+      const cancelled = cancelContract(
+        store,
+        contractId,
+        seed.cancelled,
+        shiftDays(createdOn, 3),
+      )
+      if (cancelled.ok) store = cancelled.store
+      continue
+    }
     const rows =
       store.contracts.find((item) => item.id === contractId)?.rows ?? []
     rows.slice(0, seed.paidRows).forEach((row, index) => {
+      const paidOn = row.dueDate > today ? today : row.dueDate
       const paid = recordPayment(
         store,
         contractId,
         {
-          paidOn: row.dueDate > today ? today : row.dueDate,
+          paidOn,
           amount: row.amount,
           method: index % 3 === 1 ? 'transfer' : 'auto_debit',
           reference: index % 3 === 1 ? `TRF-${88_000 + index * 71}` : '',
           note: '',
         },
         today,
+        MOCK_USER,
+        paidOn,
       )
       if (paid.ok) store = paid.store
     })
@@ -736,9 +1045,16 @@ export function seedStore(today: string): MockStore {
         note: '',
       },
       today,
+      'سالم',
+      shiftDays(today, -20),
     )
     if (wrong.ok) {
-      const voided = voidPayment(wrong.store, wrong.id, 'المبلغ ادخل بالخطا')
+      const voided = voidPayment(
+        wrong.store,
+        wrong.id,
+        'المبلغ ادخل بالخطا',
+        shiftDays(today, -19),
+      )
       if (voided.ok) store = voided.store
     }
   }

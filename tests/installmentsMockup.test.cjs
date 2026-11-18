@@ -9,7 +9,9 @@ const ts = require('typescript')
 // mockup is registered for review, and its in-memory store follows the rules
 // of migration 0203 — a payment goes to the oldest unpaid row, a void takes
 // it back, the money terms are locked by a posted payment — on sample data
-// whose dates follow the given day.
+// whose dates follow the given day. The same day he chose the design of the
+// older `company-installments` mockup on this simplified model: one page with
+// four tabs and the contract page, whose history is derived from the store.
 
 const ROOT = path.join(__dirname, '..')
 const read = (...parts) => fs.readFileSync(path.join(ROOT, ...parts), 'utf8')
@@ -79,9 +81,44 @@ test('the contract takes a free title, not tied to equipment', () => {
   const store = data.seedStore(TODAY)
   assert.ok(store.contracts.some((contract) => contract.equipment.length === 0))
   assert.equal(byNumber(store, 'INS-0005').description, 'ارض المستودع (السلي)')
+  assert.equal(data.unitOf('A291').type, 'حفار')
+  assert.equal(data.unitOf('ZZ'), null)
 })
 
-test('the sample store: seven contracts, the nearest dues first', () => {
+test('one page with four tabs and the contract page, on the simple model', () => {
+  for (const tab of ['dashboard', 'contracts', 'dues', 'financiers'])
+    assert.match(mockup, new RegExp(`<TabsTrigger value="${tab}">`))
+  for (const label of ['اللوحة', 'العقود', 'الاستحقاقات', 'الجهات'])
+    assert.ok(mockup.includes(label), label)
+  for (const piece of [
+    'function DashboardTab(',
+    'function CashflowBars(',
+    'function ContractsTab(',
+    'function DuesTab(',
+    'function FinanciersTab(',
+    'function ContractPage(',
+    'function PaymentCard(',
+  ])
+    assert.ok(mockup.includes(piece), piece)
+  // A refusal shows the safe message of its token, never the token.
+  assert.match(mockup, /t\(installmentErrorMessage\(\{ message: token \}\)\)/)
+  // What the simplified model dropped stays out, and so does the review
+  // chrome of the older mockup.
+  assert.doesNotMatch(
+    mockup,
+    /الضريبة|الارباح|الرسوم|تاريخ العقد|رقم العقد لدى الجهة|تاجير تمويلي|موقوفة|PDF/,
+  )
+  assert.doesNotMatch(
+    mockup,
+    /vatAmount|profitAmount|feesAmount|assetPrice|financier_ref|is_active/,
+  )
+  assert.doesNotMatch(
+    mockup,
+    /StateTabs|PermissionNote|SimulationField|TokenTable|installments\.(view|manage|pay)/,
+  )
+})
+
+test('the sample store: eight contracts, the nearest dues first', () => {
   const store = data.seedStore(TODAY)
   assert.deepEqual(
     Array.from(store.contracts, (contract) => contract.number),
@@ -93,28 +130,171 @@ test('the sample store: seven contracts, the nearest dues first', () => {
       'INS-0005',
       'INS-0006',
       'INS-0007',
+      'INS-0008',
     ],
   )
   assert.equal(byNumber(store, 'INS-0007').status, 'paid_off')
+  assert.equal(byNumber(store, 'INS-0007').closedOn, '2026-04-02')
+  const cancelled = byNumber(store, 'INS-0008')
+  assert.equal(cancelled.status, 'cancelled')
+  assert.equal(cancelled.cancelReason, 'ادخل العقد مرتين بالخطا')
+  assert.equal(cancelled.closedOn, '2026-11-12')
   const dues = data.openDues(store, TODAY)
-  // Sorted by due date; the overdue row leads.
+  // Sorted by due date; the two overdue rows lead, the oldest first.
   for (let index = 1; index < dues.length; index += 1)
     assert.ok(dues[index - 1].row.dueDate <= dues[index].row.dueDate)
-  assert.equal(dues[0].contract.number, 'INS-0004')
+  assert.equal(dues[0].contract.number, 'INS-0006')
   assert.equal(dues[0].state, 'overdue')
-  assert.equal(dues[0].days, -3)
-  assert.equal(dues[1].state, 'due_today')
-  assert.equal(dues[1].isPartial, true)
-  assert.equal(dues[1].remaining, 8250)
+  assert.equal(dues[0].days, -12)
+  assert.equal(dues[1].contract.number, 'INS-0004')
+  assert.equal(dues[1].state, 'overdue')
+  assert.equal(dues[1].days, -3)
+  assert.equal(dues[2].state, 'due_today')
+  assert.equal(dues[2].isPartial, true)
+  assert.equal(dues[2].remaining, 8250)
   const overview = data.overviewOf(dues)
-  assert.equal(overview.overdueCount, 1)
-  assert.equal(overview.overdueAmount, 12500)
+  assert.equal(overview.overdueCount, 2)
+  assert.equal(overview.overdueAmount, 34277.77)
   assert.equal(overview.due7Count, 2)
   assert.equal(overview.due7Amount, 38250)
   assert.equal(overview.due30Amount, 112277.77)
   assert.equal(overview.activeContracts, 6)
   // A paid-off or cancelled contract has no open due.
   assert.ok(dues.every((item) => item.contract.status === 'active'))
+})
+
+test('the dues views and the monthly bars of the dashboard', () => {
+  const store = data.seedStore(TODAY)
+  const dues = data.openDues(store, TODAY)
+  const count = (view) => data.duesInView(dues, view, TODAY).length
+  assert.equal(count('overdue'), 2)
+  // This month: the two overdue rows, the one due today and the one in a week.
+  assert.equal(count('month'), 4)
+  assert.equal(count('next30'), 6)
+  assert.equal(count('all'), dues.length)
+  assert.equal(data.sumDues(data.duesInView(dues, 'overdue', TODAY)), 34277.77)
+  assert.equal(data.sumDues(data.duesInView(dues, 'next30', TODAY)), 112277.77)
+  assert.equal(data.sumDues(dues), data.overviewOf(dues).remainingTotal)
+  assert.equal(data.monthKeyOf('2026-11-18'), '2026-11')
+
+  const months = data.monthlyDues(dues, TODAY)
+  assert.deepEqual(
+    Array.from(months.slice(0, 3), (month) => month.key),
+    ['2026-11', '2026-12', '2027-01'],
+  )
+  assert.equal(months.length, 12)
+  // The bars leave the overdue rows out: the month keeps what is still coming.
+  assert.deepEqual({ ...months[0] }, { key: '2026-11', total: 38250, count: 2 })
+  assert.deepEqual(
+    { ...months[1] },
+    { key: '2026-12', total: 104027.77, count: 5 },
+  )
+  assert.equal(data.monthlyDues(dues, TODAY, 3).length, 3)
+})
+
+test('the contract summary and the financier figures', () => {
+  const store = data.seedStore(TODAY)
+  const loader = data.summaryOf(byNumber(store, 'INS-0004'), TODAY)
+  assert.equal(loader.financed, 300000)
+  assert.equal(loader.paid, 50000)
+  assert.equal(loader.remaining, 250000)
+  assert.equal(loader.percent, 17)
+  assert.equal(loader.paidCount, 4)
+  assert.equal(loader.rowCount, 24)
+  assert.equal(loader.overdueCount, 1)
+  assert.equal(loader.overdueAmount, 12500)
+  assert.equal(loader.next.seq, 5)
+  assert.equal(loader.firstDue, '2026-07-15')
+  assert.equal(loader.lastDue, '2028-06-15')
+  assert.equal(data.rowRemaining(byNumber(store, 'INS-0002').rows[13]), 8250)
+
+  const paidOff = data.summaryOf(byNumber(store, 'INS-0007'), TODAY)
+  assert.equal(paidOff.percent, 100)
+  assert.equal(paidOff.next, null)
+  // A closed contract counts nothing as overdue.
+  const cancelled = data.summaryOf(byNumber(store, 'INS-0008'), '2030-01-01')
+  assert.equal(cancelled.overdueCount, 0)
+  assert.equal(cancelled.financed, 150000)
+
+  const stats = (name) =>
+    data.financierStats(
+      store,
+      store.financiers.find((item) => item.name === name).id,
+    )
+  assert.deepEqual(
+    { ...stats('عبداللطيف جميل') },
+    { contracts: 2, activeContracts: 1, remaining: 250000 },
+  )
+  // The cancelled contract still ties its financier.
+  assert.equal(stats('الجبر التجارية').contracts, 2)
+  assert.equal(stats('الجبر التجارية').activeContracts, 1)
+  assert.deepEqual(
+    { ...stats('بنك البلاد') },
+    { contracts: 0, activeContracts: 0, remaining: 0 },
+  )
+})
+
+test('the contract history is derived from the store, the newest first', () => {
+  const store = data.seedStore(TODAY)
+  const excavator = byNumber(store, 'INS-0003')
+  const history = data.historyOf(store, excavator.id)
+  for (let index = 1; index < history.length; index += 1)
+    assert.ok(history[index - 1].order > history[index].order)
+  // Nine payments, the mistaken one and its void, then the creation last.
+  assert.equal(history.length, 12)
+  assert.deepEqual(
+    Array.from(history.slice(0, 2), (event) => event.kind),
+    ['payment_voided', 'payment_recorded'],
+  )
+  assert.equal(history[0].detail, 'المبلغ ادخل بالخطا')
+  assert.equal(history[0].amount, 3000)
+  assert.equal(history[0].on, '2026-10-30')
+  assert.equal(history[0].by, data.MOCK_USER)
+  assert.equal(history[1].by, 'سالم')
+  assert.equal(history[1].on, '2026-10-29')
+  assert.equal(history[history.length - 1].kind, 'created')
+  assert.equal(history[history.length - 1].on, excavator.createdOn)
+
+  // The full payment closes the history of a paid-off contract.
+  const closed = data.historyOf(store, byNumber(store, 'INS-0007').id)
+  assert.equal(closed[0].kind, 'paid_off')
+  assert.equal(closed[0].on, '2026-04-02')
+  assert.equal(closed[1].kind, 'payment_recorded')
+
+  assert.deepEqual(
+    Array.from(
+      data.historyOf(store, byNumber(store, 'INS-0008').id),
+      (event) => event.kind,
+    ),
+    ['cancelled', 'created'],
+  )
+  assert.deepEqual(Array.from(data.historyOf(store, 'missing')), [])
+
+  // A live payment and its void: who, when and why.
+  const land = byNumber(store, 'INS-0005')
+  const paid = data.recordPayment(
+    store,
+    land.id,
+    {
+      paidOn: '2026-11-10',
+      amount: 40000,
+      method: 'cash',
+      reference: '',
+      note: '',
+    },
+    TODAY,
+  )
+  const after = data.historyOf(paid.store, land.id)
+  assert.equal(after[0].kind, 'paid_off')
+  assert.equal(after[0].on, '2026-11-10')
+  assert.equal(after[1].on, TODAY)
+  const voided = data.voidPayment(paid.store, paid.id, 'خطا', TODAY, 'سالم')
+  const reopened = data.historyOf(voided.store, land.id)
+  assert.equal(reopened[0].kind, 'payment_voided')
+  assert.equal(reopened[0].by, 'سالم')
+  assert.equal(reopened[0].on, TODAY)
+  assert.ok(reopened.every((event) => event.kind !== 'paid_off'))
+  assert.equal(byNumber(voided.store, 'INS-0005').closedOn, null)
 })
 
 test('a payment goes to the oldest row; a void takes it back', () => {
@@ -132,10 +312,12 @@ test('a payment goes to the oldest row; a void takes it back', () => {
   const after = byNumber(paid.store, 'INS-0004')
   assert.equal(after.rows[4].paidAmount, 12500)
   assert.equal(after.rows[5].paidAmount, 7500)
+  // Its own overdue row is paid; the one of the other contract stays.
   assert.equal(
     data.overviewOf(data.openDues(paid.store, TODAY)).overdueCount,
-    0,
+    1,
   )
+  assert.equal(data.summaryOf(after, TODAY).overdueCount, 0)
 
   const voided = data.voidPayment(paid.store, paid.id, 'تجربة')
   assert.equal(voided.ok, true)
@@ -242,9 +424,22 @@ test('the money terms are locked by a posted payment; the title is free', () => 
     },
     TODAY,
   )
-  const fresh = byNumber(created.store, 'INS-0008')
+  const fresh = byNumber(created.store, 'INS-0009')
   assert.equal(fresh.rows.length, 9)
   assert.equal(fresh.rows[0].amount, 10000)
+  const cancelled = data.cancelContract(
+    created.store,
+    fresh.id,
+    'ادخل بالخطا',
+    TODAY,
+  )
+  assert.equal(cancelled.ok, true)
+  assert.equal(byNumber(cancelled.store, 'INS-0009').closedOn, TODAY)
+  assert.equal(
+    byNumber(cancelled.store, 'INS-0009').cancelledBy,
+    data.MOCK_USER,
+  )
+  // Without a day the cancellation still goes through.
   assert.equal(
     data.cancelContract(created.store, fresh.id, 'ادخل بالخطا').ok,
     true,
