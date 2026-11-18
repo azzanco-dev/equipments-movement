@@ -1,0 +1,295 @@
+import { useCallback, useState } from 'react'
+import { Plus, Wallet } from 'lucide-react'
+import { usePermissions } from '@/auth/PermissionsContext'
+import { InstallmentContractDialog } from '@/components/installments/InstallmentContractDialog'
+import { InstallmentFinancierDialog } from '@/components/installments/InstallmentFinancierDialog'
+import {
+  InstallmentPaymentDialog,
+  type InstallmentPaymentTarget,
+} from '@/components/installments/InstallmentPaymentDialog'
+import { InstallmentsContractsTab } from '@/components/installments/InstallmentsContractsTab'
+import { InstallmentsDashboardTab } from '@/components/installments/InstallmentsDashboardTab'
+import { InstallmentsDuesTab } from '@/components/installments/InstallmentsDuesTab'
+import { InstallmentsFinanciersTab } from '@/components/installments/InstallmentsFinanciersTab'
+import { setInstallmentFlash } from '@/components/installments/flash'
+import { useInstallmentsUrl } from '@/components/installments/useInstallmentsUrl'
+import { useLoad } from '@/components/installments/useLoad'
+import {
+  Badge,
+  Button,
+  ErrorState,
+  PageHeader,
+  Skeleton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  ToastProvider,
+  useToast,
+} from '@/components/ui'
+import { useI18n } from '@/i18n/I18nContext'
+import type { TranslationKey } from '@/i18n/translations'
+import {
+  fetchInstallmentContractsCount,
+  fetchInstallmentFinanciers,
+  fetchInstallmentOverview,
+} from '@/lib/installmentsData'
+import {
+  amountOf,
+  INSTALLMENTS_URL_KEYS,
+  type InstallmentDueRow,
+  type InstallmentDuesView,
+  type InstallmentFinancierRow,
+  type InstallmentsTab,
+} from '@/lib/installmentsView'
+
+/** The dialogs the page opens. */
+export type InstallmentsDialog =
+  | { kind: 'contract' }
+  | { kind: 'pay'; contract: InstallmentPaymentTarget | null; amount?: number }
+  | { kind: 'financier'; financier: InstallmentFinancierRow | null }
+
+export interface InstallmentsScreenProps {
+  onOpenContract: (id: string) => void
+}
+
+/**
+ * «الاقساط» (/installments, migration 0203; the /ui-kit mockup the owner
+ * approved on 2026-11-18, «اعتمد وابني»): ONE page with its header and four
+ * tabs — «اللوحة» (the default), «العقود», «الاستحقاقات», «الجهات» — on the
+ * real views. The page is a HIDDEN nav entry (owner: «لاتضيف للسايد بار, خلي
+ * الوصول له عبر الرابط»), gated on `installments.view`; the write actions
+ * show for `installments.manage` only, and the database checks the key again
+ * in every function. The tab, the search, the filters and the pages live in
+ * the URL, so Back restores them.
+ */
+export function InstallmentsScreen(props: InstallmentsScreenProps) {
+  // The successes show their Toasts through this provider; no shell
+  // provides one.
+  return (
+    <ToastProvider>
+      <InstallmentsScreenInner {...props} />
+    </ToastProvider>
+  )
+}
+
+function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
+  const { t } = useI18n()
+  const toast = useToast()
+  const { can } = usePermissions()
+  // Fails closed: `can` answers false until the permissions are ready.
+  const canManage = can('installments.manage')
+  const { state, update, searchInput, setSearchInput } = useInstallmentsUrl()
+  const [dialog, setDialog] = useState<InstallmentsDialog | null>(null)
+  // Bumped after every write: each read of the page runs again.
+  const [version, setVersion] = useState(0)
+
+  const loader = useCallback(async (signal: AbortSignal) => {
+    const [overview, contractsCount, financiers] = await Promise.all([
+      fetchInstallmentOverview(signal),
+      fetchInstallmentContractsCount(signal),
+      fetchInstallmentFinanciers(signal),
+    ])
+    return { overview, contractsCount, financiers }
+  }, [])
+  const load = useLoad(loader, version)
+  const data = load.data
+
+  const setTab = (tab: InstallmentsTab) =>
+    update({ [INSTALLMENTS_URL_KEYS.tab]: tab === 'dashboard' ? null : tab })
+  const showDues = (view?: InstallmentDuesView) =>
+    update({
+      [INSTALLMENTS_URL_KEYS.tab]: 'dues',
+      ...(view
+        ? {
+            [INSTALLMENTS_URL_KEYS.duesView]: view,
+            [INSTALLMENTS_URL_KEYS.duesPage]: null,
+          }
+        : {}),
+    })
+
+  /** A write succeeded: close its dialog, read again, say so. */
+  const done = (message: TranslationKey) => {
+    setDialog(null)
+    setVersion((current) => current + 1)
+    toast({ title: t(message), tone: 'success' })
+  }
+  const refresh = () => setVersion((current) => current + 1)
+  const payRow = (row: InstallmentDueRow) =>
+    setDialog({
+      kind: 'pay',
+      contract: {
+        id: row.contract_id,
+        contract_number: row.contract_number,
+        description: row.description,
+        financier_name: row.financier_name,
+      },
+      amount: amountOf(row.remaining_amount),
+    })
+  const closeDialog = (open: boolean) => {
+    if (!open) setDialog(null)
+  }
+
+  const actions = canManage ? (
+    <>
+      <Button
+        variant="outline"
+        icon={<Wallet size={16} aria-hidden="true" />}
+        onClick={() => setDialog({ kind: 'pay', contract: null })}
+      >
+        {t('instPayTitle')}
+      </Button>
+      <Button
+        variant="primary"
+        icon={<Plus size={16} aria-hidden="true" />}
+        onClick={() => setDialog({ kind: 'contract' })}
+      >
+        {t('instContractNew')}
+      </Button>
+    </>
+  ) : undefined
+
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title={t('installments')}
+        description={t('installmentsDesc')}
+        actions={actions}
+      />
+
+      {load.status === 'failed' ? (
+        <ErrorState
+          description={t('instPageLoadError')}
+          onRetry={load.reload}
+        />
+      ) : !data ? (
+        <div className="space-y-4" aria-busy="true">
+          <span className="sr-only" role="status">
+            {t('loading')}
+          </span>
+          <Skeleton className="h-9 w-72 max-w-full" />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[0, 1, 2, 3].map((index) => (
+              <Skeleton key={index} className="h-24 w-full" />
+            ))}
+          </div>
+          <Skeleton className="h-64 w-full" />
+        </div>
+      ) : (
+        <Tabs
+          value={state.tab}
+          onValueChange={(next) => setTab(next as InstallmentsTab)}
+          className="space-y-4"
+        >
+          <TabsList aria-label={t('instTabsLabel')}>
+            <TabsTrigger value="dashboard">{t('instTabDashboard')}</TabsTrigger>
+            <TabsTrigger value="contracts">
+              {t('instTabContracts')}
+              <span className="ms-1 text-xs text-muted tabular-nums">
+                {data.contractsCount}
+              </span>
+            </TabsTrigger>
+            <TabsTrigger value="dues">
+              {t('instTabDues')}
+              {data.overview.overdue_count > 0 && (
+                <Badge size="sm" tone="danger" className="ms-1.5">
+                  {data.overview.overdue_count}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="financiers">
+              {t('instTabFinanciers')}
+            </TabsTrigger>
+          </TabsList>
+          {/* Only the open tab is mounted (and reads): what each one shows
+              is kept in the URL, so nothing is lost on a switch. */}
+          <TabsContent value="dashboard" className="mt-0">
+            <InstallmentsDashboardTab
+              overview={data.overview}
+              version={version}
+              canManage={canManage}
+              onPay={payRow}
+              onOpenContract={onOpenContract}
+              onShowDues={showDues}
+            />
+          </TabsContent>
+          <TabsContent value="contracts" className="mt-0">
+            <InstallmentsContractsTab
+              state={state}
+              update={update}
+              searchInput={searchInput}
+              onSearchInput={setSearchInput}
+              financiers={data.financiers}
+              totalContracts={data.contractsCount}
+              version={version}
+              canManage={canManage}
+              onNewContract={() => setDialog({ kind: 'contract' })}
+              onOpenContract={onOpenContract}
+            />
+          </TabsContent>
+          <TabsContent value="dues" className="mt-0">
+            <InstallmentsDuesTab
+              state={state}
+              update={update}
+              overview={data.overview}
+              financiers={data.financiers}
+              version={version}
+              canManage={canManage}
+              onPay={payRow}
+              onOpenContract={onOpenContract}
+            />
+          </TabsContent>
+          <TabsContent value="financiers" className="mt-0">
+            <InstallmentsFinanciersTab
+              financiers={data.financiers}
+              version={version}
+              canManage={canManage}
+              onAdd={() => setDialog({ kind: 'financier', financier: null })}
+              onRename={(financier) =>
+                setDialog({ kind: 'financier', financier })
+              }
+              onDeleted={() => done('instToastFinancierDeleted')}
+            />
+          </TabsContent>
+        </Tabs>
+      )}
+
+      {/* The dialogs, each open while `dialog` names it. A success reads
+          the page again and shows its Toast (a new contract opens its own
+          page, which shows the message); a refusal stays in its dialog. */}
+      {canManage && (
+        <>
+          <InstallmentContractDialog
+            open={dialog?.kind === 'contract'}
+            onOpenChange={closeDialog}
+            onSaved={(id) => {
+              setDialog(null)
+              setInstallmentFlash('instToastContractCreated')
+              onOpenContract(id)
+            }}
+          />
+          <InstallmentPaymentDialog
+            open={dialog?.kind === 'pay'}
+            onOpenChange={closeDialog}
+            contract={dialog?.kind === 'pay' ? dialog.contract : null}
+            initialAmount={dialog?.kind === 'pay' ? dialog.amount : undefined}
+            onSaved={() => done('instToastPaymentRecorded')}
+            onStale={refresh}
+          />
+          <InstallmentFinancierDialog
+            open={dialog?.kind === 'financier'}
+            onOpenChange={closeDialog}
+            financier={dialog?.kind === 'financier' ? dialog.financier : null}
+            onSaved={(created) =>
+              done(
+                created
+                  ? 'instToastFinancierAdded'
+                  : 'instToastFinancierRenamed',
+              )
+            }
+          />
+        </>
+      )}
+    </div>
+  )
+}

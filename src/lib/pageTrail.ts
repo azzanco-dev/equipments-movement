@@ -55,6 +55,8 @@ const SPECS: Partial<Record<RoutePage, TrailSpec>> = {
   'sales/quotations/:id': {
     parents: [SALES, ['quotations', '/sales/quotations']],
   },
+  // 0203: «الاقساط › INS-0003».
+  'installments/:id': { parents: [['installments', '/installments']] },
   'settings/equipment-types': { parents: [SETTINGS], name: 'equipmentTypes' },
   'settings/workshop-opening-balance': {
     parents: [SETTINGS],

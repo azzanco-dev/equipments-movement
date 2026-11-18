@@ -1,0 +1,861 @@
+import type { AsyncSearchSelectOption } from '@/components/AsyncSearchSelect'
+import type { PostgresLikeError } from '@/lib/formValidation'
+import {
+  amountOf,
+  cashflowWindowEnd,
+  currentMonthRange,
+  sumAmounts,
+  EMPTY_INSTALLMENT_OVERVIEW,
+  INSTALLMENT_CONTRACT_SORT_COLUMNS,
+  INSTALLMENTS_PAGE_SIZE,
+  type InstallmentAllocationRow,
+  type InstallmentContractRow,
+  type InstallmentContractsSort,
+  type InstallmentDueRow,
+  type InstallmentDuesView,
+  type InstallmentFinancierRow,
+  type InstallmentOverviewRow,
+  type InstallmentPaymentRow,
+  type InstallmentScheduleItem,
+  type InstallmentUnit,
+} from '@/lib/installmentsView'
+import type {
+  InstallmentContractStatus,
+  InstallmentPaymentMethod,
+} from '@/lib/installments'
+import type { RpcResult } from '@/lib/purchasingData'
+import {
+  buildSearchFilter,
+  EQUIPMENT_CODE_TYPE_SEARCH_FIELDS,
+} from '@/lib/search'
+import { supabase } from '@/lib/supabase'
+import { SupabaseLoadError, unwrapRows } from '@/lib/supabaseResult'
+
+/**
+ * installments-screens — the DATA side of «الاقساط» (migration 0203): the
+ * rows the screens select and the functions they call. Every read goes
+ * through PostgREST with the signed-in user's token (RLS:
+ * `installments.view`) and THROWS on failure, so a screen shows its error
+ * state, never an empty list. Contracts, their units, the schedule, the
+ * payments and the allocations are written ONLY by the four SECURITY
+ * DEFINER functions — `save_installment_contract`,
+ * `cancel_installment_contract`, `record_installment_payment`,
+ * `void_installment_payment` (`installments.manage`; those tables have no
+ * write policy). The financiers alone are written directly under their RLS
+ * and read back with `.select('id')`, as the banks are. The pure rules and
+ * the token map live in `src/lib/installments.ts` and
+ * `src/lib/installmentsView.ts`.
+ */
+
+// --- Selects (only the columns the screens show) ----------------------------------------
+
+export const INSTALLMENT_OVERVIEW_SELECT =
+  'overdue_count,overdue_amount,due_7_count,due_7_amount,due_30_count,due_30_amount,open_count,remaining_total,open_contract_count,next_due_date'
+
+export const INSTALLMENT_DUE_SELECT =
+  'id,contract_id,contract_number,description,financier_id,financier_name,seq,installment_count,due_date,amount,paid_amount,remaining_amount,is_balloon,is_partial,state,days_until_due'
+
+export const INSTALLMENT_CONTRACT_SELECT =
+  'id,contract_number,description,financier_id,financier_name,total_amount,down_payment,balloon_amount,financed_amount,installment_count,frequency_months,first_due_date,notes,status,closed_at,cancel_reason,created_by_name,created_at,paid_total,remaining_total,paid_count,overdue_count,overdue_amount,next_due_date,next_due_amount,last_due_date,equipment_count'
+
+export const INSTALLMENT_SCHEDULE_SELECT =
+  'id,contract_id,seq,due_date,amount,is_balloon,paid_amount'
+
+export const INSTALLMENT_PAYMENT_SELECT =
+  'id,contract_id,paid_on,amount,method,reference,note,status,voided_at,voided_by_name,void_reason,created_by_name,created_at'
+
+export const INSTALLMENT_FINANCIER_SELECT = 'id,name'
+
+/** A contract's units with the unit's code and type (null when RLS hides
+ *  the unit from this reader). */
+export const INSTALLMENT_UNIT_SELECT =
+  'contract_id,equipment_id,equipment(code,type)'
+
+/** Which installments a payment covered: the allocation with the `seq` of
+ *  its schedule row, limited to one contract through the inner embed. */
+export const INSTALLMENT_ALLOCATION_SELECT =
+  'payment_id,amount,installment_schedule!inner(seq,contract_id)'
+
+// --- The caps of the bounded reads ------------------------------------------------------
+
+/** The chart reads the unpaid rows of the next twelve months at most. */
+export const CASHFLOW_ROWS_CAP = 2000
+/** The total of the dues view adds up at most this many rows. */
+export const DUES_TOTAL_CAP = 5000
+/** The financier figures read at most this many contracts. */
+export const FINANCIER_CONTRACTS_CAP = 5000
+/** The financiers are a small list of names. */
+export const FINANCIERS_CAP = 1000
+/** The units of one page of contracts. */
+export const CONTRACT_UNITS_CAP = 1000
+/** A contract has at most 360 schedule rows (the 0203 CHECK). */
+export const SCHEDULE_ROWS_CAP = 400
+export const CONTRACT_PAYMENTS_CAP = 1000
+export const CONTRACT_ALLOCATIONS_CAP = 5000
+/** Relational selectors show the first / best 20. */
+export const INSTALLMENT_OPTION_LIMIT = 20
+
+type Abortable<Q> = { abortSignal: (signal: AbortSignal) => Q }
+
+const withSignal = <Q extends Abortable<Q>>(
+  query: Q,
+  signal: AbortSignal | undefined,
+): Q => (signal ? query.abortSignal(signal) : query)
+
+/** The rows of a result as `T[]`; throws when the read failed. */
+function rowsOf<T>(result: { data: unknown; error: unknown }): T[] {
+  return unwrapRows<T>(result as { data: T[] | null; error: unknown })
+}
+
+/** The exact count of a head request; throws when it failed. */
+function countOf(result: { count: number | null; error: unknown }): number {
+  if (result.error) throw new SupabaseLoadError()
+  return result.count ?? 0
+}
+
+// --- Page-level reads ------------------------------------------------------------------
+
+/** `installment_overview`: the four figures (ONE row, whatever the data). */
+export async function fetchInstallmentOverview(
+  signal?: AbortSignal,
+): Promise<InstallmentOverviewRow> {
+  const result = await withSignal(
+    supabase.from('installment_overview').select(INSTALLMENT_OVERVIEW_SELECT),
+    signal,
+  ).maybeSingle()
+  if (result.error) throw new SupabaseLoadError()
+  const row = result.data as Partial<InstallmentOverviewRow> | null
+  if (!row) return EMPTY_INSTALLMENT_OVERVIEW
+  return {
+    overdue_count: Number(row.overdue_count ?? 0),
+    overdue_amount: amountOf(row.overdue_amount),
+    due_7_count: Number(row.due_7_count ?? 0),
+    due_7_amount: amountOf(row.due_7_amount),
+    due_30_count: Number(row.due_30_count ?? 0),
+    due_30_amount: amountOf(row.due_30_amount),
+    open_count: Number(row.open_count ?? 0),
+    remaining_total: amountOf(row.remaining_total),
+    open_contract_count: Number(row.open_contract_count ?? 0),
+    next_due_date: row.next_due_date ?? null,
+  }
+}
+
+/** Every contract, whatever its status (the «العقود» tab's count). */
+export async function fetchInstallmentContractsCount(
+  signal?: AbortSignal,
+): Promise<number> {
+  return countOf(
+    await withSignal(
+      supabase
+        .from('installment_contracts')
+        .select('id', { count: 'exact', head: true }),
+      signal,
+    ),
+  )
+}
+
+/** The financiers by name: a small list, one bounded read. */
+export async function fetchInstallmentFinanciers(
+  signal?: AbortSignal,
+): Promise<InstallmentFinancierRow[]> {
+  return rowsOf<InstallmentFinancierRow>(
+    await withSignal(
+      supabase
+        .from('installment_financiers')
+        .select(INSTALLMENT_FINANCIER_SELECT)
+        .order('name', { ascending: true })
+        .order('id', { ascending: true })
+        .limit(FINANCIERS_CAP),
+      signal,
+    ),
+  )
+}
+
+// --- «اللوحة» --------------------------------------------------------------------------
+
+/** The unpaid rows of the ACTIVE contracts: what every dues read starts
+ *  from. */
+function openDues(
+  columns: string,
+  options?: { count: 'exact'; head?: boolean },
+) {
+  return supabase
+    .from('installment_dues')
+    .select(columns, options)
+    .eq('contract_status', 'active')
+    .eq('is_paid', false)
+}
+
+/** The active contracts that carry an overdue row (the overdue figure's
+ *  «في N عقود»). */
+export async function fetchOverdueContractsCount(
+  signal?: AbortSignal,
+): Promise<number> {
+  return countOf(
+    await withSignal(
+      supabase
+        .from('installment_contract_summary')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'active')
+        .gt('overdue_count', 0),
+      signal,
+    ),
+  )
+}
+
+/** The nearest row that is not late yet, or null. */
+export async function fetchNearestDue(
+  signal?: AbortSignal,
+): Promise<InstallmentDueRow | null> {
+  const rows = rowsOf<InstallmentDueRow>(
+    await withSignal(
+      openDues(INSTALLMENT_DUE_SELECT)
+        .gte('days_until_due', 0)
+        .order('due_date', { ascending: true })
+        .order('contract_number', { ascending: true })
+        .order('seq', { ascending: true })
+        .limit(1),
+      signal,
+    ),
+  )
+  return rows[0] ?? null
+}
+
+/** The overdue rows, the oldest first (the dashboard's card shows a few). */
+export async function fetchOverdueDues(
+  limit: number,
+  signal?: AbortSignal,
+): Promise<InstallmentDueRow[]> {
+  return rowsOf<InstallmentDueRow>(
+    await withSignal(
+      openDues(INSTALLMENT_DUE_SELECT)
+        .lt('days_until_due', 0)
+        .order('due_date', { ascending: true })
+        .order('contract_number', { ascending: true })
+        .order('seq', { ascending: true })
+        .limit(limit),
+      signal,
+    ),
+  )
+}
+
+/** The rows due today or within 30 days, the nearest first. */
+export async function fetchUpcomingDues(
+  limit: number,
+  signal?: AbortSignal,
+): Promise<InstallmentDueRow[]> {
+  return rowsOf<InstallmentDueRow>(
+    await withSignal(
+      openDues(INSTALLMENT_DUE_SELECT)
+        .gte('days_until_due', 0)
+        .lte('days_until_due', 30)
+        .order('due_date', { ascending: true })
+        .order('contract_number', { ascending: true })
+        .order('seq', { ascending: true })
+        .limit(limit),
+      signal,
+    ),
+  )
+}
+
+/**
+ * The chart's rows: what is still to pay from today to the end of the
+ * twelve-month window, ONE bounded read; `partial` when the cap was
+ * reached (the figures then cover the nearest rows only).
+ */
+export async function fetchCashflowDues(
+  today: string,
+  signal?: AbortSignal,
+): Promise<{
+  rows: { due_date: string; remaining_amount: number }[]
+  partial: boolean
+}> {
+  const rows = rowsOf<{ due_date: string; remaining_amount: number }>(
+    await withSignal(
+      openDues('due_date,remaining_amount')
+        .gte('days_until_due', 0)
+        .lt('due_date', cashflowWindowEnd(today))
+        .order('due_date', { ascending: true })
+        .order('id', { ascending: true })
+        .limit(CASHFLOW_ROWS_CAP),
+      signal,
+    ),
+  )
+  return { rows, partial: rows.length >= CASHFLOW_ROWS_CAP }
+}
+
+// --- «العقود» ---------------------------------------------------------------------------
+
+/** The columns the contracts search looks in. */
+export const INSTALLMENT_CONTRACT_SEARCH_FIELDS = [
+  'contract_number',
+  'description',
+  'financier_name',
+] as const
+
+export interface InstallmentContractsQuery {
+  search: string
+  status: InstallmentContractStatus | ''
+  financierId: string
+  /** Active contracts that carry an overdue row. */
+  overdueOnly: boolean
+  sort: InstallmentContractsSort
+  direction: 'asc' | 'desc'
+  page: number
+}
+
+/** One page of `installment_contract_summary`: searched, filtered, sorted
+ *  and paged on the server. */
+export async function fetchInstallmentContractsPage(
+  query: InstallmentContractsQuery,
+  signal?: AbortSignal,
+): Promise<{ rows: InstallmentContractRow[]; total: number }> {
+  const ascending = query.direction === 'asc'
+  let request = supabase
+    .from('installment_contract_summary')
+    .select(INSTALLMENT_CONTRACT_SELECT, { count: 'exact' })
+  // «القسط القادم»: the active contracts first, the closed ones (no row
+  // left to pay, or cancelled) after them.
+  if (query.sort === 'next')
+    request = request.order('status', { ascending: true })
+  request = request
+    .order(INSTALLMENT_CONTRACT_SORT_COLUMNS[query.sort], {
+      ascending,
+      nullsFirst: false,
+    })
+    .order('id', { ascending })
+    .range(
+      (query.page - 1) * INSTALLMENTS_PAGE_SIZE,
+      query.page * INSTALLMENTS_PAGE_SIZE - 1,
+    )
+  const searchFilter = buildSearchFilter(
+    INSTALLMENT_CONTRACT_SEARCH_FIELDS,
+    query.search,
+  )
+  if (searchFilter) request = request.or(searchFilter)
+  if (query.status) request = request.eq('status', query.status)
+  if (query.financierId) request = request.eq('financier_id', query.financierId)
+  // The view counts the late rows of a closed contract too; «المتاخرة فقط»
+  // is about the contracts still running.
+  if (query.overdueOnly)
+    request = request.eq('status', 'active').gt('overdue_count', 0)
+  const result = await withSignal(request, signal)
+  if (result.error) throw new SupabaseLoadError()
+  return {
+    rows: (result.data as unknown as InstallmentContractRow[] | null) ?? [],
+    total: result.count ?? 0,
+  }
+}
+
+type UnitLinkRow = {
+  contract_id: string
+  equipment_id: string
+  equipment: { code: string; type: string | null } | null
+}
+
+/** The units of some contracts (one page of a list, or one contract) with
+ *  each unit's code and type, ONE bounded read. */
+export async function fetchInstallmentContractUnits(
+  contractIds: readonly string[],
+  signal?: AbortSignal,
+): Promise<InstallmentUnit[]> {
+  if (contractIds.length === 0) return []
+  return rowsOf<UnitLinkRow>(
+    await withSignal(
+      supabase
+        .from('installment_contract_equipment')
+        .select(INSTALLMENT_UNIT_SELECT)
+        .in('contract_id', [...contractIds])
+        .order('contract_id', { ascending: true })
+        .order('equipment_id', { ascending: true })
+        .limit(CONTRACT_UNITS_CAP),
+      signal,
+    ),
+  ).map((row) => ({
+    contract_id: row.contract_id,
+    equipment_id: row.equipment_id,
+    code: row.equipment?.code ?? null,
+    type: row.equipment?.type ?? null,
+  }))
+}
+
+// --- «الاستحقاقات» ----------------------------------------------------------------------
+
+export interface InstallmentDuesQuery {
+  view: InstallmentDuesView
+  financierId: string
+  /** The Saudi today (yyyy-mm-dd): «هذا الشهر» is its month. */
+  today: string
+}
+
+/** The filters of a dues view, on any read that starts from `openDues`. */
+function inDuesView<Q extends ReturnType<typeof openDues>>(
+  request: Q,
+  query: InstallmentDuesQuery,
+): Q {
+  let next = request
+  if (query.view === 'overdue') next = next.lt('days_until_due', 0)
+  else if (query.view === 'next30')
+    next = next.gte('days_until_due', 0).lte('days_until_due', 30)
+  else if (query.view === 'month') {
+    const { from, to } = currentMonthRange(query.today)
+    next = next.gte('due_date', from).lt('due_date', to)
+  }
+  if (query.financierId) next = next.eq('financier_id', query.financierId)
+  return next
+}
+
+/** One page of a dues view, the oldest first, with the view's exact count. */
+export async function fetchInstallmentDuesPage(
+  query: InstallmentDuesQuery & { page: number },
+  signal?: AbortSignal,
+): Promise<{ rows: InstallmentDueRow[]; total: number }> {
+  const result = await withSignal(
+    inDuesView(openDues(INSTALLMENT_DUE_SELECT, { count: 'exact' }), query)
+      .order('due_date', { ascending: true })
+      .order('contract_number', { ascending: true })
+      .order('seq', { ascending: true })
+      .range(
+        (query.page - 1) * INSTALLMENTS_PAGE_SIZE,
+        query.page * INSTALLMENTS_PAGE_SIZE - 1,
+      ),
+    signal,
+  )
+  if (result.error) throw new SupabaseLoadError()
+  return {
+    rows: (result.data as unknown as InstallmentDueRow[] | null) ?? [],
+    total: result.count ?? 0,
+  }
+}
+
+/**
+ * What the WHOLE filtered view still asks for (never the loaded page
+ * alone): a bounded read of `remaining_amount`; `partial` when the cap was
+ * reached.
+ */
+export async function fetchInstallmentDuesTotal(
+  query: InstallmentDuesQuery,
+  signal?: AbortSignal,
+): Promise<{ total: number; partial: boolean }> {
+  const rows = rowsOf<{ remaining_amount: number }>(
+    await withSignal(
+      inDuesView(openDues('remaining_amount'), query)
+        .order('due_date', { ascending: true })
+        .order('id', { ascending: true })
+        .limit(DUES_TOTAL_CAP),
+      signal,
+    ),
+  )
+  return {
+    total: sumAmounts(rows.map((row) => row.remaining_amount)),
+    partial: rows.length >= DUES_TOTAL_CAP,
+  }
+}
+
+/** The count of «هذا الشهر» (the other three sub-tabs read theirs from the
+ *  overview). */
+export async function fetchInstallmentDuesMonthCount(
+  today: string,
+  signal?: AbortSignal,
+): Promise<number> {
+  return countOf(
+    await withSignal(
+      inDuesView(openDues('id', { count: 'exact', head: true }), {
+        view: 'month',
+        financierId: '',
+        today,
+      }),
+      signal,
+    ),
+  )
+}
+
+// --- «الجهات» ---------------------------------------------------------------------------
+
+/** The contracts behind the financier figures (grouped by the pure
+ *  `financierFigures`); `partial` when the cap was reached. */
+export async function fetchFinancierContractRows(
+  signal?: AbortSignal,
+): Promise<{
+  rows: {
+    financier_id: string
+    status: InstallmentContractStatus
+    remaining_total: number
+  }[]
+  partial: boolean
+}> {
+  const rows = rowsOf<{
+    financier_id: string
+    status: InstallmentContractStatus
+    remaining_total: number
+  }>(
+    await withSignal(
+      supabase
+        .from('installment_contract_summary')
+        .select('financier_id,status,remaining_total')
+        .order('id', { ascending: true })
+        .limit(FINANCIER_CONTRACTS_CAP),
+      signal,
+    ),
+  )
+  return { rows, partial: rows.length >= FINANCIER_CONTRACTS_CAP }
+}
+
+// --- The contract page --------------------------------------------------------------------
+
+/** One contract with everything its page shows. */
+export interface InstallmentContractDetailData {
+  contract: InstallmentContractRow
+  schedule: InstallmentScheduleItem[]
+  payments: InstallmentPaymentRow[]
+  allocations: InstallmentAllocationRow[]
+  units: InstallmentUnit[]
+}
+
+type AllocationEmbedRow = {
+  payment_id: string
+  amount: number
+  installment_schedule: { seq: number } | null
+}
+
+/** A contract's schedule, in its order. */
+async function fetchSchedule(
+  contractId: string,
+  signal?: AbortSignal,
+): Promise<InstallmentScheduleItem[]> {
+  return rowsOf<InstallmentScheduleItem>(
+    await withSignal(
+      supabase
+        .from('installment_schedule')
+        .select(INSTALLMENT_SCHEDULE_SELECT)
+        .eq('contract_id', contractId)
+        .order('seq', { ascending: true })
+        .limit(SCHEDULE_ROWS_CAP),
+      signal,
+    ),
+  )
+}
+
+async function fetchContractRow(
+  contractId: string,
+  signal?: AbortSignal,
+): Promise<InstallmentContractRow | null> {
+  const result = await withSignal(
+    supabase
+      .from('installment_contract_summary')
+      .select(INSTALLMENT_CONTRACT_SELECT)
+      .eq('id', contractId),
+    signal,
+  ).maybeSingle()
+  if (result.error) throw new SupabaseLoadError()
+  return (result.data as unknown as InstallmentContractRow | null) ?? null
+}
+
+/**
+ * A contract (its summary row) with its schedule, its payments (the newest
+ * first), which installments each payment covered and its linked units;
+ * null when no row is readable. Throws when a read fails.
+ */
+export async function fetchInstallmentContract(
+  contractId: string,
+  signal?: AbortSignal,
+): Promise<InstallmentContractDetailData | null> {
+  const [contract, schedule, payments, allocations, units] = await Promise.all([
+    fetchContractRow(contractId, signal),
+    fetchSchedule(contractId, signal),
+    withSignal(
+      supabase
+        .from('installment_payment_list')
+        .select(INSTALLMENT_PAYMENT_SELECT)
+        .eq('contract_id', contractId)
+        .order('paid_on', { ascending: false })
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(CONTRACT_PAYMENTS_CAP),
+      signal,
+    ).then((result) => rowsOf<InstallmentPaymentRow>(result)),
+    withSignal(
+      supabase
+        .from('installment_payment_allocations')
+        .select(INSTALLMENT_ALLOCATION_SELECT)
+        .eq('installment_schedule.contract_id', contractId)
+        .limit(CONTRACT_ALLOCATIONS_CAP),
+      signal,
+    ).then((result) =>
+      rowsOf<AllocationEmbedRow>(result).flatMap((row) =>
+        row.installment_schedule
+          ? [
+              {
+                payment_id: row.payment_id,
+                amount: amountOf(row.amount),
+                seq: row.installment_schedule.seq,
+              },
+            ]
+          : [],
+      ),
+    ),
+    fetchInstallmentContractUnits([contractId], signal),
+  ])
+  if (!contract) return null
+  return { contract, schedule, payments, allocations, units }
+}
+
+/** What the payment dialog needs of a contract: its totals and its
+ *  schedule (the «يوزع على» preview). Null when the contract is gone. */
+export async function fetchInstallmentPaymentContext(
+  contractId: string,
+  signal?: AbortSignal,
+): Promise<{
+  contract: InstallmentContractRow
+  schedule: InstallmentScheduleItem[]
+} | null> {
+  const [contract, schedule] = await Promise.all([
+    fetchContractRow(contractId, signal),
+    fetchSchedule(contractId, signal),
+  ])
+  return contract ? { contract, schedule } : null
+}
+
+// --- Selectors (server-side search, 20 at most) -----------------------------------------
+
+/** The ACTIVE contracts a payment can be recorded on. */
+export async function loadActiveContractOptions(
+  query: string,
+): Promise<AsyncSearchSelectOption[]> {
+  let request = supabase
+    .from('installment_contract_summary')
+    .select('id,contract_number,description,financier_name')
+    .eq('status', 'active')
+    .order('next_due_date', { ascending: true, nullsFirst: false })
+    .order('id', { ascending: true })
+    .limit(INSTALLMENT_OPTION_LIMIT)
+  const searchFilter = buildSearchFilter(
+    INSTALLMENT_CONTRACT_SEARCH_FIELDS,
+    query,
+  )
+  if (searchFilter) request = request.or(searchFilter)
+  return rowsOf<{
+    id: string
+    contract_number: string
+    description: string
+    financier_name: string
+  }>(await request).map((row) => ({
+    value: row.id,
+    label: `${row.description} · ${row.contract_number}`,
+    description: row.financier_name,
+  }))
+}
+
+/** The units a contract can be linked to: any unit, by code or type. */
+export async function loadInstallmentEquipmentOptions(
+  query: string,
+): Promise<AsyncSearchSelectOption[]> {
+  let request = supabase
+    .from('equipment')
+    .select('id,code,type')
+    .order('code', { ascending: true })
+    .limit(INSTALLMENT_OPTION_LIMIT)
+  const searchFilter = buildSearchFilter(
+    EQUIPMENT_CODE_TYPE_SEARCH_FIELDS,
+    query,
+  )
+  if (searchFilter) request = request.or(searchFilter)
+  return rowsOf<{ id: string; code: string; type: string | null }>(
+    await request,
+  ).map((row) => ({
+    value: row.id,
+    label: [row.code, row.type].filter(Boolean).join(' '),
+  }))
+}
+
+// --- Writes of contracts and payments (the four functions) -------------------------------
+
+function asResult<T>(result: {
+  data: unknown
+  error: {
+    code?: string
+    message: string
+    details?: string
+    hint?: string
+  } | null
+}): RpcResult<T> {
+  if (result.error)
+    return {
+      data: null,
+      error: {
+        code: result.error.code,
+        message: result.error.message,
+        details: result.error.details,
+        hint: result.error.hint,
+      },
+    }
+  return { data: result.data as T, error: null }
+}
+
+export interface InstallmentContractInput {
+  /** Null = a new contract (its number is issued then). */
+  id: string | null
+  description: string
+  financierId: string
+  totalAmount: number
+  downPayment: number
+  balloonAmount: number
+  installmentCount: number
+  frequencyMonths: number
+  /** yyyy-mm-dd */
+  firstDueDate: string
+  notes: string
+  /** The linked units' ids; empty = no link. */
+  equipmentIds: readonly string[]
+}
+
+/**
+ * `save_installment_contract`: creates (`id` null) or edits a contract with
+ * its generated schedule and its optional units in one transaction. Returns
+ * the contract id.
+ */
+export async function saveInstallmentContract(
+  input: InstallmentContractInput,
+): Promise<RpcResult<string>> {
+  return asResult<string>(
+    await supabase.rpc('save_installment_contract', {
+      p_id: input.id,
+      p_description: input.description.trim(),
+      p_financier_id: input.financierId,
+      p_total_amount: input.totalAmount,
+      p_down_payment: input.downPayment,
+      p_balloon_amount: input.balloonAmount,
+      p_installment_count: input.installmentCount,
+      p_frequency_months: input.frequencyMonths,
+      p_first_due_date: input.firstDueDate,
+      p_notes: input.notes.trim() || null,
+      p_equipment_ids: [...input.equipmentIds],
+    }),
+  )
+}
+
+/** `cancel_installment_contract`: an active contract without a posted
+ *  payment, with a required reason. */
+export async function cancelInstallmentContract(
+  contractId: string,
+  reason: string,
+): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('cancel_installment_contract', {
+      p_contract_id: contractId,
+      p_reason: reason.trim(),
+    }),
+  )
+}
+
+export interface InstallmentPaymentInput {
+  contractId: string
+  /** yyyy-mm-dd, not after the Saudi today. */
+  paidOn: string
+  amount: number
+  method: InstallmentPaymentMethod
+  reference: string
+  note: string
+}
+
+/** `record_installment_payment`: the database allocates the amount to the
+ *  oldest unpaid rows. Returns the payment id. */
+export async function recordInstallmentPayment(
+  input: InstallmentPaymentInput,
+): Promise<RpcResult<string>> {
+  return asResult<string>(
+    await supabase.rpc('record_installment_payment', {
+      p_contract_id: input.contractId,
+      p_paid_on: input.paidOn,
+      p_amount: input.amount,
+      p_method: input.method,
+      p_reference: input.reference.trim() || null,
+      p_note: input.note.trim() || null,
+    }),
+  )
+}
+
+/** `void_installment_payment`: takes the payment back with a required
+ *  reason; the row stays. */
+export async function voidInstallmentPayment(
+  paymentId: string,
+  reason: string,
+): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('void_installment_payment', {
+      p_payment_id: paymentId,
+      p_reason: reason.trim(),
+    }),
+  )
+}
+
+// --- Writes of the financiers (direct, under RLS) ------------------------------------------
+
+/**
+ * A financier write: `refused` when RLS refused it (an insert's 42501, or
+ * an update / delete that read back no row), else the database error to
+ * map (a duplicate name, a financier that still has contracts).
+ */
+export type FinancierWriteResult =
+  | { ok: true; id: string }
+  | { ok: false; refused: boolean; error: PostgresLikeError | null }
+
+function financierResult(result: {
+  data: { id: string }[] | null
+  error: {
+    code?: string
+    message: string
+    details?: string
+    hint?: string
+  } | null
+}): FinancierWriteResult {
+  if (result.error)
+    return {
+      ok: false,
+      refused: result.error.code === '42501',
+      error: {
+        code: result.error.code,
+        message: result.error.message,
+        details: result.error.details,
+        hint: result.error.hint,
+      },
+    }
+  const id = result.data?.[0]?.id
+  return id ? { ok: true, id } : { ok: false, refused: true, error: null }
+}
+
+export async function insertInstallmentFinancier(
+  name: string,
+): Promise<FinancierWriteResult> {
+  return financierResult(
+    await supabase
+      .from('installment_financiers')
+      .insert({ name: name.trim() })
+      .select('id'),
+  )
+}
+
+export async function updateInstallmentFinancier(
+  id: string,
+  name: string,
+): Promise<FinancierWriteResult> {
+  return financierResult(
+    await supabase
+      .from('installment_financiers')
+      .update({ name: name.trim() })
+      .eq('id', id)
+      .select('id'),
+  )
+}
+
+export async function deleteInstallmentFinancier(
+  id: string,
+): Promise<FinancierWriteResult> {
+  return financierResult(
+    await supabase
+      .from('installment_financiers')
+      .delete()
+      .eq('id', id)
+      .select('id'),
+  )
+}

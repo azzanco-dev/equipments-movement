@@ -4,6 +4,25 @@ import { isValidUserMobile, normalizeUserMobileInput } from '@/lib/userMobile'
 import { DRIVER_EMPLOYEE_NUMBER_MAX } from '@/lib/driverEmployeeNumber'
 import { isValidSupplierPoPrice } from '@/lib/purchasing'
 import {
+  checkInstallmentTerms,
+  INSTALLMENT_DESCRIPTION_MAX,
+  INSTALLMENT_ERROR_KEYS,
+  INSTALLMENT_FINANCIER_NAME_MAX,
+  INSTALLMENT_FREQUENCIES,
+  INSTALLMENT_NOTES_MAX,
+  INSTALLMENT_PAYMENT_METHODS,
+  INSTALLMENT_PAYMENT_NOTE_MAX,
+  INSTALLMENT_PAYMENT_REFERENCE_MAX,
+  INSTALLMENT_REASON_MAX,
+  type InstallmentFrequency,
+  type InstallmentPaymentMethod,
+} from '@/lib/installments'
+import {
+  installmentTermsOf,
+  parseInstallmentAmount,
+  INSTALLMENT_CONTRACT_TOKEN_FIELDS,
+} from '@/lib/installmentsView'
+import {
   COMMERCIAL_REGISTER_PATTERN,
   EMAIL_SHAPE_PATTERN,
   PARTY_ADDRESS_MAX,
@@ -1290,4 +1309,128 @@ export const quotationTermTemplateSchema = z.object({
       message('quotationTermPositionInvalid'),
     ),
   is_default: z.boolean(),
+})
+
+// --- installments (migration 0203) -------------------------------------------
+
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/
+
+/** A typed amount that may be left empty (the down payment, the final
+ *  payment): digits with at most two decimals. */
+const optionalInstallmentAmount = z
+  .string()
+  .refine(
+    (value) => !value.trim() || parseInstallmentAmount(value) !== null,
+    message('instAmountFormat'),
+  )
+
+/**
+ * «عقد جديد» / «تعديل العقد» (save_installment_contract, 0203): the title,
+ * the financier, the total and the first due date are required; the money
+ * terms then pass `checkInstallmentTerms`, the mirror of the database's
+ * `assert_installment_terms`, and its token's message goes under the field
+ * it is about. The units are optional. The database re-checks every rule.
+ */
+export const installmentContractFormSchema = z
+  .object({
+    description: requiredText('instErrDescription', {
+      max: INSTALLMENT_DESCRIPTION_MAX,
+      lengthKey: 'instErrDescription',
+    }),
+    financier_id: selected('instErrFinancier'),
+    total_amount: z
+      .string()
+      .trim()
+      .min(1, message('instTotalRequired'))
+      .refine(
+        (value) => !value || parseInstallmentAmount(value) !== null,
+        message('instAmountFormat'),
+      ),
+    down_payment: optionalInstallmentAmount,
+    balloon_amount: optionalInstallmentAmount,
+    installment_count: z
+      .string()
+      .trim()
+      .regex(/^[0-9٠-٩۰-۹]+$/, message('instErrInstallmentCount')),
+    frequency_months: z
+      .string()
+      .refine(
+        (value) =>
+          INSTALLMENT_FREQUENCIES.includes(
+            Number(value) as InstallmentFrequency,
+          ),
+        message('instErrFrequency'),
+      ),
+    first_due_date: z.string().regex(DATE_KEY, message('instErrFirstDueDate')),
+    notes: optionalText({
+      max: INSTALLMENT_NOTES_MAX,
+      lengthKey: 'instErrNotes',
+    }),
+    equipment: z.array(z.string()),
+  })
+  .superRefine((form, context) => {
+    const terms = installmentTermsOf(form)
+    if (!terms) return
+    const token = checkInstallmentTerms(terms)
+    if (token)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [INSTALLMENT_CONTRACT_TOKEN_FIELDS[token]],
+        message: INSTALLMENT_ERROR_KEYS[token],
+      })
+  })
+
+/**
+ * «تسجيل سداد» (record_installment_payment, 0203): a contract, a positive
+ * amount, a day that is not after the Saudi `today`, one of the four
+ * methods, a reference of at most 80 characters and a note of at most 500.
+ * Whether the amount fits what remains is the database's answer
+ * (`payment_exceeds_balance`).
+ */
+export function installmentPaymentFormSchema(today: string) {
+  return z.object({
+    contract_id: selected('instPayContractRequired'),
+    amount: z.string().refine((value) => {
+      const amount = parseInstallmentAmount(value)
+      return amount !== null && amount > 0
+    }, message('instErrPaymentAmount')),
+    paid_on: z
+      .string()
+      .regex(DATE_KEY, message('instPaidOnRequired'))
+      .refine((value) => value <= today, message('instErrPaidOn')),
+    method: z
+      .string()
+      .refine(
+        (value) =>
+          INSTALLMENT_PAYMENT_METHODS.includes(
+            value as InstallmentPaymentMethod,
+          ),
+        message('instErrMethod'),
+      ),
+    reference: optionalText({
+      max: INSTALLMENT_PAYMENT_REFERENCE_MAX,
+      lengthKey: 'instErrReference',
+    }),
+    note: optionalText({
+      max: INSTALLMENT_PAYMENT_NOTE_MAX,
+      lengthKey: 'instErrNote',
+    }),
+  })
+}
+
+/** «الغاء سداد» / «الغاء العقد»: a reason of 1 to 500 characters
+ *  (`reason_required`). */
+export const installmentReasonFormSchema = z.object({
+  reason: requiredText('instReasonRequired', {
+    max: INSTALLMENT_REASON_MAX,
+    lengthKey: 'instErrReasonRequired',
+  }),
+})
+
+/** «اضافة جهة» / «تعديل اسم الجهة» (installment_financiers_name_check). */
+export const installmentFinancierFormSchema = z.object({
+  name: requiredText('instFinancierNameRequired', {
+    max: INSTALLMENT_FINANCIER_NAME_MAX,
+    lengthKey: 'instFinancierNameTooLong',
+  }),
 })

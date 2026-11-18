@@ -42,6 +42,7 @@ import {
   Search,
   ShoppingCart,
   Receipt,
+  CalendarClock,
 } from 'lucide-react'
 import { FirstLoginPasswordDialog } from '@/components/FirstLoginPasswordDialog'
 import { RouteFallback } from '@/components/RouteFallback'
@@ -288,6 +289,23 @@ const QuotationDetail = dynamic(
     ),
   { loading: screenLoading },
 )
+// «الاقساط» (migration 0203, owner 2026-11-18): the one page with its four
+// tabs and the contract page, behind the `installments.view` gates; a hidden
+// entry, opened by URL only.
+const InstallmentsScreen = dynamic(
+  () =>
+    import('@/screens/installments/InstallmentsScreen').then(
+      (module) => module.InstallmentsScreen,
+    ),
+  { loading: screenLoading },
+)
+const InstallmentContractDetail = dynamic(
+  () =>
+    import('@/screens/installments/InstallmentContractDetail').then(
+      (module) => module.InstallmentContractDetail,
+    ),
+  { loading: screenLoading },
+)
 const UserDetail = dynamic(
   () => import('@/screens/UserDetail').then((module) => module.UserDetail),
   { loading: screenLoading },
@@ -361,6 +379,7 @@ const NAV_PRESENTATION: Record<
   users: { label: 'users', icon: <Users size={18} /> },
   activity: { label: 'activityLog', icon: <History size={18} /> },
   'movement-import': { label: 'movementImport', icon: <FileUp size={18} /> },
+  installments: { label: 'installments', icon: <CalendarClock size={18} /> },
   settings: { label: 'settings', icon: <Settings size={18} /> },
 }
 
@@ -703,6 +722,11 @@ function AppContent() {
             onDeleted={() => router.replace('/sales/quotations')}
             onOpenQuotation={(id) => router.push(`/sales/quotations/${id}`)}
           />
+        ) : page === 'installments/:id' ? (
+          <InstallmentContractDetail
+            contractId={detailId}
+            onBack={goBackTo('/installments')}
+          />
         ) : page === 'purchasing/:id' ? (
           <SupplierPoDetail
             poId={detailId}
@@ -827,6 +851,11 @@ function AppContent() {
             )}
             {page === 'users' && (
               <AdminUsers onSelectUser={(id) => router.push(`/users/${id}`)} />
+            )}
+            {page === 'installments' && (
+              <InstallmentsScreen
+                onOpenContract={(id) => router.push(`/installments/${id}`)}
+              />
             )}
             {page === 'movement-import' && <MovementImport />}
             {page === 'activity' && <ActivityScreen />}

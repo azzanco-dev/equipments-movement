@@ -45,6 +45,7 @@ export type NavItemKey =
   | 'users'
   | 'activity'
   | 'movement-import'
+  | 'installments'
   | 'settings'
 
 export type NavChildKey =
@@ -171,6 +172,14 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
   {
     key: 'movement-import',
     requires: [{ key: 'movements.import' }],
+    hidden: true,
+  },
+  // «الاقساط» (migration 0203, owner 2026-11-18: «مبدئيا لاتضيف للسايد بار,
+  // خلي الوصول له عبر الرابط»): opened by URL only (/installments), still
+  // gated on installments.view.
+  {
+    key: 'installments',
+    requires: [{ key: 'installments.view' }],
     hidden: true,
   },
   {
@@ -311,6 +320,7 @@ export type RoutePage =
   | 'sales/:id'
   | 'sales/cards/:id'
   | 'sales/quotations/:id'
+  | 'installments/:id'
   | 'print/export'
 
 type ExtraPage = Exclude<RoutePage, NavItemKey | NavChildKey>
@@ -341,6 +351,8 @@ const PAGE_GATES: Readonly<Record<ExtraPage, readonly NavGate[]>> = {
   'sales/cards/:id': [{ key: 'sales.view' }],
   // 0199: the quotation page.
   'sales/quotations/:id': [{ key: 'sales.view' }],
+  // 0203: the installment contract page.
+  'installments/:id': [{ key: 'installments.view' }],
   'print/export': [{ key: 'movements.export' }],
 }
 
@@ -389,6 +401,9 @@ export function routePageOf(segments: readonly string[]): RoutePage {
   if (first === 'equipment' && second) return 'equipment/:id'
   if (first === 'drivers' && second) return 'drivers/:id'
   if (first === 'users' && second) return 'users/:id'
+  // 0203: /installments is the list (a hidden top-level entry), any second
+  // segment a contract id.
+  if (first === 'installments' && second) return 'installments/:id'
   if (first === 'purchasing') {
     // /purchasing opens its first section; any other second
     // segment is a PO id.
@@ -510,6 +525,8 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'sales/cards/:id',
   'sales/quotations',
   'sales/quotations/:id',
+  'installments',
+  'installments/:id',
 ]
 /**
  * The field home's own pages (its home, the inquiry, the movement form and

@@ -44,16 +44,27 @@ const TODAY = '2026-11-18'
 const byNumber = (store, number) =>
   store.contracts.find((contract) => contract.number === number)
 
-test('the mockup is a /ui-kit section under review', () => {
-  const kit = read('src', 'screens', 'UiKit.tsx')
+test('the mockup is an approved /ui-kit section, listed second', () => {
+  // Owner 2026-11-18, «اعتمد وابني»: the real screens are built
+  // (tests/installmentsScreens.test.cjs); the mockup stays for reference.
+  const kit = read('src', 'screens', 'UiKit.tsx').replace(/\r\n/g, '\n')
   assert.match(
     kit,
     /import \{ InstallmentsMockup \} from '@\/screens\/ui-kit\/InstallmentsMockup'/,
   )
   assert.match(
     kit,
-    /id: 'installments',\n    title: 'نموذج شاشات الاقساط',[\s\S]*?status: 'review',[\s\S]*?element: <InstallmentsMockup \/>/,
+    /id: 'installments',\n    title: 'نموذج شاشات الاقساط',[\s\S]*?status: 'approved',[\s\S]*?element: <InstallmentsMockup \/>/,
   )
+  const ids = [...kit.matchAll(/^    id: '([a-z0-9-]+)',$/gm)].map(
+    (match) => match[1],
+  )
+  assert.equal(ids[1], 'installments')
+  const section = kit.slice(
+    kit.indexOf("id: 'installments'"),
+    kit.indexOf("id: 'home-dashboard-v2'"),
+  )
+  assert.doesNotMatch(section, /status: 'review'/)
 })
 
 test('sample data only: no database, tokens only, plain alif', () => {

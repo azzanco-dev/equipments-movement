@@ -34,6 +34,8 @@ const PAGE_TITLES: Readonly<
   users: { kind: 'top', name: 'users' },
   activity: { kind: 'top', name: 'activityLog' },
   'movement-import': { kind: 'top', name: 'movementImport' },
+  // 0203: «الاقساط · حركة المعدات» (a hidden entry, opened by URL).
+  installments: { kind: 'top', name: 'installments' },
   settings: { kind: 'top', name: 'settings' },
   'purchasing/orders': {
     kind: 'sub',
@@ -87,6 +89,8 @@ const PAGE_TITLES: Readonly<
   'sales/cards/:id': { kind: 'detail', section: 'equipmentCards' },
   // 0199: «QT-202611001 · عروض الاسعار».
   'sales/quotations/:id': { kind: 'detail', section: 'quotations' },
+  // 0203: «INS-0003 · الاقساط».
+  'installments/:id': { kind: 'detail', section: 'installments' },
 }
 
 const join = (...parts: string[]) => parts.join(TAB_TITLE_SEPARATOR)

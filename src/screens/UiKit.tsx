@@ -149,11 +149,13 @@ const SCREEN_SECTIONS: SectionDef[] = [
     // simplest shape («ابغاه يكون ضمن البرنامج الرئيسي», «بابسط شكل»), drawn
     // in Figma first, then «سويها في ui-kit». The contract takes a free title
     // («مانبغى نحصرها على المعدات»). Database: migration 0203, not applied.
+    // Approved 2026-11-18 («اعتمد وابني»): the real screens are /installments
+    // and /installments/:id (src/screens/installments).
     id: 'installments',
     title: 'نموذج شاشات الاقساط',
     purpose:
       'صفحة واحدة بتبويبات «اللوحة» و«العقود» و«الاستحقاقات» و«الجهات»، وصفحة العقد بجدول اقساطه وسداداته وسجله، ونوافذ العقد الجديد وتسجيل السداد والغاءه واضافة جهة. بتصميم النموذج السابق على النموذج المبسط. نموذج تفاعلي ببيانات تجريبية: لا شي ينحفظ.',
-    status: 'review',
+    status: 'approved',
     defaultOpen: true,
     element: <InstallmentsMockup />,
   },
