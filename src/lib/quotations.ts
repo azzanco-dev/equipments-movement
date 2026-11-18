@@ -130,11 +130,13 @@ export const BORNE_BY_PRINT_KEYS: Readonly<
   lessor: 'quotationPrintBorneLessor',
 }
 
-/** The costs a NEW quotation starts with (owner 2026-11-16). They are data
- *  the user may rename or remove, so they stay as stored text. */
+/** The costs a NEW quotation starts with (owner 2026-11-16; «المواصلات»
+ *  added on 2026-11-18, «اضف للتكاليف المواصلات»). They are data the user
+ *  may rename or remove, so they stay as stored text. */
 export const DEFAULT_QUOTATION_COSTS: readonly QuotationCostInput[] = [
   { name: 'الديزل', borne_by: 'client' },
   { name: 'المعيشة (الاكل والسكن)', borne_by: 'lessor' },
+  { name: 'المواصلات', borne_by: 'lessor' },
 ]
 
 // --- Form → RPC ----------------------------------------------------------------
