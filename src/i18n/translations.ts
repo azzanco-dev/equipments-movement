@@ -2914,7 +2914,7 @@ export const translations = {
     instSaveFailed: 'تعذر الحفظ. حاول مرة اخرى.',
     instErrManageRequired: 'لا تملك صلاحية ادارة الاقساط.',
     instErrContract: 'العقد غير موجود.',
-    instErrDescription: 'اكتب وصف العقد (200 حرف على الاكثر).',
+    instErrDescription: 'اكتب عنوان العقد (200 حرف على الاكثر).',
     instErrFinancier: 'اختر الجهة من القائمة.',
     instErrFinancierDuplicate: 'هذه الجهة موجودة في القائمة.',
     instErrFinancierInUse: 'لا يمكن حذف الجهة لان عليها عقود.',
@@ -6024,7 +6024,7 @@ export const translations = {
     instErrManageRequired: 'You do not have permission to manage installments.',
     instErrContract: 'The contract was not found.',
     instErrDescription:
-      'Write the contract description (at most 200 characters).',
+      'Write the contract title (at most 200 characters).',
     instErrFinancier: 'Choose the financier from the list.',
     instErrFinancierDuplicate: 'This financier is already in the list.',
     instErrFinancierInUse:

@@ -60,6 +60,7 @@ import { SalesMockup } from '@/screens/ui-kit/SalesMockup'
 import { ActivityMockup } from '@/screens/ui-kit/ActivityMockup'
 import { BankLogosMockup } from '@/screens/ui-kit/BankLogosMockup'
 import { BreadcrumbsMockup } from '@/screens/ui-kit/BreadcrumbsMockup'
+import { InstallmentsMockup } from '@/screens/ui-kit/InstallmentsMockup'
 import { PartyDocumentsMockup } from '@/screens/ui-kit/PartyDocumentsMockup'
 import { ClientPoPageMockup } from '@/screens/ui-kit/ClientPoPageMockup'
 import { HomeDashboardV2Mockup } from '@/screens/ui-kit/HomeDashboardV2Mockup'
@@ -142,6 +143,19 @@ const SCREEN_SECTIONS: SectionDef[] = [
     status: 'approved',
     defaultOpen: true,
     element: <AppHeaderV2Mockup />,
+  },
+  {
+    // Owner 2026-11-18: installments become a section of this program in the
+    // simplest shape («ابغاه يكون ضمن البرنامج الرئيسي», «بابسط شكل»), drawn
+    // in Figma first, then «سويها في ui-kit». The contract takes a free title
+    // («مانبغى نحصرها على المعدات»). Database: migration 0203, not applied.
+    id: 'installments',
+    title: 'نموذج شاشات الاقساط',
+    purpose:
+      'صفحة الاقساط بتبويبيها «الاقساط القادمة» و«العقود»، وصفحة العقد بجدول اقساطه وسداداته، ونوافذ العقد الجديد وتسجيل السداد والغاءه والجهات. نموذج تفاعلي ببيانات تجريبية: لا شي ينحفظ.',
+    status: 'review',
+    defaultOpen: true,
+    element: <InstallmentsMockup />,
   },
   {
     // Owner 2026-11-08: «نبغى نشتغل على الرئيسية … خليه يعيد بناء الرئيسية
