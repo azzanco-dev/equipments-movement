@@ -359,6 +359,8 @@ export const PERMISSION_GROUP_LABEL_KEYS: Record<string, TranslationKey> = {
   purchasing: 'permissionGroupPurchasing',
   // 0169: sales.view / sales.manage.
   sales: 'permissionGroupSales',
+  // 0203: installments.view / installments.manage.
+  installments: 'permissionGroupInstallments',
 }
 
 // --- Database errors ------------------------------------------------------------
