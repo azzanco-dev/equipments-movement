@@ -42,7 +42,18 @@ const profileLib = load('lib/companyProfile')
 const printLib = load('lib/quotationPrint')
 const SHEET = read('src', 'components', 'sales', 'QuotationPrintSheet.tsx')
 
-test('the profile: the known name, every other field empty for now', () => {
+/** A profile with the names only: the base of the rule tests below. */
+const emptyProfile = () => ({
+  ...profileLib.COMPANY_PROFILE,
+  unifiedNumber: '',
+  vatNumber: '',
+  address: '',
+  shortAddress: '',
+  phone: '',
+  email: '',
+})
+
+test('the profile: the name and the values the owner gave', () => {
   const profile = profileLib.COMPANY_PROFILE
   assert.equal(profile.nameAr, 'شركة عبدالله احمد العزاني للمقاولات')
   assert.equal(profile.nameAr, translations.ar.supplierPoPrintBuyerName)
@@ -57,12 +68,26 @@ test('the profile: the known name, every other field empty for now', () => {
     'unifiedNumber',
     'vatNumber',
   ])
-  // Nothing is printed until the owner gives the values.
-  assert.deepEqual(profileLib.companyProfileFacts(), [])
+  // The owner's values of 2026-11-18: the unified number, the VAT number
+  // and the address. The short address, the phone and the email are not
+  // given yet, so they are not printed.
+  assert.deepEqual(
+    profileLib.companyProfileFacts().map((fact) => [fact.key, fact.value]),
+    [
+      ['unifiedNumber', '7002399579'],
+      ['vatNumber', '310524041500003'],
+      ['nationalAddress', 'الرياض، حي الفيصلية، الدائري الشرقي الفرعي'],
+    ],
+  )
+  assert.match(profile.unifiedNumber, /^7[0-9]{9}$/)
+  assert.match(profile.vatNumber, /^[0-9]{15}$/)
+  assert.doesNotMatch(profile.address, HAMZA_ALIF)
+  // With no value at all the company block is not printed.
+  assert.deepEqual(profileLib.companyProfileFacts(emptyProfile()), [])
 })
 
 test('only the fields that hold a value are printed, in order', () => {
-  const base = profileLib.COMPANY_PROFILE
+  const base = emptyProfile()
   const full = profileLib.companyProfileFacts({
     ...base,
     unifiedNumber: ' 7001234567 ',

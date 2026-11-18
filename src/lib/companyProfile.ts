@@ -27,10 +27,12 @@ export const COMPANY_PROFILE: CompanyProfile = {
   // The one spelling the printed sheets already use.
   nameAr: translations.ar.supplierPoPrintBuyerName,
   nameEn: translations.en.supplierPoPrintBuyerName,
-  // Not given yet (asked from the owner on 2026-11-17): fill these in.
-  unifiedNumber: '',
-  vatNumber: '',
-  address: '',
+  // Given by the owner on 2026-11-18 (he called the first one «السجل
+  // التجاري»; it is the 10-digit unified number, printed under that label).
+  unifiedNumber: '7002399579',
+  vatNumber: '310524041500003',
+  address: 'الرياض، حي الفيصلية، الدائري الشرقي الفرعي',
+  // Not given yet: the short national address, the phone and the email.
   shortAddress: '',
   phone: '',
   email: '',
