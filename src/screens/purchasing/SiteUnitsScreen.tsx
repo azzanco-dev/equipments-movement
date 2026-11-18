@@ -12,6 +12,8 @@ import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { useCompanyProjectFilters } from '@/components/data-list/relationFilters'
 import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
+import { DevDataToggle, useDevDataMode } from '@/components/dev/DevDataToggle'
+import { devSiteUnits } from '@/lib/siteUnitsWorstCase'
 import { poPillStyle } from '@/components/sales/PoPill'
 import {
   CreateSupplierPoDialog,
@@ -136,8 +138,14 @@ export function SiteUnitsScreen({
   const { can } = usePermissions()
   const canManage = can('purchasing.manage')
   const list = useDataListState(siteUnitsListConfig)
-  const [rows, setRows] = useState<SiteUnitRow[]>([])
-  const [total, setTotal] = useState(0)
+  const [liveRows, setRows] = useState<SiteUnitRow[]>([])
+  const [liveTotal, setTotal] = useState(0)
+  // Dev only (Break UI): worst-case rows enter at the same boundary as the
+  // live ones; always 'demo' in production.
+  const [devMode, setDevMode] = useDevDataMode()
+  const devData = devSiteUnits(devMode)
+  const rows = devData ? devData.rows : liveRows
+  const total = devData ? devData.total : liveTotal
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   /** The new PO the «+» of a ticket opens, preset to its unit. Owner
@@ -400,7 +408,7 @@ export function SiteUnitsScreen({
       {loadError ? (
         <ErrorState description={t('siteUnitsLoadError')} onRetry={fetchRows} />
       ) : loading && rows.length === 0 ? (
-        <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3" aria-busy="true">
+        <ul className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-4 sm:grid-cols-3" aria-busy="true">
           {Array.from({ length: 6 }, (_, index) => (
             <li key={index}>
               <Skeleton className="h-56 w-full rounded-xl" />
@@ -422,7 +430,7 @@ export function SiteUnitsScreen({
               columns, a 16 px gap and no side padding, so the tickets line
               up with the toolbar (owner 2026-10-25). */}
           <ul
-            className={`grid grid-cols-2 gap-4 sm:grid-cols-3 ${
+            className={`grid grid-cols-1 min-[380px]:grid-cols-2 gap-4 sm:grid-cols-3 ${
               loading ? 'pointer-events-none opacity-60' : ''
             }`}
           >
@@ -519,19 +527,14 @@ export function SiteUnitsScreen({
                     </p>
                     <p className="break-words text-xs leading-5 text-muted">
                       {[
-                        localizedName(
-                          lang,
-                          row.company_name_ar,
-                          row.company_name_en,
-                        ),
-                        localizedName(
-                          lang,
-                          row.project_name_ar,
-                          row.project_name_en,
-                        ),
+                        [row.company_name_ar, row.company_name_en],
+                        [row.project_name_ar, row.project_name_en],
                       ]
-                        .filter(Boolean)
-                        .join(' · ')}
+                        // localizedName answers «—» for a missing name: skip
+                        // the part instead of printing «— · —».
+                        .filter(([ar, en]) => ar?.trim() || en?.trim())
+                        .map(([ar, en]) => localizedName(lang, ar, en))
+                        .join(' · ') || '—'}
                     </p>
                     {row.visit_state !== 'exited' && (
                       <p className="break-words text-xs leading-5 text-muted">
@@ -595,6 +598,7 @@ export function SiteUnitsScreen({
           onPageSize={list.setPageSize}
         />
       )}
+      <DevDataToggle mode={devMode} onChange={setDevMode} />
       <CreateSupplierPoDialog
         open={preset !== null}
         onOpenChange={closeAdd}

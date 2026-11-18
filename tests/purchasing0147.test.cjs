@@ -147,7 +147,11 @@ test('the page reads the view server-side and adds through the existing dialogs'
     screen,
     /\{row\.visit_state === 'exited' && \(\s+<Badge tone="neutral" size="sm">\s+\{t\('siteUnitsExited'\)\}/,
   )
-  assert.match(screen, /grid grid-cols-2 gap-4 sm:grid-cols-3/)
+  // One column below 380 px (Break UI, 2026-11-18), two up to sm, then three.
+  assert.match(
+    screen,
+    /grid grid-cols-1 min-\[380px\]:grid-cols-2 gap-4 sm:grid-cols-3/,
+  )
   assert.doesNotMatch(screen, /bg-surface p-3 sm:grid-cols-3/)
   assert.doesNotMatch(screen, /lg:grid-cols-4|xl:grid-cols-4/)
   // 2026-10-25: a button at the end of the code's row to the unit's entry
