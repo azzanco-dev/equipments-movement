@@ -1,7 +1,9 @@
 import type { PostgresLikeError } from '@/lib/formValidation'
 import type { RpcResult } from '@/lib/purchasingData'
 import {
+  quotationAttentionPayload,
   quotationCostsPayload,
+  quotationHoursPayload,
   quotationLinesPayload,
   quotationTermTemplatePayload,
   type QuotationCost,
@@ -32,7 +34,7 @@ import { supabase } from '@/lib/supabase'
 /** The columns of `quotation_list` the list and the page read (the view
  *  after 0200). */
 export const QUOTATION_LIST_SELECT =
-  'id,company_id,project_id,quote_number,issue_date,valid_until,notes,created_by,created_at,updated_at,company_name_ar,company_name_en,project_name_ar,project_name_en,created_by_name,line_count,type_names'
+  'id,company_id,project_id,quote_number,issue_date,valid_until,notes,created_by,created_at,updated_at,company_name_ar,company_name_en,project_name_ar,project_name_en,created_by_name,line_count,type_names,contact_id,attention_name,attention_number,attention_email,daily_hours,monthly_days,monthly_hours'
 
 export const QUOTATION_LINE_SELECT =
   'id,quotation_id,equipment_type,daily_price,monthly_price,mob_demob_price,note,position'
@@ -45,26 +47,12 @@ export const QUOTATION_TERM_SELECT =
 export const QUOTATION_TERM_TEMPLATE_SELECT =
   'id,body_ar,body_en,position,is_default,created_at,updated_at'
 
-/** The client's contact the PDF prints in its box (the company record's
- *  own contact fields of 0175: the person, the number, the email). */
-export const QUOTATION_COMPANY_SELECT = 'id,contact_person,contact_number,email'
-
-export interface QuotationClientContact {
-  id: string
-  contact_person: string | null
-  contact_number: string | null
-  email: string | null
-}
-
 /** One quotation with everything its page and its PDF show. */
 export interface QuotationDetailData {
   quotation: QuotationRow
   lines: QuotationLine[]
   costs: QuotationCost[]
   terms: QuotationTerm[]
-  /** Null when the company row is not readable (the PDF then prints the
-   *  client's name alone). */
-  company: QuotationClientContact | null
 }
 
 // --- Reads ---------------------------------------------------------------------
@@ -121,23 +109,11 @@ export async function fetchQuotation(
   if (failed) throw new Error('quotation_load_failed')
   const quotation = rowResult.data as unknown as QuotationRow | null
   if (!quotation) return null
-  // The client's contact is a nicety of the PDF: a failed read leaves it
-  // out instead of failing the page.
-  const companyResult = await withSignal(
-    supabase
-      .from('companies')
-      .select(QUOTATION_COMPANY_SELECT)
-      .eq('id', quotation.company_id),
-  ).maybeSingle()
   return {
     quotation,
     lines: (linesResult.data as unknown as QuotationLine[] | null) ?? [],
     costs: (costsResult.data as unknown as QuotationCost[] | null) ?? [],
     terms: (termsResult.data as unknown as QuotationTerm[] | null) ?? [],
-    company: companyResult.error
-      ? null
-      : ((companyResult.data as unknown as QuotationClientContact | null) ??
-        null),
   }
 }
 
@@ -206,6 +182,9 @@ export async function saveQuotation(input: {
       // An edit keeps the stored copies it names; a new quotation has none.
       p_keep_term_ids:
         input.id && values.keep_term_ids.length ? values.keep_term_ids : null,
+      // 0204: the «عناية» copy (an empty object clears it) and the hours.
+      p_attention: quotationAttentionPayload(values.attention),
+      p_hours: quotationHoursPayload(values),
     }),
   )
 }

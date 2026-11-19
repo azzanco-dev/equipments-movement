@@ -42,7 +42,13 @@ import {
   PAST_VISIT_NOTES_MAX_LENGTH,
   pastVisitTodayKey,
 } from '@/lib/pastVisit'
-import { parseQuotationPrice, type QuotationFormValues } from '@/lib/quotations'
+import {
+  isValidDailyHours,
+  isValidMonthlyDays,
+  isValidMonthlyHours,
+  parseQuotationPrice,
+  type QuotationFormValues,
+} from '@/lib/quotations'
 import {
   CARD_MONTH_NOTE_MAX,
   isValidCardMonthDays,
@@ -1213,6 +1219,18 @@ export const quotationFormSchema = z
     costs: z.array(quotationCostSchema),
     term_template_ids: z.array(z.string()),
     keep_term_ids: z.array(z.string()),
+    // 0204: «عناية» is a copy picked from a list (nothing to type), and the
+    // three working-hours numbers.
+    attention: z.unknown(),
+    daily_hours: z
+      .string()
+      .refine(isValidDailyHours, message('quotationErrDailyHours')),
+    monthly_days: z
+      .string()
+      .refine(isValidMonthlyDays, message('quotationErrMonthlyDays')),
+    monthly_hours: z
+      .string()
+      .refine(isValidMonthlyHours, message('quotationErrMonthlyHours')),
   })
   .superRefine((form, context) => {
     if (

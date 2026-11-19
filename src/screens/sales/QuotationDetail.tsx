@@ -9,6 +9,7 @@ import {
   Pencil,
   SlidersHorizontal,
   Trash2,
+  UserRound,
 } from 'lucide-react'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useListRequest } from '@/components/data-list/useListRequest'
@@ -51,7 +52,9 @@ import {
 } from '@/lib/quotationPrint'
 import {
   BORNE_BY,
+  quotationAttentionOf,
   quotationErrorMessage,
+  quotationHoursText,
   type QuotationLine,
 } from '@/lib/quotations'
 import {
@@ -205,8 +208,18 @@ function QuotationDetailInner({
       </div>
     )
 
-  const { quotation, lines, costs, terms, company } = data
+  const { quotation, lines, costs, terms } = data
   const lineCount = lines.length
+  // 0204: the quotation's own «عناية» copy and its working hours.
+  const attention = quotationAttentionOf(quotation)
+  const attentionParts = [attention?.contact_number, attention?.email].filter(
+    (part): part is string => Boolean(part && part.trim()),
+  )
+  const hoursRows = [
+    ['quotationDailyHours', quotation.daily_hours],
+    ['quotationMonthlyDays', quotation.monthly_days],
+    ['quotationMonthlyHours', quotation.monthly_hours],
+  ] as const
   const clientName =
     localizedName(lang, quotation.company_name_ar, quotation.company_name_en) ||
     '—'
@@ -409,6 +422,22 @@ function QuotationDetailInner({
               <span className="text-sm text-muted">
                 {projectName ?? t('quotationNoProject')}
               </span>
+              {attention && (
+                <span className="flex flex-wrap items-center gap-x-2 text-sm text-muted">
+                  <UserRound
+                    size={14}
+                    aria-hidden="true"
+                    className="shrink-0"
+                  />
+                  {t('quotationAttention')}
+                  <span className="text-fg">{attention.name}</span>
+                  {attentionParts.map((part) => (
+                    <bdi key={part} dir="ltr">
+                      {part}
+                    </bdi>
+                  ))}
+                </span>
+              )}
               <span className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
                 <span className="inline-flex items-center gap-1.5">
                   <Calendar size={14} aria-hidden="true" className="shrink-0" />
@@ -512,6 +541,23 @@ function QuotationDetailInner({
               ))}
             </ul>
           )}
+          {/* «ساعات العمل» (0204), in the same box. */}
+          <div className="space-y-2 border-t pt-3">
+            <p className="text-sm font-medium">{t('quotationHoursTitle')}</p>
+            <dl className="m-0 space-y-1.5">
+              {hoursRows.map(([label, value]) => (
+                <div
+                  key={label}
+                  className="flex items-center justify-between gap-3 text-sm"
+                >
+                  <dt className="text-muted">{t(label)}</dt>
+                  <dd className="m-0 font-medium tabular-nums">
+                    <bdi dir="ltr">{quotationHoursText(value) || '—'}</bdi>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </Card>
       </div>
 
@@ -572,7 +618,6 @@ function QuotationDetailInner({
           lines={lines}
           costs={costs}
           terms={terms}
-          contact={company}
           client={{
             ar: quotation.company_name_ar ?? clientName,
             en: quotation.company_name_en,

@@ -497,6 +497,10 @@ test('quotationFormSchema: the rules of the form', () => {
     costs: [{ name: 'الديزل', borne_by: 'client' }],
     term_template_ids: [],
     keep_term_ids: [],
+    attention: null,
+    daily_hours: '10',
+    monthly_days: '26',
+    monthly_hours: '260',
     ...patch,
   })
   const ok = v.quotationFormErrors(form())
@@ -771,7 +775,8 @@ test('the data module calls only the three functions that remain', () => {
     data,
     /approve_quotation|return_quotation_approval|set_quotation_outcome/,
   )
-  // The select is the view after 0200, column for column.
+  // The select is the view after 0200, column for column, then the seven
+  // columns 0204 appended («عناية» and the working hours).
   const select = /QUOTATION_LIST_SELECT =\s+'([^']+)'/.exec(data)[1]
   assert.deepEqual(select.split(','), [
     'id',
@@ -791,6 +796,13 @@ test('the data module calls only the three functions that remain', () => {
     'created_by_name',
     'line_count',
     'type_names',
+    'contact_id',
+    'attention_name',
+    'attention_number',
+    'attention_email',
+    'daily_hours',
+    'monthly_days',
+    'monthly_hours',
   ])
 })
 

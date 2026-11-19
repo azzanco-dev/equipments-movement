@@ -14,18 +14,17 @@ import {
   quotationHoursRows,
   quotationPageCss,
   quotationPrintDir,
-  QUOTATION_WORKING_HOURS,
+  quotationWorkingHoursOf,
   type QuotationPrintVariant,
-  type QuotationWorkingHours,
 } from '@/lib/quotationPrint'
 import {
   BORNE_BY_PRINT_KEYS,
+  quotationAttentionOf,
   type QuotationCost,
   type QuotationLine,
   type QuotationRow,
   type QuotationTerm,
 } from '@/lib/quotations'
-import type { QuotationClientContact } from '@/lib/quotationsData'
 
 /** If the browser never reports the dialog closed, the sheet leaves anyway. */
 const AFTERPRINT_FALLBACK_MS = 120_000
@@ -39,14 +38,10 @@ export interface QuotationPrintSheetProps {
   lines: readonly QuotationLine[]
   costs: readonly QuotationCost[]
   terms: readonly QuotationTerm[]
-  /** The client's contact (null when the company row is not readable). */
-  contact: QuotationClientContact | null
   /** The client in Arabic and English. */
   client: { ar: string; en: string | null }
   /** The company's own data of the header (the one profile by default). */
   profile?: CompanyProfile
-  /** «ساعات العمل» (the program's standard month by default). */
-  hours?: QuotationWorkingHours
   /** The print dialog closed (or never opened): the sheet is unmounted. */
   onDone: () => void
 }
@@ -167,10 +162,8 @@ export function QuotationPrintSheet({
   lines,
   costs,
   terms,
-  contact,
   client,
   profile = COMPANY_PROFILE,
-  hours = QUOTATION_WORKING_HOURS,
   onDone,
 }: QuotationPrintSheetProps) {
   const logoRef = useRef<HTMLImageElement>(null)
@@ -239,13 +232,17 @@ export function QuotationPrintSheet({
   // one, and under the Arabic one on the mixed sheet.
   const clientEn = client.en && client.en !== client.ar ? client.en : null
   const clientName = main === 'en' ? (clientEn ?? client.ar) : client.ar
+  // «عناية»: the quotation's own copy of a responsible person (0204), each
+  // value only when it holds one; and the quotation's working hours.
+  const attention = quotationAttentionOf(quotation)
   const clientContact = (
     [
-      ['quotationPrintAttention', contact?.contact_person, 'auto'],
-      ['quotationPrintMobile', contact?.contact_number, 'ltr'],
-      ['quotationPrintEmail', contact?.email, 'ltr'],
+      ['quotationPrintAttention', attention?.name, 'auto'],
+      ['quotationPrintMobile', attention?.contact_number, 'ltr'],
+      ['quotationPrintEmail', attention?.email, 'ltr'],
     ] as const
   ).filter(([, value]) => (value ?? '').trim() !== '')
+  const hours = quotationWorkingHoursOf(quotation)
   const price = (value: QuotationLine['daily_price']) =>
     value === null || value === undefined || value === '' ? (
       <span className="text-muted">

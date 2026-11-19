@@ -47,12 +47,36 @@ export interface QuotationWorkingHours {
   monthlyHours: number
 }
 
-/** The program's standard month: 10 hours a day, 26 days, 260 hours. Fixed
- *  for every quotation until the owner asks for them as quotation fields. */
+/** The program's standard month: 10 hours a day, 26 days, 260 hours — what
+ *  a new quotation starts with, and the fallback for a row without hours. */
 export const QUOTATION_WORKING_HOURS: QuotationWorkingHours = {
   dailyHours: 10,
   monthlyDays: 26,
   monthlyHours: 260,
+}
+
+/** The working hours a quotation carries (0204: three fields of the
+ *  quotation); a value that is not a number falls back to the standard. */
+export function quotationWorkingHoursOf(row: {
+  daily_hours?: number | string | null
+  monthly_days?: number | string | null
+  monthly_hours?: number | string | null
+}): QuotationWorkingHours {
+  const pick = (
+    value: number | string | null | undefined,
+    fallback: number,
+  ) => {
+    const amount =
+      value === null || value === undefined || value === ''
+        ? Number.NaN
+        : Number(value)
+    return Number.isFinite(amount) ? amount : fallback
+  }
+  return {
+    dailyHours: pick(row.daily_hours, QUOTATION_WORKING_HOURS.dailyHours),
+    monthlyDays: pick(row.monthly_days, QUOTATION_WORKING_HOURS.monthlyDays),
+    monthlyHours: pick(row.monthly_hours, QUOTATION_WORKING_HOURS.monthlyHours),
+  }
 }
 
 /** The rows of the working-hours table, in print order. */

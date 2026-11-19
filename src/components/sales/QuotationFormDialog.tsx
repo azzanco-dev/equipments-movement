@@ -12,6 +12,7 @@ import {
   AsyncSearchSelect,
   type AsyncSearchSelectOption,
 } from '@/components/AsyncSearchSelect'
+import { CompanyContactFormDialog } from '@/components/companies/CompanyContactFormDialog'
 import { QuotationTermFormDialog } from '@/components/quotations/QuotationTermFormDialog'
 import {
   Button,
@@ -32,6 +33,11 @@ import {
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import {
+  companyContactSummary,
+  type CompanyContact,
+} from '@/lib/companyContacts'
+import { fetchCompanyContacts } from '@/lib/companyContactsData'
+import {
   focusFirstError,
   mapDatabaseErrorToField,
   QUOTATION_COST_NAME_MAX,
@@ -46,12 +52,15 @@ import {
   BORNE_BY,
   DEFAULT_QUOTATION_COSTS,
   QUOTATION_BORNE_BY,
+  QUOTATION_DEFAULT_HOURS,
   QUOTATION_FIELD_ORDER,
   QUOTATION_FIELD_RULES,
   QUOTATION_TERMS_PERMISSION,
   quotationDefaultValidUntil,
   quotationErrorOutcome,
   quotationFormValuesOf,
+  quotationMonthlyHoursOf,
+  type QuotationAttention,
   type QuotationBorneBy,
   type QuotationCostInput,
   type QuotationFormValues,
@@ -72,6 +81,16 @@ import {
 } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { unwrapRows } from '@/lib/supabaseResult'
+
+type HoursField = 'daily_hours' | 'monthly_days' | 'monthly_hours'
+
+/** The copy a quotation takes of a responsible person. */
+const attentionOf = (contact: CompanyContact): QuotationAttention => ({
+  contact_id: contact.id,
+  name: contact.name,
+  contact_number: contact.contact_number,
+  email: contact.email,
+})
 
 type LineRow = QuotationLineInput & { key: string }
 type CostRow = QuotationCostInput & { key: string }
@@ -95,6 +114,16 @@ const NO_ERRORS: QuotationFormErrors = { fields: {}, lines: {}, costs: {} }
 const STALE_MESSAGES: ReadonlySet<TranslationKey> = new Set([
   'quotationErrNotFound',
 ])
+
+/** The select value of a stored «عناية» whose person is no longer in the
+ *  client's list (deleted, or never linked). */
+const STORED_ATTENTION = '__stored__'
+
+const HOURS_FIELDS = [
+  ['daily_hours', 'quotationDailyHours'],
+  ['monthly_days', 'quotationMonthlyDays'],
+  ['monthly_hours', 'quotationMonthlyHours'],
+] as const
 
 const PRICE_FIELDS = [
   ['daily_price', 'quotationDaily'],
@@ -205,7 +234,12 @@ function QuotationTypeSelect({
  * the issue date until the user changes it), one price row per equipment
  * TYPE (daily, monthly, transport; at least one, each type once; NO quantity
  * or total), the costs with who bears each, the template terms to copy and
- * the notes. A holder of the template's key also adds a NEW term from here
+ * the notes. Since migration 0204 (owner 2026-11-19): «عناية» — one of the
+ * client's responsible persons, whose name, number and email the quotation
+ * COPIES (a new person is added from here and chosen at once; the list is by
+ * the company alone for now) — and «ساعات العمل», three numbers that start at
+ * 10 / 26 / 260, the monthly hours following daily × days until the user
+ * types another number. A holder of the template's key also adds a NEW term from here
  * (owner 2026-11-17): it is saved to the template at once, apart from the
  * quotation, and ticked. Saved in ONE `save_quotation` call: a new quotation
  * takes its official number then, and ANY saved quotation can be edited
@@ -247,6 +281,19 @@ export function QuotationFormDialog({
   // mode it never moves by itself.
   const [validTouched, setValidTouched] = useState(false)
   const [notes, setNotes] = useState('')
+  // «عناية»: the copy the quotation will hold, and the client's persons.
+  const [attention, setAttention] = useState<QuotationAttention | null>(null)
+  const [contacts, setContacts] = useState<CompanyContact[]>([])
+  const [contactsState, setContactsState] = useState<
+    'idle' | 'loading' | 'error' | 'ready'
+  >('idle')
+  const [contactDialogOpen, setContactDialogOpen] = useState(false)
+  const contactsRequest = useRef(0)
+  // «ساعات العمل»: the monthly hours follow daily × days until typed.
+  const [hours, setHours] = useState<Record<HoursField, string>>({
+    ...QUOTATION_DEFAULT_HOURS,
+  })
+  const [monthlyTouched, setMonthlyTouched] = useState(false)
   const [lines, setLines] = useState<LineRow[]>([])
   const [costs, setCosts] = useState<CostRow[]>([])
   // The template rows to copy now (create: the ticked terms; edit: the rows
@@ -271,6 +318,7 @@ export function QuotationFormDialog({
     if (!open) return
     defaultsApplied.current = false
     setTermDialogOpen(false)
+    setContactDialogOpen(false)
     setErrors(NO_ERRORS)
     setMessage(null)
     setSaving(false)
@@ -304,6 +352,18 @@ export function QuotationFormDialog({
       setValidUntil(values.valid_until)
       setValidTouched(true)
       setNotes(values.notes)
+      setAttention(values.attention)
+      setHours({
+        daily_hours: values.daily_hours,
+        monthly_days: values.monthly_days,
+        monthly_hours: values.monthly_hours,
+      })
+      // A stored total that is not daily × days was typed: it stays.
+      setMonthlyTouched(
+        values.monthly_hours !==
+          quotationMonthlyHoursOf(values.daily_hours, values.monthly_days),
+      )
+      void loadContacts(values.company_id, false)
       setLines(
         values.lines.length
           ? values.lines.map((line) => ({ ...line, key: nextRowKey() }))
@@ -322,6 +382,10 @@ export function QuotationFormDialog({
       setValidUntil(quotationDefaultValidUntil(today))
       setValidTouched(false)
       setNotes('')
+      setAttention(null)
+      setHours({ ...QUOTATION_DEFAULT_HOURS })
+      setMonthlyTouched(false)
+      void loadContacts('', false)
       setLines([emptyLine()])
       setCosts(
         DEFAULT_QUOTATION_COSTS.map((cost) => ({ ...cost, key: nextRowKey() })),
@@ -332,6 +396,35 @@ export function QuotationFormDialog({
     // The quotation is read only when the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  /**
+   * The responsible persons of a company (none without one). `pickOnly`:
+   * after the user CHANGED the client, a company with exactly one person
+   * gets it as «عناية» at once.
+   */
+  const loadContacts = useCallback(
+    async (company: string, pickOnly: boolean) => {
+      const request = ++contactsRequest.current
+      if (!company) {
+        setContacts([])
+        setContactsState('idle')
+        return
+      }
+      setContactsState('loading')
+      try {
+        const rows = await fetchCompanyContacts(company)
+        if (request !== contactsRequest.current) return
+        setContacts(rows)
+        setContactsState('ready')
+        if (pickOnly && rows.length === 1) setAttention(attentionOf(rows[0]))
+      } catch {
+        if (request !== contactsRequest.current) return
+        setContacts([])
+        setContactsState('error')
+      }
+    },
+    [],
+  )
 
   // `quiet`: the list stays on screen while it is read again (after a term
   // was added from this form).
@@ -390,6 +483,93 @@ export function QuotationFormDialog({
     (query: string) => loadNamed('projects', query),
     [loadNamed],
   )
+
+  // The stored «عناية» stays selectable while its person is not in the
+  // client's list any more.
+  const attentionInList = attention?.contact_id
+    ? contacts.some((contact) => contact.id === attention.contact_id)
+    : false
+  const attentionValue = !attention
+    ? ''
+    : attentionInList
+      ? (attention.contact_id ?? '')
+      : STORED_ATTENTION
+  const storedAttentionOption = useMemo<AsyncSearchSelectOption | null>(
+    () =>
+      attention && !attentionInList
+        ? {
+            value: STORED_ATTENTION,
+            label: attention.name,
+            description: t('quotationAttentionStored'),
+          }
+        : null,
+    [attention, attentionInList, t],
+  )
+  const loadAttentionOptions = useCallback(
+    async (query: string) => {
+      const needle = query.trim().toLowerCase()
+      const options: AsyncSearchSelectOption[] = contacts
+        .filter(
+          (contact) =>
+            !needle ||
+            [contact.name, contact.contact_number ?? '', contact.email ?? '']
+              .join(' ')
+              .toLowerCase()
+              .includes(needle),
+        )
+        .slice(0, 20)
+        .map((contact) => ({
+          value: contact.id,
+          label: contact.name,
+          description: companyContactSummary(contact).join(' · ') || undefined,
+        }))
+      return storedAttentionOption
+        ? [storedAttentionOption, ...options]
+        : options
+    },
+    [contacts, storedAttentionOption],
+  )
+  const selectedAttentionOption: AsyncSearchSelectOption | null = !attention
+    ? null
+    : (storedAttentionOption ?? {
+        value: attention.contact_id ?? '',
+        label: attention.name,
+      })
+
+  const changeCompany = (
+    value: string,
+    option: AsyncSearchSelectOption | null,
+  ) => {
+    setCompanyId(value)
+    setCompanyOption(option)
+    clearField('company_id')
+    if (value === companyId) return
+    // Another client: its own persons, and the old «عناية» goes.
+    setAttention(null)
+    clearField('attention')
+    void loadContacts(value, true)
+  }
+
+  const changeHours = (field: HoursField, value: string) => {
+    setHours((current) => {
+      const next = { ...current, [field]: value }
+      if (field !== 'monthly_hours' && !monthlyTouched)
+        next.monthly_hours = quotationMonthlyHoursOf(
+          next.daily_hours,
+          next.monthly_days,
+        )
+      return next
+    })
+    if (field === 'monthly_hours') setMonthlyTouched(true)
+    setErrors((current) => ({
+      ...current,
+      fields: {
+        ...current.fields,
+        [field]: undefined,
+        ...(field === 'monthly_hours' ? {} : { monthly_hours: undefined }),
+      },
+    }))
+  }
 
   const usedTypes = useMemo(
     () => lines.map((line) => line.equipment_type).filter(Boolean),
@@ -534,6 +714,10 @@ export function QuotationFormDialog({
       .filter((template) => ticked.has(template.id))
       .map((template) => template.id),
     keep_term_ids: editing ? keptTermIds : [],
+    attention,
+    daily_hours: hours.daily_hours,
+    monthly_days: hours.monthly_days,
+    monthly_hours: hours.monthly_hours,
   })
 
   /** The first field with a message, else the first row with one. */
@@ -655,11 +839,7 @@ export function QuotationFormDialog({
                 selectedOption={companyOption}
                 placeholder={t('quotationCompanyPlaceholder')}
                 loadOptions={loadCompanies}
-                onChange={(value, option) => {
-                  setCompanyId(value)
-                  setCompanyOption(option)
-                  clearField('company_id')
-                }}
+                onChange={changeCompany}
               />
             )}
           </Field>
@@ -713,6 +893,47 @@ export function QuotationFormDialog({
                   setValidUntil(value)
                   setValidTouched(true)
                   clearField('valid_until')
+                }}
+              />
+            )}
+          </Field>
+          {/* «عناية»: one of the client's responsible persons (0204). */}
+          <Field
+            label={t('quotationAttention')}
+            name="attention"
+            hint={
+              companyId
+                ? t('quotationAttentionHint')
+                : t('quotationAttentionNeedsCompany')
+            }
+            error={
+              fieldError('attention') ??
+              (contactsState === 'error'
+                ? t('quotationAttentionLoadError')
+                : undefined)
+            }
+            className="sm:col-span-2"
+          >
+            {(control) => (
+              <AsyncSearchSelect
+                {...control}
+                // The loader reads the loaded persons: a new list is a new
+                // control, so its options are never stale.
+                key={`${companyId}:${contacts.length}:${attentionValue}`}
+                size="md"
+                value={attentionValue}
+                selectedOption={selectedAttentionOption}
+                placeholder={t('quotationAttentionPlaceholder')}
+                disabled={!companyId || contactsState === 'loading'}
+                loadOptions={loadAttentionOptions}
+                createLabel={t('companyContactAdd')}
+                alwaysShowCreate
+                onCreate={() => setContactDialogOpen(true)}
+                onChange={(value) => {
+                  clearField('attention')
+                  if (value === STORED_ATTENTION) return
+                  const contact = contacts.find((item) => item.id === value)
+                  setAttention(contact ? attentionOf(contact) : null)
                 }}
               />
             )}
@@ -881,6 +1102,41 @@ export function QuotationFormDialog({
             {t('quotationAddCost')}
           </Button>
         </FormSection>
+
+        {/* «ساعات العمل» (0204): three numbers of the quotation. */}
+        <section className="space-y-2 border-t pt-4">
+          <div>
+            <p className="text-sm font-medium">{t('quotationHoursTitle')}</p>
+            <p className="text-xs text-muted">{t('quotationHoursHint')}</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {HOURS_FIELDS.map(([field, label]) => (
+              <Field
+                key={field}
+                label={t(label)}
+                name={field}
+                required
+                hint={
+                  field === 'monthly_hours'
+                    ? t('quotationMonthlyHoursHint')
+                    : undefined
+                }
+                error={fieldError(field)}
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    dir="ltr"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    value={hours[field]}
+                    onChange={(event) => changeHours(field, event.target.value)}
+                  />
+                )}
+              </Field>
+            ))}
+          </div>
+        </section>
 
         {/* The template terms to copy into this quotation. */}
         <FormSection
@@ -1071,6 +1327,26 @@ export function QuotationFormDialog({
           )}
         </Field>
       </div>
+      {companyId && (
+        <CompanyContactFormDialog
+          open={contactDialogOpen}
+          onOpenChange={setContactDialogOpen}
+          companyId={companyId}
+          onSaved={(id, saved) => {
+            setContactDialogOpen(false)
+            // The new person becomes this quotation's «عناية», then the
+            // client's list is read again so it shows in its place.
+            setAttention({
+              contact_id: id,
+              name: saved.name.trim(),
+              contact_number: saved.contact_number.trim() || null,
+              email: saved.email.trim().toLowerCase() || null,
+            })
+            clearField('attention')
+            void loadContacts(companyId, false)
+          }}
+        />
+      )}
       {canAddTerm && (
         <QuotationTermFormDialog
           open={termDialogOpen}

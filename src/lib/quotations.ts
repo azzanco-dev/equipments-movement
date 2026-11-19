@@ -55,6 +55,43 @@ export interface QuotationRow {
   line_count: number | null
   /** The lines' types joined with «، » in position order. */
   type_names: string | null
+  /** 0204: the person the «عناية» copy came from (no longer checked once
+   *  saved: the person may be gone). */
+  contact_id: string | null
+  /** 0204: «عناية» — the quotation's own COPY of a responsible person. */
+  attention_name: string | null
+  attention_number: string | null
+  attention_email: string | null
+  /** 0204: «ساعات العمل» (numeric text or numbers). */
+  daily_hours: number | string
+  monthly_days: number | string
+  monthly_hours: number | string
+}
+
+/** «عناية» of a quotation: a COPY of a responsible person's three values. */
+export interface QuotationAttention {
+  /** The person of the client's list it came from, when known. */
+  contact_id: string | null
+  name: string
+  contact_number: string | null
+  email: string | null
+}
+
+/** The stored «عناية» of a quotation row, or null when it has none. */
+export function quotationAttentionOf(
+  row: Pick<
+    QuotationRow,
+    'contact_id' | 'attention_name' | 'attention_number' | 'attention_email'
+  >,
+): QuotationAttention | null {
+  const name = (row.attention_name ?? '').trim()
+  if (!name) return null
+  return {
+    contact_id: row.contact_id ?? null,
+    name,
+    contact_number: row.attention_number ?? null,
+    email: row.attention_email ?? null,
+  }
 }
 
 /** A `quotation_lines` row. Prices come back as numeric text or numbers. */
@@ -172,6 +209,12 @@ export interface QuotationFormValues {
   /** Edit only: the stored `quotation_terms` rows kept exactly as they are
    *  (`p_keep_term_ids`); an edit never refreshes a term by itself. */
   keep_term_ids: string[]
+  /** «عناية»: the chosen person's copy; null = the quotation has none. */
+  attention: QuotationAttention | null
+  /** «ساعات العمل», as typed. */
+  daily_hours: string
+  monthly_days: string
+  monthly_hours: string
 }
 
 export const QUOTATION_FIELD_ORDER: readonly (keyof QuotationFormValues)[] = [
@@ -179,8 +222,12 @@ export const QUOTATION_FIELD_ORDER: readonly (keyof QuotationFormValues)[] = [
   'project_id',
   'issue_date',
   'valid_until',
+  'attention',
   'lines',
   'costs',
+  'daily_hours',
+  'monthly_days',
+  'monthly_hours',
   'term_template_ids',
   'notes',
 ]
@@ -231,6 +278,98 @@ export function quotationCostsPayload(
   }))
 }
 
+// --- «عناية» and the working hours (0204) -------------------------------------
+
+/** A new quotation's working hours: the program's standard month. */
+export const QUOTATION_DEFAULT_HOURS = {
+  daily_hours: '10',
+  monthly_days: '26',
+  monthly_hours: '260',
+} as const
+
+/** A typed number of the hours fields (NaN when it is not one). */
+export function parseQuotationHours(value: string): number {
+  const text = latinDigits(value).trim()
+  return text ? Number(text) : Number.NaN
+}
+
+/** At most two decimals. */
+const twoDecimals = (value: number) => Math.round(value * 100) === value * 100
+
+export function isValidDailyHours(value: string): boolean {
+  const hours = parseQuotationHours(value)
+  return (
+    Number.isFinite(hours) && hours > 0 && hours <= 24 && twoDecimals(hours)
+  )
+}
+
+export function isValidMonthlyDays(value: string): boolean {
+  const days = parseQuotationHours(value)
+  return Number.isInteger(days) && days >= 1 && days <= 31
+}
+
+export function isValidMonthlyHours(value: string): boolean {
+  const hours = parseQuotationHours(value)
+  return (
+    Number.isFinite(hours) && hours > 0 && hours <= 744 && twoDecimals(hours)
+  )
+}
+
+/** «الساعات الشهرية» = the daily hours × the days (the form fills it until
+ *  the user types another number); '' while either is not a number. */
+export function quotationMonthlyHoursOf(daily: string, days: string): string {
+  const hours = parseQuotationHours(daily)
+  const count = parseQuotationHours(days)
+  if (!Number.isFinite(hours) || !Number.isFinite(count)) return ''
+  return String(Math.round(hours * count * 100) / 100)
+}
+
+/** A stored hours value as the form's text and the page's words (no
+ *  trailing zeros: «10», «8.5»). */
+export function quotationHoursText(
+  value: number | string | null | undefined,
+): string {
+  if (value === null || value === undefined || value === '') return ''
+  const amount = Number(value)
+  return Number.isFinite(amount) ? String(amount) : ''
+}
+
+/** The form's hours as `save_quotation`'s `p_hours` (JSON numbers). */
+export function quotationHoursPayload(
+  values: Pick<
+    QuotationFormValues,
+    'daily_hours' | 'monthly_days' | 'monthly_hours'
+  >,
+): { daily_hours: number; monthly_days: number; monthly_hours: number } {
+  return {
+    daily_hours: parseQuotationHours(values.daily_hours),
+    monthly_days: parseQuotationHours(values.monthly_days),
+    monthly_hours: parseQuotationHours(values.monthly_hours),
+  }
+}
+
+/** The form's «عناية» as `save_quotation`'s `p_attention`: the copy, or an
+ *  empty object that CLEARS it (SQL NULL would keep the stored one). */
+export function quotationAttentionPayload(
+  attention: QuotationAttention | null,
+):
+  | Record<string, never>
+  | {
+      contact_id: string | null
+      name: string
+      contact_number: string | null
+      email: string | null
+    } {
+  const name = (attention?.name ?? '').trim()
+  if (!attention || !name) return {}
+  return {
+    contact_id: attention.contact_id,
+    name,
+    contact_number: (attention.contact_number ?? '').trim() || null,
+    email: (attention.email ?? '').trim() || null,
+  }
+}
+
 /** A stored price as the form's text ('' = no price). */
 export function quotationPriceInput(
   value: number | string | null | undefined,
@@ -244,7 +383,18 @@ export function quotationPriceInput(
 export function quotationFormValuesOf(
   row: Pick<
     QuotationRow,
-    'company_id' | 'project_id' | 'issue_date' | 'valid_until' | 'notes'
+    | 'company_id'
+    | 'project_id'
+    | 'issue_date'
+    | 'valid_until'
+    | 'notes'
+    | 'contact_id'
+    | 'attention_name'
+    | 'attention_number'
+    | 'attention_email'
+    | 'daily_hours'
+    | 'monthly_days'
+    | 'monthly_hours'
   >,
   lines: readonly QuotationLine[],
   costs: readonly QuotationCost[],
@@ -268,6 +418,10 @@ export function quotationFormValuesOf(
     // user ticks a template row the quotation does not hold.
     term_template_ids: [],
     keep_term_ids: terms.map((term) => term.id),
+    attention: quotationAttentionOf(row),
+    daily_hours: quotationHoursText(row.daily_hours),
+    monthly_days: quotationHoursText(row.monthly_days),
+    monthly_hours: quotationHoursText(row.monthly_hours),
   }
 }
 
@@ -421,6 +575,18 @@ export const QUOTATION_FIELD_RULES: readonly DatabaseFieldRule<QuotationFormValu
       match: 'invalid_notes',
       field: 'notes',
       key: 'quotationErrNotesTooLong',
+    },
+    {
+      on: 'raised',
+      match: 'invalid_attention',
+      field: 'attention',
+      key: 'quotationErrInvalidAttention',
+    },
+    {
+      on: 'raised',
+      match: 'invalid_hours',
+      field: 'daily_hours',
+      key: 'quotationErrInvalidHours',
     },
     {
       on: 'raised',

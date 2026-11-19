@@ -15,6 +15,7 @@ import {
   PartyFormSection,
   type PartyFieldSpec,
 } from '@/components/parties/PartyFormSection'
+import { CompanyContactsSection } from '@/components/companies/CompanyContactsSection'
 import { PartyDocumentsSection } from '@/components/parties/PartyDocumentsSection'
 import {
   partyDocumentLabel,
@@ -375,6 +376,15 @@ export function CompanyFormDialog({
             moment they are uploaded, apart from the form's save, so they
             never count as unsaved changes. A new record has no id yet: it
             uploads from its details after the first save. */}
+        {/* The responsible persons of a saved client (0204): saved at once
+            through their own functions, never part of this form's save. */}
+        {company && (
+          <CompanyContactsSection
+            key={`contacts-${company.id}`}
+            companyId={company.id}
+            canEdit={canSave}
+          />
+        )}
         {company && (
           <PartyDocumentsSection
             key={company.id}

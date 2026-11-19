@@ -1,4 +1,5 @@
 import { Briefcase, FileText, Phone } from 'lucide-react'
+import { CompanyContactsSection } from '@/components/companies/CompanyContactsSection'
 import { PartyDetailsDialog } from '@/components/parties/PartyDetailsDialog'
 import { PartyDocumentsSection } from '@/components/parties/PartyDocumentsSection'
 import {
@@ -109,6 +110,13 @@ export function CompanyDetailsDialog({
         },
       ]}
     >
+      {company && (
+        <CompanyContactsSection
+          key={`contacts-${company.id}`}
+          companyId={company.id}
+          canEdit={canEditDocuments}
+        />
+      )}
       {company && (
         <PartyDocumentsSection
           key={company.id}

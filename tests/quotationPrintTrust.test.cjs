@@ -328,13 +328,14 @@ test('the sheet: its version, the page rule and the print flow', () => {
   assert.match(SHEET, /dir=\{dir\}\s+lang=\{main\}/)
   assert.match(SHEET, /const main: Lang = variant === 'en' \? 'en' : 'ar'/)
   assert.match(SHEET, /profile = COMPANY_PROFILE,/)
-  assert.match(SHEET, /hours = QUOTATION_WORKING_HOURS,/)
+  // The working hours are the quotation's own (0204).
+  assert.match(SHEET, /const hours = quotationWorkingHoursOf\(quotation\)/)
   // The page: a menu of the three versions; the version reaches the sheet.
   assert.match(PAGE, /useState<QuotationPrintVariant \| null>\(null\)/)
   const usage = PAGE.slice(PAGE.indexOf('<QuotationPrintSheet'))
   const props = usage.slice(0, usage.indexOf('/>'))
   assert.match(props, /variant=\{printing\}/)
-  assert.match(props, /contact=\{company\}/)
+  assert.doesNotMatch(props, /contact=|hours=/)
   assert.match(props, /onDone=\{\(\) => setPrinting\(null\)\}/)
   assert.doesNotMatch(props, /project=/)
 })
@@ -376,16 +377,19 @@ test('the quotation facts on one line above the client alone in its box', () => 
     CODE,
     /<section className="mb-\[18px\] break-inside-avoid rounded-md border border-\[color-mix\(in_srgb,var\(--brand-charcoal\)_35%,transparent\)\] p-3">/,
   )
-  // «عناية», the mobile and the email of the client's company record, each
-  // only when it holds a value.
+  // «عناية», the mobile and the email: the quotation's own copy of a
+  // responsible person (0204), each only when it holds a value.
+  assert.match(SHEET, /const attention = quotationAttentionOf\(quotation\)/)
   assert.match(
     CODE,
-    /\['quotationPrintAttention', contact\?\.contact_person, 'auto'\],\s+\['quotationPrintMobile', contact\?\.contact_number, 'ltr'\],\s+\['quotationPrintEmail', contact\?\.email, 'ltr'\],/,
+    /\['quotationPrintAttention', attention\?\.name, 'auto'\],\s+\['quotationPrintMobile', attention\?\.contact_number, 'ltr'\],\s+\['quotationPrintEmail', attention\?\.email, 'ltr'\],/,
   )
   assert.match(CODE, /\{clientContact\.length > 0 && \(/)
-  assert.match(
+  // The company row's own single contact is separate («لا خليهم
+  // منفصلين»): the quotation data never reads it.
+  assert.doesNotMatch(
     read('src', 'lib', 'quotationsData.ts'),
-    /export const QUOTATION_COMPANY_SELECT =\s+'id,contact_person,contact_number,email'/,
+    /QUOTATION_COMPANY_SELECT|contact_person|from\('companies'\)/,
   )
   assert.equal(translations.ar.quotationPrintAttention, 'عناية')
   assert.equal(translations.en.quotationPrintAttention, 'Attention')
