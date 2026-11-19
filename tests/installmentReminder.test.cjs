@@ -321,7 +321,11 @@ test('0205: the tables are closed to clients, the log readable by the admin', ()
 test('0205: the secret is stored as a hash only and checked first', () => {
   assert.match(MIGRATION, /key_hash ~ '\^\[0-9a-f\]\{64\}\$'/)
   assert.match(MIGRATION, /encode\(sha256\(convert_to\(p_key, 'UTF8'\)\), 'hex'\) <> v_hash/)
-  assert.match(MIGRATION, /VALUES \(true, NULL\)/)
+  // The seeded hash is 64 hex characters; the secret itself is in no file.
+  assert.match(MIGRATION, /VALUES \(true, '[0-9a-f]{64}'\)/)
+  for (const file of [MIGRATION, SERVER, ROUTE, LIB, read('vercel.json')]) {
+    assert.doesNotMatch(file, /CRON_SECRET\s*=\s*\S/)
+  }
   for (const fn of ['prepare_installment_reminder', 'complete_installment_reminder']) {
     const start = MIGRATION.indexOf(`CREATE OR REPLACE FUNCTION public.${fn}(`)
     const body = MIGRATION.slice(start, MIGRATION.indexOf('$$;', start))

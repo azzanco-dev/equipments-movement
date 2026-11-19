@@ -23,8 +23,12 @@
 --     time, so changing it on the user page is enough. No client role reads
 --     or writes this table; it is changed by a SQL statement for now.
 --   * installment_reminder_config — ONE row holding the SHA-256 (hex) of the
---     route's secret. NULL until the owner sets it (the functions then refuse
---     with reminder_not_configured). The secret itself is never stored.
+--     route's secret, seeded below with the hash of the secret generated on
+--     2026-11-19 for the owner (he put the secret itself in Vercel as
+--     CRON_SECRET; it is in no file of the repository). A hash of 48 random
+--     letters and digits cannot be turned back into the secret. To change
+--     the secret: a new CRON_SECRET in Vercel, a redeploy, and an UPDATE of
+--     key_hash. NULL makes both functions refuse with reminder_not_configured.
 --   * installment_reminder_log — one row per recipient per Saudi day with the
 --     outcome (nothing / pending / sent / failed / no_mobile /
 --     not_configured), the counts and the total. It holds no phone number and
@@ -120,7 +124,7 @@ REVOKE ALL ON TABLE public.installment_reminder_config
   FROM PUBLIC, anon, authenticated;
 
 INSERT INTO public.installment_reminder_config (id, key_hash)
-VALUES (true, NULL)
+VALUES (true, '6327ca41228ed1852a18b283dac1c4a29874c73088ec0b0be48d278f4af4367d')
 ON CONFLICT (id) DO NOTHING;
 
 -- ===========================================================================
