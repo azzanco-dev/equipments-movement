@@ -63,7 +63,7 @@ jobs:
       # Google Drive, by the token of the company account (scope drive.file).
       RCLONE_CONFIG_GDRIVE_TYPE: drive
       RCLONE_CONFIG_GDRIVE_SCOPE: drive.file
-      RCLONE_CONFIG_GDRIVE_TOKEN: ${{ secrets.GDRIVE_TOKEN }}
+      # RCLONE_CONFIG_GDRIVE_TOKEN is set by the step «Read the Drive token».
       # Supabase Storage through its S3 protocol. The project ref and region
       # are not secret (the ref is in the app's public Supabase URL).
       RCLONE_CONFIG_SUPABASE_TYPE: s3
@@ -87,6 +87,43 @@ jobs:
             if [ -z "${!name}" ]; then echo "Missing secret: $name"; missing=1; fi
           done
           exit "$missing"
+
+      # `rclone authorize "drive" "<base64 blob>"` prints the token as a
+      # base64 blob ({"token": "<json>"}), not as the JSON itself; the owner
+      # may also paste the arrow lines around it. Both shapes are accepted.
+      # The decoded token is masked before it enters the job's environment.
+      - name: Read the Drive token
+        env:
+          RAW_TOKEN: ${{ secrets.GDRIVE_TOKEN }}
+        run: |
+          set -euo pipefail
+          token="$(python3 - 2>/dev/null <<'PY'
+          import base64, json, os, re
+          raw = os.environ["RAW_TOKEN"].strip()
+          def blob_token(text):
+              pad = "=" * (-len(text) % 4)
+              data = json.loads(base64.urlsafe_b64decode(text + pad))
+              value = data.get("token") if isinstance(data, dict) else None
+              return value if isinstance(value, str) else json.dumps(value)
+          token = None
+          if "{" in raw:
+              token = raw[raw.index("{"):raw.rindex("}") + 1]
+          else:
+              parts = sorted(re.findall(r"[A-Za-z0-9_\-+/=]{40,}", raw), key=len)
+              if parts:
+                  token = blob_token(parts[-1])
+          parsed = json.loads(token or "")
+          if not isinstance(parsed, dict) or 'refresh_token' not in parsed:
+              raise SystemExit("The Drive token has no refresh_token")
+          print(json.dumps(parsed, separators=(",", ":")))
+          PY
+          )" || { echo "GDRIVE_TOKEN is not a token rclone can read"; exit 1; }
+          echo "::add-mask::$token"
+          for field in access_token refresh_token; do
+            value="$(printf '%s' "$token" | jq -r --arg f "$field" '.[$f] // empty')"
+            [ -z "$value" ] || echo "::add-mask::$value"
+          done
+          echo "RCLONE_CONFIG_GDRIVE_TOKEN=$token" >> "$GITHUB_ENV"
 
       - name: Install the tools
         run: |

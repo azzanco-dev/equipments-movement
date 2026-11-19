@@ -80,3 +80,18 @@ test('the dump is the Supabase restore shape and is checked before upload', () =
   assert.match(CODE, /TZ=Asia\/Riyadh date \+%F/)
   assert.match(CODE, /set -euo pipefail/)
 })
+
+test('the Drive token is decoded from rclone\'s blob and masked before use', () => {
+  // rclone authorize with a base64 blob prints the token as a base64 blob
+  // ({"token": "<json>"}); the first run failed on it (2026-11-19).
+  assert.doesNotMatch(CODE, /RCLONE_CONFIG_GDRIVE_TOKEN: \$\{\{/)
+  assert.match(CODE, /- name: Read the Drive token\n\s+env:\n\s+RAW_TOKEN: \$\{\{ secrets\.GDRIVE_TOKEN \}\}/)
+  assert.match(CODE, /base64\.urlsafe_b64decode/)
+  assert.match(CODE, /python3 - 2>\/dev\/null <<'PY'/)
+  const mask = CODE.indexOf('echo "::add-mask::$token"')
+  const fields = CODE.indexOf('for field in access_token refresh_token')
+  const env = CODE.indexOf('echo "RCLONE_CONFIG_GDRIVE_TOKEN=$token" >> "$GITHUB_ENV"')
+  assert.ok(mask > 0 && fields > mask && env > fields, 'masked before it enters the environment')
+  // The step runs before anything talks to Drive.
+  assert.ok(CODE.indexOf('- name: Read the Drive token') < CODE.indexOf('- name: Upload the database dump'))
+})
