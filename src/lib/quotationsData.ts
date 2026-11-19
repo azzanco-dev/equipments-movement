@@ -45,13 +45,15 @@ export const QUOTATION_TERM_SELECT =
 export const QUOTATION_TERM_TEMPLATE_SELECT =
   'id,body_ar,body_en,position,is_default,created_at,updated_at'
 
-/** The client's official numbers the PDF prints under its name (0175). */
-export const QUOTATION_COMPANY_SELECT = 'id,tax_number,commercial_register'
+/** The client's contact the PDF prints in its box (the company record's
+ *  own contact fields of 0175: the person, the number, the email). */
+export const QUOTATION_COMPANY_SELECT = 'id,contact_person,contact_number,email'
 
-export interface QuotationCompanyNumbers {
+export interface QuotationClientContact {
   id: string
-  tax_number: string | null
-  commercial_register: string | null
+  contact_person: string | null
+  contact_number: string | null
+  email: string | null
 }
 
 /** One quotation with everything its page and its PDF show. */
@@ -60,9 +62,9 @@ export interface QuotationDetailData {
   lines: QuotationLine[]
   costs: QuotationCost[]
   terms: QuotationTerm[]
-  /** Null when the company row is not readable (the PDF then omits the
-   *  two numbers). */
-  company: QuotationCompanyNumbers | null
+  /** Null when the company row is not readable (the PDF then prints the
+   *  client's name alone). */
+  company: QuotationClientContact | null
 }
 
 // --- Reads ---------------------------------------------------------------------
@@ -119,8 +121,8 @@ export async function fetchQuotation(
   if (failed) throw new Error('quotation_load_failed')
   const quotation = rowResult.data as unknown as QuotationRow | null
   if (!quotation) return null
-  // The company's numbers are a nicety of the PDF: a failed read leaves
-  // them out instead of failing the page.
+  // The client's contact is a nicety of the PDF: a failed read leaves it
+  // out instead of failing the page.
   const companyResult = await withSignal(
     supabase
       .from('companies')
@@ -134,7 +136,7 @@ export async function fetchQuotation(
     terms: (termsResult.data as unknown as QuotationTerm[] | null) ?? [],
     company: companyResult.error
       ? null
-      : ((companyResult.data as unknown as QuotationCompanyNumbers | null) ??
+      : ((companyResult.data as unknown as QuotationClientContact | null) ??
         null),
   }
 }

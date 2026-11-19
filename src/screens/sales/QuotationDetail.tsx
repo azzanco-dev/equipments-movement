@@ -45,6 +45,11 @@ import type { TranslationKey } from '@/i18n/translations'
 import { formatDate } from '@/lib/dateFormat'
 import { localizedName } from '@/lib/localizedName'
 import {
+  QUOTATION_PRINT_VARIANT_KEYS,
+  QUOTATION_PRINT_VARIANTS,
+  type QuotationPrintVariant,
+} from '@/lib/quotationPrint'
+import {
   BORNE_BY,
   quotationErrorMessage,
   type QuotationLine,
@@ -145,7 +150,8 @@ function QuotationDetailInner({
   const [loadError, setLoadError] = useState(false)
   // The open dialog (edit, delete).
   const [dialog, setDialog] = useState<QuotationDialogKind | null>(null)
-  const [printing, setPrinting] = useState(false)
+  // The version of the PDF being printed (null = no print under way).
+  const [printing, setPrinting] = useState<QuotationPrintVariant | null>(null)
   const [copying, setCopying] = useState(false)
   const [actionError, setActionError] = useState<TranslationKey | null>(null)
   const startRequest = useListRequest()
@@ -429,15 +435,30 @@ function QuotationDetailInner({
           actions={
             <div className="flex flex-wrap items-center gap-2">
               {optionsMenu}
-              <Button
-                variant="outline"
-                size="sm"
-                icon={<FileDown size={14} aria-hidden="true" />}
-                disabled={printing}
-                onClick={() => setPrinting(true)}
-              >
-                {t('quotationPdf')}
-              </Button>
+              {/* «تصدير PDF»: the three versions of the sheet. */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    icon={<FileDown size={14} aria-hidden="true" />}
+                    disabled={printing !== null}
+                  >
+                    {t('quotationPdf')}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {QUOTATION_PRINT_VARIANTS.map((variant) => (
+                    <DropdownMenuItem
+                      key={variant}
+                      icon={<FileDown size={15} />}
+                      onSelect={() => setPrinting(variant)}
+                    >
+                      {t(QUOTATION_PRINT_VARIANT_KEYS[variant])}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           }
         />
@@ -546,24 +567,17 @@ function QuotationDetailInner({
 
       {printing && (
         <QuotationPrintSheet
+          variant={printing}
           quotation={quotation}
           lines={lines}
           costs={costs}
           terms={terms}
-          company={company}
+          contact={company}
           client={{
             ar: quotation.company_name_ar ?? clientName,
             en: quotation.company_name_en,
           }}
-          project={
-            quotation.project_id
-              ? {
-                  ar: quotation.project_name_ar ?? projectName ?? '',
-                  en: quotation.project_name_en,
-                }
-              : null
-          }
-          onDone={() => setPrinting(false)}
+          onDone={() => setPrinting(null)}
         />
       )}
 

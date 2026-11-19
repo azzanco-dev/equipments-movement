@@ -253,6 +253,12 @@ body {
      ground, the white ones (Alinma, SAIB) for a dark one, in both themes. */
   --logo-tile: #ffffff;
   --logo-tile-dark: #1f2937;
+  /* The company's two brand colours, sampled from its logo (owner
+     2026-11-18, «خلي التصميم بهوية الشركة»): the amber and the charcoal of
+     the quotation PDF only. The same in both themes; the app itself stays
+     on the neutral palette. */
+  --brand-amber: #f8ab1b;
+  --brand-charcoal: #30302f;
   /* Darkened from #dc2626 (4.4:1 on danger-soft) to pass WCAG AA (5.2:1). */
   --danger: #c81e1e;
   --danger-soft: #fef2f2;

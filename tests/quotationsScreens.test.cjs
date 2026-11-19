@@ -310,7 +310,7 @@ test('no term title is left in the client code', () => {
   const sheet = read('src', 'components', 'sales', 'QuotationPrintSheet.tsx')
   assert.match(
     sheet,
-    /<span className="tabular-nums">\{index \+ 1\}\. <\/span>\s+\{term\.body_en\}/,
+    /<span className="tabular-nums">\{index \+ 1\}\. <\/span>\s+\{lang === 'en' \? term\.body_en : term\.body_ar\}/,
   )
 })
 
@@ -642,7 +642,15 @@ test('the page: PDF for every reader, three options for a manager', () => {
     /onOpenQuotation=\{\(id\) => router\.push\(`\/sales\/quotations\/\$\{id\}`\)\}/,
   )
   // «تصدير PDF» sits outside the manager's menu.
-  assert.match(page, /\{optionsMenu\}\s+<Button[\s\S]*?t\('quotationPdf'\)/)
+  // … and is a menu of the sheet's three versions (owner 2026-11-19).
+  assert.match(
+    page,
+    /\{optionsMenu\}[\s\S]*?<DropdownMenuTrigger asChild>\s+<Button[\s\S]*?\{t\('quotationPdf'\)\}/,
+  )
+  assert.match(
+    page,
+    /\{QUOTATION_PRINT_VARIANTS\.map\(\(variant\) => \(\s+<DropdownMenuItem[\s\S]*?onSelect=\{\(\) => setPrinting\(variant\)\}[\s\S]*?\{t\(QUOTATION_PRINT_VARIANT_KEYS\[variant\]\)\}/,
+  )
   // No row of facts (owner 2026-11-17: «تاريخ العرض شوف له مكان ثاني
   // وتاريخ الصلاحية», «شيل انشاه واخر تعديل»): the two dates sit in the
   // header under the client and the project, with the validity badge.
@@ -832,8 +840,8 @@ test('the delete dialog: any quotation, for good, a simple confirm', () => {
 test('the print sheet always prints the number and never a state', () => {
   const sheet = read('src', 'components', 'sales', 'QuotationPrintSheet.tsx')
   const facts = sheet.slice(
-    sheet.indexOf('const headerFacts'),
-    sheet.indexOf('const cell ='),
+    sheet.indexOf('const quoteFacts'),
+    sheet.indexOf('const clientEn'),
   )
   assert.match(facts, /\[\s+\{ key: 'quotationPrintNumber', value: number \},/)
   assert.deepEqual(
