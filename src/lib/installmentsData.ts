@@ -6,11 +6,8 @@ import {
   currentMonthRange,
   sumAmounts,
   EMPTY_INSTALLMENT_OVERVIEW,
-  INSTALLMENT_CONTRACT_SORT_COLUMNS,
-  INSTALLMENTS_PAGE_SIZE,
   type InstallmentAllocationRow,
   type InstallmentContractRow,
-  type InstallmentContractsSort,
   type InstallmentDueRow,
   type InstallmentDuesView,
   type InstallmentFinancierRow,
@@ -30,6 +27,12 @@ import {
 } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { SupabaseLoadError, unwrapRows } from '@/lib/supabaseResult'
+import type { ListFilter } from '@/components/data-list/types'
+import { applyListFilters } from '@/lib/applyListFilters'
+import {
+  installmentContractsListConfig,
+  installmentDuesListConfig,
+} from '@/lib/listConfigs'
 
 /**
  * installments-screens — the DATA side of «الاقساط» (migration 0203): the
@@ -56,13 +59,13 @@ export const INSTALLMENT_DUE_SELECT =
   'id,contract_id,contract_number,description,financier_id,financier_name,seq,installment_count,due_date,amount,paid_amount,remaining_amount,is_balloon,is_partial,state,days_until_due'
 
 export const INSTALLMENT_CONTRACT_SELECT =
-  'id,contract_number,description,financier_id,financier_name,total_amount,down_payment,balloon_amount,financed_amount,installment_count,frequency_months,first_due_date,notes,status,closed_at,cancel_reason,created_by_name,created_at,paid_total,remaining_total,paid_count,overdue_count,overdue_amount,next_due_date,next_due_amount,last_due_date,equipment_count'
+  'id,contract_number,description,financier_id,financier_name,total_amount,down_payment,balloon_amount,financed_amount,installment_count,frequency_months,first_due_date,notes,status,closed_at,cancel_reason,created_by_name,created_at,updated_at,paid_total,remaining_total,paid_count,overdue_count,overdue_amount,next_due_date,next_due_amount,last_due_date,equipment_count'
 
 export const INSTALLMENT_SCHEDULE_SELECT =
   'id,contract_id,seq,due_date,amount,is_balloon,paid_amount'
 
 export const INSTALLMENT_PAYMENT_SELECT =
-  'id,contract_id,paid_on,amount,method,reference,note,status,voided_at,voided_by_name,void_reason,created_by_name,created_at'
+  'id,contract_id,paid_on,amount,method,reference,note,status,voided_at,voided_by_name,void_reason,created_by_name,created_at,receipt_id,receipt_path,receipt_file_name,receipt_mime_type,receipt_size_bytes'
 
 export const INSTALLMENT_FINANCIER_SELECT = 'id,name'
 
@@ -293,52 +296,72 @@ export const INSTALLMENT_CONTRACT_SEARCH_FIELDS = [
   'financier_name',
 ] as const
 
-export interface InstallmentContractsQuery {
+/** The shared list state a page of «العقود» / «الاستحقاقات» is read with
+ *  (`useDataListState`). */
+export interface InstallmentListQuery {
   search: string
-  status: InstallmentContractStatus | ''
-  financierId: string
-  /** Active contracts that carry an overdue row. */
-  overdueOnly: boolean
-  sort: InstallmentContractsSort
+  filters: readonly ListFilter[]
+  sort: string
   direction: 'asc' | 'desc'
   page: number
+  pageSize: number
 }
+
+/** Filter keys the contracts tab applies itself (not view columns). */
+export const INSTALLMENT_CONTRACT_COLUMN_FILTERS: ReadonlySet<string> = new Set([
+  'has_overdue',
+])
+
+const allowedKeys = (
+  fields: readonly { key: string }[],
+  skip: ReadonlySet<string> = new Set(),
+) => new Set(fields.map((field) => field.key).filter((key) => !skip.has(key)))
+
+const CONTRACT_FILTER_KEYS = allowedKeys(
+  installmentContractsListConfig.filterFields,
+  INSTALLMENT_CONTRACT_COLUMN_FILTERS,
+)
+const CONTRACT_SORT_KEYS = new Set(
+  installmentContractsListConfig.sortableFields.map((field) => field.key),
+)
 
 /** One page of `installment_contract_summary`: searched, filtered, sorted
  *  and paged on the server. */
 export async function fetchInstallmentContractsPage(
-  query: InstallmentContractsQuery,
+  query: InstallmentListQuery,
   signal?: AbortSignal,
 ): Promise<{ rows: InstallmentContractRow[]; total: number }> {
   const ascending = query.direction === 'asc'
+  const sort = CONTRACT_SORT_KEYS.has(query.sort)
+    ? query.sort
+    : installmentContractsListConfig.defaultSort
   let request = supabase
     .from('installment_contract_summary')
     .select(INSTALLMENT_CONTRACT_SELECT, { count: 'exact' })
   // «القسط القادم»: the active contracts first, the closed ones (no row
   // left to pay, or cancelled) after them.
-  if (query.sort === 'next')
+  if (sort === 'next_due_date')
     request = request.order('status', { ascending: true })
   request = request
-    .order(INSTALLMENT_CONTRACT_SORT_COLUMNS[query.sort], {
-      ascending,
-      nullsFirst: false,
-    })
+    .order(sort, { ascending, nullsFirst: false })
     .order('id', { ascending })
     .range(
-      (query.page - 1) * INSTALLMENTS_PAGE_SIZE,
-      query.page * INSTALLMENTS_PAGE_SIZE - 1,
+      (query.page - 1) * query.pageSize,
+      query.page * query.pageSize - 1,
     )
   const searchFilter = buildSearchFilter(
-    INSTALLMENT_CONTRACT_SEARCH_FIELDS,
+    installmentContractsListConfig.searchFields,
     query.search,
   )
   if (searchFilter) request = request.or(searchFilter)
-  if (query.status) request = request.eq('status', query.status)
-  if (query.financierId) request = request.eq('financier_id', query.financierId)
+  request = applyListFilters(request, [...query.filters], CONTRACT_FILTER_KEYS)
   // The view counts the late rows of a closed contract too; «المتاخرة فقط»
   // is about the contracts still running.
-  if (query.overdueOnly)
+  const overdue = query.filters.find((filter) => filter.field === 'has_overdue')
+  if (overdue?.value === 'true')
     request = request.eq('status', 'active').gt('overdue_count', 0)
+  else if (overdue?.value === 'false')
+    request = request.or('status.neq.active,overdue_count.eq.0')
   const result = await withSignal(request, signal)
   if (result.error) throw new SupabaseLoadError()
   return {
@@ -383,12 +406,19 @@ export async function fetchInstallmentContractUnits(
 
 export interface InstallmentDuesQuery {
   view: InstallmentDuesView
-  financierId: string
   /** The Saudi today (yyyy-mm-dd): «هذا الشهر» is its month. */
   today: string
+  search?: string
+  filters?: readonly ListFilter[]
 }
 
-/** The filters of a dues view, on any read that starts from `openDues`. */
+const DUES_FILTER_KEYS = allowedKeys(installmentDuesListConfig.filterFields)
+const DUES_SORT_KEYS = new Set(
+  installmentDuesListConfig.sortableFields.map((field) => field.key),
+)
+
+/** The sub-tab, the search and the filters of the dues, on any read that
+ *  starts from `openDues`. */
 function inDuesView<Q extends ReturnType<typeof openDues>>(
   request: Q,
   query: InstallmentDuesQuery,
@@ -401,23 +431,37 @@ function inDuesView<Q extends ReturnType<typeof openDues>>(
     const { from, to } = currentMonthRange(query.today)
     next = next.gte('due_date', from).lt('due_date', to)
   }
-  if (query.financierId) next = next.eq('financier_id', query.financierId)
-  return next
+  const searchFilter = buildSearchFilter(
+    installmentDuesListConfig.searchFields,
+    query.search ?? '',
+  )
+  if (searchFilter) next = next.or(searchFilter)
+  return applyListFilters(next, [...(query.filters ?? [])], DUES_FILTER_KEYS) as Q
 }
 
-/** One page of a dues view, the oldest first, with the view's exact count. */
+/** One page of a dues view with the view's exact count. */
 export async function fetchInstallmentDuesPage(
-  query: InstallmentDuesQuery & { page: number },
+  query: InstallmentDuesQuery & {
+    sort: string
+    direction: 'asc' | 'desc'
+    page: number
+    pageSize: number
+  },
   signal?: AbortSignal,
 ): Promise<{ rows: InstallmentDueRow[]; total: number }> {
+  const ascending = query.direction === 'asc'
+  const sort = DUES_SORT_KEYS.has(query.sort)
+    ? query.sort
+    : installmentDuesListConfig.defaultSort
   const result = await withSignal(
     inDuesView(openDues(INSTALLMENT_DUE_SELECT, { count: 'exact' }), query)
+      .order(sort, { ascending })
       .order('due_date', { ascending: true })
       .order('contract_number', { ascending: true })
       .order('seq', { ascending: true })
       .range(
-        (query.page - 1) * INSTALLMENTS_PAGE_SIZE,
-        query.page * INSTALLMENTS_PAGE_SIZE - 1,
+        (query.page - 1) * query.pageSize,
+        query.page * query.pageSize - 1,
       ),
     signal,
   )
@@ -462,7 +506,6 @@ export async function fetchInstallmentDuesMonthCount(
     await withSignal(
       inDuesView(openDues('id', { count: 'exact', head: true }), {
         view: 'month',
-        financierId: '',
         today,
       }),
       signal,

@@ -349,55 +349,19 @@ test('the list page state comes from its URL, with safe defaults', () => {
     const params = new URLSearchParams(query)
     return plain(view.readInstallmentsUrlState((name) => params.get(name)))
   }
-  assert.deepEqual(read(''), {
-    tab: 'dashboard',
-    search: '',
-    status: '',
-    financierId: '',
-    overdueOnly: false,
-    sort: 'next',
-    direction: 'asc',
-    page: 1,
+  assert.deepEqual(read(''), { tab: 'dashboard', duesView: null })
+  assert.deepEqual(read('tab=contracts&cq=x&csort=remaining_total'), {
+    tab: 'contracts',
     duesView: null,
-    duesFinancierId: '',
-    duesPage: 1,
   })
-  const id = '0b0e0f6a-1111-4222-8333-444455556666'
-  assert.deepEqual(
-    read(
-      `tab=contracts&q=%20حفار%20&status=paid_off&financier=${id}&overdue=1&sort=remaining&dir=desc&page=3`,
-    ),
-    {
-      tab: 'contracts',
-      search: 'حفار',
-      status: 'paid_off',
-      financierId: id,
-      overdueOnly: true,
-      sort: 'remaining',
-      direction: 'desc',
-      page: 3,
-      duesView: null,
-      duesFinancierId: '',
-      duesPage: 1,
-    },
-  )
-  const dues = read(`tab=dues&view=month&dfinancier=${id}&dpage=2`)
-  assert.equal(dues.tab, 'dues')
-  assert.equal(dues.duesView, 'month')
-  assert.equal(dues.duesFinancierId, id)
-  assert.equal(dues.duesPage, 2)
+  assert.deepEqual(read('tab=dues&view=month&dpage=2'), {
+    tab: 'dues',
+    duesView: 'month',
+  })
   // Anything unknown falls back: a pasted URL never breaks the page.
-  const bad = read(
-    'tab=x&status=open&financier=1%20or%201&sort=id&dir=up&page=-2&view=late&dpage=abc',
-  )
-  assert.equal(bad.tab, 'dashboard')
-  assert.equal(bad.status, '')
-  assert.equal(bad.financierId, '')
-  assert.equal(bad.sort, 'next')
-  assert.equal(bad.direction, 'asc')
-  assert.equal(bad.page, 1)
-  assert.equal(bad.duesView, null)
-  assert.equal(bad.duesPage, 1)
+  assert.deepEqual(read('tab=x&view=late'), { tab: 'dashboard', duesView: null })
+  assert.equal(view.INSTALLMENT_CONTRACTS_URL_PREFIX, 'c')
+  assert.equal(view.INSTALLMENT_DUES_URL_PREFIX, 'd')
 
   assert.equal(view.defaultDuesView(2), 'overdue')
   assert.equal(view.defaultDuesView(0), 'next30')
@@ -407,11 +371,15 @@ test('the list page state comes from its URL, with safe defaults', () => {
     '/installments?tab=dues&view=overdue',
   )
   assert.equal(view.INSTALLMENTS_PAGE_SIZE, 20)
-  assert.deepEqual(plain(view.INSTALLMENT_CONTRACT_SORT_COLUMNS), {
-    contract: 'description',
-    remaining: 'remaining_total',
-    next: 'next_due_date',
-  })
+  const financiers = [{ id: 'f1', name: 'بنك' }]
+  const fields = plain(
+    view.withFinancierOptions(
+      { filterFields: [{ key: 'financier_id', options: [] }, { key: 'status' }] },
+      financiers,
+    ),
+  )
+  assert.deepEqual(fields[0].options, [{ value: 'f1', label: 'بنك' }])
+  assert.deepEqual(fields[1], { key: 'status' })
 })
 
 test('the money terms of the form, and the field of a refusal', () => {

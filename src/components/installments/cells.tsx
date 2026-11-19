@@ -51,20 +51,30 @@ export function Money({
   )
 }
 
+/** The badge size: `sm` in the list tables (the main list look), `md` on
+ *  the contract page. */
+type CellBadgeSize = 'sm' | 'md'
+
 export function InstallmentStateBadge({
   state,
   partial,
+  size = 'md',
 }: {
   state: InstallmentState
   partial?: boolean
+  size?: CellBadgeSize
 }) {
   const { t } = useI18n()
   const badge = INSTALLMENT_STATE_BADGE[state]
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      <Badge tone={badge.tone}>{t(badge.key)}</Badge>
+      <Badge size={size} tone={badge.tone}>
+        {t(badge.key)}
+      </Badge>
       {partial && state !== 'paid' && (
-        <Badge tone="info">{t('instPartlyPaid')}</Badge>
+        <Badge size={size} tone="info">
+          {t('instPartlyPaid')}
+        </Badge>
       )}
     </span>
   )
@@ -72,21 +82,33 @@ export function InstallmentStateBadge({
 
 export function InstallmentContractStatusBadge({
   status,
+  size = 'md',
 }: {
   status: InstallmentContractStatus
+  size?: CellBadgeSize
 }) {
   const { t } = useI18n()
   const badge = INSTALLMENT_CONTRACT_STATUS_BADGE[status]
-  return <Badge tone={badge.tone}>{t(badge.key)}</Badge>
+  return (
+    <Badge size={size} tone={badge.tone}>
+      {t(badge.key)}
+    </Badge>
+  )
 }
 
 /** «2 متاخر»: only an ACTIVE contract is late (the view counts the old
  *  rows of a closed one too, so the caller passes 0 for it). */
-export function OverdueBadge({ count }: { count: number }) {
+export function OverdueBadge({
+  count,
+  size = 'md',
+}: {
+  count: number
+  size?: CellBadgeSize
+}) {
   const { t } = useI18n()
   if (count <= 0) return null
   return (
-    <Badge tone="danger" icon={<AlertTriangle size={12} />}>
+    <Badge size={size} tone="danger" icon={<AlertTriangle size={12} />}>
       {t('instOverdueCount').replace('{count}', String(count))}
     </Badge>
   )

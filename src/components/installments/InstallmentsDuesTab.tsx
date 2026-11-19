@@ -1,13 +1,14 @@
 import { useCallback, useMemo } from 'react'
 import { CheckCircle2 } from 'lucide-react'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
+import { DataListToolbar } from '@/components/data-list/DataListToolbar'
+import { useDataListState } from '@/components/data-list/useDataListState'
 import {
   Badge,
   Button,
   DataTable,
   EmptyState,
   ErrorState,
-  Select,
   Tabs,
   TabsList,
   TabsTrigger,
@@ -26,9 +27,10 @@ import {
   installmentsWords,
   monthKeyOf,
   unitsByContract,
+  withFinancierOptions,
+  INSTALLMENT_DUES_URL_PREFIX,
   INSTALLMENT_DUES_VIEWS,
   INSTALLMENT_DUES_VIEW_LABEL_KEYS,
-  INSTALLMENTS_PAGE_SIZE,
   INSTALLMENTS_URL_KEYS,
   type InstallmentDueRow,
   type InstallmentDuesView,
@@ -36,6 +38,7 @@ import {
   type InstallmentOverviewRow,
   type InstallmentsUrlState,
 } from '@/lib/installmentsView'
+import { installmentDuesListConfig } from '@/lib/listConfigs'
 import { saudiDateKey } from '@/lib/saudiTime'
 import {
   ContractCell,
@@ -46,13 +49,13 @@ import {
 } from './cells'
 import { useLoad } from './useLoad'
 
-const ALL = 'all'
-
 /**
  * «الاستحقاقات»: every unpaid row of the ACTIVE contracts over
  * `installment_dues`, the oldest first, in four sub-tabs (late, this month,
- * within 30 days, everything unpaid) with a financier filter, paged on the
- * server; the state lives in the URL. The total under the table is the
+ * within 30 days, everything unpaid — the page's URL key `view`), then the
+ * program's unified list (`installmentDuesListConfig`, URL prefix `d`): the
+ * shared toolbar with its search, filters (financier, due date) and sort,
+ * the main list table look and the page sizes, all on the server. The total under the table is the
  * total of the WHOLE filtered view (a bounded read of its remaining
  * amounts), never the sum of the loaded page.
  */
@@ -76,24 +79,33 @@ export function InstallmentsDuesTab({
   onOpenContract: (id: string) => void
 }) {
   const { t, lang } = useI18n()
-  const keys = INSTALLMENTS_URL_KEYS
   const today = useMemo(() => saudiDateKey(), [])
   // Opens on what is late; with nothing late, on what is nearest.
   const view: InstallmentDuesView =
     state.duesView ?? defaultDuesView(overview.overdue_count)
-  const financierId = state.duesFinancierId
-  const page = state.duesPage
+  const list = useDataListState(
+    installmentDuesListConfig,
+    INSTALLMENT_DUES_URL_PREFIX,
+  )
+  const { search, filters, sort, direction, page, pageSize } = list
+  const filterFields = useMemo(
+    () => withFinancierOptions(installmentDuesListConfig, financiers),
+    [financiers],
+  )
 
   const loader = useCallback(
     async (signal: AbortSignal) => {
-      const query = { view, financierId, today }
-      const [list, sum] = await Promise.all([
-        fetchInstallmentDuesPage({ ...query, page }, signal),
+      const query = { view, today, search, filters }
+      const [rowsPage, sum] = await Promise.all([
+        fetchInstallmentDuesPage(
+          { ...query, sort, direction, page, pageSize },
+          signal,
+        ),
         fetchInstallmentDuesTotal(query, signal),
       ])
-      return { ...list, sum }
+      return { ...rowsPage, sum }
     },
-    [view, financierId, today, page],
+    [view, today, search, filters, sort, direction, page, pageSize],
   )
   const load = useLoad(loader, version)
   const rows = useMemo(() => load.data?.rows ?? [], [load.data])
@@ -129,8 +141,9 @@ export function InstallmentsDuesTab({
 
   const columns: DataTableColumn<InstallmentDueRow>[] = [
     {
-      key: 'due',
+      key: 'due_date',
       header: t('instDueDate'),
+      sortable: true,
       cell: (row) => (
         <DueDateCell dueDate={row.due_date} days={row.days_until_due} />
       ),
@@ -151,10 +164,10 @@ export function InstallmentsDuesTab({
       header: t('instUnits'),
       hideBelow: 'lg',
       cell: (row) => {
-        const list = units.get(row.contract_id) ?? []
+        const linked = units.get(row.contract_id) ?? []
         if (unitsLoad.status !== 'ready')
           return <span className="text-muted">—</span>
-        return <UnitTags units={list} count={list.length} />
+        return <UnitTags units={linked} count={linked.length} />
       },
     },
     {
@@ -178,12 +191,17 @@ export function InstallmentsDuesTab({
       key: 'state',
       header: t('instStatus'),
       cell: (row) => (
-        <InstallmentStateBadge state={row.state} partial={row.is_partial} />
+        <InstallmentStateBadge
+          size="sm"
+          state={row.state}
+          partial={row.is_partial}
+        />
       ),
     },
     {
-      key: 'remaining',
+      key: 'remaining_amount',
       header: t('instRemaining'),
+      sortable: true,
       align: 'end',
       cell: (row) => (
         <Money value={row.remaining_amount} className="font-medium" />
@@ -215,47 +233,40 @@ export function InstallmentsDuesTab({
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted">{t('instDuesDesc')}</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <Tabs
-          value={view}
-          onValueChange={(next) =>
-            update({ [keys.duesView]: next, [keys.duesPage]: null })
-          }
-          className="max-w-full"
-        >
-          <TabsList variant="segmented" aria-label={t('instTabDues')}>
-            {INSTALLMENT_DUES_VIEWS.map((value) => (
-              <TabsTrigger key={value} value={value}>
-                {t(INSTALLMENT_DUES_VIEW_LABEL_KEYS[value])}
-                {counts[value] !== null && (
-                  <span className="ms-1 text-xs text-muted tabular-nums">
-                    {counts[value]}
-                  </span>
-                )}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        <Select
-          size="sm"
-          aria-label={t('instFinancier')}
-          className="w-[190px]"
-          value={financierId || ALL}
-          onValueChange={(value) =>
-            update({
-              [keys.duesFinancier]: value === ALL ? null : value,
-              [keys.duesPage]: null,
-            })
-          }
-          options={[
-            { value: ALL, label: t('instAllFinanciers') },
-            ...financiers.map((item) => ({
-              value: item.id,
-              label: item.name,
-            })),
-          ]}
-        />
-      </div>
+      <Tabs
+        value={view}
+        onValueChange={(next) =>
+          update({
+            [INSTALLMENTS_URL_KEYS.duesView]: next,
+            [`${INSTALLMENT_DUES_URL_PREFIX}page`]: null,
+          })
+        }
+        className="max-w-full"
+      >
+        <TabsList variant="segmented" aria-label={t('instTabDues')}>
+          {INSTALLMENT_DUES_VIEWS.map((value) => (
+            <TabsTrigger key={value} value={value}>
+              {t(INSTALLMENT_DUES_VIEW_LABEL_KEYS[value])}
+              {counts[value] !== null && (
+                <span className="ms-1 text-xs text-muted tabular-nums">
+                  {counts[value]}
+                </span>
+              )}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      <DataListToolbar
+        config={installmentDuesListConfig}
+        search={list.searchInput}
+        onSearch={list.setSearchInput}
+        sort={sort}
+        direction={direction}
+        onSort={list.setSort}
+        filterFields={filterFields}
+        filters={filters}
+        onFilters={list.setFilters}
+      />
       {load.status === 'failed' ? (
         <ErrorState
           description={t('instDuesLoadError')}
@@ -275,6 +286,10 @@ export function InstallmentsDuesTab({
           rowClassName={(row) =>
             row.state === 'overdue' ? 'bg-danger-soft' : undefined
           }
+          sort={{ key: sort, direction }}
+          onSortChange={list.setSort}
+          cellTextClassName="text-[13px]"
+          cellClassName="py-2"
           empty={
             <EmptyState
               icon={<CheckCircle2 size={28} aria-hidden="true" />}
@@ -289,11 +304,10 @@ export function InstallmentsDuesTab({
       {load.status !== 'failed' && total > 0 && (
         <DataListPagination
           page={page}
-          pageSize={INSTALLMENTS_PAGE_SIZE}
+          pageSize={pageSize}
           total={total}
-          onPage={(next) =>
-            update({ [keys.duesPage]: next <= 1 ? null : Math.max(1, next) })
-          }
+          onPage={list.setPage}
+          onPageSize={list.setPageSize}
         />
       )}
       {load.data && total > 0 && (

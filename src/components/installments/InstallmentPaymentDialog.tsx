@@ -55,7 +55,9 @@ import {
   type InstallmentScheduleItem,
 } from '@/lib/installmentsView'
 import { saudiDateKey } from '@/lib/saudiTime'
+import { attachInstallmentReceipt, InstallmentReceiptError } from '@/lib/installmentReceiptsData'
 import { AmountHint, Money, OptionalLabel, PreviewStat } from './cells'
+import { ReceiptPicker } from './InstallmentReceipt'
 
 type Errors = FieldErrors<InstallmentPaymentFormValues>
 
@@ -102,7 +104,10 @@ export function InstallmentPaymentDialog({
   contract?: InstallmentPaymentTarget | null
   /** The amount the dialog opens with (a row's remaining, the overdue). */
   initialAmount?: number
-  onSaved: () => void
+  /** The payment is saved; `receiptError` names why its receipt (when one
+   *  was picked) could not be attached — the payment stays, and the receipt
+   *  can be attached later from its card. */
+  onSaved: (outcome: { receiptError: TranslationKey | null }) => void
   /** A refusal that means the contract changed meanwhile: the page
    *  refetches. */
   onStale?: () => void
@@ -127,6 +132,8 @@ export function InstallmentPaymentDialog({
   const [errors, setErrors] = useState<Errors>({})
   const [formError, setFormError] = useState<TranslationKey | null>(null)
   const [saving, setSaving] = useState(false)
+  const [receipt, setReceipt] = useState<File | null>(null)
+  const [receiptError, setReceiptError] = useState<TranslationKey | null>(null)
 
   // A fresh form each time the dialog opens.
   useEffect(() => {
@@ -145,6 +152,8 @@ export function InstallmentPaymentDialog({
     setErrors({})
     setFormError(null)
     setSaving(false)
+    setReceipt(null)
+    setReceiptError(null)
     // Only the opening resets the form.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -261,6 +270,7 @@ export function InstallmentPaymentDialog({
       })
       return
     }
+    if (receiptError) return
     const amount = parseInstallmentAmount(values.amount)
     if (amount === null) return
     setSaving(true)
@@ -272,8 +282,8 @@ export function InstallmentPaymentDialog({
       reference: values.reference,
       note: values.note,
     })
-    setSaving(false)
     if (result.error) {
+      setSaving(false)
       const attributed = installmentFieldError(
         result.error,
         INSTALLMENT_PAYMENT_TOKEN_FIELDS,
@@ -297,7 +307,21 @@ export function InstallmentPaymentDialog({
       }
       return
     }
-    onSaved()
+    // The payment is saved: its receipt goes up now. A failed upload never
+    // undoes the payment.
+    let failed: TranslationKey | null = null
+    if (receipt && result.data) {
+      try {
+        await attachInstallmentReceipt(values.contract_id, result.data, receipt)
+      } catch (error) {
+        failed =
+          error instanceof InstallmentReceiptError
+            ? error.key
+            : 'instReceiptSaveFailed'
+      }
+    }
+    setSaving(false)
+    onSaved({ receiptError: failed })
   }
 
   const title = ready?.contract ?? contract
@@ -542,6 +566,15 @@ export function InstallmentPaymentDialog({
             />
           )}
         </Field>
+        <ReceiptPicker
+          file={receipt}
+          disabled={saving}
+          error={receiptError ? t(receiptError) : undefined}
+          onChange={(file, error) => {
+            setReceipt(file)
+            setReceiptError(error)
+          }}
+        />
         <Field
           name="note"
           label={<OptionalLabel text={t('instPayNote')} />}

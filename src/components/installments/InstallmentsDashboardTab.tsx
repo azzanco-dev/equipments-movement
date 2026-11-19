@@ -136,7 +136,11 @@ export function InstallmentsDashboardTab({
       key: 'state',
       header: t('instStatus'),
       cell: (row) => (
-        <InstallmentStateBadge state={row.state} partial={row.is_partial} />
+        <InstallmentStateBadge
+          size="sm"
+          state={row.state}
+          partial={row.is_partial}
+        />
       ),
     },
     {
@@ -355,6 +359,8 @@ export function InstallmentsDashboardTab({
               />
             </div>
             <DataTable
+              cellTextClassName="text-[13px]"
+              cellClassName="py-2"
               columns={columns}
               rows={data.upcoming}
               rowKey={(row) => row.id}

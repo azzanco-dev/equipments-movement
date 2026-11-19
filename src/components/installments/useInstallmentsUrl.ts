@@ -1,21 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import {
   readInstallmentsUrlState,
-  INSTALLMENTS_URL_KEYS,
   type InstallmentsUrlState,
 } from '@/lib/installmentsView'
 
-/** A typed search waits this long before it reaches the URL (and the
- *  server), like every list. */
-const SEARCH_DEBOUNCE_MS = 300
-
 /**
- * The state the «الاقساط» page keeps in its URL — the tab, the contracts'
- * search / filters / sort / page, the dues' sub-tab / financier / page — so
- * Back restores it. Written with `history.replaceState` like the unified
- * lists (`useDataListState`): a change of the query never adds a history
- * entry.
+ * The page-level state of «الاقساط» in its URL — the open tab and the dues
+ * sub-tab — so Back restores it. The contracts and the dues lists keep their
+ * own search / filters / sort / page / size through `useDataListState`
+ * (prefixes `c` and `d`). Written with `history.replaceState` like the
+ * unified lists: a change of the query never adds a history entry.
  */
 export function useInstallmentsUrl() {
   const pathname = usePathname()
@@ -44,32 +39,5 @@ export function useInstallmentsUrl() {
     [params, pathname],
   )
 
-  // The search box keeps what is typed; the URL holds the trimmed term.
-  const [searchInput, setSearchInputState] = useState(state.search)
-  const pendingSearch = useRef(false)
-  useEffect(() => {
-    pendingSearch.current = false
-    setSearchInputState((current) =>
-      current.trim() === state.search ? current : state.search,
-    )
-  }, [state.search])
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      if (pendingSearch.current && searchInput.trim() !== state.search) {
-        pendingSearch.current = false
-        update({
-          [INSTALLMENTS_URL_KEYS.search]: searchInput.trim(),
-          [INSTALLMENTS_URL_KEYS.page]: null,
-        })
-      }
-    }, SEARCH_DEBOUNCE_MS)
-    return () => window.clearTimeout(timer)
-  }, [searchInput, state.search, update])
-
-  const setSearchInput = useCallback((value: string) => {
-    pendingSearch.current = true
-    setSearchInputState(value)
-  }, [])
-
-  return { state, update, searchInput, setSearchInput }
+  return { state, update }
 }

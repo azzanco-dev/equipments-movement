@@ -90,7 +90,7 @@ export function InstallmentsFinanciersTab({
       cell: (item) => (
         <span className="flex items-center gap-2">
           <Building2 size={14} aria-hidden="true" className="text-muted" />
-          <span className="font-medium">{item.name}</span>
+          <span className="font-semibold">{item.name}</span>
         </span>
       ),
     },
@@ -203,6 +203,8 @@ export function InstallmentsFinanciersTab({
       )}
       {load.status !== 'failed' && (
         <DataTable
+          cellTextClassName="text-[13px]"
+          cellClassName="py-2"
           columns={columns}
           rows={[...financiers]}
           rowKey={(item) => item.id}

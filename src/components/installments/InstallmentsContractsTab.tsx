@@ -1,20 +1,19 @@
 import { useCallback, useMemo } from 'react'
-import { Building2, FileText, Plus } from 'lucide-react'
+import { FileText, Plus } from 'lucide-react'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
+import { DataListToolbar } from '@/components/data-list/DataListToolbar'
+import { useDataListState } from '@/components/data-list/useDataListState'
+import { RelativeTime } from '@/components/RelativeTime'
 import {
   Button,
-  Checkbox,
   DataTable,
   EmptyState,
   ErrorState,
-  SearchInput,
-  Select,
   cn,
   type DataTableColumn,
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
-import { INSTALLMENT_CONTRACT_STATUS_BADGE } from '@/lib/installments'
 import {
   fetchInstallmentContractUnits,
   fetchInstallmentContractsPage,
@@ -23,13 +22,12 @@ import {
   amountOf,
   paidPercent,
   unitsByContract,
-  INSTALLMENT_CONTRACT_STATUSES,
-  INSTALLMENTS_PAGE_SIZE,
-  INSTALLMENTS_URL_KEYS,
+  withFinancierOptions,
+  INSTALLMENT_CONTRACTS_URL_PREFIX,
   type InstallmentContractRow,
   type InstallmentFinancierRow,
-  type InstallmentsUrlState,
 } from '@/lib/installmentsView'
+import { installmentContractsListConfig } from '@/lib/listConfigs'
 import { saudiDateKey } from '@/lib/saudiTime'
 import {
   ContractCell,
@@ -41,19 +39,15 @@ import {
 } from './cells'
 import { useLoad } from './useLoad'
 
-const ALL = 'all'
-
 /**
- * «العقود»: `installment_contract_summary`, searched (number, title,
- * financier), filtered (status, financier, «المتاخرة فقط»), sorted and paged
- * on the server, twenty a page; the state lives in the URL. The unit tags
- * come from ONE bounded read for the contracts of the page.
+ * «العقود»: `installment_contract_summary` on the program's unified list
+ * (`installmentContractsListConfig`, URL prefix `c`): the shared toolbar
+ * with its search (number, title, financier), its filter dialog (status,
+ * financier, «المتاخرة فقط», the next due date) and sort menu, the main
+ * list table look and the page sizes 20 … 500, all on the server. The unit
+ * tags come from ONE bounded read for the contracts of the page.
  */
 export function InstallmentsContractsTab({
-  state,
-  update,
-  searchInput,
-  onSearchInput,
   financiers,
   totalContracts,
   version,
@@ -61,10 +55,6 @@ export function InstallmentsContractsTab({
   onNewContract,
   onOpenContract,
 }: {
-  state: InstallmentsUrlState
-  update: (values: Record<string, string | number | null>) => void
-  searchInput: string
-  onSearchInput: (value: string) => void
   financiers: readonly InstallmentFinancierRow[]
   /** Every contract of the program (0 = the first-use empty state). */
   totalContracts: number
@@ -74,18 +64,24 @@ export function InstallmentsContractsTab({
   onOpenContract: (id: string) => void
 }) {
   const { t } = useI18n()
-  const keys = INSTALLMENTS_URL_KEYS
   const today = useMemo(() => saudiDateKey(), [])
-  const { search, status, financierId, overdueOnly, sort, direction, page } =
-    state
+  const list = useDataListState(
+    installmentContractsListConfig,
+    INSTALLMENT_CONTRACTS_URL_PREFIX,
+  )
+  const { search, filters, sort, direction, page, pageSize } = list
+  const filterFields = useMemo(
+    () => withFinancierOptions(installmentContractsListConfig, financiers),
+    [financiers],
+  )
 
   const loader = useCallback(
     (signal: AbortSignal) =>
       fetchInstallmentContractsPage(
-        { search, status, financierId, overdueOnly, sort, direction, page },
+        { search, filters, sort, direction, page, pageSize },
         signal,
       ),
-    [search, status, financierId, overdueOnly, sort, direction, page],
+    [search, filters, sort, direction, page, pageSize],
   )
   const load = useLoad(loader, version)
   const rows = useMemo(() => load.data?.rows ?? [], [load.data])
@@ -109,24 +105,17 @@ export function InstallmentsContractsTab({
 
   const columns: DataTableColumn<InstallmentContractRow>[] = [
     {
-      key: 'contract',
+      key: 'description',
       header: t('instContract'),
       sortable: true,
+      // The identity cell: the title in bold, the number and the financier
+      // as its muted line (the main list look; the financier has no column).
       cell: (row) => (
         <ContractCell
           description={row.description}
           contractNumber={row.contract_number}
+          financierName={row.financier_name}
         />
-      ),
-    },
-    {
-      key: 'financier',
-      header: t('instFinancier'),
-      cell: (row) => (
-        <span className="flex items-center gap-1.5">
-          <Building2 size={14} aria-hidden="true" className="text-muted" />
-          {row.financier_name}
-        </span>
       ),
     },
     {
@@ -153,7 +142,7 @@ export function InstallmentsContractsTab({
       ),
     },
     {
-      key: 'remaining',
+      key: 'remaining_total',
       header: t('instRemaining'),
       sortable: true,
       align: 'end',
@@ -164,7 +153,7 @@ export function InstallmentsContractsTab({
       ),
     },
     {
-      key: 'next',
+      key: 'next_due_date',
       header: t('instNextInstallment'),
       sortable: true,
       cell: (row) => {
@@ -188,76 +177,40 @@ export function InstallmentsContractsTab({
       header: t('instStatus'),
       cell: (row) => (
         <span className="flex flex-wrap items-center gap-1">
-          <InstallmentContractStatusBadge status={row.status} />
+          <InstallmentContractStatusBadge size="sm" status={row.status} />
           <OverdueBadge
+            size="sm"
             count={row.status === 'active' ? row.overdue_count : 0}
           />
         </span>
       ),
     },
+    {
+      key: 'updated_at',
+      header: t('updatedAt'),
+      sortable: true,
+      className: 'text-muted',
+      hideBelow: 'md',
+      cell: (row) => <RelativeTime value={row.updated_at ?? row.created_at} />,
+    },
   ]
 
-  const filtered = Boolean(search) || Boolean(status) || Boolean(financierId)
-  const noContractsYet = totalContracts === 0 && !filtered && !overdueOnly
+  const filtered = Boolean(search) || filters.length > 0
+  const noContractsYet = totalContracts === 0 && !filtered
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={searchInput}
-          onValueChange={onSearchInput}
-          placeholder={t('instContractsSearch')}
-          className="w-full sm:w-72"
-        />
-        <Select
-          size="sm"
-          aria-label={t('instStatus')}
-          className="w-[140px]"
-          value={status || ALL}
-          onValueChange={(value) =>
-            update({
-              [keys.status]: value === ALL ? null : value,
-              [keys.page]: null,
-            })
-          }
-          options={[
-            { value: ALL, label: t('instAllStatuses') },
-            ...INSTALLMENT_CONTRACT_STATUSES.map((item) => ({
-              value: item,
-              label: t(INSTALLMENT_CONTRACT_STATUS_BADGE[item].key),
-            })),
-          ]}
-        />
-        <Select
-          size="sm"
-          aria-label={t('instFinancier')}
-          className="w-[190px]"
-          value={financierId || ALL}
-          onValueChange={(value) =>
-            update({
-              [keys.financier]: value === ALL ? null : value,
-              [keys.page]: null,
-            })
-          }
-          options={[
-            { value: ALL, label: t('instAllFinanciers') },
-            ...financiers.map((item) => ({
-              value: item.id,
-              label: item.name,
-            })),
-          ]}
-        />
-        <Checkbox
-          checked={overdueOnly}
-          onCheckedChange={(checked) =>
-            update({
-              [keys.overdueOnly]: checked === true ? '1' : null,
-              [keys.page]: null,
-            })
-          }
-          label={t('instOverdueOnly')}
-        />
-      </div>
+      <DataListToolbar
+        config={installmentContractsListConfig}
+        search={list.searchInput}
+        onSearch={list.setSearchInput}
+        sort={sort}
+        direction={direction}
+        onSort={list.setSort}
+        filterFields={filterFields}
+        filters={filters}
+        onFilters={list.setFilters}
+      />
 
       {load.status === 'failed' ? (
         <ErrorState
@@ -275,13 +228,9 @@ export function InstallmentsContractsTab({
           onRowClick={(row) => onOpenContract(row.id)}
           rowHref={(row) => `/installments/${row.id}`}
           sort={{ key: sort, direction }}
-          onSortChange={(key, next) =>
-            update({
-              [keys.sort]: key,
-              [keys.direction]: next,
-              [keys.page]: null,
-            })
-          }
+          onSortChange={list.setSort}
+          cellTextClassName="text-[13px]"
+          cellClassName="py-2"
           empty={
             <EmptyState
               icon={<FileText size={28} aria-hidden="true" />}
@@ -310,11 +259,10 @@ export function InstallmentsContractsTab({
       {load.status !== 'failed' && total > 0 && (
         <DataListPagination
           page={page}
-          pageSize={INSTALLMENTS_PAGE_SIZE}
+          pageSize={pageSize}
           total={total}
-          onPage={(next) =>
-            update({ [keys.page]: next <= 1 ? null : Math.max(1, next) })
-          }
+          onPage={list.setPage}
+          onPageSize={list.setPageSize}
         />
       )}
     </div>

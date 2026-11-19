@@ -52,6 +52,11 @@ const MIGRATION = read(
   'migrations',
   '20261118100000_0203_installments.sql',
 )
+const RECEIPTS_MIGRATION = read(
+  'supabase',
+  'migrations',
+  '20261119140000_0206_installment_payment_receipts.sql',
+)
 const DATA = read('src', 'lib', 'installmentsData.ts')
 const APP = read('src', 'App.tsx')
 
@@ -305,6 +310,11 @@ test('the four functions are called with the exact parameter names of 0203', () 
 
 /** The body of a view or a table of the migration. */
 function relationBody(name) {
+  // 0206 re-created the payments list with the receipt columns appended.
+  const replaced = new RegExp(
+    `CREATE OR REPLACE VIEW public\\.${name}\\b([\\s\\S]*?)COMMENT ON VIEW public\\.${name}\\b`,
+  ).exec(RECEIPTS_MIGRATION)
+  if (replaced) return replaced[1]
   const view = new RegExp(
     `CREATE VIEW public\\.${name}\\b([\\s\\S]*?)COMMENT ON VIEW public\\.${name}\\b`,
   ).exec(MIGRATION)
@@ -457,13 +467,18 @@ test('every read is bounded or paged, and throws on failure', () => {
   }
   // The dues and contracts lists are searched, filtered, sorted and paged
   // by the server.
-  assert.match(DATA, /buildSearchFilter\(\s*INSTALLMENT_CONTRACT_SEARCH_FIELDS/)
+  assert.match(
+    DATA,
+    /buildSearchFilter\(\s*installmentContractsListConfig\.searchFields/,
+  )
+  assert.match(DATA, /buildSearchFilter\(\s*installmentDuesListConfig\.searchFields/)
+  assert.match(DATA, /applyListFilters\(/)
   assert.match(
     DATA,
     /\.eq\('contract_status', 'active'\)\s*\.eq\('is_paid', false\)/,
   )
   assert.match(DATA, /\.eq\('status', 'active'\)\.gt\('overdue_count', 0\)/)
-  assert.match(DATA, /INSTALLMENTS_PAGE_SIZE/)
+  assert.match(DATA, /query\.page \* query\.pageSize - 1/)
   // A failed read throws: a screen shows its error state, never «no data».
   assert.match(DATA, /throw new SupabaseLoadError\(\)/)
   assert.match(DATA, /unwrapRows</)
@@ -547,7 +562,13 @@ test('one page with four tabs, kept in the URL', () => {
   )
   assert.match(hook, /window\.history\.replaceState\(/)
   assert.match(hook, /readInstallmentsUrlState\(/)
-  assert.match(hook, /SEARCH_DEBOUNCE_MS = 300/)
+  // The lists keep their own state through the shared list hook.
+  for (const file of ['InstallmentsContractsTab.tsx', 'InstallmentsDuesTab.tsx'])
+    assert.match(
+      read('src', 'components', 'installments', file),
+      /useDataListState\(\s*installment(Contracts|Dues)ListConfig,\s*INSTALLMENT_(CONTRACTS|DUES)_URL_PREFIX/,
+      file,
+    )
   // A new contract opens its own page, which shows the message.
   assert.match(
     list,

@@ -1594,3 +1594,103 @@ export const quotationsListConfig: DataListConfig = {
     { key: 'quote_number', label: 'quotationNumber' },
   ],
 }
+
+/**
+ * «الاقساط › العقود» (`installment_contract_summary`, 0203): the program's
+ * unified list (owner 2026-11-19, «تحسين شامل لصفحات الاقساط, بحيث تكون
+ * متوائمة مع الـ guide»). Search by number, title and financier; filters
+ * status, financier, «المتاخرة فقط» (applied by the tab: an ACTIVE contract
+ * with a late row, `INSTALLMENT_CONTRACT_COLUMN_FILTERS`) and the next due
+ * date; the latest change first by default. The tab keeps its state under
+ * the URL prefix `c`.
+ */
+export const installmentContractsListConfig: DataListConfig = {
+  id: 'installment-contracts',
+  searchPlaceholder: 'instContractsSearch',
+  searchFields: ['contract_number', 'description', 'financier_name'],
+  defaultSort: 'updated_at',
+  defaultDirection: 'desc',
+  filterFields: [
+    {
+      key: 'status',
+      label: 'instStatus',
+      type: 'select',
+      operators: ['in'],
+      multiple: true,
+      options: [
+        { value: 'active', label: 'ساري', labelI18n: 'instContractActive' },
+        { value: 'paid_off', label: 'مسدد', labelI18n: 'instContractPaidOff' },
+        { value: 'cancelled', label: 'ملغي', labelI18n: 'instContractCancelled' },
+      ],
+    },
+    {
+      key: 'financier_id',
+      label: 'instFinancier',
+      type: 'select',
+      operators: ['in'],
+      multiple: true,
+      // Filled by the tab from the financiers list.
+      options: [],
+    },
+    {
+      key: 'has_overdue',
+      label: 'instOverdueOnly',
+      type: 'boolean',
+      operators: ['eq'],
+      options: [
+        { value: 'true', label: 'نعم', labelI18n: 'yes' },
+        { value: 'false', label: 'لا', labelI18n: 'no' },
+      ],
+    },
+    {
+      key: 'next_due_date',
+      label: 'instNextInstallment',
+      type: 'date',
+      operators: dateOps,
+    },
+  ],
+  sortableFields: [
+    { key: 'updated_at', label: 'updatedAt' },
+    { key: 'next_due_date', label: 'instNextInstallment' },
+    { key: 'remaining_total', label: 'instRemaining' },
+    { key: 'financed_amount', label: 'instFinanced' },
+    { key: 'description', label: 'instContract' },
+    { key: 'contract_number', label: { ar: 'رقم العقد', en: 'Contract number' } },
+  ],
+}
+
+/**
+ * «الاقساط › الاستحقاقات» (`installment_dues`, 0203): the unpaid rows of the
+ * active contracts, opened on a sub-tab (late, this month, within 30 days,
+ * everything unpaid — kept in the page's own URL key `view`), then searched
+ * (number, title, financier), filtered (financier, due date), sorted and
+ * paged like every list. The tab keeps its state under the URL prefix `d`.
+ */
+export const installmentDuesListConfig: DataListConfig = {
+  id: 'installment-dues',
+  searchPlaceholder: 'instContractsSearch',
+  searchFields: ['contract_number', 'description', 'financier_name'],
+  defaultSort: 'due_date',
+  defaultDirection: 'asc',
+  filterFields: [
+    {
+      key: 'financier_id',
+      label: 'instFinancier',
+      type: 'select',
+      operators: ['in'],
+      multiple: true,
+      options: [],
+    },
+    {
+      key: 'due_date',
+      label: 'instDueDate',
+      type: 'date',
+      operators: dateOps,
+    },
+  ],
+  sortableFields: [
+    { key: 'due_date', label: 'instDueDate' },
+    { key: 'remaining_amount', label: 'instRemaining' },
+    { key: 'contract_number', label: { ar: 'رقم العقد', en: 'Contract number' } },
+  ],
+}

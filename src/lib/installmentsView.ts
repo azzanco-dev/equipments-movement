@@ -1,4 +1,5 @@
 import type { Language, TranslationKey } from '@/i18n/translations'
+import type { FilterField } from '@/components/data-list/types'
 import {
   addMonths,
   fromHalalas,
@@ -93,6 +94,8 @@ export interface InstallmentContractRow {
   cancel_reason: string | null
   created_by_name: string | null
   created_at: string
+  /** The contract's last change (0203 trigger; a payment touches it). */
+  updated_at: string
   paid_total: number
   remaining_total: number
   paid_count: number
@@ -130,6 +133,12 @@ export interface InstallmentPaymentRow {
   void_reason: string | null
   created_by_name: string | null
   created_at: string
+  /** The transfer receipt (0206); null when none is attached. */
+  receipt_id: string | null
+  receipt_path: string | null
+  receipt_file_name: string | null
+  receipt_mime_type: string | null
+  receipt_size_bytes: number | null
 }
 
 /** `installment_payment_allocations` with the `seq` of its schedule row. */
@@ -652,60 +661,30 @@ export function defaultDuesView(overdueCount: number): InstallmentDuesView {
   return overdueCount > 0 ? 'overdue' : 'next30'
 }
 
-export type InstallmentContractsSort = 'contract' | 'remaining' | 'next'
-
-/** The header a contracts sort stands for → the view's column. */
-export const INSTALLMENT_CONTRACT_SORT_COLUMNS: Readonly<
-  Record<InstallmentContractsSort, string>
-> = {
-  contract: 'description',
-  remaining: 'remaining_total',
-  next: 'next_due_date',
-}
-
 export const INSTALLMENT_CONTRACT_STATUSES: readonly InstallmentContractStatus[] =
   ['active', 'paid_off', 'cancelled']
 
 /** Rows a page of the contracts and of the dues. */
 export const INSTALLMENTS_PAGE_SIZE = 20
 
-/** The names of the list page's query parameters. */
+/**
+ * The names of the list page's own query parameters: the tab and the dues
+ * sub-tab. The contracts and the dues lists keep their search, filters,
+ * sort, page and size through `useDataListState` under the prefixes
+ * `c` and `d` (`INSTALLMENT_CONTRACTS_URL_PREFIX`, `INSTALLMENT_DUES_URL_PREFIX`).
+ */
 export const INSTALLMENTS_URL_KEYS = {
   tab: 'tab',
-  search: 'q',
-  status: 'status',
-  financier: 'financier',
-  overdueOnly: 'overdue',
-  sort: 'sort',
-  direction: 'dir',
-  page: 'page',
   duesView: 'view',
-  duesFinancier: 'dfinancier',
-  duesPage: 'dpage',
 } as const
+
+export const INSTALLMENT_CONTRACTS_URL_PREFIX = 'c'
+export const INSTALLMENT_DUES_URL_PREFIX = 'd'
 
 export interface InstallmentsUrlState {
   tab: InstallmentsTab
-  search: string
-  /** '' = every status. */
-  status: InstallmentContractStatus | ''
-  /** '' = every financier. */
-  financierId: string
-  overdueOnly: boolean
-  sort: InstallmentContractsSort
-  direction: 'asc' | 'desc'
-  page: number
   /** null = not chosen yet: `defaultDuesView` decides. */
   duesView: InstallmentDuesView | null
-  duesFinancierId: string
-  duesPage: number
-}
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-const pageOf = (value: string | null) => {
-  const page = Number(value)
-  return Number.isSafeInteger(page) && page > 0 ? page : 1
 }
 
 /** The list page's state from its query string; anything unknown falls
@@ -715,27 +694,10 @@ export function readInstallmentsUrlState(
 ): InstallmentsUrlState {
   const keys = INSTALLMENTS_URL_KEYS
   const tab = get(keys.tab) as InstallmentsTab | null
-  const status = get(keys.status) as InstallmentContractStatus | null
-  const sort = get(keys.sort) as InstallmentContractsSort | null
   const view = get(keys.duesView) as InstallmentDuesView | null
-  const uuid = (value: string | null) =>
-    value && UUID.test(value) ? value : ''
   return {
     tab: tab && INSTALLMENTS_TABS.includes(tab) ? tab : 'dashboard',
-    search: (get(keys.search) ?? '').trim(),
-    status:
-      status && INSTALLMENT_CONTRACT_STATUSES.includes(status) ? status : '',
-    financierId: uuid(get(keys.financier)),
-    overdueOnly: get(keys.overdueOnly) === '1',
-    sort:
-      sort && Object.keys(INSTALLMENT_CONTRACT_SORT_COLUMNS).includes(sort)
-        ? sort
-        : 'next',
-    direction: get(keys.direction) === 'desc' ? 'desc' : 'asc',
-    page: pageOf(get(keys.page)),
     duesView: view && INSTALLMENT_DUES_VIEWS.includes(view) ? view : null,
-    duesFinancierId: uuid(get(keys.duesFinancier)),
-    duesPage: pageOf(get(keys.duesPage)),
   }
 }
 
@@ -904,3 +866,24 @@ export const INSTALLMENT_STALE_TOKENS: ReadonlySet<string> = new Set([
   'contract_has_payments',
   'payment_already_voided',
 ])
+
+/**
+ * The filter fields of a list config with the «الجهة» options filled from
+ * the financiers the page already read (a short master list, cap 1000).
+ */
+export function withFinancierOptions(
+  config: { filterFields: readonly FilterField[] },
+  financiers: readonly InstallmentFinancierRow[],
+): FilterField[] {
+  return config.filterFields.map((field) =>
+    field.key === 'financier_id'
+      ? {
+          ...field,
+          options: financiers.map((financier) => ({
+            value: financier.id,
+            label: financier.name,
+          })),
+        }
+      : field,
+  )
+}

@@ -24,6 +24,8 @@ import {
 import { usePermissions } from '@/auth/PermissionsContext'
 import { InstallmentContractDialog } from '@/components/installments/InstallmentContractDialog'
 import { InstallmentPaymentDialog } from '@/components/installments/InstallmentPaymentDialog'
+import { PaymentReceiptLine } from '@/components/installments/InstallmentReceipt'
+import { receiptOf } from '@/lib/installmentReceipts'
 import {
   CancelInstallmentContractDialog,
   VoidInstallmentPaymentDialog,
@@ -275,6 +277,25 @@ function InstallmentContractDetailInner({
   }
   const refresh = () => setVersion((current) => current + 1)
   /** A dialog succeeded: close it, read again, say so. */
+  // A payment whose receipt could not be attached is still saved: say so,
+  // and that the receipt can be attached from its card.
+  const paymentSaved = ({
+    receiptError,
+  }: {
+    receiptError: TranslationKey | null
+  }) => {
+    if (!receiptError) {
+      done('instToastPaymentRecorded')
+      return
+    }
+    setDialog(null)
+    refresh()
+    toast({
+      title: t('instToastPaymentRecordedNoReceipt'),
+      description: `${t(receiptError)} ${t('instReceiptAttachLater')}`,
+      tone: 'warning',
+    })
+  }
   const done = (message: TranslationKey) => {
     setDialog(null)
     refresh()
@@ -799,7 +820,9 @@ function InstallmentContractDetailInner({
                     payment={payment}
                     seqs={coveredBy.get(payment.id) ?? []}
                     canVoid={canManage && !cancelled}
+                    canManageReceipt={canManage}
                     onVoid={() => open({ kind: 'void', payment })}
+                    onReceiptChanged={refresh}
                   />
                 ))}
                 {payments.length > PAYMENTS_PREVIEW_ROWS && (
@@ -923,7 +946,7 @@ function InstallmentContractDetailInner({
             onOpenChange={closeDialog}
             contract={contract}
             initialAmount={dialog?.kind === 'pay' ? dialog.amount : undefined}
-            onSaved={() => done('instToastPaymentRecorded')}
+            onSaved={paymentSaved}
             onStale={refresh}
           />
           <VoidInstallmentPaymentDialog
@@ -951,13 +974,19 @@ function PaymentCard({
   payment,
   seqs,
   canVoid,
+  canManageReceipt,
   onVoid,
+  onReceiptChanged,
 }: {
   payment: InstallmentPaymentRow
   /** The installments the payment covered. */
   seqs: readonly number[]
   canVoid: boolean
+  /** installments.manage: attach, replace or remove the receipt of a
+   *  posted payment (a voided one keeps its file, view only). */
+  canManageReceipt: boolean
   onVoid: () => void
+  onReceiptChanged: () => void
 }) {
   const { t, lang } = useI18n()
   const voided = payment.status === 'voided'
@@ -998,6 +1027,13 @@ function PaymentCard({
             </p>
           )}
           {payment.note && <p className="break-words">{payment.note}</p>}
+          <PaymentReceiptLine
+            contractId={payment.contract_id}
+            paymentId={payment.id}
+            receipt={receiptOf(payment)}
+            canManage={canManageReceipt && !voided}
+            onChanged={onReceiptChanged}
+          />
           {voided && payment.void_reason && (
             <p className="break-words text-danger">
               {t('instVoidReason')} {payment.void_reason}

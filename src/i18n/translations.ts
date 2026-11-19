@@ -2995,6 +2995,28 @@ export const translations = {
       'على العقد سدادات مسجلة: الغ السدادات اولا ثم غير شروط العقد او الغه.',
     instErrPaymentAlreadyVoided: 'هذا السداد ملغي من قبل.',
     // end installments (0203)
+    // installment-receipts (0206)
+    instReceiptLabel: 'ملف الحوالة',
+    instReceiptPick: 'اختر ملف الحوالة او اسحبه هنا',
+    instReceiptLimits: 'PDF او صورة (JPG، PNG، WEBP) حتى 5 ميغا',
+    instReceiptClear: 'ازالة الملف',
+    instReceiptView: 'عرض',
+    instReceiptReplace: 'استبدال ملف الحوالة',
+    instReceiptDelete: 'حذف الملف',
+    instReceiptDeleteTitle: 'حذف ملف الحوالة',
+    instReceiptDeleteQuestion: 'سيحذف الملف من السداد نهائيا، ويبقى السداد مسجلا. هل تريد المتابعة؟',
+    instReceiptAttach: 'ارفاق ملف الحوالة',
+    instReceiptAttachLater: 'يمكنك ارفاقه من كرت السداد في صفحة العقد.',
+    instReceiptTypeInvalid: 'نوع الملف غير مقبول: PDF او صورة JPG او PNG او WEBP فقط',
+    instReceiptTooLarge: 'حجم الملف اكبر من 5 ميغا',
+    instReceiptEmpty: 'الملف فارغ',
+    instReceiptVoided: 'السداد ملغي: لا يمكن تغيير ملفه.',
+    instReceiptNotFound: 'لا يوجد ملف على هذا السداد.',
+    instReceiptNotAllowed: 'ليس لديك صلاحية تعديل ملفات السداد',
+    instReceiptSaveFailed: 'تعذر رفع ملف الحوالة، حاول مرة اخرى.',
+    instReceiptOpenFailed: 'تعذر فتح الملف',
+    instToastPaymentRecordedNoReceipt: 'تم تسجيل السداد، وتعذر رفع ملف الحوالة',
+    // end installment-receipts (0206)
     // installments-screens (0203: /installments, /installments/:id)
     installments: 'الاقساط',
     installmentsDesc: 'ما يستحق على الشركة من اقساط، وما تاخر منها.',
@@ -6365,6 +6387,28 @@ export const translations = {
       'The contract has recorded payments: void them first, then change its terms or cancel it.',
     instErrPaymentAlreadyVoided: 'This payment is already voided.',
     // end installments (0203)
+    // installment-receipts (0206)
+    instReceiptLabel: 'Transfer receipt',
+    instReceiptPick: 'Choose the transfer receipt or drop it here',
+    instReceiptLimits: 'PDF or an image (JPG, PNG, WEBP) up to 5 MB',
+    instReceiptClear: 'Remove the file',
+    instReceiptView: 'View',
+    instReceiptReplace: 'Replace the receipt',
+    instReceiptDelete: 'Delete the file',
+    instReceiptDeleteTitle: 'Delete the transfer receipt',
+    instReceiptDeleteQuestion: 'The file is removed from the payment for good; the payment stays recorded. Continue?',
+    instReceiptAttach: 'Attach the transfer receipt',
+    instReceiptAttachLater: 'You can attach it from the payment card on the contract page.',
+    instReceiptTypeInvalid: 'File type not accepted: PDF or a JPG, PNG or WEBP image only',
+    instReceiptTooLarge: 'The file is larger than 5 MB',
+    instReceiptEmpty: 'The file is empty',
+    instReceiptVoided: 'The payment is voided: its file cannot change.',
+    instReceiptNotFound: 'This payment has no file.',
+    instReceiptNotAllowed: 'You are not allowed to change payment files',
+    instReceiptSaveFailed: 'Could not upload the transfer receipt, try again.',
+    instReceiptOpenFailed: 'Could not open the file',
+    instToastPaymentRecordedNoReceipt: 'Payment recorded; the transfer receipt could not be uploaded',
+    // end installment-receipts (0206)
     // installments-screens (0203: /installments, /installments/:id)
     installments: 'Installments',
     installmentsDesc:

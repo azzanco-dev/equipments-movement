@@ -37,6 +37,7 @@ import {
 import {
   amountOf,
   INSTALLMENTS_URL_KEYS,
+  INSTALLMENT_DUES_URL_PREFIX,
   type InstallmentDueRow,
   type InstallmentDuesView,
   type InstallmentFinancierRow,
@@ -79,7 +80,7 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
   const { can } = usePermissions()
   // Fails closed: `can` answers false until the permissions are ready.
   const canManage = can('installments.manage')
-  const { state, update, searchInput, setSearchInput } = useInstallmentsUrl()
+  const { state, update } = useInstallmentsUrl()
   const [dialog, setDialog] = useState<InstallmentsDialog | null>(null)
   // Bumped after every write: each read of the page runs again.
   const [version, setVersion] = useState(0)
@@ -103,12 +104,31 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
       ...(view
         ? {
             [INSTALLMENTS_URL_KEYS.duesView]: view,
-            [INSTALLMENTS_URL_KEYS.duesPage]: null,
+            [`${INSTALLMENT_DUES_URL_PREFIX}page`]: null,
           }
         : {}),
     })
 
   /** A write succeeded: close its dialog, read again, say so. */
+  // A payment whose receipt could not be attached is still saved: say so,
+  // and that the receipt can be attached from its card.
+  const paymentSaved = ({
+    receiptError,
+  }: {
+    receiptError: TranslationKey | null
+  }) => {
+    if (!receiptError) {
+      done('instToastPaymentRecorded')
+      return
+    }
+    setDialog(null)
+    setVersion((current) => current + 1)
+    toast({
+      title: t('instToastPaymentRecordedNoReceipt'),
+      description: `${t(receiptError)} ${t('instReceiptAttachLater')}`,
+      tone: 'warning',
+    })
+  }
   const done = (message: TranslationKey) => {
     setDialog(null)
     setVersion((current) => current + 1)
@@ -215,10 +235,6 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
           </TabsContent>
           <TabsContent value="contracts" className="mt-0">
             <InstallmentsContractsTab
-              state={state}
-              update={update}
-              searchInput={searchInput}
-              onSearchInput={setSearchInput}
               financiers={data.financiers}
               totalContracts={data.contractsCount}
               version={version}
@@ -273,7 +289,7 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
             onOpenChange={closeDialog}
             contract={dialog?.kind === 'pay' ? dialog.contract : null}
             initialAmount={dialog?.kind === 'pay' ? dialog.amount : undefined}
-            onSaved={() => done('instToastPaymentRecorded')}
+            onSaved={paymentSaved}
             onStale={refresh}
           />
           <InstallmentFinancierDialog
