@@ -95,3 +95,11 @@ test('the Drive token is decoded from rclone\'s blob and masked before use', () 
   // The step runs before anything talks to Drive.
   assert.ok(CODE.indexOf('- name: Read the Drive token') < CODE.indexOf('- name: Upload the database dump'))
 })
+
+test('pruning a dump folder that does not exist yet is not a failure', () => {
+  // The second run (2026-11-19) uploaded the dump and failed on the empty
+  // monthly/ folder: rclone exits 3 for «directory not found».
+  const prunes = CODE.split('\n').filter((l) => /rclone (delete|rmdirs)\b/.test(l))
+  assert.equal(prunes.length, 4)
+  for (const line of prunes) assert.match(line, /\|\| \[ \$\? -eq 3 \]$/, line)
+})

@@ -163,10 +163,12 @@ jobs:
             rclone copy -q "$RUNNER_TEMP/db" "$DRIVE_ROOT/database/monthly/$(TZ=Asia/Riyadh date +%Y-%m)"
           fi
           # Only the dated dump folders age out; files/ is never touched.
-          rclone delete -q --min-age 31d "$DRIVE_ROOT/database/daily"
-          rclone rmdirs -q --leave-root "$DRIVE_ROOT/database/daily"
-          rclone delete -q --min-age 370d "$DRIVE_ROOT/database/monthly"
-          rclone rmdirs -q --leave-root "$DRIVE_ROOT/database/monthly"
+          # rclone exits 3 for a folder that does not exist yet (monthly/ is
+          # made on the first day of a Saudi month): nothing to prune then.
+          rclone delete -q --min-age 31d "$DRIVE_ROOT/database/daily" || [ $? -eq 3 ]
+          rclone rmdirs -q --leave-root "$DRIVE_ROOT/database/daily" || [ $? -eq 3 ]
+          rclone delete -q --min-age 370d "$DRIVE_ROOT/database/monthly" || [ $? -eq 3 ]
+          rclone rmdirs -q --leave-root "$DRIVE_ROOT/database/monthly" || [ $? -eq 3 ]
           echo "database uploaded: $day"
 
       - name: Copy the new Storage files
