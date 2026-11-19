@@ -82,8 +82,8 @@ test('the profile: the name and the values the owner gave', () => {
   ])
   // The owner's values of 2026-11-18: the unified number, the VAT number
   // and the address — the city, the district and the street only («خذ
-  // المدينة والحي والشارع فقط»), in Arabic and in English. The phone and the
-  // email are not given yet, so they are not printed.
+  // المدينة والحي والشارع فقط»), in Arabic and in English; of 2026-11-19: the phone
+  // and the email.
   assert.deepEqual(
     profileLib
       .companyProfileFacts()
@@ -96,8 +96,11 @@ test('the profile: the name and the values the owner gave', () => {
         'الرياض، حي الفيصلية، الدائري الشرقي الفرعي',
         'Riyadh, Al Faisaliyah Dist., Eastern Ring Branch',
       ],
+      ['phone', '+966 53 331 5222', '+966 53 331 5222'],
+      ['email', 'ksaleh@azzanco.com.sa', 'ksaleh@azzanco.com.sa'],
     ],
   )
+  assert.match(profile.phone, /^\+966( [0-9]+)+$/)
   assert.match(profile.unifiedNumber, /^7[0-9]{9}$/)
   assert.match(profile.vatNumber, /^[0-9]{15}$/)
   assert.doesNotMatch(profile.address, HAMZA_ALIF)

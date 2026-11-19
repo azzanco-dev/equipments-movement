@@ -36,9 +36,9 @@ export const COMPANY_PROFILE: CompanyProfile = {
   // the postal code are NOT printed, on his word.
   address: 'الرياض، حي الفيصلية، الدائري الشرقي الفرعي',
   addressEn: 'Riyadh, Al Faisaliyah Dist., Eastern Ring Branch',
-  // Not given yet: the phone and the email.
-  phone: '',
-  email: '',
+  // Given by the owner on 2026-11-19 (he wrote the number without the «+»).
+  phone: '+966 53 331 5222',
+  email: 'ksaleh@azzanco.com.sa',
 }
 
 export type CompanyProfileFactKey =
