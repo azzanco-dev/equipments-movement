@@ -2,11 +2,15 @@
 --
 -- Owner decisions: 2026-11-18 (ONE summary message a day at 9:00 Saudi time,
 -- only when there is something to say: the unpaid installments of ACTIVE
--- contracts that are overdue — repeated every day until paid —, due today,
--- and due in exactly 7 days; sent server side through the UltraMsg gateway,
--- logged, never twice the same day to the same person; triggered by Vercel
--- Cron calling a secret-protected route) and 2026-11-19 («خلي التذكير يكون
--- لعمر بلبحيث فقط»: one recipient).
+-- contracts that are overdue — repeated every day until paid — and the ones
+-- coming due; sent server side through the UltraMsg gateway, logged, never
+-- twice the same day to the same person; triggered by Vercel Cron calling a
+-- secret-protected route) and 2026-11-19 («خلي التذكير يكون لعمر بلبحيث
+-- فقط»: one recipient; then, after seeing the message, «بس … الي مستحقة
+-- خلال يوم» and, asked, «بكرة بس» with the overdue ones kept: the message
+-- holds the OVERDUE rows and the rows due TOMORROW only — not today's, not
+-- the 7-day ones; a row due today was in yesterday's message and is in
+-- tomorrow's as overdue when it is still unpaid).
 --
 -- ===========================================================================
 -- What this adds
@@ -132,8 +136,7 @@ CREATE TABLE public.installment_reminder_log (
     CONSTRAINT installment_reminder_log_status_check
       CHECK (status IN ('nothing', 'pending', 'sent', 'failed', 'no_mobile', 'not_configured')),
   overdue_count integer NOT NULL DEFAULT 0,
-  due_today_count integer NOT NULL DEFAULT 0,
-  due_soon_count integer NOT NULL DEFAULT 0,
+  due_tomorrow_count integer NOT NULL DEFAULT 0,
   total_amount numeric(14, 2) NOT NULL DEFAULT 0,
   attempts integer NOT NULL DEFAULT 0,
   provider_message_id text
@@ -202,7 +205,7 @@ REVOKE ALL ON FUNCTION public.assert_installment_reminder_key(text)
 -- ===========================================================================
 -- Returns
 --   { "day": "YYYY-MM-DD",
---     "items": [ { "bucket": "overdue" | "today" | "soon", "contract_number",
+--     "items": [ { "bucket": "overdue" | "tomorrow", "contract_number",
 --                  "description", "financier_name", "seq", "due_date",
 --                  "remaining_amount", "days_until_due" } … ],
 --     "recipients": [ { "log_id", "name", "mobile" } … ],
@@ -219,8 +222,7 @@ DECLARE
   v_day date;
   v_items jsonb;
   v_overdue integer;
-  v_today integer;
-  v_soon integer;
+  v_tomorrow integer;
   v_total numeric(14, 2);
   v_recipients jsonb := '[]'::jsonb;
   v_skipped integer := 0;
@@ -235,8 +237,7 @@ BEGIN
     SELECT
       CASE
         WHEN s.due_date < v_day THEN 'overdue'
-        WHEN s.due_date = v_day THEN 'today'
-        ELSE 'soon'
+        ELSE 'tomorrow'
       END AS bucket,
       c.contract_number,
       c.description,
@@ -250,7 +251,7 @@ BEGIN
     JOIN public.installment_financiers f ON f.id = c.financier_id
     WHERE c.status = 'active'
       AND s.paid_amount < s.amount
-      AND (s.due_date <= v_day OR s.due_date = v_day + 7)
+      AND (s.due_date < v_day OR s.due_date = v_day + 1)
   )
   SELECT
     COALESCE(
@@ -266,16 +267,15 @@ BEGIN
           'days_until_due', d.days_until_due
         )
         ORDER BY
-          CASE d.bucket WHEN 'overdue' THEN 1 WHEN 'today' THEN 2 ELSE 3 END,
+          CASE d.bucket WHEN 'overdue' THEN 1 ELSE 2 END,
           d.due_date, d.contract_number, d.seq
       ),
       '[]'::jsonb
     ),
     count(*) FILTER (WHERE d.bucket = 'overdue'),
-    count(*) FILTER (WHERE d.bucket = 'today'),
-    count(*) FILTER (WHERE d.bucket = 'soon'),
+    count(*) FILTER (WHERE d.bucket = 'tomorrow'),
     COALESCE(sum(d.remaining_amount), 0)
-  INTO v_items, v_overdue, v_today, v_soon, v_total
+  INTO v_items, v_overdue, v_tomorrow, v_total
   FROM due d;
 
   FOR v_rcpt IN
@@ -295,7 +295,7 @@ BEGIN
       ON CONFLICT (profile_id, reminder_day) DO UPDATE
         SET status = 'nothing',
             recipient_name = EXCLUDED.recipient_name,
-            overdue_count = 0, due_today_count = 0, due_soon_count = 0,
+            overdue_count = 0, due_tomorrow_count = 0,
             total_amount = 0, completed_at = now()
         WHERE l.status NOT IN ('sent', 'pending')
       RETURNING l.id INTO v_log_id;
@@ -307,17 +307,16 @@ BEGIN
 
     INSERT INTO public.installment_reminder_log AS l (
       profile_id, recipient_name, reminder_day, status,
-      overdue_count, due_today_count, due_soon_count, total_amount, attempts
+      overdue_count, due_tomorrow_count, total_amount, attempts
     ) VALUES (
       v_rcpt.profile_id, v_rcpt.full_name, v_day, 'pending',
-      v_overdue, v_today, v_soon, v_total, 1
+      v_overdue, v_tomorrow, v_total, 1
     )
     ON CONFLICT (profile_id, reminder_day) DO UPDATE
       SET status = 'pending',
           recipient_name = EXCLUDED.recipient_name,
           overdue_count = EXCLUDED.overdue_count,
-          due_today_count = EXCLUDED.due_today_count,
-          due_soon_count = EXCLUDED.due_soon_count,
+          due_tomorrow_count = EXCLUDED.due_tomorrow_count,
           total_amount = EXCLUDED.total_amount,
           attempts = l.attempts + 1,
           provider_message_id = NULL,
@@ -347,7 +346,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.prepare_installment_reminder(text) IS
-  '0205: after the secret check, collects today''s (saudi_today()) unpaid installments of active contracts — overdue, due today, due in exactly 7 days — and claims one log row per active recipient for today (pending; nothing when there is nothing to say; skipped when today''s row is already sent or pending). Returns the items and the claimed recipients with their mobile. Executable by anon only (the cron route).';
+  '0205: after the secret check, collects today''s (saudi_today()) unpaid installments of active contracts — overdue and due tomorrow — and claims one log row per active recipient for today (pending; nothing when there is nothing to say; skipped when today''s row is already sent or pending). Returns the items and the claimed recipients with their mobile. Executable by anon only (the cron route).';
 
 REVOKE ALL ON FUNCTION public.prepare_installment_reminder(text)
   FROM PUBLIC, anon, authenticated;

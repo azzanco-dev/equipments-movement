@@ -3,18 +3,17 @@
 // `prepare_installment_reminder`, parses it with `parseInstallmentReminder`
 // and sends the text of `buildInstallmentReminderMessage`.
 //
-// The text is a fixed template (owner 2026-11-18 / 2026-11-19):
+// The text is a fixed template (owner 2026-11-18 / 2026-11-19; the sections
+// since «بكرة بس» of 2026-11-19: the OVERDUE rows and the rows due TOMORROW,
+// nothing of today and nothing 7 days ahead):
 //
 //   تذكير الاقساط - 19/11/2026
 //
 //   متاخرة (1):
 //   • INS-0003 - شراء شيول - بنك الراجحي - 12,500 ريال - متاخر 3 ايام
 //
-//   مستحقة اليوم (1):
-//   • …
-//
-//   بعد 7 ايام (2):
-//   • …
+//   مستحقة غدا (2):
+//   • INS-0007 - حفار - بنك الراجحي - 18,000 ريال
 //
 //   الرابط: https://portal.azzanco.com/installments
 //
@@ -26,7 +25,7 @@
 // carry no alif with hamza or madda; the contract titles and financier names
 // are data and are printed as stored, on one line.
 
-export type InstallmentReminderBucket = 'overdue' | 'today' | 'soon'
+export type InstallmentReminderBucket = 'overdue' | 'tomorrow'
 
 export interface InstallmentReminderItem {
   bucket: InstallmentReminderBucket
@@ -55,7 +54,7 @@ export interface InstallmentReminderPayload {
   skipped: number
 }
 
-const BUCKETS: readonly InstallmentReminderBucket[] = ['overdue', 'today', 'soon']
+const BUCKETS: readonly InstallmentReminderBucket[] = ['overdue', 'tomorrow']
 
 export const INSTALLMENT_REMINDER_TITLE = 'تذكير الاقساط'
 export const INSTALLMENT_REMINDER_SECTION_TITLES: Record<
@@ -63,8 +62,7 @@ export const INSTALLMENT_REMINDER_SECTION_TITLES: Record<
   string
 > = {
   overdue: 'متاخرة',
-  today: 'مستحقة اليوم',
-  soon: 'بعد 7 ايام',
+  tomorrow: 'مستحقة غدا',
 }
 export const INSTALLMENT_REMINDER_LINK_LABEL = 'الرابط'
 export const INSTALLMENT_REMINDER_CURRENCY = 'ريال'

@@ -74,31 +74,22 @@ test('the agreed message: sections in order, the link last', () => {
     items: [
       item(),
       item({
-        bucket: 'today',
-        contractNumber: 'INS-0005',
-        description: 'سيارة نقل',
-        financierName: 'بنك الانماء',
-        dueDate: DAY,
-        remainingAmount: 4000.5,
-        daysUntilDue: 0,
-      }),
-      item({
-        bucket: 'soon',
+        bucket: 'tomorrow',
         contractNumber: 'INS-0007',
         description: 'رافعة',
         financierName: 'وكالة',
-        dueDate: '2026-11-26',
+        dueDate: '2026-11-20',
         remainingAmount: 1234567,
-        daysUntilDue: 7,
+        daysUntilDue: 1,
       }),
       item({
-        bucket: 'soon',
+        bucket: 'tomorrow',
         contractNumber: 'INS-0008',
         description: 'حفار',
         financierName: 'وكالة',
-        dueDate: '2026-11-26',
-        remainingAmount: 900,
-        daysUntilDue: 7,
+        dueDate: '2026-11-20',
+        remainingAmount: 4000.5,
+        daysUntilDue: 1,
       }),
     ],
   })
@@ -110,12 +101,9 @@ test('the agreed message: sections in order, the link last', () => {
       'متاخرة (1):',
       '• INS-0003 - شيول كاتربلر - بنك الراجحي - 12,500 ريال - متاخر 3 ايام',
       '',
-      'مستحقة اليوم (1):',
-      '• INS-0005 - سيارة نقل - بنك الانماء - 4,000.50 ريال',
-      '',
-      'بعد 7 ايام (2):',
+      'مستحقة غدا (2):',
       '• INS-0007 - رافعة - وكالة - 1,234,567 ريال',
-      '• INS-0008 - حفار - وكالة - 900 ريال',
+      '• INS-0008 - حفار - وكالة - 4,000.50 ريال',
       '',
       'الرابط: https://portal.azzanco.com/installments',
     ].join('\n'),
@@ -127,11 +115,13 @@ test('nothing to say gives no message; an empty section is left out', () => {
   const message = lib.buildInstallmentReminderMessage({
     day: DAY,
     appBaseUrl: ORIGIN,
-    items: [item({ bucket: 'soon', daysUntilDue: 7, dueDate: '2026-11-26' })],
+    items: [item({ bucket: 'tomorrow', daysUntilDue: 1, dueDate: '2026-11-20' })],
   })
   assert.ok(!message.includes('متاخرة'))
-  assert.ok(!message.includes('مستحقة اليوم'))
-  assert.ok(message.includes('بعد 7 ايام (1):'))
+  assert.ok(message.includes('مستحقة غدا (1):'))
+  // Only two sections exist: nothing of today and nothing 7 days ahead.
+  assert.deepEqual(Object.keys(lib.INSTALLMENT_REMINDER_SECTION_TITLES), ['overdue', 'tomorrow'])
+  assert.doesNotMatch(LIB, /اليوم|7 ايام/)
 })
 
 test('without an origin the link line is left out', () => {
@@ -187,14 +177,14 @@ test('a long section is cut with «و N اخرى» and the text stays short', ()
   const bullets = message.split('\n').filter((line) => line.startsWith('• '))
   assert.equal(bullets.length, lib.INSTALLMENT_REMINDER_MAX_LINES)
 
-  const huge = Array.from({ length: 3 }, (_, b) =>
+  const huge = Array.from({ length: 2 }, (_, b) =>
     Array.from({ length: 40 }, (_, index) =>
       item({
-        bucket: ['overdue', 'today', 'soon'][b],
+        bucket: ['overdue', 'tomorrow'][b],
         contractNumber: `INS-${b}${String(index).padStart(3, '0')}`,
         description: 'ب'.repeat(80),
         financierName: 'ج'.repeat(80),
-        daysUntilDue: b === 0 ? -5 : b === 1 ? 0 : 7,
+        daysUntilDue: b === 0 ? -5 : 1,
       }),
     ),
   ).flat()
@@ -234,8 +224,7 @@ test('Latin digits and no alif with hamza or madda in the template', () => {
     appBaseUrl: ORIGIN,
     items: [
       item({ description: 'شيول', financierName: 'جهة' }),
-      item({ bucket: 'today', contractNumber: 'INS-0004', description: 'نقل', financierName: 'جهة', daysUntilDue: 0, dueDate: DAY }),
-      item({ bucket: 'soon', contractNumber: 'INS-0006', description: 'رافعة', financierName: 'جهة', daysUntilDue: 7, dueDate: '2026-11-26' }),
+      item({ bucket: 'tomorrow', contractNumber: 'INS-0006', description: 'رافعة', financierName: 'جهة', daysUntilDue: 1, dueDate: '2026-11-20' }),
     ],
   })
   assert.doesNotMatch(message, /[٠-٩۰-۹]/)
@@ -271,7 +260,8 @@ test('the payload parser keeps valid rows only', () => {
         days_until_due: -9,
       },
       { bucket: 'later', contract_number: 'INS-0002', remaining_amount: 1, days_until_due: 9, due_date: DAY },
-      { bucket: 'today', contract_number: '', remaining_amount: 1, days_until_due: 0, due_date: DAY },
+      { bucket: 'tomorrow', contract_number: '', remaining_amount: 1, days_until_due: 1, due_date: DAY },
+      { bucket: 'today', contract_number: 'INS-0009', remaining_amount: 1, days_until_due: 0, due_date: DAY },
     ],
     recipients: [
       { log_id: 'abc', name: 'عمر', mobile: ' 0500000000 ' },
@@ -350,13 +340,14 @@ test('0205: the secret is stored as a hash only and checked first', () => {
   assert.doesNotMatch(MIGRATION, /GRANT EXECUTE ON FUNCTION public\.(prepare|complete)_installment_reminder[^;]*authenticated/)
 })
 
-test('0205: active contracts, unpaid rows, overdue / today / in 7 days, once a day', () => {
+test('0205: active contracts, unpaid rows, overdue and due tomorrow only, once a day', () => {
   const start = MIGRATION.indexOf('CREATE OR REPLACE FUNCTION public.prepare_installment_reminder(')
   const body = MIGRATION.slice(start, MIGRATION.indexOf('$$;', start))
   assert.match(body, /v_day := public\.saudi_today\(\)/)
   assert.match(body, /c\.status = 'active'/)
   assert.match(body, /s\.paid_amount < s\.amount/)
-  assert.match(body, /s\.due_date <= v_day OR s\.due_date = v_day \+ 7/)
+  assert.match(body, /s\.due_date < v_day OR s\.due_date = v_day \+ 1/)
+  assert.doesNotMatch(body, /v_day \+ 7|'today'|'soon'/)
   // The claim is one statement that skips a row already sent or pending.
   const claims = body.match(/WHERE l\.status NOT IN \('sent', 'pending'\)/g) ?? []
   assert.equal(claims.length, 2)
