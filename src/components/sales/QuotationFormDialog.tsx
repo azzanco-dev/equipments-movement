@@ -1332,6 +1332,9 @@ export function QuotationFormDialog({
           open={contactDialogOpen}
           onOpenChange={setContactDialogOpen}
           companyId={companyId}
+          // A person added here is assigned to the quotation's project
+          // (owner 2026-11-19); with no project, to every project.
+          projectIds={projectId ? [projectId] : []}
           onSaved={(id, saved) => {
             setContactDialogOpen(false)
             // The new person becomes this quotation's «عناية», then the

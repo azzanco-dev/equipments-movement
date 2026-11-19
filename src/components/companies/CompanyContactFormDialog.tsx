@@ -1,6 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { AsyncSearchSelectOption } from '@/components/AsyncSearchSelect'
-import { AsyncMultiSelect } from '@/components/data-list/AsyncMultiSelect'
+import { useEffect, useRef, useState } from 'react'
 import { Button, Dialog, Field, Input, Notice } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
@@ -22,16 +20,15 @@ import {
   hasErrors,
   type FieldErrors,
 } from '@/lib/formValidation'
-import { localizedName } from '@/lib/localizedName'
-import { buildSearchFilter, COMPANY_PROJECT_SEARCH_FIELDS } from '@/lib/search'
-import { supabase } from '@/lib/supabase'
-import { unwrapRows } from '@/lib/supabaseResult'
 
 /**
  * «اضافة شخص مسؤول» / «تعديل الشخص المسؤول» (migration 0204, owner
  * 2026-11-19): a responsible person of ONE client company — the name, the
- * contact number, the email — and the projects the person is assigned to
- * (none = every project of the company). Saved at once through
+ * contact number, the email. The form has NO projects field (owner
+ * 2026-11-19, «شيل المشاريع, خليها مرتبطة باختياره للمشروع»): a NEW person
+ * is assigned to `projectIds` (the project chosen in the quotation form;
+ * none = every project of the company), and an edit keeps the projects the
+ * person already has. Saved at once through
  * `save_company_contact` (`sales.manage` or `companies_projects.edit`), apart
  * from whatever form opened it: the quotation form (a new person, who then
  * becomes its «عناية») and the company form's «الاشخاص المسؤولون» section.
@@ -42,6 +39,7 @@ export function CompanyContactFormDialog({
   onOpenChange,
   companyId,
   contact = null,
+  projectIds = [],
   onSaved,
 }: {
   open: boolean
@@ -50,17 +48,15 @@ export function CompanyContactFormDialog({
   companyId: string
   /** The person to edit; null adds a new one. */
   contact?: CompanyContact | null
+  /** The projects a NEW person is assigned to (none = every project). */
+  projectIds?: readonly string[]
   /** The saved person's id and values (as typed, trimmed by the database). */
   onSaved: (id: string, values: CompanyContactFormValues) => void
 }) {
-  const { t, lang } = useI18n()
+  const { t } = useI18n()
   const [form, setForm] = useState<CompanyContactFormValues>(
     EMPTY_COMPANY_CONTACT_FORM,
   )
-  // The labels of the chosen projects (the multi-select prints them).
-  const [projectOptions, setProjectOptions] = useState<
-    AsyncSearchSelectOption[]
-  >([])
   const [errors, setErrors] = useState<FieldErrors<CompanyContactFormValues>>(
     {},
   )
@@ -73,13 +69,7 @@ export function CompanyContactFormDialog({
     setForm(
       contact
         ? companyContactFormValuesOf(contact)
-        : EMPTY_COMPANY_CONTACT_FORM,
-    )
-    setProjectOptions(
-      (contact?.projects ?? []).map((project) => ({
-        value: project.id,
-        label: localizedName(lang, project.name_ar, project.name_en),
-      })),
+        : { ...EMPTY_COMPANY_CONTACT_FORM, project_ids: [...projectIds] },
     )
     setErrors({})
     setFormError(null)
@@ -87,26 +77,6 @@ export function CompanyContactFormDialog({
     // The person is read only when the dialog opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
-
-  const loadProjects = useCallback(
-    async (query: string) => {
-      let request = supabase
-        .from('projects')
-        .select('id,name_ar,name_en')
-        .order('name_ar')
-        .limit(20)
-      const searchFilter = buildSearchFilter(
-        COMPANY_PROJECT_SEARCH_FIELDS,
-        query,
-      )
-      if (searchFilter) request = request.or(searchFilter)
-      return unwrapRows(await request).map((item) => ({
-        value: item.id,
-        label: localizedName(lang, item.name_ar, item.name_en),
-      }))
-    },
-    [lang],
-  )
 
   const update = (patch: Partial<CompanyContactFormValues>) => {
     setForm((current) => ({ ...current, ...patch }))
@@ -140,7 +110,10 @@ export function CompanyContactFormDialog({
     setSaving(false)
     if (result.error || !result.data) {
       const outcome = companyContactErrorOutcome(result.error)
-      if ('fieldErrors' in outcome) {
+      // No projects field to point at: its refusal is a form message.
+      if ('fieldErrors' in outcome && outcome.fieldErrors.project_ids) {
+        setFormError(outcome.fieldErrors.project_ids)
+      } else if ('fieldErrors' in outcome) {
         setErrors(outcome.fieldErrors)
         focusFirstError(outcome.fieldErrors, COMPANY_CONTACT_FIELD_ORDER, {
           root: formRef.current,
@@ -238,28 +211,6 @@ export function CompanyContactFormDialog({
             )}
           </Field>
         </div>
-        <Field
-          label={t('companyContactProjects')}
-          name="project_ids"
-          hint={t('companyContactProjectsHint')}
-          error={fieldError('project_ids')}
-        >
-          {(control) => (
-            <AsyncMultiSelect
-              id={control.id}
-              aria-describedby={control['aria-describedby']}
-              invalid={Boolean(errors.project_ids)}
-              value={form.project_ids}
-              selectedOptions={projectOptions}
-              allLabel={t('companyContactAllProjects')}
-              loadOptions={loadProjects}
-              onValueChange={(value, options) => {
-                update({ project_ids: value })
-                setProjectOptions(options)
-              }}
-            />
-          )}
-        </Field>
       </div>
     </Dialog>
   )

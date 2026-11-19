@@ -2878,7 +2878,6 @@ export const translations = {
     companyContactNumber: 'رقم التواصل',
     companyContactEmail: 'الايميل',
     companyContactProjects: 'المشاريع',
-    companyContactProjectsHint: 'اتركها فارغة ليكون لكل مشاريع الشركة.',
     companyContactAllProjects: 'كل المشاريع',
     companyContactSave: 'حفظ',
     companyContactSaveFailed: 'تعذر الحفظ. حاول مرة اخرى.',
@@ -6237,8 +6236,6 @@ export const translations = {
     companyContactNumber: 'Contact number',
     companyContactEmail: 'Email',
     companyContactProjects: 'Projects',
-    companyContactProjectsHint:
-      'Leave it empty for every project of the company.',
     companyContactAllProjects: 'All projects',
     companyContactSave: 'Save',
     companyContactSaveFailed: 'Could not save. Try again.',

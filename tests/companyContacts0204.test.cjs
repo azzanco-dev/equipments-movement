@@ -529,3 +529,21 @@ test('the translations: both languages, plain alif', () => {
   assert.equal(translations.ar.companyContactsTitle, 'الاشخاص المسؤولون')
   assert.equal(translations.ar.companyContactAdd, 'اضافة شخص مسؤول')
 })
+
+test('the person form has no projects field; a person added from a quotation takes its project (owner 2026-11-19)', () => {
+  const dialog = read('src', 'components', 'companies', 'CompanyContactFormDialog.tsx')
+  assert.ok(!dialog.includes('AsyncMultiSelect'))
+  assert.ok(!dialog.includes('companyContactProjects'))
+  assert.ok(!dialog.includes("from('projects')"))
+  // A new person: the given projects; an edit keeps the stored ones.
+  assert.ok(dialog.includes('projectIds = []'))
+  assert.ok(dialog.includes('{ ...EMPTY_COMPANY_CONTACT_FORM, project_ids: [...projectIds] }'))
+  assert.ok(dialog.includes('companyContactFormValuesOf(contact)'))
+  // A project refusal is a form message (no field to point at).
+  assert.ok(dialog.includes('setFormError(outcome.fieldErrors.project_ids)'))
+  const form = read('src', 'components', 'sales', 'QuotationFormDialog.tsx')
+  assert.ok(form.includes('projectIds={projectId ? [projectId] : []}'))
+  // The company section passes none: a person added there is for every project.
+  const section = read('src', 'components', 'companies', 'CompanyContactsSection.tsx')
+  assert.doesNotMatch(section, /projectIds=/)
+})
