@@ -388,9 +388,18 @@ test('the route: the Vercel Cron secret, no service key, a count summary only', 
   }
 })
 
-test('vercel.json: one cron at 06:00 UTC = 09:00 Saudi time', () => {
+test('vercel.json: one Vercel schedule at 09:00 Riyadh time, GET, no legacy crons', () => {
   const config = JSON.parse(read('vercel.json'))
-  assert.deepEqual(config.crons, [
-    { path: '/api/cron/installment-reminder', schedule: '0 6 * * *' },
-  ])
+  // A cron entry beside the schedule would run the route twice a day.
+  assert.equal(config.crons, undefined)
+  assert.deepEqual(config.schedules, {
+    'installment-reminder': {
+      schedule: '0 9 * * *',
+      timezone: 'Asia/Riyadh',
+      path: '/api/cron/installment-reminder',
+      // The route exports GET only; a schedule path defaults to POST.
+      requestMethod: 'GET',
+    },
+  })
+  assert.match(ROUTE, /export\s+(async\s+)?function\s+GET\b|export\s+const\s+GET\b/)
 })

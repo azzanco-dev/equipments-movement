@@ -1,9 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "crons": [
-    {
+  "schedules": {
+    "installment-reminder": {
+      "schedule": "0 9 * * *",
+      "timezone": "Asia/Riyadh",
       "path": "/api/cron/installment-reminder",
-      "schedule": "0 6 * * *"
+      "requestMethod": "GET"
     }
-  ]
+  }
 }
