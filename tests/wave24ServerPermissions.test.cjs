@@ -61,6 +61,11 @@ const NO_ROUTE_GATE = new Set([
   'app/api/movements/photo-uploads/route.ts',
 ])
 
+/** Scheduled jobs (migration 0205): no signed-in user, so no permission key.
+ *  Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`; the route checks
+ *  it before anything else and the database re-checks its hash. */
+const CRON_SECRET_ROUTES = new Set(['app/api/cron/installment-reminder/route.ts'])
+
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 test('requirePermission shares the token flow and demands exactly true', () => {
@@ -117,6 +122,15 @@ test('every API route decides by its permission key; none by the role', () => {
       continue
     }
     if (ADMIN_ONLY_BY_DESIGN.has(route)) continue
+    if (CRON_SECRET_ROUTES.has(route)) {
+      assert.ok(!/requireAdmin|is_admin\(|\.role\b/.test(source), route)
+      assert.match(source, /process\.env\.CRON_SECRET/, route)
+      const handler = source.slice(source.indexOf('export async function GET'))
+      const check = handler.indexOf('secretMatches(')
+      assert.ok(check > 0, `${route} checks the secret`)
+      assert.ok(!/await /.test(handler.slice(0, check)), `${route} works before the check`)
+      continue
+    }
     assert.ok(
       !/requireAdmin|rpc\('is_admin'\)|is_admin\(/.test(source),
       `${route} still decides by the role`,
@@ -170,7 +184,9 @@ test('every API route decides by its permission key; none by the role', () => {
     Object.keys(ROUTE_KEYS).sort(),
     routes.filter(
       (route) =>
-        !route.startsWith('app/api/extracting/') && !NO_ROUTE_GATE.has(route),
+        !route.startsWith('app/api/extracting/') &&
+        !NO_ROUTE_GATE.has(route) &&
+        !CRON_SECRET_ROUTES.has(route),
     ),
     'every gated route is listed with its key',
   )
