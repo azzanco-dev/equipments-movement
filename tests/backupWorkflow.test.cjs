@@ -107,11 +107,21 @@ test('pruning a dump folder that does not exist yet is not a failure', () => {
 test('rclone comes from its pinned release, checked by SHA-256', () => {
   // The third run (2026-11-19) failed on an Ubuntu mirror during apt-get.
   assert.doesNotMatch(CODE, /apt-get install[^\n]*rclone/)
-  assert.match(CODE, /RCLONE_VERSION: v\d+\.\d+\.\d+/)
-  assert.match(CODE, /RCLONE_SHA256: [0-9a-f]{64}/)
+  assert.match(CODE, /TOOL_RCLONE_VERSION: v\d+\.\d+\.\d+/)
+  assert.match(CODE, /TOOL_RCLONE_SHA256: [0-9a-f]{64}/)
   assert.match(CODE, /curl -fsSL --retry 5/)
   assert.match(CODE, /sha256sum -c --quiet -/)
   assert.match(CODE, /https:\/\/github\.com\/rclone\/rclone\/releases\/download\//)
   // The check comes before the binary is unpacked.
   assert.ok(CODE.indexOf('sha256sum -c') < CODE.indexOf('unzip -q -j'))
+})
+
+test('no RCLONE_ variable but the remotes and the stats', () => {
+  // rclone reads every RCLONE_<FLAG> variable as a flag: RCLONE_VERSION
+  // became --version and stopped the fourth run (2026-11-19).
+  const names = [...CODE.matchAll(/\b(RCLONE_[A-Z0-9_]+)\s*[:=]/g)].map((m) => m[1])
+  assert.ok(names.length > 0)
+  for (const name of names) {
+    assert.ok(/^RCLONE_CONFIG_(GDRIVE|SUPABASE)_[A-Z_]+$|^RCLONE_STATS$/.test(name), name)
+  }
 })

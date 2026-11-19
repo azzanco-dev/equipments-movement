@@ -129,15 +129,15 @@ jobs:
       # SHA-256 (the third run failed on an Ubuntu mirror, 2026-11-19).
       - name: Install the tools
         env:
-          RCLONE_VERSION: v1.75.2
-          RCLONE_SHA256: 349ac8fba6ff65d6247043f1750cdcb518ec5d500ef91463a10d37c0ccdf3702
+          TOOL_RCLONE_VERSION: v1.75.2
+          TOOL_RCLONE_SHA256: 349ac8fba6ff65d6247043f1750cdcb518ec5d500ef91463a10d37c0ccdf3702
         run: |
           set -euo pipefail
           zip="$RUNNER_TEMP/rclone.zip"
           curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o "$zip" \
-            "https://github.com/rclone/rclone/releases/download/${RCLONE_VERSION}/rclone-${RCLONE_VERSION}-linux-amd64.zip"
-          echo "${RCLONE_SHA256}  $zip" | sha256sum -c --quiet -
-          unzip -q -j "$zip" "rclone-${RCLONE_VERSION}-linux-amd64/rclone" -d "$RUNNER_TEMP/bin"
+            "https://github.com/rclone/rclone/releases/download/${TOOL_RCLONE_VERSION}/rclone-${TOOL_RCLONE_VERSION}-linux-amd64.zip"
+          echo "${TOOL_RCLONE_SHA256}  $zip" | sha256sum -c --quiet -
+          unzip -q -j "$zip" "rclone-${TOOL_RCLONE_VERSION}-linux-amd64/rclone" -d "$RUNNER_TEMP/bin"
           chmod +x "$RUNNER_TEMP/bin/rclone"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           "$RUNNER_TEMP/bin/rclone" version | sed -n 1p
