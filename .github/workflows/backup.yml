@@ -31,8 +31,8 @@
 #   SUPABASE_S3_SECRET_ACCESS_KEY  S3 connection); it reads and writes Storage,
 #                                this job only reads
 #   GDRIVE_TOKEN                 the JSON printed by
-#                                rclone authorize "drive" "eyJzY29wZSI6ImRyaXZlLmZpbGUifQ=="
-#                                (base64 of {"scope":"drive.file"}) on the
+#                                rclone authorize "drive" "eyJzY29wZSI6ImRyaXZlLmZpbGUifQ"
+#                                (unpadded base64 of {"scope":"drive.file"}) on the
 #                                owner's computer, signed in to the company
 #                                Google account
 #
