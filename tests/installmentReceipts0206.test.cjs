@@ -273,7 +273,7 @@ test('the lists: the shared toolbar, the page sizes and the main table look', ()
     assert.match(source, /<DataListToolbar/, file)
     assert.match(source, /onPageSize=\{list\.setPageSize\}/, file)
     assert.match(source, /cellTextClassName="text-\[13px\]"/, file)
-    assert.match(source, /cellClassName="py-2"/, file)
+    assert.match(source, /cellClassName="py-3"/, file)
     assert.match(source, /size="sm"/, file)
     assert.doesNotMatch(source, /<Select\b|<SearchInput\b|<Checkbox\b/, file)
   }

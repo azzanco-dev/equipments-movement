@@ -204,7 +204,7 @@ export function InstallmentsFinanciersTab({
       {load.status !== 'failed' && (
         <DataTable
           cellTextClassName="text-[13px]"
-          cellClassName="py-2"
+          cellClassName="py-3"
           columns={columns}
           rows={[...financiers]}
           rowKey={(item) => item.id}

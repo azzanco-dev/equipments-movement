@@ -248,21 +248,27 @@ export function DueDateCell({
   /** Negative = days overdue. */
   days: number
 }) {
-  const { lang } = useI18n()
   return (
-    <span className="flex flex-col items-start">
+    <span className="flex flex-col items-start gap-0.5">
       <bdi dir="ltr" className={cn('font-medium', days < 0 && 'text-danger')}>
         {formatDate(dueDate)}
       </bdi>
-      <span
-        className={cn(
-          'text-xs',
-          days < 0 ? 'text-danger' : days === 0 ? 'text-warning' : 'text-muted',
-        )}
-      >
-        {whenWords(days, lang)}
-      </span>
+      <WhenBadge days={days} />
     </span>
+  )
+}
+
+/** «باقي 5 ايام» / «اليوم» / «متاخر 3 ايام» as a small badge: red when late,
+ *  amber today, neutral ahead (owner 2026-11-19, «باقي x يوم خليه بادج»). */
+export function WhenBadge({ days }: { days: number }) {
+  const { lang } = useI18n()
+  return (
+    <Badge
+      size="sm"
+      tone={days < 0 ? 'danger' : days === 0 ? 'warning' : 'neutral'}
+    >
+      {whenWords(days, lang)}
+    </Badge>
   )
 }
 

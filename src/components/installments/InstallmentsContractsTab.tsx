@@ -15,13 +15,11 @@ import {
 import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
 import {
-  fetchInstallmentContractUnits,
   fetchInstallmentContractsPage,
 } from '@/lib/installmentsData'
 import {
   amountOf,
   paidPercent,
-  unitsByContract,
   withFinancierOptions,
   INSTALLMENT_CONTRACTS_URL_PREFIX,
   type InstallmentContractRow,
@@ -35,7 +33,6 @@ import {
   Money,
   OverdueBadge,
   PaidProgress,
-  UnitTags,
 } from './cells'
 import { useLoad } from './useLoad'
 
@@ -44,8 +41,7 @@ import { useLoad } from './useLoad'
  * (`installmentContractsListConfig`, URL prefix `c`): the shared toolbar
  * with its search (number, title, financier), its filter dialog (status,
  * financier, «المتاخرة فقط», the next due date) and sort menu, the main
- * list table look and the page sizes 20 … 500, all on the server. The unit
- * tags come from ONE bounded read for the contracts of the page.
+ * list table look and the page sizes 20 … 500, all on the server.
  */
 export function InstallmentsContractsTab({
   financiers,
@@ -87,44 +83,26 @@ export function InstallmentsContractsTab({
   const rows = useMemo(() => load.data?.rows ?? [], [load.data])
   const total = load.data?.total ?? 0
 
-  // The tags are a nicety: a failed read leaves the unit counts.
-  const idsKey = rows
-    .filter((row) => row.equipment_count > 0)
-    .map((row) => row.id)
-    .join(',')
-  const unitsLoader = useCallback(
-    (signal: AbortSignal) =>
-      fetchInstallmentContractUnits(idsKey ? idsKey.split(',') : [], signal),
-    [idsKey],
-  )
-  const unitsLoad = useLoad(unitsLoader, version)
-  const units = useMemo(
-    () => unitsByContract(unitsLoad.data ?? []),
-    [unitsLoad.data],
-  )
-
   const columns: DataTableColumn<InstallmentContractRow>[] = [
     {
       key: 'description',
       header: t('instContract'),
       sortable: true,
-      // The identity cell: the title in bold, the number and the financier
-      // as its muted line (the main list look; the financier has no column).
+      // The identity cell: the title in bold, the number as its muted line.
       cell: (row) => (
         <ContractCell
           description={row.description}
           contractNumber={row.contract_number}
-          financierName={row.financier_name}
         />
       ),
     },
     {
-      key: 'units',
-      header: t('instUnits'),
+      key: 'financier',
+      header: t('instFinancier'),
       hideBelow: 'md',
-      cell: (row) => (
-        <UnitTags units={units.get(row.id) ?? []} count={row.equipment_count} />
-      ),
+      // The financier in its own column (owner 2026-11-19, «واستبدل عمود
+      // المعدات بالجهة»: the units column is gone from the lists).
+      cell: (row) => <span className="font-medium">{row.financier_name}</span>,
     },
     {
       key: 'paid',
@@ -230,7 +208,7 @@ export function InstallmentsContractsTab({
           sort={{ key: sort, direction }}
           onSortChange={list.setSort}
           cellTextClassName="text-[13px]"
-          cellClassName="py-2"
+          cellClassName="py-3"
           empty={
             <EmptyState
               icon={<FileText size={28} aria-hidden="true" />}

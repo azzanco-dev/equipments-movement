@@ -35,6 +35,7 @@ import {
   InstallmentStateBadge,
   Money,
   OverdueBadge,
+  WhenBadge,
   PaidProgress,
   PeriodRange,
   UnitTags,
@@ -88,7 +89,6 @@ import {
   isSchedulePaid,
   paidPercent,
   scheduleRemaining,
-  whenWords,
   INSTALLMENT_HISTORY_LABEL_KEYS,
   type InstallmentPaymentRow,
 } from '@/lib/installmentsView'
@@ -730,12 +730,9 @@ function InstallmentContractDetailInner({
                             />
                             <bdi dir="ltr">{formatDate(row.due_date)}</bdi>
                             {rowState === 'overdue' && (
-                              <span className="text-xs text-danger">
-                                {whenWords(
-                                  daysUntilDue(row.due_date, today),
-                                  lang,
-                                )}
-                              </span>
+                              <WhenBadge
+                                days={daysUntilDue(row.due_date, today)}
+                              />
                             )}
                           </p>
                           {rowState && (

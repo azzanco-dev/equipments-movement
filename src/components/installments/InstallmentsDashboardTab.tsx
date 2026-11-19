@@ -34,7 +34,6 @@ import {
   contractsWords,
   installmentsWords,
   monthlyDueBuckets,
-  whenWords,
   type InstallmentDueRow,
   type InstallmentDuesView,
   type InstallmentOverviewRow,
@@ -44,6 +43,7 @@ import { CashflowBars } from './CashflowBars'
 import {
   ContractCell,
   DueDateCell,
+  WhenBadge,
   InstallmentStateBadge,
   Money,
 } from './cells'
@@ -193,10 +193,10 @@ export function InstallmentsDashboardTab({
           value={<Money value={overview.due_7_amount} />}
           hint={
             !data ? undefined : data.nearest ? (
-              <span>
+              <span className="inline-flex flex-wrap items-center gap-1">
                 {t('instNearestDue')}{' '}
-                <bdi dir="ltr">{formatDate(data.nearest.due_date)}</bdi> ·{' '}
-                {whenWords(data.nearest.days_until_due, lang)}
+                <bdi dir="ltr">{formatDate(data.nearest.due_date)}</bdi>
+                <WhenBadge days={data.nearest.days_until_due} />
               </span>
             ) : (
               t('instNoUpcoming')
@@ -299,9 +299,9 @@ export function InstallmentsDashboardTab({
                           <bdi dir="ltr">{row.contract_number}</bdi> ·{' '}
                           {row.financier_name}
                         </span>
-                        <span className="mt-0.5 block text-xs text-danger">
-                          <bdi dir="ltr">{formatDate(row.due_date)}</bdi> ·{' '}
-                          {whenWords(row.days_until_due, lang)}
+                        <span className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-danger">
+                          <bdi dir="ltr">{formatDate(row.due_date)}</bdi>
+                          <WhenBadge days={row.days_until_due} />
                         </span>
                       </AppLink>
                       <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -360,7 +360,7 @@ export function InstallmentsDashboardTab({
             </div>
             <DataTable
               cellTextClassName="text-[13px]"
-              cellClassName="py-2"
+              cellClassName="py-3"
               columns={columns}
               rows={data.upcoming}
               rowKey={(row) => row.id}

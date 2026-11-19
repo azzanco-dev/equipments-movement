@@ -16,7 +16,6 @@ import {
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import {
-  fetchInstallmentContractUnits,
   fetchInstallmentDuesMonthCount,
   fetchInstallmentDuesPage,
   fetchInstallmentDuesTotal,
@@ -26,7 +25,6 @@ import {
   installmentMonthLabel,
   installmentsWords,
   monthKeyOf,
-  unitsByContract,
   withFinancierOptions,
   INSTALLMENT_DUES_URL_PREFIX,
   INSTALLMENT_DUES_VIEWS,
@@ -45,7 +43,6 @@ import {
   DueDateCell,
   InstallmentStateBadge,
   Money,
-  UnitTags,
 } from './cells'
 import { useLoad } from './useLoad'
 
@@ -125,20 +122,6 @@ export function InstallmentsDuesTab({
     all: overview.open_count,
   }
 
-  // The tags are a nicety: a failed read leaves the cell empty-handed
-  // («بدون» is never shown for a contract whose units could not be read).
-  const idsKey = [...new Set(rows.map((row) => row.contract_id))].join(',')
-  const unitsLoader = useCallback(
-    (signal: AbortSignal) =>
-      fetchInstallmentContractUnits(idsKey ? idsKey.split(',') : [], signal),
-    [idsKey],
-  )
-  const unitsLoad = useLoad(unitsLoader, version)
-  const units = useMemo(
-    () => unitsByContract(unitsLoad.data ?? []),
-    [unitsLoad.data],
-  )
-
   const columns: DataTableColumn<InstallmentDueRow>[] = [
     {
       key: 'due_date',
@@ -155,20 +138,16 @@ export function InstallmentsDuesTab({
         <ContractCell
           description={row.description}
           contractNumber={row.contract_number}
-          financierName={row.financier_name}
         />
       ),
     },
     {
-      key: 'units',
-      header: t('instUnits'),
-      hideBelow: 'lg',
-      cell: (row) => {
-        const linked = units.get(row.contract_id) ?? []
-        if (unitsLoad.status !== 'ready')
-          return <span className="text-muted">—</span>
-        return <UnitTags units={linked} count={linked.length} />
-      },
+      key: 'financier',
+      header: t('instFinancier'),
+      hideBelow: 'md',
+      // The financier in its own column (owner 2026-11-19, «واستبدل عمود
+      // المعدات بالجهة»: the units column is gone from the lists).
+      cell: (row) => <span className="font-medium">{row.financier_name}</span>,
     },
     {
       key: 'seq',
@@ -289,7 +268,7 @@ export function InstallmentsDuesTab({
           sort={{ key: sort, direction }}
           onSortChange={list.setSort}
           cellTextClassName="text-[13px]"
-          cellClassName="py-2"
+          cellClassName="py-3"
           empty={
             <EmptyState
               icon={<CheckCircle2 size={28} aria-hidden="true" />}
