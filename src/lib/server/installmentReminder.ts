@@ -15,7 +15,6 @@ import {
   buildInstallmentReminderMessage,
   parseInstallmentReminder,
 } from '@/lib/installmentReminder'
-import { resolveAppBaseUrl } from '@/lib/server/appBaseUrl'
 import { sendWhatsAppText } from '@/lib/server/ultramsg'
 import { normalizeWhatsAppNumber } from '@/lib/whatsappNumber'
 
@@ -126,7 +125,6 @@ export async function runInstallmentReminder(
     const message = buildInstallmentReminderMessage({
       day: payload.day,
       items: payload.items,
-      appBaseUrl: resolveAppBaseUrl(),
     })
 
     for (const recipient of payload.recipients) {

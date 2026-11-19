@@ -15,8 +15,7 @@
 //   مستحقة غدا (2):
 //   • INS-0007 - حفار - بنك الراجحي - 18,000 ريال
 //
-//   الرابط: https://portal.azzanco.com/installments
-//
+// No link line since 2026-11-19 (owner «شيل الرابط من الرسالة»).
 // A section with nothing is left out; with nothing at all there is no
 // message (`null`). One line per CONTRACT in a section: its unpaid rows of
 // that section are added up (overdue: the days of the oldest one). Digits are
@@ -64,9 +63,7 @@ export const INSTALLMENT_REMINDER_SECTION_TITLES: Record<
   overdue: 'متاخرة',
   tomorrow: 'مستحقة غدا',
 }
-export const INSTALLMENT_REMINDER_LINK_LABEL = 'الرابط'
 export const INSTALLMENT_REMINDER_CURRENCY = 'ريال'
-export const INSTALLMENT_REMINDER_PATH = '/installments'
 
 /** Lines shown per section before «و N اخرى». */
 export const INSTALLMENT_REMINDER_MAX_LINES = 8
@@ -264,17 +261,9 @@ export function reminderMoreLabel(count: number): string {
   return `و ${count} اخرى`
 }
 
-/** `https://portal.azzanco.com/installments`, or `null` without an origin. */
-export function reminderLink(appBaseUrl: string | null | undefined): string | null {
-  if (typeof appBaseUrl !== 'string') return null
-  const origin = appBaseUrl.trim().replace(/\/+$/, '')
-  return origin ? `${origin}${INSTALLMENT_REMINDER_PATH}` : null
-}
-
 function compose(
   day: string,
   items: readonly InstallmentReminderItem[],
-  link: string | null,
   maxLines: number,
 ): string | null {
   const blocks: string[] = []
@@ -297,7 +286,6 @@ function compose(
     `${INSTALLMENT_REMINDER_TITLE} - ${reminderDayLabel(day)}`,
     ...blocks,
   ]
-  if (link) parts.push(`${INSTALLMENT_REMINDER_LINK_LABEL}: ${link}`)
   return parts.join('\n\n')
 }
 
@@ -309,19 +297,17 @@ function compose(
 export function buildInstallmentReminderMessage(input: {
   day: string
   items: readonly InstallmentReminderItem[]
-  appBaseUrl?: string | null
   maxLines?: number
 }): string | null {
-  const link = reminderLink(input.appBaseUrl)
   let maxLines = Math.max(1, input.maxLines ?? INSTALLMENT_REMINDER_MAX_LINES)
-  let message = compose(input.day, input.items, link, maxLines)
+  let message = compose(input.day, input.items, maxLines)
   while (
     message !== null &&
     message.length > INSTALLMENT_REMINDER_MAX_LENGTH &&
     maxLines > 1
   ) {
     maxLines -= 1
-    message = compose(input.day, input.items, link, maxLines)
+    message = compose(input.day, input.items, maxLines)
   }
   return message
 }

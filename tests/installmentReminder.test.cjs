@@ -42,7 +42,6 @@ function loadLib(name) {
 
 const lib = loadLib('installmentReminder')
 const DAY = '2026-11-19'
-const ORIGIN = 'https://portal.azzanco.com'
 
 function item(overrides) {
   return {
@@ -67,10 +66,9 @@ const SERVER = read('src', 'lib', 'server', 'installmentReminder.ts')
 const ROUTE = read('app', 'api', 'cron', 'installment-reminder', 'route.ts')
 const LIB = read('src', 'lib', 'installmentReminder.ts')
 
-test('the agreed message: sections in order, the link last', () => {
+test('the agreed message: sections in order, no link line', () => {
   const message = lib.buildInstallmentReminderMessage({
     day: DAY,
-    appBaseUrl: ORIGIN,
     items: [
       item(),
       item({
@@ -104,8 +102,6 @@ test('the agreed message: sections in order, the link last', () => {
       'مستحقة غدا (2):',
       '• INS-0007 - رافعة - وكالة - 1,234,567 ريال',
       '• INS-0008 - حفار - وكالة - 4,000.50 ريال',
-      '',
-      'الرابط: https://portal.azzanco.com/installments',
     ].join('\n'),
   )
 })
@@ -114,7 +110,6 @@ test('nothing to say gives no message; an empty section is left out', () => {
   assert.equal(lib.buildInstallmentReminderMessage({ day: DAY, items: [] }), null)
   const message = lib.buildInstallmentReminderMessage({
     day: DAY,
-    appBaseUrl: ORIGIN,
     items: [item({ bucket: 'tomorrow', daysUntilDue: 1, dueDate: '2026-11-20' })],
   })
   assert.ok(!message.includes('متاخرة'))
@@ -124,15 +119,12 @@ test('nothing to say gives no message; an empty section is left out', () => {
   assert.doesNotMatch(LIB, /اليوم|7 ايام/)
 })
 
-test('without an origin the link line is left out', () => {
-  const message = lib.buildInstallmentReminderMessage({
-    day: DAY,
-    items: [item()],
-    appBaseUrl: null,
-  })
+test('the message carries no link (owner 2026-11-19)', () => {
+  const message = lib.buildInstallmentReminderMessage({ day: DAY, items: [item()] })
   assert.ok(!message.includes('الرابط'))
-  assert.equal(lib.reminderLink(`${ORIGIN}/`), `${ORIGIN}/installments`)
-  assert.equal(lib.reminderLink('  '), null)
+  assert.doesNotMatch(message, /https?:/)
+  assert.equal(lib.reminderLink, undefined)
+  assert.doesNotMatch(SERVER, /resolveAppBaseUrl|appBaseUrl/)
 })
 
 test('one line per contract: its rows added up, the oldest days, most overdue first', () => {
@@ -167,7 +159,6 @@ test('a long section is cut with «و N اخرى» and the text stays short', ()
   const message = lib.buildInstallmentReminderMessage({
     day: DAY,
     items: many,
-    appBaseUrl: ORIGIN,
   })
   assert.ok(message.includes('متاخرة (30):'))
   assert.ok(message.includes(`و ${30 - lib.INSTALLMENT_REMINDER_MAX_LINES} اخرى`))
@@ -221,7 +212,6 @@ test('the words and numbers', () => {
 test('Latin digits and no alif with hamza or madda in the template', () => {
   const message = lib.buildInstallmentReminderMessage({
     day: DAY,
-    appBaseUrl: ORIGIN,
     items: [
       item({ description: 'شيول', financierName: 'جهة' }),
       item({ bucket: 'tomorrow', contractNumber: 'INS-0006', description: 'رافعة', financierName: 'جهة', daysUntilDue: 1, dueDate: '2026-11-20' }),
@@ -231,7 +221,6 @@ test('Latin digits and no alif with hamza or madda in the template', () => {
   assert.doesNotMatch(message, /[أإآ]/)
   const templateStrings = [
     lib.INSTALLMENT_REMINDER_TITLE,
-    lib.INSTALLMENT_REMINDER_LINK_LABEL,
     lib.INSTALLMENT_REMINDER_CURRENCY,
     ...Object.values(lib.INSTALLMENT_REMINDER_SECTION_TITLES),
     lib.reminderMoreLabel(3),
@@ -381,7 +370,6 @@ test('the route: the Vercel Cron secret, no service key, a count summary only', 
   assert.match(SERVER, /'prepare_installment_reminder'/)
   assert.match(SERVER, /'complete_installment_reminder'/)
   assert.match(SERVER, /sendWhatsAppText\(to, message\)/)
-  assert.match(SERVER, /resolveAppBaseUrl\(\)/)
   // Never logs a number, the text or the secret.
   for (const call of SERVER.match(/console\.error\([^)]*\)/gs) ?? []) {
     assert.doesNotMatch(call, /mobile|message|secret|\bto\b/)
