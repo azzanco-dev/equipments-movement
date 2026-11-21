@@ -2,7 +2,6 @@ import type { AsyncSearchSelectOption } from '@/components/AsyncSearchSelect'
 import type { PostgresLikeError } from '@/lib/formValidation'
 import {
   amountOf,
-  cashflowWindowEnd,
   currentMonthRange,
   sumAmounts,
   EMPTY_INSTALLMENT_OVERVIEW,
@@ -58,6 +57,9 @@ export const INSTALLMENT_OVERVIEW_SELECT =
 export const INSTALLMENT_DUE_SELECT =
   'id,contract_id,contract_number,description,financier_id,financier_name,seq,installment_count,due_date,amount,paid_amount,remaining_amount,is_balloon,is_partial,state,days_until_due'
 
+/** The dues lists also show the payment date of a paid row (0207). */
+export const INSTALLMENT_DUES_LIST_SELECT = `${INSTALLMENT_DUE_SELECT},last_paid_on`
+
 export const INSTALLMENT_CONTRACT_SELECT =
   'id,contract_number,description,financier_id,financier_name,total_amount,down_payment,balloon_amount,financed_amount,installment_count,frequency_months,first_due_date,notes,status,closed_at,cancel_reason,created_by_name,created_at,updated_at,paid_total,remaining_total,paid_count,overdue_count,overdue_amount,next_due_date,next_due_amount,last_due_date,equipment_count'
 
@@ -81,8 +83,6 @@ export const INSTALLMENT_ALLOCATION_SELECT =
 
 // --- The caps of the bounded reads ------------------------------------------------------
 
-/** The chart reads the unpaid rows of the next twelve months at most. */
-export const CASHFLOW_ROWS_CAP = 2000
 /** The total of the dues view adds up at most this many rows. */
 export const DUES_TOTAL_CAP = 5000
 /** The financier figures read at most this many contracts. */
@@ -224,24 +224,6 @@ export async function fetchNearestDue(
   return rows[0] ?? null
 }
 
-/** The overdue rows, the oldest first (the dashboard's card shows a few). */
-export async function fetchOverdueDues(
-  limit: number,
-  signal?: AbortSignal,
-): Promise<InstallmentDueRow[]> {
-  return rowsOf<InstallmentDueRow>(
-    await withSignal(
-      openDues(INSTALLMENT_DUE_SELECT)
-        .lt('days_until_due', 0)
-        .order('due_date', { ascending: true })
-        .order('contract_number', { ascending: true })
-        .order('seq', { ascending: true })
-        .limit(limit),
-      signal,
-    ),
-  )
-}
-
 /** The rows due today or within 30 days, the nearest first. */
 export async function fetchUpcomingDues(
   limit: number,
@@ -259,32 +241,6 @@ export async function fetchUpcomingDues(
       signal,
     ),
   )
-}
-
-/**
- * The chart's rows: what is still to pay from today to the end of the
- * twelve-month window, ONE bounded read; `partial` when the cap was
- * reached (the figures then cover the nearest rows only).
- */
-export async function fetchCashflowDues(
-  today: string,
-  signal?: AbortSignal,
-): Promise<{
-  rows: { due_date: string; remaining_amount: number }[]
-  partial: boolean
-}> {
-  const rows = rowsOf<{ due_date: string; remaining_amount: number }>(
-    await withSignal(
-      openDues('due_date,remaining_amount')
-        .gte('days_until_due', 0)
-        .lt('due_date', cashflowWindowEnd(today))
-        .order('due_date', { ascending: true })
-        .order('id', { ascending: true })
-        .limit(CASHFLOW_ROWS_CAP),
-      signal,
-    ),
-  )
-  return { rows, partial: rows.length >= CASHFLOW_ROWS_CAP }
 }
 
 // --- «العقود» ---------------------------------------------------------------------------
@@ -417,8 +373,24 @@ const DUES_SORT_KEYS = new Set(
   installmentDuesListConfig.sortableFields.map((field) => field.key),
 )
 
+/** The rows a dues view starts from: the unpaid rows of the active
+ *  contracts, or for «المسددة» the fully paid rows of the contracts that are
+ *  not cancelled (active or paid off). */
+function duesBase(
+  view: InstallmentDuesView,
+  columns: string,
+  options?: { count: 'exact'; head?: boolean },
+) {
+  if (view !== 'paid') return openDues(columns, options)
+  return supabase
+    .from('installment_dues')
+    .select(columns, options)
+    .in('contract_status', ['active', 'paid_off'])
+    .eq('is_paid', true)
+}
+
 /** The sub-tab, the search and the filters of the dues, on any read that
- *  starts from `openDues`. */
+ *  starts from `duesBase`. */
 function inDuesView<Q extends ReturnType<typeof openDues>>(
   request: Q,
   query: InstallmentDuesQuery,
@@ -449,14 +421,27 @@ export async function fetchInstallmentDuesPage(
   },
   signal?: AbortSignal,
 ): Promise<{ rows: InstallmentDueRow[]; total: number }> {
-  const ascending = query.direction === 'asc'
-  const sort = DUES_SORT_KEYS.has(query.sort)
+  let ascending = query.direction === 'asc'
+  let sort = DUES_SORT_KEYS.has(query.sort)
     ? query.sort
     : installmentDuesListConfig.defaultSort
+  // «المسددة» opens on the latest paid first while the list keeps its
+  // default sort.
+  if (
+    query.view === 'paid' &&
+    sort === installmentDuesListConfig.defaultSort &&
+    query.direction === installmentDuesListConfig.defaultDirection
+  ) {
+    sort = 'last_paid_on'
+    ascending = false
+  }
   const result = await withSignal(
-    inDuesView(openDues(INSTALLMENT_DUE_SELECT, { count: 'exact' }), query)
-      .order(sort, { ascending })
-      .order('due_date', { ascending: true })
+    inDuesView(
+      duesBase(query.view, INSTALLMENT_DUES_LIST_SELECT, { count: 'exact' }),
+      query,
+    )
+      .order(sort, { ascending, nullsFirst: false })
+      .order('due_date', { ascending: query.view !== 'paid' })
       .order('contract_number', { ascending: true })
       .order('seq', { ascending: true })
       .range(
@@ -473,17 +458,18 @@ export async function fetchInstallmentDuesPage(
 }
 
 /**
- * What the WHOLE filtered view still asks for (never the loaded page
- * alone): a bounded read of `remaining_amount`; `partial` when the cap was
- * reached.
+ * The total of the WHOLE filtered view (never the loaded page alone): what
+ * is still to pay (`remaining_amount`), or for «المسددة» what was paid
+ * (`amount`); a bounded read, `partial` when the cap was reached.
  */
 export async function fetchInstallmentDuesTotal(
   query: InstallmentDuesQuery,
   signal?: AbortSignal,
 ): Promise<{ total: number; partial: boolean }> {
-  const rows = rowsOf<{ remaining_amount: number }>(
+  const paid = query.view === 'paid'
+  const rows = rowsOf<{ amount: number; remaining_amount: number }>(
     await withSignal(
-      inDuesView(openDues('remaining_amount'), query)
+      inDuesView(duesBase(query.view, 'amount,remaining_amount'), query)
         .order('due_date', { ascending: true })
         .order('id', { ascending: true })
         .limit(DUES_TOTAL_CAP),
@@ -491,21 +477,24 @@ export async function fetchInstallmentDuesTotal(
     ),
   )
   return {
-    total: sumAmounts(rows.map((row) => row.remaining_amount)),
+    total: sumAmounts(
+      rows.map((row) => (paid ? row.amount : row.remaining_amount)),
+    ),
     partial: rows.length >= DUES_TOTAL_CAP,
   }
 }
 
-/** The count of «هذا الشهر» (the other three sub-tabs read theirs from the
- *  overview). */
-export async function fetchInstallmentDuesMonthCount(
+/** The count of «هذا الشهر» or «المسددة» (the other three sub-tabs read
+ *  theirs from the overview). */
+export async function fetchInstallmentDuesViewCount(
+  view: 'month' | 'paid',
   today: string,
   signal?: AbortSignal,
 ): Promise<number> {
   return countOf(
     await withSignal(
-      inDuesView(openDues('id', { count: 'exact', head: true }), {
-        view: 'month',
+      inDuesView(duesBase(view, 'id', { count: 'exact', head: true }), {
+        view,
         today,
       }),
       signal,
@@ -789,6 +778,21 @@ export async function cancelInstallmentContract(
       p_reason: reason.trim(),
     }),
   )
+}
+
+/** `delete_installment_contract` (0207): a CANCELLED contract, deleted
+ *  for good after its copy to the archive; returns the storage paths of its
+ *  receipt files, which the caller removes afterwards. */
+export async function deleteInstallmentContract(
+  contractId: string,
+): Promise<RpcResult<string[]>> {
+  const result = asResult<string[] | null>(
+    await supabase.rpc('delete_installment_contract', {
+      p_contract_id: contractId,
+    }),
+  )
+  if (result.error) return { data: null, error: result.error }
+  return { data: result.data ?? [], error: null }
 }
 
 export interface InstallmentPaymentInput {

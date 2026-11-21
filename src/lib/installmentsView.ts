@@ -72,6 +72,9 @@ export interface InstallmentDueRow {
   state: InstallmentState
   /** Negative = days overdue. */
   days_until_due: number
+  /** 0207: the latest date of the posted payments that paid it; null while
+   *  none (selected by the dues lists only). */
+  last_paid_on?: string | null
 }
 
 /** `installment_contract_summary`: a contract with its totals. */
@@ -638,13 +641,17 @@ export const INSTALLMENTS_TABS: readonly InstallmentsTab[] = [
   'financiers',
 ]
 
-export type InstallmentDuesView = 'overdue' | 'month' | 'next30' | 'all'
+export type InstallmentDuesView = 'overdue' | 'month' | 'next30' | 'all' | 'paid'
 
+/** The sub-tabs of «الاستحقاقات»; «المسددة» (owner 2026-11-21, «ابغى يكون
+ *  لي وصول سريع للي سددتهم») lists the fully paid rows, the latest paid
+ *  first. */
 export const INSTALLMENT_DUES_VIEWS: readonly InstallmentDuesView[] = [
   'overdue',
   'month',
   'next30',
   'all',
+  'paid',
 ]
 
 export const INSTALLMENT_DUES_VIEW_LABEL_KEYS: Readonly<
@@ -654,12 +661,12 @@ export const INSTALLMENT_DUES_VIEW_LABEL_KEYS: Readonly<
   month: 'instDuesViewMonth',
   next30: 'instDuesViewNext30',
   all: 'instDuesViewAll',
+  paid: 'instDuesViewPaid',
 }
 
-/** The dues open on what is late; with nothing late, on what is nearest. */
-export function defaultDuesView(overdueCount: number): InstallmentDuesView {
-  return overdueCount > 0 ? 'overdue' : 'next30'
-}
+/** The dues always open on «هذا الشهر» (owner 2026-11-21, «في الاستحقاقات
+ *  خل الافتراضي على تاب هذا الشهر»; it opened on what was late before). */
+export const DEFAULT_DUES_VIEW: InstallmentDuesView = 'month'
 
 export const INSTALLMENT_CONTRACT_STATUSES: readonly InstallmentContractStatus[] =
   ['active', 'paid_off', 'cancelled']
@@ -683,7 +690,7 @@ export const INSTALLMENT_DUES_URL_PREFIX = 'd'
 
 export interface InstallmentsUrlState {
   tab: InstallmentsTab
-  /** null = not chosen yet: `defaultDuesView` decides. */
+  /** null = not chosen yet: `DEFAULT_DUES_VIEW`. */
   duesView: InstallmentDuesView | null
 }
 

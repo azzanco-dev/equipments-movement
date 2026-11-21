@@ -17,6 +17,7 @@ import {
   Pencil,
   Repeat,
   StickyNote,
+  Trash2,
   Truck,
   User,
   Wallet,
@@ -40,7 +41,10 @@ import {
   PeriodRange,
   UnitTags,
 } from '@/components/installments/cells'
-import { takeInstallmentFlash } from '@/components/installments/flash'
+import {
+  setInstallmentFlash,
+  takeInstallmentFlash,
+} from '@/components/installments/flash'
 import { useLoad } from '@/components/installments/useLoad'
 import { useTabTitle } from '@/components/TabTitle'
 import {
@@ -66,6 +70,7 @@ import {
   TabsTrigger,
   ToastProvider,
   cn,
+  useConfirm,
   useToast,
   type DescriptionListItem,
 } from '@/components/ui'
@@ -76,10 +81,15 @@ import {
   daysUntilDue,
   installmentState,
   INSTALLMENT_FREQUENCY_LABEL_KEYS,
+  installmentErrorMessage,
   INSTALLMENT_PAYMENT_METHOD_LABEL_KEYS,
   type InstallmentFrequency,
 } from '@/lib/installments'
-import { fetchInstallmentContract } from '@/lib/installmentsData'
+import { removeInstallmentReceiptFiles } from '@/lib/installmentReceiptsData'
+import {
+  deleteInstallmentContract,
+  fetchInstallmentContract,
+} from '@/lib/installmentsData'
 import {
   allocationSeqsByPayment,
   amountOf,
@@ -111,6 +121,8 @@ export const EVENTS_PREVIEW_ROWS = 20
 export interface InstallmentContractDetailProps {
   contractId: string
   onBack: () => void
+  /** After «حذف العقد» (0207): opens the contracts list. */
+  onDeleted: () => void
 }
 
 function PageSkeleton({ label }: { label: string }) {
@@ -168,6 +180,7 @@ export function InstallmentContractDetail(
 function InstallmentContractDetailInner({
   contractId,
   onBack,
+  onDeleted,
 }: InstallmentContractDetailProps) {
   const { t, lang } = useI18n()
   const toast = useToast()
@@ -191,11 +204,13 @@ function InstallmentContractDetailInner({
   const [showAllRows, setShowAllRows] = useState(false)
   const [showAllPayments, setShowAllPayments] = useState(false)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [deleting, setDeleting] = useState(false)
+  const { confirm, confirmDialog } = useConfirm()
 
   // The message of the list page that opened this one (a new contract).
   useEffect(() => {
-    const message = takeInstallmentFlash()
-    if (message) toast({ title: t(message), tone: 'success' })
+    const flash = takeInstallmentFlash()
+    if (flash) toast({ title: t(flash.message), tone: flash.tone })
     // Once, on arrival.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -296,6 +311,36 @@ function InstallmentContractDetailInner({
       tone: 'warning',
     })
   }
+  /** «حذف العقد» (0207): a cancelled contract only, confirmed first; the
+   *  database deletes it after its copy to the archive, then its receipt
+   *  files go and the list opens with the message. */
+  const deleteContract = async () => {
+    const confirmed = await confirm({
+      title: t('instDeleteContractTitle').replace(
+        '{number}',
+        contract.contract_number,
+      ),
+      description: t('instDeleteContractDesc'),
+      confirmLabel: t('instDeleteContractConfirm'),
+      tone: 'danger',
+    })
+    if (!confirmed) return
+    setDeleting(true)
+    const result = await deleteInstallmentContract(contract.id)
+    if (result.error) {
+      setDeleting(false)
+      toast({ title: t(installmentErrorMessage(result.error)), tone: 'danger' })
+      refresh()
+      return
+    }
+    const filesGone = await removeInstallmentReceiptFiles(result.data)
+    setInstallmentFlash(
+      filesGone ? 'instContractDeleted' : 'instDeleteReceiptsLeft',
+      filesGone ? 'success' : 'warning',
+    )
+    onDeleted()
+  }
+
   const done = (message: TranslationKey) => {
     setDialog(null)
     refresh()
@@ -435,12 +480,24 @@ function InstallmentContractDetailInner({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
-        <DropdownMenuItem
-          icon={<Pencil size={14} />}
-          onSelect={() => open({ kind: 'edit' })}
-        >
-          {t('instContractEdit')}
-        </DropdownMenuItem>
+        {!cancelled && (
+          <DropdownMenuItem
+            icon={<Pencil size={14} />}
+            onSelect={() => open({ kind: 'edit' })}
+          >
+            {t('instContractEdit')}
+          </DropdownMenuItem>
+        )}
+        {cancelled && (
+          <DropdownMenuItem
+            icon={<Trash2 size={14} />}
+            tone="danger"
+            disabled={deleting}
+            onSelect={() => void deleteContract()}
+          >
+            {t('instDeleteContract')}
+          </DropdownMenuItem>
+        )}
         {active && (
           <DropdownMenuItem
             icon={<Ban size={14} />}
@@ -454,8 +511,9 @@ function InstallmentContractDetailInner({
       </DropdownMenuContent>
     </DropdownMenu>
   )
-  // A cancelled contract takes no action at all.
-  const showActions = canManage && !cancelled
+  // A cancelled contract takes one action: «حذف العقد» (owner 2026-11-21,
+  // «حذف عقد اقساط بس بعد الالغاء»).
+  const showActions = canManage
 
   return (
     <div className="space-y-4">
@@ -923,6 +981,8 @@ function InstallmentContractDetailInner({
           {optionsMenu(active ? 'h-11' : 'h-11 flex-1')}
         </div>
       )}
+
+      {confirmDialog}
 
       {/* The dialogs, each open while `dialog` names it. A success reads
           the contract again and shows its Toast; a refusal shows its

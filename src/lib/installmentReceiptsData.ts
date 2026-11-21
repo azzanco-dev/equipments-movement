@@ -32,6 +32,23 @@ async function removeObject(path: string | null | undefined) {
   await supabase.storage.from(INSTALLMENT_RECEIPTS_BUCKET).remove([path])
 }
 
+/** Removes the receipt files of a deleted contract (the paths
+ *  `delete_installment_contract` returned). Returns true when every file
+ *  went; a file left behind is harmless (no row points at it). */
+export async function removeInstallmentReceiptFiles(
+  paths: readonly string[],
+): Promise<boolean> {
+  if (paths.length === 0) return true
+  try {
+    const { error } = await supabase.storage
+      .from(INSTALLMENT_RECEIPTS_BUCKET)
+      .remove([...paths])
+    return !error
+  } catch {
+    return false
+  }
+}
+
 /** Uploads the file and attaches it to the payment (replacing its receipt). */
 export async function attachInstallmentReceipt(
   contractId: string,

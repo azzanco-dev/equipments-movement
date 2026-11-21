@@ -1690,7 +1690,10 @@ export const installmentDuesListConfig: DataListConfig = {
   ],
   sortableFields: [
     { key: 'due_date', label: 'instDueDate' },
-    { key: 'remaining_amount', label: 'instRemaining' },
+    // The installment's amount (owner 2026-11-21: the column is «القسط»,
+    // not «المتبقي»), and the payment date of «المسددة» (0207).
+    { key: 'amount', label: 'instInstallment' },
+    { key: 'last_paid_on', label: 'instPaidOnCol' },
     { key: 'contract_number', label: { ar: 'رقم العقد', en: 'Contract number' } },
   ],
 }

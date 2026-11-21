@@ -69,7 +69,6 @@ const UI_FILES = [
   ['src', 'screens', 'installments', 'InstallmentsScreen.tsx'],
   ['src', 'screens', 'installments', 'InstallmentContractDetail.tsx'],
   ['src', 'components', 'installments', 'cells.tsx'],
-  ['src', 'components', 'installments', 'CashflowBars.tsx'],
   ['src', 'components', 'installments', 'InstallmentsDashboardTab.tsx'],
   ['src', 'components', 'installments', 'InstallmentsContractsTab.tsx'],
   ['src', 'components', 'installments', 'InstallmentsDuesTab.tsx'],
@@ -297,10 +296,11 @@ test('the four functions are called with the exact parameter names of 0203', () 
     'p_notes',
     'p_equipment_ids',
   ])
-  // Only those four, and nothing the migration keeps for itself.
+  // Only those four, the delete of 0207, and nothing the migration keeps
+  // for itself.
   assert.deepEqual(
     [...DATA.matchAll(/\.rpc\('([a-z_]+)'/g)].map((item) => item[1]).sort(),
-    [...functions].sort(),
+    [...functions, 'delete_installment_contract'].sort(),
   )
   assert.doesNotMatch(
     DATA,
@@ -443,13 +443,11 @@ test('reads only the installments relations; writes only the financiers', () => 
 
 test('every read is bounded or paged, and throws on failure', () => {
   for (const [name, cap] of [
-    ['CASHFLOW_ROWS_CAP', 2000],
     ['DUES_TOTAL_CAP', 5000],
     ['INSTALLMENT_OPTION_LIMIT', 20],
   ])
     assert.match(DATA, new RegExp(`export const ${name} = ${cap}\\b`))
   // A capped read says when it reached its cap.
-  assert.match(DATA, /partial: rows\.length >= CASHFLOW_ROWS_CAP/)
   assert.match(DATA, /partial: rows\.length >= DUES_TOTAL_CAP/)
   assert.match(DATA, /partial: rows\.length >= FINANCIER_CONTRACTS_CAP/)
   // Each exported reader limits, ranges, counts or reads one row.
@@ -514,7 +512,8 @@ test('write actions show for installments.manage only', () => {
     assert.match(source, /\{canManage && \(\s*<>\s*<InstallmentContractDialog/)
   }
   assert.match(list, /const actions = canManage \? \(/)
-  assert.match(page, /const showActions = canManage && !cancelled/)
+  // A cancelled contract keeps «خيارات» for «حذف العقد» (0207).
+  assert.match(page, /const showActions = canManage\n/)
   assert.match(page, /canVoid=\{canManage && !cancelled\}/)
   assert.match(page, /action=\{canManage && active \? payButton : undefined\}/)
   // The row buttons and the financier actions follow the same key.
@@ -525,7 +524,7 @@ test('write actions show for installments.manage only', () => {
   ])
     assert.match(
       read('src', 'components', 'installments', file),
-      /\.\.\.\(canManage\s*\?/,
+      /\.\.\.\(canManage(?: && !paidView)?\s*\?/,
       file,
     )
   // No screen tests a role name.
@@ -621,10 +620,6 @@ test('a contract opens through real links', () => {
       /rowHref=\{\(row\) => `\/installments\/\$\{row\.(id|contract_id)\}`\}/,
       file,
     )
-  assert.match(
-    read('src', 'components', 'installments', 'InstallmentsDashboardTab.tsx'),
-    /<AppLink\s+href=\{`\/installments\/\$\{row\.contract_id\}`\}/,
-  )
   // The dues table's first column is the date: the contract cell is the link.
   assert.match(
     read('src', 'components', 'installments', 'InstallmentsDuesTab.tsx'),
@@ -661,8 +656,9 @@ test('the lists are server-side: the page total is never summed in the browser',
     'installments',
     'InstallmentsDashboardTab.tsx',
   )
-  assert.match(dashboard, /monthlyDueBuckets\(data\.cashflow\.rows, today\)/)
-  assert.match(dashboard, /data\.cashflow\.partial/)
+  // The chart and the overdue card are gone (owner 2026-11-21).
+  assert.doesNotMatch(dashboard, /CashflowBars|monthlyDueBuckets|fetchOverdueDues/)
+  assert.match(dashboard, /fetchUpcomingDues\(DASHBOARD_UPCOMING_ROWS, signal\)/)
 })
 
 test('the contract page: schedule, payments, units and a derived history', () => {

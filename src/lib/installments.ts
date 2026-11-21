@@ -364,6 +364,7 @@ export const INSTALLMENT_ERROR_KEYS: Readonly<Record<string, TranslationKey>> =
     contract_not_active: 'instErrContractNotActive',
     contract_has_payments: 'instErrContractHasPayments',
     payment_already_voided: 'instErrPaymentAlreadyVoided',
+    contract_not_cancelled: 'instErrContractNotCancelled',
   }
 
 /** Every stable token of the installments functions, for the tests. */

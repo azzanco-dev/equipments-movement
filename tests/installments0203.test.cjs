@@ -246,6 +246,13 @@ test('the client maps exactly the tokens the SQL raises', () => {
   )
   // The counter row is seeded by the migration: not a user-facing refusal.
   raised.delete('installment_contract_sequence_missing')
+  // 0207 adds the delete of a cancelled contract and its one new token.
+  const later = fs.readFileSync(
+    path.join(MIGRATIONS, '20261121100000_0207_installment_delete_and_paid_on.sql'),
+    'utf8',
+  )
+  for (const match of later.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g))
+    raised.add(match[1])
   assert.deepEqual([...raised].sort(), [...lib.INSTALLMENT_ERROR_TOKENS].sort())
 })
 

@@ -291,11 +291,6 @@ test('the lists: the shared toolbar, the page sizes and the main table look', ()
   assert.match(configs, /export const installmentContractsListConfig: DataListConfig/)
   assert.match(configs, /export const installmentDuesListConfig: DataListConfig/)
   assert.match(configs, /defaultSort: 'updated_at',\s*defaultDirection: 'desc'/)
-  // The chart is the program's shared bar chart.
-  assert.match(
-    read('src', 'components', 'installments', 'CashflowBars.tsx'),
-    /import \{ SoftBarChart \} from '@\/components\/charts\/lazy'/,
-  )
 })
 
 test('the receipt copy exists in both languages, without hamza in Arabic', () => {

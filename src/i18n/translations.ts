@@ -2995,6 +2995,23 @@ export const translations = {
       'على العقد سدادات مسجلة: الغ السدادات اولا ثم غير شروط العقد او الغه.',
     instErrPaymentAlreadyVoided: 'هذا السداد ملغي من قبل.',
     // end installments (0203)
+    // installments-delete-paid (0207)
+    instErrContractNotCancelled: 'لا يحذف الا عقد ملغي: الغ العقد اولا.',
+    instDeleteContract: 'حذف العقد',
+    instDeleteContractTitle: 'حذف العقد {number}؟',
+    instDeleteContractDesc:
+      'يحذف العقد نهائيا مع جدول اقساطه وسداداته الملغاة وملفات حوالاتها. لا يمكن التراجع، ورقم العقد لا يستخدم مرة ثانية.',
+    instDeleteContractConfirm: 'حذف نهائيا',
+    instContractDeleted: 'تم حذف العقد',
+    instDeleteReceiptsLeft: 'حذف العقد، وتعذر حذف بعض ملفات الحوالات.',
+    instDuesViewPaid: 'المسددة',
+    instDuesPaidDesc: 'الاقساط المسددة بالكامل، الاحدث سدادا اولا.',
+    instNoPaidHere: 'لا توجد اقساط مسددة.',
+    instInstallmentNo: 'رقم القسط',
+    instPaidOnCol: 'تاريخ السداد',
+    instTotalRemainingOf: 'المتبقي ({count})',
+    instTotalPaidOf: 'المسدد ({count})',
+    // end installments-delete-paid (0207)
     // installment-receipts (0206)
     instReceiptLabel: 'ملف الحوالة',
     instReceiptPick: 'اختر ملف الحوالة او اسحبه هنا',
@@ -6387,6 +6404,25 @@ export const translations = {
       'The contract has recorded payments: void them first, then change its terms or cancel it.',
     instErrPaymentAlreadyVoided: 'This payment is already voided.',
     // end installments (0203)
+    // installments-delete-paid (0207)
+    instErrContractNotCancelled:
+      'Only a cancelled contract can be deleted: cancel it first.',
+    instDeleteContract: 'Delete contract',
+    instDeleteContractTitle: 'Delete contract {number}?',
+    instDeleteContractDesc:
+      'The contract is deleted for good with its schedule, its voided payments and their receipt files. This cannot be undone, and its number is not used again.',
+    instDeleteContractConfirm: 'Delete for good',
+    instContractDeleted: 'The contract was deleted',
+    instDeleteReceiptsLeft:
+      'The contract was deleted, but some receipt files could not be removed.',
+    instDuesViewPaid: 'Paid',
+    instDuesPaidDesc: 'The fully paid installments, the latest paid first.',
+    instNoPaidHere: 'No paid installments.',
+    instInstallmentNo: 'No.',
+    instPaidOnCol: 'Paid on',
+    instTotalRemainingOf: 'Remaining ({count})',
+    instTotalPaidOf: 'Paid ({count})',
+    // end installments-delete-paid (0207)
     // installment-receipts (0206)
     instReceiptLabel: 'Transfer receipt',
     instReceiptPick: 'Choose the transfer receipt or drop it here',

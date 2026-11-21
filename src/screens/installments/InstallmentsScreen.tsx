@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Plus, Wallet } from 'lucide-react'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { InstallmentContractDialog } from '@/components/installments/InstallmentContractDialog'
@@ -11,7 +11,10 @@ import { InstallmentsContractsTab } from '@/components/installments/Installments
 import { InstallmentsDashboardTab } from '@/components/installments/InstallmentsDashboardTab'
 import { InstallmentsDuesTab } from '@/components/installments/InstallmentsDuesTab'
 import { InstallmentsFinanciersTab } from '@/components/installments/InstallmentsFinanciersTab'
-import { setInstallmentFlash } from '@/components/installments/flash'
+import {
+  setInstallmentFlash,
+  takeInstallmentFlash,
+} from '@/components/installments/flash'
 import { useInstallmentsUrl } from '@/components/installments/useInstallmentsUrl'
 import { useLoad } from '@/components/installments/useLoad'
 import {
@@ -84,6 +87,15 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
   const [dialog, setDialog] = useState<InstallmentsDialog | null>(null)
   // Bumped after every write: each read of the page runs again.
   const [version, setVersion] = useState(0)
+
+  // The message of the contract page that opened this one (a deleted
+  // contract, 0207).
+  useEffect(() => {
+    const flash = takeInstallmentFlash()
+    if (flash) toast({ title: t(flash.message), tone: flash.tone })
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const loader = useCallback(async (signal: AbortSignal) => {
     const [overview, contractsCount, financiers] = await Promise.all([

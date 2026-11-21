@@ -363,8 +363,9 @@ test('the list page state comes from its URL, with safe defaults', () => {
   assert.equal(view.INSTALLMENT_CONTRACTS_URL_PREFIX, 'c')
   assert.equal(view.INSTALLMENT_DUES_URL_PREFIX, 'd')
 
-  assert.equal(view.defaultDuesView(2), 'overdue')
-  assert.equal(view.defaultDuesView(0), 'next30')
+  // The dues always open on «هذا الشهر» (owner 2026-11-21).
+  assert.equal(view.DEFAULT_DUES_VIEW, 'month')
+  assert.deepEqual([...view.INSTALLMENT_DUES_VIEWS], ['overdue', 'month', 'next30', 'all', 'paid'])
   assert.equal(view.installmentsListHref('dashboard'), '/installments')
   assert.equal(
     view.installmentsListHref('dues', 'overdue'),

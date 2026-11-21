@@ -726,6 +726,7 @@ function AppContent() {
           <InstallmentContractDetail
             contractId={detailId}
             onBack={goBackTo('/installments')}
+            onDeleted={() => router.replace('/installments?tab=contracts')}
           />
         ) : page === 'purchasing/:id' ? (
           <SupplierPoDetail

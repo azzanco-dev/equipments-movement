@@ -16,12 +16,12 @@ import {
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import {
-  fetchInstallmentDuesMonthCount,
   fetchInstallmentDuesPage,
+  fetchInstallmentDuesViewCount,
   fetchInstallmentDuesTotal,
 } from '@/lib/installmentsData'
 import {
-  defaultDuesView,
+  DEFAULT_DUES_VIEW,
   installmentMonthLabel,
   installmentsWords,
   monthKeyOf,
@@ -37,6 +37,7 @@ import {
   type InstallmentsUrlState,
 } from '@/lib/installmentsView'
 import { installmentDuesListConfig } from '@/lib/listConfigs'
+import { formatDate } from '@/lib/dateFormat'
 import { saudiDateKey } from '@/lib/saudiTime'
 import {
   ContractCell,
@@ -48,8 +49,10 @@ import { useLoad } from './useLoad'
 
 /**
  * «الاستحقاقات»: every unpaid row of the ACTIVE contracts over
- * `installment_dues`, the oldest first, in four sub-tabs (late, this month,
- * within 30 days, everything unpaid — the page's URL key `view`), then the
+ * `installment_dues`, the oldest first, in four sub-tabs (late, this month —
+ * the default since 2026-11-21 —, within 30 days, everything unpaid), plus
+ * «المسددة», the fully paid rows the latest paid first (the page's URL key
+ * `view`), then the
  * program's unified list (`installmentDuesListConfig`, URL prefix `d`): the
  * shared toolbar with its search, filters (financier, due date) and sort,
  * the main list table look and the page sizes, all on the server. The total under the table is the
@@ -77,9 +80,9 @@ export function InstallmentsDuesTab({
 }) {
   const { t, lang } = useI18n()
   const today = useMemo(() => saudiDateKey(), [])
-  // Opens on what is late; with nothing late, on what is nearest.
-  const view: InstallmentDuesView =
-    state.duesView ?? defaultDuesView(overview.overdue_count)
+  // Always opens on «هذا الشهر» (owner 2026-11-21).
+  const view: InstallmentDuesView = state.duesView ?? DEFAULT_DUES_VIEW
+  const paidView = view === 'paid'
   const list = useDataListState(
     installmentDuesListConfig,
     INSTALLMENT_DUES_URL_PREFIX,
@@ -108,18 +111,25 @@ export function InstallmentsDuesTab({
   const rows = useMemo(() => load.data?.rows ?? [], [load.data])
   const total = load.data?.total ?? 0
 
-  // «هذا الشهر» alone needs its own count; the three others are figures of
-  // the overview.
-  const monthLoader = useCallback(
-    (signal: AbortSignal) => fetchInstallmentDuesMonthCount(today, signal),
+  // «هذا الشهر» and «المسددة» need their own counts; the three others are
+  // figures of the overview.
+  const countsLoader = useCallback(
+    async (signal: AbortSignal) => {
+      const [month, paid] = await Promise.all([
+        fetchInstallmentDuesViewCount('month', today, signal),
+        fetchInstallmentDuesViewCount('paid', today, signal),
+      ])
+      return { month, paid }
+    },
     [today],
   )
-  const monthCount = useLoad(monthLoader, version)
+  const viewCounts = useLoad(countsLoader, version)
   const counts: Record<InstallmentDuesView, number | null> = {
     overdue: overview.overdue_count,
-    month: monthCount.data,
+    month: viewCounts.data?.month ?? null,
     next30: overview.due_30_count,
     all: overview.open_count,
+    paid: viewCounts.data?.paid ?? null,
   }
 
   const columns: DataTableColumn<InstallmentDueRow>[] = [
@@ -127,9 +137,14 @@ export function InstallmentsDuesTab({
       key: 'due_date',
       header: t('instDueDate'),
       sortable: true,
-      cell: (row) => (
-        <DueDateCell dueDate={row.due_date} days={row.days_until_due} />
-      ),
+      cell: (row) =>
+        paidView ? (
+          <bdi dir="ltr" className="font-medium">
+            {formatDate(row.due_date)}
+          </bdi>
+        ) : (
+          <DueDateCell dueDate={row.due_date} days={row.days_until_due} />
+        ),
     },
     {
       key: 'contract',
@@ -151,7 +166,7 @@ export function InstallmentsDuesTab({
     },
     {
       key: 'seq',
-      header: t('instInstallment'),
+      header: t('instInstallmentNo'),
       hideBelow: 'md',
       cell: (row) => (
         <span className="flex items-center gap-1">
@@ -177,16 +192,41 @@ export function InstallmentsDuesTab({
         />
       ),
     },
+    ...(paidView
+      ? [
+          {
+            key: 'last_paid_on',
+            header: t('instPaidOnCol'),
+            sortable: true,
+            cell: (row: InstallmentDueRow) =>
+              row.last_paid_on ? (
+                <bdi dir="ltr">{formatDate(row.last_paid_on)}</bdi>
+              ) : (
+                <span className="text-muted">—</span>
+              ),
+          },
+        ]
+      : []),
     {
-      key: 'remaining_amount',
-      header: t('instRemaining'),
+      // The installment's own amount (owner 2026-11-21, «مفروض باسم
+      // القسط»); a partly paid one shows what remains under it.
+      key: 'amount',
+      header: t('instInstallment'),
       sortable: true,
       align: 'end',
       cell: (row) => (
-        <Money value={row.remaining_amount} className="font-medium" />
+        <span className="flex flex-col items-end gap-0.5">
+          <Money value={row.amount} className="font-medium" />
+          {row.is_partial && (
+            <span className="flex items-center gap-1 text-xs text-muted">
+              {t('instRemaining')}
+              <Money value={row.remaining_amount} />
+            </span>
+          )}
+        </span>
       ),
     },
-    ...(canManage
+    ...(canManage && !paidView
       ? [
           {
             key: 'action',
@@ -211,7 +251,9 @@ export function InstallmentsDuesTab({
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted">{t('instDuesDesc')}</p>
+      <p className="text-sm text-muted">
+        {t(paidView ? 'instDuesPaidDesc' : 'instDuesDesc')}
+      </p>
       <Tabs
         value={view}
         onValueChange={(next) =>
@@ -273,7 +315,11 @@ export function InstallmentsDuesTab({
             <EmptyState
               icon={<CheckCircle2 size={28} aria-hidden="true" />}
               title={
-                view === 'overdue' ? t('instNoOverdue') : t('instNoDuesHere')
+                view === 'overdue'
+                  ? t('instNoOverdue')
+                  : paidView
+                    ? t('instNoPaidHere')
+                    : t('instNoDuesHere')
               }
             />
           }
@@ -292,7 +338,7 @@ export function InstallmentsDuesTab({
       {load.data && total > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-bg p-3 sm:p-4">
           <p className="text-sm font-medium">
-            {t('instTotalOf').replace(
+            {t(paidView ? 'instTotalPaidOf' : 'instTotalRemainingOf').replace(
               '{count}',
               installmentsWords(total, lang),
             )}
