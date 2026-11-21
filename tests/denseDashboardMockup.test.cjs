@@ -83,7 +83,9 @@ test('the soft Recharts look is registered in lazy.tsx and switchable', () => {
   assert.match(sources.softArea, /dot=\{false\}/)
   assert.doesNotMatch(sources.softDonut, /\slabel=\{/)
   assert.match(sources.softDonut, /cornerRadius=/)
-  assert.match(sources.softBar, /radius=\{\[3, 3, 0, 0\]\}/)
+  // The default soft look keeps its 3 px corners; the opt-in flat look of
+  // the installments chart (2026-11-21) rounds 6 px.
+  assert.match(sources.softBar, /radius=\{flat \? \[6, 6, 0, 0\] : \[3, 3, 0, 0\]\}/)
 })
 
 test('project tokens only: no hex colors, no Tailwind palette classes', () => {
