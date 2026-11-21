@@ -52,14 +52,14 @@ export function FigureCard({
   return (
     <div
       className={cn(
-        'flex min-w-0 flex-col gap-4 rounded-xl p-5',
+        'flex min-w-0 flex-col gap-3 rounded-xl p-4',
         toneBox(tone),
       )}
     >
       <div className="flex items-start gap-3">
         <span
           className={cn(
-            'flex size-10 shrink-0 items-center justify-center rounded-lg bg-bg',
+            'flex size-9 shrink-0 items-center justify-center rounded-lg bg-bg',
             toneInk(tone),
           )}
           aria-hidden="true"
@@ -72,7 +72,7 @@ export function FigureCard({
         </div>
       </div>
       {/* Smaller while four cards share a row (xl), so «33,941,332.19» fits. */}
-      <div className="whitespace-nowrap text-2xl font-semibold tabular-nums xl:text-xl 2xl:text-2xl">
+      <div className="whitespace-nowrap text-xl font-bold tabular-nums xl:text-lg 2xl:text-xl">
         {value}
       </div>
       {foot && <p className="text-xs text-muted">{foot}</p>}
@@ -108,8 +108,8 @@ export function FinancierTile({
 export function ProgressRing({
   percent,
   tone = 'success',
-  size = 64,
-  stroke = 6,
+  size = 52,
+  stroke = 5,
   label,
 }: {
   percent: number
@@ -151,7 +151,7 @@ export function ProgressRing({
       </svg>
       <span className="absolute inset-0 flex flex-col items-center justify-center text-center">
         {label ?? (
-          <bdi dir="ltr" className="text-sm font-semibold tabular-nums">
+          <bdi dir="ltr" className="text-xs font-bold tabular-nums">
             {shown}%
           </bdi>
         )}
@@ -213,7 +213,7 @@ export function ContractCard({
   const badge = STATE_BADGE[state]
   const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight
   return (
-    <article className="flex min-w-0 flex-col gap-4 rounded-xl border bg-bg p-4 shadow-sm">
+    <article className="flex min-w-0 flex-col gap-3 rounded-xl border bg-bg p-3.5 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-2 text-xs text-muted">
           <FinancierTile tone={tone} size={28} />
@@ -227,7 +227,7 @@ export function ContractCard({
         <div className="min-w-0">
           <AppLink
             href={`/installments/${contract.id}`}
-            className="block truncate-safe text-base font-semibold hover:underline"
+            className="block truncate-safe text-sm font-bold hover:underline"
             title={contract.description}
           >
             {contract.description}
@@ -244,7 +244,7 @@ export function ContractCard({
             <p className="text-xs text-muted">{t('instRemaining')}</p>
             <Money
               value={contract.remaining_total}
-              className="text-xl font-semibold"
+              className="text-lg font-bold"
             />
           </div>
           <p className="text-xs text-muted">
@@ -269,7 +269,7 @@ export function ContractCard({
       {due && (
         <div
           className={cn(
-            'flex items-center justify-between gap-2 rounded-lg p-3',
+            'flex items-center justify-between gap-2 rounded-lg p-2.5',
             late ? 'bg-danger-soft' : 'bg-surface',
           )}
         >
@@ -282,7 +282,7 @@ export function ContractCard({
           </div>
           <Money
             value={due.amount}
-            className={cn('text-base font-semibold', late && 'text-danger')}
+            className={cn('text-sm font-bold', late && 'text-danger')}
           />
         </div>
       )}

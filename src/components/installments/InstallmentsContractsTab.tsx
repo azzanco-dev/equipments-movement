@@ -190,8 +190,8 @@ export function InstallmentsContractsTab({
     )
 
   return (
-    <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <FigureCard
           tone="success"
           icon={<FileText size={20} />}
@@ -324,7 +324,7 @@ export function InstallmentsContractsTab({
         />
       ) : !load.data ? (
         <div
-          className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+          className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
           aria-busy="true"
         >
           <span className="sr-only" role="status">
@@ -341,7 +341,7 @@ export function InstallmentsContractsTab({
         />
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {load.data.rows.map((contract) => (
               <ContractCard
                 key={contract.id}

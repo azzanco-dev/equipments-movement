@@ -4,7 +4,7 @@ import {
   CalendarDays,
   Clock,
   FileText,
-  LayoutDashboard,
+  List,
   Plus,
   Wallet,
 } from 'lucide-react'
@@ -235,7 +235,7 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
           <div className="border-b pb-3">
             <TabsList variant="buttons" aria-label={t('instTabsLabel')}>
               <TabsTrigger value="dashboard">
-                <LayoutDashboard size={16} aria-hidden="true" />
+                <List size={16} aria-hidden="true" />
                 {t('instTabDashboard')}
               </TabsTrigger>
               <TabsTrigger value="calendar">

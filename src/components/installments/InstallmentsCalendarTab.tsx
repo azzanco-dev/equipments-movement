@@ -103,11 +103,11 @@ export function InstallmentsCalendarTab({
     `${weekdays[weekdayOf(day)]} ${Number(day.slice(8, 10))} ${installmentMonthLabel(day.slice(0, 7), lang, true)}`
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
       <Card className="min-w-0 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-semibold">
+            <h2 className="text-lg font-bold">
               {installmentMonthLabel(month, lang)}
             </h2>
             <Button
@@ -183,7 +183,7 @@ export function InstallmentsCalendarTab({
                     return (
                       <div
                         key={`blank-${index}`}
-                        className="min-h-24 border-b border-e bg-surface"
+                        className="min-h-20 border-b border-e bg-surface"
                       />
                     )
                   const items = byDay.get(day) ?? []
@@ -198,7 +198,7 @@ export function InstallmentsCalendarTab({
                       aria-pressed={isSelected}
                       aria-label={`${dayTitle(day)}${items.length ? ` · ${items.length}` : ''}`}
                       className={cn(
-                        'flex min-h-24 flex-col items-stretch gap-1 border-b border-e p-1.5 text-start transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]',
+                        'flex min-h-20 flex-col items-stretch gap-1 border-b border-e p-1.5 text-start transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ring)]',
                         isSelected &&
                           'bg-warning-soft ring-2 ring-inset ring-[var(--warning)]',
                       )}
@@ -230,7 +230,7 @@ export function InstallmentsCalendarTab({
                                 </bdi>
                                 {/* Whole riyals, as the approved design:
                                     a cell is too narrow for the halalas. */}
-                                <bdi dir="ltr" className="font-semibold">
+                                <bdi dir="ltr" className="font-bold">
                                   {WHOLE.format(
                                     Math.round(dueShownAmount(row)),
                                   )}
@@ -259,10 +259,10 @@ export function InstallmentsCalendarTab({
         )}
       </Card>
 
-      <div className="min-w-0 space-y-4">
+      <div className="min-w-0 space-y-3">
         <section className="space-y-3">
           <div>
-            <h2 className="text-lg font-semibold">{dayTitle(selected)}</h2>
+            <h2 className="text-base font-bold">{dayTitle(selected)}</h2>
             <p className="text-xs text-muted">
               {dayRows.length === 0
                 ? t('instCalNoneThatDay')
@@ -313,11 +313,11 @@ export function InstallmentsCalendarTab({
           <div className="flex items-center justify-between gap-4">
             <ProgressRing
               percent={ring.percent}
-              size={112}
-              stroke={12}
+              size={96}
+              stroke={10}
               label={
                 <>
-                  <bdi dir="ltr" className="text-xl font-semibold tabular-nums">
+                  <bdi dir="ltr" className="text-lg font-bold tabular-nums">
                     {ring.percent}%
                   </bdi>
                   <span className="text-xs text-muted">{t('instPaid')}</span>
@@ -331,7 +331,7 @@ export function InstallmentsCalendarTab({
                   className="size-2.5 rounded-sm bg-success"
                 />
                 {t('instPaid')}
-                <Money value={ring.paid} className="font-semibold" />
+                <Money value={ring.paid} className="font-bold" />
               </li>
               <li className="flex items-center gap-2">
                 <span
@@ -339,7 +339,7 @@ export function InstallmentsCalendarTab({
                   className="size-2.5 rounded-sm bg-warning"
                 />
                 {t('instRemaining')}
-                <Money value={ring.remaining} className="font-semibold" />
+                <Money value={ring.remaining} className="font-bold" />
               </li>
             </ul>
           </div>
@@ -385,7 +385,7 @@ function DueCard({
         )}
       </div>
       <div className="flex items-center justify-between gap-2">
-        <Money value={dueShownAmount(row)} className="text-lg font-semibold" />
+        <Money value={dueShownAmount(row)} className="text-base font-bold" />
         {canPay && !paid && (
           <Button
             size="sm"

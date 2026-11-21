@@ -130,7 +130,7 @@ test('the tabs follow the approved design «نموذج 5» in the unified order'
   )
   assert.ok(order.every((index) => index > 0))
   assert.deepEqual([...order].sort((a, b) => a - b), order)
-  for (const icon of ['LayoutDashboard', 'CalendarDays', 'Clock', 'FileText', 'Building2'])
+  for (const icon of ['List', 'CalendarDays', 'Clock', 'FileText', 'Building2'])
     assert.ok(page.includes('<' + icon + ' size={16} aria-hidden="true" />'), icon)
   const contracts = read('src', 'components', 'installments', 'InstallmentsContractsTab.tsx')
   assert.match(contracts, /<TabsList variant="chips" aria-label=\{t\('instContractsFilters'\)\}>/)

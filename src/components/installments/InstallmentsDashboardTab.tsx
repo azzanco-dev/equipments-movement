@@ -125,10 +125,10 @@ export function InstallmentsDashboardTab({
   const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* The four figures, design 1: late red, 7 days amber, 30 days blue,
           the remaining grey. */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <FigureCard
           tone="danger"
           icon={<AlertCircle size={20} />}
@@ -211,7 +211,7 @@ export function InstallmentsDashboardTab({
           <span className="sr-only" role="status">
             {t('loading')}
           </span>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map((index) => (
               <Skeleton key={index} className="h-72 w-full" />
             ))}
@@ -223,9 +223,7 @@ export function InstallmentsDashboardTab({
           <section className="space-y-3">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
-                <h2 className="text-base font-semibold">
-                  {t('instUpcoming7Title')}
-                </h2>
+                <h2 className="text-sm font-bold">{t('instUpcoming7Title')}</h2>
                 <p className="text-xs text-muted">{t('instUpcoming7Desc')}</p>
               </div>
               <Button size="sm" variant="ghost" onClick={onShowDues}>
@@ -238,7 +236,7 @@ export function InstallmentsDashboardTab({
                 <EmptyState title={t('instNoUpcoming7')} className="p-6" />
               </Card>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {data.upcoming.map((row) => {
                   const contract = contractsById.get(row.contract_id)
                   if (!contract) return null
@@ -261,7 +259,7 @@ export function InstallmentsDashboardTab({
             )}
           </section>
 
-          <div className="grid gap-4 xl:grid-cols-3">
+          <div className="grid gap-3 xl:grid-cols-3">
             <Card className="space-y-3 xl:col-span-2">
               <SectionHeader
                 title={t('instCashflowTitle')}
@@ -307,13 +305,16 @@ export function InstallmentsDashboardTab({
                                 backgroundColor: `var(--chart-stroke-${tone})`,
                               }}
                             />
-                            <span className="truncate">
+                            <span
+                              className="truncate"
+                              title={nameOf(share.financierId)}
+                            >
                               {nameOf(share.financierId)}
                             </span>
                           </span>
                           <Money
                             value={share.remaining}
-                            className="font-medium"
+                            className="font-bold"
                           />
                         </div>
                         <div

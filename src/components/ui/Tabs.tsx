@@ -74,7 +74,7 @@ export const TabsTrigger = forwardRef<
         'group-data-[variant=segmented]/tabs:h-8 group-data-[variant=segmented]/tabs:rounded-md group-data-[variant=segmented]/tabs:px-3',
         'group-data-[variant=segmented]/tabs:data-[state=active]:bg-bg group-data-[variant=segmented]/tabs:data-[state=active]:text-fg group-data-[variant=segmented]/tabs:data-[state=active]:shadow-sm',
         // buttons (opt-in): the open one is a primary button
-        'group-data-[variant=buttons]/tabs:h-9 group-data-[variant=buttons]/tabs:rounded-lg group-data-[variant=buttons]/tabs:px-3 group-data-[variant=buttons]/tabs:hover:bg-surface-hover',
+        'group-data-[variant=buttons]/tabs:h-8 group-data-[variant=buttons]/tabs:rounded-lg group-data-[variant=buttons]/tabs:px-2.5 group-data-[variant=buttons]/tabs:hover:bg-surface-hover',
         'group-data-[variant=buttons]/tabs:data-[state=active]:bg-primary group-data-[variant=buttons]/tabs:data-[state=active]:font-semibold group-data-[variant=buttons]/tabs:data-[state=active]:text-primary-contrast group-data-[variant=buttons]/tabs:data-[state=active]:hover:bg-primary-hover',
         // chips (opt-in): the shape only; each trigger brings its tone
         'group-data-[variant=chips]/tabs:h-8 group-data-[variant=chips]/tabs:rounded-full group-data-[variant=chips]/tabs:border group-data-[variant=chips]/tabs:px-3',

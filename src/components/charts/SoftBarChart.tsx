@@ -168,7 +168,13 @@ export function SoftBarChart({
                 />
               ))}
               <LabelList
-                dataKey="value"
+                // An item's short label («2.3M») when it has one: the raw
+                // value of an amount with halalas overlaps its neighbours.
+                // (Recharts reads `valueAccessor` only without `dataKey`.)
+                valueAccessor={(entry: {
+                  payload?: HorizontalBarItem
+                  value?: unknown
+                }) => entry.payload?.valueLabel ?? (entry.value as number)}
                 position="top"
                 offset={4}
                 fontSize={11}

@@ -150,7 +150,7 @@ export function InstallmentsDuesTab({
   }
 
   const feed = (
-    <div className="min-w-0 space-y-5">
+    <div className="min-w-0 space-y-4">
       {load.status === 'failed' ? (
         <ErrorState
           description={t('instDuesLoadError')}
@@ -175,7 +175,7 @@ export function InstallmentsDuesTab({
           {groups.map((group) => (
             <section key={group.key} className="space-y-2">
               <header className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="flex items-center gap-2 text-base font-semibold">
+                <h2 className="flex items-center gap-2 text-sm font-bold">
                   <span
                     aria-hidden="true"
                     className={cn('h-5 w-1 rounded-full', BAR[group.tone])}
@@ -185,7 +185,7 @@ export function InstallmentsDuesTab({
                     {installmentsWords(group.rows.length, lang)}
                   </Badge>
                 </h2>
-                <Money value={group.total} className="font-semibold" />
+                <Money value={group.total} className="font-bold" />
               </header>
               <ul className="space-y-2">
                 {group.rows.map((row) => (
@@ -221,12 +221,12 @@ export function InstallmentsDuesTab({
   )
 
   const side = (
-    <div className="min-w-0 space-y-4">
+    <div className="min-w-0 space-y-3">
       <Card className="space-y-3">
         <p className="text-xs text-muted">{t('instRemainingOnContracts')}</p>
         <Money
           value={overview.remaining_total}
-          className="text-3xl font-semibold"
+          className="text-2xl font-bold"
         />
         {summary && (
           <>
@@ -331,10 +331,7 @@ export function InstallmentsDuesTab({
                     </span>
                   </span>
                 </span>
-                <Money
-                  value={share.remaining}
-                  className="text-sm font-medium"
-                />
+                <Money value={share.remaining} className="text-sm font-bold" />
               </li>
             ))}
           </ul>
@@ -349,7 +346,7 @@ export function InstallmentsDuesTab({
   )
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
       {feed}
       {side}
     </div>
@@ -373,12 +370,12 @@ function FeedRow({
   return (
     <li
       className={cn(
-        'flex flex-wrap items-center gap-3 rounded-xl p-3 sm:flex-nowrap',
+        'flex flex-wrap items-center gap-3 rounded-xl px-3 py-2.5 sm:flex-nowrap',
         ROW_BOX[tone],
       )}
     >
       <div className={cn('w-12 shrink-0 text-center', DAY_INK[tone])}>
-        <p className="text-2xl font-semibold leading-none tabular-nums">
+        <p className="text-xl font-bold leading-none tabular-nums">
           {Number(row.due_date.slice(8, 10))}
         </p>
         <p className="mt-1 text-xs text-muted">
@@ -400,10 +397,7 @@ function FeedRow({
         </p>
       </div>
       <div className="flex flex-col items-end gap-1">
-        <Money
-          value={dueShownAmount(row)}
-          className="text-base font-semibold"
-        />
+        <Money value={dueShownAmount(row)} className="text-sm font-bold" />
         {paid ? (
           <span className="text-xs text-success">
             {row.last_paid_on

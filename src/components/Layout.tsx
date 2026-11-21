@@ -181,7 +181,14 @@ export function Layout({
   return (
     <div
       className="min-h-screen"
-      style={{ background: 'var(--surface)', color: 'var(--fg)' }}
+      style={{
+        // The installments pages sit on a white page (owner 2026-11-21,
+        // «خليه ابيض لصفحة الاقساط فقط»); every other page keeps the grey.
+        background: activePage.startsWith('installments')
+          ? 'var(--bg)'
+          : 'var(--surface)',
+        color: 'var(--fg)',
+      }}
     >
       {/* Top bar */}
       {pendingPage && (
