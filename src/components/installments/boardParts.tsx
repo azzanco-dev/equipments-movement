@@ -71,7 +71,10 @@ export function FigureCard({
           {sub && <p className={cn('text-xs', toneInk(tone))}>{sub}</p>}
         </div>
       </div>
-      <div className="text-3xl font-semibold tabular-nums">{value}</div>
+      {/* Smaller while four cards share a row (xl), so «33,941,332.19» fits. */}
+      <div className="whitespace-nowrap text-2xl font-semibold tabular-nums xl:text-xl 2xl:text-2xl">
+        {value}
+      </div>
       {foot && <p className="text-xs text-muted">{foot}</p>}
     </div>
   )

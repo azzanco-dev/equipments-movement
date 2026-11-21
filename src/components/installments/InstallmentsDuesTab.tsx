@@ -221,7 +221,7 @@ export function InstallmentsDuesTab({
   )
 
   const side = (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <Card className="space-y-3">
         <p className="text-xs text-muted">{t('instRemainingOnContracts')}</p>
         <Money

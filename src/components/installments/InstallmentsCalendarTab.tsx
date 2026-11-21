@@ -49,6 +49,7 @@ const DOT: Record<DueTone, string> = {
   info: 'bg-info',
   success: 'bg-success',
 }
+const WHOLE = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 /** A day cell shows this many chips, then «+N». */
 const CHIPS_PER_DAY = 3
 
@@ -220,17 +221,20 @@ export function InstallmentsCalendarTab({
                               <span
                                 key={row.id}
                                 className={cn(
-                                  'flex items-center justify-between gap-1 rounded px-1.5 py-0.5 text-[11px] tabular-nums',
+                                  'flex flex-wrap items-center justify-between gap-x-1 rounded px-1.5 py-0.5 text-[11px] tabular-nums',
                                   CHIP[tone],
                                 )}
                               >
                                 <bdi dir="ltr" className="opacity-80">
                                   {shortContractNumber(row.contract_number)}
                                 </bdi>
-                                <Money
-                                  value={dueShownAmount(row)}
-                                  className="font-semibold"
-                                />
+                                {/* Whole riyals, as the approved design:
+                                    a cell is too narrow for the halalas. */}
+                                <bdi dir="ltr" className="font-semibold">
+                                  {WHOLE.format(
+                                    Math.round(dueShownAmount(row)),
+                                  )}
+                                </bdi>
                               </span>
                             )
                           })}
@@ -255,7 +259,7 @@ export function InstallmentsCalendarTab({
         )}
       </Card>
 
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4">
         <section className="space-y-3">
           <div>
             <h2 className="text-lg font-semibold">{dayTitle(selected)}</h2>
