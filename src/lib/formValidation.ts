@@ -1349,6 +1349,15 @@ const optionalInstallmentAmount = z
  * `assert_installment_terms`, and its token's message goes under the field
  * it is about. The units are optional. The database re-checks every rule.
  */
+/** 0208: an optional Saudi IBAN, typed with or without spaces. */
+const installmentIban = z
+  .string()
+  .trim()
+  .refine(
+    (value) => !value || SAUDI_IBAN_PATTERN.test(normalizeIban(value)),
+    message('ibanFormatInvalid'),
+  )
+
 export const installmentContractFormSchema = z
   .object({
     description: requiredText('instErrDescription', {
@@ -1385,6 +1394,8 @@ export const installmentContractFormSchema = z
       lengthKey: 'instErrNotes',
     }),
     equipment: z.array(z.string()),
+    bank_name: z.string().optional(),
+    iban: installmentIban.optional(),
   })
   .superRefine((form, context) => {
     const terms = installmentTermsOf(form)
@@ -1451,4 +1462,6 @@ export const installmentFinancierFormSchema = z.object({
     max: INSTALLMENT_FINANCIER_NAME_MAX,
     lengthKey: 'instFinancierNameTooLong',
   }),
+  bank_name: z.string().optional(),
+  iban: installmentIban.optional(),
 })

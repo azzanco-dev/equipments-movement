@@ -3012,6 +3012,26 @@ export const translations = {
     instTotalRemainingOf: 'المتبقي ({count})',
     instTotalPaidOf: 'المسدد ({count})',
     // end installments-delete-paid (0207)
+    // installment-accounts (0208)
+    instErrAccount: 'تعذر قراءة بيانات الحساب.',
+    instErrBank: 'البنك غير موجود في قائمة البنوك.',
+    instErrIban: 'الايبان غير صحيح: SA ثم 22 رقما وحرفا.',
+    instAccountTitle: 'حساب السداد',
+    instAccountOwn: 'حساب خاص بهذا العقد',
+    instAccountFinancier: 'حساب الجهة التمويلية',
+    instNoAccount: 'لا يوجد حساب مسجل',
+    instPayToAccount: 'يحول على',
+    instContractAccountSection: 'حساب خاص بهذا العقد (اختياري)',
+    instContractAccountHint:
+      'اذا ارسلت الجهة ايبان مختلفا لهذا العقد اكتبه هنا. اتركه فارغا ليستخدم حساب الجهة التمويلية.',
+    instContractAccountHintWith:
+      'اتركه فارغا ليستخدم حساب الجهة: {account}',
+    instFinancierEdit: 'تعديل الجهة',
+    instFinancierEditOf: 'تعديل {name}',
+    instFinancierDialogAccountDesc:
+      'بنك او وكيل او اي جهة عليها عقد، مع حسابها البنكي اذا كان معروفا.',
+    instFinancierIbanHint: 'العقد اللي له ايبان مختلف تكتبه في العقد نفسه.',
+    // end installment-accounts (0208)
     // installment-receipts (0206)
     instReceiptLabel: 'ملف الحوالة',
     instReceiptPick: 'اختر ملف الحوالة او اسحبه هنا',
@@ -6423,6 +6443,26 @@ export const translations = {
     instTotalRemainingOf: 'Remaining ({count})',
     instTotalPaidOf: 'Paid ({count})',
     // end installments-delete-paid (0207)
+    // installment-accounts (0208)
+    instErrAccount: 'The account details could not be read.',
+    instErrBank: 'The bank is not in the banks list.',
+    instErrIban: 'The IBAN is not valid: SA followed by 22 digits and letters.',
+    instAccountTitle: 'Payment account',
+    instAccountOwn: 'This contract’s own account',
+    instAccountFinancier: 'The financier’s account',
+    instNoAccount: 'No account recorded',
+    instPayToAccount: 'Transfer to',
+    instContractAccountSection: 'This contract’s own account (optional)',
+    instContractAccountHint:
+      'If the financier sent another IBAN for this contract, enter it here. Leave it empty to use the financier’s account.',
+    instContractAccountHintWith:
+      'Leave it empty to use the financier’s account: {account}',
+    instFinancierEdit: 'Edit financier',
+    instFinancierEditOf: 'Edit {name}',
+    instFinancierDialogAccountDesc:
+      'A bank, a dealer or anyone a contract is owed to, with its bank account when known.',
+    instFinancierIbanHint: 'A contract with another IBAN carries it on the contract itself.',
+    // end installment-accounts (0208)
     // installment-receipts (0206)
     instReceiptLabel: 'Transfer receipt',
     instReceiptPick: 'Choose the transfer receipt or drop it here',

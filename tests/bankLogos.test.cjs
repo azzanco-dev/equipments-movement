@@ -79,6 +79,9 @@ test('approved on /ui-kit, then used by the three bank screens', () => {
     'src/screens/ui-kit/BankLogosMockup.tsx',
   ].concat([
     'src/components/banks/BanksSettings.tsx',
+    // 0208: the installments accounts (financier and contract).
+    'src/components/installments/BankAccountFields.tsx',
+    'src/components/installments/InstallmentsFinanciersTab.tsx',
     'src/screens/lessors/LessorDetailsDialog.tsx',
     'src/screens/lessors/LessorFormDialog.tsx',
   ]).sort())

@@ -24,6 +24,8 @@ import {
   buildSearchFilter,
   EQUIPMENT_CODE_TYPE_SEARCH_FIELDS,
 } from '@/lib/search'
+import { bankOptionLoader } from '@/lib/banks'
+import { normalizeIban } from '@/lib/partyFields'
 import { supabase } from '@/lib/supabase'
 import { SupabaseLoadError, unwrapRows } from '@/lib/supabaseResult'
 import type { ListFilter } from '@/components/data-list/types'
@@ -61,7 +63,7 @@ export const INSTALLMENT_DUE_SELECT =
 export const INSTALLMENT_DUES_LIST_SELECT = `${INSTALLMENT_DUE_SELECT},last_paid_on`
 
 export const INSTALLMENT_CONTRACT_SELECT =
-  'id,contract_number,description,financier_id,financier_name,total_amount,down_payment,balloon_amount,financed_amount,installment_count,frequency_months,first_due_date,notes,status,closed_at,cancel_reason,created_by_name,created_at,updated_at,paid_total,remaining_total,paid_count,overdue_count,overdue_amount,next_due_date,next_due_amount,last_due_date,equipment_count'
+  'id,contract_number,description,financier_id,financier_name,total_amount,down_payment,balloon_amount,financed_amount,installment_count,frequency_months,first_due_date,notes,status,closed_at,cancel_reason,created_by_name,created_at,updated_at,paid_total,remaining_total,paid_count,overdue_count,overdue_amount,next_due_date,next_due_amount,last_due_date,equipment_count,financier_bank_name,financier_iban,contract_bank_name,contract_iban'
 
 export const INSTALLMENT_SCHEDULE_SELECT =
   'id,contract_id,seq,due_date,amount,is_balloon,paid_amount'
@@ -69,7 +71,7 @@ export const INSTALLMENT_SCHEDULE_SELECT =
 export const INSTALLMENT_PAYMENT_SELECT =
   'id,contract_id,paid_on,amount,method,reference,note,status,voided_at,voided_by_name,void_reason,created_by_name,created_at,receipt_id,receipt_path,receipt_file_name,receipt_mime_type,receipt_size_bytes'
 
-export const INSTALLMENT_FINANCIER_SELECT = 'id,name'
+export const INSTALLMENT_FINANCIER_SELECT = 'id,name,bank_name,iban'
 
 /** A contract's units with the unit's code and type (null when RLS hides
  *  the unit from this reader). */
@@ -739,6 +741,9 @@ export interface InstallmentContractInput {
   notes: string
   /** The linked units' ids; empty = no link. */
   equipmentIds: readonly string[]
+  /** 0208: the contract's own account; both empty = the financier's. */
+  bankName: string
+  iban: string
 }
 
 /**
@@ -762,6 +767,11 @@ export async function saveInstallmentContract(
       p_first_due_date: input.firstDueDate,
       p_notes: input.notes.trim() || null,
       p_equipment_ids: [...input.equipmentIds],
+      // Always sent: an empty object clears the contract's own account.
+      p_account: {
+        bank_name: input.bankName.trim() || null,
+        iban: normalizeIban(input.iban) || null,
+      },
     }),
   )
 }
@@ -871,29 +881,47 @@ function financierResult(result: {
   return id ? { ok: true, id } : { ok: false, refused: true, error: null }
 }
 
+/** A financier's fields as the form sends them (0208: the account). */
+export interface InstallmentFinancierInput {
+  name: string
+  bankName: string
+  iban: string
+}
+
+function financierRow(input: InstallmentFinancierInput) {
+  return {
+    name: input.name.trim(),
+    bank_name: input.bankName.trim() || null,
+    iban: normalizeIban(input.iban) || null,
+  }
+}
+
 export async function insertInstallmentFinancier(
-  name: string,
+  input: InstallmentFinancierInput,
 ): Promise<FinancierWriteResult> {
   return financierResult(
     await supabase
       .from('installment_financiers')
-      .insert({ name: name.trim() })
+      .insert(financierRow(input))
       .select('id'),
   )
 }
 
 export async function updateInstallmentFinancier(
   id: string,
-  name: string,
+  input: InstallmentFinancierInput,
 ): Promise<FinancierWriteResult> {
   return financierResult(
     await supabase
       .from('installment_financiers')
-      .update({ name: name.trim() })
+      .update(financierRow(input))
       .eq('id', id)
       .select('id'),
   )
 }
+
+/** The banks list (0177) for the account pickers, 20 at most. */
+export const loadInstallmentBankOptions = bankOptionLoader(supabase)
 
 export async function deleteInstallmentFinancier(
   id: string,

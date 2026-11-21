@@ -16,6 +16,7 @@ import {
   MoreHorizontal,
   Pencil,
   Repeat,
+  Landmark,
   StickyNote,
   Trash2,
   Truck,
@@ -25,6 +26,7 @@ import {
 import { usePermissions } from '@/auth/PermissionsContext'
 import { InstallmentContractDialog } from '@/components/installments/InstallmentContractDialog'
 import { InstallmentPaymentDialog } from '@/components/installments/InstallmentPaymentDialog'
+import { BankAccountLine } from '@/components/installments/BankAccountFields'
 import { PaymentReceiptLine } from '@/components/installments/InstallmentReceipt'
 import { receiptOf } from '@/lib/installmentReceipts'
 import {
@@ -100,6 +102,7 @@ import {
   paidPercent,
   scheduleRemaining,
   INSTALLMENT_HISTORY_LABEL_KEYS,
+  installmentAccountOf,
   type InstallmentPaymentRow,
 } from '@/lib/installmentsView'
 import { saudiDateKey } from '@/lib/saudiTime'
@@ -354,6 +357,13 @@ function InstallmentContractDetailInner({
       icon: <Building2 size={16} />,
       label: t('instFinancier'),
       value: contract.financier_name,
+    },
+    {
+      // 0208: the contract's own account, else the financier's.
+      key: 'account',
+      icon: <Landmark size={16} />,
+      label: t('instAccountTitle'),
+      value: <BankAccountLine account={installmentAccountOf(contract)} />,
     },
     {
       key: 'total',

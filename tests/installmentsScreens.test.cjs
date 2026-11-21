@@ -52,6 +52,13 @@ const MIGRATION = read(
   'migrations',
   '20261118100000_0203_installments.sql',
 )
+// 0208 re-creates save_installment_contract (p_account) and adds the
+// account columns.
+const LATER = read(
+  'supabase',
+  'migrations',
+  '20261121120000_0208_installment_accounts.sql',
+)
 const RECEIPTS_MIGRATION = read(
   'supabase',
   'migrations',
@@ -258,9 +265,11 @@ test('trail and tab titles of the two pages', () => {
 
 /** The parameter names of a 0203 function, in order. */
 function sqlParameters(name) {
-  const match = new RegExp(
+  const pattern = new RegExp(
     `CREATE OR REPLACE FUNCTION public\\.${name}\\(([\\s\\S]*?)\\)\\s*RETURNS`,
-  ).exec(MIGRATION)
+  )
+  // The latest definition wins (0208 re-creates the save).
+  const match = pattern.exec(LATER) ?? pattern.exec(MIGRATION)
   assert.ok(match, name)
   return [...match[1].matchAll(/\b(p_[a-z_]+)\b/g)].map((item) => item[1])
 }
@@ -295,6 +304,7 @@ test('the four functions are called with the exact parameter names of 0203', () 
     'p_first_due_date',
     'p_notes',
     'p_equipment_ids',
+    'p_account',
   ])
   // Only those four, the delete of 0207, and nothing the migration keeps
   // for itself.
@@ -329,7 +339,12 @@ function relationBody(name) {
 function assertColumns(relation, columns) {
   const body = relationBody(relation)
   for (const column of columns)
-    assert.match(body, new RegExp(`\\b${column}\\b`), `${relation}.${column}`)
+    assert.ok(
+      new RegExp(`\\b${column}\\b`).test(body) ||
+        // 0208 appends the account columns.
+        new RegExp(`\\b(AS|ADD COLUMN) ${column}\\b`).test(LATER),
+      `${relation}.${column}`,
+    )
 }
 
 const selectOf = (name) => {

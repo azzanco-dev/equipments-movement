@@ -1,4 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
+import { BankLogo } from '@/components/banks/BankLogo'
+import { formatIban } from '@/lib/partyFields'
 import { Building2, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   Button,
@@ -87,10 +89,33 @@ export function InstallmentsFinanciersTab({
     {
       key: 'name',
       header: t('instFinancierName'),
+      // 0208: the account as a muted line under the name (no new column:
+      // the tables stay narrow).
       cell: (item) => (
-        <span className="flex items-center gap-2">
-          <Building2 size={14} aria-hidden="true" className="text-muted" />
-          <span className="font-semibold">{item.name}</span>
+        <span className="flex items-start gap-2">
+          <Building2
+            size={14}
+            aria-hidden="true"
+            className="mt-0.5 shrink-0 text-muted"
+          />
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="font-semibold">{item.name}</span>
+            {(item.bank_name || item.iban) && (
+              <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                {item.bank_name && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <BankLogo name={item.bank_name} size="sm" />
+                    {item.bank_name}
+                  </span>
+                )}
+                {item.iban && (
+                  <bdi dir="ltr" className="tabular-nums">
+                    {formatIban(item.iban)}
+                  </bdi>
+                )}
+              </span>
+            )}
+          </span>
         </span>
       ),
     },
@@ -131,7 +156,7 @@ export function InstallmentsFinanciersTab({
                   <IconButton
                     size="sm"
                     variant="ghost"
-                    label={t('instFinancierRenameOf').replace(
+                    label={t('instFinancierEditOf').replace(
                       '{name}',
                       item.name,
                     )}

@@ -365,6 +365,9 @@ export const INSTALLMENT_ERROR_KEYS: Readonly<Record<string, TranslationKey>> =
     contract_has_payments: 'instErrContractHasPayments',
     payment_already_voided: 'instErrPaymentAlreadyVoided',
     contract_not_cancelled: 'instErrContractNotCancelled',
+    invalid_account: 'instErrAccount',
+    invalid_bank: 'instErrBank',
+    invalid_iban: 'instErrIban',
   }
 
 /** Every stable token of the installments functions, for the tests. */
@@ -402,6 +405,10 @@ export function installmentErrorMessage(
     return 'instErrFinancierDuplicate'
   if (text.includes('installment_contracts_financier_id_fkey'))
     return 'instErrFinancierInUse'
+  // 0208: a direct financier write the account constraints refused.
+  if (text.includes('installment_financiers_iban_check')) return 'instErrIban'
+  if (text.includes('installment_financiers_bank_name_fkey'))
+    return 'instErrBank'
   for (const [token, key] of TOKENS_LONGEST_FIRST)
     if (text.includes(token)) return key
   return 'instSaveFailed'

@@ -43,6 +43,7 @@ import {
 import {
   amountInputText,
   amountOf,
+  installmentAccountOf,
   installmentErrorToken,
   installmentFieldError,
   parseInstallmentAmount,
@@ -54,6 +55,7 @@ import {
   type InstallmentPaymentFormValues,
   type InstallmentScheduleItem,
 } from '@/lib/installmentsView'
+import { BankAccountLine } from './BankAccountFields'
 import { saudiDateKey } from '@/lib/saudiTime'
 import { attachInstallmentReceipt, InstallmentReceiptError } from '@/lib/installmentReceiptsData'
 import { AmountHint, Money, OptionalLabel, PreviewStat } from './cells'
@@ -441,6 +443,14 @@ export function InstallmentPaymentDialog({
                 />
               }
             />
+          </div>
+        )}
+        {/* 0208: where the money goes, with a copy button, so the IBAN is
+            never typed by hand. */}
+        {ready && (
+          <div className="space-y-1 rounded-xl border bg-surface p-3">
+            <p className="text-xs text-muted">{t('instPayToAccount')}</p>
+            <BankAccountLine account={installmentAccountOf(ready.contract)} />
           </div>
         )}
         <Field

@@ -253,6 +253,13 @@ test('the client maps exactly the tokens the SQL raises', () => {
   )
   for (const match of later.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g))
     raised.add(match[1])
+  // 0208 adds the three account tokens.
+  const accounts = fs.readFileSync(
+    path.join(MIGRATIONS, '20261121120000_0208_installment_accounts.sql'),
+    'utf8',
+  )
+  for (const match of accounts.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g))
+    raised.add(match[1])
   assert.deepEqual([...raised].sort(), [...lib.INSTALLMENT_ERROR_TOKENS].sort())
 })
 

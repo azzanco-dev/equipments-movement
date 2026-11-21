@@ -56,7 +56,9 @@ import {
   type InstallmentFinancierRow,
   type InstallmentUnit,
 } from '@/lib/installmentsView'
+import { formatIban } from '@/lib/partyFields'
 import { saudiDateKey } from '@/lib/saudiTime'
+import { BankAccountFields } from './BankAccountFields'
 import {
   AmountHint,
   Money,
@@ -88,6 +90,8 @@ function initialValues(
       first_due_date: addMonths(today, 1),
       notes: '',
       equipment: [],
+      bank_name: '',
+      iban: '',
     }
   return {
     description: contract.description,
@@ -100,6 +104,8 @@ function initialValues(
     first_due_date: contract.first_due_date,
     notes: contract.notes ?? '',
     equipment: units.map((unit) => unit.equipment_id),
+    bank_name: contract.contract_bank_name ?? '',
+    iban: contract.contract_iban ? formatIban(contract.contract_iban) : '',
   }
 }
 
@@ -212,6 +218,13 @@ export function InstallmentContractDialog({
     return options
   }, [financiers, contract])
 
+  // The chosen financier's own account, named in the section's hint.
+  const financierAccount = useMemo(() => {
+    if (financiers.status !== 'ready') return null
+    const row = financiers.rows.find((item) => item.id === values.financier_id)
+    return row && (row.bank_name || row.iban) ? row : null
+  }, [financiers, values.financier_id])
+
   const submit = async () => {
     if (saving) return
     const found = validateWithSchema<InstallmentContractFormValues>(
@@ -253,6 +266,8 @@ export function InstallmentContractDialog({
           }),
       notes: values.notes,
       equipmentIds: values.equipment,
+      bankName: values.bank_name,
+      iban: values.iban,
     })
     setSaving(false)
     if (result.error || !result.data) {
@@ -580,6 +595,37 @@ export function InstallmentContractDialog({
               </ol>
             </>
           )}
+        </section>
+
+        {/* 0208 (owner 2026-11-21): a financier may send another IBAN with
+            each contract. Empty = the financier's account. */}
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold">
+              {t('instContractAccountSection')}
+            </h3>
+            <p className="text-xs text-muted">
+              {financierAccount
+                ? t('instContractAccountHintWith').replace(
+                    '{account}',
+                    [
+                      financierAccount.bank_name,
+                      financierAccount.iban && formatIban(financierAccount.iban),
+                    ]
+                      .filter(Boolean)
+                      .join(' · '),
+                  )
+                : t('instContractAccountHint')}
+            </p>
+          </div>
+          <BankAccountFields
+            bankName={values.bank_name}
+            iban={values.iban}
+            onBankName={(value) => set('bank_name', value)}
+            onIban={(value) => set('iban', value)}
+            bankError={errors.bank_name ?? null}
+            ibanError={errors.iban ?? null}
+          />
         </section>
 
         {/* The optional link: a contract may be tied to no unit at all. */}

@@ -108,6 +108,42 @@ export interface InstallmentContractRow {
   next_due_amount: number | null
   last_due_date: string | null
   equipment_count: number
+  /** 0208: the financier's account and the contract's own account (null =
+   *  the financier's is used). */
+  financier_bank_name?: string | null
+  financier_iban?: string | null
+  contract_bank_name?: string | null
+  contract_iban?: string | null
+}
+
+/** The account a contract is paid to (0208): the contract's own when it
+ *  carries one, else the financier's; null when neither is recorded. */
+export interface InstallmentAccount {
+  bankName: string | null
+  iban: string | null
+  /** True = the contract's own account, not the financier's. */
+  own: boolean
+}
+
+export function installmentAccountOf(
+  contract: Pick<
+    InstallmentContractRow,
+    'financier_bank_name' | 'financier_iban' | 'contract_bank_name' | 'contract_iban'
+  >,
+): InstallmentAccount | null {
+  if (contract.contract_bank_name || contract.contract_iban)
+    return {
+      bankName: contract.contract_bank_name ?? null,
+      iban: contract.contract_iban ?? null,
+      own: true,
+    }
+  if (contract.financier_bank_name || contract.financier_iban)
+    return {
+      bankName: contract.financier_bank_name ?? null,
+      iban: contract.financier_iban ?? null,
+      own: false,
+    }
+  return null
 }
 
 /** `installment_schedule`: one generated payment of a contract. */
@@ -154,6 +190,9 @@ export interface InstallmentAllocationRow {
 export interface InstallmentFinancierRow {
   id: string
   name: string
+  /** 0208: the financier's account, both optional. */
+  bank_name?: string | null
+  iban?: string | null
 }
 
 /** A unit linked to a contract; `code` is null when the reader's access
@@ -735,6 +774,9 @@ export interface InstallmentContractFormValues {
   notes: string
   /** The linked units' ids; empty = no link. */
   equipment: string[]
+  /** 0208: the contract's own account; both empty = the financier's. */
+  bank_name: string
+  iban: string
 }
 
 export const INSTALLMENT_CONTRACT_FIELD_ORDER: readonly (keyof InstallmentContractFormValues)[] =
@@ -747,6 +789,8 @@ export const INSTALLMENT_CONTRACT_FIELD_ORDER: readonly (keyof InstallmentContra
     'installment_count',
     'frequency_months',
     'first_due_date',
+    'bank_name',
+    'iban',
     'equipment',
     'notes',
   ]
@@ -796,6 +840,9 @@ export const INSTALLMENT_CONTRACT_TOKEN_FIELDS: Readonly<
   invalid_first_due_date: 'first_due_date',
   invalid_notes: 'notes',
   invalid_equipment: 'equipment',
+  invalid_bank: 'bank_name',
+  invalid_iban: 'iban',
+  invalid_account: 'iban',
 }
 
 /** The payment form. */
@@ -830,6 +877,8 @@ export interface InstallmentReasonFormValues {
 
 export interface InstallmentFinancierFormValues {
   name: string
+  bank_name: string
+  iban: string
 }
 
 const TOKENS_LONGEST_FIRST = [...INSTALLMENT_ERROR_TOKENS].sort(
