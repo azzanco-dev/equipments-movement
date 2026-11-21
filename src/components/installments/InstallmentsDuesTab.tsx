@@ -346,7 +346,7 @@ export function InstallmentsDuesTab({
   )
 
   return (
-    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="grid gap-3 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       {feed}
       {side}
     </div>
