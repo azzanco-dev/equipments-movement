@@ -35,6 +35,14 @@ export interface SoftBarChartProps extends ChartBaseProps {
   singleStroke?: string
   /** The category labels' direction (Latin equipment types are `ltr`). */
   labelDir?: 'ltr' | 'rtl'
+  /**
+   * Opt-in «flat» look (the installments chart, owner 2026-11-21, «خلي الوان
+   * وشكل الرسم البياني نفس فيقما»): each bar filled with its item's own
+   * `color` (or `singleColor`) as is, no outline, 6 px rounded tops, muted
+   * regular value labels, 12 px category labels and no axis line. The default
+   * soft look is unchanged.
+   */
+  flat?: boolean
 }
 
 /** What Recharts hands a custom axis tick, narrowed to what is used. */
@@ -59,6 +67,7 @@ export function SoftBarChart({
   singleColor,
   singleStroke,
   labelDir,
+  flat = false,
   loading,
   error,
   className,
@@ -80,7 +89,7 @@ export function SoftBarChart({
         x={cx}
         y={cy + 10}
         textAnchor="middle"
-        fontSize={10}
+        fontSize={flat ? 12 : 10}
         fill={CHART_LABEL_COLOR}
         direction={labelDir}
       >
@@ -130,14 +139,14 @@ export function SoftBarChart({
           <BarChart
             data={items}
             margin={{ top: 16, right: 4, bottom: 0, left: 4 }}
-            barCategoryGap="28%"
+            barCategoryGap={flat ? '30%' : '28%'}
           >
             <XAxis
               dataKey="label"
               reversed={rtl}
               interval={0}
               tickLine={false}
-              axisLine={{ stroke: CHART_AXIS_COLOR }}
+              axisLine={flat ? false : { stroke: CHART_AXIS_COLOR }}
               tick={renderTick}
               height={32}
             />
@@ -153,18 +162,26 @@ export function SoftBarChart({
             />
             <Bar
               dataKey="value"
-              radius={[3, 3, 0, 0]}
+              radius={flat ? [6, 6, 0, 0] : [3, 3, 0, 0]}
               strokeWidth={1}
               {...animation}
             >
               {items.map((item, index) => (
                 <Cell
                   key={item.id}
-                  fill={deepTint(
-                    singleColor ?? seriesColor(index, item.color),
-                    singleStroke ?? seriesStroke(index, item.strokeColor),
-                  )}
-                  stroke={singleStroke ?? seriesStroke(index, item.strokeColor)}
+                  fill={
+                    flat
+                      ? (item.color ?? singleColor ?? seriesColor(index))
+                      : deepTint(
+                          singleColor ?? seriesColor(index, item.color),
+                          singleStroke ?? seriesStroke(index, item.strokeColor),
+                        )
+                  }
+                  stroke={
+                    flat
+                      ? 'none'
+                      : (singleStroke ?? seriesStroke(index, item.strokeColor))
+                  }
                 />
               ))}
               <LabelList
@@ -178,8 +195,8 @@ export function SoftBarChart({
                 position="top"
                 offset={4}
                 fontSize={11}
-                fontWeight={600}
-                fill="var(--fg)"
+                fontWeight={flat ? 400 : 600}
+                fill={flat ? 'var(--muted)' : 'var(--fg)'}
                 style={{ fontVariantNumeric: 'tabular-nums' }}
               />
             </Bar>

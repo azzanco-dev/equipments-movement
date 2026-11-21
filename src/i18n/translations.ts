@@ -3089,6 +3089,7 @@ export const translations = {
     instSortNumber: 'رقم العقد',
     instNoContractsHere: 'لا توجد عقود هنا.',
     instShownOfContracts: 'يعرض {shown} من {total} عقد',
+    instCashflowNear: 'الشهرين الجايين',
     // end installments-board (2026-11-21)
     // installment-receipts (0206)
     instReceiptLabel: 'ملف الحوالة',
@@ -3162,7 +3163,7 @@ export const translations = {
     instDue30: 'خلال 30 يوما',
     instRemainingOnContracts: 'المتبقي على العقود',
     instCashflowTitle: 'المستحق في الشهور القادمة',
-    instCashflowDesc: 'ما بقي للسداد في كل شهر من السنة القادمة، بدون المتاخر.',
+    instCashflowDesc: 'مجموع الاقساط غير المسددة لكل شهر.',
     instCashflowHoverHint: 'مرر على شهر لترى مبلغه وعدد اقساطه.',
     instNoActiveContracts: 'لا توجد عقود سارية بعد.',
     instOverdueListTitle: 'الاقساط المتاخرة',
@@ -6578,6 +6579,7 @@ export const translations = {
     instSortNumber: 'Contract number',
     instNoContractsHere: 'No contracts here.',
     instShownOfContracts: 'Showing {shown} of {total} contracts',
+    instCashflowNear: 'The next two months',
     // end installments-board (2026-11-21)
     // installment-receipts (0206)
     instReceiptLabel: 'Transfer receipt',
@@ -6654,8 +6656,7 @@ export const translations = {
     instDue30: 'Within 30 days',
     instRemainingOnContracts: 'Remaining on contracts',
     instCashflowTitle: 'Due in the coming months',
-    instCashflowDesc:
-      'What is still to pay in each month of the coming year, without the overdue.',
+    instCashflowDesc: 'The unpaid installments of each month.',
     instCashflowHoverHint:
       'Point at a month to see its amount and its installments.',
     instNoActiveContracts: 'No active contracts yet.',

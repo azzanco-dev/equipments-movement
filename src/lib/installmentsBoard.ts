@@ -426,3 +426,44 @@ export const WEEKDAYS_EN = [
   'Fri',
   'Sat',
 ] as const
+
+/** The chart's amber months: this month and the next one (the Figma design). */
+export const NEAR_MONTHS = 2
+
+const MONTHS_SHORT_AR = [
+  'ينا',
+  'فبر',
+  'مار',
+  'ابر',
+  'ماي',
+  'يون',
+  'يول',
+  'اغس',
+  'سبت',
+  'اكت',
+  'نوف',
+  'ديس',
+] as const
+const MONTHS_SHORT_EN = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const
+
+/** The month's short name under a bar of the chart: «نوف» / "Nov". */
+export function installmentMonthShort(
+  monthKey: string,
+  lang: 'ar' | 'en',
+): string {
+  const index = Number(monthKey.slice(5, 7)) - 1
+  return (lang === 'ar' ? MONTHS_SHORT_AR : MONTHS_SHORT_EN)[index] ?? monthKey
+}

@@ -45,7 +45,7 @@ import {
   type InstallmentOverviewRow,
 } from '@/lib/installmentsView'
 import { saudiDateKey } from '@/lib/saudiTime'
-import { CashflowBars } from './CashflowBars'
+import { CashflowBars, CashflowLegend } from './CashflowBars'
 import { ContractCard, FigureCard } from './boardParts'
 import { Money, WhenBadge } from './cells'
 import { useLoad } from './useLoad'
@@ -264,6 +264,7 @@ export function InstallmentsDashboardTab({
               <SectionHeader
                 title={t('instCashflowTitle')}
                 description={t('instCashflowDesc')}
+                action={<CashflowLegend />}
               />
               {overview.open_contract_count > 0 ? (
                 <>
