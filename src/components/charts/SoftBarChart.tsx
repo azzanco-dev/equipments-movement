@@ -139,7 +139,9 @@ export function SoftBarChart({
           <BarChart
             data={items}
             margin={{ top: 16, right: 4, bottom: 0, left: 4 }}
-            barCategoryGap={flat ? '30%' : '28%'}
+            // Recharts puts the gap on both sides of a bar: 16% leaves the
+            // flat bar two thirds of its month, as the Figma design (46 of 68).
+            barCategoryGap={flat ? '16%' : '28%'}
           >
             <XAxis
               dataKey="label"
