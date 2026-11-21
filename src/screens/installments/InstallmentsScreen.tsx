@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   Building2,
   CalendarDays,
+  Clock,
   FileText,
   LayoutDashboard,
   Plus,
@@ -14,6 +15,7 @@ import {
   InstallmentPaymentDialog,
   type InstallmentPaymentTarget,
 } from '@/components/installments/InstallmentPaymentDialog'
+import { InstallmentsCalendarTab } from '@/components/installments/InstallmentsCalendarTab'
 import { InstallmentsContractsTab } from '@/components/installments/InstallmentsContractsTab'
 import { InstallmentsDashboardTab } from '@/components/installments/InstallmentsDashboardTab'
 import { InstallmentsDuesTab } from '@/components/installments/InstallmentsDuesTab'
@@ -47,9 +49,8 @@ import {
 import {
   amountOf,
   INSTALLMENTS_URL_KEYS,
-  INSTALLMENT_DUES_URL_PREFIX,
+  type InstallmentContractRow,
   type InstallmentDueRow,
-  type InstallmentDuesView,
   type InstallmentFinancierRow,
   type InstallmentsTab,
 } from '@/lib/installmentsView'
@@ -66,8 +67,9 @@ export interface InstallmentsScreenProps {
 
 /**
  * «الاقساط» (/installments, migration 0203; the /ui-kit mockup the owner
- * approved on 2026-11-18, «اعتمد وابني»): ONE page with its header and four
- * tabs — «اللوحة» (the default), «العقود», «الاستحقاقات», «الجهات» — on the
+ * approved on 2026-11-18, «اعتمد وابني»): ONE page with its header and five
+ * tabs — «اللوحة» (the default), «التقويم», «الاستحقاقات», «العقود», «الجهات
+ * التمويلية» (the unified page approved in Figma on 2026-11-21) — on the
  * real views. The page is a HIDDEN nav entry (owner: «لاتضيف للسايد بار, خلي
  * الوصول له عبر الرابط»), gated on `installments.view`; the write actions
  * show for `installments.manage` only, and the database checks the key again
@@ -117,16 +119,7 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
 
   const setTab = (tab: InstallmentsTab) =>
     update({ [INSTALLMENTS_URL_KEYS.tab]: tab === 'dashboard' ? null : tab })
-  const showDues = (view?: InstallmentDuesView) =>
-    update({
-      [INSTALLMENTS_URL_KEYS.tab]: 'dues',
-      ...(view
-        ? {
-            [INSTALLMENTS_URL_KEYS.duesView]: view,
-            [`${INSTALLMENT_DUES_URL_PREFIX}page`]: null,
-          }
-        : {}),
-    })
+  const showDues = () => update({ [INSTALLMENTS_URL_KEYS.tab]: 'dues' })
 
   /** A write succeeded: close its dialog, read again, say so. */
   // A payment whose receipt could not be attached is still saved: say so,
@@ -164,6 +157,20 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
         financier_name: row.financier_name,
       },
       amount: amountOf(row.remaining_amount),
+    })
+  const payContract = (contract: InstallmentContractRow) =>
+    setDialog({
+      kind: 'pay',
+      contract: {
+        id: contract.id,
+        contract_number: contract.contract_number,
+        description: contract.description,
+        financier_name: contract.financier_name,
+      },
+      amount:
+        contract.next_due_amount === null
+          ? undefined
+          : amountOf(contract.next_due_amount),
     })
   const closeDialog = (open: boolean) => {
     if (!open) setDialog(null)
@@ -223,12 +230,26 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
           {/* The approved design «نموذج 5» (owner 2026-11-21, «اعتمد 5»):
               frameless buttons with an icon, the open one black like a
               primary button, between two lines; it scrolls sideways on a
-              phone. */}
+              phone. The order and «التقويم» are the unified page of the same
+              day: اللوحة, التقويم, الاستحقاقات, العقود, الجهات التمويلية. */}
           <div className="border-b pb-3">
             <TabsList variant="buttons" aria-label={t('instTabsLabel')}>
               <TabsTrigger value="dashboard">
                 <LayoutDashboard size={16} aria-hidden="true" />
                 {t('instTabDashboard')}
+              </TabsTrigger>
+              <TabsTrigger value="calendar">
+                <CalendarDays size={16} aria-hidden="true" />
+                {t('instTabCalendar')}
+              </TabsTrigger>
+              <TabsTrigger value="dues">
+                <Clock size={16} aria-hidden="true" />
+                {t('instTabDues')}
+                {data.overview.overdue_count > 0 && (
+                  <Badge size="sm" tone="danger">
+                    {data.overview.overdue_count}
+                  </Badge>
+                )}
               </TabsTrigger>
               <TabsTrigger value="contracts">
                 <FileText size={16} aria-hidden="true" />
@@ -236,15 +257,6 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
                 <span className="text-xs tabular-nums opacity-70">
                   {data.contractsCount}
                 </span>
-              </TabsTrigger>
-              <TabsTrigger value="dues">
-                <CalendarDays size={16} aria-hidden="true" />
-                {t('instTabDues')}
-                {data.overview.overdue_count > 0 && (
-                  <Badge size="sm" tone="danger">
-                    {data.overview.overdue_count}
-                  </Badge>
-                )}
               </TabsTrigger>
               <TabsTrigger value="financiers">
                 <Building2 size={16} aria-hidden="true" />
@@ -260,21 +272,30 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
           <TabsContent value="dashboard" className="mt-0">
             <InstallmentsDashboardTab
               overview={data.overview}
+              financiers={data.financiers}
               version={version}
               canManage={canManage}
               onPay={payRow}
-              onOpenContract={onOpenContract}
               onShowDues={showDues}
+            />
+          </TabsContent>
+          <TabsContent value="calendar" className="mt-0">
+            <InstallmentsCalendarTab
+              version={version}
+              canManage={canManage}
+              onPay={payRow}
             />
           </TabsContent>
           <TabsContent value="contracts" className="mt-0">
             <InstallmentsContractsTab
+              state={state}
+              update={update}
               financiers={data.financiers}
               totalContracts={data.contractsCount}
               version={version}
               canManage={canManage}
               onNewContract={() => setDialog({ kind: 'contract' })}
-              onOpenContract={onOpenContract}
+              onPay={payContract}
             />
           </TabsContent>
           <TabsContent value="dues" className="mt-0">
@@ -286,7 +307,6 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
               version={version}
               canManage={canManage}
               onPay={payRow}
-              onOpenContract={onOpenContract}
             />
           </TabsContent>
           <TabsContent value="financiers" className="mt-0">

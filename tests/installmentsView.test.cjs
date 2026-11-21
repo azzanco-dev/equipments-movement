@@ -349,17 +349,26 @@ test('the list page state comes from its URL, with safe defaults', () => {
     const params = new URLSearchParams(query)
     return plain(view.readInstallmentsUrlState((name) => params.get(name)))
   }
-  assert.deepEqual(read(''), { tab: 'dashboard', duesView: null })
-  assert.deepEqual(read('tab=contracts&cq=x&csort=remaining_total'), {
+  const base = { feedView: null, feedFinancier: null, contractChip: null, contractSort: null, contractSearch: '' }
+  assert.deepEqual(read(''), { tab: 'dashboard', duesView: null, ...base })
+  assert.deepEqual(read('tab=contracts&cq=x&csort=remaining&chip=overdue'), {
     tab: 'contracts',
     duesView: null,
+    ...base,
+    contractChip: 'overdue',
+    contractSort: 'remaining',
+    contractSearch: 'x',
   })
-  assert.deepEqual(read('tab=dues&view=month&dpage=2'), {
+  assert.deepEqual(read('tab=dues&view=paid&fin=f1'), {
     tab: 'dues',
-    duesView: 'month',
+    duesView: 'paid',
+    ...base,
+    feedView: 'paid',
+    feedFinancier: 'f1',
   })
+  assert.equal(plain(view.readInstallmentsUrlState((n) => (n === 'tab' ? 'calendar' : null))).tab, 'calendar')
   // Anything unknown falls back: a pasted URL never breaks the page.
-  assert.deepEqual(read('tab=x&view=late'), { tab: 'dashboard', duesView: null })
+  assert.deepEqual(read('tab=x&view=late'), { tab: 'dashboard', duesView: null, ...base, feedView: 'late' })
   assert.equal(view.INSTALLMENT_CONTRACTS_URL_PREFIX, 'c')
   assert.equal(view.INSTALLMENT_DUES_URL_PREFIX, 'd')
 

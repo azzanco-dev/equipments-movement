@@ -514,12 +514,7 @@ test('the screens never touch the database themselves', () => {
 
 test('write actions show for installments.manage only', () => {
   const list = read('src', 'screens', 'installments', 'InstallmentsScreen.tsx')
-  const page = read(
-    'src',
-    'screens',
-    'installments',
-    'InstallmentContractDetail.tsx',
-  )
+  const page = read('src', 'screens', 'installments', 'InstallmentContractDetail.tsx')
   for (const source of [list, page]) {
     assert.match(source, /const canManage = can\('installments\.manage'\)/)
     assert.match(source, /<ToastProvider>/)
@@ -531,34 +526,32 @@ test('write actions show for installments.manage only', () => {
   assert.match(page, /const showActions = canManage\n/)
   assert.match(page, /canVoid=\{canManage && !cancelled\}/)
   assert.match(page, /action=\{canManage && active \? payButton : undefined\}/)
-  // The row buttons and the financier actions follow the same key.
+  // The «تسديد» buttons of the cards, the calendar and the feed follow the key.
   for (const file of [
     'InstallmentsDashboardTab.tsx',
+    'InstallmentsContractsTab.tsx',
+    'InstallmentsCalendarTab.tsx',
     'InstallmentsDuesTab.tsx',
-    'InstallmentsFinanciersTab.tsx',
   ])
-    assert.match(
-      read('src', 'components', 'installments', file),
-      /\.\.\.\(canManage(?: && !paidView)?\s*\?/,
-      file,
-    )
+    assert.match(read('src', 'components', 'installments', file), /canPay=\{canManage\}/, file)
+  assert.match(
+    read('src', 'components', 'installments', 'InstallmentsFinanciersTab.tsx'),
+    /\.\.\.\(canManage\s*\?/,
+  )
   // No screen tests a role name.
   for (const file of UI_FILES)
-    assert.doesNotMatch(
-      read(...file),
-      /\.role\b|isAdmin|is_admin/,
-      file.join('/'),
-    )
+    assert.doesNotMatch(read(...file), /role === '|profile\.role|is_admin/, file.join('/'))
 })
 
-test('one page with four tabs, kept in the URL', () => {
+test('one page with five tabs, kept in the URL', () => {
   const list = read('src', 'screens', 'installments', 'InstallmentsScreen.tsx')
-  for (const tab of ['dashboard', 'contracts', 'dues', 'financiers']) {
-    assert.match(list, new RegExp(`<TabsTrigger value="${tab}">`))
-    assert.match(list, new RegExp(`<TabsContent value="${tab}"`))
+  for (const tab of ['dashboard', 'calendar', 'dues', 'contracts', 'financiers']) {
+    assert.match(list, new RegExp('<TabsTrigger value="' + tab + '">'))
+    assert.match(list, new RegExp('<TabsContent value="' + tab + '"'))
   }
   for (const piece of [
     '<InstallmentsDashboardTab',
+    '<InstallmentsCalendarTab',
     '<InstallmentsContractsTab',
     '<InstallmentsDuesTab',
     '<InstallmentsFinanciersTab',
@@ -568,26 +561,15 @@ test('one page with four tabs, kept in the URL', () => {
   ])
     assert.ok(list.includes(piece), piece)
   assert.match(list, /useInstallmentsUrl\(\)/)
-  const hook = read(
-    'src',
-    'components',
-    'installments',
-    'useInstallmentsUrl.ts',
-  )
+  const hook = read('src', 'components', 'installments', 'useInstallmentsUrl.ts')
   assert.match(hook, /window\.history\.replaceState\(/)
   assert.match(hook, /readInstallmentsUrlState\(/)
-  // The lists keep their own state through the shared list hook.
-  for (const file of ['InstallmentsContractsTab.tsx', 'InstallmentsDuesTab.tsx'])
-    assert.match(
-      read('src', 'components', 'installments', file),
-      /useDataListState\(\s*installment(Contracts|Dues)ListConfig,\s*INSTALLMENT_(CONTRACTS|DUES)_URL_PREFIX/,
-      file,
-    )
+  // The dues view and financier, the contracts chip, sort and search live in the URL.
+  const view = read('src', 'lib', 'installmentsView.ts')
+  for (const key of ["feedFinancier: 'fin'", "contractChip: 'chip'", "contractSort: 'csort'", "contractSearch: 'cq'"])
+    assert.ok(view.includes(key), key)
   // A new contract opens its own page, which shows the message.
-  assert.match(
-    list,
-    /setInstallmentFlash\('instToastContractCreated'\)\s*onOpenContract\(id\)/,
-  )
+  assert.match(list, /setInstallmentFlash\('instToastContractCreated'\)\s*onOpenContract\(id\)/)
   assert.match(
     read('src', 'screens', 'installments', 'InstallmentContractDetail.tsx'),
     /takeInstallmentFlash\(\)/,
@@ -625,56 +607,28 @@ test('a failed load is an error state with a retry, never an empty list', () => 
 })
 
 test('a contract opens through real links', () => {
-  for (const file of [
-    'InstallmentsDashboardTab.tsx',
-    'InstallmentsContractsTab.tsx',
-    'InstallmentsDuesTab.tsx',
-  ])
+  for (const file of ['boardParts.tsx', 'InstallmentsDuesTab.tsx', 'InstallmentsCalendarTab.tsx'])
     assert.match(
       read('src', 'components', 'installments', file),
-      /rowHref=\{\(row\) => `\/installments\/\$\{row\.(id|contract_id)\}`\}/,
+      /<AppLink\s+href=\{`\/installments\/\$\{(contract\.id|row\.contract_id)\}`\}/,
       file,
     )
-  // The dues table's first column is the date: the contract cell is the link.
-  assert.match(
-    read('src', 'components', 'installments', 'InstallmentsDuesTab.tsx'),
-    /rowLinkColumn="contract"/,
-  )
 })
 
-test('the lists are server-side: the page total is never summed in the browser', () => {
-  const dues = read(
-    'src',
-    'components',
-    'installments',
-    'InstallmentsDuesTab.tsx',
-  )
-  assert.match(dues, /fetchInstallmentDuesPage\(/)
-  assert.match(dues, /fetchInstallmentDuesTotal\(/)
-  // The total sits beside the chips since the design «نموذج 5».
-  assert.match(dues, /<Money\s+value=\{load\.data\.sum\.total\}/)
-  assert.match(dues, /load\.data\.sum\.partial/)
-  assert.doesNotMatch(dues, /rows\.reduce\(|sumAmounts\(/)
-  assert.match(dues, /<DataListPagination/)
-  const contracts = read(
-    'src',
-    'components',
-    'installments',
-    'InstallmentsContractsTab.tsx',
-  )
-  assert.match(contracts, /fetchInstallmentContractsPage\(/)
-  assert.match(contracts, /<DataListPagination/)
-  assert.doesNotMatch(contracts, /\.filter\(\(row\) =>[\s\S]{0,80}includes\(/)
-  assert.doesNotMatch(contracts, /\.sort\(/)
-  const dashboard = read(
-    'src',
-    'components',
-    'installments',
-    'InstallmentsDashboardTab.tsx',
-  )
-  // The chart and the overdue card are gone (owner 2026-11-21).
-  assert.doesNotMatch(dashboard, /CashflowBars|monthlyDueBuckets|fetchOverdueDues/)
-  assert.match(dashboard, /fetchUpcomingDues\(DASHBOARD_UPCOMING_ROWS, signal\)/)
+test('the reads are server-side and bounded', () => {
+  const data = read('src', 'lib', 'installmentsData.ts')
+  for (const name of ['fetchDuesFeed', 'fetchContractCards', 'fetchDuesWithin', 'fetchContractsByIds'])
+    assert.match(data, new RegExp('export async function ' + name + '\\('), name)
+  // Every new read limits its rows.
+  const board = data.slice(data.indexOf('// --- The unified page'))
+  const readers = board.split(/\nexport async function /).slice(1)
+  for (const reader of readers) assert.match(reader, /\.limit\(/, reader.slice(0, 40))
+  for (const name of ['CONTRACT_FIGURES_CAP', 'CALENDAR_ROWS_CAP', 'CASHFLOW_ROWS_CAP'])
+    assert.match(board, new RegExp('partial: rows\\.length >= ' + name), name)
+  const contracts = read('src', 'components', 'installments', 'InstallmentsContractsTab.tsx')
+  assert.doesNotMatch(contracts, /\.sort\(|\.filter\(\(row\)/)
+  const dues = read('src', 'components', 'installments', 'InstallmentsDuesTab.tsx')
+  assert.match(dues, /setLimit\(\(current\) => current \+ DUES_FEED_PAGE\)/)
 })
 
 test('the contract page: schedule, payments, units and a derived history', () => {

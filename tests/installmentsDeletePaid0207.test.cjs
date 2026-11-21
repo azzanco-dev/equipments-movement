@@ -75,35 +75,27 @@ test('0207: installment_dues keeps its columns and appends last_paid_on', () => 
   assert.match(view, /p\.status = 'posted' \) AS last_paid_on FROM/)
 })
 
-test('the dues: «المسددة», «هذا الشهر» by default, «القسط» column', () => {
-  const view = read('src', 'lib', 'installmentsView.ts')
-  assert.match(view, /export const DEFAULT_DUES_VIEW: InstallmentDuesView = 'month'/)
-  assert.match(view, /paid: 'instDuesViewPaid'/)
+test('the dues: the paid rows, the «القسط» data and the payment date', () => {
   const data = read('src', 'lib', 'installmentsData.ts')
-  // «المسددة»: fully paid rows of contracts that are not cancelled.
-  assert.match(
-    data,
-    /\.in\('contract_status', \['active', 'paid_off'\]\)\s*\.eq\('is_paid', true\)/,
-  )
-  assert.match(data, /sort = 'last_paid_on'\s*ascending = false/)
-  assert.match(data, /paid \? row\.amount : row\.remaining_amount/)
+  // «المسدد»: fully paid rows of contracts that are not cancelled, the latest paid first.
+  assert.match(data, /if \(query\.view === 'paid'\) request = request\.eq\('is_paid', true\)/)
+  assert.match(data, /\.order\('last_paid_on', \{ ascending: false, nullsFirst: false \}\)/)
   assert.match(data, /INSTALLMENT_DUES_LIST_SELECT = `\$\{INSTALLMENT_DUE_SELECT\},last_paid_on`/)
-  const tab = read('src', 'components', 'installments', 'InstallmentsDuesTab.tsx')
-  assert.match(tab, /state\.duesView \?\? DEFAULT_DUES_VIEW/)
-  assert.match(tab, /key: 'amount',\s*header: t\('instInstallment'\)/)
-  assert.match(tab, /header: t\('instInstallmentNo'\)/)
-  assert.match(tab, /key: 'last_paid_on'/)
-  assert.match(tab, /canManage && !paidView/)
-  assert.doesNotMatch(tab, /header: t\('instRemaining'\)/)
+  const dues = read('src', 'components', 'installments', 'InstallmentsDuesTab.tsx')
+  assert.match(dues, /row\.last_paid_on/)
+  assert.match(dues, /canPay && !paid/)
   const configs = read('src', 'lib', 'listConfigs.ts')
   assert.match(configs, /\{ key: 'amount', label: 'instInstallment' \}/)
 })
 
-test('the dashboard keeps the 30-day table alone', () => {
+test('the dashboard of the unified page: design 1 figures, 7-day cards, chart', () => {
   const dashboard = read('src', 'components', 'installments', 'InstallmentsDashboardTab.tsx')
-  assert.doesNotMatch(dashboard, /instCashflowTitle|instOverdueListTitle|CashflowBars/)
-  assert.match(dashboard, /title=\{t\('instUpcomingTitle'\)\}/)
-  assert.ok(!fs.existsSync(path.join(ROOT, 'src', 'components', 'installments', 'CashflowBars.tsx')))
+  assert.match(dashboard, /<FigureCard/)
+  assert.match(dashboard, /fetchDuesWithin\(UPCOMING_DAYS, UPCOMING_CARDS, signal\)/)
+  assert.match(dashboard, /<ContractCard/)
+  assert.match(dashboard, /<CashflowBars months=\{months\} \/>/)
+  assert.match(dashboard, /financierShares\(/)
+  assert.match(dashboard, /onClick=\{onShowDues\}/)
 })
 
 test('«حذف العقد»: a cancelled contract only, confirmed, then its files', () => {
@@ -130,19 +122,18 @@ test('«حذف العقد»: a cancelled contract only, confirmed, then its file
   assert.deepEqual(keys, english)
 })
 
-test('the tabs follow the approved design «نموذج 5»', () => {
+test('the tabs follow the approved design «نموذج 5» in the unified order', () => {
   const page = read('src', 'screens', 'installments', 'InstallmentsScreen.tsx')
   assert.match(page, /<TabsList variant="buttons" aria-label=\{t\('instTabsLabel'\)\}>/)
-  for (const icon of ['LayoutDashboard', 'FileText', 'CalendarDays', 'Building2'])
-    assert.ok(page.includes(`<${icon} size={16} aria-hidden="true" />`), icon)
-  const dues = read('src', 'components', 'installments', 'InstallmentsDuesTab.tsx')
-  assert.match(dues, /<TabsList variant="chips" aria-label=\{t\('instTabDues'\)\}>/)
-  assert.match(dues, /INSTALLMENT_DUES_VIEW_TONES\[value\]/)
-  const view = read('src', 'lib', 'installmentsView.ts')
-  assert.match(
-    view,
-    /overdue: 'danger',\s*month: 'warning',\s*next30: 'info',\s*all: 'neutral',\s*paid: 'success',/,
+  const order = ['dashboard', 'calendar', 'dues', 'contracts', 'financiers'].map((tab) =>
+    page.indexOf('<TabsTrigger value="' + tab + '">'),
   )
+  assert.ok(order.every((index) => index > 0))
+  assert.deepEqual([...order].sort((a, b) => a - b), order)
+  for (const icon of ['LayoutDashboard', 'CalendarDays', 'Clock', 'FileText', 'Building2'])
+    assert.ok(page.includes('<' + icon + ' size={16} aria-hidden="true" />'), icon)
+  const contracts = read('src', 'components', 'installments', 'InstallmentsContractsTab.tsx')
+  assert.match(contracts, /<TabsList variant="chips" aria-label=\{t\('instContractsFilters'\)\}>/)
   const tabs = read('src', 'components', 'ui', 'Tabs.tsx')
   assert.match(tabs, /export type TabsVariant = 'underline' \| 'segmented' \| 'buttons' \| 'chips'/)
 })

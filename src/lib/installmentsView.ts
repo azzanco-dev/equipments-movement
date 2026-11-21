@@ -674,12 +674,16 @@ export function contractHistory(
 
 // --- The list page's URL state -------------------------------------------------------------
 
-export type InstallmentsTab = 'dashboard' | 'contracts' | 'dues' | 'financiers'
+export type InstallmentsTab =
+  'dashboard' | 'calendar' | 'dues' | 'contracts' | 'financiers'
 
+/** The tabs in their order (owner 2026-11-21: «اللوحة, التقويم,
+ *  الاستحقاقات, العقود, الجهات التمويلية»). */
 export const INSTALLMENTS_TABS: readonly InstallmentsTab[] = [
   'dashboard',
-  'contracts',
+  'calendar',
   'dues',
+  'contracts',
   'financiers',
 ]
 
@@ -742,6 +746,12 @@ export const INSTALLMENTS_PAGE_SIZE = 20
 export const INSTALLMENTS_URL_KEYS = {
   tab: 'tab',
   duesView: 'view',
+  /** The dues tab of the unified page: its financier. */
+  feedFinancier: 'fin',
+  /** The contracts tab: its chip, its sort and its search. */
+  contractChip: 'chip',
+  contractSort: 'csort',
+  contractSearch: 'cq',
 } as const
 
 export const INSTALLMENT_CONTRACTS_URL_PREFIX = 'c'
@@ -751,6 +761,15 @@ export interface InstallmentsUrlState {
   tab: InstallmentsTab
   /** null = not chosen yet: `DEFAULT_DUES_VIEW`. */
   duesView: InstallmentDuesView | null
+  /** The unified page (2026-11-21) reads these raw values through the
+   *  readers of `installmentsBoard.ts`: the dues view («open» / «paid» /
+   *  «all» under the key `view`), its financier, the contracts chip, sort
+   *  and search. */
+  feedView: string | null
+  feedFinancier: string | null
+  contractChip: string | null
+  contractSort: string | null
+  contractSearch: string
 }
 
 /** The list page's state from its query string; anything unknown falls
@@ -764,6 +783,11 @@ export function readInstallmentsUrlState(
   return {
     tab: tab && INSTALLMENTS_TABS.includes(tab) ? tab : 'dashboard',
     duesView: view && INSTALLMENT_DUES_VIEWS.includes(view) ? view : null,
+    feedView: get(keys.duesView),
+    feedFinancier: get(keys.feedFinancier),
+    contractChip: get(keys.contractChip),
+    contractSort: get(keys.contractSort),
+    contractSearch: get(keys.contractSearch) ?? '',
   }
 }
 

@@ -1,209 +1,203 @@
-import { useCallback } from 'react'
-import { AlertTriangle, Calendar, CalendarClock, Coins } from 'lucide-react'
+import { useCallback, useMemo } from 'react'
+import {
+  AlertCircle,
+  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  FileText,
+} from 'lucide-react'
 import {
   Button,
   Card,
-  DataTable,
   EmptyState,
   ErrorState,
+  Notice,
   SectionHeader,
   Skeleton,
-  StatCard,
-  type DataTableColumn,
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
 import {
+  fetchCashflowDues,
+  fetchContractFigures,
+  fetchContractsByIds,
+  fetchDuesWithin,
   fetchNearestDue,
   fetchOverdueContractsCount,
-  fetchUpcomingDues,
 } from '@/lib/installmentsData'
 import {
+  addDays,
+  financierShares,
+  financierTone,
+  summarizeContracts,
+  UPCOMING_CARDS,
+  UPCOMING_DAYS,
+} from '@/lib/installmentsBoard'
+import {
   activeContractsWords,
+  amountOf,
   contractsWords,
   installmentsWords,
+  monthlyDueBuckets,
   type InstallmentDueRow,
-  type InstallmentDuesView,
+  type InstallmentFinancierRow,
   type InstallmentOverviewRow,
 } from '@/lib/installmentsView'
-import {
-  ContractCell,
-  DueDateCell,
-  WhenBadge,
-  InstallmentStateBadge,
-  Money,
-} from './cells'
+import { saudiDateKey } from '@/lib/saudiTime'
+import { CashflowBars } from './CashflowBars'
+import { ContractCard, FigureCard } from './boardParts'
+import { Money, WhenBadge } from './cells'
 import { useLoad } from './useLoad'
 
-/** The «القادم خلال 30 يوما» table shows this many rows. */
-export const DASHBOARD_UPCOMING_ROWS = 20
-
 /**
- * «اللوحة»: the four figures of `installment_overview` (overdue is the only
- * red one), then the table of what is due within 30 days alone across the
- * width — the chart of the coming months and the overdue card were removed
- * on the owner's word of 2026-11-21 («مانحتاج الرسم البياني … وشيل جدول
- * المتاخرة»). The table is a bounded, server-filtered, server-sorted read of
- * `installment_dues`.
+ * «اللوحة» of the unified page (owner 2026-11-21, Figma frame «الاقساط /
+ * الصفحة الموحدة: اللوحة», «اعتمد الصفحات وابني»): the four figures of
+ * `installment_overview` as the tinted cards of design 1, «القادم خلال 7
+ * ايام» as the contract cards of design 4 («عرض الكل» opens «الاستحقاقات»),
+ * then «حسب الجهة التمويلية» beside «المستحق في الشهور القادمة» (design 1).
+ * Every read is bounded, server-filtered and server-sorted.
  */
 export function InstallmentsDashboardTab({
   overview,
+  financiers,
   version,
   canManage,
   onPay,
-  onOpenContract,
   onShowDues,
 }: {
   overview: InstallmentOverviewRow
+  financiers: readonly InstallmentFinancierRow[]
   /** Bumped after a write: the reads run again. */
   version: number
   canManage: boolean
   onPay: (row: InstallmentDueRow) => void
-  onOpenContract: (id: string) => void
-  /** Opens «الاستحقاقات», on one of its sub-tabs when given. */
-  onShowDues: (view?: InstallmentDuesView) => void
+  /** Opens «الاستحقاقات». */
+  onShowDues: () => void
 }) {
-  const { t, lang } = useI18n()
+  const { t, lang, dir } = useI18n()
+  const today = useMemo(() => saudiDateKey(), [])
   const loader = useCallback(
     async (signal: AbortSignal) => {
-      const [overdueContracts, nearest, upcoming] = await Promise.all([
-        fetchOverdueContractsCount(signal),
-        fetchNearestDue(signal),
-        fetchUpcomingDues(DASHBOARD_UPCOMING_ROWS, signal),
-      ])
-      return { overdueContracts, nearest, upcoming }
+      const [overdueContracts, nearest, upcoming, cashflow, figures] =
+        await Promise.all([
+          fetchOverdueContractsCount(signal),
+          fetchNearestDue(signal),
+          fetchDuesWithin(UPCOMING_DAYS, UPCOMING_CARDS, signal),
+          fetchCashflowDues(today, signal),
+          fetchContractFigures(signal),
+        ])
+      const contracts = await fetchContractsByIds(
+        upcoming.map((row) => row.contract_id),
+        signal,
+      )
+      return {
+        overdueContracts,
+        nearest,
+        upcoming,
+        cashflow,
+        figures,
+        contracts,
+      }
     },
-    [],
+    [today],
   )
   const load = useLoad(loader, version)
   const data = load.data
-
-  const payButton = (row: InstallmentDueRow) => (
-    <Button
-      size="sm"
-      variant="outline"
-      onClick={(event) => {
-        event.stopPropagation()
-        onPay(row)
-      }}
-    >
-      {t('instPayRow')}
-    </Button>
+  const months = useMemo(
+    () => (data ? monthlyDueBuckets(data.cashflow.rows, today) : []),
+    [data, today],
   )
-
-  const columns: DataTableColumn<InstallmentDueRow>[] = [
-    {
-      key: 'contract',
-      header: t('instContract'),
-      cell: (row) => (
-        <ContractCell
-          description={row.description}
-          contractNumber={row.contract_number}
-          financierName={row.financier_name}
-        />
-      ),
-    },
-    {
-      key: 'due',
-      header: t('instDueDate'),
-      cell: (row) => (
-        <DueDateCell dueDate={row.due_date} days={row.days_until_due} />
-      ),
-    },
-    {
-      key: 'state',
-      header: t('instStatus'),
-      cell: (row) => (
-        <InstallmentStateBadge
-          size="sm"
-          state={row.state}
-          partial={row.is_partial}
-        />
-      ),
-    },
-    {
-      // The installment's own amount, as in «الاستحقاقات» (owner
-      // 2026-11-21); a partly paid one shows what remains under it.
-      key: 'amount',
-      header: t('instInstallment'),
-      align: 'end',
-      cell: (row) => (
-        <span className="flex flex-col items-end gap-0.5">
-          <Money value={row.amount} className="font-medium" />
-          {row.is_partial && (
-            <span className="flex items-center gap-1 text-xs text-muted">
-              {t('instRemaining')}
-              <Money value={row.remaining_amount} />
-            </span>
-          )}
-        </span>
-      ),
-    },
-    ...(canManage
-      ? [
-          {
-            key: 'action',
-            header: <span className="sr-only">{t('instPayRow')}</span>,
-            align: 'end' as const,
-            cell: payButton,
-          },
-        ]
-      : []),
-  ]
+  const summary = useMemo(
+    () => (data ? summarizeContracts(data.figures.rows, today) : null),
+    [data, today],
+  )
+  const shares = useMemo(
+    () => (data ? financierShares(data.figures.rows) : []),
+    [data],
+  )
+  const contractsById = useMemo(
+    () => new Map((data?.contracts ?? []).map((row) => [row.id, row])),
+    [data],
+  )
+  const nameOf = (id: string) =>
+    financiers.find((row) => row.id === id)?.name ?? '—'
+  const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight
 
   return (
-    <div className="space-y-4">
-      {/* The four numbers; overdue is the only red one. */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label={t('instOverdue')}
-          value={<Money value={overview.overdue_amount} />}
-          hint={
+    <div className="space-y-5">
+      {/* The four figures, design 1: late red, 7 days amber, 30 days blue,
+          the remaining grey. */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <FigureCard
+          tone="danger"
+          icon={<AlertCircle size={20} />}
+          title={t('instOverdue')}
+          sub={
             overview.overdue_count === 0
               ? t('instNoOverdue')
-              : data
-                ? t('instOverdueHint')
-                    .replace(
-                      '{installments}',
-                      installmentsWords(overview.overdue_count, lang),
-                    )
-                    .replace(
-                      '{contracts}',
-                      contractsWords(data.overdueContracts, lang),
-                    )
-                : installmentsWords(overview.overdue_count, lang)
+              : installmentsWords(overview.overdue_count, lang)
           }
-          icon={<AlertTriangle size={18} />}
-          accent={overview.overdue_count > 0 ? 'danger' : undefined}
+          value={<Money value={overview.overdue_amount} />}
+          foot={
+            overview.overdue_count > 0 && data
+              ? t('instOverdueHint')
+                  .replace(
+                    '{installments}',
+                    installmentsWords(overview.overdue_count, lang),
+                  )
+                  .replace(
+                    '{contracts}',
+                    contractsWords(data.overdueContracts, lang),
+                  )
+              : undefined
+          }
         />
-        <StatCard
-          label={t('instDue7')}
+        <FigureCard
+          tone="warning"
+          icon={<CalendarClock size={20} />}
+          title={t('instDue7')}
+          sub={installmentsWords(overview.due_7_count, lang)}
           value={<Money value={overview.due_7_amount} />}
-          hint={
-            !data ? undefined : data.nearest ? (
+          foot={
+            data?.nearest ? (
               <span className="inline-flex flex-wrap items-center gap-1">
                 {t('instNearestDue')}{' '}
                 <bdi dir="ltr">{formatDate(data.nearest.due_date)}</bdi>
                 <WhenBadge days={data.nearest.days_until_due} />
               </span>
-            ) : (
+            ) : data ? (
               t('instNoUpcoming')
-            )
+            ) : undefined
           }
-          icon={<CalendarClock size={18} />}
-          accent="warning"
         />
-        <StatCard
-          label={t('instDue30')}
+        <FigureCard
+          tone="info"
+          icon={<Clock size={20} />}
+          title={t('instDue30')}
+          sub={installmentsWords(overview.due_30_count, lang)}
           value={<Money value={overview.due_30_amount} />}
-          hint={installmentsWords(overview.due_30_count, lang)}
-          icon={<Calendar size={18} />}
+          foot={
+            <span>
+              {t('instUntil')}{' '}
+              <bdi dir="ltr">{formatDate(addDays(today, 30))}</bdi>
+            </span>
+          }
         />
-        <StatCard
-          label={t('instRemainingOnContracts')}
+        <FigureCard
+          tone="neutral"
+          icon={<FileText size={20} />}
+          title={t('instRemainingOnContracts')}
+          sub={activeContractsWords(overview.open_contract_count, lang)}
           value={<Money value={overview.remaining_total} />}
-          hint={activeContractsWords(overview.open_contract_count, lang)}
-          icon={<Coins size={18} />}
+          foot={
+            summary
+              ? t('instPaidShare').replace(
+                  '{percent}',
+                  String(summary.paidPercent),
+                )
+              : undefined
+          }
         />
       </div>
 
@@ -217,55 +211,135 @@ export function InstallmentsDashboardTab({
           <span className="sr-only" role="status">
             {t('loading')}
           </span>
-          <Skeleton className="h-80 w-full" />
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {[0, 1, 2].map((index) => (
+              <Skeleton key={index} className="h-72 w-full" />
+            ))}
+          </div>
+          <Skeleton className="h-72 w-full" />
         </div>
       ) : (
         <>
-          <Card padded={false}>
-            <div className="p-4 pb-2">
-              <SectionHeader
-                title={t('instUpcomingTitle')}
-                description={t('instUpcomingDesc')}
-                action={
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => onShowDues()}
-                  >
-                    {t('instAllDues')}
-                  </Button>
-                }
-              />
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h2 className="text-base font-semibold">
+                  {t('instUpcoming7Title')}
+                </h2>
+                <p className="text-xs text-muted">{t('instUpcoming7Desc')}</p>
+              </div>
+              <Button size="sm" variant="ghost" onClick={onShowDues}>
+                {t('instShowAll')}
+                <Chevron size={14} aria-hidden="true" />
+              </Button>
             </div>
-            <DataTable
-              cellTextClassName="text-[13px]"
-              cellClassName="py-3"
-              columns={columns}
-              rows={data.upcoming}
-              rowKey={(row) => row.id}
-              onRowClick={(row) => onOpenContract(row.contract_id)}
-              rowHref={(row) => `/installments/${row.contract_id}`}
-              caption={t('instUpcomingTitle')}
-              empty={
-                <EmptyState title={t('instNoUpcoming30')} className="p-6" />
-              }
-              className="border-t"
-            />
-            {overview.due_30_count > data.upcoming.length && (
-              <div className="flex justify-center border-t p-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onShowDues('next30')}
-                >
-                  {t('instShowAllCount').replace(
-                    '{count}',
-                    String(overview.due_30_count),
-                  )}
-                </Button>
+            {data.upcoming.length === 0 ? (
+              <Card>
+                <EmptyState title={t('instNoUpcoming7')} className="p-6" />
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {data.upcoming.map((row) => {
+                  const contract = contractsById.get(row.contract_id)
+                  if (!contract) return null
+                  return (
+                    <ContractCard
+                      key={row.id}
+                      contract={contract}
+                      tone={financierTone(financiers, row.financier_id)}
+                      due={{
+                        date: row.due_date,
+                        amount: amountOf(row.remaining_amount),
+                        days: row.days_until_due,
+                      }}
+                      canPay={canManage}
+                      onPay={() => onPay(row)}
+                    />
+                  )
+                })}
               </div>
             )}
-          </Card>
+          </section>
+
+          <div className="grid gap-4 xl:grid-cols-3">
+            <Card className="space-y-3 xl:col-span-2">
+              <SectionHeader
+                title={t('instCashflowTitle')}
+                description={t('instCashflowDesc')}
+              />
+              {overview.open_contract_count > 0 ? (
+                <>
+                  <CashflowBars months={months} />
+                  {data.cashflow.partial && (
+                    <Notice tone="warning" size="compact">
+                      {t('instPartialFigures')}
+                    </Notice>
+                  )}
+                </>
+              ) : (
+                <EmptyState
+                  title={t('instNoActiveContracts')}
+                  className="p-6"
+                />
+              )}
+            </Card>
+            <Card className="space-y-3">
+              <SectionHeader
+                title={t('instByFinancierTitle')}
+                description={t('instByFinancierDesc')}
+              />
+              {shares.length === 0 ? (
+                <p className="text-sm text-muted">
+                  {t('instNoActiveContracts')}
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {shares.map((share) => {
+                    const tone = financierTone(financiers, share.financierId)
+                    return (
+                      <li key={share.financierId} className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2 text-sm">
+                          <span className="flex min-w-0 items-center gap-2 font-medium">
+                            <span
+                              aria-hidden="true"
+                              className="size-2.5 shrink-0 rounded-sm"
+                              style={{
+                                backgroundColor: `var(--chart-stroke-${tone})`,
+                              }}
+                            />
+                            <span className="truncate">
+                              {nameOf(share.financierId)}
+                            </span>
+                          </span>
+                          <Money
+                            value={share.remaining}
+                            className="font-medium"
+                          />
+                        </div>
+                        <div
+                          className="h-1.5 overflow-hidden rounded-full bg-surface-hover"
+                          aria-hidden="true"
+                        >
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${share.share}%`,
+                              backgroundColor: `var(--chart-stroke-${tone})`,
+                            }}
+                          />
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+              {data.figures.partial && (
+                <Notice tone="warning" size="compact">
+                  {t('instPartialFigures')}
+                </Notice>
+              )}
+            </Card>
+          </div>
         </>
       )}
     </div>

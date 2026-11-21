@@ -1,247 +1,385 @@
-import { useCallback, useMemo } from 'react'
-import { FileText, Plus } from 'lucide-react'
-import { DataListPagination } from '@/components/data-list/DataListPagination'
-import { DataListToolbar } from '@/components/data-list/DataListToolbar'
-import { useDataListState } from '@/components/data-list/useDataListState'
-import { RelativeTime } from '@/components/RelativeTime'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  CalendarDays,
+  Check,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Plus,
+} from 'lucide-react'
 import {
   Button,
-  DataTable,
   EmptyState,
   ErrorState,
+  Notice,
+  SearchInput,
+  Select,
+  Skeleton,
+  Tabs,
+  TabsList,
+  TabsTrigger,
   cn,
-  type DataTableColumn,
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
+import { daysUntilDue } from '@/lib/installments'
 import {
-  fetchInstallmentContractsPage,
+  fetchContractCards,
+  fetchContractFigures,
 } from '@/lib/installmentsData'
 import {
   amountOf,
-  paidPercent,
-  withFinancierOptions,
-  INSTALLMENT_CONTRACTS_URL_PREFIX,
+  INSTALLMENTS_URL_KEYS,
   type InstallmentContractRow,
   type InstallmentFinancierRow,
+  type InstallmentsUrlState,
 } from '@/lib/installmentsView'
-import { installmentContractsListConfig } from '@/lib/listConfigs'
-import { saudiDateKey } from '@/lib/saudiTime'
 import {
-  ContractCell,
-  InstallmentContractStatusBadge,
-  Money,
-  OverdueBadge,
-  PaidProgress,
-} from './cells'
+  CONTRACT_CARDS_PAGE,
+  CONTRACT_CHIPS,
+  CONTRACT_SORTS,
+  contractChipCounts,
+  financierTone,
+  readContractChip,
+  readContractSort,
+  summarizeContracts,
+  type ContractChip,
+  type ContractSort,
+} from '@/lib/installmentsBoard'
+import { saudiDateKey } from '@/lib/saudiTime'
+import { ContractCard, FigureCard, type BoardTone } from './boardParts'
+import { Money } from './cells'
 import { useLoad } from './useLoad'
 
+/** A chip's urgency colour (design «نموذج 5»): «الكل» neutral, late red,
+ *  ending soon amber, paid off green, cancelled grey. */
+const CHIP_TONE: Record<ContractChip, BoardTone> = {
+  all: 'neutral',
+  overdue: 'danger',
+  ending: 'warning',
+  paid_off: 'success',
+  cancelled: 'neutral',
+}
+const CHIP_LABEL: Record<
+  ContractChip,
+  | 'instChipAll'
+  | 'instChipOverdue'
+  | 'instChipEnding'
+  | 'instChipPaidOff'
+  | 'instChipCancelled'
+> = {
+  all: 'instChipAll',
+  overdue: 'instChipOverdue',
+  ending: 'instChipEnding',
+  paid_off: 'instChipPaidOff',
+  cancelled: 'instChipCancelled',
+}
+const SORT_LABEL: Record<
+  ContractSort,
+  'instSortNextDue' | 'instSortUpdated' | 'instSortRemaining' | 'instSortNumber'
+> = {
+  next_due: 'instSortNextDue',
+  updated: 'instSortUpdated',
+  remaining: 'instSortRemaining',
+  number: 'instSortNumber',
+}
+const CHIP_DOT: Record<BoardTone, string> = {
+  danger: 'bg-danger',
+  warning: 'bg-warning',
+  info: 'bg-info',
+  success: 'bg-success',
+  neutral: 'bg-muted',
+}
+const CHIP_ACTIVE: Record<BoardTone, string> = {
+  danger:
+    'data-[state=active]:border-danger data-[state=active]:bg-danger-soft data-[state=active]:text-danger',
+  warning:
+    'data-[state=active]:border-warning data-[state=active]:bg-warning-soft data-[state=active]:text-warning',
+  info: 'data-[state=active]:border-info data-[state=active]:bg-info-soft data-[state=active]:text-info',
+  success:
+    'data-[state=active]:border-success data-[state=active]:bg-success-soft data-[state=active]:text-success',
+  neutral:
+    'data-[state=active]:border-fg data-[state=active]:bg-surface-hover data-[state=active]:text-fg',
+}
+
 /**
- * «العقود»: `installment_contract_summary` on the program's unified list
- * (`installmentContractsListConfig`, URL prefix `c`): the shared toolbar
- * with its search (number, title, financier), its filter dialog (status,
- * financier, «المتاخرة فقط», the next due date) and sort menu, the main
- * list table look and the page sizes 20 … 500, all on the server.
+ * «العقود» of the unified page (owner 2026-11-21, Figma frame «الاقساط /
+ * الصفحة الموحدة: العقود», design 4 with the chips of «نموذج 5»): four
+ * figures — active contracts, paid, remaining, ending this year —, the
+ * chips الكل / فيها متاخر / تخلص قريب (last installment within
+ * `ENDING_SOON_DAYS`) / مسددة / ملغاة with their counts, the search and the
+ * sort, then the contracts as cards (ring, remaining, the next installment,
+ * «فتح العقد» and «تسديد»), `CONTRACT_CARDS_PAGE` at a time. Chip, sort and
+ * search live in the URL; the cards are read on the server.
  */
 export function InstallmentsContractsTab({
+  state,
+  update,
   financiers,
   totalContracts,
   version,
   canManage,
   onNewContract,
-  onOpenContract,
+  onPay,
 }: {
+  state: InstallmentsUrlState
+  update: (values: Record<string, string | number | null>) => void
   financiers: readonly InstallmentFinancierRow[]
   /** Every contract of the program (0 = the first-use empty state). */
   totalContracts: number
   version: number
   canManage: boolean
   onNewContract: () => void
-  onOpenContract: (id: string) => void
+  onPay: (contract: InstallmentContractRow) => void
 }) {
   const { t } = useI18n()
   const today = useMemo(() => saudiDateKey(), [])
-  const list = useDataListState(
-    installmentContractsListConfig,
-    INSTALLMENT_CONTRACTS_URL_PREFIX,
-  )
-  const { search, filters, sort, direction, page, pageSize } = list
-  const filterFields = useMemo(
-    () => withFinancierOptions(installmentContractsListConfig, financiers),
-    [financiers],
-  )
+  const chip = readContractChip(state.contractChip)
+  const sort = readContractSort(state.contractSort)
+  const search = state.contractSearch
+  const [typed, setTyped] = useState(search)
+  const [limit, setLimit] = useState(CONTRACT_CARDS_PAGE)
+
+  // The search box writes the URL 300 ms after the last key.
+  useEffect(() => {
+    if (typed === search) return
+    const timer = window.setTimeout(() => {
+      setLimit(CONTRACT_CARDS_PAGE)
+      update({ [INSTALLMENTS_URL_KEYS.contractSearch]: typed.trim() || null })
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [typed, search, update])
 
   const loader = useCallback(
     (signal: AbortSignal) =>
-      fetchInstallmentContractsPage(
-        { search, filters, sort, direction, page, pageSize },
-        signal,
-      ),
-    [search, filters, sort, direction, page, pageSize],
+      fetchContractCards({ chip, search, sort, limit, today }, signal),
+    [chip, search, sort, limit, today],
   )
   const load = useLoad(loader, version)
-  const rows = useMemo(() => load.data?.rows ?? [], [load.data])
-  const total = load.data?.total ?? 0
+  const figuresLoader = useCallback(
+    (signal: AbortSignal) => fetchContractFigures(signal),
+    [],
+  )
+  const figures = useLoad(figuresLoader, version)
+  const summary = useMemo(
+    () => (figures.data ? summarizeContracts(figures.data.rows, today) : null),
+    [figures.data, today],
+  )
+  const counts = useMemo(
+    () => (figures.data ? contractChipCounts(figures.data.rows, today) : null),
+    [figures.data, today],
+  )
 
-  const columns: DataTableColumn<InstallmentContractRow>[] = [
-    {
-      key: 'description',
-      header: t('instContract'),
-      sortable: true,
-      // The identity cell: the title in bold, the number as its muted line.
-      cell: (row) => (
-        <ContractCell
-          description={row.description}
-          contractNumber={row.contract_number}
-        />
-      ),
-    },
-    {
-      key: 'financier',
-      header: t('instFinancier'),
-      hideBelow: 'md',
-      // The financier in its own column (owner 2026-11-19, «واستبدل عمود
-      // المعدات بالجهة»: the units column is gone from the lists).
-      cell: (row) => <span className="font-medium">{row.financier_name}</span>,
-    },
-    {
-      key: 'paid',
-      header: t('instPaid'),
-      hideBelow: 'lg',
-      cell: (row) => (
-        <PaidProgress
-          percent={paidPercent(
-            amountOf(row.paid_total),
-            amountOf(row.financed_amount),
-          )}
-          paidCount={row.paid_count}
-          rowCount={row.installment_count}
-        />
-      ),
-    },
-    {
-      key: 'remaining_total',
-      header: t('instRemaining'),
-      sortable: true,
-      align: 'end',
-      cell: (row) => (
-        <Money
-          value={row.status === 'cancelled' ? null : row.remaining_total}
-        />
-      ),
-    },
-    {
-      key: 'next_due_date',
-      header: t('instNextInstallment'),
-      sortable: true,
-      cell: (row) => {
-        if (!row.next_due_date || row.status !== 'active')
-          return <span className="text-muted">—</span>
-        const late = row.next_due_date < today
-        return (
-          <span className="flex flex-col items-start">
-            <bdi dir="ltr" className={cn(late && 'font-medium text-danger')}>
-              {formatDate(row.next_due_date)}
-            </bdi>
-            <span className="text-xs text-muted">
-              <Money value={row.next_due_amount} />
-            </span>
-          </span>
-        )
-      },
-    },
-    {
-      key: 'status',
-      header: t('instStatus'),
-      cell: (row) => (
-        <span className="flex flex-wrap items-center gap-1">
-          <InstallmentContractStatusBadge size="sm" status={row.status} />
-          <OverdueBadge
-            size="sm"
-            count={row.status === 'active' ? row.overdue_count : 0}
-          />
-        </span>
-      ),
-    },
-    {
-      key: 'updated_at',
-      header: t('updatedAt'),
-      sortable: true,
-      className: 'text-muted',
-      hideBelow: 'md',
-      cell: (row) => <RelativeTime value={row.updated_at ?? row.created_at} />,
-    },
-  ]
-
-  const filtered = Boolean(search) || filters.length > 0
-  const noContractsYet = totalContracts === 0 && !filtered
+  if (totalContracts === 0)
+    return (
+      <EmptyState
+        icon={<FileText size={28} aria-hidden="true" />}
+        title={t('instNoContractsYet')}
+        action={
+          canManage ? (
+            <Button
+              variant="primary"
+              icon={<Plus size={16} aria-hidden="true" />}
+              onClick={onNewContract}
+            >
+              {t('instContractNew')}
+            </Button>
+          ) : undefined
+        }
+      />
+    )
 
   return (
-    <div className="space-y-3">
-      <DataListToolbar
-        config={installmentContractsListConfig}
-        search={list.searchInput}
-        onSearch={list.setSearchInput}
-        sort={sort}
-        direction={direction}
-        onSort={list.setSort}
-        filterFields={filterFields}
-        filters={filters}
-        onFilters={list.setFilters}
-      />
+    <div className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <FigureCard
+          tone="success"
+          icon={<FileText size={20} />}
+          title={t('instActiveContractsTitle')}
+          value={summary ? summary.activeCount : '—'}
+          foot={
+            summary
+              ? t('instFinanciersCount').replace(
+                  '{count}',
+                  String(summary.activeFinanciers),
+                )
+              : undefined
+          }
+        />
+        <FigureCard
+          tone="neutral"
+          icon={<CheckCircle2 size={20} />}
+          title={t('instPaid')}
+          value={summary ? <Money value={summary.paid} /> : '—'}
+          foot={
+            summary
+              ? t('instPaidOfFinancing').replace(
+                  '{percent}',
+                  String(summary.paidPercent),
+                )
+              : undefined
+          }
+        />
+        <FigureCard
+          tone="info"
+          icon={<Clock size={20} />}
+          title={t('instRemaining')}
+          value={summary ? <Money value={summary.remaining} /> : '—'}
+          foot={
+            summary?.lastYear
+              ? t('instUntilYear').replace('{year}', String(summary.lastYear))
+              : undefined
+          }
+        />
+        <FigureCard
+          tone="warning"
+          icon={<CalendarDays size={20} />}
+          title={t('instEndingThisYear')}
+          value={summary ? summary.endingThisYear : '—'}
+          foot={t('instEndingThisYearHint').replace(
+            '{date}',
+            formatDate(`${today.slice(0, 4)}-12-31`),
+          )}
+        />
+      </div>
+      {figures.status === 'failed' && (
+        <Notice tone="danger" size="compact">
+          {t('instContractsLoadError')}
+        </Notice>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          value={chip}
+          onValueChange={(next) => {
+            setLimit(CONTRACT_CARDS_PAGE)
+            update({
+              [INSTALLMENTS_URL_KEYS.contractChip]:
+                next === 'all' ? null : next,
+            })
+          }}
+          className="max-w-full"
+        >
+          <TabsList variant="chips" aria-label={t('instContractsFilters')}>
+            {CONTRACT_CHIPS.map((value) => {
+              const tone = CHIP_TONE[value]
+              return (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className={cn(
+                    'bg-bg text-fg hover:bg-surface-hover data-[state=active]:font-semibold',
+                    CHIP_ACTIVE[tone],
+                  )}
+                >
+                  {value === chip ? (
+                    <Check size={14} aria-hidden="true" />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className={cn('size-2 rounded-full', CHIP_DOT[tone])}
+                    />
+                  )}
+                  {t(CHIP_LABEL[value])}
+                  {counts && (
+                    <span className="text-xs tabular-nums opacity-70">
+                      {counts[value]}
+                    </span>
+                  )}
+                </TabsTrigger>
+              )
+            })}
+          </TabsList>
+        </Tabs>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <SearchInput
+            value={typed}
+            onValueChange={setTyped}
+            placeholder={t('instContractsSearch')}
+            className="w-full sm:w-72"
+          />
+          <Select
+            aria-label={t('instSortLabel')}
+            value={sort}
+            onValueChange={(next) => {
+              setLimit(CONTRACT_CARDS_PAGE)
+              update({
+                [INSTALLMENTS_URL_KEYS.contractSort]:
+                  next === 'next_due' ? null : next,
+              })
+            }}
+            options={CONTRACT_SORTS.map((value) => ({
+              value,
+              label: `${t('instSortLabel')}: ${t(SORT_LABEL[value])}`,
+            }))}
+            className="w-full sm:w-52"
+          />
+        </div>
+      </div>
 
       {load.status === 'failed' ? (
         <ErrorState
           description={t('instContractsLoadError')}
           onRetry={load.reload}
         />
+      ) : !load.data ? (
+        <div
+          className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+          aria-busy="true"
+        >
+          <span className="sr-only" role="status">
+            {t('loading')}
+          </span>
+          {[0, 1, 2].map((index) => (
+            <Skeleton key={index} className="h-72 w-full" />
+          ))}
+        </div>
+      ) : load.data.rows.length === 0 ? (
+        <EmptyState
+          icon={<FileText size={28} aria-hidden="true" />}
+          title={t('instNoContractsHere')}
+        />
       ) : (
-        <DataTable
-          columns={columns}
-          rows={rows}
-          rowKey={(row) => row.id}
-          loading={!load.data}
-          loadingRows={6}
-          caption={t('instTabContracts')}
-          onRowClick={(row) => onOpenContract(row.id)}
-          rowHref={(row) => `/installments/${row.id}`}
-          sort={{ key: sort, direction }}
-          onSortChange={list.setSort}
-          cellTextClassName="text-[13px]"
-          cellClassName="py-3"
-          empty={
-            <EmptyState
-              icon={<FileText size={28} aria-hidden="true" />}
-              title={
-                noContractsYet
-                  ? t('instNoContractsYet')
-                  : t('instNoContractsMatch')
-              }
-              action={
-                noContractsYet && canManage ? (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    icon={<Plus size={14} aria-hidden="true" />}
-                    onClick={onNewContract}
-                  >
-                    {t('instContractNew')}
-                  </Button>
-                ) : undefined
-              }
-            />
-          }
-          className="rounded-xl border bg-bg"
-        />
-      )}
-      {load.status !== 'failed' && total > 0 && (
-        <DataListPagination
-          page={page}
-          pageSize={pageSize}
-          total={total}
-          onPage={list.setPage}
-          onPageSize={list.setPageSize}
-        />
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {load.data.rows.map((contract) => (
+              <ContractCard
+                key={contract.id}
+                contract={contract}
+                tone={financierTone(financiers, contract.financier_id)}
+                due={
+                  contract.status === 'active' && contract.next_due_date
+                    ? {
+                        date: contract.next_due_date,
+                        amount: amountOf(contract.next_due_amount),
+                        days: daysUntilDue(contract.next_due_date, today),
+                      }
+                    : null
+                }
+                canPay={canManage}
+                onPay={() => onPay(contract)}
+              />
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-muted">
+              {t('instShownOfContracts')
+                .replace('{shown}', String(load.data.rows.length))
+                .replace('{total}', String(load.data.total))}
+            </p>
+            {load.data.rows.length < load.data.total && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  setLimit((current) => current + CONTRACT_CARDS_PAGE)
+                }
+              >
+                {t('instShowMore')}
+              </Button>
+            )}
+          </div>
+        </>
       )}
     </div>
   )

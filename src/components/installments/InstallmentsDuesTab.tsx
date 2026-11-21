@@ -1,100 +1,91 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Check, CheckCircle2 } from 'lucide-react'
-import { DataListPagination } from '@/components/data-list/DataListPagination'
-import { DataListToolbar } from '@/components/data-list/DataListToolbar'
-import { useDataListState } from '@/components/data-list/useDataListState'
 import {
+  AppLink,
   Badge,
   Button,
-  DataTable,
+  Card,
   EmptyState,
   ErrorState,
+  Notice,
+  Select,
+  Skeleton,
   Tabs,
   TabsList,
   TabsTrigger,
   cn,
-  type DataTableColumn,
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
+import { formatDate } from '@/lib/dateFormat'
+import { fetchContractFigures, fetchDuesFeed } from '@/lib/installmentsData'
 import {
-  fetchInstallmentDuesPage,
-  fetchInstallmentDuesViewCount,
-  fetchInstallmentDuesTotal,
-} from '@/lib/installmentsData'
+  dueShownAmount,
+  dueTone,
+  DUES_FEED_PAGE,
+  DUES_FEED_VIEWS,
+  financierShares,
+  financierTone,
+  groupDues,
+  readDuesFeedView,
+  summarizeContracts,
+  type DuesFeedView,
+  type DuesGroup,
+  type DueTone,
+} from '@/lib/installmentsBoard'
 import {
-  DEFAULT_DUES_VIEW,
+  activeContractsWords,
   installmentMonthLabel,
   installmentsWords,
-  monthKeyOf,
-  withFinancierOptions,
-  INSTALLMENT_DUES_URL_PREFIX,
-  INSTALLMENT_DUES_VIEWS,
-  INSTALLMENT_DUES_VIEW_LABEL_KEYS,
-  INSTALLMENT_DUES_VIEW_TONES,
-  type InstallmentDuesViewTone,
   INSTALLMENTS_URL_KEYS,
   type InstallmentDueRow,
-  type InstallmentDuesView,
   type InstallmentFinancierRow,
   type InstallmentOverviewRow,
   type InstallmentsUrlState,
 } from '@/lib/installmentsView'
-import { installmentDuesListConfig } from '@/lib/listConfigs'
-import { formatDate } from '@/lib/dateFormat'
 import { saudiDateKey } from '@/lib/saudiTime'
-import {
-  ContractCell,
-  DueDateCell,
-  InstallmentStateBadge,
-  Money,
-} from './cells'
+import { FinancierTile } from './boardParts'
+import { Money, WhenBadge } from './cells'
 import { useLoad } from './useLoad'
 
-/**
- * «الاستحقاقات»: every unpaid row of the ACTIVE contracts over
- * `installment_dues`, the oldest first, in four sub-tabs (late, this month —
- * the default since 2026-11-21 —, within 30 days, everything unpaid), plus
- * «المسددة», the fully paid rows the latest paid first (the page's URL key
- * `view`), then the
- * program's unified list (`installmentDuesListConfig`, URL prefix `d`): the
- * shared toolbar with its search, filters (financier, due date) and sort,
- * the main list table look and the page sizes, all on the server. The total under the table is the
- * total of the WHOLE filtered view (a bounded read of its remaining
- * amounts), never the sum of the loaded page.
- */
-/** A chip's colours by its urgency: a white chip with a dot of its colour,
- *  the chosen one in its light fill with a tick. */
-const CHIP_TONE: Record<
-  InstallmentDuesViewTone,
-  { dot: string; active: string }
+const VIEW_LABEL: Record<
+  DuesFeedView,
+  'instFeedOpen' | 'instFeedPaid' | 'instFeedAll'
 > = {
-  danger: {
-    dot: 'bg-danger',
-    active:
-      'data-[state=active]:border-danger data-[state=active]:bg-danger-soft data-[state=active]:text-danger',
-  },
-  warning: {
-    dot: 'bg-warning',
-    active:
-      'data-[state=active]:border-warning data-[state=active]:bg-warning-soft data-[state=active]:text-warning',
-  },
-  info: {
-    dot: 'bg-info',
-    active:
-      'data-[state=active]:border-info data-[state=active]:bg-info-soft data-[state=active]:text-info',
-  },
-  neutral: {
-    dot: 'bg-muted',
-    active:
-      'data-[state=active]:border-fg data-[state=active]:bg-surface-hover data-[state=active]:text-fg',
-  },
-  success: {
-    dot: 'bg-success',
-    active:
-      'data-[state=active]:border-success data-[state=active]:bg-success-soft data-[state=active]:text-success',
-  },
+  open: 'instFeedOpen',
+  paid: 'instFeedPaid',
+  all: 'instFeedAll',
+}
+const BAR: Record<DuesGroup['tone'], string> = {
+  danger: 'bg-danger',
+  warning: 'bg-warning',
+  info: 'bg-info',
+  success: 'bg-success',
+  neutral: 'bg-muted',
+}
+const ROW_BOX: Record<DueTone, string> = {
+  danger: 'bg-danger-soft',
+  warning: 'bg-warning-soft',
+  info: 'bg-surface',
+  success: 'bg-surface',
+}
+const DAY_INK: Record<DueTone, string> = {
+  danger: 'text-danger',
+  warning: 'text-warning',
+  info: 'text-info',
+  success: 'text-success',
 }
 
+/**
+ * «الاستحقاقات» of the unified page (owner 2026-11-21, Figma frame «الاقساط /
+ * الصفحة الموحدة: الاستحقاقات», design 3 without its top ribbon): the
+ * installments in groups — «متاخر», «هذا الاسبوع», «الاسبوع الجاي», then one
+ * group a month — each with its count and total, every installment with its
+ * day, its contract, its amount and «تسديد»; beside them the remaining on
+ * the contracts, «عرض» (غير المسدد / المسدد / الكل) with the financier, and
+ * the financiers' shares. «المسدد» is the quick way to the paid ones. The
+ * view and the financier live in the URL; the rows are read in pages of
+ * `DUES_FEED_PAGE` («عرض المزيد»).
+ */
 export function InstallmentsDuesTab({
   state,
   update,
@@ -103,7 +94,6 @@ export function InstallmentsDuesTab({
   version,
   canManage,
   onPay,
-  onOpenContract,
 }: {
   state: InstallmentsUrlState
   update: (values: Record<string, string | number | null>) => void
@@ -112,307 +102,331 @@ export function InstallmentsDuesTab({
   version: number
   canManage: boolean
   onPay: (row: InstallmentDueRow) => void
-  onOpenContract: (id: string) => void
 }) {
   const { t, lang } = useI18n()
   const today = useMemo(() => saudiDateKey(), [])
-  // Always opens on «هذا الشهر» (owner 2026-11-21).
-  const view: InstallmentDuesView = state.duesView ?? DEFAULT_DUES_VIEW
-  const paidView = view === 'paid'
-  const list = useDataListState(
-    installmentDuesListConfig,
-    INSTALLMENT_DUES_URL_PREFIX,
-  )
-  const { search, filters, sort, direction, page, pageSize } = list
-  const filterFields = useMemo(
-    () => withFinancierOptions(installmentDuesListConfig, financiers),
-    [financiers],
-  )
+  const view = readDuesFeedView(state.feedView)
+  const financierId =
+    state.feedFinancier &&
+    financiers.some((row) => row.id === state.feedFinancier)
+      ? state.feedFinancier
+      : null
+  const [limit, setLimit] = useState(DUES_FEED_PAGE)
 
   const loader = useCallback(
-    async (signal: AbortSignal) => {
-      const query = { view, today, search, filters }
-      const [rowsPage, sum] = await Promise.all([
-        fetchInstallmentDuesPage(
-          { ...query, sort, direction, page, pageSize },
-          signal,
-        ),
-        fetchInstallmentDuesTotal(query, signal),
-      ])
-      return { ...rowsPage, sum }
-    },
-    [view, today, search, filters, sort, direction, page, pageSize],
+    (signal: AbortSignal) =>
+      fetchDuesFeed({ view, financierId, limit }, signal),
+    [view, financierId, limit],
   )
   const load = useLoad(loader, version)
-  const rows = useMemo(() => load.data?.rows ?? [], [load.data])
-  const total = load.data?.total ?? 0
-
-  // «هذا الشهر» and «المسددة» need their own counts; the three others are
-  // figures of the overview.
-  const countsLoader = useCallback(
-    async (signal: AbortSignal) => {
-      const [month, paid] = await Promise.all([
-        fetchInstallmentDuesViewCount('month', today, signal),
-        fetchInstallmentDuesViewCount('paid', today, signal),
-      ])
-      return { month, paid }
-    },
-    [today],
+  const figuresLoader = useCallback(
+    (signal: AbortSignal) => fetchContractFigures(signal),
+    [],
   )
-  const viewCounts = useLoad(countsLoader, version)
-  const counts: Record<InstallmentDuesView, number | null> = {
-    overdue: overview.overdue_count,
-    month: viewCounts.data?.month ?? null,
-    next30: overview.due_30_count,
-    all: overview.open_count,
-    paid: viewCounts.data?.paid ?? null,
+  const figures = useLoad(figuresLoader, version)
+  const groups = useMemo(
+    () => groupDues(load.data?.rows ?? [], view, today),
+    [load.data, view, today],
+  )
+  const summary = useMemo(
+    () => (figures.data ? summarizeContracts(figures.data.rows, today) : null),
+    [figures.data, today],
+  )
+  const shares = useMemo(
+    () => (figures.data ? financierShares(figures.data.rows) : []),
+    [figures.data],
+  )
+  const nameOf = (id: string) =>
+    financiers.find((row) => row.id === id)?.name ?? '—'
+
+  const groupTitle = (group: DuesGroup) => {
+    if (group.kind === 'overdue') return t('instOverdue')
+    if (group.kind === 'this_week') return t('instFeedThisWeek')
+    if (group.kind === 'next_week') return t('instFeedNextWeek')
+    const month = installmentMonthLabel(group.month ?? '', lang)
+    return group.kind === 'paid_month'
+      ? t('instFeedPaidIn').replace('{month}', month)
+      : month
   }
 
-  const columns: DataTableColumn<InstallmentDueRow>[] = [
-    {
-      key: 'due_date',
-      header: t('instDueDate'),
-      sortable: true,
-      cell: (row) =>
-        paidView ? (
-          <bdi dir="ltr" className="font-medium">
-            {formatDate(row.due_date)}
-          </bdi>
-        ) : (
-          <DueDateCell dueDate={row.due_date} days={row.days_until_due} />
-        ),
-    },
-    {
-      key: 'contract',
-      header: t('instContract'),
-      cell: (row) => (
-        <ContractCell
-          description={row.description}
-          contractNumber={row.contract_number}
-        />
-      ),
-    },
-    {
-      key: 'financier',
-      header: t('instFinancier'),
-      hideBelow: 'md',
-      // The financier in its own column (owner 2026-11-19, «واستبدل عمود
-      // المعدات بالجهة»: the units column is gone from the lists).
-      cell: (row) => <span className="font-medium">{row.financier_name}</span>,
-    },
-    {
-      key: 'seq',
-      header: t('instInstallmentNo'),
-      hideBelow: 'md',
-      cell: (row) => (
-        <span className="flex items-center gap-1">
-          <bdi dir="ltr" className="tabular-nums">
-            {row.seq}/{row.installment_count}
-          </bdi>
-          {row.is_balloon && (
-            <Badge size="sm" tone="info">
-              {t('instBalloonBadge')}
-            </Badge>
-          )}
-        </span>
-      ),
-    },
-    {
-      key: 'state',
-      header: t('instStatus'),
-      cell: (row) => (
-        <InstallmentStateBadge
-          size="sm"
-          state={row.state}
-          partial={row.is_partial}
-        />
-      ),
-    },
-    ...(paidView
-      ? [
-          {
-            key: 'last_paid_on',
-            header: t('instPaidOnCol'),
-            sortable: true,
-            cell: (row: InstallmentDueRow) =>
-              row.last_paid_on ? (
-                <bdi dir="ltr">{formatDate(row.last_paid_on)}</bdi>
-              ) : (
-                <span className="text-muted">—</span>
-              ),
-          },
-        ]
-      : []),
-    {
-      // The installment's own amount (owner 2026-11-21, «مفروض باسم
-      // القسط»); a partly paid one shows what remains under it.
-      key: 'amount',
-      header: t('instInstallment'),
-      sortable: true,
-      align: 'end',
-      cell: (row) => (
-        <span className="flex flex-col items-end gap-0.5">
-          <Money value={row.amount} className="font-medium" />
-          {row.is_partial && (
-            <span className="flex items-center gap-1 text-xs text-muted">
-              {t('instRemaining')}
-              <Money value={row.remaining_amount} />
-            </span>
-          )}
-        </span>
-      ),
-    },
-    ...(canManage && !paidView
-      ? [
-          {
-            key: 'action',
-            header: <span className="sr-only">{t('instPayRow')}</span>,
-            align: 'end' as const,
-            cell: (row: InstallmentDueRow) => (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onPay(row)
-                }}
-              >
-                {t('instPayRow')}
-              </Button>
-            ),
-          },
-        ]
-      : []),
-  ]
-
-  return (
-    <div className="space-y-3">
-      {/* The approved design «نموذج 5»: the views as chips coloured by
-          urgency, wrapping on a phone, and the open view's count and total
-          beside them. */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Tabs
-          value={view}
-          onValueChange={(next) =>
-            update({
-              [INSTALLMENTS_URL_KEYS.duesView]: next,
-              [`${INSTALLMENT_DUES_URL_PREFIX}page`]: null,
-            })
-          }
-          className="max-w-full"
-        >
-          <TabsList variant="chips" aria-label={t('instTabDues')}>
-            {INSTALLMENT_DUES_VIEWS.map((value) => {
-              const tone = CHIP_TONE[INSTALLMENT_DUES_VIEW_TONES[value]]
-              const active = value === view
-              return (
-                <TabsTrigger
-                  key={value}
-                  value={value}
-                  className={cn(
-                    'bg-bg text-fg hover:bg-surface-hover',
-                    tone.active,
-                    'data-[state=active]:font-semibold',
-                  )}
-                >
-                  {active ? (
-                    <Check size={14} aria-hidden="true" />
-                  ) : (
-                    <span
-                      aria-hidden="true"
-                      className={cn('size-2 rounded-full', tone.dot)}
-                    />
-                  )}
-                  {t(INSTALLMENT_DUES_VIEW_LABEL_KEYS[value])}
-                  {counts[value] !== null && (
-                    <span className="text-xs tabular-nums opacity-70">
-                      {counts[value]}
-                    </span>
-                  )}
-                </TabsTrigger>
-              )
-            })}
-          </TabsList>
-        </Tabs>
-        {load.data && total > 0 && (
-          <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted">
-            {t(paidView ? 'instSummaryPaid' : 'instSummaryDue').replace(
-              '{count}',
-              installmentsWords(total, lang),
-            )}
-            {view === 'month' && (
-              <span>· {installmentMonthLabel(monthKeyOf(today), lang)}</span>
-            )}
-            <Money
-              value={load.data.sum.total}
-              className="font-semibold text-fg"
-            />
-            {load.data.sum.partial && (
-              <span className="w-full text-xs text-warning">
-                {t('instPartialFigures')}
-              </span>
-            )}
-          </p>
-        )}
-      </div>
-      <DataListToolbar
-        config={installmentDuesListConfig}
-        search={list.searchInput}
-        onSearch={list.setSearchInput}
-        sort={sort}
-        direction={direction}
-        onSort={list.setSort}
-        filterFields={filterFields}
-        filters={filters}
-        onFilters={list.setFilters}
-      />
+  const feed = (
+    <div className="min-w-0 space-y-5">
       {load.status === 'failed' ? (
         <ErrorState
           description={t('instDuesLoadError')}
           onRetry={load.reload}
         />
+      ) : !load.data ? (
+        <div className="space-y-3" aria-busy="true">
+          <span className="sr-only" role="status">
+            {t('loading')}
+          </span>
+          {[0, 1, 2, 3].map((index) => (
+            <Skeleton key={index} className="h-20 w-full" />
+          ))}
+        </div>
+      ) : groups.length === 0 ? (
+        <EmptyState
+          icon={<CheckCircle2 size={28} aria-hidden="true" />}
+          title={view === 'paid' ? t('instNoPaidHere') : t('instNoDuesHere')}
+        />
       ) : (
-        <DataTable
-          columns={columns}
-          rows={rows}
-          rowKey={(row) => row.id}
-          loading={!load.data}
-          loadingRows={6}
-          caption={t('instTabDues')}
-          onRowClick={(row) => onOpenContract(row.contract_id)}
-          rowHref={(row) => `/installments/${row.contract_id}`}
-          rowLinkColumn="contract"
-          rowClassName={(row) =>
-            row.state === 'overdue' ? 'bg-danger-soft' : undefined
-          }
-          sort={{ key: sort, direction }}
-          onSortChange={list.setSort}
-          cellTextClassName="text-[13px]"
-          cellClassName="py-3"
-          empty={
-            <EmptyState
-              icon={<CheckCircle2 size={28} aria-hidden="true" />}
-              title={
-                view === 'overdue'
-                  ? t('instNoOverdue')
-                  : paidView
-                    ? t('instNoPaidHere')
-                    : t('instNoDuesHere')
-              }
-            />
-          }
-          className="rounded-xl border bg-bg"
-        />
-      )}
-      {load.status !== 'failed' && total > 0 && (
-        <DataListPagination
-          page={page}
-          pageSize={pageSize}
-          total={total}
-          onPage={list.setPage}
-          onPageSize={list.setPageSize}
-        />
+        <>
+          {groups.map((group) => (
+            <section key={group.key} className="space-y-2">
+              <header className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-base font-semibold">
+                  <span
+                    aria-hidden="true"
+                    className={cn('h-5 w-1 rounded-full', BAR[group.tone])}
+                  />
+                  {groupTitle(group)}
+                  <Badge size="sm">
+                    {installmentsWords(group.rows.length, lang)}
+                  </Badge>
+                </h2>
+                <Money value={group.total} className="font-semibold" />
+              </header>
+              <ul className="space-y-2">
+                {group.rows.map((row) => (
+                  <FeedRow
+                    key={row.id}
+                    row={row}
+                    canPay={canManage}
+                    onPay={() => onPay(row)}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+          {load.data.rows.length < load.data.total && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted">
+                {t('instShownOf')
+                  .replace('{shown}', String(load.data.rows.length))
+                  .replace('{total}', String(load.data.total))}
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLimit((current) => current + DUES_FEED_PAGE)}
+              >
+                {t('instShowMore')}
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
+  )
+
+  const side = (
+    <div className="space-y-4">
+      <Card className="space-y-3">
+        <p className="text-xs text-muted">{t('instRemainingOnContracts')}</p>
+        <Money
+          value={overview.remaining_total}
+          className="text-3xl font-semibold"
+        />
+        {summary && (
+          <>
+            <div
+              className="h-2 overflow-hidden rounded-full bg-surface-hover"
+              aria-hidden="true"
+            >
+              <div
+                className="h-full rounded-full bg-success"
+                style={{ width: `${summary.paidPercent}%` }}
+              />
+            </div>
+            <p className="flex justify-between gap-2 text-xs">
+              <span className="text-success">
+                {t('instPaidShare').replace(
+                  '{percent}',
+                  String(summary.paidPercent),
+                )}
+              </span>
+              <span className="text-muted">
+                {activeContractsWords(summary.activeCount, lang)}
+              </span>
+            </p>
+          </>
+        )}
+      </Card>
+      <Card className="space-y-3">
+        <h3 className="text-sm font-semibold">{t('instFeedShow')}</h3>
+        <Tabs
+          value={view}
+          onValueChange={(next) => {
+            setLimit(DUES_FEED_PAGE)
+            update({
+              [INSTALLMENTS_URL_KEYS.duesView]: next === 'open' ? null : next,
+            })
+          }}
+        >
+          <TabsList
+            variant="segmented"
+            aria-label={t('instFeedShow')}
+            className="w-full"
+          >
+            {DUES_FEED_VIEWS.map((value) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="flex-1 justify-center"
+              >
+                {t(VIEW_LABEL[value])}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <Select
+          aria-label={t('instFinancier')}
+          value={financierId ?? 'all'}
+          onValueChange={(next) => {
+            setLimit(DUES_FEED_PAGE)
+            update({
+              [INSTALLMENTS_URL_KEYS.feedFinancier]:
+                next === 'all' ? null : next,
+            })
+          }}
+          options={[
+            { value: 'all', label: t('instAllFinanciers') },
+            ...financiers.map((row) => ({ value: row.id, label: row.name })),
+          ]}
+        />
+      </Card>
+      <Card className="space-y-3">
+        <h3 className="text-sm font-semibold">{t('instTabFinanciers')}</h3>
+        {figures.status === 'failed' ? (
+          <ErrorState
+            description={t('instFinanciersLoadError')}
+            onRetry={figures.reload}
+          />
+        ) : !figures.data ? (
+          <Skeleton className="h-32 w-full" />
+        ) : shares.length === 0 ? (
+          <p className="text-sm text-muted">{t('instNoActiveContracts')}</p>
+        ) : (
+          <ul className="space-y-3">
+            {shares.map((share) => (
+              <li
+                key={share.financierId}
+                className="flex items-center justify-between gap-2"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <FinancierTile
+                    tone={financierTone(financiers, share.financierId)}
+                    size={36}
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">
+                      {nameOf(share.financierId)}
+                    </span>
+                    <span className="block text-xs text-muted">
+                      {t('instShareOfRemaining').replace(
+                        '{percent}',
+                        String(share.share),
+                      )}
+                    </span>
+                  </span>
+                </span>
+                <Money
+                  value={share.remaining}
+                  className="text-sm font-medium"
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+        {figures.data?.partial && (
+          <Notice tone="warning" size="compact">
+            {t('instPartialFigures')}
+          </Notice>
+        )}
+      </Card>
+    </div>
+  )
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      {feed}
+      {side}
+    </div>
+  )
+}
+
+/** One installment of the feed: its day in its colour, the contract, the
+ *  amount with when (or when it was paid) and «تسديد». */
+function FeedRow({
+  row,
+  canPay,
+  onPay,
+}: {
+  row: InstallmentDueRow
+  canPay: boolean
+  onPay: () => void
+}) {
+  const { t, lang } = useI18n()
+  const tone = dueTone(row)
+  const paid = row.state === 'paid'
+  return (
+    <li
+      className={cn(
+        'flex flex-wrap items-center gap-3 rounded-xl p-3 sm:flex-nowrap',
+        ROW_BOX[tone],
+      )}
+    >
+      <div className={cn('w-12 shrink-0 text-center', DAY_INK[tone])}>
+        <p className="text-2xl font-semibold leading-none tabular-nums">
+          {Number(row.due_date.slice(8, 10))}
+        </p>
+        <p className="mt-1 text-xs text-muted">
+          {installmentMonthLabel(row.due_date.slice(0, 7), lang, true)}
+        </p>
+      </div>
+      <div className="min-w-0 flex-1">
+        <AppLink
+          href={`/installments/${row.contract_id}`}
+          className="block truncate-safe text-sm font-semibold hover:underline"
+        >
+          {row.description}
+        </AppLink>
+        <p className="text-xs text-muted">
+          <bdi dir="ltr">{row.contract_number}</bdi> · {row.financier_name} ·{' '}
+          {t('instCardSeqOf')
+            .replace('{seq}', String(row.seq))
+            .replace('{count}', String(row.installment_count))}
+        </p>
+      </div>
+      <div className="flex flex-col items-end gap-1">
+        <Money
+          value={dueShownAmount(row)}
+          className="text-base font-semibold"
+        />
+        {paid ? (
+          <span className="text-xs text-success">
+            {row.last_paid_on
+              ? t('instPaidOnShort').replace(
+                  '{date}',
+                  formatDate(row.last_paid_on),
+                )
+              : t('instPaid')}
+          </span>
+        ) : (
+          <WhenBadge days={row.days_until_due} />
+        )}
+      </div>
+      {canPay && !paid && (
+        <Button
+          size="sm"
+          variant="outline"
+          icon={<Check size={14} aria-hidden="true" />}
+          onClick={onPay}
+        >
+          {t('instPayRow')}
+        </Button>
+      )}
+    </li>
   )
 }

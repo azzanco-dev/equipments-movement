@@ -2,6 +2,7 @@ import type { AsyncSearchSelectOption } from '@/components/AsyncSearchSelect'
 import type { PostgresLikeError } from '@/lib/formValidation'
 import {
   amountOf,
+  cashflowWindowEnd,
   currentMonthRange,
   sumAmounts,
   EMPTY_INSTALLMENT_OVERVIEW,
@@ -25,6 +26,14 @@ import {
   EQUIPMENT_CODE_TYPE_SEARCH_FIELDS,
 } from '@/lib/search'
 import { bankOptionLoader } from '@/lib/banks'
+import {
+  addDays,
+  ENDING_SOON_DAYS,
+  type ContractChip,
+  type ContractFigureRow,
+  type ContractSort,
+  type DuesFeedView,
+} from '@/lib/installmentsBoard'
 import { normalizeIban } from '@/lib/partyFields'
 import { supabase } from '@/lib/supabase'
 import { SupabaseLoadError, unwrapRows } from '@/lib/supabaseResult'
@@ -266,9 +275,9 @@ export interface InstallmentListQuery {
 }
 
 /** Filter keys the contracts tab applies itself (not view columns). */
-export const INSTALLMENT_CONTRACT_COLUMN_FILTERS: ReadonlySet<string> = new Set([
-  'has_overdue',
-])
+export const INSTALLMENT_CONTRACT_COLUMN_FILTERS: ReadonlySet<string> = new Set(
+  ['has_overdue'],
+)
 
 const allowedKeys = (
   fields: readonly { key: string }[],
@@ -303,10 +312,7 @@ export async function fetchInstallmentContractsPage(
   request = request
     .order(sort, { ascending, nullsFirst: false })
     .order('id', { ascending })
-    .range(
-      (query.page - 1) * query.pageSize,
-      query.page * query.pageSize - 1,
-    )
+    .range((query.page - 1) * query.pageSize, query.page * query.pageSize - 1)
   const searchFilter = buildSearchFilter(
     installmentContractsListConfig.searchFields,
     query.search,
@@ -410,7 +416,11 @@ function inDuesView<Q extends ReturnType<typeof openDues>>(
     query.search ?? '',
   )
   if (searchFilter) next = next.or(searchFilter)
-  return applyListFilters(next, [...(query.filters ?? [])], DUES_FILTER_KEYS) as Q
+  return applyListFilters(
+    next,
+    [...(query.filters ?? [])],
+    DUES_FILTER_KEYS,
+  ) as Q
 }
 
 /** One page of a dues view with the view's exact count. */
@@ -933,4 +943,215 @@ export async function deleteInstallmentFinancier(
       .eq('id', id)
       .select('id'),
   )
+}
+
+// --- The unified page (owner 2026-11-21, the Figma frames «الصفحة الموحدة») ---------------
+
+/** The figures of every contract: the dashboard's financier list, the dues
+ *  tab's side cards, the contracts tab's figures and chip counts. */
+export const CONTRACT_FIGURES_SELECT =
+  'id,financier_id,status,financed_amount,paid_total,remaining_total,overdue_count,last_due_date'
+export const CONTRACT_FIGURES_CAP = 5000
+/** The calendar reads at most this many rows of one month. */
+export const CALENDAR_ROWS_CAP = 1500
+/** The dashboard chart reads at most this many rows of the coming year. */
+export const CASHFLOW_ROWS_CAP = 2000
+
+export async function fetchContractFigures(signal?: AbortSignal): Promise<{
+  rows: ContractFigureRow[]
+  partial: boolean
+}> {
+  const rows = rowsOf<ContractFigureRow>(
+    await withSignal(
+      supabase
+        .from('installment_contract_summary')
+        .select(CONTRACT_FIGURES_SELECT)
+        .order('id', { ascending: true })
+        .limit(CONTRACT_FIGURES_CAP),
+      signal,
+    ),
+  )
+  return { rows, partial: rows.length >= CONTRACT_FIGURES_CAP }
+}
+
+/** The unpaid rows of the active contracts due from today to `days` ahead,
+ *  the nearest first. */
+export async function fetchDuesWithin(
+  days: number,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<InstallmentDueRow[]> {
+  return rowsOf<InstallmentDueRow>(
+    await withSignal(
+      openDues(INSTALLMENT_DUE_SELECT)
+        .gte('days_until_due', 0)
+        .lte('days_until_due', days)
+        .order('due_date', { ascending: true })
+        .order('contract_number', { ascending: true })
+        .order('seq', { ascending: true })
+        .limit(limit),
+      signal,
+    ),
+  )
+}
+
+/** Some contracts' summary rows (the dashboard cards), one read. */
+export async function fetchContractsByIds(
+  ids: readonly string[],
+  signal?: AbortSignal,
+): Promise<InstallmentContractRow[]> {
+  const unique = [...new Set(ids)]
+  if (unique.length === 0) return []
+  return rowsOf<InstallmentContractRow>(
+    await withSignal(
+      supabase
+        .from('installment_contract_summary')
+        .select(INSTALLMENT_CONTRACT_SELECT)
+        .in('id', unique)
+        .limit(unique.length),
+      signal,
+    ),
+  )
+}
+
+/**
+ * The chart's rows: what is still to pay from today to the end of the
+ * twelve-month window, ONE bounded read; `partial` when the cap was
+ * reached (the figures then cover the nearest rows only).
+ */
+export async function fetchCashflowDues(
+  today: string,
+  signal?: AbortSignal,
+): Promise<{
+  rows: { due_date: string; remaining_amount: number }[]
+  partial: boolean
+}> {
+  const rows = rowsOf<{ due_date: string; remaining_amount: number }>(
+    await withSignal(
+      openDues('due_date,remaining_amount')
+        .gte('days_until_due', 0)
+        .lt('due_date', cashflowWindowEnd(today))
+        .order('due_date', { ascending: true })
+        .order('id', { ascending: true })
+        .limit(CASHFLOW_ROWS_CAP),
+      signal,
+    ),
+  )
+  return { rows, partial: rows.length >= CASHFLOW_ROWS_CAP }
+}
+
+/** Every row of the contracts that are not cancelled due in [from, to),
+ *  paid or not (the calendar's month), ONE bounded read. */
+export async function fetchDuesBetween(
+  from: string,
+  to: string,
+  signal?: AbortSignal,
+): Promise<{ rows: InstallmentDueRow[]; partial: boolean }> {
+  const rows = rowsOf<InstallmentDueRow>(
+    await withSignal(
+      supabase
+        .from('installment_dues')
+        .select(INSTALLMENT_DUES_LIST_SELECT)
+        .in('contract_status', ['active', 'paid_off'])
+        .gte('due_date', from)
+        .lt('due_date', to)
+        .order('due_date', { ascending: true })
+        .order('contract_number', { ascending: true })
+        .order('seq', { ascending: true })
+        .limit(CALENDAR_ROWS_CAP),
+      signal,
+    ),
+  )
+  return { rows, partial: rows.length >= CALENDAR_ROWS_CAP }
+}
+
+/**
+ * One page of the dues tab (design 3): «غير المسدد» = the unpaid rows of
+ * the active contracts, the oldest first; «المسدد» = the fully paid rows,
+ * the latest paid first; «الكل» = both, by due date. A financier narrows
+ * it. Returns the rows and the view's exact count.
+ */
+export async function fetchDuesFeed(
+  query: { view: DuesFeedView; financierId: string | null; limit: number },
+  signal?: AbortSignal,
+): Promise<{ rows: InstallmentDueRow[]; total: number }> {
+  let request =
+    query.view === 'open'
+      ? openDues(INSTALLMENT_DUES_LIST_SELECT, { count: 'exact' })
+      : supabase
+          .from('installment_dues')
+          .select(INSTALLMENT_DUES_LIST_SELECT, { count: 'exact' })
+          .in('contract_status', ['active', 'paid_off'])
+  if (query.view === 'paid') request = request.eq('is_paid', true)
+  if (query.financierId) request = request.eq('financier_id', query.financierId)
+  request =
+    query.view === 'paid'
+      ? request
+          .order('last_paid_on', { ascending: false, nullsFirst: false })
+          .order('due_date', { ascending: false })
+      : request.order('due_date', { ascending: true })
+  const result = await withSignal(
+    request
+      .order('contract_number', { ascending: true })
+      .order('seq', { ascending: true })
+      .limit(query.limit),
+    signal,
+  )
+  if (result.error) throw new SupabaseLoadError()
+  return {
+    rows: (result.data as unknown as InstallmentDueRow[] | null) ?? [],
+    total: result.count ?? 0,
+  }
+}
+
+/**
+ * The contract cards (design 4): a chip, the search (number, title,
+ * financier), a sort and how many cards are shown. Returns the rows and the
+ * chip's exact count.
+ */
+export async function fetchContractCards(
+  query: {
+    chip: ContractChip
+    search: string
+    sort: ContractSort
+    limit: number
+    today: string
+  },
+  signal?: AbortSignal,
+): Promise<{ rows: InstallmentContractRow[]; total: number }> {
+  let request = supabase
+    .from('installment_contract_summary')
+    .select(INSTALLMENT_CONTRACT_SELECT, { count: 'exact' })
+  if (query.chip === 'overdue')
+    request = request.eq('status', 'active').gt('overdue_count', 0)
+  else if (query.chip === 'ending')
+    request = request
+      .eq('status', 'active')
+      .lte('last_due_date', addDays(query.today, ENDING_SOON_DAYS))
+  else if (query.chip === 'paid_off') request = request.eq('status', 'paid_off')
+  else if (query.chip === 'cancelled')
+    request = request.eq('status', 'cancelled')
+  const searchFilter = buildSearchFilter(
+    INSTALLMENT_CONTRACT_SEARCH_FIELDS,
+    query.search,
+  )
+  if (searchFilter) request = request.or(searchFilter)
+  if (query.sort === 'next_due')
+    request = request
+      .order('status', { ascending: true })
+      .order('next_due_date', { ascending: true, nullsFirst: false })
+  else if (query.sort === 'updated')
+    request = request.order('updated_at', { ascending: false })
+  else if (query.sort === 'remaining')
+    request = request.order('remaining_total', { ascending: false })
+  else request = request.order('contract_number', { ascending: false })
+  const result = await withSignal(
+    request.order('id', { ascending: true }).limit(query.limit),
+    signal,
+  )
+  if (result.error) throw new SupabaseLoadError()
+  return {
+    rows: (result.data as unknown as InstallmentContractRow[] | null) ?? [],
+    total: result.count ?? 0,
+  }
 }

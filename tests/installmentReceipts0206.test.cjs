@@ -267,30 +267,22 @@ test('the payment dialog uploads the receipt only after the payment is saved', (
   assert.match(line, /window\.open\('', '_blank'\)/)
 })
 
-test('the lists: the shared toolbar, the page sizes and the main table look', () => {
-  for (const file of ['InstallmentsContractsTab.tsx', 'InstallmentsDuesTab.tsx']) {
-    const source = read('src', 'components', 'installments', file)
-    assert.match(source, /<DataListToolbar/, file)
-    assert.match(source, /onPageSize=\{list\.setPageSize\}/, file)
-    assert.match(source, /cellTextClassName="text-\[13px\]"/, file)
-    assert.match(source, /cellClassName="py-3"/, file)
-    assert.match(source, /size="sm"/, file)
-    assert.doesNotMatch(source, /<Select\b|<SearchInput\b|<Checkbox\b/, file)
-  }
-  for (const file of ['InstallmentsDashboardTab.tsx', 'InstallmentsFinanciersTab.tsx'])
-    assert.match(
-      read('src', 'components', 'installments', file),
-      /cellTextClassName="text-\[13px\]"/,
-      file,
-    )
+test('the lists: the unified page (2026-11-21) and the table look that stays', () => {
+  // The contracts are cards, the dues a grouped feed (owner «اعتمد الصفحات وابني»).
   const contracts = read('src', 'components', 'installments', 'InstallmentsContractsTab.tsx')
-  // «اخر تعديل» is the last column.
-  const keys = [...contracts.matchAll(/key: '([a-z_]+)',\n\s+header/g)].map((m) => m[1])
-  assert.equal(keys.at(-1), 'updated_at')
+  assert.match(contracts, /<ContractCard/)
+  assert.match(contracts, /fetchContractCards\(/)
+  const dues = read('src', 'components', 'installments', 'InstallmentsDuesTab.tsx')
+  assert.match(dues, /groupDues\(/)
+  assert.match(dues, /fetchDuesFeed\(/)
+  // The financiers table keeps the main table look.
+  assert.match(
+    read('src', 'components', 'installments', 'InstallmentsFinanciersTab.tsx'),
+    /cellTextClassName="text-\[13px\]"/,
+  )
   const configs = read('src', 'lib', 'listConfigs.ts')
   assert.match(configs, /export const installmentContractsListConfig: DataListConfig/)
   assert.match(configs, /export const installmentDuesListConfig: DataListConfig/)
-  assert.match(configs, /defaultSort: 'updated_at',\s*defaultDirection: 'desc'/)
 })
 
 test('the receipt copy exists in both languages, without hamza in Arabic', () => {
