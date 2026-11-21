@@ -68,6 +68,12 @@ const ROW_BOX: Record<DueTone, string> = {
   info: 'bg-surface',
   success: 'bg-surface',
 }
+const DOT: Record<DueTone, string> = {
+  danger: 'bg-danger',
+  warning: 'bg-warning',
+  info: 'bg-info',
+  success: 'bg-success',
+}
 const DAY_INK: Record<DueTone, string> = {
   danger: 'text-danger',
   warning: 'text-warning',
@@ -173,7 +179,7 @@ export function InstallmentsDuesTab({
       ) : (
         <>
           {groups.map((group) => (
-            <section key={group.key} className="space-y-2">
+            <section key={group.key} className="space-y-3">
               <header className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="flex items-center gap-2 text-sm font-bold">
                   <span
@@ -187,7 +193,9 @@ export function InstallmentsDuesTab({
                 </h2>
                 <Money value={group.total} className="font-bold" />
               </header>
-              <ul className="space-y-2">
+              {/* The rail of design 3: a dot per installment in its colour,
+                  joined by a thin line at the start side. */}
+              <ul className="relative space-y-3 ps-5 before:absolute before:inset-y-4 before:start-[5px] before:w-0.5 before:rounded-full before:bg-border before:content-['']">
                 {group.rows.map((row) => (
                   <FeedRow
                     key={row.id}
@@ -370,10 +378,17 @@ function FeedRow({
   return (
     <li
       className={cn(
-        'flex flex-wrap items-center gap-3 rounded-xl px-3 py-2.5 sm:flex-nowrap',
+        'relative flex flex-wrap items-center gap-3 rounded-xl p-4 sm:flex-nowrap',
         ROW_BOX[tone],
       )}
     >
+      <span
+        aria-hidden="true"
+        className={cn(
+          'absolute -start-5 top-1/2 size-3 -translate-y-1/2 rounded-full ring-2 ring-[var(--bg)]',
+          DOT[tone],
+        )}
+      />
       <div className={cn('w-12 shrink-0 text-center', DAY_INK[tone])}>
         <p className="text-xl font-bold leading-none tabular-nums">
           {Number(row.due_date.slice(8, 10))}
