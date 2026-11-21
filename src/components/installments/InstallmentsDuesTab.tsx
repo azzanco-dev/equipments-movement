@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react'
-import { CheckCircle2 } from 'lucide-react'
+import { Check, CheckCircle2 } from 'lucide-react'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { DataListToolbar } from '@/components/data-list/DataListToolbar'
 import { useDataListState } from '@/components/data-list/useDataListState'
@@ -12,6 +12,7 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
+  cn,
   type DataTableColumn,
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
@@ -29,6 +30,8 @@ import {
   INSTALLMENT_DUES_URL_PREFIX,
   INSTALLMENT_DUES_VIEWS,
   INSTALLMENT_DUES_VIEW_LABEL_KEYS,
+  INSTALLMENT_DUES_VIEW_TONES,
+  type InstallmentDuesViewTone,
   INSTALLMENTS_URL_KEYS,
   type InstallmentDueRow,
   type InstallmentDuesView,
@@ -59,6 +62,39 @@ import { useLoad } from './useLoad'
  * total of the WHOLE filtered view (a bounded read of its remaining
  * amounts), never the sum of the loaded page.
  */
+/** A chip's colours by its urgency: a white chip with a dot of its colour,
+ *  the chosen one in its light fill with a tick. */
+const CHIP_TONE: Record<
+  InstallmentDuesViewTone,
+  { dot: string; active: string }
+> = {
+  danger: {
+    dot: 'bg-danger',
+    active:
+      'data-[state=active]:border-danger data-[state=active]:bg-danger-soft data-[state=active]:text-danger',
+  },
+  warning: {
+    dot: 'bg-warning',
+    active:
+      'data-[state=active]:border-warning data-[state=active]:bg-warning-soft data-[state=active]:text-warning',
+  },
+  info: {
+    dot: 'bg-info',
+    active:
+      'data-[state=active]:border-info data-[state=active]:bg-info-soft data-[state=active]:text-info',
+  },
+  neutral: {
+    dot: 'bg-muted',
+    active:
+      'data-[state=active]:border-fg data-[state=active]:bg-surface-hover data-[state=active]:text-fg',
+  },
+  success: {
+    dot: 'bg-success',
+    active:
+      'data-[state=active]:border-success data-[state=active]:bg-success-soft data-[state=active]:text-success',
+  },
+}
+
 export function InstallmentsDuesTab({
   state,
   update,
@@ -251,32 +287,74 @@ export function InstallmentsDuesTab({
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted">
-        {t(paidView ? 'instDuesPaidDesc' : 'instDuesDesc')}
-      </p>
-      <Tabs
-        value={view}
-        onValueChange={(next) =>
-          update({
-            [INSTALLMENTS_URL_KEYS.duesView]: next,
-            [`${INSTALLMENT_DUES_URL_PREFIX}page`]: null,
-          })
-        }
-        className="max-w-full"
-      >
-        <TabsList variant="segmented" aria-label={t('instTabDues')}>
-          {INSTALLMENT_DUES_VIEWS.map((value) => (
-            <TabsTrigger key={value} value={value}>
-              {t(INSTALLMENT_DUES_VIEW_LABEL_KEYS[value])}
-              {counts[value] !== null && (
-                <span className="ms-1 text-xs text-muted tabular-nums">
-                  {counts[value]}
-                </span>
-              )}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      {/* The approved design «نموذج 5»: the views as chips coloured by
+          urgency, wrapping on a phone, and the open view's count and total
+          beside them. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          value={view}
+          onValueChange={(next) =>
+            update({
+              [INSTALLMENTS_URL_KEYS.duesView]: next,
+              [`${INSTALLMENT_DUES_URL_PREFIX}page`]: null,
+            })
+          }
+          className="max-w-full"
+        >
+          <TabsList variant="chips" aria-label={t('instTabDues')}>
+            {INSTALLMENT_DUES_VIEWS.map((value) => {
+              const tone = CHIP_TONE[INSTALLMENT_DUES_VIEW_TONES[value]]
+              const active = value === view
+              return (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className={cn(
+                    'bg-bg text-fg hover:bg-surface-hover',
+                    tone.active,
+                    'data-[state=active]:font-semibold',
+                  )}
+                >
+                  {active ? (
+                    <Check size={14} aria-hidden="true" />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className={cn('size-2 rounded-full', tone.dot)}
+                    />
+                  )}
+                  {t(INSTALLMENT_DUES_VIEW_LABEL_KEYS[value])}
+                  {counts[value] !== null && (
+                    <span className="text-xs tabular-nums opacity-70">
+                      {counts[value]}
+                    </span>
+                  )}
+                </TabsTrigger>
+              )
+            })}
+          </TabsList>
+        </Tabs>
+        {load.data && total > 0 && (
+          <p className="flex flex-wrap items-center gap-1.5 text-sm text-muted">
+            {t(paidView ? 'instSummaryPaid' : 'instSummaryDue').replace(
+              '{count}',
+              installmentsWords(total, lang),
+            )}
+            {view === 'month' && (
+              <span>· {installmentMonthLabel(monthKeyOf(today), lang)}</span>
+            )}
+            <Money
+              value={load.data.sum.total}
+              className="font-semibold text-fg"
+            />
+            {load.data.sum.partial && (
+              <span className="w-full text-xs text-warning">
+                {t('instPartialFigures')}
+              </span>
+            )}
+          </p>
+        )}
+      </div>
       <DataListToolbar
         config={installmentDuesListConfig}
         search={list.searchInput}
@@ -334,30 +412,6 @@ export function InstallmentsDuesTab({
           onPage={list.setPage}
           onPageSize={list.setPageSize}
         />
-      )}
-      {load.data && total > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-bg p-3 sm:p-4">
-          <p className="text-sm font-medium">
-            {t(paidView ? 'instTotalPaidOf' : 'instTotalRemainingOf').replace(
-              '{count}',
-              installmentsWords(total, lang),
-            )}
-            {view === 'month' && (
-              <span className="text-muted">
-                {' '}
-                · {installmentMonthLabel(monthKeyOf(today), lang)}
-              </span>
-            )}
-            {load.data.sum.partial && (
-              <span className="block text-xs font-normal text-warning">
-                {t('instPartialFigures')}
-              </span>
-            )}
-          </p>
-          <p className="text-lg font-semibold">
-            <Money value={load.data.sum.total} />
-          </p>
-        </div>
       )}
     </div>
   )

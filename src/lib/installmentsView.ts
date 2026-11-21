@@ -128,7 +128,10 @@ export interface InstallmentAccount {
 export function installmentAccountOf(
   contract: Pick<
     InstallmentContractRow,
-    'financier_bank_name' | 'financier_iban' | 'contract_bank_name' | 'contract_iban'
+    | 'financier_bank_name'
+    | 'financier_iban'
+    | 'contract_bank_name'
+    | 'contract_iban'
   >,
 ): InstallmentAccount | null {
   if (contract.contract_bank_name || contract.contract_iban)
@@ -680,7 +683,8 @@ export const INSTALLMENTS_TABS: readonly InstallmentsTab[] = [
   'financiers',
 ]
 
-export type InstallmentDuesView = 'overdue' | 'month' | 'next30' | 'all' | 'paid'
+export type InstallmentDuesView =
+  'overdue' | 'month' | 'next30' | 'all' | 'paid'
 
 /** The sub-tabs of «الاستحقاقات»; «المسددة» (owner 2026-11-21, «ابغى يكون
  *  لي وصول سريع للي سددتهم») lists the fully paid rows, the latest paid
@@ -701,6 +705,22 @@ export const INSTALLMENT_DUES_VIEW_LABEL_KEYS: Readonly<
   next30: 'instDuesViewNext30',
   all: 'instDuesViewAll',
   paid: 'instDuesViewPaid',
+}
+
+/** The urgency tone of each dues view (design «نموذج 5», owner
+ *  2026-11-21): late red, this month amber, 30 days blue, all unpaid
+ *  neutral, paid green. */
+export type InstallmentDuesViewTone =
+  'danger' | 'warning' | 'info' | 'neutral' | 'success'
+
+export const INSTALLMENT_DUES_VIEW_TONES: Readonly<
+  Record<InstallmentDuesView, InstallmentDuesViewTone>
+> = {
+  overdue: 'danger',
+  month: 'warning',
+  next30: 'info',
+  all: 'neutral',
+  paid: 'success',
 }
 
 /** The dues always open on «هذا الشهر» (owner 2026-11-21, «في الاستحقاقات

@@ -3005,12 +3005,11 @@ export const translations = {
     instContractDeleted: 'تم حذف العقد',
     instDeleteReceiptsLeft: 'حذف العقد، وتعذر حذف بعض ملفات الحوالات.',
     instDuesViewPaid: 'المسددة',
-    instDuesPaidDesc: 'الاقساط المسددة بالكامل، الاحدث سدادا اولا.',
     instNoPaidHere: 'لا توجد اقساط مسددة.',
     instInstallmentNo: 'رقم القسط',
     instPaidOnCol: 'تاريخ السداد',
-    instTotalRemainingOf: 'المتبقي ({count})',
-    instTotalPaidOf: 'المسدد ({count})',
+    instSummaryDue: '{count} بمبلغ',
+    instSummaryPaid: '{count} مسددة بمبلغ',
     // end installments-delete-paid (0207)
     // installment-accounts (0208)
     instErrAccount: 'تعذر قراءة بيانات الحساب.',
@@ -6436,12 +6435,11 @@ export const translations = {
     instDeleteReceiptsLeft:
       'The contract was deleted, but some receipt files could not be removed.',
     instDuesViewPaid: 'Paid',
-    instDuesPaidDesc: 'The fully paid installments, the latest paid first.',
     instNoPaidHere: 'No paid installments.',
     instInstallmentNo: 'No.',
     instPaidOnCol: 'Paid on',
-    instTotalRemainingOf: 'Remaining ({count})',
-    instTotalPaidOf: 'Paid ({count})',
+    instSummaryDue: '{count} totalling',
+    instSummaryPaid: '{count} paid, totalling',
     // end installments-delete-paid (0207)
     // installment-accounts (0208)
     instErrAccount: 'The account details could not be read.',

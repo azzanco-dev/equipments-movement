@@ -129,3 +129,20 @@ test('«حذف العقد»: a cancelled contract only, confirmed, then its file
   const english = [...blocks[1][1].matchAll(/^\s+([A-Za-z]+):/gm)].map((m) => m[1])
   assert.deepEqual(keys, english)
 })
+
+test('the tabs follow the approved design «نموذج 5»', () => {
+  const page = read('src', 'screens', 'installments', 'InstallmentsScreen.tsx')
+  assert.match(page, /<TabsList variant="buttons" aria-label=\{t\('instTabsLabel'\)\}>/)
+  for (const icon of ['LayoutDashboard', 'FileText', 'CalendarDays', 'Building2'])
+    assert.ok(page.includes(`<${icon} size={16} aria-hidden="true" />`), icon)
+  const dues = read('src', 'components', 'installments', 'InstallmentsDuesTab.tsx')
+  assert.match(dues, /<TabsList variant="chips" aria-label=\{t\('instTabDues'\)\}>/)
+  assert.match(dues, /INSTALLMENT_DUES_VIEW_TONES\[value\]/)
+  const view = read('src', 'lib', 'installmentsView.ts')
+  assert.match(
+    view,
+    /overdue: 'danger',\s*month: 'warning',\s*next30: 'info',\s*all: 'neutral',\s*paid: 'success',/,
+  )
+  const tabs = read('src', 'components', 'ui', 'Tabs.tsx')
+  assert.match(tabs, /export type TabsVariant = 'underline' \| 'segmented' \| 'buttons' \| 'chips'/)
+})

@@ -651,7 +651,8 @@ test('the lists are server-side: the page total is never summed in the browser',
   )
   assert.match(dues, /fetchInstallmentDuesPage\(/)
   assert.match(dues, /fetchInstallmentDuesTotal\(/)
-  assert.match(dues, /<Money value=\{load\.data\.sum\.total\} \/>/)
+  // The total sits beside the chips since the design «نموذج 5».
+  assert.match(dues, /<Money\s+value=\{load\.data\.sum\.total\}/)
   assert.match(dues, /load\.data\.sum\.partial/)
   assert.doesNotMatch(dues, /rows\.reduce\(|sumAmounts\(/)
   assert.match(dues, /<DataListPagination/)

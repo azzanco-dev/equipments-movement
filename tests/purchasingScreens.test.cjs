@@ -1232,7 +1232,12 @@ test('the PO list switches between «حسب المعدات» (the default) and �
     trigger,
     /group-data-\[variant=segmented\]\/tabs:data-\[state=active\]:bg-bg /,
   )
-  assert.doesNotMatch(trigger, /bg-primary/)
+  // Only the opt-in `buttons` variant (installments, 2026-11-21) fills its
+  // open trigger; the default looks never do.
+  assert.doesNotMatch(
+    trigger.replace(/group-data-\[variant=buttons\][^\s']*/g, ''),
+    /bg-primary/,
+  )
   assert.match(screen, /const list = useDataListState\(supplierPosListConfig\)/)
   assert.match(
     screen,

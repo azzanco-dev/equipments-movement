@@ -5,12 +5,16 @@ import { cn } from './cn'
 /** Tabs root; keyboard arrows follow the interface direction (RTL/LTR). */
 export const Tabs = RadixTabs.Root
 
-export type TabsVariant = 'underline' | 'segmented'
+export type TabsVariant = 'underline' | 'segmented' | 'buttons' | 'chips'
 
 export interface TabsListProps extends ComponentPropsWithoutRef<
   typeof RadixTabs.List
 > {
-  /** `underline` for page sections, `segmented` for compact filters. */
+  /** `underline` for page sections, `segmented` for compact filters.
+   *  Opt-in (owner 2026-11-21, the installments page, design «نموذج 5»):
+   *  `buttons` = frameless buttons whose open one is a primary button, in a
+   *  row that scrolls sideways on a phone; `chips` = rounded chips that wrap,
+   *  their colours given by each trigger (no active style of their own). */
   variant?: TabsVariant
 }
 
@@ -22,14 +26,18 @@ export const TabsList = forwardRef<HTMLDivElement, TabsListProps>(
         data-variant={variant}
         className={cn(
           'group/tabs flex max-w-full items-center',
-          variant === 'underline'
-            ? // No horizontal (or auto-computed vertical) scroll container here:
-              // the `-mb-px`/`border-b-2` active-trigger underline sits 1px below
-              // the row, and `overflow-x-auto` with the default `overflow-y`
-              // resolves to `overflow-y: auto` too, so that 1px alone was enough
-              // to show a scrollbar (owner report, phone video, 2026-09-22).
-              'flex-wrap gap-4 border-b'
-            : 'overflow-x-auto inline-flex w-fit gap-0.5 rounded-lg border bg-surface p-0.5',
+          variant === 'buttons'
+            ? 'gap-1 overflow-x-auto p-0.5'
+            : variant === 'chips'
+              ? 'flex-wrap gap-2'
+              : variant === 'underline'
+                ? // No horizontal (or auto-computed vertical) scroll container here:
+                  // the `-mb-px`/`border-b-2` active-trigger underline sits 1px below
+                  // the row, and `overflow-x-auto` with the default `overflow-y`
+                  // resolves to `overflow-y: auto` too, so that 1px alone was enough
+                  // to show a scrollbar (owner report, phone video, 2026-09-22).
+                  'flex-wrap gap-4 border-b'
+                : 'overflow-x-auto inline-flex w-fit gap-0.5 rounded-lg border bg-surface p-0.5',
           className,
         )}
         {...props}
@@ -65,6 +73,11 @@ export const TabsTrigger = forwardRef<
         // segmented
         'group-data-[variant=segmented]/tabs:h-8 group-data-[variant=segmented]/tabs:rounded-md group-data-[variant=segmented]/tabs:px-3',
         'group-data-[variant=segmented]/tabs:data-[state=active]:bg-bg group-data-[variant=segmented]/tabs:data-[state=active]:text-fg group-data-[variant=segmented]/tabs:data-[state=active]:shadow-sm',
+        // buttons (opt-in): the open one is a primary button
+        'group-data-[variant=buttons]/tabs:h-9 group-data-[variant=buttons]/tabs:rounded-lg group-data-[variant=buttons]/tabs:px-3 group-data-[variant=buttons]/tabs:hover:bg-surface-hover',
+        'group-data-[variant=buttons]/tabs:data-[state=active]:bg-primary group-data-[variant=buttons]/tabs:data-[state=active]:font-semibold group-data-[variant=buttons]/tabs:data-[state=active]:text-primary-contrast group-data-[variant=buttons]/tabs:data-[state=active]:hover:bg-primary-hover',
+        // chips (opt-in): the shape only; each trigger brings its tone
+        'group-data-[variant=chips]/tabs:h-8 group-data-[variant=chips]/tabs:rounded-full group-data-[variant=chips]/tabs:border group-data-[variant=chips]/tabs:px-3',
         className,
       )}
       {...props}

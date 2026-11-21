@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Wallet } from 'lucide-react'
+import {
+  Building2,
+  CalendarDays,
+  FileText,
+  LayoutDashboard,
+  Plus,
+  Wallet,
+} from 'lucide-react'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { InstallmentContractDialog } from '@/components/installments/InstallmentContractDialog'
 import { InstallmentFinancierDialog } from '@/components/installments/InstallmentFinancierDialog'
@@ -213,26 +220,41 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
           onValueChange={(next) => setTab(next as InstallmentsTab)}
           className="space-y-4"
         >
-          <TabsList aria-label={t('instTabsLabel')}>
-            <TabsTrigger value="dashboard">{t('instTabDashboard')}</TabsTrigger>
-            <TabsTrigger value="contracts">
-              {t('instTabContracts')}
-              <span className="ms-1 text-xs text-muted tabular-nums">
-                {data.contractsCount}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="dues">
-              {t('instTabDues')}
-              {data.overview.overdue_count > 0 && (
-                <Badge size="sm" tone="danger" className="ms-1.5">
-                  {data.overview.overdue_count}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="financiers">
-              {t('instTabFinanciers')}
-            </TabsTrigger>
-          </TabsList>
+          {/* The approved design «نموذج 5» (owner 2026-11-21, «اعتمد 5»):
+              frameless buttons with an icon, the open one black like a
+              primary button, between two lines; it scrolls sideways on a
+              phone. */}
+          <div className="border-b pb-3">
+            <TabsList variant="buttons" aria-label={t('instTabsLabel')}>
+              <TabsTrigger value="dashboard">
+                <LayoutDashboard size={16} aria-hidden="true" />
+                {t('instTabDashboard')}
+              </TabsTrigger>
+              <TabsTrigger value="contracts">
+                <FileText size={16} aria-hidden="true" />
+                {t('instTabContracts')}
+                <span className="text-xs tabular-nums opacity-70">
+                  {data.contractsCount}
+                </span>
+              </TabsTrigger>
+              <TabsTrigger value="dues">
+                <CalendarDays size={16} aria-hidden="true" />
+                {t('instTabDues')}
+                {data.overview.overdue_count > 0 && (
+                  <Badge size="sm" tone="danger">
+                    {data.overview.overdue_count}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="financiers">
+                <Building2 size={16} aria-hidden="true" />
+                {t('instTabFinanciers')}
+                <span className="text-xs tabular-nums opacity-70">
+                  {data.financiers.length}
+                </span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
           {/* Only the open tab is mounted (and reads): what each one shows
               is kept in the URL, so nothing is lost on a switch. */}
           <TabsContent value="dashboard" className="mt-0">
