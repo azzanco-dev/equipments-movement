@@ -267,6 +267,16 @@ export function dueShownAmount(
     : amountOf(row.remaining_amount)
 }
 
+/** The total of one calendar day: its installments' own amounts, paid or
+ *  not (owner 2026-11-22, «تحسب الاجمالي حق اليوم»). */
+export function dayDueTotal(
+  rows: readonly Pick<InstallmentDueRow, 'amount'>[],
+): number {
+  return fromHalalas(
+    rows.reduce((sum, row) => sum + toHalalas(amountOf(row.amount)), 0),
+  )
+}
+
 /** The short number on a calendar chip: «INS-0016» → «0016». */
 export const shortContractNumber = (number: string) =>
   number.replace(/^INS-/, '')
@@ -466,4 +476,61 @@ export function installmentMonthShort(
 ): string {
   const index = Number(monthKey.slice(5, 7)) - 1
   return (lang === 'ar' ? MONTHS_SHORT_AR : MONTHS_SHORT_EN)[index] ?? monthKey
+}
+
+// --- Financiers (the cards of «الجهات التمويلية», owner 2026-11-22) -----------------------
+
+/** The four figures over the financiers' cards. */
+export interface FinanciersOverview {
+  financiers: number
+  /** Financiers with at least one ACTIVE contract. */
+  withActive: number
+  activeContracts: number
+  remaining: number
+  /** The financier owed the most, with its whole-percent share. */
+  top: { financierId: string; share: number } | null
+  /** Financiers without an IBAN (the «بدون حساب بنكي» card). */
+  withoutIban: number
+}
+
+export function financiersOverview(
+  financiers: readonly { id: string; iban?: string | null }[],
+  figures: ReadonlyMap<
+    string,
+    { activeContracts: number; remaining: number }
+  >,
+): FinanciersOverview {
+  let withActive = 0
+  let activeContracts = 0
+  let all = 0
+  let top: { financierId: string; halalas: number } | null = null
+  for (const financier of financiers) {
+    const row = figures.get(financier.id)
+    if (!row) continue
+    if (row.activeContracts > 0) withActive += 1
+    activeContracts += row.activeContracts
+    const halalas = toHalalas(row.remaining)
+    all += halalas
+    if (halalas > 0 && (!top || halalas > top.halalas))
+      top = { financierId: financier.id, halalas }
+  }
+  return {
+    financiers: financiers.length,
+    withActive,
+    activeContracts,
+    remaining: fromHalalas(all),
+    top: top
+      ? {
+          financierId: top.financierId,
+          share: Math.round((top.halalas / all) * 100),
+        }
+      : null,
+    withoutIban: financiers.filter((row) => !row.iban).length,
+  }
+}
+
+/** A financier's whole-percent share of what every financier is owed. */
+export function remainingShare(remaining: number, total: number): number {
+  const all = toHalalas(total)
+  return all > 0 ? Math.round((toHalalas(remaining) / all) * 100) : 0
 }

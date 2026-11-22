@@ -182,10 +182,10 @@ test('the chart: twelve months from this one, the late rows left out', () => {
 
 test('the financier figures are grouped from the contract summaries', () => {
   const figures = view.financierFigures([
-    { financier_id: 'a', status: 'active', remaining_total: 250000 },
+    { financier_id: 'a', status: 'active', remaining_total: 250000, next_due_date: '2026-12-05' },
     { financier_id: 'a', status: 'paid_off', remaining_total: 0 },
-    { financier_id: 'b', status: 'active', remaining_total: '0.1' },
-    { financier_id: 'b', status: 'active', remaining_total: 0.2 },
+    { financier_id: 'b', status: 'active', remaining_total: '0.1', next_due_date: '2026-12-09' },
+    { financier_id: 'b', status: 'active', remaining_total: 0.2, next_due_date: '2026-11-30' },
     // A cancelled contract still ties its financier, and owes nothing.
     { financier_id: 'c', status: 'cancelled', remaining_total: 150000 },
   ])
@@ -193,21 +193,25 @@ test('the financier figures are grouped from the contract summaries', () => {
     contracts: 2,
     activeContracts: 1,
     remaining: 250000,
+    nextDue: '2026-12-05',
   })
   assert.deepEqual(plain(view.figuresOf(figures, 'b')), {
     contracts: 2,
     activeContracts: 2,
     remaining: 0.3,
+    nextDue: '2026-11-30',
   })
   assert.deepEqual(plain(view.figuresOf(figures, 'c')), {
     contracts: 1,
     activeContracts: 0,
     remaining: 0,
+    nextDue: null,
   })
   assert.deepEqual(plain(view.figuresOf(figures, 'none')), {
     contracts: 0,
     activeContracts: 0,
     remaining: 0,
+    nextDue: null,
   })
 })
 

@@ -525,6 +525,7 @@ export async function fetchFinancierContractRows(
     financier_id: string
     status: InstallmentContractStatus
     remaining_total: number
+    next_due_date: string | null
   }[]
   partial: boolean
 }> {
@@ -532,11 +533,12 @@ export async function fetchFinancierContractRows(
     financier_id: string
     status: InstallmentContractStatus
     remaining_total: number
+    next_due_date: string | null
   }>(
     await withSignal(
       supabase
         .from('installment_contract_summary')
-        .select('financier_id,status,remaining_total')
+        .select('financier_id,status,remaining_total,next_due_date')
         .order('id', { ascending: true })
         .limit(FINANCIER_CONTRACTS_CAP),
       signal,

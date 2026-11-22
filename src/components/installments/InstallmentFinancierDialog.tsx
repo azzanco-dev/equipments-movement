@@ -163,6 +163,7 @@ export function InstallmentFinancierDialog({
           bankError={bankError}
           ibanError={ibanError}
           ibanHint={t('instFinancierIbanHint')}
+          stacked
         />
       </form>
     </Dialog>

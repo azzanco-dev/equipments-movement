@@ -319,6 +319,13 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
                 setDialog({ kind: 'financier', financier })
               }
               onDeleted={() => done('instToastFinancierDeleted')}
+              onOpenContracts={(financier) =>
+                update({
+                  [INSTALLMENTS_URL_KEYS.tab]: 'contracts',
+                  [INSTALLMENTS_URL_KEYS.contractChip]: null,
+                  [INSTALLMENTS_URL_KEYS.contractSearch]: financier.name,
+                })
+              }
             />
           </TabsContent>
         </Tabs>

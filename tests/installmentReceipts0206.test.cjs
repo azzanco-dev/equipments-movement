@@ -275,10 +275,10 @@ test('the lists: the unified page (2026-11-21) and the table look that stays', (
   const dues = read('src', 'components', 'installments', 'InstallmentsDuesTab.tsx')
   assert.match(dues, /groupDues\(/)
   assert.match(dues, /fetchDuesFeed\(/)
-  // The financiers table keeps the main table look.
+  // The financiers are cards since 2026-11-22 (owner «اعتمد تصميم الجهات التمويلية»).
   assert.match(
     read('src', 'components', 'installments', 'InstallmentsFinanciersTab.tsx'),
-    /cellTextClassName="text-\[13px\]"/,
+    /<FinancierCard/,
   )
   const configs = read('src', 'lib', 'listConfigs.ts')
   assert.match(configs, /export const installmentContractsListConfig: DataListConfig/)

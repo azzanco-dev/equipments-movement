@@ -16,6 +16,7 @@ import { addMonths } from '@/lib/installments'
 import { fetchDuesBetween } from '@/lib/installmentsData'
 import {
   dueShownAmount,
+  dayDueTotal,
   duesByDay,
   dueTone,
   monthDueSummary,
@@ -58,8 +59,8 @@ const CHIPS_PER_DAY = 3
  * التقويم», from design 2): the month as a grid, Sunday first, every
  * installment a chip on its day in its colour — late red, within 7 days
  * amber, later blue, paid green — with the arrows and «اليوم»; beside it the
- * chosen day's installments with «تسديد», the next ones after it and the
- * month's ring (paid against what fell due). ONE bounded read per month of
+ * chosen day's installments with «تسديد» and their total (the «بعده» list
+ * went on the owner's word of 2026-11-22) and the month's ring (paid against what fell due). ONE bounded read per month of
  * `installment_dues` (active and paid-off contracts, paid or not).
  */
 export function InstallmentsCalendarTab({
@@ -88,9 +89,9 @@ export function InstallmentsCalendarTab({
   const ring = useMemo(() => monthDueSummary(rows), [rows])
   const weekdays = lang === 'ar' ? WEEKDAYS_AR : WEEKDAYS_EN
   const dayRows = byDay.get(selected) ?? []
-  const after = rows
-    .filter((row) => row.due_date > selected && row.state !== 'paid')
-    .slice(0, 3)
+  // The day's total (owner 2026-11-22, «تحسب الاجمالي حق اليوم»): the
+  // installments' own amounts, paid or not.
+  const dayAmount = dayDueTotal(dayRows)
 
   const go = (months: number) => {
     const next = shiftMonth(month, months)
@@ -166,7 +167,7 @@ export function InstallmentsCalendarTab({
           />
         ) : (
           <div className="overflow-x-auto">
-            <div className="min-w-[640px]">
+            <div className="min-w-[560px]">
               <div className="grid grid-cols-7 text-center text-xs text-muted">
                 {weekdays.map((name) => (
                   <div key={name} className="py-2">
@@ -284,22 +285,15 @@ export function InstallmentsCalendarTab({
               />
             ))
           )}
+          {load.data && dayRows.length > 0 && (
+            <div className="flex items-center justify-between gap-3 rounded-xl border bg-surface px-4 py-3">
+              <span className="text-sm font-semibold">
+                {t('instCalDayTotal')}
+              </span>
+              <Money value={dayAmount} className="text-base font-bold" />
+            </div>
+          )}
         </section>
-        {after.length > 0 && (
-          <section className="space-y-3 border-t pt-3">
-            <h3 className="text-sm font-semibold text-muted">
-              {t('instCalAfter')}
-            </h3>
-            {after.map((row) => (
-              <DueCard
-                key={row.id}
-                row={row}
-                canPay={canManage}
-                onPay={() => onPay(row)}
-              />
-            ))}
-          </section>
-        )}
         <Card className="space-y-3">
           <div>
             <h3 className="text-sm font-semibold">

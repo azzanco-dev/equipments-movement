@@ -1,38 +1,63 @@
 import { useCallback, useMemo, useState } from 'react'
-import { BankLogo } from '@/components/banks/BankLogo'
-import { formatIban } from '@/lib/partyFields'
-import { Building2, Pencil, Plus, Trash2 } from 'lucide-react'
+import {
+  AlertTriangle,
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  FileText,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react'
 import {
   Button,
   ConfirmDialog,
-  DataTable,
   EmptyState,
   ErrorState,
   IconButton,
   Notice,
-  type DataTableColumn,
 } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
+import { formatDate } from '@/lib/dateFormat'
 import { installmentErrorMessage } from '@/lib/installments'
+import {
+  financiersOverview,
+  financierTone,
+  remainingShare,
+} from '@/lib/installmentsBoard'
 import {
   deleteInstallmentFinancier,
   fetchFinancierContractRows,
 } from '@/lib/installmentsData'
 import {
+  activeCountWords,
   figuresOf,
   financierFigures,
+  type FinancierFigures,
   type InstallmentFinancierRow,
 } from '@/lib/installmentsView'
+import { BankAccountLine } from './BankAccountFields'
+import { FigureCard, FinancierTile } from './boardParts'
 import { Money } from './cells'
 import { useLoad } from './useLoad'
 
 /**
- * «الجهات»: the banks and dealers the contracts are owed to, each with its
- * active contracts and what they still owe (ONE bounded read of the
- * contract summaries, grouped by `financierFigures`). `installments.manage`
- * adds, renames and deletes; a financier with contracts is not deleted (the
- * database refuses it, `installment_contracts_financier_id_fkey`).
+ * «الجهات التمويلية» (owner 2026-11-22, «اعتمد تصميم الجهات التمويلية»: the
+ * Figma frame «الاقساط / الموحد / الجهات التمويلية»): four figure cards —
+ * the financiers, the active contracts, what they still owe with the
+ * largest financier's share, and the financiers without an IBAN —, then ONE
+ * CARD per financier in its colour (the same tone as on the dues and the
+ * contracts): its active contracts, «حساب السداد» (the bank with its logo
+ * and the IBAN with a copy button, or a dashed «لا يوجد حساب مسجل» with
+ * «اضافة الحساب»), what it is owed with its share and a bar, «عقود الجهة»
+ * (the contracts tab searched by its name) and its next due date. The
+ * figures come from ONE bounded read of the contract summaries
+ * (`financierFigures`). `installments.manage` adds, edits and deletes; a
+ * financier with contracts is not deleted (the database refuses it,
+ * `installment_contracts_financier_id_fkey`), and a dashed tile closes the
+ * grid with «اضافة جهة».
  */
 export function InstallmentsFinanciersTab({
   financiers,
@@ -41,6 +66,7 @@ export function InstallmentsFinanciersTab({
   onAdd,
   onRename,
   onDeleted,
+  onOpenContracts,
 }: {
   financiers: readonly InstallmentFinancierRow[]
   version: number
@@ -48,8 +74,10 @@ export function InstallmentsFinanciersTab({
   onAdd: () => void
   onRename: (financier: InstallmentFinancierRow) => void
   onDeleted: () => void
+  /** «عقود الجهة»: the contracts tab searched by the financier's name. */
+  onOpenContracts: (financier: InstallmentFinancierRow) => void
 }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const [deleting, setDeleting] = useState<InstallmentFinancierRow | null>(null)
   const [removing, setRemoving] = useState(false)
   const [error, setError] = useState<TranslationKey | null>(null)
@@ -62,6 +90,10 @@ export function InstallmentsFinanciersTab({
   const figures = useMemo(
     () => financierFigures(load.data?.rows ?? []),
     [load.data],
+  )
+  const overview = useMemo(
+    () => (load.data ? financiersOverview(financiers, figures) : null),
+    [financiers, figures, load.data],
   )
   // With a capped read a financier may have contracts the figures do not
   // see: the delete stays open and the database answers.
@@ -85,118 +117,68 @@ export function InstallmentsFinanciersTab({
     onDeleted()
   }
 
-  const columns: DataTableColumn<InstallmentFinancierRow>[] = [
-    {
-      key: 'name',
-      header: t('instFinancierName'),
-      // 0208: the account as a muted line under the name (no new column:
-      // the tables stay narrow).
-      cell: (item) => (
-        <span className="flex items-start gap-2">
-          <Building2
-            size={14}
-            aria-hidden="true"
-            className="mt-0.5 shrink-0 text-muted"
-          />
-          <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="font-semibold">{item.name}</span>
-            {(item.bank_name || item.iban) && (
-              <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
-                {item.bank_name && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <BankLogo name={item.bank_name} size="sm" />
-                    {item.bank_name}
-                  </span>
-                )}
-                {item.iban && (
-                  <bdi dir="ltr" className="tabular-nums">
-                    {formatIban(item.iban)}
-                  </bdi>
-                )}
-              </span>
-            )}
-          </span>
-        </span>
-      ),
-    },
-    {
-      key: 'contracts',
-      header: t('instActiveContracts'),
-      align: 'center',
-      cell: (item) =>
-        load.data ? (
-          <span className="tabular-nums">
-            {figuresOf(figures, item.id).activeContracts}
-          </span>
-        ) : (
-          <span className="text-muted">—</span>
-        ),
-    },
-    {
-      key: 'remaining',
-      header: t('instRemaining'),
-      align: 'end',
-      cell: (item) =>
-        load.data ? (
-          <Money value={figuresOf(figures, item.id).remaining} />
-        ) : (
-          <span className="text-muted">—</span>
-        ),
-    },
-    ...(canManage
-      ? [
-          {
-            key: 'actions',
-            header: <span className="sr-only">{t('actions')}</span>,
-            align: 'end' as const,
-            cell: (item: InstallmentFinancierRow) => {
-              const used = complete && figuresOf(figures, item.id).contracts > 0
-              return (
-                <span className="inline-flex items-center gap-1">
-                  <IconButton
-                    size="sm"
-                    variant="ghost"
-                    label={t('instFinancierEditOf').replace(
-                      '{name}',
-                      item.name,
-                    )}
-                    icon={<Pencil size={15} aria-hidden="true" />}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onRename(item)
-                    }}
-                  />
-                  <IconButton
-                    size="sm"
-                    variant="ghost"
-                    label={(used
-                      ? t('instFinancierDeleteBlockedOf')
-                      : t('instFinancierDeleteOf')
-                    ).replace('{name}', item.name)}
-                    title={used ? t('instFinancierDeleteBlocked') : undefined}
-                    disabled={used}
-                    icon={
-                      <Trash2
-                        size={15}
-                        aria-hidden="true"
-                        className={used ? undefined : 'text-danger'}
-                      />
-                    }
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      setDeleting(item)
-                    }}
-                  />
-                </span>
-              )
-            },
-          },
-        ]
-      : []),
-  ]
+  const topName = overview?.top
+    ? (financiers.find((row) => row.id === overview.top?.financierId)?.name ??
+      '')
+    : ''
 
   return (
     <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <FigureCard
+          tone="success"
+          icon={<Building2 size={20} />}
+          title={t('instTabFinanciers')}
+          value={financiers.length}
+          foot={
+            overview
+              ? t('instFinWithActive').replace(
+                  '{count}',
+                  String(overview.withActive),
+                )
+              : undefined
+          }
+        />
+        <FigureCard
+          tone="neutral"
+          icon={<FileText size={20} />}
+          title={t('instActiveContractsTitle')}
+          value={overview ? overview.activeContracts : '—'}
+          foot={
+            overview
+              ? t('instFinAtFinanciers').replace(
+                  '{count}',
+                  String(overview.withActive),
+                )
+              : undefined
+          }
+        />
+        <FigureCard
+          tone="info"
+          icon={<Clock size={20} />}
+          title={t('instRemainingOnContracts')}
+          value={overview ? <Money value={overview.remaining} /> : '—'}
+          foot={
+            overview?.top
+              ? t('instFinTopShare')
+                  .replace('{name}', topName)
+                  .replace('{percent}', String(overview.top.share))
+              : undefined
+          }
+        />
+        <FigureCard
+          tone={overview && overview.withoutIban > 0 ? 'warning' : 'neutral'}
+          icon={<AlertTriangle size={20} />}
+          title={t('instFinNoIbanTitle')}
+          value={financiers.filter((row) => !row.iban).length}
+          foot={
+            financiers.some((row) => !row.iban)
+              ? t('instFinNoIbanHint')
+              : t('instFinNoIbanNone')
+          }
+        />
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted">{t('instFinanciersDesc')}</p>
         {canManage && (
@@ -226,19 +208,51 @@ export function InstallmentsFinanciersTab({
           {t('instPartialFigures')}
         </Notice>
       )}
-      {load.status !== 'failed' && (
-        <DataTable
-          cellTextClassName="text-[13px]"
-          cellClassName="py-3"
-          columns={columns}
-          rows={[...financiers]}
-          rowKey={(item) => item.id}
-          caption={t('instTabFinanciers')}
-          onRowClick={canManage ? onRename : undefined}
-          empty={<EmptyState title={t('instNoFinanciers')} />}
-          className="rounded-xl border bg-bg"
-        />
+
+      {financiers.length === 0 && !canManage ? (
+        <EmptyState title={t('instNoFinanciers')} />
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {financiers.map((financier) => (
+            <FinancierCard
+              key={financier.id}
+              financier={financier}
+              tone={financierTone(financiers, financier.id)}
+              figures={load.data ? figuresOf(figures, financier.id) : null}
+              total={overview?.remaining ?? 0}
+              canManage={canManage}
+              deleteBlocked={
+                complete && figuresOf(figures, financier.id).contracts > 0
+              }
+              lang={lang}
+              onEdit={() => onRename(financier)}
+              onDelete={() => setDeleting(financier)}
+              onOpenContracts={() => onOpenContracts(financier)}
+            />
+          ))}
+          {canManage && (
+            <button
+              type="button"
+              onClick={onAdd}
+              className="flex min-h-48 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+            >
+              <span
+                aria-hidden="true"
+                className="flex size-9 items-center justify-center rounded-full bg-surface text-muted"
+              >
+                <Plus size={18} />
+              </span>
+              <span className="text-sm font-bold">
+                {t('instFinancierAdd')}
+              </span>
+              <span className="text-xs text-muted">
+                {t('instFinAddTileDesc')}
+              </span>
+            </button>
+          )}
+        </div>
       )}
+
       <ConfirmDialog
         open={deleting !== null}
         onOpenChange={(next) => !next && setDeleting(null)}
@@ -255,5 +269,170 @@ export function InstallmentsFinanciersTab({
         onConfirm={remove}
       />
     </div>
+  )
+}
+
+/** One financier as a card (the Figma frame, 2026-11-22). */
+function FinancierCard({
+  financier,
+  tone,
+  figures,
+  total,
+  canManage,
+  deleteBlocked,
+  lang,
+  onEdit,
+  onDelete,
+  onOpenContracts,
+}: {
+  financier: InstallmentFinancierRow
+  tone: number
+  /** null while the figures load. */
+  figures: FinancierFigures | null
+  total: number
+  canManage: boolean
+  deleteBlocked: boolean
+  lang: 'ar' | 'en'
+  onEdit: () => void
+  onDelete: () => void
+  onOpenContracts: () => void
+}) {
+  const { t, dir } = useI18n()
+  const account =
+    financier.bank_name || financier.iban
+      ? {
+          bankName: financier.bank_name ?? null,
+          iban: financier.iban ?? null,
+          own: false,
+        }
+      : null
+  const share = figures ? remainingShare(figures.remaining, total) : 0
+  const Forward = dir === 'rtl' ? ChevronLeft : ChevronRight
+
+  return (
+    <article className="flex min-w-0 flex-col gap-3 rounded-xl border bg-bg p-4">
+      <header className="flex items-start gap-3">
+        <FinancierTile tone={tone} size={36} />
+        <div className="min-w-0 flex-1">
+          <h3 className="break-words text-base font-bold">{financier.name}</h3>
+          <p className="text-xs text-muted">
+            {!figures
+              ? '—'
+              : figures.contracts === 0
+                ? t('instFinNoContracts')
+                : activeCountWords(figures.activeContracts, lang)}
+          </p>
+        </div>
+        {canManage && (
+          <span className="inline-flex shrink-0 items-center gap-0.5">
+            <IconButton
+              size="sm"
+              variant="ghost"
+              label={t('instFinancierEditOf').replace('{name}', financier.name)}
+              icon={<Pencil size={15} aria-hidden="true" />}
+              onClick={onEdit}
+            />
+            <IconButton
+              size="sm"
+              variant="ghost"
+              label={(deleteBlocked
+                ? t('instFinancierDeleteBlockedOf')
+                : t('instFinancierDeleteOf')
+              ).replace('{name}', financier.name)}
+              title={deleteBlocked ? t('instFinancierDeleteBlocked') : undefined}
+              disabled={deleteBlocked}
+              icon={
+                <Trash2
+                  size={15}
+                  aria-hidden="true"
+                  className={deleteBlocked ? undefined : 'text-danger'}
+                />
+              }
+              onClick={onDelete}
+            />
+          </span>
+        )}
+      </header>
+
+      {account ? (
+        <div className="space-y-1.5 rounded-lg bg-surface p-3">
+          <p className="text-xs text-muted">{t('instAccountTitle')}</p>
+          <BankAccountLine account={account} showSource={false} />
+        </div>
+      ) : (
+        <div className="space-y-1.5 rounded-lg border border-dashed p-3">
+          <p className="text-xs text-muted">{t('instAccountTitle')}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm text-muted">{t('instNoAccount')}</span>
+            {canManage && (
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Plus size={14} aria-hidden="true" />}
+                onClick={onEdit}
+              >
+                {t('instFinAddAccount')}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs text-muted">{t('instRemaining')}</p>
+            <div className="text-xl font-bold">
+              {figures ? <Money value={figures.remaining} /> : '—'}
+            </div>
+          </div>
+          {figures && (
+            <span className="shrink-0 text-xs text-muted">
+              {t('instShareOfRemaining').replace('{percent}', String(share))}
+            </span>
+          )}
+        </div>
+        <div
+          className="h-1.5 overflow-hidden rounded-full bg-surface-hover"
+          aria-hidden="true"
+        >
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${share}%`,
+              backgroundColor: `var(--chart-stroke-${tone})`,
+            }}
+          />
+        </div>
+      </div>
+
+      <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs">
+        {figures && figures.contracts === 0 ? (
+          <span className="text-muted">
+            {canManage ? t('instFinCanDelete') : t('instFinNoContracts')}
+          </span>
+        ) : (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onOpenContracts}
+              className="-ms-2"
+            >
+              {t('instFinContractsLink')}
+              <Forward size={14} aria-hidden="true" />
+            </Button>
+            {figures?.nextDue && (
+              <span className="text-muted">
+                {t('instCardNextDue')}{' '}
+                <bdi dir="ltr" className="tabular-nums">
+                  {formatDate(figures.nextDue)}
+                </bdi>
+              </span>
+            )}
+          </>
+        )}
+      </footer>
+    </article>
   )
 }

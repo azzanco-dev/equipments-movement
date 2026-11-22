@@ -25,6 +25,7 @@ export function BankAccountFields({
   bankError,
   ibanError,
   ibanHint,
+  stacked = false,
 }: {
   bankName: string
   iban: string
@@ -33,6 +34,10 @@ export function BankAccountFields({
   bankError?: TranslationKey | null
   ibanError?: TranslationKey | null
   ibanHint?: string
+  /** One field a row: the IBAN under the bank on its own line (the
+   *  financier dialog, Figma 2026-11-22: 24 characters with their spaces do
+   *  not fit half a 512 px dialog). */
+  stacked?: boolean
 }) {
   const { t } = useI18n()
   const loadBanks = useMemo(
@@ -44,7 +49,7 @@ export function BankAccountFields({
     [],
   )
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className={stacked ? 'grid gap-3' : 'grid gap-4 sm:grid-cols-2'}>
       <Field
         name="bank_name"
         label={<OptionalLabel text={t('bankName')} />}

@@ -338,6 +338,20 @@ export function activeContractsWords(count: number, lang: Language): string {
   return `على ${count} عقد ساري`
 }
 
+/** «عقد نشط واحد», «عقدين نشطين», «5 عقود نشطة», «12 عقد نشط» / "1 active
+ *  contract" (a financier's card, 2026-11-22). */
+export function activeCountWords(count: number, lang: Language): string {
+  if (lang === 'en') {
+    if (count === 0) return 'No active contracts'
+    return `${count} active ${count === 1 ? 'contract' : 'contracts'}`
+  }
+  if (count === 0) return 'لا توجد عقود نشطة'
+  if (count === 1) return 'عقد نشط واحد'
+  if (count === 2) return 'عقدين نشطين'
+  if (count <= 10) return `${count} عقود نشطة`
+  return `${count} عقد نشط`
+}
+
 /** «معدة واحدة», «معدتين», «3 معدات», «11 معدة» / "1 unit". */
 export function unitsWords(count: number, lang: Language): string {
   if (lang === 'en') return `${count} ${count === 1 ? 'unit' : 'units'}`
@@ -488,12 +502,16 @@ export interface FinancierFigures {
   activeContracts: number
   /** What its ACTIVE contracts still owe. */
   remaining: number
+  /** The nearest unpaid due date of its ACTIVE contracts (the card's
+   *  «القسط الجاي», 2026-11-22), null without one. */
+  nextDue: string | null
 }
 
 const NO_FIGURES: FinancierFigures = {
   contracts: 0,
   activeContracts: 0,
   remaining: 0,
+  nextDue: null,
 }
 
 /** The contracts of each financier, grouped from the summary rows. */
@@ -502,22 +520,19 @@ export function financierFigures(
     financier_id: string
     status: InstallmentContractStatus
     remaining_total: number | string | null
+    next_due_date?: string | null
   }[],
 ): Map<string, FinancierFigures> {
-  const halalas = new Map<
-    string,
-    { contracts: number; activeContracts: number; remaining: number }
-  >()
+  const halalas = new Map<string, FinancierFigures>()
   for (const row of rows) {
-    const figures = halalas.get(row.financier_id) ?? {
-      contracts: 0,
-      activeContracts: 0,
-      remaining: 0,
-    }
+    const figures = halalas.get(row.financier_id) ?? { ...NO_FIGURES }
     figures.contracts += 1
     if (row.status === 'active') {
       figures.activeContracts += 1
       figures.remaining += toHalalas(amountOf(row.remaining_total))
+      const due = row.next_due_date ?? null
+      if (due && (!figures.nextDue || due < figures.nextDue))
+        figures.nextDue = due
     }
     halalas.set(row.financier_id, figures)
   }

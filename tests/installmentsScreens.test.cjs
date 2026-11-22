@@ -536,7 +536,7 @@ test('write actions show for installments.manage only', () => {
     assert.match(read('src', 'components', 'installments', file), /canPay=\{canManage\}/, file)
   assert.match(
     read('src', 'components', 'installments', 'InstallmentsFinanciersTab.tsx'),
-    /\.\.\.\(canManage\s*\?/,
+    /\{canManage && \(/,
   )
   // No screen tests a role name.
   for (const file of UI_FILES)
