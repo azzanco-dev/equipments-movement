@@ -213,7 +213,7 @@ export function ContractCard({
   const badge = STATE_BADGE[state]
   const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight
   return (
-    <article className="flex min-w-0 flex-col gap-3 rounded-xl border bg-bg p-3.5 shadow-sm">
+    <article className="flex min-w-0 flex-col gap-2 rounded-xl border bg-bg p-3.5 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-2 text-xs text-muted">
           <FinancierTile tone={tone} size={28} />
@@ -223,7 +223,7 @@ export function ContractCard({
           {t(badge.key)}
         </Badge>
       </div>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <AppLink
             href={`/installments/${contract.id}`}
@@ -238,7 +238,7 @@ export function ContractCard({
         </div>
         <ProgressRing percent={percent} tone={late ? 'danger' : 'success'} />
       </div>
-      <div className="space-y-2">
+      <div className="space-y-1">
         <div className="flex items-end justify-between gap-2">
           <div>
             <p className="text-xs text-muted">{t('instRemaining')}</p>
@@ -269,7 +269,7 @@ export function ContractCard({
       {due && (
         <div
           className={cn(
-            'flex items-center justify-between gap-2 rounded-lg p-2.5',
+            'flex items-center justify-between gap-2 rounded-lg px-2.5 py-2',
             late ? 'bg-danger-soft' : 'bg-surface',
           )}
         >

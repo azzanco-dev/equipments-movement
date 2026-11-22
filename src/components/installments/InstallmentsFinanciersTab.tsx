@@ -310,7 +310,7 @@ function FinancierCard({
   const Forward = dir === 'rtl' ? ChevronLeft : ChevronRight
 
   return (
-    <article className="flex min-w-0 flex-col gap-3 rounded-xl border bg-bg p-4">
+    <article className="flex min-w-0 flex-col gap-2 rounded-xl border bg-bg p-4">
       <header className="flex items-start gap-3">
         <FinancierTile tone={tone} size={36} />
         <div className="min-w-0 flex-1">
@@ -355,12 +355,12 @@ function FinancierCard({
       </header>
 
       {account ? (
-        <div className="space-y-1.5 rounded-lg bg-surface p-3">
+        <div className="space-y-1 rounded-lg bg-surface px-3 py-2">
           <p className="text-xs text-muted">{t('instAccountTitle')}</p>
           <BankAccountLine account={account} showSource={false} />
         </div>
       ) : (
-        <div className="space-y-1.5 rounded-lg border border-dashed p-3">
+        <div className="space-y-1 rounded-lg border border-dashed px-3 py-2">
           <p className="text-xs text-muted">{t('instAccountTitle')}</p>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm text-muted">{t('instNoAccount')}</span>
@@ -378,7 +378,7 @@ function FinancierCard({
         </div>
       )}
 
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs text-muted">{t('instRemaining')}</p>
@@ -406,7 +406,7 @@ function FinancierCard({
         </div>
       </div>
 
-      <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs">
+      <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-xs">
         {figures && figures.contracts === 0 ? (
           <span className="text-muted">
             {canManage ? t('instFinCanDelete') : t('instFinNoContracts')}
