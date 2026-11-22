@@ -38,8 +38,10 @@ test('the SVG logos carry no script, handler or outside link', () => {
 test('the lookup by name, the white logos and the initials', () => {
   assert.equal(lib.bankLogoOf('مصرف الانماء').src, '/banks/alinma.svg')
   assert.equal(lib.bankLogoOf('مصرف  الانماء').onDark, true)
-  // All 13 banks of 0177 have a logo since the owner's «جيبهم بطريقتك».
-  assert.equal(Object.keys(lib.BANK_LOGOS).length, 13)
+  // The 13 banks of 0177 («جيبهم بطريقتك»), and Standard Chartered since 2026-11-22.
+  assert.equal(Object.keys(lib.BANK_LOGOS).length, 14)
+  assert.equal(lib.bankLogoOf('بنك ستاندرد تشارترد').src, '/banks/standardchartered.svg')
+  assert.ok(read('public', 'banks', 'standardchartered.svg').includes('viewBox="0 0 142 56"'))
   assert.equal(lib.bankLogoOf('مصرف الراجحي').src, '/banks/rajhi.svg')
   assert.equal(lib.bankLogoOf('بنك جديد'), null)
   assert.equal(lib.bankLogoOf(null), null)

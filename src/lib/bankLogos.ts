@@ -5,6 +5,8 @@
  * Bank Aljazira's from aljazirabank.com.sa, their current sites). Approved on
  * /ui-kit «شعارات البنوك» the same day («Yes, apply them»): the supplier
  * form's bank picker, Settings › «البنوك» and the supplier details.
+ * Standard Chartered's was added on 2026-11-22 from sc.com/sa-en, with a
+ * viewBox so that it scales.
  *
  * Matched by the bank's name in the banks list (migration 0177), compared
  * without spaces; a bank without a file (any bank added in Settings) shows
@@ -31,6 +33,7 @@ export const BANK_LOGOS: Readonly<Record<string, BankLogo>> = {
   'بنك الخليج الدولي': { src: '/banks/gib.png' },
   'بنك STC': { src: '/banks/stc.svg' },
   'بنك دال 360': { src: '/banks/d360.png' },
+  'بنك ستاندرد تشارترد': { src: '/banks/standardchartered.svg' },
 }
 
 const key = (name: string) => name.replace(/\s+/g, '').toLowerCase()
