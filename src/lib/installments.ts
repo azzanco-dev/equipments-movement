@@ -370,7 +370,6 @@ export const INSTALLMENT_ERROR_KEYS: Readonly<Record<string, TranslationKey>> =
     invalid_iban: 'instErrIban',
     // 0209
     invalid_vat: 'instErrVat',
-    invalid_vat_timing: 'instErrVatTiming',
     invalid_vat_amount: 'instErrVatAmount',
     invalid_vat_date: 'instErrVatDate',
     invalid_first_payment: 'instErrFirstPayment',

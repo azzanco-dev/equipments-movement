@@ -4,7 +4,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 // Migration 0209 (owner 2026-11-22): first payments, a first due date that
-// may be unknown, the VAT with each payment or at the end, the contract's
+// may be unknown, the VAT inside one typed total, the contract's
 // files, and the screens on them.
 
 const ROOT = path.join(__dirname, '..')
@@ -37,6 +37,8 @@ test('0209: nothing earlier moves', () => {
   assert.match(CODE, /RAISE EXCEPTION '0209: a contract does not add up after the backfill'/)
   // The down payment is never turned into a first payment.
   assert.doesNotMatch(FLAT, /DROP COLUMN|RENAME COLUMN/)
+  // The earlier shape rules still hold: they are not dropped.
+  assert.doesNotMatch(FLAT, /DROP CONSTRAINT installment_contracts_/)
 })
 
 test('0209: every writer checks the key first and is closed to anon', () => {
@@ -44,7 +46,7 @@ test('0209: every writer checks the key first and is closed to anon', () => {
     'save_installment_contract',
     'record_installment_payment',
     'set_installment_first_due_date',
-    'set_installment_first_payment_date',
+    'set_installment_payment_date',
     'add_installment_contract_file',
     'remove_installment_contract_file',
     'delete_installment_contract',
@@ -57,7 +59,7 @@ test('0209: every writer checks the key first and is closed to anon', () => {
     'save_installment_contract',
     'record_installment_payment',
     'set_installment_first_due_date',
-    'set_installment_first_payment_date',
+    'set_installment_payment_date',
     'add_installment_contract_file',
     'remove_installment_contract_file',
   ]) {
@@ -88,9 +90,9 @@ test('0209: a first payment is payable before the division', () => {
 
 test('0209: what money on a row fixes', () => {
   const body = bodyOf('save_installment_contract')
-  assert.match(body, /IF v_gross <> v_old\.amount OR v_paid_on IS NOT NULL THEN RAISE EXCEPTION 'first_payment_locked'/)
+  assert.match(body, /IF v_base <> v_old\.amount OR v_paid_on IS NOT NULL THEN RAISE EXCEPTION 'first_payment_locked'/)
   assert.match(body, /s\.kind = 'installment' AND s\.paid_amount > 0 \) THEN RAISE EXCEPTION 'contract_has_payments'/)
-  assert.match(body, /s\.kind = 'vat' AND s\.paid_amount > 0 \) THEN RAISE EXCEPTION 'contract_has_payments'/)
+  assert.match(body, /IF v_vat_row\.paid_amount > 0 THEN IF v_vat_mode <> 'separate' OR v_vat <> v_vat_row\.amount OR v_vat_paid_on IS NOT NULL THEN RAISE EXCEPTION 'contract_has_payments'/)
   // «مدفوعة» is an ordinary payment.
   assert.match(body, /PERFORM public\.record_installment_payment\(/)
   // «غير محدد» is never a choice.
@@ -193,7 +195,8 @@ test('0209: an edit over a changed contract is refused', () => {
 
 test('0209: paid rows are recorded last, and the agreed day stays', () => {
   const save = bodyOf('save_installment_contract')
-  assert.match(save, /v_due := COALESCE\(v_due, v_paid_on\);/)
+  // No day is invented for a row that had none: a void would make it late.
+  assert.doesNotMatch(save, /COALESCE\(v_due, v_paid_on\)/)
   assert.ok(
     save.indexOf('INSERT INTO public.installment_schedule') <
       save.indexOf('FROM jsonb_array_elements(v_payments)'),
@@ -204,4 +207,58 @@ test('0209: paid rows are recorded last, and the agreed day stays', () => {
     bodyOf('sync_installment_vat_row'),
     /WHERE id = v_row\.id AND paid_amount < amount AND due_date IS DISTINCT FROM v_due/,
   )
+})
+
+test('0209: one typed total, the VAT inside it', () => {
+  assert.match(FLAT, /vat_mode IN \('unspecified', 'none', 'inside', 'separate'\)/)
+  const save = bodyOf('save_installment_contract')
+  assert.match(save, /IF v_vat_mode = 'inside' THEN v_vat := round\(v_total \* 15 \/ 115, 2\);/)
+  assert.match(save, /v_rate_base := v_total - CASE WHEN v_vat_mode = 'separate' THEN v_vat ELSE 0 END;/)
+  assert.match(save, /v_installments := v_rate_base - v_prepaid - v_first_total;/)
+  // Nothing is ever added on top of the typed total.
+  assert.doesNotMatch(FLAT, /total_amount \+ |v_total \+ /)
+  assert.doesNotMatch(FLAT, /installment_with_vat|vat_timing/)
+  assert.match(FLAT, /c\.total_amount AS payable_total/)
+})
+
+test('0209: a separate VAT is payable without a day, before the division', () => {
+  assert.match(FLAT, /CHECK \(due_date IS NOT NULL OR kind <> 'installment'\)/)
+  const sync = bodyOf('sync_installment_vat_row')
+  // The row is there whether it has a day or not.
+  assert.doesNotMatch(sync, /IF v_due IS NULL THEN/)
+  assert.match(sync, /IF c\.vat_mode <> 'separate' THEN DELETE/)
+  assert.match(bodyOf('set_installment_payment_date'), /kind IN \('first_payment', 'vat'\)/)
+  const save = bodyOf('save_installment_contract')
+  assert.match(save, /IF v_vat_paid_on IS NOT NULL THEN v_payments :=/)
+  // A paid installment still allows none <-> inside: no amount moves.
+  assert.match(save, /OR \(v_vat_mode = 'separate'\) <> \(c\.vat_mode = 'separate'\)/)
+})
+
+test('the form asks one question and types one total', () => {
+  const form = read('src', 'screens', 'installments', 'InstallmentContractFormScreen.tsx')
+  assert.equal([...form.matchAll(/name="vat_mode"/g)].length, 1)
+  assert.doesNotMatch(form, /vat_timing|instBeforeVatHint/)
+  const row = read('src', 'components', 'installments', 'InstallmentVatRow.tsx')
+  // «مدفوعة» hides the planned day.
+  assert.match(row, /const showDue = !paidNow && !settled/)
+  const page = read('src', 'screens', 'installments', 'InstallmentContractDetail.tsx')
+  // Above the schedule: it is not always at the end.
+  assert.ok(page.indexOf('<VatPaymentCard') < page.indexOf("t('instScheduleTitle')"))
+})
+
+test('0209: a void puts the VAT back on its chosen day', () => {
+  const body = bodyOf('void_installment_payment')
+  assert.match(body, /BEGIN PERFORM public\.assert_installments_manage\(\);/)
+  assert.ok(
+    body.indexOf('SET paid_amount = s.paid_amount - a.amount') <
+      body.indexOf('PERFORM public.sync_installment_vat_row(c.id)'),
+  )
+  // A paid VAT no longer stretches the contract's end.
+  assert.match(FLAT, /WHERE s\.kind = 'installment' OR \(s\.kind = 'vat' AND s\.paid_amount < s\.amount\) \) AS last_due_date/)
+})
+
+test('the VAT field compares amounts, not their spelling', () => {
+  const row = read('src', 'components', 'installments', 'InstallmentVatRow.tsx')
+  assert.doesNotMatch(row, /text === automatic/)
+  assert.match(row, /toHalalas\(typed\) === toHalalas\(Number\(automatic\)\)/)
 })

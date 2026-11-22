@@ -238,9 +238,7 @@ export function InstallmentPaymentDialog({
   // day: each by its name.
   const rowChoices = [
     ...(chosen ? [chosen] : nextRow ? [nextRow] : []),
-    ...(awaiting || !nextRow
-      ? openRows.filter((row) => row.kind === 'first_payment' && !row.due_date)
-      : []),
+    ...openRows.filter((row) => row.kind !== 'installment' && !row.due_date),
   ].filter((row, index, rows) => rows.indexOf(row) === index)
   const quick: {
     key: string

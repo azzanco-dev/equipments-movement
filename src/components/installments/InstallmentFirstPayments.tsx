@@ -23,31 +23,26 @@ import {
   firstPaymentValue,
   newFirstPaymentRow,
   rateHalalas,
-  withVatHalalas,
   INSTALLMENT_FIRST_PAYMENTS_MAX,
   INSTALLMENT_FIRST_PAYMENT_NOTE_MAX,
   INSTALLMENT_FIRST_PAYMENT_TITLE_MAX,
   type FirstPaymentFormRow,
   type FirstPaymentValueKind,
-  type InstallmentVatTiming,
 } from '@/lib/installmentPlan'
 import { Money } from './cells'
 
-/** What a row will ask for, with its VAT when it carries one. */
+/** What a row will ask for: an amount is final as typed. */
 function rowAmount(
   row: FirstPaymentFormRow,
-  total: number | null,
-  timing: InstallmentVatTiming | null,
+  rateBase: number | null,
 ): number | null {
   if (row.lockedAmount !== null) return row.lockedAmount
   const value = firstPaymentValue(row)
   if (!value) return null
-  if (value.rate !== null && !total) return null
-  const base =
-    value.rate !== null
-      ? rateHalalas(toHalalas(total as number), value.rate)
-      : toHalalas(value.amount as number)
-  return fromHalalas(withVatHalalas(base, timing))
+  if (value.rate === null) return value.amount
+  return rateBase
+    ? fromHalalas(rateHalalas(toHalalas(rateBase), value.rate))
+    : null
 }
 
 /**
@@ -59,8 +54,7 @@ function rowAmount(
 export function InstallmentFirstPayments({
   rows,
   onChange,
-  total,
-  timing,
+  rateBase,
   today,
   termsLocked,
   showErrors,
@@ -68,9 +62,8 @@ export function InstallmentFirstPayments({
 }: {
   rows: readonly FirstPaymentFormRow[]
   onChange: (rows: FirstPaymentFormRow[]) => void
-  /** The typed contract total, for a percentage. */
-  total: number | null
-  timing: InstallmentVatTiming | null
+  /** What a percentage is of (`rateBaseOf`). */
+  rateBase: number | null
   today: string
   /** An installment has money: what is divided is fixed. */
   termsLocked: boolean
@@ -104,10 +97,10 @@ export function InstallmentFirstPayments({
             const valueFixed = disabled || hasMoney || termsLocked
             const paidNow = row.paid && !hasMoney
             const error = showErrors ? firstPaymentRowError(row, today) : null
-            const amount = rowAmount(row, total, timing)
+            const amount = rowAmount(row, rateBase)
             // A paid percentage stays the amount it was paid as when the
             // total changes: the row then shows that amount.
-            const kept = hasMoney ? firstPaymentPlanValue(row, total) : null
+            const kept = hasMoney ? firstPaymentPlanValue(row, rateBase) : null
             const asAmount = row.kind === 'rate' && kept?.amount != null
             const kind = asAmount ? 'amount' : row.kind
             return (

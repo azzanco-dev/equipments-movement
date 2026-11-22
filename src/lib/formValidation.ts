@@ -26,11 +26,9 @@ import {
   INSTALLMENT_FIRST_PAYMENT_NOTE_MAX,
   INSTALLMENT_FIRST_PAYMENT_TITLE_MAX,
   INSTALLMENT_VAT_CHOICES,
-  INSTALLMENT_VAT_TIMINGS,
   type FirstPaymentFormRow,
   type InstallmentContractFormValues,
   type InstallmentVatMode,
-  type InstallmentVatTiming,
 } from '@/lib/installmentPlan'
 import {
   COMMERCIAL_REGISTER_PATTERN,
@@ -1065,7 +1063,13 @@ export function focusFieldControl(
     `[data-field="${CSS.escape(name)}"]`,
   )
   if (!container) return false
-  const control = container.querySelector<HTMLElement>(FOCUSABLE) ?? container
+  let control = container.querySelector<HTMLElement>(FOCUSABLE) ?? container
+  // A field drawn twice (a desktop and a phone control): the one on screen.
+  if (control !== container && control.getClientRects?.().length === 0)
+    control =
+      Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE)).find(
+        (element) => element.getClientRects().length > 0,
+      ) ?? control
   control.focus({ preventScroll: true })
   container.scrollIntoView({ block: 'center' })
   return true
@@ -1352,13 +1356,6 @@ const optionalInstallmentAmount = z
     message('instAmountFormat'),
   )
 
-/**
- * «عقد جديد» / «تعديل العقد» (save_installment_contract, 0203): the title,
- * the financier, the total and the first due date are required; the money
- * terms then pass `checkInstallmentTerms`, the mirror of the database's
- * `assert_installment_terms`, and its token's message goes under the field
- * it is about. The units are optional. The database re-checks every rule.
- */
 /** 0208: an optional Saudi IBAN, typed with or without spaces. */
 const installmentIban = z
   .string()
@@ -1395,8 +1392,8 @@ export function firstPaymentRowError(
 
 /**
  * «عقد جديد» / «تعديل العقد» (save_installment_contract, 0209): the title,
- * the financier, the amounts, the VAT (a required choice; exclusive asks
- * when it is paid), the first payments, the division — whose first date may
+ * the financier, the one typed total, the VAT (a required choice of three;
+ * a separate one has its row), the first payments, the division — whose first date may
  * be empty — and the account. The arithmetic is `buildInstallmentPlan`'s,
  * with the database's tokens.
  */
@@ -1426,9 +1423,14 @@ export function installmentContractFormSchema(today: string) {
             INSTALLMENT_VAT_CHOICES.includes(value as InstallmentVatMode),
           message('instErrVat'),
         ),
-      vat_timing: z.string(),
+      vat_title: z.string(),
+      vat_note: z.string(),
       vat_amount: z.string(),
+      vat_due: z.string(),
       vat_due_date: z.string(),
+      vat_paid: z.boolean(),
+      vat_paid_on: z.string(),
+      vat_method: z.string(),
       payments: z.custom<FirstPaymentFormRow[]>(Array.isArray),
       balloon_amount: optionalInstallmentAmount,
       installment_count: z
@@ -1468,24 +1470,26 @@ export function installmentContractFormSchema(today: string) {
           path: [field],
           message: key,
         })
-      if (form.vat_mode === 'exclusive') {
-        if (
-          !INSTALLMENT_VAT_TIMINGS.includes(
-            form.vat_timing as InstallmentVatTiming,
-          )
-        ) {
-          refuse('vat_timing', 'instErrVatTiming')
+      if (form.vat_mode === 'separate') {
+        if (form.vat_amount.trim() && !parseInstallmentAmount(form.vat_amount)) {
+          refuse('vat_amount', 'instErrVatAmount')
           return
         }
-        if (form.vat_timing === 'end') {
-          if (form.vat_amount.trim() && !parseInstallmentAmount(form.vat_amount)) {
-            refuse('vat_amount', 'instErrVatAmount')
+        if (form.vat_paid) {
+          if (!DATE_KEY.test(form.vat_paid_on)) {
+            refuse('vat_paid_on', 'instPaidOnRequired')
             return
           }
-          if (form.vat_due_date && !DATE_KEY.test(form.vat_due_date)) {
-            refuse('vat_due_date', 'instErrVatDate')
+          if (form.vat_paid_on > today) {
+            refuse('vat_paid_on', 'instErrPaidOn')
             return
           }
+        } else if (
+          form.vat_due === 'date' &&
+          !DATE_KEY.test(form.vat_due_date)
+        ) {
+          refuse('vat_due_date', 'instErrVatDate')
+          return
         }
       }
       if (

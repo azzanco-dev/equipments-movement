@@ -6,13 +6,16 @@ import { formatDate } from '@/lib/dateFormat'
 import {
   daysUntilDue,
   formatInstallmentAmount,
+  fromHalalas,
   toHalalas,
 } from '@/lib/installments'
-import { vatHalalas } from '@/lib/installmentPlan'
+import { vatInsideHalalas } from '@/lib/installmentPlan'
 import {
   amountOf,
   isSchedulePaid,
+  payableRowLabel,
   scheduleRemaining,
+  sumAmounts,
   type InstallmentContractRow,
   type InstallmentScheduleItem,
 } from '@/lib/installmentsView'
@@ -100,6 +103,7 @@ export function FirstPaymentsCard({
   contract,
   rows,
   today,
+  paidOn,
   canAct,
   onPay,
   onSetDate,
@@ -107,6 +111,8 @@ export function FirstPaymentsCard({
   contract: InstallmentContractRow
   rows: readonly InstallmentScheduleItem[]
   today: string
+  /** The day a row was paid, for one paid without a day. */
+  paidOn: (row: InstallmentScheduleItem) => string | null
   /** installments.manage and an active contract. */
   canAct: boolean
   onPay: (row: InstallmentScheduleItem) => void
@@ -131,22 +137,38 @@ export function FirstPaymentsCard({
           const partial = partlyPaid(row)
           const days = row.due_date ? daysUntilDue(row.due_date, today) : null
           const rated = row.rate !== null && row.rate !== undefined
+          const inside = vatInsideHalalas(toHalalas(amountOf(row.amount)))
           const parts = [
             rated
-              ? t('instFpRateOfContract').replace(
-                  '{rate}',
-                  String(amountOf(row.rate)),
-                )
+              ? contract.vat_mode === 'separate'
+                ? t('instRateOfBase')
+                    .replace('{rate}', String(amountOf(row.rate)))
+                    .replace(
+                      '{amount}',
+                      money(
+                        sumAmounts([
+                          contract.total_amount,
+                          -amountOf(contract.vat_amount),
+                        ]),
+                      ),
+                    )
+                : t('instFpRateOfContract').replace(
+                    '{rate}',
+                    String(amountOf(row.rate)),
+                  )
               : t('instFpKindAmount'),
-            ...(contract.vat_mode === 'exclusive'
+            ...(contract.vat_mode === 'inside'
               ? [
                   t('instBeforeVat').replace(
                     '{amount}',
-                    money(row.base_amount),
+                    money(
+                      fromHalalas(toHalalas(amountOf(row.amount)) - inside),
+                    ),
                   ),
-                  ...(contract.vat_timing === 'each'
-                    ? [t('instVatPart').replace('{amount}', money(row.vat_amount))]
-                    : []),
+                  t('instVatPart').replace(
+                    '{amount}',
+                    money(fromHalalas(inside)),
+                  ),
                 ]
               : []),
           ]
@@ -160,7 +182,7 @@ export function FirstPaymentsCard({
                   {row.note && <span className="block">{row.note}</span>}
                 </>
               }
-              date={row.due_date}
+              date={row.due_date ?? (paid ? paidOn(row) : null)}
               late={running && !paid && days !== null && days < 0}
               amountLabel={t('instFpDue')}
               amount={amountOf(row.amount)}
@@ -217,45 +239,57 @@ export function FirstPaymentsCard({
   )
 }
 
-/** «دفعة الضريبة» of a contract whose VAT is paid at the end. Its row
- *  exists once it has a day; until then the contract says what it will be. */
+/** «دفعة الضريبة» of a contract whose VAT is paid by itself: payable and
+ *  datable like a first payment, before the first due date too. */
 export function VatPaymentCard({
   contract,
   row,
   today,
+  paidOn,
   canAct,
   onPay,
+  onSetDate,
 }: {
   contract: InstallmentContractRow
-  row: InstallmentScheduleItem | null
+  row: InstallmentScheduleItem
   today: string
+  /** The day it was paid, for a row paid without a day. */
+  paidOn: string | null
   canAct: boolean
   onPay: (row: InstallmentScheduleItem) => void
+  onSetDate: (row: InstallmentScheduleItem) => void
 }) {
   const { t } = useI18n()
   const running = contract.status !== 'cancelled'
-  const date = row?.due_date ?? null
-  const paid = !!row && isSchedulePaid(row)
-  const partial = !!row && partlyPaid(row)
+  const paid = isSchedulePaid(row)
+  const partial = partlyPaid(row)
+  const date = row.due_date
   const days = date ? daysUntilDue(date, today) : null
-  const total = amountOf(contract.total_amount)
-  const automatic =
-    toHalalas(amountOf(contract.vat_amount)) === vatHalalas(toHalalas(total))
+  const total = toHalalas(amountOf(contract.total_amount))
+  const vat = toHalalas(amountOf(contract.vat_amount))
+  const automatic = vat === vatInsideHalalas(total)
+  const withLast = contract.vat_due === 'last'
   return (
     <Card className="space-y-3 p-4">
       <SectionHeader title={t('instVatPayment')} />
       <ul>
         <PayableRowCard
-          title={t('instVatOfContract')}
-          sub={t(automatic ? 'instVatRateOf' : 'instVatTypedOf').replace(
-            '{amount}',
-            formatInstallmentAmount(total),
-          )}
-          date={date}
+          title={row.title ? payableRowLabel(row, t) : t('instVatOfContract')}
+          sub={
+            <>
+              {t(automatic ? 'instVatRateOf' : 'instVatTypedOf').replace(
+                '{amount}',
+                formatInstallmentAmount(fromHalalas(total - vat)),
+              )}
+              {row.note && <span className="block">{row.note}</span>}
+            </>
+          }
+          // Paid: the day it was paid, its planned day is past use.
+          date={paid ? (paidOn ?? date) : date}
           late={running && !paid && days !== null && days < 0}
           amountLabel={t('instFpDue')}
-          amount={amountOf(row ? row.amount : contract.vat_amount)}
-          remaining={row && partial ? scheduleRemaining(row) : undefined}
+          amount={amountOf(row.amount)}
+          remaining={partial ? scheduleRemaining(row) : undefined}
           badges={
             running ? (
               <>
@@ -263,13 +297,13 @@ export function VatPaymentCard({
                   <Badge size="sm" tone="success">
                     {t('instFpPaid')}
                   </Badge>
-                ) : days === null ? (
-                  <Badge size="sm" tone="warning">
-                    {t('instAwaitingInstallmentsDate')}
-                  </Badge>
-                ) : days >= 0 && !contract.vat_due_date ? (
+                ) : withLast && (days === null || days >= 0) ? (
                   <Badge size="sm" tone="info">
                     {t('instWithLast')}
+                  </Badge>
+                ) : days === null ? (
+                  <Badge size="sm" tone="warning">
+                    {t('instFpWaitsDate')}
                   </Badge>
                 ) : (
                   <WhenBadge days={days} />
@@ -283,10 +317,21 @@ export function VatPaymentCard({
             ) : undefined
           }
           actions={
-            row && canAct && !paid ? (
-              <Button size="sm" variant="outline" onClick={() => onPay(row)}>
-                {t('instPayRow')}
-              </Button>
+            canAct && !paid ? (
+              <>
+                <Button size="sm" variant="outline" onClick={() => onPay(row)}>
+                  {t('instPayRow')}
+                </Button>
+                {!date && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onSetDate(row)}
+                  >
+                    {t('instSetDate')}
+                  </Button>
+                )}
+              </>
             ) : undefined
           }
         />

@@ -1,18 +1,25 @@
 import type { ReactNode } from 'react'
+import { Badge } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import { formatDate } from '@/lib/dateFormat'
 import {
   formatInstallmentAmount,
   INSTALLMENT_ERROR_KEYS,
   INSTALLMENT_FREQUENCY_LABEL_KEYS,
+  INSTALLMENT_PAYMENT_METHOD_LABEL_KEYS,
   type InstallmentFrequency,
 } from '@/lib/installments'
 import {
   buildInstallmentPlan,
+  firstPaymentPlanValue,
   planInputOf,
+  rateBaseOf,
   type InstallmentContractFormValues,
 } from '@/lib/installmentPlan'
-import { installmentsWords } from '@/lib/installmentsView'
+import {
+  installmentsWords,
+  parseInstallmentAmount,
+} from '@/lib/installmentsView'
 import { Money, PeriodRange } from './cells'
 
 function Line({
@@ -41,36 +48,55 @@ function Line({
 }
 
 /**
- * The body of «حسبة العقد» (owner 2026-11-22): what the database will store
- * for the typed values, as they are typed (`buildInstallmentPlan` mirrors
- * it) — the total with its VAT, each first payment with its state, what is
- * left to divide, the VAT row, then the installment, the last and the term.
+ * The body of «حسبة العقد» (owner 2026-11-22, «يكفي في العرض الجانبي»): what
+ * the database will store for the typed values, as they are typed
+ * (`buildInstallmentPlan` mirrors it) — the one typed total with what of it
+ * is VAT, each first payment, a VAT paid by itself, what is left to divide,
+ * then the installment, the last and the term.
  */
 export function InstallmentPlanSummary({
   values,
+  vatSettled = false,
 }: {
   values: InstallmentContractFormValues
+  /** The stored VAT row is fully paid. */
+  vatSettled?: boolean
 }) {
   const { t, lang } = useI18n()
+  if (!values.vat_mode)
+    return (
+      <p className="rounded-xl bg-surface p-3 text-xs text-muted">
+        {t('instCalcPickVat')}
+      </p>
+    )
   const planned = planInputOf(values)
-  if (!planned)
-    return <p className="text-sm text-muted">{t('instCalcEmpty')}</p>
+  if (!planned) {
+    const badVat =
+      values.vat_mode === 'separate' &&
+      !!values.vat_amount.trim() &&
+      parseInstallmentAmount(values.vat_amount) === null
+    return (
+      <p className={badVat ? 'text-sm text-danger' : 'text-sm text-muted'}>
+        {t(badVat ? 'instErrVatAmount' : 'instCalcEmpty')}
+      </p>
+    )
+  }
   const { plan, error } = buildInstallmentPlan(planned.input)
   if (!plan)
     return (
       <p className="text-sm text-danger">{t(INSTALLMENT_ERROR_KEYS[error])}</p>
     )
 
-  const exclusive = values.vat_mode === 'exclusive'
-  const each = exclusive && values.vat_timing === 'each'
+  const inside = values.vat_mode === 'inside'
+  const separate = values.vat_mode === 'separate'
+  const unspecified = values.vat_mode === 'unspecified'
   const money = formatInstallmentAmount
   const split = (base: number, vat: number) =>
-    exclusive
-      ? [
-          t('instBeforeVat').replace('{amount}', money(base)),
-          ...(each ? [t('instVatPart').replace('{amount}', money(vat))] : []),
-        ].join(' · ')
-      : undefined
+    [
+      t('instBeforeVat').replace('{amount}', money(base)),
+      t('instVatPart').replace('{amount}', money(vat)),
+    ].join(' · ')
+  const rateBase = rateBaseOf(values)
   const count = planned.input.installmentCount
   const last = plan.rows[plan.rows.length - 1]
 
@@ -78,13 +104,12 @@ export function InstallmentPlanSummary({
     <div className="space-y-2">
       <div className="rounded-xl bg-surface p-3">
         <p className="text-xs text-muted">
-          {t(exclusive ? 'instCalcTotalWithVat' : 'instContractTotal')}
+          {t(unspecified ? 'instContractTotal' : 'instCalcTotal')}
         </p>
-        <Money value={plan.payable} className="text-2xl font-bold" />
-        {exclusive && (
+        <Money value={plan.total} className="text-2xl font-bold" />
+        {plan.vat > 0 && (
           <p className="text-xs text-muted">
-            {t('instBeforeVat').replace('{amount}', money(plan.total))} ·{' '}
-            {t('instVatPart').replace('{amount}', money(plan.vat))}
+            {split(plan.beforeVat, plan.vat)}
           </p>
         )}
       </div>
@@ -95,12 +120,28 @@ export function InstallmentPlanSummary({
         {plan.payments.map((payment, index) => {
           const row = values.payments[planned.rowIndexes[index]]
           const paid = row.settled || (row.paid && row.lockedAmount === null)
+          const rate = firstPaymentPlanValue(row, rateBase)?.rate ?? null
+          const of =
+            rate === null
+              ? null
+              : separate
+                ? t('instRateOfBase')
+                    .replace('{rate}', String(rate))
+                    .replace('{amount}', money(rateBase))
+                : t('instRateOfTotal').replace('{rate}', String(rate))
           return (
             <Line
               key={row.key}
               title={row.title || t('instFirstPayment')}
               amount={payment.amount}
-              sub={split(payment.base, payment.vat)}
+              sub={
+                (of || inside) && (
+                  <>
+                    {of && <span className="block">{of}</span>}
+                    {inside && split(payment.base, payment.vat)}
+                  </>
+                )
+              }
               state={
                 paid ? (
                   <span className="text-xs font-normal text-success">
@@ -122,23 +163,45 @@ export function InstallmentPlanSummary({
         <Line
           title={t('instCalcLeft')}
           amount={plan.installments.amount}
-          sub={split(plan.installments.base, plan.installments.vat)}
+          sub={
+            inside
+              ? split(plan.installments.base, plan.installments.vat)
+              : separate
+                ? t('instNoVatOnIt')
+                : undefined
+          }
         />
-        {exclusive && values.vat_timing === 'end' && (
+        {separate && (
           <Line
-            title={t('instVatPayment')}
+            title={values.vat_title.trim() || t('instVatPayment')}
             amount={plan.vat}
             state={
-              <span className="text-xs font-normal text-info">
-                {t('instVatAtEndShort')}
-              </span>
+              values.vat_paid || vatSettled ? (
+                <span className="text-xs font-normal text-success">
+                  {t('instFpPaid')}
+                </span>
+              ) : values.vat_due === 'last' ? (
+                <span className="text-xs font-normal text-info">
+                  {t('instWithLast')}
+                </span>
+              ) : plan.vatDueDate ? (
+                <bdi dir="ltr" className="text-xs font-normal text-muted">
+                  {formatDate(plan.vatDueDate)}
+                </bdi>
+              ) : (
+                <span className="text-xs font-normal text-warning">
+                  {t('instFpWaitsDate')}
+                </span>
+              )
             }
             sub={
-              values.vat_due_date ? (
-                <bdi dir="ltr">{formatDate(values.vat_due_date)}</bdi>
-              ) : (
-                t('instWithLast')
-              )
+              values.vat_paid && values.vat_paid_on ? (
+                <>
+                  {t(INSTALLMENT_PAYMENT_METHOD_LABEL_KEYS[values.vat_method])}
+                  {' · '}
+                  <bdi dir="ltr">{formatDate(values.vat_paid_on)}</bdi>
+                </>
+              ) : undefined
             }
           />
         )}
@@ -187,6 +250,14 @@ export function InstallmentPlanSummary({
             )}
           </dd>
         </div>
+        {unspecified && (
+          <div className="flex items-center justify-between gap-2">
+            <dt className="text-muted">{t('instVatLabel')}</dt>
+            <dd>
+              <Badge size="sm">{t('instVatUnspecified')}</Badge>
+            </dd>
+          </div>
+        )}
       </dl>
     </div>
   )

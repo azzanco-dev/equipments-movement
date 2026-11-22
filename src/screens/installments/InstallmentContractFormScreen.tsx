@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { ChevronDown, Clock, FileText, Lock, X } from 'lucide-react'
+import { ChevronDown, Clock, FileText, Info, Lock, X } from 'lucide-react'
 import type { AsyncSearchSelectOption } from '@/components/AsyncSearchSelect'
 import { AsyncMultiSelect } from '@/components/data-list/AsyncMultiSelect'
 import { BankAccountFields } from '@/components/installments/BankAccountFields'
@@ -17,6 +17,7 @@ import {
 } from '@/components/installments/InstallmentContractFiles'
 import { InstallmentFirstPayments } from '@/components/installments/InstallmentFirstPayments'
 import { InstallmentPlanSummary } from '@/components/installments/InstallmentPlanSummary'
+import { InstallmentVatRow } from '@/components/installments/InstallmentVatRow'
 import {
   AmountHint,
   Money,
@@ -26,6 +27,7 @@ import { setInstallmentFlash } from '@/components/installments/flash'
 import { useLoad } from '@/components/installments/useLoad'
 import { useTabTitle } from '@/components/TabTitle'
 import {
+  Badge,
   Button,
   Card,
   DatePicker,
@@ -63,32 +65,27 @@ import {
 import type { DraftInstallmentFile } from '@/lib/installmentFiles'
 import { uploadDraftInstallmentFiles } from '@/lib/installmentFilesData'
 import {
-  fromHalalas,
   installmentErrorMessage,
-  toHalalas,
   INSTALLMENT_DESCRIPTION_MAX,
   INSTALLMENT_FREQUENCIES,
   INSTALLMENT_FREQUENCY_LABEL_KEYS,
   INSTALLMENT_NOTES_MAX,
 } from '@/lib/installments'
 import {
-  buildInstallmentPlan,
   contractFormValues,
   emptyContractForm,
   firstPaymentsPayload,
   mergeStoredForm,
   planInputOf,
-  vatHalalas,
+  rateBaseOf,
   vatPayload,
   INSTALLMENT_CONTRACT_FIELD_ORDER,
   INSTALLMENT_CONTRACT_TOKEN_FIELDS,
   INSTALLMENT_VAT_CHOICES,
+  INSTALLMENT_VAT_HINT_KEYS,
   INSTALLMENT_VAT_LABEL_KEYS,
-  INSTALLMENT_VAT_TIMINGS,
-  INSTALLMENT_VAT_TIMING_LABEL_KEYS,
   type InstallmentContractFormValues,
   type InstallmentVatMode,
-  type InstallmentVatTiming,
 } from '@/lib/installmentPlan'
 import {
   fetchInstallmentContractForEdit,
@@ -97,7 +94,6 @@ import {
   saveInstallmentContract,
 } from '@/lib/installmentsData'
 import {
-  amountInputText,
   amountOf,
   installmentErrorToken,
   installmentFieldError,
@@ -121,20 +117,6 @@ interface StoredContract {
   editKey: string
 }
 
-const VAT_SHORT_KEYS: Record<InstallmentVatMode, TranslationKey> = {
-  unspecified: 'instVatUnspecified',
-  inclusive: 'instVatShortInclusive',
-  exclusive: 'instVatExclusive',
-  exempt: 'instVatShortExempt',
-}
-const TIMING_SHORT_KEYS: Record<InstallmentVatTiming, TranslationKey> = {
-  each: 'instVatEachShort',
-  end: 'instVatEndShort',
-}
-const TIMING_HINT_KEYS: Record<InstallmentVatTiming, TranslationKey> = {
-  each: 'instVatEachHint',
-  end: 'instVatEndHint',
-}
 /** A card on a wider screen, plain sections on a phone (the drawing). */
 const SECTION = 'space-y-3 p-4 max-sm:border-0 max-sm:p-0 max-sm:shadow-none'
 
@@ -149,7 +131,8 @@ export interface InstallmentContractFormScreenProps {
 /**
  * «عقد جديد» / «تعديل العقد» as a page of its own (owner 2026-11-22, «خلي
  * اضافة العقد في صفحة مستقلة»; Figma «الدفعات والضريبة / صفحة عقد جديد»;
- * migration 0209): the contract, its VAT and when that is paid, the first
+ * migration 0209): the contract, its ONE typed total with the VAT in three
+ * options (redrawn and approved the same day, «الضريبة المعدلة»), the first
  * payments, the installments — whose first date may wait —, the files, the
  * account, the units, beside «حسبة العقد» as it is typed. Saved in ONE
  * `save_installment_contract` call (`installments.manage`).
@@ -292,8 +275,6 @@ function ContractForm({
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(0)
   const [showCalc, setShowCalc] = useState(false)
-  // The VAT amount while it is typed: an empty field must stay empty.
-  const [vatText, setVatText] = useState<string | null>(null)
 
   const financiersLoader = useCallback(
     (signal: AbortSignal) => fetchInstallmentFinanciers(signal),
@@ -306,9 +287,8 @@ function ContractForm({
   const vatRowPaid = !!stored?.schedule.some(
     (row) => row.kind === 'vat' && amountOf(row.paid_amount) > 0,
   )
-  // A stored VAT is fixed with the terms, or once its own row has money.
-  const vatFixed = !!contract?.vat_timing && (termsLocked || vatRowPaid)
-  // Its day may move until the VAT is fully paid.
+  const storedSeparate = contract?.vat_mode === 'separate'
+  // Its day may move until it is fully paid.
   const vatSettled = !!stored?.schedule.some(
     (row) => row.kind === 'vat' && isSchedulePaid(row),
   )
@@ -368,19 +348,40 @@ function ContractForm({
   )
 
   const total = parseInstallmentAmount(values.total_amount)
-  const exclusive = values.vat_mode === 'exclusive'
-  const timing = exclusive ? values.vat_timing || null : null
-  const autoVat = total
-    ? amountInputText(fromHalalas(vatHalalas(toHalalas(total))))
-    : ''
-  const planned = planInputOf(values)
-  const payable = planned
-    ? (buildInstallmentPlan(planned.input).plan?.payable ?? null)
-    : null
+  // What a percentage is of depends on the VAT: unknown until it is chosen.
+  const rateBase = values.vat_mode ? rateBaseOf(values) : null
   const modes: readonly InstallmentVatMode[] =
     initial.vat_mode === 'unspecified'
-      ? [...INSTALLMENT_VAT_CHOICES, 'unspecified']
+      ? ['unspecified', ...INSTALLMENT_VAT_CHOICES]
       : INSTALLMENT_VAT_CHOICES
+  // A paid VAT stays; a paid installment allows only what moves no amount.
+  const modeBlocked = (mode: InstallmentVatMode) =>
+    mode !== values.vat_mode &&
+    (vatRowPaid || (termsLocked && (storedSeparate || mode === 'separate')))
+  const chooseMode = (mode: string) => {
+    set('vat_mode', mode as InstallmentVatMode)
+    setErrors((current) =>
+      clearFieldErrors(current, [
+        'vat_amount',
+        'vat_due_date',
+        'vat_paid_on',
+        'payments',
+      ]),
+    )
+  }
+  const setVat = (patch: Partial<Values>) => {
+    setValues((current) => ({ ...current, ...patch }))
+    setErrors((current) =>
+      clearFieldErrors(current, [
+        ...(Object.keys(patch) as (keyof Values)[]),
+        // Choosing when it is due, or «مدفوعة», changes which day is asked.
+        ...('vat_due' in patch || 'vat_paid' in patch
+          ? (['vat_due_date', 'vat_paid_on'] as const)
+          : []),
+      ]),
+    )
+    setFormError(null)
+  }
 
   /** `contract_changed`: what is stored takes the place of the terms on
    *  the page; the free fields the user changed stay. */
@@ -409,7 +410,6 @@ function ContractForm({
       ])
       setErrors({})
       setCheckRows(false)
-      setVatText(null)
     } catch {
       // The refusal's message shows; the next save is refused and reads again.
     }
@@ -446,7 +446,7 @@ function ContractForm({
       vat: vatPayload(values),
       firstPayments: firstPaymentsPayload(
         values.payments,
-        typed.input.totalAmount,
+        rateBase,
       ),
       expectedKey: stored?.editKey ?? null,
       notes: values.notes,
@@ -645,12 +645,18 @@ function ContractForm({
           </Card>
 
           <Card className={SECTION}>
-            <SectionHeader title={t('instFormTermsSection')} />
+            <SectionHeader
+              title={t('instFormTermsSection')}
+              action={
+                values.vat_mode === 'unspecified' ? (
+                  <Badge size="sm">{t('instVatUnspecified')}</Badge>
+                ) : undefined
+              }
+            />
             <div className="grid gap-4 sm:grid-cols-2">
               {amountField(
                 'total_amount',
                 t('instContractTotal'),
-                exclusive ? t('instBeforeVatHint') : undefined,
               )}
               {amountField(
                 'down_payment',
@@ -662,185 +668,105 @@ function ContractForm({
               name="vat_mode"
               label={t('instVatLabel')}
               error={errorOf('vat_mode')}
-              hint={t('instVatHint')}
+              hint={
+                values.vat_mode
+                  ? t(INSTALLMENT_VAT_HINT_KEYS[values.vat_mode])
+                  : undefined
+              }
             >
               {(labelId) => (
-                <Tabs
-                  value={values.vat_mode}
-                  onValueChange={(mode) => {
-                    set('vat_mode', mode as InstallmentVatMode)
-                    setErrors((current) =>
-                      clearFieldErrors(current, ['vat_timing', 'payments']),
-                    )
-                  }}
-                  // Nothing is chosen on a new contract, so a click chooses.
-                  activationMode="manual"
-                >
-                  <TabsList
-                    variant="segmented"
+                <>
+                  <Tabs
+                    className="hidden sm:block"
+                    value={values.vat_mode}
+                    onValueChange={chooseMode}
+                    // Nothing is chosen on a new contract: a click chooses.
+                    activationMode="manual"
+                  >
+                    <TabsList
+                      variant="segmented"
+                      aria-labelledby={labelId}
+                      className="w-full"
+                    >
+                      {modes.map((mode) => (
+                        <TabsTrigger
+                          key={mode}
+                          value={mode}
+                          disabled={modeBlocked(mode)}
+                          className={cn(
+                            'justify-center',
+                            // Each takes the room its words need (English is long).
+                            'flex-auto',
+                            PRIMARY_ACTIVE_TRIGGER,
+                          )}
+                        >
+                          {t(INSTALLMENT_VAT_LABEL_KEYS[mode])}
+                        </TabsTrigger>
+                      ))}
+                    </TabsList>
+                  </Tabs>
+                  {/* On a phone the whole labels, one under the other. */}
+                  <RadioGroup
                     aria-labelledby={labelId}
-                    // An earlier contract has a fourth choice: two a row on a
-                    // phone.
-                    className={cn(
-                      'w-full',
-                      modes.length > 3 && 'max-sm:grid max-sm:grid-cols-2',
-                    )}
+                    className="sm:hidden"
+                    value={values.vat_mode}
+                    onValueChange={chooseMode}
                   >
                     {modes.map((mode) => (
-                      <TabsTrigger
+                      <label
                         key={mode}
-                        value={mode}
-                        disabled={
-                          mode !== values.vat_mode &&
-                          (vatFixed || (termsLocked && mode === 'exclusive'))
-                        }
                         className={cn(
-                          'min-w-0 flex-1 justify-center',
-                          PRIMARY_ACTIVE_TRIGGER,
+                          'flex min-h-11 items-center gap-2.5 rounded-lg border px-3 py-2 text-sm',
+                          values.vat_mode === mode
+                            ? 'border-primary bg-surface font-semibold'
+                            : 'bg-bg',
+                          modeBlocked(mode) && 'opacity-50',
                         )}
                       >
-                        <span className="sm:hidden">
-                          {t(VAT_SHORT_KEYS[mode])}
-                        </span>
-                        <span className="hidden sm:inline">
-                          {t(INSTALLMENT_VAT_LABEL_KEYS[mode])}
-                        </span>
-                      </TabsTrigger>
+                        <RadioGroupItem
+                          value={mode}
+                          disabled={modeBlocked(mode)}
+                        />
+                        {t(INSTALLMENT_VAT_LABEL_KEYS[mode])}
+                      </label>
                     ))}
-                  </TabsList>
-                </Tabs>
+                  </RadioGroup>
+                </>
               )}
             </Group>
-            {exclusive && (
-              <div className="space-y-3 rounded-xl border p-3 max-sm:border-0 max-sm:p-0">
-                <Group
-                  name="vat_timing"
-                  label={t('instVatWhen')}
-                  error={errorOf('vat_timing')}
-                >
-                  {(labelId) => (
-                    <>
-                      <RadioGroup
-                        aria-labelledby={labelId}
-                        className="hidden grid-cols-2 gap-2 sm:grid"
-                        disabled={vatFixed || termsLocked}
-                        value={values.vat_timing}
-                        onValueChange={(value) =>
-                          set('vat_timing', value as InstallmentVatTiming)
-                        }
-                      >
-                        {INSTALLMENT_VAT_TIMINGS.map((value) => (
-                          <label
-                            key={value}
-                            className={cn(
-                              'flex cursor-pointer items-start gap-2.5 rounded-lg border p-3',
-                              values.vat_timing === value
-                                ? 'border-primary bg-surface'
-                                : 'bg-bg hover:bg-surface-hover',
-                            )}
-                          >
-                            <RadioGroupItem value={value} className="mt-0.5" />
-                            <span className="min-w-0">
-                              <span className="block text-sm font-semibold">
-                                {t(INSTALLMENT_VAT_TIMING_LABEL_KEYS[value])}
-                              </span>
-                              <span className="block text-xs text-muted">
-                                {t(TIMING_HINT_KEYS[value])}
-                              </span>
-                            </span>
-                          </label>
-                        ))}
-                      </RadioGroup>
-                      <Tabs
-                        className="sm:hidden"
-                        activationMode="manual"
-                        value={values.vat_timing}
-                        onValueChange={(value) =>
-                          set('vat_timing', value as InstallmentVatTiming)
-                        }
-                      >
-                        <TabsList
-                          variant="segmented"
-                          aria-labelledby={labelId}
-                          className="w-full"
-                        >
-                          {INSTALLMENT_VAT_TIMINGS.map((value) => (
-                            <TabsTrigger
-                              key={value}
-                              value={value}
-                              disabled={vatFixed || termsLocked}
-                              className="flex-1 justify-center"
-                            >
-                              {t(TIMING_SHORT_KEYS[value])}
-                            </TabsTrigger>
-                          ))}
-                        </TabsList>
-                      </Tabs>
-                    </>
-                  )}
-                </Group>
-                {timing === 'end' && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field
-                      name="vat_amount"
-                      label={t('instVatAmountLabel')}
-                      required
-                      error={errorOf('vat_amount')}
-                      hint={t('instVatAmountHint')}
-                    >
-                      {(control) => (
-                        <Input
-                          {...control}
-                          dir="ltr"
-                          inputMode="decimal"
-                          disabled={vatFixed || termsLocked}
-                          value={vatText ?? (values.vat_amount || autoVat)}
-                          onFocus={() =>
-                            setVatText(values.vat_amount || autoVat)
-                          }
-                          onBlur={() => setVatText(null)}
-                          onChange={(event) => {
-                            const text = event.target.value
-                            setVatText(text)
-                            // 15% again = following the total again.
-                            set('vat_amount', text === autoVat ? '' : text)
-                          }}
-                        />
-                      )}
-                    </Field>
-                    <Field
-                      name="vat_due_date"
-                      label={<OptionalLabel text={t('instVatDateLabel')} />}
-                      error={errorOf('vat_due_date')}
-                      hint={t('instVatDateHint')}
-                    >
-                      {(control) => (
-                        <DatePicker
-                          {...control}
-                          disabled={vatSettled}
-                          placeholder={t('instWithLast')}
-                          value={values.vat_due_date}
-                          onChange={(value) => set('vat_due_date', value)}
-                        />
-                      )}
-                    </Field>
-                  </div>
-                )}
-              </div>
+            {(vatRowPaid || (termsLocked && !storedSeparate)) && (
+              <Notice tone="info" size="compact" icon={<Info size={16} />}>
+                {t(vatRowPaid ? 'instVatPaidHint' : 'instVatLockedHint')}
+              </Notice>
+            )}
+            {values.vat_mode === 'separate' && (
+              <InstallmentVatRow
+                values={values}
+                onChange={setVat}
+                errors={errors}
+                today={today}
+                amountFixed={vatRowPaid || (termsLocked && storedSeparate)}
+                hasMoney={vatRowPaid}
+                settled={vatSettled}
+                disabled={saving}
+              />
             )}
           </Card>
 
           <Card className={SECTION}>
             <SectionHeader
               title={t('instFirstPayments')}
-              description={t('instFirstPaymentsHint')}
+              description={t(
+                values.vat_mode === 'separate'
+                  ? 'instFirstPaymentsHintSeparate'
+                  : 'instFirstPaymentsHint',
+              )}
             />
             <div data-field="payments" className="space-y-2">
               <InstallmentFirstPayments
                 rows={values.payments}
                 onChange={(rows) => set('payments', rows)}
-                total={total}
-                timing={timing}
+                rateBase={rateBase}
                 today={today}
                 termsLocked={termsLocked}
                 showErrors={checkRows}
@@ -1061,7 +987,7 @@ function ContractForm({
             <h2 className="text-sm font-semibold">{t('instCalcTitle')}</h2>
             <span className="text-xs text-muted">{t('instCalcLive')}</span>
           </div>
-          <InstallmentPlanSummary values={values} />
+          <InstallmentPlanSummary values={values} vatSettled={vatSettled} />
         </Card>
       </div>
 
@@ -1073,7 +999,7 @@ function ContractForm({
       >
         {showCalc && (
           <div className="mb-3 max-h-[55dvh] overflow-y-auto border-b pb-3">
-            <InstallmentPlanSummary values={values} />
+            <InstallmentPlanSummary values={values} vatSettled={vatSettled} />
           </div>
         )}
         <div className="flex items-center justify-between gap-3">
@@ -1091,10 +1017,10 @@ function ContractForm({
                 className={cn('transition-transform', showCalc && 'rotate-180')}
               />
             </span>
-            {payable === null ? (
+            {total === null ? (
               <span className="text-base font-bold">—</span>
             ) : (
-              <Money value={payable} className="text-base font-bold" />
+              <Money value={total} className="text-base font-bold" />
             )}
           </button>
           {saveButton('h-11 min-w-36')}

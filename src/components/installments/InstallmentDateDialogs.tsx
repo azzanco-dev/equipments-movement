@@ -23,12 +23,13 @@ import {
 import { planDivision } from '@/lib/installmentPlan'
 import {
   setInstallmentFirstDueDate,
-  setInstallmentFirstPaymentDate,
+  setInstallmentPaymentDate,
 } from '@/lib/installmentsData'
 import {
   installmentErrorToken,
   installmentsWords,
   latinDigits,
+  payableRowLabel,
   INSTALLMENT_STALE_TOKENS,
   type InstallmentContractRow,
   type InstallmentScheduleItem,
@@ -257,7 +258,9 @@ export function SetFirstDueDateDialog({
                 </li>
               ),
             )}
-            {contract?.vat_timing === 'end' && plan.vatDueDate && (
+            {contract?.vat_mode === 'separate' &&
+              !contract.vat_settled &&
+              plan.vatDueDate && (
               <li className="flex items-center justify-between gap-3 px-3 py-1.5">
                 <span className="flex items-center gap-2">
                   <bdi dir="ltr">{formatDate(plan.vatDueDate)}</bdi>
@@ -285,14 +288,14 @@ export function SetFirstDueDateDialog({
   )
 }
 
-/** «تحديد تاريخ الدفعة الثانية»: dates one first payment. */
+/** «تحديد تاريخ الدفعة الثانية»: dates a first payment or a separate VAT. */
 export function SetPaymentDateDialog({
   row,
   onOpenChange,
   onDone,
   onStale,
 }: {
-  /** The first payment; null = closed. */
+  /** The first payment or the VAT row; null = closed. */
   row: InstallmentScheduleItem | null
   onOpenChange: (open: boolean) => void
   onDone: () => void
@@ -318,7 +321,7 @@ export function SetPaymentDateDialog({
     if (!date) return setError('instErrFirstPaymentDate')
     setError(null)
     setSaving(true)
-    const result = await setInstallmentFirstPaymentDate(row.id, date)
+    const result = await setInstallmentPaymentDate(row.id, date)
     setSaving(false)
     if (result.error) {
       setError(installmentErrorMessage(result.error))
@@ -339,7 +342,7 @@ export function SetPaymentDateDialog({
       }}
       title={t('instPaymentDateTitle').replace(
         '{title}',
-        () => row?.title ?? t('instFirstPayment'),
+        () => (row ? payableRowLabel(row, t) : ''),
       )}
       footer={
         <>

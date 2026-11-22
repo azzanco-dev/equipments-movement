@@ -6,53 +6,59 @@
 --   * «ارفاق ملف العقد», «حد الملف 5 ميقا»: several files per contract.
 --   * «تحديد الدفعات, ممكن تكون فيه دفعة اولى او دفعتين , وكل دفعة ابغى احدد
 --     اذا كانت مبلغ مقطوع او نسبة», «خليها نفس فكرة اضافة التسعيرات»: rows,
---     a percentage is always of the contract's total.
+--     a percentage is of the contract's total (before a separate VAT).
 --   * «ممكن تاريخ اول قسط مايكون متاح في البداية, فتصير تقسم القسط لما احط
 --     تاريخ اول قسط», «الدفعة الاولى ممكن تندفع, لكن تاريخ اول قسط مايتحدد».
---   * «ابغى احدد اذا كانت الاقساط شاملة الضريبة او غير شاملة», then «اذا كان
---     غير شامل مش معناه اني بحسب كل قسط 15بالمية لكن بعضهم يقول غير شامل ,
---     بحيث مبلغ الضريبة يكون نهاية القسط»: exclusive has two timings.
+--   * «ابغى احدد اذا كانت الاقساط شاملة الضريبة او غير شاملة», settled the
+--     same day on the redrawn design (approved «اعتمد وابني»): «ممكن يكون
+--     المبلغ بدون ضريبة تماما / واذا هو بضريبة فقد يكون ضمن الدفعات والاقساط,
+--     وقد يكو دفعة لحاله», «بسطها» (one question, three options), «ميحتاج
+--     الاجمالي قبل الضريبة وشامل, يكفي في العرض الجانبي, انا بكتب اجمالي
+--     المبلغ فقط» (one typed total).
 --
 -- ===========================================================================
 -- The model
 -- ===========================================================================
 --   installment_schedule holds every payable row, told apart by `kind`:
---     first_payment  a first payment (title, optional rate, base_amount);
+--     first_payment  a first payment (title, optional rate);
 --                    due_date may be NULL; payable whether dated or not.
 --     installment    the generated installments. They exist ONLY while the
 --                    contract has a first_due_date.
---     vat            the one VAT row of «في نهاية الاقساط», once it has a
---                    date (its own, else the last installment's).
+--     vat            the one row of a VAT paid by itself («دفعة لحالها»):
+--                    due_date may be NULL; payable whether dated or not.
 --   seq counts inside a kind, so «القسط 1 من 24» never counts a payment.
 --
 --   installment_contracts:
---     total_amount         as typed (before VAT when exclusive).
+--     total_amount         as typed: EVERYTHING to pay, the VAT included.
 --     down_payment         KEEPS ITS NAME, reads «مدفوع قبل التسجيل»: what
 --                          was paid before the contract was entered, as paid.
---     vat_mode             unspecified (every earlier contract) / inclusive /
---                          exclusive / exempt.
---     vat_timing           exclusive only: each / end.
---     vat_amount           what is added to total_amount: each = 15% of the
---                          total; end = as typed (15% when not given); 0
---                          otherwise. Payable = total_amount + vat_amount.
+--     vat_mode             unspecified (every earlier contract) / none /
+--                          inside (the payments and installments carry it) /
+--                          separate (one row of its own).
+--     vat_amount           the VAT INSIDE total_amount: inside = total x
+--                          15/115; separate = as typed (total x 15/115 when
+--                          not given); 0 otherwise. Never added to anything.
+--     vat_due              separate only: undecided / date (vat_due_date) /
+--                          last (the last installment's day, following it).
 --     installments_amount  what the installments add up to, as payable.
 --
 --   Arithmetic (halalas, ties away from zero):
---     each: every first payment, the final payment and the division are with
---           VAT: installments = total + vat - prepaid - first payments.
---     else: installments = total - prepaid - first payments; `end` adds the
---           VAT row.
---   So for a scheduled contract the rows always add up to
---   payable - prepaid, to the halala.
+--     installments = total - prepaid - first payments - (separate: the VAT).
+--     A first payment's amount and the final payment are final as typed. A
+--     percentage is of the total, of the amount before VAT when the VAT is
+--     separate. The VAT inside a row is computed on read, never stored.
+--   So for a scheduled contract the rows always add up to total - prepaid,
+--   to the halala.
 --
 --   Locks (a posted payment no longer locks the whole contract):
 --     * a first payment with money on it keeps its amount and cannot be
 --       removed (first_payment_locked); its title and note stay editable.
---     * once an installment has money on it, the total, prepaid, VAT, final
+--     * once an installment has money on it, the total, prepaid, final
 --       payment, count, frequency, first due date and the amount to divide
---       are fixed (contract_has_payments).
---     * once the VAT row has money on it, its amount and timing are fixed;
---       its day still follows the installments until it is fully paid.
+--       are fixed (contract_has_payments), and so is a separate VAT: only
+--       none / inside may still be chosen, they move no amount.
+--     * once the VAT row has money on it, it stays and keeps its amount; its
+--       day may move until it is fully paid.
 --
 --   An edit says which version it read (installment_contract_edit_key,
 --   p_expected_key): a save over a contract that changed meanwhile is
@@ -69,7 +75,7 @@
 -- live until the deploy keep working on the contracts they create.
 --
 -- New tokens
---   22023: invalid_vat, invalid_vat_timing, invalid_vat_amount,
+--   22023: invalid_vat, invalid_vat_amount,
 --          invalid_vat_date, invalid_first_payment, invalid_first_payments,
 --          invalid_first_payment_date, invalid_schedule_row,
 --          installments_not_scheduled, invalid_contract_file
@@ -93,10 +99,10 @@ ALTER TABLE public.installment_contracts
   ALTER COLUMN first_due_date DROP NOT NULL,
   ADD COLUMN vat_mode text NOT NULL DEFAULT 'unspecified'
     CONSTRAINT installment_contracts_vat_mode_check
-      CHECK (vat_mode IN ('unspecified', 'inclusive', 'exclusive', 'exempt')),
-  ADD COLUMN vat_timing text
-    CONSTRAINT installment_contracts_vat_timing_check
-      CHECK (vat_timing IN ('each', 'end')),
+      CHECK (vat_mode IN ('unspecified', 'none', 'inside', 'separate')),
+  ADD COLUMN vat_due text
+    CONSTRAINT installment_contracts_vat_due_check
+      CHECK (vat_due IN ('undecided', 'date', 'last')),
   ADD COLUMN vat_amount numeric(14, 2) NOT NULL DEFAULT 0
     CONSTRAINT installment_contracts_vat_amount_check CHECK (vat_amount >= 0),
   ADD COLUMN vat_due_date date,
@@ -114,23 +120,20 @@ ALTER TABLE public.installment_contracts
   ADD CONSTRAINT installment_contracts_installments_amount_check
     CHECK (installments_amount > 0),
   ADD CONSTRAINT installment_contracts_vat_shape CHECK (
-    ((vat_mode = 'exclusive') = (vat_timing IS NOT NULL))
-    AND (vat_mode = 'exclusive' OR vat_amount = 0)
-    AND (vat_due_date IS NULL OR vat_timing IS NOT DISTINCT FROM 'end')
-  ),
-  -- Prepaid is typed as paid, so with VAT it may pass the total before VAT.
-  DROP CONSTRAINT installment_contracts_down_payment_lt_total,
-  ADD CONSTRAINT installment_contracts_prepaid_lt_payable
-    CHECK (down_payment < total_amount + vat_amount),
-  -- The final payment is checked against installments_amount by the function.
-  DROP CONSTRAINT installment_contracts_balloon_shape,
-  ADD CONSTRAINT installment_contracts_balloon_count
-    CHECK (balloon_amount = 0 OR installment_count >= 2);
+    ((vat_mode = 'separate') = (vat_due IS NOT NULL))
+    AND (vat_mode IN ('inside', 'separate') OR vat_amount = 0)
+    AND ((vat_due IS NOT DISTINCT FROM 'date') = (vat_due_date IS NOT NULL))
+    AND vat_amount < total_amount
+  );
 
+COMMENT ON COLUMN public.installment_contracts.total_amount IS
+  '0203, meaning since 0209: everything to pay as typed, the VAT included (vat_amount is inside it).';
+COMMENT ON COLUMN public.installment_contracts.vat_amount IS
+  '0209: the VAT inside total_amount, never added to it.';
 COMMENT ON COLUMN public.installment_contracts.down_payment IS
-  '0203, meaning since 0209: «مدفوع قبل التسجيل», what was paid before the contract was entered, as paid (no VAT is added to it). Counts as paid; no payment row.';
+  '0203, meaning since 0209: «مدفوع قبل التسجيل», what was paid before the contract was entered, as paid. Counts as paid; no payment row.';
 COMMENT ON COLUMN public.installment_contracts.installments_amount IS
-  '0209: what the installments add up to, as payable (with VAT when vat_timing = each), whether they are scheduled yet or not.';
+  '0209: what the installments add up to, as payable, whether they are scheduled yet or not.';
 COMMENT ON COLUMN public.installment_contracts.first_due_date IS
   '0209: NULL = the contract waits for its first due date and has no installment rows yet.';
 
@@ -146,16 +149,16 @@ ALTER TABLE public.installment_schedule
     CONSTRAINT installment_schedule_note_check CHECK (char_length(note) <= 200),
   ADD COLUMN rate numeric(7, 4)
     CONSTRAINT installment_schedule_rate_check CHECK (rate > 0 AND rate < 100),
-  ADD COLUMN base_amount numeric(14, 2),
-  ADD COLUMN vat_amount numeric(14, 2) NOT NULL DEFAULT 0,
   DROP CONSTRAINT installment_schedule_unique,
   ADD CONSTRAINT installment_schedule_unique UNIQUE (contract_id, kind, seq),
   ADD CONSTRAINT installment_schedule_due_check
-    CHECK (due_date IS NOT NULL OR kind = 'first_payment'),
-  ADD CONSTRAINT installment_schedule_first_payment_shape CHECK (
-    CASE WHEN kind = 'first_payment'
-      THEN title IS NOT NULL AND base_amount IS NOT NULL
-      ELSE title IS NULL AND note IS NULL AND rate IS NULL AND base_amount IS NULL
+    CHECK (due_date IS NOT NULL OR kind <> 'installment'),
+  -- A VAT row's title is NULL until it is renamed.
+  ADD CONSTRAINT installment_schedule_kind_shape CHECK (
+    CASE kind
+      WHEN 'first_payment' THEN title IS NOT NULL
+      WHEN 'vat' THEN rate IS NULL
+      ELSE title IS NULL AND note IS NULL AND rate IS NULL
     END
   );
 
@@ -165,24 +168,6 @@ CREATE UNIQUE INDEX installment_schedule_one_vat
 -- ===========================================================================
 -- 2. Small helpers, executable by nobody
 -- ===========================================================================
-CREATE FUNCTION public.installment_with_vat(p_amount numeric, p_timing text)
-RETURNS numeric
-LANGUAGE sql
-IMMUTABLE
-SET search_path = public, pg_temp
-AS $$
-  SELECT CASE WHEN p_timing = 'each'
-    THEN p_amount + round(p_amount * 15 / 100, 2)
-    ELSE p_amount
-  END;
-$$;
-
-COMMENT ON FUNCTION public.installment_with_vat(numeric, text) IS
-  '0209: an amount as payable: plus its 15% only when the VAT is paid with each payment.';
-
-REVOKE ALL ON FUNCTION public.installment_with_vat(numeric, text)
-  FROM PUBLIC, anon, authenticated;
-
 -- A day out of JSON: JSON null or a missing key = NULL, else YYYY-MM-DD.
 CREATE FUNCTION public.installment_json_day(p_value jsonb, p_token text)
 RETURNS date
@@ -287,7 +272,7 @@ BEGIN
     RETURN;
   END IF;
 
-  v_final := public.installment_with_vat(c.balloon_amount, c.vat_timing);
+  v_final := c.balloon_amount;
   v_regular_count := c.installment_count - CASE WHEN v_final > 0 THEN 1 ELSE 0 END;
   v_regular_total := c.installments_amount - v_final;
   v_each := trunc(v_regular_total / v_regular_count, 2);
@@ -299,15 +284,14 @@ BEGIN
       ELSE v_each
     END;
     INSERT INTO public.installment_schedule (
-      contract_id, kind, seq, due_date, amount, is_balloon, vat_amount
+      contract_id, kind, seq, due_date, amount, is_balloon
     ) VALUES (
       c.id,
       'installment',
       v_i,
       (c.first_due_date + make_interval(months => (v_i - 1) * c.frequency_months))::date,
       v_amount,
-      v_i > v_regular_count,
-      CASE WHEN c.vat_timing = 'each' THEN round(v_amount * 15 / 115, 2) ELSE 0 END
+      v_i > v_regular_count
     );
   END LOOP;
 END;
@@ -316,8 +300,9 @@ $$;
 COMMENT ON FUNCTION public.generate_installment_schedule(uuid) IS
   '0203, re-created 0209: rebuilds the INSTALLMENT rows of a contract from installments_amount (none while first_due_date is NULL); first payments and the VAT row are never touched. Executable by nobody.';
 
--- The VAT row of «في نهاية الاقساط». With money on it the amount stays and
--- only the day follows, until it is fully paid.
+-- The row of a separate VAT: it exists whenever the VAT is separate, dated or
+-- not, so it is payable from the start. With money on it the amount stays
+-- and only the day moves, until it is fully paid.
 CREATE FUNCTION public.sync_installment_vat_row(p_contract_id uuid)
 RETURNS void
 LANGUAGE plpgsql
@@ -332,34 +317,31 @@ BEGIN
   SELECT * INTO c FROM public.installment_contracts WHERE id = p_contract_id;
   SELECT * INTO v_row FROM public.installment_schedule
   WHERE contract_id = p_contract_id AND kind = 'vat';
-  IF c.vat_timing = 'end' THEN
-    v_due := COALESCE(
-      c.vat_due_date,
-      (c.first_due_date
-        + make_interval(months => (c.installment_count - 1) * c.frequency_months))::date
-    );
-  END IF;
 
-  IF v_row.paid_amount > 0 THEN
-    IF v_due IS NOT NULL THEN
-      UPDATE public.installment_schedule
-      SET due_date = v_due
-      WHERE id = v_row.id AND paid_amount < amount AND due_date IS DISTINCT FROM v_due;
-    END IF;
+  IF c.vat_mode <> 'separate' THEN
+    DELETE FROM public.installment_schedule
+    WHERE contract_id = p_contract_id AND kind = 'vat' AND paid_amount = 0;
     RETURN;
   END IF;
 
-  IF v_due IS NULL THEN
-    DELETE FROM public.installment_schedule
-    WHERE contract_id = p_contract_id AND kind = 'vat';
-  ELSIF v_row.id IS NULL THEN
+  v_due := CASE c.vat_due
+    WHEN 'date' THEN c.vat_due_date
+    WHEN 'last' THEN (c.first_due_date
+      + make_interval(months => (c.installment_count - 1) * c.frequency_months))::date
+  END;
+
+  IF v_row.id IS NULL THEN
     INSERT INTO public.installment_schedule (contract_id, kind, seq, due_date, amount)
     VALUES (p_contract_id, 'vat', 1, v_due, c.vat_amount);
-  ELSE
+  ELSIF v_row.paid_amount = 0 THEN
     UPDATE public.installment_schedule
     SET due_date = v_due, amount = c.vat_amount
     WHERE id = v_row.id
       AND (due_date IS DISTINCT FROM v_due OR amount IS DISTINCT FROM c.vat_amount);
+  ELSE
+    UPDATE public.installment_schedule
+    SET due_date = v_due
+    WHERE id = v_row.id AND paid_amount < amount AND due_date IS DISTINCT FROM v_due;
   END IF;
 END;
 $$;
@@ -436,7 +418,7 @@ BEGIN
 
   SELECT
     COALESCE(sum(s.amount - s.paid_amount), 0),
-    c.total_amount + c.vat_amount - c.down_payment - COALESCE(sum(s.paid_amount), 0)
+    c.total_amount - c.down_payment - COALESCE(sum(s.paid_amount), 0)
   INTO v_open, v_remaining
   FROM public.installment_schedule s WHERE s.contract_id = c.id;
 
@@ -454,7 +436,7 @@ BEGIN
   )
   RETURNING id INTO v_payment_id;
 
-  -- The chosen row, then the oldest due, then the undated first payments.
+  -- The chosen row, then the oldest due, then the undated (first payments, VAT).
   v_left := v_amount;
   FOR r IN
     SELECT s.id, s.amount - s.paid_amount AS open_amount
@@ -483,12 +465,69 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.record_installment_payment(uuid, date, numeric, text, text, text, uuid) IS
-  '0203, re-created 0209: records a payment and allocates it to p_schedule_id first (when given), then the oldest due rows, then the undated first payments. Before the division it cannot pass the existing rows (installments_not_scheduled) and never closes the contract. installments.manage.';
+  '0203, re-created 0209: records a payment and allocates it to p_schedule_id first (when given), then the oldest due rows, then the undated ones. Before the division it cannot pass the existing rows (installments_not_scheduled) and never closes the contract. installments.manage.';
 
 REVOKE ALL ON FUNCTION public.record_installment_payment(uuid, date, numeric, text, text, text, uuid)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.record_installment_payment(uuid, date, numeric, text, text, text, uuid)
   TO authenticated;
+
+-- A void puts the VAT row back on the day its choice says: paid, it did
+-- not follow the installments. The body is 0203's, plus the sync.
+CREATE OR REPLACE FUNCTION public.void_installment_payment(
+  p_payment_id uuid,
+  p_reason text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  p public.installment_payments%ROWTYPE;
+  c public.installment_contracts%ROWTYPE;
+  v_reason text;
+BEGIN
+  PERFORM public.assert_installments_manage();
+
+  v_reason := btrim(COALESCE(p_reason, ''));
+  IF v_reason = '' OR char_length(v_reason) > 500 THEN
+    RAISE EXCEPTION 'reason_required' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT * INTO p FROM public.installment_payments WHERE id = p_payment_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'invalid_payment' USING ERRCODE = '22023';
+  END IF;
+  -- The contract first, the lock order of record_installment_payment.
+  SELECT * INTO c FROM public.installment_contracts WHERE id = p.contract_id FOR UPDATE;
+  SELECT * INTO p FROM public.installment_payments WHERE id = p_payment_id FOR UPDATE;
+  IF p.status = 'voided' THEN
+    RAISE EXCEPTION 'payment_already_voided' USING ERRCODE = '55000';
+  END IF;
+  IF c.status = 'cancelled' THEN
+    RAISE EXCEPTION 'contract_not_active' USING ERRCODE = '55000';
+  END IF;
+
+  UPDATE public.installment_schedule s
+  SET paid_amount = s.paid_amount - a.amount
+  FROM public.installment_payment_allocations a
+  WHERE a.payment_id = p.id AND a.schedule_id = s.id;
+
+  UPDATE public.installment_payments
+  SET status = 'voided', voided_at = now(), voided_by = auth.uid(), void_reason = v_reason
+  WHERE id = p.id;
+
+  IF c.status = 'paid_off' THEN
+    UPDATE public.installment_contracts SET status = 'active', closed_at = NULL WHERE id = c.id;
+  END IF;
+
+  PERFORM public.sync_installment_vat_row(c.id);
+END;
+$$;
+
+COMMENT ON FUNCTION public.void_installment_payment(uuid, text) IS
+  '0203, re-created 0209: voids a payment recorded by mistake (a reason of 1 to 500 characters): its allocations are taken back from the schedule, a paid-off contract reopens and a separate VAT follows its chosen day again. The payment row stays with who voided it. installments.manage.';
 
 -- ===========================================================================
 -- 5. Saving a contract
@@ -549,7 +588,8 @@ CREATE FUNCTION public.save_installment_contract(
   p_notes text DEFAULT NULL,
   p_equipment_ids uuid[] DEFAULT NULL,
   p_account jsonb DEFAULT NULL,
-  -- {mode, timing, amount, due_date}; SQL NULL keeps the stored VAT.
+  -- {mode, amount, due, due_date, title, note, paid_on, method}; SQL NULL
+  -- keeps the stored VAT.
   p_vat jsonb DEFAULT NULL,
   -- [{id, title, rate | amount, due_date, note, paid_on, method}] in their
   -- order; SQL NULL keeps the stored rows, [] removes them.
@@ -572,16 +612,21 @@ DECLARE
   v_total numeric(14, 2);
   v_prepaid numeric(14, 2);
   v_balloon numeric(14, 2);
-  v_final numeric;
   v_installments numeric;
   v_units uuid[];
   v_account_set boolean := false;
   v_bank text;
   v_iban text;
   v_vat_mode text := 'unspecified';
-  v_vat_timing text;
   v_vat numeric := 0;
-  v_vat_due date;
+  v_vat_due text;
+  v_vat_date date;
+  v_vat_row public.installment_schedule%ROWTYPE;
+  v_vat_title text;
+  v_vat_note text;
+  v_vat_paid_on date;
+  v_vat_method text;
+  v_rate_base numeric;
   v_input jsonb;
   v_item jsonb;
   v_rows jsonb := '[]'::jsonb;
@@ -593,7 +638,6 @@ DECLARE
   v_row_note text;
   v_rate numeric;
   v_base numeric;
-  v_gross numeric;
   v_first_total numeric := 0;
   v_due date;
   v_paid_on date;
@@ -678,16 +722,23 @@ BEGIN
   END IF;
 
   -- VAT -----------------------------------------------------------------------
+  IF NOT v_new THEN
+    SELECT * INTO v_vat_row FROM public.installment_schedule s
+    WHERE s.contract_id = c.id AND s.kind = 'vat';
+  END IF;
+
   IF p_vat IS NULL THEN
     IF NOT v_new THEN
       v_vat_mode := c.vat_mode;
-      v_vat_timing := c.vat_timing;
+      v_vat_due := c.vat_due;
+      v_vat_date := c.vat_due_date;
       v_vat := c.vat_amount;
-      v_vat_due := c.vat_due_date;
+      v_vat_title := v_vat_row.title;
+      v_vat_note := v_vat_row.note;
     END IF;
   ELSE
     IF jsonb_typeof(p_vat) <> 'object'
-       OR COALESCE(p_vat->>'mode', '') NOT IN ('unspecified', 'inclusive', 'exclusive', 'exempt') THEN
+       OR COALESCE(p_vat->>'mode', '') NOT IN ('unspecified', 'none', 'inside', 'separate') THEN
       RAISE EXCEPTION 'invalid_vat' USING ERRCODE = '22023';
     END IF;
     v_vat_mode := p_vat->>'mode';
@@ -695,32 +746,70 @@ BEGIN
     IF v_vat_mode = 'unspecified' AND (v_new OR c.vat_mode <> 'unspecified') THEN
       RAISE EXCEPTION 'invalid_vat' USING ERRCODE = '22023';
     END IF;
-    IF v_vat_mode = 'exclusive' THEN
-      v_vat_timing := p_vat->>'timing';
-      IF COALESCE(v_vat_timing, '') NOT IN ('each', 'end') THEN
-        RAISE EXCEPTION 'invalid_vat_timing' USING ERRCODE = '22023';
+
+    IF v_vat_mode = 'separate' THEN
+      IF COALESCE(jsonb_typeof(p_vat->'amount'), 'null') = 'null' THEN
+        v_vat := round(v_total * 15 / 115, 2);
+      ELSIF jsonb_typeof(p_vat->'amount') = 'number' THEN
+        v_vat := round((p_vat->>'amount')::numeric, 2);
+      ELSE
+        RAISE EXCEPTION 'invalid_vat_amount' USING ERRCODE = '22023';
       END IF;
-      IF v_vat_timing = 'end' THEN
-        IF COALESCE(jsonb_typeof(p_vat->'amount'), 'null') = 'null' THEN
-          v_vat := round(v_total * 15 / 100, 2);
-        ELSIF jsonb_typeof(p_vat->'amount') = 'number' THEN
-          v_vat := round((p_vat->>'amount')::numeric, 2);
-        ELSE
-          RAISE EXCEPTION 'invalid_vat_amount' USING ERRCODE = '22023';
+
+      v_vat_due := COALESCE(p_vat->>'due', 'undecided');
+      IF v_vat_due NOT IN ('undecided', 'date', 'last') THEN
+        RAISE EXCEPTION 'invalid_vat_date' USING ERRCODE = '22023';
+      END IF;
+      IF v_vat_due = 'date' THEN
+        v_vat_date := public.installment_json_day(p_vat->'due_date', 'invalid_vat_date');
+        IF v_vat_date IS NULL THEN
+          RAISE EXCEPTION 'invalid_vat_date' USING ERRCODE = '22023';
         END IF;
-        IF v_vat <= 0 OR v_vat > v_total THEN
-          RAISE EXCEPTION 'invalid_vat_amount' USING ERRCODE = '22023';
-        END IF;
-        v_vat_due := public.installment_json_day(p_vat->'due_date', 'invalid_vat_date');
+      END IF;
+
+      v_vat_title := NULLIF(btrim(COALESCE(p_vat->>'title', '')), '');
+      v_vat_note := NULLIF(btrim(COALESCE(p_vat->>'note', '')), '');
+      IF char_length(v_vat_title) > 80 OR char_length(v_vat_note) > 200 THEN
+        RAISE EXCEPTION 'invalid_vat' USING ERRCODE = '22023';
+      END IF;
+
+      v_vat_paid_on := public.installment_json_day(p_vat->'paid_on', 'invalid_paid_on');
+      IF v_vat_paid_on > public.saudi_today() THEN
+        RAISE EXCEPTION 'invalid_paid_on' USING ERRCODE = '22023';
+      END IF;
+      v_vat_method := COALESCE(p_vat->>'method', 'transfer');
+      IF v_vat_paid_on IS NOT NULL
+         AND v_vat_method NOT IN ('transfer', 'cheque', 'auto_debit', 'cash') THEN
+        RAISE EXCEPTION 'invalid_method' USING ERRCODE = '22023';
       END IF;
     END IF;
   END IF;
-  IF v_vat_timing = 'each' THEN
-    v_vat := round(v_total * 15 / 100, 2);
+
+  -- The VAT is inside the typed total: it adds nothing.
+  IF v_vat_mode = 'inside' THEN
+    v_vat := round(v_total * 15 / 115, 2);
+  ELSIF v_vat_mode = 'separate' THEN
+    IF v_vat <= 0 OR v_vat >= v_total THEN
+      RAISE EXCEPTION 'invalid_vat_amount' USING ERRCODE = '22023';
+    END IF;
+    -- A fully paid one keeps its day.
+    IF NOT v_new AND c.vat_mode = 'separate'
+       AND v_vat_row.paid_amount >= v_vat_row.amount THEN
+      v_vat_due := c.vat_due;
+      v_vat_date := c.vat_due_date;
+    END IF;
+  ELSE
+    v_vat := 0;
   END IF;
-  IF v_total + v_vat > 999999999999.99 THEN
-    RAISE EXCEPTION 'invalid_amount' USING ERRCODE = '22023';
+
+  IF v_vat_row.paid_amount > 0 THEN
+    IF v_vat_mode <> 'separate' OR v_vat <> v_vat_row.amount OR v_vat_paid_on IS NOT NULL THEN
+      RAISE EXCEPTION 'contract_has_payments' USING ERRCODE = '55000';
+    END IF;
   END IF;
+
+  -- What a percentage is of.
+  v_rate_base := v_total - CASE WHEN v_vat_mode = 'separate' THEN v_vat ELSE 0 END;
 
   -- The first payments --------------------------------------------------------
   v_input := p_first_payments;
@@ -729,7 +818,7 @@ BEGIN
       'id', s.id,
       'title', s.title,
       'rate', s.rate,
-      'amount', CASE WHEN s.rate IS NULL THEN s.base_amount END,
+      'amount', CASE WHEN s.rate IS NULL THEN s.amount END,
       'due_date', s.due_date,
       'note', s.note
     ) ORDER BY s.seq), '[]'::jsonb)
@@ -762,7 +851,7 @@ BEGIN
       IF v_rate <= 0 OR v_rate >= 100 OR round(v_rate, 4) <> v_rate THEN
         RAISE EXCEPTION 'invalid_first_payment' USING ERRCODE = '22023';
       END IF;
-      v_base := round(v_total * v_rate / 100, 2);
+      v_base := round(v_rate_base * v_rate / 100, 2);
     ELSIF jsonb_typeof(v_item->'amount') = 'number'
        AND COALESCE(jsonb_typeof(v_item->'rate'), 'null') = 'null' THEN
       v_base := round((v_item->>'amount')::numeric, 2);
@@ -772,7 +861,6 @@ BEGIN
     IF v_base <= 0 OR v_base > 999999999999.99 THEN
       RAISE EXCEPTION 'invalid_first_payment' USING ERRCODE = '22023';
     END IF;
-    v_gross := public.installment_with_vat(v_base, v_vat_timing);
 
     v_due := public.installment_json_day(v_item->'due_date', 'invalid_first_payment_date');
     v_paid_on := public.installment_json_day(v_item->'paid_on', 'invalid_paid_on');
@@ -796,7 +884,7 @@ BEGIN
       v_row_id := v_old.id;
       v_keep := v_keep || v_old.id;
       IF v_old.paid_amount > 0 THEN
-        IF v_gross <> v_old.amount OR v_paid_on IS NOT NULL THEN
+        IF v_base <> v_old.amount OR v_paid_on IS NOT NULL THEN
           RAISE EXCEPTION 'first_payment_locked' USING ERRCODE = '55000';
         END IF;
         IF v_old.paid_amount >= v_old.amount THEN
@@ -804,13 +892,11 @@ BEGIN
         END IF;
       END IF;
     END IF;
-    -- «مدفوعة»: the agreed day stays; without one, the day it was paid.
-    v_due := COALESCE(v_due, v_paid_on);
 
-    v_first_total := v_first_total + v_gross;
+    v_first_total := v_first_total + v_base;
     v_rows := v_rows || jsonb_build_array(jsonb_build_object(
       'id', v_row_id, 'title', v_title, 'note', v_row_note, 'rate', v_rate,
-      'base', v_base, 'gross', v_gross, 'due', v_due,
+      'amount', v_base, 'due', v_due,
       'paid_on', v_paid_on, 'method', v_method
     ));
   END LOOP;
@@ -824,17 +910,15 @@ BEGIN
   END IF;
 
   -- What is left to divide ----------------------------------------------------
-  v_installments := v_total - v_prepaid - v_first_total
-    + CASE WHEN v_vat_timing = 'each' THEN v_vat ELSE 0 END;
+  v_installments := v_rate_base - v_prepaid - v_first_total;
   IF v_installments <= 0 THEN
     IF v_first_total > 0 THEN
       RAISE EXCEPTION 'invalid_first_payments' USING ERRCODE = '22023';
     END IF;
     RAISE EXCEPTION 'invalid_down_payment' USING ERRCODE = '22023';
   END IF;
-  v_final := public.installment_with_vat(v_balloon, v_vat_timing);
   PERFORM public.assert_installment_division(
-    v_installments, v_final, p_installment_count, p_frequency_months
+    v_installments, v_balloon, p_installment_count, p_frequency_months
   );
 
   IF v_new THEN
@@ -842,30 +926,22 @@ BEGIN
   ELSE
     v_division_changed :=
       v_installments IS DISTINCT FROM c.installments_amount
-      OR v_final IS DISTINCT FROM public.installment_with_vat(c.balloon_amount, c.vat_timing)
-      OR COALESCE(v_vat_timing = 'each', false) <> COALESCE(c.vat_timing = 'each', false)
+      OR v_balloon IS DISTINCT FROM c.balloon_amount
       OR p_installment_count IS DISTINCT FROM c.installment_count
       OR p_frequency_months IS DISTINCT FROM c.frequency_months::integer
       OR p_first_due_date IS DISTINCT FROM c.first_due_date;
 
+    -- none <-> inside moves no amount, so it stays open.
     IF (
       v_division_changed
       OR v_total IS DISTINCT FROM c.total_amount
       OR v_prepaid IS DISTINCT FROM c.down_payment
-      OR v_vat IS DISTINCT FROM c.vat_amount
-      OR v_vat_timing IS DISTINCT FROM c.vat_timing
+      OR (v_vat_mode = 'separate') <> (c.vat_mode = 'separate')
+      OR (v_vat_mode = 'separate' AND v_vat IS DISTINCT FROM c.vat_amount)
     ) AND EXISTS (
       SELECT 1 FROM public.installment_schedule s
       WHERE s.contract_id = c.id AND s.kind = 'installment' AND s.paid_amount > 0
     ) THEN
-      RAISE EXCEPTION 'contract_has_payments' USING ERRCODE = '55000';
-    END IF;
-
-    IF (v_vat IS DISTINCT FROM c.vat_amount OR v_vat_timing IS DISTINCT FROM c.vat_timing)
-       AND EXISTS (
-         SELECT 1 FROM public.installment_schedule s
-         WHERE s.contract_id = c.id AND s.kind = 'vat' AND s.paid_amount > 0
-       ) THEN
       RAISE EXCEPTION 'contract_has_payments' USING ERRCODE = '55000';
     END IF;
   END IF;
@@ -876,12 +952,12 @@ BEGIN
       contract_number, description, financier_id, total_amount, down_payment,
       balloon_amount, installment_count, frequency_months, first_due_date,
       notes, created_by, bank_name, iban,
-      vat_mode, vat_timing, vat_amount, vat_due_date, installments_amount
+      vat_mode, vat_due, vat_amount, vat_due_date, installments_amount
     ) VALUES (
       public.next_installment_contract_number(), v_description, p_financier_id,
       v_total, v_prepaid, v_balloon, p_installment_count, p_frequency_months,
       p_first_due_date, v_notes, auth.uid(), v_bank, v_iban,
-      v_vat_mode, v_vat_timing, v_vat, v_vat_due, v_installments
+      v_vat_mode, v_vat_due, v_vat, v_vat_date, v_installments
     )
     RETURNING id INTO v_id;
   ELSE
@@ -904,9 +980,9 @@ BEGIN
         WHEN p_first_due_date IS DISTINCT FROM c.first_due_date THEN auth.uid()
         ELSE c.first_due_set_by END,
       vat_mode = v_vat_mode,
-      vat_timing = v_vat_timing,
+      vat_due = v_vat_due,
       vat_amount = v_vat,
-      vat_due_date = v_vat_due,
+      vat_due_date = v_vat_date,
       installments_amount = v_installments,
       notes = v_notes,
       bank_name = CASE WHEN v_account_set THEN v_bank ELSE c.bank_name END,
@@ -925,19 +1001,23 @@ BEGIN
     PERFORM public.generate_installment_schedule(v_id);
   END IF;
   PERFORM public.sync_installment_vat_row(v_id);
+  IF v_vat_mode = 'separate' THEN
+    UPDATE public.installment_schedule
+    SET title = v_vat_title, note = v_vat_note
+    WHERE contract_id = v_id AND kind = 'vat';
+  END IF;
 
   FOR v_item IN SELECT e.value FROM jsonb_array_elements(v_rows) WITH ORDINALITY AS e(value, n) ORDER BY e.n
   LOOP
     v_seq := v_seq + 1;
     v_row_id := (v_item->>'id')::uuid;
-    v_base := (v_item->>'base')::numeric;
-    v_gross := (v_item->>'gross')::numeric;
+    v_base := (v_item->>'amount')::numeric;
     IF v_row_id IS NULL THEN
       INSERT INTO public.installment_schedule (
-        contract_id, kind, seq, title, note, rate, base_amount, vat_amount, amount, due_date
+        contract_id, kind, seq, title, note, rate, amount, due_date
       ) VALUES (
         v_id, 'first_payment', v_seq, v_item->>'title', v_item->>'note',
-        (v_item->>'rate')::numeric, v_base, v_gross - v_base, v_gross,
+        (v_item->>'rate')::numeric, v_base,
         (v_item->>'due')::date
       )
       RETURNING id INTO v_row_id;
@@ -947,9 +1027,7 @@ BEGIN
         title = v_item->>'title',
         note = v_item->>'note',
         rate = (v_item->>'rate')::numeric,
-        base_amount = v_base,
-        vat_amount = v_gross - v_base,
-        amount = v_gross,
+        amount = v_base,
         due_date = (v_item->>'due')::date
       WHERE id = v_row_id;
     END IF;
@@ -959,13 +1037,20 @@ BEGIN
     END IF;
   END LOOP;
 
+  IF v_vat_paid_on IS NOT NULL THEN
+    v_payments := v_payments || jsonb_build_array(jsonb_build_object(
+      'id', (SELECT s.id FROM public.installment_schedule s WHERE s.contract_id = v_id AND s.kind = 'vat'),
+      'amount', v_vat, 'paid_on', v_vat_paid_on, 'method', v_vat_method
+    ));
+  END IF;
+
   -- «مدفوعة» is an ordinary payment: voided and receipted like any other.
   -- Recorded once every row exists, so paying one never closes the contract
   -- over a row still to be written.
   FOR v_item IN SELECT e.value FROM jsonb_array_elements(v_payments) WITH ORDINALITY AS e(value, n) ORDER BY e.n
   LOOP
     PERFORM public.record_installment_payment(
-      v_id, (v_item->>'paid_on')::date, (v_item->>'gross')::numeric, v_item->>'method',
+      v_id, (v_item->>'paid_on')::date, (v_item->>'amount')::numeric, v_item->>'method',
       NULL, NULL, (v_item->>'id')::uuid
     );
   END LOOP;
@@ -981,7 +1066,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.save_installment_contract(uuid, text, uuid, numeric, numeric, numeric, integer, integer, date, text, uuid[], jsonb, jsonb, jsonb, text) IS
-  '0203 / 0208, re-created 0209: creates or edits a contract with its first payments, VAT, installments (none while p_first_due_date is NULL) and units in one transaction. p_down_payment is what was paid before entry. A first payment sent with paid_on records an ordinary payment. p_expected_key refuses a save over a changed contract (contract_changed). installments.manage.';
+  '0203 / 0208, re-created 0209: creates or edits a contract with its first payments, VAT, installments (none while p_first_due_date is NULL) and units in one transaction. p_total_amount is everything to pay, the VAT inside it. p_down_payment is what was paid before entry. A first payment or a separate VAT sent with paid_on records an ordinary payment. p_expected_key refuses a save over a changed contract (contract_changed). installments.manage.';
 
 REVOKE ALL ON FUNCTION public.save_installment_contract(uuid, text, uuid, numeric, numeric, numeric, integer, integer, date, text, uuid[], jsonb, jsonb, jsonb, text)
   FROM PUBLIC, anon, authenticated;
@@ -1019,7 +1104,7 @@ BEGIN
   END IF;
   PERFORM public.assert_installment_division(
     c.installments_amount,
-    public.installment_with_vat(c.balloon_amount, c.vat_timing),
+    c.balloon_amount,
     p_installment_count,
     p_frequency_months
   );
@@ -1057,7 +1142,7 @@ REVOKE ALL ON FUNCTION public.set_installment_first_due_date(uuid, date, integer
 GRANT EXECUTE ON FUNCTION public.set_installment_first_due_date(uuid, date, integer, integer)
   TO authenticated;
 
-CREATE FUNCTION public.set_installment_first_payment_date(p_schedule_id uuid, p_due_date date)
+CREATE FUNCTION public.set_installment_payment_date(p_schedule_id uuid, p_due_date date)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -1073,7 +1158,7 @@ BEGIN
     RAISE EXCEPTION 'invalid_first_payment_date' USING ERRCODE = '22023';
   END IF;
   SELECT * INTO v_row FROM public.installment_schedule
-  WHERE id = p_schedule_id AND kind = 'first_payment';
+  WHERE id = p_schedule_id AND kind IN ('first_payment', 'vat');
   IF NOT FOUND THEN
     RAISE EXCEPTION 'invalid_schedule_row' USING ERRCODE = '22023';
   END IF;
@@ -1091,16 +1176,22 @@ BEGIN
   END IF;
 
   UPDATE public.installment_schedule SET due_date = p_due_date WHERE id = v_row.id;
-  UPDATE public.installment_contracts SET updated_at = now() WHERE id = c.id;
+  IF v_row.kind = 'vat' THEN
+    UPDATE public.installment_contracts
+    SET vat_due = 'date', vat_due_date = p_due_date, updated_at = now()
+    WHERE id = c.id;
+  ELSE
+    UPDATE public.installment_contracts SET updated_at = now() WHERE id = c.id;
+  END IF;
 END;
 $$;
 
-COMMENT ON FUNCTION public.set_installment_first_payment_date(uuid, date) IS
-  '0209: dates a first payment that is not fully paid, so it joins the dues and the reminder. installments.manage.';
+COMMENT ON FUNCTION public.set_installment_payment_date(uuid, date) IS
+  '0209: dates a first payment or a separate VAT that is not fully paid (the VAT then follows that day, not the last installment), so it joins the dues and the reminder. installments.manage.';
 
-REVOKE ALL ON FUNCTION public.set_installment_first_payment_date(uuid, date)
+REVOKE ALL ON FUNCTION public.set_installment_payment_date(uuid, date)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.set_installment_first_payment_date(uuid, date)
+GRANT EXECUTE ON FUNCTION public.set_installment_payment_date(uuid, date)
   TO authenticated;
 
 -- ===========================================================================
@@ -1479,7 +1570,7 @@ LEFT JOIN LATERAL (
 WHERE s.due_date IS NOT NULL OR s.paid_amount >= s.amount;
 
 COMMENT ON VIEW public.installment_dues IS
-  '0203 / 0207 / 0209: every DATED payable row (installment, first payment or VAT row: kind, title) with its contract, financier, state and days_until_due, and a fully paid undated first payment on the day it was paid. An undated unpaid first payment and the installments of an undivided contract are no dues. security_invoker.';
+  '0203 / 0207 / 0209: every DATED payable row (installment, first payment or VAT row: kind, title) with its contract, financier, state and days_until_due, and a fully paid undated first payment or VAT row on the day it was paid. An undated unpaid one and the installments of an undivided contract are no dues. security_invoker.';
 
 CREATE OR REPLACE VIEW public.installment_contract_summary
 WITH (security_invoker = true) AS
@@ -1505,7 +1596,7 @@ SELECT
   c.created_at,
   c.updated_at,
   COALESCE(t.paid_total, 0) AS paid_total,
-  c.total_amount + c.vat_amount - c.down_payment - COALESCE(t.paid_total, 0) AS remaining_total,
+  c.total_amount - c.down_payment - COALESCE(t.paid_total, 0) AS remaining_total,
   COALESCE(t.paid_count, 0) AS paid_count,
   COALESCE(t.overdue_count, 0) AS overdue_count,
   COALESCE(t.overdue_amount, 0) AS overdue_amount,
@@ -1522,11 +1613,11 @@ SELECT
   c.iban AS contract_iban,
   -- 0209
   c.vat_mode,
-  c.vat_timing,
+  c.vat_due,
   c.vat_amount,
   c.vat_due_date,
   c.installments_amount,
-  c.total_amount + c.vat_amount AS payable_total,
+  c.total_amount AS payable_total,
   c.down_payment + COALESCE(t.paid_total, 0) AS paid_overall,
   COALESCE(t.first_payments_count, 0) AS first_payments_count,
   COALESCE(t.first_payments_paid_count, 0) AS first_payments_paid_count,
@@ -1537,7 +1628,8 @@ SELECT
   n.title AS next_due_title,
   n.seq AS next_due_seq,
   c.first_due_set_at,
-  ds.full_name AS first_due_set_by_name
+  ds.full_name AS first_due_set_by_name,
+  COALESCE(t.vat_settled, false) AS vat_settled
 FROM public.installment_contracts c
 JOIN public.installment_financiers f ON f.id = c.financier_id
 LEFT JOIN public.profile_names cb ON cb.id = c.created_by
@@ -1550,7 +1642,10 @@ LEFT JOIN LATERAL (
       AS overdue_count,
     sum(s.amount - s.paid_amount) FILTER (WHERE s.due_date < public.saudi_today())
       AS overdue_amount,
-    max(s.due_date) FILTER (WHERE s.kind <> 'first_payment') AS last_due_date,
+    max(s.due_date) FILTER (
+      WHERE s.kind = 'installment' OR (s.kind = 'vat' AND s.paid_amount < s.amount)
+    ) AS last_due_date,
+    bool_or(s.kind = 'vat' AND s.paid_amount >= s.amount) AS vat_settled,
     count(*) FILTER (WHERE s.kind = 'first_payment') AS first_payments_count,
     count(*) FILTER (WHERE s.kind = 'first_payment' AND s.paid_amount >= s.amount)
       AS first_payments_paid_count,
@@ -1568,7 +1663,7 @@ LEFT JOIN LATERAL (
 ) n ON true;
 
 COMMENT ON VIEW public.installment_contract_summary IS
-  '0203 / 0208 / 0209: one row per contract: remaining_total is the whole contract''s (payable - prepaid - paid) whether divided yet or not; paid_count counts installments only; paid_overall includes what was paid before entry; next_* is the next DATED unpaid row of any kind. security_invoker.';
+  '0203 / 0208 / 0209: one row per contract: remaining_total is the whole contract''s (total - prepaid - paid) whether divided yet or not; paid_count counts installments only; paid_overall includes what was paid before entry; next_* is the next DATED unpaid row of any kind. security_invoker.';
 
 -- The remaining and the contract count come from the contracts, so a
 -- contract waiting for its division is in them.
@@ -1610,7 +1705,7 @@ FROM (
 ) d
 CROSS JOIN (
   SELECT
-    COALESCE(sum(c.total_amount + c.vat_amount - c.down_payment - COALESCE((
+    COALESCE(sum(c.total_amount - c.down_payment - COALESCE((
       SELECT sum(s.paid_amount) FROM public.installment_schedule s WHERE s.contract_id = c.id
     ), 0)), 0) AS remaining_total,
     count(*) AS open_contract_count

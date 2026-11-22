@@ -92,6 +92,7 @@ const UI_FILES = [
   ['src', 'components', 'installments', 'InstallmentFirstPayments.tsx'],
   ['src', 'components', 'installments', 'InstallmentPayableRows.tsx'],
   ['src', 'components', 'installments', 'InstallmentPlanSummary.tsx'],
+  ['src', 'components', 'installments', 'InstallmentVatRow.tsx'],
   ['src', 'components', 'installments', 'boardParts.tsx'],
   ['src', 'components', 'installments', 'InstallmentsCalendarTab.tsx'],
   ['src', 'components', 'installments', 'InstallmentPaymentDialog.tsx'],
@@ -396,7 +397,7 @@ test('the four functions are called with the exact parameter names of 0203', () 
     'record_installment_payment',
     'void_installment_payment',
     'set_installment_first_due_date',
-    'set_installment_first_payment_date',
+    'set_installment_payment_date',
     'installment_contract_edit_key',
   ]
   for (const name of functions)
@@ -819,10 +820,15 @@ const contractValues = (patch = {}) => ({
   first_due_date: '2026-12-01',
   notes: '',
   equipment: [],
-  vat_mode: 'inclusive',
-  vat_timing: '',
+  vat_mode: 'none',
+  vat_title: '',
+  vat_note: '',
   vat_amount: '',
+  vat_due: 'undecided',
   vat_due_date: '',
+  vat_paid: false,
+  vat_paid_on: '',
+  vat_method: 'transfer',
   payments: [],
   ...patch,
 })
@@ -867,16 +873,26 @@ test('installmentContractFormSchema: the rules of the contract form', () => {
   })
   assert.deepEqual(check({ vat_mode: '' }), { vat_mode: 'instErrVat' })
   assert.deepEqual(check({ vat_mode: 'unspecified' }), {})
-  assert.deepEqual(check({ vat_mode: 'exclusive' }), {
-    vat_timing: 'instErrVatTiming',
+  assert.deepEqual(check({ vat_mode: 'inside' }), {})
+  assert.deepEqual(check({ vat_mode: 'separate' }), {})
+  assert.deepEqual(check({ vat_mode: 'separate', vat_amount: '0' }), {
+    vat_amount: 'instErrVatAmount',
   })
+  assert.deepEqual(check({ vat_mode: 'separate', vat_due: 'date' }), {
+    vat_due_date: 'instErrVatDate',
+  })
+  // Paid: its planned day is hidden, the day it was paid is asked.
   assert.deepEqual(
-    check({ vat_mode: 'exclusive', vat_timing: 'end', vat_amount: '0' }),
-    { vat_amount: 'instErrVatAmount' },
+    check({ vat_mode: 'separate', vat_due: 'date', vat_paid: true, vat_paid_on: '2026-11-20' }),
+    {},
+  )
+  assert.deepEqual(
+    check({ vat_mode: 'separate', vat_paid: true, vat_paid_on: '2026-11-23' }),
+    { vat_paid_on: 'instErrPaidOn' },
   )
   const row = (patch = {}) => ({
     key: 'k', id: null, title: 'الدفعة الاولى', kind: 'rate', value: '20',
-    date: '', paidOn: '', note: '', paid: false, method: 'transfer', lockedAmount: null, lockedBase: null,
+    date: '', paidOn: '', note: '', paid: false, method: 'transfer', lockedAmount: null,
     settled: false, ...patch,
   })
   assert.deepEqual(check({ payments: [row()] }), {})
@@ -992,7 +1008,11 @@ test('the contract page: one save, a live breakdown, the locked terms', () => {
   assert.match(dialog, /label=\{t\('instContractTitle'\)\}\s+required/)
   assert.match(dialog, /installmentContractFormSchema\(today\)/)
   assert.equal([...dialog.matchAll(/saveInstallmentContract\(/g)].length, 1)
-  assert.match(dialog, /<InstallmentPlanSummary values=\{values\} \/>/)
+  // The breakdown is live, and shows a VAT already paid as paid.
+  assert.match(
+    dialog,
+    /<InstallmentPlanSummary values=\{values\} vatSettled=\{vatSettled\} \/>/,
+  )
   // Money on an installment: the notice and the disabled terms; their
   // values are the stored ones, so they go back as they are.
   assert.match(dialog, /\{termsLocked && \(\s*<Notice tone="info"/)

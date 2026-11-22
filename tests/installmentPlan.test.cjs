@@ -5,10 +5,11 @@ const path = require('node:path')
 const vm = require('node:vm')
 const ts = require('typescript')
 
-// The plan of a contract (migration 0209, owner 2026-11-22): the first
-// payments (an amount or a percentage of the total), the VAT with each
-// payment or at the end, the division that waits for the first due date and
-// the allocation of a payment. src/lib/installmentPlan.ts, made-up numbers.
+// The plan of a contract (migration 0209, owner 2026-11-22): ONE typed total
+// with the VAT inside it («انا بكتب اجمالي المبلغ فقط»), the VAT in three
+// options, the first payments (an amount or a percentage), the division
+// that waits for the first due date and the allocation of a payment.
+// src/lib/installmentPlan.ts, made-up numbers.
 
 const ROOT = path.join(__dirname, '..')
 
@@ -47,18 +48,15 @@ function loadLibModule(name, cache = new Map()) {
 const lib = loadLibModule('installmentPlan')
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null))
 
-/** The approved example: a million, 20% and 100,000, 24 months. */
+/** The approved drawing: one payment of 20%, 24 months. */
 const input = (patch = {}) => ({
-  totalAmount: 1000000,
+  totalAmount: 1150000,
   prepaid: 0,
-  vatMode: 'exclusive',
-  vatTiming: 'end',
+  vatMode: 'separate',
   vatAmount: null,
+  vatDue: 'undecided',
   vatDueDate: null,
-  payments: [
-    { rate: 20, amount: null },
-    { rate: null, amount: 100000 },
-  ],
+  payments: [{ rate: 20, amount: null }],
   balloonAmount: 0,
   installmentCount: 24,
   frequencyMonths: 1,
@@ -68,90 +66,100 @@ const input = (patch = {}) => ({
 const planOf = (patch) => plain(lib.buildInstallmentPlan(input(patch)))
 const halalas = (value) => Math.round(value * 100)
 
-test('VAT at the end: payments and installments without it, one row for it', () => {
-  const { plan, error } = planOf()
+test('no VAT: the typed total, nothing taken out of it', () => {
+  const { plan, error } = planOf({ vatMode: 'none', totalAmount: 1000000 })
   assert.equal(error, null)
-  assert.deepEqual(
-    plan.payments.map((row) => row.amount),
-    [200000, 100000],
-  )
-  assert.equal(plan.installments.amount, 700000)
-  assert.equal(plan.regular, 29166.66)
-  assert.equal(plan.lastRegular, 29166.82)
-  assert.equal(plan.vat, 150000)
-  assert.equal(plan.payable, 1150000)
+  assert.deepEqual([plan.total, plan.vat, plan.beforeVat], [1000000, 0, 1000000])
+  assert.equal(plan.payments[0].amount, 200000)
+  assert.deepEqual([plan.regular, plan.lastRegular], [33333.33, 33333.41])
 })
 
-test('VAT with each payment and installment', () => {
-  const { plan } = planOf({ vatTiming: 'each' })
-  assert.deepEqual(
-    plan.payments.map((row) => [row.base, row.vat, row.amount]),
-    [
-      [200000, 30000, 230000],
-      [100000, 15000, 115000],
-    ],
-  )
-  assert.equal(plan.installments.amount, 805000)
-  assert.equal(plan.installments.base, 700000)
-  assert.equal(plan.regular, 33541.66)
-  assert.equal(plan.lastRegular, 33541.82)
-  assert.equal(plan.payable, 1150000)
-  assert.equal(plan.vatDueDate, null)
+test('inside the payments and installments: the same total, its VAT shown', () => {
+  const { plan } = planOf({ vatMode: 'inside' })
+  assert.deepEqual([plan.total, plan.vat, plan.beforeVat], [1150000, 150000, 1000000])
+  // 20% of the total, and the VAT that is inside it.
+  assert.deepEqual(plan.payments[0], { base: 200000, vat: 30000, amount: 230000 })
+  assert.deepEqual(plan.installments, { base: 800000, vat: 120000, amount: 920000 })
+  assert.deepEqual([plan.regular, plan.lastRegular], [38333.33, 38333.41])
 })
 
-test('inclusive and no VAT add nothing', () => {
-  for (const vatMode of ['inclusive', 'exempt', 'unspecified']) {
-    const { plan } = planOf({ vatMode, vatTiming: null })
-    assert.equal(plan.vat, 0, vatMode)
-    assert.equal(plan.payable, 1000000, vatMode)
-    assert.equal(plan.installments.amount, 700000, vatMode)
+test('a payment by itself: worked out of the total, the rest without VAT', () => {
+  const { plan } = planOf()
+  assert.deepEqual([plan.total, plan.vat, plan.beforeVat], [1150000, 150000, 1000000])
+  // 20% of the amount before VAT, so the VAT is not counted twice.
+  assert.equal(plan.payments[0].amount, 200000)
+  assert.equal(plan.installments.amount, 800000)
+  assert.deepEqual([plan.regular, plan.lastRegular], [33333.33, 33333.41])
+})
+
+test('an amount is final as typed, whatever the VAT', () => {
+  for (const vatMode of ['none', 'inside', 'separate', 'unspecified']) {
+    const { plan } = planOf({ vatMode, payments: [{ rate: null, amount: 100000 }] })
+    assert.equal(plan.payments[0].amount, 100000, vatMode)
+    assert.equal(plan.total, 1150000, vatMode)
   }
 })
 
-test('every halala is in the plan, whatever the VAT timing', () => {
+test('a changed VAT amount keeps the typed total', () => {
+  const { plan } = planOf({ vatAmount: 100000 })
+  assert.deepEqual([plan.total, plan.vat, plan.beforeVat], [1150000, 100000, 1050000])
+  assert.equal(plan.payments[0].amount, 210000)
+})
+
+test('every halala of the typed total is in the plan', () => {
   for (const patch of [
     {},
-    { vatTiming: 'each' },
-    { vatTiming: 'each', totalAmount: 999999.99, installmentCount: 7 },
-    { totalAmount: 123456.78, prepaid: 1000, balloonAmount: 20000, payments: [] },
-    { vatTiming: 'each', payments: [{ rate: 33.3333, amount: null }], balloonAmount: 100000 },
+    { vatMode: 'inside' },
+    { vatMode: 'inside', totalAmount: 999999.99, installmentCount: 7 },
+    { vatMode: 'none', totalAmount: 123456.78, prepaid: 1000, balloonAmount: 20000, payments: [] },
+    { totalAmount: 1000000, payments: [{ rate: 33.3333, amount: null }], balloonAmount: 100000 },
+    { totalAmount: 777777.77, vatAmount: 12345.67 },
   ]) {
     const { plan, error } = planOf(patch)
     assert.equal(error, null)
+    const separate = input(patch).vatMode === 'separate'
     const sum =
       halalas(plan.prepaid) +
       plan.payments.reduce((total, row) => total + halalas(row.amount), 0) +
       plan.rows.reduce((total, row) => total + halalas(row.amount), 0) +
-      (input(patch).vatTiming === 'end' ? halalas(plan.vat) : 0)
-    assert.equal(sum, halalas(plan.payable), JSON.stringify(patch))
+      (separate ? halalas(plan.vat) : 0)
+    assert.equal(sum, halalas(plan.total), JSON.stringify(patch))
   }
 })
 
-test('the installments wait for the first due date, then take their days', () => {
-  const waiting = planOf().plan
-  assert.ok(waiting.rows.every((row) => row.dueDate === null))
-  assert.equal(waiting.vatDueDate, null)
-  const dated = planOf({ firstDueDate: '2027-01-15' }).plan
-  assert.equal(dated.rows[0].dueDate, '2027-01-15')
-  assert.equal(dated.rows[23].dueDate, '2028-12-15')
-  // With the last installment, unless another day was chosen.
-  assert.equal(dated.vatDueDate, '2028-12-15')
-  assert.equal(
-    planOf({ firstDueDate: '2027-01-15', vatDueDate: '2028-06-01' }).plan.vatDueDate,
-    '2028-06-01',
-  )
+test('an earlier contract: «غير محدد», its numbers as they were', () => {
+  const { plan } = planOf({
+    vatMode: 'unspecified',
+    totalAmount: 500000,
+    prepaid: 250000,
+    payments: [],
+    installmentCount: 10,
+  })
+  assert.deepEqual([plan.total, plan.vat, plan.installments.amount, plan.regular], [500000, 0, 250000, 25000])
 })
 
-test('a typed VAT amount, and what is refused', () => {
-  assert.equal(planOf({ vatAmount: 149000 }).plan.vat, 149000)
+test('when the VAT by itself is due', () => {
+  // Not assumed to be at the end.
+  assert.equal(planOf({ firstDueDate: '2027-01-15' }).plan.vatDueDate, null)
+  assert.equal(planOf({ vatDue: 'last' }).plan.vatDueDate, null)
+  const dated = planOf({ vatDue: 'last', firstDueDate: '2027-01-15' }).plan
+  assert.equal(dated.vatDueDate, '2028-12-15')
+  assert.equal(dated.rows[0].dueDate, '2027-01-15')
+  assert.equal(
+    planOf({ vatDue: 'date', vatDueDate: '2026-11-30' }).plan.vatDueDate,
+    '2026-11-30',
+  )
+  assert.ok(planOf().plan.rows.every((row) => row.dueDate === null))
+})
+
+test('what is refused', () => {
   const refusal = (patch) => planOf(patch).error
-  assert.equal(refusal({ vatTiming: null }), 'invalid_vat_timing')
   assert.equal(refusal({ vatAmount: 0 }), 'invalid_vat_amount')
-  assert.equal(refusal({ vatAmount: 1000000.01 }), 'invalid_vat_amount')
+  assert.equal(refusal({ vatAmount: 1150000 }), 'invalid_vat_amount')
   assert.equal(refusal({ payments: [{ rate: null, amount: 1000000 }] }), 'invalid_first_payments')
   assert.equal(refusal({ payments: [], prepaid: 1000000 }), 'invalid_down_payment')
   assert.equal(refusal({ installmentCount: 361 }), 'invalid_installment_count')
-  assert.equal(refusal({ balloonAmount: 700000 }), 'invalid_balloon')
+  assert.equal(refusal({ balloonAmount: 800000 }), 'invalid_balloon')
   assert.equal(
     refusal({ payments: [{ rate: 20, amount: null, lockedAmount: 150000 }] }),
     'first_payment_locked',
@@ -168,15 +176,25 @@ test('a percentage', () => {
 
 test('«تحديد تاريخ اول قسط» divides the stored amount, the payments untouched', () => {
   const stored = {
-    installments_amount: '805000.00',
+    installments_amount: '800000.00',
     balloon_amount: 0,
-    vat_timing: 'each',
+    vat_mode: 'separate',
+    vat_due: 'last',
     vat_due_date: null,
   }
   const { plan } = plain(lib.planDivision(stored, '2027-01-15', 24, 1))
-  assert.equal(plan.regular, 33541.66)
-  assert.equal(plan.lastRegular, 33541.82)
+  assert.deepEqual([plan.regular, plan.lastRegular], [33333.33, 33333.41])
   assert.equal(plan.rows[23].dueDate, '2028-12-15')
+  assert.equal(plan.vatDueDate, '2028-12-15')
+  const undecided = plain(lib.planDivision({ ...stored, vat_due: 'undecided' }, '2027-01-15', 24, 1))
+  assert.equal(undecided.plan.vatDueDate, null)
+})
+
+test('a new form chooses nothing', () => {
+  const form = lib.emptyContractForm()
+  assert.equal(form.vat_mode, '')
+  assert.equal(form.vat_due, 'undecided')
+  assert.deepEqual(plain(lib.INSTALLMENT_VAT_CHOICES), ['none', 'inside', 'separate'])
 })
 
 test('what the save sends', () => {
@@ -198,16 +216,28 @@ test('what the save sends', () => {
   // A row with money on it never records a second payment.
   const [again] = plain(lib.firstPaymentsPayload([{ ...paid, lockedAmount: 200000 }], 1000000))
   assert.equal(again.paid_on, undefined)
-  const vat = (vat_mode, vat_timing, vat_amount = '') =>
-    plain(lib.vatPayload({ vat_mode, vat_timing, vat_amount, vat_due_date: '' }))
-  assert.deepEqual(vat('inclusive', 'end'), { mode: 'inclusive' })
-  assert.deepEqual(vat('exclusive', 'each'), { mode: 'exclusive', timing: 'each' })
-  assert.deepEqual(vat('exclusive', 'end'), {
-    mode: 'exclusive',
-    timing: 'end',
+
+  const vat = (patch) => plain(lib.vatPayload({ ...lib.emptyContractForm(), ...patch }))
+  assert.deepEqual(vat({ vat_mode: 'inside', vat_amount: '5' }), { mode: 'inside' })
+  assert.deepEqual(vat({ vat_mode: 'separate' }), {
+    mode: 'separate',
     amount: null,
+    due: 'undecided',
     due_date: null,
+    title: null,
+    note: null,
   })
+  // «مدفوعة» hides the planned day; it is not lost.
+  const hidden = vat({
+    vat_mode: 'separate', vat_due: 'date', vat_due_date: '2026-12-30',
+    vat_paid: true, vat_paid_on: '2026-11-20',
+  })
+  assert.deepEqual([hidden.due, hidden.due_date, hidden.paid_on], ['date', '2026-12-30', '2026-11-20'])
+  // Paid with no day asked: none is invented.
+  assert.equal(
+    vat({ vat_mode: 'separate', vat_due: 'date', vat_paid: true, vat_paid_on: '2026-11-20' }).due,
+    'undecided',
+  )
 })
 
 test('a payment: the chosen row, then the oldest due, then the undated', () => {
@@ -215,7 +245,7 @@ test('a payment: the chosen row, then the oldest due, then the undated', () => {
     id, kind, seq, due_date, amount: 100, paid_amount,
   })
   const rows = [
-    row('p2', 'first_payment', 2, null),
+    row('v', 'vat', 1, null),
     row('i1', 'installment', 1, '2027-01-15'),
     row('p1', 'first_payment', 1, '2026-11-20', 100),
     row('i2', 'installment', 2, '2027-02-15'),
@@ -224,45 +254,48 @@ test('a payment: the chosen row, then the oldest due, then the undated', () => {
     const result = lib.allocateToRows(rows, amount, target)
     return result && plain(result.map((item) => [item.row.id, item.amount]))
   }
-  assert.deepEqual(split(250), [['i1', 100], ['i2', 100], ['p2', 50]])
-  // A first payment is paid before the first due date comes.
-  assert.deepEqual(split(100, 'p2'), [['p2', 100]])
-  assert.deepEqual(split(120, 'p2'), [['p2', 100], ['i1', 20]])
+  assert.deepEqual(split(250), [['i1', 100], ['i2', 100], ['v', 50]])
+  // The VAT is paid without a day, before the first due date comes.
+  assert.deepEqual(split(100, 'v'), [['v', 100]])
+  assert.deepEqual(split(120, 'v'), [['v', 100], ['i1', 20]])
   assert.equal(split(300.01), null)
 })
 
 const storedRow = (patch) => ({
   id: 'p1', contract_id: 'c', kind: 'first_payment', seq: 1, title: 'one',
-  note: null, rate: '30.0000', base_amount: '30000.00', amount: '30000.00',
-  vat_amount: 0, paid_amount: '30000.00', due_date: null, is_balloon: false,
+  note: null, rate: '30.0000', amount: '30000.00', paid_amount: '30000.00',
+  due_date: null, is_balloon: false,
   ...patch,
 })
 const storedContract = {
-  description: 'x', financier_id: 'f', total_amount: '100000.00',
+  description: 'x', financier_id: 'f', total_amount: '115000.00',
   down_payment: '0.00', balloon_amount: '0.00', installment_count: 12,
-  frequency_months: 1, first_due_date: null, notes: null, vat_mode: 'exclusive',
-  vat_timing: 'end', vat_amount: '15000.00', vat_due_date: null,
+  frequency_months: 1, first_due_date: null, notes: null, vat_mode: 'separate',
+  vat_due: 'undecided', vat_amount: '15000.00', vat_due_date: null,
   contract_bank_name: null, contract_iban: null,
 }
 
 test('a paid percentage never locks the total: it stays what was paid', () => {
   const values = lib.contractFormValues(storedContract, [storedRow()], [])
-  // Unchanged: still a percentage.
+  // Unchanged: still a percentage of the amount before VAT.
+  assert.equal(lib.rateBaseOf(values), 100000)
   assert.equal(lib.firstPaymentsPayload(values.payments, 100000)[0].rate, 30)
-  values.total_amount = '110000'
+  values.total_amount = '126500'
+  const base = lib.rateBaseOf(values)
+  assert.equal(base, 110000)
   const { input } = lib.planInputOf(values)
   const { plan, error } = lib.buildInstallmentPlan(input)
   assert.equal(error, null)
   assert.equal(plan.payments[0].amount, 30000)
   assert.equal(plan.installments.amount, 80000)
-  const [sent] = plain(lib.firstPaymentsPayload(values.payments, 110000))
+  const [sent] = plain(lib.firstPaymentsPayload(values.payments, base))
   assert.deepEqual([sent.rate, sent.amount], [null, 30000])
 })
 
 test('a paid VAT keeps its amount when the total is corrected', () => {
   const vatRow = storedRow({
-    id: 'v', kind: 'vat', title: null, rate: null, base_amount: null,
-    amount: '15000.00', paid_amount: '1000.00', due_date: '2027-12-15',
+    id: 'v', kind: 'vat', title: null, rate: null,
+    amount: '15000.00', paid_amount: '1000.00', due_date: null,
   })
   const values = lib.contractFormValues(storedContract, [vatRow], [])
   assert.equal(lib.vatPayload(values).amount, 15000)
@@ -273,7 +306,7 @@ test('a paid VAT keeps its amount when the total is corrected', () => {
 
 test('a changed contract: the terms stored now, the free edits of the user', () => {
   const before = lib.contractFormValues(storedContract, [], [])
-  const typed = { ...before, notes: 'typed', total_amount: '120000' }
+  const typed = { ...before, notes: 'typed', total_amount: '120000', vat_mode: 'none' }
   const now = lib.contractFormValues(
     { ...storedContract, first_due_date: '2027-01-15', description: 'renamed' },
     [storedRow()],
@@ -281,7 +314,8 @@ test('a changed contract: the terms stored now, the free edits of the user', () 
   )
   const merged = plain(lib.mergeStoredForm(typed, before, now))
   assert.equal(merged.first_due_date, '2027-01-15')
-  assert.equal(merged.total_amount, '100000')
+  assert.equal(merged.total_amount, '115000')
+  assert.equal(merged.vat_mode, 'separate')
   assert.equal(merged.payments.length, 1)
   assert.equal(merged.notes, 'typed')
   assert.equal(merged.description, 'renamed')

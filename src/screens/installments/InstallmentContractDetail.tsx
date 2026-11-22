@@ -93,7 +93,9 @@ import { formatDate } from '@/lib/dateFormat'
 import {
   daysUntilDue,
   formatInstallmentAmount,
+  fromHalalas,
   installmentState,
+  toHalalas,
   INSTALLMENT_FREQUENCY_LABEL_KEYS,
   installmentErrorMessage,
   INSTALLMENT_PAYMENT_METHOD_LABEL_KEYS,
@@ -128,8 +130,8 @@ import { saudiDateKey } from '@/lib/saudiTime'
 import { contractPaidPercent } from '@/lib/installmentsBoard'
 import {
   planDivision,
+  vatInsideHalalas,
   INSTALLMENT_VAT_LABEL_KEYS,
-  INSTALLMENT_VAT_TIMING_LABEL_KEYS,
 } from '@/lib/installmentPlan'
 import { removeInstallmentFileObjects } from '@/lib/installmentFilesData'
 
@@ -311,8 +313,22 @@ function InstallmentContractDetailInner({
     .sort((a, b) => a.seq - b.seq)
   const installments = schedule.filter((row) => row.kind === 'installment')
   const vatRow = schedule.find((row) => row.kind === 'vat') ?? null
-  const vatAtEnd = contract.vat_timing === 'end'
-  const exclusive = contract.vat_mode === 'exclusive'
+  const vatSeparate = contract.vat_mode === 'separate'
+  const vatInside = contract.vat_mode === 'inside'
+  const contractVat = amountOf(contract.vat_amount)
+  // The latest posted payment on a row: the day a row paid without one shows.
+  const paidOnOf = (target: InstallmentScheduleItem) =>
+    payments.reduce<string | null>(
+      (latest, payment) =>
+        payment.status === 'posted' &&
+        (othersBy.get(payment.id) ?? []).some(
+          (row) => row.kind === target.kind && row.seq === target.seq,
+        ) &&
+        (!latest || payment.paid_on > latest)
+          ? payment.paid_on
+          : latest,
+      null,
+    )
   const division = awaiting
     ? planDivision(
         contract,
@@ -334,12 +350,12 @@ function InstallmentContractDetailInner({
     ...(awaiting || installments.some((row) => !isSchedulePaid(row))
       ? [t('instPartInstallments')]
       : []),
-    ...(vatAtEnd && (!vatRow || !isSchedulePaid(vatRow))
+    ...(vatSeparate && vatRow && !isSchedulePaid(vatRow)
       ? [t('instPartVat')]
       : []),
   ]
   const remainingParts =
-    active && (firstPayments.length > 0 || vatAtEnd)
+    active && (firstPayments.length > 0 || vatSeparate)
       ? openParts.join(t('instListAnd'))
       : ''
   const scheduleView: ScheduleView =
@@ -467,7 +483,7 @@ function InstallmentContractDetailInner({
     {
       key: 'total',
       icon: <Banknote size={16} />,
-      label: t(exclusive ? 'instTotalBeforeVat' : 'instContractTotal'),
+      label: t('instContractTotal'),
       value: <Money value={contract.total_amount} />,
     },
     ...(amountOf(contract.down_payment) > 0
@@ -480,19 +496,29 @@ function InstallmentContractDetailInner({
           },
         ]
       : []),
+    ...(contractVat > 0
+      ? [
+          {
+            key: 'before_vat',
+            icon: <FileText size={16} />,
+            label: t('instBeforeVatLabel'),
+            value: (
+              <Money
+                value={sumAmounts([contract.total_amount, -contractVat])}
+              />
+            ),
+          },
+        ]
+      : []),
     {
       key: 'vat',
       icon: <Percent size={16} />,
-      label: contract.vat_timing
-        ? `${t('instVatLabel')}${t('instListComma')}${t(
-            INSTALLMENT_VAT_TIMING_LABEL_KEYS[contract.vat_timing],
-          )}`
-        : t('instVatLabel'),
+      label: t('instVatLabel'),
       value: (
         <span className="flex flex-wrap items-baseline gap-x-2">
           {t(INSTALLMENT_VAT_LABEL_KEYS[contract.vat_mode])}
-          {exclusive && (
-            <Money value={contract.vat_amount} className="text-muted" />
+          {contractVat > 0 && (
+            <Money value={contractVat} className="text-muted" />
           )}
         </span>
       ),
@@ -838,7 +864,7 @@ function InstallmentContractDetailInner({
         >
           {t('instOverdueOnContract').replace(
             '{installments}',
-            firstPayments.length > 0 || vatAtEnd
+            firstPayments.length > 0 || vatSeparate
               ? duesWords(overdueCount, lang)
               : installmentsWords(overdueCount, lang),
           )}{' '}
@@ -868,11 +894,24 @@ function InstallmentContractDetailInner({
               contract={contract}
               rows={firstPayments}
               today={today}
+              paidOn={paidOnOf}
               canAct={canManage && active}
               onPay={payRow}
               onSetDate={(row) => open({ kind: 'payment_date', row })}
             />
           )}
+          {vatSeparate && vatRow && (
+            <VatPaymentCard
+              contract={contract}
+              row={vatRow}
+              today={today}
+              paidOn={paidOnOf(vatRow)}
+              canAct={canManage && active}
+              onPay={payRow}
+              onSetDate={(row) => open({ kind: 'payment_date', row })}
+            />
+          )}
+
           {/* The schedule: wide cards, the amount in a fixed end block. */}
           <Card padded={false} className="flex min-w-0 flex-col">
             <div className="space-y-3 p-4 pb-0">
@@ -1007,23 +1046,18 @@ function InstallmentContractDetailInner({
                       )
                   const partial =
                     amountOf(row.paid_amount) > 0 && !isSchedulePaid(row)
-                  const vatInside = amountOf(row.vat_amount)
-                  const sub = exclusive
+                  const halalas = toHalalas(amountOf(row.amount))
+                  const part = vatInsideHalalas(halalas)
+                  const sub = vatInside
                     ? [
                         t('instBeforeVat').replace(
                           '{amount}',
-                          formatInstallmentAmount(
-                            sumAmounts([row.amount, -vatInside]),
-                          ),
+                          formatInstallmentAmount(fromHalalas(halalas - part)),
                         ),
-                        ...(contract.vat_timing === 'each'
-                          ? [
-                              t('instVatPart').replace(
-                                '{amount}',
-                                formatInstallmentAmount(vatInside),
-                              ),
-                            ]
-                          : []),
+                        t('instVatPart').replace(
+                          '{amount}',
+                          formatInstallmentAmount(fromHalalas(part)),
+                        ),
                       ].join(' · ')
                     : undefined
                   return (
@@ -1096,16 +1130,6 @@ function InstallmentContractDetailInner({
               </ul>
             )}
           </Card>
-
-          {vatAtEnd && (
-            <VatPaymentCard
-              contract={contract}
-              row={vatRow}
-              today={today}
-              canAct={canManage && active}
-              onPay={payRow}
-            />
-          )}
 
           {/* Payments: the latest ten, voided ones kept and struck out. */}
           <Card padded={false}>

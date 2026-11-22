@@ -81,10 +81,10 @@ export const INSTALLMENT_DUE_SELECT =
 export const INSTALLMENT_DUES_LIST_SELECT = `${INSTALLMENT_DUE_SELECT},last_paid_on`
 
 export const INSTALLMENT_CONTRACT_SELECT =
-  'id,contract_number,description,financier_id,financier_name,total_amount,down_payment,balloon_amount,financed_amount,installment_count,frequency_months,first_due_date,notes,status,closed_at,cancel_reason,created_by_name,created_at,updated_at,paid_total,remaining_total,paid_count,overdue_count,overdue_amount,next_due_date,next_due_amount,last_due_date,equipment_count,financier_bank_name,financier_iban,contract_bank_name,contract_iban,vat_mode,vat_timing,vat_amount,vat_due_date,installments_amount,payable_total,paid_overall,first_payments_count,first_payments_paid_count,first_payments_total,installments_locked,next_due_id,next_due_kind,next_due_title,next_due_seq,first_due_set_at,first_due_set_by_name'
+  'id,contract_number,description,financier_id,financier_name,total_amount,down_payment,balloon_amount,financed_amount,installment_count,frequency_months,first_due_date,notes,status,closed_at,cancel_reason,created_by_name,created_at,updated_at,paid_total,remaining_total,paid_count,overdue_count,overdue_amount,next_due_date,next_due_amount,last_due_date,equipment_count,financier_bank_name,financier_iban,contract_bank_name,contract_iban,vat_mode,vat_due,vat_amount,vat_due_date,installments_amount,payable_total,paid_overall,first_payments_count,first_payments_paid_count,first_payments_total,installments_locked,next_due_id,next_due_kind,next_due_title,next_due_seq,first_due_set_at,first_due_set_by_name,vat_settled'
 
 export const INSTALLMENT_SCHEDULE_SELECT =
-  'id,contract_id,seq,due_date,amount,is_balloon,paid_amount,kind,title,note,rate,base_amount,vat_amount'
+  'id,contract_id,seq,due_date,amount,is_balloon,paid_amount,kind,title,note,rate'
 
 export const INSTALLMENT_PAYMENT_SELECT =
   'id,contract_id,paid_on,amount,method,reference,note,status,voided_at,voided_by_name,void_reason,created_by_name,created_at,receipt_id,receipt_path,receipt_file_name,receipt_mime_type,receipt_size_bytes'
@@ -888,13 +888,14 @@ export async function setInstallmentFirstDueDate(input: {
   )
 }
 
-/** `set_installment_first_payment_date` (0209): dates a first payment. */
-export async function setInstallmentFirstPaymentDate(
+/** `set_installment_payment_date` (0209): dates a first payment or a
+ *  separate VAT. */
+export async function setInstallmentPaymentDate(
   scheduleId: string,
   dueDate: string,
 ): Promise<RpcResult<null>> {
   return asResult<null>(
-    await supabase.rpc('set_installment_first_payment_date', {
+    await supabase.rpc('set_installment_payment_date', {
       p_schedule_id: scheduleId,
       p_due_date: dueDate,
     }),

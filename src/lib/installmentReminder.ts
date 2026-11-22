@@ -226,7 +226,8 @@ export function reminderSectionLines(
     if (item.bucket !== bucket) continue
     const name =
       item.kind === 'vat'
-        ? INSTALLMENT_REMINDER_VAT_LABEL
+        ? oneLine(item.title ?? '', MAX_NAME_LENGTH) ||
+          INSTALLMENT_REMINDER_VAT_LABEL
         : item.kind === 'first_payment'
           ? oneLine(item.title ?? '', MAX_NAME_LENGTH) ||
             INSTALLMENT_REMINDER_PAYMENT_LABEL

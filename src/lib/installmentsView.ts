@@ -65,7 +65,7 @@ export interface InstallmentDueRow {
   financier_name: string
   seq: number
   installment_count: number
-  /** 0209: a first payment paid without a date shows on the day it was paid. */
+  /** 0209: a row paid without a date shows on the day it was paid. */
   due_date: string
   kind: InstallmentRowKind
   /** A first payment's name. */
@@ -122,13 +122,16 @@ export interface InstallmentContractRow {
   contract_bank_name?: string | null
   contract_iban?: string | null
   /** 0209. `down_payment` above is «مدفوع قبل التسجيل». */
-  vat_mode: 'unspecified' | 'inclusive' | 'exclusive' | 'exempt'
-  vat_timing: 'each' | 'end' | null
+  vat_mode: 'unspecified' | 'none' | 'inside' | 'separate'
+  vat_due: 'undecided' | 'date' | 'last' | null
+  /** The VAT INSIDE the total. */
   vat_amount: number
   vat_due_date: string | null
+  /** A separate VAT that is fully paid: it is due no more. */
+  vat_settled: boolean
   /** What the installments add up to, divided or not. */
   installments_amount: number
-  /** total_amount + vat_amount. */
+  /** The typed total: the VAT is inside it. */
   payable_total: number
   /** Paid, with what was paid before the contract was entered. */
   paid_overall: number
@@ -183,7 +186,7 @@ export interface InstallmentScheduleItem {
   id: string
   contract_id: string
   seq: number
-  /** Null only for a first payment whose day is not known. */
+  /** Null only for a first payment or a VAT row whose day is not known. */
   due_date: string | null
   amount: number
   is_balloon: boolean
@@ -192,9 +195,6 @@ export interface InstallmentScheduleItem {
   title: string | null
   note: string | null
   rate: number | null
-  base_amount: number | null
-  /** The VAT inside `amount` («مع كل دفعة وقسط»). */
-  vat_amount: number
 }
 
 /** `installment_payment_list`: a payment with the two names. */
@@ -386,7 +386,7 @@ export function payableRowLabel(
   count?: number,
 ): string {
   if (row.kind === 'first_payment') return row.title || t('instFirstPayment')
-  if (row.kind === 'vat') return t('instVatPayment')
+  if (row.kind === 'vat') return row.title || t('instVatPayment')
   const key = count ? 'instCardSeqOf' : 'instInstallmentN'
   return t(key)
     .replace('{seq}', String(row.seq))

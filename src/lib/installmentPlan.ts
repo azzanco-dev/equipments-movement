@@ -23,9 +23,10 @@ import { formatIban } from '@/lib/partyFields'
 
 /**
  * The plan of an installment contract (migration 0209, owner 2026-11-22):
- * its first payments (an amount or a percentage of the total), its VAT (with
- * each payment, or one row at the end) and the division of what is left,
- * which waits while the first due date is not known.
+ * ONE typed total — everything to pay, the VAT inside it —, the VAT in
+ * three options (none, inside the payments and installments, a payment by
+ * itself), the first payments (an amount or a percentage) and the division
+ * of what is left, which waits while the first due date is not known.
  *
  * Pure. The arithmetic MIRRORS `save_installment_contract` and
  * `generate_installment_schedule` in halalas, so «حسبة العقد» shows what the
@@ -34,37 +35,48 @@ import { formatIban } from '@/lib/partyFields'
 
 // --- The vocabulary ---------------------------------------------------------------------
 
-export type InstallmentVatMode =
-  'unspecified' | 'inclusive' | 'exclusive' | 'exempt'
-export type InstallmentVatTiming = 'each' | 'end'
+export type InstallmentVatMode = 'unspecified' | 'none' | 'inside' | 'separate'
+/** When a VAT paid by itself falls due. */
+export type InstallmentVatDue = 'undecided' | 'date' | 'last'
 
 /** The three a user chooses from; «غير محدد» is only what earlier contracts
  *  are. */
 export const INSTALLMENT_VAT_CHOICES: readonly InstallmentVatMode[] = [
-  'inclusive',
-  'exclusive',
-  'exempt',
+  'none',
+  'inside',
+  'separate',
 ]
 
 export const INSTALLMENT_VAT_LABEL_KEYS: Readonly<
   Record<InstallmentVatMode, TranslationKey>
 > = {
   unspecified: 'instVatUnspecified',
-  inclusive: 'instVatInclusive',
-  exclusive: 'instVatExclusive',
-  exempt: 'instVatExempt',
+  none: 'instVatNone',
+  inside: 'instVatInside',
+  separate: 'instVatSeparate',
 }
 
-export const INSTALLMENT_VAT_TIMINGS: readonly InstallmentVatTiming[] = [
-  'each',
-  'end',
+export const INSTALLMENT_VAT_HINT_KEYS: Readonly<
+  Record<InstallmentVatMode, TranslationKey>
+> = {
+  unspecified: 'instVatUnspecifiedHint',
+  none: 'instVatNoneHint',
+  inside: 'instVatInsideHint',
+  separate: 'instVatSeparateHint',
+}
+
+export const INSTALLMENT_VAT_DUES: readonly InstallmentVatDue[] = [
+  'undecided',
+  'date',
+  'last',
 ]
 
-export const INSTALLMENT_VAT_TIMING_LABEL_KEYS: Readonly<
-  Record<InstallmentVatTiming, TranslationKey>
+export const INSTALLMENT_VAT_DUE_LABEL_KEYS: Readonly<
+  Record<InstallmentVatDue, TranslationKey>
 > = {
-  each: 'instVatEach',
-  end: 'instVatEnd',
+  undecided: 'instVatDueUndecided',
+  date: 'instVatDueDate',
+  last: 'instWithLast',
 }
 
 export const INSTALLMENT_FIRST_PAYMENT_TITLE_MAX = 80
@@ -73,27 +85,14 @@ export const INSTALLMENT_FIRST_PAYMENTS_MAX = 100
 
 // --- Arithmetic (halalas) ---------------------------------------------------------------
 
-/** `round(amount * 15 / 100, 2)`: a tie goes up. */
-export function vatHalalas(halalas: number): number {
-  return Math.floor((halalas * 15 + 50) / 100)
-}
-
 /** The VAT inside an amount that carries it: `round(amount * 15 / 115, 2)`. */
 export function vatInsideHalalas(halalas: number): number {
   return Math.round((halalas * 3) / 23)
 }
 
-/** `installment_with_vat`. */
-export function withVatHalalas(
-  halalas: number,
-  timing: InstallmentVatTiming | null,
-): number {
-  return timing === 'each' ? halalas + vatHalalas(halalas) : halalas
-}
-
-/** `round(total * rate / 100, 2)`, exact for a rate of four decimals. */
-export function rateHalalas(totalHalalas: number, rate: number): number {
-  const scaled = BigInt(totalHalalas) * BigInt(Math.round(rate * 10_000))
+/** `round(base * rate / 100, 2)`, exact for a rate of four decimals. */
+export function rateHalalas(baseHalalas: number, rate: number): number {
+  const scaled = BigInt(baseHalalas) * BigInt(Math.round(rate * 10_000))
   return Number((scaled + BigInt(500_000)) / BigInt(1_000_000))
 }
 
@@ -108,7 +107,7 @@ export function parseInstallmentRate(value: string): number | null {
 // --- The plan ---------------------------------------------------------------------------
 
 export interface InstallmentPlanPayment {
-  /** One of the two: a percentage of the total, or an amount. */
+  /** One of the two: a percentage, or an amount, final as typed. */
   rate: number | null
   amount: number | null
   /** The payable amount it must keep: there is money on it. */
@@ -116,14 +115,15 @@ export interface InstallmentPlanPayment {
 }
 
 export interface InstallmentPlanInput {
+  /** Everything to pay, the VAT included. */
   totalAmount: number
   /** «مدفوع قبل التسجيل», as paid. */
   prepaid: number
   vatMode: InstallmentVatMode
-  vatTiming: InstallmentVatTiming | null
-  /** `end` only; null = 15% of the total. */
+  /** `separate` only; null = total x 15/115. */
   vatAmount: number | null
-  /** `end` only; null = with the last installment. */
+  /** `separate` only. */
+  vatDue: InstallmentVatDue
   vatDueDate: string | null
   payments: readonly InstallmentPlanPayment[]
   balloonAmount: number
@@ -136,7 +136,6 @@ export interface InstallmentPlanInput {
 export type InstallmentPlanError =
   | 'invalid_amount'
   | 'invalid_down_payment'
-  | 'invalid_vat_timing'
   | 'invalid_vat_amount'
   | 'invalid_first_payment'
   | 'first_payment_locked'
@@ -154,10 +153,11 @@ export interface InstallmentPlanRow {
 
 export interface InstallmentPlan {
   total: number
-  /** What is added to the total. */
+  /** The VAT inside the total. */
   vat: number
-  payable: number
+  beforeVat: number
   prepaid: number
+  /** `vat` = the part of the amount that is VAT. */
   payments: { base: number; vat: number; amount: number }[]
   installments: { base: number; vat: number; amount: number }
   /** Every installment, dated or not. */
@@ -186,28 +186,27 @@ export function buildInstallmentPlan(
   if (!Number.isFinite(prepaid) || prepaid < 0 || prepaid > max)
     return fail('invalid_down_payment')
 
-  const timing = input.vatMode === 'exclusive' ? input.vatTiming : null
-  let vat = 0
-  if (input.vatMode === 'exclusive') {
-    if (!timing) return fail('invalid_vat_timing')
+  const separate = input.vatMode === 'separate'
+  const inside = input.vatMode === 'inside'
+  let vat = inside ? vatInsideHalalas(total) : 0
+  if (separate) {
     vat =
-      timing === 'end' && input.vatAmount !== null
-        ? toHalalas(input.vatAmount)
-        : vatHalalas(total)
-    if (timing === 'end' && (vat <= 0 || vat > total))
-      return fail('invalid_vat_amount')
+      input.vatAmount === null
+        ? vatInsideHalalas(total)
+        : toHalalas(input.vatAmount)
+    if (!(vat > 0 && vat < total)) return fail('invalid_vat_amount')
   }
-  if (total + vat > max) return fail('invalid_amount')
+  // What a percentage is of, and what is shared out: without a separate VAT.
+  const shared = separate ? total - vat : total
 
   const payments: InstallmentPlan['payments'] = []
   let paymentsTotal = 0
   for (const payment of input.payments) {
-    const base =
+    const amount =
       payment.rate !== null
-        ? rateHalalas(total, payment.rate)
+        ? rateHalalas(shared, payment.rate)
         : toHalalas(payment.amount ?? 0)
-    if (!(base > 0)) return fail('invalid_first_payment')
-    const amount = withVatHalalas(base, timing)
+    if (!(amount > 0)) return fail('invalid_first_payment')
     if (
       payment.lockedAmount !== null &&
       payment.lockedAmount !== undefined &&
@@ -215,15 +214,15 @@ export function buildInstallmentPlan(
     )
       return fail('first_payment_locked')
     paymentsTotal += amount
+    const part = inside ? vatInsideHalalas(amount) : 0
     payments.push({
-      base: fromHalalas(base),
-      vat: fromHalalas(amount - base),
+      base: fromHalalas(amount - part),
+      vat: fromHalalas(part),
       amount: fromHalalas(amount),
     })
   }
 
-  const divided =
-    total - prepaid - paymentsTotal + (timing === 'each' ? vat : 0)
+  const divided = shared - prepaid - paymentsTotal
   if (divided <= 0)
     return fail(
       paymentsTotal > 0 ? 'invalid_first_payments' : 'invalid_down_payment',
@@ -238,11 +237,10 @@ export function buildInstallmentPlan(
     )
   )
     return fail('invalid_frequency')
-  const typedFinal = toHalalas(input.balloonAmount)
-  const final = withVatHalalas(typedFinal, timing)
+  const final = toHalalas(input.balloonAmount)
   if (
-    !Number.isFinite(typedFinal) ||
-    typedFinal < 0 ||
+    !Number.isFinite(final) ||
+    final < 0 ||
     (final > 0 && (count < 2 || final >= divided))
   )
     return fail('invalid_balloon')
@@ -267,14 +265,14 @@ export function buildInstallmentPlan(
       isBalloon,
     }
   })
-  const dividedVat = timing === 'each' ? vatInsideHalalas(divided) : 0
+  const dividedVat = inside ? vatInsideHalalas(divided) : 0
 
   return {
     error: null,
     plan: {
       total: fromHalalas(total),
       vat: fromHalalas(vat),
-      payable: fromHalalas(total + vat),
+      beforeVat: fromHalalas(total - vat),
       prepaid: fromHalalas(prepaid),
       payments,
       installments: {
@@ -286,7 +284,13 @@ export function buildInstallmentPlan(
       regular: fromHalalas(regularCount === 1 ? lastRegular : each),
       lastRegular: fromHalalas(lastRegular),
       balloon: fromHalalas(final),
-      vatDueDate: timing === 'end' ? (input.vatDueDate ?? dayOf(count)) : null,
+      vatDueDate: !separate
+        ? null
+        : input.vatDue === 'date'
+          ? input.vatDueDate
+          : input.vatDue === 'last'
+            ? dayOf(count)
+            : null,
     },
   }
 }
@@ -301,25 +305,26 @@ export function buildInstallmentPlan(
 export function planDivision(
   contract: Pick<
     InstallmentContractRow,
-    'installments_amount' | 'balloon_amount' | 'vat_timing' | 'vat_due_date'
+    | 'installments_amount'
+    | 'balloon_amount'
+    | 'vat_mode'
+    | 'vat_due'
+    | 'vat_due_date'
   >,
   firstDueDate: string | null,
   installmentCount: number,
   frequencyMonths: number,
 ): InstallmentPlanResult {
-  const timing = contract.vat_timing
   const result = buildInstallmentPlan({
     totalAmount: amountOf(contract.installments_amount),
     prepaid: 0,
-    // The stored amount already carries its VAT.
-    vatMode: 'inclusive',
-    vatTiming: null,
+    // The stored amount is what is divided: nothing to take out of it.
+    vatMode: 'none',
     vatAmount: null,
+    vatDue: 'undecided',
     vatDueDate: null,
     payments: [],
-    balloonAmount: fromHalalas(
-      withVatHalalas(toHalalas(amountOf(contract.balloon_amount)), timing),
-    ),
+    balloonAmount: amountOf(contract.balloon_amount),
     installmentCount,
     frequencyMonths,
     firstDueDate,
@@ -331,7 +336,13 @@ export function planDivision(
     plan: {
       ...result.plan,
       vatDueDate:
-        timing === 'end' ? (contract.vat_due_date ?? last.dueDate) : null,
+        contract.vat_mode !== 'separate'
+          ? null
+          : contract.vat_due === 'date'
+            ? contract.vat_due_date
+            : contract.vat_due === 'last'
+              ? last.dueDate
+              : null,
     },
   }
 }
@@ -358,8 +369,6 @@ export interface FirstPaymentFormRow {
   method: InstallmentPaymentMethod
   /** The stored payable amount, when money is on the row. */
   lockedAmount: number | null
-  /** Its stored amount before VAT, when money is on the row. */
-  lockedBase: number | null
   /** Fully paid: its day is fixed too. */
   settled: boolean
 }
@@ -372,10 +381,17 @@ export interface InstallmentContractFormValues {
   down_payment: string
   /** '' = not chosen yet. */
   vat_mode: InstallmentVatMode | ''
-  vat_timing: InstallmentVatTiming | ''
-  /** '' = 15% of the total, following it. */
+  /** The row of a separate VAT: '' = its usual name. */
+  vat_title: string
+  vat_note: string
+  /** '' = total x 15/115, following the total. */
   vat_amount: string
+  vat_due: InstallmentVatDue
   vat_due_date: string
+  /** «مدفوعة» on it: the planned day is hidden, not lost. */
+  vat_paid: boolean
+  vat_paid_on: string
+  vat_method: InstallmentPaymentMethod
   payments: FirstPaymentFormRow[]
   balloon_amount: string
   installment_count: string
@@ -397,9 +413,9 @@ export const INSTALLMENT_CONTRACT_FIELD_ORDER: readonly (keyof InstallmentContra
     'total_amount',
     'down_payment',
     'vat_mode',
-    'vat_timing',
     'vat_amount',
     'vat_due_date',
+    'vat_paid_on',
     'payments',
     'installment_count',
     'frequency_months',
@@ -420,7 +436,6 @@ export const INSTALLMENT_CONTRACT_TOKEN_FIELDS: Readonly<
   invalid_amount: 'total_amount',
   invalid_down_payment: 'down_payment',
   invalid_vat: 'vat_mode',
-  invalid_vat_timing: 'vat_timing',
   invalid_vat_amount: 'vat_amount',
   invalid_vat_date: 'vat_due_date',
   invalid_first_payment: 'payments',
@@ -475,7 +490,6 @@ export function newFirstPaymentRow(
     paid: false,
     method: 'transfer',
     lockedAmount: null,
-    lockedBase: null,
     settled: false,
   }
 }
@@ -488,9 +502,15 @@ export function emptyContractForm(): InstallmentContractFormValues {
     total_amount: '',
     down_payment: '0',
     vat_mode: '',
-    vat_timing: '',
+    vat_title: '',
+    vat_note: '',
     vat_amount: '',
+    // Not assumed to be at the end.
+    vat_due: 'undecided',
     vat_due_date: '',
+    vat_paid: false,
+    vat_paid_on: '',
+    vat_method: 'transfer',
     payments: [],
     balloon_amount: '0',
     installment_count: '12',
@@ -511,23 +531,27 @@ export function contractFormValues(
 ): InstallmentContractFormValues {
   const total = toHalalas(amountOf(contract.total_amount))
   const vat = toHalalas(amountOf(contract.vat_amount))
+  const vatRow = schedule.find((row) => row.kind === 'vat')
   return {
     description: contract.description,
     financier_id: contract.financier_id,
     total_amount: amountInputText(contract.total_amount),
     down_payment: amountInputText(contract.down_payment),
     vat_mode: contract.vat_mode,
-    vat_timing: contract.vat_timing ?? '',
+    vat_title: vatRow?.title ?? '',
+    vat_note: vatRow?.note ?? '',
     vat_amount:
-      contract.vat_timing === 'end' &&
-      (vat !== vatHalalas(total) ||
+      contract.vat_mode === 'separate' &&
+      (vat !== vatInsideHalalas(total) ||
         // With money on its row it stays, whatever the total becomes.
-        schedule.some(
-          (row) => row.kind === 'vat' && amountOf(row.paid_amount) > 0,
-        ))
+        amountOf(vatRow?.paid_amount) > 0)
         ? amountInputText(contract.vat_amount)
         : '',
+    vat_due: contract.vat_due ?? 'undecided',
     vat_due_date: contract.vat_due_date ?? '',
+    vat_paid: false,
+    vat_paid_on: '',
+    vat_method: 'transfer',
     payments: schedule
       .filter((row) => row.kind === 'first_payment')
       .sort((a, b) => a.seq - b.seq)
@@ -538,7 +562,7 @@ export function contractFormValues(
           id: row.id,
           title: row.title ?? '',
           kind: rated ? 'rate' : 'amount',
-          value: amountInputText(rated ? row.rate : row.base_amount),
+          value: amountInputText(rated ? row.rate : row.amount),
           date: row.due_date ?? '',
           paidOn: '',
           note: row.note ?? '',
@@ -546,8 +570,6 @@ export function contractFormValues(
           method: 'transfer',
           lockedAmount:
             amountOf(row.paid_amount) > 0 ? amountOf(row.amount) : null,
-          lockedBase:
-            amountOf(row.paid_amount) > 0 ? amountOf(row.base_amount) : null,
           settled: isSchedulePaid(row),
         }
       }),
@@ -575,20 +597,43 @@ export function firstPaymentValue(
 }
 
 /**
+ * What a percentage is of: the total, less a VAT that is paid by itself (it
+ * would be counted twice otherwise). Null while the total is no number.
+ */
+export function rateBaseOf(
+  values: Pick<
+    InstallmentContractFormValues,
+    'total_amount' | 'vat_mode' | 'vat_amount'
+  >,
+): number | null {
+  const total = parseInstallmentAmount(values.total_amount)
+  if (!total) return null
+  if (values.vat_mode !== 'separate') return total
+  const typed = values.vat_amount.trim()
+    ? parseInstallmentAmount(values.vat_amount)
+    : null
+  const halalas = toHalalas(total)
+  const base =
+    halalas - (typed === null ? vatInsideHalalas(halalas) : toHalalas(typed))
+  return base > 0 ? fromHalalas(base) : null
+}
+
+/**
  * A row as the plan and the save take it. A percentage with money on it
- * stays the amount it was paid as when the total is corrected: it goes as
+ * stays the amount it was paid as when what it is of changes: it goes as
  * that amount, so the total stays editable.
  */
 export function firstPaymentPlanValue(
-  row: Pick<FirstPaymentFormRow, 'kind' | 'value' | 'lockedBase'>,
-  total: number | null,
+  row: Pick<FirstPaymentFormRow, 'kind' | 'value' | 'lockedAmount'>,
+  rateBase: number | null,
 ): { rate: number | null; amount: number | null } | null {
   const value = firstPaymentValue(row)
-  if (!value || value.rate === null || row.lockedBase === null || total === null)
-    return value
-  return rateHalalas(toHalalas(total), value.rate) === toHalalas(row.lockedBase)
+  if (!value || value.rate === null) return value
+  if (row.lockedAmount === null || rateBase === null) return value
+  return rateHalalas(toHalalas(rateBase), value.rate) ===
+    toHalalas(row.lockedAmount)
     ? value
-    : { rate: null, amount: row.lockedBase }
+    : { rate: null, amount: row.lockedAmount }
 }
 
 /** The fields an edit may change whatever is paid. */
@@ -635,16 +680,17 @@ export function planInputOf(
   const count = latinDigits(values.installment_count).trim()
   if (total === null || prepaid === null || balloon === null) return null
   if (!/^\d+$/.test(count)) return null
-  const atEnd = values.vat_mode === 'exclusive' && values.vat_timing === 'end'
+  const separate = values.vat_mode === 'separate'
   let vatAmount: number | null = null
-  if (atEnd && values.vat_amount.trim()) {
+  if (separate && values.vat_amount.trim()) {
     vatAmount = parseInstallmentAmount(values.vat_amount)
     if (vatAmount === null) return null
   }
+  const rateBase = rateBaseOf(values)
   const payments: InstallmentPlanPayment[] = []
   const rowIndexes: number[] = []
   values.payments.forEach((row, index) => {
-    const value = firstPaymentPlanValue(row, total)
+    const value = firstPaymentPlanValue(row, rateBase)
     if (!value) return
     payments.push({ ...value, lockedAmount: row.lockedAmount })
     rowIndexes.push(index)
@@ -654,10 +700,10 @@ export function planInputOf(
     input: {
       totalAmount: total,
       prepaid,
-      vatMode: values.vat_mode || 'inclusive',
-      vatTiming: values.vat_timing || null,
+      vatMode: values.vat_mode || 'none',
       vatAmount,
-      vatDueDate: atEnd ? values.vat_due_date || null : null,
+      vatDue: values.vat_due,
+      vatDueDate: separate ? values.vat_due_date || null : null,
       payments,
       balloonAmount: balloon,
       installmentCount: Number(count),
@@ -671,28 +717,45 @@ export function planInputOf(
 
 export interface InstallmentVatPayload {
   mode: InstallmentVatMode
-  timing?: InstallmentVatTiming
   amount?: number | null
+  due?: InstallmentVatDue
   due_date?: string | null
+  title?: string | null
+  note?: string | null
+  paid_on?: string
+  method?: InstallmentPaymentMethod
 }
 
 export function vatPayload(
   values: Pick<
     InstallmentContractFormValues,
-    'vat_mode' | 'vat_timing' | 'vat_amount' | 'vat_due_date'
+    | 'vat_mode'
+    | 'vat_title'
+    | 'vat_note'
+    | 'vat_amount'
+    | 'vat_due'
+    | 'vat_due_date'
+    | 'vat_paid'
+    | 'vat_paid_on'
+    | 'vat_method'
   >,
 ): InstallmentVatPayload {
   const mode = values.vat_mode as InstallmentVatMode
-  if (mode !== 'exclusive') return { mode }
-  const timing = values.vat_timing as InstallmentVatTiming
-  if (timing !== 'end') return { mode, timing }
+  if (mode !== 'separate') return { mode }
+  // A day is needed only while one is asked for.
+  const dated = values.vat_due === 'date' && !!values.vat_due_date
   return {
     mode,
-    timing,
     amount: values.vat_amount.trim()
       ? parseInstallmentAmount(values.vat_amount)
       : null,
-    due_date: values.vat_due_date || null,
+    due: values.vat_due === 'date' && !dated ? 'undecided' : values.vat_due,
+    due_date: dated ? values.vat_due_date : null,
+    title: values.vat_title.trim() || null,
+    note: values.vat_note.trim() || null,
+    ...(values.vat_paid
+      ? { paid_on: values.vat_paid_on, method: values.vat_method }
+      : {}),
   }
 }
 
@@ -709,10 +772,10 @@ export interface InstallmentFirstPaymentPayload {
 
 export function firstPaymentsPayload(
   rows: readonly FirstPaymentFormRow[],
-  total: number | null,
+  rateBase: number | null,
 ): InstallmentFirstPaymentPayload[] {
   return rows.map((row) => {
-    const value = firstPaymentPlanValue(row, total)
+    const value = firstPaymentPlanValue(row, rateBase)
     return {
       id: row.id,
       title: row.title.trim(),
