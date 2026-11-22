@@ -333,14 +333,14 @@ export function InstallmentsContractsTab({
         />
       ) : !load.data ? (
         <div
-          className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
+          className="grid gap-5 md:grid-cols-2 xl:grid-cols-3"
           aria-busy="true"
         >
           <span className="sr-only" role="status">
             {t('loading')}
           </span>
           {[0, 1, 2].map((index) => (
-            <Skeleton key={index} className="h-72 w-full" />
+            <Skeleton key={index} className="h-60 w-full" />
           ))}
         </div>
       ) : load.data.rows.length === 0 ? (
@@ -350,7 +350,7 @@ export function InstallmentsContractsTab({
         />
       ) : (
         <>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {load.data.rows.map((contract) => (
               <ContractCard
                 key={contract.id}

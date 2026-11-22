@@ -105,7 +105,7 @@ test('the financiers tab is cards with the payment account', () => {
     '<FigureCard',
     'financiersOverview(',
     'financierTone(financiers, financier.id)',
-    "<BankAccountLine account={account} showSource={false} />",
+    '<BankAccountLine account={account} showSource={false} compact />',
     "t('instNoAccount')",
     "t('instFinAddAccount')",
     "t('instFinContractsLink')",
@@ -130,6 +130,26 @@ test('the financiers tab is cards with the payment account', () => {
     read('src', 'components', 'installments', 'InstallmentFinancierDialog.tsx'),
     /ibanHint=\{t\('instFinancierIbanHint'\)\}\s*stacked/,
   )
+})
+
+// Owner 2026-11-22: «وشيل البار الاخضر اكتفي بالدائرة, وحط عندها القسط 1
+// من كذا», «والمتبقي خليه اخر الكرت تحت», «اللوحة خليه نظرة عامة».
+test('the cards: the ring alone with the place, the remaining last', () => {
+  const parts = read('src', 'components', 'installments', 'boardParts.tsx')
+  const card = parts.slice(parts.indexOf('export function ContractCard('))
+  assert.doesNotMatch(card, /width: `${percent}%`/)
+  const ring = card.indexOf('<ProgressRing')
+  assert.ok(ring > 0 && ring < card.indexOf('{place}'))
+  assert.ok(card.indexOf("t('instPayRow')") < card.indexOf("t('instRemaining')"))
+
+  const tab = read('src', 'components', 'installments', 'InstallmentsFinanciersTab.tsx')
+  const financier = tab.slice(tab.indexOf('function FinancierCard('))
+  assert.ok(
+    financier.indexOf("t('instFinContractsLink')") < financier.indexOf("t('instRemaining')"),
+  )
+  const copy = read('src', 'i18n', 'translations.ts')
+  assert.ok(copy.includes("instTabDashboard: 'نظرة عامة',"))
+  assert.ok(copy.includes("instTabDashboard: 'Overview',"))
 })
 
 test('the new copy exists in both languages, without hamza in Arabic', () => {

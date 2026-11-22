@@ -211,9 +211,9 @@ export function InstallmentsDashboardTab({
           <span className="sr-only" role="status">
             {t('loading')}
           </span>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {[0, 1, 2].map((index) => (
-              <Skeleton key={index} className="h-72 w-full" />
+              <Skeleton key={index} className="h-60 w-full" />
             ))}
           </div>
           <Skeleton className="h-72 w-full" />
@@ -236,7 +236,7 @@ export function InstallmentsDashboardTab({
                 <EmptyState title={t('instNoUpcoming7')} className="p-6" />
               </Card>
             ) : (
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {data.upcoming.map((row) => {
                   const contract = contractsById.get(row.contract_id)
                   if (!contract) return null

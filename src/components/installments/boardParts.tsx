@@ -57,14 +57,14 @@ export function FigureCard({
   return (
     <div
       className={cn(
-        'flex min-w-0 flex-col gap-3 rounded-xl p-4',
+        'flex min-w-0 flex-col gap-1.5 rounded-xl p-3',
         toneBox(tone),
       )}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2">
         <span
           className={cn(
-            'flex size-9 shrink-0 items-center justify-center rounded-lg bg-bg',
+            'flex size-7 shrink-0 items-center justify-center rounded-md bg-bg [&>svg]:size-4',
             toneInk(tone),
           )}
           aria-hidden="true"
@@ -72,15 +72,14 @@ export function FigureCard({
           {icon}
         </span>
         <div className="min-w-0">
-          <p className={cn('text-sm font-semibold', toneInk(tone))}>{title}</p>
-          {sub && <p className={cn('text-xs', toneInk(tone))}>{sub}</p>}
+          <p className={cn('text-xs font-semibold', toneInk(tone))}>{title}</p>
+          {sub && <p className={cn('text-[11px]', toneInk(tone))}>{sub}</p>}
         </div>
       </div>
-      {/* Smaller while four cards share a row (xl), so «33,941,332.19» fits. */}
-      <div className="whitespace-nowrap text-xl font-bold tabular-nums xl:text-lg 2xl:text-xl">
+      <div className="whitespace-nowrap text-base font-bold tabular-nums">
         {value}
       </div>
-      {foot && <p className="text-xs text-muted">{foot}</p>}
+      {foot && <p className="text-[11px] text-muted">{foot}</p>}
     </div>
   )
 }
@@ -198,9 +197,10 @@ export interface CardDue {
 
 /**
  * The contract card of design 4: the financier with its tile and the state
- * badge, the title and the number beside the ring of the share paid, «المتبقي»
- * with «القسط N من M» and a bar, the box of the installment it points at
- * (red when late), then «فتح العقد» and «تسديد». The dashboard points it at
+ * badge, the title and the number beside the ring of the share paid with
+ * «القسط N من M» under it (owner 2026-11-22: the ring alone, no bar), the
+ * box of the installment it points at (red when late), «فتح العقد» and
+ * «تسديد», and «المتبقي» last, at the foot. The dashboard points it at
  * the installment due within 7 days; the contracts tab at the next one.
  * Since 0209 the row may be a first payment or the VAT, and a contract
  * waiting for its first due date says so and offers «تحديد التاريخ».
@@ -253,10 +253,10 @@ export function ContractCard({
               .replace('{seq}', String(currentSeq(contract)))
               .replace('{count}', String(contract.installment_count))
   return (
-    <article className="flex min-w-0 flex-col gap-2 rounded-xl border bg-bg p-3.5 shadow-sm">
+    <article className="flex min-w-0 flex-col gap-2 rounded-xl border bg-bg p-3 shadow-sm">
       <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-2 text-xs text-muted">
-          <FinancierTile tone={tone} size={28} />
+        <span className="flex min-w-0 items-center gap-2 text-[11px] text-muted">
+          <FinancierTile tone={tone} size={24} />
           <span className="truncate">{contract.financier_name}</span>
         </span>
         <Badge size="sm" tone={badge.tone}>
@@ -267,29 +267,24 @@ export function ContractCard({
         <div className="min-w-0">
           <AppLink
             href={`/installments/${contract.id}`}
-            className="block truncate-safe text-sm font-bold hover:underline"
+            className="block truncate-safe text-[13px] font-bold hover:underline"
             title={contract.description}
           >
             {contract.description}
           </AppLink>
-          <bdi dir="ltr" className="text-xs text-muted">
+          <bdi dir="ltr" className="text-[11px] text-muted">
             {contract.contract_number}
           </bdi>
         </div>
-        <ProgressRing percent={percent} tone={late ? 'danger' : 'success'} />
-      </div>
-      <div className="space-y-1">
-        <div className="flex items-end justify-between gap-2">
-          <div>
-            <p className="text-xs text-muted">{t('instRemaining')}</p>
-            <Money
-              value={contract.remaining_total}
-              className="text-lg font-bold"
-            />
-          </div>
+        <div className="flex max-w-32 shrink-0 flex-col items-center gap-1">
+          <ProgressRing
+            percent={percent}
+            tone={late ? 'danger' : 'success'}
+            size={48}
+          />
           <p
             className={cn(
-              'text-xs',
+              'text-center text-[11px] leading-tight [text-wrap:balance]',
               waiting && !due && paidPayments > 0
                 ? 'text-success'
                 : 'text-muted',
@@ -297,18 +292,6 @@ export function ContractCard({
           >
             {place}
           </p>
-        </div>
-        <div
-          className="h-1.5 overflow-hidden rounded-full bg-surface-hover"
-          aria-hidden="true"
-        >
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${percent}%`,
-              backgroundColor: late ? 'var(--danger)' : 'var(--success)',
-            }}
-          />
         </div>
       </div>
       {due && (
@@ -319,40 +302,40 @@ export function ContractCard({
           )}
         >
           <div className="min-w-0">
-            <p className="truncate text-xs text-muted">
+            <p className="truncate text-[11px] text-muted">
               {due.kind === 'installment'
                 ? t('instCardNextDue')
                 : payableRowLabel(due, t)}
             </p>
-            <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
+            <p className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
               <bdi dir="ltr">{formatDate(due.date)}</bdi>
               <WhenBadge days={due.days} />
             </p>
           </div>
           <Money
             value={due.amount}
-            className={cn('text-sm font-bold', late && 'text-danger')}
+            className={cn('text-[13px] font-bold', late && 'text-danger')}
           />
         </div>
       )}
       {!due && waiting && (
         <div className="flex items-center justify-between gap-2 rounded-lg bg-warning-soft px-2.5 py-2">
           <div className="min-w-0">
-            <p className="text-xs text-muted">{t('instFirstDueDate')}</p>
-            <p className="text-sm font-medium text-warning">
+            <p className="text-[11px] text-muted">{t('instFirstDueDate')}</p>
+            <p className="text-xs font-medium text-warning">
               {t('instFpNoDate')}
             </p>
           </div>
           <Money
             value={contract.installments_amount}
-            className="text-sm font-bold"
+            className="text-[13px] font-bold"
           />
         </div>
       )}
       <div className="mt-auto flex items-center justify-between gap-2">
         <AppLink
           href={`/installments/${contract.id}`}
-          className="inline-flex items-center gap-1 text-sm hover:underline"
+          className="inline-flex items-center gap-1 text-xs hover:underline"
         >
           {t('instCardOpen')}
           <Chevron size={14} aria-hidden="true" />
@@ -371,6 +354,13 @@ export function ContractCard({
             {t('instPayRow')}
           </Button>
         ) : null}
+      </div>
+      <div className="flex items-baseline justify-between gap-2 border-t pt-2">
+        <span className="text-[11px] text-muted">{t('instRemaining')}</span>
+        <Money
+          value={contract.remaining_total}
+          className="text-[15px] font-bold"
+        />
       </div>
     </article>
   )

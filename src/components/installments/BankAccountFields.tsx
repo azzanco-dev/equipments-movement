@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check, Copy } from 'lucide-react'
 import { AsyncSearchSelect } from '@/components/AsyncSearchSelect'
 import { BankLogo } from '@/components/banks/BankLogo'
-import { Field, IconButton, Input } from '@/components/ui'
+import { cn, Field, IconButton, Input } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import { loadInstallmentBankOptions } from '@/lib/installmentsData'
@@ -102,14 +102,17 @@ export function BankAccountFields({
 /**
  * The account a contract is paid to (0208): the bank with its logo, the
  * IBAN in groups of four with a copy button, and whose account it is.
- * Nothing recorded = a quiet line.
+ * Nothing recorded = a quiet line. `compact` is the financier card's
+ * smaller look (owner 2026-11-22, «خصوصا رقم الايبان»).
  */
 export function BankAccountLine({
   account,
   showSource = true,
+  compact = false,
 }: {
   account: InstallmentAccount | null
   showSource?: boolean
+  compact?: boolean
 }) {
   const { t } = useI18n()
   const [copied, setCopied] = useState(false)
@@ -134,7 +137,7 @@ export function BankAccountLine({
   }
 
   return (
-    <span className="flex min-w-0 flex-col gap-1">
+    <span className={cn('flex min-w-0 flex-col', compact ? 'text-xs' : 'gap-1')}>
       {account.bankName && (
         <span className="flex min-w-0 items-center gap-2">
           <BankLogo name={account.bankName} size="sm" />
@@ -145,7 +148,13 @@ export function BankAccountLine({
       )}
       {iban && (
         <span className="flex items-center gap-1">
-          <bdi dir="ltr" className="font-medium tabular-nums">
+          <bdi
+            dir="ltr"
+            className={cn(
+              'tabular-nums',
+              compact ? 'text-[11px] text-muted' : 'font-medium',
+            )}
+          >
             {formatIban(iban)}
           </bdi>
           <IconButton

@@ -51,8 +51,9 @@ import { useLoad } from './useLoad'
  * CARD per financier in its colour (the same tone as on the dues and the
  * contracts): its active contracts, «حساب السداد» (the bank with its logo
  * and the IBAN with a copy button, or a dashed «لا يوجد حساب مسجل» with
- * «اضافة الحساب»), what it is owed with its share and a bar, «عقود الجهة»
- * (the contracts tab searched by its name) and its next due date. The
+ * «اضافة الحساب»), «عقود الجهة» (the contracts tab searched by its name)
+ * with its next due date, and last, at the foot, what it is owed with its
+ * share and a bar (owner 2026-11-22: «المتبقي» last, smaller cards). The
  * figures come from ONE bounded read of the contract summaries
  * (`financierFigures`). `installments.manage` adds, edits and deletes; a
  * financier with contracts is not deleted (the database refuses it,
@@ -234,7 +235,7 @@ export function InstallmentsFinanciersTab({
             <button
               type="button"
               onClick={onAdd}
-              className="flex min-h-48 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
+              className="flex min-h-36 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)]"
             >
               <span
                 aria-hidden="true"
@@ -242,10 +243,10 @@ export function InstallmentsFinanciersTab({
               >
                 <Plus size={18} />
               </span>
-              <span className="text-sm font-bold">
+              <span className="text-[13px] font-bold">
                 {t('instFinancierAdd')}
               </span>
-              <span className="text-xs text-muted">
+              <span className="text-[11px] text-muted">
                 {t('instFinAddTileDesc')}
               </span>
             </button>
@@ -310,12 +311,12 @@ function FinancierCard({
   const Forward = dir === 'rtl' ? ChevronLeft : ChevronRight
 
   return (
-    <article className="flex min-w-0 flex-col gap-2 rounded-xl border bg-bg p-4">
-      <header className="flex items-start gap-3">
-        <FinancierTile tone={tone} size={36} />
+    <article className="flex min-w-0 flex-col gap-2 rounded-xl border bg-bg p-3">
+      <header className="flex items-start gap-2">
+        <FinancierTile tone={tone} size={28} />
         <div className="min-w-0 flex-1">
-          <h3 className="break-words text-base font-bold">{financier.name}</h3>
-          <p className="text-xs text-muted">
+          <h3 className="break-words text-[13px] font-bold">{financier.name}</h3>
+          <p className="text-[11px] text-muted">
             {!figures
               ? '—'
               : figures.contracts === 0
@@ -355,15 +356,15 @@ function FinancierCard({
       </header>
 
       {account ? (
-        <div className="space-y-1 rounded-lg bg-surface px-3 py-2">
-          <p className="text-xs text-muted">{t('instAccountTitle')}</p>
-          <BankAccountLine account={account} showSource={false} />
+        <div className="space-y-1 rounded-lg bg-surface px-2.5 py-1.5">
+          <p className="text-[11px] text-muted">{t('instAccountTitle')}</p>
+          <BankAccountLine account={account} showSource={false} compact />
         </div>
       ) : (
-        <div className="space-y-1 rounded-lg border border-dashed px-3 py-2">
-          <p className="text-xs text-muted">{t('instAccountTitle')}</p>
+        <div className="space-y-1 rounded-lg border border-dashed px-2.5 py-1.5">
+          <p className="text-[11px] text-muted">{t('instAccountTitle')}</p>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-sm text-muted">{t('instNoAccount')}</span>
+            <span className="text-xs text-muted">{t('instNoAccount')}</span>
             {canManage && (
               <Button
                 variant="ghost"
@@ -378,35 +379,7 @@ function FinancierCard({
         </div>
       )}
 
-      <div className="space-y-1">
-        <div className="flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs text-muted">{t('instRemaining')}</p>
-            <div className="text-xl font-bold">
-              {figures ? <Money value={figures.remaining} /> : '—'}
-            </div>
-          </div>
-          {figures && (
-            <span className="shrink-0 text-xs text-muted">
-              {t('instShareOfRemaining').replace('{percent}', String(share))}
-            </span>
-          )}
-        </div>
-        <div
-          className="h-1.5 overflow-hidden rounded-full bg-surface-hover"
-          aria-hidden="true"
-        >
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${share}%`,
-              backgroundColor: `var(--chart-stroke-${tone})`,
-            }}
-          />
-        </div>
-      </div>
-
-      <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t pt-2 text-xs">
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 text-[11px]">
         {figures && figures.contracts === 0 ? (
           <span className="text-muted">
             {canManage ? t('instFinCanDelete') : t('instFinNoContracts')}
@@ -432,7 +405,35 @@ function FinancierCard({
             )}
           </>
         )}
-      </footer>
+      </div>
+
+      <div className="space-y-1 border-t pt-2">
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] text-muted">{t('instRemaining')}</p>
+            <div className="text-[15px] font-bold">
+              {figures ? <Money value={figures.remaining} /> : '—'}
+            </div>
+          </div>
+          {figures && (
+            <span className="shrink-0 text-[11px] text-muted">
+              {t('instShareOfRemaining').replace('{percent}', String(share))}
+            </span>
+          )}
+        </div>
+        <div
+          className="h-1 overflow-hidden rounded-full bg-surface-hover"
+          aria-hidden="true"
+        >
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${share}%`,
+              backgroundColor: `var(--chart-stroke-${tone})`,
+            }}
+          />
+        </div>
+      </div>
     </article>
   )
 }
