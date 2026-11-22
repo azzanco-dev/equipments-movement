@@ -31,6 +31,7 @@ import {
 import {
   installmentMonthLabel,
   monthKeyOf,
+  payableRowLabel,
   type InstallmentDueRow,
 } from '@/lib/installmentsView'
 import { saudiDateKey } from '@/lib/saudiTime'
@@ -229,6 +230,9 @@ export function InstallmentsCalendarTab({
                                 <bdi dir="ltr" className="opacity-80">
                                   {shortContractNumber(row.contract_number)}
                                 </bdi>
+                                {row.kind !== 'installment' && (
+                                  <span>{t('instFirstPayment')}</span>
+                                )}
                                 {/* Whole riyals, as the approved design:
                                     a cell is too narrow for the halalas. */}
                                 <bdi dir="ltr" className="font-bold">
@@ -368,6 +372,9 @@ function DueCard({
           </AppLink>
           <p className="text-xs text-muted">
             <bdi dir="ltr">{row.contract_number}</bdi> · {row.financier_name}
+          </p>
+          <p className="text-xs text-muted">
+            {payableRowLabel(row, t, row.installment_count)}
           </p>
         </div>
         {paid ? (

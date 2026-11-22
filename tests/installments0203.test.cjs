@@ -260,6 +260,22 @@ test('the client maps exactly the tokens the SQL raises', () => {
   )
   for (const match of accounts.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g))
     raised.add(match[1])
+  // 0209 adds the first payments, the VAT, the date writers and the files;
+  // two of its helpers are handed their token.
+  const plan = fs
+    .readFileSync(
+      path.join(MIGRATIONS, '20261122100000_0209_installment_first_payments_vat_files.sql'),
+      'utf8',
+    )
+    .replace(/--[^\n]*/g, '')
+  for (const pattern of [
+    /RAISE EXCEPTION '([a-z_]+)'/g,
+    /installment_json_day\([^;]*?'(invalid_[a-z_]+)'\)/g,
+  ])
+    for (const match of plan.matchAll(pattern))
+      // The migration's own guards are sentences, never tokens.
+      if (lib.INSTALLMENT_ERROR_TOKENS.includes(match[1]) || match[1].startsWith('invalid_'))
+        raised.add(match[1])
   assert.deepEqual([...raised].sort(), [...lib.INSTALLMENT_ERROR_TOKENS].sort())
 })
 

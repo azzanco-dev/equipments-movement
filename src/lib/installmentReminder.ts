@@ -32,6 +32,10 @@ export interface InstallmentReminderItem {
   description: string
   financierName: string
   seq: number
+  /** 0209; missing = an installment. */
+  kind?: 'first_payment' | 'installment' | 'vat'
+  /** A first payment's name. */
+  title?: string
   /** YYYY-MM-DD */
   dueDate: string
   remainingAmount: number
@@ -127,6 +131,9 @@ export function parseInstallmentReminder(
       description: text(row.description),
       financierName: text(row.financier_name),
       seq: seq ?? 0,
+      ...(row.kind === 'first_payment' || row.kind === 'vat'
+        ? { kind: row.kind, title: text(row.title) }
+        : {}),
       dueDate,
       remainingAmount: remaining,
       daysUntilDue: Math.trunc(days),
@@ -187,6 +194,10 @@ export function reminderInstallmentsWords(count: number): string {
   return `${count} قسط`
 }
 
+/** 0209: the fixed words of the rows that are no installment. */
+export const INSTALLMENT_REMINDER_VAT_LABEL = 'دفعة الضريبة'
+export const INSTALLMENT_REMINDER_PAYMENT_LABEL = 'دفعة'
+
 /** One line of data: no line breaks, no runs of spaces, cut with «…». */
 function oneLine(value: string, max: number): string {
   const clean = value.replace(/\s+/g, ' ').trim()
@@ -199,6 +210,8 @@ export interface InstallmentReminderLine {
   financierName: string
   amount: number
   installments: number
+  /** 0209: the first payments and the VAT row among its rows, by name. */
+  named?: string[]
   /** For an overdue line: the days of its oldest unpaid row. */
   overdueDays: number
 }
@@ -211,10 +224,18 @@ export function reminderSectionLines(
   const byContract = new Map<string, InstallmentReminderLine>()
   for (const item of items) {
     if (item.bucket !== bucket) continue
+    const name =
+      item.kind === 'vat'
+        ? INSTALLMENT_REMINDER_VAT_LABEL
+        : item.kind === 'first_payment'
+          ? oneLine(item.title ?? '', MAX_NAME_LENGTH) ||
+            INSTALLMENT_REMINDER_PAYMENT_LABEL
+          : null
     const line = byContract.get(item.contractNumber)
     if (line) {
       line.amount += item.remainingAmount
-      line.installments += 1
+      if (name) line.named = [...(line.named ?? []), name]
+      else line.installments += 1
       line.overdueDays = Math.max(line.overdueDays, -item.daysUntilDue)
     } else {
       byContract.set(item.contractNumber, {
@@ -222,7 +243,8 @@ export function reminderSectionLines(
         description: item.description,
         financierName: item.financierName,
         amount: item.remainingAmount,
-        installments: 1,
+        installments: name ? 0 : 1,
+        ...(name ? { named: [name] } : {}),
         overdueDays: Math.max(0, -item.daysUntilDue),
       })
     }
@@ -244,6 +266,15 @@ function lineText(
   if (title) parts.push(title)
   const financier = oneLine(line.financierName, MAX_NAME_LENGTH)
   if (financier) parts.push(financier)
+  if (line.named?.length) {
+    // A contract's line names three of them, so no line outgrows a message.
+    const names = line.named.slice(0, MAX_NAMED)
+    if (line.named.length > MAX_NAMED)
+      names.push(reminderMoreLabel(line.named.length - MAX_NAMED))
+    // Beside a first payment a single installment is said too.
+    if (line.installments === 1) names.push('قسط')
+    parts.push(names.join(' + '))
+  }
   parts.push(
     `${reminderAmountLabel(line.amount)} ${INSTALLMENT_REMINDER_CURRENCY}`,
   )
@@ -255,6 +286,9 @@ function lineText(
   }
   return `• ${parts.join(' - ')}`
 }
+
+/** The payments one line names before «و N اخرى». */
+const MAX_NAMED = 3
 
 /** «و 3 اخرى» */
 export function reminderMoreLabel(count: number): string {

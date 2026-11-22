@@ -10,7 +10,6 @@ import {
   type InstallmentDatabaseError,
   type InstallmentPaymentMethod,
   type InstallmentState,
-  type InstallmentTerms,
 } from '@/lib/installments'
 
 /**
@@ -24,6 +23,9 @@ import {
  */
 
 // --- The rows the screens read ------------------------------------------------------
+
+/** 0209: what a payable row is. `seq` counts inside a kind. */
+export type InstallmentRowKind = 'first_payment' | 'installment' | 'vat'
 
 /** `installment_overview`: ONE row over the unpaid rows of active contracts. */
 export interface InstallmentOverviewRow {
@@ -63,7 +65,11 @@ export interface InstallmentDueRow {
   financier_name: string
   seq: number
   installment_count: number
+  /** 0209: a first payment paid without a date shows on the day it was paid. */
   due_date: string
+  kind: InstallmentRowKind
+  /** A first payment's name. */
+  title: string | null
   amount: number
   paid_amount: number
   remaining_amount: number
@@ -90,7 +96,8 @@ export interface InstallmentContractRow {
   financed_amount: number
   installment_count: number
   frequency_months: number
-  first_due_date: string
+  /** 0209: null = waiting for its first due date. */
+  first_due_date: string | null
   notes: string | null
   status: InstallmentContractStatus
   closed_at: string | null
@@ -114,6 +121,28 @@ export interface InstallmentContractRow {
   financier_iban?: string | null
   contract_bank_name?: string | null
   contract_iban?: string | null
+  /** 0209. `down_payment` above is «مدفوع قبل التسجيل». */
+  vat_mode: 'unspecified' | 'inclusive' | 'exclusive' | 'exempt'
+  vat_timing: 'each' | 'end' | null
+  vat_amount: number
+  vat_due_date: string | null
+  /** What the installments add up to, divided or not. */
+  installments_amount: number
+  /** total_amount + vat_amount. */
+  payable_total: number
+  /** Paid, with what was paid before the contract was entered. */
+  paid_overall: number
+  first_payments_count: number
+  first_payments_paid_count: number
+  first_payments_total: number
+  /** An installment has money on it: the terms are fixed. */
+  installments_locked: boolean
+  next_due_id: string | null
+  next_due_kind: InstallmentRowKind | null
+  next_due_title: string | null
+  next_due_seq: number | null
+  first_due_set_at: string | null
+  first_due_set_by_name: string | null
 }
 
 /** The account a contract is paid to (0208): the contract's own when it
@@ -154,10 +183,18 @@ export interface InstallmentScheduleItem {
   id: string
   contract_id: string
   seq: number
-  due_date: string
+  /** Null only for a first payment whose day is not known. */
+  due_date: string | null
   amount: number
   is_balloon: boolean
   paid_amount: number
+  kind: InstallmentRowKind
+  title: string | null
+  note: string | null
+  rate: number | null
+  base_amount: number | null
+  /** The VAT inside `amount` («مع كل دفعة وقسط»). */
+  vat_amount: number
 }
 
 /** `installment_payment_list`: a payment with the two names. */
@@ -188,6 +225,8 @@ export interface InstallmentAllocationRow {
   payment_id: string
   amount: number
   seq: number
+  kind?: InstallmentRowKind
+  title?: string | null
 }
 
 export interface InstallmentFinancierRow {
@@ -262,7 +301,7 @@ export function paidPercent(paid: number, financed: number): number {
 const ARABIC_DIGITS = /[٠-٩۰-۹]/g
 
 /** Arabic-Indic digits as Latin ones (the amount fields accept both). */
-function latinDigits(value: string): string {
+export function latinDigits(value: string): string {
   return value.replace(ARABIC_DIGITS, (digit) => {
     const code = digit.charCodeAt(0)
     return String(code >= 0x06f0 ? code - 0x06f0 : code - 0x0660)
@@ -310,6 +349,55 @@ export function installmentsWords(count: number, lang: Language): string {
   if (count === 2) return 'قسطين'
   if (count <= 10) return `${count} اقساط`
   return `${count} قسط`
+}
+
+/** Rows of any kind (0209: installments, first payments, the VAT row):
+ *  «استحقاق واحد», «استحقاقين», «5 استحقاقات» / "1 due". */
+export function duesWords(count: number, lang: Language): string {
+  if (lang === 'en') {
+    if (count === 0) return 'Nothing due'
+    return `${count} ${count === 1 ? 'due' : 'dues'}`
+  }
+  if (count === 0) return 'لا توجد استحقاقات'
+  if (count === 1) return 'استحقاق واحد'
+  if (count === 2) return 'استحقاقين'
+  if (count <= 10) return `${count} استحقاقات`
+  return `${count} استحقاق`
+}
+
+/** «دفعة واحدة», «دفعتين», «3 دفعات», «11 دفعة» / "1 payment". */
+export function firstPaymentsWords(count: number, lang: Language): string {
+  if (lang === 'en') return `${count} ${count === 1 ? 'payment' : 'payments'}`
+  if (count === 1) return 'دفعة واحدة'
+  if (count === 2) return 'دفعتين'
+  if (count <= 10) return `${count} دفعات`
+  return `${count} دفعة`
+}
+
+/** What a payable row is called: its title for a first payment, «دفعة
+ *  الضريبة», else «القسط 3 من 24» (or «القسط 3» without a count). */
+export function payableRowLabel(
+  row: {
+    kind?: InstallmentRowKind | null
+    title?: string | null
+    seq: number
+  },
+  t: (key: TranslationKey) => string,
+  count?: number,
+): string {
+  if (row.kind === 'first_payment') return row.title || t('instFirstPayment')
+  if (row.kind === 'vat') return t('instVatPayment')
+  const key = count ? 'instCardSeqOf' : 'instInstallmentN'
+  return t(key)
+    .replace('{seq}', String(row.seq))
+    .replace('{count}', String(count ?? ''))
+}
+
+/** An active contract whose installments wait for their first date. */
+export function isAwaitingFirstDue(
+  contract: Pick<InstallmentContractRow, 'status' | 'first_due_date'>,
+): boolean {
+  return contract.status === 'active' && !contract.first_due_date
 }
 
 /** «عقد واحد», «عقدين», «6 عقود», «12 عقد» / "1 contract". */
@@ -559,6 +647,7 @@ export function allocationSeqsByPayment(
 ): Map<string, number[]> {
   const map = new Map<string, number[]>()
   for (const row of rows) {
+    if (row.kind && row.kind !== 'installment') continue
     const seqs = map.get(row.payment_id) ?? []
     seqs.push(row.seq)
     map.set(row.payment_id, seqs)
@@ -567,13 +656,39 @@ export function allocationSeqsByPayment(
   return map
 }
 
+/** The first payments and the VAT row each payment covered. */
+export function allocationOthersByPayment(
+  rows: readonly InstallmentAllocationRow[],
+): Map<string, InstallmentAllocationRow[]> {
+  const map = new Map<string, InstallmentAllocationRow[]>()
+  for (const row of rows) {
+    if (!row.kind || row.kind === 'installment') continue
+    const list = map.get(row.payment_id) ?? []
+    list.push(row)
+    map.set(row.payment_id, list)
+  }
+  for (const list of map.values())
+    list.sort((a, b) =>
+      a.kind === b.kind ? a.seq - b.seq : a.kind! < b.kind! ? -1 : 1,
+    )
+  return map
+}
+
 export type InstallmentHistoryKind =
-  'created' | 'payment_recorded' | 'payment_voided' | 'paid_off' | 'cancelled'
+  | 'created'
+  | 'file_added'
+  | 'first_due_set'
+  | 'payment_recorded'
+  | 'payment_voided'
+  | 'paid_off'
+  | 'cancelled'
 
 export const INSTALLMENT_HISTORY_LABEL_KEYS: Readonly<
   Record<InstallmentHistoryKind, TranslationKey>
 > = {
   created: 'instHistoryCreated',
+  file_added: 'instHistoryFileAdded',
+  first_due_set: 'instHistoryFirstDueSet',
   payment_recorded: 'instHistoryPaymentRecorded',
   payment_voided: 'instHistoryPaymentVoided',
   paid_off: 'instHistoryPaidOff',
@@ -597,10 +712,12 @@ export interface InstallmentHistoryEvent {
  *  payment closes the contract right after it is recorded. */
 const HISTORY_RANK: Readonly<Record<InstallmentHistoryKind, number>> = {
   created: 0,
-  payment_recorded: 1,
-  paid_off: 2,
-  payment_voided: 3,
-  cancelled: 4,
+  file_added: 1,
+  first_due_set: 2,
+  payment_recorded: 3,
+  paid_off: 4,
+  payment_voided: 5,
+  cancelled: 6,
 }
 
 const instantOf = (value: string | null) => {
@@ -612,14 +729,26 @@ const instantOf = (value: string | null) => {
  * The contract's history, the newest first, DERIVED from the contract and
  * its payments (migration 0203 keeps no event table): the creation, every
  * payment, every void with its reason, the full payment that closed the
- * contract (only while it is still paid off) and the cancellation.
+ * contract (only while it is still paid off) and the cancellation. Since
+ * 0209 also the files still on the contract and the latest setting of the
+ * first due date.
  */
 export function contractHistory(
   contract: Pick<
     InstallmentContractRow,
     'status' | 'closed_at' | 'cancel_reason' | 'created_at' | 'created_by_name'
-  >,
+  > &
+    Partial<
+      Pick<InstallmentContractRow, 'first_due_set_at' | 'first_due_set_by_name'>
+    >,
   payments: readonly InstallmentPaymentRow[],
+  files: readonly {
+    id: string
+    file_name: string
+    title: string | null
+    created_at: string
+    uploaded_by_name: string | null
+  }[] = [],
 ): InstallmentHistoryEvent[] {
   const events: InstallmentHistoryEvent[] = [
     {
@@ -631,6 +760,24 @@ export function contractHistory(
       detail: null,
     },
   ]
+  for (const file of files)
+    events.push({
+      key: `${file.id}:file`,
+      kind: 'file_added',
+      at: file.created_at,
+      by: file.uploaded_by_name,
+      amount: null,
+      detail: file.title ?? file.file_name,
+    })
+  if (contract.first_due_set_at)
+    events.push({
+      key: 'first_due_set',
+      kind: 'first_due_set',
+      at: contract.first_due_set_at,
+      by: contract.first_due_set_by_name ?? null,
+      amount: null,
+      detail: null,
+    })
   for (const payment of payments) {
     events.push({
       key: `${payment.id}:recorded`,
@@ -820,90 +967,6 @@ export function installmentsListHref(
 
 // --- The forms -----------------------------------------------------------------------------
 
-/** The contract form: every field as its control holds it. */
-export interface InstallmentContractFormValues {
-  description: string
-  financier_id: string
-  total_amount: string
-  down_payment: string
-  balloon_amount: string
-  installment_count: string
-  frequency_months: string
-  first_due_date: string
-  notes: string
-  /** The linked units' ids; empty = no link. */
-  equipment: string[]
-  /** 0208: the contract's own account; both empty = the financier's. */
-  bank_name: string
-  iban: string
-}
-
-export const INSTALLMENT_CONTRACT_FIELD_ORDER: readonly (keyof InstallmentContractFormValues)[] =
-  [
-    'description',
-    'financier_id',
-    'total_amount',
-    'down_payment',
-    'balloon_amount',
-    'installment_count',
-    'frequency_months',
-    'first_due_date',
-    'bank_name',
-    'iban',
-    'equipment',
-    'notes',
-  ]
-
-/** The money terms of the form, or null while an amount or the count is
- *  not a number yet. An empty down payment or final payment is 0. */
-export function installmentTermsOf(
-  values: Pick<
-    InstallmentContractFormValues,
-    | 'total_amount'
-    | 'down_payment'
-    | 'balloon_amount'
-    | 'installment_count'
-    | 'frequency_months'
-    | 'first_due_date'
-  >,
-): InstallmentTerms | null {
-  const optional = (value: string) =>
-    value.trim() ? parseInstallmentAmount(value) : 0
-  const total = parseInstallmentAmount(values.total_amount)
-  const down = optional(values.down_payment)
-  const balloon = optional(values.balloon_amount)
-  const count = latinDigits(values.installment_count).trim()
-  if (total === null || down === null || balloon === null) return null
-  if (!/^\d+$/.test(count)) return null
-  return {
-    totalAmount: total,
-    downPayment: down,
-    balloonAmount: balloon,
-    installmentCount: Number(count),
-    frequencyMonths: Number(values.frequency_months),
-    firstDueDate: values.first_due_date,
-  }
-}
-
-/** The form field a token of `save_installment_contract` belongs to. */
-export const INSTALLMENT_CONTRACT_TOKEN_FIELDS: Readonly<
-  Record<string, keyof InstallmentContractFormValues>
-> = {
-  invalid_description: 'description',
-  invalid_financier: 'financier_id',
-  invalid_amount: 'total_amount',
-  invalid_down_payment: 'down_payment',
-  invalid_balloon: 'balloon_amount',
-  invalid_installment_count: 'installment_count',
-  invalid_frequency: 'frequency_months',
-  invalid_first_due_date: 'first_due_date',
-  invalid_notes: 'notes',
-  invalid_equipment: 'equipment',
-  invalid_bank: 'bank_name',
-  invalid_iban: 'iban',
-  invalid_account: 'iban',
-}
-
 /** The payment form. */
 export interface InstallmentPaymentFormValues {
   contract_id: string
@@ -927,6 +990,7 @@ export const INSTALLMENT_PAYMENT_TOKEN_FIELDS: Readonly<
   invalid_method: 'method',
   invalid_reference: 'reference',
   invalid_note: 'note',
+  installments_not_scheduled: 'amount',
 }
 
 /** The void-payment and cancel-contract dialogs. */
@@ -980,6 +1044,11 @@ export const INSTALLMENT_STALE_TOKENS: ReadonlySet<string> = new Set([
   'contract_not_active',
   'contract_has_payments',
   'payment_already_voided',
+  'invalid_schedule_row',
+  'first_payment_locked',
+  'installments_not_scheduled',
+  'contract_file_not_found',
+  'contract_changed',
 ])
 
 /**

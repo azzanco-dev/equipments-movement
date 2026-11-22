@@ -38,7 +38,7 @@ import {
   activeContractsWords,
   amountOf,
   contractsWords,
-  installmentsWords,
+  duesWords,
   monthlyDueBuckets,
   type InstallmentDueRow,
   type InstallmentFinancierRow,
@@ -136,7 +136,7 @@ export function InstallmentsDashboardTab({
           sub={
             overview.overdue_count === 0
               ? t('instNoOverdue')
-              : installmentsWords(overview.overdue_count, lang)
+              : duesWords(overview.overdue_count, lang)
           }
           value={<Money value={overview.overdue_amount} />}
           foot={
@@ -144,7 +144,7 @@ export function InstallmentsDashboardTab({
               ? t('instOverdueHint')
                   .replace(
                     '{installments}',
-                    installmentsWords(overview.overdue_count, lang),
+                    duesWords(overview.overdue_count, lang),
                   )
                   .replace(
                     '{contracts}',
@@ -157,7 +157,7 @@ export function InstallmentsDashboardTab({
           tone="warning"
           icon={<CalendarClock size={20} />}
           title={t('instDue7')}
-          sub={installmentsWords(overview.due_7_count, lang)}
+          sub={duesWords(overview.due_7_count, lang)}
           value={<Money value={overview.due_7_amount} />}
           foot={
             data?.nearest ? (
@@ -175,7 +175,7 @@ export function InstallmentsDashboardTab({
           tone="info"
           icon={<Clock size={20} />}
           title={t('instDue30')}
-          sub={installmentsWords(overview.due_30_count, lang)}
+          sub={duesWords(overview.due_30_count, lang)}
           value={<Money value={overview.due_30_amount} />}
           foot={
             <span>
@@ -249,6 +249,9 @@ export function InstallmentsDashboardTab({
                         date: row.due_date,
                         amount: amountOf(row.remaining_amount),
                         days: row.days_until_due,
+                        kind: row.kind,
+                        title: row.title,
+                        seq: row.seq,
                       }}
                       canPay={canManage}
                       onPay={() => onPay(row)}

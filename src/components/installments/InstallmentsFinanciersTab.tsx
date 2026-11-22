@@ -424,7 +424,7 @@ function FinancierCard({
             </Button>
             {figures?.nextDue && (
               <span className="text-muted">
-                {t('instCardNextDue')}{' '}
+                {t('instNextDue')}{' '}
                 <bdi dir="ltr" className="tabular-nums">
                   {formatDate(figures.nextDue)}
                 </bdi>

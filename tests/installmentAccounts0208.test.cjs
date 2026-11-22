@@ -119,8 +119,12 @@ test('the screens: the account of a contract, the financier dialog and the form'
   assert.match(data, /p_account: \{\s*bank_name: input\.bankName\.trim\(\) \|\| null,\s*iban: normalizeIban\(input\.iban\) \|\| null,\s*\}/)
   const dialog = read('src', 'components', 'installments', 'InstallmentFinancierDialog.tsx')
   assert.match(dialog, /<BankAccountFields/)
-  const form = read('src', 'components', 'installments', 'InstallmentContractDialog.tsx')
-  assert.match(form, /bank_name: contract\.contract_bank_name \?\? ''/)
+  // 0209: the contract's form is a page, its values in installmentPlan.ts.
+  assert.match(
+    read('src', 'lib', 'installmentPlan.ts'),
+    /bank_name: contract\.contract_bank_name \?\? ''/,
+  )
+  const form = read('src', 'screens', 'installments', 'InstallmentContractFormScreen.tsx')
   assert.match(form, /<BankAccountFields/)
   const page = read('src', 'screens', 'installments', 'InstallmentContractDetail.tsx')
   assert.match(page, /<BankAccountLine account=\{installmentAccountOf\(contract\)\} \/>/)

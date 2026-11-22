@@ -396,33 +396,8 @@ test('the list page state comes from its URL, with safe defaults', () => {
   assert.deepEqual(fields[1], { key: 'status' })
 })
 
-test('the money terms of the form, and the field of a refusal', () => {
-  const values = {
-    total_amount: '1,200,000',
-    down_payment: '',
-    balloon_amount: '0',
-    installment_count: '36',
-    frequency_months: '1',
-    first_due_date: '2026-12-01',
-  }
-  assert.deepEqual(plain(view.installmentTermsOf(values)), {
-    totalAmount: 1200000,
-    downPayment: 0,
-    balloonAmount: 0,
-    installmentCount: 36,
-    frequencyMonths: 1,
-    firstDueDate: '2026-12-01',
-  })
-  assert.equal(view.installmentTermsOf({ ...values, total_amount: '' }), null)
-  assert.equal(
-    view.installmentTermsOf({ ...values, down_payment: '1.234' }),
-    null,
-  )
-  assert.equal(
-    view.installmentTermsOf({ ...values, installment_count: '' }),
-    null,
-  )
-
+test('the field of a refusal', () => {
+  const plan = loadLibModule('installmentPlan')
   const error = (message) => ({ message, code: '22023' })
   // The longest token wins: `invalid_notes` is never read as `invalid_note`.
   assert.equal(
@@ -440,7 +415,7 @@ test('the money terms of the form, and the field of a refusal', () => {
     plain(
       view.installmentFieldError(
         error('invalid_balloon'),
-        view.INSTALLMENT_CONTRACT_TOKEN_FIELDS,
+        plan.INSTALLMENT_CONTRACT_TOKEN_FIELDS,
       ),
     ),
     { field: 'balloon_amount', key: 'instErrBalloon' },
@@ -458,7 +433,7 @@ test('the money terms of the form, and the field of a refusal', () => {
   assert.equal(
     view.installmentFieldError(
       error('contract_has_payments'),
-      view.INSTALLMENT_CONTRACT_TOKEN_FIELDS,
+      plan.INSTALLMENT_CONTRACT_TOKEN_FIELDS,
     ),
     null,
   )
@@ -472,7 +447,7 @@ test('the money terms of the form, and the field of a refusal', () => {
   // Every mapped token is a token the database raises.
   const inst = loadLibModule('installments')
   for (const token of [
-    ...Object.keys(view.INSTALLMENT_CONTRACT_TOKEN_FIELDS),
+    ...Object.keys(plan.INSTALLMENT_CONTRACT_TOKEN_FIELDS),
     ...Object.keys(view.INSTALLMENT_PAYMENT_TOKEN_FIELDS),
     ...view.INSTALLMENT_STALE_TOKENS,
   ])

@@ -391,3 +391,12 @@ test('vercel.json: one Vercel schedule at 09:00 Riyadh time, GET, no legacy cron
   })
   assert.match(ROUTE, /export\s+(async\s+)?function\s+GET\b|export\s+const\s+GET\b/)
 })
+
+test('many named payments on one contract never outgrow the message', () => {
+  const items = Array.from({ length: 100 }, (_, index) =>
+    item({ kind: 'first_payment', title: 'الدفعة الطويلة الاسم رقم ' + index }),
+  )
+  const message = lib.buildInstallmentReminderMessage({ day: DAY, items })
+  assert.ok(message.length < 1000)
+  assert.ok(message.includes('و 97 اخرى'))
+})

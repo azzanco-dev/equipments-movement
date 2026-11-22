@@ -320,7 +320,9 @@ export type RoutePage =
   | 'sales/:id'
   | 'sales/cards/:id'
   | 'sales/quotations/:id'
+  | 'installments/new'
   | 'installments/:id'
+  | 'installments/:id/edit'
   | 'print/export'
 
 type ExtraPage = Exclude<RoutePage, NavItemKey | NavChildKey>
@@ -353,6 +355,13 @@ const PAGE_GATES: Readonly<Record<ExtraPage, readonly NavGate[]>> = {
   'sales/quotations/:id': [{ key: 'sales.view' }],
   // 0203: the installment contract page.
   'installments/:id': [{ key: 'installments.view' }],
+  // 0209: the contract's form, its own page: readers who may also write.
+  'installments/new': [
+    { key: 'installments.manage', with: [{ key: 'installments.view' }] },
+  ],
+  'installments/:id/edit': [
+    { key: 'installments.manage', with: [{ key: 'installments.view' }] },
+  ],
   'print/export': [{ key: 'movements.export' }],
 }
 
@@ -401,9 +410,13 @@ export function routePageOf(segments: readonly string[]): RoutePage {
   if (first === 'equipment' && second) return 'equipment/:id'
   if (first === 'drivers' && second) return 'drivers/:id'
   if (first === 'users' && second) return 'users/:id'
-  // 0203: /installments is the list (a hidden top-level entry), any second
-  // segment a contract id.
-  if (first === 'installments' && second) return 'installments/:id'
+  // 0203: /installments is the list (a hidden top-level entry); 0209: its
+  // form at /installments/new and /installments/:id/edit; any other second
+  // segment is a contract id.
+  if (first === 'installments' && second) {
+    if (second === 'new') return 'installments/new'
+    return third === 'edit' ? 'installments/:id/edit' : 'installments/:id'
+  }
   if (first === 'purchasing') {
     // /purchasing opens its first section; any other second
     // segment is a PO id.
@@ -526,7 +539,9 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'sales/quotations',
   'sales/quotations/:id',
   'installments',
+  'installments/new',
   'installments/:id',
+  'installments/:id/edit',
 ]
 /**
  * The field home's own pages (its home, the inquiry, the movement form and

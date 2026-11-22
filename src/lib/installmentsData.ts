@@ -13,6 +13,7 @@ import {
   type InstallmentFinancierRow,
   type InstallmentOverviewRow,
   type InstallmentPaymentRow,
+  type InstallmentRowKind,
   type InstallmentScheduleItem,
   type InstallmentUnit,
 } from '@/lib/installmentsView'
@@ -40,6 +41,14 @@ import { SupabaseLoadError, unwrapRows } from '@/lib/supabaseResult'
 import type { ListFilter } from '@/components/data-list/types'
 import { applyListFilters } from '@/lib/applyListFilters'
 import {
+  INSTALLMENT_FILE_SELECT,
+  type InstallmentFile,
+} from '@/lib/installmentFiles'
+import type {
+  InstallmentFirstPaymentPayload,
+  InstallmentVatPayload,
+} from '@/lib/installmentPlan'
+import {
   installmentContractsListConfig,
   installmentDuesListConfig,
 } from '@/lib/listConfigs'
@@ -66,16 +75,16 @@ export const INSTALLMENT_OVERVIEW_SELECT =
   'overdue_count,overdue_amount,due_7_count,due_7_amount,due_30_count,due_30_amount,open_count,remaining_total,open_contract_count,next_due_date'
 
 export const INSTALLMENT_DUE_SELECT =
-  'id,contract_id,contract_number,description,financier_id,financier_name,seq,installment_count,due_date,amount,paid_amount,remaining_amount,is_balloon,is_partial,state,days_until_due'
+  'id,contract_id,contract_number,description,financier_id,financier_name,seq,installment_count,due_date,amount,paid_amount,remaining_amount,is_balloon,is_partial,state,days_until_due,kind,title'
 
 /** The dues lists also show the payment date of a paid row (0207). */
 export const INSTALLMENT_DUES_LIST_SELECT = `${INSTALLMENT_DUE_SELECT},last_paid_on`
 
 export const INSTALLMENT_CONTRACT_SELECT =
-  'id,contract_number,description,financier_id,financier_name,total_amount,down_payment,balloon_amount,financed_amount,installment_count,frequency_months,first_due_date,notes,status,closed_at,cancel_reason,created_by_name,created_at,updated_at,paid_total,remaining_total,paid_count,overdue_count,overdue_amount,next_due_date,next_due_amount,last_due_date,equipment_count,financier_bank_name,financier_iban,contract_bank_name,contract_iban'
+  'id,contract_number,description,financier_id,financier_name,total_amount,down_payment,balloon_amount,financed_amount,installment_count,frequency_months,first_due_date,notes,status,closed_at,cancel_reason,created_by_name,created_at,updated_at,paid_total,remaining_total,paid_count,overdue_count,overdue_amount,next_due_date,next_due_amount,last_due_date,equipment_count,financier_bank_name,financier_iban,contract_bank_name,contract_iban,vat_mode,vat_timing,vat_amount,vat_due_date,installments_amount,payable_total,paid_overall,first_payments_count,first_payments_paid_count,first_payments_total,installments_locked,next_due_id,next_due_kind,next_due_title,next_due_seq,first_due_set_at,first_due_set_by_name'
 
 export const INSTALLMENT_SCHEDULE_SELECT =
-  'id,contract_id,seq,due_date,amount,is_balloon,paid_amount'
+  'id,contract_id,seq,due_date,amount,is_balloon,paid_amount,kind,title,note,rate,base_amount,vat_amount'
 
 export const INSTALLMENT_PAYMENT_SELECT =
   'id,contract_id,paid_on,amount,method,reference,note,status,voided_at,voided_by_name,void_reason,created_by_name,created_at,receipt_id,receipt_path,receipt_file_name,receipt_mime_type,receipt_size_bytes'
@@ -90,7 +99,7 @@ export const INSTALLMENT_UNIT_SELECT =
 /** Which installments a payment covered: the allocation with the `seq` of
  *  its schedule row, limited to one contract through the inner embed. */
 export const INSTALLMENT_ALLOCATION_SELECT =
-  'payment_id,amount,installment_schedule!inner(seq,contract_id)'
+  'payment_id,amount,installment_schedule!inner(seq,kind,title,contract_id)'
 
 // --- The caps of the bounded reads ------------------------------------------------------
 
@@ -102,8 +111,10 @@ export const FINANCIER_CONTRACTS_CAP = 5000
 export const FINANCIERS_CAP = 1000
 /** The units of one page of contracts. */
 export const CONTRACT_UNITS_CAP = 1000
-/** A contract has at most 360 schedule rows (the 0203 CHECK). */
-export const SCHEDULE_ROWS_CAP = 400
+/** A contract has at most 461 schedule rows: 360 installments (0203), 100
+ *  first payments and the VAT row (0209). */
+export const SCHEDULE_ROWS_CAP = 500
+export const CONTRACT_FILES_CAP = 200
 export const CONTRACT_PAYMENTS_CAP = 1000
 export const CONTRACT_ALLOCATIONS_CAP = 5000
 /** Relational selectors show the first / best 20. */
@@ -227,6 +238,7 @@ export async function fetchNearestDue(
         .gte('days_until_due', 0)
         .order('due_date', { ascending: true })
         .order('contract_number', { ascending: true })
+        .order('kind', { ascending: true })
         .order('seq', { ascending: true })
         .limit(1),
       signal,
@@ -247,6 +259,7 @@ export async function fetchUpcomingDues(
         .lte('days_until_due', 30)
         .order('due_date', { ascending: true })
         .order('contract_number', { ascending: true })
+        .order('kind', { ascending: true })
         .order('seq', { ascending: true })
         .limit(limit),
       signal,
@@ -455,6 +468,7 @@ export async function fetchInstallmentDuesPage(
       .order(sort, { ascending, nullsFirst: false })
       .order('due_date', { ascending: query.view !== 'paid' })
       .order('contract_number', { ascending: true })
+      .order('kind', { ascending: true })
       .order('seq', { ascending: true })
       .range(
         (query.page - 1) * query.pageSize,
@@ -556,12 +570,18 @@ export interface InstallmentContractDetailData {
   payments: InstallmentPaymentRow[]
   allocations: InstallmentAllocationRow[]
   units: InstallmentUnit[]
+  /** 0209: the contract's files, the oldest first. */
+  files: InstallmentFile[]
 }
 
 type AllocationEmbedRow = {
   payment_id: string
   amount: number
-  installment_schedule: { seq: number } | null
+  installment_schedule: {
+    seq: number
+    kind: InstallmentRowKind
+    title: string | null
+  } | null
 }
 
 /** A contract's schedule, in its order. */
@@ -575,6 +595,7 @@ async function fetchSchedule(
         .from('installment_schedule')
         .select(INSTALLMENT_SCHEDULE_SELECT)
         .eq('contract_id', contractId)
+        .order('kind', { ascending: true })
         .order('seq', { ascending: true })
         .limit(SCHEDULE_ROWS_CAP),
       signal,
@@ -597,6 +618,55 @@ async function fetchContractRow(
   return (result.data as unknown as InstallmentContractRow | null) ?? null
 }
 
+/** A contract's files (0209), the oldest first. */
+export async function fetchContractFiles(
+  contractId: string,
+  signal?: AbortSignal,
+): Promise<InstallmentFile[]> {
+  return rowsOf<InstallmentFile>(
+    await withSignal(
+      supabase
+        .from('installment_contract_files')
+        .select(INSTALLMENT_FILE_SELECT)
+        .eq('contract_id', contractId)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .limit(CONTRACT_FILES_CAP),
+      signal,
+    ),
+  )
+}
+
+/** What «تعديل العقد» edits: the summary row, the rows and the units. */
+export async function fetchInstallmentContractForEdit(
+  contractId: string,
+  signal?: AbortSignal,
+): Promise<{
+  contract: InstallmentContractRow
+  schedule: InstallmentScheduleItem[]
+  units: InstallmentUnit[]
+  /** The version this edit is based on. */
+  editKey: string
+} | null> {
+  // The key FIRST: a change during the reads then refuses the save, never
+  // passes it.
+  const key = await withSignal(
+    supabase.rpc('installment_contract_edit_key', {
+      p_contract_id: contractId,
+    }),
+    signal,
+  )
+  if (key.error) throw new SupabaseLoadError()
+  if (typeof key.data !== 'string') return null
+  const editKey = key.data
+  const [contract, schedule, units] = await Promise.all([
+    fetchContractRow(contractId, signal),
+    fetchSchedule(contractId, signal),
+    fetchInstallmentContractUnits([contractId], signal),
+  ])
+  return contract ? { contract, schedule, units, editKey } : null
+}
+
 /**
  * A contract (its summary row) with its schedule, its payments (the newest
  * first), which installments each payment covered and its linked units;
@@ -606,7 +676,7 @@ export async function fetchInstallmentContract(
   contractId: string,
   signal?: AbortSignal,
 ): Promise<InstallmentContractDetailData | null> {
-  const [contract, schedule, payments, allocations, units] = await Promise.all([
+  const [contract, schedule, payments, allocations, units, files] = await Promise.all([
     fetchContractRow(contractId, signal),
     fetchSchedule(contractId, signal),
     withSignal(
@@ -635,15 +705,18 @@ export async function fetchInstallmentContract(
                 payment_id: row.payment_id,
                 amount: amountOf(row.amount),
                 seq: row.installment_schedule.seq,
+                kind: row.installment_schedule.kind,
+                title: row.installment_schedule.title,
               },
             ]
           : [],
       ),
     ),
     fetchInstallmentContractUnits([contractId], signal),
+    fetchContractFiles(contractId, signal),
   ])
   if (!contract) return null
-  return { contract, schedule, payments, allocations, units }
+  return { contract, schedule, payments, allocations, units, files }
 }
 
 /** What the payment dialog needs of a contract: its totals and its
@@ -744,12 +817,18 @@ export interface InstallmentContractInput {
   description: string
   financierId: string
   totalAmount: number
+  /** «مدفوع قبل التسجيل» (the column keeps its 0203 name). */
   downPayment: number
   balloonAmount: number
   installmentCount: number
   frequencyMonths: number
-  /** yyyy-mm-dd */
-  firstDueDate: string
+  /** yyyy-mm-dd; null = waiting for it (0209). */
+  firstDueDate: string | null
+  /** The version the edit is based on; null for a new contract. */
+  expectedKey: string | null
+  vat: InstallmentVatPayload
+  /** Every row, in its order: a row left out is removed. */
+  firstPayments: readonly InstallmentFirstPaymentPayload[]
   notes: string
   /** The linked units' ids; empty = no link. */
   equipmentIds: readonly string[]
@@ -784,6 +863,40 @@ export async function saveInstallmentContract(
         bank_name: input.bankName.trim() || null,
         iban: normalizeIban(input.iban) || null,
       },
+      p_vat: input.vat,
+      p_first_payments: input.firstPayments,
+      p_expected_key: input.expectedKey,
+    }),
+  )
+}
+
+/** `set_installment_first_due_date` (0209): divides the installments. */
+export async function setInstallmentFirstDueDate(input: {
+  contractId: string
+  /** yyyy-mm-dd */
+  firstDueDate: string
+  installmentCount: number
+  frequencyMonths: number
+}): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('set_installment_first_due_date', {
+      p_contract_id: input.contractId,
+      p_first_due_date: input.firstDueDate,
+      p_installment_count: input.installmentCount,
+      p_frequency_months: input.frequencyMonths,
+    }),
+  )
+}
+
+/** `set_installment_first_payment_date` (0209): dates a first payment. */
+export async function setInstallmentFirstPaymentDate(
+  scheduleId: string,
+  dueDate: string,
+): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('set_installment_first_payment_date', {
+      p_schedule_id: scheduleId,
+      p_due_date: dueDate,
     }),
   )
 }
@@ -825,10 +938,12 @@ export interface InstallmentPaymentInput {
   method: InstallmentPaymentMethod
   reference: string
   note: string
+  /** 0209: the row paid first (a first payment, the VAT row). */
+  scheduleId: string | null
 }
 
 /** `record_installment_payment`: the database allocates the amount to the
- *  oldest unpaid rows. Returns the payment id. */
+ *  chosen row, then the oldest unpaid rows. Returns the payment id. */
 export async function recordInstallmentPayment(
   input: InstallmentPaymentInput,
 ): Promise<RpcResult<string>> {
@@ -840,6 +955,7 @@ export async function recordInstallmentPayment(
       p_method: input.method,
       p_reference: input.reference.trim() || null,
       p_note: input.note.trim() || null,
+      p_schedule_id: input.scheduleId,
     }),
   )
 }
@@ -952,7 +1068,7 @@ export async function deleteInstallmentFinancier(
 /** The figures of every contract: the dashboard's financier list, the dues
  *  tab's side cards, the contracts tab's figures and chip counts. */
 export const CONTRACT_FIGURES_SELECT =
-  'id,financier_id,status,financed_amount,paid_total,remaining_total,overdue_count,last_due_date'
+  'id,financier_id,status,first_due_date,payable_total,paid_overall,remaining_total,overdue_count,last_due_date'
 export const CONTRACT_FIGURES_CAP = 5000
 /** The calendar reads at most this many rows of one month. */
 export const CALENDAR_ROWS_CAP = 1500
@@ -990,6 +1106,7 @@ export async function fetchDuesWithin(
         .lte('days_until_due', days)
         .order('due_date', { ascending: true })
         .order('contract_number', { ascending: true })
+        .order('kind', { ascending: true })
         .order('seq', { ascending: true })
         .limit(limit),
       signal,
@@ -1059,6 +1176,7 @@ export async function fetchDuesBetween(
         .lt('due_date', to)
         .order('due_date', { ascending: true })
         .order('contract_number', { ascending: true })
+        .order('kind', { ascending: true })
         .order('seq', { ascending: true })
         .limit(CALENDAR_ROWS_CAP),
       signal,
@@ -1095,6 +1213,7 @@ export async function fetchDuesFeed(
   const result = await withSignal(
     request
       .order('contract_number', { ascending: true })
+      .order('kind', { ascending: true })
       .order('seq', { ascending: true })
       .limit(query.limit),
     signal,
@@ -1126,6 +1245,8 @@ export async function fetchContractCards(
     .select(INSTALLMENT_CONTRACT_SELECT, { count: 'exact' })
   if (query.chip === 'overdue')
     request = request.eq('status', 'active').gt('overdue_count', 0)
+  else if (query.chip === 'awaiting')
+    request = request.eq('status', 'active').is('first_due_date', null)
   else if (query.chip === 'ending')
     request = request
       .eq('status', 'active')

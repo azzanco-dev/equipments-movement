@@ -64,6 +64,12 @@ const RECEIPTS_MIGRATION = read(
   'migrations',
   '20261119140000_0206_installment_payment_receipts.sql',
 )
+// 0209 re-creates the save and the payment and appends columns.
+const PLAN_MIGRATION = read(
+  'supabase',
+  'migrations',
+  '20261122100000_0209_installment_first_payments_vat_files.sql',
+)
 const DATA = read('src', 'lib', 'installmentsData.ts')
 const APP = read('src', 'App.tsx')
 
@@ -80,7 +86,14 @@ const UI_FILES = [
   ['src', 'components', 'installments', 'InstallmentsContractsTab.tsx'],
   ['src', 'components', 'installments', 'InstallmentsDuesTab.tsx'],
   ['src', 'components', 'installments', 'InstallmentsFinanciersTab.tsx'],
-  ['src', 'components', 'installments', 'InstallmentContractDialog.tsx'],
+  ['src', 'screens', 'installments', 'InstallmentContractFormScreen.tsx'],
+  ['src', 'components', 'installments', 'InstallmentContractFiles.tsx'],
+  ['src', 'components', 'installments', 'InstallmentDateDialogs.tsx'],
+  ['src', 'components', 'installments', 'InstallmentFirstPayments.tsx'],
+  ['src', 'components', 'installments', 'InstallmentPayableRows.tsx'],
+  ['src', 'components', 'installments', 'InstallmentPlanSummary.tsx'],
+  ['src', 'components', 'installments', 'boardParts.tsx'],
+  ['src', 'components', 'installments', 'InstallmentsCalendarTab.tsx'],
   ['src', 'components', 'installments', 'InstallmentPaymentDialog.tsx'],
   ['src', 'components', 'installments', 'InstallmentReasonDialogs.tsx'],
   ['src', 'components', 'installments', 'InstallmentFinancierDialog.tsx'],
@@ -91,6 +104,8 @@ const UI_FILES = [
 const LIB_FILES = [
   ['src', 'lib', 'installmentsView.ts'],
   ['src', 'lib', 'installmentsData.ts'],
+  ['src', 'lib', 'installmentPlan.ts'],
+  ['src', 'lib', 'installmentFiles.ts'],
 ]
 const NEW_FILES = [...UI_FILES, ...LIB_FILES]
 
@@ -203,6 +218,30 @@ test('the routes: the list, then any second segment is a contract', () => {
     'installments/:id',
   )
   assert.equal(nav.navKeyOfPage('installments/:id'), 'installments')
+  // 0209: the form is a page of its own, for readers who may also write.
+  assert.equal(nav.routePageOf(['installments', 'new']), 'installments/new')
+  assert.equal(
+    nav.routePageOf(['installments', 'abc', 'edit']),
+    'installments/:id/edit',
+  )
+  for (const page of ['installments/new', 'installments/:id/edit']) {
+    assert.equal(nav.navKeyOfPage(page), 'installments')
+    assert.ok(
+      nav
+        .planShell(ready(['home.admin', 'installments.view', 'installments.manage']))
+        .pages.has(page),
+    )
+    assert.ok(
+      !nav.planShell(ready(['home.admin', 'installments.view'])).pages.has(page),
+    )
+    assert.ok(
+      !nav.planShell(ready(['home.admin', 'installments.manage'])).pages.has(page),
+    )
+  }
+  assert.match(
+    APP,
+    /page === 'installments\/new' \? \(\s*<InstallmentContractFormScreen\s+contractId=\{null\}\s+onBack=\{goBackTo\('\/installments'\)\}\s+onSaved=\{\(id\) => router\.replace\(/,
+  )
 
   assert.match(
     APP,
@@ -218,7 +257,7 @@ test('the routes: the list, then any second segment is a contract', () => {
   )
   assert.match(
     APP,
-    /\{page === 'installments' && \(\s*<InstallmentsScreen\s+onOpenContract=\{\(id\) => router\.push\(`\/installments\/\$\{id\}`\)\}/,
+    /\{page === 'installments' && \(\s*<InstallmentsScreen \/>/,
   )
   // The sidebar label exists for the type's sake; the entry is never listed.
   assert.match(APP, /installments: \{ label: 'installments', icon: </)
@@ -237,6 +276,66 @@ test('trail and tab titles of the two pages', () => {
     parentPath: '/installments',
     parentLabel: '<installments>',
   })
+  // 0209: the form's two pages.
+  assert.deepEqual(
+    plain(trail.pageTrail('installments/new', t, null)).crumbs,
+    [
+      { label: '<installments>', href: '/installments' },
+      { label: '<instContractNew>' },
+    ],
+  )
+  assert.deepEqual(
+    plain(
+      trail.pageTrail('installments/:id/edit', t, 'INS-0003', {
+        recordPath: '/installments/c1',
+      }),
+    ),
+    {
+      crumbs: [
+        { label: '<installments>', href: '/installments' },
+        { label: 'INS-0003', href: '/installments/c1' },
+        { label: '<instContractEdit>' },
+      ],
+      parentPath: '/installments/c1',
+      parentLabel: 'INS-0003',
+    },
+  )
+  assert.equal(
+    title.tabTitle('installments/new', t, null),
+    '<instContractNew> · <installments>',
+  )
+  const back = loadLibModule('backNavigation')
+  const entries = (...paths) =>
+    paths.map((path) => ({ url: path, path, merged: false }))
+  // Back from a saved new contract: the list, never the form.
+  assert.deepEqual(
+    plain(
+      back.planBack(
+        entries('/installments', '/installments/new', '/installments/c1'),
+        '/installments',
+      ),
+    ),
+    { kind: 'push', url: '/installments' },
+  )
+  // Back from a contract reached through its own edit page: not itself.
+  assert.deepEqual(
+    plain(
+      back.planBack(
+        entries('/installments', '/installments/c1', '/installments/c1/edit', '/installments/c1'),
+        '/installments',
+      ),
+    ),
+    { kind: 'push', url: '/installments' },
+  )
+  assert.deepEqual(
+    plain(
+      back.planBack(
+        entries('/installments', '/installments/c1', '/installments/c1/edit'),
+        '/installments/c1',
+      ),
+    ),
+    { kind: 'history' },
+  )
   // The list is a top-level page: no trail.
   assert.equal(trail.pageTrail('installments', t, null), null)
   assert.equal(
@@ -269,7 +368,14 @@ function sqlParameters(name) {
     `CREATE OR REPLACE FUNCTION public\\.${name}\\(([\\s\\S]*?)\\)\\s*RETURNS`,
   )
   // The latest definition wins (0208 re-creates the save).
-  const match = pattern.exec(LATER) ?? pattern.exec(MIGRATION)
+  // 0209 drops and creates what gains a parameter.
+  const created = new RegExp(
+    `CREATE (?:OR REPLACE )?FUNCTION public\\.${name}\\(([\\s\\S]*?)\\)\\s*RETURNS`,
+  )
+  const match =
+    created.exec(PLAN_MIGRATION.replace(/--[^\n]*/g, '')) ??
+    pattern.exec(LATER) ??
+    pattern.exec(MIGRATION)
   assert.ok(match, name)
   return [...match[1].matchAll(/\b(p_[a-z_]+)\b/g)].map((item) => item[1])
 }
@@ -289,6 +395,9 @@ test('the four functions are called with the exact parameter names of 0203', () 
     'cancel_installment_contract',
     'record_installment_payment',
     'void_installment_payment',
+    'set_installment_first_due_date',
+    'set_installment_first_payment_date',
+    'installment_contract_edit_key',
   ]
   for (const name of functions)
     assert.deepEqual(rpcArguments(name), sqlParameters(name), name)
@@ -305,8 +414,11 @@ test('the four functions are called with the exact parameter names of 0203', () 
     'p_notes',
     'p_equipment_ids',
     'p_account',
+    'p_vat',
+    'p_first_payments',
+    'p_expected_key',
   ])
-  // Only those four, the delete of 0207, and nothing the migration keeps
+  // Only those (0209 adds the two dates), the delete of 0207, and nothing the migration keeps
   // for itself.
   assert.deepEqual(
     [...DATA.matchAll(/\.rpc\('([a-z_]+)'/g)].map((item) => item[1]).sort(),
@@ -336,13 +448,29 @@ function relationBody(name) {
   return table[1]
 }
 
+/** What 0209 gives a relation: its re-created view, or its new columns. */
+function planBody(name) {
+  const view = new RegExp(
+    `CREATE OR REPLACE VIEW public\\.${name}\\b([\\s\\S]*?);\\n`,
+  ).exec(PLAN_MIGRATION)
+  if (view) return view[1]
+  return [
+    ...PLAN_MIGRATION.matchAll(
+      new RegExp(`ALTER TABLE public\\.${name}\\n([\\s\\S]*?);\\n`, 'g'),
+    ),
+  ]
+    .map((match) => match[1])
+    .join('\n')
+}
+
 function assertColumns(relation, columns) {
   const body = relationBody(relation)
   for (const column of columns)
     assert.ok(
       new RegExp(`\\b${column}\\b`).test(body) ||
         // 0208 appends the account columns.
-        new RegExp(`\\b(AS|ADD COLUMN) ${column}\\b`).test(LATER),
+        new RegExp(`\\b(AS|ADD COLUMN) ${column}\\b`).test(LATER) ||
+        new RegExp(`\\b${column}\\b`).test(planBody(relation)),
       `${relation}.${column}`,
     )
 }
@@ -378,7 +506,7 @@ test('the selects name only columns the views and tables have', () => {
   ])
   assert.equal(
     selectOf('INSTALLMENT_ALLOCATION_SELECT'),
-    'payment_id,amount,installment_schedule!inner(seq,contract_id)',
+    'payment_id,amount,installment_schedule!inner(seq,kind,title,contract_id)',
   )
   assertColumns('installment_payment_allocations', [
     'payment_id',
@@ -419,6 +547,7 @@ test('reads only the installments relations; writes only the financiers', () => 
   assert.deepEqual([...relations].sort(), [
     'equipment',
     'installment_contract_equipment',
+    'installment_contract_files',
     'installment_contract_summary',
     'installment_contracts',
     'installment_dues',
@@ -469,7 +598,7 @@ test('every read is bounded or paged, and throws on failure', () => {
   const readers = DATA.split(/\nexport async function /).slice(1)
   for (const reader of readers) {
     const name = reader.slice(0, reader.indexOf('('))
-    if (/^(save|cancel|record|void|insert|update|delete)Installment/.test(name))
+    if (/^(save|set|cancel|record|void|insert|update|delete)Installment/.test(name))
       continue
     const body = reader.slice(0, reader.indexOf('\n}\n'))
     assert.match(
@@ -519,12 +648,14 @@ test('write actions show for installments.manage only', () => {
     assert.match(source, /const canManage = can\('installments\.manage'\)/)
     assert.match(source, /<ToastProvider>/)
     // The dialogs are not even mounted for a reader.
-    assert.match(source, /\{canManage && \(\s*<>\s*<InstallmentContractDialog/)
+    assert.match(source, /\{canManage && \(\s*<>\s*<SetFirstDueDateDialog/)
   }
   assert.match(list, /const actions = canManage \? \(/)
   // A cancelled contract keeps «خيارات» for «حذف العقد» (0207).
   assert.match(page, /const showActions = canManage\n/)
   assert.match(page, /canVoid=\{canManage && !cancelled\}/)
+  assert.match(page, /canManage=\{canManage && !cancelled\}/)
+  assert.match(page, /canAct=\{canManage && active\}/)
   assert.match(page, /action=\{canManage && active \? payButton : undefined\}/)
   // The «تسديد» buttons of the cards, the calendar and the feed follow the key.
   for (const file of [
@@ -555,7 +686,7 @@ test('one page with five tabs, kept in the URL', () => {
     '<InstallmentsContractsTab',
     '<InstallmentsDuesTab',
     '<InstallmentsFinanciersTab',
-    '<InstallmentContractDialog',
+    '<SetFirstDueDateDialog',
     '<InstallmentPaymentDialog',
     '<InstallmentFinancierDialog',
   ])
@@ -569,7 +700,9 @@ test('one page with five tabs, kept in the URL', () => {
   for (const key of ["feedFinancier: 'fin'", "contractChip: 'chip'", "contractSort: 'csort'", "contractSearch: 'cq'"])
     assert.ok(view.includes(key), key)
   // A new contract opens its own page, which shows the message.
-  assert.match(list, /setInstallmentFlash\('instToastContractCreated'\)\s*onOpenContract\(id\)/)
+  assert.match(list, /<AppLink href="\/installments\/new">/)
+  const form = read('src', 'screens', 'installments', 'InstallmentContractFormScreen.tsx')
+  assert.match(form, /'instToastContractCreated'[\s\S]{0,120}onSaved\(result\.data\)/)
   assert.match(
     read('src', 'screens', 'installments', 'InstallmentContractDetail.tsx'),
     /takeInstallmentFlash\(\)/,
@@ -639,7 +772,7 @@ test('the contract page: schedule, payments, units and a derived history', () =>
     'InstallmentContractDetail.tsx',
   )
   assert.match(page, /fetchInstallmentContract\(contractId, signal\)/)
-  assert.match(page, /contractHistory\(data\.contract, data\.payments\)/)
+  assert.match(page, /contractHistory\(data\.contract, data\.payments, data\.files\)/)
   assert.match(page, /allocationSeqsByPayment\(data\?\.allocations \?\? \[\]\)/)
   for (const piece of [
     '<DetailHeader',
@@ -659,7 +792,10 @@ test('the contract page: schedule, payments, units and a derived history', () =>
     /const locked = payments\.some\(\(payment\) => payment\.status === 'posted'\)/,
   )
   assert.match(page, /disabled=\{locked\}/)
-  assert.match(page, /locked=\{locked\}/)
+  // 0209: edit is a link to the form's page; the date may change until an
+  // installment is paid.
+  assert.match(page, /<AppLink href=\{`\/installments\/\$\{contract\.id\}\/edit`\}>/)
+  assert.match(page, /active && !awaiting && !contract\.installments_locked/)
   // The view counts the late rows of a closed contract too.
   assert.match(
     page,
@@ -683,6 +819,11 @@ const contractValues = (patch = {}) => ({
   first_due_date: '2026-12-01',
   notes: '',
   equipment: [],
+  vat_mode: 'inclusive',
+  vat_timing: '',
+  vat_amount: '',
+  vat_due_date: '',
+  payments: [],
   ...patch,
 })
 
@@ -690,7 +831,7 @@ test('installmentContractFormSchema: the rules of the contract form', () => {
   const check = (patch) =>
     plain(
       v.validateWithSchema(
-        v.installmentContractFormSchema,
+        v.installmentContractFormSchema('2026-11-22'),
         contractValues(patch),
       ),
     )
@@ -719,8 +860,43 @@ test('installmentContractFormSchema: the rules of the contract form', () => {
   assert.deepEqual(check({ frequency_months: '4' }), {
     frequency_months: 'instErrFrequency',
   })
-  assert.deepEqual(check({ first_due_date: '' }), {
+  // 0209: the first due date may be unknown; a wrong one is refused.
+  assert.deepEqual(check({ first_due_date: '' }), {})
+  assert.deepEqual(check({ first_due_date: '1/12/2026' }), {
     first_due_date: 'instErrFirstDueDate',
+  })
+  assert.deepEqual(check({ vat_mode: '' }), { vat_mode: 'instErrVat' })
+  assert.deepEqual(check({ vat_mode: 'unspecified' }), {})
+  assert.deepEqual(check({ vat_mode: 'exclusive' }), {
+    vat_timing: 'instErrVatTiming',
+  })
+  assert.deepEqual(
+    check({ vat_mode: 'exclusive', vat_timing: 'end', vat_amount: '0' }),
+    { vat_amount: 'instErrVatAmount' },
+  )
+  const row = (patch = {}) => ({
+    key: 'k', id: null, title: 'الدفعة الاولى', kind: 'rate', value: '20',
+    date: '', paidOn: '', note: '', paid: false, method: 'transfer', lockedAmount: null, lockedBase: null,
+    settled: false, ...patch,
+  })
+  assert.deepEqual(check({ payments: [row()] }), {})
+  for (const wrong of [
+    { title: ' ' },
+    { value: '100' },
+    { value: '0' },
+    { paid: true },
+    { paid: true, paidOn: '2026-11-23' },
+  ])
+    assert.deepEqual(check({ payments: [row(wrong)] }), {
+      payments: 'instFpCheckRows',
+    })
+  // Paid before the first due date is known.
+  assert.deepEqual(
+    check({ first_due_date: '', payments: [row({ paid: true, date: '2026-12-15', paidOn: '2026-11-20' })] }),
+    {},
+  )
+  assert.deepEqual(check({ payments: [row({ kind: 'amount', value: '1080000' })] }), {
+    payments: 'instErrFirstPayments',
   })
   assert.deepEqual(check({ notes: 'x'.repeat(1001) }), {
     notes: 'instErrNotes',
@@ -806,26 +982,25 @@ test('the payment, reason and financier schemas', () => {
   })
 })
 
-test('the contract dialog: one save, a live preview, the locked terms', () => {
+test('the contract page: one save, a live breakdown, the locked terms', () => {
   const dialog = read(
     'src',
-    'components',
+    'screens',
     'installments',
-    'InstallmentContractDialog.tsx',
+    'InstallmentContractFormScreen.tsx',
   )
   assert.match(dialog, /label=\{t\('instContractTitle'\)\}\s+required/)
-  assert.match(dialog, /installmentContractFormSchema/)
+  assert.match(dialog, /installmentContractFormSchema\(today\)/)
   assert.equal([...dialog.matchAll(/saveInstallmentContract\(/g)].length, 1)
-  assert.match(dialog, /buildSchedule\(terms\)/)
-  assert.match(dialog, /checkInstallmentTerms\(terms\)/)
-  // A posted payment: the notice, the disabled money fields, the stored
-  // terms sent back exactly.
-  assert.match(dialog, /\{locked && \(\s*<Notice tone="info"/)
-  assert.ok([...dialog.matchAll(/disabled=\{locked\}/g)].length >= 4)
-  assert.match(
-    dialog,
-    /\.\.\.\(locked && contract\s*\?\s*\{\s*totalAmount: amountOf\(contract\.total_amount\)/,
-  )
+  assert.match(dialog, /<InstallmentPlanSummary values=\{values\} \/>/)
+  // Money on an installment: the notice and the disabled terms; their
+  // values are the stored ones, so they go back as they are.
+  assert.match(dialog, /\{termsLocked && \(\s*<Notice tone="info"/)
+  assert.ok([...dialog.matchAll(/disabled=\{termsLocked\}/g)].length >= 4)
+  assert.match(dialog, /const termsLocked = contract\?\.installments_locked === true/)
+  // Leaving with unsaved changes asks.
+  assert.match(dialog, /confirmLeave=\{confirmLeave\}/)
+  assert.match(dialog, /addEventListener\('beforeunload', warn\)/)
   // The units: optional, searched on the server, 20 at most.
   assert.match(dialog, /<OptionalLabel text=\{t\('instLinkedUnits'\)\} \/>/)
   assert.match(dialog, /<AsyncMultiSelect/)
@@ -854,7 +1029,7 @@ test('the payment and reason dialogs', () => {
   )
   assert.match(pay, /installmentPaymentFormSchema\(today\)/)
   assert.equal([...pay.matchAll(/recordInstallmentPayment\(/g)].length, 1)
-  assert.match(pay, /allocatePayment\(/)
+  assert.match(pay, /allocateToRows\(/)
   assert.match(pay, /max=\{today\}/)
   assert.match(pay, /loadOptions=\{loadActiveContractOptions\}/)
   assert.match(pay, /INSTALLMENT_PAYMENT_TOKEN_FIELDS/)

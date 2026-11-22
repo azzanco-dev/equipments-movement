@@ -9,7 +9,12 @@ import {
   currentSeq,
   type ContractCardState,
 } from '@/lib/installmentsBoard'
-import type { InstallmentContractRow } from '@/lib/installmentsView'
+import {
+  payableRowLabel,
+  installmentsWords,
+  type InstallmentContractRow,
+  type InstallmentRowKind,
+} from '@/lib/installmentsView'
 import { Money, WhenBadge } from './cells'
 
 /**
@@ -168,21 +173,27 @@ const STATE_BADGE: Record<
       | 'instCardOverdue'
       | 'instCardPaidOff'
       | 'instCardCancelled'
-    tone: 'success' | 'danger' | 'info' | 'neutral'
+      | 'instAwaitingShort'
+    tone: 'success' | 'danger' | 'warning' | 'info' | 'neutral'
   }
 > = {
   active: { key: 'instCardActive', tone: 'success' },
   overdue: { key: 'instCardOverdue', tone: 'danger' },
+  awaiting: { key: 'instAwaitingShort', tone: 'warning' },
   paid_off: { key: 'instCardPaidOff', tone: 'info' },
   cancelled: { key: 'instCardCancelled', tone: 'neutral' },
 }
 
-/** The installment a card points at: its day, amount and days left. */
+/** The payable row a card points at: what it is, its day, amount, days. */
 export interface CardDue {
   date: string
   amount: number
   /** Negative = days late. */
   days: number
+  /** 0209: what the row is; a first payment has its name. */
+  kind: InstallmentRowKind
+  title: string | null
+  seq: number
 }
 
 /**
@@ -191,6 +202,8 @@ export interface CardDue {
  * with «القسط N من M» and a bar, the box of the installment it points at
  * (red when late), then «فتح العقد» and «تسديد». The dashboard points it at
  * the installment due within 7 days; the contracts tab at the next one.
+ * Since 0209 the row may be a first payment or the VAT, and a contract
+ * waiting for its first due date says so and offers «تحديد التاريخ».
  */
 export function ContractCard({
   contract,
@@ -198,6 +211,7 @@ export function ContractCard({
   tone,
   canPay,
   onPay,
+  onSetFirstDue,
 }: {
   contract: InstallmentContractRow
   due: CardDue | null
@@ -205,13 +219,39 @@ export function ContractCard({
   tone: number
   canPay: boolean
   onPay: () => void
+  /** The card of a waiting contract without a dated row. */
+  onSetFirstDue?: () => void
 }) {
-  const { t, dir } = useI18n()
+  const { t, dir, lang } = useI18n()
   const state = contractCardState(contract)
   const late = state === 'overdue'
   const percent = contractPaidPercent(contract)
   const badge = STATE_BADGE[state]
   const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight
+  const waiting = contract.status === 'active' && !contract.first_due_date
+  const payments = contract.first_payments_count
+  const paidPayments = contract.first_payments_paid_count
+  const place =
+    due?.kind === 'first_payment'
+      ? t('instFpSeqOf')
+          .replace('{seq}', String(due.seq))
+          .replace('{count}', String(payments))
+      : due?.kind === 'vat'
+        ? t('instVatPayment')
+        : waiting
+          ? paidPayments === 0
+            ? t('instNotDivided').replace(
+                '{installments}',
+                installmentsWords(contract.installment_count, lang),
+              )
+            : payments === 1
+              ? t('instFpOneSettled')
+              : t('instFpPaidOf')
+                  .replace('{paid}', String(paidPayments))
+                  .replace('{count}', String(payments))
+          : t('instCardSeqOf')
+              .replace('{seq}', String(currentSeq(contract)))
+              .replace('{count}', String(contract.installment_count))
   return (
     <article className="flex min-w-0 flex-col gap-2 rounded-xl border bg-bg p-3.5 shadow-sm">
       <div className="flex items-center justify-between gap-2">
@@ -247,10 +287,15 @@ export function ContractCard({
               className="text-lg font-bold"
             />
           </div>
-          <p className="text-xs text-muted">
-            {t('instCardSeqOf')
-              .replace('{seq}', String(currentSeq(contract)))
-              .replace('{count}', String(contract.installment_count))}
+          <p
+            className={cn(
+              'text-xs',
+              waiting && !due && paidPayments > 0
+                ? 'text-success'
+                : 'text-muted',
+            )}
+          >
+            {place}
           </p>
         </div>
         <div
@@ -274,7 +319,11 @@ export function ContractCard({
           )}
         >
           <div className="min-w-0">
-            <p className="text-xs text-muted">{t('instCardNextDue')}</p>
+            <p className="truncate text-xs text-muted">
+              {due.kind === 'installment'
+                ? t('instCardNextDue')
+                : payableRowLabel(due, t)}
+            </p>
             <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
               <bdi dir="ltr">{formatDate(due.date)}</bdi>
               <WhenBadge days={due.days} />
@@ -286,6 +335,20 @@ export function ContractCard({
           />
         </div>
       )}
+      {!due && waiting && (
+        <div className="flex items-center justify-between gap-2 rounded-lg bg-warning-soft px-2.5 py-2">
+          <div className="min-w-0">
+            <p className="text-xs text-muted">{t('instFirstDueDate')}</p>
+            <p className="text-sm font-medium text-warning">
+              {t('instFpNoDate')}
+            </p>
+          </div>
+          <Money
+            value={contract.installments_amount}
+            className="text-sm font-bold"
+          />
+        </div>
+      )}
       <div className="mt-auto flex items-center justify-between gap-2">
         <AppLink
           href={`/installments/${contract.id}`}
@@ -294,7 +357,11 @@ export function ContractCard({
           {t('instCardOpen')}
           <Chevron size={14} aria-hidden="true" />
         </AppLink>
-        {canPay && contract.status === 'active' && (
+        {canPay && waiting && !due && onSetFirstDue ? (
+          <Button size="sm" variant="outline" onClick={onSetFirstDue}>
+            {t('instSetDate')}
+          </Button>
+        ) : canPay && contract.status === 'active' ? (
           <Button
             size="sm"
             variant={late ? 'primary' : 'outline'}
@@ -303,7 +370,7 @@ export function ContractCard({
           >
             {t('instPayRow')}
           </Button>
-        )}
+        ) : null}
       </div>
     </article>
   )

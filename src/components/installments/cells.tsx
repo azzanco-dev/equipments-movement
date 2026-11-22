@@ -159,26 +159,24 @@ export function UnitTags({
   )
 }
 
-/** Paid out of financed, as a thin bar with its numbers. */
-export function PaidProgress({
-  percent,
-  paidCount,
-  rowCount,
-}: {
-  percent: number
-  paidCount: number
-  rowCount: number
-}) {
+/** «المسدد من العقد» (0209): the share of the whole contract, as a thin bar. */
+export function PaidProgress({ percent }: { percent: number }) {
   const { t } = useI18n()
   return (
     <div className="min-w-[120px] space-y-1">
+      <p className="flex justify-between gap-2 text-xs text-muted">
+        {t('instPaidOfContract')}
+        <bdi dir="ltr" className="font-semibold tabular-nums text-fg">
+          {percent}%
+        </bdi>
+      </p>
       <div
         className="h-1.5 overflow-hidden rounded-full bg-surface-hover"
         role="progressbar"
         aria-valuenow={percent}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={t('instPaid')}
+        aria-label={t('instPaidOfContract')}
       >
         <div
           className="h-full rounded-full"
@@ -188,14 +186,6 @@ export function PaidProgress({
           }}
         />
       </div>
-      <p className="flex justify-between gap-2 text-xs text-muted">
-        <bdi dir="ltr" className="tabular-nums">
-          {paidCount}/{rowCount}
-        </bdi>
-        <bdi dir="ltr" className="tabular-nums">
-          {percent}%
-        </bdi>
-      </p>
     </div>
   )
 }

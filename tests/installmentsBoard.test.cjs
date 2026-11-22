@@ -118,25 +118,31 @@ test('the dues feed in groups', () => {
 
 test('the contracts: figures, chips, shares, the card state', () => {
   const rows = [
-    { id: 'a', financier_id: 'f1', status: 'active', financed_amount: 1000, paid_total: 400, remaining_total: 600, overdue_count: 1, last_due_date: '2026-12-31' },
-    { id: 'b', financier_id: 'f2', status: 'active', financed_amount: 1000, paid_total: 0, remaining_total: 1000, overdue_count: 0, last_due_date: '2029-05-01' },
-    { id: 'c', financier_id: 'f1', status: 'paid_off', financed_amount: 500, paid_total: 500, remaining_total: 0, overdue_count: 0, last_due_date: '2026-01-01' },
-    { id: 'd', financier_id: 'f3', status: 'cancelled', financed_amount: 900, paid_total: 0, remaining_total: 900, overdue_count: 0, last_due_date: '2027-01-01' },
+    { id: 'a', financier_id: 'f1', status: 'active', first_due_date: '2026-01-31', payable_total: 1000, paid_overall: 400, remaining_total: 600, overdue_count: 1, last_due_date: '2026-12-31' },
+    { id: 'b', financier_id: 'f2', status: 'active', first_due_date: '2026-06-01', payable_total: 1000, paid_overall: 0, remaining_total: 1000, overdue_count: 0, last_due_date: '2029-05-01' },
+    { id: 'c', financier_id: 'f1', status: 'paid_off', first_due_date: '2025-02-01', payable_total: 500, paid_overall: 500, remaining_total: 0, overdue_count: 0, last_due_date: '2026-01-01' },
+    { id: 'd', financier_id: 'f3', status: 'cancelled', first_due_date: null, payable_total: 900, paid_overall: 0, remaining_total: 900, overdue_count: 0, last_due_date: '2027-01-01' },
   ]
   const summary = plain(board.summarizeContracts(rows, TODAY))
   assert.deepEqual(summary, {
     activeCount: 2,
     activeFinanciers: 2,
     paid: 900,
-    financed: 2500,
+    payable: 2500,
     paidPercent: 36,
     remaining: 1600,
     lastYear: 2029,
     endingThisYear: 1,
   })
   assert.deepEqual(plain(board.contractChipCounts(rows, TODAY)), {
-    all: 4, overdue: 1, ending: 1, paid_off: 1, cancelled: 1,
+    all: 4, overdue: 1, awaiting: 0, ending: 1, paid_off: 1, cancelled: 1,
   })
+  // 0209: waiting for the first due date — only an active contract waits.
+  const waiting = { ...rows[1], id: 'e', first_due_date: null, last_due_date: null }
+  const withWaiting = plain(board.contractChipCounts([...rows, waiting], TODAY))
+  assert.equal(withWaiting.awaiting, 1)
+  assert.equal(withWaiting.ending, 1)
+  assert.equal(board.readContractChip('awaiting'), 'awaiting')
   // 90 days from 1 September end before row a's last installment.
   assert.equal(plain(board.contractChipCounts(rows, '2026-09-01')).ending, 0)
   assert.deepEqual(plain(board.financierShares(rows)), [
@@ -145,6 +151,11 @@ test('the contracts: figures, chips, shares, the card state', () => {
   ])
   assert.equal(board.contractCardState({ status: 'active', overdue_count: 2 }), 'overdue')
   assert.equal(board.contractCardState({ status: 'active', overdue_count: 0 }), 'active')
+  assert.equal(board.contractCardState({ status: 'active', overdue_count: 0, first_due_date: null }), 'awaiting')
+  assert.equal(board.contractCardState({ status: 'active', overdue_count: 1, first_due_date: null }), 'overdue')
+  assert.equal(board.contractCardState({ status: 'cancelled', overdue_count: 0, first_due_date: null }), 'cancelled')
+  // The share of the whole contract, with what was paid before entry.
+  assert.equal(board.contractPaidPercent({ paid_overall: 500, payable_total: 1000 }), 50)
   assert.equal(board.currentSeq({ paid_count: 36, installment_count: 36 }), 36)
   assert.equal(board.currentSeq({ paid_count: 8, installment_count: 36 }), 9)
   assert.equal(board.financierTone([{ id: 'x' }, { id: 'y' }], 'y'), 2)

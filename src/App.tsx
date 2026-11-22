@@ -306,6 +306,13 @@ const InstallmentContractDetail = dynamic(
     ),
   { loading: screenLoading },
 )
+const InstallmentContractFormScreen = dynamic(
+  () =>
+    import('@/screens/installments/InstallmentContractFormScreen').then(
+      (module) => module.InstallmentContractFormScreen,
+    ),
+  { loading: screenLoading },
+)
 const UserDetail = dynamic(
   () => import('@/screens/UserDetail').then((module) => module.UserDetail),
   { loading: screenLoading },
@@ -605,6 +612,8 @@ function AppContent() {
   const trail = pageTrail(page, t, tabTitleRecord, {
     fieldHome,
     movementType,
+    recordPath:
+      page === 'installments/:id/edit' ? `/installments/${detailId}` : undefined,
     opens: (path) =>
       shell.pages.has(routePageOf(path.split('/').filter(Boolean))),
   })
@@ -721,6 +730,20 @@ function AppContent() {
             onBack={goBackTo('/sales/quotations')}
             onDeleted={() => router.replace('/sales/quotations')}
             onOpenQuotation={(id) => router.push(`/sales/quotations/${id}`)}
+          />
+        ) : page === 'installments/new' ? (
+          <InstallmentContractFormScreen
+            contractId={null}
+            onBack={goBackTo('/installments')}
+            onSaved={(id) => router.replace(`/installments/${id}`)}
+          />
+        ) : page === 'installments/:id/edit' ? (
+          <InstallmentContractFormScreen
+            contractId={detailId}
+            onBack={goBackTo(`/installments/${detailId}`)}
+            // Back to the contract it was opened from, so the trail has no
+            // second copy of it.
+            onSaved={(id) => goBackTo(`/installments/${id}`)()}
           />
         ) : page === 'installments/:id' ? (
           <InstallmentContractDetail
@@ -854,9 +877,7 @@ function AppContent() {
               <AdminUsers onSelectUser={(id) => router.push(`/users/${id}`)} />
             )}
             {page === 'installments' && (
-              <InstallmentsScreen
-                onOpenContract={(id) => router.push(`/installments/${id}`)}
-              />
+              <InstallmentsScreen />
             )}
             {page === 'movement-import' && <MovementImport />}
             {page === 'activity' && <ActivityScreen />}

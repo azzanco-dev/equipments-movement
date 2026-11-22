@@ -368,6 +368,21 @@ export const INSTALLMENT_ERROR_KEYS: Readonly<Record<string, TranslationKey>> =
     invalid_account: 'instErrAccount',
     invalid_bank: 'instErrBank',
     invalid_iban: 'instErrIban',
+    // 0209
+    invalid_vat: 'instErrVat',
+    invalid_vat_timing: 'instErrVatTiming',
+    invalid_vat_amount: 'instErrVatAmount',
+    invalid_vat_date: 'instErrVatDate',
+    invalid_first_payment: 'instErrFirstPayment',
+    invalid_first_payments: 'instErrFirstPayments',
+    invalid_first_payment_date: 'instErrFirstPaymentDate',
+    first_payment_locked: 'instErrFirstPaymentLocked',
+    invalid_schedule_row: 'instErrScheduleRow',
+    installments_not_scheduled: 'instErrNotScheduled',
+    invalid_contract_file: 'instErrContractFile',
+    contract_file_missing: 'instErrContractFileMissing',
+    contract_file_not_found: 'instErrContractFileNotFound',
+    contract_changed: 'instErrContractChanged',
   }
 
 /** Every stable token of the installments functions, for the tests. */

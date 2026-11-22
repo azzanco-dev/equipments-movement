@@ -8,6 +8,7 @@ import {
   Plus,
 } from 'lucide-react'
 import {
+  AppLink,
   Button,
   EmptyState,
   ErrorState,
@@ -56,6 +57,7 @@ import { useLoad } from './useLoad'
 const CHIP_TONE: Record<ContractChip, BoardTone> = {
   all: 'neutral',
   overdue: 'danger',
+  awaiting: 'warning',
   ending: 'warning',
   paid_off: 'success',
   cancelled: 'neutral',
@@ -64,12 +66,14 @@ const CHIP_LABEL: Record<
   ContractChip,
   | 'instChipAll'
   | 'instChipOverdue'
+  | 'instChipAwaiting'
   | 'instChipEnding'
   | 'instChipPaidOff'
   | 'instChipCancelled'
 > = {
   all: 'instChipAll',
   overdue: 'instChipOverdue',
+  awaiting: 'instChipAwaiting',
   ending: 'instChipEnding',
   paid_off: 'instChipPaidOff',
   cancelled: 'instChipCancelled',
@@ -106,7 +110,7 @@ const CHIP_ACTIVE: Record<BoardTone, string> = {
  * «العقود» of the unified page (owner 2026-11-21, Figma frame «الاقساط /
  * الصفحة الموحدة: العقود», design 4 with the chips of «نموذج 5»): four
  * figures — active contracts, paid, remaining, ending this year —, the
- * chips الكل / فيها متاخر / تخلص قريب (last installment within
+ * chips الكل / فيها متاخر / بانتظار التاريخ (0209) / تخلص قريب (last installment within
  * `ENDING_SOON_DAYS`) / مسددة / ملغاة with their counts, the search and the
  * sort, then the contracts as cards (ring, remaining, the next installment,
  * «فتح العقد» and «تسديد»), `CONTRACT_CARDS_PAGE` at a time. Chip, sort and
@@ -119,8 +123,8 @@ export function InstallmentsContractsTab({
   totalContracts,
   version,
   canManage,
-  onNewContract,
   onPay,
+  onSetFirstDue,
 }: {
   state: InstallmentsUrlState
   update: (values: Record<string, string | number | null>) => void
@@ -129,8 +133,8 @@ export function InstallmentsContractsTab({
   totalContracts: number
   version: number
   canManage: boolean
-  onNewContract: () => void
   onPay: (contract: InstallmentContractRow) => void
+  onSetFirstDue: (contract: InstallmentContractRow) => void
 }) {
   const { t } = useI18n()
   const today = useMemo(() => saudiDateKey(), [])
@@ -177,12 +181,11 @@ export function InstallmentsContractsTab({
         title={t('instNoContractsYet')}
         action={
           canManage ? (
-            <Button
-              variant="primary"
-              icon={<Plus size={16} aria-hidden="true" />}
-              onClick={onNewContract}
-            >
-              {t('instContractNew')}
+            <Button asChild variant="primary">
+              <AppLink href="/installments/new">
+                <Plus size={16} aria-hidden="true" />
+                {t('instContractNew')}
+              </AppLink>
             </Button>
           ) : undefined
         }
@@ -277,7 +280,13 @@ export function InstallmentsContractsTab({
                   ) : (
                     <span
                       aria-hidden="true"
-                      className={cn('size-2 rounded-full', CHIP_DOT[tone])}
+                      className={cn(
+                        'size-2 rounded-full',
+                        // Two amber chips: the waiting one is the brighter.
+                        value === 'awaiting'
+                          ? 'bg-[var(--brand-amber)]'
+                          : CHIP_DOT[tone],
+                      )}
                     />
                   )}
                   {t(CHIP_LABEL[value])}
@@ -353,11 +362,15 @@ export function InstallmentsContractsTab({
                         date: contract.next_due_date,
                         amount: amountOf(contract.next_due_amount),
                         days: daysUntilDue(contract.next_due_date, today),
+                        kind: contract.next_due_kind ?? 'installment',
+                        title: contract.next_due_title,
+                        seq: contract.next_due_seq ?? 0,
                       }
                     : null
                 }
                 canPay={canManage}
                 onPay={() => onPay(contract)}
+                onSetFirstDue={() => onSetFirstDue(contract)}
               />
             ))}
           </div>

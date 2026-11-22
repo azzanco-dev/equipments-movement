@@ -4,7 +4,6 @@ import { isValidUserMobile, normalizeUserMobileInput } from '@/lib/userMobile'
 import { DRIVER_EMPLOYEE_NUMBER_MAX } from '@/lib/driverEmployeeNumber'
 import { isValidSupplierPoPrice } from '@/lib/purchasing'
 import {
-  checkInstallmentTerms,
   INSTALLMENT_DESCRIPTION_MAX,
   INSTALLMENT_ERROR_KEYS,
   INSTALLMENT_FINANCIER_NAME_MAX,
@@ -17,11 +16,22 @@ import {
   type InstallmentFrequency,
   type InstallmentPaymentMethod,
 } from '@/lib/installments'
+import { parseInstallmentAmount } from '@/lib/installmentsView'
 import {
-  installmentTermsOf,
-  parseInstallmentAmount,
+  buildInstallmentPlan,
+  firstPaymentValue,
+  planInputOf,
   INSTALLMENT_CONTRACT_TOKEN_FIELDS,
-} from '@/lib/installmentsView'
+  INSTALLMENT_FIRST_PAYMENTS_MAX,
+  INSTALLMENT_FIRST_PAYMENT_NOTE_MAX,
+  INSTALLMENT_FIRST_PAYMENT_TITLE_MAX,
+  INSTALLMENT_VAT_CHOICES,
+  INSTALLMENT_VAT_TIMINGS,
+  type FirstPaymentFormRow,
+  type InstallmentContractFormValues,
+  type InstallmentVatMode,
+  type InstallmentVatTiming,
+} from '@/lib/installmentPlan'
 import {
   COMMERCIAL_REGISTER_PATTERN,
   EMAIL_SHAPE_PATTERN,
@@ -1358,56 +1368,143 @@ const installmentIban = z
     message('ibanFormatInvalid'),
   )
 
-export const installmentContractFormSchema = z
-  .object({
-    description: requiredText('instErrDescription', {
-      max: INSTALLMENT_DESCRIPTION_MAX,
-      lengthKey: 'instErrDescription',
-    }),
-    financier_id: selected('instErrFinancier'),
-    total_amount: z
-      .string()
-      .trim()
-      .min(1, message('instTotalRequired'))
-      .refine(
-        (value) => !value || parseInstallmentAmount(value) !== null,
-        message('instAmountFormat'),
-      ),
-    down_payment: optionalInstallmentAmount,
-    balloon_amount: optionalInstallmentAmount,
-    installment_count: z
-      .string()
-      .trim()
-      .regex(/^[0-9٠-٩۰-۹]+$/, message('instErrInstallmentCount')),
-    frequency_months: z
-      .string()
-      .refine(
-        (value) =>
-          INSTALLMENT_FREQUENCIES.includes(
-            Number(value) as InstallmentFrequency,
-          ),
-        message('instErrFrequency'),
-      ),
-    first_due_date: z.string().regex(DATE_KEY, message('instErrFirstDueDate')),
-    notes: optionalText({
-      max: INSTALLMENT_NOTES_MAX,
-      lengthKey: 'instErrNotes',
-    }),
-    equipment: z.array(z.string()),
-    bank_name: z.string().optional(),
-    iban: installmentIban.optional(),
-  })
-  .superRefine((form, context) => {
-    const terms = installmentTermsOf(form)
-    if (!terms) return
-    const token = checkInstallmentTerms(terms)
-    if (token)
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: [INSTALLMENT_CONTRACT_TOKEN_FIELDS[token]],
-        message: INSTALLMENT_ERROR_KEYS[token],
-      })
-  })
+/**
+ * The message of one row of «الدفعات الاولى» (0209), or null: a name, a
+ * value of its kind, and the day it was paid when «مدفوعة» is on (never
+ * after the Saudi `today`). Shown under the row, as the quotation's rows do.
+ */
+export function firstPaymentRowError(
+  row: FirstPaymentFormRow,
+  today: string,
+): TranslationKey | null {
+  const title = row.title.trim()
+  if (!title || title.length > INSTALLMENT_FIRST_PAYMENT_TITLE_MAX)
+    return 'instFpTitleRequired'
+  if (!firstPaymentValue(row))
+    return row.kind === 'rate' ? 'instFpRateInvalid' : 'instFpAmountInvalid'
+  if (row.note.trim().length > INSTALLMENT_FIRST_PAYMENT_NOTE_MAX)
+    return 'instFpNoteLong'
+  if (row.date && !DATE_KEY.test(row.date)) return 'instErrFirstPaymentDate'
+  if (row.paid && row.lockedAmount === null) {
+    if (!row.paidOn) return 'instPaidOnRequired'
+    if (!DATE_KEY.test(row.paidOn)) return 'instErrFirstPaymentDate'
+    if (row.paidOn > today) return 'instErrPaidOn'
+  }
+  return null
+}
+
+/**
+ * «عقد جديد» / «تعديل العقد» (save_installment_contract, 0209): the title,
+ * the financier, the amounts, the VAT (a required choice; exclusive asks
+ * when it is paid), the first payments, the division — whose first date may
+ * be empty — and the account. The arithmetic is `buildInstallmentPlan`'s,
+ * with the database's tokens.
+ */
+export function installmentContractFormSchema(today: string) {
+  return z
+    .object({
+      description: requiredText('instErrDescription', {
+        max: INSTALLMENT_DESCRIPTION_MAX,
+        lengthKey: 'instErrDescription',
+      }),
+      financier_id: selected('instErrFinancier'),
+      total_amount: z
+        .string()
+        .trim()
+        .min(1, message('instTotalRequired'))
+        .refine(
+          (value) => !value || parseInstallmentAmount(value) !== null,
+          message('instAmountFormat'),
+        ),
+      down_payment: optionalInstallmentAmount,
+      // «غير محدد» only comes back from a stored contract.
+      vat_mode: z
+        .string()
+        .refine(
+          (value) =>
+            value === 'unspecified' ||
+            INSTALLMENT_VAT_CHOICES.includes(value as InstallmentVatMode),
+          message('instErrVat'),
+        ),
+      vat_timing: z.string(),
+      vat_amount: z.string(),
+      vat_due_date: z.string(),
+      payments: z.custom<FirstPaymentFormRow[]>(Array.isArray),
+      balloon_amount: optionalInstallmentAmount,
+      installment_count: z
+        .string()
+        .trim()
+        .regex(/^[0-9٠-٩۰-۹]+$/, message('instErrInstallmentCount')),
+      frequency_months: z
+        .string()
+        .refine(
+          (value) =>
+            INSTALLMENT_FREQUENCIES.includes(
+              Number(value) as InstallmentFrequency,
+            ),
+          message('instErrFrequency'),
+        ),
+      first_due_date: z
+        .string()
+        .refine(
+          (value) => !value || DATE_KEY.test(value),
+          message('instErrFirstDueDate'),
+        ),
+      notes: optionalText({
+        max: INSTALLMENT_NOTES_MAX,
+        lengthKey: 'instErrNotes',
+      }),
+      equipment: z.array(z.string()),
+      bank_name: z.string().optional(),
+      iban: installmentIban.optional(),
+    })
+    .superRefine((form, context) => {
+      const refuse = (
+        field: keyof InstallmentContractFormValues,
+        key: TranslationKey,
+      ) =>
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [field],
+          message: key,
+        })
+      if (form.vat_mode === 'exclusive') {
+        if (
+          !INSTALLMENT_VAT_TIMINGS.includes(
+            form.vat_timing as InstallmentVatTiming,
+          )
+        ) {
+          refuse('vat_timing', 'instErrVatTiming')
+          return
+        }
+        if (form.vat_timing === 'end') {
+          if (form.vat_amount.trim() && !parseInstallmentAmount(form.vat_amount)) {
+            refuse('vat_amount', 'instErrVatAmount')
+            return
+          }
+          if (form.vat_due_date && !DATE_KEY.test(form.vat_due_date)) {
+            refuse('vat_due_date', 'instErrVatDate')
+            return
+          }
+        }
+      }
+      if (
+        form.payments.length > INSTALLMENT_FIRST_PAYMENTS_MAX ||
+        form.payments.some((row) => firstPaymentRowError(row, today))
+      ) {
+        refuse('payments', 'instFpCheckRows')
+        return
+      }
+      const planned = planInputOf(form as InstallmentContractFormValues)
+      if (!planned) return
+      const { error } = buildInstallmentPlan(planned.input)
+      if (error)
+        refuse(
+          INSTALLMENT_CONTRACT_TOKEN_FIELDS[error],
+          INSTALLMENT_ERROR_KEYS[error],
+        )
+    })
+}
 
 /**
  * «تسجيل سداد» (record_installment_payment, 0203): a contract, a positive

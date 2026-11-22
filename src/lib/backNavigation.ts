@@ -60,17 +60,31 @@ export type VisitKind = 'first' | 'push' | 'pop' | 'back'
 
 /** A page that only leads somewhere else (the movement form opens the saved
  *  movement): back never returns to it. */
-const TRANSIENT_PATHS: readonly string[] = ['/movements/new']
+const TRANSIENT_PATHS: readonly string[] = [
+  '/movements/new',
+  '/installments/new',
+]
+/** The edit page of a contract leads back to the contract (0209). */
+const TRANSIENT_PATTERN = /^\/installments\/[^/]+\/edit$/
 
 export function isTransientPath(path: string): boolean {
-  return TRANSIENT_PATHS.includes(path)
+  return TRANSIENT_PATHS.includes(path) || TRANSIENT_PATTERN.test(path)
 }
 
 /** The trail entry back leads to: the nearest page before the current one
  *  that is not transient; -1 when there is none. */
 function backIndex(trail: readonly TrailEntry[]): number {
+  const current = trail[trail.length - 1]
   let index = trail.length - 2
-  while (index >= 0 && isTransientPath(trail[index].path)) index -= 1
+  let skipped = false
+  while (index >= 0) {
+    const { path } = trail[index]
+    if (isTransientPath(path)) skipped = true
+    // A page reached again through its own transient page (the edit page
+    // and the contract's crumb on it) is not the page before itself.
+    else if (!skipped || path !== current.path) break
+    index -= 1
+  }
   return index
 }
 

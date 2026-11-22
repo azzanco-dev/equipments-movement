@@ -15,7 +15,7 @@ import { OptionalLabel } from './cells'
  * form has them: the bank picked from the banks list (0177) with its logo,
  * the IBAN typed with or without spaces (stored without, upper-case). Both
  * optional. Used by the financier dialog and, for a contract's own account,
- * by the contract dialog.
+ * by the contract's form page.
  */
 export function BankAccountFields({
   bankName,

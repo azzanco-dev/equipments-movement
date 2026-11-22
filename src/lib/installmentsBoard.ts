@@ -68,14 +68,19 @@ export function financierTone(
 
 // --- Contracts --------------------------------------------------------------------------
 
-export type ContractCardState = 'overdue' | 'active' | 'paid_off' | 'cancelled'
+export type ContractCardState =
+  'overdue' | 'awaiting' | 'active' | 'paid_off' | 'cancelled'
 
-/** The badge of a contract card: «فيه متاخر» wins over «نشط». */
+/** The badge of a contract card: «فيه متاخر» wins over «بانتظار التاريخ»
+ *  (0209), which wins over «نشط». */
 export function contractCardState(
-  contract: Pick<InstallmentContractRow, 'status' | 'overdue_count'>,
+  contract: Pick<InstallmentContractRow, 'status' | 'overdue_count'> &
+    Partial<Pick<InstallmentContractRow, 'first_due_date'>>,
 ): ContractCardState {
   if (contract.status === 'active' && contract.overdue_count > 0)
     return 'overdue'
+  if (contract.status === 'active' && contract.first_due_date === null)
+    return 'awaiting'
   return contract.status
 }
 
@@ -86,13 +91,14 @@ export function currentSeq(
   return Math.min(contract.paid_count + 1, contract.installment_count)
 }
 
-/** The share of a contract already paid, 0–100. */
+/** The share of the WHOLE contract already paid, 0–100 (0209: with what
+ *  was paid before it was entered, out of the total with its VAT). */
 export function contractPaidPercent(
-  contract: Pick<InstallmentContractRow, 'paid_total' | 'financed_amount'>,
+  contract: Pick<InstallmentContractRow, 'paid_overall' | 'payable_total'>,
 ): number {
   return paidPercent(
-    amountOf(contract.paid_total),
-    amountOf(contract.financed_amount),
+    amountOf(contract.paid_overall),
+    amountOf(contract.payable_total),
   )
 }
 
@@ -101,8 +107,9 @@ export interface ContractFigureRow {
   id: string
   financier_id: string
   status: InstallmentContractStatus
-  financed_amount: number | string
-  paid_total: number | string
+  first_due_date: string | null
+  payable_total: number | string
+  paid_overall: number | string
   remaining_total: number | string
   overdue_count: number
   last_due_date: string | null
@@ -112,9 +119,10 @@ export interface ContractsSummary {
   activeCount: number
   /** Financiers with at least one active contract. */
   activeFinanciers: number
-  /** Paid and financed over the contracts that are not cancelled. */
+  /** Over the contracts that are not cancelled: paid (with what was paid
+   *  before entry) and payable. */
   paid: number
-  financed: number
+  payable: number
   paidPercent: number
   /** What the active contracts still owe. */
   remaining: number
@@ -129,7 +137,7 @@ export function summarizeContracts(
   today: string,
 ): ContractsSummary {
   let paid = 0
-  let financed = 0
+  let payable = 0
   let remaining = 0
   let activeCount = 0
   let endingThisYear = 0
@@ -138,8 +146,8 @@ export function summarizeContracts(
   const yearEnd = `${today.slice(0, 4)}-12-31`
   for (const row of rows) {
     if (row.status === 'cancelled') continue
-    paid += toHalalas(amountOf(row.paid_total))
-    financed += toHalalas(amountOf(row.financed_amount))
+    paid += toHalalas(amountOf(row.paid_overall))
+    payable += toHalalas(amountOf(row.payable_total))
     if (row.status !== 'active') continue
     activeCount += 1
     financiers.add(row.financier_id)
@@ -153,8 +161,8 @@ export function summarizeContracts(
     activeCount,
     activeFinanciers: financiers.size,
     paid: fromHalalas(paid),
-    financed: fromHalalas(financed),
-    paidPercent: paidPercent(fromHalalas(paid), fromHalalas(financed)),
+    payable: fromHalalas(payable),
+    paidPercent: paidPercent(fromHalalas(paid), fromHalalas(payable)),
     remaining: fromHalalas(remaining),
     lastYear: last ? Number(last.slice(0, 4)) : null,
     endingThisYear,
@@ -186,11 +194,12 @@ export function financierShares(
 
 /** The contract filters of «العقود» (chips of the design «نموذج 5»). */
 export type ContractChip =
-  'all' | 'overdue' | 'ending' | 'paid_off' | 'cancelled'
+  'all' | 'overdue' | 'awaiting' | 'ending' | 'paid_off' | 'cancelled'
 
 export const CONTRACT_CHIPS: readonly ContractChip[] = [
   'all',
   'overdue',
+  'awaiting',
   'ending',
   'paid_off',
   'cancelled',
@@ -211,6 +220,7 @@ export function contractChipCounts(
   const counts: Record<ContractChip, number> = {
     all: rows.length,
     overdue: 0,
+    awaiting: 0,
     ending: 0,
     paid_off: 0,
     cancelled: 0,
@@ -220,6 +230,7 @@ export function contractChipCounts(
     else if (row.status === 'cancelled') counts.cancelled += 1
     else {
       if (row.overdue_count > 0) counts.overdue += 1
+      if (!row.first_due_date) counts.awaiting += 1
       if (row.last_due_date && row.last_due_date <= endBy) counts.ending += 1
     }
   }

@@ -104,7 +104,7 @@ test('«حذف العقد»: a cancelled contract only, confirmed, then its file
   assert.match(page, /tone: 'danger',\s*\}\)\s*if \(!confirmed\) return/)
   assert.ok(
     page.indexOf('await deleteInstallmentContract(contract.id)') <
-      page.indexOf('await removeInstallmentReceiptFiles(result.data)'),
+      page.indexOf('removeInstallmentReceiptFiles(result.data),'),
   )
   assert.match(page, /onDeleted\(\)/)
   assert.match(read('src', 'App.tsx'), /onDeleted=\{\(\) => router\.replace\('\/installments\?tab=contracts'\)\}/)

@@ -91,6 +91,17 @@ const PAGE_TITLES: Readonly<
   'sales/quotations/:id': { kind: 'detail', section: 'quotations' },
   // 0203: «INS-0003 · الاقساط».
   'installments/:id': { kind: 'detail', section: 'installments' },
+  // 0209: «عقد جديد · الاقساط», «INS-0003 · الاقساط» while editing.
+  'installments/new': {
+    kind: 'sub',
+    name: 'instContractNew',
+    section: 'installments',
+  },
+  'installments/:id/edit': {
+    kind: 'sub',
+    name: 'instContractEdit',
+    section: 'installments',
+  },
 }
 
 const join = (...parts: string[]) => parts.join(TAB_TITLE_SEPARATOR)

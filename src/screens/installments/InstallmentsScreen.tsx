@@ -9,7 +9,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { usePermissions } from '@/auth/PermissionsContext'
-import { InstallmentContractDialog } from '@/components/installments/InstallmentContractDialog'
+import { SetFirstDueDateDialog } from '@/components/installments/InstallmentDateDialogs'
 import { InstallmentFinancierDialog } from '@/components/installments/InstallmentFinancierDialog'
 import {
   InstallmentPaymentDialog,
@@ -20,13 +20,11 @@ import { InstallmentsContractsTab } from '@/components/installments/Installments
 import { InstallmentsDashboardTab } from '@/components/installments/InstallmentsDashboardTab'
 import { InstallmentsDuesTab } from '@/components/installments/InstallmentsDuesTab'
 import { InstallmentsFinanciersTab } from '@/components/installments/InstallmentsFinanciersTab'
-import {
-  setInstallmentFlash,
-  takeInstallmentFlash,
-} from '@/components/installments/flash'
+import { takeInstallmentFlash } from '@/components/installments/flash'
 import { useInstallmentsUrl } from '@/components/installments/useInstallmentsUrl'
 import { useLoad } from '@/components/installments/useLoad'
 import {
+  AppLink,
   Badge,
   Button,
   ErrorState,
@@ -57,13 +55,15 @@ import {
 
 /** The dialogs the page opens. */
 export type InstallmentsDialog =
-  | { kind: 'contract' }
-  | { kind: 'pay'; contract: InstallmentPaymentTarget | null; amount?: number }
+  | { kind: 'first_due'; contract: InstallmentContractRow }
+  | {
+      kind: 'pay'
+      contract: InstallmentPaymentTarget | null
+      amount?: number
+      /** A first payment or the VAT row is paid first (0209). */
+      targetId?: string
+    }
   | { kind: 'financier'; financier: InstallmentFinancierRow | null }
-
-export interface InstallmentsScreenProps {
-  onOpenContract: (id: string) => void
-}
 
 /**
  * «الاقساط» (/installments, migration 0203; the /ui-kit mockup the owner
@@ -76,17 +76,17 @@ export interface InstallmentsScreenProps {
  * in every function. The tab, the search, the filters and the pages live in
  * the URL, so Back restores them.
  */
-export function InstallmentsScreen(props: InstallmentsScreenProps) {
+export function InstallmentsScreen() {
   // The successes show their Toasts through this provider; no shell
   // provides one.
   return (
     <ToastProvider>
-      <InstallmentsScreenInner {...props} />
+      <InstallmentsScreenInner />
     </ToastProvider>
   )
 }
 
-function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
+function InstallmentsScreenInner() {
   const { t } = useI18n()
   const toast = useToast()
   const { can } = usePermissions()
@@ -157,6 +157,8 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
         financier_name: row.financier_name,
       },
       amount: amountOf(row.remaining_amount),
+      // An installment stays oldest first.
+      targetId: row.kind === 'installment' ? undefined : row.id,
     })
   const payContract = (contract: InstallmentContractRow) =>
     setDialog({
@@ -171,6 +173,10 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
         contract.next_due_amount === null
           ? undefined
           : amountOf(contract.next_due_amount),
+      targetId:
+        contract.next_due_id && contract.next_due_kind !== 'installment'
+          ? contract.next_due_id
+          : undefined,
     })
   const closeDialog = (open: boolean) => {
     if (!open) setDialog(null)
@@ -185,12 +191,11 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
       >
         {t('instPayTitle')}
       </Button>
-      <Button
-        variant="primary"
-        icon={<Plus size={16} aria-hidden="true" />}
-        onClick={() => setDialog({ kind: 'contract' })}
-      >
-        {t('instContractNew')}
+      <Button asChild variant="primary">
+        <AppLink href="/installments/new">
+          <Plus size={16} aria-hidden="true" />
+          {t('instContractNew')}
+        </AppLink>
       </Button>
     </>
   ) : undefined
@@ -294,8 +299,10 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
               totalContracts={data.contractsCount}
               version={version}
               canManage={canManage}
-              onNewContract={() => setDialog({ kind: 'contract' })}
               onPay={payContract}
+              onSetFirstDue={(contract) =>
+                setDialog({ kind: 'first_due', contract })
+              }
             />
           </TabsContent>
           <TabsContent value="dues" className="mt-0">
@@ -332,24 +339,22 @@ function InstallmentsScreenInner({ onOpenContract }: InstallmentsScreenProps) {
       )}
 
       {/* The dialogs, each open while `dialog` names it. A success reads
-          the page again and shows its Toast (a new contract opens its own
-          page, which shows the message); a refusal stays in its dialog. */}
+          the page again and shows its Toast; a refusal stays in its dialog.
+          A contract is added on its own page (/installments/new, 0209). */}
       {canManage && (
         <>
-          <InstallmentContractDialog
-            open={dialog?.kind === 'contract'}
+          <SetFirstDueDateDialog
+            contract={dialog?.kind === 'first_due' ? dialog.contract : null}
             onOpenChange={closeDialog}
-            onSaved={(id) => {
-              setDialog(null)
-              setInstallmentFlash('instToastContractCreated')
-              onOpenContract(id)
-            }}
+            onDone={() => done('instToastFirstDueSet')}
+            onStale={refresh}
           />
           <InstallmentPaymentDialog
             open={dialog?.kind === 'pay'}
             onOpenChange={closeDialog}
             contract={dialog?.kind === 'pay' ? dialog.contract : null}
             initialAmount={dialog?.kind === 'pay' ? dialog.amount : undefined}
+            targetId={dialog?.kind === 'pay' ? dialog.targetId : undefined}
             onSaved={paymentSaved}
             onStale={refresh}
           />

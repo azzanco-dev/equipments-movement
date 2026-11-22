@@ -35,7 +35,8 @@ import {
 import {
   activeContractsWords,
   installmentMonthLabel,
-  installmentsWords,
+  duesWords,
+  payableRowLabel,
   INSTALLMENTS_URL_KEYS,
   type InstallmentDueRow,
   type InstallmentFinancierRow,
@@ -188,7 +189,7 @@ export function InstallmentsDuesTab({
                   />
                   {groupTitle(group)}
                   <Badge size="sm">
-                    {installmentsWords(group.rows.length, lang)}
+                    {duesWords(group.rows.length, lang)}
                   </Badge>
                 </h2>
                 <Money value={group.total} className="font-bold" />
@@ -406,11 +407,14 @@ function FeedRow({
         </AppLink>
         <p className="text-xs text-muted">
           <bdi dir="ltr">{row.contract_number}</bdi> · {row.financier_name} ·{' '}
-          {t('instCardSeqOf')
-            .replace('{seq}', String(row.seq))
-            .replace('{count}', String(row.installment_count))}
+          {payableRowLabel(row, t, row.installment_count)}
         </p>
       </div>
+      {row.kind !== 'installment' && (
+        <Badge size="sm" tone="info">
+          {t('instFirstPayment')}
+        </Badge>
+      )}
       <div className="flex flex-col items-end gap-1">
         <Money value={dueShownAmount(row)} className="text-sm font-bold" />
         {paid ? (

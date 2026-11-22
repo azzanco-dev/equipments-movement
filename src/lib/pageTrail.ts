@@ -32,12 +32,16 @@ const HOME: Parent = ['dashboard', '/dashboard']
 const SETTINGS: Parent = ['settings', '/settings']
 const PURCHASING: Parent = ['purchasing', '/purchasing']
 const SALES: Parent = ['sales', '/sales']
+const INSTALLMENTS: Parent = ['installments', '/installments']
 
 type TrailSpec = {
   parents: readonly Parent[]
   /** The current page's own name (a settings page); a record page names
    *  its record instead. */
   name?: TranslationKey
+  /** The page hangs under its record (the edit page): a crumb of its
+   *  own before the page's name. */
+  underRecord?: boolean
 }
 
 const SPECS: Partial<Record<RoutePage, TrailSpec>> = {
@@ -56,7 +60,14 @@ const SPECS: Partial<Record<RoutePage, TrailSpec>> = {
     parents: [SALES, ['quotations', '/sales/quotations']],
   },
   // 0203: «الاقساط › INS-0003».
-  'installments/:id': { parents: [['installments', '/installments']] },
+  'installments/:id': { parents: [INSTALLMENTS] },
+  // 0209: «الاقساط › عقد جديد», «الاقساط › INS-0003 › تعديل العقد».
+  'installments/new': { parents: [INSTALLMENTS], name: 'instContractNew' },
+  'installments/:id/edit': {
+    parents: [INSTALLMENTS],
+    name: 'instContractEdit',
+    underRecord: true,
+  },
   'settings/equipment-types': { parents: [SETTINGS], name: 'equipmentTypes' },
   'settings/workshop-opening-balance': {
     parents: [SETTINGS],
@@ -75,6 +86,8 @@ export interface PageTrailOptions {
   /** A field home (foreman / workshop): a movement's parent is the home. */
   fieldHome?: boolean
   movementType?: 'entry' | 'exit'
+  /** The page of the record, for a page that hangs under it. */
+  recordPath?: string
   /** Whether the current shell opens a path; a parent it does not open is
    *  shown as plain text. */
   opens?: (path: string) => boolean
@@ -90,7 +103,8 @@ export function pageTrail(
   record: string | null,
   options: PageTrailOptions = {},
 ): PageTrail | null {
-  const { fieldHome = false, movementType = 'entry', opens } = options
+  const { fieldHome = false, movementType = 'entry', recordPath, opens } =
+    options
   let spec: TrailSpec | undefined
   let current: string | null
   if (page === 'movements/new') {
@@ -109,6 +123,19 @@ export function pageTrail(
     label: t(label),
     href: !opens || opens(path) ? path : undefined,
   }))
+  if (spec.underRecord && recordPath) {
+    crumbs.push({
+      label: record ?? '…',
+      href: !opens || opens(recordPath) ? recordPath : undefined,
+    })
+    crumbs.push({ label: current ?? '' })
+    // Back falls to the record, not to the list.
+    return {
+      crumbs,
+      parentPath: recordPath,
+      parentLabel: record ?? t(parents[parents.length - 1][0]),
+    }
+  }
   // While a record loads its crumb is an empty placeholder.
   crumbs.push({ label: current ?? '' })
   const [parentLabel, parentPath] = parents[parents.length - 1]

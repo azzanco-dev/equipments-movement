@@ -109,7 +109,7 @@ test('the financiers tab is cards with the payment account', () => {
     "t('instNoAccount')",
     "t('instFinAddAccount')",
     "t('instFinContractsLink')",
-    "t('instCardNextDue')",
+    "t('instNextDue')",
     "t('instFinAddTileDesc')",
     'border-dashed',
   ])
