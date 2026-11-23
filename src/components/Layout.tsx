@@ -70,7 +70,7 @@ type NavItem = LayoutProps['navItems'][number]
 /**
  * The sidebar's sections (owner 2026-11-23, model 1 approved in Figma): the
  * items under small headings («الرئيسية», «البيانات», «المالية», «الادارة»,
- * `groupNavItems`), 40 high with px-14 (owner «زيد البادنق»; 36 at first); the open page black (the primary fill, owner
+ * `groupNavItems`), 44 high with px-16 (owner «زيد البادنق», «وزيدها اكثر»; 36, then 40 with px-14); the open page black (the primary fill, owner
  * «خلي الاختيار اسود»; a light fill with a black bar at first); a section's
  * pages under it when it is open. The desktop sidebar and the phone drawer share it.
  */
@@ -117,7 +117,7 @@ function SidebarNav({
                     item.children ? onToggle(item.key, !open) : onOpen(item.key)
                   }
                   className={cn(
-                    'flex h-10 w-full items-center gap-3 rounded-lg px-3.5 text-sm transition-colors duration-150 active:scale-[0.98] active:opacity-80',
+                    'flex h-11 w-full items-center gap-3 rounded-lg px-4 text-sm transition-colors duration-150 active:scale-[0.98] active:opacity-80',
                     active
                       ? 'bg-primary font-semibold text-primary-contrast'
                       : 'font-medium text-fg hover:bg-surface-hover',
