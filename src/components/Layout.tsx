@@ -19,6 +19,7 @@ import { canSeeIntegrationsStatus } from '@/lib/actionPermissions'
 import { localizedName } from '@/lib/localizedName'
 import { saudiClockLabel, saudiDayLabel } from '@/lib/homeGreeting'
 import { GlobalSearch } from '@/components/GlobalSearch'
+import { groupNavItems } from '@/lib/navGroups'
 import { useEffect, useState } from 'react'
 import {
   AppLink,
@@ -31,6 +32,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
+  cn,
 } from '@/components/ui'
 import { usePathname } from 'next/navigation'
 import {
@@ -60,6 +62,116 @@ function NavControl({
       onNavigate={onActivate}
       {...(props as HTMLAttributes<HTMLAnchorElement>)}
     />
+  )
+}
+
+type NavItem = LayoutProps['navItems'][number]
+
+/**
+ * The sidebar's sections (owner 2026-11-23, model 1 approved in Figma): the
+ * items under small headings («الرئيسية», «البيانات», «المالية», «الادارة»,
+ * `groupNavItems`), 36 high; the open page on the light hover fill with a
+ * black bar at its start and its label semibold; a section's pages under it
+ * when it is open. The desktop sidebar and the phone drawer share it.
+ */
+function SidebarNav({
+  items,
+  activePage,
+  pathname,
+  expanded,
+  onToggle,
+  onOpen,
+  onOpenChild,
+}: {
+  items: readonly NavItem[]
+  activePage: string
+  pathname: string
+  expanded: Record<string, boolean>
+  onToggle: (key: string, open: boolean) => void
+  onOpen: (key: string) => void
+  onOpenChild: (key: string) => void
+}) {
+  const { t } = useI18n()
+  return (
+    <nav className="flex flex-col gap-4">
+      {groupNavItems(items).map((group) => (
+        <div key={group.key} className="flex flex-col gap-0.5">
+          <p className="px-3 py-1 text-[11px] font-medium text-muted">
+            {t(group.labelKey)}
+          </p>
+          {group.items.map((item) => {
+            const hasActiveChild = Boolean(
+              item.children?.some((child) =>
+                pathname.startsWith(`/${child.key}`),
+              ),
+            )
+            const open = expanded[item.key] ?? hasActiveChild
+            const active = activePage === item.key
+            return (
+              <div key={item.key}>
+                <NavControl
+                  href={item.children ? undefined : `/${item.key}`}
+                  aria-current={active ? 'page' : undefined}
+                  aria-expanded={item.children ? open : undefined}
+                  onActivate={() =>
+                    item.children ? onToggle(item.key, !open) : onOpen(item.key)
+                  }
+                  className={cn(
+                    'flex h-9 w-full items-center gap-2.5 rounded-lg pe-2 ps-1 text-sm text-fg transition-colors duration-150 active:scale-[0.98] active:opacity-80',
+                    active
+                      ? 'bg-surface-hover font-semibold'
+                      : 'font-medium hover:bg-surface-hover',
+                  )}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'h-[18px] w-[3px] shrink-0 rounded-sm',
+                      active && 'bg-primary',
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      'flex shrink-0',
+                      active ? 'text-fg' : 'text-muted',
+                    )}
+                  >
+                    {item.icon}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-start">
+                    {item.label}
+                  </span>
+                  {item.children && (
+                    <ChevronDown
+                      size={16}
+                      aria-hidden="true"
+                      className={cn(
+                        'shrink-0 text-placeholder transition-transform',
+                        !open && 'ltr:-rotate-90 rtl:rotate-90',
+                      )}
+                    />
+                  )}
+                </NavControl>
+                {item.children && open && (
+                  <div className="ms-9 mt-1 space-y-0.5 border-s border-[var(--border)] ps-2">
+                    {item.children.map((child) => (
+                      <NavControl
+                        key={child.key}
+                        href={`/${child.key}`}
+                        className={`block w-full rounded px-2 py-1.5 text-start text-xs ${pathname.startsWith(`/${child.key}`) ? 'font-semibold text-fg' : 'text-muted hover:text-fg'}`}
+                        onActivate={() => onOpenChild(child.key)}
+                      >
+                        {child.label}
+                      </NavControl>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      ))}
+    </nav>
   )
 }
 
@@ -391,73 +503,21 @@ export function Layout({
             className="hidden lg:flex w-60 shrink-0 flex-col border-e p-4 sticky top-16 h-[calc(100dvh-4rem)] overflow-y-auto"
             style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}
           >
-            <nav className="flex flex-col gap-1">
-              {navItems.map((item) => (
-                <div key={item.key}>
-                  {(() => {
-                    const hasActiveChild = Boolean(
-                      item.children?.some((child) =>
-                        pathname.startsWith(`/${child.key}`),
-                      ),
-                    )
-                    const expanded =
-                      expandedNavItems[item.key] ?? hasActiveChild
-                    return (
-                      <>
-                        <NavControl
-                          key={item.key}
-                          href={item.children ? undefined : `/${item.key}`}
-                          aria-current={
-                            activePage === item.key ? 'page' : undefined
-                          }
-                          aria-expanded={item.children ? expanded : undefined}
-                          onActivate={() => {
-                            if (item.children) {
-                              setExpandedNavItems((current) => ({
-                                ...current,
-                                [item.key]: !expanded,
-                              }))
-                              return
-                            }
-                            if (isCurrentPage(item.key)) return
-                            setPendingPage(item.key)
-                            onNavigate(item.key)
-                          }}
-                          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
-                            activePage === item.key
-                              ? 'nav-active'
-                              : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-fg'
-                          }`}
-                        >
-                          {item.icon}
-                          {item.label}
-                          {item.children && (
-                            <ChevronDown
-                              size={16}
-                              className={`ms-auto transition-transform ${expanded ? 'rotate-180' : ''}`}
-                            />
-                          )}
-                        </NavControl>
-                        {item.children && expanded && (
-                          <div className="ms-9 mt-1 space-y-0.5 border-s border-[var(--border)] ps-2">
-                            {item.children.map((child) => (
-                              <NavControl
-                                key={child.key}
-                                href={`/${child.key}`}
-                                className={`block w-full rounded px-2 py-1.5 text-start text-xs ${pathname.startsWith(`/${child.key}`) ? 'font-semibold text-fg' : 'text-muted hover:text-fg'}`}
-                                onActivate={() => onNavigate(child.key)}
-                              >
-                                {child.label}
-                              </NavControl>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )
-                  })()}
-                </div>
-              ))}
-            </nav>
+            <SidebarNav
+              items={navItems}
+              activePage={activePage}
+              pathname={pathname}
+              expanded={expandedNavItems}
+              onToggle={(key, open) =>
+                setExpandedNavItems((current) => ({ ...current, [key]: open }))
+              }
+              onOpen={(key) => {
+                if (isCurrentPage(key)) return
+                setPendingPage(key)
+                onNavigate(key)
+              }}
+              onOpenChild={(key) => onNavigate(key)}
+            />
             {showWhatsAppStatus && (
               <div className="mt-auto border-t border-[var(--border)] pt-3">
                 <WhatsAppStatusIndicator />
@@ -478,74 +538,25 @@ export function Layout({
               style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}
               onClick={(event) => event.stopPropagation()}
             >
-              <nav className="flex flex-col gap-1">
-                {navItems.map((item) => (
-                  <div key={item.key}>
-                    {(() => {
-                      const hasActiveChild = Boolean(
-                        item.children?.some((child) =>
-                          pathname.startsWith(`/${child.key}`),
-                        ),
-                      )
-                      const expanded =
-                        expandedNavItems[item.key] ?? hasActiveChild
-                      return (
-                        <>
-                          <NavControl
-                            key={item.key}
-                            href={item.children ? undefined : `/${item.key}`}
-                            aria-expanded={item.children ? expanded : undefined}
-                            onActivate={() => {
-                              if (item.children) {
-                                setExpandedNavItems((current) => ({
-                                  ...current,
-                                  [item.key]: !expanded,
-                                }))
-                                return
-                              }
-                              if (isCurrentPage(item.key)) return
-                              setPendingPage(item.key)
-                              onNavigate(item.key)
-                              setMobileOpen(false)
-                            }}
-                            className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 active:scale-[0.98] active:opacity-80 ${
-                              activePage === item.key
-                                ? 'nav-active'
-                                : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-                            }`}
-                          >
-                            {item.icon}
-                            {item.label}
-                            {item.children && (
-                              <ChevronDown
-                                size={16}
-                                className={`ms-auto transition-transform ${expanded ? 'rotate-180' : ''}`}
-                              />
-                            )}
-                          </NavControl>
-                          {item.children && expanded && (
-                            <div className="ms-9 mt-1 space-y-0.5 border-s border-[var(--border)] ps-2">
-                              {item.children.map((child) => (
-                                <NavControl
-                                  key={child.key}
-                                  href={`/${child.key}`}
-                                  className={`block w-full rounded px-2 py-1.5 text-start text-xs ${pathname.startsWith(`/${child.key}`) ? 'font-semibold text-fg' : 'text-muted'}`}
-                                  onActivate={() => {
-                                    setMobileOpen(false)
-                                    onNavigate(child.key)
-                                  }}
-                                >
-                                  {child.label}
-                                </NavControl>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )
-                    })()}
-                  </div>
-                ))}
-              </nav>
+              <SidebarNav
+                items={navItems}
+                activePage={activePage}
+                pathname={pathname}
+                expanded={expandedNavItems}
+                onToggle={(key, open) =>
+                  setExpandedNavItems((current) => ({ ...current, [key]: open }))
+                }
+                onOpen={(key) => {
+                  if (isCurrentPage(key)) return
+                  setPendingPage(key)
+                  onNavigate(key)
+                  setMobileOpen(false)
+                }}
+                onOpenChild={(key) => {
+                  setMobileOpen(false)
+                  onNavigate(key)
+                }}
+              />
               {showWhatsAppStatus && (
                 <div className="mt-auto border-t border-[var(--border)] pt-3">
                   <WhatsAppStatusIndicator />

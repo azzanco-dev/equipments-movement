@@ -112,6 +112,11 @@ export const translations = {
     logs: 'السجلات',
     // The sidebar entry of /logs (owner 2026-10-20); the page keeps its title.
     navLogs: 'الدخوليات',
+    // The sidebar's sections (2026-11-23)
+    navGroupHome: 'الرئيسية',
+    navGroupData: 'البيانات',
+    navGroupFinance: 'المالية',
+    navGroupAdmin: 'الادارة',
     reports: 'التقارير',
     entryReports: 'تقارير الدخوليات',
     equipmentReports: 'تقارير المعدات',
@@ -3716,6 +3721,11 @@ export const translations = {
     dashboard: 'Dashboard',
     logs: 'Logs',
     navLogs: 'Entries',
+    // The sidebar's sections (2026-11-23)
+    navGroupHome: 'Main',
+    navGroupData: 'Data',
+    navGroupFinance: 'Finance',
+    navGroupAdmin: 'Administration',
     reports: 'Reports',
     entryReports: 'Entry Reports',
     equipmentReports: 'Equipment Reports',

@@ -41,16 +41,18 @@ test('the sidebar and the drawer: links for pages, buttons for parents', () => {
   const layout = read('src', 'components', 'Layout.tsx')
   assert.match(layout, /if \(!href\)\s+return \(\s+<button/)
   assert.match(layout, /<AppLink\s+href=\{href\}\s+onNavigate=\{onActivate\}/)
-  // Desktop and mobile entries, and their children.
+  // The entries and their children, drawn once by SidebarNav (2026-11-23),
+  // which the desktop sidebar and the phone drawer both use.
   assert.equal(
     (
       layout.match(
         /href=\{item\.children \? undefined : `\/\$\{item\.key\}`\}/g,
       ) ?? []
     ).length,
-    2,
+    1,
   )
-  assert.equal((layout.match(/href=\{`\/\$\{child\.key\}`\}/g) ?? []).length, 2)
+  assert.equal((layout.match(/href=\{`\/\$\{child\.key\}`\}/g) ?? []).length, 1)
+  assert.equal((layout.match(/<SidebarNav\b/g) ?? []).length, 2)
   assert.match(layout, /<AppLink\s+href="\/dashboard"/)
 })
 

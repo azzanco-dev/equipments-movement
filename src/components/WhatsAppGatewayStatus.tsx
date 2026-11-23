@@ -124,10 +124,12 @@ export function useWhatsAppStatusPolling(enabled: boolean) {
 }
 
 /**
- * The sidebar line, shaped like a navigation item (owner decision
- * 2026-10-05): a light green box with a green dot when connected, a light
- * red box with a red dot when the device is not linked, and a neutral box
- * while the status is unknown. Renders nothing when the status is not polled.
+ * The state at the foot of the sidebar. Since the sidebar of model 1
+ * (owner 2026-11-23, approved in Figma) it is ONE quiet line: the dot in a
+ * soft halo of its colour, «واتساب» and the state word, muted while it is
+ * connected or unknown, the state in red when the device is not linked. It
+ * was a light green / red box shaped like a navigation item (2026-10-05).
+ * Renders nothing when the status is not polled.
  */
 export function WhatsAppStatusIndicator({ className }: { className?: string }) {
   const { t } = useI18n()
@@ -147,10 +149,7 @@ export function WhatsAppStatusIndicator({ className }: { className?: string }) {
       title={label}
       aria-label={label}
       className={cn(
-        'flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs font-normal',
-        tone === 'ok' && 'bg-success-soft',
-        tone === 'down' && 'bg-danger-soft',
-        tone === 'neutral' && 'bg-surface-hover',
+        'flex h-7 w-full items-center gap-2 px-3 text-xs font-normal text-muted',
         className,
       )}
     >
@@ -166,17 +165,12 @@ export function WhatsAppStatusIndicator({ className }: { className?: string }) {
           tone === 'neutral' && 'bg-muted',
         )}
       />
-      <span aria-hidden="true" className="min-w-0 truncate text-fg">
+      <span aria-hidden="true" className="min-w-0 truncate">
         {t('whatsappStatusName')}
       </span>
       <span
         aria-hidden="true"
-        className={cn(
-          'ms-auto shrink-0',
-          tone === 'ok' && 'text-success',
-          tone === 'down' && 'text-danger',
-          tone === 'neutral' && 'text-muted',
-        )}
+        className={cn('shrink-0', tone === 'down' && 'text-danger')}
       >
         {t(STATE_LABELS[view])}
       </span>
