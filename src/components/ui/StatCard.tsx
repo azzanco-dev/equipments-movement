@@ -46,6 +46,9 @@ export interface StatCardProps {
   ariaControls?: string
   /** Replaces the value with a skeleton and announces a busy state. */
   loading?: boolean
+  /** `sm`: a tighter card with a smaller number (the installments contract
+   *  page, owner 2026-11-23). Every other screen keeps `md`. */
+  size?: 'md' | 'sm'
   className?: string
 }
 
@@ -87,12 +90,15 @@ export function StatCard({
   onClick,
   ariaControls,
   loading = false,
+  size = 'md',
   className,
 }: StatCardProps) {
+  const small = size === 'sm'
   const { t } = useI18n()
   const colors = accent ? accentColors(accent) : null
   const classes = cn(
-    'flex w-full items-start justify-between gap-2 rounded-xl border bg-bg p-3 text-start transition-colors',
+    'flex w-full items-start justify-between gap-2 rounded-xl border bg-bg text-start transition-colors',
+    small ? 'p-2.5' : 'p-3',
     onClick &&
       'cursor-pointer hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
     className,
@@ -116,7 +122,12 @@ export function StatCard({
             </span>
           </span>
         ) : (
-          <span className="truncate-safe block text-xs text-muted">
+          <span
+            className={cn(
+              'truncate-safe block text-muted',
+              small ? 'text-[11px]' : 'text-xs',
+            )}
+          >
             {label}
           </span>
         )}
@@ -128,7 +139,8 @@ export function StatCard({
         ) : (
           <span
             className={cn(
-              'block text-2xl leading-tight tabular-nums',
+              'block leading-tight tabular-nums',
+              small ? 'text-lg' : 'text-2xl',
               colors ? 'mt-1 font-bold' : 'mt-0.5 font-semibold',
             )}
             style={valueStyle(tone)}
@@ -137,7 +149,12 @@ export function StatCard({
           </span>
         )}
         {hint && !loading && (
-          <span className="truncate-safe mt-0.5 block text-xs text-muted">
+          <span
+            className={cn(
+              'truncate-safe mt-0.5 block text-muted',
+              small ? 'text-[11px]' : 'text-xs',
+            )}
+          >
             {hint}
           </span>
         )}

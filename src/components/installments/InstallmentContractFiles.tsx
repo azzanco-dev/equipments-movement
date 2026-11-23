@@ -71,29 +71,50 @@ function FileTile({
   title,
   fileName,
   size,
+  compact = false,
   children,
 }: {
   kind: InstallmentFileKind
   title: ReactNode
   fileName: string
   size: number
+  /** The contract page's smaller tile (owner 2026-11-23). */
+  compact?: boolean
   children?: ReactNode
 }) {
   const { t } = useI18n()
   return (
-    <li className="flex min-w-0 items-center gap-2.5 rounded-lg border bg-bg p-2">
+    <li
+      className={cn(
+        'flex min-w-0 items-center rounded-lg border bg-bg',
+        compact ? 'gap-2 p-1.5' : 'gap-2.5 p-2',
+      )}
+    >
       <span
         aria-hidden="true"
         className={cn(
-          'flex size-8 shrink-0 items-center justify-center rounded-lg',
+          'flex shrink-0 items-center justify-center rounded-lg',
+          compact ? 'size-7' : 'size-8',
           KIND_TONE[kind],
         )}
       >
         <FileText size={16} />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold">{title}</div>
-        <p className="flex min-w-0 items-center gap-1 text-xs text-muted">
+        <div
+          className={cn(
+            'truncate font-semibold',
+            compact ? 'text-[13px]' : 'text-sm',
+          )}
+        >
+          {title}
+        </div>
+        <p
+          className={cn(
+            'flex min-w-0 items-center gap-1 text-muted',
+            compact ? 'text-[11px]' : 'text-xs',
+          )}
+        >
           <bdi className="truncate">{fileName}</bdi>
           {size > 0 && (
             <span className="shrink-0">· {formatDocumentSize(size, t)}</span>
@@ -341,7 +362,7 @@ export function ContractFilesCard({
   }
 
   return (
-    <Card className={cn('space-y-3 p-4', className)}>
+    <Card className={cn('space-y-2 p-3', className)}>
       <SectionHeader
         title={t('instFilesTitle')}
         description={description}
@@ -361,7 +382,7 @@ export function ContractFilesCard({
       {files.length === 0 ? (
         <p className="text-xs text-muted">{t('instFilesEmpty')}</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-1.5">
           {files.map((file) => (
             <FileTile
               key={file.id}
@@ -369,6 +390,7 @@ export function ContractFilesCard({
               title={nameOf(file)}
               fileName={file.file_name}
               size={file.size_bytes}
+              compact
             >
               <IconButton
                 size="sm"

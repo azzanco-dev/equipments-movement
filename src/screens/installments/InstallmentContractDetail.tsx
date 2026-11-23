@@ -679,12 +679,12 @@ function InstallmentContractDetailInner({
   const showActions = canManage
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <PageTrailBar onBack={onBack} fallbackLabel={t('installments')} />
 
       {/* 1. Header card: the number with its status, the title on its own
           line, the financier, the actions, then the summary strip. */}
-      <div className="card space-y-4 p-4">
+      <div className="card space-y-3 p-3">
         <DetailHeader
           as="h1"
           identifier={contract.contract_number}
@@ -718,26 +718,29 @@ function InstallmentContractDetailInner({
             ) : undefined
           }
         />
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
+            size="sm"
             label={t('instContractTotal')}
             value={<Money value={contract.payable_total} />}
             hint={
               amountOf(contract.vat_amount) > 0 ? t('instWithVat') : undefined
             }
-            icon={<Banknote size={18} />}
+            icon={<Banknote size={16} />}
           />
           <StatCard
+            size="sm"
             label={t('instPaid')}
             value={<Money value={paid} />}
             hint={t('instPercentOfContract').replace(
               '{percent}',
               String(percent),
             )}
-            icon={<CheckCircle2 size={18} />}
+            icon={<CheckCircle2 size={16} />}
             accent="success"
           />
           <StatCard
+            size="sm"
             label={t('instRemaining')}
             value={<Money value={cancelled ? 0 : remaining} />}
             hint={
@@ -749,9 +752,10 @@ function InstallmentContractDetailInner({
                 remainingParts || undefined
               )
             }
-            icon={<Coins size={18} />}
+            icon={<Coins size={16} />}
           />
           <StatCard
+            size="sm"
             label={t('instNextDue')}
             value={next ? <Money value={scheduleRemaining(next)} /> : '—'}
             hint={
@@ -774,7 +778,7 @@ function InstallmentContractDetailInner({
                 t('instAwaitingShort')
               ) : undefined
             }
-            icon={<CalendarClock size={18} />}
+            icon={<CalendarClock size={16} />}
           />
         </div>
         <PaidProgress percent={percent} />
@@ -859,21 +863,21 @@ function InstallmentContractDetailInner({
 
       {/* 2. Body: the facts above the records below xl; from xl the records
           span two columns beside the facts and the history. */}
-      <div className="grid gap-4 xl:grid-cols-3 xl:grid-rows-[auto_1fr]">
-        <div className="min-w-0 space-y-4 xl:col-start-3 xl:row-start-1">
+      <div className="grid gap-3 xl:grid-cols-3 xl:grid-rows-[auto_1fr]">
+        <div className="min-w-0 space-y-3 xl:col-start-3 xl:row-start-1">
           <ContractFilesCard
             contractId={contract.id}
             files={files}
             canManage={canManage && !cancelled}
             onChanged={refresh}
           />
-          <Card className="space-y-3 p-4">
+          <Card className="space-y-1 p-3">
             <SectionHeader title={t('instFactsTitle')} />
-            <DescriptionList items={facts} className="-my-2" />
+            <DescriptionList items={facts} dense className="-my-1" />
           </Card>
         </div>
 
-        <div className="min-w-0 space-y-4 xl:col-span-2 xl:col-start-1 xl:row-span-2 xl:row-start-1">
+        <div className="min-w-0 space-y-3 xl:col-span-2 xl:col-start-1 xl:row-span-2 xl:row-start-1">
           {/* «جدول السداد» (owner 2026-11-23, model C): the first payments,
               the installments and the VAT in one table. */}
           <ContractPaymentTable
@@ -892,7 +896,7 @@ function InstallmentContractDetailInner({
 
           {/* Payments: the latest ten, voided ones kept and struck out. */}
           <Card padded={false}>
-            <div className="p-4 pb-0">
+            <div className="p-3 pb-0">
               <SectionHeader
                 title={
                   <span className="flex items-center gap-2">
@@ -905,11 +909,11 @@ function InstallmentContractDetailInner({
               />
             </div>
             {payments.length === 0 ? (
-              <div className="p-4">
+              <div className="p-3">
                 <EmptyState title={t('instNoPayments')} className="p-6" />
               </div>
             ) : (
-              <ul className="space-y-2 p-4 pt-3">
+              <ul className="space-y-1.5 p-3 pt-2">
                 {shownPayments.map((payment) => (
                   <PaymentCard
                     key={payment.id}
@@ -942,12 +946,12 @@ function InstallmentContractDetailInner({
           </Card>
         </div>
 
-        <Card className="space-y-3 p-4 xl:col-start-3 xl:row-start-2 xl:self-start">
+        <Card className="space-y-2 p-3 xl:col-start-3 xl:row-start-2 xl:self-start">
           <SectionHeader
             title={t('instHistoryTitle')}
             description={t('instHistoryDesc')}
           />
-          <ol className="space-y-3">
+          <ol className="space-y-2">
             {history.slice(0, EVENTS_PREVIEW_ROWS).map((event) => (
               <li key={event.key} className="relative flex gap-3 ps-1">
                 <span
@@ -964,7 +968,7 @@ function InstallmentContractDetailInner({
                   }}
                 />
                 <div className="min-w-0 space-y-0.5">
-                  <p className="text-sm font-medium">
+                  <p className="text-[13px] font-medium">
                     {t(INSTALLMENT_HISTORY_LABEL_KEYS[event.kind])}
                     {event.amount !== null && (
                       <>
@@ -1116,13 +1120,13 @@ function PaymentCard({
   return (
     <li
       className={cn(
-        'rounded-xl border bg-bg p-3 sm:p-4',
+        'rounded-xl border bg-bg p-2.5 sm:p-3',
         voided && 'opacity-70',
       )}
     >
-      <div className="flex flex-wrap items-start gap-x-4 gap-y-3 sm:flex-nowrap">
+      <div className="flex flex-wrap items-start gap-x-3 gap-y-2 sm:flex-nowrap">
         <div className="min-w-0 flex-1 sm:basis-2/5">
-          <p className="break-words font-semibold">
+          <p className="break-words text-[13px] font-semibold">
             {coverage || <bdi dir="ltr">{formatDate(payment.paid_on)}</bdi>}
           </p>
           <p className="mt-0.5 text-xs text-muted">
@@ -1164,8 +1168,8 @@ function PaymentCard({
             </p>
           )}
         </div>
-        <div className="flex w-full items-center justify-between gap-3 border-t pt-3 sm:w-44 sm:shrink-0 sm:flex-col sm:items-end sm:border-t-0 sm:pt-0">
-          <p className={cn('text-lg font-semibold', voided && 'line-through')}>
+        <div className="flex w-full items-center justify-between gap-3 border-t pt-2 sm:w-44 sm:shrink-0 sm:flex-col sm:items-end sm:border-t-0 sm:pt-0">
+          <p className={cn('text-base font-semibold', voided && 'line-through')}>
             <Money value={payment.amount} />
           </p>
           {!voided && canVoid && (

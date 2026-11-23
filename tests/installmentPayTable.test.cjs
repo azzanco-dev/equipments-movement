@@ -118,3 +118,19 @@ test('the copy of both languages, no alif with hamza or madda', () => {
   assert.deepEqual(keys(blocks[0][1]), keys(blocks[1][1]))
   for (const key of keys(blocks[0][1])) assert.match(TABLE, new RegExp(`'${key}'`), key)
 })
+
+// «صغر المسافات والقابز والخطوط شوي», «وخصوصا كروت الارقام», «والجانبية».
+test('the contract page is tighter: small figures, dense facts, compact files', () => {
+  assert.equal([...PAGE.matchAll(/<StatCard\n\s+size="sm"/g)].length, 4)
+  assert.match(PAGE, /<DescriptionList items=\{facts\} dense /)
+  assert.match(PAGE, /<div className="card space-y-3 p-3">/)
+  const stat = read('src', 'components', 'ui', 'StatCard.tsx')
+  // Opt-in: every other screen keeps the default size.
+  assert.match(stat, /size = 'md',/)
+  assert.match(stat, /small \? 'text-lg' : 'text-2xl'/)
+  const list = read('src', 'components', 'ui', 'DescriptionList.tsx')
+  assert.match(list, /dense = false,/)
+  const files = read('src', 'components', 'installments', 'InstallmentContractFiles.tsx')
+  assert.match(files, /size=\{file\.size_bytes\}\n\s+compact\n/)
+  assert.match(TABLE, /text-\[13px\]/)
+})

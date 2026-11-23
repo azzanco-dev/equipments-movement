@@ -17,6 +17,9 @@ export interface DescriptionListProps {
   items: DescriptionListItem[]
   /** Two columns from the `sm` breakpoint up; one column stacks on mobile. */
   columns?: 1 | 2
+  /** Tighter rows and smaller text (the installments contract page, owner
+   *  2026-11-23). Every other screen keeps the default. */
+  dense?: boolean
   className?: string
 }
 
@@ -25,6 +28,7 @@ export interface DescriptionListProps {
 export function DescriptionList({
   items,
   columns = 1,
+  dense = false,
   className,
 }: DescriptionListProps) {
   return (
@@ -39,17 +43,28 @@ export function DescriptionList({
         const isEmpty =
           item.value === null || item.value === undefined || item.value === ''
         return (
-          <div key={item.key ?? index} className="flex items-start gap-3 py-2">
+          <div
+            key={item.key ?? index}
+            className={cn(
+              'flex items-start',
+              dense ? 'gap-2.5 py-1.5' : 'gap-3 py-2',
+            )}
+          >
             {item.icon && (
               <span aria-hidden="true" className="mt-0.5 shrink-0 text-muted">
                 {item.icon}
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <dt className="text-xs text-muted">{item.label}</dt>
+              <dt
+                className={cn('text-muted', dense ? 'text-[11px]' : 'text-xs')}
+              >
+                {item.label}
+              </dt>
               <dd
                 className={cn(
                   'm-0 break-words text-start leading-relaxed',
+                  dense && 'text-[13px]',
                   isEmpty ? 'text-muted' : 'font-medium',
                 )}
               >

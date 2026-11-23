@@ -58,7 +58,7 @@ export type PaymentTableView = 'open' | 'paid' | 'all'
 /** The fixed widths of the table's columns from md (one grid for the head
  *  and every row, so the columns line up). */
 const GRID =
-  'md:grid md:grid-cols-[2.5rem_minmax(0,1fr)_7.5rem_8.5rem_8.5rem_7rem] md:items-center'
+  'md:grid md:grid-cols-[2.25rem_minmax(0,1fr)_7rem_8rem_8rem_6.5rem] md:items-center'
 
 /**
  * «جدول السداد» of the contract page (owner 2026-11-23, model C approved in
@@ -197,7 +197,7 @@ export function ContractPaymentTable({
 
   return (
     <Card padded={false} className="flex min-w-0 flex-col">
-      <div className="space-y-3 p-4 pb-0">
+      <div className="space-y-2 p-3 pb-0">
         <SectionHeader
           title={
             <span className="flex items-center gap-2">
@@ -242,8 +242,8 @@ export function ContractPaymentTable({
             </div>
           }
         />
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <p className="flex flex-wrap items-center gap-x-2 text-sm font-medium">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <p className="flex flex-wrap items-center gap-x-2 text-[13px] font-medium">
             <span>
               {t('instPayTablePaidOf')
                 .replace('{paid}', String(paidCount))
@@ -255,7 +255,7 @@ export function ContractPaymentTable({
               </span>
             )}
           </p>
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-muted">
             <div
               className="h-1.5 w-28 overflow-hidden rounded-full bg-surface-hover sm:w-40"
               role="progressbar"
@@ -278,7 +278,7 @@ export function ContractPaymentTable({
         </div>
       </div>
 
-      <div className="p-4 pt-3">
+      <div className="p-3 pt-2">
         {groups.length === 0 ? (
           <EmptyState
             title={
@@ -290,15 +290,15 @@ export function ContractPaymentTable({
           <div className="overflow-hidden rounded-xl border">
             <div
               className={cn(
-                'hidden h-9 border-b bg-surface text-xs font-medium text-muted',
+                'hidden h-8 border-b bg-surface text-[11px] font-medium text-muted',
                 GRID,
               )}
             >
-              <span className="px-3">#</span>
-              <span className="px-3">{t('instColPayment')}</span>
-              <span className="px-3">{t('instDueDate')}</span>
-              <span className="px-3">{t('instAmount')}</span>
-              <span className="px-3">{t('instStatus')}</span>
+              <span className="px-2.5">#</span>
+              <span className="px-2.5">{t('instColPayment')}</span>
+              <span className="px-2.5">{t('instDueDate')}</span>
+              <span className="px-2.5">{t('instAmount')}</span>
+              <span className="px-2.5">{t('instStatus')}</span>
               <span className="sr-only">{t('instColActions')}</span>
             </div>
             {groups.map((group) => (
@@ -307,7 +307,7 @@ export function ContractPaymentTable({
                 aria-label={group.title}
                 className="border-t first-of-type:border-t-0"
               >
-                <div className="flex flex-wrap items-baseline gap-x-2 border-b bg-surface px-3 py-2 text-xs">
+                <div className="flex flex-wrap items-baseline gap-x-2 border-b bg-surface px-2.5 py-1.5 text-[11px]">
                   <span className="font-semibold">{group.title}</span>
                   <span className="text-muted">{group.facts}</span>
                 </div>
@@ -341,7 +341,7 @@ export function ContractPaymentTable({
         )}
 
         {hiddenInstallments || showAll ? (
-          <div className="mt-2 flex justify-center">
+          <div className="mt-1.5 flex justify-center">
             <Button
               size="sm"
               variant="ghost"
@@ -364,22 +364,22 @@ export function ContractPaymentTable({
           </div>
         ) : null}
 
-        <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 rounded-xl bg-surface px-4 py-3">
+        <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1.5 rounded-lg bg-surface px-3 py-2">
           <div>
-            <dt className="text-xs text-muted">{t('instContractTotal')}</dt>
-            <dd className="text-sm font-semibold">
+            <dt className="text-[11px] text-muted">{t('instContractTotal')}</dt>
+            <dd className="text-[13px] font-semibold">
               <Money value={contract.payable_total} />
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-muted">{t('instPaid')}</dt>
-            <dd className="text-sm font-semibold text-success">
+            <dt className="text-[11px] text-muted">{t('instPaid')}</dt>
+            <dd className="text-[13px] font-semibold text-success">
               <Money value={contract.paid_overall} />
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-muted">{t('instRemaining')}</dt>
-            <dd className="text-sm font-semibold">
+            <dt className="text-[11px] text-muted">{t('instRemaining')}</dt>
+            <dd className="text-[13px] font-semibold">
               <Money value={cancelled ? 0 : contract.remaining_total} />
             </dd>
           </div>
@@ -520,17 +520,17 @@ function PaymentRow({
       className={cn(
         'border-b last:border-b-0',
         GRID,
-        'grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 px-3 py-3 md:gap-0 md:px-0 md:py-2',
+        'grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 px-2.5 py-2 md:gap-0 md:px-0 md:py-1.5',
         late && 'bg-danger-soft',
       )}
     >
-      <span className="hidden px-3 text-sm tabular-nums text-muted md:block">
+      <span className="hidden px-2.5 text-[13px] tabular-nums text-muted md:block">
         {row.kind === 'vat' ? '—' : row.seq}
       </span>
-      <div className="min-w-0 md:px-3">
+      <div className="min-w-0 md:px-2.5">
         <p
           className={cn(
-            'flex flex-wrap items-center gap-1.5 break-words text-sm font-medium',
+            'flex flex-wrap items-center gap-1.5 break-words text-[13px] font-medium',
             paid && 'text-muted',
           )}
         >
@@ -542,34 +542,34 @@ function PaymentRow({
           )}
         </p>
         {sub.map((line) => (
-          <p key={line} className="break-words text-xs text-muted">
+          <p key={line} className="break-words text-[11px] text-muted">
             {line}
           </p>
         ))}
       </div>
       {/* Phone: the state beside the name. */}
       <div className="justify-self-end md:hidden">{badge}</div>
-      <div className="md:px-3">
-        <p className={cn('text-sm', paid ? 'text-muted' : 'text-fg')}>
+      <div className="md:px-2.5">
+        <p className={cn('text-[13px]', paid ? 'text-muted' : 'text-fg')}>
           {date ? <bdi dir="ltr">{formatDate(date)}</bdi> : '—'}
         </p>
         {paid && paidOn && (
-          <p className="text-xs text-muted">
+          <p className="text-[11px] text-muted">
             {t('instPaidOnShort').replace('{date}', formatDate(paidOn))}
           </p>
         )}
       </div>
-      <div className="justify-self-end text-end md:justify-self-auto md:px-3 md:text-start">
-        <p className={cn('text-sm font-medium', paid && 'text-muted')}>
+      <div className="justify-self-end text-end md:justify-self-auto md:px-2.5 md:text-start">
+        <p className={cn('text-[13px] font-medium', paid && 'text-muted')}>
           <Money value={row.amount} />
         </p>
         {partial && (
-          <p className={cn('text-xs', late ? 'text-danger' : 'text-muted')}>
+          <p className={cn('text-[11px]', late ? 'text-danger' : 'text-muted')}>
             {t('instRemaining')} <Money value={scheduleRemaining(row)} />
           </p>
         )}
       </div>
-      <div className="hidden flex-wrap items-center gap-1 px-3 md:flex">
+      <div className="hidden flex-wrap items-center gap-1 px-2.5 md:flex">
         {badge}
         {partial && running && (
           <Badge size="sm" tone="info">
@@ -577,7 +577,7 @@ function PaymentRow({
           </Badge>
         )}
       </div>
-      <div className="col-span-2 flex items-center justify-end gap-1 md:col-span-1 md:px-3">
+      <div className="col-span-2 flex items-center justify-end gap-1 md:col-span-1 md:px-2.5">
         {canAct && !paid && (
           <Button
             size="sm"
@@ -637,13 +637,13 @@ function WaitingRow({
 }) {
   const { t, lang } = useI18n()
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 border-b px-3 py-3 last:border-b-0">
+    <li className="flex flex-wrap items-center justify-between gap-3 border-b px-2.5 py-2 last:border-b-0">
       <div className="min-w-0">
-        <p className="flex items-center gap-1.5 text-sm font-medium">
+        <p className="flex items-center gap-1.5 text-[13px] font-medium">
           <CalendarDays size={14} aria-hidden="true" className="text-muted" />
           {t('instNotDividedTitle')}
         </p>
-        <p className="text-xs text-muted">
+        <p className="text-[11px] text-muted">
           {[
             installmentsWords(contract.installment_count, lang),
             ...(regular !== null
