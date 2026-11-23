@@ -793,6 +793,11 @@ test('the reads are server-side and bounded', () => {
 // لصفحة الاستحقاقات».
 test('the dues: heavier day numbers, the cards rise in', () => {
   const dues = read('src', 'components', 'installments', 'InstallmentsDuesTab.tsx')
+  // «فيه مشكلة في النقل بين المسدد غير المسدد الكل»: the rows are grouped
+  // by the view they were read for, and a new view mounts a new list.
+  assert.match(dues, /groupDues\(load\.data\?\.rows \?\? \[\], shownView, today\)/)
+  assert.match(dues, /key=\{listKey\}/)
+  assert.match(dues, /switching && 'opacity-50'/)
   assert.match(dues, /text-xl font-extrabold leading-none tabular-nums/)
   assert.match(dues, /'dues-rise relative flex/)
   assert.match(dues, /style=\{riseDelay\(order\)\}/)

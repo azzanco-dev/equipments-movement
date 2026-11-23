@@ -130,20 +130,34 @@ export function InstallmentsDuesTab({
       : null
   const [limit, setLimit] = useState(DUES_FEED_PAGE)
 
+  // The rows carry the view and the financier they were read for: while
+  // another view loads, the list on screen stays grouped as it was read
+  // (faded), and the new list replaces it whole and rises in once.
   const loader = useCallback(
-    (signal: AbortSignal) =>
-      fetchDuesFeed({ view, financierId, limit }, signal),
+    async (signal: AbortSignal) => ({
+      ...(await fetchDuesFeed({ view, financierId, limit }, signal)),
+      view,
+      financierId,
+    }),
     [view, financierId, limit],
   )
   const load = useLoad(loader, version)
+  const shownView = load.data?.view ?? view
+  const listKey = load.data
+    ? `${load.data.view}:${load.data.financierId ?? ''}`
+    : ''
+  const switching =
+    load.status === 'loading' &&
+    !!load.data &&
+    (load.data.view !== view || load.data.financierId !== financierId)
   const figuresLoader = useCallback(
     (signal: AbortSignal) => fetchContractFigures(signal),
     [],
   )
   const figures = useLoad(figuresLoader, version)
   const groups = useMemo(
-    () => groupDues(load.data?.rows ?? [], view, today),
-    [load.data, view, today],
+    () => groupDues(load.data?.rows ?? [], shownView, today),
+    [load.data, shownView, today],
   )
   const shares = useMemo(
     () => (figures.data ? financierShares(figures.data.rows) : []),
@@ -255,10 +269,21 @@ export function InstallmentsDuesTab({
       ) : groups.length === 0 ? (
         <EmptyState
           icon={<CheckCircle2 size={28} aria-hidden="true" />}
-          title={view === 'paid' ? t('instNoPaidHere') : t('instNoDuesHere')}
+          title={
+            shownView === 'paid' ? t('instNoPaidHere') : t('instNoDuesHere')
+          }
         />
       ) : (
-        <>
+        // A new view or financier mounts a new list, so every card rises in
+        // together; «عرض المزيد» and a reload keep the list (same key).
+        <div
+          key={listKey}
+          className={cn(
+            'space-y-4 transition-opacity duration-200',
+            switching && 'opacity-50',
+          )}
+          aria-busy={switching || undefined}
+        >
           {groups.map((group, groupIndex) => {
             // A group's place in the whole list: the rows before it.
             const first = groups
@@ -314,7 +339,7 @@ export function InstallmentsDuesTab({
               </Button>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )
