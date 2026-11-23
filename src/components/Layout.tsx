@@ -140,7 +140,10 @@ function SidebarNav({
                   >
                     {item.icon}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-start">
+                  {/* py-1: the truncate box clips, and the tail of «ع» hangs
+                      about 7 px under the line (owner «المشاريع جزء من العين
+                      ماكول»). */}
+                  <span className="min-w-0 flex-1 truncate py-1 text-start">
                     {item.label}
                   </span>
                   {item.children && (
@@ -185,7 +188,7 @@ function SidebarNav({
                             )}
                             onActivate={() => onOpenChild(child.key)}
                           >
-                            <span className="min-w-0 flex-1 truncate">
+                            <span className="min-w-0 flex-1 truncate py-1">
                               {child.label}
                             </span>
                             {childActive && (

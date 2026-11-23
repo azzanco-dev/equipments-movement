@@ -70,6 +70,9 @@ test('the sidebar and the drawer share SidebarNav, with no fold button', () => {
   assert.match(layout, /h-5 w-3 rounded-es-lg border-b border-s/)
   assert.match(layout, /\{!last && \(/)
   assert.match(layout, /childActive && \(\s+<ChevronDown/)
+  // The truncate box clips: room for the tail of «ع» (owner «المشاريع جزء من العين ماكول»).
+  assert.match(layout, /'?min-w-0 flex-1 truncate py-1 text-start'?/)
+  assert.match(layout, /min-w-0 flex-1 truncate py-1">\s+\{child\.label\}/)
   assert.doesNotMatch(layout, /nav-active|hover:bg-gray-100/)
   assert.doesNotMatch(layout, /PanelRight|طي القائمة/)
   assert.equal((layout.match(/<WhatsAppStatusIndicator \/>/g) ?? []).length, 2)
