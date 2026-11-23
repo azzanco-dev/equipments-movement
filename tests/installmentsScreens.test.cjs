@@ -789,6 +789,18 @@ test('the reads are server-side and bounded', () => {
 
 // Owner 2026-11-23: «شيل المتبقي على العقود, وخلي فلتر الجهة وفلتر … فوق
 // القائمة», «استبدل اسم العقد باسم القسط, وممكن تضيف اسم العقد تحته».
+// Owner 2026-11-23: «ارقام الايام خليها بولد او اللي بعده», «سوي انيميشن
+// لصفحة الاستحقاقات».
+test('the dues: heavier day numbers, the cards rise in', () => {
+  const dues = read('src', 'components', 'installments', 'InstallmentsDuesTab.tsx')
+  assert.match(dues, /text-xl font-extrabold leading-none tabular-nums/)
+  assert.match(dues, /'dues-rise relative flex/)
+  assert.match(dues, /style=\{riseDelay\(order\)\}/)
+  const css = read('src', 'index.css')
+  assert.match(css, /@keyframes dues-rise/)
+  assert.match(css, /prefers-reduced-motion: reduce\) \{\n  \.dues-rise \{\n    animation: none;/)
+})
+
 test('the dues: the filters over the list, the installment named first', () => {
   const dues = read('src', 'components', 'installments', 'InstallmentsDuesTab.tsx')
   assert.doesNotMatch(dues, /instRemainingOnContracts|summarizeContracts|overview/)
@@ -797,6 +809,10 @@ test('the dues: the filters over the list, the installment named first', () => {
   const filters = dues.slice(dues.indexOf('const filters = ('), dues.indexOf('const feed = ('))
   assert.match(filters, /DUES_FEED_VIEWS\.map/)
   assert.match(filters, /instAllFinanciers/)
+  // «حقل اختيار الجهة فيه بحث»: a searchable picker over the loaded list.
+  assert.match(filters, /<AsyncSearchSelect/)
+  assert.match(dues, /normalizeSearchText\(row\.name\)\.includes\(needle\)/)
+  assert.doesNotMatch(dues, /<Select\b/)
   const row = dues.slice(dues.indexOf('function FeedRow('))
   assert.ok(
     row.indexOf('payableRowLabel(row, t, row.installment_count)') < row.indexOf('{row.description}'),

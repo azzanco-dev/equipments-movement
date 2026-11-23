@@ -1,6 +1,10 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Check, CheckCircle2 } from 'lucide-react'
 import {
+  AsyncSearchSelect,
+  type AsyncSearchSelectOption,
+} from '@/components/AsyncSearchSelect'
+import {
   AppLink,
   Badge,
   Button,
@@ -8,7 +12,6 @@ import {
   EmptyState,
   ErrorState,
   Notice,
-  Select,
   Skeleton,
   Tabs,
   TabsList,
@@ -41,6 +44,7 @@ import {
   type InstallmentsUrlState,
 } from '@/lib/installmentsView'
 import { saudiDateKey } from '@/lib/saudiTime'
+import { normalizeSearchText } from '@/lib/search'
 import { FinancierTile } from './boardParts'
 import { Money, WhenBadge } from './cells'
 import { useLoad } from './useLoad'
@@ -72,6 +76,14 @@ const DOT: Record<DueTone, string> = {
   info: 'bg-info',
   success: 'bg-success',
 }
+/** The cards rise in one after the other (owner 2026-11-23): 40 ms apart,
+ *  the ninth and later ones together, so a long list never waits. */
+const RISE_STEP_MS = 40
+const RISE_MAX_STEPS = 8
+const riseDelay = (order: number) => ({
+  animationDelay: `${Math.min(order, RISE_MAX_STEPS) * RISE_STEP_MS}ms`,
+})
+
 const DAY_INK: Record<DueTone, string> = {
   danger: 'text-danger',
   warning: 'text-warning',
@@ -140,6 +152,36 @@ export function InstallmentsDuesTab({
   const nameOf = (id: string) =>
     financiers.find((row) => row.id === id)?.name ?? '—'
 
+  // The financier filter searches the financiers the page already holds
+  // (owner 2026-11-23, «حقل اختيار الجهة فيه بحث»): no request, at most 20.
+  const ALL = 'all'
+  const financierOption = useCallback(
+    (row: InstallmentFinancierRow): AsyncSearchSelectOption => ({
+      value: row.id,
+      label: row.name,
+      icon: (
+        <FinancierTile tone={financierTone(financiers, row.id)} size={20} />
+      ),
+    }),
+    [financiers],
+  )
+  const loadFinancierOptions = useCallback(
+    async (query: string) => {
+      const needle = normalizeSearchText(query)
+      const matches = financiers
+        .filter(
+          (row) => !needle || normalizeSearchText(row.name).includes(needle),
+        )
+        .slice(0, 20)
+        .map(financierOption)
+      return needle
+        ? matches
+        : [{ value: ALL, label: t('instAllFinanciers') }, ...matches]
+    },
+    [financiers, financierOption, t],
+  )
+  const selectedFinancier = financiers.find((row) => row.id === financierId)
+
   const groupTitle = (group: DuesGroup) => {
     if (group.kind === 'overdue') return t('instOverdue')
     if (group.kind === 'this_week') return t('instFeedThisWeek')
@@ -170,22 +212,26 @@ export function InstallmentsDuesTab({
           ))}
         </TabsList>
       </Tabs>
-      <Select
-        aria-label={t('instFinancier')}
-        value={financierId ?? 'all'}
-        onValueChange={(next) => {
-          setLimit(DUES_FEED_PAGE)
-          update({
-            [INSTALLMENTS_URL_KEYS.feedFinancier]:
-              next === 'all' ? null : next,
-          })
-        }}
-        options={[
-          { value: 'all', label: t('instAllFinanciers') },
-          ...financiers.map((row) => ({ value: row.id, label: row.name })),
-        ]}
-        className="w-full sm:w-60"
-      />
+      <div className="w-full sm:w-64">
+        <AsyncSearchSelect
+          size="md"
+          value={financierId ?? ALL}
+          selectedOption={
+            selectedFinancier
+              ? financierOption(selectedFinancier)
+              : { value: ALL, label: t('instAllFinanciers') }
+          }
+          onChange={(next) => {
+            setLimit(DUES_FEED_PAGE)
+            update({
+              [INSTALLMENTS_URL_KEYS.feedFinancier]:
+                !next || next === ALL ? null : next,
+            })
+          }}
+          loadOptions={loadFinancierOptions}
+          placeholder={t('instAllFinanciers')}
+        />
+      </div>
     </div>
   )
 
@@ -213,35 +259,45 @@ export function InstallmentsDuesTab({
         />
       ) : (
         <>
-          {groups.map((group) => (
-            <section key={group.key} className="space-y-3">
-              <header className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="flex items-center gap-2 text-sm font-bold">
-                  <span
-                    aria-hidden="true"
-                    className={cn('h-5 w-1 rounded-full', BAR[group.tone])}
-                  />
-                  {groupTitle(group)}
-                  <Badge size="sm">
-                    {duesWords(group.rows.length, lang)}
-                  </Badge>
-                </h2>
-                <Money value={group.total} className="font-bold" />
-              </header>
-              {/* The rail of design 3: a dot per installment in its colour,
+          {groups.map((group, groupIndex) => {
+            // A group's place in the whole list: the rows before it.
+            const first = groups
+              .slice(0, groupIndex)
+              .reduce((count, earlier) => count + earlier.rows.length, 0)
+            return (
+              <section key={group.key} className="space-y-3">
+                <header
+                  className="dues-rise flex flex-wrap items-center justify-between gap-2"
+                  style={riseDelay(first)}
+                >
+                  <h2 className="flex items-center gap-2 text-sm font-bold">
+                    <span
+                      aria-hidden="true"
+                      className={cn('h-5 w-1 rounded-full', BAR[group.tone])}
+                    />
+                    {groupTitle(group)}
+                    <Badge size="sm">
+                      {duesWords(group.rows.length, lang)}
+                    </Badge>
+                  </h2>
+                  <Money value={group.total} className="font-bold" />
+                </header>
+                {/* The rail of design 3: a dot per installment in its colour,
                   joined by a thin line at the start side. */}
-              <ul className="relative space-y-3 ps-5 before:absolute before:inset-y-4 before:start-[5px] before:w-0.5 before:rounded-full before:bg-border before:content-['']">
-                {group.rows.map((row) => (
-                  <FeedRow
-                    key={row.id}
-                    row={row}
-                    canPay={canManage}
-                    onPay={() => onPay(row)}
-                  />
-                ))}
-              </ul>
-            </section>
-          ))}
+                <ul className="relative space-y-3 ps-5 before:absolute before:inset-y-4 before:start-[5px] before:w-0.5 before:rounded-full before:bg-border before:content-['']">
+                  {group.rows.map((row, index) => (
+                    <FeedRow
+                      key={row.id}
+                      row={row}
+                      order={first + index}
+                      canPay={canManage}
+                      onPay={() => onPay(row)}
+                    />
+                  ))}
+                </ul>
+              </section>
+            )
+          })}
           {load.data.rows.length < load.data.total && (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-muted">
@@ -327,10 +383,13 @@ export function InstallmentsDuesTab({
  *  (or when it was paid) and «تسديد». */
 function FeedRow({
   row,
+  order,
   canPay,
   onPay,
 }: {
   row: InstallmentDueRow
+  /** Its place in the list, for the rise-in delay. */
+  order: number
   canPay: boolean
   onPay: () => void
 }) {
@@ -340,9 +399,10 @@ function FeedRow({
   return (
     <li
       className={cn(
-        'relative flex flex-wrap items-center gap-3 rounded-xl p-4 sm:flex-nowrap',
+        'dues-rise relative flex flex-wrap items-center gap-3 rounded-xl p-4 sm:flex-nowrap',
         ROW_BOX[tone],
       )}
+      style={riseDelay(order)}
     >
       <span
         aria-hidden="true"
@@ -352,7 +412,7 @@ function FeedRow({
         )}
       />
       <div className={cn('w-12 shrink-0 text-center', DAY_INK[tone])}>
-        <p className="text-xl font-bold leading-none tabular-nums">
+        <p className="text-xl font-extrabold leading-none tabular-nums">
           {Number(row.due_date.slice(8, 10))}
         </p>
         <p className="mt-1 text-xs text-muted">
