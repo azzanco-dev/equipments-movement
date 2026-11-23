@@ -241,9 +241,12 @@ test('the form asks one question and types one total', () => {
   const row = read('src', 'components', 'installments', 'InstallmentVatRow.tsx')
   // «مدفوعة» hides the planned day.
   assert.match(row, /const showDue = !paidNow && !settled/)
-  const page = read('src', 'screens', 'installments', 'InstallmentContractDetail.tsx')
-  // Above the schedule: it is not always at the end.
-  assert.ok(page.indexOf('<VatPaymentCard') < page.indexOf("t('instScheduleTitle')"))
+  // Since 2026-11-23 (model C) the VAT paid by itself is the last group of
+  // «جدول السداد», after the first payments and the installments.
+  const table = read('src', 'components', 'installments', 'ContractPaymentTable.tsx')
+  assert.ok(table.indexOf("key: 'first'") < table.indexOf("key: 'installments'"))
+  assert.ok(table.indexOf("key: 'installments'") < table.indexOf("key: 'vat'"))
+  assert.match(table, /contract\.vat_mode === 'separate'\n\s*\? \(schedule\.find\(\(row\) => row\.kind === 'vat'\)/)
 })
 
 test('0209: a void puts the VAT back on its chosen day', () => {

@@ -1087,3 +1087,22 @@ export function withFinancierOptions(
       : field,
   )
 }
+
+// «جدول السداد» of the contract page (owner 2026-11-23, model C).
+
+/** The installments the table shows until «عرض كل الاقساط»: the ones near
+ *  the first unpaid one. */
+export const NEAR_INSTALLMENTS = 6
+
+/** The near installments of a list in seq order: from one before the first
+ *  unpaid row, or the last ones when every row is paid. */
+export function nearInstallments<T extends { paid: boolean }>(
+  rows: readonly T[],
+  size = NEAR_INSTALLMENTS,
+): T[] {
+  if (rows.length <= size) return [...rows]
+  const firstOpen = rows.findIndex((row) => !row.paid)
+  const anchor = firstOpen < 0 ? rows.length : firstOpen
+  const start = Math.max(0, Math.min(anchor - 1, rows.length - size))
+  return rows.slice(start, start + size)
+}

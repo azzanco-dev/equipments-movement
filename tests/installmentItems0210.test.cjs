@@ -250,7 +250,12 @@ test('the screens: the items in the form and on the page, the name dialog', () =
   const page = read('src', 'screens', 'installments', 'InstallmentContractDetail.tsx')
   assert.match(page, /key: 'items'/)
   assert.match(page, /open\(\{ kind: 'row_name', row \}\)/)
-  assert.match(page, /canManage && !cancelled \? \(\n\s*<Button/)
+  // «تسمية» sits in the row's «...» of «جدول السداد» (2026-11-23).
+  assert.match(page, /canName=\{canManage && !cancelled\}/)
+  assert.match(
+    read('src', 'components', 'installments', 'ContractPaymentTable.tsx'),
+    /const canRename = canName && row\.kind === 'installment'/,
+  )
   const dialogs = read('src', 'components', 'installments', 'InstallmentDateDialogs.tsx')
   assert.match(dialogs, /export function SetInstallmentNameDialog/)
   // The copy of both languages, no alif with hamza or madda in the Arabic.

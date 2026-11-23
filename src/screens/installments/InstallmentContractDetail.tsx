@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
   Ban,
   Banknote,
   Building2,
@@ -32,11 +30,7 @@ import {
   SetInstallmentNameDialog,
   SetPaymentDateDialog,
 } from '@/components/installments/InstallmentDateDialogs'
-import {
-  FirstPaymentsCard,
-  PayableRowCard,
-  VatPaymentCard,
-} from '@/components/installments/InstallmentPayableRows'
+import { ContractPaymentTable } from '@/components/installments/ContractPaymentTable'
 import { InstallmentPaymentDialog } from '@/components/installments/InstallmentPaymentDialog'
 import { BankAccountLine } from '@/components/installments/BankAccountFields'
 import { PaymentReceiptLine } from '@/components/installments/InstallmentReceipt'
@@ -50,7 +44,6 @@ import {
   InstallmentStateBadge,
   Money,
   OverdueBadge,
-  WhenBadge,
   PaidProgress,
   PeriodRange,
   UnitTags,
@@ -74,15 +67,11 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   ErrorState,
-  IconButton,
   Notice,
   PageTrailBar,
   SectionHeader,
   Skeleton,
   StatCard,
-  Tabs,
-  TabsList,
-  TabsTrigger,
   ToastProvider,
   cn,
   useConfirm,
@@ -93,11 +82,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import { formatDate } from '@/lib/dateFormat'
 import {
-  daysUntilDue,
-  formatInstallmentAmount,
-  fromHalalas,
   installmentState,
-  toHalalas,
   INSTALLMENT_FREQUENCY_LABEL_KEYS,
   installmentErrorMessage,
   INSTALLMENT_PAYMENT_METHOD_LABEL_KEYS,
@@ -133,7 +118,6 @@ import { contractPaidPercent } from '@/lib/installmentsBoard'
 import {
   formatItemQuantity,
   planDivision,
-  vatInsideHalalas,
   INSTALLMENT_VAT_LABEL_KEYS,
 } from '@/lib/installmentPlan'
 import { removeInstallmentFileObjects } from '@/lib/installmentFilesData'
@@ -149,10 +133,6 @@ export type InstallmentContractDialogKind =
   /** 0210: «تسمية القسط». */
   | { kind: 'row_name'; row: InstallmentScheduleItem }
 
-type ScheduleView = 'open' | 'paid' | 'all'
-
-/** The schedule shows this many cards until «عرض الكل». */
-export const SCHEDULE_PREVIEW_ROWS = 12
 export const PAYMENTS_PREVIEW_ROWS = 10
 export const EVENTS_PREVIEW_ROWS = 20
 
@@ -238,10 +218,7 @@ function InstallmentContractDetailInner({
   const [dialog, setDialog] = useState<InstallmentContractDialogKind | null>(
     null,
   )
-  const [view, setView] = useState<ScheduleView | null>(null)
-  const [showAllRows, setShowAllRows] = useState(false)
   const [showAllPayments, setShowAllPayments] = useState(false)
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [deleting, setDeleting] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
 
@@ -319,7 +296,6 @@ function InstallmentContractDetailInner({
   const installments = schedule.filter((row) => row.kind === 'installment')
   const vatRow = schedule.find((row) => row.kind === 'vat') ?? null
   const vatSeparate = contract.vat_mode === 'separate'
-  const vatInside = contract.vat_mode === 'inside'
   const contractVat = amountOf(contract.vat_amount)
   // The latest posted payment on a row: the day a row paid without one shows.
   const paidOnOf = (target: InstallmentScheduleItem) =>
@@ -363,21 +339,6 @@ function InstallmentContractDetailInner({
     active && (firstPayments.length > 0 || vatSeparate)
       ? openParts.join(t('instListAnd'))
       : ''
-  const scheduleView: ScheduleView =
-    view ?? (contract.status === 'paid_off' ? 'all' : 'open')
-
-  const viewRows = installments
-    .filter((row) =>
-      scheduleView === 'all'
-        ? true
-        : scheduleView === 'paid'
-          ? isSchedulePaid(row)
-          : !isSchedulePaid(row),
-    )
-    .sort((a, b) => (sortDirection === 'asc' ? a.seq - b.seq : b.seq - a.seq))
-  const shownRows = showAllRows
-    ? viewRows
-    : viewRows.slice(0, SCHEDULE_PREVIEW_ROWS)
   const shownPayments = showAllPayments
     ? payments
     : payments.slice(0, PAYMENTS_PREVIEW_ROWS)
@@ -913,264 +874,21 @@ function InstallmentContractDetailInner({
         </div>
 
         <div className="min-w-0 space-y-4 xl:col-span-2 xl:col-start-1 xl:row-span-2 xl:row-start-1">
-          {firstPayments.length > 0 && (
-            <FirstPaymentsCard
-              contract={contract}
-              rows={firstPayments}
-              today={today}
-              paidOn={paidOnOf}
-              canAct={canManage && active}
-              onPay={payRow}
-              onSetDate={(row) => open({ kind: 'payment_date', row })}
-            />
-          )}
-          {vatSeparate && vatRow && (
-            <VatPaymentCard
-              contract={contract}
-              row={vatRow}
-              today={today}
-              paidOn={paidOnOf(vatRow)}
-              canAct={canManage && active}
-              onPay={payRow}
-              onSetDate={(row) => open({ kind: 'payment_date', row })}
-            />
-          )}
-
-          {/* The schedule: wide cards, the amount in a fixed end block. */}
-          <Card padded={false} className="flex min-w-0 flex-col">
-            <div className="space-y-3 p-4 pb-0">
-              <SectionHeader
-                title={
-                  <span className="flex items-center gap-2">
-                    {t('instScheduleTitle')}
-                    {installments.length > 0 && (
-                      <Badge size="sm">{installments.length}</Badge>
-                    )}
-                  </span>
-                }
-                description={t('instScheduleDesc')}
-                action={
-                  installments.length === 0 ? undefined : (
-                  <div className="flex items-center gap-1.5">
-                    <Tabs
-                      value={scheduleView}
-                      onValueChange={(nextView) => {
-                        setView(nextView as ScheduleView)
-                        setShowAllRows(false)
-                      }}
-                    >
-                      <TabsList
-                        variant="segmented"
-                        aria-label={t('instScheduleTitle')}
-                      >
-                        <TabsTrigger value="open">
-                          {t('instScheduleOpen')}
-                        </TabsTrigger>
-                        <TabsTrigger value="paid">
-                          {t('instStatePaid')}
-                        </TabsTrigger>
-                        <TabsTrigger value="all">
-                          {t('instScheduleAll')}
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                    <IconButton
-                      size="sm"
-                      variant="outline"
-                      label={
-                        sortDirection === 'asc'
-                          ? t('instSortDescending')
-                          : t('instSortAscending')
-                      }
-                      icon={
-                        sortDirection === 'asc' ? (
-                          <ArrowUp size={14} aria-hidden="true" />
-                        ) : (
-                          <ArrowDown size={14} aria-hidden="true" />
-                        )
-                      }
-                      onClick={() =>
-                        setSortDirection((current) =>
-                          current === 'asc' ? 'desc' : 'asc',
-                        )
-                      }
-                    />
-                  </div>
-                  )
-                }
-              />
-            </div>
-            {installments.length === 0 ? (
-              <div className="p-4 pt-3">
-                <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed px-3 py-8 text-center">
-                  <CalendarDays
-                    size={24}
-                    aria-hidden="true"
-                    className="text-muted"
-                  />
-                  <p className="text-sm font-semibold">
-                    {t('instNotDividedTitle')}
-                  </p>
-                  <p className="text-xs text-muted">
-                    {[
-                      `${installmentsWords(contract.installment_count, lang)} ${t(
-                        INSTALLMENT_FREQUENCY_LABEL_KEYS[
-                          contract.frequency_months as InstallmentFrequency
-                        ] ?? 'instFrequencyMonthly',
-                      )}`,
-                      ...(division
-                        ? [
-                            t('instEachAmount').replace(
-                              '{amount}',
-                              formatInstallmentAmount(division.regular),
-                            ),
-                          ]
-                        : []),
-                      t('instSumAmount').replace(
-                        '{amount}',
-                        formatInstallmentAmount(contract.installments_amount),
-                      ),
-                    ].join(' · ')}
-                  </p>
-                  {canManage && active && (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      icon={<CalendarDays size={14} aria-hidden="true" />}
-                      onClick={() => open({ kind: 'first_due' })}
-                    >
-                      {t('instSetFirstDue')}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ) : shownRows.length === 0 ? (
-              <div className="p-4">
-                <EmptyState
-                  title={
-                    scheduleView === 'open'
-                      ? t('instScheduleAllPaid')
-                      : t('instScheduleNonePaid')
-                  }
-                  className="p-6"
-                />
-              </div>
-            ) : (
-              <ul className="space-y-2 p-4 pt-3">
-                {shownRows.map((row) => {
-                  // Only a first payment may lack a day.
-                  const due = row.due_date as string
-                  const rowState = cancelled
-                    ? null
-                    : installmentState(
-                        due,
-                        amountOf(row.amount),
-                        amountOf(row.paid_amount),
-                        today,
-                      )
-                  const partial =
-                    amountOf(row.paid_amount) > 0 && !isSchedulePaid(row)
-                  const halalas = toHalalas(amountOf(row.amount))
-                  const part = vatInsideHalalas(halalas)
-                  const sub = vatInside
-                    ? [
-                        t('instBeforeVat').replace(
-                          '{amount}',
-                          formatInstallmentAmount(fromHalalas(halalas - part)),
-                        ),
-                        t('instVatPart').replace(
-                          '{amount}',
-                          formatInstallmentAmount(fromHalalas(part)),
-                        ),
-                      ].join(' · ')
-                    : undefined
-                  return (
-                    <PayableRowCard
-                      key={row.id}
-                      title={
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          {t('instInstallmentOf')
-                            .replace('{seq}', String(row.seq))
-                            .replace(
-                              '{total}',
-                              String(contract.installment_count),
-                            )}
-                          {row.note && (
-                            <span className="min-w-0 break-words">
-                              - {row.note}
-                            </span>
-                          )}
-                          {row.is_balloon && (
-                            <Badge size="sm" tone="info">
-                              {t('instBalloonBadge')}
-                            </Badge>
-                          )}
-                        </span>
-                      }
-                      sub={sub}
-                      actions={
-                        canManage && !cancelled ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            icon={<Pencil size={14} aria-hidden="true" />}
-                            onClick={() => open({ kind: 'row_name', row })}
-                          >
-                            {t('instRowNameAction')}
-                          </Button>
-                        ) : undefined
-                      }
-                      date={due}
-                      late={rowState === 'overdue'}
-                      amountLabel={t('instInstallmentAmount')}
-                      amount={amountOf(row.amount)}
-                      remaining={partial ? scheduleRemaining(row) : undefined}
-                      badges={
-                        rowState ? (
-                          <>
-                            <InstallmentStateBadge
-                              state={rowState}
-                              partial={partial}
-                            />
-                            {rowState === 'overdue' && (
-                              <WhenBadge days={daysUntilDue(due, today)} />
-                            )}
-                          </>
-                        ) : undefined
-                      }
-                    />
-                  )
-                })}
-                {viewRows.length > SCHEDULE_PREVIEW_ROWS && (
-                  <li className="flex justify-center">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setShowAllRows((current) => !current)}
-                    >
-                      {showAllRows
-                        ? t('instShowLess')
-                        : t('instShowAllCount').replace(
-                            '{count}',
-                            String(viewRows.length),
-                          )}
-                    </Button>
-                  </li>
-                )}
-                {/* The total closes the list in the same end block. */}
-                <li className="rounded-xl border bg-surface p-3 sm:p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3 sm:flex-nowrap">
-                    <p className="text-sm font-medium">
-                      {t('instInstallmentsTotal')}
-                    </p>
-                    <p className="text-lg font-semibold sm:w-44 sm:shrink-0 sm:text-end">
-                      <Money value={contract.installments_amount} />
-                    </p>
-                  </div>
-                </li>
-              </ul>
-            )}
-          </Card>
+          {/* «جدول السداد» (owner 2026-11-23, model C): the first payments,
+              the installments and the VAT in one table. */}
+          <ContractPaymentTable
+            contract={contract}
+            schedule={schedule}
+            today={today}
+            paidOn={paidOnOf}
+            canAct={canManage && active}
+            canName={canManage && !cancelled}
+            waitingRegular={division ? division.regular : null}
+            onPay={payRow}
+            onSetDate={(row) => open({ kind: 'payment_date', row })}
+            onName={(row) => open({ kind: 'row_name', row })}
+            onSetFirstDue={() => open({ kind: 'first_due' })}
+          />
 
           {/* Payments: the latest ten, voided ones kept and struck out. */}
           <Card padded={false}>

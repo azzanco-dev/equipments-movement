@@ -96,7 +96,7 @@ const UI_FILES = [
   ['src', 'components', 'installments', 'InstallmentContractFiles.tsx'],
   ['src', 'components', 'installments', 'InstallmentDateDialogs.tsx'],
   ['src', 'components', 'installments', 'InstallmentFirstPayments.tsx'],
-  ['src', 'components', 'installments', 'InstallmentPayableRows.tsx'],
+  ['src', 'components', 'installments', 'ContractPaymentTable.tsx'],
   ['src', 'components', 'installments', 'InstallmentPlanSummary.tsx'],
   ['src', 'components', 'installments', 'InstallmentVatRow.tsx'],
   ['src', 'components', 'installments', 'boardParts.tsx'],
