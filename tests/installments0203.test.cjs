@@ -276,6 +276,14 @@ test('the client maps exactly the tokens the SQL raises', () => {
       // The migration's own guards are sentences, never tokens.
       if (lib.INSTALLMENT_ERROR_TOKENS.includes(match[1]) || match[1].startsWith('invalid_'))
         raised.add(match[1])
+  // 0210 adds the items and the installment's name.
+  const items = fs
+    .readFileSync(
+      path.join(MIGRATIONS, '20261123100000_0210_installment_items_and_names.sql'),
+      'utf8',
+    )
+    .replace(/--[^\n]*/g, '')
+  for (const match of items.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g)) raised.add(match[1])
   assert.deepEqual([...raised].sort(), [...lib.INSTALLMENT_ERROR_TOKENS].sort())
 })
 

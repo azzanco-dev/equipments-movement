@@ -7,6 +7,7 @@ import {
   sumAmounts,
   EMPTY_INSTALLMENT_OVERVIEW,
   type InstallmentAllocationRow,
+  type InstallmentContractItem,
   type InstallmentContractRow,
   type InstallmentDueRow,
   type InstallmentDuesView,
@@ -46,6 +47,7 @@ import {
 } from '@/lib/installmentFiles'
 import type {
   InstallmentFirstPaymentPayload,
+  InstallmentItemPayload,
   InstallmentVatPayload,
 } from '@/lib/installmentPlan'
 import {
@@ -75,13 +77,18 @@ export const INSTALLMENT_OVERVIEW_SELECT =
   'overdue_count,overdue_amount,due_7_count,due_7_amount,due_30_count,due_30_amount,open_count,remaining_total,open_contract_count,next_due_date'
 
 export const INSTALLMENT_DUE_SELECT =
-  'id,contract_id,contract_number,description,financier_id,financier_name,seq,installment_count,due_date,amount,paid_amount,remaining_amount,is_balloon,is_partial,state,days_until_due,kind,title'
+  'id,contract_id,contract_number,description,financier_id,financier_name,seq,installment_count,due_date,amount,paid_amount,remaining_amount,is_balloon,is_partial,state,days_until_due,kind,title,note'
 
 /** The dues lists also show the payment date of a paid row (0207). */
 export const INSTALLMENT_DUES_LIST_SELECT = `${INSTALLMENT_DUE_SELECT},last_paid_on`
 
 export const INSTALLMENT_CONTRACT_SELECT =
   'id,contract_number,description,financier_id,financier_name,total_amount,down_payment,balloon_amount,financed_amount,installment_count,frequency_months,first_due_date,notes,status,closed_at,cancel_reason,created_by_name,created_at,updated_at,paid_total,remaining_total,paid_count,overdue_count,overdue_amount,next_due_date,next_due_amount,last_due_date,equipment_count,financier_bank_name,financier_iban,contract_bank_name,contract_iban,vat_mode,vat_due,vat_amount,vat_due_date,installments_amount,payable_total,paid_overall,first_payments_count,first_payments_paid_count,first_payments_total,installments_locked,next_due_id,next_due_kind,next_due_title,next_due_seq,first_due_set_at,first_due_set_by_name,vat_settled'
+
+/** 0210: the items of a contract. */
+export const INSTALLMENT_ITEM_SELECT = 'id,position,name,quantity'
+/** A contract has at most 100 items (installment_contract_items). */
+const CONTRACT_ITEMS_CAP = 100
 
 export const INSTALLMENT_SCHEDULE_SELECT =
   'id,contract_id,seq,due_date,amount,is_balloon,paid_amount,kind,title,note,rate'
@@ -572,6 +579,8 @@ export interface InstallmentContractDetailData {
   units: InstallmentUnit[]
   /** 0209: the contract's files, the oldest first. */
   files: InstallmentFile[]
+  /** 0210: what the contract covers, in its order. */
+  items: InstallmentContractItem[]
 }
 
 type AllocationEmbedRow = {
@@ -637,7 +646,26 @@ export async function fetchContractFiles(
   )
 }
 
-/** What «تعديل العقد» edits: the summary row, the rows and the units. */
+/** A contract's items (0210), in their order. */
+export async function fetchContractItems(
+  contractId: string,
+  signal?: AbortSignal,
+): Promise<InstallmentContractItem[]> {
+  return rowsOf<InstallmentContractItem>(
+    await withSignal(
+      supabase
+        .from('installment_contract_items')
+        .select(INSTALLMENT_ITEM_SELECT)
+        .eq('contract_id', contractId)
+        .order('position', { ascending: true })
+        .limit(CONTRACT_ITEMS_CAP),
+      signal,
+    ),
+  ).map((item) => ({ ...item, quantity: amountOf(item.quantity) }))
+}
+
+/** What «تعديل العقد» edits: the summary row, the rows, the units and the
+ *  items. */
 export async function fetchInstallmentContractForEdit(
   contractId: string,
   signal?: AbortSignal,
@@ -645,6 +673,7 @@ export async function fetchInstallmentContractForEdit(
   contract: InstallmentContractRow
   schedule: InstallmentScheduleItem[]
   units: InstallmentUnit[]
+  items: InstallmentContractItem[]
   /** The version this edit is based on. */
   editKey: string
 } | null> {
@@ -659,12 +688,13 @@ export async function fetchInstallmentContractForEdit(
   if (key.error) throw new SupabaseLoadError()
   if (typeof key.data !== 'string') return null
   const editKey = key.data
-  const [contract, schedule, units] = await Promise.all([
+  const [contract, schedule, units, items] = await Promise.all([
     fetchContractRow(contractId, signal),
     fetchSchedule(contractId, signal),
     fetchInstallmentContractUnits([contractId], signal),
+    fetchContractItems(contractId, signal),
   ])
-  return contract ? { contract, schedule, units, editKey } : null
+  return contract ? { contract, schedule, units, items, editKey } : null
 }
 
 /**
@@ -676,7 +706,7 @@ export async function fetchInstallmentContract(
   contractId: string,
   signal?: AbortSignal,
 ): Promise<InstallmentContractDetailData | null> {
-  const [contract, schedule, payments, allocations, units, files] = await Promise.all([
+  const [contract, schedule, payments, allocations, units, files, items] = await Promise.all([
     fetchContractRow(contractId, signal),
     fetchSchedule(contractId, signal),
     withSignal(
@@ -714,9 +744,10 @@ export async function fetchInstallmentContract(
     ),
     fetchInstallmentContractUnits([contractId], signal),
     fetchContractFiles(contractId, signal),
+    fetchContractItems(contractId, signal),
   ])
   if (!contract) return null
-  return { contract, schedule, payments, allocations, units, files }
+  return { contract, schedule, payments, allocations, units, files, items }
 }
 
 /** What the payment dialog needs of a contract: its totals and its
@@ -832,6 +863,8 @@ export interface InstallmentContractInput {
   notes: string
   /** The linked units' ids; empty = no link. */
   equipmentIds: readonly string[]
+  /** 0210: every item, in its order; empty = none. */
+  items: readonly InstallmentItemPayload[]
   /** 0208: the contract's own account; both empty = the financier's. */
   bankName: string
   iban: string
@@ -866,6 +899,8 @@ export async function saveInstallmentContract(
       p_vat: input.vat,
       p_first_payments: input.firstPayments,
       p_expected_key: input.expectedKey,
+      // 0210: always sent, the whole list.
+      p_items: input.items,
     }),
   )
 }
@@ -898,6 +933,23 @@ export async function setInstallmentPaymentDate(
     await supabase.rpc('set_installment_payment_date', {
       p_schedule_id: scheduleId,
       p_due_date: dueDate,
+    }),
+  )
+}
+
+/** The longest installment name (installment_schedule.note). */
+export const INSTALLMENT_ROW_NAME_MAX = 200
+
+/** `set_installment_row_note` (0210): names an installment; a blank
+ *  clears it. */
+export async function setInstallmentRowName(
+  scheduleId: string,
+  name: string,
+): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('set_installment_row_note', {
+      p_schedule_id: scheduleId,
+      p_note: name.trim() || null,
     }),
   )
 }

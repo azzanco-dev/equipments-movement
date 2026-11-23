@@ -70,6 +70,12 @@ const PLAN_MIGRATION = read(
   'migrations',
   '20261122100000_0209_installment_first_payments_vat_files.sql',
 )
+// 0210 re-creates the save (p_items), adds the items and the name writer.
+const ITEMS_MIGRATION = read(
+  'supabase',
+  'migrations',
+  '20261123100000_0210_installment_items_and_names.sql',
+)
 const DATA = read('src', 'lib', 'installmentsData.ts')
 const APP = read('src', 'App.tsx')
 
@@ -374,6 +380,7 @@ function sqlParameters(name) {
     `CREATE (?:OR REPLACE )?FUNCTION public\\.${name}\\(([\\s\\S]*?)\\)\\s*RETURNS`,
   )
   const match =
+    created.exec(ITEMS_MIGRATION.replace(/--[^\n]*/g, '')) ??
     created.exec(PLAN_MIGRATION.replace(/--[^\n]*/g, '')) ??
     pattern.exec(LATER) ??
     pattern.exec(MIGRATION)
@@ -399,6 +406,7 @@ test('the four functions are called with the exact parameter names of 0203', () 
     'set_installment_first_due_date',
     'set_installment_payment_date',
     'installment_contract_edit_key',
+    'set_installment_row_note',
   ]
   for (const name of functions)
     assert.deepEqual(rpcArguments(name), sqlParameters(name), name)
@@ -418,6 +426,7 @@ test('the four functions are called with the exact parameter names of 0203', () 
     'p_vat',
     'p_first_payments',
     'p_expected_key',
+    'p_items',
   ])
   // Only those (0209 adds the two dates), the delete of 0207, and nothing the migration keeps
   // for itself.
@@ -449,14 +458,15 @@ function relationBody(name) {
   return table[1]
 }
 
-/** What 0209 gives a relation: its re-created view, or its new columns. */
-function planBody(name) {
+/** What 0209 (or 0210) gives a relation: its re-created view, or its new
+ *  columns. */
+function planBody(name, source = PLAN_MIGRATION) {
   const view = new RegExp(
     `CREATE OR REPLACE VIEW public\\.${name}\\b([\\s\\S]*?);\\n`,
-  ).exec(PLAN_MIGRATION)
+  ).exec(source)
   if (view) return view[1]
   return [
-    ...PLAN_MIGRATION.matchAll(
+    ...source.matchAll(
       new RegExp(`ALTER TABLE public\\.${name}\\n([\\s\\S]*?);\\n`, 'g'),
     ),
   ]
@@ -471,7 +481,10 @@ function assertColumns(relation, columns) {
       new RegExp(`\\b${column}\\b`).test(body) ||
         // 0208 appends the account columns.
         new RegExp(`\\b(AS|ADD COLUMN) ${column}\\b`).test(LATER) ||
-        new RegExp(`\\b${column}\\b`).test(planBody(relation)),
+        new RegExp(`\\b${column}\\b`).test(planBody(relation)) ||
+        new RegExp(`\\b${column}\\b`).test(
+          planBody(relation, ITEMS_MIGRATION),
+        ),
       `${relation}.${column}`,
     )
 }
@@ -491,6 +504,14 @@ test('the selects name only columns the views and tables have', () => {
     INSTALLMENT_PAYMENT_SELECT: 'installment_payment_list',
     INSTALLMENT_FINANCIER_SELECT: 'installment_financiers',
   }
+  // 0210: the items, a table of its own.
+  const itemsTable =
+    /CREATE TABLE public\.installment_contract_items \(([\s\S]*?)\n\);/.exec(
+      ITEMS_MIGRATION,
+    )
+  assert.ok(itemsTable)
+  for (const column of selectOf('INSTALLMENT_ITEM_SELECT').split(','))
+    assert.match(itemsTable[1], new RegExp(`\\b${column}\\b`), column)
   for (const [name, relation] of Object.entries(plainSelects)) {
     const select = selectOf(name)
     assert.doesNotMatch(select, /\*/, name)
@@ -549,6 +570,7 @@ test('reads only the installments relations; writes only the financiers', () => 
     'equipment',
     'installment_contract_equipment',
     'installment_contract_files',
+    'installment_contract_items',
     'installment_contract_summary',
     'installment_contracts',
     'installment_dues',

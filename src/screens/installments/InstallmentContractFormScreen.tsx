@@ -15,6 +15,7 @@ import {
   DraftContractFiles,
   EditContractFiles,
 } from '@/components/installments/InstallmentContractFiles'
+import { InstallmentContractItems } from '@/components/installments/InstallmentContractItems'
 import { InstallmentFirstPayments } from '@/components/installments/InstallmentFirstPayments'
 import { InstallmentPlanSummary } from '@/components/installments/InstallmentPlanSummary'
 import { InstallmentVatRow } from '@/components/installments/InstallmentVatRow'
@@ -75,6 +76,7 @@ import {
   contractFormValues,
   emptyContractForm,
   firstPaymentsPayload,
+  itemsPayload,
   mergeStoredForm,
   planInputOf,
   rateBaseOf,
@@ -100,6 +102,7 @@ import {
   isSchedulePaid,
   latinDigits,
   parseInstallmentAmount,
+  type InstallmentContractItem,
   type InstallmentContractRow,
   type InstallmentScheduleItem,
   type InstallmentUnit,
@@ -113,6 +116,8 @@ interface StoredContract {
   contract: InstallmentContractRow
   schedule: InstallmentScheduleItem[]
   units: InstallmentUnit[]
+  /** 0210: what the contract covers. */
+  items: InstallmentContractItem[]
   /** The version the edit is based on. */
   editKey: string
 }
@@ -255,6 +260,7 @@ function ContractForm({
           initialStored.contract,
           initialStored.schedule,
           initialStored.units,
+          initialStored.items,
         )
       : emptyContractForm(),
   )
@@ -390,7 +396,12 @@ function ContractForm({
     try {
       const next = await fetchInstallmentContractForEdit(contractId)
       if (!next) return
-      const saved = contractFormValues(next.contract, next.schedule, next.units)
+      const saved = contractFormValues(
+        next.contract,
+        next.schedule,
+        next.units,
+        next.items,
+      )
       setValues((current) => mergeStoredForm(current, initial, saved))
       setStored(next)
       setInitial(saved)
@@ -451,6 +462,7 @@ function ContractForm({
       expectedKey: stored?.editKey ?? null,
       notes: values.notes,
       equipmentIds: values.equipment,
+      items: itemsPayload(values.items),
       bankName: values.bank_name,
       iban: values.iban,
     })
@@ -641,6 +653,26 @@ function ContractForm({
                   />
                 )}
               </Field>
+            </div>
+          </Card>
+
+          <Card className={SECTION}>
+            <SectionHeader
+              title={t('instItemsTitle')}
+              description={t('optional')}
+            />
+            <div data-field="items" className="space-y-1.5">
+              <InstallmentContractItems
+                rows={values.items}
+                onChange={(rows) => set('items', rows)}
+                showErrors={checkRows}
+                disabled={saving}
+              />
+              {errors.items && (
+                <p className="text-xs text-danger" role="alert">
+                  {t(errors.items)}
+                </p>
+              )}
             </div>
           </Card>
 

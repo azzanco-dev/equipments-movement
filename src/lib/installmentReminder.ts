@@ -36,6 +36,8 @@ export interface InstallmentReminderItem {
   kind?: 'first_payment' | 'installment' | 'vat'
   /** A first payment's name. */
   title?: string
+  /** 0210: an installment's name («رقم سند الامر 545456564»). */
+  note?: string
   /** YYYY-MM-DD */
   dueDate: string
   remainingAmount: number
@@ -133,7 +135,9 @@ export function parseInstallmentReminder(
       seq: seq ?? 0,
       ...(row.kind === 'first_payment' || row.kind === 'vat'
         ? { kind: row.kind, title: text(row.title) }
-        : {}),
+        : text(row.note).trim()
+          ? { note: text(row.note) }
+          : {}),
       dueDate,
       remainingAmount: remaining,
       daysUntilDue: Math.trunc(days),
@@ -212,6 +216,8 @@ export interface InstallmentReminderLine {
   installments: number
   /** 0209: the first payments and the VAT row among its rows, by name. */
   named?: string[]
+  /** 0210: its installments that carry a name: «القسط 1: سند 545456564». */
+  installmentNames?: string[]
   /** For an overdue line: the days of its oldest unpaid row. */
   overdueDays: number
 }
@@ -232,11 +238,20 @@ export function reminderSectionLines(
           ? oneLine(item.title ?? '', MAX_NAME_LENGTH) ||
             INSTALLMENT_REMINDER_PAYMENT_LABEL
           : null
+    const installmentName =
+      !name && item.note?.trim()
+        ? `القسط ${item.seq}: ${oneLine(item.note, MAX_NAME_LENGTH)}`
+        : null
     const line = byContract.get(item.contractNumber)
     if (line) {
       line.amount += item.remainingAmount
       if (name) line.named = [...(line.named ?? []), name]
       else line.installments += 1
+      if (installmentName)
+        line.installmentNames = [
+          ...(line.installmentNames ?? []),
+          installmentName,
+        ]
       line.overdueDays = Math.max(line.overdueDays, -item.daysUntilDue)
     } else {
       byContract.set(item.contractNumber, {
@@ -246,6 +261,7 @@ export function reminderSectionLines(
         amount: item.remainingAmount,
         installments: name ? 0 : 1,
         ...(name ? { named: [name] } : {}),
+        ...(installmentName ? { installmentNames: [installmentName] } : {}),
         overdueDays: Math.max(0, -item.daysUntilDue),
       })
     }
@@ -274,6 +290,12 @@ function lineText(
       names.push(reminderMoreLabel(line.named.length - MAX_NAMED))
     // Beside a first payment a single installment is said too.
     if (line.installments === 1) names.push('قسط')
+    parts.push(names.join(' + '))
+  }
+  if (line.installmentNames?.length) {
+    const names = line.installmentNames.slice(0, MAX_NAMED)
+    if (line.installmentNames.length > MAX_NAMED)
+      names.push(reminderMoreLabel(line.installmentNames.length - MAX_NAMED))
     parts.push(names.join(' + '))
   }
   parts.push(

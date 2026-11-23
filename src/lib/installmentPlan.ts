@@ -16,6 +16,7 @@ import {
   latinDigits,
   parseInstallmentAmount,
   type InstallmentContractRow,
+  type InstallmentContractItem,
   type InstallmentScheduleItem,
   type InstallmentUnit,
 } from '@/lib/installmentsView'
@@ -373,6 +374,80 @@ export interface FirstPaymentFormRow {
   settled: boolean
 }
 
+/** 0210: one row of «بنود العقد», as typed. */
+export interface InstallmentItemFormRow {
+  /** React's key. */
+  key: string
+  name: string
+  quantity: string
+}
+
+/** installment_contract_items: the name (1-120), the count (> 0, two
+ *  decimals) and at most 100 items. */
+export const INSTALLMENT_ITEM_NAME_MAX = 120
+export const INSTALLMENT_ITEM_QUANTITY_MAX = 99999999.99
+export const INSTALLMENT_ITEMS_MAX = 100
+
+export function newItemRow(key: string): InstallmentItemFormRow {
+  return { key, name: '', quantity: '1' }
+}
+
+/** A row without a name is left out of the save, whatever its count. */
+export function isBlankItemRow(row: Pick<InstallmentItemFormRow, 'name'>) {
+  return !row.name.trim()
+}
+
+/** The count of a row, or null while it is no number above zero. */
+export function itemQuantityValue(value: string): number | null {
+  const quantity = parseInstallmentAmount(value)
+  return quantity !== null &&
+    quantity > 0 &&
+    quantity <= INSTALLMENT_ITEM_QUANTITY_MAX
+    ? quantity
+    : null
+}
+
+/** What is wrong with a row, or null. A blank row is never wrong. */
+export function itemRowError(
+  row: Pick<InstallmentItemFormRow, 'name' | 'quantity'>,
+): TranslationKey | null {
+  if (isBlankItemRow(row)) return null
+  if (row.name.trim().length > INSTALLMENT_ITEM_NAME_MAX)
+    return 'instItemErrName'
+  if (itemQuantityValue(row.quantity) === null) return 'instItemErrQuantity'
+  return null
+}
+
+/** «2», «1.5»: a count as it is read (Latin digits, two decimals at most). */
+export function formatItemQuantity(value: number): string {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(
+    amountOf(value),
+  )
+}
+
+/** 0210: an item as `save_installment_contract` takes it. */
+export interface InstallmentItemPayload {
+  name: string
+  quantity: number
+}
+
+/** The items the save sends: the named rows, in their order. */
+export function itemsPayload(
+  rows: readonly InstallmentItemFormRow[],
+): InstallmentItemPayload[] {
+  return rows
+    .filter((row) => !isBlankItemRow(row))
+    .map((row) => ({
+      name: row.name.trim(),
+      quantity: itemQuantityValue(row.quantity) ?? 0,
+    }))
+}
+
+/** «2», «1.5»: a stored count as the text of its field. */
+function quantityText(value: number): string {
+  return String(amountOf(value))
+}
+
 export interface InstallmentContractFormValues {
   description: string
   financier_id: string
@@ -401,6 +476,8 @@ export interface InstallmentContractFormValues {
   notes: string
   /** The linked units' ids; empty = no link. */
   equipment: string[]
+  /** 0210: «بنود العقد». */
+  items: InstallmentItemFormRow[]
   /** 0208: the contract's own account; both empty = the financier's. */
   bank_name: string
   iban: string
@@ -410,6 +487,7 @@ export const INSTALLMENT_CONTRACT_FIELD_ORDER: readonly (keyof InstallmentContra
   [
     'description',
     'financier_id',
+    'items',
     'total_amount',
     'down_payment',
     'vat_mode',
@@ -453,6 +531,9 @@ export const INSTALLMENT_CONTRACT_TOKEN_FIELDS: Readonly<
   invalid_bank: 'bank_name',
   invalid_iban: 'iban',
   invalid_account: 'iban',
+  invalid_items: 'items',
+  invalid_item_name: 'items',
+  invalid_item_quantity: 'items',
 }
 
 const ORDINAL_KEYS: readonly TranslationKey[] = [
@@ -518,6 +599,7 @@ export function emptyContractForm(): InstallmentContractFormValues {
     first_due_date: '',
     notes: '',
     equipment: [],
+    items: [],
     bank_name: '',
     iban: '',
   }
@@ -528,6 +610,7 @@ export function contractFormValues(
   contract: InstallmentContractRow,
   schedule: readonly InstallmentScheduleItem[],
   units: readonly Pick<InstallmentUnit, 'equipment_id'>[],
+  items: readonly InstallmentContractItem[] = [],
 ): InstallmentContractFormValues {
   const total = toHalalas(amountOf(contract.total_amount))
   const vat = toHalalas(amountOf(contract.vat_amount))
@@ -579,6 +662,13 @@ export function contractFormValues(
     first_due_date: contract.first_due_date ?? '',
     notes: contract.notes ?? '',
     equipment: units.map((unit) => unit.equipment_id),
+    items: [...items]
+      .sort((a, b) => a.position - b.position)
+      .map((item) => ({
+        key: item.id,
+        name: item.name,
+        quantity: quantityText(item.quantity),
+      })),
     bank_name: contract.contract_bank_name ?? '',
     iban: contract.contract_iban ? formatIban(contract.contract_iban) : '',
   }
@@ -642,6 +732,7 @@ const FREE_FIELDS = [
   'financier_id',
   'notes',
   'equipment',
+  'items',
   'bank_name',
   'iban',
 ] as const

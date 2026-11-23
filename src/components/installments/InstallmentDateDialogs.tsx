@@ -24,6 +24,8 @@ import { planDivision } from '@/lib/installmentPlan'
 import {
   setInstallmentFirstDueDate,
   setInstallmentPaymentDate,
+  setInstallmentRowName,
+  INSTALLMENT_ROW_NAME_MAX,
 } from '@/lib/installmentsData'
 import {
   installmentErrorToken,
@@ -384,6 +386,115 @@ export function SetPaymentDateDialog({
           )}
         </Field>
       </div>
+    </Dialog>
+  )
+}
+
+/**
+ * «تسمية القسط» (migration 0210, owner 2026-11-23: «مرات ابغى اضيف له اسم,
+ * مثل "القسط 1 - رقم سند الامر 545456564"»): a name shown after the
+ * installment's number, on any installment, paid or not; a blank clears it.
+ */
+export function SetInstallmentNameDialog({
+  row,
+  onOpenChange,
+  onDone,
+  onStale,
+}: {
+  /** The installment; null = closed. */
+  row: InstallmentScheduleItem | null
+  onOpenChange: (open: boolean) => void
+  onDone: () => void
+  onStale?: () => void
+}) {
+  const { t } = useI18n()
+  const [name, setName] = useState('')
+  const [error, setError] = useState<TranslationKey | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const rowId = row?.id
+  useEffect(() => {
+    if (!row) return
+    setName(row.note ?? '')
+    setError(null)
+    setSaving(false)
+    // Another row, or the opening, resets it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowId])
+
+  const submit = async () => {
+    if (!row || saving) return
+    if (name.trim().length > INSTALLMENT_ROW_NAME_MAX)
+      return setError('instRowNameErr')
+    setError(null)
+    setSaving(true)
+    const result = await setInstallmentRowName(row.id, name)
+    setSaving(false)
+    if (result.error) {
+      const token = installmentErrorToken(result.error)
+      setError(
+        token === 'invalid_note'
+          ? 'instRowNameErr'
+          : installmentErrorMessage(result.error),
+      )
+      if (token && INSTALLMENT_STALE_TOKENS.has(token)) onStale?.()
+      return
+    }
+    onDone()
+  }
+
+  return (
+    <Dialog
+      open={row !== null}
+      size="sm"
+      onOpenChange={(next) => {
+        if (!next && saving) return
+        onOpenChange(next)
+      }}
+      title={t('instRowNameTitle').replace(
+        '{label}',
+        () => (row ? payableRowLabel({ seq: row.seq }, t) : ''),
+      )}
+      footer={
+        <>
+          <Button
+            variant="outline"
+            disabled={saving}
+            onClick={() => onOpenChange(false)}
+          >
+            {t('instDialogCancel')}
+          </Button>
+          <Button variant="primary" loading={saving} onClick={submit}>
+            {t('save')}
+          </Button>
+        </>
+      }
+    >
+      <Field
+        label={t('instRowName')}
+        error={error ? t(error) : undefined}
+        hint={t('instRowNameHint')}
+      >
+        {(control) => (
+          <Input
+            {...control}
+            autoFocus
+            maxLength={INSTALLMENT_ROW_NAME_MAX}
+            placeholder={t('instRowNamePlaceholder')}
+            value={name}
+            onChange={(event) => {
+              setName(event.target.value)
+              setError(null)
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                void submit()
+              }
+            }}
+          />
+        )}
+      </Field>
     </Dialog>
   )
 }

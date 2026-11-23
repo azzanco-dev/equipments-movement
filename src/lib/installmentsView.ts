@@ -70,6 +70,8 @@ export interface InstallmentDueRow {
   kind: InstallmentRowKind
   /** A first payment's name. */
   title: string | null
+  /** 0210: an installment's name (a first payment's or the VAT's note). */
+  note: string | null
   amount: number
   paid_amount: number
   remaining_amount: number
@@ -221,6 +223,14 @@ export interface InstallmentPaymentRow {
 }
 
 /** `installment_payment_allocations` with the `seq` of its schedule row. */
+/** 0210: what a contract covers («البنود»), in its order. */
+export interface InstallmentContractItem {
+  id: string
+  position: number
+  name: string
+  quantity: number
+}
+
 export interface InstallmentAllocationRow {
   payment_id: string
   amount: number
@@ -375,11 +385,15 @@ export function firstPaymentsWords(count: number, lang: Language): string {
 }
 
 /** What a payable row is called: its title for a first payment, «دفعة
- *  الضريبة», else «القسط 3 من 24» (or «القسط 3» without a count). */
+ *  الضريبة», else «القسط 3 من 24» (or «القسط 3» without a count), followed
+ *  by the installment's name when it has one (0210: «القسط 1 - رقم سند
+ *  الامر 545456564»). */
 export function payableRowLabel(
   row: {
     kind?: InstallmentRowKind | null
     title?: string | null
+    /** 0210: an installment's name; a first payment's note is not shown. */
+    note?: string | null
     seq: number
   },
   t: (key: TranslationKey) => string,
@@ -388,9 +402,11 @@ export function payableRowLabel(
   if (row.kind === 'first_payment') return row.title || t('instFirstPayment')
   if (row.kind === 'vat') return row.title || t('instVatPayment')
   const key = count ? 'instCardSeqOf' : 'instInstallmentN'
-  return t(key)
+  const label = t(key)
     .replace('{seq}', String(row.seq))
     .replace('{count}', String(count ?? ''))
+  const name = row.note?.trim()
+  return name ? `${label} - ${name}` : label
 }
 
 /** An active contract whose installments wait for their first date. */

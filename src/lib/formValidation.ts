@@ -25,8 +25,11 @@ import {
   INSTALLMENT_FIRST_PAYMENTS_MAX,
   INSTALLMENT_FIRST_PAYMENT_NOTE_MAX,
   INSTALLMENT_FIRST_PAYMENT_TITLE_MAX,
+  INSTALLMENT_ITEMS_MAX,
   INSTALLMENT_VAT_CHOICES,
+  itemRowError,
   type FirstPaymentFormRow,
+  type InstallmentItemFormRow,
   type InstallmentContractFormValues,
   type InstallmentVatMode,
 } from '@/lib/installmentPlan'
@@ -1457,6 +1460,7 @@ export function installmentContractFormSchema(today: string) {
         lengthKey: 'instErrNotes',
       }),
       equipment: z.array(z.string()),
+      items: z.custom<InstallmentItemFormRow[]>(Array.isArray).optional(),
       bank_name: z.string().optional(),
       iban: installmentIban.optional(),
     })
@@ -1470,6 +1474,12 @@ export function installmentContractFormSchema(today: string) {
           path: [field],
           message: key,
         })
+      // 0210: each named row needs a count above zero; a blank row is left out.
+      if (
+        (form.items ?? []).length > INSTALLMENT_ITEMS_MAX ||
+        (form.items ?? []).some((row) => itemRowError(row))
+      )
+        refuse('items', 'instItemsCheckRows')
       if (form.vat_mode === 'separate') {
         if (form.vat_amount.trim() && !parseInstallmentAmount(form.vat_amount)) {
           refuse('vat_amount', 'instErrVatAmount')

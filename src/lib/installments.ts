@@ -382,6 +382,10 @@ export const INSTALLMENT_ERROR_KEYS: Readonly<Record<string, TranslationKey>> =
     contract_file_missing: 'instErrContractFileMissing',
     contract_file_not_found: 'instErrContractFileNotFound',
     contract_changed: 'instErrContractChanged',
+    // 0210
+    invalid_items: 'instErrItems',
+    invalid_item_name: 'instItemErrName',
+    invalid_item_quantity: 'instItemErrQuantity',
   }
 
 /** Every stable token of the installments functions, for the tests. */

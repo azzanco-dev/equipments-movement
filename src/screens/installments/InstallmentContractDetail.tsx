@@ -18,6 +18,7 @@ import {
   Pencil,
   Repeat,
   Landmark,
+  Package,
   StickyNote,
   Trash2,
   Truck,
@@ -28,6 +29,7 @@ import { usePermissions } from '@/auth/PermissionsContext'
 import { ContractFilesCard } from '@/components/installments/InstallmentContractFiles'
 import {
   SetFirstDueDateDialog,
+  SetInstallmentNameDialog,
   SetPaymentDateDialog,
 } from '@/components/installments/InstallmentDateDialogs'
 import {
@@ -129,6 +131,7 @@ import {
 import { saudiDateKey } from '@/lib/saudiTime'
 import { contractPaidPercent } from '@/lib/installmentsBoard'
 import {
+  formatItemQuantity,
   planDivision,
   vatInsideHalalas,
   INSTALLMENT_VAT_LABEL_KEYS,
@@ -143,6 +146,8 @@ export type InstallmentContractDialogKind =
   /** `targetId`: the row paid first (a first payment, the VAT row). */
   | { kind: 'pay'; amount?: number; targetId?: string }
   | { kind: 'void'; payment: InstallmentPaymentRow }
+  /** 0210: «تسمية القسط». */
+  | { kind: 'row_name'; row: InstallmentScheduleItem }
 
 type ScheduleView = 'open' | 'paid' | 'all'
 
@@ -291,7 +296,7 @@ function InstallmentContractDetailInner({
       </div>
     )
 
-  const { contract, schedule, payments, units, files } = data
+  const { contract, schedule, payments, units, files, items } = data
   const active = contract.status === 'active'
   const cancelled = contract.status === 'cancelled'
   // A posted payment locks the cancellation; the terms are locked by money
@@ -584,6 +589,25 @@ function InstallmentContractDetailInner({
           count={contract.equipment_count}
           max={Math.max(units.length, 1)}
         />
+      ),
+    },
+    {
+      key: 'items',
+      icon: <Package size={16} />,
+      label: t('instItemsTitle'),
+      value: items.length ? (
+        <ul className="space-y-0.5">
+          {items.map((item) => (
+            <li key={item.id} className="flex items-baseline gap-1.5">
+              <span className="min-w-0 break-words">{item.name}</span>
+              <bdi dir="ltr" className="shrink-0 text-muted">
+                × {formatItemQuantity(item.quantity)}
+              </bdi>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        none
       ),
     },
     {
@@ -1071,6 +1095,11 @@ function InstallmentContractDetailInner({
                               '{total}',
                               String(contract.installment_count),
                             )}
+                          {row.note && (
+                            <span className="min-w-0 break-words">
+                              - {row.note}
+                            </span>
+                          )}
                           {row.is_balloon && (
                             <Badge size="sm" tone="info">
                               {t('instBalloonBadge')}
@@ -1079,6 +1108,18 @@ function InstallmentContractDetailInner({
                         </span>
                       }
                       sub={sub}
+                      actions={
+                        canManage && !cancelled ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            icon={<Pencil size={14} aria-hidden="true" />}
+                            onClick={() => open({ kind: 'row_name', row })}
+                          >
+                            {t('instRowNameAction')}
+                          </Button>
+                        ) : undefined
+                      }
                       date={due}
                       late={rowState === 'overdue'}
                       amountLabel={t('instInstallmentAmount')}
@@ -1290,6 +1331,12 @@ function InstallmentContractDetailInner({
             contract={dialog?.kind === 'first_due' ? contract : null}
             onOpenChange={closeDialog}
             onDone={() => done('instToastFirstDueSet')}
+            onStale={refresh}
+          />
+          <SetInstallmentNameDialog
+            row={dialog?.kind === 'row_name' ? dialog.row : null}
+            onOpenChange={closeDialog}
+            onDone={() => done('instRowNameSaved')}
             onStale={refresh}
           />
           <SetPaymentDateDialog
