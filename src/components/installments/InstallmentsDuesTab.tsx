@@ -27,20 +27,17 @@ import {
   financierTone,
   groupDues,
   readDuesFeedView,
-  summarizeContracts,
   type DuesFeedView,
   type DuesGroup,
   type DueTone,
 } from '@/lib/installmentsBoard'
 import {
-  activeContractsWords,
   installmentMonthLabel,
   duesWords,
   payableRowLabel,
   INSTALLMENTS_URL_KEYS,
   type InstallmentDueRow,
   type InstallmentFinancierRow,
-  type InstallmentOverviewRow,
   type InstallmentsUrlState,
 } from '@/lib/installmentsView'
 import { saudiDateKey } from '@/lib/saudiTime'
@@ -86,17 +83,19 @@ const DAY_INK: Record<DueTone, string> = {
  * «الاستحقاقات» of the unified page (owner 2026-11-21, Figma frame «الاقساط /
  * الصفحة الموحدة: الاستحقاقات», design 3 without its top ribbon): the
  * installments in groups — «متاخر», «هذا الاسبوع», «الاسبوع الجاي», then one
- * group a month — each with its count and total, every installment with its
- * day, its contract, its amount and «تسديد»; beside them the remaining on
- * the contracts, «عرض» (غير المسدد / المسدد / الكل) with the financier, and
- * the financiers' shares. «المسدد» is the quick way to the paid ones. The
+ * group a month — each with its count and total, every installment named
+ * first (its number and name) with its contract under it, its day, its
+ * amount and «تسديد»; «عرض» (غير المسدد / المسدد / الكل) and the financier
+ * sit over the list, and the financiers' shares beside it (owner
+ * 2026-11-23: no «المتبقي على العقود», the filters over the list, the
+ * installment's name in the contract's place). «المسدد» is the quick way to
+ * the paid ones. The
  * view and the financier live in the URL; the rows are read in pages of
  * `DUES_FEED_PAGE` («عرض المزيد»).
  */
 export function InstallmentsDuesTab({
   state,
   update,
-  overview,
   financiers,
   version,
   canManage,
@@ -104,7 +103,6 @@ export function InstallmentsDuesTab({
 }: {
   state: InstallmentsUrlState
   update: (values: Record<string, string | number | null>) => void
-  overview: InstallmentOverviewRow
   financiers: readonly InstallmentFinancierRow[]
   version: number
   canManage: boolean
@@ -135,10 +133,6 @@ export function InstallmentsDuesTab({
     () => groupDues(load.data?.rows ?? [], view, today),
     [load.data, view, today],
   )
-  const summary = useMemo(
-    () => (figures.data ? summarizeContracts(figures.data.rows, today) : null),
-    [figures.data, today],
-  )
   const shares = useMemo(
     () => (figures.data ? financierShares(figures.data.rows) : []),
     [figures.data],
@@ -156,8 +150,48 @@ export function InstallmentsDuesTab({
       : month
   }
 
+  const filters = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Tabs
+        value={view}
+        onValueChange={(next) => {
+          setLimit(DUES_FEED_PAGE)
+          update({
+            [INSTALLMENTS_URL_KEYS.duesView]: next === 'open' ? null : next,
+          })
+        }}
+        className="max-w-full"
+      >
+        <TabsList variant="segmented" aria-label={t('instFeedShow')}>
+          {DUES_FEED_VIEWS.map((value) => (
+            <TabsTrigger key={value} value={value}>
+              {t(VIEW_LABEL[value])}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+      <Select
+        aria-label={t('instFinancier')}
+        value={financierId ?? 'all'}
+        onValueChange={(next) => {
+          setLimit(DUES_FEED_PAGE)
+          update({
+            [INSTALLMENTS_URL_KEYS.feedFinancier]:
+              next === 'all' ? null : next,
+          })
+        }}
+        options={[
+          { value: 'all', label: t('instAllFinanciers') },
+          ...financiers.map((row) => ({ value: row.id, label: row.name })),
+        ]}
+        className="w-full sm:w-60"
+      />
+    </div>
+  )
+
   const feed = (
     <div className="min-w-0 space-y-4">
+      {filters}
       {load.status === 'failed' ? (
         <ErrorState
           description={t('instDuesLoadError')}
@@ -232,80 +266,6 @@ export function InstallmentsDuesTab({
   const side = (
     <div className="min-w-0 space-y-3">
       <Card className="space-y-3">
-        <p className="text-xs text-muted">{t('instRemainingOnContracts')}</p>
-        <Money
-          value={overview.remaining_total}
-          className="text-2xl font-bold"
-        />
-        {summary && (
-          <>
-            <div
-              className="h-2 overflow-hidden rounded-full bg-surface-hover"
-              aria-hidden="true"
-            >
-              <div
-                className="h-full rounded-full bg-success"
-                style={{ width: `${summary.paidPercent}%` }}
-              />
-            </div>
-            <p className="flex justify-between gap-2 text-xs">
-              <span className="text-success">
-                {t('instPaidShare').replace(
-                  '{percent}',
-                  String(summary.paidPercent),
-                )}
-              </span>
-              <span className="text-muted">
-                {activeContractsWords(summary.activeCount, lang)}
-              </span>
-            </p>
-          </>
-        )}
-      </Card>
-      <Card className="space-y-3">
-        <h3 className="text-sm font-semibold">{t('instFeedShow')}</h3>
-        <Tabs
-          value={view}
-          onValueChange={(next) => {
-            setLimit(DUES_FEED_PAGE)
-            update({
-              [INSTALLMENTS_URL_KEYS.duesView]: next === 'open' ? null : next,
-            })
-          }}
-        >
-          <TabsList
-            variant="segmented"
-            aria-label={t('instFeedShow')}
-            className="w-full"
-          >
-            {DUES_FEED_VIEWS.map((value) => (
-              <TabsTrigger
-                key={value}
-                value={value}
-                className="flex-1 justify-center"
-              >
-                {t(VIEW_LABEL[value])}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        <Select
-          aria-label={t('instFinancier')}
-          value={financierId ?? 'all'}
-          onValueChange={(next) => {
-            setLimit(DUES_FEED_PAGE)
-            update({
-              [INSTALLMENTS_URL_KEYS.feedFinancier]:
-                next === 'all' ? null : next,
-            })
-          }}
-          options={[
-            { value: 'all', label: t('instAllFinanciers') },
-            ...financiers.map((row) => ({ value: row.id, label: row.name })),
-          ]}
-        />
-      </Card>
-      <Card className="space-y-3">
         <h3 className="text-sm font-semibold">{t('instTabFinanciers')}</h3>
         {figures.status === 'failed' ? (
           <ErrorState
@@ -362,8 +322,9 @@ export function InstallmentsDuesTab({
   )
 }
 
-/** One installment of the feed: its day in its colour, the contract, the
- *  amount with when (or when it was paid) and «تسديد». */
+/** One installment of the feed: its day in its colour, the installment
+ *  (its number and name) with its contract under it, the amount with when
+ *  (or when it was paid) and «تسديد». */
 function FeedRow({
   row,
   canPay,
@@ -398,19 +359,20 @@ function FeedRow({
           {installmentMonthLabel(row.due_date.slice(0, 7), lang, true)}
         </p>
       </div>
-      <div className="min-w-0 flex-1">
+      {/* basis-48: on a phone the amount and «تسديد» wrap under the name. */}
+      <div className="min-w-0 flex-1 basis-48">
         <AppLink
           href={`/installments/${row.contract_id}`}
           className="block truncate-safe text-sm font-semibold hover:underline"
         >
-          {row.description}
-        </AppLink>
-        <p className="text-xs text-muted">
-          <bdi dir="ltr">{row.contract_number}</bdi> · {row.financier_name} ·{' '}
           {payableRowLabel(row, t, row.installment_count)}
+        </AppLink>
+        <p className="truncate-safe text-xs text-muted">{row.description}</p>
+        <p className="text-xs text-muted">
+          <bdi dir="ltr">{row.contract_number}</bdi> · {row.financier_name}
         </p>
       </div>
-      {row.kind !== 'installment' && (
+      {row.kind === 'first_payment' && (
         <Badge size="sm" tone="info">
           {t('instFirstPayment')}
         </Badge>

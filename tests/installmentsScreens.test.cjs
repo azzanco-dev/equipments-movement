@@ -787,6 +787,26 @@ test('the reads are server-side and bounded', () => {
   assert.match(dues, /setLimit\(\(current\) => current \+ DUES_FEED_PAGE\)/)
 })
 
+// Owner 2026-11-23: «شيل المتبقي على العقود, وخلي فلتر الجهة وفلتر … فوق
+// القائمة», «استبدل اسم العقد باسم القسط, وممكن تضيف اسم العقد تحته».
+test('the dues: the filters over the list, the installment named first', () => {
+  const dues = read('src', 'components', 'installments', 'InstallmentsDuesTab.tsx')
+  assert.doesNotMatch(dues, /instRemainingOnContracts|summarizeContracts|overview/)
+  const feed = dues.slice(dues.indexOf('const feed = ('), dues.indexOf('const side = ('))
+  assert.ok(feed.indexOf('{filters}') < feed.indexOf("load.status === 'failed'"))
+  const filters = dues.slice(dues.indexOf('const filters = ('), dues.indexOf('const feed = ('))
+  assert.match(filters, /DUES_FEED_VIEWS\.map/)
+  assert.match(filters, /instAllFinanciers/)
+  const row = dues.slice(dues.indexOf('function FeedRow('))
+  assert.ok(
+    row.indexOf('payableRowLabel(row, t, row.installment_count)') < row.indexOf('{row.description}'),
+  )
+  assert.doesNotMatch(
+    read('src', 'screens', 'installments', 'InstallmentsScreen.tsx'),
+    /<InstallmentsDuesTab[^>]*overview=/,
+  )
+})
+
 test('the contract page: schedule, payments, units and a derived history', () => {
   const page = read(
     'src',

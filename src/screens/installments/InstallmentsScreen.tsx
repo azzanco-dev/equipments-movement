@@ -309,7 +309,6 @@ function InstallmentsScreenInner() {
             <InstallmentsDuesTab
               state={state}
               update={update}
-              overview={data.overview}
               financiers={data.financiers}
               version={version}
               canManage={canManage}
