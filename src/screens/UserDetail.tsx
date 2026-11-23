@@ -165,6 +165,11 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   // permissions load or after a failed load); the page gate and the
   // database (0127) require the same key.
   const canManageUsers = usersActions(permissionState).manage
+  // 0211 (owner 2026-11-23): users.manage may be held by any role. Only the
+  // admin (the one holder of the admin-only `settings.roles`) gives the admin
+  // role or edits an admin's account; the database and the Edge Functions
+  // refuse the rest.
+  const callerIsAdmin = permissionState.can('settings.roles')
   const { roles: activeRoles } = useActiveRoles(true)
   // Roles stage 3 (owner 2026-10-27): «الشركات المسؤول عنها» belongs to every
   // role that records project movements (the admin aside). Until the roles
@@ -191,6 +196,9 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   const systemRoleLoaded =
     systemRole?.userId === userId && systemRole.state === 'loaded'
   const savedAssignedKey = systemRoleLoaded ? (systemRole.roleKey ?? '') : ''
+  // An admin's account is read-only for a user manager who is not the admin.
+  const adminTargetLocked = !callerIsAdmin && savedAssignedKey === 'admin'
+  const canSaveUser = canManageUsers && !adminTargetLocked
   const assignmentChanged =
     systemRoleLoaded &&
     assignedRoleKey !== '' &&
@@ -246,10 +254,12 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   // The active roles; the current assignment stays visible (disabled) when
   // it is inactive or unknown, as on the roles page.
   const assignedRoleOptions = useMemo(() => {
-    const options: UiSelectOption[] = (activeRoles ?? []).map((candidate) => ({
-      value: candidate.key,
-      label: roleName(lang, candidate),
-    }))
+    const options: UiSelectOption[] = (activeRoles ?? [])
+      .filter((candidate) => callerIsAdmin || candidate.key !== 'admin')
+      .map((candidate) => ({
+        value: candidate.key,
+        label: roleName(lang, candidate),
+      }))
     if (
       savedAssignedKey &&
       !options.some((option) => option.value === savedAssignedKey)
@@ -262,7 +272,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
         disabled: true,
       })
     return options
-  }, [activeRoles, lang, savedAssignedKey, systemRole, t])
+  }, [activeRoles, callerIsAdmin, lang, savedAssignedKey, systemRole, t])
 
   const callManageUser = useCallback(
     (body: Record<string, unknown>) =>
@@ -275,6 +285,8 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       if (!(cause instanceof EdgeFunctionError)) return t('userUpdateError')
       if (cause.code === 'network') return t('networkConnectionError')
       if (cause.code === 'sessionExpired') return t('sessionExpiredError')
+      if (cause.serverCode === 'admin_role_admin_only')
+        return t('rolesErrAdminRoleAdminOnly')
       if (cause.code === 'forbidden') return t('userPermissionError')
       if (cause.code === 'notFound') return t('userNotFound')
       if (cause.code === 'server') return t('serverTemporaryError')
@@ -896,6 +908,9 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       </div>
       <div className="card space-y-4">
         <SectionHeader title={t('editUser')} />
+        {adminTargetLocked && canManageUsers && (
+          <Notice tone="info">{t('userAdminTargetLocked')}</Notice>
+        )}
         {error && <Notice tone="danger">{error}</Notice>}
         {mobileNotSaved && (
           <Notice tone="warning">{t('userSavedMobileFailed')}</Notice>
@@ -1083,7 +1098,7 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           <Button variant="outline" onClick={handleBack}>
             {t('cancel')}
           </Button>
-          {canManageUsers && (
+          {canSaveUser && (
             <Button
               variant="primary"
               loading={saving}

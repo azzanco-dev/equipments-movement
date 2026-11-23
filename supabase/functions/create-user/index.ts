@@ -117,6 +117,26 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    // 0211 (owner 2026-11-23): users.manage may be held by any role, but only
+    // the admin creates an admin (the assignment refuses it too, after the
+    // account would already exist).
+    if (roleKey === 'admin') {
+      const { data: callerIsAdmin, error: adminError } =
+        await userClient.rpc('is_admin')
+      if (adminError || callerIsAdmin !== true) {
+        return new Response(
+          JSON.stringify({
+            error: 'Only an administrator may create an admin',
+            code: 'admin_role_admin_only',
+          }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          },
+        )
+      }
+    }
+
     // Use service role client to create the new user
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
 

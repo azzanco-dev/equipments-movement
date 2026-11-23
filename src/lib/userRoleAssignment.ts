@@ -82,8 +82,10 @@ export function assignedRoleFromEmbed(value: unknown): AssignedRole | null {
  * user form; every other failure is a form-level message.
  */
 export const ASSIGN_ROLE_FIELD_CODES: ReadonlySet<string> = new Set([
+  'admin_role_admin_only',
   'admin_role_mismatch',
   'cannot_change_own_admin',
+  'cannot_change_own_role',
   'last_admin',
   'role_inactive',
   'role_not_found',

@@ -142,6 +142,30 @@ Deno.serve(async (req: Request) => {
       if (targetError || !targetProfile)
         return json({ error: 'User not found' }, 404)
 
+      // 0211 (owner 2026-11-23): users.manage may be held by any role, but
+      // only the admin changes an admin's login details (email, password),
+      // so the permission cannot be used to take over an admin account.
+      const { data: targetAdminRow, error: targetRoleError } = await adminClient
+        .from('profile_roles')
+        .select('role_key')
+        .eq('profile_id', userId)
+        .eq('role_key', 'admin')
+        .maybeSingle()
+      if (targetRoleError)
+        return json({ error: 'Could not check the user role' }, 500)
+      if (targetAdminRow) {
+        const { data: callerIsAdmin, error: adminError } =
+          await userClient.rpc('is_admin')
+        if (adminError || callerIsAdmin !== true)
+          return json(
+            {
+              error: 'Only an administrator may edit an admin',
+              code: 'admin_role_admin_only',
+            },
+            403,
+          )
+      }
+
       const authAttributes: {
         email: string
         password?: string

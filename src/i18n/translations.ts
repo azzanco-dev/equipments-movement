@@ -1227,6 +1227,10 @@ export const translations = {
     rolesErrAdminMismatch:
       'دور الادمن يعين فقط لمن دوره الحالي ادمن، ومن دوره الحالي ادمن يبقى عليه. غيّر الدور الحالي من صفحة المستخدم اولا',
     rolesErrLastAdmin: 'يجب ان يبقى مدير نظام واحد على الاقل',
+    // 0211: users.manage held by a role that is not the admin.
+    rolesErrAdminRoleAdminOnly: 'دور الادمن وحسابات الادمن يعدلها الادمن فقط',
+    rolesErrCannotChangeOwnRole: 'لا يمكنك تغيير دور حسابك بنفسك',
+    userAdminTargetLocked: 'هذا حساب ادمن، ويعدله الادمن فقط.',
     rolesErrGeneric: 'تعذر تنفيذ العملية، حاول مرة اخرى',
     permissionGroupHome: 'اللوحات',
     permissionGroupMovements: 'الحركات',
@@ -4858,6 +4862,10 @@ export const translations = {
     rolesErrAdminMismatch:
       'The admin role goes only to users whose current role is admin, and they keep it. Change the current role on the user page first',
     rolesErrLastAdmin: 'At least one admin is required',
+    // 0211: users.manage held by a role that is not the admin.
+    rolesErrAdminRoleAdminOnly: 'Only an admin can give the admin role or edit an admin account',
+    rolesErrCannotChangeOwnRole: 'You cannot change the role of your own account',
+    userAdminTargetLocked: 'This is an admin account; only an admin can edit it.',
     rolesErrGeneric: 'The operation failed; try again',
     permissionGroupHome: 'Home pages',
     permissionGroupMovements: 'Movements',

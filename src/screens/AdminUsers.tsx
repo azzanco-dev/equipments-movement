@@ -85,6 +85,9 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   // while the permissions load or after a failed load); the page gate and
   // the database (0127) require the same key.
   const canManageUsers = usersActions(permissionState).manage
+  // 0211 (owner 2026-11-23): users.manage may be held by any role; only the
+  // admin (the one holder of `settings.roles`) creates an admin.
+  const callerIsAdmin = permissionState.can('settings.roles')
   const { roles: activeRoles } = useActiveRoles(true)
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -181,15 +184,17 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
   // load, or when they could not be read, the six original roles (their
   // values are role keys too) keep the dialog usable; create-user checks
   // that the chosen role exists and is active.
-  const roleOptions = activeRoles
-    ? activeRoles.map((role) => ({
-        value: role.key,
-        label: roleName(lang, role),
-      }))
-    : USER_ROLES.map((value) => ({
-        value,
-        label: t(roleBadge(value).key),
-      }))
+  const roleOptions = (
+    activeRoles
+      ? activeRoles.map((role) => ({
+          value: role.key,
+          label: roleName(lang, role),
+        }))
+      : USER_ROLES.map((value) => ({
+          value,
+          label: t(roleBadge(value).key),
+        }))
+  ).filter((option) => callerIsAdmin || option.value !== 'admin')
 
   // The role filter: the active roles (runtime labels in the active
   // language) once read, the six original roles until then.
@@ -351,7 +356,10 @@ export function AdminUsers({ onSelectUser }: AdminUsersProps) {
       key: 'actions',
       header: t('actions'),
       cell: (row) =>
-        row.id === currentUser?.id || !canManageUsers ? null : (
+        row.id === currentUser?.id ||
+        !canManageUsers ||
+        // 0211: an admin's account is deleted by the admin only.
+        (!callerIsAdmin && row.assignedRole?.key === 'admin') ? null : (
           <IconButton
             size="sm"
             label={t('delete')}

@@ -140,8 +140,11 @@ test('assignedRoleFromEmbed accepts an object, a one-element array and a missing
 
 test('the assign codes that belong under the role field', () => {
   assert.deepEqual([...lib.ASSIGN_ROLE_FIELD_CODES].sort(), [
+    // 0211: a user manager who is not the admin.
+    'admin_role_admin_only',
     'admin_role_mismatch',
     'cannot_change_own_admin',
+    'cannot_change_own_role',
     'last_admin',
     'role_inactive',
     'role_not_found',
@@ -234,7 +237,7 @@ test('the users list reads the assignment and filters by it', () => {
   assert.match(list, /if \(createdUserId\) return/)
   assert.match(list, /\{t\('userOpenPage'\)\}/)
   // One select: the active roles, the six original keys until they load.
-  assert.match(list, /const roleOptions = activeRoles\s+\?/)
+  assert.match(list, /const roleOptions = \(\s+activeRoles\s+\?/)
   assert.match(list, /: USER_ROLES\.map\(\(value\) => \(\{/)
   assert.match(
     list,
