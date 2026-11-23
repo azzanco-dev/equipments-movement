@@ -108,8 +108,7 @@ export function ContractPaymentTable({
 
   const cancelled = contract.status === 'cancelled'
   const active = contract.status === 'active'
-  const view: PaymentTableView =
-    chosenView ?? (contract.status === 'paid_off' ? 'all' : 'open')
+  const view: PaymentTableView = chosenView ?? 'all'
   const bySeq = (a: InstallmentScheduleItem, b: InstallmentScheduleItem) =>
     a.seq - b.seq
   const firstPayments = schedule
@@ -122,10 +121,15 @@ export function ContractPaymentTable({
     contract.vat_mode === 'separate'
       ? (schedule.find((row) => row.kind === 'vat') ?? null)
       : null
-  const waiting = active && !contract.first_due_date && installments.length === 0
+  const waiting =
+    active && !contract.first_due_date && installments.length === 0
 
   const inView = (row: InstallmentScheduleItem) =>
-    view === 'all' ? true : view === 'paid' ? isSchedulePaid(row) : !isSchedulePaid(row)
+    view === 'all'
+      ? true
+      : view === 'paid'
+        ? isSchedulePaid(row)
+        : !isSchedulePaid(row)
   const ordered = (rows: InstallmentScheduleItem[]) =>
     direction === 'asc' ? rows : [...rows].reverse()
 
@@ -180,9 +184,12 @@ export function ContractPaymentTable({
       rows: [vatRow],
     })
 
-  const allRows = [...firstPayments, ...installments, ...(vatRow ? [vatRow] : [])]
-  const totalCount =
-    allRows.length + (waiting ? contract.installment_count : 0)
+  const allRows = [
+    ...firstPayments,
+    ...installments,
+    ...(vatRow ? [vatRow] : []),
+  ]
+  const totalCount = allRows.length + (waiting ? contract.installment_count : 0)
   const paidCount = allRows.filter(isSchedulePaid).length
   const lateCount = active
     ? allRows.filter(
@@ -214,10 +221,16 @@ export function ContractPaymentTable({
                   setShowAll(false)
                 }}
               >
-                <TabsList variant="segmented" aria-label={t('instPayTableTitle')}>
-                  <TabsTrigger value="open">{t('instScheduleOpen')}</TabsTrigger>
-                  <TabsTrigger value="paid">{t('instStatePaid')}</TabsTrigger>
+                <TabsList
+                  variant="segmented"
+                  aria-label={t('instPayTableTitle')}
+                >
+                  {/* «الكل» first and by default (owner 2026-11-23). */}
                   <TabsTrigger value="all">{t('instScheduleAll')}</TabsTrigger>
+                  <TabsTrigger value="open">
+                    {t('instScheduleOpen')}
+                  </TabsTrigger>
+                  <TabsTrigger value="paid">{t('instStatePaid')}</TabsTrigger>
                 </TabsList>
               </Tabs>
               <IconButton
@@ -236,7 +249,9 @@ export function ContractPaymentTable({
                   )
                 }
                 onClick={() =>
-                  setDirection((current) => (current === 'asc' ? 'desc' : 'asc'))
+                  setDirection((current) =>
+                    current === 'asc' ? 'desc' : 'asc',
+                  )
                 }
               />
             </div>
@@ -270,7 +285,10 @@ export function ContractPaymentTable({
               />
             </div>
             <span className="flex items-center gap-1">
-              <Money value={contract.paid_overall} className="font-medium text-fg" />
+              <Money
+                value={contract.paid_overall}
+                className="font-medium text-fg"
+              />
               {t('instPayTableOf')}
               <Money value={contract.payable_total} />
             </span>
@@ -282,7 +300,9 @@ export function ContractPaymentTable({
         {groups.length === 0 ? (
           <EmptyState
             title={
-              view === 'open' ? t('instPayTableAllPaid') : t('instPayTableNonePaid')
+              view === 'open'
+                ? t('instPayTableAllPaid')
+                : t('instPayTableNonePaid')
             }
             className="p-6"
           />
@@ -403,11 +423,17 @@ function rowSub(
   const vatParts =
     contract.vat_mode === 'inside'
       ? [
-          t('instBeforeVat').replace('{amount}', money(fromHalalas(halalas - inside))),
+          t('instBeforeVat').replace(
+            '{amount}',
+            money(fromHalalas(halalas - inside)),
+          ),
           t('instVatPart').replace('{amount}', money(fromHalalas(inside))),
         ]
       : []
-  const beforeVat = sumAmounts([contract.total_amount, -amountOf(contract.vat_amount)])
+  const beforeVat = sumAmounts([
+    contract.total_amount,
+    -amountOf(contract.vat_amount),
+  ])
   if (row.kind === 'first_payment') {
     const rated = row.rate !== null && row.rate !== undefined
     const kind = rated
@@ -415,7 +441,10 @@ function rowSub(
         ? t('instRateOfBase')
             .replace('{rate}', String(amountOf(row.rate)))
             .replace('{amount}', money(beforeVat))
-        : t('instFpRateOfContract').replace('{rate}', String(amountOf(row.rate)))
+        : t('instFpRateOfContract').replace(
+            '{rate}',
+            String(amountOf(row.rate)),
+          )
       : t('instFpKindAmount')
     return [[kind, ...vatParts].join(' · '), ...(row.note ? [row.note] : [])]
   }
@@ -466,10 +495,17 @@ function PaymentRow({
   const days = date ? daysUntilDue(date, today) : null
   const late = running && !paid && days !== null && days < 0
   const state = date
-    ? installmentState(date, amountOf(row.amount), amountOf(row.paid_amount), today)
+    ? installmentState(
+        date,
+        amountOf(row.amount),
+        amountOf(row.paid_amount),
+        today,
+      )
     : null
   const withLast =
-    row.kind === 'vat' && contract.vat_due === 'last' && (days === null || days >= 0)
+    row.kind === 'vat' &&
+    contract.vat_due === 'last' &&
+    (days === null || days >= 0)
   const title =
     row.kind === 'installment'
       ? t('instInstallmentN').replace('{seq}', String(row.seq))

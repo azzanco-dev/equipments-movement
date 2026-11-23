@@ -134,3 +134,11 @@ test('the contract page is tighter: small figures, dense facts, compact files', 
   assert.match(files, /size=\{file\.size_bytes\}\n\s+compact\n/)
   assert.match(TABLE, /text-\[13px\]/)
 })
+
+// «التاب الافتراضي (الكل) وخليه يمين اول واحد».
+test('«الكل» is the first tab and the default view', () => {
+  assert.match(TABLE, /const view: PaymentTableView = chosenView \?\? 'all'/)
+  const all = TABLE.indexOf('<TabsTrigger value="all">')
+  assert.ok(all > 0 && all < TABLE.indexOf('<TabsTrigger value="open">'))
+  assert.ok(TABLE.indexOf('<TabsTrigger value="open">') < TABLE.indexOf('<TabsTrigger value="paid">'))
+})
