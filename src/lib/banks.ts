@@ -26,9 +26,43 @@ export const BANK_DATABASE_RULES: readonly DatabaseFieldRule<BankFormValues>[] =
     { on: 'check', match: 'banks_name', field: 'name', key: 'bankRequired' },
   ]
 
-/** A delete refused by the foreign key of `lessors.bank_name` (23503). */
+/** A delete refused by a foreign key to `banks.name` (23503): a supplier
+ *  (`lessors`, 0177), a financier or a contract with its own account
+ *  (`installment_financiers` / `installment_contracts`, 0208). */
 export function bankInUse(error: { code?: string } | null | undefined) {
   return error?.code === '23503'
+}
+
+/**
+ * Settings › «البنوك» as wide tiles (owner 2026-11-23, approved in Figma):
+ * the tile shows no counts, but a bank in use has «حذف» locked with its
+ * reason. Its use is read with the bank, each count only where the reader
+ * may read it: the suppliers always (the page needs `lessors.edit`), the
+ * financiers and the contracts with their own account only with
+ * `installments.view` (RLS would answer 0 anyway; the read is skipped).
+ * The foreign keys refuse the delete of a used bank in every case.
+ */
+export function banksSelect(withInstallments: boolean) {
+  return withInstallments
+    ? 'id,name,lessors(count),installment_financiers(count),installment_contracts(count)'
+    : 'id,name,lessors(count)'
+}
+
+type CountEmbed = Array<{ count: number }> | null | undefined
+export type BankUsageRow = {
+  lessors?: CountEmbed
+  installment_financiers?: CountEmbed
+  installment_contracts?: CountEmbed
+}
+
+/** Every use of a bank the reader could read. */
+export function bankUsageCount(row: BankUsageRow) {
+  const count = (embed: CountEmbed) => embed?.[0]?.count ?? 0
+  return (
+    count(row.lessors) +
+    count(row.installment_financiers) +
+    count(row.installment_contracts)
+  )
 }
 
 /** The bank selector of the supplier form: server-side search, 20 at most;

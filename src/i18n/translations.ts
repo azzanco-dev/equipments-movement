@@ -844,23 +844,29 @@ export const translations = {
     // foreman assignments — end
     // banks — start (migration 0177: the banks list, Settings › «البنوك»)
     banks: 'البنوك',
-    banksDesc: 'قائمة البنوك التي يختار منها بنك المورد.',
+    banksDesc: 'البنوك التي تختار منها حسابات الموردين والجهات التمويلية.',
     addBank: 'اضافة بنك',
     editBank: 'تعديل بنك',
     bankRequired: 'اكتب اسم البنك',
     duplicateBank: 'يوجد بنك بنفس الاسم',
     bankNotInList: 'البنك غير موجود في قائمة البنوك',
-    bankInUse: 'لا يمكن حذف البنك لانه مستخدم لموردين.',
+    bankInUse: 'لا يمكن حذف البنك لانه مستخدم.',
     banksLoadError: 'تعذر تحميل البنوك. حاول مرة اخرى.',
     noBanks: 'لا توجد بنوك',
     searchBanks: 'البحث باسم البنك',
     bankNameLabel: 'اسم البنك',
     bankPlaceholder: 'مثال: بنك الرياض',
-    linkedLessorsCount: 'الموردون المرتبطون',
-    confirmDeleteBank: 'حذف البنك؟',
+    confirmDeleteBankNamed: 'حذف {name}؟',
     dialogDescBankDelete: 'سيحذف البنك من القائمة نهائيا.',
-    dialogDescBankForm: 'تغيير الاسم يغيره عند كل الموردين المرتبطين.',
     bankSaveNotAllowed: 'لا تملك صلاحية تعديل البنوك.',
+    // the tiles (owner 2026-11-23, approved in Figma)
+    bankOptions: 'خيارات {name}',
+    bankUsedCannotDelete: 'البنك مستخدم ولا يمكن حذفه',
+    bankRenameNotice:
+      'الاسم الجديد يتغير عند كل مورد وجهة تمويلية وعقد يستخدم هذا البنك.',
+    bankRenameLogoWarning:
+      'الشعار مربوط بالاسم، فاذا غيرته تظهر الحروف الاولى بدل الشعار.',
+    bankNewInitialsHint: 'البنك الجديد يظهر بحروفه الاولى.',
     // banks — end
 
     // Users management
@@ -4455,23 +4461,29 @@ export const translations = {
     // foreman assignments — end
     // banks — start (migration 0177: the banks list, Settings › «البنوك»)
     banks: 'Banks',
-    banksDesc: "The banks a supplier's bank is chosen from.",
+    banksDesc: 'The banks the accounts of suppliers and financiers are chosen from.',
     addBank: 'Add bank',
     editBank: 'Edit bank',
     bankRequired: 'Enter the bank name.',
     duplicateBank: 'A bank with this name already exists.',
     bankNotInList: 'The bank is not in the banks list.',
-    bankInUse: 'The bank cannot be deleted because suppliers use it.',
+    bankInUse: 'The bank cannot be deleted because it is in use.',
     banksLoadError: 'Could not load the banks. Try again.',
     noBanks: 'No banks',
     searchBanks: 'Search by bank name',
     bankNameLabel: 'Bank name',
     bankPlaceholder: 'e.g. Riyad Bank',
-    linkedLessorsCount: 'Linked suppliers',
-    confirmDeleteBank: 'Delete the bank?',
+    confirmDeleteBankNamed: 'Delete {name}?',
     dialogDescBankDelete: 'The bank will be removed from the list permanently.',
-    dialogDescBankForm: 'Renaming it renames it on every linked supplier.',
     bankSaveNotAllowed: 'You are not allowed to edit the banks.',
+    // the tiles (owner 2026-11-23, approved in Figma)
+    bankOptions: 'Options for {name}',
+    bankUsedCannotDelete: 'The bank is in use and cannot be deleted',
+    bankRenameNotice:
+      'The new name applies to every supplier, financier and contract that uses this bank.',
+    bankRenameLogoWarning:
+      'The logo is tied to the name: renaming the bank shows its initials instead.',
+    bankNewInitialsHint: 'A new bank shows its initials.',
     // banks — end
 
     addUser: 'Add User',

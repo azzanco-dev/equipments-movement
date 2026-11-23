@@ -1,23 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Edit2, Landmark, Plus, Trash2 } from 'lucide-react'
+import { Landmark, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   Button,
-  DataTable,
   Dialog,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   EmptyState,
   ErrorState,
   Field,
   IconButton,
   Input,
   SearchInput,
+  Skeleton,
   useConfirm,
 } from '@/components/ui'
-import type { DataTableColumn } from '@/components/ui'
 import { Notice } from '@/components/ui/Notice'
 import { DataListPagination } from '@/components/data-list/DataListPagination'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { useUrlSearchPage } from '@/components/data-list/useUrlSearchPage'
-import { RelativeTime } from '@/components/RelativeTime'
 import { BankLogo } from '@/components/banks/BankLogo'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { useI18n } from '@/i18n/I18nContext'
@@ -26,8 +28,12 @@ import {
   BANK_DATABASE_RULES,
   BANK_FIELD_ORDER,
   bankInUse,
+  bankUsageCount,
+  banksSelect,
   type BankFormValues,
+  type BankUsageRow,
 } from '@/lib/banks'
+import { bankLogoOf } from '@/lib/bankLogos'
 import {
   bankFormSchema,
   focusFirstError,
@@ -42,27 +48,27 @@ import { supabase } from '@/lib/supabase'
 type BankRow = {
   id: string
   name: string
-  lessor_count: number
-  updated_at: string
+  /** Every use the reader could read (suppliers, financiers, contracts). */
+  usage: number
 }
-type BankQueryRow = {
-  id: string
-  name: string
-  updated_at: string
-  lessors: Array<{ count: number }>
-}
+type BankQueryRow = BankUsageRow & { id: string; name: string }
 const PAGE_SIZE = 20
 
 /**
- * Settings › «البنوك» (migration 0177, owner 2026-11-05): the banks list the
- * supplier's bank is picked from. Server-side search and paging, the count
- * of suppliers on each bank, add / rename / delete for `lessors.edit` (the
- * row policies re-check it and every write reads its row back). Renaming
- * cascades to the suppliers; a bank in use cannot be deleted.
+ * Settings › «البنوك» (migration 0177, owner 2026-11-05; redrawn as wide
+ * tiles on 2026-11-23, approved in Figma): the banks list the supplier's and
+ * the financier's bank is picked from. Server-side search and paging; each
+ * bank a tile with its logo and name and, for `lessors.edit`, a «...» menu
+ * with «تعديل» and «حذف» (the row policies re-check it and every write reads
+ * its row back). A bank in use has «حذف» locked with its reason (`banksSelect`
+ * reads the use the reader may see); the foreign keys refuse it anyway.
+ * Renaming cascades to every supplier, financier and contract.
  */
 export function BanksSettings() {
   const { t } = useI18n()
-  const canEdit = lessorsActions(usePermissions()).edit
+  const permissions = usePermissions()
+  const canEdit = lessorsActions(permissions).edit
+  const withInstallments = permissions.can('installments.view')
   const [rows, setRows] = useState<BankRow[]>([])
   const [total, setTotal] = useState(0)
   // `q` and `page` live in the URL (EM-121), so Back and reload restore them.
@@ -87,7 +93,7 @@ export function BanksSettings() {
     setLoadError(null)
     let query = supabase
       .from('banks')
-      .select('id,name,updated_at,lessors(count)', { count: 'exact' })
+      .select(banksSelect(withInstallments), { count: 'exact' })
       .order('name')
       .order('id')
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
@@ -97,16 +103,15 @@ export function BanksSettings() {
     if (signal.aborted) return
     if (fetchError) setLoadError(t('banksLoadError'))
     setRows(
-      ((data as BankQueryRow[] | null) ?? []).map((row) => ({
+      ((data as unknown as BankQueryRow[] | null) ?? []).map((row) => ({
         id: row.id,
         name: row.name,
-        lessor_count: row.lessors[0]?.count ?? 0,
-        updated_at: row.updated_at,
+        usage: bankUsageCount(row),
       })),
     )
     setTotal(count ?? 0)
     setLoading(false)
-  }, [page, search, startRequest, t])
+  }, [page, search, startRequest, t, withInstallments])
 
   useEffect(() => {
     fetchRows()
@@ -163,7 +168,7 @@ export function BanksSettings() {
     setError(null)
     if (
       !(await confirm({
-        title: t('confirmDeleteBank'),
+        title: t('confirmDeleteBankNamed').replace('{name}', row.name),
         description: t('dialogDescBankDelete'),
         tone: 'danger',
       }))
@@ -176,6 +181,7 @@ export function BanksSettings() {
       .select('id')
     if (bankInUse(result.error)) {
       setError(t('bankInUse'))
+      await fetchRows()
       return
     }
     if (refusedByPolicy(result.error, result.data)) {
@@ -189,57 +195,6 @@ export function BanksSettings() {
     await fetchRows()
   }
 
-  const columns: DataTableColumn<BankRow>[] = [
-    {
-      key: 'name',
-      header: t('bankNameLabel'),
-      className: 'font-semibold',
-      cell: (row) => (
-        <span className="flex items-center gap-2">
-          <BankLogo name={row.name} size="sm" />
-          {row.name}
-        </span>
-      ),
-    },
-    {
-      key: 'lessor_count',
-      header: t('linkedLessorsCount'),
-      cell: (row) => row.lessor_count,
-    },
-    ...(canEdit
-      ? [
-          {
-            key: 'actions',
-            header: t('actions'),
-            cell: (row: BankRow) => (
-              <span className="flex items-center gap-1">
-                <IconButton
-                  size="sm"
-                  label={t('edit')}
-                  title={t('edit')}
-                  icon={<Edit2 size={15} />}
-                  onClick={() => openForm(row)}
-                />
-                <IconButton
-                  size="sm"
-                  label={t('delete')}
-                  title={t('delete')}
-                  icon={<Trash2 size={15} />}
-                  onClick={() => remove(row)}
-                />
-              </span>
-            ),
-          },
-        ]
-      : []),
-    {
-      key: 'updated_at',
-      header: t('updatedAt'),
-      className: 'text-muted',
-      cell: (row) => <RelativeTime value={row.updated_at} />,
-    },
-  ]
-
   const addButton = canEdit && (
     <Button
       variant="primary"
@@ -249,6 +204,11 @@ export function BanksSettings() {
       {t('addBank')}
     </Button>
   )
+
+  // The dialog's logo follows the typed name: renaming a bank that has a
+  // logo shows its initials, which the warning explains.
+  const typedName = name.trim()
+  const editingHasLogo = Boolean(editing && bankLogoOf(editing.name))
 
   return (
     <div className="space-y-3">
@@ -264,25 +224,55 @@ export function BanksSettings() {
       {error && <Notice tone="danger">{error}</Notice>}
       {loadError ? (
         <ErrorState description={loadError} onRetry={fetchRows} />
-      ) : !loading && rows.length === 0 ? (
+      ) : loading && rows.length === 0 ? (
+        <ul
+          aria-busy="true"
+          aria-label={t('banks')}
+          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        >
+          {Array.from({ length: 8 }, (_, index) => (
+            <li
+              key={index}
+              className="flex items-center gap-3 rounded-xl border bg-bg p-3"
+            >
+              <Skeleton className="h-9 w-16" />
+              <Skeleton variant="text" className="w-28" />
+            </li>
+          ))}
+        </ul>
+      ) : rows.length === 0 ? (
         <EmptyState
           icon={<Landmark size={28} aria-hidden="true" />}
           title={t('noBanks')}
           action={addButton || undefined}
         />
       ) : (
-        <DataTable
-          columns={columns}
-          rows={rows}
-          rowKey={(row) => row.id}
-          loading={loading}
-          loadingRows={6}
-          size="md"
-          caption={t('banks')}
-          empty={t('noBanks')}
-        />
+        <ul
+          aria-label={t('banks')}
+          aria-busy={loading || undefined}
+          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        >
+          {rows.map((row) => (
+            <li
+              key={row.id}
+              className="flex min-h-[62px] items-center gap-3 rounded-xl border bg-bg p-3"
+            >
+              <BankLogo name={row.name} />
+              <span className="min-w-0 flex-1 text-sm font-semibold">
+                {row.name}
+              </span>
+              {canEdit && (
+                <BankOptionsMenu
+                  row={row}
+                  onEdit={() => openForm(row)}
+                  onDelete={() => remove(row)}
+                />
+              )}
+            </li>
+          ))}
+        </ul>
       )}
-      {!loadError && total > 0 && (
+      {!loadError && total > PAGE_SIZE && (
         <DataListPagination
           page={page}
           pageSize={PAGE_SIZE}
@@ -294,7 +284,6 @@ export function BanksSettings() {
         open={modalOpen}
         onOpenChange={setModalOpen}
         title={editing ? t('editBank') : t('addBank')}
-        description={t('dialogDescBankForm')}
         size="sm"
         footer={
           <>
@@ -313,11 +302,19 @@ export function BanksSettings() {
               {formError}
             </Notice>
           )}
+          <div className="flex justify-start">
+            <BankLogo name={typedName || editing?.name || ''} size="lg" />
+          </div>
           <Field
             label={t('bankNameLabel')}
             name="name"
             required
             error={nameErrors.name && t(nameErrors.name)}
+            hint={
+              !editing && typedName && !bankLogoOf(typedName)
+                ? t('bankNewInitialsHint')
+                : undefined
+            }
           >
             {(control) => (
               <Input
@@ -331,9 +328,68 @@ export function BanksSettings() {
               />
             )}
           </Field>
+          {editing && (
+            <Notice tone="info" size="compact">
+              {t('bankRenameNotice')}
+            </Notice>
+          )}
+          {editingHasLogo && (
+            <Notice tone="warning" size="compact">
+              {t('bankRenameLogoWarning')}
+            </Notice>
+          )}
         </div>
       </Dialog>
       {confirmDialog}
     </div>
+  )
+}
+
+/** The tile's «...»: «تعديل», and «حذف» locked with its reason while the
+ *  bank is in use. */
+function BankOptionsMenu({
+  row,
+  onEdit,
+  onDelete,
+}: {
+  row: BankRow
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const { t } = useI18n()
+  const used = row.usage > 0
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <IconButton
+          size="sm"
+          label={t('bankOptions').replace('{name}', row.name)}
+          icon={<MoreHorizontal size={16} aria-hidden="true" />}
+          className="text-muted"
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuItem icon={<Pencil size={15} />} onSelect={onEdit}>
+          {t('edit')}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          icon={<Trash2 size={15} />}
+          tone={used ? 'default' : 'danger'}
+          disabled={used}
+          onSelect={onDelete}
+        >
+          {used ? (
+            <span className="flex min-w-0 flex-col">
+              <span>{t('delete')}</span>
+              <span className="max-w-56 whitespace-normal text-xs text-muted">
+                {t('bankUsedCannotDelete')}
+              </span>
+            </span>
+          ) : (
+            t('delete')
+          )}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

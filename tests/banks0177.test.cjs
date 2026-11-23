@@ -91,10 +91,12 @@ test('Settings › «البنوك»: its own page, gated on lessors.edit, writes
   const nav = read('src', 'lib', 'navPermissions.ts')
   assert.match(nav, /'settings\/banks': \[\{ key: 'lessors\.edit' \}\]/)
   const page = read('src', 'components', 'banks', 'BanksSettings.tsx')
-  assert.match(page, /select\('id,name,updated_at,lessors\(count\)', \{ count: 'exact' \}\)/)
+  // Since 2026-11-23 the page reads the use through `banksSelect`
+  // (tests/banksTiles.test.cjs).
+  assert.match(page, /select\(banksSelect\(withInstallments\), \{ count: 'exact' \}\)/)
   assert.match(page, /\.range\(/)
   assert.match(page, /buildSearchFilter\(NAME_SEARCH_FIELDS, search\)/)
-  assert.match(page, /lessorsActions\(usePermissions\(\)\)\.edit/)
+  assert.match(page, /const permissions = usePermissions\(\)\s+const canEdit = lessorsActions\(permissions\)\.edit/)
   assert.equal(page.match(/\.select\('id'\)/g)?.length, 3)
   assert.match(page, /bankInUse\(result\.error\)/)
   assert.match(page, /<ErrorState description=\{loadError\} onRetry=\{fetchRows\} \/>/)
