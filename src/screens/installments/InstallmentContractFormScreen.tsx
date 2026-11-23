@@ -658,11 +658,14 @@ function ContractForm({
                 'total_amount',
                 t('instContractTotal'),
               )}
-              {amountField(
-                'down_payment',
-                <OptionalLabel text={t('instDownPayment')} />,
-                t('instDownPaymentHint'),
-              )}
+              {/* «مدفوع قبل التسجيل» is gone from the form (owner
+                  2026-11-23): a first payment marked paid takes its place.
+                  An older contract that carries one still shows it. */}
+              {(contract?.down_payment ?? 0) > 0 &&
+                amountField(
+                  'down_payment',
+                  <OptionalLabel text={t('instDownPayment')} />,
+                )}
             </div>
             <Group
               name="vat_mode"
@@ -842,7 +845,6 @@ function ContractForm({
               {amountField(
                 'balloon_amount',
                 <OptionalLabel text={t('instBalloon')} />,
-                t('instFinalHint'),
               )}
             </div>
             {!values.first_due_date && (
@@ -983,10 +985,7 @@ function ContractForm({
         </div>
 
         <Card className="sticky top-20 hidden max-h-[calc(100dvh-6rem)] space-y-3 overflow-y-auto p-4 xl:block">
-          <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-sm font-semibold">{t('instCalcTitle')}</h2>
-            <span className="text-xs text-muted">{t('instCalcLive')}</span>
-          </div>
+          <h2 className="text-sm font-semibold">{t('instCalcTitle')}</h2>
           <InstallmentPlanSummary values={values} vatSettled={vatSettled} />
         </Card>
       </div>

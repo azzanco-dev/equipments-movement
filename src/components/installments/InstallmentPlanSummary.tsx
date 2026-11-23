@@ -34,13 +34,13 @@ function Line({
   amount: number
 }) {
   return (
-    <li className="flex items-start justify-between gap-3 py-2.5">
+    <li className="flex items-start justify-between gap-3 py-2">
       <div className="min-w-0">
         <p className="flex flex-wrap items-center gap-x-1.5 text-sm font-semibold">
           <span className="min-w-0 break-words">{title}</span>
           {state}
         </p>
-        {sub && <p className="text-xs text-muted">{sub}</p>}
+        {sub && <p className="mt-0.5 text-xs text-muted">{sub}</p>}
       </div>
       <Money value={amount} className="text-sm font-bold" />
     </li>
@@ -101,19 +101,34 @@ export function InstallmentPlanSummary({
   const last = plan.rows[plan.rows.length - 1]
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {/* The total first, then what of it is before the VAT and the VAT,
+          each on its own line (owner 2026-11-23). */}
       <div className="rounded-xl bg-surface p-3">
         <p className="text-xs text-muted">
           {t(unspecified ? 'instContractTotal' : 'instCalcTotal')}
         </p>
-        <Money value={plan.total} className="text-2xl font-bold" />
+        <div className="mt-0.5">
+          <Money value={plan.total} className="text-2xl font-bold" />
+        </div>
         {plan.vat > 0 && (
-          <p className="text-xs text-muted">
-            {split(plan.beforeVat, plan.vat)}
-          </p>
+          <dl className="mt-3 space-y-1.5 border-t pt-3 text-xs">
+            <div className="flex items-center justify-between gap-2">
+              <dt className="text-muted">{t('instBeforeVatLabel')}</dt>
+              <dd>
+                <Money value={plan.beforeVat} className="font-semibold" />
+              </dd>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <dt className="text-muted">{t('instCalcVatLine')}</dt>
+              <dd>
+                <Money value={plan.vat} className="font-semibold" />
+              </dd>
+            </div>
+          </dl>
         )}
       </div>
-      <ul className="divide-y">
+      <ul className="divide-y border-y">
         {plan.prepaid > 0 && (
           <Line title={t('instDownPayment')} amount={plan.prepaid} />
         )}
