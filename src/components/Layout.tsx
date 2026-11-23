@@ -67,12 +67,18 @@ function NavControl({
 
 type NavItem = LayoutProps['navItems'][number]
 
+/** The labels of the items that are not selected: lighter than the text
+ *  colour (owner «لون النص خليه خفيف مش اسود كاتم», 2026-11-23). */
+const SOFT_TEXT = 'text-[color-mix(in_srgb,var(--fg)_72%,var(--bg))]'
+
 /**
  * The sidebar's sections (owner 2026-11-23, model 1 approved in Figma): the
  * items under small headings («الرئيسية», «البيانات», «المالية», «الادارة»,
- * `groupNavItems`), 44 high with px-16 (owner «زيد البادنق», «وزيدها اكثر»; 36, then 40 with px-14); the open page black (the primary fill, owner
- * «خلي الاختيار اسود»; a light fill with a black bar at first); a section's
- * pages under it when it is open. The desktop sidebar and the phone drawer share it.
+ * `groupNavItems`), 40 high with px-14 (owner «ورجع البادنق 40»; it went 36, 40, 44, then back); the open page — and a section whose page is
+ * open — on the light hover fill with its label semibold (owner, with a
+ * picture: «لون الخلفية لما يكون مختار نفسه»; it was black for an hour);
+ * the other labels in a lighter text colour; a section's pages under it as
+ * a small tree («خلي القائمة الفرعية نفس هذا»). The desktop sidebar and the phone drawer share it.
  */
 function SidebarNav({
   items,
@@ -107,6 +113,9 @@ function SidebarNav({
             )
             const open = expanded[item.key] ?? hasActiveChild
             const active = activePage === item.key
+            // A section whose page is open shows as selected too (the
+            // owner's picture of 2026-11-23).
+            const selected = active || hasActiveChild
             return (
               <div key={item.key}>
                 <NavControl
@@ -117,14 +126,14 @@ function SidebarNav({
                     item.children ? onToggle(item.key, !open) : onOpen(item.key)
                   }
                   className={cn(
-                    'flex h-11 w-full items-center gap-3 rounded-lg px-4 text-sm transition-colors duration-150 active:scale-[0.98] active:opacity-80',
-                    active
-                      ? 'bg-primary font-semibold text-primary-contrast'
-                      : 'font-medium text-fg hover:bg-surface-hover',
+                    'flex h-10 w-full items-center gap-3 rounded-lg px-3.5 text-sm transition-colors duration-150 active:scale-[0.98] active:opacity-80',
+                    selected
+                      ? 'bg-surface-hover font-semibold text-fg'
+                      : `font-medium ${SOFT_TEXT} hover:bg-surface-hover`,
                   )}
                 >
                   <span
-                    className={cn('flex shrink-0', !active && 'text-muted')}
+                    className={cn('flex shrink-0', !selected && 'text-muted')}
                   >
                     {item.icon}
                   </span>
@@ -136,25 +145,56 @@ function SidebarNav({
                       size={16}
                       aria-hidden="true"
                       className={cn(
-                        'shrink-0 transition-transform',
-                        !active && 'text-placeholder',
-                        !open && 'ltr:-rotate-90 rtl:rotate-90',
+                        'shrink-0 text-muted transition-transform',
+                        open && 'rotate-180',
                       )}
                     />
                   )}
                 </NavControl>
                 {item.children && open && (
-                  <div className="ms-9 mt-1 space-y-0.5 border-s border-[var(--border)] ps-2">
-                    {item.children.map((child) => (
-                      <NavControl
-                        key={child.key}
-                        href={`/${child.key}`}
-                        className={`block w-full rounded px-2 py-1.5 text-start text-xs ${pathname.startsWith(`/${child.key}`) ? 'font-semibold text-fg' : 'text-muted hover:text-fg'}`}
-                        onActivate={() => onOpenChild(child.key)}
-                      >
-                        {child.label}
-                      </NavControl>
-                    ))}
+                  // A thin line from the section's icon, branching with a
+                  // curve to each page (the owner's picture).
+                  <div className="ms-[22px] mt-0.5">
+                    {item.children.map((child, index) => {
+                      const childActive = pathname.startsWith(`/${child.key}`)
+                      const last = index === item.children!.length - 1
+                      return (
+                        <div key={child.key} className="relative ps-4 pt-0.5">
+                          {!last && (
+                            <span
+                              aria-hidden="true"
+                              className="absolute inset-y-0 start-0 border-s border-[var(--border)]"
+                            />
+                          )}
+                          <span
+                            aria-hidden="true"
+                            className="absolute start-0 top-0 h-5 w-3 rounded-es-lg border-b border-s border-[var(--border)]"
+                          />
+                          <NavControl
+                            href={`/${child.key}`}
+                            aria-current={childActive ? 'page' : undefined}
+                            className={cn(
+                              'flex h-9 w-full items-center gap-2 rounded-lg px-3 text-start text-[13px] transition-colors',
+                              childActive
+                                ? 'bg-surface-hover font-semibold text-fg'
+                                : 'text-muted hover:bg-surface-hover hover:text-fg',
+                            )}
+                            onActivate={() => onOpenChild(child.key)}
+                          >
+                            <span className="min-w-0 flex-1 truncate">
+                              {child.label}
+                            </span>
+                            {childActive && (
+                              <ChevronDown
+                                size={16}
+                                aria-hidden="true"
+                                className="shrink-0 text-muted ltr:-rotate-90 rtl:rotate-90"
+                              />
+                            )}
+                          </NavControl>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>

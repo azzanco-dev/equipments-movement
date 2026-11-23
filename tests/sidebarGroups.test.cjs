@@ -58,19 +58,27 @@ test('the sidebar and the drawer share SidebarNav, with no fold button', () => {
   assert.equal((layout.match(/<SidebarNav\b/g) ?? []).length, 2)
   assert.match(layout, /groupNavItems\(items\)/)
   assert.match(layout, /text-\[11px\] font-medium text-muted/)
-  // The open page black (owner «خلي الاختيار اسود»), no side bar.
-  assert.match(layout, /'bg-primary font-semibold text-primary-contrast'/)
-  assert.doesNotMatch(layout, /w-\[3px\]/)
+  // The selected page and its section on the light fill (the owner's
+  // picture, «لون الخلفية لما يكون مختار نفسه»), the other labels lighter.
+  assert.match(layout, /'bg-surface-hover font-semibold text-fg'/)
+  assert.match(layout, /const selected = active \|\| hasActiveChild/)
+  assert.match(layout, /const SOFT_TEXT = 'text-\[color-mix\(in_srgb,var\(--fg\)_72%,var\(--bg\)\)\]'/)
+  assert.doesNotMatch(layout, /bg-primary font-semibold|w-\[3px\]/)
+  // The pages of a section as a small tree: a line from the section's icon,
+  // a curve to each page, the selected page with an arrow at its end.
+  assert.match(layout, /h-5 w-3 rounded-es-lg border-b border-s/)
+  assert.match(layout, /\{!last && \(/)
+  assert.match(layout, /childActive && \(\s+<ChevronDown/)
   assert.doesNotMatch(layout, /nav-active|hover:bg-gray-100/)
   assert.doesNotMatch(layout, /PanelRight|طي القائمة/)
   assert.equal((layout.match(/<WhatsAppStatusIndicator \/>/g) ?? []).length, 2)
 })
 
-test('the WhatsApp state is one quiet line, red only when not linked', () => {
+test('the WhatsApp state keeps its soft box (owner «ليش شلت الخلفية الخضراء حق الواتس»)', () => {
   const component = read('src', 'components', 'WhatsAppGatewayStatus.tsx')
-  assert.match(component, /'flex h-7 w-full items-center gap-2 px-3 text-xs font-normal text-muted'/)
-  assert.match(component, /tone === 'down' && 'text-danger'/)
-  assert.doesNotMatch(component, /bg-success-soft|bg-danger-soft/)
+  assert.match(component, /'flex w-full items-center gap-2\.5 rounded-lg px-3 py-2\.5 text-xs font-normal'/)
+  assert.match(component, /tone === 'ok' && 'bg-success-soft'/)
+  assert.match(component, /tone === 'down' && 'bg-danger-soft'/)
 })
 
 test('the four headings exist in both languages, plain alif', () => {
