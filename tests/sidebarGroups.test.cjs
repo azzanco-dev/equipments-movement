@@ -58,8 +58,9 @@ test('the sidebar and the drawer share SidebarNav, with no fold button', () => {
   assert.equal((layout.match(/<SidebarNav\b/g) ?? []).length, 2)
   assert.match(layout, /groupNavItems\(items\)/)
   assert.match(layout, /text-\[11px\] font-medium text-muted/)
-  assert.match(layout, /h-\[18px\] w-\[3px\] shrink-0 rounded-sm/)
-  assert.match(layout, /'bg-surface-hover font-semibold'/)
+  // The open page black (owner «خلي الاختيار اسود»), no side bar.
+  assert.match(layout, /'bg-primary font-semibold text-primary-contrast'/)
+  assert.doesNotMatch(layout, /w-\[3px\]/)
   assert.doesNotMatch(layout, /nav-active|hover:bg-gray-100/)
   assert.doesNotMatch(layout, /PanelRight|طي القائمة/)
   assert.equal((layout.match(/<WhatsAppStatusIndicator \/>/g) ?? []).length, 2)

@@ -70,9 +70,9 @@ type NavItem = LayoutProps['navItems'][number]
 /**
  * The sidebar's sections (owner 2026-11-23, model 1 approved in Figma): the
  * items under small headings («الرئيسية», «البيانات», «المالية», «الادارة»,
- * `groupNavItems`), 36 high; the open page on the light hover fill with a
- * black bar at its start and its label semibold; a section's pages under it
- * when it is open. The desktop sidebar and the phone drawer share it.
+ * `groupNavItems`), 40 high with px-14 (owner «زيد البادنق»; 36 at first); the open page black (the primary fill, owner
+ * «خلي الاختيار اسود»; a light fill with a black bar at first); a section's
+ * pages under it when it is open. The desktop sidebar and the phone drawer share it.
  */
 function SidebarNav({
   items,
@@ -117,24 +117,14 @@ function SidebarNav({
                     item.children ? onToggle(item.key, !open) : onOpen(item.key)
                   }
                   className={cn(
-                    'flex h-9 w-full items-center gap-2.5 rounded-lg pe-2 ps-1 text-sm text-fg transition-colors duration-150 active:scale-[0.98] active:opacity-80',
+                    'flex h-10 w-full items-center gap-3 rounded-lg px-3.5 text-sm transition-colors duration-150 active:scale-[0.98] active:opacity-80',
                     active
-                      ? 'bg-surface-hover font-semibold'
-                      : 'font-medium hover:bg-surface-hover',
+                      ? 'bg-primary font-semibold text-primary-contrast'
+                      : 'font-medium text-fg hover:bg-surface-hover',
                   )}
                 >
                   <span
-                    aria-hidden="true"
-                    className={cn(
-                      'h-[18px] w-[3px] shrink-0 rounded-sm',
-                      active && 'bg-primary',
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      'flex shrink-0',
-                      active ? 'text-fg' : 'text-muted',
-                    )}
+                    className={cn('flex shrink-0', !active && 'text-muted')}
                   >
                     {item.icon}
                   </span>
@@ -146,7 +136,8 @@ function SidebarNav({
                       size={16}
                       aria-hidden="true"
                       className={cn(
-                        'shrink-0 text-placeholder transition-transform',
+                        'shrink-0 transition-transform',
+                        !active && 'text-placeholder',
                         !open && 'ltr:-rotate-90 rtl:rotate-90',
                       )}
                     />
