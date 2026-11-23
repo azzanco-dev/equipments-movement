@@ -75,9 +75,10 @@ const SOFT_TEXT = 'text-[color-mix(in_srgb,var(--fg)_72%,var(--bg))]'
  * The sidebar's sections (owner 2026-11-23, model 1 approved in Figma): the
  * items under small headings («الرئيسية», «البيانات», «المالية», «الادارة»,
  * `groupNavItems`), 40 high with px-14 (owner «ورجع البادنق 40»; it went 36, 40, 44, then back); the open page — and a section whose page is
- * open — on the light hover fill with its label semibold (owner, with a
- * picture: «لون الخلفية لما يكون مختار نفسه»; it was black for an hour);
- * the other labels in a lighter text colour; a section's pages under it as
+ * open — BLACK with white text and icon (owner «معليش رجعه اسود»; for an
+ * hour it was the light hover fill of his picture); the selected page of
+ * the tree stays on the light fill; the other labels in a lighter text
+ * colour; a section's pages under it as
  * a small tree («خلي القائمة الفرعية نفس هذا»). The desktop sidebar and the phone drawer share it.
  */
 function SidebarNav({
@@ -127,8 +128,10 @@ function SidebarNav({
                   }
                   className={cn(
                     'flex h-10 w-full items-center gap-3 rounded-lg px-3.5 text-sm transition-colors duration-150 active:scale-[0.98] active:opacity-80',
+                    // Black again (owner «معليش رجعه اسود», after an hour
+                    // on the light fill of his picture).
                     selected
-                      ? 'bg-surface-hover font-semibold text-fg'
+                      ? 'bg-primary font-semibold text-primary-contrast'
                       : `font-medium ${SOFT_TEXT} hover:bg-surface-hover`,
                   )}
                 >
@@ -145,7 +148,8 @@ function SidebarNav({
                       size={16}
                       aria-hidden="true"
                       className={cn(
-                        'shrink-0 text-muted transition-transform',
+                        'shrink-0 transition-transform',
+                        !selected && 'text-muted',
                         open && 'rotate-180',
                       )}
                     />

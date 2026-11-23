@@ -58,12 +58,13 @@ test('the sidebar and the drawer share SidebarNav, with no fold button', () => {
   assert.equal((layout.match(/<SidebarNav\b/g) ?? []).length, 2)
   assert.match(layout, /groupNavItems\(items\)/)
   assert.match(layout, /text-\[11px\] font-medium text-muted/)
-  // The selected page and its section on the light fill (the owner's
-  // picture, «لون الخلفية لما يكون مختار نفسه»), the other labels lighter.
+  // The selected page and its section BLACK (owner «معليش رجعه اسود»), the
+  // selected page of the tree on the light fill, the other labels lighter.
+  assert.match(layout, /'bg-primary font-semibold text-primary-contrast'/)
   assert.match(layout, /'bg-surface-hover font-semibold text-fg'/)
   assert.match(layout, /const selected = active \|\| hasActiveChild/)
   assert.match(layout, /const SOFT_TEXT = 'text-\[color-mix\(in_srgb,var\(--fg\)_72%,var\(--bg\)\)\]'/)
-  assert.doesNotMatch(layout, /bg-primary font-semibold|w-\[3px\]/)
+  assert.doesNotMatch(layout, /w-\[3px\]/)
   // The pages of a section as a small tree: a line from the section's icon,
   // a curve to each page, the selected page with an arrow at its end.
   assert.match(layout, /h-5 w-3 rounded-es-lg border-b border-s/)
