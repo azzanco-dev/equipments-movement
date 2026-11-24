@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
   Percent,
   Pencil,
+  Printer,
   Repeat,
   Landmark,
   Package,
@@ -31,6 +32,8 @@ import {
   SetPaymentDateDialog,
 } from '@/components/installments/InstallmentDateDialogs'
 import { ContractPaymentTable } from '@/components/installments/ContractPaymentTable'
+import { InstallmentPrintSheet } from '@/components/installments/InstallmentPrintSheet'
+import { installmentToPay } from '@/lib/installmentPrint'
 import { InstallmentPaymentDialog } from '@/components/installments/InstallmentPaymentDialog'
 import { BankAccountLine } from '@/components/installments/BankAccountFields'
 import { PaymentReceiptLine } from '@/components/installments/InstallmentReceipt'
@@ -220,6 +223,8 @@ function InstallmentContractDetailInner({
   )
   const [showAllPayments, setShowAllPayments] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  /** «تصدير القسط»: the print sheet is mounted while the dialog is up. */
+  const [printing, setPrinting] = useState(false)
   const { confirm, confirmDialog } = useConfirm()
 
   // The message of the list page that opened this one (a new contract).
@@ -677,6 +682,20 @@ function InstallmentContractDetailInner({
   // A cancelled contract takes one action: «حذف العقد» (owner 2026-11-21,
   // «حذف عقد اقساط بس بعد الالغاء»).
   const showActions = canManage
+  // «تصدير القسط» (owner 2026-11-24): every reader, while the contract has a
+  // row to pay.
+  const askedRow = installmentToPay(contract, schedule)
+  const exportButton = askedRow ? (
+    <Button
+      size="sm"
+      variant="outline"
+      icon={<Printer size={14} aria-hidden="true" />}
+      disabled={printing}
+      onClick={() => setPrinting(true)}
+    >
+      {t('instPrintExport')}
+    </Button>
+  ) : null
 
   return (
     <div className="space-y-3">
@@ -710,10 +729,11 @@ function InstallmentContractDetailInner({
             </span>
           }
           actions={
-            showActions ? (
+            showActions || exportButton ? (
               <div className="hidden gap-2 sm:flex">
-                {active && payButton}
-                {optionsMenu()}
+                {exportButton}
+                {showActions && active && payButton}
+                {showActions && optionsMenu()}
               </div>
             ) : undefined
           }
@@ -1043,6 +1063,16 @@ function InstallmentContractDetailInner({
       )}
 
       {confirmDialog}
+
+      {printing && askedRow && (
+        <InstallmentPrintSheet
+          contract={contract}
+          schedule={schedule}
+          asked={askedRow}
+          account={installmentAccountOf(contract)}
+          onDone={() => setPrinting(false)}
+        />
+      )}
 
       {/* The dialogs, each open while `dialog` names it. A success reads
           the contract again and shows its Toast; a refusal shows its

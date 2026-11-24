@@ -785,6 +785,21 @@ textarea::placeholder {
 }
 /* ===== quotations (0199): quotation print sheet — end ===== */
 
+/* ===== installments: installment print sheet — start =====
+   «تصدير القسط» (owner 2026-11-24) prints from the contract page exactly as
+   the quotation sheet does: while the sheet is mounted (portaled to body,
+   hidden on screen) it is the only child of body that prints, and its
+   .print-export class applies the light tokens. */
+@media print {
+  html:has(.installment-print-sheet) body > :not(.installment-print-sheet) {
+    display: none !important;
+  }
+  .installment-print-sheet {
+    display: block !important;
+  }
+}
+/* ===== installments: installment print sheet — end ===== */
+
 /* Inquiry page background (owner 2026-10-27: «تقدر تسوي gradient للخلفية
    حق الصفحة؟»): the one gradient of the page, behind everything; the cards
    on it stay flat. In use: the two glows at the top corners, blue on the

@@ -142,3 +142,76 @@ test('«الكل» is the first tab and the default view', () => {
   assert.ok(all > 0 && all < TABLE.indexOf('<TabsTrigger value="open">'))
   assert.ok(TABLE.indexOf('<TabsTrigger value="open">') < TABLE.indexOf('<TabsTrigger value="paid">'))
 })
+
+// «تصدير القسط» (owner 2026-11-24, model 1 approved in Figma): the PDF
+// «سداد قسط» for accounting.
+const PRINT = loadLibModule('installmentPrint')
+const SHEET = read('src', 'components', 'installments', 'InstallmentPrintSheet.tsx')
+
+const srow = (patch) => ({
+  id: `${patch.kind ?? 'installment'}-${patch.seq ?? 1}`,
+  seq: 1,
+  due_date: null,
+  amount: 100,
+  paid_amount: 0,
+  kind: 'installment',
+  ...patch,
+})
+
+test('the sheet asks for the next due row, on an active contract only', () => {
+  const schedule = [srow({ seq: 1, paid_amount: 100 }), srow({ seq: 2 })]
+  const asked = PRINT.installmentToPay({ status: 'active', next_due_id: 'installment-2' }, schedule)
+  assert.equal(asked.seq, 2)
+  assert.equal(PRINT.installmentToPay({ status: 'paid_off', next_due_id: 'installment-2' }, schedule), null)
+  assert.equal(PRINT.installmentToPay({ status: 'active', next_due_id: null }, schedule), null)
+})
+
+test('each row of the sheet has one state', () => {
+  const today = '2026-11-24'
+  const state = (patch) => PRINT.installmentPrintState(srow(patch), 'installment-9', today)
+  assert.equal(state({ seq: 9, due_date: '2026-10-15' }), 'asked')
+  assert.equal(state({ seq: 1, due_date: '2026-01-15', paid_amount: 100 }), 'paid')
+  assert.equal(state({ seq: 2, due_date: '2026-11-15' }), 'late')
+  assert.equal(state({ seq: 3, due_date: '2026-12-15', paid_amount: 40 }), 'partial')
+  assert.equal(state({ kind: 'first_payment', seq: 2 }), 'waits')
+  assert.equal(state({ seq: 4, due_date: '2027-01-15' }), 'upcoming')
+})
+
+test('the groups: first payments, installments, a VAT paid by itself', () => {
+  const schedule = [
+    srow({ seq: 2 }),
+    srow({ kind: 'vat', seq: 1 }),
+    srow({ kind: 'first_payment', seq: 1 }),
+    srow({ seq: 1 }),
+  ]
+  const groups = PRINT.installmentPrintGroups({ vat_mode: 'separate' }, schedule)
+  assert.deepEqual(Array.from(groups, (g) => g.key), ['first', 'installments', 'vat'])
+  assert.deepEqual(Array.from(groups[1].rows, (r) => r.seq), [1, 2])
+  // A VAT inside every amount has no row of its own; a waiting contract keeps
+  // its installments group.
+  const inside = PRINT.installmentPrintGroups({ vat_mode: 'inside' }, [srow({ kind: 'first_payment' })])
+  assert.deepEqual(Array.from(inside, (g) => g.key), ['first', 'installments'])
+  assert.equal(PRINT.installmentPrintFileName('سداد قسط', 'عقد 4/2027'), 'سداد قسط - عقد 4 2027')
+})
+
+test('the sheet: Arabic only, no company data, five columns, account last', () => {
+  assert.match(SHEET, /className="installment-print-sheet print-export hidden/)
+  assert.match(SHEET, /dir="rtl"\n\s+lang="ar"/)
+  assert.doesNotMatch(SHEET, /companyProfileFacts|contract_number/)
+  assert.equal([...SHEET.matchAll(/<th scope="col"/g)].length, 5)
+  assert.ok(SHEET.indexOf("ar('instPayTableTitle')") < SHEET.indexOf("ar('instAccountTitle')"))
+  assert.ok(SHEET.indexOf("ar('instAccountTitle')") < SHEET.indexOf("ar('quotationPrintElectronic')"))
+  assert.match(SHEET, /bankLogoOf\(account\?\.bankName\)/)
+  assert.match(SHEET, /quotationPageCss\(issuedAt, 'ar'\)/)
+  const css = read('src', 'index.css')
+  assert.match(css, /html:has\(\.installment-print-sheet\) body > :not\(\.installment-print-sheet\)/)
+  // The page: every reader may export while a row is due.
+  assert.match(PAGE, /const askedRow = installmentToPay\(contract, schedule\)/)
+  assert.match(PAGE, /\{printing && askedRow && \(\n\s+<InstallmentPrintSheet/)
+  const translations = read('src', 'i18n', 'translations.ts')
+  const blocks = [
+    ...translations.matchAll(/\/\/ installment-print \(2026-11-24\)\n([\s\S]*?)\/\/ end installment-print \(2026-11-24\)/g),
+  ]
+  assert.equal(blocks.length, 2)
+  assert.doesNotMatch(blocks[0][1], /[أإآ]/)
+})

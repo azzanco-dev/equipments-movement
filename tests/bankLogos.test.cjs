@@ -84,6 +84,8 @@ test('approved on /ui-kit, then used by the three bank screens', () => {
     // 0208: the installments accounts (financier and contract).
     // (the financiers' cards show it through BankAccountLine, 2026-11-22)
     'src/components/installments/BankAccountFields.tsx',
+    // 2026-11-24: the installment PDF «سداد قسط» prints the bank's logo.
+    'src/components/installments/InstallmentPrintSheet.tsx',
     'src/screens/lessors/LessorDetailsDialog.tsx',
     'src/screens/lessors/LessorFormDialog.tsx',
   ]).sort())

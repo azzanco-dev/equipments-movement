@@ -3329,6 +3329,17 @@ export const translations = {
     instGroupVat: 'الضريبة',
     instRowOptions: 'خيارات {name}',
     // end installment-pay-table (2026-11-23)
+    // installment-print (2026-11-24)
+    instPrintTitle: 'سداد قسط',
+    instPrintExport: 'تصدير القسط (PDF)',
+    instPrintContractTitle: 'عنوان العقد',
+    instPrintRequestDate: 'تاريخ الطلب',
+    instPrintAsked: 'القسط المطلوب سداده',
+    instPrintAskedAmount: 'المبلغ المطلوب',
+    instPrintOfTotal: 'من اصل {amount}',
+    instPrintStateAsked: 'المطلوب',
+    instPrintIban: 'الايبان',
+    // end installment-print (2026-11-24)
     instCalcTotal: 'الاجمالي',
     instCalcPickVat: 'اختر الضريبة وتطلع الحسبة',
     instRateOfBase: '{rate}% من {amount} قبل الضريبة',
@@ -7037,6 +7048,17 @@ export const translations = {
     instGroupVat: 'VAT',
     instRowOptions: '{name} options',
     // end installment-pay-table (2026-11-23)
+    // installment-print (2026-11-24)
+    instPrintTitle: 'Installment payment',
+    instPrintExport: 'Export installment (PDF)',
+    instPrintContractTitle: 'Contract title',
+    instPrintRequestDate: 'Request date',
+    instPrintAsked: 'Installment to pay',
+    instPrintAskedAmount: 'Amount to pay',
+    instPrintOfTotal: 'of {amount}',
+    instPrintStateAsked: 'To pay',
+    instPrintIban: 'IBAN',
+    // end installment-print (2026-11-24)
     instCalcTotal: 'Total',
     instCalcPickVat: 'Choose the VAT to see the figures',
     instRateOfBase: '{rate}% of {amount} before VAT',
