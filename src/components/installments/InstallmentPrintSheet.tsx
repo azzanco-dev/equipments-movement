@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Price } from '@/components/purchasing/Price'
 import { translations, type TranslationKey } from '@/i18n/translations'
-import { bankInitials, bankLogoOf } from '@/lib/bankLogos'
 import { COMPANY_PROFILE } from '@/lib/companyProfile'
 import { formatDate } from '@/lib/dateFormat'
 import { daysUntilDue, formatInstallmentAmount } from '@/lib/installments'
@@ -20,11 +19,9 @@ import {
   payableRowLabel,
   scheduleRemaining,
   whenWords,
-  type InstallmentAccount,
   type InstallmentContractRow,
   type InstallmentScheduleItem,
 } from '@/lib/installmentsView'
-import { formatIban, normalizeIban } from '@/lib/partyFields'
 import { printIssuedAtLabel, quotationPageCss } from '@/lib/quotationPrint'
 import { saudiDateKey } from '@/lib/saudiTime'
 
@@ -74,8 +71,6 @@ export interface InstallmentPrintSheetProps {
   schedule: readonly InstallmentScheduleItem[]
   /** The row to pay: the contract's next due row. */
   asked: InstallmentScheduleItem
-  /** The account it is paid to (the contract's own, else the financier's). */
-  account: InstallmentAccount | null
   /** The print dialog closed (or never opened): the sheet is unmounted. */
   onDone: () => void
 }
@@ -96,15 +91,14 @@ export interface InstallmentPrintSheetProps {
  * pay — its name, its day and how far it is, the amount still due on it;
  * the whole schedule in five columns (# · الدفعة · تاريخ الاستحقاق · المبلغ
  * · الحالة), the asked row tinted, group rows by title only; the contract's
- * total, paid and remaining once, under the table; then «حساب السداد» with
- * the bank's logo, its name and the IBAN; the electronic-issue line. Every
+ * total, paid and remaining once, under the table; the electronic-issue
+ * line. No bank account (owner 2026-11-24, «وشيل الحساب البنكي»). Every
  * page carries its number and the issue time (`quotationPageCss`).
  */
 export function InstallmentPrintSheet({
   contract,
   schedule,
   asked,
-  account,
   onDone,
 }: InstallmentPrintSheetProps) {
   const logoRef = useRef<HTMLImageElement>(null)
@@ -154,8 +148,6 @@ export function InstallmentPrintSheet({
       ? payableRowLabel(asked, ar, contract.installment_count)
       : payableRowLabel(asked, ar)
   const partial = amountOf(asked.paid_amount) > 0 && !isSchedulePaid(asked)
-  const iban = account?.iban ? formatIban(normalizeIban(account.iban)) : null
-  const logo = bankLogoOf(account?.bankName)
   const rowTitle = (row: InstallmentScheduleItem) =>
     row.kind === 'installment'
       ? ar('instInstallmentN').replace('{seq}', String(row.seq)) +
@@ -366,51 +358,7 @@ export function InstallmentPrintSheet({
           </dl>
         </section>
 
-        {/* 5. The payment account, last, with the bank's logo. */}
-        {account && (account.bankName || iban) && (
-          <section className="break-inside-avoid">
-            <h2 className={SECTION_TITLE}>{ar('instAccountTitle')}</h2>
-            <div className="flex items-center justify-between gap-4 rounded-md border px-3 py-2">
-              <div className="flex min-w-0 items-center gap-3">
-                {account.bankName && (
-                  <span
-                    className={`flex h-9 w-[88px] shrink-0 items-center justify-center rounded-md border px-2.5 ${
-                      logo?.onDark ? 'bg-[var(--logo-tile-dark)]' : 'bg-bg'
-                    }`}
-                  >
-                    {logo ? (
-                      <img
-                        src={logo.src}
-                        alt=""
-                        className="max-h-[22px] max-w-full object-contain"
-                      />
-                    ) : (
-                      <span className="font-bold text-muted">
-                        {bankInitials(account.bankName)}
-                      </span>
-                    )}
-                  </span>
-                )}
-                <p className="break-words text-[12px] font-bold">
-                  {account.bankName ?? '—'}
-                </p>
-              </div>
-              {iban && (
-                <div className="shrink-0 text-end">
-                  <p className="text-[10px] text-muted">{ar('instPrintIban')}</p>
-                  <p
-                    dir="ltr"
-                    className="text-[13px] font-bold tabular-nums"
-                  >
-                    {iban}
-                  </p>
-                </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* 6. The electronic-issue line closes the sheet. */}
+        {/* 5. The electronic-issue line closes the sheet. */}
         <footer className="mt-[10px] break-inside-avoid border-t pt-1.5 text-[9px] leading-[12px] text-muted">
           <p className="text-start">
             {ar('quotationPrintElectronic').replace(

@@ -3338,7 +3338,6 @@ export const translations = {
     instPrintAskedAmount: 'المبلغ المطلوب',
     instPrintOfTotal: 'من اصل {amount}',
     instPrintStateAsked: 'المطلوب',
-    instPrintIban: 'الايبان',
     // end installment-print (2026-11-24)
     instCalcTotal: 'الاجمالي',
     instCalcPickVat: 'اختر الضريبة وتطلع الحسبة',
@@ -7057,7 +7056,6 @@ export const translations = {
     instPrintAskedAmount: 'Amount to pay',
     instPrintOfTotal: 'of {amount}',
     instPrintStateAsked: 'To pay',
-    instPrintIban: 'IBAN',
     // end installment-print (2026-11-24)
     instCalcTotal: 'Total',
     instCalcPickVat: 'Choose the VAT to see the figures',

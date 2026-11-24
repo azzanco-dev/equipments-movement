@@ -1069,7 +1069,6 @@ function InstallmentContractDetailInner({
           contract={contract}
           schedule={schedule}
           asked={askedRow}
-          account={installmentAccountOf(contract)}
           onDone={() => setPrinting(false)}
         />
       )}

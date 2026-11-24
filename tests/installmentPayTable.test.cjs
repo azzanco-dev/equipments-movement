@@ -194,14 +194,14 @@ test('the groups: first payments, installments, a VAT paid by itself', () => {
   assert.equal(PRINT.installmentPrintFileName('سداد قسط', 'عقد 4/2027'), 'سداد قسط - عقد 4 2027')
 })
 
-test('the sheet: Arabic only, no company data, five columns, account last', () => {
+test('the sheet: Arabic only, no company data, five columns, no bank account', () => {
   assert.match(SHEET, /className="installment-print-sheet print-export hidden/)
   assert.match(SHEET, /dir="rtl"\n\s+lang="ar"/)
   assert.doesNotMatch(SHEET, /companyProfileFacts|contract_number/)
   assert.equal([...SHEET.matchAll(/<th scope="col"/g)].length, 5)
-  assert.ok(SHEET.indexOf("ar('instPayTableTitle')") < SHEET.indexOf("ar('instAccountTitle')"))
-  assert.ok(SHEET.indexOf("ar('instAccountTitle')") < SHEET.indexOf("ar('quotationPrintElectronic')"))
-  assert.match(SHEET, /bankLogoOf\(account\?\.bankName\)/)
+  // «وشيل الحساب البنكي».
+  assert.doesNotMatch(SHEET, /instAccountTitle|bankLogoOf|iban|InstallmentAccount/i)
+  assert.ok(SHEET.indexOf("ar('instPayTableTitle')") < SHEET.indexOf("ar('quotationPrintElectronic')"))
   assert.match(SHEET, /quotationPageCss\(issuedAt, 'ar'\)/)
   const css = read('src', 'index.css')
   assert.match(css, /html:has\(\.installment-print-sheet\) body > :not\(\.installment-print-sheet\)/)
