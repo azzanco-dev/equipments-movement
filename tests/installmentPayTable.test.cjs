@@ -201,11 +201,11 @@ test('the sheet: Arabic only, no company data, five columns, the account by the 
   assert.equal([...SHEET.matchAll(/<th scope="col"/g)].length, 5)
   // «اضف الحساب البنكي» (it was taken out with «وشيل الحساب البنكي»): on
   // the totals' row, the contract's own account, else the financier's.
-  assert.match(SHEET, /bankLogoOf(account?.bankName)/)
+  assert.match(SHEET, /bankLogoOf\(account\?\.bankName\)/)
   assert.ok(SHEET.indexOf("ar('instPayTableTitle')") < SHEET.indexOf("ar('instAccountTitle')"))
   assert.ok(SHEET.indexOf("ar('instAccountTitle')") < SHEET.indexOf("'instContractTotal'"))
   assert.ok(SHEET.indexOf("'instContractTotal'") < SHEET.indexOf("ar('quotationPrintElectronic')"))
-  assert.match(PAGE, /account={installmentAccountOf(contract)}/)
+  assert.match(PAGE, /account=\{installmentAccountOf\(contract\)\}/)
   assert.match(SHEET, /quotationPageCss\(issuedAt, 'ar'\)/)
   const css = read('src', 'index.css')
   assert.match(css, /html:has\(\.installment-print-sheet\) body > :not\(\.installment-print-sheet\)/)
