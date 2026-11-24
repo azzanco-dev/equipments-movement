@@ -35,11 +35,11 @@ const AFTERPRINT_FALLBACK_MS = 120_000
 const ar = (key: TranslationKey) => translations.ar[key]
 
 const BRAND = 'text-[var(--brand-charcoal)]'
-const CELL = 'border px-2 py-1 align-middle'
+const CELL = 'border px-1.5 py-[2px] align-middle'
 const HEAD = `${CELL} border-[var(--brand-charcoal)] bg-[var(--brand-charcoal)] font-medium text-bg`
 const TABLE =
   'w-full table-fixed border-collapse border-t-[3px] border-t-[var(--brand-amber)]'
-const SECTION_TITLE = `mb-1.5 font-medium ${BRAND}`
+const SECTION_TITLE = `mb-1 font-medium ${BRAND}`
 const AMBER_TINT = 'bg-[color-mix(in_srgb,var(--brand-amber)_16%,transparent)]'
 
 const STATE_INK: Readonly<Record<InstallmentPrintState, string>> = {
@@ -170,16 +170,16 @@ export function InstallmentPrintSheet({
       aria-hidden="true"
     >
       <style>{quotationPageCss(issuedAt, 'ar')}</style>
-      <div className="mx-auto max-w-[210mm] px-[10mm] pb-[2mm] pt-[12mm] text-[12px] leading-[17px] [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">
+      <div className="mx-auto max-w-[210mm] px-[10mm] pb-[2mm] pt-[8mm] text-[11px] leading-[15px] [-webkit-box-decoration-break:clone] [box-decoration-break:clone]">
         {/* 1. The title and the logo; no company data. */}
-        <header className="mb-[14px] flex items-start justify-between gap-4">
+        <header className="mb-[10px] flex items-start justify-between gap-4">
           <div className="flex flex-col items-start">
-            <h1 className={`text-[30px] font-bold leading-[38px] ${BRAND}`}>
+            <h1 className={`text-[24px] font-bold leading-[30px] ${BRAND}`}>
               {title}
             </h1>
             <span
               aria-hidden="true"
-              className="my-1.5 block h-1 w-14 rounded-sm bg-[var(--brand-amber)]"
+              className="my-1 block h-1 w-12 rounded-sm bg-[var(--brand-amber)]"
             />
           </div>
           <img
@@ -188,12 +188,12 @@ export function InstallmentPrintSheet({
             onError={() => setLogoSettled(true)}
             src="/azzanco-logo-full.png"
             alt=""
-            className="h-[18mm] w-auto object-contain"
+            className="h-[13mm] w-auto object-contain"
           />
         </header>
 
         {/* 2. The contract on one line. */}
-        <dl className="m-0 mb-[14px] flex flex-wrap gap-x-6 gap-y-0.5 text-[11px] leading-[15px]">
+        <dl className="m-0 mb-[10px] flex flex-wrap gap-x-6 gap-y-0.5 text-[10px] leading-[14px]">
           <Fact label={ar('instPrintContractTitle')}>{contract.description}</Fact>
           <Fact label={ar('instFinancier')}>{contract.financier_name}</Fact>
           <Fact label={ar('instPrintRequestDate')}>
@@ -203,20 +203,20 @@ export function InstallmentPrintSheet({
 
         {/* 3. The installment to pay. */}
         <section
-          className={`mb-[18px] flex break-inside-avoid items-center justify-between gap-6 rounded-md border-[1.5px] border-[var(--brand-amber)] p-4 ${AMBER_TINT}`}
+          className={`mb-[12px] flex break-inside-avoid items-center justify-between gap-6 rounded-md border-[1.5px] border-[var(--brand-amber)] px-3 py-2.5 ${AMBER_TINT}`}
         >
-          <div className="min-w-0 space-y-2">
-            <p className="flex items-center gap-1.5 text-[11px] font-medium text-muted">
+          <div className="min-w-0 space-y-1">
+            <p className="flex items-center gap-1.5 text-[10px] font-medium text-muted">
               <span
                 aria-hidden="true"
                 className="inline-block h-2.5 w-1 rounded-sm bg-[var(--brand-amber)]"
               />
               {ar('instPrintAsked')}
             </p>
-            <p className={`break-words text-[16px] font-bold leading-[22px] ${BRAND}`}>
+            <p className={`break-words text-[14px] font-bold leading-[19px] ${BRAND}`}>
               {askedTitle}
             </p>
-            <dl className="m-0 flex flex-wrap gap-x-5 text-[11px]">
+            <dl className="m-0 flex flex-wrap gap-x-5 text-[10px]">
               <Fact label={ar('instDueDate')}>
                 {asked.due_date ? (
                   <bdi dir="ltr">{formatDate(asked.due_date)}</bdi>
@@ -236,14 +236,14 @@ export function InstallmentPrintSheet({
             </dl>
           </div>
           <div className="shrink-0 text-end">
-            <p className="text-[11px] text-muted">
+            <p className="text-[10px] text-muted">
               {ar('instPrintAskedAmount')}
             </p>
-            <p className="text-[26px] font-bold leading-[34px]">
+            <p className="text-[20px] font-bold leading-[26px]">
               <Amount value={scheduleRemaining(asked)} />
             </p>
             {partial && (
-              <p className="text-[11px] text-muted">
+              <p className="text-[10px] text-muted">
                 {ar('instPrintOfTotal').replace(
                   '{amount}',
                   formatInstallmentAmount(asked.amount),
@@ -254,9 +254,9 @@ export function InstallmentPrintSheet({
         </section>
 
         {/* 4. The whole schedule. */}
-        <section className="mb-[14px]">
+        <section className="mb-[10px]">
           <h2 className={SECTION_TITLE}>{ar('instPayTableTitle')}</h2>
-          <table className={TABLE}>
+          <table className={`${TABLE} text-[10px] leading-[13px]`}>
             <colgroup>
               <col style={{ width: '6%' }} />
               <col />
@@ -348,7 +348,7 @@ export function InstallmentPrintSheet({
           </table>
 
           {/* The contract's figures, once, under the table. */}
-          <dl className="m-0 mt-2 inline-flex break-inside-avoid gap-7 rounded-md border px-3.5 py-2.5">
+          <dl className="m-0 mt-1.5 inline-flex break-inside-avoid gap-6 rounded-md border px-3 py-1.5">
             {(
               [
                 ['instContractTotal', contract.payable_total, ''],
@@ -357,8 +357,8 @@ export function InstallmentPrintSheet({
               ] as const
             ).map(([key, value, tone]) => (
               <div key={key}>
-                <dt className="text-[11px] text-muted">{ar(key)}</dt>
-                <dd className={`m-0 text-[13px] font-bold ${tone}`}>
+                <dt className="text-[10px] text-muted">{ar(key)}</dt>
+                <dd className={`m-0 text-[12px] font-bold ${tone}`}>
                   <Amount value={value} />
                 </dd>
               </div>
@@ -370,11 +370,11 @@ export function InstallmentPrintSheet({
         {account && (account.bankName || iban) && (
           <section className="break-inside-avoid">
             <h2 className={SECTION_TITLE}>{ar('instAccountTitle')}</h2>
-            <div className="flex items-center justify-between gap-4 rounded-md border px-3.5 py-3">
+            <div className="flex items-center justify-between gap-4 rounded-md border px-3 py-2">
               <div className="flex min-w-0 items-center gap-3">
                 {account.bankName && (
                   <span
-                    className={`flex h-11 w-[104px] shrink-0 items-center justify-center rounded-md border px-2.5 ${
+                    className={`flex h-9 w-[88px] shrink-0 items-center justify-center rounded-md border px-2.5 ${
                       logo?.onDark ? 'bg-[var(--logo-tile-dark)]' : 'bg-bg'
                     }`}
                   >
@@ -382,7 +382,7 @@ export function InstallmentPrintSheet({
                       <img
                         src={logo.src}
                         alt=""
-                        className="max-h-[26px] max-w-full object-contain"
+                        className="max-h-[22px] max-w-full object-contain"
                       />
                     ) : (
                       <span className="font-bold text-muted">
@@ -391,16 +391,16 @@ export function InstallmentPrintSheet({
                     )}
                   </span>
                 )}
-                <p className="break-words text-[13px] font-bold">
+                <p className="break-words text-[12px] font-bold">
                   {account.bankName ?? '—'}
                 </p>
               </div>
               {iban && (
                 <div className="shrink-0 text-end">
-                  <p className="text-[11px] text-muted">{ar('instPrintIban')}</p>
+                  <p className="text-[10px] text-muted">{ar('instPrintIban')}</p>
                   <p
                     dir="ltr"
-                    className="text-[14px] font-bold tabular-nums"
+                    className="text-[13px] font-bold tabular-nums"
                   >
                     {iban}
                   </p>
@@ -411,7 +411,7 @@ export function InstallmentPrintSheet({
         )}
 
         {/* 6. The electronic-issue line closes the sheet. */}
-        <footer className="mt-[18px] break-inside-avoid border-t pt-2 text-[10px] leading-[14px] text-muted">
+        <footer className="mt-[10px] break-inside-avoid border-t pt-1.5 text-[9px] leading-[12px] text-muted">
           <p className="text-start">
             {ar('quotationPrintElectronic').replace(
               '{company}',
