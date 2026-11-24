@@ -844,6 +844,13 @@ test('the gates of the pages outside the sidebar', () => {
     { key: 'settings.roles' },
     // 0197: «اضافة زيارة كاملة» is a card of the Settings hub.
     { key: 'movements.site.add_past_visit' },
+    // 0212: «اسناد الشركات والمشاريع» is a card of the hub too.
+    { key: 'users.manage' },
+    { key: 'users.assignments' },
+  ])
+  assert.deepEqual(gate('settings/assignments'), [
+    { key: 'users.manage' },
+    { key: 'users.assignments' },
   ])
   // A detail page with only the settings key it needs.
   const afaqy = nav.planShell(
@@ -1017,7 +1024,7 @@ test('App.tsx renders each screen behind its page', () => {
     )
   assert.match(
     content,
-    /\(page === 'settings' \|\|\s*page === 'settings\/equipment-types' \|\|\s*page === 'settings\/workshop-opening-balance' \|\|\s*page === 'settings\/afaqy' \|\|\s*page === 'settings\/banks' \|\|\s*page === 'settings\/quotation-terms'\) && <AdminSettings \/>/,
+    /\(page === 'settings' \|\|\s*page === 'settings\/equipment-types' \|\|\s*page === 'settings\/workshop-opening-balance' \|\|\s*page === 'settings\/afaqy' \|\|\s*page === 'settings\/banks' \|\|\s*page === 'settings\/quotation-terms' \|\|\s*page === 'settings\/assignments'\) && <AdminSettings \/>/,
   )
   // The admin home's shortcuts follow the pages they open.
   assert.match(

@@ -196,11 +196,12 @@ test('the routes: quotations before the client PO id fallback', () => {
     nav,
     /'settings\/quotation-terms': \[\{ key: 'sales\.quotations\.approve' \}\]/,
   )
-  assert.match(nav, /'quotation-terms',\n\]\)/)
+  // (0212: «اسناد الشركات والمشاريع» follows it.)
+  assert.match(nav, /'quotation-terms',\n  'assignments',\n\]\)/)
   const app = read('src', 'App.tsx')
   assert.match(
     app,
-    /page === 'settings\/quotation-terms'\) && <AdminSettings \/>/,
+    /page === 'settings\/quotation-terms' \|\|\s*page === 'settings\/assignments'\) && <AdminSettings \/>/,
   )
   assert.match(app, /page === 'sales\/quotations\/:id'/)
 })

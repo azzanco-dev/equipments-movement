@@ -14,6 +14,7 @@ import {
   History,
   Landmark,
   ScrollText,
+  Briefcase,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { readWorkbookSafely, workbookReadErrorKey } from '@/lib/safeWorkbook'
@@ -31,6 +32,7 @@ import {
   Input,
   PageHeader,
   SearchInput,
+  ToastProvider,
   useConfirm,
   usePageTrail,
 } from '@/components/ui'
@@ -67,6 +69,7 @@ import { canOpenPage, type RoutePage } from '@/lib/navPermissions'
 import { AfaqySettings } from '@/components/afaqy/AfaqySettings'
 import { BanksSettings } from '@/components/banks/BanksSettings'
 import { QuotationTermsSettings } from '@/components/quotations/QuotationTermsSettings'
+import { UserAssignmentsSettings } from '@/components/assignments/UserAssignmentsSettings'
 import { AddPastVisitDialog } from '@/components/movement/AddPastVisitDialog'
 import { PAST_VISIT_PERMISSION } from '@/lib/pastVisit'
 
@@ -119,6 +122,9 @@ export function AdminSettings() {
   const showBanks = pathname === '/settings/banks'
   // 0199: the terms template of the quotations.
   const showQuotationTerms = pathname === '/settings/quotation-terms'
+  // 0212 (owner 2026-11-24): the companies and projects of the users, apart
+  // from the user page.
+  const showAssignments = pathname === '/settings/assignments'
   // Each hub card follows the gate of the page it opens (pageGate in
   // src/lib/navPermissions.ts, 2026-10-28), so a card never leads to a page
   // that sends the user back; «سجل النشاط» (owner 2026-10-22) is the
@@ -478,6 +484,21 @@ export function AdminSettings() {
       </div>
     )
 
+  if (showAssignments)
+    return (
+      <ToastProvider>
+        <div className="space-y-4">
+          <PageHeader
+            title={t('userAssignments')}
+            description={t('userAssignmentsDesc')}
+            onBack={backToSettings}
+            backLabel={t('backToSettings')}
+          />
+          <UserAssignmentsSettings />
+        </div>
+      </ToastProvider>
+    )
+
   if (showQuotationTerms)
     return (
       <QuotationTermsSettings
@@ -632,6 +653,30 @@ export function AdminSettings() {
               <h2 className="font-semibold">{t('quotationTermsSettings')}</h2>
               <p className="mt-1 text-sm text-muted">
                 {t('quotationTermsSettingsDesc')}
+              </p>
+            </button>
+          )}
+          {opens('settings/assignments') && (
+            <button
+              type="button"
+              onClick={() => router.push('/settings/assignments')}
+              className="card group flex min-h-36 flex-col items-start text-start transition-colors hover:bg-surface-hover"
+            >
+              <div className="mb-4 flex w-full items-start justify-between gap-3">
+                <span
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  <Briefcase size={18} />
+                </span>
+                <ChevronRight
+                  size={18}
+                  className="text-muted transition-transform group-hover:translate-x-[-2px] rtl-flip"
+                />
+              </div>
+              <h2 className="font-semibold">{t('userAssignments')}</h2>
+              <p className="mt-1 text-sm text-muted">
+                {t('userAssignmentsDesc')}
               </p>
             </button>
           )}

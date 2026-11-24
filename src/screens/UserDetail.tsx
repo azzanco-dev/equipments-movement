@@ -1,18 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Pencil } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { usersActions } from '@/lib/actionPermissions'
 import { roleName } from '@/components/roles/roleRows'
 import { useActiveRoles } from '@/components/roles/useActiveRoles'
 import { foremanRoleKeys, isForemanRoleKey } from '@/lib/rolePermissionHolders'
-import { AsyncMultiSelect } from '@/components/AsyncMultiSelect'
 import { PasswordInput } from '@/components/PasswordInput'
-import type { SelectOption } from '@/components/Select'
+import { AssignmentLines } from '@/components/assignments/AssignmentLines'
+import { UserAssignmentsDialog } from '@/components/assignments/UserAssignmentsDialog'
 import { useI18n } from '@/i18n/I18nContext'
 import { useTabTitle } from '@/components/TabTitle'
 import { formatDate } from '@/lib/dateFormat'
-import { localizedName } from '@/lib/localizedName'
-import { buildSearchFilter, COMPANY_PROJECT_SEARCH_FIELDS } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 import { callEdgeFunction, EdgeFunctionError } from '@/lib/edgeFunction'
 import type { Profile, ProfileContact } from '@/lib/types'
@@ -20,12 +19,12 @@ import { normalizeUserMobileInput, userMobileErrorCode } from '@/lib/userMobile'
 import { rolesRpcError } from '@/lib/rolesAdmin'
 import {
   PROFILE_ASSIGNMENTS_SELECT,
-  assignedProjectsOf,
-  assignmentSaveMessage,
-  companiesProjectLoader,
-  projectsWithinCompanies,
+  assignmentsFromRows,
+  assignmentsLockOf,
+  canManageAssignments,
+  rowsFromAssignments,
+  type AssignmentCompanyRow,
   type ProfileAssignmentRow,
-  type ProjectOption,
 } from '@/lib/foremanAssignments'
 import {
   ASSIGN_ROLE_FIELD_CODES,
@@ -69,24 +68,11 @@ interface UserDetailProps {
   onBack: () => void
 }
 
-/** A company option that keeps both names, so its label follows the active
- *  language at render time instead of needing a reload of the user. */
-type CompanyOption = SelectOption & { name_ar: string; name_en: string }
-
 /** The record fields `manage-user` saves; the role is the assignment, which
- *  is tracked apart (`assignmentChanged`). */
-function formSnapshot(
-  fullName: string,
-  email: string,
-  password: string,
-  companies: SelectOption[],
-) {
-  return JSON.stringify({
-    fullName,
-    email,
-    password,
-    companyIds: companies.map((company) => company.value).sort(),
-  })
+ *  is tracked apart (`assignmentChanged`). The companies and projects are no
+ *  longer edited here (migration 0212): «تعديل الاسناد» opens their dialog. */
+function formSnapshot(fullName: string, email: string, password: string) {
+  return JSON.stringify({ fullName, email, password })
 }
 
 export function UserDetail({ userId, onBack }: UserDetailProps) {
@@ -108,22 +94,18 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [companies, setCompanies] = useState<CompanyOption[]>([])
-  // «المشاريع المسؤول عنها» (migration 0176, owner 2026-11-05): the projects
-  // of the chosen companies the user is narrowed to; none chosen in a
-  // company = every project of it. Read from `profile_assignments` and
-  // written by `admin_set_profile_assignments`, apart from `manage-user`
-  // (like the mobile number); a failed read leaves the field locked.
-  const [projects, setProjects] = useState<ProjectOption[]>([])
-  const [projectsLoad, setProjectsLoad] = useState<{
+  // The companies and projects the user is responsible for (0176), shown in
+  // the account summary and edited in ONE dialog (migration 0212, owner
+  // 2026-11-24: «مهمة منفصلة عن صفحة المستخدم»), the same dialog as
+  // Settings › «اسناد الشركات والمشاريع». Read from `profile_assignments`.
+  const [assignmentsLoad, setAssignmentsLoad] = useState<{
     userId: string
     state: 'loaded' | 'failed'
-    /** The saved projects' ids, sorted. */
-    saved: string
-    /** The saved projects, for the summary above the form. */
-    options: ProjectOption[]
+    rows: AssignmentCompanyRow[]
   } | null>(null)
-  const [projectsReloadKey, setProjectsReloadKey] = useState(0)
+  const [assignmentsReloadKey, setAssignmentsReloadKey] = useState(0)
+  const [assignmentsOpen, setAssignmentsOpen] = useState(false)
+  const [assignmentsSaved, setAssignmentsSaved] = useState(false)
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null)
   // wave 9 — the mobile number (migration 0110). It is read and written apart
   // from the rest of the record: the `manage-user` Edge Function neither
@@ -205,8 +187,8 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     assignedRoleKey !== savedAssignedKey
 
   const currentSnapshot = useMemo(
-    () => formSnapshot(fullName, email, password, companies),
-    [companies, email, fullName, password],
+    () => formSnapshot(fullName, email, password),
+    [email, fullName, password],
   )
   const mainChanged =
     savedSnapshot !== null && currentSnapshot !== savedSnapshot
@@ -216,16 +198,11 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
   const savedMobile = mobileLoad?.userId === userId ? mobileLoad.saved : ''
   const mobileChanged =
     mobileState === 'loaded' && normalizeUserMobileInput(mobile) !== savedMobile
-  const projectsState =
-    projectsLoad?.userId === userId ? projectsLoad.state : 'loading'
-  const projectIdsKey = projects
-    .map((project) => project.value)
-    .sort()
-    .join(',')
-  const projectsChanged =
-    projectsState === 'loaded' && projectIdsKey !== projectsLoad?.saved
-  const hasUnsavedChanges =
-    mainChanged || mobileChanged || assignmentChanged || projectsChanged
+  const assignmentsState =
+    assignmentsLoad?.userId === userId ? assignmentsLoad.state : 'loading'
+  const assignmentRows =
+    assignmentsLoad?.userId === userId ? assignmentsLoad.rows : []
+  const hasUnsavedChanges = mainChanged || mobileChanged || assignmentChanged
 
   // The steps a save runs for the role (`planRoleChange`): the assignment
   // through `admin_assign_profile_role` when it changed.
@@ -239,17 +216,31 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
         : [],
     [assignedRoleKey, systemRole, systemRoleLoaded],
   )
-  // Whether a role carries «الشركات المسؤول عنها»: by the permission once the
-  // foreman roles and the user's assignment are read. Until then (or when
-  // they cannot be read) the field stays shown for the original foreman role
-  // and for a user who already has companies, so a save never clears them
-  // unseen.
+  // Whether the summary shows «الشركات والمشاريع»: for a role that records
+  // project movements (by the permission once the foreman roles and the
+  // user's assignment are read, else the original foreman role), and for
+  // any user who already carries assignments.
   const companiesFor = (roleKey: string | null | undefined) =>
     foremanKeys && systemRoleLoaded
       ? isForemanRoleKey(roleKey, foremanKeys)
-      : roleKey === 'supervisor' || (user?.assigned_companies?.length ?? 0) > 0
-  const companiesApply = companiesFor(assignedRoleKey || savedAssignedKey)
-  const savedCompaniesApply = user ? companiesFor(savedAssignedKey) : false
+      : roleKey === 'supervisor'
+  const savedCompaniesApply = user
+    ? companiesFor(savedAssignedKey) || assignmentRows.length > 0
+    : false
+  // 0212: users.manage or users.assignments edits the assignments; a caller
+  // who is not the admin never his own account nor an admin's (the database
+  // refuses them too).
+  const assignmentsLock = assignmentsLockOf({
+    callerIsAdmin,
+    callerId: currentUser?.id,
+    targetId: userId,
+    targetIsAdmin: savedAssignedKey === 'admin',
+  })
+  const canEditAssignments =
+    canManageAssignments(permissionState.can) &&
+    systemRoleLoaded &&
+    assignmentsState === 'loaded' &&
+    !assignmentsLock
 
   // The active roles; the current assignment stays visible (disabled) when
   // it is inactive or unknown, as on the roles page.
@@ -312,23 +303,8 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
         setLoadedUserId(userId)
         setFullName(loadedUser.full_name)
         setEmail(loadedUser.email ?? '')
-        const assignedCompanies = (loadedUser.assigned_companies ?? []).map(
-          (company): CompanyOption => ({
-            value: company.id,
-            // Re-localized at render (see `companyOptions`).
-            label: company.name_ar,
-            name_ar: company.name_ar,
-            name_en: company.name_en,
-          }),
-        )
-        setCompanies(assignedCompanies)
         setSavedSnapshot(
-          formSnapshot(
-            loadedUser.full_name,
-            loadedUser.email ?? '',
-            '',
-            assignedCompanies,
-          ),
+          formSnapshot(loadedUser.full_name, loadedUser.email ?? '', ''),
         )
       } catch (cause) {
         if (active) setLoadFailure({ cause })
@@ -382,32 +358,23 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       .from('profile_assignments')
       .select(PROFILE_ASSIGNMENTS_SELECT)
       .eq('profile_id', userId)
+      .order('company_name_ar')
       .then(({ data, error: loadError }) => {
         if (!active) return
         if (loadError) {
-          setProjects([])
-          setProjectsLoad({ userId, state: 'failed', saved: '', options: [] })
+          setAssignmentsLoad({ userId, state: 'failed', rows: [] })
           return
         }
-        const saved = assignedProjectsOf(
-          (data ?? []) as ProfileAssignmentRow[],
-          'ar',
-        )
-        setProjects(saved)
-        setProjectsLoad({
+        setAssignmentsLoad({
           userId,
           state: 'loaded',
-          saved: saved
-            .map((project) => project.value)
-            .sort()
-            .join(','),
-          options: saved,
+          rows: (data ?? []) as ProfileAssignmentRow[],
         })
       })
     return () => {
       active = false
     }
-  }, [projectsReloadKey, userId])
+  }, [assignmentsReloadKey, userId])
 
   useEffect(() => {
     let active = true
@@ -447,92 +414,6 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
     return () => window.removeEventListener('beforeunload', warnBeforeUnload)
   }, [hasUnsavedChanges])
 
-  const loadCompanies = useCallback(
-    async (search: string): Promise<CompanyOption[]> => {
-      let query = supabase
-        .from('companies')
-        .select('id,name_ar,name_en')
-        .order(lang === 'ar' ? 'name_ar' : 'name_en')
-        .limit(20)
-      const searchFilter = buildSearchFilter(
-        COMPANY_PROJECT_SEARCH_FIELDS,
-        search,
-      )
-      if (searchFilter) query = query.or(searchFilter)
-      const { data } = await query
-      return (data ?? []).map((company) => ({
-        value: company.id,
-        label: localizedName(lang, company.name_ar, company.name_en),
-        name_ar: company.name_ar,
-        name_en: company.name_en,
-      }))
-    },
-    [lang],
-  )
-
-  const loadAllCompanies = useCallback(async (): Promise<CompanyOption[]> => {
-    const { data } = await supabase
-      .from('companies')
-      .select('id,name_ar,name_en')
-      .order(lang === 'ar' ? 'name_ar' : 'name_en')
-    return (data ?? []).map((company) => ({
-      value: company.id,
-      label: localizedName(lang, company.name_ar, company.name_en),
-      name_ar: company.name_ar,
-      name_en: company.name_en,
-    }))
-  }, [lang])
-
-  const companyIdsKey = companies.map((company) => company.value).join(',')
-  const loadProjects = useMemo(
-    () =>
-      companiesProjectLoader(
-        supabase,
-        companyIdsKey ? companyIdsKey.split(',') : [],
-        lang,
-      ),
-    [companyIdsKey, lang],
-  )
-  const projectOptions = useMemo(
-    () =>
-      projects.map((project) => ({
-        ...project,
-        label: localizedName(lang, project.name_ar, project.name_en),
-      })),
-    [projects, lang],
-  )
-  // The saved projects in the active language (the summary).
-  const savedProjectNames = useMemo(
-    () =>
-      (projectsLoad?.userId === userId ? projectsLoad.options : []).map(
-        (project) => ({
-          ...project,
-          label: localizedName(lang, project.name_ar, project.name_en),
-        }),
-      ),
-    [lang, projectsLoad, userId],
-  )
-  /** The companies changed: their projects that left go with them. */
-  const changeCompanies = (next: CompanyOption[]) => {
-    setCompanies(next)
-    setProjects((current) =>
-      projectsWithinCompanies(
-        current,
-        next.map((company) => company.value),
-      ),
-    )
-  }
-
-  // The selected companies with their labels in the active language.
-  const companyOptions = useMemo(
-    () =>
-      companies.map((company) => ({
-        ...company,
-        label: localizedName(lang, company.name_ar, company.name_en),
-      })),
-    [companies, lang],
-  )
-
   async function handleSave() {
     setError(null)
     setMobileError(null)
@@ -561,12 +442,24 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       // 1. The record itself, through the Edge Function as before. Skipped
       //    only when the mobile number and/or the assignment alone changed,
       //    so correcting a number (or assigning a role) does not rewrite the
-      //    login details and company assignments.
-      const saveMain =
-        mainChanged || (!mobileChanged && !assignStep && !projectsChanged)
+      //    login details.
+      const saveMain = mainChanged || (!mobileChanged && !assignStep)
       if (saveMain) {
         const nextFullName = fullName.trim()
         const nextEmail = email.trim()
+        // 0212: the companies are edited in their own dialog (here or in
+        // Settings), never by this form. manage-user still replaces the
+        // links with the list it receives, so it gets the companies stored
+        // RIGHT NOW: it then changes none (it writes only the ones that
+        // differ). A failed read saves nothing, never an empty list.
+        const { data: storedLinks, error: linksError } = await supabase
+          .from('profile_companies')
+          .select('company_id')
+          .eq('profile_id', userId)
+        if (linksError) {
+          setError(t('userAssignmentsCompaniesLoadError'))
+          return
+        }
         try {
           await callManageUser({
             action: 'update',
@@ -574,9 +467,9 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             full_name: nextFullName,
             email: nextEmail,
             password,
-            company_ids: companiesApply
-              ? companies.map((item) => item.value)
-              : [],
+            company_ids: (storedLinks ?? []).map((link) =>
+              String(link.company_id),
+            ),
           })
         } catch (cause) {
           // Nothing was written: the number is not attempted either, and
@@ -599,21 +492,10 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
         // every field the update just wrote.
         setUser((current) =>
           current
-            ? {
-                ...current,
-                full_name: nextFullName,
-                email: nextEmail,
-                assigned_companies: companiesApply
-                  ? companies.map((company) => ({
-                      id: company.value,
-                      name_ar: company.name_ar,
-                      name_en: company.name_en,
-                    }))
-                  : [],
-              }
+            ? { ...current, full_name: nextFullName, email: nextEmail }
             : current,
         )
-        setSavedSnapshot(formSnapshot(nextFullName, nextEmail, '', companies))
+        setSavedSnapshot(formSnapshot(nextFullName, nextEmail, ''))
       }
 
       // 1b. The assignment, when the plan needs it. The record above is
@@ -645,40 +527,6 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           return
         }
         applyAssignment(assignStep.roleKey)
-      }
-
-      // 1c. The projects (0176), when they changed: one call with the
-      //     companies on the form, so both sets agree. What step 1 saved
-      //     stays saved and is said to be saved. Also after every save of
-      //     the record with the companies field (owner 2026-11-07, «تختفي
-      //     المشاريع»): manage-user rewrote the company links, and the 0176
-      //     trigger dropped the projects with them, so the projects on the
-      //     form are written again. Never after a failed projects read.
-      const rewriteProjects =
-        saveMain && companiesApply && projectsState === 'loaded'
-      if (projectsChanged || rewriteProjects) {
-        const { error: projectsError } = await supabase.rpc(
-          'admin_set_profile_assignments',
-          {
-            p_profile_id: userId,
-            p_company_ids: companiesApply
-              ? companies.map((company) => company.value)
-              : [],
-            p_project_ids: companiesApply
-              ? projects.map((project) => project.value)
-              : [],
-          },
-        )
-        if (projectsError) {
-          setError(t(assignmentSaveMessage(projectsError)))
-          return
-        }
-        setProjectsLoad({
-          userId,
-          state: 'loaded',
-          saved: projectIdsKey,
-          options: projects,
-        })
       }
 
       // 2. The mobile number, only when it changed. Its failure is reported
@@ -828,52 +676,48 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
       label: t('createdAt'),
       value: user.created_at ? formatDate(user.created_at) : null,
     },
-    ...(savedCompaniesApply
+    // 0212: the companies and projects, one line per company, with «تعديل
+    // الاسناد» for whoever may edit them (the approved design).
+    ...(savedCompaniesApply || assignmentsState === 'failed'
       ? [
           {
-            key: 'assignedCompanies',
-            label: t('assignedCompanies'),
-            value: user.assigned_companies?.length ? (
-              <span className="flex flex-wrap gap-1.5">
-                {user.assigned_companies.map((company) => (
-                  // A long name wraps inside its badge on a phone.
-                  <Badge
-                    key={company.id}
-                    tone="neutral"
-                    className="max-w-full !shrink !whitespace-normal break-words"
+            key: 'assignments',
+            label: t('userAssignmentsColumn'),
+            value:
+              assignmentsState === 'failed' ? (
+                <span className="inline-flex flex-wrap items-center gap-2 font-normal text-danger">
+                  {t('userAssignmentsLoadError')}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setAssignmentsReloadKey((key) => key + 1)}
                   >
-                    {localizedName(lang, company.name_ar, company.name_en)}
-                  </Badge>
-                ))}
-              </span>
-            ) : null,
-            // On the grid cell, so the badges get the whole row.
+                    {t('retry')}
+                  </Button>
+                </span>
+              ) : assignmentsState === 'loading' ? (
+                <span className="flex h-6 items-center" aria-busy="true">
+                  <Skeleton variant="text" className="h-4 w-40" />
+                  <span className="sr-only">{t('loading')}</span>
+                </span>
+              ) : (
+                <span className="flex flex-col items-start gap-2 font-normal">
+                  <AssignmentLines rows={assignmentRows} />
+                  {canEditAssignments && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={<Pencil size={14} aria-hidden="true" />}
+                      onClick={() => setAssignmentsOpen(true)}
+                    >
+                      {t('userAssignmentsEdit')}
+                    </Button>
+                  )}
+                </span>
+              ),
+            // On the grid cell, so the lines get the whole row.
             cellClassName: 'sm:col-span-2',
           },
-          ...(user.assigned_companies?.length && projectsState === 'loaded'
-            ? [
-                {
-                  key: 'assignedProjects',
-                  label: t('assignedProjects'),
-                  value: savedProjectNames.length ? (
-                    <span className="flex flex-wrap gap-1.5">
-                      {savedProjectNames.map((project) => (
-                        <Badge
-                          key={project.value}
-                          tone="neutral"
-                          className="max-w-full !shrink !whitespace-normal break-words"
-                        >
-                          {project.label}
-                        </Badge>
-                      ))}
-                    </span>
-                  ) : (
-                    t('assignedProjectsAll')
-                  ),
-                  cellClassName: 'sm:col-span-2',
-                },
-              ]
-            : []),
         ]
       : []),
   ]
@@ -905,6 +749,11 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           items={accountItems}
           columns={2}
         />
+        {assignmentsSaved && (
+          <Notice tone="success" size="compact">
+            {t('userAssignmentsSaved').replace('{name}', user.full_name)}
+          </Notice>
+        )}
       </div>
       <div className="card space-y-4">
         <SectionHeader title={t('editUser')} />
@@ -985,7 +834,6 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
                 onValueChange={(value) => {
                   clearError('role')
                   setAssignedRoleKey(value)
-                  if (!companiesFor(value)) changeCompanies([])
                 }}
                 options={assignedRoleOptions}
               />
@@ -1037,63 +885,6 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
             )}
           </Field>
         </div>
-        {companiesApply && (
-          <Field
-            label={t('assignedCompanies')}
-            hint={t('assignedCompaniesHelp')}
-          >
-            {() => (
-              <AsyncMultiSelect
-                value={companyOptions}
-                // Every option comes from the loaders of this screen, which
-                // always carry both names.
-                onChange={(next) => changeCompanies(next as CompanyOption[])}
-                loadOptions={loadCompanies}
-                loadAllOptions={loadAllCompanies}
-                placeholder={t('selectCompanies')}
-              />
-            )}
-          </Field>
-        )}
-        {companiesApply && companies.length > 0 && (
-          <Field
-            label={t('assignedProjects')}
-            hint={
-              projectsState === 'failed'
-                ? undefined
-                : projects.length
-                  ? t('assignedProjectsSomeHint')
-                  : t('assignedProjectsHelp')
-            }
-            error={
-              projectsState === 'failed' ? (
-                <span className="inline-flex flex-wrap items-center gap-2">
-                  {t('assignedProjectsLoadError')}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setProjectsReloadKey((key) => key + 1)}
-                  >
-                    {t('retry')}
-                  </Button>
-                </span>
-              ) : undefined
-            }
-          >
-            {() => (
-              <AsyncMultiSelect
-                // Re-mounted when the companies change, so its options
-                // follow them.
-                key={companyIdsKey}
-                value={projectOptions}
-                onChange={(next) => setProjects(next as ProjectOption[])}
-                loadOptions={loadProjects}
-                placeholder={t('assignedProjectsAll')}
-                disabled={projectsState !== 'loaded'}
-              />
-            )}
-          </Field>
-        )}
         <div className="flex justify-end gap-3 pt-2">
           <Button variant="outline" onClick={handleBack}>
             {t('cancel')}
@@ -1112,6 +903,25 @@ export function UserDetail({ userId, onBack }: UserDetailProps) {
           )}
         </div>
       </div>
+      {canEditAssignments && (
+        <UserAssignmentsDialog
+          open={assignmentsOpen}
+          onOpenChange={setAssignmentsOpen}
+          userId={userId}
+          userName={user.full_name}
+          subtitle={savedRoleLabel}
+          initial={assignmentsFromRows(assignmentRows, lang)}
+          onSaved={(saved) => {
+            setAssignmentsLoad({
+              userId,
+              state: 'loaded',
+              rows: rowsFromAssignments(saved),
+            })
+            setAssignmentsOpen(false)
+            setAssignmentsSaved(true)
+          }}
+        />
+      )}
       {confirmDialog}
     </div>
   )

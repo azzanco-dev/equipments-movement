@@ -976,6 +976,9 @@ test('after 0127 no live policy or function tests a role name, except by design'
     'admin_upsert_role',
     'admin_set_role_permissions',
     'admin_assign_profile_role',
+    // 0212: the 0211 rule — a caller who is not the admin never changes his
+    // own or an admin's assignments.
+    'admin_set_profile_assignments',
     'admin_delete_role',
     'admin_roles_system_offenders',
     'admin_roles_system_preview',

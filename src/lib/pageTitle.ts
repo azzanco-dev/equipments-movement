@@ -75,6 +75,12 @@ const PAGE_TITLES: Readonly<
     name: 'quotationTermsSettings',
     section: 'settings',
   },
+  // 0212: «اسناد الشركات والمشاريع · الاعدادات».
+  'settings/assignments': {
+    kind: 'sub',
+    name: 'userAssignments',
+    section: 'settings',
+  },
   'settings/roles': {
     kind: 'sub',
     name: 'rolesSettingsTitle',

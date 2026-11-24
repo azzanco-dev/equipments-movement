@@ -191,6 +191,10 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
       // is a card of the Settings hub, so its holders reach the hub too; every
       // other card there keeps its own gate.
       { key: 'movements.site.add_past_visit' },
+      // 0212 (owner 2026-11-24): «اسناد الشركات والمشاريع» is a card of the
+      // hub, open to users.manage and to the new users.assignments.
+      { key: 'users.manage' },
+      { key: 'users.assignments' },
     ],
   },
 ]
@@ -309,6 +313,7 @@ export type RoutePage =
   | 'settings/afaqy'
   | 'settings/banks'
   | 'settings/quotation-terms'
+  | 'settings/assignments'
   | 'settings/roles'
   | 'movements/new'
   | 'movements/:id'
@@ -336,6 +341,11 @@ const PAGE_GATES: Readonly<Record<ExtraPage, readonly NavGate[]>> = {
   'settings/banks': [{ key: 'lessors.edit' }],
   // 0199: the quotation terms template, written by the approvers only.
   'settings/quotation-terms': [{ key: 'sales.quotations.approve' }],
+  // 0212: the users' companies and projects, apart from the user page.
+  'settings/assignments': [
+    { key: 'users.manage' },
+    { key: 'users.assignments' },
+  ],
   'settings/roles': [{ key: 'settings.roles' }],
   'movements/new': [
     { key: 'movements.site.create' },
@@ -392,6 +402,7 @@ const SETTINGS_SUBPAGES: ReadonlySet<string> = new Set([
   'afaqy',
   'banks',
   'quotation-terms',
+  'assignments',
 ])
 
 /**
@@ -517,6 +528,7 @@ const ADMIN_SHELL_PAGES: readonly RoutePage[] = [
   'settings/afaqy',
   'settings/banks',
   'settings/quotation-terms',
+  'settings/assignments',
   'settings/roles',
   'movements/new',
   'movements/:id',

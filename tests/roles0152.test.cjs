@@ -96,10 +96,14 @@ test('the companies of a user follow the role permission', () => {
   const page = read('src', 'screens', 'UserDetail.tsx')
   // Roles stage 4c-2 (0156): no legacy fallback; until the roles are read
   // the field stays shown for the foreman role and a user with companies.
-  assert.match(page, /foremanKeys && systemRoleLoaded\s+\? isForemanRoleKey\(roleKey, foremanKeys\)\s+: roleKey === 'supervisor' \|\|\s+\(user\?\.assigned_companies\?\.length \?\? 0\) > 0/)
+  // 0212 (owner 2026-11-24): the companies are edited in their own dialog;
+  // the summary shows them for a foreman role or a user who carries some.
+  assert.match(page, /foremanKeys && systemRoleLoaded\s+\? isForemanRoleKey\(roleKey, foremanKeys\)\s+: roleKey === 'supervisor'/)
+  assert.match(page, /companiesFor\(savedAssignedKey\) \|\| assignmentRows\.length > 0/)
   assert.doesNotMatch(page, /legacy === 'supervisor'/)
-  assert.match(page, /company_ids: companiesApply/)
-  assert.match(page, /\{companiesApply && \(/)
+  // manage-user gets the companies stored right now, so it changes none.
+  assert.match(page, /\.from\('profile_companies'\)\s+\.select\('company_id'\)\s+\.eq\('profile_id', userId\)/)
+  assert.doesNotMatch(page, /company_ids: companiesApply/)
   assert.match(page, /\.\.\.\(savedCompaniesApply/)
   const fn = read('supabase', 'functions', 'manage-user', 'index.ts')
   assert.match(fn, /if \(addedIds\.length > 0\) \{/)

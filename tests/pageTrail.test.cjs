@@ -244,8 +244,9 @@ test('App feeds the trail and every detail page uses the back rule', () => {
   assert.match(read('src', 'components', 'roles', 'RolesSettings.tsx'), /confirmLeave=\{confirmDiscard\}/)
   // the settings sub-pages go back by the rule too
   const settings = read('src', 'screens', 'AdminSettings.tsx')
-  // (0199: the quotation terms page is the fifth.)
-  assert.equal(settings.split('onBack={backToSettings}').length - 1, 5)
+  // (0199: the quotation terms page is the fifth; 0212: the assignments
+  // page the sixth.)
+  assert.equal(settings.split('onBack={backToSettings}').length - 1, 6)
   // the header renders the trail, never the bare back button
   const header = read('src', 'components', 'ui', 'PageHeader.tsx')
   assert.match(header, /<PageTrailBar\s+onBack=\{onBack\}/)

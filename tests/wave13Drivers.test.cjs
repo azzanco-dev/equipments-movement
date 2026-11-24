@@ -336,6 +336,17 @@ test('the drivers list hides the external supplier by default, NULL kept', () =>
           value: '2026-08-01',
         },
       ])
+    // 0212: Settings › «اسناد الشركات والمشاريع» opens on the users whose
+    // role records project movements (the foremen).
+    else if (config === configs.userAssignmentsListConfig)
+      assert.deepEqual(plain(config.defaultFilters), [
+        {
+          id: 'default-records-projects',
+          field: 'records_projects',
+          operator: 'eq',
+          value: 'true',
+        },
+      ])
     else if (config !== driversListConfig)
       assert.equal(config.defaultFilters, undefined, config.id)
 })

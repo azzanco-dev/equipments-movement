@@ -79,6 +79,7 @@ const SPECS: Partial<Record<RoutePage, TrailSpec>> = {
     parents: [SETTINGS],
     name: 'quotationTermsSettings',
   },
+  'settings/assignments': { parents: [SETTINGS], name: 'userAssignments' },
   'settings/roles': { parents: [SETTINGS], name: 'rolesSettingsTitle' },
 }
 

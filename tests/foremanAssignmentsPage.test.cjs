@@ -87,31 +87,29 @@ test('the movement form scope: whole companies and narrowed projects', () => {
   has(read('src', 'components', 'movement', 'useMovementFormOptions.ts'), 'projectScopeOf(rows)')
 })
 
-test('the user page: a projects field under the companies, saved in one call', () => {
-  const page = read('src', 'screens', 'UserDetail.tsx')
-  has(page, "label={t('assignedProjects')}")
-  has(page, '{companiesApply && companies.length > 0 && (')
+test('the projects field lives in the shared dialog, saved in one call (0212)', () => {
+  // Since 2026-11-24 (migration 0212) the two fields left the user page's
+  // form for ONE dialog, opened from the page and from Settings.
+  const dialog = read('src', 'components', 'assignments', 'UserAssignmentsDialog.tsx')
+  has(dialog, "label={t('assignedProjects')}")
+  has(dialog, '{companies.length > 0 && (')
   // Its options are the projects of the chosen companies (server side, 20).
-  has(page, 'companiesProjectLoader(')
+  has(dialog, 'companiesProjectLoader(')
   const loader = read('src', 'lib', 'foremanAssignments.ts')
   has(loader, ".in('company_projects.company_id', Array.from(companyIds))")
   has(loader, '.limit(20)')
-  // Read from the view, written by the 0176 function, apart from manage-user.
-  has(page, ".from('profile_assignments')")
-  has(page, "'admin_set_profile_assignments'")
-  has(page, 'setError(t(assignmentSaveMessage(projectsError)))')
-  // A projects-only change does not rewrite the record through manage-user.
-  has(page, '!mobileChanged && !assignStep && !projectsChanged')
+  has(dialog, "'admin_set_profile_assignments'")
   // Removing a company drops its projects; the field follows the companies.
-  has(page, 'projectsWithinCompanies(')
-  has(page, 'key={companyIdsKey}')
-  // A failed read locks the field and offers a retry, never an empty list.
-  has(page, "disabled={projectsState !== 'loaded'}")
-  has(page, "t('assignedProjectsLoadError')")
-  has(page, "key: 'assignedProjects'")
+  has(dialog, 'projectsWithinCompanies(')
+  has(dialog, 'key={companyIdsKey}')
+  // The user page reads the view and shows a failed read with a retry.
+  const page = read('src', 'screens', 'UserDetail.tsx')
+  has(page, ".from('profile_assignments')")
+  has(page, "t('userAssignmentsLoadError')")
+  assert.doesNotMatch(page, /<AsyncMultiSelect/)
 })
 
-test('a later save never drops the projects (owner 2026-11-07, «تختفي المشاريع»)', () => {
+test('a later save never drops the companies or the projects (owner 2026-11-07, «تختفي المشاريع»)', () => {
   // manage-user changes only the companies that changed: deleting every
   // link fired the 0176 prune trigger, which removed all the projects.
   const fn = read('supabase', 'functions', 'manage-user', 'index.ts')
@@ -119,13 +117,11 @@ test('a later save never drops the projects (owner 2026-11-07, «تختفي ال
   assert.match(fn, /const addedIds = companyIds\.filter\(\(id\) => !currentIds\.has\(id\)\)/)
   assert.match(fn, /\.delete\(\)\s*\.eq\('profile_id', userId\)\s*\.in\('company_id', removedIds\)/)
   assert.doesNotMatch(fn, /\.delete\(\)\s*\.eq\('profile_id', userId\)\s*if/)
-  // The user page writes the projects again after every save of the record
-  // with the companies field, and saves nothing while nothing changed.
+  // 0212: the user page sends the companies stored right now, so
+  // manage-user changes none; a failed read saves nothing.
   const page = read('src', 'screens', 'UserDetail.tsx')
-  assert.match(
-    page,
-    /const rewriteProjects =\s+saveMain && companiesApply && projectsState === 'loaded'\s+if \(projectsChanged \|\| rewriteProjects\) \{/,
-  )
+  assert.match(page, /if \(linksError\) \{\s+setError\(t\('userAssignmentsCompaniesLoadError'\)\)\s+return\s+\}/)
+  assert.match(page, /company_ids: \(storedLinks \?\? \[\]\)\.map/)
   assert.match(page, /disabled=\{!hasUnsavedChanges\}\s+onClick=\{handleSave\}/)
 })
 

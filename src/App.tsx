@@ -888,7 +888,8 @@ function AppContent() {
               page === 'settings/workshop-opening-balance' ||
               page === 'settings/afaqy' ||
               page === 'settings/banks' ||
-              page === 'settings/quotation-terms') && <AdminSettings />}
+              page === 'settings/quotation-terms' ||
+              page === 'settings/assignments') && <AdminSettings />}
           </>
         )}
       </Layout>
