@@ -162,6 +162,30 @@ test('rows ↔ dialog values: companies by name, projects under their company', 
   )
 })
 
+test('the count words of the table and the details', () => {
+  assert.equal(lib.companyCountWords(1, 'ar'), 'شركة واحدة')
+  assert.equal(lib.companyCountWords(2, 'ar'), 'شركتين')
+  assert.equal(lib.companyCountWords(9, 'ar'), '9 شركات')
+  assert.equal(lib.companyCountWords(11, 'ar'), '11 شركة')
+  assert.equal(lib.companyCountWords(1, 'en'), '1 company')
+  assert.equal(lib.pickedProjectWords(1, 'ar'), 'مشروع محدد')
+  assert.equal(lib.pickedProjectWords(2, 'ar'), 'مشروعين محددين')
+  assert.equal(lib.pickedProjectWords(4, 'ar'), '4 مشاريع محددة')
+  assert.equal(lib.pickedProjectWords(12, 'en'), '12 selected projects')
+  const row = (id, projects) => ({
+    company_id: id,
+    company_name_ar: 'شركة ' + id,
+    company_name_en: null,
+    project_ids: projects,
+    project_names_ar: projects,
+    project_names_en: projects.map(() => null),
+  })
+  const rows = [row('ا', ['p1', 'p2']), row('ب', []), row('ج', ['p3'])]
+  assert.deepEqual(plain(lib.assignmentCounts(rows)), { companies: 3, projects: 3 })
+  assert.equal(lib.firstCompanyNames(rows, 'ar'), 'شركة ا، شركة ب…')
+  assert.equal(lib.firstCompanyNames(rows.slice(0, 2), 'ar'), 'شركة ا، شركة ب')
+})
+
 test('the page: Settings card and route, gates, trail and title', () => {
   const nav = read('src', 'lib', 'navPermissions.ts')
   assert.match(
@@ -188,7 +212,15 @@ test('the list: the foremen only, the overlap company filter', () => {
   assert.match(screen, /\.filter\(\(key\) => !USER_ASSIGNMENT_COLUMN_FILTERS\.has\(key\)\)/)
   assert.match(screen, /<ErrorState\s+description=\{t\('userAssignmentsLoadError'\)\}/)
   assert.match(screen, /className="hidden md:block"/)
-  assert.match(screen, /className="space-y-3 md:hidden"/)
+  assert.match(screen, /className="space-y-2 md:hidden"/)
+  // «نموذج 2» (owner 2026-11-24): counts in the table, every company in the
+  // details — a panel beside it from lg, a dialog below.
+  assert.match(screen, /const SIDE_PANEL_QUERY = '\(min-width: 1024px\)'/)
+  assert.match(screen, /\{panelFits && selected && \(\s+<aside/)
+  assert.match(screen, /\{!panelFits && selected && \(\s+<Dialog/)
+  assert.match(screen, /<AssignmentLines rows=\{row\.assignments\} compact divided \/>/)
+  assert.match(screen, /onRowClick=\{toggle\}/)
+  assert.doesNotMatch(screen, /cell: \(row\) => <AssignmentLines/)
   const configs = read('src', 'lib', 'listConfigs.ts')
   const config = configs.slice(configs.indexOf('export const userAssignmentsListConfig'))
   assert.doesNotMatch(config.slice(0, config.indexOf('\n}\n')), /records_projects|defaultFilters/)

@@ -306,3 +306,46 @@ export function rowsFromAssignments(
       }
     })
 }
+
+// Model 2 of the page (owner 2026-11-24, «نموذج 2», approved in Figma): the
+// table shows counts only, the side panel every company.
+
+/** A foreman's counts: his companies and the projects he is narrowed to. */
+export function assignmentCounts(rows: readonly AssignmentCompanyRow[]): {
+  companies: number
+  projects: number
+} {
+  return {
+    companies: rows.length,
+    projects: rows.reduce((total, row) => total + row.project_ids.length, 0),
+  }
+}
+
+/** «شركة واحدة», «شركتين», «5 شركات», «11 شركة» / "1 company", "5 companies". */
+export function companyCountWords(count: number, lang: Lang): string {
+  if (lang === 'en') return `${count} ${count === 1 ? 'company' : 'companies'}`
+  if (count === 1) return 'شركة واحدة'
+  if (count === 2) return 'شركتين'
+  return count <= 10 ? `${count} شركات` : `${count} شركة`
+}
+
+/** «مشروع محدد», «مشروعين محددين», «4 مشاريع محددة», «11 مشروع محدد». */
+export function pickedProjectWords(count: number, lang: Lang): string {
+  if (lang === 'en')
+    return `${count} selected ${count === 1 ? 'project' : 'projects'}`
+  if (count === 1) return 'مشروع محدد'
+  if (count === 2) return 'مشروعين محددين'
+  return count <= 10 ? `${count} مشاريع محددة` : `${count} مشروع محدد`
+}
+
+/** The first company names of the table's line, «…» when there are more. */
+export function firstCompanyNames(
+  rows: readonly AssignmentCompanyRow[],
+  lang: Lang,
+  shown = 2,
+): string {
+  const names = rows
+    .slice(0, shown)
+    .map((row) => localizedName(lang, row.company_name_ar, row.company_name_en))
+  return names.join(lang === 'ar' ? '، ' : ', ') + (rows.length > shown ? '…' : '')
+}

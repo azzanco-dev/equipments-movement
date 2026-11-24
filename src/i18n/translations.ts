@@ -870,6 +870,9 @@ export const translations = {
     userAssignmentsRecordsProjects: 'يسجل حركات مشاريع',
     userAssignmentsHasAny: 'عليه اسناد',
     userAssignmentsCompaniesLoadError: 'تعذر قراءة الشركات المسؤول عنها قبل الحفظ. حاول مرة اخرى.',
+    userAssignmentsProjectsPicked: '{count} محددة',
+    userAssignmentsDetails: 'تفاصيل الاسناد',
+    userAssignmentsOpenDetails: 'عرض التفاصيل',
     // user assignments — end
     // banks — start (migration 0177: the banks list, Settings › «البنوك»)
     banks: 'البنوك',
@@ -4544,6 +4547,9 @@ export const translations = {
     userAssignmentsRecordsProjects: 'Records project movements',
     userAssignmentsHasAny: 'Has assignments',
     userAssignmentsCompaniesLoadError: 'Could not read the assigned companies before saving. Try again.',
+    userAssignmentsProjectsPicked: '{count} picked',
+    userAssignmentsDetails: 'Assignment details',
+    userAssignmentsOpenDetails: 'Show details',
     // user assignments — end
     // banks — start (migration 0177: the banks list, Settings › «البنوك»)
     banks: 'Banks',

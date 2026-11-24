@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Pencil, Users } from 'lucide-react'
+import { ChevronRight, Pencil, Users, X } from 'lucide-react'
 import { useAuth } from '@/auth/AuthContext'
 import { usePermissions } from '@/auth/PermissionsContext'
 import { AssignmentLines } from '@/components/assignments/AssignmentLines'
@@ -14,12 +14,13 @@ import { useActiveRoles } from '@/components/roles/useActiveRoles'
 import { foremanRoleKeys } from '@/lib/rolePermissionHolders'
 import {
   Badge,
+  Button,
   DataTable,
+  Dialog,
   EmptyState,
   ErrorState,
   IconButton,
   Skeleton,
-  Tooltip,
   useToast,
   type DataTableColumn,
 } from '@/components/ui'
@@ -29,9 +30,13 @@ import { applyListFilters } from '@/lib/applyListFilters'
 import {
   USER_ASSIGNMENT_COLUMN_FILTERS,
   USER_ASSIGNMENT_LIST_SELECT,
+  assignmentCounts,
   assignmentsFromRows,
   assignmentsLockOf,
+  companyCountWords,
   filterIds,
+  firstCompanyNames,
+  pickedProjectWords,
   rowsFromAssignments,
   type UserAssignmentListRow,
 } from '@/lib/foremanAssignments'
@@ -39,18 +44,37 @@ import { userAssignmentsListConfig } from '@/lib/listConfigs'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 
+/** The width from which the details sit beside the table (`lg`); below it
+ *  they open in a dialog. */
+const SIDE_PANEL_QUERY = '(min-width: 1024px)'
+
+function useSidePanelFits(): boolean {
+  const [fits, setFits] = useState(false)
+  useEffect(() => {
+    const query = window.matchMedia(SIDE_PANEL_QUERY)
+    const update = () => setFits(query.matches)
+    update()
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+  return fits
+}
+
 /**
  * Settings › «اسناد الشركات والمشاريع» (/settings/assignments, migration 0212,
  * owner 2026-11-24, «نبغى نخلي اسنادات الشركات والمشاريع للمستخدمين مهمة
- * منفصلة عن صفحة المستخدم», design approved in Figma): every user who is not
- * an admin over `user_assignment_list`, server-side searched by name,
- * filtered by role, company, «يسجل حركات مشاريع» (the foremen, a visible
- * removable default) and «عليه اسناد», sorted and paged through the unified
- * list system. Each user shows his companies, one line each with its
- * projects or «كل المشاريع»; the pencil opens `UserAssignmentsDialog`. The
- * page is open to users.manage and users.assignments; the caller's own
- * account is locked unless he is the admin (the database refuses it too).
- * Below md each user is a card.
+ * منفصلة عن صفحة المستخدم»; «ضمن الفورمينس فقط»; the layout is «نموذج 2»
+ * of the Figma models, chosen the same day because a foreman with many
+ * companies took too much room): the FOREMEN only over
+ * `user_assignment_list`, server-side searched by name, filtered by role,
+ * company and «عليه اسناد», sorted and paged through the unified list system.
+ * The table shows counts only — «9 شركات» with the first two names under it,
+ * «4 محددة» or «كل المشاريع» — so every row keeps one height; a row opens
+ * the details: from `lg` a panel beside the table, below it a dialog. The
+ * details list every company with its projects and carry «تعديل الاسناد»
+ * (`UserAssignmentsDialog`). The page is open to users.manage and
+ * users.assignments; the caller's own account is locked unless he is the
+ * admin (the database refuses it too). Below md each foreman is a card.
  */
 export function UserAssignmentsSettings() {
   const { t, lang } = useI18n()
@@ -63,7 +87,9 @@ export function UserAssignmentsSettings() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editing, setEditing] = useState<UserAssignmentListRow | null>(null)
+  const panelFits = useSidePanelFits()
   const { roles: activeRoles } = useActiveRoles(true)
   // The foreman roles (they record project movements, the admin aside): the
   // role filter offers these only, as the list holds their users only.
@@ -167,6 +193,12 @@ export function UserAssignmentsSettings() {
     fetchRows()
   }, [fetchRows])
 
+  // The details follow the rows on screen: a foreman who left the page (a
+  // search, a filter, another page) closes them.
+  const selected = rows.find((row) => row.id === selectedId) ?? null
+  const toggle = (row: UserAssignmentListRow) =>
+    setSelectedId((current) => (current === row.id ? null : row.id))
+
   const filtered = Boolean(list.search.trim()) || list.filters.length > 0
   const lockOf = (row: UserAssignmentListRow) =>
     assignmentsLockOf({
@@ -178,28 +210,20 @@ export function UserAssignmentsSettings() {
     })
   const roleLabel = (row: UserAssignmentListRow) =>
     row.role_key
-      ? roleName(lang, { name_ar: row.role_name_ar ?? row.role_key, name_en: row.role_name_en ?? row.role_key })
+      ? roleName(lang, {
+          name_ar: row.role_name_ar ?? row.role_key,
+          name_en: row.role_name_en ?? row.role_key,
+        })
       : t('roleUsersNoRole')
-
-  const editButton = (row: UserAssignmentListRow) => {
-    const lock = lockOf(row)
-    const button = (
-      <IconButton
-        size="sm"
-        label={t('userAssignmentsEdit')}
-        icon={<Pencil size={15} aria-hidden="true" />}
-        disabled={Boolean(lock)}
-        onClick={() => setEditing(row)}
-      />
-    )
-    if (!lock) return button
-    const reason: TranslationKey =
-      lock === 'own' ? 'userAssignmentsOwnLocked' : 'userAssignmentsAdminLocked'
-    return (
-      <Tooltip content={t(reason)}>
-        <span className="inline-flex">{button}</span>
-      </Tooltip>
-    )
+  /** «9 شركات · 4 مشاريع محددة», «شركتين · كل المشاريع», «بدون اسناد». */
+  const countsLine = (row: UserAssignmentListRow) => {
+    const counts = assignmentCounts(row.assignments)
+    if (!counts.companies) return t('userAssignmentsNone')
+    return `${companyCountWords(counts.companies, lang)} · ${
+      counts.projects
+        ? pickedProjectWords(counts.projects, lang)
+        : t('userAssignmentsAllProjects')
+    }`
   }
 
   const userCell = (row: UserAssignmentListRow) => (
@@ -215,28 +239,101 @@ export function UserAssignmentsSettings() {
       <span className="text-xs text-muted">{roleLabel(row)}</span>
     </span>
   )
+  const companiesCell = (row: UserAssignmentListRow) => {
+    const counts = assignmentCounts(row.assignments)
+    if (!counts.companies)
+      return <span className="text-muted">{t('userAssignmentsNone')}</span>
+    return (
+      <span className="flex min-w-0 flex-col gap-0.5 text-start">
+        <span className="font-medium">
+          {companyCountWords(counts.companies, lang)}
+        </span>
+        <span className="truncate text-xs text-muted">
+          {firstCompanyNames(row.assignments, lang)}
+        </span>
+      </span>
+    )
+  }
+  const projectsCell = (row: UserAssignmentListRow) => {
+    const counts = assignmentCounts(row.assignments)
+    if (!counts.companies) return <span className="text-muted">—</span>
+    if (!counts.projects)
+      return (
+        <span className="text-muted">{t('userAssignmentsAllProjects')}</span>
+      )
+    return (
+      <span className="tabular-nums">
+        {t('userAssignmentsProjectsPicked').replace(
+          '{count}',
+          String(counts.projects),
+        )}
+      </span>
+    )
+  }
 
   const columns: DataTableColumn<UserAssignmentListRow>[] = [
     {
       key: 'full_name',
       header: t('userAssignmentsUser'),
       sortable: true,
-      width: '15rem',
+      width: '14rem',
       cell: userCell,
     },
     {
-      key: 'assignments',
-      header: t('userAssignmentsColumn'),
-      cell: (row) => <AssignmentLines rows={row.assignments} compact />,
+      key: 'companies',
+      header: t('companies'),
+      cell: companiesCell,
     },
     {
-      key: 'actions',
-      header: <span className="sr-only">{t('actions')}</span>,
-      width: '4rem',
+      key: 'projects',
+      header: t('projects'),
+      width: '9rem',
+      cell: projectsCell,
+    },
+    {
+      key: 'open',
+      header: <span className="sr-only">{t('userAssignmentsOpenDetails')}</span>,
+      width: '3rem',
       align: 'end',
-      cell: editButton,
+      cell: () => (
+        <ChevronRight
+          size={16}
+          aria-hidden="true"
+          className="text-muted rtl-flip"
+        />
+      ),
     },
   ]
+
+  /** The details: the counts, «تعديل الاسناد» (or why it is locked) and
+   *  every company with its projects. */
+  const details = (row: UserAssignmentListRow) => {
+    const lock = lockOf(row)
+    const reason: TranslationKey | null =
+      lock === 'own'
+        ? 'userAssignmentsOwnLocked'
+        : lock === 'admin'
+          ? 'userAssignmentsAdminLocked'
+          : null
+    return (
+      <div className="space-y-3">
+        <p className="text-[13px] text-muted">{countsLine(row)}</p>
+        <Button
+          variant="primary"
+          className="w-full"
+          icon={<Pencil size={15} aria-hidden="true" />}
+          disabled={Boolean(lock)}
+          onClick={() => setEditing(row)}
+        >
+          {t('userAssignmentsEdit')}
+        </Button>
+        {reason && <p className="text-xs text-muted">{t(reason)}</p>}
+        <div className="border-t pt-3">
+          <AssignmentLines rows={row.assignments} compact divided />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -267,41 +364,79 @@ export function UserAssignmentsSettings() {
           }
         />
       ) : (
-        <>
-          <div className="hidden md:block">
-            <DataTable
-              size="md"
-              columns={columns}
-              rows={rows}
-              rowKey={(row) => row.id}
-              loading={loading}
-              loadingRows={6}
-              caption={t('userAssignments')}
-              sort={{ key: list.sort, direction: list.direction }}
-              onSortChange={list.setSort}
-              cellTextClassName="text-[13px]"
-              cellClassName="py-2"
-            />
+        <div className="flex items-start gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="hidden md:block">
+              <DataTable
+                size="md"
+                columns={columns}
+                rows={rows}
+                rowKey={(row) => row.id}
+                loading={loading}
+                loadingRows={6}
+                caption={t('userAssignments')}
+                sort={{ key: list.sort, direction: list.direction }}
+                onSortChange={list.setSort}
+                onRowClick={toggle}
+                rowClassName={(row) =>
+                  row.id === selectedId ? 'bg-surface-hover' : undefined
+                }
+                cellTextClassName="text-[13px]"
+                cellClassName="py-2"
+              />
+            </div>
+            {/* Below md: one card per foreman, the counts only. */}
+            <div className="space-y-2 md:hidden">
+              {loading && rows.length === 0
+                ? Array.from({ length: 4 }, (_, index) => (
+                    <Skeleton key={index} className="h-16 w-full rounded-xl" />
+                  ))
+                : rows.map((row) => (
+                    <button
+                      key={row.id}
+                      type="button"
+                      onClick={() => toggle(row)}
+                      className="card flex w-full items-center justify-between gap-3 p-3 text-start"
+                    >
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        {userCell(row)}
+                        <span className="truncate text-xs text-muted">
+                          {countsLine(row)}
+                        </span>
+                      </span>
+                      <ChevronRight
+                        size={16}
+                        aria-hidden="true"
+                        className="shrink-0 text-muted rtl-flip"
+                      />
+                    </button>
+                  ))}
+            </div>
           </div>
-          {/* Below md: one card per user (the approved phone design). */}
-          <div className="space-y-3 md:hidden">
-            {loading && rows.length === 0
-              ? Array.from({ length: 4 }, (_, index) => (
-                  <Skeleton key={index} className="h-28 w-full rounded-xl" />
-                ))
-              : rows.map((row) => (
-                  <div key={row.id} className="card space-y-2.5 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      {userCell(row)}
-                      {editButton(row)}
-                    </div>
-                    <div className="border-t pt-2.5">
-                      <AssignmentLines rows={row.assignments} compact />
-                    </div>
-                  </div>
-                ))}
-          </div>
-        </>
+          {panelFits && selected && (
+            <aside
+              aria-label={t('userAssignmentsDetails')}
+              className="card sticky top-4 w-[380px] shrink-0 space-y-3 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold">
+                    {selected.full_name}
+                  </h2>
+                  <p className="text-xs text-muted">{roleLabel(selected)}</p>
+                </div>
+                <IconButton
+                  size="sm"
+                  variant="ghost"
+                  label={t('close')}
+                  icon={<X size={16} aria-hidden="true" />}
+                  onClick={() => setSelectedId(null)}
+                />
+              </div>
+              {details(selected)}
+            </aside>
+          )}
+        </div>
       )}
       {!loadError && total > 0 && (
         <DataListPagination
@@ -311,6 +446,20 @@ export function UserAssignmentsSettings() {
           onPage={list.setPage}
           onPageSize={list.setPageSize}
         />
+      )}
+      {/* Below lg the details open in a dialog (hidden while editing). */}
+      {!panelFits && selected && (
+        <Dialog
+          open={!editing}
+          onOpenChange={(open) => {
+            if (!open) setSelectedId(null)
+          }}
+          title={selected.full_name}
+          description={roleLabel(selected)}
+          size="sm"
+        >
+          {details(selected)}
+        </Dialog>
       )}
       {editing && (
         <UserAssignmentsDialog

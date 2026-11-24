@@ -13,10 +13,13 @@ import { localizedName } from '@/lib/localizedName'
 export function AssignmentLines({
   rows,
   compact = false,
+  divided = false,
 }: {
   rows: readonly AssignmentCompanyRow[]
   /** 13 px text (the list's table); the user page keeps 14 px. */
   compact?: boolean
+  /** A thin line between the companies (the Settings page's side panel). */
+  divided?: boolean
 }) {
   const { t, lang } = useI18n()
   const text = compact ? 'text-[13px]' : 'text-sm'
@@ -30,7 +33,9 @@ export function AssignmentLines({
       </span>
     )
   return (
-    <span className="flex flex-col gap-1.5 text-start">
+    <span
+      className={`flex flex-col text-start ${divided ? 'divide-y' : 'gap-1.5'}`}
+    >
       {rows.map((row) => {
         const projects = row.project_ids.map((_, index) =>
           localizedName(
@@ -42,7 +47,7 @@ export function AssignmentLines({
         return (
           <span
             key={row.company_id}
-            className="flex flex-wrap items-center gap-x-2 gap-y-1"
+            className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${divided ? 'py-2.5 first:pt-0 last:pb-0' : ''}`}
           >
             <Badge
               tone="neutral"
