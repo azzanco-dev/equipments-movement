@@ -67,11 +67,6 @@ function NavControl({
 
 type NavItem = LayoutProps['navItems'][number]
 
-/** The labels of the items that are not selected: lighter than the text
- *  colour (owner «لون النص خليه خفيف مش اسود كاتم», 2026-11-23; 50% since
- *  2026-11-24, «اخف من الاسود بنسبة 50», it was 72%). */
-const SOFT_TEXT = 'text-[color-mix(in_srgb,var(--fg)_50%,var(--bg))]'
-
 /**
  * The sidebar's sections (owner 2026-11-23, model 1 approved in Figma): the
  * items under small headings («الرئيسية», «البيانات», «المالية», «الادارة»,
@@ -80,8 +75,8 @@ const SOFT_TEXT = 'text-[color-mix(in_srgb,var(--fg)_50%,var(--bg))]'
  * 400 … الارتفاع 36»; it went 36, 40, 44, 40); the open page — and a section whose page is
  * open — BLACK with white text and icon (owner «معليش رجعه اسود»; for an
  * hour it was the light hover fill of his picture); the selected page of
- * the tree stays on the light fill; the other labels in a lighter text
- * colour; a section's pages under it as
+ * the tree stays on the light fill; the other labels in the plain text
+ * colour (`text-fg`, owner «خليه اسود خالص», 2026-11-24; it was lighter); a section's pages under it as
  * a small tree («خلي القائمة الفرعية نفس هذا»). The desktop sidebar and the phone drawer share it.
  */
 function SidebarNav({
@@ -135,7 +130,7 @@ function SidebarNav({
                     // on the light fill of his picture).
                     selected
                       ? 'bg-primary font-semibold text-primary-contrast'
-                      : `font-normal ${SOFT_TEXT} hover:bg-surface-hover`,
+                      : 'font-normal text-fg hover:bg-surface-hover',
                   )}
                 >
                   <span

@@ -64,11 +64,12 @@ test('the sidebar and the drawer share SidebarNav, with no fold button', () => {
   assert.match(layout, /'bg-primary font-semibold text-primary-contrast'/)
   assert.match(layout, /'bg-surface-hover font-semibold text-fg'/)
   assert.match(layout, /const selected = active \|\| hasActiveChild/)
-  assert.match(layout, /const SOFT_TEXT = 'text-\[color-mix\(in_srgb,var\(--fg\)_50%,var\(--bg\)\)\]'/)
+  // The other labels plain black (owner «خليه اسود خالص», 2026-11-24): the text token, no mix.
+  assert.doesNotMatch(layout, /SOFT_TEXT|text-black/)
   // Owner 2026-11-24: sections 12 apart, items 36 high, labels 13 px regular.
   assert.match(layout, /<nav className="flex flex-col gap-3">/)
   assert.match(layout, /'flex h-9 w-full items-center gap-3 rounded-lg px-3\.5 text-\[13px\] /)
-  assert.match(layout, /`font-normal \$\{SOFT_TEXT\} hover:bg-surface-hover`/)
+  assert.match(layout, /'font-normal text-fg hover:bg-surface-hover'/)
   // The sub-menu slides down and up (owner «انيميشن عن نزول القائمة الفرعية»):
   // always rendered, 0fr → 1fr, invisible while closed, off under reduced motion.
   assert.match(layout, /'grid transition-\[grid-template-rows,visibility\] duration-200 ease-out motion-reduce:transition-none'/)
