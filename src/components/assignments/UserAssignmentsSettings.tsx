@@ -208,15 +208,15 @@ export function UserAssignmentsSettings() {
 
   const userCell = (row: UserAssignmentListRow) => (
     <span className="flex min-w-0 flex-col gap-0.5 text-start">
-      <span className="flex min-w-0 items-center gap-1.5">
-        <span className="min-w-0 truncate font-semibold">{row.full_name}</span>
+      <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+        <span className="break-words font-semibold">{row.full_name}</span>
         {row.id === currentUser?.id && (
           <Badge tone="info" size="sm">
             {t('userAssignmentsYou')}
           </Badge>
         )}
       </span>
-      <span className="truncate text-xs text-muted">{roleLabel(row)}</span>
+      <span className="text-xs text-muted">{roleLabel(row)}</span>
     </span>
   )
   const companiesCell = (row: UserAssignmentListRow) => {
@@ -225,10 +225,10 @@ export function UserAssignmentsSettings() {
       return <span className="text-muted">{t('userAssignmentsNone')}</span>
     return (
       <span className="flex min-w-0 flex-col gap-0.5 text-start">
-        <span className="truncate font-medium">
+        <span className="font-medium">
           {companyCountWords(counts.companies, lang)}
         </span>
-        <span className="truncate text-xs text-muted">
+        <span className="line-clamp-2 break-words text-xs text-muted">
           {firstCompanyNames(row.assignments, lang)}
         </span>
       </span>
@@ -257,16 +257,18 @@ export function UserAssignmentsSettings() {
       header: t('userAssignmentsUser'),
       sortable: true,
       width: '12rem',
-      // The name and the role are cut with «…» rather than widen the table.
-      className: 'max-w-[12rem]',
+      // The full name and role, on a second line when long (owner
+      // 2026-11-24, «فيه مشكلة في الاسماء, ماكول منها»: they were cut with «…»).
+      className: 'min-w-[10rem] whitespace-normal',
       cell: userCell,
     },
     {
       key: 'companies',
       header: t('companies'),
-      // Takes the room left and cuts the names with «…» (cells never wrap):
-      // the table never scrolls sideways (owner 2026-11-24, «بدون سكرول»).
-      className: 'w-full max-w-0',
+      // Takes the room left, its names on up to two lines, never wider: the
+      // table never scrolls sideways (owner 2026-11-24, «بدون سكرول»), and the
+      // names are not cut (owner the same day, «ماكول منها»).
+      className: 'w-full max-w-0 whitespace-normal',
       cell: companiesCell,
     },
     {
