@@ -194,14 +194,18 @@ test('the groups: first payments, installments, a VAT paid by itself', () => {
   assert.equal(PRINT.installmentPrintFileName('سداد قسط', 'عقد 4/2027'), 'سداد قسط - عقد 4 2027')
 })
 
-test('the sheet: Arabic only, no company data, five columns, no bank account', () => {
+test('the sheet: Arabic only, no company data, five columns, the account by the totals', () => {
   assert.match(SHEET, /className="installment-print-sheet print-export hidden/)
   assert.match(SHEET, /dir="rtl"\n\s+lang="ar"/)
   assert.doesNotMatch(SHEET, /companyProfileFacts|contract_number/)
   assert.equal([...SHEET.matchAll(/<th scope="col"/g)].length, 5)
-  // «وشيل الحساب البنكي».
-  assert.doesNotMatch(SHEET, /instAccountTitle|bankLogoOf|iban|InstallmentAccount/i)
-  assert.ok(SHEET.indexOf("ar('instPayTableTitle')") < SHEET.indexOf("ar('quotationPrintElectronic')"))
+  // «اضف الحساب البنكي» (it was taken out with «وشيل الحساب البنكي»): on
+  // the totals' row, the contract's own account, else the financier's.
+  assert.match(SHEET, /bankLogoOf(account?.bankName)/)
+  assert.ok(SHEET.indexOf("ar('instPayTableTitle')") < SHEET.indexOf("ar('instAccountTitle')"))
+  assert.ok(SHEET.indexOf("ar('instAccountTitle')") < SHEET.indexOf("'instContractTotal'"))
+  assert.ok(SHEET.indexOf("'instContractTotal'") < SHEET.indexOf("ar('quotationPrintElectronic')"))
+  assert.match(PAGE, /account={installmentAccountOf(contract)}/)
   assert.match(SHEET, /quotationPageCss\(issuedAt, 'ar'\)/)
   const css = read('src', 'index.css')
   assert.match(css, /html:has\(\.installment-print-sheet\) body > :not\(\.installment-print-sheet\)/)

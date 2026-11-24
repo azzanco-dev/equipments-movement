@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Price } from '@/components/purchasing/Price'
 import { translations, type TranslationKey } from '@/i18n/translations'
+import { bankInitials, bankLogoOf } from '@/lib/bankLogos'
 import { COMPANY_PROFILE } from '@/lib/companyProfile'
 import { formatDate } from '@/lib/dateFormat'
 import { daysUntilDue, formatInstallmentAmount } from '@/lib/installments'
@@ -19,9 +20,11 @@ import {
   payableRowLabel,
   scheduleRemaining,
   whenWords,
+  type InstallmentAccount,
   type InstallmentContractRow,
   type InstallmentScheduleItem,
 } from '@/lib/installmentsView'
+import { formatIban, normalizeIban } from '@/lib/partyFields'
 import { printIssuedAtLabel, quotationPageCss } from '@/lib/quotationPrint'
 import { saudiDateKey } from '@/lib/saudiTime'
 
@@ -71,6 +74,8 @@ export interface InstallmentPrintSheetProps {
   schedule: readonly InstallmentScheduleItem[]
   /** The row to pay: the contract's next due row. */
   asked: InstallmentScheduleItem
+  /** The account it is paid to (the contract's own, else the financier's). */
+  account: InstallmentAccount | null
   /** The print dialog closed (or never opened): the sheet is unmounted. */
   onDone: () => void
 }
@@ -91,14 +96,18 @@ export interface InstallmentPrintSheetProps {
  * pay — its name, its day and how far it is, the amount still due on it;
  * the whole schedule in five columns (# · الدفعة · تاريخ الاستحقاق · المبلغ
  * · الحالة), the asked row tinted, group rows by title only; the contract's
- * total, paid and remaining once, under the table; the electronic-issue
- * line. No bank account (owner 2026-11-24, «وشيل الحساب البنكي»). Every
+ * total, paid and remaining once, under the table, beside «حساب السداد»
+ * (the bank's logo, its name and the IBAN; owner 2026-11-24, removed with
+ * «وشيل الحساب البنكي», then back with «اضف الحساب البنكي», on the totals'
+ * row so a contract of 27 installments keeps one page); the electronic-issue
+ * line. Every
  * page carries its number and the issue time (`quotationPageCss`).
  */
 export function InstallmentPrintSheet({
   contract,
   schedule,
   asked,
+  account,
   onDone,
 }: InstallmentPrintSheetProps) {
   const logoRef = useRef<HTMLImageElement>(null)
@@ -142,6 +151,9 @@ export function InstallmentPrintSheet({
   }, [logoSettled, fileName])
 
   const groups = installmentPrintGroups(contract, schedule)
+  const iban = account?.iban ? formatIban(normalizeIban(account.iban)) : null
+  const logo = bankLogoOf(account?.bankName)
+  const showAccount = !!account && (!!account.bankName || !!iban)
   const days = asked.due_date ? daysUntilDue(asked.due_date, today) : null
   const askedTitle =
     asked.kind === 'installment'
@@ -186,7 +198,9 @@ export function InstallmentPrintSheet({
 
         {/* 2. The contract on one line. */}
         <dl className="m-0 mb-[10px] flex flex-wrap gap-x-6 gap-y-0.5 text-[10.5px] leading-[15px]">
-          <Fact label={ar('instPrintContractTitle')}>{contract.description}</Fact>
+          <Fact label={ar('instPrintContractTitle')}>
+            {contract.description}
+          </Fact>
           <Fact label={ar('instFinancier')}>{contract.financier_name}</Fact>
           <Fact label={ar('instPrintRequestDate')}>
             <bdi dir="ltr">{formatDate(today)}</bdi>
@@ -205,7 +219,9 @@ export function InstallmentPrintSheet({
               />
               {ar('instPrintAsked')}
             </p>
-            <p className={`break-words text-[15px] font-bold leading-[20px] ${BRAND}`}>
+            <p
+              className={`break-words text-[15px] font-bold leading-[20px] ${BRAND}`}
+            >
               {askedTitle}
             </p>
             <dl className="m-0 flex flex-wrap gap-x-5 text-[10.5px]">
@@ -339,23 +355,70 @@ export function InstallmentPrintSheet({
             ))}
           </table>
 
-          {/* The contract's figures, once, under the table. */}
-          <dl className="m-0 mt-1.5 inline-flex break-inside-avoid gap-6 rounded-md border px-3 py-1.5">
-            {(
-              [
-                ['instContractTotal', contract.payable_total, ''],
-                ['instPaid', contract.paid_overall, 'text-success'],
-                ['instRemaining', contract.remaining_total, ''],
-              ] as const
-            ).map(([key, value, tone]) => (
-              <div key={key}>
-                <dt className="text-[10.5px] text-muted">{ar(key)}</dt>
-                <dd className={`m-0 text-[12.5px] font-bold ${tone}`}>
-                  <Amount value={value} />
-                </dd>
+          {/* The payment account and the contract's figures, once, on one
+              row under the table: the account at the start side. */}
+          <div className="mt-1.5 flex break-inside-avoid items-stretch justify-between gap-3">
+            {showAccount ? (
+              <div className="flex min-w-0 items-center gap-2.5 rounded-md border px-3 py-1.5">
+                {account?.bankName && (
+                  <span
+                    className={`flex h-8 w-[76px] shrink-0 items-center justify-center rounded border px-1.5 ${
+                      logo?.onDark ? 'bg-[var(--logo-tile-dark)]' : 'bg-bg'
+                    }`}
+                  >
+                    {logo ? (
+                      <img
+                        src={logo.src}
+                        alt=""
+                        className="max-h-[18px] max-w-full object-contain"
+                      />
+                    ) : (
+                      <span className="font-bold text-muted">
+                        {bankInitials(account.bankName)}
+                      </span>
+                    )}
+                  </span>
+                )}
+                <div className="min-w-0">
+                  <p className="text-[10.5px] text-muted">
+                    {ar('instAccountTitle')}
+                    {account?.bankName && (
+                      <span className="font-bold text-fg">
+                        {' '}
+                        · {account.bankName}
+                      </span>
+                    )}
+                  </p>
+                  {iban && (
+                    <p
+                      dir="ltr"
+                      className="text-end text-[12.5px] font-bold tabular-nums"
+                    >
+                      {iban}
+                    </p>
+                  )}
+                </div>
               </div>
-            ))}
-          </dl>
+            ) : (
+              <span />
+            )}
+            <dl className="m-0 flex shrink-0 gap-6 rounded-md border px-3 py-1.5">
+              {(
+                [
+                  ['instContractTotal', contract.payable_total, ''],
+                  ['instPaid', contract.paid_overall, 'text-success'],
+                  ['instRemaining', contract.remaining_total, ''],
+                ] as const
+              ).map(([key, value, tone]) => (
+                <div key={key}>
+                  <dt className="text-[10.5px] text-muted">{ar(key)}</dt>
+                  <dd className={`m-0 text-[12.5px] font-bold ${tone}`}>
+                    <Amount value={value} />
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </section>
 
         {/* 5. The electronic-issue line closes the sheet. */}
