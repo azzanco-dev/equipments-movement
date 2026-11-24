@@ -174,13 +174,12 @@ export const NAV_ENTRIES: readonly NavEntry[] = [
     requires: [{ key: 'movements.import' }],
     hidden: true,
   },
-  // «الاقساط» (migration 0203, owner 2026-11-18: «مبدئيا لاتضيف للسايد بار,
-  // خلي الوصول له عبر الرابط»): opened by URL only (/installments), still
-  // gated on installments.view.
+  // «الاقساط» (migration 0203): opened by URL only from 2026-11-18 («مبدئيا
+  // لاتضيف للسايد بار»), listed since 2026-11-24 (owner «اضف ادارة الاقساط
+  // للسايدبار»), under «المالية»; gated on installments.view.
   {
     key: 'installments',
     requires: [{ key: 'installments.view' }],
-    hidden: true,
   },
   {
     key: 'settings',

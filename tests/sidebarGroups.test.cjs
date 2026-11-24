@@ -7,7 +7,7 @@ const ts = require('typescript')
 
 // The sidebar's sections (owner 2026-11-23: model 1 approved in Figma,
 // «الرئيسية» / «البيانات» / «المالية» / «الادارة», «المعدات في البيانات»,
-// «الاقساط» stays hidden on the site, no fold button).
+// «الاقساط» listed since 2026-11-24, no fold button).
 
 const ROOT = path.join(__dirname, '..')
 const read = (...parts) => fs.readFileSync(path.join(ROOT, ...parts), 'utf8')
@@ -47,10 +47,11 @@ test('an empty section is left out and an unknown item is never dropped', () => 
   assert.deepEqual(keys(lib.groupNavItems([])), [])
 })
 
-test('the sections only display: NAV_ENTRIES keeps its order and installments stays hidden', () => {
+test('the sections only display: NAV_ENTRIES keeps its order, installments listed', () => {
   const nav = read('src', 'lib', 'navPermissions.ts')
   assert.ok(nav.indexOf("key: 'purchasing'") < nav.indexOf("key: 'drivers'"), 'the landing order is unchanged')
-  assert.match(nav, /key: 'installments',[\s\S]{0,200}hidden: true/)
+  // Listed since 2026-11-24 (owner «اضف ادارة الاقساط للسايدبار»).
+  assert.doesNotMatch(nav, /key: 'installments',\s+requires: \[\{ key: 'installments\.view' \}\],\s+hidden: true/)
 })
 
 test('the sidebar and the drawer share SidebarNav, with no fold button', () => {

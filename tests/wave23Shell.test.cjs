@@ -667,6 +667,8 @@ test('the landing is the first passing section in menu order', () => {
     'sales/orders',
     'drivers',
     'users',
+    // Listed since 2026-11-24 (owner «اضف ادارة الاقساط للسايدبار»).
+    'installments',
     'settings',
   ])
 })

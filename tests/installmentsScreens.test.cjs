@@ -160,14 +160,15 @@ const ready = (keys) => ({
   permissions: new Map(keys.map((key) => [key, 'all'])),
 })
 
-test('a hidden top-level entry, gated on installments.view', () => {
+test('a listed top-level entry, gated on installments.view', () => {
   const entry = nav.NAV_ENTRIES.find((item) => item.key === 'installments')
   assert.ok(entry)
-  assert.equal(entry.hidden, true)
+  // Listed since 2026-11-24 (owner «اضف ادارة الاقساط للسايدبار»).
+  assert.equal(entry.hidden, undefined)
   assert.deepEqual(plain(entry.requires), [{ key: 'installments.view' }])
   assert.equal(entry.children, undefined)
 
-  // Never listed in the sidebar, whatever the user holds.
+  // Listed in the sidebar for a holder of the key, never for anyone else.
   const admin = ready([
     'home.admin',
     'equipment.read',
@@ -176,11 +177,17 @@ test('a hidden top-level entry, gated on installments.view', () => {
   ])
   const listed = Array.from(nav.visibleNavItems(admin), (item) => item.key)
   assert.ok(listed.includes('equipment'))
-  assert.ok(!listed.includes('installments'))
+  assert.ok(listed.includes('installments'))
   const shell = nav.planShell(admin)
   assert.ok(
-    !Array.from(
+    Array.from(
       nav.visibleNavItems(admin, shell.pages),
+      (item) => item.key,
+    ).includes('installments'),
+  )
+  assert.ok(
+    !Array.from(
+      nav.visibleNavItems(ready(['home.admin', 'equipment.read'])),
       (item) => item.key,
     ).includes('installments'),
   )
@@ -211,8 +218,7 @@ test('a hidden top-level entry, gated on installments.view', () => {
   )
   assert.equal(foreman.landing, 'dashboard')
   assert.ok(foreman.pages.has('installments'))
-  // Like every hidden entry, the last resort of a role that holds nothing
-  // else (instead of the no-permissions page).
+  // The landing of a role that holds nothing else.
   const only = nav.planShell(ready(['installments.view']))
   assert.equal(only.kind, 'admin')
   assert.equal(only.landing, 'installments')
