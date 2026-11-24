@@ -307,7 +307,7 @@ export function UserAssignmentsSettings() {
 
   /** The details: the counts, «تعديل الاسناد» (or why it is locked) and
    *  every company with its projects. */
-  const details = (row: UserAssignmentListRow) => {
+  const details = (row: UserAssignmentListRow, stagger = false) => {
     const lock = lockOf(row)
     const reason: TranslationKey | null =
       lock === 'own'
@@ -329,7 +329,12 @@ export function UserAssignmentsSettings() {
         </Button>
         {reason && <p className="text-xs text-muted">{t(reason)}</p>}
         <div className="border-t pt-3">
-          <AssignmentLines rows={row.assignments} compact divided />
+          <AssignmentLines
+            rows={row.assignments}
+            compact
+            divided
+            stagger={stagger}
+          />
         </div>
       </div>
     )
@@ -379,7 +384,9 @@ export function UserAssignmentsSettings() {
                 onSortChange={list.setSort}
                 onRowClick={toggle}
                 rowClassName={(row) =>
-                  row.id === selectedId ? 'bg-surface-hover' : undefined
+                  row.id === selectedId
+                    ? 'bg-surface-hover transition-colors'
+                    : 'transition-colors'
                 }
                 cellTextClassName="text-[13px]"
                 cellClassName="py-2"
@@ -413,27 +420,50 @@ export function UserAssignmentsSettings() {
                   ))}
             </div>
           </div>
-          {panelFits && selected && (
+          {/* From lg the panel always stands beside the table (owner
+              2026-11-24, «خلي القائمة الجانبية ثابتة حتى لو مو مختار احد»):
+              «اختر فورمن» while none is picked; its content is keyed by the
+              foreman, so it fades up again on every pick. */}
+          {panelFits && (
             <aside
               aria-label={t('userAssignmentsDetails')}
-              className="card sticky top-4 w-[380px] shrink-0 space-y-3 p-4"
+              aria-live="polite"
+              className="card sticky top-4 w-[380px] shrink-0 p-4"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="text-base font-semibold">
-                    {selected.full_name}
-                  </h2>
-                  <p className="text-xs text-muted">{roleLabel(selected)}</p>
+              {selected ? (
+                <div key={selected.id} className="assign-panel-in space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="text-base font-semibold">
+                        {selected.full_name}
+                      </h2>
+                      <p className="text-xs text-muted">
+                        {roleLabel(selected)}
+                      </p>
+                    </div>
+                    <IconButton
+                      size="sm"
+                      variant="ghost"
+                      label={t('close')}
+                      icon={<X size={16} aria-hidden="true" />}
+                      onClick={() => setSelectedId(null)}
+                    />
+                  </div>
+                  {details(selected, true)}
                 </div>
-                <IconButton
-                  size="sm"
-                  variant="ghost"
-                  label={t('close')}
-                  icon={<X size={16} aria-hidden="true" />}
-                  onClick={() => setSelectedId(null)}
-                />
-              </div>
-              {details(selected)}
+              ) : (
+                <div className="assign-panel-in flex flex-col items-center gap-2 py-10 text-center">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface-hover text-muted">
+                    <Users size={18} aria-hidden="true" />
+                  </span>
+                  <p className="text-sm font-semibold">
+                    {t('userAssignmentsPickTitle')}
+                  </p>
+                  <p className="max-w-60 text-xs text-muted">
+                    {t('userAssignmentsPickHint')}
+                  </p>
+                </div>
+              )}
             </aside>
           )}
         </div>

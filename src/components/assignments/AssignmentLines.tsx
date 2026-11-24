@@ -14,12 +14,17 @@ export function AssignmentLines({
   rows,
   compact = false,
   divided = false,
+  stagger = false,
 }: {
   rows: readonly AssignmentCompanyRow[]
   /** 13 px text (the list's table); the user page keeps 14 px. */
   compact?: boolean
   /** A thin line between the companies (the Settings page's side panel). */
   divided?: boolean
+  /** The lines fade up one after the other (the side panel, owner
+   *  2026-11-24 «واضف انيميشن»; `.assign-panel-in`, still under reduced
+   *  motion). */
+  stagger?: boolean
 }) {
   const { t, lang } = useI18n()
   const text = compact ? 'text-[13px]' : 'text-sm'
@@ -36,18 +41,24 @@ export function AssignmentLines({
     <span
       className={`flex flex-col text-start ${divided ? 'divide-y' : 'gap-1.5'}`}
     >
-      {rows.map((row) => {
-        const projects = row.project_ids.map((_, index) =>
+      {rows.map((row, index) => {
+        const projects = row.project_ids.map((_, position) =>
           localizedName(
             lang,
-            row.project_names_ar[index] ?? '',
-            row.project_names_en[index] ?? null,
+            row.project_names_ar[position] ?? '',
+            row.project_names_en[position] ?? null,
           ),
         )
         return (
           <span
             key={row.company_id}
-            className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${divided ? 'py-2.5 first:pt-0 last:pb-0' : ''}`}
+            className={`flex flex-wrap items-center gap-x-2 gap-y-1 ${divided ? 'py-2.5 first:pt-0 last:pb-0' : ''} ${stagger ? 'assign-panel-in' : ''}`}
+            // 35 ms apart, the twelfth line and the ones after it together.
+            style={
+              stagger
+                ? { animationDelay: `${Math.min(index, 12) * 35}ms` }
+                : undefined
+            }
           >
             <Badge
               tone="neutral"

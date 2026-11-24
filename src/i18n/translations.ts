@@ -873,6 +873,8 @@ export const translations = {
     userAssignmentsProjectsPicked: '{count} محددة',
     userAssignmentsDetails: 'تفاصيل الاسناد',
     userAssignmentsOpenDetails: 'عرض التفاصيل',
+    userAssignmentsPickTitle: 'اختر فورمن',
+    userAssignmentsPickHint: 'اضغط على فورمن في الجدول لعرض شركاته ومشاريعه.',
     // user assignments — end
     // banks — start (migration 0177: the banks list, Settings › «البنوك»)
     banks: 'البنوك',
@@ -4550,6 +4552,8 @@ export const translations = {
     userAssignmentsProjectsPicked: '{count} picked',
     userAssignmentsDetails: 'Assignment details',
     userAssignmentsOpenDetails: 'Show details',
+    userAssignmentsPickTitle: 'Pick a foreman',
+    userAssignmentsPickHint: 'Click a foreman in the table to see his companies and projects.',
     // user assignments — end
     // banks — start (migration 0177: the banks list, Settings › «البنوك»)
     banks: 'Banks',

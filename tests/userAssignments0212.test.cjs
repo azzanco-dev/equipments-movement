@@ -216,9 +216,19 @@ test('the list: the foremen only, the overlap company filter', () => {
   // «نموذج 2» (owner 2026-11-24): counts in the table, every company in the
   // details — a panel beside it from lg, a dialog below.
   assert.match(screen, /const SIDE_PANEL_QUERY = '\(min-width: 1024px\)'/)
-  assert.match(screen, /\{panelFits && selected && \(\s+<aside/)
+  // The panel always stands from lg, «اختر فورمن» while none is picked, its
+  // content keyed by the foreman so it animates on every pick (owner
+  // 2026-11-24, «خلي القائمة الجانبية ثابتة حتى لو مو مختار احد, واضف انيميشن»).
+  assert.match(screen, /\{panelFits && \(\s+<aside/)
+  assert.match(screen, /<div key=\{selected\.id\} className="assign-panel-in space-y-3">/)
+  assert.match(screen, /\{t\('userAssignmentsPickTitle'\)\}/)
   assert.match(screen, /\{!panelFits && selected && \(\s+<Dialog/)
-  assert.match(screen, /<AssignmentLines rows=\{row\.assignments\} compact divided \/>/)
+  assert.match(screen, /<AssignmentLines\s+rows=\{row\.assignments\}\s+compact\s+divided\s+stagger=\{stagger\}/)
+  const lines = read('src', 'components', 'assignments', 'AssignmentLines.tsx')
+  assert.match(lines, /animationDelay: `\$\{Math\.min\(index, 12\) \* 35\}ms`/)
+  const css = read('src', 'index.css')
+  assert.match(css, /@keyframes assign-panel-in/)
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s+\.assign-panel-in \{\s+animation: none;/)
   assert.match(screen, /onRowClick=\{toggle\}/)
   assert.doesNotMatch(screen, /cell: \(row\) => <AssignmentLines/)
   const configs = read('src', 'lib', 'listConfigs.ts')
