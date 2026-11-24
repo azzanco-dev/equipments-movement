@@ -349,3 +349,15 @@ export function firstCompanyNames(
     .map((row) => localizedName(lang, row.company_name_ar, row.company_name_en))
   return names.join(lang === 'ar' ? '، ' : ', ') + (rows.length > shown ? '…' : '')
 }
+
+/**
+ * The roles Settings › «اسناد الشركات والمشاريع» lists (owner 2026-11-24,
+ * «خليه مقتصر على الفورمينس ورئيس الفورمين»): «فورمين» and «رئيس الفورمين».
+ * A display choice of that page only: it grants and refuses nothing (the
+ * database writer keeps its permission gate), and every other screen still
+ * finds the foremen by the permission (`foremanRoleKeys`).
+ */
+export const ASSIGNMENT_ROLE_KEYS: readonly string[] = [
+  'supervisor',
+  'foreman_lead',
+]

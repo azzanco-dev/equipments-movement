@@ -205,9 +205,12 @@ test('the page: Settings card and route, gates, trail and title', () => {
 test('the list: the foremen only, the overlap company filter', () => {
   const screen = read('src', 'components', 'assignments', 'UserAssignmentsSettings.tsx')
   assert.match(screen, /\.from\('user_assignment_list'\)/)
-  // Owner 2026-11-24, «ضمن الفورمينس فقط»: always, not a filter.
-  assert.match(screen, /\.eq\('records_projects', true\)/)
-  assert.match(screen, /foremanRoleKeys\(supabase\)/)
+  // Owner 2026-11-24, «خليه مقتصر على الفورمينس ورئيس الفورمين»: always, not
+  // a filter; the role filter offers those two roles only.
+  assert.match(screen, /\.in\('role_key', \[\.\.\.ASSIGNMENT_ROLE_KEYS\]\)/)
+  assert.match(screen, /\.filter\(\(role\) => ASSIGNMENT_ROLE_KEYS\.includes\(role\.key\)\)/)
+  assert.doesNotMatch(screen, /records_projects|foremanRoleKeys/)
+  assert.deepEqual(plain(lib.ASSIGNMENT_ROLE_KEYS), ['supervisor', 'foreman_lead'])
   assert.match(screen, /query\.overlaps\('company_ids', companies\)/)
   assert.match(screen, /\.filter\(\(key\) => !USER_ASSIGNMENT_COLUMN_FILTERS\.has\(key\)\)/)
   assert.match(screen, /<ErrorState\s+description=\{t\('userAssignmentsLoadError'\)\}/)

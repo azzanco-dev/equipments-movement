@@ -11,7 +11,6 @@ import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { roleName } from '@/components/roles/roleRows'
 import { useActiveRoles } from '@/components/roles/useActiveRoles'
-import { foremanRoleKeys } from '@/lib/rolePermissionHolders'
 import {
   Badge,
   Button,
@@ -28,6 +27,7 @@ import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import { applyListFilters } from '@/lib/applyListFilters'
 import {
+  ASSIGNMENT_ROLE_KEYS,
   USER_ASSIGNMENT_COLUMN_FILTERS,
   USER_ASSIGNMENT_LIST_SELECT,
   assignmentCounts,
@@ -67,7 +67,8 @@ function useSidePanelFits(): boolean {
  * owner 2026-11-24, «نبغى نخلي اسنادات الشركات والمشاريع للمستخدمين مهمة
  * منفصلة عن صفحة المستخدم»; «ضمن الفورمينس فقط»; the layout is «نموذج 2»
  * of the Figma models, chosen the same day because a foreman with many
- * companies took too much room): the FOREMEN only over
+ * companies took too much room): the users of the roles «فورمين» and «رئيس
+ * الفورمين» only (`ASSIGNMENT_ROLE_KEYS`) over
  * `user_assignment_list`, server-side searched by name, filtered by role,
  * company and «عليه اسناد», sorted and paged through the unified list system.
  * The table shows counts only — «9 شركات» with the first two names under it,
@@ -93,33 +94,13 @@ export function UserAssignmentsSettings() {
   const [editing, setEditing] = useState<UserAssignmentListRow | null>(null)
   const panelFits = useSidePanelFits()
   const { roles: activeRoles } = useActiveRoles(true)
-  // The foreman roles (they record project movements, the admin aside): the
-  // role filter offers these only, as the list holds their users only.
-  const [foremanKeys, setForemanKeys] = useState<ReadonlySet<string> | null>(
-    null,
-  )
-  useEffect(() => {
-    let active = true
-    foremanRoleKeys(supabase).then(
-      (keys) => {
-        if (active) setForemanKeys(new Set(keys))
-      },
-      () => {
-        if (active) setForemanKeys(null)
-      },
-    )
-    return () => {
-      active = false
-    }
-  }, [])
 
   const companyFilter = useCompanyProjectFilters().company_id
   const asyncFields = useMemo(
     () => ({ company_ids: companyFilter }),
     [companyFilter],
   )
-  // The role filter's options: the active foreman roles (the admin aside;
-  // every active non-admin role while the foreman roles cannot be read).
+  // The role filter's options: the two roles the page lists.
   const filterFields = useMemo(
     () =>
       userAssignmentsListConfig.filterFields.map((field) =>
@@ -127,11 +108,7 @@ export function UserAssignmentsSettings() {
           ? {
               ...field,
               options: (activeRoles ?? [])
-                .filter(
-                  (role) =>
-                    role.key !== 'admin' &&
-                    (!foremanKeys || foremanKeys.has(role.key)),
-                )
+                .filter((role) => ASSIGNMENT_ROLE_KEYS.includes(role.key))
                 .map((role) => ({
                   value: role.key,
                   label: roleName(lang, role),
@@ -139,7 +116,7 @@ export function UserAssignmentsSettings() {
             }
           : field,
       ),
-    [activeRoles, foremanKeys, lang],
+    [activeRoles, lang],
   )
 
   const startListRequest = useListRequest()
@@ -150,9 +127,10 @@ export function UserAssignmentsSettings() {
     let query = supabase
       .from('user_assignment_list')
       .select(USER_ASSIGNMENT_LIST_SELECT, { count: 'exact' })
-      // The foremen only (owner 2026-11-24, «ضمن الفورمينس فقط»): the users
-      // whose active role records project movements. Not a filter.
-      .eq('records_projects', true)
+      // The foremen and the foremen's lead only (owner 2026-11-24, «خليه
+      // مقتصر على الفورمينس ورئيس الفورمين»: a sales user whose role also
+      // records project movements was listed). Not a filter.
+      .in('role_key', [...ASSIGNMENT_ROLE_KEYS])
       .order(list.sort, { ascending: list.direction === 'asc' })
       .order('id', { ascending: true })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)
