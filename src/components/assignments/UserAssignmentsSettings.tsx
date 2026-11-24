@@ -11,6 +11,7 @@ import { useDataListState } from '@/components/data-list/useDataListState'
 import { useListRequest } from '@/components/data-list/useListRequest'
 import { roleName } from '@/components/roles/roleRows'
 import { useActiveRoles } from '@/components/roles/useActiveRoles'
+import { foremanRoleKeys } from '@/lib/rolePermissionHolders'
 import {
   Badge,
   DataTable,
@@ -64,14 +65,33 @@ export function UserAssignmentsSettings() {
   const [loadError, setLoadError] = useState(false)
   const [editing, setEditing] = useState<UserAssignmentListRow | null>(null)
   const { roles: activeRoles } = useActiveRoles(true)
+  // The foreman roles (they record project movements, the admin aside): the
+  // role filter offers these only, as the list holds their users only.
+  const [foremanKeys, setForemanKeys] = useState<ReadonlySet<string> | null>(
+    null,
+  )
+  useEffect(() => {
+    let active = true
+    foremanRoleKeys(supabase).then(
+      (keys) => {
+        if (active) setForemanKeys(new Set(keys))
+      },
+      () => {
+        if (active) setForemanKeys(null)
+      },
+    )
+    return () => {
+      active = false
+    }
+  }, [])
 
   const companyFilter = useCompanyProjectFilters().company_id
   const asyncFields = useMemo(
     () => ({ company_ids: companyFilter }),
     [companyFilter],
   )
-  // The role filter's options: the active roles but the admin (the view
-  // never lists an admin).
+  // The role filter's options: the active foreman roles (the admin aside;
+  // every active non-admin role while the foreman roles cannot be read).
   const filterFields = useMemo(
     () =>
       userAssignmentsListConfig.filterFields.map((field) =>
@@ -79,7 +99,11 @@ export function UserAssignmentsSettings() {
           ? {
               ...field,
               options: (activeRoles ?? [])
-                .filter((role) => role.key !== 'admin')
+                .filter(
+                  (role) =>
+                    role.key !== 'admin' &&
+                    (!foremanKeys || foremanKeys.has(role.key)),
+                )
                 .map((role) => ({
                   value: role.key,
                   label: roleName(lang, role),
@@ -87,7 +111,7 @@ export function UserAssignmentsSettings() {
             }
           : field,
       ),
-    [activeRoles, lang],
+    [activeRoles, foremanKeys, lang],
   )
 
   const startListRequest = useListRequest()
@@ -98,6 +122,9 @@ export function UserAssignmentsSettings() {
     let query = supabase
       .from('user_assignment_list')
       .select(USER_ASSIGNMENT_LIST_SELECT, { count: 'exact' })
+      // The foremen only (owner 2026-11-24, «ضمن الفورمينس فقط»): the users
+      // whose active role records project movements. Not a filter.
+      .eq('records_projects', true)
       .order(list.sort, { ascending: list.direction === 'asc' })
       .order('id', { ascending: true })
       .range((list.page - 1) * list.pageSize, list.page * list.pageSize - 1)

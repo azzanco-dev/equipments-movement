@@ -2,7 +2,6 @@ import type {
   DataListConfig,
   FilterOperator,
   FilterOption,
-  ListFilter,
 } from '@/components/data-list/types'
 import {
   ACTIVITY_FIELD_FILTER_KEY,
@@ -1598,18 +1597,13 @@ export const quotationsListConfig: DataListConfig = {
 
 /**
  * Settings › «اسناد الشركات والمشاريع» (`user_assignment_list`, migration
- * 0212, owner 2026-11-24, design approved in Figma): every user who is not an
- * admin, searched by name, filtered by role (options from the active roles),
- * company (`company_ids` overlaps, applied by the screen), «يسجل حركات
- * مشاريع» (a visible removable default: the foremen) and «عليه اسناد»;
+ * 0212, owner 2026-11-24, design approved in Figma): the FOREMEN only (owner
+ * the same day, «ضمن الفورمينس فقط»: the screen always keeps
+ * `records_projects`, the users whose role records project movements; it is
+ * no filter), searched by name, filtered by role (the foreman roles),
+ * company (`company_ids` overlaps, applied by the screen) and «عليه اسناد»;
  * sorted by name.
  */
-const USER_ASSIGNMENTS_DEFAULT_FILTER: ListFilter = {
-  id: 'default-records-projects',
-  field: 'records_projects',
-  operator: 'eq',
-  value: 'true',
-}
 export const userAssignmentsListConfig: DataListConfig = {
   id: 'user-assignments',
   searchPlaceholder: { ar: 'ابحث باسم المستخدم', en: 'Search by user name' },
@@ -1634,16 +1628,6 @@ export const userAssignmentsListConfig: DataListConfig = {
       multiple: true,
     },
     {
-      key: 'records_projects',
-      label: 'userAssignmentsRecordsProjects',
-      type: 'boolean',
-      operators: ['eq'],
-      options: [
-        { value: 'true', label: 'نعم', labelI18n: 'yes' },
-        { value: 'false', label: 'لا', labelI18n: 'no' },
-      ],
-    },
-    {
       key: 'has_assignments',
       label: 'userAssignmentsHasAny',
       type: 'boolean',
@@ -1654,7 +1638,6 @@ export const userAssignmentsListConfig: DataListConfig = {
       ],
     },
   ],
-  defaultFilters: [USER_ASSIGNMENTS_DEFAULT_FILTER],
   sortableFields: [
     { key: 'full_name', label: 'fullName' },
     { key: 'role_name_ar', label: 'role' },

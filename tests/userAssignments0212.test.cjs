@@ -178,17 +178,20 @@ test('the page: Settings card and route, gates, trail and title', () => {
   assert.match(read('src', 'lib', 'pageTitle.ts'), /'settings\/assignments': \{\s+kind: 'sub',\s+name: 'userAssignments'/)
 })
 
-test('the list: the view, the overlap company filter, the default filter', () => {
+test('the list: the foremen only, the overlap company filter', () => {
   const screen = read('src', 'components', 'assignments', 'UserAssignmentsSettings.tsx')
   assert.match(screen, /\.from\('user_assignment_list'\)/)
+  // Owner 2026-11-24, «ضمن الفورمينس فقط»: always, not a filter.
+  assert.match(screen, /\.eq\('records_projects', true\)/)
+  assert.match(screen, /foremanRoleKeys\(supabase\)/)
   assert.match(screen, /query\.overlaps\('company_ids', companies\)/)
   assert.match(screen, /\.filter\(\(key\) => !USER_ASSIGNMENT_COLUMN_FILTERS\.has\(key\)\)/)
   assert.match(screen, /<ErrorState\s+description=\{t\('userAssignmentsLoadError'\)\}/)
   assert.match(screen, /className="hidden md:block"/)
   assert.match(screen, /className="space-y-3 md:hidden"/)
   const configs = read('src', 'lib', 'listConfigs.ts')
-  assert.match(configs, /defaultFilters: \[USER_ASSIGNMENTS_DEFAULT_FILTER\]/)
-  assert.match(configs, /field: 'records_projects',\s+operator: 'eq',\s+value: 'true'/)
+  const config = configs.slice(configs.indexOf('export const userAssignmentsListConfig'))
+  assert.doesNotMatch(config.slice(0, config.indexOf('\n}\n')), /records_projects|defaultFilters/)
 })
 
 test('the user page: the summary, the dialog, no fields in the form', () => {
