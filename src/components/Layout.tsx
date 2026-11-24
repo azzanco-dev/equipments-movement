@@ -68,13 +68,16 @@ function NavControl({
 type NavItem = LayoutProps['navItems'][number]
 
 /** The labels of the items that are not selected: lighter than the text
- *  colour (owner «لون النص خليه خفيف مش اسود كاتم», 2026-11-23). */
-const SOFT_TEXT = 'text-[color-mix(in_srgb,var(--fg)_72%,var(--bg))]'
+ *  colour (owner «لون النص خليه خفيف مش اسود كاتم», 2026-11-23; 50% since
+ *  2026-11-24, «اخف من الاسود بنسبة 50», it was 72%). */
+const SOFT_TEXT = 'text-[color-mix(in_srgb,var(--fg)_50%,var(--bg))]'
 
 /**
  * The sidebar's sections (owner 2026-11-23, model 1 approved in Figma): the
  * items under small headings («الرئيسية», «البيانات», «المالية», «الادارة»,
- * `groupNavItems`), 40 high with px-14 (owner «ورجع البادنق 40»; it went 36, 40, 44, then back); the open page — and a section whose page is
+ * `groupNavItems`, 12 apart since 2026-11-24, was 16), 36 high with px-14
+ * and 13 px regular labels since 2026-11-24 (owner «خط البنود 13 الوزن
+ * 400 … الارتفاع 36»; it went 36, 40, 44, 40); the open page — and a section whose page is
  * open — BLACK with white text and icon (owner «معليش رجعه اسود»; for an
  * hour it was the light hover fill of his picture); the selected page of
  * the tree stays on the light fill; the other labels in a lighter text
@@ -100,7 +103,7 @@ function SidebarNav({
 }) {
   const { t } = useI18n()
   return (
-    <nav className="flex flex-col gap-4">
+    <nav className="flex flex-col gap-3">
       {groupNavItems(items).map((group) => (
         <div key={group.key} className="flex flex-col gap-0.5">
           <p className="px-3 py-1 text-[11px] font-medium text-muted">
@@ -127,12 +130,12 @@ function SidebarNav({
                     item.children ? onToggle(item.key, !open) : onOpen(item.key)
                   }
                   className={cn(
-                    'flex h-10 w-full items-center gap-3 rounded-lg px-3.5 text-sm transition-colors duration-150 active:scale-[0.98] active:opacity-80',
+                    'flex h-9 w-full items-center gap-3 rounded-lg px-3.5 text-[13px] transition-colors duration-150 active:scale-[0.98] active:opacity-80',
                     // Black again (owner «معليش رجعه اسود», after an hour
                     // on the light fill of his picture).
                     selected
                       ? 'bg-primary font-semibold text-primary-contrast'
-                      : `font-medium ${SOFT_TEXT} hover:bg-surface-hover`,
+                      : `font-normal ${SOFT_TEXT} hover:bg-surface-hover`,
                   )}
                 >
                   <span
@@ -151,57 +154,76 @@ function SidebarNav({
                       size={16}
                       aria-hidden="true"
                       className={cn(
-                        'shrink-0 transition-transform',
+                        'shrink-0 transition-transform duration-200 ease-out motion-reduce:transition-none',
                         !selected && 'text-muted',
                         open && 'rotate-180',
                       )}
                     />
                   )}
                 </NavControl>
-                {item.children && open && (
-                  // A thin line from the section's icon, branching with a
-                  // curve to each page (the owner's picture).
-                  <div className="ms-[22px] mt-0.5">
-                    {item.children.map((child, index) => {
-                      const childActive = pathname.startsWith(`/${child.key}`)
-                      const last = index === item.children!.length - 1
-                      return (
-                        <div key={child.key} className="relative ps-4 pt-0.5">
-                          {!last && (
-                            <span
-                              aria-hidden="true"
-                              className="absolute inset-y-0 start-0 border-s border-[var(--border)]"
-                            />
-                          )}
-                          <span
-                            aria-hidden="true"
-                            className="absolute start-0 top-0 h-5 w-3 rounded-es-lg border-b border-s border-[var(--border)]"
-                          />
-                          <NavControl
-                            href={`/${child.key}`}
-                            aria-current={childActive ? 'page' : undefined}
-                            className={cn(
-                              'flex h-9 w-full items-center gap-2 rounded-lg px-3 text-start text-[13px] transition-colors',
-                              childActive
-                                ? 'bg-surface-hover font-semibold text-fg'
-                                : 'text-muted hover:bg-surface-hover hover:text-fg',
-                            )}
-                            onActivate={() => onOpenChild(child.key)}
-                          >
-                            <span className="min-w-0 flex-1 truncate py-1">
-                              {child.label}
-                            </span>
-                            {childActive && (
-                              <ChevronDown
-                                size={16}
+                {item.children && (
+                  // Slides down and up (owner «انيميشن عن نزول القائمة
+                  // الفرعية», 2026-11-24): always rendered, the rows go from
+                  // 0fr to 1fr; `invisible` keeps a closed tree out of the
+                  // tab order and from screen readers, and flips only after
+                  // it has closed.
+                  <div
+                    className={cn(
+                      'grid transition-[grid-template-rows,visibility] duration-200 ease-out motion-reduce:transition-none',
+                      open ? 'visible grid-rows-[1fr]' : 'invisible grid-rows-[0fr]',
+                    )}
+                  >
+                    <div className="min-h-0 overflow-hidden">
+                      {/* A thin line from the section's icon, branching with a
+                          curve to each page (the owner's picture). */}
+                      <div
+                        className={cn(
+                          'ms-[22px] pt-0.5 transition-opacity duration-200 ease-out motion-reduce:transition-none',
+                          open ? 'opacity-100' : 'opacity-0',
+                        )}
+                      >
+                        {item.children.map((child, index) => {
+                          const childActive = pathname.startsWith(`/${child.key}`)
+                          const last = index === item.children!.length - 1
+                          return (
+                            <div key={child.key} className="relative ps-4 pt-0.5">
+                              {!last && (
+                                <span
+                                  aria-hidden="true"
+                                  className="absolute inset-y-0 start-0 border-s border-[var(--border)]"
+                                />
+                              )}
+                              <span
                                 aria-hidden="true"
-                                className="shrink-0 text-muted ltr:-rotate-90 rtl:rotate-90"
+                                className="absolute start-0 top-0 h-5 w-3 rounded-es-lg border-b border-s border-[var(--border)]"
                               />
-                            )}
-                          </NavControl>
-                        </div>
-                      )
-                    })}
+                              <NavControl
+                                href={`/${child.key}`}
+                                aria-current={childActive ? 'page' : undefined}
+                                className={cn(
+                                  'flex h-9 w-full items-center gap-2 rounded-lg px-3 text-start text-[13px] transition-colors',
+                                  childActive
+                                    ? 'bg-surface-hover font-semibold text-fg'
+                                    : 'text-muted hover:bg-surface-hover hover:text-fg',
+                                )}
+                                onActivate={() => onOpenChild(child.key)}
+                              >
+                                <span className="min-w-0 flex-1 truncate py-1">
+                                  {child.label}
+                                </span>
+                                {childActive && (
+                                  <ChevronDown
+                                    size={16}
+                                    aria-hidden="true"
+                                    className="shrink-0 text-muted ltr:-rotate-90 rtl:rotate-90"
+                                  />
+                                )}
+                              </NavControl>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
