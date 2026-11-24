@@ -267,3 +267,15 @@ test('the copy, both languages, no hamza on the alif', () => {
   assert.deepEqual(keys(blocks[0]), keys(blocks[1]))
   assert.doesNotMatch(MIGRATION.match(/'المستخدمون:[^']*'/)[0], /[أإآ]/)
 })
+
+test('the dialog uses the Popover multi-select, whose list stays inside the dialog', () => {
+  // Owner 2026-11-24, «فيه مشكلة في الdialog حق تعديل الاسناد»: the older
+  // multi-select portals its list to the body, where the modal dialog took a
+  // click on it for a click outside.
+  const dialog = read('src', 'components', 'assignments', 'UserAssignmentsDialog.tsx')
+  assert.match(dialog, /import \{ AsyncMultiSelect \} from '@\/components\/data-list\/AsyncMultiSelect'/)
+  assert.doesNotMatch(dialog, /from '@\/components\/AsyncMultiSelect'/)
+  assert.match(dialog, /allLabel=\{t\('userAssignmentsAllCompanies'\)\}/)
+  assert.match(dialog, /allLabel=\{t\('assignedProjectsAll'\)\}/)
+  assert.match(dialog, /<PickedChips options=\{companyOptions\} \/>/)
+})

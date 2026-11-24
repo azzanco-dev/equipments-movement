@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AsyncMultiSelect } from '@/components/AsyncMultiSelect'
-import type { SelectOption } from '@/components/Select'
-import { Button, Dialog, Field, Notice } from '@/components/ui'
+import type { AsyncSearchSelectOption } from '@/components/AsyncSearchSelect'
+// The Radix Popover multi-select: its list opens INSIDE the dialog's layer.
+// The older `@/components/AsyncMultiSelect` portals its list to the body,
+// where a modal dialog takes a click on it for a click outside and closes
+// (owner 2026-11-24, «فيه مشكلة في الdialog حق تعديل الاسناد»).
+import { AsyncMultiSelect } from '@/components/data-list/AsyncMultiSelect'
+import { Badge, Button, Dialog, Field, Notice } from '@/components/ui'
 import { useI18n } from '@/i18n/I18nContext'
 import type { TranslationKey } from '@/i18n/translations'
 import {
@@ -96,9 +100,28 @@ export function UserAssignmentsDialog({
   const changed =
     assignmentsKey({ companies, projects }) !== assignmentsKey(initial)
 
-  const changeCompanies = (next: SelectOption[]) => {
-    // Every option comes from the loaders above, which carry both names.
-    const nextCompanies = next as CompanyAssignmentOption[]
+  /** The picked ids back to full options: from what the control knows (the
+   *  loader's rows carry both names and, for a project, its companies), else
+   *  from what was already chosen. */
+  function pick<T extends AsyncSearchSelectOption>(
+    ids: string[],
+    known: AsyncSearchSelectOption[],
+    current: readonly T[],
+  ): T[] {
+    const byId = new Map<string, T>()
+    for (const option of current) byId.set(option.value, option)
+    for (const option of known) byId.set(option.value, option as T)
+    return ids.flatMap((id) => {
+      const option = byId.get(id)
+      return option ? [option] : []
+    })
+  }
+
+  const changeCompanies = (
+    ids: string[],
+    known: AsyncSearchSelectOption[],
+  ) => {
+    const nextCompanies = pick(ids, known, companies)
     setMessage(null)
     setCompanies(nextCompanies)
     setProjects((current) =>
@@ -170,37 +193,47 @@ export function UserAssignmentsDialog({
           label={t('assignedCompanies')}
           hint={t('userAssignmentsCompaniesHint')}
         >
-          {() => (
+          {(control) => (
             <AsyncMultiSelect
-              value={companyOptions}
-              onChange={changeCompanies}
+              id={control.id}
+              aria-describedby={control['aria-describedby']}
+              value={companyOptions.map((company) => company.value)}
+              selectedOptions={companyOptions}
+              onValueChange={changeCompanies}
               loadOptions={loadCompanies}
-              placeholder={t('selectCompanies')}
+              allLabel={t('userAssignmentsAllCompanies')}
               disabled={saving}
             />
           )}
         </Field>
+        <PickedChips options={companyOptions} />
         {companies.length > 0 && (
-          <Field
-            label={t('assignedProjects')}
-            hint={t('userAssignmentsProjectsHint')}
-          >
-            {() => (
-              <AsyncMultiSelect
-                // Re-mounted when the companies change, so its options
-                // follow them.
-                key={companyIdsKey}
-                value={projectOptions}
-                onChange={(next) => {
-                  setMessage(null)
-                  setProjects(next as ProjectOption[])
-                }}
-                loadOptions={loadProjects}
-                placeholder={t('assignedProjectsAll')}
-                disabled={saving}
-              />
-            )}
-          </Field>
+          <>
+            <Field
+              label={t('assignedProjects')}
+              hint={t('userAssignmentsProjectsHint')}
+            >
+              {(control) => (
+                <AsyncMultiSelect
+                  // Re-mounted when the companies change, so its options
+                  // follow them.
+                  key={companyIdsKey}
+                  id={control.id}
+                  aria-describedby={control['aria-describedby']}
+                  value={projectOptions.map((project) => project.value)}
+                  selectedOptions={projectOptions}
+                  onValueChange={(ids, known) => {
+                    setMessage(null)
+                    setProjects(pick(ids, known, projects))
+                  }}
+                  loadOptions={loadProjects}
+                  allLabel={t('assignedProjectsAll')}
+                  disabled={saving}
+                />
+              )}
+            </Field>
+            <PickedChips options={projectOptions} />
+          </>
         )}
         {message && (
           <Notice tone="danger" size="compact">
@@ -209,5 +242,25 @@ export function UserAssignmentsDialog({
         )}
       </div>
     </Dialog>
+  )
+}
+
+/** The picked names under a field once there are more than the control's
+ *  trigger names (it then reads «3 محددة»), so every choice stays in view. */
+function PickedChips({ options }: { options: readonly AsyncSearchSelectOption[] }) {
+  if (options.length <= 2) return null
+  return (
+    <div className="-mt-2 flex flex-wrap gap-1.5">
+      {options.map((option) => (
+        <Badge
+          key={option.value}
+          tone="neutral"
+          size="sm"
+          className="max-w-full !shrink !whitespace-normal break-words"
+        >
+          {option.label}
+        </Badge>
+      ))}
+    </div>
   )
 }
