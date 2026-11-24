@@ -214,9 +214,14 @@ test('the list: the foremen only, the overlap company filter', () => {
   assert.match(screen, /className="hidden md:block"/)
   assert.match(screen, /className="space-y-2 md:hidden"/)
   // «نموذج 2» (owner 2026-11-24): counts in the table, every company in the
-  // details — a panel beside it from lg, a dialog below.
-  assert.match(screen, /const SIDE_PANEL_QUERY = '\(min-width: 1024px\)'/)
-  // The panel always stands from lg, «اختر فورمن» while none is picked, its
+  // details — a panel beside it from xl, a dialog below (xl since «خلي الجدول
+  // اليمين له حد, بدون سكرول»: the table keeps room for its columns).
+  assert.match(screen, /const SIDE_PANEL_QUERY = '\(min-width: 1280px\)'/)
+  // The table never scrolls sideways: the companies column takes the room
+  // left and cuts its names, the name column is capped.
+  assert.match(screen, /className: 'w-full max-w-0',\s+cell: companiesCell,/)
+  assert.match(screen, /className: 'max-w-\[12rem\]',\s+cell: userCell,/)
+  // The panel always stands from xl, «اختر فورمن» while none is picked, its
   // content keyed by the foreman so it animates on every pick (owner
   // 2026-11-24, «خلي القائمة الجانبية ثابتة حتى لو مو مختار احد, واضف انيميشن»).
   assert.match(screen, /\{panelFits && \(\s+<aside/)

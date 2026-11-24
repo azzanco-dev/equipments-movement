@@ -44,9 +44,11 @@ import { userAssignmentsListConfig } from '@/lib/listConfigs'
 import { buildSearchFilter } from '@/lib/search'
 import { supabase } from '@/lib/supabase'
 
-/** The width from which the details sit beside the table (`lg`); below it
- *  they open in a dialog. */
-const SIDE_PANEL_QUERY = '(min-width: 1024px)'
+/** The width from which the details sit beside the table (`xl`); below it
+ *  they open in a dialog. From `xl` the table keeps room for its four
+ *  columns beside the 380 px panel without a side scroll (owner 2026-11-24,
+ *  «خلي الجدول اليمين له حد, بدون سكرول»). */
+const SIDE_PANEL_QUERY = '(min-width: 1280px)'
 
 function useSidePanelFits(): boolean {
   const [fits, setFits] = useState(false)
@@ -70,7 +72,7 @@ function useSidePanelFits(): boolean {
  * company and «عليه اسناد», sorted and paged through the unified list system.
  * The table shows counts only — «9 شركات» with the first two names under it,
  * «4 محددة» or «كل المشاريع» — so every row keeps one height; a row opens
- * the details: from `lg` a panel beside the table, below it a dialog. The
+ * the details: from `xl` a panel beside the table, below it a dialog. The
  * details list every company with its projects and carry «تعديل الاسناد»
  * (`UserAssignmentsDialog`). The page is open to users.manage and
  * users.assignments; the caller's own account is locked unless he is the
@@ -227,16 +229,16 @@ export function UserAssignmentsSettings() {
   }
 
   const userCell = (row: UserAssignmentListRow) => (
-    <span className="flex flex-col gap-0.5 text-start">
-      <span className="flex flex-wrap items-center gap-1.5">
-        <span className="font-semibold">{row.full_name}</span>
+    <span className="flex min-w-0 flex-col gap-0.5 text-start">
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className="min-w-0 truncate font-semibold">{row.full_name}</span>
         {row.id === currentUser?.id && (
           <Badge tone="info" size="sm">
             {t('userAssignmentsYou')}
           </Badge>
         )}
       </span>
-      <span className="text-xs text-muted">{roleLabel(row)}</span>
+      <span className="truncate text-xs text-muted">{roleLabel(row)}</span>
     </span>
   )
   const companiesCell = (row: UserAssignmentListRow) => {
@@ -245,7 +247,7 @@ export function UserAssignmentsSettings() {
       return <span className="text-muted">{t('userAssignmentsNone')}</span>
     return (
       <span className="flex min-w-0 flex-col gap-0.5 text-start">
-        <span className="font-medium">
+        <span className="truncate font-medium">
           {companyCountWords(counts.companies, lang)}
         </span>
         <span className="truncate text-xs text-muted">
@@ -276,18 +278,23 @@ export function UserAssignmentsSettings() {
       key: 'full_name',
       header: t('userAssignmentsUser'),
       sortable: true,
-      width: '14rem',
+      width: '12rem',
+      // The name and the role are cut with «…» rather than widen the table.
+      className: 'max-w-[12rem]',
       cell: userCell,
     },
     {
       key: 'companies',
       header: t('companies'),
+      // Takes the room left and cuts the names with «…» (cells never wrap):
+      // the table never scrolls sideways (owner 2026-11-24, «بدون سكرول»).
+      className: 'w-full max-w-0',
       cell: companiesCell,
     },
     {
       key: 'projects',
       header: t('projects'),
-      width: '9rem',
+      width: '8rem',
       cell: projectsCell,
     },
     {
@@ -420,7 +427,7 @@ export function UserAssignmentsSettings() {
                   ))}
             </div>
           </div>
-          {/* From lg the panel always stands beside the table (owner
+          {/* From xl the panel always stands beside the table (owner
               2026-11-24, «خلي القائمة الجانبية ثابتة حتى لو مو مختار احد»):
               «اختر فورمن» while none is picked; its content is keyed by the
               foreman, so it fades up again on every pick. */}
