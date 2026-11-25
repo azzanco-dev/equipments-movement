@@ -4,6 +4,7 @@ import {
   addMonths,
   fromHalalas,
   toHalalas,
+  daysUntilDue,
   INSTALLMENT_ERROR_KEYS,
   INSTALLMENT_ERROR_TOKENS,
   type InstallmentContractStatus,
@@ -1105,4 +1106,20 @@ export function nearInstallments<T extends { paid: boolean }>(
   const anchor = firstOpen < 0 ? rows.length : firstOpen
   const start = Math.max(0, Math.min(anchor - 1, rows.length - size))
   return rows.slice(start, start + size)
+}
+
+/**
+ * When a row was paid against its due day (owner 2026-11-25): the day of
+ * the transfer (the latest posted payment on the row) minus the due day.
+ * Null without both days.
+ */
+export function paymentTiming(
+  dueDate: string | null | undefined,
+  paidOn: string | null | undefined,
+): { kind: 'late' | 'early' | 'on_time'; days: number } | null {
+  if (!dueDate || !paidOn) return null
+  const days = -daysUntilDue(dueDate, paidOn)
+  if (days > 0) return { kind: 'late', days }
+  if (days < 0) return { kind: 'early', days: -days }
+  return { kind: 'on_time', days: 0 }
 }

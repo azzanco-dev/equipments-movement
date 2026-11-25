@@ -3358,6 +3358,9 @@ export const translations = {
     instColActions: 'الاجراء',
     instGroupVat: 'الضريبة',
     instRowOptions: 'خيارات {name}',
+    instTimingOnTime: 'في موعده',
+    instTimingLate: 'متاخر {days}',
+    instTimingEarly: 'مبكر {days}',
     // end installment-pay-table (2026-11-23)
     // installment-print (2026-11-24)
     instPrintTitle: 'سداد قسط',
@@ -7106,6 +7109,9 @@ export const translations = {
     instColActions: 'Action',
     instGroupVat: 'VAT',
     instRowOptions: '{name} options',
+    instTimingOnTime: 'On time',
+    instTimingLate: '{days} late',
+    instTimingEarly: '{days} early',
     // end installment-pay-table (2026-11-23)
     // installment-print (2026-11-24)
     instPrintTitle: 'Installment payment',

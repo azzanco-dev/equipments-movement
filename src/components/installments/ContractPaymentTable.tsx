@@ -39,11 +39,13 @@ import {
 import { vatInsideHalalas } from '@/lib/installmentPlan'
 import {
   amountOf,
+  daysWords,
   firstPaymentsWords,
   installmentsWords,
   isSchedulePaid,
   nearInstallments,
   payableRowLabel,
+  paymentTiming,
   scheduleRemaining,
   sumAmounts,
   whenWords,
@@ -58,7 +60,7 @@ export type PaymentTableView = 'open' | 'paid' | 'all'
 /** The fixed widths of the table's columns from md (one grid for the head
  *  and every row, so the columns line up). */
 const GRID =
-  'md:grid md:grid-cols-[2.25rem_minmax(0,1fr)_7rem_8rem_8rem_6.5rem] md:items-center'
+  'md:grid md:grid-cols-[2.25rem_minmax(0,1fr)_6.5rem_7.5rem_7.5rem_7.5rem_6rem] md:items-center'
 
 /**
  * «جدول السداد» of the contract page (owner 2026-11-23, model C approved in
@@ -317,6 +319,7 @@ export function ContractPaymentTable({
               <span className="px-2.5">#</span>
               <span className="px-2.5">{t('instColPayment')}</span>
               <span className="px-2.5">{t('instDueDate')}</span>
+              <span className="px-2.5">{t('instPaidOnCol')}</span>
               <span className="px-2.5">{t('instAmount')}</span>
               <span className="px-2.5">{t('instStatus')}</span>
               <span className="sr-only">{t('instColActions')}</span>
@@ -548,6 +551,7 @@ function PaymentRow({
   }
 
   const canSetDate = canAct && !paid && row.kind !== 'installment' && !date
+  const timing = paymentTiming(date, paidOn)
   const canRename = canName && row.kind === 'installment'
   const menu = canSetDate || canRename
 
@@ -589,10 +593,30 @@ function PaymentRow({
         <p className={cn('text-[13px]', paid ? 'text-muted' : 'text-fg')}>
           {date ? <bdi dir="ltr">{formatDate(date)}</bdi> : '—'}
         </p>
-        {paid && paidOn && (
-          <p className="text-[11px] text-muted">
+        {/* Phone: the transfer day under the due day. */}
+        {paidOn && (
+          <p className="text-[11px] text-muted md:hidden">
             {t('instPaidOnShort').replace('{date}', formatDate(paidOn))}
+            {timing && <TimingWords timing={timing} />}
           </p>
+        )}
+      </div>
+      {/* The day of the transfer, and how it stands to the due day
+          (owner 2026-11-25, «ابغاك تضيفهم على كل قسط»). */}
+      <div className="hidden md:block md:px-2.5">
+        {paidOn ? (
+          <>
+            <p className={cn('text-[13px]', paid ? 'text-muted' : 'text-fg')}>
+              <bdi dir="ltr">{formatDate(paidOn)}</bdi>
+            </p>
+            {timing && (
+              <p className="text-[11px]">
+                <TimingWords timing={timing} bare />
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-[13px] text-muted">—</p>
         )}
       </div>
       <div className="justify-self-end text-end md:justify-self-auto md:px-2.5 md:text-start">
@@ -655,6 +679,38 @@ function PaymentRow({
         )}
       </div>
     </li>
+  )
+}
+
+/** «في موعده» / «متاخر 5 ايام» / «مبكر يومين»: a transfer against its due
+ *  day, late in red, on time in green. `bare` drops the leading « · ». */
+function TimingWords({
+  timing,
+  bare = false,
+}: {
+  timing: NonNullable<ReturnType<typeof paymentTiming>>
+  bare?: boolean
+}) {
+  const { t, lang } = useI18n()
+  const text =
+    timing.kind === 'on_time'
+      ? t('instTimingOnTime')
+      : t(
+          timing.kind === 'late' ? 'instTimingLate' : 'instTimingEarly',
+        ).replace('{days}', daysWords(timing.days, lang))
+  return (
+    <span
+      className={cn(
+        timing.kind === 'late'
+          ? 'text-danger'
+          : timing.kind === 'on_time'
+            ? 'text-success'
+            : 'text-muted',
+      )}
+    >
+      {bare ? '' : ' · '}
+      {text}
+    </span>
   )
 }
 

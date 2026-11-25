@@ -219,3 +219,23 @@ test('the sheet: Arabic only, no company data, five columns, the account by the 
   assert.equal(blocks.length, 2)
   assert.doesNotMatch(blocks[0][1], /[أإآ]/)
 })
+
+// «هل البرنامج يفرق بين تاريخ الاستحقاق وتاريخ الحوالة؟» → «ابغاك تضيفهم على كل قسط».
+test('each row shows its transfer day and how it stands to the due day', () => {
+  const timing = (due, paid) => {
+    const out = view.paymentTiming(due, paid)
+    return out && { kind: out.kind, days: out.days }
+  }
+  assert.deepEqual(timing('2026-11-15', '2026-11-20'), { kind: 'late', days: 5 })
+  assert.deepEqual(timing('2026-11-15', '2026-11-13'), { kind: 'early', days: 2 })
+  assert.deepEqual(timing('2026-11-15', '2026-11-15'), { kind: 'on_time', days: 0 })
+  assert.equal(view.paymentTiming(null, '2026-11-15'), null)
+  assert.equal(view.paymentTiming('2026-11-15', null), null)
+  // A column of its own beside the due day, on the head and every row.
+  assert.match(TABLE, /\{t\('instDueDate'\)\}<\/span>\n\s+<span className="px-2\.5">\{t\('instPaidOnCol'\)\}<\/span>/)
+  assert.match(TABLE, /const timing = paymentTiming\(date, paidOn\)/)
+  assert.match(TABLE, /md:grid-cols-\[2\.25rem_minmax\(0,1fr\)_6\.5rem_7\.5rem_7\.5rem_7\.5rem_6rem\]/)
+  const translations = read('src', 'i18n', 'translations.ts')
+  for (const key of ['instTimingOnTime', 'instTimingLate', 'instTimingEarly'])
+    assert.equal([...translations.matchAll(new RegExp(`^\\s+${key}:`, 'gm'))].length, 2, key)
+})
