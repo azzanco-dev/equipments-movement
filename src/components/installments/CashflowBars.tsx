@@ -13,7 +13,7 @@ const compact = new Intl.NumberFormat('en-US', {
  * dashboard (owner 2026-11-21, «خلي الوان وشكل الرسم البياني نفس فيقما»):
  * pale green bars (`--chart-1`) without an outline and with 6 px rounded
  * tops, this month and the next one in the brand amber, a muted compact
- * value over every bar («2.3M») and the short month name under it («نوف»).
+ * value over every bar («2.3M») and the short English month under it («Nov»).
  * It uses the shared `SoftBarChart` in its opt-in `flat` look.
  */
 export function CashflowBars({ months }: { months: InstallmentMonthBucket[] }) {
@@ -27,7 +27,8 @@ export function CashflowBars({ months }: { months: InstallmentMonthBucket[] }) {
       height={240}
       items={months.map((month, index) => ({
         id: month.key,
-        label: installmentMonthShort(month.key, lang),
+        // Owner 2026-11-25, «خلي الاشهر بالانقليزي»: in both languages.
+        label: installmentMonthShort(month.key, 'en'),
         value: month.total,
         valueLabel: month.total > 0 ? compact.format(month.total) : '',
         color: index < NEAR_MONTHS ? 'var(--brand-amber)' : 'var(--chart-1)',
