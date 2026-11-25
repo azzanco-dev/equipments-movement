@@ -260,7 +260,8 @@ test('the payment dialog uploads the receipt only after the payment is saved', (
   }
   const detail = read('src', 'screens', 'installments', 'InstallmentContractDetail.tsx')
   assert.match(detail, /<PaymentReceiptLine/)
-  assert.match(detail, /canManage=\{canManageReceipt && !voided\}/)
+  assert.match(detail, /const canReceipt = canManageReceipt && !voided/)
+  assert.match(detail, /canManage={canReceipt}/)
   const line = read('src', 'components', 'installments', 'InstallmentReceipt.tsx')
   assert.match(line, /<Lightbox/)
   assert.match(line, /useConfirm\(\)/)

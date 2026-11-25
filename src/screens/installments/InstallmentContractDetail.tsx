@@ -74,6 +74,7 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   ErrorState,
+  IconButton,
   Notice,
   PageTrailBar,
   SectionHeader,
@@ -1215,6 +1216,17 @@ function PaymentCard({
 }) {
   const { t } = useI18n()
   const voided = payment.status === 'voided'
+  const receipt = receiptOf(payment)
+  const canReceipt = canManageReceipt && !voided
+  const hasExtra =
+    Boolean(payment.note) ||
+    Boolean(receipt) ||
+    canReceipt ||
+    (voided && Boolean(payment.void_reason))
+  const title = coverage || formatDate(payment.paid_on)
+  // Owner 2026-11-25, «رتب سطر السداد, لانه فيه تداخل»: two rows — what it
+  // paid and its amount, then the note and the receipt across the width —,
+  // the edit and the void in a «...» menu beside the amount.
   return (
     <li
       className={cn(
@@ -1222,11 +1234,16 @@ function PaymentCard({
         voided && 'opacity-70',
       )}
     >
-      <div className="flex flex-wrap items-start gap-x-3 gap-y-2 sm:flex-nowrap">
-        <div className="min-w-0 flex-1 sm:basis-2/5">
-          <p className="break-words text-[13px] font-semibold">
-            {coverage || <bdi dir="ltr">{formatDate(payment.paid_on)}</bdi>}
-          </p>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <p className="min-w-0 break-words text-[13px] font-semibold">
+              {coverage || <bdi dir="ltr">{formatDate(payment.paid_on)}</bdi>}
+            </p>
+            <Badge size="sm" tone={voided ? 'neutral' : 'success'}>
+              {t(voided ? 'instPaymentVoided' : 'instPaymentPosted')}
+            </Badge>
+          </div>
           <p className="mt-0.5 text-xs text-muted">
             <bdi dir="ltr">{formatDate(payment.paid_on)}</bdi>
             {' · '}
@@ -1234,7 +1251,9 @@ function PaymentCard({
             {payment.reference ? (
               <>
                 {' · '}
-                <bdi dir="ltr">{payment.reference}</bdi>
+                <bdi dir="ltr" className="whitespace-nowrap">
+                  {payment.reference}
+                </bdi>
               </>
             ) : null}
           </p>
@@ -1254,18 +1273,52 @@ function PaymentCard({
             </p>
           )}
         </div>
-        <div className="min-w-0 flex-1 space-y-1 text-xs text-muted sm:basis-3/5">
-          <p>
-            <Badge size="sm" tone={voided ? 'neutral' : 'success'}>
-              {t(voided ? 'instPaymentVoided' : 'instPaymentPosted')}
-            </Badge>
+        <div className="flex shrink-0 items-center gap-1">
+          <p
+            className={cn(
+              'whitespace-nowrap text-base font-semibold',
+              voided && 'line-through',
+            )}
+          >
+            <Money value={payment.amount} />
           </p>
+          {!voided && canVoid && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <IconButton
+                  size="sm"
+                  label={t('instRowOptions').replace('{name}', () => title)}
+                  icon={<MoreHorizontal size={16} aria-hidden="true" />}
+                  className="text-muted"
+                />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem
+                  icon={<Pencil size={14} />}
+                  onSelect={onEdit}
+                >
+                  {t('instEditPayment')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  tone="danger"
+                  icon={<Ban size={14} />}
+                  onSelect={onVoid}
+                >
+                  {t('instVoidConfirm')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      </div>
+      {hasExtra && (
+        <div className="mt-2 space-y-1.5 border-t pt-2 text-xs text-muted">
           {payment.note && <p className="break-words">{payment.note}</p>}
           <PaymentReceiptLine
             contractId={payment.contract_id}
             paymentId={payment.id}
-            receipt={receiptOf(payment)}
-            canManage={canManageReceipt && !voided}
+            receipt={receipt}
+            canManage={canReceipt}
             onChanged={onReceiptChanged}
           />
           {voided && payment.void_reason && (
@@ -1274,34 +1327,7 @@ function PaymentCard({
             </p>
           )}
         </div>
-        <div className="flex w-full items-center justify-between gap-3 border-t pt-2 sm:w-44 sm:shrink-0 sm:flex-col sm:items-end sm:border-t-0 sm:pt-0">
-          <p
-            className={cn('text-base font-semibold', voided && 'line-through')}
-          >
-            <Money value={payment.amount} />
-          </p>
-          {!voided && canVoid && (
-            <div className="flex flex-wrap items-center gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                icon={<Pencil size={14} aria-hidden="true" />}
-                onClick={onEdit}
-              >
-                {t('instEditPayment')}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                icon={<Ban size={14} aria-hidden="true" />}
-                onClick={onVoid}
-              >
-                {t('instVoidConfirm')}
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
+      )}
     </li>
   )
 }
