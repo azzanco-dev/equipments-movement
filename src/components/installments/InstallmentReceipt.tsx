@@ -222,7 +222,7 @@ export function PaymentReceiptLine({
         }}
       />
       {receipt ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-surface px-2.5 py-1.5">
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-bg px-2.5 py-1.5">
           <Paperclip size={14} aria-hidden="true" className="shrink-0 text-muted" />
           <span className="min-w-0 flex-1 text-xs">
             <span className="font-medium text-fg">{t('instReceiptLabel')}</span>

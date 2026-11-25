@@ -1230,7 +1230,7 @@ function PaymentCard({
   return (
     <li
       className={cn(
-        'rounded-xl border bg-bg p-2.5 sm:p-3',
+        'rounded-xl border bg-surface p-2.5 sm:p-3',
         voided && 'opacity-70',
       )}
     >
