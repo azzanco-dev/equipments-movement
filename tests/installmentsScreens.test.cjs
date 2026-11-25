@@ -76,6 +76,12 @@ const ITEMS_MIGRATION = read(
   'migrations',
   '20261123100000_0210_installment_items_and_names.sql',
 )
+// 0213: the payment edit and the installment's due day.
+const EDITS_MIGRATION = read(
+  'supabase',
+  'migrations',
+  '20261125100000_0213_installment_payment_and_due_date_edits.sql',
+)
 const DATA = read('src', 'lib', 'installmentsData.ts')
 const APP = read('src', 'App.tsx')
 
@@ -386,6 +392,7 @@ function sqlParameters(name) {
     `CREATE (?:OR REPLACE )?FUNCTION public\\.${name}\\(([\\s\\S]*?)\\)\\s*RETURNS`,
   )
   const match =
+    created.exec(EDITS_MIGRATION.replace(/--[^\n]*/g, '')) ??
     created.exec(ITEMS_MIGRATION.replace(/--[^\n]*/g, '')) ??
     created.exec(PLAN_MIGRATION.replace(/--[^\n]*/g, '')) ??
     pattern.exec(LATER) ??
@@ -413,6 +420,8 @@ test('the four functions are called with the exact parameter names of 0203', () 
     'set_installment_payment_date',
     'installment_contract_edit_key',
     'set_installment_row_note',
+    'update_installment_payment',
+    'set_installment_due_date',
   ]
   for (const name of functions)
     assert.deepEqual(rpcArguments(name), sqlParameters(name), name)
@@ -490,6 +499,9 @@ function assertColumns(relation, columns) {
         new RegExp(`\\b${column}\\b`).test(planBody(relation)) ||
         new RegExp(`\\b${column}\\b`).test(
           planBody(relation, ITEMS_MIGRATION),
+        ) ||
+        new RegExp(`\\b${column}\\b`).test(
+          planBody(relation, EDITS_MIGRATION),
         ),
       `${relation}.${column}`,
     )
@@ -842,7 +854,10 @@ test('the contract page: schedule, payments, units and a derived history', () =>
     'InstallmentContractDetail.tsx',
   )
   assert.match(page, /fetchInstallmentContract\(contractId, signal\)/)
-  assert.match(page, /contractHistory\(data\.contract, data\.payments, data\.files\)/)
+  assert.match(
+    page,
+    /contractHistory\(\n\s+data\.contract,\n\s+data\.payments,\n\s+data\.files,/,
+  )
   assert.match(page, /allocationSeqsByPayment\(data\?\.allocations \?\? \[\]\)/)
   for (const piece of [
     '<DetailHeader',

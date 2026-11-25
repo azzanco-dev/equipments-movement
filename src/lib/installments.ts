@@ -386,6 +386,9 @@ export const INSTALLMENT_ERROR_KEYS: Readonly<Record<string, TranslationKey>> =
     invalid_items: 'instErrItems',
     invalid_item_name: 'instItemErrName',
     invalid_item_quantity: 'instItemErrQuantity',
+    // 0213
+    installment_already_paid: 'instErrInstallmentAlreadyPaid',
+    invalid_due_date: 'instErrDueDate',
   }
 
 /** Every stable token of the installments functions, for the tests. */

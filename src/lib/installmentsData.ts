@@ -91,10 +91,10 @@ export const INSTALLMENT_ITEM_SELECT = 'id,position,name,quantity'
 const CONTRACT_ITEMS_CAP = 100
 
 export const INSTALLMENT_SCHEDULE_SELECT =
-  'id,contract_id,seq,due_date,amount,is_balloon,paid_amount,kind,title,note,rate'
+  'id,contract_id,seq,due_date,amount,is_balloon,paid_amount,kind,title,note,rate,due_date_edited_at,due_date_edited_by_name'
 
 export const INSTALLMENT_PAYMENT_SELECT =
-  'id,contract_id,paid_on,amount,method,reference,note,status,voided_at,voided_by_name,void_reason,created_by_name,created_at,receipt_id,receipt_path,receipt_file_name,receipt_mime_type,receipt_size_bytes'
+  'id,contract_id,paid_on,amount,method,reference,note,status,voided_at,voided_by_name,void_reason,created_by_name,created_at,receipt_id,receipt_path,receipt_file_name,receipt_mime_type,receipt_size_bytes,edited_at,edited_by_name'
 
 export const INSTALLMENT_FINANCIER_SELECT = 'id,name,bank_name,iban'
 
@@ -706,46 +706,47 @@ export async function fetchInstallmentContract(
   contractId: string,
   signal?: AbortSignal,
 ): Promise<InstallmentContractDetailData | null> {
-  const [contract, schedule, payments, allocations, units, files, items] = await Promise.all([
-    fetchContractRow(contractId, signal),
-    fetchSchedule(contractId, signal),
-    withSignal(
-      supabase
-        .from('installment_payment_list')
-        .select(INSTALLMENT_PAYMENT_SELECT)
-        .eq('contract_id', contractId)
-        .order('paid_on', { ascending: false })
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
-        .limit(CONTRACT_PAYMENTS_CAP),
-      signal,
-    ).then((result) => rowsOf<InstallmentPaymentRow>(result)),
-    withSignal(
-      supabase
-        .from('installment_payment_allocations')
-        .select(INSTALLMENT_ALLOCATION_SELECT)
-        .eq('installment_schedule.contract_id', contractId)
-        .limit(CONTRACT_ALLOCATIONS_CAP),
-      signal,
-    ).then((result) =>
-      rowsOf<AllocationEmbedRow>(result).flatMap((row) =>
-        row.installment_schedule
-          ? [
-              {
-                payment_id: row.payment_id,
-                amount: amountOf(row.amount),
-                seq: row.installment_schedule.seq,
-                kind: row.installment_schedule.kind,
-                title: row.installment_schedule.title,
-              },
-            ]
-          : [],
+  const [contract, schedule, payments, allocations, units, files, items] =
+    await Promise.all([
+      fetchContractRow(contractId, signal),
+      fetchSchedule(contractId, signal),
+      withSignal(
+        supabase
+          .from('installment_payment_list')
+          .select(INSTALLMENT_PAYMENT_SELECT)
+          .eq('contract_id', contractId)
+          .order('paid_on', { ascending: false })
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(CONTRACT_PAYMENTS_CAP),
+        signal,
+      ).then((result) => rowsOf<InstallmentPaymentRow>(result)),
+      withSignal(
+        supabase
+          .from('installment_payment_allocations')
+          .select(INSTALLMENT_ALLOCATION_SELECT)
+          .eq('installment_schedule.contract_id', contractId)
+          .limit(CONTRACT_ALLOCATIONS_CAP),
+        signal,
+      ).then((result) =>
+        rowsOf<AllocationEmbedRow>(result).flatMap((row) =>
+          row.installment_schedule
+            ? [
+                {
+                  payment_id: row.payment_id,
+                  amount: amountOf(row.amount),
+                  seq: row.installment_schedule.seq,
+                  kind: row.installment_schedule.kind,
+                  title: row.installment_schedule.title,
+                },
+              ]
+            : [],
+        ),
       ),
-    ),
-    fetchInstallmentContractUnits([contractId], signal),
-    fetchContractFiles(contractId, signal),
-    fetchContractItems(contractId, signal),
-  ])
+      fetchInstallmentContractUnits([contractId], signal),
+      fetchContractFiles(contractId, signal),
+      fetchContractItems(contractId, signal),
+    ])
   if (!contract) return null
   return { contract, schedule, payments, allocations, units, files, items }
 }
@@ -931,6 +932,36 @@ export async function setInstallmentPaymentDate(
 ): Promise<RpcResult<null>> {
   return asResult<null>(
     await supabase.rpc('set_installment_payment_date', {
+      p_schedule_id: scheduleId,
+      p_due_date: dueDate,
+    }),
+  )
+}
+
+/** `update_installment_payment` (0213): a posted payment's transfer day
+ *  and amount; a new amount is allocated again by the database. */
+export async function updateInstallmentPayment(
+  paymentId: string,
+  paidOn: string,
+  amount: number,
+): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('update_installment_payment', {
+      p_payment_id: paymentId,
+      p_paid_on: paidOn,
+      p_amount: amount,
+    }),
+  )
+}
+
+/** `set_installment_due_date` (0213): moves an installment that is not
+ *  fully paid. */
+export async function setInstallmentDueDate(
+  scheduleId: string,
+  dueDate: string,
+): Promise<RpcResult<null>> {
+  return asResult<null>(
+    await supabase.rpc('set_installment_due_date', {
       p_schedule_id: scheduleId,
       p_due_date: dueDate,
     }),

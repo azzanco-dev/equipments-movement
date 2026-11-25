@@ -21,7 +21,6 @@ import {
   StickyNote,
   Trash2,
   Truck,
-  User,
   Wallet,
 } from 'lucide-react'
 import { usePermissions } from '@/auth/PermissionsContext'
@@ -32,6 +31,10 @@ import {
   SetPaymentDateDialog,
 } from '@/components/installments/InstallmentDateDialogs'
 import { ContractPaymentTable } from '@/components/installments/ContractPaymentTable'
+import {
+  EditInstallmentPaymentDialog,
+  SetInstallmentDueDateDialog,
+} from '@/components/installments/InstallmentEditDialogs'
 import { InstallmentPrintSheet } from '@/components/installments/InstallmentPrintSheet'
 import { installmentToPay } from '@/lib/installmentPrint'
 import { InstallmentPaymentDialog } from '@/components/installments/InstallmentPaymentDialog'
@@ -137,6 +140,9 @@ export type InstallmentContractDialogKind =
   | { kind: 'void'; payment: InstallmentPaymentRow }
   /** 0210: «تسمية القسط». */
   | { kind: 'row_name'; row: InstallmentScheduleItem }
+  /** 0213: «تعديل السداد» and «تعديل تاريخ الاستحقاق». */
+  | { kind: 'edit_payment'; payment: InstallmentPaymentRow }
+  | { kind: 'due_date'; row: InstallmentScheduleItem }
 
 export const PAYMENTS_PREVIEW_ROWS = 10
 export const EVENTS_PREVIEW_ROWS = 20
@@ -245,8 +251,26 @@ function InstallmentContractDetailInner({
 
   const history = useMemo(
     () =>
-      data ? contractHistory(data.contract, data.payments, data.files) : [],
-    [data],
+      data
+        ? contractHistory(
+            data.contract,
+            data.payments,
+            data.files,
+            data.schedule.flatMap((row) =>
+              row.due_date_edited_at && row.due_date
+                ? [
+                    {
+                      key: row.id,
+                      at: row.due_date_edited_at,
+                      by: row.due_date_edited_by_name ?? null,
+                      detail: `${payableRowLabel(row, t)}: ${formatDate(row.due_date)}`,
+                    },
+                  ]
+                : [],
+            ),
+          )
+        : [],
+    [data, t],
   )
   const coveredBy = useMemo(
     () => allocationSeqsByPayment(data?.allocations ?? []),
@@ -614,12 +638,6 @@ function InstallmentContractDetailInner({
       ),
     },
     {
-      key: 'by',
-      icon: <User size={16} />,
-      label: t('instCreatedBy'),
-      value: contract.created_by_name ?? '—',
-    },
-    {
       key: 'at',
       icon: <Clock size={16} />,
       label: t('instCreatedOn'),
@@ -936,6 +954,7 @@ function InstallmentContractDetailInner({
             onPay={payRow}
             onSetDate={(row) => open({ kind: 'payment_date', row })}
             onName={(row) => open({ kind: 'row_name', row })}
+            onEditDueDate={(row) => open({ kind: 'due_date', row })}
             onSetFirstDue={() => open({ kind: 'first_due' })}
           />
 
@@ -968,6 +987,7 @@ function InstallmentContractDetailInner({
                     canVoid={canManage && !cancelled}
                     canManageReceipt={canManage}
                     onVoid={() => open({ kind: 'void', payment })}
+                    onEdit={() => open({ kind: 'edit_payment', payment })}
                     onReceiptChanged={refresh}
                   />
                 ))}
@@ -1117,6 +1137,18 @@ function InstallmentContractDetailInner({
             onDone={() => done('instRowNameSaved')}
             onStale={refresh}
           />
+          <EditInstallmentPaymentDialog
+            payment={dialog?.kind === 'edit_payment' ? dialog.payment : null}
+            onOpenChange={closeDialog}
+            onDone={() => done('instToastPaymentEdited')}
+            onStale={refresh}
+          />
+          <SetInstallmentDueDateDialog
+            row={dialog?.kind === 'due_date' ? dialog.row : null}
+            onOpenChange={closeDialog}
+            onDone={() => done('instToastDueDateSet')}
+            onStale={refresh}
+          />
           <SetPaymentDateDialog
             row={dialog?.kind === 'payment_date' ? dialog.row : null}
             onOpenChange={closeDialog}
@@ -1160,6 +1192,7 @@ function PaymentCard({
   canVoid,
   canManageReceipt,
   onVoid,
+  onEdit,
   onReceiptChanged,
 }: {
   payment: InstallmentPaymentRow
@@ -1176,6 +1209,8 @@ function PaymentCard({
    *  posted payment (a voided one keeps its file, view only). */
   canManageReceipt: boolean
   onVoid: () => void
+  /** 0213: «تعديل» of a posted payment. */
+  onEdit: () => void
   onReceiptChanged: () => void
 }) {
   const { t } = useI18n()
@@ -1225,12 +1260,6 @@ function PaymentCard({
               {t(voided ? 'instPaymentVoided' : 'instPaymentPosted')}
             </Badge>
           </p>
-          {payment.created_by_name && (
-            <p className="flex items-center gap-1.5">
-              <User size={12} aria-hidden="true" />
-              {payment.created_by_name}
-            </p>
-          )}
           {payment.note && <p className="break-words">{payment.note}</p>}
           <PaymentReceiptLine
             contractId={payment.contract_id}
@@ -1242,7 +1271,6 @@ function PaymentCard({
           {voided && payment.void_reason && (
             <p className="break-words text-danger">
               {t('instVoidReason')} {payment.void_reason}
-              {payment.voided_by_name && <> · {payment.voided_by_name}</>}
             </p>
           )}
         </div>
@@ -1253,14 +1281,24 @@ function PaymentCard({
             <Money value={payment.amount} />
           </p>
           {!voided && canVoid && (
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={<Ban size={14} aria-hidden="true" />}
-              onClick={onVoid}
-            >
-              {t('instVoidConfirm')}
-            </Button>
+            <div className="flex flex-wrap items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<Pencil size={14} aria-hidden="true" />}
+                onClick={onEdit}
+              >
+                {t('instEditPayment')}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                icon={<Ban size={14} aria-hidden="true" />}
+                onClick={onVoid}
+              >
+                {t('instVoidConfirm')}
+              </Button>
+            </div>
           )}
         </div>
       </div>

@@ -284,6 +284,14 @@ test('the client maps exactly the tokens the SQL raises', () => {
     )
     .replace(/--[^\n]*/g, '')
   for (const match of items.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g)) raised.add(match[1])
+  // 0213 adds the payment edit and the installment's due day.
+  const edits = fs
+    .readFileSync(
+      path.join(MIGRATIONS, '20261125100000_0213_installment_payment_and_due_date_edits.sql'),
+      'utf8',
+    )
+    .replace(/--[^\n]*/g, '')
+  for (const match of edits.matchAll(/RAISE EXCEPTION '([a-z_]+)'/g)) raised.add(match[1])
   assert.deepEqual([...raised].sort(), [...lib.INSTALLMENT_ERROR_TOKENS].sort())
 })
 

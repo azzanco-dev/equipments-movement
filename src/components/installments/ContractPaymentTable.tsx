@@ -82,6 +82,7 @@ export function ContractPaymentTable({
   onPay,
   onSetDate,
   onName,
+  onEditDueDate,
   onSetFirstDue,
 }: {
   contract: InstallmentContractRow
@@ -99,6 +100,8 @@ export function ContractPaymentTable({
   onPay: (row: InstallmentScheduleItem) => void
   onSetDate: (row: InstallmentScheduleItem) => void
   onName: (row: InstallmentScheduleItem) => void
+  /** 0213: «تعديل تاريخ الاستحقاق» of an installment not fully paid. */
+  onEditDueDate: (row: InstallmentScheduleItem) => void
   onSetFirstDue: () => void
 }) {
   const { t, lang } = useI18n()
@@ -352,6 +355,7 @@ export function ContractPaymentTable({
                       onPay={onPay}
                       onSetDate={onSetDate}
                       onName={onName}
+                      onEditDueDate={onEditDueDate}
                     />
                   ))}
                 </ul>
@@ -476,6 +480,7 @@ function PaymentRow({
   onPay,
   onSetDate,
   onName,
+  onEditDueDate,
 }: {
   contract: InstallmentContractRow
   row: InstallmentScheduleItem
@@ -486,6 +491,7 @@ function PaymentRow({
   onPay: (row: InstallmentScheduleItem) => void
   onSetDate: (row: InstallmentScheduleItem) => void
   onName: (row: InstallmentScheduleItem) => void
+  onEditDueDate: (row: InstallmentScheduleItem) => void
 }) {
   const { t, lang } = useI18n()
   const running = contract.status !== 'cancelled'
@@ -549,7 +555,9 @@ function PaymentRow({
 
   const canSetDate = canAct && !paid && row.kind !== 'installment' && !date
   const canRename = canName && row.kind === 'installment'
-  const menu = canSetDate || canRename
+  // 0213: an installment not fully paid takes a new due day.
+  const canMoveDue = canAct && !paid && row.kind === 'installment'
+  const menu = canSetDate || canRename || canMoveDue
 
   return (
     <li
@@ -648,6 +656,14 @@ function PaymentRow({
                   onSelect={() => onSetDate(row)}
                 >
                   {t('instSetDate')}
+                </DropdownMenuItem>
+              )}
+              {canMoveDue && (
+                <DropdownMenuItem
+                  icon={<CalendarDays size={14} />}
+                  onSelect={() => onEditDueDate(row)}
+                >
+                  {t('instDueDateAction')}
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>

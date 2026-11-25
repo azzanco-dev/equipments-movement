@@ -198,6 +198,9 @@ export interface InstallmentScheduleItem {
   title: string | null
   note: string | null
   rate: number | null
+  /** 0213: the last move of an installment's due day by hand. */
+  due_date_edited_at?: string | null
+  due_date_edited_by_name?: string | null
 }
 
 /** `installment_payment_list`: a payment with the two names. */
@@ -221,6 +224,9 @@ export interface InstallmentPaymentRow {
   receipt_file_name: string | null
   receipt_mime_type: string | null
   receipt_size_bytes: number | null
+  /** 0213: the last edit of the transfer day or the amount. */
+  edited_at?: string | null
+  edited_by_name?: string | null
 }
 
 /** `installment_payment_allocations` with the `seq` of its schedule row. */
@@ -696,6 +702,8 @@ export type InstallmentHistoryKind =
   | 'file_added'
   | 'first_due_set'
   | 'payment_recorded'
+  | 'payment_edited'
+  | 'due_date_edited'
   | 'payment_voided'
   | 'paid_off'
   | 'cancelled'
@@ -707,6 +715,8 @@ export const INSTALLMENT_HISTORY_LABEL_KEYS: Readonly<
   file_added: 'instHistoryFileAdded',
   first_due_set: 'instHistoryFirstDueSet',
   payment_recorded: 'instHistoryPaymentRecorded',
+  payment_edited: 'instHistoryPaymentEdited',
+  due_date_edited: 'instHistoryDueDateEdited',
   payment_voided: 'instHistoryPaymentVoided',
   paid_off: 'instHistoryPaidOff',
   cancelled: 'instHistoryCancelled',
@@ -731,10 +741,12 @@ const HISTORY_RANK: Readonly<Record<InstallmentHistoryKind, number>> = {
   created: 0,
   file_added: 1,
   first_due_set: 2,
-  payment_recorded: 3,
-  paid_off: 4,
-  payment_voided: 5,
-  cancelled: 6,
+  due_date_edited: 3,
+  payment_recorded: 4,
+  payment_edited: 5,
+  paid_off: 6,
+  payment_voided: 7,
+  cancelled: 8,
 }
 
 const instantOf = (value: string | null) => {
@@ -766,6 +778,13 @@ export function contractHistory(
     created_at: string
     uploaded_by_name: string | null
   }[] = [],
+  /** 0213: installments whose due day was moved by hand (the last move). */
+  dueDateEdits: readonly {
+    key: string
+    at: string
+    by: string | null
+    detail: string
+  }[] = [],
 ): InstallmentHistoryEvent[] {
   const events: InstallmentHistoryEvent[] = [
     {
@@ -795,7 +814,25 @@ export function contractHistory(
       amount: null,
       detail: null,
     })
+  for (const edit of dueDateEdits)
+    events.push({
+      key: `${edit.key}:due`,
+      kind: 'due_date_edited',
+      at: edit.at,
+      by: edit.by,
+      amount: null,
+      detail: edit.detail,
+    })
   for (const payment of payments) {
+    if (payment.edited_at)
+      events.push({
+        key: `${payment.id}:edited`,
+        kind: 'payment_edited',
+        at: payment.edited_at,
+        by: payment.edited_by_name ?? null,
+        amount: amountOf(payment.amount),
+        detail: null,
+      })
     events.push({
       key: `${payment.id}:recorded`,
       kind: 'payment_recorded',
@@ -1063,6 +1100,7 @@ export const INSTALLMENT_STALE_TOKENS: ReadonlySet<string> = new Set([
   'payment_already_voided',
   'invalid_schedule_row',
   'first_payment_locked',
+  'installment_already_paid',
   'installments_not_scheduled',
   'contract_file_not_found',
   'contract_changed',

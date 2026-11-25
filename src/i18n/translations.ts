@@ -3364,6 +3364,23 @@ export const translations = {
     instTimingLate: 'متاخر {days}',
     instTimingEarly: 'مبكر {days}',
     // end installment-timing (2026-11-25)
+    // installment-edits (0213)
+    instEditPayment: 'تعديل',
+    instEditPaymentTitle: 'تعديل السداد',
+    instEditPaymentDate: 'تاريخ الحوالة',
+    instEditPaymentAmount: 'مبلغ السداد',
+    instEditPaymentSave: 'حفظ التعديل',
+    instEditPaymentReallocate: 'المبلغ يتوزع من جديد على الدفعات، ويبدا بالي كان يغطيه.',
+    instToastPaymentEdited: 'تم تعديل السداد',
+    instDueDateAction: 'تعديل تاريخ الاستحقاق',
+    instDueDateTitle: 'تعديل تاريخ استحقاق {title}',
+    instDueDateHint: 'التاخير والتذكير يمشون على التاريخ الجديد. اذا تغيرت شروط العقد ينرجع التاريخ.',
+    instToastDueDateSet: 'تم تعديل تاريخ الاستحقاق',
+    instErrInstallmentAlreadyPaid: 'القسط مسدد كامل: تاريخه ما يتغير.',
+    instErrDueDate: 'تاريخ الاستحقاق غير صحيح.',
+    instHistoryPaymentEdited: 'تعديل سداد',
+    instHistoryDueDateEdited: 'تعديل تاريخ استحقاق',
+    // end installment-edits (0213)
     // installment-print (2026-11-24)
     instPrintTitle: 'سداد قسط',
     instPrintExport: 'تصدير القسط (PDF)',
@@ -7117,6 +7134,23 @@ export const translations = {
     instTimingLate: '{days} late',
     instTimingEarly: '{days} early',
     // end installment-timing (2026-11-25)
+    // installment-edits (0213)
+    instEditPayment: 'Edit',
+    instEditPaymentTitle: 'Edit payment',
+    instEditPaymentDate: 'Transfer date',
+    instEditPaymentAmount: 'Payment amount',
+    instEditPaymentSave: 'Save changes',
+    instEditPaymentReallocate: 'The amount is spread over the payments again, starting with what it covered.',
+    instToastPaymentEdited: 'Payment updated',
+    instDueDateAction: 'Edit due date',
+    instDueDateTitle: 'Edit the due date of {title}',
+    instDueDateHint: 'Lateness and reminders follow the new date. A change of the contract terms resets it.',
+    instToastDueDateSet: 'Due date updated',
+    instErrInstallmentAlreadyPaid: 'The installment is fully paid: its date cannot change.',
+    instErrDueDate: 'The due date is not valid.',
+    instHistoryPaymentEdited: 'Payment edited',
+    instHistoryDueDateEdited: 'Due date edited',
+    // end installment-edits (0213)
     // installment-print (2026-11-24)
     instPrintTitle: 'Installment payment',
     instPrintExport: 'Export installment (PDF)',
