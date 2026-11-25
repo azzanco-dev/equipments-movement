@@ -47,6 +47,7 @@ import {
   InstallmentStateBadge,
   Money,
   OverdueBadge,
+  PaymentTimingWords,
   PaidProgress,
   PeriodRange,
   UnitTags,
@@ -109,6 +110,7 @@ import {
   isAwaitingFirstDue,
   isSchedulePaid,
   payableRowLabel,
+  paymentTiming,
   scheduleRemaining,
   sumAmounts,
   INSTALLMENT_HISTORY_LABEL_KEYS,
@@ -357,6 +359,29 @@ function InstallmentContractDetailInner({
     else if (seqs.length > 1)
       names.push(`${t('instInstallments')} ${coveredSeqsLabel(seqs, lang)}`)
     return names.join(t('instListComma'))
+  }
+  /** Each row a payment covered with how its transfer day stands to the
+   *  row's due day (owner 2026-11-25: on the payment cards only). */
+  const timingsOf = (payment: InstallmentPaymentRow) => {
+    const covered = [
+      ...(othersBy.get(payment.id) ?? []).map((row) => ({
+        kind: row.kind,
+        seq: row.seq,
+      })),
+      ...(coveredBy.get(payment.id) ?? []).map((seq) => ({
+        kind: 'installment' as const,
+        seq,
+      })),
+    ]
+    return covered.flatMap((target) => {
+      const row = schedule.find(
+        (item) => item.kind === target.kind && item.seq === target.seq,
+      )
+      const timing = row ? paymentTiming(row.due_date, payment.paid_on) : null
+      return row && timing
+        ? [{ key: row.id, label: payableRowLabel(row, t), timing }]
+        : []
+    })
   }
 
   const open = (kind: InstallmentContractDialogKind) => setDialog(kind)
@@ -939,6 +964,7 @@ function InstallmentContractDetailInner({
                     key={payment.id}
                     payment={payment}
                     coverage={coverageOf(payment.id)}
+                    timings={timingsOf(payment)}
                     canVoid={canManage && !cancelled}
                     canManageReceipt={canManage}
                     onVoid={() => open({ kind: 'void', payment })}
@@ -1130,6 +1156,7 @@ function InstallmentContractDetailInner({
 function PaymentCard({
   payment,
   coverage,
+  timings,
   canVoid,
   canManageReceipt,
   onVoid,
@@ -1138,6 +1165,12 @@ function PaymentCard({
   payment: InstallmentPaymentRow
   /** What the payment covered; empty when nothing says. */
   coverage: string
+  /** Each covered row with how the transfer stands to its due day. */
+  timings: {
+    key: string
+    label: string
+    timing: NonNullable<ReturnType<typeof paymentTiming>>
+  }[]
   canVoid: boolean
   /** installments.manage: attach, replace or remove the receipt of a
    *  posted payment (a voided one keeps its file, view only). */
@@ -1170,6 +1203,21 @@ function PaymentCard({
               </>
             ) : null}
           </p>
+          {!voided && timings.length > 0 && (
+            <p className="mt-0.5 text-xs">
+              {timings.length === 1 ? (
+                <PaymentTimingWords timing={timings[0].timing} />
+              ) : (
+                timings.map((item, index) => (
+                  <span key={item.key}>
+                    {index > 0 && <span className="text-muted"> · </span>}
+                    <span className="text-muted">{item.label}: </span>
+                    <PaymentTimingWords timing={item.timing} />
+                  </span>
+                ))
+              )}
+            </p>
+          )}
         </div>
         <div className="min-w-0 flex-1 space-y-1 text-xs text-muted sm:basis-3/5">
           <p>
@@ -1199,7 +1247,9 @@ function PaymentCard({
           )}
         </div>
         <div className="flex w-full items-center justify-between gap-3 border-t pt-2 sm:w-44 sm:shrink-0 sm:flex-col sm:items-end sm:border-t-0 sm:pt-0">
-          <p className={cn('text-base font-semibold', voided && 'line-through')}>
+          <p
+            className={cn('text-base font-semibold', voided && 'line-through')}
+          >
             <Money value={payment.amount} />
           </p>
           {!voided && canVoid && (

@@ -221,7 +221,8 @@ test('the sheet: Arabic only, no company data, five columns, the account by the 
 })
 
 // «هل البرنامج يفرق بين تاريخ الاستحقاق وتاريخ الحوالة؟» → «ابغاك تضيفهم على كل قسط».
-test('each row shows its transfer day and how it stands to the due day', () => {
+// Then «خليه يظهر في السدادات بس»: on the payment cards only.
+test('each payment shows how its transfer stands to the due day', () => {
   const timing = (due, paid) => {
     const out = view.paymentTiming(due, paid)
     return out && { kind: out.kind, days: out.days }
@@ -231,10 +232,13 @@ test('each row shows its transfer day and how it stands to the due day', () => {
   assert.deepEqual(timing('2026-11-15', '2026-11-15'), { kind: 'on_time', days: 0 })
   assert.equal(view.paymentTiming(null, '2026-11-15'), null)
   assert.equal(view.paymentTiming('2026-11-15', null), null)
-  // A column of its own beside the due day, on the head and every row.
-  assert.match(TABLE, /\{t\('instDueDate'\)\}<\/span>\n\s+<span className="px-2\.5">\{t\('instPaidOnCol'\)\}<\/span>/)
-  assert.match(TABLE, /const timing = paymentTiming\(date, paidOn\)/)
-  assert.match(TABLE, /md:grid-cols-\[2\.25rem_minmax\(0,1fr\)_6\.5rem_7\.5rem_7\.5rem_7\.5rem_6rem\]/)
+  // Not in «جدول السداد»: on each payment card, per row it covered.
+  assert.doesNotMatch(TABLE, /instPaidOnCol|paymentTiming/)
+  assert.match(PAGE, /const timingsOf = \(payment: InstallmentPaymentRow\) =>/)
+  assert.match(PAGE, /paymentTiming\(row\.due_date, payment\.paid_on\)/)
+  assert.match(PAGE, /timings=\{timingsOf\(payment\)\}/)
+  assert.match(PAGE, /!voided && timings\.length > 0 &&/)
+  assert.match(read('src', 'components', 'installments', 'cells.tsx'), /export function PaymentTimingWords\(/)
   const translations = read('src', 'i18n', 'translations.ts')
   for (const key of ['instTimingOnTime', 'instTimingLate', 'instTimingEarly'])
     assert.equal([...translations.matchAll(new RegExp(`^\\s+${key}:`, 'gm'))].length, 2, key)

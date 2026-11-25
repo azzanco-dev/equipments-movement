@@ -11,7 +11,9 @@ import {
   type InstallmentState,
 } from '@/lib/installments'
 import {
+  daysWords,
   parseInstallmentAmount,
+  paymentTiming,
   unitsWords,
   whenWords,
   type InstallmentUnit,
@@ -250,6 +252,35 @@ export function DueDateCell({
 
 /** «باقي 5 ايام» / «اليوم» / «متاخر 3 ايام» as a small badge: red when late,
  *  amber today, neutral ahead (owner 2026-11-19, «باقي x يوم خليه بادج»). */
+/** A transfer against its due day (owner 2026-11-25): «في موعده» in green,
+ *  «متاخر 5 ايام» in red, «مبكر يومين» muted. */
+export function PaymentTimingWords({
+  timing,
+}: {
+  timing: NonNullable<ReturnType<typeof paymentTiming>>
+}) {
+  const { t, lang } = useI18n()
+  const text =
+    timing.kind === 'on_time'
+      ? t('instTimingOnTime')
+      : t(
+          timing.kind === 'late' ? 'instTimingLate' : 'instTimingEarly',
+        ).replace('{days}', daysWords(timing.days, lang))
+  return (
+    <span
+      className={cn(
+        timing.kind === 'late'
+          ? 'text-danger'
+          : timing.kind === 'on_time'
+            ? 'text-success'
+            : 'text-muted',
+      )}
+    >
+      {text}
+    </span>
+  )
+}
+
 export function WhenBadge({ days }: { days: number }) {
   const { lang } = useI18n()
   return (
