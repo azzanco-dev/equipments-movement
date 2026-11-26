@@ -288,7 +288,7 @@ export function dayDueTotal(
   )
 }
 
-/** The short number on a calendar chip: «INS-0016» → «0016». */
+/** The short number on a calendar chip: «INS-016» → «016». */
 export const shortContractNumber = (number: string) =>
   number.replace(/^INS-/, '')
 

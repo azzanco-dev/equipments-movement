@@ -66,8 +66,8 @@ export const INSTALLMENT_PAYMENT_REFERENCE_MAX = 80
 export const INSTALLMENT_PAYMENT_NOTE_MAX = 500
 export const INSTALLMENT_FINANCIER_NAME_MAX = 120
 
-/** The contract number as the database issues it (`INS-0001`). */
-export const INSTALLMENT_CONTRACT_NUMBER_PATTERN = /^INS-[0-9]{4,}$/
+/** The contract number as the database issues it (`INS-001`; three digits since 0215). */
+export const INSTALLMENT_CONTRACT_NUMBER_PATTERN = /^INS-[0-9]{3,}$/
 
 export interface InstallmentTerms {
   totalAmount: number
