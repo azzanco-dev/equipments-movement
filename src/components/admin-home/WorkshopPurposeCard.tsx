@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Download } from 'lucide-react'
-import { AppLink, Button, cn } from '@/components/ui'
+import { Button, cn } from '@/components/ui'
 import { SoftDonut } from '@/components/charts/lazy'
 import type { FleetDonutSlice } from '@/components/charts/lazy'
 import { useI18n } from '@/i18n/I18nContext'
@@ -48,7 +48,8 @@ const PURPOSES: {
  * الملاك تحت الدائرة … بدون المالك الاخر»; the lines «خارج الخدمة اكثر من
  * 30 يوم» and «متاحة للملاك المختارين» it replaced are gone). The owners
  * list reads the page's snapshot over every owner, so it does not follow the
- * card's owner filter; the ring does. It took the place of «حالات المتبقي» (owner 2026-10-29)
+ * card's owner filter; the ring does, and a press on an owner sets that
+ * filter to him alone. It took the place of «حالات المتبقي» (owner 2026-10-29)
  * and keeps its decisions: its own owner filter over all five, Al-Azani by
  * default («اضف له فلتر للملاك كلهم، وافتراضي على العزاني»; empty = every
  * owner), and the Excel export of the units outside a project — the workshop
@@ -181,9 +182,8 @@ export function WorkshopPurposeCard({
                   label={t(ownershipBadge(row.owner).key)}
                   count={row.count}
                   share={percentOf(row.count, ownerRows.total)}
-                  href={
-                    canOpenLogs ? openWorkshopVisitsHref([row.owner]) : null
-                  }
+                  selected={owners.length === 1 && owners[0] === row.owner}
+                  onSelect={() => setOwners([row.owner])}
                 />
               ))}
             </ul>
@@ -219,41 +219,55 @@ export function WorkshopPurposeCard({
   )
 }
 
-/** One owner under the ring, the fleet card's legend row. */
+/**
+ * One owner under the ring, the fleet card's legend row. A press picks that
+ * owner in the card's own filter (owner 2026-11-26, «خلي الضغط عليها تختار
+ * الفلتر حقها»), so the ring then shows that owner's purposes.
+ */
 function OwnerLine({
   owner,
   label,
   count,
   share,
-  href,
+  selected,
+  onSelect,
 }: {
   owner: AdminHomeOwner
   label: string
   count: number
   share: number
-  href: string | null
+  selected: boolean
+  onSelect: () => void
 }) {
   return (
-    <li className="flex items-center gap-2 py-1">
-      <span
-        aria-hidden="true"
-        className="block h-2.5 w-2.5 shrink-0 rounded-full"
-        style={{ backgroundColor: `var(--chart-${OWNER_SHADE[owner]})` }}
-      />
-      {href ? (
-        <AppLink
-          href={href}
-          className="truncate-safe min-w-0 flex-1 rounded text-fg underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+    <li>
+      <button
+        type="button"
+        aria-pressed={selected}
+        onClick={onSelect}
+        className={cn(
+          'flex w-full items-center gap-2 rounded-md px-1 py-1 text-start transition-colors hover:bg-surface-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring',
+          selected && 'bg-surface-hover',
+        )}
+      >
+        <span
+          aria-hidden="true"
+          className="block h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ backgroundColor: `var(--chart-${OWNER_SHADE[owner]})` }}
+        />
+        <span
+          className={cn(
+            'truncate-safe min-w-0 flex-1 text-fg',
+            selected && 'font-semibold',
+          )}
         >
           {label}
-        </AppLink>
-      ) : (
-        <span className="truncate-safe min-w-0 flex-1 text-fg">{label}</span>
-      )}
-      <span className="font-semibold tabular-nums text-fg">
-        <CountUp value={count} />
-      </span>
-      <span className="w-9 text-end tabular-nums text-muted">{share}%</span>
+        </span>
+        <span className="font-semibold tabular-nums text-fg">
+          <CountUp value={count} />
+        </span>
+        <span className="w-9 text-end tabular-nums text-muted">{share}%</span>
+      </button>
     </li>
   )
 }

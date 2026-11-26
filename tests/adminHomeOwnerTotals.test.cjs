@@ -240,7 +240,10 @@ test('the workshop block keeps the remaining-states filter and export', () => {
   assert.match(card, /ownerTotals\(\s*pageMatrix\.data,/)
   assert.match(card, /row\.owner !== 'external_supplier'/)
   assert.match(card, /grid grid-cols-2 gap-x-3 border-t pt-2 text-xs/)
-  assert.match(card, /openWorkshopVisitsHref\(\[row\.owner\]\)/)
+  // A press on an owner picks him in the card's filter («خلي الضغط عليها
+  // تختار الفلتر حقها»).
+  assert.match(card, /onSelect=\{\(\) => setOwners\(\[row\.owner\]\)\}/)
+  assert.match(card, /aria-pressed=\{selected\}/)
   assert.doesNotMatch(card, /availableEquipmentHref|outOfServiceLongHref|fetchLongOutOfServiceCount/)
   for (const state of [
     'workshop_maintenance',
