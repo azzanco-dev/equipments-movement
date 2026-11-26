@@ -28,7 +28,7 @@ export const STATE_SHADE: Record<FleetStateId, number> = {
 }
 
 /** One chart shade per owner (the tones the owner cards had). */
-const OWNER_SHADE: Record<AdminHomeOwner, number> = {
+export const OWNER_SHADE: Record<AdminHomeOwner, number> = {
   alazani: 1,
   takween: 3,
   third_party_f: 2,

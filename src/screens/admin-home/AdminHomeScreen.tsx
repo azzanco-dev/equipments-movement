@@ -230,10 +230,7 @@ export function AdminHomeScreen({
             canOpenEquipment={canOpenEquipment}
             onSelectEquipment={onSelectEquipment}
           />
-          <WorkshopPurposeCard
-            canOpenLogs={canOpenLogs}
-            canOpenEquipment={canOpenEquipment}
-          />
+          <WorkshopPurposeCard matrix={matrix} canOpenLogs={canOpenLogs} />
         </div>
         <div className={ROW}>
           <AttentionSection

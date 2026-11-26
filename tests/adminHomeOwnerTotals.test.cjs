@@ -233,8 +233,15 @@ test('the workshop block keeps the remaining-states filter and export', () => {
   assert.match(card, /fileName: 'remaining-by-state'/)
   // The links carry the chosen owners.
   assert.match(card, /openWorkshopVisitsHref\(owners\)/)
-  assert.match(card, /availableEquipmentHref\(owners\)/)
-  assert.match(card, /outOfServiceLongHref\(cutoff, owners\)/)
+  // Owner 2026-11-26 («المساحة الي تحت خليها مثل الاسطول, بالملاك تصير»,
+  // then «بدون المالك الاخر»): under the ring the workshop by owner, in two
+  // columns like the fleet card, from the page's snapshot; the long
+  // out-of-service and available lines are gone.
+  assert.match(card, /ownerTotals\(\s*pageMatrix\.data,/)
+  assert.match(card, /row\.owner !== 'external_supplier'/)
+  assert.match(card, /grid grid-cols-2 gap-x-3 border-t pt-2 text-xs/)
+  assert.match(card, /openWorkshopVisitsHref\(\[row\.owner\]\)/)
+  assert.doesNotMatch(card, /availableEquipmentHref|outOfServiceLongHref|fetchLongOutOfServiceCount/)
   for (const state of [
     'workshop_maintenance',
     'workshop_parking',
@@ -243,7 +250,7 @@ test('the workshop block keeps the remaining-states filter and export', () => {
   ])
     assert.match(card, new RegExp(`state: '${state}'`))
   // Owner 2026-10-29: «بالنسبة للارقام الاحصائية خليها counter».
-  assert.match(card, /<CountUp value=\{value\} \/>/)
+  assert.match(card, /<CountUp value=\{count\} \/>/)
   const counter = read('src', 'components', 'admin-home', 'CountUp.tsx')
   assert.match(counter, /prefers-reduced-motion: reduce/)
   assert.match(counter, /<span className="sr-only">\{value\}<\/span>/)
